@@ -949,7 +949,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::{IndexerService, WorkspaceIndex};
+        use crate::{IndexerService, index::WorkspaceIndex};
 
         fn find_entry<'a>(
             entries: &'a [crate::index::FileEntry],
@@ -1129,7 +1129,7 @@ mod tests {
 
         #[test]
         fn extracts_values_from_list_field() {
-            let note = crate::parse_note(
+            let note = crate::test_support::parse_note(
                 "test.md",
                 "---\ntags:\n  - rust\n  - pkm\n---\nBody.",
             );

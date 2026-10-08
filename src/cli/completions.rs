@@ -120,7 +120,7 @@ impl Completions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{TestProject, fixture_service};
+    use crate::test_support::{TestProject, fixture_service};
 
     mod script {
         use super::*;

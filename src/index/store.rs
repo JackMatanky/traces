@@ -1636,7 +1636,10 @@ mod tests {
     use super::{super::IndexError, *};
     #[cfg(unix)]
     use crate::index::tests::fixtures::PermissionsGuard;
-    use crate::{IndexerService, WorkspaceIndex, parse_note as parse};
+    use crate::{
+        IndexerService, index::WorkspaceIndex,
+        test_support::parse_note as parse,
+    };
     mod multimap_paths {
 
         use super::*;

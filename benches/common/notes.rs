@@ -2,8 +2,8 @@
 //!
 //! Use this module when the benchmark needs [`Note`] values or matching
 //! [`FileMeta`] records but not a real directory tree. Every generator returns
-//! notes sorted by path so [`InlinkMap`](traces_pkm::InlinkMap) callers get
-//! deterministic input order.
+//! notes sorted by path so [`InlinkMap`](traces_pkm::testing::InlinkMap)
+//! callers get deterministic input order.
 //!
 //! Do not add filesystem setup here. If a benchmark needs actual files,
 //! attachments, or `index.redb`, use [`super::project`] instead. Keep topology
@@ -21,7 +21,7 @@ use super::content::{
 
 /// Parses a synthetic note at `path` from `content`.
 pub(crate) fn parse_note(path: &Path, content: &str) -> Note {
-    traces_pkm::parse_note(path, content)
+    traces_pkm::testing::parse_note(path, content)
 }
 
 /// Returns sorted [`FileMeta`] note records matching `notes`.
@@ -130,8 +130,9 @@ pub(crate) fn generate_ambiguous_target_link_notes(
 /// Generates parsed notes that link to attachment-looking paths plus matching
 /// [`FileMeta`] records.
 ///
-/// Use this for in-memory [`InlinkMap`](traces_pkm::InlinkMap) benchmarks. It
-/// does not create files on disk; use [`super::project::create_project`] with
+/// Use this for in-memory [`InlinkMap`](traces_pkm::testing::InlinkMap)
+/// benchmarks. It does not create files on disk; use
+/// [`super::project::create_project`] with
 /// [`ProjectShape::AttachmentProject`](super::content::ProjectShape::AttachmentProject)
 /// when a benchmark needs real temporary attachment files.
 pub(crate) fn generate_attachment_link_notes(
@@ -148,11 +149,11 @@ pub(crate) fn generate_attachment_link_notes(
     for i in 0..20 {
         files.push(FileMeta::for_test(
             format!("assets/image-{i}.png"),
-            traces_pkm::FileFormat::Other,
+            traces_pkm::testing::FileFormat::Other,
         ));
         files.push(FileMeta::for_test(
             format!("docs/spec-{i}.pdf"),
-            traces_pkm::FileFormat::Other,
+            traces_pkm::testing::FileFormat::Other,
         ));
     }
     notes.sort_by(|a, b| a.path().cmp(b.path()));

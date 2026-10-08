@@ -52,7 +52,7 @@
 //! # {
 //! use std::sync::Arc;
 //!
-//! use traces_pkm::{
+//! use traces_pkm::testing::{
 //!     IndexerService, QueryBuilder, QueryService, SourceSelector,
 //! };
 //!
@@ -112,7 +112,7 @@ pub(super) mod test_support {
         _temp: &Path,
         files: &[(&str, &str)],
     ) -> QuerySet {
-        let index = crate::build_test_index(files);
+        let index = crate::test_support::build_test_index(files);
         QueryService::new("class")
             .run(&index, QueryBuilder::pages(SourceSelector::All))
     }

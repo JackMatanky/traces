@@ -62,7 +62,7 @@ mod tests {
     use super::*;
 
     mod fixtures {
-        use crate::WorkspaceIndex;
+        use crate::index::WorkspaceIndex;
 
         pub(super) fn record_paths(index: &WorkspaceIndex) -> Vec<String> {
             index
@@ -74,7 +74,7 @@ mod tests {
     }
     use fixtures::*;
 
-    use crate::TestProject;
+    use crate::test_support::TestProject;
 
     mod index {
         use std::{fs, path::Path};

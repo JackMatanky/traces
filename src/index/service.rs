@@ -1199,8 +1199,8 @@ mod tests {
                  non-Unicode path"
             );
             let mut notes = vec![
-                crate::parse_note(&weird, "link to [[normal]]"),
-                crate::parse_note(&normal, "link to [[weird]]"),
+                crate::test_support::parse_note(&weird, "link to [[normal]]"),
+                crate::test_support::parse_note(&normal, "link to [[weird]]"),
             ];
             notes.sort_by(|a, b| a.path().cmp(b.path()));
             let mut links = std::collections::HashMap::new();

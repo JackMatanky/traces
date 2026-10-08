@@ -40,7 +40,8 @@ use criterion::{
     Throughput, criterion_group, criterion_main,
 };
 use traces_pkm::{
-    NoteFieldValue, QueryBuilder, QueryRow, QueryService, SourceSelector,
+    NoteFieldValue,
+    testing::{QueryBuilder, QueryRow, QueryService, SourceSelector},
 };
 
 #[expect(

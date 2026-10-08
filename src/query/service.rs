@@ -39,7 +39,7 @@ use crate::{
 /// # {
 /// use std::sync::Arc;
 ///
-/// use traces_pkm::{
+/// use traces_pkm::testing::{
 ///     IndexerService, QueryBuilder, QueryService, SourceSelector,
 /// };
 ///
@@ -618,7 +618,7 @@ mod tests {
         }
 
         fn build_book_index() -> Arc<WorkspaceIndex> {
-            crate::build_test_index(&[(
+            crate::test_support::build_test_index(&[(
                 "book.md",
                 "---\ntitle: Dune\n---\nGenre:: Sci-fi\n\nShelved as #book.",
             )])

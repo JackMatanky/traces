@@ -6,8 +6,11 @@ use std::{path::Path, sync::Arc};
 
 use pretty_assertions::{assert_eq, assert_ne};
 use traces_pkm::{
-    IndexerService, QueryBuilder, QueryBuilderError, QueryService, SourceLine,
-    SourceSelector, TaskConfig, TestProject,
+    SourceLine,
+    testing::{
+        IndexerService, QueryBuilder, QueryBuilderError, QueryService,
+        SourceSelector, TaskConfig, TestProject,
+    },
 };
 
 /// Checks a page request returns every indexed note without consuming the

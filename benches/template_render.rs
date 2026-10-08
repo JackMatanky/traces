@@ -40,8 +40,11 @@ use criterion::{
 };
 use tempfile::TempDir;
 use traces_pkm::{
-    Config, IndexerService, PresetDialogProvider, TemplatePathInput,
-    TemplateService, TestProject, WriteMode,
+    PresetDialogProvider,
+    testing::{
+        Config, IndexerService, TemplatePathInput, TemplateService,
+        TestProject, WriteMode,
+    },
 };
 
 #[expect(

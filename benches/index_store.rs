@@ -36,7 +36,7 @@ use criterion::{
     Throughput, criterion_group, criterion_main,
 };
 use tempfile::TempDir;
-use traces_pkm::{IndexerService, WorkspaceIndex};
+use traces_pkm::testing::{FileEntry, IndexerService, WorkspaceIndex};
 
 #[expect(
     dead_code,
@@ -346,7 +346,7 @@ fn bench_load_list_heavy(c: &mut Criterion) {
                     let count: usize = index
                         .entries()
                         .iter()
-                        .filter_map(traces_pkm::FileEntry::note)
+                        .filter_map(FileEntry::note)
                         .map(|note| note.lists().len())
                         .sum();
                     black_box(count);

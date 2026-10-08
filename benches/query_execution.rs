@@ -33,7 +33,7 @@ use criterion::{
     AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration,
     Throughput, criterion_group, criterion_main,
 };
-use traces_pkm::{QueryBuilder, QueryService, SourceSelector};
+use traces_pkm::testing::{QueryBuilder, QueryService, SourceSelector};
 
 #[expect(
     dead_code,

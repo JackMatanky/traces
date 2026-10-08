@@ -29,7 +29,7 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use traces_pkm::{QueryBuilder, SourceSelector};
+use traces_pkm::testing::{QueryBuilder, SourceSelector};
 #[expect(
     dead_code,
     reason = "shared benchmark common helpers are compiled into each bench \

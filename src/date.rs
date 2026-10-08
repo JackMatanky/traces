@@ -1747,7 +1747,7 @@ pub enum DateError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TzGuard;
+    use crate::test_support::TzGuard;
 
     fn fixed_datetime() -> DateTimeValue {
         DateTimeValue(

@@ -10,9 +10,11 @@ use std::sync::Arc;
 use chrono::NaiveDate;
 use pretty_assertions::{assert_eq, assert_ne};
 use traces_pkm::{
-    IndexerService, ListItem, ListItemType, QueryBuilder, QueryService,
-    QuerySet, SourceSelector, TaskConfig, TaskDateType, TaskPriority,
-    TaskStatusType, TestProject,
+    ListItem, ListItemType, TaskDateType, TaskPriority, TaskStatusType,
+    testing::{
+        IndexerService, QueryBuilder, QueryService, QuerySet, SourceSelector,
+        TaskConfig, TestProject,
+    },
 };
 
 #[test]

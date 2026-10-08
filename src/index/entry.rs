@@ -54,7 +54,7 @@ impl WorkspaceIndex {
         let mut prepared = Vec::with_capacity(notes.len());
         prepared.extend(notes.iter().map(|(path_str, src)| {
             let p = std::path::Path::new(path_str);
-            let note = crate::parse_note(p, src);
+            let note = crate::test_support::parse_note(p, src);
             let size = u64::try_from(src.len()).unwrap_or(u64::MAX);
             (note, size)
         }));

@@ -1129,7 +1129,7 @@ mod tests {
     };
 
     fn rows_for_files(_temp: &Path, files: &[(&str, &str)]) -> QuerySet {
-        let index = crate::build_test_index(files);
+        let index = crate::test_support::build_test_index(files);
         QueryService::new("class")
             .run(&index, QueryBuilder::pages(SourceSelector::All))
     }
@@ -1226,7 +1226,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::TzGuard;
+        use crate::test_support::TzGuard;
 
         #[rstest]
         #[case::greater_than("rating > 5", &["high"])]
