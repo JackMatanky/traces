@@ -2,13 +2,12 @@
 //! `traces_pkm`'s `test-utils`-gated public surface alone (no process spawning,
 //! no crate-internal imports). See `tests/e2e.rs` for process-boundary coverage
 //! of the same command surface.
+//!
+//! The former blanket `#![allow(clippy::expect_used)]` here was vestigial
+//! (clippy.toml's `allow-expect-in-tests` already covers every test target)
+//! and was removed in ticket 17; `.expect` style still follows the
+//! `tests/common` convention: fixture/setup invariants only.
 #![cfg(feature = "test-utils")]
-#![allow(
-    clippy::expect_used,
-    reason = "this whole binary is test fixture/harness code; a failed \
-              .expect() here means the fixture itself is broken and should \
-              panic the test immediately"
-)]
 #[path = "common/mod.rs"]
 mod common;
 #[path = "integration/index_persistence_roundtrip.rs"]

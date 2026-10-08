@@ -18,7 +18,7 @@ mod trust_and_diagnostics {
     /// of the pair.
     #[test]
     fn list_persists_the_file_index_without_an_explicit_index_command() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("a.md", "# A\n");
 
         let list = sandbox.run(&["list"]);
@@ -56,7 +56,7 @@ mod trust_and_diagnostics {
     /// rendering intact enough to still match as a substring.
     #[test]
     fn unknown_sort_field_reports_a_did_you_mean_suggestion() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("a.md", "# A\n");
 
         let list = sandbox.run(&["list", "--sort", "file.nam"]);
@@ -82,7 +82,7 @@ mod trust_and_diagnostics {
     /// that the typed diagnostic constructs.
     #[test]
     fn invalid_filter_expression_reports_its_location_and_repair() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("a.md", "# A\n");
 
         let list = sandbox.run(&["list", "--where", "not a valid expression"]);
@@ -119,7 +119,7 @@ mod query_commands {
     /// library query type has a stdout/stderr concept to unit-test against.
     #[test]
     fn list_prints_matching_pages_to_stdout_and_a_count_to_stderr() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("books/dune.md", "#book\n");
         sandbox.write_note("books/other.md", "# Other\n");
 
@@ -138,7 +138,7 @@ mod query_commands {
     /// connection.
     #[test]
     fn table_renders_a_markdown_table_with_one_row_per_page() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("dune.md", "---\nrating: 9\n---\n");
 
         let table = sandbox.run(&[
@@ -171,7 +171,7 @@ mod query_commands {
     /// diagnostic survives `task`'s own argv wiring and Miette rendering.
     #[test]
     fn task_invalid_where_reports_its_location_and_repair() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("a.md", "- [ ] x\n");
 
         let task = sandbox.run(&["task", "--where", "task.completed == true"]);
@@ -199,7 +199,7 @@ mod query_commands {
     #[test]
     fn task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers()
      {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note(
             "tasks.md",
             "- [ ] Root task\n- [x] Done plain\n  - [/] In progress\n    - \
@@ -237,7 +237,7 @@ mod query_commands {
     /// verifying output filtering.
     #[test]
     fn task_filter_shortcuts_narrow_output_accurately() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("items.md", ITEMS_MD);
 
         // 1. Shortcut --todo: returns incomplete tasks (Todo, InProgress,
@@ -268,7 +268,7 @@ mod query_commands {
     /// tabular output, count output, and direct note file resolution.
     #[test]
     fn task_renders_tables_outputs_counts_and_resolves_bare_markdown_sources() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note(
             "todo.md",
             "- [ ] Alpha item 📅 2026-10-01 🔺\n- [x] Beta item 📅 2026-10-05 \
@@ -349,7 +349,7 @@ mod query_commands {
     /// a crash or a confusing match against an unrelated source kind.
     #[test]
     fn task_from_nonexistent_markdown_path_matches_nothing_without_erroring() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_note("todo.md", "- [ ] real task\n");
 
         let from_missing = sandbox.run(&["task", "--from", "missing.md"]);
@@ -376,7 +376,7 @@ mod template {
     /// real disk can prove absence; a mock can't.
     #[test]
     fn dry_run_prints_rendered_content_to_stdout_without_writing() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         // Notes live under `notes/`, scoped away from `templates/`:
         // `WorkspaceIndex` indexes every markdown file under the
         // project root, including the template file itself, so an
@@ -411,7 +411,7 @@ mod template {
     /// covered instead.
     #[test]
     fn render_error_reports_a_stable_diagnostic_code() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
         sandbox.write_template(
             "broken.md",
             "line one\n{{ query.from().sort(\"nope.bad\") }}\n",
@@ -460,7 +460,7 @@ mod completions {
     /// script shapes.
     #[test]
     fn zsh_shell_prints_a_completion_script() {
-        let sandbox = Sandbox::trusted();
+        let sandbox = Sandbox::trusted_via_cli();
 
         let completions = sandbox.run(&["completions", "--shell", "zsh"]);
 

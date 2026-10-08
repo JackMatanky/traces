@@ -25,7 +25,7 @@ use traces_pkm::{
 #[test]
 fn reloads_flat_list_items_with_metadata_and_hierarchy() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     let markdown = "\
 - [ ] Root task 📅 2025-06-01 🔺
   - [ ] Subtask
@@ -118,7 +118,7 @@ fn reloads_flat_list_items_with_metadata_and_hierarchy() {
 #[test]
 fn preserves_query_rows_and_list_metadata_across_cold_reload() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     // Note 1: rich task outline with custom markers, priorities, and dates.
     let tasks_md = r"# Tasks
@@ -284,7 +284,7 @@ fn assert_rows_match(loaded: &QuerySet, in_memory: &QuerySet, label: &str) {
 fn refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted()
  {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("a.md", "# A\n");
     project.write_note("b.md", "# B\n");
     let (indexer, built) = project.build_and_persist();

@@ -219,7 +219,7 @@ fn state_store_follows_a_state_dir_override_not_the_default_accessor() {
 /// default table would flip the first assertion).
 #[test]
 fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("open.md", "# open\n");
     sandbox.write_note("secret/hidden.md", "# hidden\n");
 

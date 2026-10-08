@@ -12,7 +12,7 @@ use super::support::Sandbox;
 /// mutation.
 #[test]
 fn untrust_then_list_fails_with_the_untrusted_diagnostic() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     let untrust = sandbox.run(&["untrust"]);
     assert!(untrust.is_success(), "stderr: {}", untrust.stderr);
 

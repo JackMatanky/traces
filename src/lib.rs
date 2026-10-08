@@ -253,6 +253,13 @@ mod test_support {
     /// Default schema values directory relative to project root.
     pub const DEFAULT_SCHEMA_VALUES_DIR: &str = ".traces/schemas/values";
 
+    /// Minimal local config TOML shared by every crate-side fixture that
+    /// writes `.traces/config.toml` directly. Single-sourced here (ticket
+    /// 17); the E2E harness keeps its own copy and imports nothing from the
+    /// crate.
+    pub(crate) const LOCAL_CONFIG_TOML: &str =
+        "[templates]\ndirectory = \"templates\"\n";
+
     /// Encapsulates an isolated workspace fixture directory, configuration,
     /// trust records, and on-disk index persistence for tests.
     ///
@@ -312,11 +319,8 @@ mod test_support {
                 config_path.parent().expect("config parent"),
             )
             .expect("create config parent");
-            std::fs::write(
-                &config_path,
-                "[templates]\ndirectory = \"templates\"\n",
-            )
-            .expect("write config file");
+            std::fs::write(&config_path, LOCAL_CONFIG_TOML)
+                .expect("write config file");
             let service = Self::project_service(&root);
             Self {
                 root,
@@ -356,11 +360,13 @@ mod test_support {
             &self.service
         }
 
-        /// Returns test [`Config`] rooted at this project, with templates
-        /// configured if `templates/` exists.
+        /// Returns test [`Config`] rooted at this project, configuring the
+        /// local `templates/` directory only when that directory exists on
+        /// disk — the directory-existence flip is the accessor's whole
+        /// contract, hence the name.
         #[inline]
         #[must_use]
-        pub fn config(&self) -> Config {
+        pub fn config_with_templates_if_present(&self) -> Config {
             let base = Config::test_default(&self.root);
             if self.root.join(DEFAULT_TEMPLATES_DIR).is_dir() {
                 base.with_templates()
@@ -495,7 +501,7 @@ mod test_support {
         #[inline]
         #[must_use]
         pub fn indexer(&self) -> IndexerService {
-            IndexerService::from(&self.config())
+            IndexerService::from(&self.config_with_templates_if_present())
         }
 
         /// Builds an in-memory index from disk files.
@@ -644,11 +650,8 @@ mod test_support {
         let config_path = root.join(".traces/config.toml");
         std::fs::create_dir_all(config_path.parent().expect("config parent"))
             .expect("create config parent");
-        std::fs::write(
-            &config_path,
-            "[templates]\ndirectory = \"templates\"\n",
-        )
-        .expect("write config file");
+        std::fs::write(&config_path, LOCAL_CONFIG_TOML)
+            .expect("write config file");
         let config =
             LocalConfigFile::<Discovered>::try_new(config_path.clone())
                 .expect("valid local config");
@@ -969,11 +972,18 @@ mod test_support {
             fn config_detects_templates_directory() {
                 let temp = tempfile::tempdir().expect("create temp dir");
                 let project = TestProject::empty(temp.path().join("proj"));
-                assert!(project.config().local_template_dir().is_none());
+                assert!(
+                    project
+                        .config_with_templates_if_present()
+                        .local_template_dir()
+                        .is_none()
+                );
 
                 project.write_template("test.md", "content");
                 assert_eq!(
-                    project.config().local_template_dir(),
+                    project
+                        .config_with_templates_if_present()
+                        .local_template_dir(),
                     Some(project.root().join("templates").as_path())
                 );
             }

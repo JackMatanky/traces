@@ -1034,7 +1034,7 @@ mod tests {
                 .expect("create empty templates dir");
             fs::write(
                 root.join(".traces/config.toml"),
-                "[templates]\ndirectory = \"templates\"\n",
+                crate::test_support::LOCAL_CONFIG_TOML,
             )
             .expect("write config file");
             let config = crate::config::LocalConfigFile::<

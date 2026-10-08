@@ -953,8 +953,6 @@ pub fn traces_pkm::testing::ConfigService::at(std::path::PathBuf, std::path::Pat
 pub fn traces_pkm::testing::ConfigService::untrust(&self, &traces_pkm::testing::TrustRequest) -> core::result::Result<usize, traces_pkm::config::error::ConfigStateError>
 impl core::clone::Clone for traces_pkm::testing::ConfigService
 pub fn traces_pkm::testing::ConfigService::clone(&self) -> Self
-impl core::default::Default for traces_pkm::testing::ConfigService
-pub fn traces_pkm::testing::ConfigService::default() -> Self
 impl core::fmt::Debug for traces_pkm::testing::ConfigService
 pub fn traces_pkm::testing::ConfigService::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for traces_pkm::testing::ConfigService
@@ -1845,7 +1843,7 @@ pub struct traces_pkm::testing::TestProject
 impl traces_pkm::testing::TestProject
 pub fn traces_pkm::testing::TestProject::build_and_persist(&self) -> (traces_pkm::testing::IndexerService, traces_pkm::testing::WorkspaceIndex)
 pub fn traces_pkm::testing::TestProject::build_index(&self) -> traces_pkm::testing::WorkspaceIndex
-pub fn traces_pkm::testing::TestProject::config(&self) -> traces_pkm::testing::Config
+pub fn traces_pkm::testing::TestProject::config_with_templates_if_present(&self) -> traces_pkm::testing::Config
 pub fn traces_pkm::testing::TestProject::empty<P: core::convert::Into<std::path::PathBuf>>(P) -> Self
 pub fn traces_pkm::testing::TestProject::indexer(&self) -> traces_pkm::testing::IndexerService
 pub fn traces_pkm::testing::TestProject::root(&self) -> &std::path::Path

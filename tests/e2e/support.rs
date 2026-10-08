@@ -424,11 +424,13 @@ impl Sandbox {
     }
 
     /// Constructs a trusted [`Sandbox`] by writing configuration and
-    /// dispatching `traces trust`.
+    /// dispatching `traces trust` — the trusted-via-CLI arrangement: the
+    /// child binary itself records the trust, so a broken trust flow fails
+    /// here and not three assertions later.
     ///
     /// Exercises the trust flow as a side effect for fixtures requiring a
     /// trusted root.
-    pub(crate) fn trusted() -> Self {
+    pub(crate) fn trusted_via_cli() -> Self {
         let sandbox = Self::new();
         sandbox.write_config();
         let trust = sandbox.run(&["trust"]);

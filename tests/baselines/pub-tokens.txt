@@ -602,7 +602,7 @@ src/lib.rs: pub const DEFAULT_TEMPLATES_DIR: &str = "templates";
 src/lib.rs: pub fn build_and_persist(&self) -> (IndexerService, WorkspaceIndex) {
 src/lib.rs: pub fn build_index(&self) -> WorkspaceIndex {
 src/lib.rs: pub fn build_test_index(notes: &[(&str, &str)]) -> Arc<WorkspaceIndex> {
-src/lib.rs: pub fn config(&self) -> Config {
+src/lib.rs: pub fn config_with_templates_if_present(&self) -> Config {
 src/lib.rs: pub fn create_trusted_project(
 src/lib.rs: pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
 src/lib.rs: pub fn fixture_service(root: &Path) -> ConfigService {
@@ -640,6 +640,7 @@ src/lib.rs: pub use note::{
 src/lib.rs: pub use position::{PositionError, SourceLine};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
+src/lib.rs: pub(crate) const LOCAL_CONFIG_TOML: &str =
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
 src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;

@@ -3,9 +3,10 @@
 //! `src/cli/tracked.rs`.
 //!
 //! The tracked-config store is populated by `ConfigService::load` (see
-//! `src/cli/tracked.rs`'s module docs), not by `trust`. `Sandbox::trusted()`
-//! only runs `traces trust`, so every test here runs a load-triggering
-//! command (`index`) first to record the local config as a tracked entry.
+//! `src/cli/tracked.rs`'s module docs), not by `trust`.
+//! `Sandbox::trusted_via_cli()` only runs `traces trust`, so every test here
+//! runs a load-triggering command (`index`) first to record the local config as
+//! a tracked entry.
 
 use super::support::Sandbox;
 
@@ -17,7 +18,7 @@ use super::support::Sandbox;
 /// are actually wired to it.
 #[test]
 fn list_prints_every_tracked_config_path() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     let index = sandbox.run(&["index"]);
     assert!(index.is_success(), "stderr: {}", index.stderr);
 
@@ -40,7 +41,7 @@ fn list_prints_every_tracked_config_path() {
 /// `contains('1')` (ticket 16, §14 P2.24).
 #[test]
 fn clean_removes_a_stale_tracked_entry_and_reports_the_count() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     let index = sandbox.run(&["index"]);
     assert!(index.is_success(), "stderr: {}", index.stderr);
     std::fs::remove_file(sandbox.root().join(".traces/config.toml"))
