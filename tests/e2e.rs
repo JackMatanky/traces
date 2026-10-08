@@ -13,6 +13,8 @@ mod dispatch;
 mod golden_path;
 #[path = "e2e/init.rs"]
 mod init;
+#[path = "e2e/process_contract.rs"]
+mod process_contract;
 #[path = "e2e/template_write.rs"]
 mod template_write;
 #[path = "e2e/tracked.rs"]

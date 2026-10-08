@@ -33,8 +33,8 @@ use std::{
     process::{Command, ExitStatus, Output},
 };
 
+use pretty_assertions::{assert_eq, assert_ne};
 use tempfile::TempDir;
-/// Stores the absolute path to the compiled `traces` binary set by Cargo before
 /// integration tests run.
 pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
 
@@ -49,6 +49,46 @@ pub(crate) struct Run {
 impl Run {
     pub(crate) fn is_success(&self) -> bool {
         self.status.success()
+    }
+
+    pub(crate) fn is_failure(&self) -> bool {
+        !self.is_success()
+    }
+
+    pub(crate) fn code(&self) -> Option<i32> {
+        self.status.code()
+    }
+
+    pub(crate) fn assert_code(&self, expected: i32) {
+        assert_eq!(
+            self.code(),
+            Some(expected),
+            "expected exit code {expected}, got {:?}\nstdout: {}\nstderr: {}",
+            self.code(),
+            self.stdout,
+            self.stderr
+        );
+    }
+
+    pub(crate) fn assert_success(&self) {
+        self.assert_code(0);
+    }
+
+    pub(crate) fn assert_never_exit_101(&self) {
+        assert_ne!(
+            self.code(),
+            Some(101),
+            "process panicked with exit code 101!\nstderr: {}",
+            self.stderr
+        );
+    }
+
+    pub(crate) fn assert_stdout_eq(&self, expected: &str) {
+        assert_eq!(self.stdout, expected);
+    }
+
+    pub(crate) fn assert_stderr_eq(&self, expected: &str) {
+        assert_eq!(self.stderr, expected);
     }
 }
 

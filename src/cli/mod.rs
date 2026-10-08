@@ -1461,6 +1461,45 @@ mod tests {
             test_support::TestProject,
         };
 
+        struct InterruptingSelect;
+        impl DialogProvider for InterruptingSelect {
+            fn is_interactive(&self) -> bool {
+                true
+            }
+
+            fn text(
+                &self,
+                _: &str,
+                _: Option<&str>,
+            ) -> Result<String, crate::DialogError> {
+                Ok(String::new())
+            }
+
+            fn confirm(
+                &self,
+                _: &str,
+                _: Option<bool>,
+            ) -> Result<bool, crate::DialogError> {
+                Ok(true)
+            }
+
+            fn select(
+                &self,
+                _: &str,
+                _: &[String],
+            ) -> Result<usize, crate::DialogError> {
+                Err(crate::DialogError::UserInterrupted)
+            }
+
+            fn multi_select(
+                &self,
+                _: &str,
+                _: &[String],
+            ) -> Result<Vec<usize>, crate::DialogError> {
+                Err(crate::DialogError::UserInterrupted)
+            }
+        }
+
         #[test]
         fn no_command_returns_no_command_error() {
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -1495,6 +1534,44 @@ mod tests {
             .run(project.service(), Arc::new(fixtures::CancellingSelect))
             .expect("user abort is not an error");
             assert_eq!(outcome, CommandOutcome::Aborted(UserAbort::Cancelled));
+        }
+
+        /// Verifies that a user interrupt (`Ctrl-C`) during interactive dialog
+        /// input
+        /// maps to `CommandOutcome::Aborted(UserAbort::Interrupted)`.
+        ///
+        /// Chain of custody:
+        /// 1. `DialogProvider` returns `DialogError::UserInterrupted` (e.g.
+        ///    from SIGINT / Ctrl-C).
+        /// 2. `Template::run` wraps prompt errors into
+        ///    `CliError::TemplatePicker { source }`.
+        /// 3. `CliError::user_abort()` maps `DialogError::UserInterrupted` to
+        ///    `UserAbort::Interrupted`.
+        /// 4. `Cli::run` returns
+        ///    `Ok(CommandOutcome::Aborted(UserAbort::Interrupted))`.
+        /// 5. `src/main.rs` matches `Aborted(UserAbort::Interrupted)` and exits
+        ///    with code 130.
+        ///
+        /// Defect class: unwitnessed-contract (mapping link was previously
+        /// untested).
+        #[test]
+        fn user_interrupted_during_template_picker_returns_aborted_interrupted()
+        {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let project = TestProject::trusted(temp.path().join("project"));
+            project.write_template("daily.md", "content");
+            let _guard = CwdGuard::enter(project.root());
+
+            let outcome = Cli {
+                command: None,
+                input: Some(None),
+            }
+            .run(project.service(), Arc::new(InterruptingSelect))
+            .expect("user abort is not an error");
+            assert_eq!(
+                outcome,
+                CommandOutcome::Aborted(UserAbort::Interrupted)
+            );
         }
     }
 
