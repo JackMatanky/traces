@@ -83,6 +83,35 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: mise install --locked cargo-binstall github:nextest-rs/nextest
       - run: mise run test
+      - name: Assert per-target non-empty test counts and exact doctest count
+        run: |
+          echo "==> Asserting per-target non-empty test counts..."
+          lib_count=$(cargo nextest list --all-features -E 'kind(lib)' | grep -c '^traces-pkm ' || true)
+          integration_count=$(cargo nextest list --all-features -E 'binary(integration)' | grep -c '^traces-pkm::integration ' || true)
+          e2e_count=$(cargo nextest list --all-features -E 'binary(e2e)' | grep -c '^traces-pkm::e2e ' || true)
+          echo "Target test counts: lib=${lib_count}, integration=${integration_count}, e2e=${e2e_count}"
+          if [[ "${lib_count}" -eq 0 ]]; then
+            echo "ERROR: lib target produced 0 tests!" >&2
+            exit 1
+          fi
+          if [[ "${integration_count}" -eq 0 ]]; then
+            echo "ERROR: integration target produced 0 tests!" >&2
+            exit 1
+          fi
+          if [[ "${e2e_count}" -eq 0 ]]; then
+            echo "ERROR: e2e target produced 0 tests!" >&2
+            exit 1
+          fi
+          echo "==> Asserting exact doctest count (83)..."
+          doc_output=$(cargo test --doc --all-features 2>&1)
+          echo "${doc_output}"
+          total_passed=$(echo "${doc_output}" | grep -o '[0-9]\+ passed' | awk '{s+=$1} END {print s}')
+          echo "Total doctests passed: ${total_passed}"
+          if [[ "${total_passed}" -ne 83 ]]; then
+            echo "ERROR: Expected exactly 83 doctests passed, got ${total_passed}!" >&2
+            exit 1
+          fi
+          echo "==> Silent-green guards passed."
 
   # -- Repository hygiene & file formats (hk) --
   hygiene:

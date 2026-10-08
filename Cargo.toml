@@ -35,6 +35,23 @@ name = "traces-pkm"
 path = "src/main.rs"
 
 # ------------------------------------------------------------- #
+#                      Integration Tests                        #
+# ------------------------------------------------------------- #
+# Silent-green guard: explicit `cargo test --test integration` without
+# `--features test-utils` hard-errors via Cargo's required-features check.
+#
+# Note on Cargo bare-run behavior:
+# Plain `cargo test` skips targets whose required-features are not enabled
+# (Cargo: "the target will be skipped"). We document this standard behavior
+# rather than pretending to prevent it; the real guard against silently
+# skipped targets lives in CI and the canonical `mise run test` runner, which
+# both assert per-target non-empty test counts (lib, integration, e2e) plus
+# an exact doctest count.
+[[test]]
+name = "integration"
+required-features = ["test-utils"]
+
+# ------------------------------------------------------------- #
 #                          Benchmarks                           #
 # ------------------------------------------------------------- #
 [[bench]]
