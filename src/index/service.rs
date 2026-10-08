@@ -1740,6 +1740,52 @@ mod tests {
             assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
         }
 
+        /// Regression (ticket 04, ruled correct-as-designed): executes the
+        /// Fresh arm of `refresh_with_report` — file metadata unchanged — and
+        /// asserts persisted selector axes are served unchanged when the
+        /// config's `class_field` differs from the one the index was built
+        /// under. Defect class: unwitnessed freshness contract.
+        ///
+        /// Executes-vs-asserts: the seam executes the real metadata
+        /// fingerprint comparison and Fresh-arm assembly; only derived-row
+        /// outcomes are asserted. The E2E staleness recipe (edit config →
+        /// re-trust → query stale rows) is deliberately asserted nowhere —
+        /// it would pin behavior ticket 04 left to the healing contract
+        /// (`traces index`).
+        #[test]
+        fn fresh_refresh_serves_persisted_class_axes_unchanged_when_class_field_config_changes()
+         {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            fs::write(
+                root.join("a.md"),
+                "---\nclass: Book\nkind: Novel\n---\n# A",
+            )
+            .expect("write a");
+            let built = Config::test_default(root.to_path_buf());
+            let builder = IndexerService::from(&built);
+            let index = builder.build().expect("build index");
+            builder.persist(&index).expect("persist index");
+
+            // Act: same untouched files, service under class_field = "kind"
+            let changed = Config::test_default(root.to_path_buf())
+                .with_schemas(SchemasConfig::for_test("kind"));
+            let (_refreshed, report) = IndexerService::from(&changed)
+                .refresh_with_report()
+                .expect("refresh with report");
+
+            // Assert: Fresh arm — zero rows touched, old-field axis intact,
+            // new-field value never derived
+            assert_eq!(report, RefreshReport::default());
+            let store = IndexStore::open(root).expect("open store");
+            let book = store.paths_with_file_class("book").expect("read book");
+            assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
+            let novel =
+                store.paths_with_file_class("novel").expect("read novel");
+            assert_eq!(novel.as_ref(), <&[PathBuf]>::default());
+        }
+
         #[rstest]
         #[case::file_class("fileClass")]
         #[case::file_class_snake("file_class")]
