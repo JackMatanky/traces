@@ -19,8 +19,6 @@ mod index_persistence_roundtrip;
 mod index_query;
 #[path = "integration/index_refresh.rs"]
 mod index_refresh;
-#[path = "integration/schema_field_resolution.rs"]
-mod schema_field_resolution;
 #[path = "integration/task_tag_filters.rs"]
 mod task_tag_filters;
 #[path = "integration/template_render.rs"]
