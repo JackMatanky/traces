@@ -1,6 +1,5 @@
 //! Shared end-to-end test harness: spawns the real `traces` binary against a
-//! fully isolated [`Sandbox`], or (for `init`'s inherently-interactive flow)
-//! drives the crate in-process under a [`CwdGuard`].
+//! fully isolated [`Sandbox`].
 //!
 //! # Isolation
 //!
@@ -29,25 +28,12 @@
 //!   Miette).
 //! - [`plain`] output (used only for short single-bullet messages confirmed to
 //!   wrap at real word boundaries with no glyph inside the reconstructed span).
-//!
-//! # `CwdGuard` and process cwd
-//!
-//! The process current directory is global mutable state shared by every
-//! thread. This crate's own `#[cfg(test)]` unit tests serialize cwd-mutating
-//! tests behind an internal `pub(crate)` mutex (see `src/cli/cwd.rs`), which is
-//! not reachable from this external test binary. [`CwdGuard`] here does
-//! **not** share that lock: within this test binary, `init` and `golden_path`
-//! mutate cwd in-process and `CwdGuard` restores the original directory on drop
-//! without acquiring a cross-thread lock. Concurrency between them is an
-//! accepted harness limitation until they are spawned.
 use std::{
-    env,
     path::Path,
     process::{Command, ExitStatus, Output},
 };
 
 use tempfile::TempDir;
-
 /// Stores the absolute path to the compiled `traces` binary set by Cargo before
 /// integration tests run.
 pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
@@ -217,35 +203,5 @@ impl Sandbox {
             trust.stderr
         );
         sandbox
-    }
-}
-
-/// Enters `path` as the process current directory for the guard's lifetime,
-/// restoring the original directory on drop.
-///
-/// See the module docs' "`CwdGuard` and process cwd" section for this
-/// harness's serialization limitations relative to the crate's own
-/// in-process `#[cfg(test)]` cwd guard.
-pub(crate) struct CwdGuard {
-    original: std::path::PathBuf,
-}
-
-impl CwdGuard {
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "test helper mirroring crate-internal CwdGuard"
-    )]
-    pub(crate) fn enter(path: &Path) -> Self {
-        let original = env::current_dir().expect("read current dir");
-        env::set_current_dir(path).expect("enter temp dir");
-        Self {
-            original,
-        }
-    }
-}
-
-impl Drop for CwdGuard {
-    fn drop(&mut self) {
-        env::set_current_dir(&self.original).expect("restore current dir");
     }
 }

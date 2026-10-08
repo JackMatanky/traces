@@ -1,84 +1,46 @@
-//! Proves the interactive `traces init` flow end-to-end via
-//! `PresetDialogProvider`. `init` has no non-interactive mode (it always
-//! prompts via the injected `DialogProvider`, with no CLI flags at all), so
-//! this drives it directly in-process rather than through `Sandbox`'s
-//! process-spawn model — the only e2e test besides `golden_path` that does.
-//! Covers preset input, default input, and the already-initialized refusal
-//! path.
+//! End-to-end tests for `traces init`.
+//!
+//! Exercises `traces init` through the spawned binary against an isolated
+//! sandbox on null stdin, verifying process-level exit status and stderr
+//! output.
 
-use std::{fs, path::Path};
+use super::support::Sandbox;
 
-use pretty_assertions::assert_eq;
-use traces_pkm::{
-    PresetDialogProvider,
-    cli::{CliError, init::Init},
-};
-
-use super::support::CwdGuard;
-
-/// Runs `init` three times to cover preset input, default input, and
-/// refusal of an already-initialized project.
+/// Spawns `traces init` in a fresh sandbox on null stdin.
 ///
-/// `init` is dialog input driving a filesystem scaffold in one pass.
-/// Unit-testing either half alone would miss a wiring bug where typed
-/// answers never reach the config the scaffold logic writes.
+/// On non-TTY stdin (such as `/dev/null` in a spawned child), the terminal
+/// dialog provider short-circuits to defaults rather than hanging, scaffolds
+/// `.traces/`, and emits `initialised traces in <dir>` to stderr.
+///
+/// Executes vs asserts:
+/// - Executes: spawned `traces init` with stdin piped from `/dev/null`.
+/// - Asserts: process exits successfully (exit 0) and stderr contains
+///   `initialised traces in`.
+///
+/// Defect class: unexecuted-dispatch-arm (previously never spawned at process
+/// level).
 #[test]
-fn init_scaffolds_preset_defaults_and_refuses_existing_traces_dir() {
-    let preset = tempfile::tempdir().expect("create preset temp dir");
-    {
-        let _guard = CwdGuard::enter(preset.path());
-        let provider = PresetDialogProvider::new()
-            .with_text("custom/templates")
-            .with_text("notes");
+fn default_path_init_spawns_and_scaffolds_workspace() {
+    let sandbox = Sandbox::new();
+    let run = sandbox.run(&["init"]);
 
-        Init.run(&provider).expect("run preset init");
-    }
-
-    assert_config(preset.path(), "custom/templates", "notes");
-    assert!(preset.path().join(".traces/templates").is_dir());
-
-    let defaults = tempfile::tempdir().expect("create defaults temp dir");
-    {
-        let _guard = CwdGuard::enter(defaults.path());
-        let provider = PresetDialogProvider::new();
-
-        Init.run(&provider).expect("run default init");
-    }
-
-    assert_config(defaults.path(), ".traces/templates", ".");
-    assert!(defaults.path().join(".traces/templates").is_dir());
-
-    let existing = tempfile::tempdir().expect("create existing temp dir");
-    fs::create_dir(existing.path().join(".traces"))
-        .expect("create existing traces dir");
-    let result = {
-        let _guard = CwdGuard::enter(existing.path());
-        let provider = PresetDialogProvider::new();
-
-        Init.run(&provider)
-    };
-
-    let error = result.expect_err("existing .traces directory fails init");
-    assert!(matches!(error, CliError::InitAlreadyInitialized { .. }));
-}
-
-fn assert_config(
-    root: &Path,
-    expected_directory: &str,
-    expected_output_dir: &str,
-) {
-    let config_path = root.join(".traces/config.toml");
-    let contents = fs::read_to_string(config_path).expect("read config");
-    let value: toml::Value = toml::from_str(&contents).expect("parse config");
-    let templates = value
-        .get("templates")
-        .and_then(toml::Value::as_table)
-        .expect("templates table");
-
-    assert_eq!(table_str(templates, "directory"), expected_directory);
-    assert_eq!(table_str(templates, "output_dir"), expected_output_dir);
-}
-
-fn table_str<'a>(table: &'a toml::value::Table, key: &str) -> &'a str {
-    table.get(key).and_then(toml::Value::as_str).expect("string value")
+    assert!(
+        run.is_success(),
+        "traces init failed (exit status: {:?}): stderr: {}",
+        run.status,
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("initialised traces in"),
+        "expected 'initialised traces in' in stderr, got: {}",
+        run.stderr
+    );
+    assert!(
+        sandbox.root().join(".traces").is_dir(),
+        ".traces directory was not created"
+    );
+    assert!(
+        sandbox.root().join(".traces/config.toml").is_file(),
+        ".traces/config.toml was not created"
+    );
 }

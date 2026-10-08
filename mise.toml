@@ -117,6 +117,7 @@ hk check \
   --skip-step cargo-doc \
   --skip-step cargo-deny
 mise run check:visibility
+mise run check:layers
 '''
 
 [tasks."check:visibility"]
@@ -142,6 +143,45 @@ echo "==> Verifying pub-token declaration snapshot..."
 git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort | diff -u tests/baselines/pub-tokens.txt -
 
 echo "==> Visibility freeze check passed."
+'''
+
+[tasks."check:layers"]
+description = "Verify test layer isolation and boundary discipline"
+extends = "gate:never-skip"
+run = '''
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Verifying layer discipline boundaries..."
+
+if git grep -E 'use traces_pkm::' tests/e2e/ >/dev/null 2>&1; then
+    echo "ERROR: tests/e2e/ must not import from traces_pkm::" >&2
+    git grep -n -E 'use traces_pkm::' tests/e2e/ >&2
+    exit 1
+fi
+
+e2e_process_refs=$(git grep -n -E 'std::process' tests/e2e/ ':!tests/e2e/support.rs' || true)
+if [[ -n "${e2e_process_refs}" ]]; then
+    echo "ERROR: tests/e2e/ must not use std::process outside support.rs" >&2
+    echo "${e2e_process_refs}" >&2
+    exit 1
+fi
+
+int_cmd_refs=$(git grep -n -E 'std::process::Command|CARGO_BIN_EXE' tests/integration/ || true)
+if [[ -n "${int_cmd_refs}" ]]; then
+    echo "ERROR: tests/integration/ must not spawn child processes or reference CARGO_BIN_EXE" >&2
+    echo "${int_cmd_refs}" >&2
+    exit 1
+fi
+
+cwd_refs=$(git grep -n -E 'set_current_dir' tests/ || true)
+if [[ -n "${cwd_refs}" ]]; then
+    echo "ERROR: env::set_current_dir is forbidden in tests/" >&2
+    echo "${cwd_refs}" >&2
+    exit 1
+fi
+
+echo "==> Layer discipline checks passed."
 '''
 
 [tasks.build]

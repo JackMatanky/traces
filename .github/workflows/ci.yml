@@ -70,6 +70,7 @@ jobs:
           shared-key: "visibility-ubuntu"
       - run: mise install --locked cargo-binstall cargo:cargo-public-api
       - run: mise run check:visibility
+      - run: mise run check:layers
 
   # -- Tests --
   test:
