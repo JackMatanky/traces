@@ -7,8 +7,11 @@ use std::sync::Arc;
 use pretty_assertions::{assert_eq, assert_ne};
 use rstest::rstest;
 use traces_pkm::{
-    CommitPolicy, PresetDialogProvider, TemplatePathInput, TemplateService,
-    TestProject, TzGuard, WriteMode, WriteOutcome,
+    PresetDialogProvider,
+    testing::{
+        CommitPolicy, TemplatePathInput, TemplateService, TestProject, TzGuard,
+        WriteMode, WriteOutcome,
+    },
 };
 
 /// Renders a template whose query counts real indexed notes, and checks

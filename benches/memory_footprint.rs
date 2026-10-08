@@ -29,8 +29,8 @@ use std::{alloc::System, hint::black_box, path::Path, time::Duration};
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 use traces_pkm::{
-    IndexerService, MarkdownParserInput, QueryBuilder, QueryService,
-    SourceSelector, parse_markdown,
+    MarkdownParserInput, parse_markdown,
+    testing::{IndexerService, QueryBuilder, QueryService, SourceSelector},
 };
 
 #[expect(

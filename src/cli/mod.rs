@@ -520,7 +520,10 @@ mod tests {
         use std::{fs, path::Path, sync::Arc};
 
         use super::*;
-        use crate::{TestProject, cli::CwdGuard, dialog::PresetDialogProvider};
+        use crate::{
+            cli::CwdGuard, dialog::PresetDialogProvider,
+            test_support::TestProject,
+        };
 
         pub(super) struct CancellingSelect;
         impl DialogProvider for CancellingSelect {
@@ -1092,7 +1095,6 @@ mod tests {
 
         use super::*;
         use crate::{
-            TestProject,
             cli::CwdGuard,
             config::{Config, ConfigService},
             dialog::PresetDialogProvider,
@@ -1103,6 +1105,7 @@ mod tests {
                 TemplateError, TemplatePathInput, TemplateService, WriteMode,
                 WriteOutcome,
             },
+            test_support::TestProject,
         };
 
         /// Writes a trusted project under `root/project` with two Notes
@@ -1454,8 +1457,8 @@ mod tests {
 
         use super::*;
         use crate::{
-            TestProject, cli::CwdGuard, config::ConfigService,
-            dialog::PresetDialogProvider,
+            cli::CwdGuard, config::ConfigService, dialog::PresetDialogProvider,
+            test_support::TestProject,
         };
 
         #[test]
@@ -1500,8 +1503,8 @@ mod tests {
 
         use super::*;
         use crate::{
-            PresetDialogProvider, TestProject, cli::CwdGuard,
-            config::ConfigLoadError,
+            PresetDialogProvider, cli::CwdGuard, config::ConfigLoadError,
+            test_support::TestProject,
         };
 
         #[test]

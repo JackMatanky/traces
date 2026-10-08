@@ -5,7 +5,7 @@
 //! test proving that field inheritance works when called only through
 //! `SchemaService::new` + `get` + `field`.
 
-use traces_pkm::{SchemaService, TestProject};
+use traces_pkm::testing::{SchemaService, TestProject};
 
 #[test]
 fn child_schema_inherits_parent_fields()

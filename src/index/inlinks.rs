@@ -440,7 +440,9 @@ impl Source<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{file::FileFormat, note::LinkType, parse_note as parse};
+    use crate::{
+        file::FileFormat, note::LinkType, test_support::parse_note as parse,
+    };
 
     fn file_for_note(path: &str) -> FileMeta {
         FileMeta::note_for_test(path)

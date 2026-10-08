@@ -306,7 +306,7 @@ mod tests {
     use crate::{
         DateValue, Note, SourceLine, TaskStatusType,
         note::{ListItem, MarkdownParserInput, parse_markdown},
-        parse_note_str as parse,
+        test_support::parse_note_str as parse,
     };
 
     mod dates {

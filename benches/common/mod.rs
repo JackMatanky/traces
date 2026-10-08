@@ -13,8 +13,8 @@
 //!   [`FileMeta`](traces_pkm::FileMeta) collections for in-memory benches. It
 //!   does not create files on disk.
 //! - [`project`] owns [`TempDir`](tempfile::TempDir)-backed project trees and
-//!   [`WorkspaceIndex`](traces_pkm::WorkspaceIndex) builders for scanner,
-//!   persistence, and query benches that need real filesystem state.
+//!   [`WorkspaceIndex`](traces_pkm::testing::WorkspaceIndex) builders for
+//!   scanner, persistence, and query benches that need real filesystem state.
 //!
 //! # Usage rules
 //!
@@ -25,8 +25,8 @@
 //! when persistence itself is the measured operation.
 //!
 //! Use `notes::*` helpers for in-memory benchmarks such as
-//! [`InlinkMap`](traces_pkm::InlinkMap) construction. Those helpers parse
-//! project-relative note paths and never touch the filesystem.
+//! [`InlinkMap`](traces_pkm::testing::InlinkMap) construction. Those helpers
+//! parse project-relative note paths and never touch the filesystem.
 //!
 //! Use identifiers that name the measured unit, not the implementation detail:
 //! `*_FILE_COUNTS`, `*_ITEM_COUNTS`, `*_FIELD_COUNTS`, and `*_note_source`.

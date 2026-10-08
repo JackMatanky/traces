@@ -118,7 +118,7 @@ mod tests {
     }
     use fixtures::*;
 
-    use crate::fixture_service;
+    use crate::test_support::fixture_service;
 
     mod parsing {
         use super::*;

@@ -628,26 +628,18 @@ src/lib.rs: pub fn write_schema_value<P: AsRef<Path>>(
 src/lib.rs: pub fn write_template<P: AsRef<Path>>(
 src/lib.rs: pub fn write_template<P: AsRef<Path>>(
 src/lib.rs: pub mod cli;
+src/lib.rs: pub mod testing {
 src/lib.rs: pub struct TestProject {
 src/lib.rs: pub struct TzGuard {
-src/lib.rs: pub use config::{Config, ConfigService, TaskConfig, TrustRequest};
+src/lib.rs: pub use crate::{
 src/lib.rs: pub use date::{DateError, DateTimeValue, DateValue};
 src/lib.rs: pub use dialog::{
 src/lib.rs: pub use duration::{DurationError, DurationValue};
-src/lib.rs: pub use file::FileFormat;
 src/lib.rs: pub use file::FileMeta;
-src/lib.rs: pub use hash::{Blake3FileHash, Blake3PathHash};
-src/lib.rs: pub use index::{
 src/lib.rs: pub use note::{
-src/lib.rs: pub use path::codec as path_codec;
 src/lib.rs: pub use position::{PositionError, SourceLine};
-src/lib.rs: pub use query::{
-src/lib.rs: pub use schema::{Schema, SchemaFieldDef, SchemaService, SchemaServiceError};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
-src/lib.rs: pub use template::{
-src/lib.rs: pub use test_support::TzGuard;
-src/lib.rs: pub use test_support::{
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
 src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;

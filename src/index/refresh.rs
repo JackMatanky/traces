@@ -554,7 +554,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::parse_note;
+        use crate::test_support::parse_note;
 
         #[test]
         fn returns_all_modified_notes_for_upsert() {

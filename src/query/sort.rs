@@ -483,7 +483,7 @@ mod tests {
     use super::super::*;
 
     fn rows_for_files(_temp: &Path, files: &[(&str, &str)]) -> QuerySet {
-        let index = crate::build_test_index(files);
+        let index = crate::test_support::build_test_index(files);
         QueryService::new("class")
             .run(&index, QueryBuilder::pages(SourceSelector::All))
     }
@@ -959,7 +959,7 @@ mod tests {
 
         #[test]
         fn from_value_ref_maps_tags_to_null() {
-            let tags = [crate::parse_tag("#book")];
+            let tags = [crate::test_support::parse_tag("#book")];
             assert_eq!(
                 SortKey::from_value_ref(QueryFieldValueRef::Tags(&tags)),
                 SortKey::Null

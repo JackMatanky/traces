@@ -39,7 +39,7 @@ pub(crate) enum QueryMode {
 /// ```rust
 /// # #[cfg(feature = "test-utils")]
 /// # {
-/// use traces_pkm::{QueryBuilder, SourceSelector};
+/// use traces_pkm::testing::{QueryBuilder, SourceSelector};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let builder = QueryBuilder::pages(SourceSelector::All)

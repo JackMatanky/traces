@@ -703,7 +703,7 @@ mod tests {
         env.render_str(source, minijinja::context!())
     }
 
-    use crate::write_note;
+    use crate::test_support::write_note;
 
     mod get_value {
         use super::*;
@@ -1660,8 +1660,9 @@ mod tests {
         fn uses_configured_class_field_and_task_statuses_for_template_queries()
         {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let project =
-                crate::TestProject::empty(temp.path().join("project"));
+            let project = crate::test_support::TestProject::empty(
+                temp.path().join("project"),
+            );
             let config_toml = "[templates]\ndirectory = \
                                \"templates\"\n\n[tasks]\ntag_filters = \
                                [\"task\"]\n\n[[tasks.statuses]]\nsymbol = \

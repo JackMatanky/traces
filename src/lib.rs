@@ -47,16 +47,20 @@
 //!   Interactive and preset dialog prompts.
 //! - [`parse_markdown`], [`MarkdownParserInput`]: Note parsing entry points.
 //!
-//! Available with the `test-utils` feature:
+//! Available with the `test-utils` feature under `testing`:
 //!
-//! - `Config`, `ConfigService`, `TrustRequest`: Project configuration and trust
-//!   verification.
-//! - `WorkspaceIndex`, `IndexerService`: Persistent index engine and services.
-//! - `QueryBuilder`, `QuerySet`, `QueryService`: Query planning and execution.
-//! - `Schema`, `SchemaService`: Schema registry and inheritance graph.
-//! - `TemplateService`, `CommitPolicy`, `WriteMode`: Template rendering and
-//!   file writes.
-//! - `Blake3FileHash`, `Blake3PathHash`: BLAKE3 hashing primitives.
+//! - `testing::Config`, `testing::ConfigService`, `testing::TrustRequest`:
+//!   Project configuration and trust verification.
+//! - `testing::WorkspaceIndex`, `testing::IndexerService`: Persistent index
+//!   engine and services.
+//! - `testing::QueryBuilder`, `testing::QuerySet`, `testing::QueryService`:
+//!   Query planning and execution.
+//! - `testing::Schema`, `testing::SchemaService`: Schema registry and
+//!   inheritance graph.
+//! - `testing::TemplateService`, `testing::CommitPolicy`, `testing::WriteMode`:
+//!   Template rendering and file writes.
+//! - `testing::Blake3FileHash`, `testing::Blake3PathHash`: BLAKE3 hashing
+//!   primitives.
 //! # Visibility Probes
 //!
 //! Internal configuration structures remain private to the crate and unnameable
@@ -130,9 +134,6 @@ mod task;
 mod template;
 mod yaml;
 
-#[cfg(any(test, feature = "test-utils"))]
-pub use config::{Config, ConfigService, TaskConfig, TrustRequest};
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
 pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 pub use date::{DateError, DateTimeValue, DateValue};
@@ -147,23 +148,13 @@ pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_HINT};
 pub(crate) use field::{
     FieldKey, FieldKeyRef, FieldName, FieldNameError, FieldNameRef, FieldValue,
 };
-#[cfg(any(test, feature = "test-utils"))]
-pub use file::FileFormat;
 pub use file::FileMeta;
 pub(crate) use file::{BaseName, BaseNameRef, FileName};
 pub(crate) use file_tracker::{
     CleanMode, FilePathTracker, FilePathTrackerError,
 };
-#[cfg(any(test, feature = "test-utils"))]
-pub use hash::{Blake3FileHash, Blake3PathHash};
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) use hash::{Blake3FileHash, Blake3PathHash};
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) use index::IndexerService;
-#[cfg(any(test, feature = "test-utils"))]
-pub use index::{
-    FileEntry, IndexerService, InlinkMap, RefreshReport, WorkspaceIndex,
-};
 pub(crate) use lexer::{
     LexError, SpannedTokenStream, TokenSpec, lexical_unquote,
 };
@@ -172,39 +163,49 @@ pub use note::{
     Heading, ListItem, ListItemType, ListText, MarkdownParserInput, Note,
     NoteFieldValue, NoteFieldValueRef, TaskListItem, parse_markdown,
 };
-#[cfg(any(test, feature = "test-utils"))]
-pub use path::codec as path_codec;
 pub(crate) use position::{BytePos, ByteSpan, LineIndex, Spanned};
 pub use position::{PositionError, SourceLine};
-#[cfg(any(test, feature = "test-utils"))]
-pub use query::{
-    QueryBuilder, QueryBuilderError, QueryResult, QueryRow, QueryService,
-    QuerySet, SourceSelector,
-};
-#[cfg(any(test, feature = "test-utils"))]
-pub use schema::{Schema, SchemaFieldDef, SchemaService, SchemaServiceError};
 pub use tag::{Tag, TagError};
 pub use task::{
     TaskDate, TaskDateSet, TaskDateSetIter, TaskDateType, TaskError,
     TaskPriority, TaskStatus, TaskStatusMap, TaskStatusSymbol, TaskStatusType,
 };
-#[cfg(not(any(test, feature = "test-utils")))]
 #[expect(unused_imports, reason = "crate re-export")]
 pub(crate) use template::TemplateService;
+
 #[cfg(any(test, feature = "test-utils"))]
-pub use template::{
-    CommitPolicy, RenderFailureKind, TemplatePathInput, TemplateService,
-    WriteMode, WriteOutcome,
-};
-#[cfg(any(test, feature = "test-utils"))]
-pub use test_support::TzGuard;
-#[cfg(any(test, feature = "test-utils"))]
-pub use test_support::{
-    DEFAULT_SCHEMA_VALUES_DIR, DEFAULT_SCHEMAS_DIR, DEFAULT_TEMPLATES_DIR,
-    TestProject, build_test_index, create_trusted_project, fixture_service,
-    parse_note, parse_note_str, parse_tag, resolve_safe_path, write_note,
-    write_schema, write_template,
-};
+pub mod testing {
+    //! Test-only exports for integration tests and benchmarks.
+    //!
+    //! The membership of this module is frozen: exactly the 45 identifiers
+    //! required by external test targets under the `test-utils` feature.
+
+    pub use crate::{
+        config::{Config, ConfigService, TaskConfig, TrustRequest},
+        file::FileFormat,
+        hash::{Blake3FileHash, Blake3PathHash},
+        index::{
+            FileEntry, IndexerService, InlinkMap, RefreshReport, WorkspaceIndex,
+        },
+        path::codec as path_codec,
+        query::{
+            QueryBuilder, QueryBuilderError, QueryResult, QueryRow,
+            QueryService, QuerySet, SourceSelector,
+        },
+        schema::{Schema, SchemaFieldDef, SchemaService, SchemaServiceError},
+        template::{
+            CommitPolicy, RenderFailureKind, TemplatePathInput,
+            TemplateService, WriteMode, WriteOutcome,
+        },
+        test_support::{
+            DEFAULT_SCHEMA_VALUES_DIR, DEFAULT_SCHEMAS_DIR,
+            DEFAULT_TEMPLATES_DIR, TestProject, TzGuard, build_test_index,
+            create_trusted_project, fixture_service, parse_note,
+            parse_note_str, parse_tag, resolve_safe_path, write_note,
+            write_schema, write_template,
+        },
+    };
+}
 
 /// Build isolated fixtures for the crate's own `#[cfg(test)]` suites and,
 /// under the `test-utils` feature, for external `tests/`/`benches/`
@@ -238,8 +239,8 @@ mod test_support {
 
     use crate::{
         Config, ConfigService, IndexerService, MarkdownParserInput, Note, Tag,
-        WorkspaceIndex,
         config::{Discovered, LocalConfigFile, TrustRequest},
+        index::WorkspaceIndex,
         parse_markdown,
     };
 
@@ -258,7 +259,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::TestProject;
+    /// # use traces_pkm::testing::TestProject;
     /// let temp = tempfile::tempdir().unwrap();
     /// let project = TestProject::trusted(temp.path().join("project"));
     /// project.write_note("notes/sample.md", "# Sample\n");
@@ -528,7 +529,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::parse_note;
+    /// # use traces_pkm::testing::parse_note;
     /// let note = parse_note("notes/daily.md", "# Today\n\n- [ ] Task");
     /// assert_eq!(note.path().to_str(), Some("notes/daily.md"));
     /// ```
@@ -543,7 +544,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::parse_note_str;
+    /// # use traces_pkm::testing::parse_note_str;
     /// let note = parse_note_str("# Sample\n\nContent");
     /// assert_eq!(note.path().to_str(), Some("note.md"));
     /// ```
@@ -559,7 +560,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::build_test_index;
+    /// # use traces_pkm::testing::build_test_index;
     /// let index = build_test_index(&[("a.md", "# A"), ("b.md", "# B")]);
     /// assert_eq!(index.entries().len(), 2);
     /// ```
@@ -579,7 +580,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::parse_tag;
+    /// # use traces_pkm::testing::parse_tag;
     /// let tag = parse_tag("#projects/active");
     /// assert_eq!(tag.as_str(), "#projects/active");
     /// ```

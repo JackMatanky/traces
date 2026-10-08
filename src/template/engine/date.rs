@@ -1410,7 +1410,7 @@ fn unknown_unit_error(unit: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TzGuard;
+    use crate::test_support::TzGuard;
 
     fn env() -> Environment<'static> {
         // Every date filter reads the local zone through the core parser, so
@@ -2284,7 +2284,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::TzGuard;
+        use crate::test_support::TzGuard;
 
         #[test]
         fn returns_an_integer_day_count_when_neither_input_has_time() {

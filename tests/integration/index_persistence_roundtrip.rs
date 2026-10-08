@@ -9,9 +9,11 @@ use std::sync::Arc;
 use chrono::NaiveDate;
 use pretty_assertions::assert_eq;
 use traces_pkm::{
-    FileEntry, QueryBuilder, QueryService, QuerySet, SourceLine,
-    SourceSelector, TaskDateType, TaskListItem, TaskPriority, TaskStatusType,
-    TestProject,
+    SourceLine, TaskDateType, TaskListItem, TaskPriority, TaskStatusType,
+    testing::{
+        FileEntry, QueryBuilder, QueryService, QuerySet, SourceSelector,
+        TestProject,
+    },
 };
 /// Builds an index, persists it, and reloads it into a fresh `WorkspaceIndex`,
 /// checking records survive intact.
