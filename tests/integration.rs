@@ -9,6 +9,8 @@
               .expect() here means the fixture itself is broken and should \
               panic the test immediately"
 )]
+#[path = "common/mod.rs"]
+mod common;
 #[path = "integration/config_lifecycle.rs"]
 mod config_lifecycle;
 #[path = "integration/index_persistence_roundtrip.rs"]
