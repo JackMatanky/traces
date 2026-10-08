@@ -645,3 +645,78 @@ fn renders_class_expanded_source_selectors_through_the_schema_graph() {
         "descendants, children, exact, unknown-literal, transitive counts"
     );
 }
+
+/// Guards the cross-render freshness constraint named in code on
+/// `INDEX_CACHE_KEY` (`src/template/engine/query.rs`: "A cache field on
+/// `QueryOps` itself would wrongly persist across independent renders on a
+/// reused `Environment`/`TemplateEngine`"): the refreshed index is cached in
+/// render-scoped `State` temp storage, so a second render on the same
+/// service must observe filesystem changes made after the first render.
+///
+/// All other template integration tests are single-render; this is the only
+/// one rendering twice with a mutation in between.
+///
+/// Executes vs asserts:
+/// - Executes: two `render_to_file` calls on one `TemplateService` with a note
+///   written to disk between them.
+/// - Asserts: the first render counts 1 note, the second counts 2 — a
+///   render-lifetime cache field would have served the stale count.
+///
+/// Defect class: stale-cross-render-cache.
+#[test]
+fn index_cache_does_not_persist_across_independent_renders() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let project = TestProject::trusted(temp.path().join("project"));
+    project.write_note("a.md", "# A #fresh\n");
+    // The counted tag is assembled dynamically so the template file (which
+    // is inside the project and indexed too) does not itself match the
+    // selector.
+    project.write_template(
+        "count.md",
+        "{{ query.from(\"#fres\" ~ \"h\") | length }}",
+    );
+
+    let config = project.config();
+    let template_service =
+        TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
+            .expect("valid test schema directory");
+    let input = TemplatePathInput::parse(std::path::Path::new("count"))
+        .expect("valid template input");
+
+    let first = template_service
+        .render_to_file(
+            &input,
+            None,
+            WriteMode::Commit(CommitPolicy::CreateNew),
+        )
+        .expect("first render");
+    let first_path = match first {
+        WriteOutcome::Written(path) => Some(path),
+        WriteOutcome::Previewed(_) => None,
+    }
+    .expect("Commit mode must write");
+    assert_eq!(
+        std::fs::read_to_string(first_path).expect("read first render"),
+        "1"
+    );
+
+    project.write_note("b.md", "# B #fresh\n");
+
+    let second = template_service
+        .render_to_file(
+            &input,
+            Some(std::path::Path::new("second.md")),
+            WriteMode::Commit(CommitPolicy::CreateNew),
+        )
+        .expect("second render");
+    let second_path = match second {
+        WriteOutcome::Written(path) => Some(path),
+        WriteOutcome::Previewed(_) => None,
+    }
+    .expect("Commit mode must write");
+    assert_eq!(
+        std::fs::read_to_string(second_path).expect("read second render"),
+        "2",
+        "the second render must observe the note written after the first"
+    );
+}
