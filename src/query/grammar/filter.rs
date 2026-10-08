@@ -1120,7 +1120,7 @@ fn string_callback(lex: &mut Lexer<'_, FilterToken>) -> NoteFieldValue {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path, sync::Arc};
+    use std::{fs, sync::Arc};
 
     use super::FilterExpr;
     use crate::{
@@ -1128,18 +1128,18 @@ mod tests {
         query::{QueryError, *},
     };
 
-    fn rows_for_files(_temp: &Path, files: &[(&str, &str)]) -> QuerySet {
+    fn rows_for_files(files: &[(&str, &str)]) -> QuerySet {
         let index = crate::test_support::build_test_index(files);
         QueryService::new("class")
             .run(&index, QueryBuilder::pages(SourceSelector::All))
     }
 
-    fn rows_for(temp: &Path, content: &str) -> QuerySet {
-        rows_for_files(temp, &[("note.md", content)])
+    fn rows_for(content: &str) -> QuerySet {
+        rows_for_files(&[("note.md", content)])
     }
 
-    fn rated_rows(temp: &Path) -> QuerySet {
-        rows_for_files(temp, &[
+    fn rated_rows() -> QuerySet {
+        rows_for_files(&[
             ("low.md", "---\nrating: 3\nstatus: draft\n---"),
             ("high.md", "---\nrating: 7\nstatus: done\n---"),
             ("unrated.md", "---\nstatus: done\n---"),
@@ -1163,8 +1163,7 @@ mod tests {
         #[case::unknown_function("unknown(tags, \"#book\")")]
         #[case::function_missing_target("contains(tags)")]
         fn rejects_malformed_expressions(#[case] expr: &str) {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             assert!(matches!(
                 rows.filter(expr),
@@ -1198,8 +1197,7 @@ mod tests {
 
         #[test]
         fn rejects_malformed_field_path_in_expression() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             assert_eq!(
                 rows.filter("file.zzzz == 1"),
@@ -1241,8 +1239,7 @@ mod tests {
             #[case] expr: &str,
             #[case] expected: &[&str],
         ) {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows.filter(expr).expect("valid filter");
 
@@ -1251,8 +1248,7 @@ mod tests {
 
         #[test]
         fn missing_field_never_matches_equality_or_ordering() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows.filter("rating > 0").expect("valid filter");
 
@@ -1261,8 +1257,7 @@ mod tests {
 
         #[test]
         fn missing_field_matches_not_equal() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows.filter("rating != 7").expect("valid filter");
 
@@ -1271,8 +1266,7 @@ mod tests {
 
         #[test]
         fn cross_kind_ordering_follows_canonical_rank() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             // Text (rank 5) is greater than Number 5 (rank 2).
             let filtered =
@@ -1286,8 +1280,7 @@ mod tests {
 
         #[test]
         fn mixed_kind_column_ordering_matches_sort_order() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("num_low.md", "---\nrating: 3\n---"),
                 ("num_high.md", "---\nrating: 7\n---"),
                 ("text.md", "---\nrating: gold\n---"),
@@ -1307,8 +1300,7 @@ mod tests {
 
         #[test]
         fn chains_across_multiple_filter_calls() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows
                 .filter("status == \"done\"")
@@ -1321,8 +1313,7 @@ mod tests {
 
         #[test]
         fn equal_matches_a_date_field_against_a_string_literal() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\ndue: 2026-01-01\n---");
+            let rows = rows_for("---\ndue: 2026-01-01\n---");
 
             let filtered =
                 rows.filter("due == \"2026-01-01\"").expect("valid filter");
@@ -1332,8 +1323,7 @@ mod tests {
 
         #[test]
         fn equal_null_matches_rows_with_a_null_field() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows.filter("rating == null").expect("valid filter");
 
@@ -1342,8 +1332,7 @@ mod tests {
 
         #[test]
         fn not_equal_null_matches_rows_with_a_non_null_field() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows.filter("rating != null").expect("valid filter");
 
@@ -1352,8 +1341,7 @@ mod tests {
 
         #[test]
         fn r_where_alias_filters_records_identically_to_filter() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows.r#where("rating >= 7").expect("valid where");
 
@@ -1362,8 +1350,7 @@ mod tests {
 
         #[test]
         fn evaluates_duration_comparisons_temporally() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\nspent: 1h\n---"),
                 ("b.md", "---\nspent: 30m\n---"),
             ]);
@@ -1374,8 +1361,7 @@ mod tests {
 
         #[test]
         fn matches_duration_equality_across_differing_spellings() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\nspent: 90m\n---"),
                 ("b.md", "---\nspent: 45m\n---"),
             ]);
@@ -1479,8 +1465,7 @@ mod tests {
 
         #[test]
         fn and_combination_keeps_only_records_matching_both_sides() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows
                 .filter("rating > 5 AND status == \"done\"")
@@ -1491,8 +1476,7 @@ mod tests {
 
         #[test]
         fn or_combination_keeps_records_matching_either_side() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows
                 .filter("rating == 3 OR status == \"done\"")
@@ -1503,8 +1487,7 @@ mod tests {
 
         #[test]
         fn not_combination_reverses_the_matching_condition() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered =
                 rows.filter("NOT status == \"done\"").expect("valid filter");
@@ -1514,8 +1497,7 @@ mod tests {
 
         #[test]
         fn default_boolean_precedence_evaluates_correctly() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let filtered = rows
                 .filter(
@@ -1528,8 +1510,7 @@ mod tests {
 
         #[test]
         fn nested_parentheses_override_precedence() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rated_rows(temp.path());
+            let rows = rated_rows();
 
             let nested = rows
                 .filter(
@@ -1542,8 +1523,7 @@ mod tests {
 
         #[test]
         fn logical_op_spellings_do_not_swallow_identifier_prefixes() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\norder: 5\nandrew: 3\n---");
+            let rows = rows_for("---\norder: 5\nandrew: 3\n---");
 
             let lower = rows
                 .clone()
@@ -1584,8 +1564,7 @@ mod tests {
 
         #[test]
         fn contains_matches_tags_by_prefix_hierarchy() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 (
                     "book.md",
                     "---\ntitle: Rust Handbook\n---\nFiled under #book/fiction",
@@ -1604,8 +1583,7 @@ mod tests {
 
         #[test]
         fn contains_matches_string_fields_by_substring() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 (
                     "book.md",
                     "---\ntitle: Rust Handbook\n---\nFiled under #book/fiction",
@@ -1625,8 +1603,7 @@ mod tests {
 
         #[test]
         fn contains_distinguishes_list_values_from_tag_hierarchy() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 (
                     "handbook.md",
                     "---\ncategories: [handbook]\n---\nTagged #bookworm",
@@ -1699,8 +1676,7 @@ mod tests {
 
     #[test]
     fn query_date_arithmetic_matches_calendar_application_and_written_order() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("jan.md", "---\nwhen: 2026-01-31\n---"),
             ("feb.md", "---\nwhen: 2026-02-15\n---"),
         ]);
@@ -1717,8 +1693,7 @@ mod tests {
 
     #[test]
     fn query_temporal_values_support_difference_components_and_scaling() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("jan.md", "---\nwhen: 2026-01-31\n---"),
             ("feb.md", "---\nwhen: 2026-02-15\n---"),
         ]);
@@ -1771,8 +1746,7 @@ mod tests {
     }
     #[test]
     fn query_arithmetic_uses_written_order_and_handles_null_and_wrong_types() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for(temp.path(), "---\nwhen: 2026-01-31\n---");
+        let rows = rows_for("---\nwhen: 2026-01-31\n---");
         for expression in [
             "dur(\"1d\") + dur(\"2d\") * 2 == dur(\"6d\")",
             "dur(\"5d\") - dur(\"2d\") == dur(\"3d\")",
@@ -1820,8 +1794,7 @@ mod tests {
 
     #[test]
     fn query_sow_returns_iso_start_of_week() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1833,8 +1806,7 @@ mod tests {
 
     #[test]
     fn query_eow_returns_iso_end_of_week() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1846,8 +1818,7 @@ mod tests {
 
     #[test]
     fn query_som_returns_first_day_of_month() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1872,8 +1843,7 @@ mod tests {
 
     #[test]
     fn query_eom_returns_last_day_of_month() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1898,8 +1868,7 @@ mod tests {
 
     #[test]
     fn query_soy_returns_first_day_of_year() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1911,8 +1880,7 @@ mod tests {
 
     #[test]
     fn query_eoy_returns_last_day_of_year() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1924,8 +1892,7 @@ mod tests {
 
     #[test]
     fn query_date_function_evaluates_parse_with_format() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);
@@ -1941,8 +1908,7 @@ mod tests {
 
     #[test]
     fn query_date_function_evaluates_iso_literal() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let rows = rows_for_files(temp.path(), &[
+        let rows = rows_for_files(&[
             ("sun.md", "---\nwhen: 2026-02-01\n---"),
             ("wed.md", "---\nwhen: 2026-07-29\n---"),
         ]);

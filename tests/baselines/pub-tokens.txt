@@ -983,8 +983,8 @@ src/query/mod.rs: pub(crate) use grammar::{
 src/query/mod.rs: pub(crate) use sort::{SortDirection, SortOrder};
 src/query/mod.rs: pub(super) fn find_base<'a>(
 src/query/mod.rs: pub(super) fn find_entry<'a>(
-src/query/mod.rs: pub(super) fn rows_for(temp: &Path, content: &str) -> QuerySet {
-src/query/mod.rs: pub(super) fn rows_for_files(
+src/query/mod.rs: pub(super) fn rows_for(content: &str) -> QuerySet {
+src/query/mod.rs: pub(super) fn rows_for_files(files: &[(&str, &str)]) -> QuerySet {
 src/query/mod.rs: pub(super) mod test_support {
 src/query/plan.rs: pub(super) enum QueryTransform {
 src/query/plan.rs: pub(super) fn apply(&self, rows: Vec<QueryRow>) -> Vec<QueryRow> {

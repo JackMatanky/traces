@@ -865,7 +865,7 @@ mod tests {
         fn task_accessors_return_none_for_page_level_records() {
             let temp = tempfile::tempdir().expect("create temp dir");
             fs::write(temp.path().join("a.md"), "body").expect("write file");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
             let row = rows.get(0).expect("row");
 
             assert_eq!(row.task_completed(), None);
@@ -874,8 +874,7 @@ mod tests {
 
         #[test]
         fn inlinks_accessor_returns_the_bundled_inlinks() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("target.md", "# Target"),
                 ("b.md", "[[target]]"),
             ]);
@@ -898,8 +897,7 @@ mod tests {
         fn resolves_file_path_name_folder_and_size() {
             let temp = tempfile::tempdir().expect("create temp dir");
             fs::create_dir_all(temp.path().join("notes")).expect("mkdir");
-            let rows =
-                rows_for_files(temp.path(), &[("notes/todo.md", "body")]);
+            let rows = rows_for_files(&[("notes/todo.md", "body")]);
             let row = rows.get(0).expect("row");
 
             assert_eq!(
@@ -919,8 +917,7 @@ mod tests {
 
         #[test]
         fn resolves_dataview_style_time_accessors_from_file_record() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
             let row = rows.get(0).expect("row");
             let file = row.file();
 
@@ -953,9 +950,7 @@ mod tests {
 
         #[test]
         fn resolves_frontmatter_and_inline_fields_by_key() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows =
-                rows_for(temp.path(), "---\nrating: 5\n---\nStatus:: Draft");
+            let rows = rows_for("---\nrating: 5\n---\nStatus:: Draft");
             let row = rows.get(0).expect("row");
 
             assert_eq!(row.field("rating"), Ok(NoteFieldValue::Number(5.0)));
@@ -967,11 +962,7 @@ mod tests {
 
         #[test]
         fn frontmatter_field_takes_precedence_over_same_key_inline_field() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(
-                temp.path(),
-                "---\nstatus: Approved\n---\nstatus:: Draft",
-            );
+            let rows = rows_for("---\nstatus: Approved\n---\nstatus:: Draft");
             let row = rows.get(0).expect("row");
 
             assert_eq!(
@@ -982,8 +973,7 @@ mod tests {
 
         #[test]
         fn resolves_tags_as_a_list_of_tag_strings() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "Filed under #book #read");
+            let rows = rows_for("Filed under #book #read");
             let row = rows.get(0).expect("row");
 
             assert_eq!(
@@ -1000,8 +990,7 @@ mod tests {
 
         #[test]
         fn resolves_inlinks_as_a_list_of_linking_note_paths() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("target.md", "# Target"),
                 ("a.md", "[[target]]"),
                 ("b.md", "[[target]]"),
@@ -1025,8 +1014,7 @@ mod tests {
 
         #[test]
         fn resolves_inlinks_as_an_empty_list_when_nothing_links_to_the_note() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "No inbound links here.");
+            let rows = rows_for("No inbound links here.");
             let row = rows.get(0).expect("row");
 
             assert_eq!(
@@ -1037,8 +1025,7 @@ mod tests {
 
         #[test]
         fn missing_field_resolves_to_null() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body, no frontmatter");
+            let rows = rows_for("body, no frontmatter");
             let row = rows.get(0).expect("row");
 
             assert_eq!(row.field("no_such_field"), Ok(NoteFieldValue::Null));
@@ -1214,8 +1201,7 @@ rating: note
 
         #[test]
         fn task_fields_resolve_to_null_on_page_level_records() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
             let row = rows.get(0).expect("row");
 
             assert_eq!(row.field("list.completed"), Ok(NoteFieldValue::Null));
@@ -1228,42 +1214,34 @@ rating: note
 
         use super::*;
 
-        fn rows_of_three(temp: &Path) -> QuerySet {
-            rows_for_files(temp, &[
-                ("a.md", "# A"),
-                ("b.md", "# B"),
-                ("c.md", "# C"),
-            ])
+        fn rows_of_three() -> QuerySet {
+            rows_for_files(&[("a.md", "# A"), ("b.md", "# B"), ("c.md", "# C")])
         }
 
         #[test]
         fn keeps_at_most_n_leading_records() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_of_three(temp.path());
+            let rows = rows_of_three();
 
             assert_eq!(rows.limit(2).expect("valid limit").len(), 2);
         }
 
         #[test]
         fn n_at_or_above_length_keeps_every_record() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_of_three(temp.path());
+            let rows = rows_of_three();
 
             assert_eq!(rows.limit(10).expect("valid limit").len(), 3);
         }
 
         #[test]
         fn zero_yields_empty_rows() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_of_three(temp.path());
+            let rows = rows_of_three();
 
             assert!(rows.limit(0).expect("valid limit").is_empty());
         }
 
         #[test]
         fn rejects_a_negative_limit() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_of_three(temp.path());
+            let rows = rows_of_three();
 
             assert_eq!(
                 rows.limit(-1),
@@ -1281,8 +1259,7 @@ rating: note
 
         #[test]
         fn clusters_records_with_equal_values_in_ascending_key_order() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\ncategory: book\n---"),
                 ("b.md", "---\ncategory: article\n---"),
                 ("c.md", "---\ncategory: book\n---"),
@@ -1304,8 +1281,7 @@ rating: note
         #[test]
         fn clusters_semantically_equivalent_durations_despite_differing_spelling()
          {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\nspent: 1h 30m\n---"),
                 ("b.md", "---\nspent: 10m\n---"),
                 ("c.md", "---\nspent: 90m\n---"),
@@ -1328,8 +1304,7 @@ rating: note
 
         #[test]
         fn rejects_malformed_field_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
 
             assert_eq!(
                 rows.group_by("file.zzzz"),
@@ -1347,9 +1322,7 @@ rating: note
 
         #[test]
         fn explodes_a_list_field_into_one_row_per_element() {
-            let temp = tempfile::tempdir().expect("create temp dir");
             let rows = rows_for(
-                temp.path(),
                 "---\ntitle: Multi\nauthors:\n  - Alice\n  - Bob\n---",
             );
 
@@ -1375,8 +1348,7 @@ rating: note
 
         #[test]
         fn empty_list_drops_the_record() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\nauthors: []\n---");
+            let rows = rows_for("---\nauthors: []\n---");
 
             let flattened = rows.flatten("authors").expect("valid flatten");
 
@@ -1385,8 +1357,7 @@ rating: note
 
         #[test]
         fn non_list_field_passes_through_unchanged() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\nrating: 5\n---");
+            let rows = rows_for("---\nrating: 5\n---");
 
             let flattened = rows.flatten("rating").expect("valid flatten");
 
@@ -1399,8 +1370,7 @@ rating: note
 
         #[test]
         fn flattening_tags_yields_one_row_per_tag() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "Filed under #book #read");
+            let rows = rows_for("Filed under #book #read");
 
             let flattened = rows.flatten("tags").expect("valid flatten");
 
@@ -1416,8 +1386,7 @@ rating: note
 
         #[test]
         fn rejects_malformed_field_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
 
             assert_eq!(
                 rows.flatten("file.zzzz"),
@@ -1429,9 +1398,7 @@ rating: note
 
         #[test]
         fn chains_into_a_filter_over_the_flattened_value() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows =
-                rows_for(temp.path(), "---\nauthors:\n  - Alice\n  - Bob\n---");
+            let rows = rows_for("---\nauthors:\n  - Alice\n  - Bob\n---");
 
             let filtered = rows
                 .flatten("authors")
@@ -1448,9 +1415,7 @@ rating: note
 
         #[test]
         fn chains_multiple_flatten_calls_without_overwriting_prior_overrides() {
-            let temp = tempfile::tempdir().expect("create temp dir");
             let rows = rows_for(
-                temp.path(),
                 "---\nauthors:\n  - Alice\n  - Bob\n---\nFiled under #book \
                  #read",
             );
@@ -1499,8 +1464,7 @@ rating: note
 
         #[test]
         fn renders_header_separator_and_one_row_per_record() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\nrating: 5\n---"),
                 ("b.md", "---\nrating: 3\n---"),
             ]);
@@ -1528,8 +1492,7 @@ rating: note
 
         #[test]
         fn escapes_pipe_characters_so_cell_values_cannot_break_table_rows() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\ntitle: \"A | B\"\n---");
+            let rows = rows_for("---\ntitle: \"A | B\"\n---");
 
             let table =
                 rows.table(&["Title"], &["title"]).expect("valid table");
@@ -1549,11 +1512,7 @@ rating: note
 
         #[test]
         fn collapses_newlines_in_cell_values_to_keep_one_row_per_record() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(
-                temp.path(),
-                "---\nnotes: |\n  line one\n  line two\n---",
-            );
+            let rows = rows_for("---\nnotes: |\n  line one\n  line two\n---");
 
             let table =
                 rows.table(&["Notes"], &["notes"]).expect("valid table");
@@ -1565,8 +1524,7 @@ rating: note
 
         #[test]
         fn rejects_malformed_field_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
 
             assert_eq!(
                 rows.table(&["Name"], &["file.zzzz"]),
@@ -1579,8 +1537,7 @@ rating: note
 
         #[test]
         fn rejects_a_headers_columns_length_mismatch() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
 
             assert_eq!(
                 rows.table(&["Name", "Rating"], &["file.name"]),
@@ -1599,8 +1556,7 @@ rating: note
 
         #[test]
         fn renders_one_bullet_per_record() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\nrating: 5\n---"),
                 ("b.md", "---\nrating: 3\n---"),
             ]);
@@ -1622,8 +1578,7 @@ rating: note
 
         #[test]
         fn rejects_malformed_field_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
 
             assert_eq!(
                 rows.list("file.zzzz"),
@@ -1636,8 +1591,7 @@ rating: note
 
         #[test]
         fn renders_a_bool_field_as_true_or_false() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\nactive: true\n---");
+            let rows = rows_for("---\nactive: true\n---");
 
             let list = rows.list("active").expect("valid list");
 
@@ -1646,8 +1600,7 @@ rating: note
 
         #[test]
         fn renders_a_missing_field_as_an_empty_bullet() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body, no frontmatter");
+            let rows = rows_for("body, no frontmatter");
 
             let list = rows.list("no_such_field").expect("valid list");
 
@@ -1656,11 +1609,7 @@ rating: note
 
         #[test]
         fn renders_a_wikilink_field_as_its_target_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(
-                temp.path(),
-                "---\nlink: \"[[Project Alpha|Alpha]]\"\n---",
-            );
+            let rows = rows_for("---\nlink: \"[[Project Alpha|Alpha]]\"\n---");
 
             let list = rows.list("link").expect("valid list");
 
@@ -1669,9 +1618,7 @@ rating: note
 
         #[test]
         fn renders_an_unflattened_list_field_joined_by_comma_space() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows =
-                rows_for(temp.path(), "---\nauthors:\n  - Alice\n  - Bob\n---");
+            let rows = rows_for("---\nauthors:\n  - Alice\n  - Bob\n---");
 
             let list = rows.list("authors").expect("valid list");
 
@@ -1680,11 +1627,7 @@ rating: note
 
         #[test]
         fn renders_an_object_field_as_key_value_pairs_joined_by_comma_space() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(
-                temp.path(),
-                "---\nmeta:\n  city: NYC\n  zip: 10001\n---",
-            );
+            let rows = rows_for("---\nmeta:\n  city: NYC\n  zip: 10001\n---");
 
             let list = rows.list("meta").expect("valid list");
 
@@ -1693,8 +1636,7 @@ rating: note
 
         #[test]
         fn display_format_matches_list_wrapper() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "---\nrating: 5\n---");
+            let rows = rows_for("---\nrating: 5\n---");
 
             let direct = rows
                 .format(&QueryDisplayFormat::list("rating"))
@@ -1761,8 +1703,7 @@ rating: note
 
         #[test]
         fn rejects_page_level_records_with_no_task_fields() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "# Just a Note");
+            let rows = rows_for("# Just a Note");
 
             assert_eq!(
                 rows.task_list(TaskPathStyle::default()),
@@ -1790,24 +1731,21 @@ rating: note
 
         #[test]
         fn len_returns_record_count_for_non_empty_rows() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "# A");
+            let rows = rows_for("# A");
 
             assert_eq!(rows.len(), 1);
         }
 
         #[test]
         fn is_empty_returns_false_for_non_empty_rows() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "# A");
+            let rows = rows_for("# A");
 
             assert!(!rows.is_empty());
         }
 
         #[test]
         fn get_returns_record_or_none() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "# A");
+            let rows = rows_for("# A");
 
             assert!(rows.get(0).is_some());
             assert_eq!(rows.get(1), None);
@@ -1815,8 +1753,7 @@ rating: note
 
         #[test]
         fn iter_and_into_iterator_yield_records() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "# A");
+            let rows = rows_for("# A");
 
             assert_eq!(rows.iter().count(), 1);
 
@@ -1833,8 +1770,7 @@ rating: note
 
         #[test]
         fn chained_filters_match_one_combined_filter_expression() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let base = rows_for_files(temp.path(), &[
+            let base = rows_for_files(&[
                 ("a.md", "---\nrating: 1\n---\n"),
                 ("b.md", "---\nrating: 3\n---\n"),
                 ("c.md", "---\nrating: 5\n---\n"),
@@ -1856,7 +1792,6 @@ rating: note
 
         #[test]
         fn chained_sort_then_limit_matches_full_sort_order_for_tied_keys() {
-            let temp = tempfile::tempdir().expect("create temp dir");
             let files: Vec<(String, String)> = (0..200)
                 .map(|i| {
                     (
@@ -1869,7 +1804,7 @@ rating: note
                 .iter()
                 .map(|(name, content)| (name.as_str(), content.as_str()))
                 .collect();
-            let base = rows_for_files(temp.path(), &file_refs);
+            let base = rows_for_files(&file_refs);
 
             for n in [5_usize, 50, 100] {
                 let chained = base
@@ -1907,8 +1842,7 @@ rating: note
 
         #[test]
         fn branching_from_the_same_base_does_not_cross_contaminate() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let base = rows_for_files(temp.path(), &[
+            let base = rows_for_files(&[
                 ("a.md", "---\nrating: 1\n---\n"),
                 ("b.md", "---\nrating: 5\n---\n"),
                 ("c.md", "---\nrating: 9\n---\n"),
@@ -1951,8 +1885,7 @@ rating: note
 
         #[test]
         fn returns_none_status_symbol_for_page_row() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[("page.md", "# Page")]);
+            let rows = rows_for_files(&[("page.md", "# Page")]);
             let page_row = rows.get(0).expect("page row");
             assert_eq!(page_row.status_symbol(), None);
         }
@@ -1972,8 +1905,7 @@ rating: note
 
         #[test]
         fn returns_zero_depth_for_page_row() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[("page.md", "# Page")]);
+            let rows = rows_for_files(&[("page.md", "# Page")]);
             let page_row = rows.get(0).expect("page row");
             assert_eq!(page_row.depth(), 0);
         }
@@ -1991,8 +1923,7 @@ rating: note
 
         #[test]
         fn returns_none_line_for_page_row() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[("page.md", "# Page")]);
+            let rows = rows_for_files(&[("page.md", "# Page")]);
             let page_row = rows.get(0).expect("page row");
             assert_eq!(page_row.line(), None);
         }
@@ -2015,8 +1946,7 @@ rating: note
 
         #[test]
         fn returns_none_parent_line_for_page_row() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[("page.md", "# Page")]);
+            let rows = rows_for_files(&[("page.md", "# Page")]);
             let page_row = rows.get(0).expect("page row");
             assert_eq!(page_row.parent(), None);
         }
