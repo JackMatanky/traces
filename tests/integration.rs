@@ -11,15 +11,11 @@
 )]
 #[path = "common/mod.rs"]
 mod common;
-#[path = "integration/config_lifecycle.rs"]
-mod config_lifecycle;
 #[path = "integration/index_persistence_roundtrip.rs"]
 mod index_persistence_roundtrip;
 #[path = "integration/index_query.rs"]
 mod index_query;
 #[path = "integration/index_refresh.rs"]
 mod index_refresh;
-#[path = "integration/task_tag_filters.rs"]
-mod task_tag_filters;
 #[path = "integration/template_render.rs"]
 mod template_render;

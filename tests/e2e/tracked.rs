@@ -31,11 +31,13 @@ fn list_prints_every_tracked_config_path() {
 }
 
 /// Deletes a tracked entry's config file to make it stale, then checks
-/// `tracked clean` reports removing exactly one entry.
+/// `tracked clean` reports the removal in its structured message.
 ///
 /// The staleness check runs against a real path on a real filesystem after
 /// a real deletion — a fixture-backed unit test could fake staleness
-/// without proving `clean` actually rechecks disk state.
+/// without proving `clean` actually rechecks disk state. The assertion is
+/// the full structured message (count + noun, singular), not a trivia
+/// `contains('1')` (ticket 16, §14 P2.24).
 #[test]
 fn clean_removes_a_stale_tracked_entry_and_reports_the_count() {
     let sandbox = Sandbox::trusted();
@@ -45,6 +47,6 @@ fn clean_removes_a_stale_tracked_entry_and_reports_the_count() {
         .expect("delete tracked config to make the entry stale");
 
     let clean = sandbox.run(&["tracked", "clean"]);
-    assert!(clean.is_success(), "stderr: {}", clean.stderr);
-    assert!(clean.stderr.contains('1'), "stderr: {}", clean.stderr);
+    clean.assert_success();
+    clean.assert_stderr_eq("removed 1 stale tracked entry\n");
 }

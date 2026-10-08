@@ -7,27 +7,15 @@
 mod trust_and_diagnostics {
     use super::super::support::{Sandbox, plain};
 
-    /// Trusts a project, writes a note, runs `index`, and checks
-    /// that `.traces/index.redb` exists on disk after the process exits.
-    ///
-    /// Verifies the CLI's `index` subcommand wires argv through to persistence
-    /// and leaves the index file present on disk.
-    #[test]
-    fn trust_then_index_persists_the_file_index() {
-        let sandbox = Sandbox::trusted();
-        sandbox.write_note("a.md", "# A\n");
-
-        let index = sandbox.run(&["index"]);
-
-        assert!(index.is_success(), "stderr: {}", index.stderr);
-        assert!(sandbox.root().join(".traces/index.redb").is_file());
-    }
-
     /// Trusts a project, writes a note, and runs `list` with **no** prior
     /// `index` call — then checks that `.traces/index.redb` exists on disk.
     ///
     /// Verifies that the `list` dispatch path invokes persistence on its
     /// initial cold path, leaving the index file present on disk.
+    ///
+    /// Subsumes the deleted `trust_then_index_persists_the_file_index`
+    /// (ticket 16, ledger D12): the no-explicit-index claim is the stronger
+    /// of the pair.
     #[test]
     fn list_persists_the_file_index_without_an_explicit_index_command() {
         let sandbox = Sandbox::trusted();
@@ -114,7 +102,7 @@ mod trust_and_diagnostics {
 }
 
 mod query_commands {
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     use super::super::support::{Sandbox, plain};
 
@@ -174,30 +162,6 @@ mod query_commands {
         );
     }
 
-    /// Runs `task` and checks one checkbox line per task reaches stdout.
-    ///
-    /// Same reasoning as `table` above, for the `task` subcommand's argv
-    /// wiring and rendering.
-    #[test]
-    fn task_prints_a_checkbox_line_per_task() {
-        let sandbox = Sandbox::trusted();
-        sandbox.write_note("todo.md", "- [ ] buy milk\n- [x] walk dog\n");
-
-        let task = sandbox.run(&["task"]);
-
-        assert!(task.is_success(), "stderr: {}", task.stderr);
-        assert!(
-            task.stdout.contains("- [ ] buy milk"),
-            "stdout: {}",
-            task.stdout
-        );
-        assert!(
-            task.stdout.contains("- [x] walk dog"),
-            "stdout: {}",
-            task.stdout
-        );
-    }
-
     /// Passes an invalid `--where` expression on `task` (obsolete
     /// `task.<field>` syntax) and checks the CLI's own diagnostic-rendering
     /// path for the `task` subcommand, not just `list`'s.
@@ -228,14 +192,18 @@ mod query_commands {
     /// Runs `task` across custom status markers, nested outlines, and line
     /// numbers, checking marker characters, indentation, and clickable
     /// coordinates are rendered faithfully.
+    ///
+    /// Collapses the deleted `task_prints_a_checkbox_line_per_task`
+    /// (ticket 16, ledger D5): a plain todo/done checkbox pair is folded
+    /// into this exact-stdout contract.
     #[test]
     fn task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers()
      {
         let sandbox = Sandbox::trusted();
         sandbox.write_note(
             "tasks.md",
-            "- [ ] Root task\n  - [/] In progress\n    - [-] Cancelled\n  - \
-             [!] On hold\n- [?] Unknown marker\n",
+            "- [ ] Root task\n- [x] Done plain\n  - [/] In progress\n    - \
+             [-] Cancelled\n  - [!] On hold\n- [?] Unknown marker\n",
         );
 
         // 1. Plain task output:
@@ -243,6 +211,7 @@ mod query_commands {
         assert!(task.is_success(), "stderr: {}", task.stderr);
         let expected = "\
 - [ ] Root task (tasks.md)
+- [x] Done plain (tasks.md)
   - [/] In progress (tasks.md)
     - [-] Cancelled (tasks.md)
   - [!] On hold (tasks.md)
@@ -255,10 +224,11 @@ mod query_commands {
         assert!(task_lines.is_success(), "stderr: {}", task_lines.stderr);
         let expected_lines = "\
 - [ ] Root task (tasks.md:1)
-  - [/] In progress (tasks.md:2)
-    - [-] Cancelled (tasks.md:3)
-  - [!] On hold (tasks.md:4)
-- [?] Unknown marker (tasks.md:5)
+- [x] Done plain (tasks.md:2)
+  - [/] In progress (tasks.md:3)
+    - [-] Cancelled (tasks.md:4)
+  - [!] On hold (tasks.md:5)
+- [?] Unknown marker (tasks.md:6)
 ";
         assert_eq!(task_lines.stdout, expected_lines);
     }
@@ -292,35 +262,6 @@ mod query_commands {
         assert!(in_progress.stdout.contains("- [/] Alpha in-progress"));
         assert!(!in_progress.stdout.contains("Bravo task"));
         assert!(!in_progress.stdout.contains("Charlie done"));
-    }
-
-    /// Runs `task` with `--sort` and `--asc` / `--desc`, verifying ordered
-    /// output rows.
-    #[test]
-    fn task_sorting_orders_output_with_asc_and_desc() {
-        let sandbox = Sandbox::trusted();
-        sandbox.write_note("items.md", ITEMS_MD);
-
-        let asc = sandbox.run(&["task", "--sort", "list.text", "--asc"]);
-        assert!(asc.is_success(), "stderr: {}", asc.stderr);
-        let mut asc_lines = asc.stdout.lines();
-        assert!(
-            asc_lines.next().is_some_and(|l| l.contains("Alpha in-progress"))
-        );
-        assert!(asc_lines.next().is_some_and(|l| l.contains("Bravo task")));
-        assert!(asc_lines.next().is_some_and(|l| l.contains("Charlie done")));
-        assert!(asc_lines.next().is_some_and(|l| l.contains("Delta on-hold")));
-
-        let desc = sandbox.run(&["task", "--sort", "list.text", "--desc"]);
-        assert!(desc.is_success(), "stderr: {}", desc.stderr);
-        let mut desc_lines = desc.stdout.lines();
-        assert!(desc_lines.next().is_some_and(|l| l.contains("Delta on-hold")));
-        assert!(desc_lines.next().is_some_and(|l| l.contains("Charlie done")));
-        assert!(desc_lines.next().is_some_and(|l| l.contains("Bravo task")));
-        assert!(
-            desc_lines.next().is_some_and(|l| l.contains("Alpha in-progress"))
-        );
-        assert_ne!(asc.stdout, desc.stdout);
     }
 
     /// Runs `task` with `--table`, `--count`, and `--from <file.md>`, proving
@@ -421,35 +362,6 @@ mod query_commands {
             from_missing.stderr
         );
     }
-
-    /// Passes an invalid `--column` field path to `task --table` and checks
-    /// the CLI's diagnostic-rendering path for `--table`'s own field
-    /// resolution, not just `--where`'s.
-    ///
-    /// `TaskTableArgs::format` (`src/cli/task.rs`) resolves every `--column`
-    /// through the identical `FieldPath::parse` used by `--where`/`--sort`;
-    /// this proves that shared validation survives `--table`'s own argv
-    /// wiring and Miette rendering.
-    #[test]
-    fn task_table_invalid_column_reports_its_location_and_repair() {
-        let sandbox = Sandbox::trusted();
-        sandbox.write_note("a.md", "- [ ] x\n");
-
-        let table =
-            sandbox.run(&["task", "--table", "--column", "task.completed"]);
-
-        assert!(!table.is_success());
-        assert!(
-            table.stderr.contains("traces::cli::query::failed"),
-            "stderr: {}",
-            table.stderr
-        );
-        assert!(
-            plain(&table.stderr).contains("did you mean `list.completed`?"),
-            "stderr: {}",
-            table.stderr
-        );
-    }
 }
 
 mod template {
@@ -540,27 +452,12 @@ mod template {
 mod completions {
     use super::super::support::Sandbox;
 
-    /// Checks `completions --shell bash` prints the `_traces()` function
+    /// Checks `completions --shell zsh` prints the `#compdef traces`
     /// marker to stdout.
     ///
-    /// Completion scripts exist to be read by a real shell from real
-    /// stdout; there's no lower-level abstraction to unit-test.
-    #[test]
-    fn bash_shell_prints_a_completion_script() {
-        let sandbox = Sandbox::trusted();
-
-        let completions = sandbox.run(&["completions", "--shell", "bash"]);
-
-        assert!(completions.is_success(), "stderr: {}", completions.stderr);
-        assert!(
-            completions.stdout.contains("_traces()"),
-            "stdout: {}",
-            completions.stdout
-        );
-    }
-
-    /// Same as the bash completions test above, for zsh's `#compdef
-    /// traces` marker.
+    /// Sole E2E representative per the ticket 16 ledger (D9): the bash and
+    /// fish twins are deleted; in-crate shell marker units own the per-shell
+    /// script shapes.
     #[test]
     fn zsh_shell_prints_a_completion_script() {
         let sandbox = Sandbox::trusted();
@@ -570,22 +467,6 @@ mod completions {
         assert!(completions.is_success(), "stderr: {}", completions.stderr);
         assert!(
             completions.stdout.contains("#compdef traces"),
-            "stdout: {}",
-            completions.stdout
-        );
-    }
-
-    /// Same as the bash completions test above, for fish's `complete -c
-    /// traces` marker.
-    #[test]
-    fn fish_shell_prints_a_completion_script() {
-        let sandbox = Sandbox::trusted();
-
-        let completions = sandbox.run(&["completions", "--shell", "fish"]);
-
-        assert!(completions.is_success(), "stderr: {}", completions.stderr);
-        assert!(
-            completions.stdout.contains("complete -c traces"),
             "stdout: {}",
             completions.stdout
         );

@@ -3,6 +3,10 @@
 //! covers redb persistence invariance without the `LISTS` table (ADR 0005) and
 //! recovery from a corrupted `.traces/index.redb` file, both through the public
 //! `IndexerService` surface alone.
+//!
+//! The deleted `persist_then_load_recovers_the_same_file_count_and_paths`
+//! (ticket 16, ledger D2) is subsumed by the in-crate persistence roundtrip
+//! units; the unique re-query-after-source-deletion contract stays here.
 
 use std::sync::Arc;
 
@@ -15,34 +19,6 @@ use traces_pkm::{
         TestProject,
     },
 };
-/// Builds an index, persists it, and reloads it into a fresh `WorkspaceIndex`,
-/// checking records survive intact.
-///
-/// Proves that `build`/`persist`/`load` survive intact when called through
-/// the public `IndexerService` signatures.
-#[test]
-fn persist_then_load_recovers_the_same_file_count_and_paths() {
-    let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
-    project.write_note("a.md", "# A\n");
-    project.write_note("b.md", "# B\n");
-    let (indexer, built) = project.build_and_persist();
-
-    let loaded = indexer.load().expect("load persisted index");
-
-    assert_eq!(loaded.entries().len(), built.entries().len());
-    let mut loaded_paths: Vec<_> = loaded
-        .entries()
-        .iter()
-        .map(|entry| entry.file().path().to_path_buf())
-        .collect();
-    loaded_paths.sort();
-    assert_eq!(loaded_paths, vec![
-        std::path::PathBuf::from("a.md"),
-        std::path::PathBuf::from("b.md"),
-    ]);
-}
-
 /// Proves list items with tasks persist inside `Note` in the `NOTES` table and
 /// reload with full metadata and hierarchy through a fresh service instance,
 /// simulating a new process.

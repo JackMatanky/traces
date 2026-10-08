@@ -478,18 +478,16 @@ impl TextShape {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use super::super::*;
 
-    fn rows_for_files(_temp: &Path, files: &[(&str, &str)]) -> QuerySet {
+    fn rows_for_files(files: &[(&str, &str)]) -> QuerySet {
         let index = crate::test_support::build_test_index(files);
         QueryService::new("class")
             .run(&index, QueryBuilder::pages(SourceSelector::All))
     }
 
-    fn rows_for(temp: &Path, content: &str) -> QuerySet {
-        rows_for_files(temp, &[("note.md", content)])
+    fn rows_for(content: &str) -> QuerySet {
+        rows_for_files(&[("note.md", content)])
     }
 
     fn names(rows: &QuerySet) -> Vec<String> {
@@ -503,8 +501,7 @@ mod tests {
 
         #[test]
         fn orders_ascending_by_default() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("b.md", "---\nrating: 7\n---"),
                 ("a.md", "---\nrating: 3\n---"),
             ]);
@@ -516,8 +513,7 @@ mod tests {
 
         #[test]
         fn orders_descending_when_requested() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("b.md", "---\nrating: 7\n---"),
                 ("a.md", "---\nrating: 3\n---"),
             ]);
@@ -529,8 +525,7 @@ mod tests {
 
         #[test]
         fn missing_field_sorts_as_the_minimum_value() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("rated.md", "---\nrating: 3\n---"),
                 ("unrated.md", "no frontmatter"),
             ]);
@@ -547,8 +542,7 @@ mod tests {
 
         #[test]
         fn ties_keep_original_relative_order() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("a.md", "---\nrating: 5\n---"),
                 ("b.md", "---\nrating: 5\n---"),
             ]);
@@ -560,8 +554,7 @@ mod tests {
 
         #[test]
         fn rejects_malformed_field_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for(temp.path(), "body");
+            let rows = rows_for("body");
 
             assert_eq!(
                 rows.sort("file.zzzz", false),
@@ -573,8 +566,7 @@ mod tests {
 
         #[test]
         fn sorts_boolean_field_false_before_true() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("true.md", "---\nactive: true\n---"),
                 ("false.md", "---\nactive: false\n---"),
             ]);
@@ -586,8 +578,7 @@ mod tests {
 
         #[test]
         fn sorts_null_field_alongside_boolean_field() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let rows = rows_for_files(temp.path(), &[
+            let rows = rows_for_files(&[
                 ("true.md", "---\nactive: true\n---"),
                 ("none.md", "no frontmatter"),
             ]);

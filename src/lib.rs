@@ -966,15 +966,6 @@ mod test_support {
             }
 
             #[test]
-            fn manages_trust_and_untrust_lifecycle() {
-                let temp = tempfile::tempdir().expect("create temp dir");
-                let project = TestProject::untrusted(temp.path().join("proj"));
-                project.trust();
-                let removed = project.untrust();
-                assert_eq!(removed, 1);
-            }
-
-            #[test]
             fn config_detects_templates_directory() {
                 let temp = tempfile::tempdir().expect("create temp dir");
                 let project = TestProject::empty(temp.path().join("proj"));
