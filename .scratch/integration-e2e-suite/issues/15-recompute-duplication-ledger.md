@@ -108,5 +108,11 @@ The maintainer signs off on this ledger before ticket 16 executes. Ticket 16
 may prune only rows marked **Delete** above; **Keep/Collapse** rows are
 refactors at most.
 
+**Sign-off (2026-10-09):** maintainer approved the ledger as written. Ticket
+16 is mandated to delete exactly the 9 proposed tests plus the empty
+`config_lifecycle.rs` file (D1, D2, D5-collapse, D6, D7, D9, D10, D12-
+partial), each with its ledger-named survivor in place. Keep/Collapse rows:
+refactors only, no deletions.
+
 **Evidence:** audit §9 (duplication table D1–D12), §14 P2 (recompute note); spec §Consolidation.
 **Defect class:** consolidation-masking-gap (the failure mode this gate prevents).
