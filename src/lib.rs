@@ -623,9 +623,10 @@ mod test_support {
         ConfigService::at(root.join("tracked-store"), root.join("trust-store"))
     }
 
-    /// Writes a minimal local config at `root/.traces/config.toml` pointing at
-    /// `root/templates` (creating that directory), and records `root` as
-    /// trusted in `service`'s trust store.
+    /// Writes a minimal local config at `root/.traces/config.toml` configuring
+    /// `templates` as the template directory name, and records `root` as
+    /// trusted in `service`'s trust store. Note: does not create the template
+    /// directory on disk.
     ///
     /// # Panics
     ///

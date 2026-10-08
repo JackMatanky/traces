@@ -34,19 +34,12 @@
 //!
 //! The process current directory is global mutable state shared by every
 //! thread. This crate's own `#[cfg(test)]` unit tests serialize cwd-mutating
-//! tests behind an internal `pub(crate)` mutex (see `src/cwd.rs`), which is
+//! tests behind an internal `pub(crate)` mutex (see `src/cli/cwd.rs`), which is
 //! not reachable from this external test binary. [`CwdGuard`] here does
-//! **not** share that lock: cwd-mutating e2e tests (`init`, `golden_path`)
-//! must not run concurrently with each other or with in-crate cwd-guarded
-//! tests. This is acceptable because `cargo test` runs each integration test
-//! *binary* single-threaded relative to other binaries by default is false in
-//! general, but within this one binary `init` and `golden_path` are the only
-//! two cwd-mutating tests and `cargo test`'s default per-binary test
-//! parallelism still runs them concurrently with each other unless scoped;
-//! both tests hold the guard for their entire cwd-dependent section, so a
-//! second guard's `enter` simply blocks nothing — there is no lock — meaning
-//! true concurrent cwd mutation between them is a known, accepted limitation
-//! of this lightweight harness, not a guarantee.
+//! **not** share that lock: within this test binary, `init` and `golden_path`
+//! mutate cwd in-process and `CwdGuard` restores the original directory on drop
+//! without acquiring a cross-thread lock. Concurrency between them is an
+//! accepted harness limitation until they are spawned.
 use std::{
     env,
     path::Path,
