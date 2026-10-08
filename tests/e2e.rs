@@ -7,6 +7,8 @@ mod common;
 #[path = "e2e/support.rs"]
 mod support;
 
+#[path = "e2e/config_capability.rs"]
+mod config_capability;
 #[path = "e2e/dispatch.rs"]
 mod dispatch;
 #[path = "e2e/env_policy.rs"]
