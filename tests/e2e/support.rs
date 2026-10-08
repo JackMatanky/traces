@@ -46,8 +46,11 @@
 //!   wrap at real word boundaries with no glyph inside the reconstructed span).
 use std::{
     ffi::{OsStr, OsString},
+    io::Read,
     path::Path,
-    process::{Command, ExitStatus, Output},
+    process::{Command, ExitStatus, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use pretty_assertions::{assert_eq, assert_ne};
@@ -367,6 +370,57 @@ impl Sandbox {
             stdout: String::from_utf8_lossy(&stdout).into_owned(),
             stderr: String::from_utf8_lossy(&stderr).into_owned(),
         }
+    }
+
+    /// Executes `args` with stdin detached, bounded by a std-only watchdog:
+    /// if the child outlives `timeout` it is killed and `None` is returned,
+    /// so an interactive hang can never wedge the suite.
+    ///
+    /// `Command::output` cannot bound a hang; this poll loop (`try_wait` +
+    /// timed kill) needs no dependency and no ticket-18 runner timeout. The
+    /// child's output is small (far below the OS pipe buffer), so reading it
+    /// after exit cannot deadlock the poll.
+    pub(crate) fn run_with_watchdog(
+        &self,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Option<Run> {
+        let mut child = self
+            .command(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn traces");
+        let started = Instant::now();
+        let status = loop {
+            if let Some(status) = child.try_wait().expect("poll child status") {
+                break status;
+            }
+            if started.elapsed() >= timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "not async code; the watchdog bounds a spawned child \
+                          on a std-only poll loop, and a dependency like \
+                          wait-timeout is out of scope for this ticket"
+            )]
+            thread::sleep(Duration::from_millis(50));
+        };
+        let mut stdout_pipe = child.stdout.take().expect("piped stdout");
+        let mut stderr_pipe = child.stderr.take().expect("piped stderr");
+        let mut stdout = String::new();
+        let mut stderr = String::new();
+        stdout_pipe.read_to_string(&mut stdout).expect("read child stdout");
+        stderr_pipe.read_to_string(&mut stderr).expect("read child stderr");
+        Some(Run {
+            status,
+            stdout,
+            stderr,
+        })
     }
 
     /// Constructs a trusted [`Sandbox`] by writing configuration and
