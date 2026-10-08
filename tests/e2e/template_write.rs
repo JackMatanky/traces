@@ -14,7 +14,7 @@ use super::support::Sandbox;
 /// mutating path the CLI has.
 #[test]
 fn writes_the_rendered_file_to_the_default_output_path() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_template("daily.md", "# {{ \"Today\" }}\n");
 
     let template = sandbox.run(&["template", "-i", "daily", "--no-input"]);
@@ -45,7 +45,7 @@ fn writes_the_rendered_file_to_the_default_output_path() {
 /// Defect class: destructive-overwrite.
 #[test]
 fn overwrite_refusal_is_non_destructive_and_force_and_output_paths_spawn() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_template("daily.md", "new content\n");
     std::fs::write(sandbox.root().join("daily.md"), "old content\n")
         .expect("seed existing output");
@@ -109,7 +109,7 @@ fn overwrite_refusal_is_non_destructive_and_force_and_output_paths_spawn() {
 /// Defect class: nondeterministic-TTY.
 #[test]
 fn non_tty_dialog_short_circuits_to_defaults_without_hanging() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_template(
         "daily.md",
         "{{ ui.text_input(\"name\", \"anon\") }}\n",
@@ -145,7 +145,7 @@ fn non_tty_dialog_short_circuits_to_defaults_without_hanging() {
 /// Defect class: untested-feedback-loop.
 #[test]
 fn rendered_output_reenters_the_index() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     // The tag is assembled dynamically so the template file itself does not
     // carry the literal `#fromtemplate` tag (it is inside the project and
     // indexed too); only the rendered output does.
@@ -164,7 +164,7 @@ fn rendered_output_reenters_the_index() {
 }
 #[test]
 fn renders_file_sourced_select_field_in_e2e_template() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
 
     // Write values file DTO
     sandbox.write_schema_value(

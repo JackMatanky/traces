@@ -18,7 +18,7 @@ use traces_pkm::{
 #[test]
 fn page_query_returns_real_indexed_notes() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("a.md", "---\nrating: 3\n---\n");
     project.write_note("b.md", "---\nrating: 9\n---\n");
     project.write_note("c.md", "---\nrating: 5\n---\n");
@@ -46,7 +46,7 @@ fn page_query_returns_real_indexed_notes() {
 #[test]
 fn sorts_pages_by_a_typed_date_frontmatter_field() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("late.md", "---\ndue: 2026-07-29T14:30:00Z\n---\n");
     project.write_note("early.md", "---\ndue: 2026-01-01\n---\n");
     project.write_note("none.md", "no frontmatter");
@@ -73,7 +73,7 @@ fn sorts_pages_by_a_typed_date_frontmatter_field() {
 #[test]
 fn sorts_tasks_by_priority_severity_rank_with_nulls_first() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("p1.md", "- [ ] high task ⏫\n");
     project.write_note("p2.md", "- [ ] low task 🔽\n");
     project.write_note("p3.md", "- [ ] highest task 🔺\n");
@@ -122,7 +122,7 @@ fn sorts_tasks_by_priority_severity_rank_with_nulls_first() {
 #[test]
 fn query_tasks_returns_task_level_rows_distinct_from_page_level_query() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("todo.md", "- [ ] one\n- [x] two\n");
     let index = Arc::new(project.build_index());
     let tasks = QueryService::new("class")
@@ -145,7 +145,7 @@ fn query_tasks_returns_task_level_rows_distinct_from_page_level_query() {
 #[test]
 fn query_builder_reuses_one_index_for_page_and_task_queries() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note(
         "book.md",
         "---\nrating: 9\n---\n#book [[todo]]\n- [ ] read chapter\n",
@@ -175,7 +175,7 @@ fn query_builder_reuses_one_index_for_page_and_task_queries() {
 fn evaluates_query_modes_distinguishing_lists_and_tasks_with_structural_metadata()
  {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     let markdown = r"# Planning
 
@@ -187,7 +187,9 @@ fn evaluates_query_modes_distinguishing_lists_and_tasks_with_structural_metadata
 ";
     project.write_note("planning.md", markdown);
 
-    let config = project.config().with_tasks(TaskConfig::from_tags(&["#task"]));
+    let config = project
+        .config_with_templates_if_present()
+        .with_tasks(TaskConfig::from_tags(&["#task"]));
     let index =
         Arc::new(IndexerService::from(&config).build().expect("build index"));
     let service = QueryService::new("class");
@@ -251,7 +253,7 @@ fn evaluates_query_modes_distinguishing_lists_and_tasks_with_structural_metadata
 fn accepts_canonical_list_paths_and_rejects_obsolete_task_paths_with_diagnostic()
  {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     let markdown = r"# Work
 
@@ -261,7 +263,9 @@ fn accepts_canonical_list_paths_and_rejects_obsolete_task_paths_with_diagnostic(
 ";
     project.write_note("work.md", markdown);
 
-    let config = project.config().with_tasks(TaskConfig::from_tags(&["#task"]));
+    let config = project
+        .config_with_templates_if_present()
+        .with_tasks(TaskConfig::from_tags(&["#task"]));
     let index =
         Arc::new(IndexerService::from(&config).build().expect("build index"));
     let service = QueryService::new("class");
@@ -305,7 +309,7 @@ fn accepts_canonical_list_paths_and_rejects_obsolete_task_paths_with_diagnostic(
 #[test]
 fn inherits_note_frontmatter_on_list_rows_with_inline_field_override() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     let markdown = r"---
 category: project
 priority: normal
@@ -318,7 +322,9 @@ priority: normal
 ";
     project.write_note("planning.md", markdown);
 
-    let config = project.config().with_tasks(TaskConfig::from_tags(&["#task"]));
+    let config = project
+        .config_with_templates_if_present()
+        .with_tasks(TaskConfig::from_tags(&["#task"]));
     let index =
         Arc::new(IndexerService::from(&config).build().expect("build index"));
     let service = QueryService::new("class");
@@ -359,7 +365,7 @@ priority: normal
 #[test]
 fn sort_then_limit_returns_top_k_rows() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     for i in 0..10 {
         project.write_note(
             format!("note{i}.md"),
@@ -388,7 +394,7 @@ fn sort_then_limit_returns_top_k_rows() {
 #[test]
 fn sorting_an_empty_query_set_returns_empty() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("a.md", "---\nrating: 5\n---\n");
     let index = Arc::new(project.build_index());
     let query = QueryBuilder::pages(SourceSelector::All)
@@ -405,7 +411,7 @@ fn sorting_an_empty_query_set_returns_empty() {
 #[test]
 fn sorts_pages_descending_by_text_field() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("alpha.md", "---\nclass: Alpha\n---\n");
     project.write_note("beta.md", "---\nclass: Beta\n---\n");
     project.write_note("gamma.md", "---\nclass: Gamma\n---\n");
@@ -428,7 +434,7 @@ fn sorts_pages_descending_by_text_field() {
 #[test]
 fn filters_pages_using_temporal_arithmetic_and_duration_scaling() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("note_a.md", "---\ndue: 2026-07-29\n---\n");
     project.write_note("note_b.md", "---\ndue: 2026-08-15\n---\n");
     let index = Arc::new(project.build_index());
@@ -479,7 +485,7 @@ fn filters_pages_using_temporal_arithmetic_and_duration_scaling() {
 #[test]
 fn filters_pages_using_temporal_registry_functions() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("note_a.md", "---\ndue: 2026-07-29\n---\n");
     project.write_note("note_b.md", "---\ndue: 2026-08-15\n---\n");
     let index = Arc::new(project.build_index());
@@ -538,7 +544,7 @@ fn filters_pages_using_temporal_registry_functions() {
 #[test]
 fn filters_pages_using_temporal_bucketing_helpers() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("note_a.md", "---\ndue: 2026-07-29\n---\n");
     let index = Arc::new(project.build_index());
     let service = QueryService::new("class");
@@ -581,7 +587,7 @@ fn filters_pages_reject_static_invalid_temporal_arguments() {
 #[test]
 fn filters_pages_handle_null_and_missing_temporal_operands() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("note_null.md", "---\ndue: null\n---\n");
     project.write_note("note_missing.md", "---\ntitle: Missing\n---\n");
     let index = Arc::new(project.build_index());
@@ -675,7 +681,7 @@ fn assert_structural_parity(
 #[test]
 fn store_backed_and_in_memory_queries_agree_across_representative_selectors() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/a.md", "# A\n\n- [ ] plan #todo\n");
     project.write_note("notes/b.md", "# B\n\n- [ ] review #project/active\n");
     project.write_note("docs/c.md", "# C\n\nsee [[notes/a]]\n");

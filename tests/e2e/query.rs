@@ -65,7 +65,7 @@ fn class_descendant_selector_expands_through_the_schema_graph() {
 /// misattributed across the store round-trip).
 #[test]
 fn inlinks_render_from_the_persisted_store() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("notes/foo.md", "# Foo\n");
     sandbox.write_note("a.md", "see [[notes/foo]]\n");
     sandbox.run(&["index"]).assert_success();

@@ -23,14 +23,14 @@ use traces_pkm::{
 #[test]
 fn renders_a_query_over_real_indexed_notes_and_writes_the_result() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/a.md", "# A\n");
     project.write_note("notes/b.md", "# B\n");
     project.write_template(
         "report.md",
         "{{ query.from(\"notes/\") | length }} notes",
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid test schema directory");
@@ -59,7 +59,7 @@ fn renders_a_query_over_real_indexed_notes_and_writes_the_result() {
 #[test]
 fn renders_a_file_sourced_select_field_in_template_rendering() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     project.write_schema_value(
         "categories.toml",
@@ -80,7 +80,7 @@ fn renders_a_file_sourced_select_field_in_template_rendering() {
         "Category: {{ schema.get('topic').field('category')[0].label }} ({{ \
          schema.get('topic').field('category')[0].value }})",
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid test schema directory");
@@ -114,7 +114,7 @@ fn renders_a_file_sourced_select_field_in_template_rendering() {
 #[test]
 fn renders_tasks_and_lists_pipelines_with_transforms_and_formatters() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     let work_md = r"---
 project: alpha
@@ -158,7 +158,7 @@ Table:
 "#;
     project.write_template("dashboard.md", template_body);
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -235,14 +235,14 @@ fn tasks_pipeline_rejects_obsolete_task_field_syntax_with_diagnostic() {
     use std::error::Error as StdError;
 
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("todo.md", "- [ ] one\n");
     project.write_template(
         "broken.md",
         "{{ tasks.from().where('task.completed == true') | count }}",
     );
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -277,11 +277,11 @@ fn lists_pipeline_rejects_task_list_formatter_on_non_task_rows() {
     use std::error::Error as StdError;
 
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("todo.md", "- Plain bullet\n");
     project.write_template("broken.md", "{{ lists.from().task_list() }}");
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -310,14 +310,14 @@ fn lists_pipeline_rejects_task_list_formatter_on_non_task_rows() {
 #[test]
 fn query_date_arithmetic_agrees_with_template_calendar_shift() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/jan.md", "---\nwhen: 2026-01-31\n---\n");
     project.write_note("notes/feb.md", "---\nwhen: 2026-02-15\n---\n");
     project.write_template(
         "calendar.md",
         r#"{{ query.from("notes/").where('when + dur("1 month") == "2026-02-28"') | length }}|{{ "2026-01-31" | date_add(1, unit="months") }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -347,12 +347,12 @@ fn query_date_arithmetic_agrees_with_template_calendar_shift() {
 #[test]
 fn template_shorthands_support_iso_offsets_and_reference_format() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "offsets.md",
         r#"{{ date.now("YYYY-MM-DD", "P1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.now("YYYY-MM-DD", "P-1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.sow(reference="2026-02-01", reference_format="%Y-%m-%d") }}|{{ date.eow(reference="2026-02-01", reference_format="%Y-%m-%d") }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -381,12 +381,12 @@ fn template_shorthands_support_iso_offsets_and_reference_format() {
 #[test]
 fn template_filters_support_bucketing_aliases_and_weekday_arg() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "bucketing.md",
         r#"{{ "2026-02-01" | sow }}|{{ "2026-02-01" | eow }}|{{ "2026-07-29" | som }}|{{ "2026-07-29" | eom }}|{{ "2026-07-29" | soy }}|{{ "2026-07-29" | eoy }}|{{ "2026-07-29" | weekday(1) }}|{{ "2026-07-29" | weekday(7) }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -418,12 +418,12 @@ fn template_filters_support_bucketing_aliases_and_weekday_arg() {
 #[case::far_out_of_range(99)]
 fn template_weekday_rejects_out_of_range_day_index(#[case] invalid_idx: i64) {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "invalid_weekday.md",
         &format!(r#"{{{{ "2026-07-29" | weekday({invalid_idx}) }}}}"#),
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -438,14 +438,14 @@ fn template_weekday_rejects_out_of_range_day_index(#[case] invalid_idx: i64) {
 #[test]
 fn file_day_resolves_in_query_with_filename_precedence() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/2026-07-29-daily.md", "---\ntitle: Daily\n---\n");
     project.write_note("notes/plain.md", "---\ntitle: Plain\n---\n");
     project.write_template(
         "file_day.md",
         r#"{{ query.from("notes/").where('file.day == "2026-07-29"') | length }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -470,12 +470,12 @@ fn file_day_resolves_in_query_with_filename_precedence() {
 #[test]
 fn template_shorthands_reject_malformed_iso_offsets() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "invalid_offset.md",
         r#"{{ date.now("YYYY-MM-DD", "P1Q2D", "2026-05-15", "%Y-%m-%d") }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -492,13 +492,13 @@ fn template_shorthands_reject_malformed_iso_offsets() {
 #[test]
 fn file_day_persists_at_index_time_across_query_time_zone_changes() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/2026-07-29-daily.md", "---\ntitle: Daily\n---\n");
     project.write_template(
         "file_day_tz.md",
         r#"{{ query.from("notes/").where('file.day == "2026-07-29"') | length }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -548,9 +548,9 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 fn template_seam_renders_local_clock_under_injected_tz() {
     TzGuard::set("Etc/GMT-5"); // UTC+05:00
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template("clock.md", r#"{{ date.now("%Y") }}"#);
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -602,7 +602,7 @@ fn template_seam_renders_local_clock_under_injected_tz() {
 #[test]
 fn renders_class_expanded_source_selectors_through_the_schema_graph() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_schema("book", "");
     project.write_schema("sci_fi", "extends = [\"book\"]");
     project.write_schema("novel", "extends = [\"sci_fi\"]");
@@ -619,7 +619,7 @@ fn renders_class_expanded_source_selectors_through_the_schema_graph() {
          length }}",
     );
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid test schema directory");
@@ -666,7 +666,7 @@ fn renders_class_expanded_source_selectors_through_the_schema_graph() {
 #[test]
 fn index_cache_does_not_persist_across_independent_renders() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("a.md", "# A #fresh\n");
     // The counted tag is assembled dynamically so the template file (which
     // is inside the project and indexed too) does not itself match the
@@ -676,7 +676,7 @@ fn index_cache_does_not_persist_across_independent_renders() {
         "{{ query.from(\"#fres\" ~ \"h\") | length }}",
     );
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid test schema directory");

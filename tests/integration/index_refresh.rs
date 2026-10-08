@@ -27,7 +27,7 @@ use traces_pkm::testing::{
 #[test]
 fn refresh_persists_a_query_visible_delta_observed_without_mutation() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("a.md", "# A\n\n- [ ] old task #alpha\n");
     let (indexer, _built) = project.build_and_persist();
 

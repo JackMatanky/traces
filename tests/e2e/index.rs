@@ -17,7 +17,7 @@ use super::support::Sandbox;
 /// Defect class: stale-secondary-index.
 #[test]
 fn content_edit_between_spawns_is_query_visible() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("a.md", "# A\n\n- [ ] old task\n");
     sandbox.run(&["index"]).assert_success();
 
@@ -52,7 +52,7 @@ fn content_edit_between_spawns_is_query_visible() {
 /// surviving a path-set change).
 #[test]
 fn path_set_changes_between_spawns_prune_ghosts_and_resolve_links() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("notes/foo.md", "# Foo\n");
     sandbox.write_note("archive/foo.md", "# Old Foo\n");
     sandbox.write_note("a.md", "links to [[foo]]\n");
@@ -103,7 +103,7 @@ fn path_set_changes_between_spawns_prune_ghosts_and_resolve_links() {
 /// Defect class: unobservable-reload.
 #[test]
 fn same_size_mtime_restored_edit_reads_the_store_not_a_rebuild() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     let note = sandbox.root().join("a.md");
     fs::write(&note, "# A\n\n- [ ] alpha task\n").expect("write note");
     let original_mtime = fs::metadata(&note)
@@ -158,7 +158,7 @@ fn same_size_mtime_restored_edit_reads_the_store_not_a_rebuild() {
 /// Defect class: panic-on-corruption.
 #[test]
 fn table_level_corruption_self_heals_on_the_next_query() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("a.md", "# A\n");
     sandbox.write_note("b.md", "# B\n");
     sandbox.run(&["index"]).assert_success();
