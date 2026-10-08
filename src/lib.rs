@@ -57,6 +57,51 @@
 //! - `TemplateService`, `CommitPolicy`, `WriteMode`: Template rendering and
 //!   file writes.
 //! - `Blake3FileHash`, `Blake3PathHash`: BLAKE3 hashing primitives.
+//! # Visibility Probes
+//!
+//! Internal configuration structures remain private to the crate and unnameable
+//! from outside. Each compile-fail probe is paired with a positive-control
+//! doctest verifying that the corresponding public interface is nameable.
+//!
+//! ```compile_fail
+//! // ConfigLoadError must not be nameable from outside the crate.
+//! use traces_pkm::ConfigLoadError;
+//! ```
+//!
+//! ```rust
+//! // Positive control: CliError is the public error entrypoint.
+//! use traces_pkm::cli::CliError;
+//! ```
+//!
+//! ```compile_fail
+//! // ConfigBuilder must not be nameable from outside the crate.
+//! use traces_pkm::ConfigBuilder;
+//! ```
+//!
+//! ```rust
+//! // Positive control: Note is a public item always available.
+//! use traces_pkm::Note;
+//! ```
+//!
+//! ```compile_fail
+//! // SchemasConfig must not be nameable from outside the crate.
+//! use traces_pkm::SchemasConfig;
+//! ```
+//!
+//! ```rust
+//! // Positive control: Tag is a public item always available.
+//! use traces_pkm::Tag;
+//! ```
+//!
+//! ```compile_fail
+//! // FrontmatterConfig must not be nameable from outside the crate.
+//! use traces_pkm::FrontmatterConfig;
+//! ```
+//!
+//! ```rust
+//! // Positive control: TaskStatus is a public item always available.
+//! use traces_pkm::TaskStatus;
+//! ```
 
 pub mod cli;
 mod config;
@@ -967,6 +1012,29 @@ mod test_support {
                 let paths: Vec<&Path> =
                     index.entries().iter().map(|e| e.file().path()).collect();
                 assert_eq!(paths, [Path::new("a.md")]);
+            }
+        }
+        mod visibility {
+            use pretty_assertions::assert_eq;
+
+            #[test]
+            fn retains_config_internals_under_expected_names() {
+                assert_eq!(
+                    std::any::type_name::<crate::config::ConfigLoadError>(),
+                    "traces_pkm::config::error::ConfigLoadError"
+                );
+                assert_eq!(
+                    std::any::type_name::<crate::config::ConfigBuilder>(),
+                    "traces_pkm::config::builder::ConfigBuilder"
+                );
+                assert_eq!(
+                    std::any::type_name::<crate::config::SchemasConfig>(),
+                    "traces_pkm::config::model::SchemasConfig"
+                );
+                assert_eq!(
+                    std::any::type_name::<crate::config::FrontmatterConfig>(),
+                    "traces_pkm::config::model::FrontmatterConfig"
+                );
             }
         }
     }

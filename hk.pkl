@@ -118,6 +118,10 @@ local quality = new Mapping<String, Step> {
         check = "mise run doc"
     }
     ["cargo-deny"] = rust["cargo-deny"]
+    ["visibility"] = new Step {
+        glob = List("src/**/*.rs", "tests/baselines/**", "Cargo.toml")
+        check = "mise run check:visibility"
+    }
 }
 
 hooks {
