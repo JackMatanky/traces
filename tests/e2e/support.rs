@@ -1,17 +1,33 @@
 //! Shared end-to-end test harness: spawns the real `traces` binary against a
 //! fully isolated [`Sandbox`].
 //!
+//! # Environment policy
+//!
+//! The child environment is an explicit policy, not a blanket wipe or an
+//! inherit-and-override ([`Sandbox::apply_env_policy`]):
+//!
+//! - **Sandbox-owned**: `TRACES_STATE_DIR`, `XDG_CONFIG_HOME`, `TZ=UTC`, and
+//!   the platform home anchors (`HOME` on Unix; `APPDATA`, `LOCALAPPDATA`,
+//!   `USERPROFILE` on Windows) always carry sandbox-provided values, so every
+//!   derived state/config location lands inside the sandbox.
+//! - **Passthrough allowlist**: `PATH` (all platforms), `SystemRoot`, `TEMP`,
+//!   `TMP` (Windows) are copied from this test process; the child cannot run
+//!   tooling without them.
+//! - **Opt-in**: `TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS` are never set by
+//!   default; tests studying them set them explicitly via
+//!   [`Sandbox::run_with_envs`].
+//!
+//! Everything else is dropped: a shell-exported variable cannot leak into any
+//! child unless it is allow-listed or explicitly opted in.
+//!
 //! # Isolation
 //!
-//! Two environment variables, set only on the spawned child (never on this
+//! Sandbox-owned variables are set only on the spawned child (never on this
 //! test process itself) so every test stays parallel-safe with no shared
-//! mutable state:
-//!
-//! - `TRACES_STATE_DIR` isolates the trust store and tracked-config store
-//!   (`src/dirs.rs`'s dedicated override for exactly this).
-//! - `XDG_CONFIG_HOME` isolates global config/template discovery, so a
-//!   developer machine's real `~/.config/traces/config.toml` (if any) never
-//!   leaks into a test.
+//! mutable state. `TRACES_STATE_DIR` isolates the trust and tracked-config
+//! stores (`src/dirs.rs`'s dedicated override); `XDG_CONFIG_HOME` isolates
+//! global config/template discovery, so a developer machine's real
+//! `~/.config/traces/config.toml` (if any) never leaks into a test.
 //!
 //! # Diagnostic text is wrap-fragile
 //!
@@ -29,6 +45,7 @@
 //! - [`plain`] output (used only for short single-bullet messages confirmed to
 //!   wrap at real word boundaries with no glyph inside the reconstructed span).
 use std::{
+    ffi::{OsStr, OsString},
     path::Path,
     process::{Command, ExitStatus, Output},
 };
@@ -152,6 +169,105 @@ impl Sandbox {
         self.project.path()
     }
 
+    /// Returns the sandbox state directory (`TRACES_STATE_DIR`): the root
+    /// under which the trust and tracked-config stores must land.
+    pub(crate) fn state_dir(&self) -> &Path {
+        self.state_dir.path()
+    }
+
+    /// Returns the sandbox global-config home (`XDG_CONFIG_HOME`): the parent
+    /// directory under which global config/template discovery resolves.
+    pub(crate) fn config_home(&self) -> &Path {
+        self.config_home.path()
+    }
+
+    /// Passthrough allowlist entries copied from this test process.
+    fn passthrough_env() -> Vec<(&'static str, OsString)> {
+        let base = vec![("PATH", std::env::var_os("PATH").unwrap_or_default())];
+        #[cfg(windows)]
+        {
+            let mut passthrough = base;
+            for key in ["SystemRoot", "TEMP", "TMP"] {
+                if let Some(value) = std::env::var_os(key) {
+                    passthrough.push((key, value));
+                }
+            }
+            passthrough
+        }
+        #[cfg(not(windows))]
+        base
+    }
+
+    /// Sandbox-owned entries: every derived state/config location the binary
+    /// can resolve carries a sandbox-provided value, never the host's.
+    fn owned_env(&self) -> Vec<(&'static str, OsString)> {
+        // Windows entries are cfg-gated because the config resolver reads
+        // `APPDATA` (not `XDG_CONFIG_HOME`) there; `dirs.rs` anchors its
+        // Windows `HOME` on `USERPROFILE`. On Unix, `HOME` anchors the
+        // `XDG_*` fallbacks.
+        #[cfg(windows)]
+        {
+            vec![
+                (
+                    "TRACES_STATE_DIR",
+                    self.state_dir.path().as_os_str().to_owned(),
+                ),
+                (
+                    "XDG_CONFIG_HOME",
+                    self.config_home.path().as_os_str().to_owned(),
+                ),
+                ("APPDATA", self.config_home.path().as_os_str().to_owned()),
+                ("LOCALAPPDATA", self.state_dir.path().as_os_str().to_owned()),
+                ("USERPROFILE", self.state_dir.path().as_os_str().to_owned()),
+                ("TZ", OsString::from("UTC")),
+            ]
+        }
+        #[cfg(not(windows))]
+        {
+            vec![
+                (
+                    "TRACES_STATE_DIR",
+                    self.state_dir.path().as_os_str().to_owned(),
+                ),
+                (
+                    "XDG_CONFIG_HOME",
+                    self.config_home.path().as_os_str().to_owned(),
+                ),
+                ("HOME", self.state_dir.path().as_os_str().to_owned()),
+                ("TZ", OsString::from("UTC")),
+            ]
+        }
+    }
+
+    /// Returns the full declared policy table (passthrough + owned entries)
+    /// applied to every spawned child.
+    ///
+    /// Opt-in variables (`TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS`) are
+    /// deliberately absent; tests studying them add them explicitly.
+    pub(crate) fn env_policy_entries(&self) -> Vec<(String, OsString)> {
+        Self::passthrough_env()
+            .into_iter()
+            .chain(self.owned_env())
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect()
+    }
+
+    /// Applies the sandbox environment policy to `cmd`: default-deny via
+    /// [`Command::env_clear`], then the passthrough allowlist and the
+    /// sandbox-owned entries.
+    ///
+    /// Unlisted variables are dropped, so a shell-exported variable cannot
+    /// leak into any child unless it is allow-listed or explicitly opted in.
+    fn apply_env_policy(&self, cmd: &mut Command) {
+        cmd.env_clear();
+        for (key, value) in Self::passthrough_env() {
+            cmd.env(key, value);
+        }
+        for (key, value) in self.owned_env() {
+            cmd.env(key, value);
+        }
+    }
+
     /// Writes `.traces/config.toml` pointing to a local `templates` directory
     /// and creates that directory.
     pub(crate) fn write_config(&self) {
@@ -202,15 +318,13 @@ impl Sandbox {
 
     /// Builds a `traces` [`Command`] invocation configured for this sandbox.
     ///
-    /// Sets binary path, project root working directory, and isolation
-    /// environment variables on the child process without mutating the test
-    /// process environment.
+    /// Sets binary path, project root working directory, and applies the
+    /// sandbox environment policy ([`Self::apply_env_policy`]) on the child
+    /// process without mutating the test process environment.
     pub(crate) fn command(&self, args: &[&str]) -> Command {
         let mut cmd = Command::new(TRACES_BIN);
-        cmd.args(args)
-            .current_dir(self.root())
-            .env("TRACES_STATE_DIR", self.state_dir.path())
-            .env("XDG_CONFIG_HOME", self.config_home.path());
+        cmd.args(args).current_dir(self.root());
+        self.apply_env_policy(&mut cmd);
         cmd
     }
 
@@ -221,6 +335,33 @@ impl Sandbox {
             stdout,
             stderr,
         } = self.command(args).output().expect("spawn traces");
+        Run {
+            status,
+            stdout: String::from_utf8_lossy(&stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        }
+    }
+
+    /// Executes `args` with explicit opt-in environment entries layered on
+    /// top of the sandbox policy, and captures output in a [`Run`].
+    ///
+    /// This is the only sanctioned way to study opt-in variables
+    /// (`TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS`) from a test: they are
+    /// never part of the default policy table.
+    pub(crate) fn run_with_envs(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &OsStr)],
+    ) -> Run {
+        let mut cmd = self.command(args);
+        for (key, value) in envs {
+            cmd.env(key, value);
+        }
+        let Output {
+            status,
+            stdout,
+            stderr,
+        } = cmd.output().expect("spawn traces");
         Run {
             status,
             stdout: String::from_utf8_lossy(&stdout).into_owned(),
