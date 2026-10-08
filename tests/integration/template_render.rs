@@ -572,3 +572,76 @@ fn template_seam_renders_local_clock_under_injected_tz() {
     let content = std::fs::read_to_string(path).expect("read report");
     assert_eq!(content.len(), 4);
 }
+
+/// Proves `@class` source expansion resolves through the schema graph at the
+/// template composition root: transitive `extends` rows match `@book*`, the
+/// `class(book, children)` form matches direct extenders only, exact `@book`
+/// matches nothing when no note carries that class, and an unknown class
+/// degrades to a literal match without error or hierarchy expansion
+/// (`@horror` finds the horror-classed note but has no descendants).
+///
+/// This is the class-expander's external reachability proof: the expander is
+/// `pub(crate)` and `QueryService::new` leaves it `None` (a direct
+/// query-service `@class` test would be vacuous), so coverage enters through
+/// the template service, which attaches the expander internally from the
+/// configured schemas directory. Replaces the graph-reachability coverage of
+/// the deleted `schema_field_resolution.rs` (field-inheritance internals
+/// stay with their source-local in-crate twins in `src/schema`).
+///
+/// Executes vs asserts:
+/// - Executes: schemas written to the default schemas dir (`book` ← `sci_fi` ←
+///   `novel`, `book` ← `memoir`), classed notes, then `TemplateService::
+///   render_to_file` over `query.from(...)` sources.
+/// - Asserts: exact rendered counts — descendants include the depth-2 `novel`
+///   note, children exclude it, exact `@book` matches nothing, unknown
+///   `@horror` degrades to its literal match, and the transitive subtree
+///   `@sci_fi*` finds only the novel note.
+///
+/// Defect class: reachability-transfer (class expansion silently
+/// unreachable from any external entry point).
+#[test]
+fn renders_class_expanded_source_selectors_through_the_schema_graph() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let project = TestProject::trusted(temp.path().join("project"));
+    project.write_schema("book", "");
+    project.write_schema("sci_fi", "extends = [\"book\"]");
+    project.write_schema("novel", "extends = [\"sci_fi\"]");
+    project.write_schema("memoir", "extends = [\"book\"]");
+    project.write_note("shelf/a.md", "---\nclass: novel\n---\n# A\n");
+    project.write_note("shelf/b.md", "---\nclass: memoir\n---\n# B\n");
+    project.write_note("shelf/c.md", "---\nclass: horror\n---\n# C\n");
+    project.write_note("shelf/d.md", "# D\n");
+    project.write_template(
+        "classes.md",
+        "{{ query.from(\"@book*\") | length }}-{{ query.from(\"class(book, \
+         children)\") | length }}-{{ query.from(\"@book\") | length }}-{{ \
+         query.from(\"@horror\") | length }}-{{ query.from(\"@sci_fi*\") | \
+         length }}",
+    );
+
+    let config = project.config();
+    let template_service =
+        TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
+            .expect("valid test schema directory");
+    let input = TemplatePathInput::parse(std::path::Path::new("classes"))
+        .expect("valid template input");
+
+    let outcome = template_service
+        .render_to_file(
+            &input,
+            None,
+            WriteMode::Commit(CommitPolicy::CreateNew),
+        )
+        .expect("render class report");
+
+    let written = match outcome {
+        WriteOutcome::Written(path) => Some(path),
+        WriteOutcome::Previewed(_) => None,
+    }
+    .expect("Commit mode must write");
+    assert_eq!(
+        std::fs::read_to_string(written).expect("read class report"),
+        "2-1-0-1-1",
+        "descendants, children, exact, unknown-literal, transitive counts"
+    );
+}
