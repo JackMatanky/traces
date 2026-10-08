@@ -9,6 +9,8 @@ mod support;
 
 #[path = "e2e/dispatch.rs"]
 mod dispatch;
+#[path = "e2e/env_policy.rs"]
+mod env_policy;
 #[path = "e2e/golden_path.rs"]
 mod golden_path;
 #[path = "e2e/init.rs"]
