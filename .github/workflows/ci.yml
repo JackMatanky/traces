@@ -56,6 +56,21 @@ jobs:
           shared-key: "clippy-ubuntu"
       - run: mise exec -- cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+  visibility:
+    name: visibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+          install_args: rust
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "visibility-ubuntu"
+      - run: mise install --locked cargo-binstall cargo:cargo-public-api
+      - run: mise run check:visibility
+
   # -- Tests --
   test:
     runs-on: ubuntu-latest

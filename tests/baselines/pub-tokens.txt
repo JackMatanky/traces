@@ -1,0 +1,1417 @@
+src/cli/completions.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/completions.rs: pub(super) struct Completions {
+src/cli/cwd.rs: pub(crate) fn enter(dir: &Path) -> Self {
+src/cli/cwd.rs: pub(crate) fn into_inner(self) -> PathBuf {
+src/cli/cwd.rs: pub(crate) fn new() -> io::Result<Self> {
+src/cli/cwd.rs: pub(crate) fn same_dir() -> Self {
+src/cli/cwd.rs: pub(crate) struct Cwd(PathBuf);
+src/cli/cwd.rs: pub(crate) struct CwdGuard {
+src/cli/error.rs: pub enum CliError {
+src/cli/error.rs: pub type CliResult = std::result::Result<(), CliError>;
+src/cli/error.rs: pub(super) fn state_source() -> ConfigStateError {
+src/cli/error.rs: pub(super) fn user_abort(&self) -> Option<UserAbort> {
+src/cli/index.rs: pub(super) fn record_paths(index: &WorkspaceIndex) -> Vec<String> {
+src/cli/index.rs: pub(super) fn run(&self, service: &ConfigService) -> CliResult {
+src/cli/index.rs: pub(super) struct Index;
+src/cli/init.rs: pub fn run(self, provider: &dyn DialogProvider) -> CliResult {
+src/cli/init.rs: pub struct Init;
+src/cli/init.rs: pub(super) struct CancellingDialogProvider;
+src/cli/list.rs: pub(super) fn run(&self, service: &ConfigService) -> CliResult {
+src/cli/list.rs: pub(super) struct List {
+src/cli/mod.rs: pub enum CommandOutcome {
+src/cli/mod.rs: pub enum UserAbort {
+src/cli/mod.rs: pub fn run() -> Result<CommandOutcome, CliError> {
+src/cli/mod.rs: pub mod init;
+src/cli/mod.rs: pub use error::{CliError, CliResult};
+src/cli/mod.rs: pub(crate) mod fixtures {
+src/cli/mod.rs: pub(crate) use cwd::CwdGuard;
+src/cli/mod.rs: pub(super) fn dispatch_argv_and_read_output(
+src/cli/mod.rs: pub(super) struct CancellingSelect;
+src/cli/mod.rs: pub(super) struct SortArgs {
+src/cli/table.rs: pub(super) fn run(&self, service: &ConfigService) -> Result<(), CliError> {
+src/cli/table.rs: pub(super) struct Table {
+src/cli/task.rs: pub(super) fn run(&self, service: &ConfigService) -> CliResult {
+src/cli/task.rs: pub(super) struct Task {
+src/cli/task.rs: pub(super) struct TaskFilterArgs {
+src/cli/task.rs: pub(super) struct TaskPresentationArgs {
+src/cli/task.rs: pub(super) struct TaskTableArgs {
+src/cli/template.rs: pub(super) const fn interactive() -> Self {
+src/cli/template.rs: pub(super) const fn new(name: PathBuf) -> Self {
+src/cli/template.rs: pub(super) dry_run: bool,
+src/cli/template.rs: pub(super) fn create_test_project(
+src/cli/template.rs: pub(super) fn name(&self) -> Option<&Path> {
+src/cli/template.rs: pub(super) fn preset_provider() -> Arc<dyn DialogProvider> {
+src/cli/template.rs: pub(super) fn run(
+src/cli/template.rs: pub(super) force: bool,
+src/cli/template.rs: pub(super) input: Option<PathBuf>,
+src/cli/template.rs: pub(super) list: bool,
+src/cli/template.rs: pub(super) name: Option<PathBuf>,
+src/cli/template.rs: pub(super) no_input: bool,
+src/cli/template.rs: pub(super) output: Option<PathBuf>,
+src/cli/template.rs: pub(super) struct CancellingDialogProvider;
+src/cli/template.rs: pub(super) struct Template {
+src/cli/tracked.rs: pub(super) fn action_args(action: TrackedAction) -> Tracked {
+src/cli/tracked.rs: pub(super) fn parse(args: &[&str]) -> Tracked {
+src/cli/tracked.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/tracked.rs: pub(super) struct TestCli {
+src/cli/tracked.rs: pub(super) struct Tracked {
+src/cli/tracked.rs: pub(super) tracked: Tracked,
+src/cli/trust.rs: pub(super) fn action_args(action: TrustAction) -> Trust {
+src/cli/trust.rs: pub(super) fn parse(args: &[&str]) -> Trust {
+src/cli/trust.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/trust.rs: pub(super) fn trust_args(path: Option<PathBuf>) -> Trust {
+src/cli/trust.rs: pub(super) struct TestCli {
+src/cli/trust.rs: pub(super) struct Trust {
+src/cli/trust.rs: pub(super) trust: Trust,
+src/cli/untrust.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/untrust.rs: pub(super) struct Untrust {
+src/config/builder.rs: pub(crate) fn build(self) -> Result<Config, ConfigBuilderError> {
+src/config/builder.rs: pub(crate) fn new(
+src/config/builder.rs: pub(crate) struct ConfigBuilder {
+src/config/discovery.rs: pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
+src/config/discovery.rs: pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
+src/config/discovery.rs: pub(crate) const fn anchor(&self) -> &DiscoveryAnchor {
+src/config/discovery.rs: pub(crate) const fn kind(&self) -> DiscoveryScope {
+src/config/discovery.rs: pub(crate) enum DiscoveryAnchor {
+src/config/discovery.rs: pub(crate) enum DiscoveryScope {
+src/config/discovery.rs: pub(crate) fn new(
+src/config/discovery.rs: pub(crate) fn run(ctx: DiscoveryContext) -> DiscoveryResult<DiscoveryOutcome> {
+src/config/discovery.rs: pub(crate) fn trust_requests(
+src/config/discovery.rs: pub(crate) struct DiscoveryContext {
+src/config/discovery.rs: pub(crate) struct DiscoveryOutcome {
+src/config/discovery.rs: pub(super) fn global(&self) -> &[GlobalConfigFile<Discovered>] {
+src/config/discovery.rs: pub(super) fn into_parts(self) -> (DiscoveryScope, DiscoveryAnchor) {
+src/config/discovery.rs: pub(super) fn into_parts(self) -> OutcomeParts {
+src/config/discovery.rs: pub(super) fn local(&self) -> &[LocalConfigFile<Discovered>] {
+src/config/discovery.rs: pub(super) fn new(
+src/config/discovery.rs: pub(super) fn path(&self) -> &Path {
+src/config/discovery.rs: pub(super) fn with_kind(
+src/config/error.rs: pub enum ConfigStateError {
+src/config/error.rs: pub(crate) enum ConfigBuilderError {
+src/config/error.rs: pub(crate) enum ConfigFileError {
+src/config/error.rs: pub(crate) enum ConfigLoadError {
+src/config/error.rs: pub(crate) enum ConfigScaffoldError {
+src/config/error.rs: pub(crate) enum DiscoveryError {
+src/config/error.rs: pub(crate) fn invalid_field_key(
+src/config/error.rs: pub(crate) type DiscoveryResult<T> = std::result::Result<T, DiscoveryError>;
+src/config/file.rs: pub(crate) enum TrustOutcome {
+src/config/file.rs: pub(crate) fn from_content_for_test(
+src/config/file.rs: pub(crate) fn into_tracked(
+src/config/file.rs: pub(crate) fn path(&self) -> &Path {
+src/config/file.rs: pub(crate) fn root(&self) -> &Path {
+src/config/file.rs: pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigFileError> {
+src/config/file.rs: pub(crate) fn verify_trust(
+src/config/file.rs: pub(crate) struct ConfigFile<Source, State> {
+src/config/file.rs: pub(crate) struct Discovered;
+src/config/file.rs: pub(crate) struct IsGlobal;
+src/config/file.rs: pub(crate) struct IsLocal;
+src/config/file.rs: pub(crate) struct Parsed {
+src/config/file.rs: pub(crate) struct Tracked;
+src/config/file.rs: pub(crate) struct Trusted {
+src/config/file.rs: pub(crate) type GlobalConfigFile<State> = ConfigFile<IsGlobal, State>;
+src/config/file.rs: pub(crate) type LocalConfigFile<State> = ConfigFile<IsLocal, State>;
+src/config/file.rs: pub(super) fn raw(&self) -> &RawConfig {
+src/config/file.rs: pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigFileError> {
+src/config/mod.rs: pub use model::{Config, FrontmatterConfig, SchemasConfig, TaskConfig};
+src/config/mod.rs: pub use service::ConfigService;
+src/config/mod.rs: pub use trust::TrustRequest;
+src/config/mod.rs: pub(crate) use builder::ConfigBuilder;
+src/config/mod.rs: pub(crate) use discovery::{
+src/config/mod.rs: pub(crate) use error::{
+src/config/mod.rs: pub(crate) use file::{Discovered, LocalConfigFile};
+src/config/mod.rs: pub(crate) use model::DEFAULT_LOCAL_TEMPLATES_DIR;
+src/config/mod.rs: pub(crate) use trust::ConfigTrustStatus;
+src/config/mod.rs: pub(crate) use trust::TrustRequests;
+src/config/model.rs: pub const fn date_created(&self) -> &DateFieldConfig {
+src/config/model.rs: pub const fn date_modified(&self) -> &DateFieldConfig {
+src/config/model.rs: pub const fn frontmatter(&self) -> &FrontmatterConfig {
+src/config/model.rs: pub const fn schemas(&self) -> &SchemasConfig {
+src/config/model.rs: pub const fn tasks(&self) -> &TaskConfig {
+src/config/model.rs: pub fn aliases_name(&self) -> &str {
+src/config/model.rs: pub fn as_path(&self) -> &Path {
+src/config/model.rs: pub fn class_field_name(&self) -> &str {
+src/config/model.rs: pub fn directory(&self) -> &Path {
+src/config/model.rs: pub fn for_test(
+src/config/model.rs: pub fn for_test(class_field: &str) -> Self {
+src/config/model.rs: pub fn for_test(tag_filters: Vec<Tag>) -> Self {
+src/config/model.rs: pub fn for_test<T: Into<String>, A: Into<String>>(
+src/config/model.rs: pub fn format(&self) -> &str {
+src/config/model.rs: pub fn from_tags(tags: &[&str]) -> Self {
+src/config/model.rs: pub fn global_template_dir(&self) -> Option<&Path> {
+src/config/model.rs: pub fn local_template_dir(&self) -> Option<&Path> {
+src/config/model.rs: pub fn name(&self) -> &str {
+src/config/model.rs: pub fn output_dir(&self) -> &Path {
+src/config/model.rs: pub fn root(&self) -> &Path {
+src/config/model.rs: pub fn tag_filters(&self) -> &[Tag] {
+src/config/model.rs: pub fn tags_name(&self) -> &str {
+src/config/model.rs: pub fn test_default<P: Into<PathBuf>>(root: P) -> Self {
+src/config/model.rs: pub fn title_name(&self) -> &str {
+src/config/model.rs: pub fn with_frontmatter(mut self, frontmatter: FrontmatterConfig) -> Self {
+src/config/model.rs: pub fn with_schemas(mut self, schemas: SchemasConfig) -> Self {
+src/config/model.rs: pub fn with_tags_name<T: Into<String>>(mut self, tags: T) -> Self {
+src/config/model.rs: pub fn with_tasks(mut self, tasks: TaskConfig) -> Self {
+src/config/model.rs: pub fn with_templates(mut self) -> Self {
+src/config/model.rs: pub struct Config {
+src/config/model.rs: pub struct DateFieldConfig {
+src/config/model.rs: pub struct FrontmatterConfig {
+src/config/model.rs: pub struct SchemasConfig {
+src/config/model.rs: pub struct TaskConfig {
+src/config/model.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
+src/config/model.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
+src/config/model.rs: pub(crate) fn class_field_arc(&self) -> Arc<str> {
+src/config/model.rs: pub(crate) fn resolve_against(
+src/config/model.rs: pub(crate) fn root_arc(&self) -> Arc<Path> {
+src/config/model.rs: pub(crate) struct ConfigSubDir(RelativePath);
+src/config/model.rs: pub(super) const DEFAULT_CLASS_FIELD: &str = "class";
+src/config/model.rs: pub(super) const DEFAULT_LOCAL_SCHEMAS_DIR: &str = ".traces/schemas/";
+src/config/model.rs: pub(super) const fn new(
+src/config/model.rs: pub(super) const fn new(
+src/config/model.rs: pub(super) fn default_for_root(root: &Path) -> Self {
+src/config/model.rs: pub(super) fn from_raw_or_default(
+src/config/model.rs: pub(super) fn global(&self) -> Option<&Path> {
+src/config/model.rs: pub(super) fn local(&self) -> Option<&Path> {
+src/config/model.rs: pub(super) fn new(
+src/config/model.rs: pub(super) fn output(&self) -> &Path {
+src/config/model.rs: pub(super) struct TemplateConfig {
+src/config/raw.rs: pub(crate) aliases: Option<String>,
+src/config/raw.rs: pub(crate) class_field: Option<String>,
+src/config/raw.rs: pub(crate) date_created: Option<RawDateFieldConfig>,
+src/config/raw.rs: pub(crate) date_modified: Option<RawDateFieldConfig>,
+src/config/raw.rs: pub(crate) directory: Option<PathBuf>,
+src/config/raw.rs: pub(crate) directory: Option<PathBuf>,
+src/config/raw.rs: pub(crate) enum RawTaskStatusKind {
+src/config/raw.rs: pub(crate) format: Option<String>,
+src/config/raw.rs: pub(crate) frontmatter: RawFrontmatterConfig,
+src/config/raw.rs: pub(crate) kind: RawTaskStatusKind,
+src/config/raw.rs: pub(crate) name: Option<String>,
+src/config/raw.rs: pub(crate) name: String,
+src/config/raw.rs: pub(crate) output_dir: Option<PathBuf>,
+src/config/raw.rs: pub(crate) schemas: RawSchemasConfig,
+src/config/raw.rs: pub(crate) statuses: Vec<RawTaskStatus>,
+src/config/raw.rs: pub(crate) struct RawConfig {
+src/config/raw.rs: pub(crate) struct RawDateFieldConfig {
+src/config/raw.rs: pub(crate) struct RawFrontmatterConfig {
+src/config/raw.rs: pub(crate) struct RawSchemasConfig {
+src/config/raw.rs: pub(crate) struct RawTaskConfig {
+src/config/raw.rs: pub(crate) struct RawTaskStatus {
+src/config/raw.rs: pub(crate) struct RawTemplateConfig {
+src/config/raw.rs: pub(crate) symbol: char,
+src/config/raw.rs: pub(crate) tag_filters: Vec<String>,
+src/config/raw.rs: pub(crate) tags: Option<String>,
+src/config/raw.rs: pub(crate) tasks: RawTaskConfig,
+src/config/raw.rs: pub(crate) templates: RawTemplateConfig,
+src/config/raw.rs: pub(crate) title: Option<String>,
+src/config/service.rs: pub fn at(tracked_root: PathBuf, trusted_root: PathBuf) -> Self {
+src/config/service.rs: pub fn untrust(
+src/config/service.rs: pub struct ConfigService {
+src/config/service.rs: pub(crate) const fn status(&self) -> ConfigTrustStatus {
+src/config/service.rs: pub(crate) enum ConfigTrustCheck {
+src/config/service.rs: pub(crate) fn clean_tracked_store(
+src/config/service.rs: pub(crate) fn clean_trusted_store(
+src/config/service.rs: pub(crate) fn config_file_trust_check(
+src/config/service.rs: pub(crate) fn config_trust_status(
+src/config/service.rs: pub(crate) fn list_tracked(
+src/config/service.rs: pub(crate) fn list_trusted(
+src/config/service.rs: pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigLoadError> {
+src/config/service.rs: pub(crate) fn new() -> Self {
+src/config/service.rs: pub(crate) fn scaffold_local(
+src/config/service.rs: pub(crate) fn track_seen_config(
+src/config/service.rs: pub(crate) fn trust(
+src/config/service.rs: pub(crate) fn trust_requests(
+src/config/service.rs: pub(crate) fn trust_status(
+src/config/service.rs: pub(crate) fn workspace_trust_status(
+src/config/trust.rs: pub enum TrustRequest {
+src/config/trust.rs: pub(crate) enum ConfigTrustStatus {
+src/config/trust.rs: pub(crate) enum WorkspaceTrustStatus {
+src/config/trust.rs: pub(crate) fn config_file(&self) -> Option<&Path> {
+src/config/trust.rs: pub(crate) fn root_path(&self) -> &Path {
+src/config/trust.rs: pub(crate) type TrustRequests = Vec<TrustRequest>;
+src/date.rs: pub enum DateError {
+src/date.rs: pub struct DateTimeValue(DateTime<Utc>);
+src/date.rs: pub struct DateValue(NaiveDate);
+src/date.rs: pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
+src/date.rs: pub(crate) const ALL: [Self; 7] = [
+src/date.rs: pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
+src/date.rs: pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
+src/date.rs: pub(crate) const fn has_time(&self) -> bool {
+src/date.rs: pub(crate) const fn has_time(self) -> bool {
+src/date.rs: pub(crate) const fn into_inner(self) -> DateTime<Utc> {
+src/date.rs: pub(crate) const fn into_inner(self) -> NaiveDate {
+src/date.rs: pub(crate) const fn new(
+src/date.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
+src/date.rs: pub(crate) enum DateDiff {
+src/date.rs: pub(crate) enum DateFormat {
+src/date.rs: pub(crate) enum DateTimeFormat {
+src/date.rs: pub(crate) enum ParsedDateTimeShape {
+src/date.rs: pub(crate) enum Precision {
+src/date.rs: pub(crate) enum RecognizedDateValue {
+src/date.rs: pub(crate) fn apply(
+src/date.rs: pub(crate) fn apply(
+src/date.rs: pub(crate) fn apply(
+src/date.rs: pub(crate) fn classify(
+src/date.rs: pub(crate) fn date(&self) -> DateValue {
+src/date.rs: pub(crate) fn date(self) -> DateValue {
+src/date.rs: pub(crate) fn diff(
+src/date.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
+src/date.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
+src/date.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
+src/date.rs: pub(crate) fn is_equal_to_date(self, date: DateValue) -> bool {
+src/date.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
+src/date.rs: pub(crate) fn month_boundary(self, end: bool) -> Result<Self, DateError> {
+src/date.rs: pub(crate) fn parse_any(
+src/date.rs: pub(crate) fn parse_any(
+src/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/date.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(RecognizedDate, usize)> {
+src/date.rs: pub(crate) fn parse_with(
+src/date.rs: pub(crate) fn point(&self) -> DatePoint {
+src/date.rs: pub(crate) fn shift(
+src/date.rs: pub(crate) fn shift(
+src/date.rs: pub(crate) fn shift(
+src/date.rs: pub(crate) fn to_date_string(self) -> String {
+src/date.rs: pub(crate) fn to_datetime_string(self) -> String {
+src/date.rs: pub(crate) fn to_f64(self) -> Option<f64> {
+src/date.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
+src/date.rs: pub(crate) fn wall_or_utc(self) -> NaiveDateTime {
+src/date.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Self, DateError> {
+src/date.rs: pub(crate) fn weekday_point(
+src/date.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
+src/date.rs: pub(crate) instant: DateTime<Utc>,
+src/date.rs: pub(crate) precision: Precision,
+src/date.rs: pub(crate) precision: Precision,
+src/date.rs: pub(crate) struct DatePoint {
+src/date.rs: pub(crate) struct RecognizedDate {
+src/date.rs: pub(crate) value: RecognizedDateValue,
+src/date.rs: pub(crate) wall: NaiveDateTime,
+src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
+src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
+src/delimiter.rs: pub(crate) const fn close_len(self) -> usize {
+src/delimiter.rs: pub(crate) const fn close_str(self) -> &'static str {
+src/delimiter.rs: pub(crate) const fn from_open_char(ch: char) -> Option<Self> {
+src/delimiter.rs: pub(crate) const fn matches_char_close(self, ch: char) -> bool {
+src/delimiter.rs: pub(crate) const fn open_char(self) -> Option<char> {
+src/delimiter.rs: pub(crate) enum DelimiterType {
+src/delimiter.rs: pub(crate) fn find_closing(self, input: &str) -> Option<usize> {
+src/dialog/error.rs: pub enum DialogError {
+src/dialog/error.rs: pub type DialogResult<T> = std::result::Result<T, DialogError>;
+src/dialog/mod.rs: pub trait DialogProvider: Send + Sync {
+src/dialog/mod.rs: pub use error::{DialogError, DialogResult};
+src/dialog/mod.rs: pub use preset::PresetDialogProvider;
+src/dialog/mod.rs: pub use terminal::TerminalDialogProvider;
+src/dialog/preset.rs: pub fn is_empty(&self) -> bool {
+src/dialog/preset.rs: pub fn new() -> Self {
+src/dialog/preset.rs: pub fn with_confirm(mut self, response: bool) -> Self {
+src/dialog/preset.rs: pub fn with_multi_select<I>(mut self, response: I) -> Self
+src/dialog/preset.rs: pub fn with_select(mut self, response: usize) -> Self {
+src/dialog/preset.rs: pub fn with_text<S: Into<String>>(mut self, response: S) -> Self {
+src/dialog/preset.rs: pub struct PresetDialogProvider {
+src/dialog/terminal.rs: pub const fn new() -> Self {
+src/dialog/terminal.rs: pub struct TerminalDialogProvider;
+src/dirs.rs: pub(crate) static CONFIG_HOME: LazyLock<PathBuf> = LazyLock::new(|| {
+src/dirs.rs: pub(crate) static CONFIG_HOME: LazyLock<PathBuf> = LazyLock::new(|| {
+src/dirs.rs: pub(crate) static CONFIG_HOME: LazyLock<PathBuf> = LazyLock::new(|| {
+src/dirs.rs: pub(crate) static TRACKED_CONFIGS: LazyLock<StateDirRoot> =
+src/dirs.rs: pub(crate) static TRUSTED_CONFIGS: LazyLock<StateDirRoot> =
+src/dirs.rs: pub(crate) struct StateDirRoot(PathBuf);
+src/dirtree.rs: pub(crate) enum DirTreeError {
+src/dirtree.rs: pub(crate) fn children(dir: impl AsRef<Path>) -> Self {
+src/dirtree.rs: pub(crate) fn descendants(dir: impl AsRef<Path>) -> Self {
+src/dirtree.rs: pub(crate) fn file_name(&self) -> &OsStr {
+src/dirtree.rs: pub(crate) fn file_name(self) -> &'a OsStr {
+src/dirtree.rs: pub(crate) fn file_type(&self) -> fs::FileType {
+src/dirtree.rs: pub(crate) fn filter<F>(mut self, mut predicate: F) -> Self
+src/dirtree.rs: pub(crate) fn into_parts(self) -> (PathBuf, io::Error) {
+src/dirtree.rs: pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
+src/dirtree.rs: pub(crate) fn path(&self) -> &Path {
+src/dirtree.rs: pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
+src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
+src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
+src/dirtree.rs: pub(crate) struct DirTree {
+src/duration.rs: pub enum DurationError {
+src/duration.rs: pub struct DurationValue {
+src/duration.rs: pub(crate) const UNIT_HINT: &str =
+src/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
+src/duration.rs: pub(crate) const fn fixed_seconds(self) -> f64 {
+src/duration.rs: pub(crate) const fn fixed_seconds_i64(self) -> Option<i64> {
+src/duration.rs: pub(crate) const fn is_calendar(self) -> bool {
+src/duration.rs: pub(crate) const fn to_seconds(&self) -> DurationSeconds {
+src/duration.rs: pub(crate) enum DurationUnit {
+src/duration.rs: pub(crate) fn as_str(&self) -> &str {
+src/duration.rs: pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
+src/duration.rs: pub(crate) fn from_seconds(seconds: DurationSeconds) -> Self {
+src/duration.rs: pub(crate) fn is_calendar(&self) -> bool {
+src/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
+src/duration.rs: pub(crate) fn parse(unit: &str) -> Option<Self> {
+src/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
+src/duration.rs: pub(crate) fn parts(&self) -> Option<&[(f64, DurationUnit)]> {
+src/duration.rs: pub(crate) struct DurationSeconds(pub(crate) f64);
+src/duration.rs: pub(super) enum ScanMode {
+src/duration.rs: pub(super) fn apply_sign(
+src/duration.rs: pub(super) fn can_start_duration_segment(bytes: &[u8], pos: usize) -> bool {
+src/duration.rs: pub(super) fn has_digits_after_sign(
+src/duration.rs: pub(super) fn parse_number(
+src/duration.rs: pub(super) fn parse_unit(
+src/duration.rs: pub(super) fn parsed_number(
+src/duration.rs: pub(super) fn parsed_unit(
+src/duration.rs: pub(super) fn scan_part(
+src/duration.rs: pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
+src/duration.rs: pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
+src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
+src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
+src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =
+src/field.rs: pub(crate) const fn as_f64(&self) -> Option<f64> {
+src/field.rs: pub(crate) const fn as_str(self) -> &'a str {
+src/field.rs: pub(crate) const fn new(candidate: &'a str) -> Self {
+src/field.rs: pub(crate) enum DateTimeCoercion {
+src/field.rs: pub(crate) enum FieldKeyError {
+src/field.rs: pub(crate) enum FieldNameError {
+src/field.rs: pub(crate) enum FieldValue {
+src/field.rs: pub(crate) enum FieldValueRef<'a> {
+src/field.rs: pub(crate) fn as_ref(&self) -> FieldNameRef<'_> {
+src/field.rs: pub(crate) fn as_str(&self) -> &str {
+src/field.rs: pub(crate) fn canonical(&self) -> &str {
+src/field.rs: pub(crate) fn canonicalize(raw: &str) -> String {
+src/field.rs: pub(crate) fn classify(
+src/field.rs: pub(crate) fn deserialize_with<'de, D>(
+src/field.rs: pub(crate) fn is_canonical_match(&self, candidate: &str) -> bool {
+src/field.rs: pub(crate) fn is_match(&self, candidate: &str) -> bool {
+src/field.rs: pub(crate) fn is_name_match(&self, candidate: &FieldName) -> bool {
+src/field.rs: pub(crate) fn name(&self) -> &str {
+src/field.rs: pub(crate) fn new(s: Cow<'a, str>) -> Self {
+src/field.rs: pub(crate) fn to_canonical(raw: &str) -> Cow<'_, str> {
+src/field.rs: pub(crate) fn try_new(
+src/field.rs: pub(crate) struct FieldKey {
+src/field.rs: pub(crate) struct FieldKeyRef<'a>(&'a str);
+src/field.rs: pub(crate) struct FieldName(String);
+src/field.rs: pub(crate) struct FieldNameRef<'a>(&'a str);
+src/field.rs: pub(crate) struct FieldStringValue<'a>(Cow<'a, str>);
+src/file.rs: pub enum FileFormat {
+src/file.rs: pub fn for_test<P: Into<PathBuf>>(path: P, format: FileFormat) -> Self {
+src/file.rs: pub fn note_for_test<P: Into<PathBuf>>(path: P) -> Self {
+src/file.rs: pub fn note_with_created_at_for_test<P: Into<PathBuf>>(
+src/file.rs: pub fn note_with_size_for_test<P: Into<PathBuf>>(
+src/file.rs: pub fn path(&self) -> &Path {
+src/file.rs: pub struct FileMeta {
+src/file.rs: pub(crate) const fn as_str(self) -> &'a str {
+src/file.rs: pub(crate) const fn created_at(&self) -> Option<SystemTime> {
+src/file.rs: pub(crate) const fn day(&self) -> Option<crate::DateValue> {
+src/file.rs: pub(crate) const fn empty() -> Self {
+src/file.rs: pub(crate) const fn format(&self) -> FileFormat {
+src/file.rs: pub(crate) const fn modified_at(&self) -> SystemTime {
+src/file.rs: pub(crate) const fn size(&self) -> u64 {
+src/file.rs: pub(crate) enum FileNameError {
+src/file.rs: pub(crate) fn as_str(&self) -> &str {
+src/file.rs: pub(crate) fn extension(&self) -> Option<&str> {
+src/file.rs: pub(crate) fn folder(&self) -> FolderRef<'_> {
+src/file.rs: pub(crate) fn from_metadata(
+src/file.rs: pub(crate) fn from_path(path: &'a Path) -> Option<Self> {
+src/file.rs: pub(crate) fn from_path(path: &Path) -> Self {
+src/file.rs: pub(crate) fn name(&self) -> BaseNameRef<'_> {
+src/file.rs: pub(crate) struct BaseName(String);
+src/file.rs: pub(crate) struct BaseNameRef<'a>(&'a str);
+src/file.rs: pub(crate) struct FileName(String);
+src/file_tracker.rs: pub enum FilePathTrackerError {
+src/file_tracker.rs: pub(crate) enum CleanMode<'a> {
+src/file_tracker.rs: pub(crate) fn at(root: PathBuf) -> Self {
+src/file_tracker.rs: pub(crate) fn clean(
+src/file_tracker.rs: pub(crate) fn contains(
+src/file_tracker.rs: pub(crate) fn from_target(
+src/file_tracker.rs: pub(crate) fn list_all(
+src/file_tracker.rs: pub(crate) fn read_companion(
+src/file_tracker.rs: pub(crate) fn record(
+src/file_tracker.rs: pub(crate) fn remove_with_companions(
+src/file_tracker.rs: pub(crate) fn write_companion(
+src/file_tracker.rs: pub(crate) struct FilePathTracker {
+src/hash.rs: pub fn from_path(path: &Path) -> Result<Self, HashError> {
+src/hash.rs: pub fn to_hex(self) -> impl AsRef<str> + Display {
+src/hash.rs: pub struct Blake3FileHash(blake3::Hash);
+src/hash.rs: pub struct Blake3PathHash([u8; 64]);
+src/hash.rs: pub struct HashError {
+src/hash.rs: pub(crate) fn as_str(&self) -> &str {
+src/hash.rs: pub(crate) path: PathBuf,
+src/hash.rs: pub(crate) source: io::Error,
+src/index/codec.rs: pub(super) fn as_bytes(&self) -> &'a [u8] {
+src/index/codec.rs: pub(super) fn decode_row<T: DeserializeOwned>(
+src/index/codec.rs: pub(super) fn encode_row<'a, T: Serialize>(
+src/index/codec.rs: pub(super) fn new(path: &'a Path) -> Self {
+src/index/codec.rs: pub(super) fn path(&self) -> &'a Path {
+src/index/codec.rs: pub(super) fn path_from_bytes(bytes: &[u8]) -> PathBuf {
+src/index/codec.rs: pub(super) struct PathKey<'a>(&'a Path);
+src/index/delta.rs: pub(super) fn compute(
+src/index/delta.rs: pub(super) fn compute(
+src/index/delta.rs: pub(super) fn deleted(&self) -> &[(PathBuf, PathBuf)] {
+src/index/delta.rs: pub(super) fn deleted(&self) -> &[FileMeta] {
+src/index/delta.rs: pub(super) fn from_raw(
+src/index/delta.rs: pub(super) fn is_empty(&self) -> bool {
+src/index/delta.rs: pub(super) fn is_empty(&self) -> bool {
+src/index/delta.rs: pub(super) fn upserted(&self) -> &[(PathBuf, PathBuf)] {
+src/index/delta.rs: pub(super) fn upserted(&self) -> &[FileMeta] {
+src/index/delta.rs: pub(super) struct FileDelta {
+src/index/delta.rs: pub(super) struct InlinkDelta {
+src/index/entry.rs: pub fn entries(&self) -> &[FileEntry] {
+src/index/entry.rs: pub fn file(&self) -> &FileMeta {
+src/index/entry.rs: pub fn for_test(notes: &[(&str, &str)]) -> Self {
+src/index/entry.rs: pub fn inlinks(&self) -> &[PathBuf] {
+src/index/entry.rs: pub fn note(&self) -> Option<&Note> {
+src/index/entry.rs: pub struct FileEntry {
+src/index/entry.rs: pub struct WorkspaceIndex {
+src/index/entry.rs: pub(crate) const fn new(position: usize) -> Self {
+src/index/entry.rs: pub(crate) fn assemble(
+src/index/entry.rs: pub(crate) fn entry_at(&self, position: RowIndex) -> &FileEntry {
+src/index/entry.rs: pub(crate) struct RowIndex(usize);
+src/index/entry.rs: pub(super) fn new(entries: Box<[FileEntry]>) -> Self {
+src/index/entry.rs: pub(super) fn new(file: FileMeta, note: Option<Note>) -> Self {
+src/index/entry.rs: pub(super) fn set_inlinks(&mut self, inlinks: Box<[PathBuf]>) {
+src/index/error.rs: pub enum IndexError {
+src/index/error.rs: pub type IndexResult<T> = std::result::Result<T, IndexError>;
+src/index/error.rs: pub(crate) enum StoreError {
+src/index/error.rs: pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
+src/index/inlinks.rs: pub fn has_target(&self, target: &Path) -> bool {
+src/index/inlinks.rs: pub fn inlinks_of(&self, target: &Path) -> &[PathBuf] {
+src/index/inlinks.rs: pub fn into_entries(
+src/index/inlinks.rs: pub fn is_empty(&self) -> bool {
+src/index/inlinks.rs: pub fn iter(&self) -> impl Iterator<Item = (&Path, &[PathBuf])> {
+src/index/inlinks.rs: pub fn len(&self) -> usize {
+src/index/inlinks.rs: pub fn new(notes: &[Note], files: &[FileMeta]) -> Self {
+src/index/inlinks.rs: pub struct InlinkMap(HashMap<PathBuf, Box<[PathBuf]>>);
+src/index/inlinks.rs: pub(super) fn from_raw(edges: HashMap<PathBuf, Box<[PathBuf]>>) -> Self {
+src/index/inlinks.rs: pub(super) fn new(files: &'a [FileMeta]) -> Self {
+src/index/inlinks.rs: pub(super) fn patch_and_diff(
+src/index/inlinks.rs: pub(super) fn remove(&mut self, target: &Path) -> Option<Box<[PathBuf]>> {
+src/index/inlinks.rs: pub(super) fn resolve_edges_for(
+src/index/inlinks.rs: pub(super) fn with_edges(
+src/index/inlinks.rs: pub(super) fn with_resolver(
+src/index/inlinks.rs: pub(super) struct LinkResolver<'a> {
+src/index/mod.rs: pub struct PermissionsGuard<'a>(pub &'a Path);
+src/index/mod.rs: pub use entry::{FileEntry, WorkspaceIndex};
+src/index/mod.rs: pub use error::{IndexError, IndexResult};
+src/index/mod.rs: pub use inlinks::InlinkMap;
+src/index/mod.rs: pub use refresh::RefreshReport;
+src/index/mod.rs: pub use service::IndexerService;
+src/index/mod.rs: pub(crate) mod fixtures {
+src/index/mod.rs: pub(crate) use entry::RowIndex;
+src/index/mod.rs: pub(crate) use sort::SortedByPath;
+src/index/mod.rs: pub(crate) use store::IndexStore;
+src/index/refresh.rs: pub const fn deleted_count(self) -> usize {
+src/index/refresh.rs: pub const fn links_modified_count(self) -> usize {
+src/index/refresh.rs: pub const fn new(
+src/index/refresh.rs: pub const fn upserted_count(self) -> usize {
+src/index/refresh.rs: pub struct RefreshReport {
+src/index/refresh.rs: pub(super) const fn source(&self) -> &IndexError {
+src/index/refresh.rs: pub(super) enum NoteScope {
+src/index/refresh.rs: pub(super) enum RefreshState {
+src/index/refresh.rs: pub(super) fn apply(
+src/index/refresh.rs: pub(super) fn collect(root: &Path) -> IndexResult<Self> {
+src/index/refresh.rs: pub(super) fn into_error(self) -> IndexError {
+src/index/refresh.rs: pub(super) fn into_fresh(self) -> RefreshState {
+src/index/refresh.rs: pub(super) fn into_index(
+src/index/refresh.rs: pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
+src/index/refresh.rs: pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
+src/index/refresh.rs: pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
+src/index/refresh.rs: pub(super) fn into_store(self) -> IndexStore {
+src/index/refresh.rs: pub(super) fn is_fresh(&self) -> bool {
+src/index/refresh.rs: pub(super) fn persisted_files(&self) -> &SortedByPath<FileMeta> {
+src/index/refresh.rs: pub(super) fn reconcile(
+src/index/refresh.rs: pub(super) fn report(&self) -> RefreshReport {
+src/index/refresh.rs: pub(super) fn report(&self) -> RefreshReport {
+src/index/refresh.rs: pub(super) fn resolve(
+src/index/refresh.rs: pub(super) fn store(&self) -> &IndexStore {
+src/index/refresh.rs: pub(super) fn to_upsert(&self, upserted: &[FileMeta]) -> Vec<&Note> {
+src/index/refresh.rs: pub(super) fn upserted_files(&self) -> &[FileMeta] {
+src/index/refresh.rs: pub(super) struct IndexUpdate {
+src/index/refresh.rs: pub(super) struct InlinkReconciliation {
+src/index/refresh.rs: pub(super) struct PendingApply {
+src/index/refresh.rs: pub(super) struct PersistFailed {
+src/index/refresh.rs: pub(super) struct Persisted {
+src/index/refresh.rs: pub(super) struct RefreshPlan {
+src/index/service.rs: pub fn build(&self) -> IndexResult<WorkspaceIndex> {
+src/index/service.rs: pub fn for_tests<P: Into<PathBuf>>(root: P) -> Self {
+src/index/service.rs: pub fn load(&self) -> IndexResult<WorkspaceIndex> {
+src/index/service.rs: pub fn persist(&self, index: &WorkspaceIndex) -> IndexResult<()> {
+src/index/service.rs: pub fn refresh(&self) -> IndexResult<WorkspaceIndex> {
+src/index/service.rs: pub fn refresh_with_report(
+src/index/service.rs: pub struct IndexerService {
+src/index/service.rs: pub(crate) fn rebuild(&self) -> IndexResult<WorkspaceIndex> {
+src/index/service.rs: pub(crate) fn refresh_store(&self) -> IndexResult<IndexStore> {
+src/index/service.rs: pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
+src/index/sort.rs: pub(crate) fn as_slice(&self) -> &[T] {
+src/index/sort.rs: pub(crate) fn assumed_sorted(rows: Vec<T>) -> Self {
+src/index/sort.rs: pub(crate) fn binary_search_by_path(
+src/index/sort.rs: pub(crate) fn get_mut_by_path(&mut self, path: &Path) -> Option<&mut T> {
+src/index/sort.rs: pub(crate) fn into_vec(self) -> Vec<T> {
+src/index/sort.rs: pub(crate) fn sorted(mut rows: Vec<T>) -> Self {
+src/index/sort.rs: pub(crate) struct SortedByPath<T>(Vec<T>);
+src/index/store.rs: pub(crate) fn open(root: &Path) -> IndexResult<Self> {
+src/index/store.rs: pub(crate) fn paths_in_folder(
+src/index/store.rs: pub(crate) fn paths_with_file_class(
+src/index/store.rs: pub(crate) fn paths_with_tag(
+src/index/store.rs: pub(crate) fn read_files_batch<'a>(
+src/index/store.rs: pub(crate) fn read_links_for_targets<'a>(
+src/index/store.rs: pub(crate) fn read_notes_batch<'a>(
+src/index/store.rs: pub(crate) struct IndexStore {
+src/index/store.rs: pub(super) const fn incremental(
+src/index/store.rs: pub(super) const fn rebuild(
+src/index/store.rs: pub(super) enum PersistRows<'a> {
+src/index/store.rs: pub(super) fn for_class_field(class_field: &str) -> Self {
+src/index/store.rs: pub(super) fn persist(
+src/index/store.rs: pub(super) fn poison_note_row(&self, path: &Path) -> IndexResult<()> {
+src/index/store.rs: pub(super) fn read_all(&self) -> IndexResult<StoreSnapshot> {
+src/index/store.rs: pub(super) fn read_all_files(&self) -> IndexResult<SortedByPath<FileMeta>> {
+src/index/store.rs: pub(super) fn read_all_links(
+src/index/store.rs: pub(super) fn read_all_notes(&self) -> IndexResult<SortedByPath<Note>> {
+src/index/store.rs: pub(super) fn wrap_redb_error(
+src/index/store.rs: pub(super) struct IndexDimensions {
+src/index/store.rs: pub(super) struct PersistRequest<'a> {
+src/index/store.rs: pub(super) type StoreSnapshot =
+src/index/tables.rs: pub(super) const FILES: TableDefinition<'static, &'static [u8], &'static [u8]> =
+src/index/tables.rs: pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
+src/index/tables.rs: pub(super) const LINKS: MultimapTableDefinition<
+src/index/tables.rs: pub(super) const NOTES: TableDefinition<'static, &'static [u8], &'static [u8]> =
+src/index/tables.rs: pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
+src/index/tables.rs: pub(super) const PATHS_BY_TAG: MultimapTableDefinition<
+src/index/tables.rs: pub(super) const TABLES: [TableSpec; 7] = [
+src/index/tables.rs: pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
+src/index/tables.rs: pub(super) fn delete(
+src/index/tables.rs: pub(super) fn probe(
+src/index/tables.rs: pub(super) struct TableSpec {
+src/index/trie.rs: pub(super) const TRIE_THRESHOLD: usize = 64;
+src/index/trie.rs: pub(super) fn build(candidates: Vec<&'a Path>) -> Self {
+src/index/trie.rs: pub(super) fn nearest(
+src/index/trie.rs: pub(super) struct BaseNameIndex<'a>(ResolutionType<'a>);
+src/lexer.rs: pub(crate) const fn new(value: &'a T, desc: &'static str) -> Self {
+src/lexer.rs: pub(crate) desc: &'static str,
+src/lexer.rs: pub(crate) enum LexError {
+src/lexer.rs: pub(crate) fn expect<U>(
+src/lexer.rs: pub(crate) fn expect_map<F, R>(
+src/lexer.rs: pub(crate) fn lexical_unquote(raw: &str) -> String {
+src/lexer.rs: pub(crate) fn new(tokens: Vec<T>) -> Self {
+src/lexer.rs: pub(crate) fn next(&mut self) -> Option<T> {
+src/lexer.rs: pub(crate) fn next_span(&mut self, input: &str) -> Range<usize> {
+src/lexer.rs: pub(crate) fn peek(&mut self) -> Option<&T> {
+src/lexer.rs: pub(crate) fn peek_is_value<U>(&mut self, expected: &U) -> bool
+src/lexer.rs: pub(crate) fn span(&self) -> Range<usize> {
+src/lexer.rs: pub(crate) fn tokenize<'a>(input: &'a str) -> Result<Self, LexError>
+src/lexer.rs: pub(crate) fn tokenize_with<'a>(
+src/lexer.rs: pub(crate) struct LexTokenStream<T> {
+src/lexer.rs: pub(crate) struct TokenSpec<'a, T: ?Sized> {
+src/lexer.rs: pub(crate) type SpannedTokenStream<T> = LexTokenStream<Spanned<T>>;
+src/lexer.rs: pub(crate) value: &'a T,
+src/lib.rs: pub const DEFAULT_SCHEMAS_DIR: &str = ".traces/schemas";
+src/lib.rs: pub const DEFAULT_SCHEMA_VALUES_DIR: &str = ".traces/schemas/values";
+src/lib.rs: pub const DEFAULT_TEMPLATES_DIR: &str = "templates";
+src/lib.rs: pub fn build_and_persist(&self) -> (IndexerService, WorkspaceIndex) {
+src/lib.rs: pub fn build_index(&self) -> WorkspaceIndex {
+src/lib.rs: pub fn build_test_index(notes: &[(&str, &str)]) -> Arc<WorkspaceIndex> {
+src/lib.rs: pub fn config(&self) -> Config {
+src/lib.rs: pub fn create_trusted_project(
+src/lib.rs: pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
+src/lib.rs: pub fn fixture_service(root: &Path) -> ConfigService {
+src/lib.rs: pub fn indexer(&self) -> IndexerService {
+src/lib.rs: pub fn keep() {
+src/lib.rs: pub fn parse_note<P: AsRef<Path>>(path: P, src: &str) -> Note {
+src/lib.rs: pub fn parse_note_str(src: &str) -> Note {
+src/lib.rs: pub fn parse_tag(s: &str) -> Tag {
+src/lib.rs: pub fn resolve_safe_path<P: AsRef<Path>>(
+src/lib.rs: pub fn root(&self) -> &Path {
+src/lib.rs: pub fn service(&self) -> &ConfigService {
+src/lib.rs: pub fn set(zone: &str) {
+src/lib.rs: pub fn trust(&self) {
+src/lib.rs: pub fn trusted<P: Into<PathBuf>>(root: P) -> Self {
+src/lib.rs: pub fn untrust(&self) -> usize {
+src/lib.rs: pub fn untrusted<P: Into<PathBuf>>(root: P) -> Self {
+src/lib.rs: pub fn write_file<P: AsRef<Path>>(
+src/lib.rs: pub fn write_note<P: AsRef<Path>>(
+src/lib.rs: pub fn write_note<P: AsRef<Path>>(
+src/lib.rs: pub fn write_schema<P: AsRef<Path>>(
+src/lib.rs: pub fn write_schema<P: AsRef<Path>>(
+src/lib.rs: pub fn write_schema_value<P: AsRef<Path>>(
+src/lib.rs: pub fn write_template<P: AsRef<Path>>(
+src/lib.rs: pub fn write_template<P: AsRef<Path>>(
+src/lib.rs: pub mod cli;
+src/lib.rs: pub struct TestProject {
+src/lib.rs: pub struct TzGuard {
+src/lib.rs: pub use config::{Config, ConfigService, TaskConfig, TrustRequest};
+src/lib.rs: pub use date::{DateError, DateTimeValue, DateValue};
+src/lib.rs: pub use dialog::{
+src/lib.rs: pub use duration::{DurationError, DurationValue};
+src/lib.rs: pub use file::FileFormat;
+src/lib.rs: pub use file::FileMeta;
+src/lib.rs: pub use hash::{Blake3FileHash, Blake3PathHash};
+src/lib.rs: pub use index::{
+src/lib.rs: pub use note::{
+src/lib.rs: pub use path::codec as path_codec;
+src/lib.rs: pub use position::{PositionError, SourceLine};
+src/lib.rs: pub use query::{
+src/lib.rs: pub use schema::{Schema, SchemaFieldDef, SchemaService, SchemaServiceError};
+src/lib.rs: pub use tag::{Tag, TagError};
+src/lib.rs: pub use task::{
+src/lib.rs: pub use template::{
+src/lib.rs: pub use test_support::TzGuard;
+src/lib.rs: pub use test_support::{
+src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
+src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
+src/lib.rs: pub(crate) use delimiter::DelimiterType;
+src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
+src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_HINT};
+src/lib.rs: pub(crate) use field::{
+src/lib.rs: pub(crate) use file::{BaseName, BaseNameRef, FileName};
+src/lib.rs: pub(crate) use file_tracker::{
+src/lib.rs: pub(crate) use hash::{Blake3FileHash, Blake3PathHash};
+src/lib.rs: pub(crate) use index::IndexerService;
+src/lib.rs: pub(crate) use lexer::{
+src/lib.rs: pub(crate) use note::NoteFieldType;
+src/lib.rs: pub(crate) use position::{BytePos, ByteSpan, LineIndex, Spanned};
+src/lib.rs: pub(crate) use template::TemplateService;
+src/note/cursor.rs: pub(super) const fn len(&self) -> usize {
+src/note/cursor.rs: pub(super) const fn new(source: &'a str) -> Self {
+src/note/cursor.rs: pub(super) fn advance(&self, pos: usize, bytes: usize) -> usize {
+src/note/cursor.rs: pub(super) fn advance_char(&self, pos: usize, ch: char) -> usize {
+src/note/cursor.rs: pub(super) fn from(&self, pos: usize) -> Option<&'a str> {
+src/note/cursor.rs: pub(super) fn get(&self, range: Range<usize>) -> Option<&'a str> {
+src/note/cursor.rs: pub(super) fn token_end(
+src/note/cursor.rs: pub(super) struct SourceText<'a>(&'a str);
+src/note/field.rs: pub enum NoteFieldValue {
+src/note/field.rs: pub enum NoteFieldValueRef<'a> {
+src/note/field.rs: pub fn as_date(&self) -> Option<chrono::NaiveDate> {
+src/note/field.rs: pub fn as_ref(&self) -> NoteFieldValueRef<'_> {
+src/note/field.rs: pub fn as_str(&self) -> Option<&str> {
+src/note/field.rs: pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
+src/note/field.rs: pub(crate) const fn rank(self) -> u8 {
+src/note/field.rs: pub(crate) enum NoteFieldType {
+src/note/field.rs: pub(crate) fn append_text(&self, out: &mut String) {
+src/note/field.rs: pub(crate) fn as_str(&self) -> Option<&str> {
+src/note/field.rs: pub(crate) fn is_containing(&self, target: &NoteFieldValue) -> bool {
+src/note/field.rs: pub(crate) fn is_equal_to_literal(&self, literal: &NoteFieldValue) -> bool {
+src/note/field.rs: pub(crate) fn normalize_zero(n: f64) -> f64 {
+src/note/field.rs: pub(crate) fn to_owned_value(self) -> NoteFieldValue {
+src/note/heading.rs: pub const fn level(&self) -> u8 {
+src/note/heading.rs: pub const fn line(&self) -> SourceLine {
+src/note/heading.rs: pub fn text(&self) -> &str {
+src/note/heading.rs: pub struct Heading {
+src/note/heading.rs: pub(crate) const fn new(level: u8, text: String, line: SourceLine) -> Self {
+src/note/heading.rs: pub(crate) fn push_text(&mut self, text: &str) {
+src/note/links.rs: pub enum LinkTarget<'a> {
+src/note/links.rs: pub enum LinkType {
+src/note/links.rs: pub struct Link {
+src/note/links.rs: pub(crate) const fn anchor(self) -> Option<&'a str> {
+src/note/links.rs: pub(crate) const fn is_embedded(&self) -> bool {
+src/note/links.rs: pub(crate) const fn is_markdown(&self) -> bool {
+src/note/links.rs: pub(crate) const fn is_wikilink(&self) -> bool {
+src/note/links.rs: pub(crate) const fn kind(&self) -> LinkType {
+src/note/links.rs: pub(crate) const fn path(self) -> Option<&'a str> {
+src/note/links.rs: pub(crate) fn has_path(self) -> bool {
+src/note/links.rs: pub(crate) fn is_basename(self) -> bool {
+src/note/links.rs: pub(crate) fn new(
+src/note/links.rs: pub(crate) fn parse_wikilink(s: &str) -> Option<Self> {
+src/note/links.rs: pub(crate) fn parse_wikilink_prefix(s: &str) -> Option<(Self, usize)> {
+src/note/links.rs: pub(crate) fn target(&self) -> &str {
+src/note/links.rs: pub(crate) fn target_parts(&self) -> LinkTarget<'_> {
+src/note/links.rs: pub(crate) fn text(&self) -> &str {
+src/note/lists.rs: pub const fn as_task(&self) -> Option<&TaskListItem> {
+src/note/lists.rs: pub const fn dates(&self) -> TaskDateSet {
+src/note/lists.rs: pub const fn depth(&self) -> u8 {
+src/note/lists.rs: pub const fn is_checkbox(&self) -> bool {
+src/note/lists.rs: pub const fn is_fully_complete(&self) -> bool {
+src/note/lists.rs: pub const fn is_ordered(&self) -> bool {
+src/note/lists.rs: pub const fn is_plain(&self) -> bool {
+src/note/lists.rs: pub const fn is_task(&self) -> bool {
+src/note/lists.rs: pub const fn kind(&self) -> &ListItemType {
+src/note/lists.rs: pub const fn line(&self) -> SourceLine {
+src/note/lists.rs: pub const fn new(
+src/note/lists.rs: pub const fn parent(&self) -> Option<SourceLine> {
+src/note/lists.rs: pub const fn priority(&self) -> Option<TaskPriority> {
+src/note/lists.rs: pub const fn status(&self) -> &TaskStatus {
+src/note/lists.rs: pub enum ListItemType {
+src/note/lists.rs: pub fn clean(&self) -> &str {
+src/note/lists.rs: pub fn clean_text(&self) -> &str {
+src/note/lists.rs: pub fn for_test<T: Into<ListText>>(text: T, kind: ListItemType) -> Self {
+src/note/lists.rs: pub fn new<R: Into<String>, C: Into<String>>(raw: R, clean: C) -> Self {
+src/note/lists.rs: pub fn new<T: Into<ListText>>(
+src/note/lists.rs: pub fn raw(&self) -> &str {
+src/note/lists.rs: pub fn raw_text(&self) -> &str {
+src/note/lists.rs: pub fn tags(&self) -> &[Tag] {
+src/note/lists.rs: pub fn text(&self) -> &ListText {
+src/note/lists.rs: pub fn with_depth(mut self, depth: u8) -> Self {
+src/note/lists.rs: pub fn with_is_ordered(mut self, is_ordered: bool) -> Self {
+src/note/lists.rs: pub fn with_parent(mut self, parent: Option<SourceLine>) -> Self {
+src/note/lists.rs: pub struct ListItem {
+src/note/lists.rs: pub struct ListText {
+src/note/lists.rs: pub struct TaskListItem {
+src/note/lists.rs: pub(crate) fn descendants_of(
+src/note/lists.rs: pub(crate) fn fields(&self) -> Option<&ListFieldMap> {
+src/note/lists.rs: pub(crate) fn with_fields(
+src/note/lists.rs: pub(crate) fn with_tags<T: Into<Box<[Tag]>>>(mut self, tags: T) -> Self {
+src/note/lists.rs: pub(crate) type ListFieldMap = IndexMap<FieldKey, Box<[NoteFieldValue]>>;
+src/note/metadata.rs: pub struct Frontmatter {
+src/note/metadata.rs: pub(crate) fn fields(&self) -> &IndexMap<FieldKey, NoteFieldValue> {
+src/note/metadata.rs: pub(crate) fn get(&self, key: &str) -> Option<&NoteFieldValue> {
+src/note/metadata.rs: pub(crate) fn get_values(
+src/note/metadata.rs: pub(crate) fn is_empty(&self) -> bool {
+src/note/metadata.rs: pub(crate) fn new(fields: IndexMap<FieldKey, NoteFieldValue>) -> Self {
+src/note/metadata.rs: pub(crate) fn new(raw: impl Into<String>) -> Self {
+src/note/metadata.rs: pub(crate) fn tags<'a>(
+src/note/metadata.rs: pub(crate) struct RawFrontmatter(String);
+src/note/mod.rs: pub use field::{NoteFieldValue, NoteFieldValueRef};
+src/note/mod.rs: pub use heading::Heading;
+src/note/mod.rs: pub use links::{Link, LinkTarget, LinkType};
+src/note/mod.rs: pub use lists::{ListItem, ListItemType, ListText, TaskListItem};
+src/note/mod.rs: pub use metadata::Frontmatter;
+src/note/mod.rs: pub use model::Note;
+src/note/mod.rs: pub use parser::{MarkdownParserInput, parse_markdown};
+src/note/mod.rs: pub(crate) use field::{NoteFieldType, normalize_zero};
+src/note/mod.rs: pub(crate) use metadata::RawFrontmatter;
+src/note/model.rs: pub const fn frontmatter(&self) -> Option<&Frontmatter> {
+src/note/model.rs: pub fn descendants(
+src/note/model.rs: pub fn headings(&self) -> &[Heading] {
+src/note/model.rs: pub fn list_items(&self) -> impl Iterator<Item = &ListItem> {
+src/note/model.rs: pub fn lists(&self) -> &[ListItem] {
+src/note/model.rs: pub fn outlinks(&self) -> &[Link] {
+src/note/model.rs: pub fn path(&self) -> &Path {
+src/note/model.rs: pub fn tags(&self) -> &[Tag] {
+src/note/model.rs: pub fn tasks(&self) -> impl Iterator<Item = &ListItem> {
+src/note/model.rs: pub struct Note {
+src/note/model.rs: pub(crate) fn fields(
+src/note/model.rs: pub(crate) fn get(&self, key: &str) -> Option<&NoteFieldValue> {
+src/note/model.rs: pub(crate) fn inline_fields(
+src/note/model.rs: pub(crate) fn new<P, L, O, T, H>(
+src/note/parser.rs: pub fn parse_markdown(input: &MarkdownParserInput<'_>) -> Note {
+src/note/parser.rs: pub use input::MarkdownParserInput;
+src/note/parser/inline.rs: pub(super) fn parse_inline_value(raw: &str) -> NoteFieldValue {
+src/note/parser/input.rs: pub const fn new(
+src/note/parser/input.rs: pub fn for_test(path: &'a Path, src: &'a str) -> Self {
+src/note/parser/input.rs: pub struct MarkdownParserInput<'a> {
+src/note/parser/input.rs: pub(crate) const fn frontmatter(&self) -> &'a FrontmatterConfig {
+src/note/parser/input.rs: pub(crate) const fn path(&self) -> &'a Path {
+src/note/parser/input.rs: pub(crate) const fn src(&self) -> &'a str {
+src/note/parser/input.rs: pub(crate) const fn tasks(&self) -> &'a TaskConfig {
+src/note/parser/lexer.rs: pub(super) enum FieldForm {
+src/note/parser/lexer.rs: pub(super) enum ItemToken {
+src/note/parser/lexer.rs: pub(super) enum TaskFieldEmojis {
+src/note/parser/lexer.rs: pub(super) fn scan_metadata(
+src/note/parser/lexer.rs: pub(super) fn tokenize_item_text(
+src/note/parser/lexer.rs: pub(super) form: FieldForm,
+src/note/parser/lexer.rs: pub(super) key: FieldKey,
+src/note/parser/lexer.rs: pub(super) struct FieldToken {
+src/note/parser/lexer.rs: pub(super) value: NoteFieldValue,
+src/note/parser/list.rs: pub(super) const fn is_item_active(&self) -> bool {
+src/note/parser/list.rs: pub(super) fn end_item(
+src/note/parser/list.rs: pub(super) fn end_list(&mut self) {
+src/note/parser/list.rs: pub(super) fn inline_code(&mut self, text: &str) {
+src/note/parser/list.rs: pub(super) fn into_lists(self) -> Vec<ListItem> {
+src/note/parser/list.rs: pub(super) fn push_break(&mut self) -> bool {
+src/note/parser/list.rs: pub(super) fn push_scan_char(&mut self, ch: char) -> bool {
+src/note/parser/list.rs: pub(super) fn push_text(
+src/note/parser/list.rs: pub(super) fn reject_marker(&mut self) {
+src/note/parser/list.rs: pub(super) fn resolve_pending_marker(&mut self) {
+src/note/parser/list.rs: pub(super) fn start_item(&mut self, line: SourceLine) {
+src/note/parser/list.rs: pub(super) fn start_list(
+src/note/parser/list.rs: pub(super) fn start_nested_block(&mut self) -> bool {
+src/note/parser/list.rs: pub(super) struct ListTracker {
+src/note/parser/marker.rs: pub(super) const fn is_marked(&self) -> bool {
+src/note/parser/marker.rs: pub(super) const fn marker_symbol(&self) -> Option<char> {
+src/note/parser/marker.rs: pub(super) const fn new() -> Self {
+src/note/parser/marker.rs: pub(super) enum ItemMarker {
+src/note/parser/marker.rs: pub(super) enum MarkerAccumulator {
+src/note/parser/marker.rs: pub(super) enum MarkerAction<'a> {
+src/note/parser/marker.rs: pub(super) fn push_text<'a>(
+src/note/parser/marker.rs: pub(super) fn reject(&mut self) -> MarkerAction<'_> {
+src/note/parser/marker.rs: pub(super) fn resolve_at_line_end(&mut self) -> MarkerAction<'_> {
+src/note/parser/task.rs: pub(super) const fn initial() -> Self {
+src/note/parser/task.rs: pub(super) const fn is_fully_complete(self) -> bool {
+src/note/parser/task.rs: pub(super) enum SubTaskCompletion {
+src/note/parser/task.rs: pub(super) fields: &'a IndexMap<FieldKey, Vec<NoteFieldValue>>,
+src/note/parser/task.rs: pub(super) fn classify(
+src/note/parser/task.rs: pub(super) fn clean_text(&self, tag_filters: &[Tag]) -> String {
+src/note/parser/task.rs: pub(super) fn dates(
+src/note/parser/task.rs: pub(super) fn observe_child(
+src/note/parser/task.rs: pub(super) fn priority(
+src/note/parser/task.rs: pub(super) fn scan(
+src/note/parser/task.rs: pub(super) fully_complete: bool,
+src/note/parser/task.rs: pub(super) marker: Option<char>,
+src/note/parser/task.rs: pub(super) statuses: &'a TaskStatusMap,
+src/note/parser/task.rs: pub(super) struct TaskClassificationParams<'a> {
+src/note/parser/task.rs: pub(super) struct TaskScan<'a> {
+src/note/parser/task.rs: pub(super) tag_filters: &'a [Tag],
+src/note/parser/task.rs: pub(super) tags: &'a [Tag],
+src/path.rs: pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+src/path.rs: pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+src/path.rs: pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+src/path.rs: pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
+src/path.rs: pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
+src/path.rs: pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
+src/path.rs: pub mod codec {
+src/path.rs: pub(crate) enum PathError {
+src/path.rs: pub(crate) fn as_path(self) -> &'a Path {
+src/path.rs: pub(crate) fn derive(root: &Path, path: &Path) -> Result<Self, PathError> {
+src/path.rs: pub(crate) fn distance_to(self, other: FolderRef<'_>) -> usize {
+src/path.rs: pub(crate) fn fold_confinement<T>(
+src/path.rs: pub(crate) fn into_path_buf(self) -> PathBuf {
+src/path.rs: pub(crate) fn into_path_buf(self) -> PathBuf {
+src/path.rs: pub(crate) fn of(path: &'a Path) -> Self {
+src/path.rs: pub(crate) fn parse(
+src/path.rs: pub(crate) fn parse(candidate: &Path) -> Result<Self, PathError> {
+src/path.rs: pub(crate) struct FolderRef<'a>(&'a Path);
+src/path.rs: pub(crate) struct RelativePath(PathBuf);
+src/path.rs: pub(crate) struct SafeRelativePath(PathBuf);
+src/path.rs: pub(crate) trait HasPath {
+src/position.rs: pub const MAX: Self = Self(u32::MAX);
+src/position.rs: pub const MIN: Self = Self(NonZeroU32::MIN);
+src/position.rs: pub const fn get(self) -> u32 {
+src/position.rs: pub const fn new(line: u32) -> Option<Self> {
+src/position.rs: pub enum PositionError {
+src/position.rs: pub struct SourceLine(NonZeroU32);
+src/position.rs: pub(crate) const fn new(pos: u32) -> Self {
+src/position.rs: pub(crate) const fn new(value: T, span: ByteSpan) -> Self {
+src/position.rs: pub(crate) const fn span(&self) -> ByteSpan {
+src/position.rs: pub(crate) const fn start(&self) -> BytePos {
+src/position.rs: pub(crate) const fn start(self) -> BytePos {
+src/position.rs: pub(crate) const fn value(&self) -> &T {
+src/position.rs: pub(crate) fn end_usize(&self) -> usize {
+src/position.rs: pub(crate) fn end_usize(self) -> usize {
+src/position.rs: pub(crate) fn from_usize_range(value: T, range: Range<usize>) -> Self {
+src/position.rs: pub(crate) fn into_parts(self) -> (T, ByteSpan) {
+src/position.rs: pub(crate) fn into_parts_usize(self) -> (T, Range<usize>) {
+src/position.rs: pub(crate) fn into_value(self) -> T {
+src/position.rs: pub(crate) fn is_empty(self) -> bool {
+src/position.rs: pub(crate) fn len(self) -> usize {
+src/position.rs: pub(crate) fn line_at(&self, pos: BytePos) -> SourceLine {
+src/position.rs: pub(crate) fn new(source: &str) -> Self {
+src/position.rs: pub(crate) fn new(start: BytePos, end: BytePos) -> Self {
+src/position.rs: pub(crate) fn saturating_from(pos: usize) -> Self {
+src/position.rs: pub(crate) fn span_usize(&self) -> Range<usize> {
+src/position.rs: pub(crate) fn start_usize(&self) -> usize {
+src/position.rs: pub(crate) fn start_usize(self) -> usize {
+src/position.rs: pub(crate) fn to_range(self) -> Range<usize> {
+src/position.rs: pub(crate) struct BytePos(u32);
+src/position.rs: pub(crate) struct ByteSpan {
+src/position.rs: pub(crate) struct LineIndex(Box<[BytePos]>);
+src/position.rs: pub(crate) struct Spanned<T> {
+src/query/builder.rs: pub fn filter(mut self, expr: &str) -> Result<Self, QueryBuilderError> {
+src/query/builder.rs: pub fn limit(mut self, n: i64) -> Result<Self, QueryBuilderError> {
+src/query/builder.rs: pub fn lists(source: SourceSelector) -> Self {
+src/query/builder.rs: pub fn pages(source: SourceSelector) -> Self {
+src/query/builder.rs: pub fn sort(
+src/query/builder.rs: pub fn tasks(source: SourceSelector) -> Self {
+src/query/builder.rs: pub struct QueryBuilder {
+src/query/builder.rs: pub(crate) enum QueryMode {
+src/query/builder.rs: pub(crate) fn from_mode(mode: QueryMode, source: SourceSelector) -> Self {
+src/query/builder.rs: pub(crate) fn order(mut self, by: SortOrder) -> Self {
+src/query/builder.rs: pub(super) fn into_parts(
+src/query/error.rs: pub enum QueryBuilderError {
+src/query/error.rs: pub enum QueryDialect {
+src/query/error.rs: pub enum QueryError {
+src/query/error.rs: pub struct FieldPathError {
+src/query/error.rs: pub struct QuerySyntaxError {
+src/query/error.rs: pub type QueryResult<T> = std::result::Result<T, QueryError>;
+src/query/error.rs: pub(crate) dialect: QueryDialect,
+src/query/error.rs: pub(crate) fn from_lex(
+src/query/error.rs: pub(crate) fn unexpected_end(
+src/query/error.rs: pub(crate) input: String,
+src/query/error.rs: pub(crate) lex_error: Box<LexError>,
+src/query/error.rs: pub(crate) path: String,
+src/query/error.rs: pub(crate) span: SourceSpan,
+src/query/error.rs: pub(crate) suggestion: Option<String>,
+src/query/error.rs: pub(in crate::query) fn new(path: &str, suggestion: Option<&str>) -> Self {
+src/query/format.rs: pub(crate) enum TaskPathStyle {
+src/query/format.rs: pub(super) const fn task_list(style: TaskPathStyle) -> Self {
+src/query/format.rs: pub(super) enum QueryDisplayFormat {
+src/query/format.rs: pub(super) fn list(field: &str) -> Self {
+src/query/format.rs: pub(super) fn render(&self, rows: &[QueryRow]) -> QueryResult<String> {
+src/query/format.rs: pub(super) fn table(headers: &[&str], columns: &[&str]) -> Self {
+src/query/grammar/expr.rs: pub(crate) enum BooleanExpr<A> {
+src/query/grammar/expr.rs: pub(crate) fn visit_atoms_mut(&mut self, visitor: &mut impl FnMut(&mut A)) {
+src/query/grammar/expr.rs: pub(super) enum LogicalControl {
+src/query/grammar/expr.rs: pub(super) enum LogicalOp {
+src/query/grammar/expr.rs: pub(super) fn has_any_atom(&self, predicate: impl Fn(&A) -> bool) -> bool {
+src/query/grammar/expr.rs: pub(super) fn is_satisfied_by(
+src/query/grammar/expr.rs: pub(super) fn parse_boolean_expr<G>(
+src/query/grammar/expr.rs: pub(super) trait AtomParser {
+src/query/grammar/field.rs: pub(crate) const ACCESSOR_NAMES: &'static [&'static str] = &[
+src/query/grammar/field.rs: pub(crate) const ACCESSOR_NAMES: &'static [&'static str] = &[
+src/query/grammar/field.rs: pub(crate) enum FieldPath {
+src/query/grammar/field.rs: pub(crate) enum FileField {
+src/query/grammar/field.rs: pub(crate) enum ListField {
+src/query/grammar/field.rs: pub(crate) enum TaskField {
+src/query/grammar/field.rs: pub(crate) fn parse(name: &str) -> Option<Self> {
+src/query/grammar/field.rs: pub(crate) fn parse(name: &str) -> Option<Self> {
+src/query/grammar/field.rs: pub(crate) fn parse(path: &str) -> Result<Self, FieldPathError> {
+src/query/grammar/field.rs: pub(super) const ACCESSOR_NAMES: &'static [&'static str] = &[
+src/query/grammar/field.rs: pub(super) fn parse(name: &str) -> Option<Self> {
+src/query/grammar/filter.rs: pub(crate) enum ArithOp {
+src/query/grammar/filter.rs: pub(crate) enum FilterAtom {
+src/query/grammar/filter.rs: pub(crate) enum FilterFunction {
+src/query/grammar/filter.rs: pub(crate) enum ValueExpr {
+src/query/grammar/filter.rs: pub(crate) fn and(self, other: Self) -> Self {
+src/query/grammar/filter.rs: pub(crate) fn is_matching(&self, row: &QueryRow) -> bool {
+src/query/grammar/filter.rs: pub(crate) fn parse(input: &str) -> Result<Self, QueryBuilderError> {
+src/query/grammar/filter.rs: pub(crate) struct ComparisonExpr {
+src/query/grammar/filter.rs: pub(crate) struct FilterExpr(BooleanExpr<FilterAtom>);
+src/query/grammar/filter.rs: pub(super) enum CompareOp {
+src/query/grammar/filter.rs: pub(super) fn classify_literal(literal: NoteFieldValue) -> NoteFieldValue {
+src/query/grammar/filter.rs: pub(super) fn is_matching(&self, row: &QueryRow) -> bool {
+src/query/grammar/filter.rs: pub(super) fn is_satisfied_by_values(
+src/query/grammar/filter.rs: pub(super) fn new(lhs: ValueExpr, op: CompareOp, rhs: ValueExpr) -> Self {
+src/query/grammar/mod.rs: pub use source::SourceSelector;
+src/query/grammar/mod.rs: pub(crate) use expr::BooleanExpr;
+src/query/grammar/mod.rs: pub(crate) use field::{FieldPath, FileField, ListField, TaskField};
+src/query/grammar/mod.rs: pub(crate) use filter::FilterExpr;
+src/query/grammar/mod.rs: pub(crate) use source::{
+src/query/grammar/source.rs: pub enum SourceSelector {
+src/query/grammar/source.rs: pub fn parse(input: &str) -> QueryResult<Self> {
+src/query/grammar/source.rs: pub struct SourceExpr(BooleanExpr<SourceAtom>);
+src/query/grammar/source.rs: pub(crate) const fn atom(atom: SourceAtom) -> Self {
+src/query/grammar/source.rs: pub(crate) const fn classes(&self) -> &BTreeSet<String> {
+src/query/grammar/source.rs: pub(crate) enum ClassExpansionMode {
+src/query/grammar/source.rs: pub(crate) enum SourceAtom {
+src/query/grammar/source.rs: pub(crate) fn and(first: Self, rest: Vec<Self>) -> Self {
+src/query/grammar/source.rs: pub(crate) fn class_values<'a, 'b>(
+src/query/grammar/source.rs: pub(crate) fn has_classes(&self) -> bool {
+src/query/grammar/source.rs: pub(crate) fn has_classes(&self) -> bool {
+src/query/grammar/source.rs: pub(crate) fn inner(&self) -> &BooleanExpr<SourceAtom> {
+src/query/grammar/source.rs: pub(crate) fn is_match(
+src/query/grammar/source.rs: pub(crate) fn is_match(
+src/query/grammar/source.rs: pub(crate) fn is_match(&self, path: &Path) -> bool {
+src/query/grammar/source.rs: pub(crate) fn or(first: SourceAtom, rest: Vec<SourceAtom>) -> Self {
+src/query/grammar/source.rs: pub(crate) fn parse(input: &str) -> Result<Self, QueryBuilderError> {
+src/query/grammar/source.rs: pub(crate) fn path(pattern: &str) -> Result<Self, regex::Error> {
+src/query/grammar/source.rs: pub(crate) fn resolve_classes(
+src/query/grammar/source.rs: pub(crate) fn set_classes(&mut self, resolved: BTreeSet<String>) {
+src/query/grammar/source.rs: pub(crate) fn visit_atoms_mut(
+src/query/grammar/source.rs: pub(crate) struct GlobPattern {
+src/query/grammar/source.rs: pub(crate) trait FileClassExpander: Send + Sync {
+src/query/mod.rs: pub use builder::QueryBuilder;
+src/query/mod.rs: pub use error::{QueryBuilderError, QueryDialect, QueryError, QueryResult};
+src/query/mod.rs: pub use grammar::SourceSelector;
+src/query/mod.rs: pub use results::{QueryRow, QuerySet};
+src/query/mod.rs: pub use service::QueryService;
+src/query/mod.rs: pub(crate) use builder::QueryMode;
+src/query/mod.rs: pub(crate) use error::{FieldPathError, QuerySyntaxError};
+src/query/mod.rs: pub(crate) use format::TaskPathStyle;
+src/query/mod.rs: pub(crate) use grammar::{
+src/query/mod.rs: pub(crate) use sort::{SortDirection, SortOrder};
+src/query/mod.rs: pub(super) fn find_base<'a>(
+src/query/mod.rs: pub(super) fn find_entry<'a>(
+src/query/mod.rs: pub(super) fn rows_for(temp: &Path, content: &str) -> QuerySet {
+src/query/mod.rs: pub(super) fn rows_for_files(
+src/query/mod.rs: pub(super) mod test_support {
+src/query/plan.rs: pub(super) enum QueryTransform {
+src/query/plan.rs: pub(super) fn apply(&self, rows: Vec<QueryRow>) -> Vec<QueryRow> {
+src/query/plan.rs: pub(super) fn filter(expr: &str) -> Result<Self, QueryBuilderError> {
+src/query/plan.rs: pub(super) fn flatten(path: &str) -> Result<Self, QueryBuilderError> {
+src/query/plan.rs: pub(super) fn group_by(path: &str) -> Result<Self, QueryBuilderError> {
+src/query/plan.rs: pub(super) fn is_empty(&self) -> bool {
+src/query/plan.rs: pub(super) fn limit(n: i64) -> Result<Self, QueryBuilderError> {
+src/query/plan.rs: pub(super) fn order(by: SortOrder) -> Self {
+src/query/plan.rs: pub(super) fn push(&mut self, op: QueryTransform) {
+src/query/plan.rs: pub(super) fn run(self, rows: Vec<QueryRow>) -> Vec<QueryRow> {
+src/query/plan.rs: pub(super) fn sort(
+src/query/plan.rs: pub(super) struct ExecutionPlan {
+src/query/results.rs: pub fn depth(&self) -> u8 {
+src/query/results.rs: pub fn file(&self) -> &FileMeta {
+src/query/results.rs: pub fn get(&self, index: usize) -> Option<&QueryRow> {
+src/query/results.rs: pub fn is_empty(&self) -> bool {
+src/query/results.rs: pub fn iter(&self) -> std::slice::Iter<'_, QueryRow> {
+src/query/results.rs: pub fn len(&self) -> usize {
+src/query/results.rs: pub fn line(&self) -> Option<SourceLine> {
+src/query/results.rs: pub fn parent(&self) -> Option<SourceLine> {
+src/query/results.rs: pub fn status_symbol(&self) -> Option<TaskStatusSymbol> {
+src/query/results.rs: pub fn task_completed(&self) -> Option<bool> {
+src/query/results.rs: pub fn task_priority_rank(&self) -> Option<u8> {
+src/query/results.rs: pub fn task_text(&self) -> Option<&str> {
+src/query/results.rs: pub struct QueryRow {
+src/query/results.rs: pub struct QuerySet {
+src/query/results.rs: pub(crate) fn cmp_document_order(
+src/query/results.rs: pub(crate) fn field(&self, path: &str) -> QueryResult<NoteFieldValue> {
+src/query/results.rs: pub(crate) fn filter(self, expr: &str) -> QueryResult<Self> {
+src/query/results.rs: pub(crate) fn flatten(self, path: &str) -> QueryResult<Self> {
+src/query/results.rs: pub(crate) fn group_by(self, path: &str) -> QueryResult<Self> {
+src/query/results.rs: pub(crate) fn inlinks(&self) -> &[PathBuf] {
+src/query/results.rs: pub(crate) fn limit(self, n: i64) -> QueryResult<Self> {
+src/query/results.rs: pub(crate) fn list(&self, path: &str) -> QueryResult<String> {
+src/query/results.rs: pub(crate) fn note(&self) -> Option<&Note> {
+src/query/results.rs: pub(crate) fn order(self, by: SortOrder) -> Self {
+src/query/results.rs: pub(crate) fn resolve_owned(&self, path: &FieldPath) -> NoteFieldValue {
+src/query/results.rs: pub(crate) fn sort(
+src/query/results.rs: pub(crate) fn sort_field(
+src/query/results.rs: pub(crate) fn table(
+src/query/results.rs: pub(crate) fn task_list(
+src/query/results.rs: pub(super) fn format(
+src/query/results.rs: pub(super) fn list_row(
+src/query/results.rs: pub(super) fn new(index: &Arc<WorkspaceIndex>, position: RowIndex) -> Self {
+src/query/results.rs: pub(super) fn new(rows: Vec<QueryRow>) -> Self {
+src/query/results.rs: pub(super) fn r#where(self, expr: &str) -> QueryResult<Self> {
+src/query/results.rs: pub(super) fn resolve_ref(
+src/query/results.rs: pub(super) fn with_flattened(
+src/query/results.rs: pub(super) fn with_list_item(mut self, item_idx: u32) -> Self {
+src/query/service.rs: pub fn new<S: Into<String>>(class_field: S) -> Self {
+src/query/service.rs: pub fn run(
+src/query/service.rs: pub fn sync_and_run(
+src/query/service.rs: pub struct QueryService {
+src/query/service.rs: pub(crate) fn run_from_store(
+src/query/service.rs: pub(crate) fn with_class_expander(
+src/query/sort.rs: pub(crate) enum NullPlacement {
+src/query/sort.rs: pub(crate) enum SortDirection {
+src/query/sort.rs: pub(crate) fn parse(
+src/query/sort.rs: pub(crate) struct SortOrder {
+src/query/sort.rs: pub(super) const fn direction(&self) -> SortDirection {
+src/query/sort.rs: pub(super) enum SortKey<'a> {
+src/query/sort.rs: pub(super) enum TextShape {
+src/query/sort.rs: pub(super) fn classify(s: &str) -> Self {
+src/query/sort.rs: pub(super) fn cmp(&self, other: &Self) -> Ordering {
+src/query/sort.rs: pub(super) fn compare_keys(
+src/query/sort.rs: pub(super) fn concat(self, other: Self) -> Self {
+src/query/sort.rs: pub(super) fn from_value_ref(val: QueryFieldValueRef<'a>) -> Self {
+src/query/sort.rs: pub(super) fn get(&self, row_idx: usize) -> &[SortKey<'a>] {
+src/query/sort.rs: pub(super) fn keys_for<'a>(&self, rows: &'a [QueryRow]) -> SortKeys<'a> {
+src/query/sort.rs: pub(super) fn len(&self) -> usize {
+src/query/sort.rs: pub(super) fn single(path: FieldPath, direction: SortDirection) -> Self {
+src/query/sort.rs: pub(super) fn sort(&self, rows: Vec<QueryRow>) -> Vec<QueryRow> {
+src/query/sort.rs: pub(super) fn terms(&self) -> &[SortTerm] {
+src/query/sort.rs: pub(super) struct SortKeys<'a> {
+src/query/sort.rs: pub(super) struct SortTerm {
+src/query/value.rs: pub(super) enum QueryFieldValueRef<'a> {
+src/query/value.rs: pub(super) fn append_text(&self, out: &mut String) {
+src/query/value.rs: pub(super) fn as_note_ref(&self) -> Option<NoteFieldValueRef<'_>> {
+src/query/value.rs: pub(super) fn as_str(&self) -> Option<&str> {
+src/query/value.rs: pub(super) fn is_containing(&self, target: &NoteFieldValue) -> bool {
+src/query/value.rs: pub(super) fn is_equal_to_literal(&self, literal: &NoteFieldValue) -> bool {
+src/query/value.rs: pub(super) fn text(&self) -> String {
+src/query/value.rs: pub(super) fn to_owned_value(&self) -> NoteFieldValue {
+src/schema/builder.rs: pub(crate) error: SchemaError,
+src/schema/builder.rs: pub(crate) schema: SchemaName,
+src/schema/builder.rs: pub(crate) struct SchemaFailure {
+src/schema/builder.rs: pub(super) failures: Vec<SchemaFailure>,
+src/schema/builder.rs: pub(super) fn build(mut self) -> SchemaResult<ResolvedSchemas> {
+src/schema/builder.rs: pub(super) fn new(
+src/schema/builder.rs: pub(super) schemas: IndexMap<SchemaName, Schema>,
+src/schema/builder.rs: pub(super) struct ResolvedSchemas {
+src/schema/builder.rs: pub(super) struct SchemaBuilder<'a> {
+src/schema/builder.rs: pub(super) warnings: Vec<SchemaWarning>,
+src/schema/error.rs: pub(crate) enum SchemaError {
+src/schema/error.rs: pub(crate) enum SchemaFileError {
+src/schema/error.rs: pub(crate) enum SchemaNameError {
+src/schema/error.rs: pub(crate) enum SchemaWarning {
+src/schema/error.rs: pub(crate) type SchemaResult<T> = std::result::Result<T, SchemaError>;
+src/schema/fields.rs: pub struct SchemaFieldDef {
+src/schema/fields.rs: pub(crate) const fn is_multi(&self) -> bool {
+src/schema/fields.rs: pub(crate) const fn is_required(&self) -> bool {
+src/schema/fields.rs: pub(crate) enum SchemaFieldType {
+src/schema/fields.rs: pub(crate) enum SchemaFieldTypeTag {
+src/schema/fields.rs: pub(crate) fn file_filter(&self) -> Option<file::SchemaFileFieldRef<'_>> {
+src/schema/fields.rs: pub(crate) fn select_values(&self) -> Option<&[SchemaSelectFieldEntry]> {
+src/schema/fields.rs: pub(crate) use address::{FieldAddress, FieldAddressRef};
+src/schema/fields.rs: pub(crate) use builder::{SchemaFieldBuildContext, SchemaFieldBuilder};
+src/schema/fields.rs: pub(crate) use date::SchemaDateField;
+src/schema/fields.rs: pub(crate) use error::SchemaFieldBuilderError;
+src/schema/fields.rs: pub(crate) use error::SchemaFieldParserError;
+src/schema/fields.rs: pub(crate) use file::{SchemaFileField, SchemaFileFieldRef};
+src/schema/fields.rs: pub(crate) use number::SchemaNumberField;
+src/schema/fields.rs: pub(crate) use select::{SchemaSelectField, SchemaSelectFieldEntry};
+src/schema/fields.rs: pub(super) const fn as_date(&self) -> Option<&SchemaDateField> {
+src/schema/fields.rs: pub(super) const fn as_number(&self) -> Option<&SchemaNumberField> {
+src/schema/fields.rs: pub(super) const fn for_test(
+src/schema/fields.rs: pub(super) const fn kind(&self) -> &SchemaFieldType {
+src/schema/fields.rs: pub(super) const fn kind(&self) -> SchemaFieldTypeTag {
+src/schema/fields.rs: pub(super) fn as_file(&self) -> Option<&SchemaFileField> {
+src/schema/fields.rs: pub(super) fn as_select(&self) -> Option<&SchemaSelectField> {
+src/schema/fields/address.rs: pub(crate) const fn field(&self) -> &FieldName {
+src/schema/fields/address.rs: pub(crate) const fn field(self) -> FieldNameRef<'a> {
+src/schema/fields/address.rs: pub(crate) const fn new(
+src/schema/fields/address.rs: pub(crate) const fn schema(&self) -> &SchemaName {
+src/schema/fields/address.rs: pub(crate) const fn schema(self) -> SchemaNameRef<'a> {
+src/schema/fields/address.rs: pub(crate) enum FieldAddressError {
+src/schema/fields/address.rs: pub(crate) fn as_ref(&self) -> FieldAddressRef<'_> {
+src/schema/fields/address.rs: pub(crate) struct FieldAddress {
+src/schema/fields/address.rs: pub(crate) struct FieldAddressRef<'a> {
+src/schema/fields/builder.rs: pub(crate) const fn new(
+src/schema/fields/builder.rs: pub(crate) fn build(
+src/schema/fields/builder.rs: pub(crate) fn for_test() -> Self {
+src/schema/fields/builder.rs: pub(crate) fn new(schema_dir: &Path) -> Self {
+src/schema/fields/builder.rs: pub(crate) struct SchemaFieldBuildContext {
+src/schema/fields/builder.rs: pub(crate) struct SchemaFieldBuilder<'a> {
+src/schema/fields/date.rs: pub(crate) const fn for_test(format: Option<String>) -> Self {
+src/schema/fields/date.rs: pub(crate) fn format(&self) -> Option<&str> {
+src/schema/fields/date.rs: pub(crate) struct SchemaDateField {
+src/schema/fields/date.rs: pub(super) fn parse(
+src/schema/fields/error.rs: pub(crate) enum SchemaFieldBuilderError {
+src/schema/fields/error.rs: pub(crate) enum SchemaFieldParserError {
+src/schema/fields/error.rs: pub(crate) enum SchemaSelectFieldEntryError {
+src/schema/fields/error.rs: pub(crate) enum SchemaSelectFieldFileError {
+src/schema/fields/error.rs: pub(crate) enum SchemaSelectFieldValueError {
+src/schema/fields/file.rs: pub(crate) class: &'a [String],
+src/schema/fields/file.rs: pub(crate) const fn for_test(
+src/schema/fields/file.rs: pub(crate) ext: Option<&'a str>,
+src/schema/fields/file.rs: pub(crate) fn class(&self) -> &[String] {
+src/schema/fields/file.rs: pub(crate) fn ext(&self) -> Option<&str> {
+src/schema/fields/file.rs: pub(crate) fn folders(&self) -> &[String] {
+src/schema/fields/file.rs: pub(crate) folders: &'a [String],
+src/schema/fields/file.rs: pub(crate) struct SchemaFileField {
+src/schema/fields/file.rs: pub(crate) struct SchemaFileFieldRef<'a> {
+src/schema/fields/file.rs: pub(super) fn as_ref(&self) -> SchemaFileFieldRef<'_> {
+src/schema/fields/file.rs: pub(super) fn parse(
+src/schema/fields/number.rs: pub(crate) const fn for_test(
+src/schema/fields/number.rs: pub(crate) const fn max(&self) -> Option<f64> {
+src/schema/fields/number.rs: pub(crate) const fn min(&self) -> Option<f64> {
+src/schema/fields/number.rs: pub(crate) const fn step(&self) -> Option<f64> {
+src/schema/fields/number.rs: pub(crate) struct SchemaNumberField {
+src/schema/fields/number.rs: pub(super) fn parse(
+src/schema/fields/parser.rs: pub(super) fn f64(
+src/schema/fields/parser.rs: pub(super) fn finish(
+src/schema/fields/parser.rs: pub(super) fn has_errors_since(&self, mark: usize) -> bool {
+src/schema/fields/parser.rs: pub(super) fn mark_errors(&self) -> usize {
+src/schema/fields/parser.rs: pub(super) fn new(
+src/schema/fields/parser.rs: pub(super) fn push_number_constraint(
+src/schema/fields/parser.rs: pub(super) fn push_number_range(&mut self, min: f64, max: f64) {
+src/schema/fields/parser.rs: pub(super) fn push_select_value_error(
+src/schema/fields/parser.rs: pub(super) fn push_type_mismatch<T: std::fmt::Debug + ?Sized>(
+src/schema/fields/parser.rs: pub(super) fn push_unknown_key(&mut self, key: &str) {
+src/schema/fields/parser.rs: pub(super) fn raw_value<'m>(
+src/schema/fields/parser.rs: pub(super) fn string(
+src/schema/fields/parser.rs: pub(super) fn string_list(
+src/schema/fields/parser.rs: pub(super) struct SchemaFieldParser<'a> {
+src/schema/fields/select.rs: pub(crate) const fn extra(&self) -> &IndexMap<String, FieldValue> {
+src/schema/fields/select.rs: pub(crate) const fn for_test(values: Vec<SchemaSelectFieldEntry>) -> Self {
+src/schema/fields/select.rs: pub(crate) const fn label(&self) -> &FieldValue {
+src/schema/fields/select.rs: pub(crate) const fn new(
+src/schema/fields/select.rs: pub(crate) const fn value(&self) -> &FieldValue {
+src/schema/fields/select.rs: pub(crate) fn for_test() -> Self {
+src/schema/fields/select.rs: pub(crate) fn literal(value: String) -> Self {
+src/schema/fields/select.rs: pub(crate) fn load(
+src/schema/fields/select.rs: pub(crate) fn new(dir: &Path) -> Self {
+src/schema/fields/select.rs: pub(crate) fn values(&self) -> &[SchemaSelectFieldEntry] {
+src/schema/fields/select.rs: pub(crate) fn with_label(
+src/schema/fields/select.rs: pub(crate) struct SchemaSelectField {
+src/schema/fields/select.rs: pub(crate) struct SchemaSelectFieldEntry {
+src/schema/fields/select.rs: pub(crate) struct SelectValuesFileCache {
+src/schema/fields/select.rs: pub(super) fn parse(
+src/schema/graph.rs: pub(super) fn hierarchy<'b>(
+src/schema/graph.rs: pub(super) fn parents_of(&self, name: SchemaNameRef<'_>) -> &[SchemaName] {
+src/schema/graph.rs: pub(super) fn topological_order(
+src/schema/graph.rs: pub(super) struct SchemaGraph<'a> {
+src/schema/graph.rs: pub(super) use builder::SchemaGraphBuilder;
+src/schema/graph/adjacency.rs: pub(super) fn build(
+src/schema/graph/adjacency.rs: pub(super) fn child_targets_iter(
+src/schema/graph/adjacency.rs: pub(super) fn children_slice(&self, node: DenseIndex) -> &[DenseIndex] {
+src/schema/graph/adjacency.rs: pub(super) fn children_slice_mut(
+src/schema/graph/adjacency.rs: pub(super) fn compute_topo_rank(
+src/schema/graph/adjacency.rs: pub(super) fn from_usize(n: usize) -> Self {
+src/schema/graph/adjacency.rs: pub(super) fn index(self) -> usize {
+src/schema/graph/adjacency.rs: pub(super) fn index_of(
+src/schema/graph/adjacency.rs: pub(super) fn name_of(
+src/schema/graph/adjacency.rs: pub(super) fn names_iter(
+src/schema/graph/adjacency.rs: pub(super) fn node_count(&self) -> usize {
+src/schema/graph/adjacency.rs: pub(super) fn parents_of(&self, name: SchemaNameRef<'_>) -> &[SchemaName] {
+src/schema/graph/adjacency.rs: pub(super) fn saturating_u32(n: usize) -> u32 {
+src/schema/graph/adjacency.rs: pub(super) fn widen_usize(n: u32) -> usize {
+src/schema/graph/adjacency.rs: pub(super) struct DenseIndex(u32);
+src/schema/graph/adjacency.rs: pub(super) struct SchemaAdjacency<'a> {
+src/schema/graph/builder.rs: pub(crate) fn build(mut self) -> Result<SchemaGraph<'a>, Vec<SchemaName>> {
+src/schema/graph/builder.rs: pub(crate) fn new(
+src/schema/graph/builder.rs: pub(crate) struct SchemaGraphBuilder<'a> {
+src/schema/graph/cycle.rs: pub(super) fn find(mut self) -> Vec<SchemaName> {
+src/schema/graph/cycle.rs: pub(super) fn new<'b>(
+src/schema/graph/cycle.rs: pub(super) struct CycleDetector<'a, 'b> {
+src/schema/mod.rs: pub use fields::SchemaFieldDef;
+src/schema/mod.rs: pub use model::Schema;
+src/schema/mod.rs: pub use service::SchemaService;
+src/schema/mod.rs: pub use service::SchemaServiceError;
+src/schema/mod.rs: pub(crate) const GLOBAL_SCHEMA_NAME: &str = "global";
+src/schema/mod.rs: pub(crate) use error::SchemaError;
+src/schema/mod.rs: pub(crate) use error::SchemaFileError;
+src/schema/mod.rs: pub(crate) use fields::{SchemaFileFieldRef, SchemaSelectFieldEntry};
+src/schema/mod.rs: pub(crate) use name::{SchemaName, SchemaNameRef};
+src/schema/mod.rs: pub(crate) use raw::{
+src/schema/mod.rs: pub(crate) use service::warn_schema_construction_diagnostics;
+src/schema/model.rs: pub fn field(&self, name: &str) -> Option<&SchemaFieldDef> {
+src/schema/model.rs: pub fn name(&self) -> &str {
+src/schema/model.rs: pub struct Schema {
+src/schema/model.rs: pub(crate) const fn fields(&self) -> &IndexMap<FieldName, SchemaFieldDef> {
+src/schema/model.rs: pub(crate) fn is_a(&self, class: &str) -> bool {
+src/schema/model.rs: pub(crate) fn suggest_field(&self, field: &str) -> Option<&str> {
+src/schema/model.rs: pub(super) const fn ancestors(&self) -> &IndexSet<SchemaName> {
+src/schema/model.rs: pub(super) const fn children(&self) -> &IndexSet<SchemaName> {
+src/schema/model.rs: pub(super) const fn descendants(&self) -> &IndexSet<SchemaName> {
+src/schema/model.rs: pub(super) fn new(
+src/schema/model.rs: pub(super) fn set_hierarchy(
+src/schema/name.rs: pub(crate) const fn as_str(self) -> &'a str {
+src/schema/name.rs: pub(crate) fn as_ref(&self) -> SchemaNameRef<'_> {
+src/schema/name.rs: pub(crate) fn as_str(&self) -> &str {
+src/schema/name.rs: pub(crate) fn for_test(name: &str) -> Self {
+src/schema/name.rs: pub(crate) fn global() -> Self {
+src/schema/name.rs: pub(crate) fn is_global(&self) -> bool {
+src/schema/name.rs: pub(crate) fn is_global(self) -> bool {
+src/schema/name.rs: pub(crate) struct SchemaName(String);
+src/schema/name.rs: pub(crate) struct SchemaNameRef<'a>(&'a str);
+src/schema/raw.rs: pub(crate) entries: Option<Vec<RawSchemaSelectFieldEntry>>,
+src/schema/raw.rs: pub(crate) enum RawFieldDefError {
+src/schema/raw.rs: pub(crate) enum RawSchemaFieldSource {
+src/schema/raw.rs: pub(crate) enum RawSchemaFieldType {
+src/schema/raw.rs: pub(crate) enum RawSchemaSelectFieldEntry {
+src/schema/raw.rs: pub(crate) excludes: Vec<FieldName>,
+src/schema/raw.rs: pub(crate) extends: Vec<SchemaName>,
+src/schema/raw.rs: pub(crate) fields: IndexMap<FieldName, RawSchemaFieldDef>,
+src/schema/raw.rs: pub(crate) fn direct(kind: RawSchemaFieldType) -> Self {
+src/schema/raw.rs: pub(crate) fn reference(address: FieldAddress) -> Self {
+src/schema/raw.rs: pub(crate) multi: Option<bool>,
+src/schema/raw.rs: pub(crate) options: IndexMap<String, FieldValue>,
+src/schema/raw.rs: pub(crate) required: Option<bool>,
+src/schema/raw.rs: pub(crate) source: RawSchemaFieldSource,
+src/schema/raw.rs: pub(crate) struct RawSchema {
+src/schema/raw.rs: pub(crate) struct RawSchemaFieldDef {
+src/schema/raw.rs: pub(crate) struct RawSchemaSelectFieldValues {
+src/schema/service.rs: pub fn children_of(&self, name: &str) -> Vec<Arc<Schema>> {
+src/schema/service.rs: pub fn descendants_of(&self, name: &str) -> Vec<Arc<Schema>> {
+src/schema/service.rs: pub fn get(&self, name: &str) -> Option<&Arc<Schema>> {
+src/schema/service.rs: pub fn matches(&self, classes: &[String]) -> IndexSet<String> {
+src/schema/service.rs: pub fn new(directory: &Path) -> Result<Self, SchemaServiceError> {
+src/schema/service.rs: pub struct SchemaService {
+src/schema/service.rs: pub struct SchemaServiceError(#[from] pub(crate) SchemaError);
+src/schema/service.rs: pub(crate) failures: Vec<SchemaFailure>,
+src/schema/service.rs: pub(crate) fn as_error(&self) -> &SchemaError {
+src/schema/service.rs: pub(crate) fn children_names_of<'a>(
+src/schema/service.rs: pub(crate) fn load_verbose(
+src/schema/service.rs: pub(crate) fn warn_schema_construction_diagnostics(
+src/schema/service.rs: pub(crate) fn warn_unknown_classes(&self, classes: &[String]) {
+src/schema/service.rs: pub(crate) service: SchemaService,
+src/schema/service.rs: pub(crate) struct SchemaConstruction {
+src/schema/service.rs: pub(crate) warnings: Vec<SchemaWarning>,
+src/strsim.rs: pub(crate) fn closest_match<'a, T>(
+src/tag.rs: pub enum TagError {
+src/tag.rs: pub fn as_str(&self) -> &str {
+src/tag.rs: pub fn is_contained_in(&self, prefix: &str) -> bool {
+src/tag.rs: pub fn is_exact_match(&self, other: &Self) -> bool {
+src/tag.rs: pub fn parse(input: &str) -> Result<Self, TagError> {
+src/tag.rs: pub fn segments(&self) -> impl Iterator<Item = &str> {
+src/tag.rs: pub struct Tag(Box<str>);
+src/tag.rs: pub(crate) fn is_hierarchical_match(item: &str, target: &str) -> bool {
+src/tag.rs: pub(crate) fn parse_lenient(input: &str) -> Result<Self, TagError> {
+src/tag.rs: pub(crate) fn parse_lenient_into(
+src/tag.rs: pub(crate) fn prefix_len(input: &str) -> Option<usize> {
+src/task.rs: pub const ALL: [Self; 6] = [
+src/task.rs: pub const EMOJIS: &'static [(&'static str, Self)] = &[
+src/task.rs: pub const EMOJIS: &'static [(&'static str, Self)] = &[
+src/task.rs: pub const fn as_char(&self) -> char {
+src/task.rs: pub const fn as_str(&self) -> &'static str {
+src/task.rs: pub const fn as_str(self) -> &'static str {
+src/task.rs: pub const fn date(&self) -> DateValue {
+src/task.rs: pub const fn emoji(&self) -> Option<&'static str> {
+src/task.rs: pub const fn field_keys(self) -> &'static [&'static str] {
+src/task.rs: pub const fn get(&self, kind: TaskDateType) -> Option<DateValue> {
+src/task.rs: pub const fn is_empty(&self) -> bool {
+src/task.rs: pub const fn kind(&self) -> TaskDateType {
+src/task.rs: pub const fn kind(&self) -> TaskStatusType {
+src/task.rs: pub const fn new(kind: TaskDateType, date: DateValue) -> Self {
+src/task.rs: pub const fn new(symbol: char) -> Self {
+src/task.rs: pub const fn rank(self) -> u8 {
+src/task.rs: pub const fn symbol(&self) -> TaskStatusSymbol {
+src/task.rs: pub enum TaskDateType {
+src/task.rs: pub enum TaskError {
+src/task.rs: pub enum TaskPriority {
+src/task.rs: pub enum TaskStatusType {
+src/task.rs: pub fn from_emoji(emoji: &str) -> Option<Self> {
+src/task.rs: pub fn from_emoji(emoji: &str) -> Option<Self> {
+src/task.rs: pub fn is_field_key(key: &str) -> bool {
+src/task.rs: pub fn iter(&self) -> TaskDateSetIter {
+src/task.rs: pub fn name(&self) -> &str {
+src/task.rs: pub struct TaskDate {
+src/task.rs: pub struct TaskDateSet {
+src/task.rs: pub struct TaskDateSetIter {
+src/task.rs: pub struct TaskStatus {
+src/task.rs: pub struct TaskStatusMap {
+src/task.rs: pub struct TaskStatusSymbol(char);
+src/task.rs: pub(crate) const fn completed(self) -> Option<bool> {
+src/task.rs: pub(crate) const fn is_complete(self) -> bool {
+src/task.rs: pub(crate) fn by_name(&self, name: &str) -> Option<&TaskStatus> {
+src/task.rs: pub(crate) fn by_symbol(
+src/task.rs: pub(crate) fn by_type(&self, kind: TaskStatusType) -> &[TaskStatus] {
+src/task.rs: pub(crate) fn insert(
+src/task.rs: pub(crate) fn insert(&mut self, date: TaskDate) {
+src/task.rs: pub(crate) fn new<S: Into<String>>(
+src/task.rs: pub(crate) fn resolve(&self, symbol: char) -> TaskStatus {
+src/template/engine.rs: pub(super) content: String,
+src/template/engine.rs: pub(super) fn new(
+src/template/engine.rs: pub(super) fn render(
+src/template/engine.rs: pub(super) struct RenderOutput {
+src/template/engine.rs: pub(super) struct TemplateEngine {
+src/template/engine.rs: pub(super) write_to: Option<DeclaredOutputPath>,
+src/template/engine/cache.rs: pub(super) fn cached<T, E>(
+src/template/engine/cache.rs: pub(super) fn get_temp<T>(state: &State, key: &'static str) -> Option<T>
+src/template/engine/cache.rs: pub(super) fn set_temp<T>(state: &State, key: &'static str, value: T)
+src/template/engine/date.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
+src/template/engine/date.rs: pub(super) struct DateOps;
+src/template/engine/error.rs: pub(super) fn confine_error(path: &str, source: PathError) -> Error {
+src/template/engine/error.rs: pub(super) fn invalid_operation<E>(
+src/template/engine/error.rs: pub(super) type TemplateEngineResult<T> = std::result::Result<T, Error>;
+src/template/engine/file.rs: pub(super) const WRITE_TO_KEY: &str = "file.write_to";
+src/template/engine/file.rs: pub(super) const fn new(root: Arc<Path>) -> Self {
+src/template/engine/file.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
+src/template/engine/file.rs: pub(super) struct FileOps {
+src/template/engine/num.rs: pub(super) fn register(env: &mut Environment<'static>) {
+src/template/engine/num.rs: pub(super) struct NumOps;
+src/template/engine/path.rs: pub(super) const fn new(root: Arc<Path>) -> Self {
+src/template/engine/path.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
+src/template/engine/path.rs: pub(super) struct PathOps {
+src/template/engine/query.rs: pub(super) fn list(
+src/template/engine/query.rs: pub(super) fn page(
+src/template/engine/query.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
+src/template/engine/query.rs: pub(super) fn register_terminal_filters(env: &mut Environment<'static>) {
+src/template/engine/query.rs: pub(super) fn task(
+src/template/engine/query.rs: pub(super) struct QueryOps {
+src/template/engine/schema.rs: pub(super) const fn new(service: Arc<SchemaService>) -> Self {
+src/template/engine/schema.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
+src/template/engine/schema.rs: pub(super) struct SchemaOps {
+src/template/engine/string.rs: pub(super) fn register(env: &mut Environment<'static>) {
+src/template/engine/string.rs: pub(super) struct StrOps;
+src/template/engine/ui.rs: pub(super) const fn new(provider: Arc<dyn DialogProvider>) -> Self {
+src/template/engine/ui.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
+src/template/engine/ui.rs: pub(super) struct FailingDialogProvider;
+src/template/engine/ui.rs: pub(super) struct UiOps {
+src/template/engine/yaml.rs: pub(super) fn from_yaml(text: &str) -> TemplateEngineResult<Value> {
+src/template/engine/yaml.rs: pub(super) fn register(env: &mut Environment<'static>) {
+src/template/engine/yaml.rs: pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
+src/template/engine/yaml.rs: pub(super) struct YamlOps;
+src/template/error.rs: pub enum RenderFailureKind {
+src/template/error.rs: pub enum TemplateError {
+src/template/error.rs: pub fn classify(error: &minijinja::Error) -> Self {
+src/template/loader.rs: pub(super) const fn new(
+src/template/loader.rs: pub(super) fn find(
+src/template/loader.rs: pub(super) fn list_available(&self) -> Vec<String> {
+src/template/loader.rs: pub(super) fn load(&self, name: &str) -> Result<Option<String>, Error> {
+src/template/loader.rs: pub(super) struct TemplateLoader {
+src/template/mod.rs: pub use error::{RenderFailureKind, TemplateError};
+src/template/mod.rs: pub use path::{TemplatePathError, TemplatePathInput};
+src/template/mod.rs: pub use service::TemplateService;
+src/template/mod.rs: pub use writer::CommitPolicy;
+src/template/mod.rs: pub use writer::{WriteMode, WriteOutcome};
+src/template/path.rs: pub enum TemplatePathError {
+src/template/path.rs: pub fn parse(path: &Path) -> Result<Self, TemplatePathError> {
+src/template/path.rs: pub struct TemplatePathInput(RelativePath);
+src/template/path.rs: pub(super) const fn for_test(
+src/template/path.rs: pub(super) const fn new(path: PathBuf) -> Self {
+src/template/path.rs: pub(super) const fn verified(
+src/template/path.rs: pub(super) fn absolute(&self) -> PathBuf {
+src/template/path.rs: pub(super) fn as_path(&self) -> &Path {
+src/template/path.rs: pub(super) fn default_output_filename(&self) -> PathBuf {
+src/template/path.rs: pub(super) fn read(&self) -> io::Result<String> {
+src/template/path.rs: pub(super) struct DeclaredOutputPath(PathBuf);
+src/template/path.rs: pub(super) struct TemplatePath {
+src/template/service.rs: pub fn list_available(config: &Config) -> Vec<String> {
+src/template/service.rs: pub fn new(
+src/template/service.rs: pub fn render_to_file(
+src/template/service.rs: pub struct TemplateService<'a> {
+src/template/service.rs: pub(crate) fn render(
+src/template/service.rs: pub(crate) fn write(
+src/template/service.rs: pub(crate) struct RenderedTemplate {
+src/template/writer.rs: pub enum CommitPolicy {
+src/template/writer.rs: pub enum WriteMode {
+src/template/writer.rs: pub enum WriteOutcome {
+src/template/writer.rs: pub(crate) const fn from_flags(dry_run: bool, force: bool) -> Self {
+src/template/writer.rs: pub(super) const fn new(root: &'a Path) -> Self {
+src/template/writer.rs: pub(super) const fn with_requested(
+src/template/writer.rs: pub(super) fn resolve(
+src/template/writer.rs: pub(super) fn target_path(
+src/template/writer.rs: pub(super) fn trusted(root: &Path, candidate: PathBuf) -> PathBuf {
+src/template/writer.rs: pub(super) fn with_declared(
+src/template/writer.rs: pub(super) fn write(
+src/template/writer.rs: pub(super) struct TemplateWriteTarget<'a> {
+src/yaml.rs: pub(crate) fn parse(text: &str) -> Result<noyalib::Value, noyalib::Error> {

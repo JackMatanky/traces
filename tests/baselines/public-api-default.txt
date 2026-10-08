@@ -1,0 +1,2551 @@
+pub mod traces_pkm
+pub mod traces_pkm::cli
+pub mod traces_pkm::cli::init
+pub struct traces_pkm::cli::init::Init
+impl traces_pkm::cli::init::Init
+pub fn traces_pkm::cli::init::Init::run(self, &dyn traces_pkm::DialogProvider) -> traces_pkm::cli::CliResult
+impl clap_builder::derive::Args for traces_pkm::cli::init::Init
+pub fn traces_pkm::cli::init::Init::augment_args<'b>(clap_builder::builder::command::Command) -> clap_builder::builder::command::Command
+pub fn traces_pkm::cli::init::Init::augment_args_for_update<'b>(clap_builder::builder::command::Command) -> clap_builder::builder::command::Command
+pub fn traces_pkm::cli::init::Init::group_id() -> core::option::Option<clap_builder::util::id::Id>
+impl clap_builder::derive::FromArgMatches for traces_pkm::cli::init::Init
+pub fn traces_pkm::cli::init::Init::from_arg_matches(&clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<Self, clap_builder::Error>
+pub fn traces_pkm::cli::init::Init::from_arg_matches_mut(&mut clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<Self, clap_builder::Error>
+pub fn traces_pkm::cli::init::Init::update_from_arg_matches(&mut self, &clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<(), clap_builder::Error>
+pub fn traces_pkm::cli::init::Init::update_from_arg_matches_mut(&mut self, &mut clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<(), clap_builder::Error>
+impl core::fmt::Debug for traces_pkm::cli::init::Init
+pub fn traces_pkm::cli::init::Init::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for traces_pkm::cli::init::Init
+impl core::marker::Send for traces_pkm::cli::init::Init
+impl core::marker::Sync for traces_pkm::cli::init::Init
+impl core::marker::Unpin for traces_pkm::cli::init::Init
+impl core::marker::UnsafeUnpin for traces_pkm::cli::init::Init
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::cli::init::Init
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::cli::init::Init
+impl<D> owo_colors::OwoColorize for traces_pkm::cli::init::Init
+impl<T, U> core::convert::Into<U> for traces_pkm::cli::init::Init where U: core::convert::From<T>
+pub fn traces_pkm::cli::init::Init::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::cli::init::Init where U: core::convert::Into<T>
+pub type traces_pkm::cli::init::Init::Error = never
+pub fn traces_pkm::cli::init::Init::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::cli::init::Init where U: core::convert::TryFrom<T>
+pub type traces_pkm::cli::init::Init::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::cli::init::Init::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for traces_pkm::cli::init::Init where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::cli::init::Init::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::cli::init::Init where T: ?core::marker::Sized
+pub fn traces_pkm::cli::init::Init::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::cli::init::Init where T: ?core::marker::Sized
+pub fn traces_pkm::cli::init::Init::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for traces_pkm::cli::init::Init
+pub fn traces_pkm::cli::init::Init::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::cli::init::Init
+pub type traces_pkm::cli::init::Init::Init = T
+pub const traces_pkm::cli::init::Init::ALIGN: usize
+pub unsafe fn traces_pkm::cli::init::Init::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::cli::init::Init::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::cli::init::Init::drop(usize)
+pub unsafe fn traces_pkm::cli::init::Init::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for traces_pkm::cli::init::Init
+impl<T> tracing::instrument::Instrument for traces_pkm::cli::init::Init
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::cli::init::Init
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::cli::init::Init where T: 'static
+#[non_exhaustive] pub enum traces_pkm::cli::CliError
+pub traces_pkm::cli::CliError::ConfigLoad
+pub traces_pkm::cli::CliError::ConfigLoad::cwd: std::path::PathBuf
+pub traces_pkm::cli::CliError::ConfigLoad::source: error::ConfigLoadError
+pub traces_pkm::cli::CliError::CurrentDirectory
+pub traces_pkm::cli::CliError::CurrentDirectory::source: core::io::error::Error
+pub traces_pkm::cli::CliError::Index
+pub traces_pkm::cli::CliError::Index::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::Index::source: traces_pkm::index::error::IndexError
+pub traces_pkm::cli::CliError::InitAlreadyInitialized
+pub traces_pkm::cli::CliError::InitAlreadyInitialized::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::InitConfigWrite
+pub traces_pkm::cli::CliError::InitConfigWrite::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::InitConfigWrite::source: error::ConfigScaffoldError
+pub traces_pkm::cli::CliError::InitPrompt
+pub traces_pkm::cli::CliError::InitPrompt::source: traces_pkm::DialogError
+pub traces_pkm::cli::CliError::InitScaffold
+pub traces_pkm::cli::CliError::InitScaffold::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::InitScaffold::source: core::io::error::Error
+pub traces_pkm::cli::CliError::NoCommand
+pub traces_pkm::cli::CliError::NoTemplates
+pub traces_pkm::cli::CliError::Query
+pub traces_pkm::cli::CliError::Query::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::Query::source: traces_pkm::query::error::QueryError
+pub traces_pkm::cli::CliError::SchemaQuery
+pub traces_pkm::cli::CliError::SchemaQuery::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::SchemaQuery::source: error::SchemaError
+pub traces_pkm::cli::CliError::TemplateInstantiate
+pub traces_pkm::cli::CliError::TemplateInstantiate::name: std::path::PathBuf
+pub traces_pkm::cli::CliError::TemplateInstantiate::source: traces_pkm::template::error::TemplateError
+pub traces_pkm::cli::CliError::TemplatePicker
+pub traces_pkm::cli::CliError::TemplatePicker::source: traces_pkm::DialogError
+pub traces_pkm::cli::CliError::TrackedClean
+pub traces_pkm::cli::CliError::TrackedClean::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrackedList
+pub traces_pkm::cli::CliError::TrackedList::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::Trust
+pub traces_pkm::cli::CliError::Trust::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::Trust::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustClean
+pub traces_pkm::cli::CliError::TrustClean::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustList
+pub traces_pkm::cli::CliError::TrustList::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustShow
+pub traces_pkm::cli::CliError::TrustShow::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::TrustShow::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustTargetResolve
+pub traces_pkm::cli::CliError::TrustTargetResolve::path: std::path::PathBuf
+pub traces_pkm::cli::CliError::TrustTargetResolve::source: error::DiscoveryError
+pub traces_pkm::cli::CliError::Untrust
+pub traces_pkm::cli::CliError::Untrust::root: std::path::PathBuf
+pub traces_pkm::cli::CliError::Untrust::source: traces_pkm::config::error::ConfigStateError
+impl core::error::Error for traces_pkm::cli::CliError
+pub fn traces_pkm::cli::CliError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for traces_pkm::cli::CliError
+pub fn traces_pkm::cli::CliError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::cli::CliError
+pub fn traces_pkm::cli::CliError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl miette::protocol::Diagnostic for traces_pkm::cli::CliError
+pub fn traces_pkm::cli::CliError::code<'a>(&'a self) -> core::option::Option<alloc::boxed::Box<(dyn core::fmt::Display + 'a)>>
+pub fn traces_pkm::cli::CliError::diagnostic_source(&self) -> core::option::Option<&dyn miette::protocol::Diagnostic>
+pub fn traces_pkm::cli::CliError::help<'a>(&'a self) -> core::option::Option<alloc::boxed::Box<(dyn core::fmt::Display + 'a)>>
+impl core::marker::Freeze for traces_pkm::cli::CliError
+impl core::marker::Send for traces_pkm::cli::CliError
+impl core::marker::Sync for traces_pkm::cli::CliError
+impl core::marker::Unpin for traces_pkm::cli::CliError
+impl core::marker::UnsafeUnpin for traces_pkm::cli::CliError
+impl !core::panic::unwind_safe::RefUnwindSafe for traces_pkm::cli::CliError
+impl !core::panic::unwind_safe::UnwindSafe for traces_pkm::cli::CliError
+impl<D> owo_colors::OwoColorize for traces_pkm::cli::CliError
+impl<T, U> core::convert::Into<U> for traces_pkm::cli::CliError where U: core::convert::From<T>
+pub fn traces_pkm::cli::CliError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::cli::CliError where U: core::convert::Into<T>
+pub type traces_pkm::cli::CliError::Error = never
+pub fn traces_pkm::cli::CliError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::cli::CliError where U: core::convert::TryFrom<T>
+pub type traces_pkm::cli::CliError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::cli::CliError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for traces_pkm::cli::CliError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::cli::CliError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::cli::CliError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::cli::CliError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::cli::CliError where T: ?core::marker::Sized
+pub fn traces_pkm::cli::CliError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::cli::CliError where T: ?core::marker::Sized
+pub fn traces_pkm::cli::CliError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for traces_pkm::cli::CliError
+pub fn traces_pkm::cli::CliError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::cli::CliError
+pub type traces_pkm::cli::CliError::Init = T
+pub const traces_pkm::cli::CliError::ALIGN: usize
+pub unsafe fn traces_pkm::cli::CliError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::cli::CliError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::cli::CliError::drop(usize)
+pub unsafe fn traces_pkm::cli::CliError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for traces_pkm::cli::CliError
+impl<T> tracing::instrument::Instrument for traces_pkm::cli::CliError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::cli::CliError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::cli::CliError where T: 'static
+pub enum traces_pkm::cli::CommandOutcome
+pub traces_pkm::cli::CommandOutcome::Aborted(traces_pkm::cli::UserAbort)
+pub traces_pkm::cli::CommandOutcome::Completed
+impl core::clone::Clone for traces_pkm::cli::CommandOutcome
+pub fn traces_pkm::cli::CommandOutcome::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::cli::CommandOutcome
+impl core::cmp::PartialEq for traces_pkm::cli::CommandOutcome
+pub fn traces_pkm::cli::CommandOutcome::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::cli::CommandOutcome
+pub fn traces_pkm::cli::CommandOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for traces_pkm::cli::CommandOutcome
+impl core::marker::StructuralPartialEq for traces_pkm::cli::CommandOutcome
+impl core::marker::Freeze for traces_pkm::cli::CommandOutcome
+impl core::marker::Send for traces_pkm::cli::CommandOutcome
+impl core::marker::Sync for traces_pkm::cli::CommandOutcome
+impl core::marker::Unpin for traces_pkm::cli::CommandOutcome
+impl core::marker::UnsafeUnpin for traces_pkm::cli::CommandOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::cli::CommandOutcome
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::cli::CommandOutcome
+impl<D> owo_colors::OwoColorize for traces_pkm::cli::CommandOutcome
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::cli::CommandOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::cli::CommandOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::cli::CommandOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::cli::CommandOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::cli::CommandOutcome where U: core::convert::From<T>
+pub fn traces_pkm::cli::CommandOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::cli::CommandOutcome where U: core::convert::Into<T>
+pub type traces_pkm::cli::CommandOutcome::Error = never
+pub fn traces_pkm::cli::CommandOutcome::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::cli::CommandOutcome where U: core::convert::TryFrom<T>
+pub type traces_pkm::cli::CommandOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::cli::CommandOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::cli::CommandOutcome where T: core::clone::Clone
+pub type traces_pkm::cli::CommandOutcome::Owned = T
+pub fn traces_pkm::cli::CommandOutcome::clone_into(&self, &mut T)
+pub fn traces_pkm::cli::CommandOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::cli::CommandOutcome where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::cli::CommandOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::cli::CommandOutcome where T: ?core::marker::Sized
+pub fn traces_pkm::cli::CommandOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::cli::CommandOutcome where T: ?core::marker::Sized
+pub fn traces_pkm::cli::CommandOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::cli::CommandOutcome where T: core::clone::Clone
+pub unsafe fn traces_pkm::cli::CommandOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::cli::CommandOutcome
+pub fn traces_pkm::cli::CommandOutcome::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::cli::CommandOutcome
+pub type traces_pkm::cli::CommandOutcome::Init = T
+pub const traces_pkm::cli::CommandOutcome::ALIGN: usize
+pub unsafe fn traces_pkm::cli::CommandOutcome::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::cli::CommandOutcome::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::cli::CommandOutcome::drop(usize)
+pub unsafe fn traces_pkm::cli::CommandOutcome::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::cli::CommandOutcome where T: core::clone::Clone
+pub fn traces_pkm::cli::CommandOutcome::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::cli::CommandOutcome
+impl<T> tracing::instrument::Instrument for traces_pkm::cli::CommandOutcome
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::cli::CommandOutcome
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::cli::CommandOutcome where T: 'static
+pub enum traces_pkm::cli::UserAbort
+pub traces_pkm::cli::UserAbort::Cancelled
+pub traces_pkm::cli::UserAbort::Interrupted
+impl core::clone::Clone for traces_pkm::cli::UserAbort
+pub fn traces_pkm::cli::UserAbort::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::cli::UserAbort
+impl core::cmp::PartialEq for traces_pkm::cli::UserAbort
+pub fn traces_pkm::cli::UserAbort::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::cli::UserAbort
+pub fn traces_pkm::cli::UserAbort::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for traces_pkm::cli::UserAbort
+impl core::marker::StructuralPartialEq for traces_pkm::cli::UserAbort
+impl core::marker::Freeze for traces_pkm::cli::UserAbort
+impl core::marker::Send for traces_pkm::cli::UserAbort
+impl core::marker::Sync for traces_pkm::cli::UserAbort
+impl core::marker::Unpin for traces_pkm::cli::UserAbort
+impl core::marker::UnsafeUnpin for traces_pkm::cli::UserAbort
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::cli::UserAbort
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::cli::UserAbort
+impl<D> owo_colors::OwoColorize for traces_pkm::cli::UserAbort
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::cli::UserAbort where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::cli::UserAbort::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::cli::UserAbort where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::cli::UserAbort::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::cli::UserAbort where U: core::convert::From<T>
+pub fn traces_pkm::cli::UserAbort::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::cli::UserAbort where U: core::convert::Into<T>
+pub type traces_pkm::cli::UserAbort::Error = never
+pub fn traces_pkm::cli::UserAbort::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::cli::UserAbort where U: core::convert::TryFrom<T>
+pub type traces_pkm::cli::UserAbort::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::cli::UserAbort::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::cli::UserAbort where T: core::clone::Clone
+pub type traces_pkm::cli::UserAbort::Owned = T
+pub fn traces_pkm::cli::UserAbort::clone_into(&self, &mut T)
+pub fn traces_pkm::cli::UserAbort::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::cli::UserAbort where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::cli::UserAbort::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::cli::UserAbort where T: ?core::marker::Sized
+pub fn traces_pkm::cli::UserAbort::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::cli::UserAbort where T: ?core::marker::Sized
+pub fn traces_pkm::cli::UserAbort::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::cli::UserAbort where T: core::clone::Clone
+pub unsafe fn traces_pkm::cli::UserAbort::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::cli::UserAbort
+pub fn traces_pkm::cli::UserAbort::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::cli::UserAbort
+pub type traces_pkm::cli::UserAbort::Init = T
+pub const traces_pkm::cli::UserAbort::ALIGN: usize
+pub unsafe fn traces_pkm::cli::UserAbort::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::cli::UserAbort::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::cli::UserAbort::drop(usize)
+pub unsafe fn traces_pkm::cli::UserAbort::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::cli::UserAbort where T: core::clone::Clone
+pub fn traces_pkm::cli::UserAbort::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::cli::UserAbort
+impl<T> tracing::instrument::Instrument for traces_pkm::cli::UserAbort
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::cli::UserAbort
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::cli::UserAbort where T: 'static
+pub fn traces_pkm::cli::run() -> core::result::Result<traces_pkm::cli::CommandOutcome, traces_pkm::cli::CliError>
+pub type traces_pkm::cli::CliResult = core::result::Result<(), traces_pkm::cli::CliError>
+#[non_exhaustive] pub enum traces_pkm::DateError
+pub traces_pkm::DateError::InvalidYearDigits
+pub traces_pkm::DateError::InvalidYearDigits::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::LocalZoneLookup
+pub traces_pkm::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::OutOfRange
+pub traces_pkm::DateError::Unparseable
+pub traces_pkm::DateError::Unparseable::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::Unparseable::source: chrono::format::ParseError
+impl core::clone::Clone for traces_pkm::DateError
+pub fn traces_pkm::DateError::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::DateError
+impl core::cmp::PartialEq for traces_pkm::DateError
+pub fn traces_pkm::DateError::eq(&self, &Self) -> bool
+impl core::error::Error for traces_pkm::DateError
+pub fn traces_pkm::DateError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for traces_pkm::DateError
+pub fn traces_pkm::DateError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::DateError
+pub fn traces_pkm::DateError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::DateError
+impl core::marker::Freeze for traces_pkm::DateError
+impl core::marker::Send for traces_pkm::DateError
+impl core::marker::Sync for traces_pkm::DateError
+impl core::marker::Unpin for traces_pkm::DateError
+impl core::marker::UnsafeUnpin for traces_pkm::DateError
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::DateError
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::DateError
+impl<D> owo_colors::OwoColorize for traces_pkm::DateError
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::DateError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateError::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::DateError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateError::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::DateError where U: core::convert::From<T>
+pub fn traces_pkm::DateError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::DateError where U: core::convert::Into<T>
+pub type traces_pkm::DateError::Error = never
+pub fn traces_pkm::DateError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::DateError where U: core::convert::TryFrom<T>
+pub type traces_pkm::DateError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::DateError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::DateError where T: core::clone::Clone
+pub type traces_pkm::DateError::Owned = T
+pub fn traces_pkm::DateError::clone_into(&self, &mut T)
+pub fn traces_pkm::DateError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::DateError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::DateError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::DateError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::DateError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::DateError where T: ?core::marker::Sized
+pub fn traces_pkm::DateError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::DateError where T: ?core::marker::Sized
+pub fn traces_pkm::DateError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::DateError where T: core::clone::Clone
+pub unsafe fn traces_pkm::DateError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::DateError
+pub fn traces_pkm::DateError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::DateError
+pub type traces_pkm::DateError::Init = T
+pub const traces_pkm::DateError::ALIGN: usize
+pub unsafe fn traces_pkm::DateError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::DateError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::DateError::drop(usize)
+pub unsafe fn traces_pkm::DateError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::DateError where T: core::clone::Clone
+pub fn traces_pkm::DateError::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::DateError
+impl<T> tracing::instrument::Instrument for traces_pkm::DateError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateError where T: 'static
+#[non_exhaustive] pub enum traces_pkm::DialogError
+pub traces_pkm::DialogError::BackendFailure(alloc::boxed::Box<(dyn core::error::Error + core::marker::Send + core::marker::Sync)>)
+pub traces_pkm::DialogError::EmptySelectionInput
+pub traces_pkm::DialogError::InvalidConfiguration(alloc::string::String)
+pub traces_pkm::DialogError::Io(core::io::error::Error)
+pub traces_pkm::DialogError::NotInteractive
+pub traces_pkm::DialogError::UserCancelled
+pub traces_pkm::DialogError::UserInterrupted
+impl core::convert::From<core::io::error::Error> for traces_pkm::DialogError
+pub fn traces_pkm::DialogError::from(core::io::error::Error) -> Self
+impl core::convert::From<inquire::error::InquireError> for traces_pkm::DialogError
+pub fn traces_pkm::DialogError::from(inquire::error::InquireError) -> Self
+impl core::error::Error for traces_pkm::DialogError
+pub fn traces_pkm::DialogError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for traces_pkm::DialogError
+pub fn traces_pkm::DialogError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::DialogError
+pub fn traces_pkm::DialogError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for traces_pkm::DialogError
+impl core::marker::Send for traces_pkm::DialogError
+impl core::marker::Sync for traces_pkm::DialogError
+impl core::marker::Unpin for traces_pkm::DialogError
+impl core::marker::UnsafeUnpin for traces_pkm::DialogError
+impl !core::panic::unwind_safe::RefUnwindSafe for traces_pkm::DialogError
+impl !core::panic::unwind_safe::UnwindSafe for traces_pkm::DialogError
+impl<D> owo_colors::OwoColorize for traces_pkm::DialogError
+impl<T, U> core::convert::Into<U> for traces_pkm::DialogError where U: core::convert::From<T>
+pub fn traces_pkm::DialogError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::DialogError where U: core::convert::Into<T>
+pub type traces_pkm::DialogError::Error = never
+pub fn traces_pkm::DialogError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::DialogError where U: core::convert::TryFrom<T>
+pub type traces_pkm::DialogError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::DialogError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for traces_pkm::DialogError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::DialogError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::DialogError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::DialogError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::DialogError where T: ?core::marker::Sized
+pub fn traces_pkm::DialogError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::DialogError where T: ?core::marker::Sized
+pub fn traces_pkm::DialogError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for traces_pkm::DialogError
+pub fn traces_pkm::DialogError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::DialogError
+pub type traces_pkm::DialogError::Init = T
+pub const traces_pkm::DialogError::ALIGN: usize
+pub unsafe fn traces_pkm::DialogError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::DialogError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::DialogError::drop(usize)
+pub unsafe fn traces_pkm::DialogError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for traces_pkm::DialogError
+impl<T> tracing::instrument::Instrument for traces_pkm::DialogError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::DialogError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::DialogError where T: 'static
+#[non_exhaustive] pub enum traces_pkm::DurationError
+pub traces_pkm::DurationError::Empty
+pub traces_pkm::DurationError::InvalidNumber
+pub traces_pkm::DurationError::InvalidNumber::input: alloc::string::String
+pub traces_pkm::DurationError::MalformedNumber
+pub traces_pkm::DurationError::MalformedNumber::input: alloc::string::String
+pub traces_pkm::DurationError::MalformedNumber::source: core::num::float_parse::ParseFloatError
+pub traces_pkm::DurationError::MissingNumber
+pub traces_pkm::DurationError::MissingNumber::input: alloc::string::String
+pub traces_pkm::DurationError::MissingUnit
+pub traces_pkm::DurationError::MissingUnit::input: alloc::string::String
+pub traces_pkm::DurationError::NonFiniteNumber
+pub traces_pkm::DurationError::NonFiniteNumber::input: alloc::string::String
+pub traces_pkm::DurationError::NonFiniteSeconds
+pub traces_pkm::DurationError::UnknownUnit
+pub traces_pkm::DurationError::UnknownUnit::input: alloc::string::String
+impl core::clone::Clone for traces_pkm::DurationError
+pub fn traces_pkm::DurationError::clone(&self) -> Self
+impl core::error::Error for traces_pkm::DurationError
+pub fn traces_pkm::DurationError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for traces_pkm::DurationError
+pub fn traces_pkm::DurationError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::DurationError
+pub fn traces_pkm::DurationError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for traces_pkm::DurationError
+impl core::marker::Send for traces_pkm::DurationError
+impl core::marker::Sync for traces_pkm::DurationError
+impl core::marker::Unpin for traces_pkm::DurationError
+impl core::marker::UnsafeUnpin for traces_pkm::DurationError
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::DurationError
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::DurationError
+impl<D> owo_colors::OwoColorize for traces_pkm::DurationError
+impl<T, U> core::convert::Into<U> for traces_pkm::DurationError where U: core::convert::From<T>
+pub fn traces_pkm::DurationError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::DurationError where U: core::convert::Into<T>
+pub type traces_pkm::DurationError::Error = never
+pub fn traces_pkm::DurationError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::DurationError where U: core::convert::TryFrom<T>
+pub type traces_pkm::DurationError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::DurationError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::DurationError where T: core::clone::Clone
+pub type traces_pkm::DurationError::Owned = T
+pub fn traces_pkm::DurationError::clone_into(&self, &mut T)
+pub fn traces_pkm::DurationError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::DurationError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::DurationError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::DurationError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::DurationError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::DurationError where T: ?core::marker::Sized
+pub fn traces_pkm::DurationError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::DurationError where T: ?core::marker::Sized
+pub fn traces_pkm::DurationError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::DurationError where T: core::clone::Clone
+pub unsafe fn traces_pkm::DurationError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::DurationError
+pub fn traces_pkm::DurationError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::DurationError
+pub type traces_pkm::DurationError::Init = T
+pub const traces_pkm::DurationError::ALIGN: usize
+pub unsafe fn traces_pkm::DurationError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::DurationError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::DurationError::drop(usize)
+pub unsafe fn traces_pkm::DurationError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::DurationError where T: core::clone::Clone
+pub fn traces_pkm::DurationError::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::DurationError
+impl<T> tracing::instrument::Instrument for traces_pkm::DurationError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::DurationError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::DurationError where T: 'static
+pub enum traces_pkm::ListItemType
+pub traces_pkm::ListItemType::Checkbox
+pub traces_pkm::ListItemType::Plain
+pub traces_pkm::ListItemType::Task(traces_pkm::TaskListItem)
+impl traces_pkm::ListItemType
+pub const fn traces_pkm::ListItemType::as_task(&self) -> core::option::Option<&traces_pkm::TaskListItem>
+pub const fn traces_pkm::ListItemType::is_checkbox(&self) -> bool
+pub const fn traces_pkm::ListItemType::is_plain(&self) -> bool
+pub const fn traces_pkm::ListItemType::is_task(&self) -> bool
+impl core::clone::Clone for traces_pkm::ListItemType
+pub fn traces_pkm::ListItemType::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::ListItemType
+impl core::cmp::PartialEq for traces_pkm::ListItemType
+pub fn traces_pkm::ListItemType::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::ListItemType
+pub fn traces_pkm::ListItemType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::ListItemType
+impl serde_core::ser::Serialize for traces_pkm::ListItemType
+pub fn traces_pkm::ListItemType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::ListItemType
+pub fn traces_pkm::ListItemType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::ListItemType
+impl core::marker::Send for traces_pkm::ListItemType
+impl core::marker::Sync for traces_pkm::ListItemType
+impl core::marker::Unpin for traces_pkm::ListItemType
+impl core::marker::UnsafeUnpin for traces_pkm::ListItemType
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::ListItemType
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::ListItemType
+impl<D> owo_colors::OwoColorize for traces_pkm::ListItemType
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::ListItemType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::ListItemType::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::ListItemType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::ListItemType::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::ListItemType where U: core::convert::From<T>
+pub fn traces_pkm::ListItemType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::ListItemType where U: core::convert::Into<T>
+pub type traces_pkm::ListItemType::Error = never
+pub fn traces_pkm::ListItemType::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::ListItemType where U: core::convert::TryFrom<T>
+pub type traces_pkm::ListItemType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::ListItemType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::ListItemType where T: core::clone::Clone
+pub type traces_pkm::ListItemType::Owned = T
+pub fn traces_pkm::ListItemType::clone_into(&self, &mut T)
+pub fn traces_pkm::ListItemType::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::ListItemType where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::ListItemType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::ListItemType where T: ?core::marker::Sized
+pub fn traces_pkm::ListItemType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::ListItemType where T: ?core::marker::Sized
+pub fn traces_pkm::ListItemType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::ListItemType where T: core::clone::Clone
+pub unsafe fn traces_pkm::ListItemType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::ListItemType
+pub fn traces_pkm::ListItemType::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::ListItemType
+pub type traces_pkm::ListItemType::Init = T
+pub const traces_pkm::ListItemType::ALIGN: usize
+pub unsafe fn traces_pkm::ListItemType::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::ListItemType::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::ListItemType::drop(usize)
+pub unsafe fn traces_pkm::ListItemType::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::ListItemType where T: core::clone::Clone
+pub fn traces_pkm::ListItemType::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::ListItemType
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::ListItemType where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::ListItemType
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::ListItemType
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::ListItemType where T: 'static
+pub enum traces_pkm::NoteFieldValue
+pub traces_pkm::NoteFieldValue::Bool(bool)
+pub traces_pkm::NoteFieldValue::Date(traces_pkm::DateValue)
+pub traces_pkm::NoteFieldValue::DateTime(traces_pkm::DateTimeValue)
+pub traces_pkm::NoteFieldValue::Duration(traces_pkm::DurationValue)
+pub traces_pkm::NoteFieldValue::Link(traces_pkm::note::links::Link)
+pub traces_pkm::NoteFieldValue::List(alloc::boxed::Box<[Self]>)
+pub traces_pkm::NoteFieldValue::Null
+pub traces_pkm::NoteFieldValue::Number(f64)
+pub traces_pkm::NoteFieldValue::Object(indexmap::map::IndexMap<alloc::string::String, Self>)
+pub traces_pkm::NoteFieldValue::String(alloc::string::String)
+impl traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::as_date(&self) -> core::option::Option<chrono::naive::date::NaiveDate>
+pub fn traces_pkm::NoteFieldValue::as_ref(&self) -> traces_pkm::NoteFieldValueRef<'_>
+pub fn traces_pkm::NoteFieldValue::as_str(&self) -> core::option::Option<&str>
+impl core::clone::Clone for traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::clone(&self) -> Self
+impl core::cmp::PartialEq for traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::NoteFieldValue
+impl serde_core::ser::Serialize for traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::NoteFieldValue
+impl core::marker::Send for traces_pkm::NoteFieldValue
+impl core::marker::Sync for traces_pkm::NoteFieldValue
+impl core::marker::Unpin for traces_pkm::NoteFieldValue
+impl core::marker::UnsafeUnpin for traces_pkm::NoteFieldValue
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::NoteFieldValue
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::NoteFieldValue
+impl<D> owo_colors::OwoColorize for traces_pkm::NoteFieldValue
+impl<T, U> core::convert::Into<U> for traces_pkm::NoteFieldValue where U: core::convert::From<T>
+pub fn traces_pkm::NoteFieldValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::NoteFieldValue where U: core::convert::Into<T>
+pub type traces_pkm::NoteFieldValue::Error = never
+pub fn traces_pkm::NoteFieldValue::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::NoteFieldValue where U: core::convert::TryFrom<T>
+pub type traces_pkm::NoteFieldValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::NoteFieldValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::NoteFieldValue where T: core::clone::Clone
+pub type traces_pkm::NoteFieldValue::Owned = T
+pub fn traces_pkm::NoteFieldValue::clone_into(&self, &mut T)
+pub fn traces_pkm::NoteFieldValue::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::NoteFieldValue where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::NoteFieldValue where T: ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::NoteFieldValue where T: ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::NoteFieldValue where T: core::clone::Clone
+pub unsafe fn traces_pkm::NoteFieldValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::NoteFieldValue
+pub fn traces_pkm::NoteFieldValue::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::NoteFieldValue
+pub type traces_pkm::NoteFieldValue::Init = T
+pub const traces_pkm::NoteFieldValue::ALIGN: usize
+pub unsafe fn traces_pkm::NoteFieldValue::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::NoteFieldValue::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::NoteFieldValue::drop(usize)
+pub unsafe fn traces_pkm::NoteFieldValue::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::NoteFieldValue where T: core::clone::Clone
+pub fn traces_pkm::NoteFieldValue::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::NoteFieldValue
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::NoteFieldValue where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::NoteFieldValue
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::NoteFieldValue
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::NoteFieldValue where T: 'static
+pub enum traces_pkm::NoteFieldValueRef<'a>
+pub traces_pkm::NoteFieldValueRef::Bool(bool)
+pub traces_pkm::NoteFieldValueRef::Date(traces_pkm::DateValue)
+pub traces_pkm::NoteFieldValueRef::DateTime(traces_pkm::DateTimeValue)
+pub traces_pkm::NoteFieldValueRef::Duration(&'a traces_pkm::DurationValue)
+pub traces_pkm::NoteFieldValueRef::Link(&'a traces_pkm::note::links::Link)
+pub traces_pkm::NoteFieldValueRef::List(&'a [traces_pkm::NoteFieldValue])
+pub traces_pkm::NoteFieldValueRef::Null
+pub traces_pkm::NoteFieldValueRef::Number(f64)
+pub traces_pkm::NoteFieldValueRef::Object(&'a indexmap::map::IndexMap<alloc::string::String, traces_pkm::NoteFieldValue>)
+pub traces_pkm::NoteFieldValueRef::String(&'a str)
+impl traces_pkm::NoteFieldValueRef<'_>
+pub fn traces_pkm::NoteFieldValueRef<'_>::compare(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::Eq for traces_pkm::NoteFieldValueRef<'_>
+impl core::cmp::Ord for traces_pkm::NoteFieldValueRef<'_>
+pub fn traces_pkm::NoteFieldValueRef<'_>::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::NoteFieldValueRef<'_>
+pub fn traces_pkm::NoteFieldValueRef<'_>::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::NoteFieldValueRef<'_>
+pub fn traces_pkm::NoteFieldValueRef<'_>::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl<'a> core::clone::Clone for traces_pkm::NoteFieldValueRef<'a>
+pub fn traces_pkm::NoteFieldValueRef<'a>::clone(&self) -> Self
+impl<'a> core::fmt::Debug for traces_pkm::NoteFieldValueRef<'a>
+pub fn traces_pkm::NoteFieldValueRef<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::marker::Freeze for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::marker::Send for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::marker::Sync for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::marker::Unpin for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::marker::UnsafeUnpin for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for traces_pkm::NoteFieldValueRef<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for traces_pkm::NoteFieldValueRef<'a>
+impl<D> owo_colors::OwoColorize for traces_pkm::NoteFieldValueRef<'a>
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::NoteFieldValueRef<'a> where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValueRef<'a>::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::NoteFieldValueRef<'a> where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValueRef<'a>::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::NoteFieldValueRef<'a> where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValueRef<'a>::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::NoteFieldValueRef<'a> where U: core::convert::From<T>
+pub fn traces_pkm::NoteFieldValueRef<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::NoteFieldValueRef<'a> where U: core::convert::Into<T>
+pub type traces_pkm::NoteFieldValueRef<'a>::Error = never
+pub fn traces_pkm::NoteFieldValueRef<'a>::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::NoteFieldValueRef<'a> where U: core::convert::TryFrom<T>
+pub type traces_pkm::NoteFieldValueRef<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::NoteFieldValueRef<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::NoteFieldValueRef<'a> where T: core::clone::Clone
+pub type traces_pkm::NoteFieldValueRef<'a>::Owned = T
+pub fn traces_pkm::NoteFieldValueRef<'a>::clone_into(&self, &mut T)
+pub fn traces_pkm::NoteFieldValueRef<'a>::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::NoteFieldValueRef<'a> where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValueRef<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::NoteFieldValueRef<'a> where T: ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValueRef<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::NoteFieldValueRef<'a> where T: ?core::marker::Sized
+pub fn traces_pkm::NoteFieldValueRef<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::NoteFieldValueRef<'a> where T: core::clone::Clone
+pub unsafe fn traces_pkm::NoteFieldValueRef<'a>::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::NoteFieldValueRef<'a>
+pub fn traces_pkm::NoteFieldValueRef<'a>::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::NoteFieldValueRef<'a>
+pub type traces_pkm::NoteFieldValueRef<'a>::Init = T
+pub const traces_pkm::NoteFieldValueRef<'a>::ALIGN: usize
+pub unsafe fn traces_pkm::NoteFieldValueRef<'a>::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::NoteFieldValueRef<'a>::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::NoteFieldValueRef<'a>::drop(usize)
+pub unsafe fn traces_pkm::NoteFieldValueRef<'a>::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::NoteFieldValueRef<'a> where T: core::clone::Clone
+pub fn traces_pkm::NoteFieldValueRef<'a>::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::NoteFieldValueRef<'a>
+impl<T> tracing::instrument::Instrument for traces_pkm::NoteFieldValueRef<'a>
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::NoteFieldValueRef<'a>
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::NoteFieldValueRef<'a> where T: 'static
+pub enum traces_pkm::PositionError
+pub traces_pkm::PositionError::BytePosOverflow
+pub traces_pkm::PositionError::ZeroSourceLine
+impl core::clone::Clone for traces_pkm::PositionError
+pub fn traces_pkm::PositionError::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::PositionError
+impl core::cmp::PartialEq for traces_pkm::PositionError
+pub fn traces_pkm::PositionError::eq(&self, &Self) -> bool
+impl core::error::Error for traces_pkm::PositionError
+impl core::fmt::Debug for traces_pkm::PositionError
+pub fn traces_pkm::PositionError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::PositionError
+pub fn traces_pkm::PositionError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for traces_pkm::PositionError
+impl core::marker::StructuralPartialEq for traces_pkm::PositionError
+impl core::marker::Freeze for traces_pkm::PositionError
+impl core::marker::Send for traces_pkm::PositionError
+impl core::marker::Sync for traces_pkm::PositionError
+impl core::marker::Unpin for traces_pkm::PositionError
+impl core::marker::UnsafeUnpin for traces_pkm::PositionError
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::PositionError
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::PositionError
+impl<D> owo_colors::OwoColorize for traces_pkm::PositionError
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::PositionError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::PositionError::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::PositionError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::PositionError::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::PositionError where U: core::convert::From<T>
+pub fn traces_pkm::PositionError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::PositionError where U: core::convert::Into<T>
+pub type traces_pkm::PositionError::Error = never
+pub fn traces_pkm::PositionError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::PositionError where U: core::convert::TryFrom<T>
+pub type traces_pkm::PositionError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::PositionError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::PositionError where T: core::clone::Clone
+pub type traces_pkm::PositionError::Owned = T
+pub fn traces_pkm::PositionError::clone_into(&self, &mut T)
+pub fn traces_pkm::PositionError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::PositionError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::PositionError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::PositionError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::PositionError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::PositionError where T: ?core::marker::Sized
+pub fn traces_pkm::PositionError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::PositionError where T: ?core::marker::Sized
+pub fn traces_pkm::PositionError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::PositionError where T: core::clone::Clone
+pub unsafe fn traces_pkm::PositionError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::PositionError
+pub fn traces_pkm::PositionError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::PositionError
+pub type traces_pkm::PositionError::Init = T
+pub const traces_pkm::PositionError::ALIGN: usize
+pub unsafe fn traces_pkm::PositionError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::PositionError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::PositionError::drop(usize)
+pub unsafe fn traces_pkm::PositionError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::PositionError where T: core::clone::Clone
+pub fn traces_pkm::PositionError::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::PositionError
+impl<T> tracing::instrument::Instrument for traces_pkm::PositionError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::PositionError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::PositionError where T: 'static
+pub enum traces_pkm::TagError
+pub traces_pkm::TagError::InvalidBodyCharacter
+pub traces_pkm::TagError::InvalidBodyCharacter::found: char
+pub traces_pkm::TagError::InvalidBodyCharacter::offset: usize
+pub traces_pkm::TagError::InvalidFirstCharacter
+pub traces_pkm::TagError::InvalidFirstCharacter::found: char
+pub traces_pkm::TagError::MissingHash
+impl core::clone::Clone for traces_pkm::TagError
+pub fn traces_pkm::TagError::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TagError
+impl core::cmp::PartialEq for traces_pkm::TagError
+pub fn traces_pkm::TagError::eq(&self, &Self) -> bool
+impl core::error::Error for traces_pkm::TagError
+impl core::fmt::Debug for traces_pkm::TagError
+pub fn traces_pkm::TagError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::TagError
+pub fn traces_pkm::TagError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::TagError
+impl core::marker::Freeze for traces_pkm::TagError
+impl core::marker::Send for traces_pkm::TagError
+impl core::marker::Sync for traces_pkm::TagError
+impl core::marker::Unpin for traces_pkm::TagError
+impl core::marker::UnsafeUnpin for traces_pkm::TagError
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TagError
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TagError
+impl<D> owo_colors::OwoColorize for traces_pkm::TagError
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TagError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TagError::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TagError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TagError::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TagError where U: core::convert::From<T>
+pub fn traces_pkm::TagError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TagError where U: core::convert::Into<T>
+pub type traces_pkm::TagError::Error = never
+pub fn traces_pkm::TagError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TagError where U: core::convert::TryFrom<T>
+pub type traces_pkm::TagError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TagError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TagError where T: core::clone::Clone
+pub type traces_pkm::TagError::Owned = T
+pub fn traces_pkm::TagError::clone_into(&self, &mut T)
+pub fn traces_pkm::TagError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::TagError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::TagError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::TagError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TagError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TagError where T: ?core::marker::Sized
+pub fn traces_pkm::TagError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TagError where T: ?core::marker::Sized
+pub fn traces_pkm::TagError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TagError where T: core::clone::Clone
+pub unsafe fn traces_pkm::TagError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TagError
+pub fn traces_pkm::TagError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TagError
+pub type traces_pkm::TagError::Init = T
+pub const traces_pkm::TagError::ALIGN: usize
+pub unsafe fn traces_pkm::TagError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TagError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TagError::drop(usize)
+pub unsafe fn traces_pkm::TagError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TagError where T: core::clone::Clone
+pub fn traces_pkm::TagError::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TagError
+impl<T> tracing::instrument::Instrument for traces_pkm::TagError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TagError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TagError where T: 'static
+pub enum traces_pkm::TaskDateType
+pub traces_pkm::TaskDateType::Cancelled
+pub traces_pkm::TaskDateType::Created
+pub traces_pkm::TaskDateType::Done
+pub traces_pkm::TaskDateType::Due
+pub traces_pkm::TaskDateType::Scheduled
+pub traces_pkm::TaskDateType::Start
+impl traces_pkm::TaskDateType
+pub const traces_pkm::TaskDateType::ALL: [Self; 6]
+pub const traces_pkm::TaskDateType::EMOJIS: &'static [(&'static str, Self)]
+pub const fn traces_pkm::TaskDateType::as_str(self) -> &'static str
+pub const fn traces_pkm::TaskDateType::field_keys(self) -> &'static [&'static str]
+pub fn traces_pkm::TaskDateType::from_emoji(&str) -> core::option::Option<Self>
+pub fn traces_pkm::TaskDateType::is_field_key(&str) -> bool
+impl core::clone::Clone for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskDateType
+impl core::cmp::Ord for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::TaskDateType
+impl core::marker::StructuralPartialEq for traces_pkm::TaskDateType
+impl core::str::traits::FromStr for traces_pkm::TaskDateType
+pub type traces_pkm::TaskDateType::Err = traces_pkm::TaskError
+pub fn traces_pkm::TaskDateType::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl core::marker::Freeze for traces_pkm::TaskDateType
+impl core::marker::Send for traces_pkm::TaskDateType
+impl core::marker::Sync for traces_pkm::TaskDateType
+impl core::marker::Unpin for traces_pkm::TaskDateType
+impl core::marker::UnsafeUnpin for traces_pkm::TaskDateType
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskDateType
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskDateType
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskDateType
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::TaskDateType where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskDateType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskDateType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskDateType where U: core::convert::From<T>
+pub fn traces_pkm::TaskDateType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskDateType where U: core::convert::Into<T>
+pub type traces_pkm::TaskDateType::Error = never
+pub fn traces_pkm::TaskDateType::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskDateType where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskDateType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskDateType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskDateType where T: core::clone::Clone
+pub type traces_pkm::TaskDateType::Owned = T
+pub fn traces_pkm::TaskDateType::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskDateType::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::TaskDateType where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::TaskDateType where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskDateType where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskDateType where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDateType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskDateType where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskDateType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskDateType
+pub fn traces_pkm::TaskDateType::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskDateType
+pub type traces_pkm::TaskDateType::Init = T
+pub const traces_pkm::TaskDateType::ALIGN: usize
+pub unsafe fn traces_pkm::TaskDateType::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskDateType::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskDateType::drop(usize)
+pub unsafe fn traces_pkm::TaskDateType::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskDateType where T: core::clone::Clone
+pub fn traces_pkm::TaskDateType::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskDateType
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskDateType
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskDateType
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskDateType where T: 'static
+pub enum traces_pkm::TaskError
+pub traces_pkm::TaskError::InvalidDateType
+pub traces_pkm::TaskError::InvalidDateType::input: alloc::string::String
+pub traces_pkm::TaskError::InvalidPriority
+pub traces_pkm::TaskError::InvalidPriority::input: alloc::string::String
+pub traces_pkm::TaskError::ProhibitedStatusSymbol
+pub traces_pkm::TaskError::ProhibitedStatusSymbol::symbol: char
+impl core::clone::Clone for traces_pkm::TaskError
+pub fn traces_pkm::TaskError::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskError
+impl core::cmp::PartialEq for traces_pkm::TaskError
+pub fn traces_pkm::TaskError::eq(&self, &Self) -> bool
+impl core::error::Error for traces_pkm::TaskError
+impl core::fmt::Debug for traces_pkm::TaskError
+pub fn traces_pkm::TaskError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::TaskError
+pub fn traces_pkm::TaskError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::TaskError
+impl core::marker::Freeze for traces_pkm::TaskError
+impl core::marker::Send for traces_pkm::TaskError
+impl core::marker::Sync for traces_pkm::TaskError
+impl core::marker::Unpin for traces_pkm::TaskError
+impl core::marker::UnsafeUnpin for traces_pkm::TaskError
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskError
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskError
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskError
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskError::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskError where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskError::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskError where U: core::convert::From<T>
+pub fn traces_pkm::TaskError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskError where U: core::convert::Into<T>
+pub type traces_pkm::TaskError::Error = never
+pub fn traces_pkm::TaskError::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskError where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskError where T: core::clone::Clone
+pub type traces_pkm::TaskError::Owned = T
+pub fn traces_pkm::TaskError::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::TaskError where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::TaskError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::TaskError where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskError where T: ?core::marker::Sized
+pub fn traces_pkm::TaskError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskError where T: ?core::marker::Sized
+pub fn traces_pkm::TaskError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskError where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskError
+pub fn traces_pkm::TaskError::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskError
+pub type traces_pkm::TaskError::Init = T
+pub const traces_pkm::TaskError::ALIGN: usize
+pub unsafe fn traces_pkm::TaskError::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskError::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskError::drop(usize)
+pub unsafe fn traces_pkm::TaskError::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskError where T: core::clone::Clone
+pub fn traces_pkm::TaskError::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskError
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskError
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskError
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskError where T: 'static
+pub enum traces_pkm::TaskPriority
+pub traces_pkm::TaskPriority::High
+pub traces_pkm::TaskPriority::Highest
+pub traces_pkm::TaskPriority::Low
+pub traces_pkm::TaskPriority::Lowest
+pub traces_pkm::TaskPriority::Medium
+pub traces_pkm::TaskPriority::Normal
+impl traces_pkm::TaskPriority
+pub const traces_pkm::TaskPriority::EMOJIS: &'static [(&'static str, Self)]
+pub const fn traces_pkm::TaskPriority::as_str(&self) -> &'static str
+pub const fn traces_pkm::TaskPriority::emoji(&self) -> core::option::Option<&'static str>
+pub fn traces_pkm::TaskPriority::from_emoji(&str) -> core::option::Option<Self>
+pub const fn traces_pkm::TaskPriority::rank(self) -> u8
+impl core::clone::Clone for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskPriority
+impl core::cmp::Ord for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::TaskPriority
+impl core::marker::StructuralPartialEq for traces_pkm::TaskPriority
+impl core::str::traits::FromStr for traces_pkm::TaskPriority
+pub type traces_pkm::TaskPriority::Err = traces_pkm::TaskError
+pub fn traces_pkm::TaskPriority::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::TaskPriority
+impl core::marker::Send for traces_pkm::TaskPriority
+impl core::marker::Sync for traces_pkm::TaskPriority
+impl core::marker::Unpin for traces_pkm::TaskPriority
+impl core::marker::UnsafeUnpin for traces_pkm::TaskPriority
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskPriority
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskPriority
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskPriority
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::TaskPriority where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskPriority where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskPriority where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskPriority where U: core::convert::From<T>
+pub fn traces_pkm::TaskPriority::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskPriority where U: core::convert::Into<T>
+pub type traces_pkm::TaskPriority::Error = never
+pub fn traces_pkm::TaskPriority::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskPriority where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskPriority::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskPriority::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskPriority where T: core::clone::Clone
+pub type traces_pkm::TaskPriority::Owned = T
+pub fn traces_pkm::TaskPriority::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskPriority::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::TaskPriority where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::TaskPriority where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskPriority where T: ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskPriority where T: ?core::marker::Sized
+pub fn traces_pkm::TaskPriority::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskPriority where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskPriority::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskPriority
+pub fn traces_pkm::TaskPriority::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskPriority
+pub type traces_pkm::TaskPriority::Init = T
+pub const traces_pkm::TaskPriority::ALIGN: usize
+pub unsafe fn traces_pkm::TaskPriority::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskPriority::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskPriority::drop(usize)
+pub unsafe fn traces_pkm::TaskPriority::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskPriority where T: core::clone::Clone
+pub fn traces_pkm::TaskPriority::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskPriority
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::TaskPriority where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskPriority
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskPriority
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskPriority where T: 'static
+pub enum traces_pkm::TaskStatusType
+pub traces_pkm::TaskStatusType::Cancelled
+pub traces_pkm::TaskStatusType::Done
+pub traces_pkm::TaskStatusType::InProgress
+pub traces_pkm::TaskStatusType::NonTask
+pub traces_pkm::TaskStatusType::OnHold
+pub traces_pkm::TaskStatusType::Todo
+impl core::clone::Clone for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskStatusType
+impl core::cmp::PartialEq for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::TaskStatusType
+impl core::marker::StructuralPartialEq for traces_pkm::TaskStatusType
+impl serde_core::ser::Serialize for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::TaskStatusType
+impl core::marker::Send for traces_pkm::TaskStatusType
+impl core::marker::Sync for traces_pkm::TaskStatusType
+impl core::marker::Unpin for traces_pkm::TaskStatusType
+impl core::marker::UnsafeUnpin for traces_pkm::TaskStatusType
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskStatusType
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskStatusType
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskStatusType
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskStatusType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusType::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskStatusType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusType::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskStatusType where U: core::convert::From<T>
+pub fn traces_pkm::TaskStatusType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskStatusType where U: core::convert::Into<T>
+pub type traces_pkm::TaskStatusType::Error = never
+pub fn traces_pkm::TaskStatusType::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskStatusType where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskStatusType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskStatusType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskStatusType where T: core::clone::Clone
+pub type traces_pkm::TaskStatusType::Owned = T
+pub fn traces_pkm::TaskStatusType::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskStatusType::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskStatusType where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskStatusType where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatusType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskStatusType where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatusType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskStatusType where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskStatusType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatusType::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskStatusType
+pub type traces_pkm::TaskStatusType::Init = T
+pub const traces_pkm::TaskStatusType::ALIGN: usize
+pub unsafe fn traces_pkm::TaskStatusType::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskStatusType::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskStatusType::drop(usize)
+pub unsafe fn traces_pkm::TaskStatusType::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskStatusType where T: core::clone::Clone
+pub fn traces_pkm::TaskStatusType::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskStatusType
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::TaskStatusType where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskStatusType
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskStatusType
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskStatusType where T: 'static
+#[repr(transparent)] pub struct traces_pkm::DateTimeValue(_)
+impl core::clone::Clone for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::DateTimeValue
+impl core::cmp::Ord for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<chrono::datetime::DateTime<chrono::offset::utc::Utc>> for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from(chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> Self
+impl core::convert::From<std::time::SystemTime> for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from(std::time::SystemTime) -> Self
+impl core::convert::From<traces_pkm::DateTimeValue> for chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub fn chrono::datetime::DateTime<chrono::offset::utc::Utc>::from(traces_pkm::DateTimeValue) -> Self
+impl core::convert::From<traces_pkm::DateValue> for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from(traces_pkm::DateValue) -> Self
+impl core::fmt::Debug for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::DateTimeValue
+impl core::marker::StructuralPartialEq for traces_pkm::DateTimeValue
+impl core::str::traits::FromStr for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Err = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::serialize<S>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error> where S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::deserialize<D>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error> where D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::DateTimeValue
+impl core::marker::Send for traces_pkm::DateTimeValue
+impl core::marker::Sync for traces_pkm::DateTimeValue
+impl core::marker::Unpin for traces_pkm::DateTimeValue
+impl core::marker::UnsafeUnpin for traces_pkm::DateTimeValue
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::DateTimeValue
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::DateTimeValue
+impl<D> owo_colors::OwoColorize for traces_pkm::DateTimeValue
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::DateTimeValue where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::DateTimeValue where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::DateTimeValue where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::DateTimeValue where U: core::convert::From<T>
+pub fn traces_pkm::DateTimeValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::DateTimeValue where U: core::convert::Into<T>
+pub type traces_pkm::DateTimeValue::Error = never
+pub fn traces_pkm::DateTimeValue::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::DateTimeValue where U: core::convert::TryFrom<T>
+pub type traces_pkm::DateTimeValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::DateTimeValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::DateTimeValue where T: core::clone::Clone
+pub type traces_pkm::DateTimeValue::Owned = T
+pub fn traces_pkm::DateTimeValue::clone_into(&self, &mut T)
+pub fn traces_pkm::DateTimeValue::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::DateTimeValue where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::DateTimeValue where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::DateTimeValue where T: ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::DateTimeValue where T: ?core::marker::Sized
+pub fn traces_pkm::DateTimeValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::DateTimeValue where T: core::clone::Clone
+pub unsafe fn traces_pkm::DateTimeValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Init = T
+pub const traces_pkm::DateTimeValue::ALIGN: usize
+pub unsafe fn traces_pkm::DateTimeValue::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::DateTimeValue::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::DateTimeValue::drop(usize)
+pub unsafe fn traces_pkm::DateTimeValue::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::DateTimeValue where T: core::clone::Clone
+pub fn traces_pkm::DateTimeValue::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::DateTimeValue
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::DateTimeValue where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::DateTimeValue
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateTimeValue
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateTimeValue where T: 'static
+#[repr(transparent)] pub struct traces_pkm::DateValue(_)
+impl core::clone::Clone for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::DateValue
+impl core::cmp::Ord for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<chrono::naive::date::NaiveDate> for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from(chrono::naive::date::NaiveDate) -> Self
+impl core::convert::From<std::time::SystemTime> for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from(std::time::SystemTime) -> Self
+impl core::convert::From<traces_pkm::DateValue> for chrono::naive::date::NaiveDate
+pub fn chrono::naive::date::NaiveDate::from(traces_pkm::DateValue) -> Self
+impl core::convert::From<traces_pkm::DateValue> for traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from(traces_pkm::DateValue) -> Self
+impl core::fmt::Debug for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::DateValue
+impl core::marker::StructuralPartialEq for traces_pkm::DateValue
+impl core::str::traits::FromStr for traces_pkm::DateValue
+pub type traces_pkm::DateValue::Err = traces_pkm::DateError
+pub fn traces_pkm::DateValue::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::serialize<S>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error> where S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::deserialize<D>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error> where D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::DateValue
+impl core::marker::Send for traces_pkm::DateValue
+impl core::marker::Sync for traces_pkm::DateValue
+impl core::marker::Unpin for traces_pkm::DateValue
+impl core::marker::UnsafeUnpin for traces_pkm::DateValue
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::DateValue
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::DateValue
+impl<D> owo_colors::OwoColorize for traces_pkm::DateValue
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::DateValue where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateValue::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::DateValue where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateValue::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::DateValue where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DateValue::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::DateValue where U: core::convert::From<T>
+pub fn traces_pkm::DateValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::DateValue where U: core::convert::Into<T>
+pub type traces_pkm::DateValue::Error = never
+pub fn traces_pkm::DateValue::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::DateValue where U: core::convert::TryFrom<T>
+pub type traces_pkm::DateValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::DateValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::DateValue where T: core::clone::Clone
+pub type traces_pkm::DateValue::Owned = T
+pub fn traces_pkm::DateValue::clone_into(&self, &mut T)
+pub fn traces_pkm::DateValue::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::DateValue where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::DateValue::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::DateValue where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::DateValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::DateValue where T: ?core::marker::Sized
+pub fn traces_pkm::DateValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::DateValue where T: ?core::marker::Sized
+pub fn traces_pkm::DateValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::DateValue where T: core::clone::Clone
+pub unsafe fn traces_pkm::DateValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::DateValue
+pub type traces_pkm::DateValue::Init = T
+pub const traces_pkm::DateValue::ALIGN: usize
+pub unsafe fn traces_pkm::DateValue::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::DateValue::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::DateValue::drop(usize)
+pub unsafe fn traces_pkm::DateValue::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::DateValue where T: core::clone::Clone
+pub fn traces_pkm::DateValue::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::DateValue
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::DateValue where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::DateValue
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateValue
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateValue where T: 'static
+pub struct traces_pkm::DurationValue
+impl core::clone::Clone for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::DurationValue
+impl core::cmp::Ord for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::TryFrom<traces_pkm::DurationValue> for chrono::time_delta::TimeDelta
+pub type chrono::time_delta::TimeDelta::Error = traces_pkm::DurationError
+pub fn chrono::time_delta::TimeDelta::try_from(traces_pkm::DurationValue) -> core::result::Result<Self, Self::Error>
+impl core::fmt::Debug for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::hash<H: core::hash::Hasher>(&self, &mut H)
+impl core::ops::arith::Add for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::add(self, Self) -> Self
+impl core::ops::arith::Mul<f64> for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::mul(self, f64) -> Self
+impl core::ops::arith::Mul<traces_pkm::DurationValue> for f64
+pub type f64::Output = traces_pkm::DurationValue
+pub fn f64::mul(self, traces_pkm::DurationValue) -> traces_pkm::DurationValue
+impl core::ops::arith::Sub for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::sub(self, Self) -> Self
+impl core::str::traits::FromStr for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Err = traces_pkm::DurationError
+pub fn traces_pkm::DurationValue::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::serialize<S>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error> where S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::deserialize<D>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error> where D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::DurationValue
+impl core::marker::Send for traces_pkm::DurationValue
+impl core::marker::Sync for traces_pkm::DurationValue
+impl core::marker::Unpin for traces_pkm::DurationValue
+impl core::marker::UnsafeUnpin for traces_pkm::DurationValue
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::DurationValue
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::DurationValue
+impl<D> owo_colors::OwoColorize for traces_pkm::DurationValue
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::DurationValue where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DurationValue::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::DurationValue where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DurationValue::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::DurationValue where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::DurationValue::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::DurationValue where U: core::convert::From<T>
+pub fn traces_pkm::DurationValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::DurationValue where U: core::convert::Into<T>
+pub type traces_pkm::DurationValue::Error = never
+pub fn traces_pkm::DurationValue::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::DurationValue where U: core::convert::TryFrom<T>
+pub type traces_pkm::DurationValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::DurationValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::DurationValue where T: core::clone::Clone
+pub type traces_pkm::DurationValue::Owned = T
+pub fn traces_pkm::DurationValue::clone_into(&self, &mut T)
+pub fn traces_pkm::DurationValue::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::DurationValue where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::DurationValue::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::DurationValue where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::DurationValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::DurationValue where T: ?core::marker::Sized
+pub fn traces_pkm::DurationValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::DurationValue where T: ?core::marker::Sized
+pub fn traces_pkm::DurationValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::DurationValue where T: core::clone::Clone
+pub unsafe fn traces_pkm::DurationValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Init = T
+pub const traces_pkm::DurationValue::ALIGN: usize
+pub unsafe fn traces_pkm::DurationValue::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::DurationValue::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::DurationValue::drop(usize)
+pub unsafe fn traces_pkm::DurationValue::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::DurationValue where T: core::clone::Clone
+pub fn traces_pkm::DurationValue::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::DurationValue
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::DurationValue where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::DurationValue
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::DurationValue
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::DurationValue where T: 'static
+pub struct traces_pkm::FileMeta
+impl traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::path(&self) -> &std::path::Path
+impl core::clone::Clone for traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::FileMeta
+impl core::cmp::PartialEq for traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::FileMeta
+impl serde_core::ser::Serialize for traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::FileMeta
+impl core::marker::Send for traces_pkm::FileMeta
+impl core::marker::Sync for traces_pkm::FileMeta
+impl core::marker::Unpin for traces_pkm::FileMeta
+impl core::marker::UnsafeUnpin for traces_pkm::FileMeta
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::FileMeta
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::FileMeta
+impl<D> owo_colors::OwoColorize for traces_pkm::FileMeta
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::FileMeta where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::FileMeta::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::FileMeta where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::FileMeta::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::FileMeta where U: core::convert::From<T>
+pub fn traces_pkm::FileMeta::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::FileMeta where U: core::convert::Into<T>
+pub type traces_pkm::FileMeta::Error = never
+pub fn traces_pkm::FileMeta::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::FileMeta where U: core::convert::TryFrom<T>
+pub type traces_pkm::FileMeta::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::FileMeta::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::FileMeta where T: core::clone::Clone
+pub type traces_pkm::FileMeta::Owned = T
+pub fn traces_pkm::FileMeta::clone_into(&self, &mut T)
+pub fn traces_pkm::FileMeta::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::FileMeta where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::FileMeta::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::FileMeta where T: ?core::marker::Sized
+pub fn traces_pkm::FileMeta::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::FileMeta where T: ?core::marker::Sized
+pub fn traces_pkm::FileMeta::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::FileMeta where T: core::clone::Clone
+pub unsafe fn traces_pkm::FileMeta::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::FileMeta
+pub fn traces_pkm::FileMeta::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::FileMeta
+pub type traces_pkm::FileMeta::Init = T
+pub const traces_pkm::FileMeta::ALIGN: usize
+pub unsafe fn traces_pkm::FileMeta::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::FileMeta::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::FileMeta::drop(usize)
+pub unsafe fn traces_pkm::FileMeta::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::FileMeta where T: core::clone::Clone
+pub fn traces_pkm::FileMeta::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::FileMeta
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::FileMeta where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::FileMeta
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::FileMeta
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::FileMeta where T: 'static
+pub struct traces_pkm::Heading
+impl traces_pkm::Heading
+pub const fn traces_pkm::Heading::level(&self) -> u8
+pub const fn traces_pkm::Heading::line(&self) -> traces_pkm::SourceLine
+pub fn traces_pkm::Heading::text(&self) -> &str
+impl core::clone::Clone for traces_pkm::Heading
+pub fn traces_pkm::Heading::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::Heading
+impl core::cmp::PartialEq for traces_pkm::Heading
+pub fn traces_pkm::Heading::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::Heading
+pub fn traces_pkm::Heading::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::Heading
+impl serde_core::ser::Serialize for traces_pkm::Heading
+pub fn traces_pkm::Heading::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::Heading
+pub fn traces_pkm::Heading::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::Heading
+impl core::marker::Send for traces_pkm::Heading
+impl core::marker::Sync for traces_pkm::Heading
+impl core::marker::Unpin for traces_pkm::Heading
+impl core::marker::UnsafeUnpin for traces_pkm::Heading
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::Heading
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::Heading
+impl<D> owo_colors::OwoColorize for traces_pkm::Heading
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::Heading where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::Heading::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::Heading where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::Heading::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::Heading where U: core::convert::From<T>
+pub fn traces_pkm::Heading::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::Heading where U: core::convert::Into<T>
+pub type traces_pkm::Heading::Error = never
+pub fn traces_pkm::Heading::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::Heading where U: core::convert::TryFrom<T>
+pub type traces_pkm::Heading::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::Heading::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::Heading where T: core::clone::Clone
+pub type traces_pkm::Heading::Owned = T
+pub fn traces_pkm::Heading::clone_into(&self, &mut T)
+pub fn traces_pkm::Heading::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::Heading where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::Heading::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::Heading where T: ?core::marker::Sized
+pub fn traces_pkm::Heading::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::Heading where T: ?core::marker::Sized
+pub fn traces_pkm::Heading::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::Heading where T: core::clone::Clone
+pub unsafe fn traces_pkm::Heading::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::Heading
+pub fn traces_pkm::Heading::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::Heading
+pub type traces_pkm::Heading::Init = T
+pub const traces_pkm::Heading::ALIGN: usize
+pub unsafe fn traces_pkm::Heading::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::Heading::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::Heading::drop(usize)
+pub unsafe fn traces_pkm::Heading::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::Heading where T: core::clone::Clone
+pub fn traces_pkm::Heading::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::Heading
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::Heading where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::Heading
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::Heading
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::Heading where T: 'static
+pub struct traces_pkm::ListItem
+impl traces_pkm::ListItem
+pub fn traces_pkm::ListItem::clean_text(&self) -> &str
+pub const fn traces_pkm::ListItem::depth(&self) -> u8
+pub const fn traces_pkm::ListItem::is_ordered(&self) -> bool
+pub const fn traces_pkm::ListItem::kind(&self) -> &traces_pkm::ListItemType
+pub const fn traces_pkm::ListItem::line(&self) -> traces_pkm::SourceLine
+pub fn traces_pkm::ListItem::new<T: core::convert::Into<traces_pkm::ListText>>(traces_pkm::SourceLine, T, traces_pkm::ListItemType) -> Self
+pub const fn traces_pkm::ListItem::parent(&self) -> core::option::Option<traces_pkm::SourceLine>
+pub fn traces_pkm::ListItem::raw_text(&self) -> &str
+pub fn traces_pkm::ListItem::tags(&self) -> &[traces_pkm::Tag]
+pub fn traces_pkm::ListItem::text(&self) -> &traces_pkm::ListText
+pub fn traces_pkm::ListItem::with_depth(self, u8) -> Self
+pub fn traces_pkm::ListItem::with_is_ordered(self, bool) -> Self
+pub fn traces_pkm::ListItem::with_parent(self, core::option::Option<traces_pkm::SourceLine>) -> Self
+impl core::clone::Clone for traces_pkm::ListItem
+pub fn traces_pkm::ListItem::clone(&self) -> Self
+impl core::cmp::PartialEq for traces_pkm::ListItem
+pub fn traces_pkm::ListItem::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::ListItem
+pub fn traces_pkm::ListItem::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::ListItem
+impl serde_core::ser::Serialize for traces_pkm::ListItem
+pub fn traces_pkm::ListItem::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::ListItem
+pub fn traces_pkm::ListItem::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::ListItem
+impl core::marker::Send for traces_pkm::ListItem
+impl core::marker::Sync for traces_pkm::ListItem
+impl core::marker::Unpin for traces_pkm::ListItem
+impl core::marker::UnsafeUnpin for traces_pkm::ListItem
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::ListItem
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::ListItem
+impl<D> owo_colors::OwoColorize for traces_pkm::ListItem
+impl<T, U> core::convert::Into<U> for traces_pkm::ListItem where U: core::convert::From<T>
+pub fn traces_pkm::ListItem::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::ListItem where U: core::convert::Into<T>
+pub type traces_pkm::ListItem::Error = never
+pub fn traces_pkm::ListItem::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::ListItem where U: core::convert::TryFrom<T>
+pub type traces_pkm::ListItem::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::ListItem::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::ListItem where T: core::clone::Clone
+pub type traces_pkm::ListItem::Owned = T
+pub fn traces_pkm::ListItem::clone_into(&self, &mut T)
+pub fn traces_pkm::ListItem::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::ListItem where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::ListItem::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::ListItem where T: ?core::marker::Sized
+pub fn traces_pkm::ListItem::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::ListItem where T: ?core::marker::Sized
+pub fn traces_pkm::ListItem::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::ListItem where T: core::clone::Clone
+pub unsafe fn traces_pkm::ListItem::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::ListItem
+pub fn traces_pkm::ListItem::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::ListItem
+pub type traces_pkm::ListItem::Init = T
+pub const traces_pkm::ListItem::ALIGN: usize
+pub unsafe fn traces_pkm::ListItem::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::ListItem::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::ListItem::drop(usize)
+pub unsafe fn traces_pkm::ListItem::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::ListItem where T: core::clone::Clone
+pub fn traces_pkm::ListItem::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::ListItem
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::ListItem where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::ListItem
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::ListItem
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::ListItem where T: 'static
+pub struct traces_pkm::ListText
+impl traces_pkm::ListText
+pub fn traces_pkm::ListText::clean(&self) -> &str
+pub fn traces_pkm::ListText::new<R: core::convert::Into<alloc::string::String>, C: core::convert::Into<alloc::string::String>>(R, C) -> Self
+pub fn traces_pkm::ListText::raw(&self) -> &str
+impl core::clone::Clone for traces_pkm::ListText
+pub fn traces_pkm::ListText::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::ListText
+impl core::cmp::PartialEq for traces_pkm::ListText
+pub fn traces_pkm::ListText::eq(&self, &Self) -> bool
+impl core::cmp::PartialEq<&str> for traces_pkm::ListText
+pub fn traces_pkm::ListText::eq(&self, &&str) -> bool
+impl core::cmp::PartialEq<str> for traces_pkm::ListText
+pub fn traces_pkm::ListText::eq(&self, &str) -> bool
+impl core::cmp::PartialEq<traces_pkm::ListText> for &str
+pub fn &str::eq(&self, &traces_pkm::ListText) -> bool
+impl core::cmp::PartialEq<traces_pkm::ListText> for str
+pub fn str::eq(&self, &traces_pkm::ListText) -> bool
+impl core::convert::AsRef<str> for traces_pkm::ListText
+pub fn traces_pkm::ListText::as_ref(&self) -> &str
+impl core::convert::From<&str> for traces_pkm::ListText
+pub fn traces_pkm::ListText::from(&str) -> Self
+impl core::convert::From<(&str, &str)> for traces_pkm::ListText
+pub fn traces_pkm::ListText::from((&str, &str)) -> Self
+impl core::convert::From<(alloc::string::String, alloc::string::String)> for traces_pkm::ListText
+pub fn traces_pkm::ListText::from((alloc::string::String, alloc::string::String)) -> Self
+impl core::convert::From<alloc::string::String> for traces_pkm::ListText
+pub fn traces_pkm::ListText::from(alloc::string::String) -> Self
+impl core::default::Default for traces_pkm::ListText
+pub fn traces_pkm::ListText::default() -> Self
+impl core::fmt::Debug for traces_pkm::ListText
+pub fn traces_pkm::ListText::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::ListText
+pub fn traces_pkm::ListText::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::ListText
+pub fn traces_pkm::ListText::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for traces_pkm::ListText
+impl serde_core::ser::Serialize for traces_pkm::ListText
+pub fn traces_pkm::ListText::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::ListText
+pub fn traces_pkm::ListText::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::ListText
+impl core::marker::Send for traces_pkm::ListText
+impl core::marker::Sync for traces_pkm::ListText
+impl core::marker::Unpin for traces_pkm::ListText
+impl core::marker::UnsafeUnpin for traces_pkm::ListText
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::ListText
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::ListText
+impl<D> owo_colors::OwoColorize for traces_pkm::ListText
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::ListText where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::ListText::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::ListText where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::ListText::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::ListText where U: core::convert::From<T>
+pub fn traces_pkm::ListText::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::ListText where U: core::convert::Into<T>
+pub type traces_pkm::ListText::Error = never
+pub fn traces_pkm::ListText::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::ListText where U: core::convert::TryFrom<T>
+pub type traces_pkm::ListText::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::ListText::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::ListText where T: core::clone::Clone
+pub type traces_pkm::ListText::Owned = T
+pub fn traces_pkm::ListText::clone_into(&self, &mut T)
+pub fn traces_pkm::ListText::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::ListText where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::ListText::to_string(&self) -> alloc::string::String
+impl<T> convert_case::Casing<T> for traces_pkm::ListText where T: core::convert::AsRef<str>
+pub fn traces_pkm::ListText::from_case(&self, convert_case::case::Case<'_>) -> convert_case::StateConverter<'_, T>
+pub fn traces_pkm::ListText::remove_boundaries(&self, &[convert_case::boundary::Boundary]) -> convert_case::StateConverter<'_, T>
+pub fn traces_pkm::ListText::remove_empty(&self) -> convert_case::StateConverter<'_, T>
+pub fn traces_pkm::ListText::set_boundaries(&self, &[convert_case::boundary::Boundary]) -> convert_case::StateConverter<'_, T>
+pub fn traces_pkm::ListText::to_case(&self, convert_case::case::Case<'_>) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::ListText where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::ListText::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::ListText where T: ?core::marker::Sized
+pub fn traces_pkm::ListText::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::ListText where T: ?core::marker::Sized
+pub fn traces_pkm::ListText::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::ListText where T: core::clone::Clone
+pub unsafe fn traces_pkm::ListText::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::ListText
+pub fn traces_pkm::ListText::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::ListText
+pub type traces_pkm::ListText::Init = T
+pub const traces_pkm::ListText::ALIGN: usize
+pub unsafe fn traces_pkm::ListText::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::ListText::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::ListText::drop(usize)
+pub unsafe fn traces_pkm::ListText::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::ListText where T: core::clone::Clone
+pub fn traces_pkm::ListText::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::ListText
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::ListText where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::ListText
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::ListText
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::ListText where T: 'static
+pub struct traces_pkm::MarkdownParserInput<'a>
+impl<'a> traces_pkm::MarkdownParserInput<'a>
+pub const fn traces_pkm::MarkdownParserInput<'a>::new(&'a std::path::Path, &'a str, &'a traces_pkm::config::model::TaskConfig, &'a traces_pkm::config::model::FrontmatterConfig) -> Self
+impl<'a> core::clone::Clone for traces_pkm::MarkdownParserInput<'a>
+pub fn traces_pkm::MarkdownParserInput<'a>::clone(&self) -> Self
+impl<'a> core::fmt::Debug for traces_pkm::MarkdownParserInput<'a>
+pub fn traces_pkm::MarkdownParserInput<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for traces_pkm::MarkdownParserInput<'a>
+impl<'a> core::marker::Send for traces_pkm::MarkdownParserInput<'a>
+impl<'a> core::marker::Sync for traces_pkm::MarkdownParserInput<'a>
+impl<'a> core::marker::Unpin for traces_pkm::MarkdownParserInput<'a>
+impl<'a> core::marker::UnsafeUnpin for traces_pkm::MarkdownParserInput<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for traces_pkm::MarkdownParserInput<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for traces_pkm::MarkdownParserInput<'a>
+impl<D> owo_colors::OwoColorize for traces_pkm::MarkdownParserInput<'a>
+impl<T, U> core::convert::Into<U> for traces_pkm::MarkdownParserInput<'a> where U: core::convert::From<T>
+pub fn traces_pkm::MarkdownParserInput<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::MarkdownParserInput<'a> where U: core::convert::Into<T>
+pub type traces_pkm::MarkdownParserInput<'a>::Error = never
+pub fn traces_pkm::MarkdownParserInput<'a>::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::MarkdownParserInput<'a> where U: core::convert::TryFrom<T>
+pub type traces_pkm::MarkdownParserInput<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::MarkdownParserInput<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::MarkdownParserInput<'a> where T: core::clone::Clone
+pub type traces_pkm::MarkdownParserInput<'a>::Owned = T
+pub fn traces_pkm::MarkdownParserInput<'a>::clone_into(&self, &mut T)
+pub fn traces_pkm::MarkdownParserInput<'a>::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::MarkdownParserInput<'a> where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::MarkdownParserInput<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::MarkdownParserInput<'a> where T: ?core::marker::Sized
+pub fn traces_pkm::MarkdownParserInput<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::MarkdownParserInput<'a> where T: ?core::marker::Sized
+pub fn traces_pkm::MarkdownParserInput<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::MarkdownParserInput<'a> where T: core::clone::Clone
+pub unsafe fn traces_pkm::MarkdownParserInput<'a>::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::MarkdownParserInput<'a>
+pub fn traces_pkm::MarkdownParserInput<'a>::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::MarkdownParserInput<'a>
+pub type traces_pkm::MarkdownParserInput<'a>::Init = T
+pub const traces_pkm::MarkdownParserInput<'a>::ALIGN: usize
+pub unsafe fn traces_pkm::MarkdownParserInput<'a>::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::MarkdownParserInput<'a>::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::MarkdownParserInput<'a>::drop(usize)
+pub unsafe fn traces_pkm::MarkdownParserInput<'a>::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::MarkdownParserInput<'a> where T: core::clone::Clone
+pub fn traces_pkm::MarkdownParserInput<'a>::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::MarkdownParserInput<'a>
+impl<T> tracing::instrument::Instrument for traces_pkm::MarkdownParserInput<'a>
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::MarkdownParserInput<'a>
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::MarkdownParserInput<'a> where T: 'static
+pub struct traces_pkm::Note
+impl traces_pkm::Note
+pub fn traces_pkm::Note::descendants(&self, usize) -> impl core::iter::traits::iterator::Iterator<Item = &traces_pkm::ListItem>
+pub const fn traces_pkm::Note::frontmatter(&self) -> core::option::Option<&traces_pkm::note::metadata::Frontmatter>
+pub fn traces_pkm::Note::headings(&self) -> &[traces_pkm::Heading]
+pub fn traces_pkm::Note::list_items(&self) -> impl core::iter::traits::iterator::Iterator<Item = &traces_pkm::ListItem>
+pub fn traces_pkm::Note::lists(&self) -> &[traces_pkm::ListItem]
+pub fn traces_pkm::Note::outlinks(&self) -> &[traces_pkm::note::links::Link]
+pub fn traces_pkm::Note::path(&self) -> &std::path::Path
+pub fn traces_pkm::Note::tags(&self) -> &[traces_pkm::Tag]
+pub fn traces_pkm::Note::tasks(&self) -> impl core::iter::traits::iterator::Iterator<Item = &traces_pkm::ListItem>
+impl core::clone::Clone for traces_pkm::Note
+pub fn traces_pkm::Note::clone(&self) -> Self
+impl core::cmp::PartialEq for traces_pkm::Note
+pub fn traces_pkm::Note::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::Note
+pub fn traces_pkm::Note::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::Note
+impl serde_core::ser::Serialize for traces_pkm::Note
+pub fn traces_pkm::Note::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::Note
+pub fn traces_pkm::Note::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::Note
+impl core::marker::Send for traces_pkm::Note
+impl core::marker::Sync for traces_pkm::Note
+impl core::marker::Unpin for traces_pkm::Note
+impl core::marker::UnsafeUnpin for traces_pkm::Note
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::Note
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::Note
+impl<D> owo_colors::OwoColorize for traces_pkm::Note
+impl<T, U> core::convert::Into<U> for traces_pkm::Note where U: core::convert::From<T>
+pub fn traces_pkm::Note::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::Note where U: core::convert::Into<T>
+pub type traces_pkm::Note::Error = never
+pub fn traces_pkm::Note::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::Note where U: core::convert::TryFrom<T>
+pub type traces_pkm::Note::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::Note::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::Note where T: core::clone::Clone
+pub type traces_pkm::Note::Owned = T
+pub fn traces_pkm::Note::clone_into(&self, &mut T)
+pub fn traces_pkm::Note::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::Note where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::Note::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::Note where T: ?core::marker::Sized
+pub fn traces_pkm::Note::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::Note where T: ?core::marker::Sized
+pub fn traces_pkm::Note::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::Note where T: core::clone::Clone
+pub unsafe fn traces_pkm::Note::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::Note
+pub fn traces_pkm::Note::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::Note
+pub type traces_pkm::Note::Init = T
+pub const traces_pkm::Note::ALIGN: usize
+pub unsafe fn traces_pkm::Note::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::Note::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::Note::drop(usize)
+pub unsafe fn traces_pkm::Note::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::Note where T: core::clone::Clone
+pub fn traces_pkm::Note::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::Note
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::Note where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::Note
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::Note
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::Note where T: 'static
+pub struct traces_pkm::PresetDialogProvider
+impl traces_pkm::PresetDialogProvider
+pub fn traces_pkm::PresetDialogProvider::is_empty(&self) -> bool
+pub fn traces_pkm::PresetDialogProvider::new() -> Self
+pub fn traces_pkm::PresetDialogProvider::with_confirm(self, bool) -> Self
+pub fn traces_pkm::PresetDialogProvider::with_multi_select<I>(self, I) -> Self where I: core::iter::traits::collect::IntoIterator<Item = usize>
+pub fn traces_pkm::PresetDialogProvider::with_select(self, usize) -> Self
+pub fn traces_pkm::PresetDialogProvider::with_text<S: core::convert::Into<alloc::string::String>>(self, S) -> Self
+impl core::default::Default for traces_pkm::PresetDialogProvider
+pub fn traces_pkm::PresetDialogProvider::default() -> Self
+impl core::fmt::Debug for traces_pkm::PresetDialogProvider
+pub fn traces_pkm::PresetDialogProvider::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl traces_pkm::DialogProvider for traces_pkm::PresetDialogProvider
+pub fn traces_pkm::PresetDialogProvider::confirm(&self, &str, core::option::Option<bool>) -> traces_pkm::DialogResult<bool>
+pub fn traces_pkm::PresetDialogProvider::is_interactive(&self) -> bool
+pub fn traces_pkm::PresetDialogProvider::multi_select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<alloc::vec::Vec<usize>>
+pub fn traces_pkm::PresetDialogProvider::select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<usize>
+pub fn traces_pkm::PresetDialogProvider::text(&self, &str, core::option::Option<&str>) -> traces_pkm::DialogResult<alloc::string::String>
+impl !core::marker::Freeze for traces_pkm::PresetDialogProvider
+impl core::marker::Send for traces_pkm::PresetDialogProvider
+impl core::marker::Sync for traces_pkm::PresetDialogProvider
+impl core::marker::Unpin for traces_pkm::PresetDialogProvider
+impl core::marker::UnsafeUnpin for traces_pkm::PresetDialogProvider
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::PresetDialogProvider
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::PresetDialogProvider
+impl<D> owo_colors::OwoColorize for traces_pkm::PresetDialogProvider
+impl<T, U> core::convert::Into<U> for traces_pkm::PresetDialogProvider where U: core::convert::From<T>
+pub fn traces_pkm::PresetDialogProvider::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::PresetDialogProvider where U: core::convert::Into<T>
+pub type traces_pkm::PresetDialogProvider::Error = never
+pub fn traces_pkm::PresetDialogProvider::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::PresetDialogProvider where U: core::convert::TryFrom<T>
+pub type traces_pkm::PresetDialogProvider::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::PresetDialogProvider::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for traces_pkm::PresetDialogProvider where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::PresetDialogProvider::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::PresetDialogProvider where T: ?core::marker::Sized
+pub fn traces_pkm::PresetDialogProvider::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::PresetDialogProvider where T: ?core::marker::Sized
+pub fn traces_pkm::PresetDialogProvider::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for traces_pkm::PresetDialogProvider
+pub fn traces_pkm::PresetDialogProvider::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::PresetDialogProvider
+pub type traces_pkm::PresetDialogProvider::Init = T
+pub const traces_pkm::PresetDialogProvider::ALIGN: usize
+pub unsafe fn traces_pkm::PresetDialogProvider::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::PresetDialogProvider::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::PresetDialogProvider::drop(usize)
+pub unsafe fn traces_pkm::PresetDialogProvider::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for traces_pkm::PresetDialogProvider
+impl<T> tracing::instrument::Instrument for traces_pkm::PresetDialogProvider
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::PresetDialogProvider
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::PresetDialogProvider where T: 'static
+pub struct traces_pkm::SourceLine(_)
+impl traces_pkm::SourceLine
+pub const traces_pkm::SourceLine::MIN: Self
+pub const fn traces_pkm::SourceLine::get(self) -> u32
+pub const fn traces_pkm::SourceLine::new(u32) -> core::option::Option<Self>
+impl core::clone::Clone for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::SourceLine
+impl core::cmp::Ord for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<traces_pkm::SourceLine> for u32
+pub fn u32::from(traces_pkm::SourceLine) -> Self
+impl core::convert::TryFrom<u32> for traces_pkm::SourceLine
+pub type traces_pkm::SourceLine::Error = traces_pkm::PositionError
+pub fn traces_pkm::SourceLine::try_from(u32) -> core::result::Result<Self, Self::Error>
+impl core::fmt::Debug for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::SourceLine
+impl core::marker::StructuralPartialEq for traces_pkm::SourceLine
+impl serde_core::ser::Serialize for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
+impl core::marker::Freeze for traces_pkm::SourceLine
+impl core::marker::Send for traces_pkm::SourceLine
+impl core::marker::Sync for traces_pkm::SourceLine
+impl core::marker::Unpin for traces_pkm::SourceLine
+impl core::marker::UnsafeUnpin for traces_pkm::SourceLine
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::SourceLine
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::SourceLine
+impl<D> owo_colors::OwoColorize for traces_pkm::SourceLine
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::SourceLine where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::SourceLine::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::SourceLine where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::SourceLine::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::SourceLine where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::SourceLine::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::SourceLine where U: core::convert::From<T>
+pub fn traces_pkm::SourceLine::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::SourceLine where U: core::convert::Into<T>
+pub type traces_pkm::SourceLine::Error = never
+pub fn traces_pkm::SourceLine::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::SourceLine where U: core::convert::TryFrom<T>
+pub type traces_pkm::SourceLine::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::SourceLine::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::SourceLine where T: core::clone::Clone
+pub type traces_pkm::SourceLine::Owned = T
+pub fn traces_pkm::SourceLine::clone_into(&self, &mut T)
+pub fn traces_pkm::SourceLine::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::SourceLine where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::SourceLine::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::SourceLine where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::SourceLine::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::SourceLine where T: ?core::marker::Sized
+pub fn traces_pkm::SourceLine::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::SourceLine where T: ?core::marker::Sized
+pub fn traces_pkm::SourceLine::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::SourceLine where T: core::clone::Clone
+pub unsafe fn traces_pkm::SourceLine::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::SourceLine
+pub fn traces_pkm::SourceLine::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::SourceLine
+pub type traces_pkm::SourceLine::Init = T
+pub const traces_pkm::SourceLine::ALIGN: usize
+pub unsafe fn traces_pkm::SourceLine::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::SourceLine::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::SourceLine::drop(usize)
+pub unsafe fn traces_pkm::SourceLine::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::SourceLine where T: core::clone::Clone
+pub fn traces_pkm::SourceLine::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::SourceLine
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::SourceLine where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::SourceLine
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::SourceLine
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::SourceLine where T: 'static
+pub struct traces_pkm::Tag(_)
+impl traces_pkm::Tag
+pub fn traces_pkm::Tag::as_str(&self) -> &str
+pub fn traces_pkm::Tag::is_contained_in(&self, &str) -> bool
+pub fn traces_pkm::Tag::is_exact_match(&self, &Self) -> bool
+pub fn traces_pkm::Tag::parse(&str) -> core::result::Result<Self, traces_pkm::TagError>
+pub fn traces_pkm::Tag::segments(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+impl core::clone::Clone for traces_pkm::Tag
+pub fn traces_pkm::Tag::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::Tag
+impl core::cmp::Ord for traces_pkm::Tag
+pub fn traces_pkm::Tag::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::Tag
+pub fn traces_pkm::Tag::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::Tag
+pub fn traces_pkm::Tag::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for traces_pkm::Tag
+pub fn traces_pkm::Tag::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::Tag
+pub fn traces_pkm::Tag::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for traces_pkm::Tag
+impl serde_core::ser::Serialize for traces_pkm::Tag
+pub fn traces_pkm::Tag::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::Tag
+pub fn traces_pkm::Tag::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::Tag
+impl core::marker::Send for traces_pkm::Tag
+impl core::marker::Sync for traces_pkm::Tag
+impl core::marker::Unpin for traces_pkm::Tag
+impl core::marker::UnsafeUnpin for traces_pkm::Tag
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::Tag
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::Tag
+impl<D> owo_colors::OwoColorize for traces_pkm::Tag
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::Tag where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::Tag::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::Tag where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::Tag::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::Tag where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::Tag::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::Tag where U: core::convert::From<T>
+pub fn traces_pkm::Tag::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::Tag where U: core::convert::Into<T>
+pub type traces_pkm::Tag::Error = never
+pub fn traces_pkm::Tag::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::Tag where U: core::convert::TryFrom<T>
+pub type traces_pkm::Tag::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::Tag::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::Tag where T: core::clone::Clone
+pub type traces_pkm::Tag::Owned = T
+pub fn traces_pkm::Tag::clone_into(&self, &mut T)
+pub fn traces_pkm::Tag::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::Tag where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::Tag::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::Tag where T: ?core::marker::Sized
+pub fn traces_pkm::Tag::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::Tag where T: ?core::marker::Sized
+pub fn traces_pkm::Tag::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::Tag where T: core::clone::Clone
+pub unsafe fn traces_pkm::Tag::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::Tag
+pub fn traces_pkm::Tag::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::Tag
+pub type traces_pkm::Tag::Init = T
+pub const traces_pkm::Tag::ALIGN: usize
+pub unsafe fn traces_pkm::Tag::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::Tag::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::Tag::drop(usize)
+pub unsafe fn traces_pkm::Tag::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::Tag where T: core::clone::Clone
+pub fn traces_pkm::Tag::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::Tag
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::Tag where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::Tag
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::Tag
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::Tag where T: 'static
+pub struct traces_pkm::TaskDate
+impl traces_pkm::TaskDate
+pub const fn traces_pkm::TaskDate::date(&self) -> traces_pkm::DateValue
+pub const fn traces_pkm::TaskDate::kind(&self) -> traces_pkm::TaskDateType
+pub const fn traces_pkm::TaskDate::new(traces_pkm::TaskDateType, traces_pkm::DateValue) -> Self
+impl core::clone::Clone for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskDate
+impl core::cmp::Ord for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::iter::traits::collect::Extend<traces_pkm::TaskDate> for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::extend<T: core::iter::traits::collect::IntoIterator<Item = traces_pkm::TaskDate>>(&mut self, T)
+impl core::iter::traits::collect::FromIterator<traces_pkm::TaskDate> for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::from_iter<T: core::iter::traits::collect::IntoIterator<Item = traces_pkm::TaskDate>>(T) -> Self
+impl core::marker::Copy for traces_pkm::TaskDate
+impl core::marker::StructuralPartialEq for traces_pkm::TaskDate
+impl core::marker::Freeze for traces_pkm::TaskDate
+impl core::marker::Send for traces_pkm::TaskDate
+impl core::marker::Sync for traces_pkm::TaskDate
+impl core::marker::Unpin for traces_pkm::TaskDate
+impl core::marker::UnsafeUnpin for traces_pkm::TaskDate
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskDate
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskDate
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskDate
+impl<Q, K> equivalent::Comparable<K> for traces_pkm::TaskDate where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDate::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskDate where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDate::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskDate where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDate::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskDate where U: core::convert::From<T>
+pub fn traces_pkm::TaskDate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskDate where U: core::convert::Into<T>
+pub type traces_pkm::TaskDate::Error = never
+pub fn traces_pkm::TaskDate::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskDate where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskDate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskDate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskDate where T: core::clone::Clone
+pub type traces_pkm::TaskDate::Owned = T
+pub fn traces_pkm::TaskDate::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskDate::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskDate where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskDate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskDate where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskDate where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskDate where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskDate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskDate
+pub fn traces_pkm::TaskDate::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskDate
+pub type traces_pkm::TaskDate::Init = T
+pub const traces_pkm::TaskDate::ALIGN: usize
+pub unsafe fn traces_pkm::TaskDate::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskDate::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskDate::drop(usize)
+pub unsafe fn traces_pkm::TaskDate::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskDate where T: core::clone::Clone
+pub fn traces_pkm::TaskDate::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskDate
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskDate
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskDate
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskDate where T: 'static
+pub struct traces_pkm::TaskDateSet
+impl traces_pkm::TaskDateSet
+pub const fn traces_pkm::TaskDateSet::get(&self, traces_pkm::TaskDateType) -> core::option::Option<traces_pkm::DateValue>
+pub const fn traces_pkm::TaskDateSet::is_empty(&self) -> bool
+pub fn traces_pkm::TaskDateSet::iter(&self) -> traces_pkm::TaskDateSetIter
+impl core::clone::Clone for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskDateSet
+impl core::cmp::PartialEq for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::eq(&self, &Self) -> bool
+impl core::default::Default for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::default() -> Self
+impl core::fmt::Debug for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::iter::traits::collect::Extend<traces_pkm::TaskDate> for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::extend<T: core::iter::traits::collect::IntoIterator<Item = traces_pkm::TaskDate>>(&mut self, T)
+impl core::iter::traits::collect::FromIterator<traces_pkm::TaskDate> for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::from_iter<T: core::iter::traits::collect::IntoIterator<Item = traces_pkm::TaskDate>>(T) -> Self
+impl core::iter::traits::collect::IntoIterator for &traces_pkm::TaskDateSet
+pub type &traces_pkm::TaskDateSet::IntoIter = traces_pkm::TaskDateSetIter
+pub type &traces_pkm::TaskDateSet::Item = traces_pkm::TaskDate
+pub fn &traces_pkm::TaskDateSet::into_iter(self) -> Self::IntoIter
+impl core::iter::traits::collect::IntoIterator for traces_pkm::TaskDateSet
+pub type traces_pkm::TaskDateSet::IntoIter = traces_pkm::TaskDateSetIter
+pub type traces_pkm::TaskDateSet::Item = traces_pkm::TaskDate
+pub fn traces_pkm::TaskDateSet::into_iter(self) -> Self::IntoIter
+impl core::marker::Copy for traces_pkm::TaskDateSet
+impl core::marker::StructuralPartialEq for traces_pkm::TaskDateSet
+impl serde_core::ser::Serialize for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::TaskDateSet
+impl core::marker::Send for traces_pkm::TaskDateSet
+impl core::marker::Sync for traces_pkm::TaskDateSet
+impl core::marker::Unpin for traces_pkm::TaskDateSet
+impl core::marker::UnsafeUnpin for traces_pkm::TaskDateSet
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskDateSet
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskDateSet
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskDateSet
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskDateSet where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDateSet::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskDateSet where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskDateSet::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskDateSet where U: core::convert::From<T>
+pub fn traces_pkm::TaskDateSet::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskDateSet where U: core::convert::Into<T>
+pub type traces_pkm::TaskDateSet::Error = never
+pub fn traces_pkm::TaskDateSet::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskDateSet where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskDateSet::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskDateSet::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskDateSet where T: core::clone::Clone
+pub type traces_pkm::TaskDateSet::Owned = T
+pub fn traces_pkm::TaskDateSet::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskDateSet::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskDateSet where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskDateSet::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskDateSet where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDateSet::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskDateSet where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDateSet::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskDateSet where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskDateSet::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskDateSet
+pub fn traces_pkm::TaskDateSet::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskDateSet
+pub type traces_pkm::TaskDateSet::Init = T
+pub const traces_pkm::TaskDateSet::ALIGN: usize
+pub unsafe fn traces_pkm::TaskDateSet::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskDateSet::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskDateSet::drop(usize)
+pub unsafe fn traces_pkm::TaskDateSet::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskDateSet where T: core::clone::Clone
+pub fn traces_pkm::TaskDateSet::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskDateSet
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::TaskDateSet where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskDateSet
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskDateSet
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskDateSet where T: 'static
+pub struct traces_pkm::TaskDateSetIter
+impl core::clone::Clone for traces_pkm::TaskDateSetIter
+pub fn traces_pkm::TaskDateSetIter::clone(&self) -> Self
+impl core::fmt::Debug for traces_pkm::TaskDateSetIter
+pub fn traces_pkm::TaskDateSetIter::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::iter::traits::iterator::Iterator for traces_pkm::TaskDateSetIter
+pub type traces_pkm::TaskDateSetIter::Item = traces_pkm::TaskDate
+pub fn traces_pkm::TaskDateSetIter::next(&mut self) -> core::option::Option<Self::Item>
+pub fn traces_pkm::TaskDateSetIter::size_hint(&self) -> (usize, core::option::Option<usize>)
+impl core::marker::Freeze for traces_pkm::TaskDateSetIter
+impl core::marker::Send for traces_pkm::TaskDateSetIter
+impl core::marker::Sync for traces_pkm::TaskDateSetIter
+impl core::marker::Unpin for traces_pkm::TaskDateSetIter
+impl core::marker::UnsafeUnpin for traces_pkm::TaskDateSetIter
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskDateSetIter
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskDateSetIter
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskDateSetIter
+impl<I> core::iter::traits::collect::IntoIterator for traces_pkm::TaskDateSetIter where I: core::iter::traits::iterator::Iterator
+pub type traces_pkm::TaskDateSetIter::IntoIter = I
+pub type traces_pkm::TaskDateSetIter::Item = <I as core::iter::traits::iterator::Iterator>::Item
+pub fn traces_pkm::TaskDateSetIter::into_iter(self) -> I
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskDateSetIter where U: core::convert::From<T>
+pub fn traces_pkm::TaskDateSetIter::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskDateSetIter where U: core::convert::Into<T>
+pub type traces_pkm::TaskDateSetIter::Error = never
+pub fn traces_pkm::TaskDateSetIter::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskDateSetIter where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskDateSetIter::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskDateSetIter::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskDateSetIter where T: core::clone::Clone
+pub type traces_pkm::TaskDateSetIter::Owned = T
+pub fn traces_pkm::TaskDateSetIter::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskDateSetIter::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskDateSetIter where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskDateSetIter::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskDateSetIter where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDateSetIter::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskDateSetIter where T: ?core::marker::Sized
+pub fn traces_pkm::TaskDateSetIter::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskDateSetIter where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskDateSetIter::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskDateSetIter
+pub fn traces_pkm::TaskDateSetIter::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskDateSetIter
+pub type traces_pkm::TaskDateSetIter::Init = T
+pub const traces_pkm::TaskDateSetIter::ALIGN: usize
+pub unsafe fn traces_pkm::TaskDateSetIter::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskDateSetIter::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskDateSetIter::drop(usize)
+pub unsafe fn traces_pkm::TaskDateSetIter::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskDateSetIter where T: core::clone::Clone
+pub fn traces_pkm::TaskDateSetIter::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskDateSetIter
+impl<T> rayon::iter::par_bridge::ParallelBridge for traces_pkm::TaskDateSetIter where T: core::iter::traits::iterator::Iterator + core::marker::Send, <T as core::iter::traits::iterator::Iterator>::Item: core::marker::Send
+pub fn traces_pkm::TaskDateSetIter::par_bridge(self) -> rayon::iter::par_bridge::IterBridge<T>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskDateSetIter
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskDateSetIter
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskDateSetIter where T: 'static
+pub struct traces_pkm::TaskListItem
+impl traces_pkm::TaskListItem
+pub const fn traces_pkm::TaskListItem::dates(&self) -> traces_pkm::TaskDateSet
+pub const fn traces_pkm::TaskListItem::is_fully_complete(&self) -> bool
+pub const fn traces_pkm::TaskListItem::new(traces_pkm::TaskDateSet, core::option::Option<traces_pkm::TaskPriority>, traces_pkm::TaskStatus, bool) -> Self
+pub const fn traces_pkm::TaskListItem::priority(&self) -> core::option::Option<traces_pkm::TaskPriority>
+pub const fn traces_pkm::TaskListItem::status(&self) -> &traces_pkm::TaskStatus
+impl core::clone::Clone for traces_pkm::TaskListItem
+pub fn traces_pkm::TaskListItem::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskListItem
+impl core::cmp::PartialEq for traces_pkm::TaskListItem
+pub fn traces_pkm::TaskListItem::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces_pkm::TaskListItem
+pub fn traces_pkm::TaskListItem::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::TaskListItem
+impl serde_core::ser::Serialize for traces_pkm::TaskListItem
+pub fn traces_pkm::TaskListItem::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::TaskListItem
+pub fn traces_pkm::TaskListItem::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::TaskListItem
+impl core::marker::Send for traces_pkm::TaskListItem
+impl core::marker::Sync for traces_pkm::TaskListItem
+impl core::marker::Unpin for traces_pkm::TaskListItem
+impl core::marker::UnsafeUnpin for traces_pkm::TaskListItem
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskListItem
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskListItem
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskListItem
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskListItem where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskListItem::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskListItem where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskListItem::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskListItem where U: core::convert::From<T>
+pub fn traces_pkm::TaskListItem::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskListItem where U: core::convert::Into<T>
+pub type traces_pkm::TaskListItem::Error = never
+pub fn traces_pkm::TaskListItem::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskListItem where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskListItem::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskListItem::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskListItem where T: core::clone::Clone
+pub type traces_pkm::TaskListItem::Owned = T
+pub fn traces_pkm::TaskListItem::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskListItem::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskListItem where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskListItem::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskListItem where T: ?core::marker::Sized
+pub fn traces_pkm::TaskListItem::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskListItem where T: ?core::marker::Sized
+pub fn traces_pkm::TaskListItem::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskListItem where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskListItem::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskListItem
+pub fn traces_pkm::TaskListItem::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskListItem
+pub type traces_pkm::TaskListItem::Init = T
+pub const traces_pkm::TaskListItem::ALIGN: usize
+pub unsafe fn traces_pkm::TaskListItem::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskListItem::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskListItem::drop(usize)
+pub unsafe fn traces_pkm::TaskListItem::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskListItem where T: core::clone::Clone
+pub fn traces_pkm::TaskListItem::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskListItem
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::TaskListItem where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskListItem
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskListItem
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskListItem where T: 'static
+pub struct traces_pkm::TaskStatus
+impl traces_pkm::TaskStatus
+pub const fn traces_pkm::TaskStatus::kind(&self) -> traces_pkm::TaskStatusType
+pub fn traces_pkm::TaskStatus::name(&self) -> &str
+pub const fn traces_pkm::TaskStatus::symbol(&self) -> traces_pkm::TaskStatusSymbol
+impl core::clone::Clone for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskStatus
+impl core::cmp::PartialEq for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::eq(&self, &Self) -> bool
+impl core::default::Default for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::default() -> Self
+impl core::fmt::Debug for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces_pkm::TaskStatus
+impl serde_core::ser::Serialize for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::TaskStatus
+impl core::marker::Send for traces_pkm::TaskStatus
+impl core::marker::Sync for traces_pkm::TaskStatus
+impl core::marker::Unpin for traces_pkm::TaskStatus
+impl core::marker::UnsafeUnpin for traces_pkm::TaskStatus
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskStatus
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskStatus
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskStatus
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskStatus where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskStatus::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskStatus where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskStatus::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskStatus where U: core::convert::From<T>
+pub fn traces_pkm::TaskStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskStatus where U: core::convert::Into<T>
+pub type traces_pkm::TaskStatus::Error = never
+pub fn traces_pkm::TaskStatus::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskStatus where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskStatus where T: core::clone::Clone
+pub type traces_pkm::TaskStatus::Owned = T
+pub fn traces_pkm::TaskStatus::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskStatus::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskStatus where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskStatus where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskStatus where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskStatus where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskStatus
+pub fn traces_pkm::TaskStatus::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskStatus
+pub type traces_pkm::TaskStatus::Init = T
+pub const traces_pkm::TaskStatus::ALIGN: usize
+pub unsafe fn traces_pkm::TaskStatus::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskStatus::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskStatus::drop(usize)
+pub unsafe fn traces_pkm::TaskStatus::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskStatus where T: core::clone::Clone
+pub fn traces_pkm::TaskStatus::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskStatus
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::TaskStatus where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskStatus
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskStatus
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskStatus where T: 'static
+pub struct traces_pkm::TaskStatusMap
+impl core::clone::Clone for traces_pkm::TaskStatusMap
+pub fn traces_pkm::TaskStatusMap::clone(&self) -> Self
+impl core::default::Default for traces_pkm::TaskStatusMap
+pub fn traces_pkm::TaskStatusMap::default() -> Self
+impl core::fmt::Debug for traces_pkm::TaskStatusMap
+pub fn traces_pkm::TaskStatusMap::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for traces_pkm::TaskStatusMap
+impl core::marker::Send for traces_pkm::TaskStatusMap
+impl core::marker::Sync for traces_pkm::TaskStatusMap
+impl core::marker::Unpin for traces_pkm::TaskStatusMap
+impl core::marker::UnsafeUnpin for traces_pkm::TaskStatusMap
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskStatusMap
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskStatusMap
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskStatusMap
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskStatusMap where U: core::convert::From<T>
+pub fn traces_pkm::TaskStatusMap::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskStatusMap where U: core::convert::Into<T>
+pub type traces_pkm::TaskStatusMap::Error = never
+pub fn traces_pkm::TaskStatusMap::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskStatusMap where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskStatusMap::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskStatusMap::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskStatusMap where T: core::clone::Clone
+pub type traces_pkm::TaskStatusMap::Owned = T
+pub fn traces_pkm::TaskStatusMap::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskStatusMap::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskStatusMap where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusMap::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskStatusMap where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatusMap::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskStatusMap where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatusMap::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskStatusMap where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskStatusMap::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskStatusMap
+pub fn traces_pkm::TaskStatusMap::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskStatusMap
+pub type traces_pkm::TaskStatusMap::Init = T
+pub const traces_pkm::TaskStatusMap::ALIGN: usize
+pub unsafe fn traces_pkm::TaskStatusMap::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskStatusMap::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskStatusMap::drop(usize)
+pub unsafe fn traces_pkm::TaskStatusMap::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskStatusMap where T: core::clone::Clone
+pub fn traces_pkm::TaskStatusMap::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskStatusMap
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskStatusMap
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskStatusMap
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskStatusMap where T: 'static
+pub struct traces_pkm::TaskStatusSymbol(_)
+impl traces_pkm::TaskStatusSymbol
+pub const fn traces_pkm::TaskStatusSymbol::as_char(&self) -> char
+pub const fn traces_pkm::TaskStatusSymbol::new(char) -> Self
+impl core::clone::Clone for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::TaskStatusSymbol
+impl core::cmp::PartialEq for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::eq(&self, &Self) -> bool
+impl core::cmp::PartialEq<char> for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::eq(&self, &char) -> bool
+impl core::cmp::PartialEq<traces_pkm::TaskStatusSymbol> for char
+pub fn char::eq(&self, &traces_pkm::TaskStatusSymbol) -> bool
+impl core::convert::From<char> for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::from(char) -> Self
+impl core::fmt::Debug for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for traces_pkm::TaskStatusSymbol
+impl core::marker::StructuralPartialEq for traces_pkm::TaskStatusSymbol
+impl serde_core::ser::Serialize for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for traces_pkm::TaskStatusSymbol
+impl core::marker::Send for traces_pkm::TaskStatusSymbol
+impl core::marker::Sync for traces_pkm::TaskStatusSymbol
+impl core::marker::Unpin for traces_pkm::TaskStatusSymbol
+impl core::marker::UnsafeUnpin for traces_pkm::TaskStatusSymbol
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TaskStatusSymbol
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TaskStatusSymbol
+impl<D> owo_colors::OwoColorize for traces_pkm::TaskStatusSymbol
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::TaskStatusSymbol where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusSymbol::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::TaskStatusSymbol where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusSymbol::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::TaskStatusSymbol where U: core::convert::From<T>
+pub fn traces_pkm::TaskStatusSymbol::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TaskStatusSymbol where U: core::convert::Into<T>
+pub type traces_pkm::TaskStatusSymbol::Error = never
+pub fn traces_pkm::TaskStatusSymbol::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TaskStatusSymbol where U: core::convert::TryFrom<T>
+pub type traces_pkm::TaskStatusSymbol::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TaskStatusSymbol::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TaskStatusSymbol where T: core::clone::Clone
+pub type traces_pkm::TaskStatusSymbol::Owned = T
+pub fn traces_pkm::TaskStatusSymbol::clone_into(&self, &mut T)
+pub fn traces_pkm::TaskStatusSymbol::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TaskStatusSymbol where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TaskStatusSymbol::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TaskStatusSymbol where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatusSymbol::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TaskStatusSymbol where T: ?core::marker::Sized
+pub fn traces_pkm::TaskStatusSymbol::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TaskStatusSymbol where T: core::clone::Clone
+pub unsafe fn traces_pkm::TaskStatusSymbol::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TaskStatusSymbol
+pub fn traces_pkm::TaskStatusSymbol::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TaskStatusSymbol
+pub type traces_pkm::TaskStatusSymbol::Init = T
+pub const traces_pkm::TaskStatusSymbol::ALIGN: usize
+pub unsafe fn traces_pkm::TaskStatusSymbol::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TaskStatusSymbol::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TaskStatusSymbol::drop(usize)
+pub unsafe fn traces_pkm::TaskStatusSymbol::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TaskStatusSymbol where T: core::clone::Clone
+pub fn traces_pkm::TaskStatusSymbol::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TaskStatusSymbol
+impl<T> serde_core::de::DeserializeOwned for traces_pkm::TaskStatusSymbol where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for traces_pkm::TaskStatusSymbol
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskStatusSymbol
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskStatusSymbol where T: 'static
+pub struct traces_pkm::TerminalDialogProvider
+impl traces_pkm::TerminalDialogProvider
+pub const fn traces_pkm::TerminalDialogProvider::new() -> Self
+impl core::clone::Clone for traces_pkm::TerminalDialogProvider
+pub fn traces_pkm::TerminalDialogProvider::clone(&self) -> Self
+impl core::default::Default for traces_pkm::TerminalDialogProvider
+pub fn traces_pkm::TerminalDialogProvider::default() -> Self
+impl core::fmt::Debug for traces_pkm::TerminalDialogProvider
+pub fn traces_pkm::TerminalDialogProvider::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for traces_pkm::TerminalDialogProvider
+impl traces_pkm::DialogProvider for traces_pkm::TerminalDialogProvider
+pub fn traces_pkm::TerminalDialogProvider::confirm(&self, &str, core::option::Option<bool>) -> traces_pkm::DialogResult<bool>
+pub fn traces_pkm::TerminalDialogProvider::is_interactive(&self) -> bool
+pub fn traces_pkm::TerminalDialogProvider::multi_select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<alloc::vec::Vec<usize>>
+pub fn traces_pkm::TerminalDialogProvider::select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<usize>
+pub fn traces_pkm::TerminalDialogProvider::text(&self, &str, core::option::Option<&str>) -> traces_pkm::DialogResult<alloc::string::String>
+impl core::marker::Freeze for traces_pkm::TerminalDialogProvider
+impl core::marker::Send for traces_pkm::TerminalDialogProvider
+impl core::marker::Sync for traces_pkm::TerminalDialogProvider
+impl core::marker::Unpin for traces_pkm::TerminalDialogProvider
+impl core::marker::UnsafeUnpin for traces_pkm::TerminalDialogProvider
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::TerminalDialogProvider
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::TerminalDialogProvider
+impl<D> owo_colors::OwoColorize for traces_pkm::TerminalDialogProvider
+impl<T, U> core::convert::Into<U> for traces_pkm::TerminalDialogProvider where U: core::convert::From<T>
+pub fn traces_pkm::TerminalDialogProvider::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::TerminalDialogProvider where U: core::convert::Into<T>
+pub type traces_pkm::TerminalDialogProvider::Error = never
+pub fn traces_pkm::TerminalDialogProvider::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::TerminalDialogProvider where U: core::convert::TryFrom<T>
+pub type traces_pkm::TerminalDialogProvider::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::TerminalDialogProvider::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::TerminalDialogProvider where T: core::clone::Clone
+pub type traces_pkm::TerminalDialogProvider::Owned = T
+pub fn traces_pkm::TerminalDialogProvider::clone_into(&self, &mut T)
+pub fn traces_pkm::TerminalDialogProvider::to_owned(&self) -> T
+impl<T> core::any::Any for traces_pkm::TerminalDialogProvider where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::TerminalDialogProvider::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::TerminalDialogProvider where T: ?core::marker::Sized
+pub fn traces_pkm::TerminalDialogProvider::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::TerminalDialogProvider where T: ?core::marker::Sized
+pub fn traces_pkm::TerminalDialogProvider::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::TerminalDialogProvider where T: core::clone::Clone
+pub unsafe fn traces_pkm::TerminalDialogProvider::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::TerminalDialogProvider
+pub fn traces_pkm::TerminalDialogProvider::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::TerminalDialogProvider
+pub type traces_pkm::TerminalDialogProvider::Init = T
+pub const traces_pkm::TerminalDialogProvider::ALIGN: usize
+pub unsafe fn traces_pkm::TerminalDialogProvider::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::TerminalDialogProvider::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::TerminalDialogProvider::drop(usize)
+pub unsafe fn traces_pkm::TerminalDialogProvider::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::TerminalDialogProvider where T: core::clone::Clone
+pub fn traces_pkm::TerminalDialogProvider::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::TerminalDialogProvider
+impl<T> tracing::instrument::Instrument for traces_pkm::TerminalDialogProvider
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::TerminalDialogProvider
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::TerminalDialogProvider where T: 'static
+pub trait traces_pkm::DialogProvider: core::marker::Send + core::marker::Sync
+pub fn traces_pkm::DialogProvider::confirm(&self, &str, core::option::Option<bool>) -> traces_pkm::DialogResult<bool>
+pub fn traces_pkm::DialogProvider::is_interactive(&self) -> bool
+pub fn traces_pkm::DialogProvider::multi_select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<alloc::vec::Vec<usize>>
+pub fn traces_pkm::DialogProvider::select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<usize>
+pub fn traces_pkm::DialogProvider::text(&self, &str, core::option::Option<&str>) -> traces_pkm::DialogResult<alloc::string::String>
+impl traces_pkm::DialogProvider for traces_pkm::PresetDialogProvider
+pub fn traces_pkm::PresetDialogProvider::confirm(&self, &str, core::option::Option<bool>) -> traces_pkm::DialogResult<bool>
+pub fn traces_pkm::PresetDialogProvider::is_interactive(&self) -> bool
+pub fn traces_pkm::PresetDialogProvider::multi_select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<alloc::vec::Vec<usize>>
+pub fn traces_pkm::PresetDialogProvider::select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<usize>
+pub fn traces_pkm::PresetDialogProvider::text(&self, &str, core::option::Option<&str>) -> traces_pkm::DialogResult<alloc::string::String>
+impl traces_pkm::DialogProvider for traces_pkm::TerminalDialogProvider
+pub fn traces_pkm::TerminalDialogProvider::confirm(&self, &str, core::option::Option<bool>) -> traces_pkm::DialogResult<bool>
+pub fn traces_pkm::TerminalDialogProvider::is_interactive(&self) -> bool
+pub fn traces_pkm::TerminalDialogProvider::multi_select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<alloc::vec::Vec<usize>>
+pub fn traces_pkm::TerminalDialogProvider::select(&self, &str, &[alloc::string::String]) -> traces_pkm::DialogResult<usize>
+pub fn traces_pkm::TerminalDialogProvider::text(&self, &str, core::option::Option<&str>) -> traces_pkm::DialogResult<alloc::string::String>
+pub fn traces_pkm::parse_markdown(&traces_pkm::MarkdownParserInput<'_>) -> traces_pkm::Note
+pub type traces_pkm::DialogResult<T> = core::result::Result<T, traces_pkm::DialogError>
