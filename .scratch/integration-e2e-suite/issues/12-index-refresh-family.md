@@ -11,32 +11,94 @@ exact-stdout).
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Integration: build → persist → edit tag/body → assert **query-visible** delta through the
+- [x] Integration: build → persist → edit tag/body → assert **query-visible** delta through the
       public query API using non-mutating observation (`IndexerService::load()` +
       `QueryService::run`) — units only assert report counts today; `sync_and_run`/spawned
       refreshers used only when the refresh IS the act under test
-- [ ] In-crate unit: `refresh()` fail-open (documented at the seam; not inducible from outside
+- [x] In-crate unit: `refresh()` fail-open (documented at the seam; not inducible from outside
       since the store re-creates its file — unit is its only honest layer)
-- [ ] E2E content branch: note edit between two spawned `list` runs, asserted through output
-- [ ] E2E path-set branch: delete + rename between spawns → ghost rows gone, links
+- [x] E2E content branch: note edit between two spawned `list` runs, asserted through output
+- [x] E2E path-set branch: delete + rename between spawns → ghost rows gone, links
       re-resolved (distinct recompute path from content edits)
-- [ ] Divergence canary: **one canonical recipe** — same-size + restored-mtime content edit
+- [x] Divergence canary: **one canonical recipe** — same-size + restored-mtime content edit
       (portable) — proving reload ≠ rebuild before claiming "the store was read"; `chmod 000`
       variant cfg(unix), skipped when privileged; config-staleness recipe NOT used (ticket 04);
       plain successive-invocation content assertions make no store-read claim
-- [ ] Corruption self-heal: overwrite the index file with garbage → next spawned query exits 0
+- [x] Corruption self-heal: overwrite the index file with garbage → next spawned query exits 0
       with correct output and a valid file again (catches exit-101 panic, permanent
       `index::failed`, silent empty results)
-- [ ] Each test carries executes-vs-asserts note + defect class (stale-secondary-index,
+- [x] Each test carries executes-vs-asserts note + defect class (stale-secondary-index,
       unobservable-reload, panic-on-corruption)
-- [ ] Visibility freeze: production and test-utils public-api diffs empty; textual pub-token
+- [x] Visibility freeze: production and test-utils public-api diffs empty; textual pub-token
       diff empty (the new fail-open unit exports nothing)
-- [ ] Fidelity note respected: persist→load codec fidelity stays with the integration
+- [x] Fidelity note respected: persist→load codec fidelity stays with the integration
       persistence file (already owns it)
-- [ ] E2E tests land in the `index` capability file; integration tests in the refresh seam file
+- [x] E2E tests land in the `index` capability file; integration tests in the refresh seam file
       (final names per ticket 19)
+
+## Comments
+
+Resolved in this ticket branch (merged into `integration-e2e-suite`).
+
+### Maintainer ruling (2026-10-09): corruption canary scope
+
+Empirical finding: corruption recovery is damage-class-dependent.
+- **Table-level corruption** (redb file magic preserved, tables trashed):
+  a spawned `list` exits 0 with correct output and a rebuilt store — the
+  spec's expected self-heal exists for this class, and the integration
+  persistence file already owns the service-level contract for it.
+- **Header-level destruction** (literal total-garbage overwrite): every
+  command fails permanently with `traces::cli::index::failed` (exit 1, no
+  panic) — including an explicit `traces index`; only manual deletion of
+  `.traces/index.redb` recovers.
+Ruling: the E2E canary covers the table-level class (exit-0 self-heal,
+writes accepted again); the header-destruction boundary is documented here
+and NOT pinned as an assertion. A potential wipe-and-recreate enhancement
+for header-level damage is recorded for ticket 15's ledger (product change
+→ would need its own spec).
+
+### Deliverables
+
+- `tests/integration/index_refresh.rs` (new, wired in `tests/integration.rs`):
+  `refresh_persists_a_query_visible_delta_observed_without_mutation` — build
+  → persist → edit → `refresh_with_report` (upsert 1, delete 0) → observed
+  via `load()` + `QueryService::run` (new `#beta` tag resolves a.md, removed
+  `#alpha` gone, rewritten task text visible). The refresh is the act; the
+  observation path is non-mutating.
+- In-crate fail-open unit: `src/index/refresh.rs::tests::fail_open_
+  materializes_the_unpersisted_delta_into_the_returned_index` — builds the
+  real reconciled Stale pass, constructs `PersistFailed` at the only
+  inducible point (private fields, in-module), asserts the unpersisted delta
+  materializes in the returned index AND the store stays untouched (fresh
+  service still loads pre-edit content). Defect class: unobservable-reload.
+- `tests/e2e/index.rs` (new, wired in `tests/e2e.rs`):
+  - `content_edit_between_spawns_is_query_visible` (stale-secondary-index)
+  - `path_set_changes_between_spawns_prune_ghosts_and_resolve_links` —
+    ambiguous `[[foo]]` re-resolves after deleting the sibling; exact `list`
+    output + `inlinks` table row (stale-secondary-index)
+  - `same_size_mtime_restored_edit_reads_the_store_not_a_rebuild` — the one
+    canonical portable recipe (`filetime` dev-dependency added); query after
+    the metadata-neutral edit still shows the old text, rebuild shows the
+    new; the ticket-04 staleness recipe is not used (unobservable-reload)
+  - `table_level_corruption_self_heals_on_the_next_query` — magic-preserving
+    byte corruption, exit-0 exact-output self-heal, store accepts writes
+    after (panic-on-corruption)
+- Pre-existing flake repaired: `src/query/service.rs::
+  runs_from_store_matching_in_memory_lists` compared whole `QuerySet`s,
+  including FileMeta stat fields captured by two independent scans
+  (`created_at` birth-time availability / sub-second precision differ under
+  parallel I/O — observed twice this session). Narrowed to the seam contract
+  (row structure + list content), matching the existing
+  `assert_rows_match` precedent in the integration persistence file.
+- `Cargo.toml`: `filetime = "0.2"` added to dev-dependencies (mtime restore
+  for the canary; std has no portable setter).
+- Persist→load codec fidelity remains owned by
+  `tests/integration/index_persistence_roundtrip.rs` (untouched).
+- Gate: `check:layers`, `check:visibility` (empty diffs), full suite
+  (lib 3,151 / integration 56 / e2e 55 / doctests 83), clippy `-D warnings`,
+  fmt — all green.
 
 **Evidence:** audit §10 G-B3/G4, E-2, plus the potential-defects entry's own disposition for
 fail-open ("not inducible from the public API … **in-crate unit**"), §14 P1.10 (divergence
