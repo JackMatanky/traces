@@ -34,13 +34,13 @@ fn run(sandbox: &Sandbox, args: &[&str]) -> Run {
 /// `template --dry-run` in one project directory, matching a real first
 /// run.
 ///
-/// The most expensive test in the suite — eight process spawns — because
-/// it's the only one that can prove commands compose: `dispatch.rs`'s
-/// per-command tests each start from a fresh `Sandbox::trusted()` fixture,
-/// so none of them prove `index`'s output is what `list` reads, or that
-/// `trust` durably unblocks later commands. Also confirms `init` alone
-/// doesn't establish trust (see the inline comment before the `trust`
-/// step).
+/// Exercises command composition across seven steps (six process spawns plus
+/// one in-process `Init` call) in one project directory, demonstrating that
+/// `trust` unblocks later commands and `index` allows subsequent queries and
+/// template inspection to succeed.
+///
+/// Note: `list` could cold-rebuild on its own, and no command is attempted
+/// before `trust` to assert an untrusted failure here.
 #[test]
 fn init_trust_index_list_table_task_and_template_chain_through_one_project() {
     let root = tempfile::tempdir().expect("create project temp dir");

@@ -1156,6 +1156,9 @@ mod tests {
             previewed.expect("dry run always previews, never writes")
         }
 
+        /// Verifies that sequential CLI queries run against a project with a
+        /// persisted index without error, observing the persisted state via
+        /// `load()`.
         #[test]
         fn indexing_then_page_and_task_queries_observe_the_same_project_state()
         {
@@ -1178,8 +1181,8 @@ mod tests {
             assert_eq!(list_outcome, CommandOutcome::Completed);
             let list_index = Arc::new(
                 IndexerService::for_tests(&project)
-                    .refresh()
-                    .expect("refresh index"),
+                    .load()
+                    .expect("load persisted index without refresh"),
             );
             let _list = QueryService::new("class")
                 .run(
@@ -1207,8 +1210,8 @@ mod tests {
             assert_eq!(table_outcome, CommandOutcome::Completed);
             let table_index = Arc::new(
                 IndexerService::for_tests(&project)
-                    .refresh()
-                    .expect("refresh index"),
+                    .load()
+                    .expect("load persisted index without refresh"),
             );
             let _table = QueryService::new("class")
                 .run(&table_index, QueryBuilder::pages(SourceSelector::All))
@@ -1222,8 +1225,8 @@ mod tests {
             assert_eq!(task_outcome, CommandOutcome::Completed);
             let task_index = Arc::new(
                 IndexerService::for_tests(&project)
-                    .refresh()
-                    .expect("refresh index"),
+                    .load()
+                    .expect("load persisted index without refresh"),
             );
             let _tasks = QueryService::new("class")
                 .run(&task_index, QueryBuilder::tasks(SourceSelector::All))
@@ -1276,21 +1279,18 @@ mod tests {
             assert_eq!(second_outcome, CommandOutcome::Completed);
 
             // `table`'s own stdout isn't captured (see the module doc above),
-            // so confirm the edit reached the persisted store - which is
-            // exactly what the CLI command just queried - via the same
-            // `run_from_store` seam `table`'s render path uses internally.
-            let store = IndexerService::for_tests(&project)
-                .refresh_store()
-                .expect("store already current after the second cli call");
+            // so confirm the edit reached the persisted store without
+            // re-syncing by using `load()` rather than
+            // `refresh_store()`.
+            let index = Arc::new(
+                IndexerService::for_tests(&project)
+                    .load()
+                    .expect("load persisted index without refresh"),
+            );
             let rendered = QueryService::new("class")
-                .run_from_store(
-                    &store,
-                    QueryBuilder::pages(SourceSelector::All),
-                )
-                .expect("query from store")
+                .run(&index, QueryBuilder::pages(SourceSelector::All))
                 .table(&["Name", "Rating"], &["file.name", "rating"])
                 .expect("valid table");
-
             assert!(
                 rendered.contains("| 2 "),
                 "expected dune's updated rating to appear:\n{rendered}"

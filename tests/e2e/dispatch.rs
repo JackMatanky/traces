@@ -1,4 +1,4 @@
-//! Process-level end-to-end tests for `trust`, `list`/`table`/`task` query
+//! Process-level end-to-end tests for `list`/`table`/`task` query
 //! commands, `template --dry-run`, and `completions`. Migrated from the former
 //! `tests/cli_e2e.rs`; see `support` for isolation guarantees and the
 //! "diagnostic text is wrap-fragile" caveat that governs which stderr
@@ -8,11 +8,10 @@ mod trust_and_diagnostics {
     use super::super::support::{Sandbox, plain};
 
     /// Trusts a project, writes a note, runs `index`, and checks
-    /// `.traces/index.redb` gets persisted.
+    /// that `.traces/index.redb` exists on disk after the process exits.
     ///
-    /// A `WorkspaceIndex::persist` unit test proves the write; only a spawned
-    /// process proves the CLI's `index` subcommand actually wires argv to
-    /// it and the result survives process exit.
+    /// Verifies the CLI's `index` subcommand wires argv through to persistence
+    /// and leaves the index file present on disk.
     #[test]
     fn trust_then_index_persists_the_file_index() {
         let sandbox = Sandbox::trusted();
@@ -25,15 +24,10 @@ mod trust_and_diagnostics {
     }
 
     /// Trusts a project, writes a note, and runs `list` with **no** prior
-    /// `index` call — then checks `.traces/index.redb` gets persisted
-    /// anyway.
+    /// `index` call — then checks that `.traces/index.redb` exists on disk.
     ///
-    /// `IndexerService::refresh` persisting internally is unit-tested
-    /// against the service directly; only a spawned process proves the
-    /// `list`/`table`/`task` dispatch path (`refresh_page_query`/
-    /// `refresh_task_query` in `src/cli/mod.rs`) actually reaches that
-    /// `refresh()` call and the write survives process exit, rather than
-    /// e.g. a future refactor swapping it for `build()`.
+    /// Verifies that the `list` dispatch path invokes persistence on its
+    /// initial cold path, leaving the index file present on disk.
     #[test]
     fn list_persists_the_file_index_without_an_explicit_index_command() {
         let sandbox = Sandbox::trusted();
@@ -48,10 +42,8 @@ mod trust_and_diagnostics {
     /// Checks an untrusted config makes `list` fail with the untrusted
     /// diagnostic, non-zero exit, and empty stdout.
     ///
-    /// That's the exact contract a script's exit-code check depends on. A
-    /// unit test of the error type proves it constructs; it can't prove the
-    /// full CLI error path delivers it to real stderr with the right exit
-    /// code.
+    /// Verifies that an untrusted root reaches the CLI error path, printing
+    /// the expected diagnostic to stderr and exiting with a failure status.
     #[test]
     fn untrusted_root_fails_with_the_config_build_diagnostic() {
         let sandbox = Sandbox::new();

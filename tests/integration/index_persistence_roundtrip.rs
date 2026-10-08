@@ -1,9 +1,7 @@
-//! Promotes `src/index/mod.rs`'s internal
-//! `persist_then_load_recovers_the_same_records_and_notes` test to prove the
-//! public round-trip contract: `WorkspaceIndex::build` → `persist` → `load` in
-//! a fresh `WorkspaceIndex` value, simulating a new process. Also covers redb
-//! persistence invariance without the `LISTS` table (ADR 0005) and recovery
-//! from a corrupted `.traces/index.redb` file, both through the public
+//! Proves the public round-trip contract: `WorkspaceIndex::build` → `persist` →
+//! `load` in a fresh `WorkspaceIndex` value, simulating a new process. Also
+//! covers redb persistence invariance without the `LISTS` table (ADR 0005) and
+//! recovery from a corrupted `.traces/index.redb` file, both through the public
 //! `IndexerService` surface alone.
 
 use std::sync::Arc;
@@ -18,9 +16,8 @@ use traces_pkm::{
 /// Builds an index, persists it, and reloads it into a fresh `WorkspaceIndex`,
 /// checking records survive intact.
 ///
-/// `src/index/mod.rs` covers the identical round trip with an internal unit
-/// test. This is the only test proving `build`/`persist`/`load` still work when
-/// called only through their `pub` signatures.
+/// Proves that `build`/`persist`/`load` survive intact when called through
+/// the public `IndexerService` signatures.
 #[test]
 fn persist_then_load_recovers_the_same_file_count_and_paths() {
     let temp = tempfile::tempdir().expect("create temp dir");
