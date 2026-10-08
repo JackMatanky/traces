@@ -1,177 +1,100 @@
-# Modeling
+# Modeling: Rust Types, Invariants & Layout Architecture
 
-## Contents
-
-1. [Overview & Semantic Starting Points](#overview--semantic-starting-points)
-2. [Ordinary Functions & Newtypes](#ordinary-functions--newtypes)
-3. [Validated Types: Parse, Don't Validate](#validated-types-parse-dont-validate)
-4. [Structs & Enums](#structs--enums)
-5. [Data-Oriented Layout & Cache Locality](#data-oriented-layout--cache-locality)
-6. [Zero-Copy Memory Models & Lifecycles](#zero-copy-memory-models--lifecycles)
-7. [Typestate & Compile-Time State Machines](#typestate--compile-time-state-machines)
-8. [Traits, Variation, & Generic Costs](#traits-variation--generic-costs)
-9. [Ownership, Borrowing, & Visibility](#ownership-borrowing--visibility)
-10. [Error Types as Part of the Seam](#error-types-as-part-of-the-seam)
-11. [Module & File Layout (POLS)](#module--file-layout-pols)
-12. [Comparing Candidate Representations](#comparing-candidate-representations)
+| Section | Focus / Key Concepts | Line Target |
+| :--- | :--- | :--- |
+| [1. Module & File Layout (POLS SSOT)](#1-module--file-layout-pols-ssot) | Principle of Least Surprise, 500 SLoC rule, junk drawers | Line 16 |
+| [2. Validated Types & Parse, Don't Validate](#2-validated-types--parse-dont-validate) | Invariants at construction, eliminating runtime checks | Line 28 |
+| [3. Traits, Variation & Generic Costs](#3-traits-variation--generic-costs) | Justifying traits, generics as caller burden | Line 38 |
+| [4. Ownership, Borrowing & Visibility](#4-ownership-borrowing--visibility) | Avoiding `Arc`/`Mutex` masking responsibility, scoped vis | Line 48 |
+| [5. Data-Oriented Layout & Cache Locality](#5-data-oriented-layout--cache-locality) | Hot/cold segregation, struct alignment, contiguous buffers | Line 58 |
+| [6. Zero-Copy Models & Lifecycles](#6-zero-copy-models--lifecycles) | Borrowing, `Cow<'a, T>`, arena allocation, small vectors | Line 68 |
+| [7. Typestate & Compile-Time State Machines](#7-typestate--compile-time-state-machines) | Zero-cost transitions vs caller ceremony trade-offs | Line 78 |
+| [8. Error Boundaries & Panic-Free Seams](#8-error-boundaries--panic-free-seams) | Fault isolation, panic containment, contract evolution | Line 90 |
 
 ---
 
-## Overview & Semantic Starting Points
+## 1. Module & File Layout (POLS SSOT)
 
-Translate discovered concepts and seams into idiomatic Rust.
-The type system is part of the interface. Stronger compile-time guarantees are useful only when their leverage exceeds the additional knowledge and ceremony imposed on callers.
+Structure file and directory layouts to match the cognitive map of the domain:
 
-### Start from Semantics
-
-Before choosing a Rust construct, state:
-
-- What concept exists and what invariant or policy it owns
-- What operations belong to it and what states are legal
-- Who constructs it and who observes it
-- Which representation details must remain hidden behind the seam
-- Whether real variation or substitutability exists
+- **Principle of Least Surprise (POLS):** An engineer inspecting a module must find state, logic, and types exactly where semantic ownership implies.
+- **SLoC Concentration (>500 SLoC):** A single `.rs` file exceeding 500 SLoC is a primary indicator of mixed lifecycles, entangled invariants, or multiple independent modules trapped in one file.
+- **Disjoint Reference Clusters:** In knowledge graph analysis (`codegraph`/`rustgraph`), types and functions within the same file that have zero references to each other, but heavy references to distinct external modules, represent misplaced responsibilities grouped by accident.
+- **Feature Envy:** A type or function in `module_a.rs` that references fields, methods, or errors in `module_b.rs` more frequently than its own file belongs inside `module_b.rs`.
+- **Bypassed Seams (Deep Path Traversal):** Callers reaching deep into child submodules (e.g. `use crate::pipeline::stage::internal::parse_header;`) indicate an ineffective parent seam.
+- **Eliminate "Junk Drawer" Files:** Files named `utils.rs`, `helpers.rs`, `common.rs`, or `misc.rs` violate predictability. Functions in utility files must be relocated to the domain type they operate upon or encapsulated behind an intentional seam.
 
 ---
 
-## Ordinary Functions & Newtypes
+## 2. Validated Types & Parse, Don't Validate
 
-### Ordinary Functions
+Translate discovered invariants into idiomatic Rust types:
 
-Prefer a free or associated function when:
-
-- The operation is stateless or works entirely from its parameters
-- No durable invariant requires ownership
-- No new semantic identity is needed
-
-Do not introduce a type merely to give one function a namespace.
-
-### Newtypes
-
-A newtype is promising when it:
-
-- Prevents confusing semantically different values of the same primitive type
-- Owns construction validation constraints
-- Creates domain vocabulary at an architectural seam
-
-A wrapper that enforces nothing, distinguishes nothing, and simplifies no caller has weak justification.
+- **Move Validity to Construction:** Ensure invalid states cannot be constructed. Downstream operations assume validity and discard runtime checks.
+- **Enums over Correlated Booleans:** Replace boolean flags, incompatible `Option` pairs, and tag-plus-payload structs with enums representing semantic alternatives ($\text{ISR} = 0$).
+- **Newtypes for Domain Vocabulary:** Use newtypes to prevent confusing semantically distinct values of identical underlying primitives and to own construction validation. Avoid wrappers that enforce nothing.
+- **Constructor Encapsulation:** Private fields alone do not protect invariants if public constructors, `Default` derivations, or serialization bypass validation.
 
 ---
 
-## Validated Types: Parse, Don't Validate
+## 3. Traits, Variation & Generic Costs
 
-Prefer moving validity to construction ("parse, don't validate"):
-
-- Validity has a stable, closed definition
-- Downstream operations assume validity and can discard runtime checks
-- Invalid values cannot enter the deeper module
-
-Ensure every safe construction, deserialization, and mutation path preserves the invariant; private fields alone do not help if a public constructor or conversion bypasses validation.
+Introduce a trait only when a seam needs meaningful behavioral variation or external dependency isolation, never as ornamental decoration:
+- Multiple legitimate implementations exist, or an owned dependency requires a test/environment adapter.
+- Treat generic parameters and trait bounds as interface cost. Prefer concrete types until variation produces demonstrable leverage.
+- Do not introduce traits merely to enable mocking when in-memory test doubles or fast local implementations suffice.
 
 ---
 
-## Structs & Enums
+## 4. Ownership, Borrowing & Visibility
 
-### Structs
-
-Use a struct when several values form one concept and their relationship or invariant is meaningful. Methods must truly belong with the state they act upon.
-
-### Enums
-
-Enums replace correlated booleans, incompatible `Option` combinations, and tag-plus-payload structures. Variants must represent semantic alternatives rather than incidental execution steps.
-Where states are enumerable, ensure $\text{ISR} = 0$.
+- **Authority over State:** Code enforcing an invariant must have direct authority over the state involved.
+- **Avoid Shared Ownership Crutches:** Do not use `Arc`, `Rc`, `Mutex`, or `RefCell` merely to dodge borrow checker boundaries or mask unclear ownership. If multiple components need shared mutability, find the single cohesive owner or pass messages across channels.
+- **Scoped Visibility:** Visibility implements the intended seam. Restrict internal child items to `pub(crate)`, `pub(super)`, or `pub(in crate::ancestor)` to prevent internal mechanisms from leaking into public crate APIs.
 
 ---
 
-## Data-Oriented Layout & Cache Locality
+## 5. Data-Oriented Layout & Cache Locality
 
 When data structures reside on performance-critical paths or scale with input volume:
 
-- **Hot/Cold Field Segregation:** Group frequently accessed fields in contiguous memory. Move cold metadata (rarely checked flags, debug info, diagnostic names) into secondary structs behind an `Option<Box<ColdMeta>>` or separate array.
-- **Struct-of-Arrays (SoA) vs Array-of-Structs (AoS):** If loops frequently iterate over only a subset of fields, prefer columnar/SoA layouts to maximize CPU cache-line saturation and enable auto-vectorization.
-- **Alignment and Padding:** Order struct fields from largest alignment to smallest to eliminate compiler padding holes.
+- **Hot/Cold Field Segregation:** Group frequently accessed fields in contiguous memory. Move cold metadata (rarely checked flags, diagnostic names) behind `Option<Box<ColdMeta>>` or separate arrays.
+- **Struct-of-Arrays (SoA):** If loops iterate over only a subset of fields, prefer columnar/SoA layouts to maximize CPU cache saturation and auto-vectorization.
+- **Struct Field Ordering:** Order fields from largest alignment to smallest to eliminate compiler padding holes.
 - **Avoid Indirection for Small Items:** Prefer contiguous storage (slices, arrays, inline buffers) over pointer-chasing collections of `Box<T>`.
 
 ---
 
-## Zero-Copy Memory Models & Lifecycles
+## 6. Zero-Copy Models & Lifecycles
 
-Eliminating heap allocation overhead while maintaining clean seams:
+Eliminate heap allocation overhead while maintaining clean seams:
 
 - **Borrowing over Defensive Cloning:** Expose borrowed views (`&[T]`, `&str`) or `Cow<'a, T>` instead of eagerly calling `.clone()` or `.to_owned()`.
-- **Scoped Arena Allocation:** For tree or graph structures with bounded lifecycles (such as parsing passes or compiler phases), allocate nodes into a typed arena (`bumpalo`, `typed-arena`). Nodes can freely cross-reference each other via references or lightweight arena indices without per-item `Arc` or heap deallocations.
+- **Scoped Arena Allocation:** For tree or graph structures with bounded lifecycles (such as parsing passes), allocate nodes into a typed arena (`bumpalo`). Nodes cross-reference via references or arena indices without per-item heap deallocations.
 - **Small-Vector Optimization:** Use stack-allocated inline buffers (`SmallVec`) for collections that almost always contain fewer than 4 to 8 elements.
 
 ---
 
-## Typestate & Compile-Time State Machines
+## 7. Typestate & Compile-Time State Machines
 
-Typestate is strongest when states are well-defined, transitions are central to correctness, and different states expose materially different legal operations:
+Use typestate when states are well-defined, transitions are central to correctness, and different states expose materially different legal operations ($\text{ITE} = 0$):
 
 ```rust
-// Hiding internal typestate transitions from high-level callers
 pub struct Session<State> {
     inner: SessionInner,
     _state: std::marker::PhantomData<State>,
 }
 ```
 
-Prefer an ordinary enum or runtime validation when typestate would leak marker types, generic parameters, and conversion ceremony through unrelated caller interfaces.
+Prefer ordinary enums or runtime validation when typestate would leak marker types, generic parameters, and conversion ceremony through unrelated caller interfaces.
 
 ---
 
-## Traits, Variation, & Generic Costs
+## 8. Error Boundaries & Panic-Free Seams
 
-Introduce a trait because a seam needs meaningful behavioural variation or external dependency isolation, not as an ornamental pattern:
+Error types are part of the interface because callers must act on failure modes:
 
-- Multiple legitimate implementations exist
-- An owned external dependency requires a test or environment adapter
-- A stable behavioural contract is needed independent of implementation details
-
-Treat generic parameters and trait bounds as interface cost. Prefer concrete types until variation produces demonstrable leverage.
-
----
-
-## Ownership, Borrowing, & Visibility
-
-- Code enforcing an invariant must have direct authority over the state involved.
-- Avoid shared ownership (`Arc`, `Rc`) or interior mutability (`Mutex`, `RefCell`) to mask unclear responsibility.
-- Visibility implements the intended seam. Use scoped visibility (`pub(crate)`, `pub(super)`, `pub(in crate::ancestor)`) to prevent internal child details from leaking into public crates.
-
----
-
-## Error Types as Part of the Seam
-
-Error types are part of the interface because callers must understand and handle failure modes:
-
-- Design errors at the abstraction level of the seam.
-- Do not mechanically mirror every child error variant through every parent.
-- Hide child implementation errors behind cohesive domain error classifications.
-- **Panic-Free Seams:** Public and cross-crate entry points must never expose unhandled `.unwrap()`, `.expect()`, or `panic!` calls. Errors crossing the seam must be structured `Result<T, E>` domain enums (`thiserror`), preserving caller fault isolation.
-- **Panic Boundaries for Untrusted Execution:** Seams hosting worker tasks or plugins must isolate thread panics (`std::panic::catch_unwind` or tokio task join handling) to prevent cascading process failure.
-
-## Module & File Layout (POLS)
-
-Structure file and directory layouts to match the cognitive map of the domain:
-
-- Follow the **Principle of Least Surprise (POLS)**: locate state and types where semantic ownership implies.
-- A single file exceeding 500 SLoC is a candidate for decomposing into cohesive child modules.
-- Eliminate "junk drawer" files (`utils.rs`, `helpers.rs`, `common.rs`).
-
----
-
-## Comparing Candidate Representations
-
-For non-trivial choices, compare candidate representations against:
-
-1. Semantic precision
-2. Invalid states prevented ($\text{ISR} = 0$, $\text{ITE} = 0$)
-3. Caller knowledge and cognitive load ($\text{IKL}$)
-4. Seam depth and parent simplification
-5. Compile-time vs runtime trade-offs
-6. **Reversibility & Evolution (Expand-and-Contract):** For public contracts, evaluate whether changes can be deployed non-destructively:
-   - Use `#[non_exhaustive]` on public enums so variant additions are backward-compatible.
-   - Use builder patterns with defaults for struct parameter expansion.
-   - Employ parallel deprecation (`#[deprecated]`) over immediate breaking signature replacement.
-
-Prefer the least elaborate representation that preserves the needed semantics, resilience, and recursive depth.
+- **Panic-Free Seams:** Public and cross-crate entry points must never expose unhandled `.unwrap()`, `.expect()`, or `panic!` calls. Errors crossing seams must be structured `Result<T, E>` domain enums (`thiserror`).
+- **Domain Error Classification:** Hide internal child errors behind cohesive domain classifications rather than mechanically mirroring every internal error variant.
+- **Panic Containment:** Seams hosting worker tasks or plugins must isolate thread panics (`std::panic::catch_unwind` or tokio task join handling) to prevent cascading process failure.
+- **Contract Evolution (Expand-and-Contract):** Use `#[non_exhaustive]` on public enums so variant additions are backward-compatible; use builder patterns with defaults for struct parameter expansion; employ parallel deprecation (`#[deprecated]`) over breaking signature changes.

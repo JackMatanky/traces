@@ -10,33 +10,33 @@ mapping link gains its missing unit. The PTY/130 question is closed with a recor
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Harness gains numeric code accessor, failure predicate, and exact-stdout/stderr
+- [x] Harness gains numeric code accessor, failure predicate, and exact-stdout/stderr
       assertions — test-crate-internal only, zero `src/` changes (fixture additions to exported
       types are forbidden; harness growth is not a surface change)
-- [ ] Exit codes asserted: success → 0, domain failure → 1 (e.g. an untrusted root), argv
+- [x] Exit codes asserted: success → 0, domain failure → 1 (e.g. an untrusted root), argv
       failure → 2; `--help` / `--version` → 0 with correct stdout
-- [ ] Argv contract via spawn (unknown subcommand, missing required flag e.g. `table` without
+- [x] Argv contract via spawn (unknown subcommand, missing required flag e.g. `table` without
       `--column`, invalid value e.g. `completions --shell tcsh`) — each exit 2 + usage on
       stderr; these are unreachable in-crate (`Cli::parse` exits, `try_parse_from` returns)
-- [ ] Representative valid and error paths assert **never 101** (no `ExitCode::from(101)` path
+- [x] Representative valid and error paths assert **never 101** (no `ExitCode::from(101)` path
       exists in the binary; release `panic = "abort"` → 134 — and because nextest runs
       dev-profile binaries where a panic *would* give 101, this doubles as a no-panic check;
       ticket 05 owns the EPIPE/panic contract decision)
-- [ ] Stream contracts (exact, not `contains`): `trust list` = `path\tstate`, `trust --show` =
+- [x] Stream contracts (exact, not `contains`): `trust list` = `path\tstate`, `trust --show` =
       bare root, `trust clean`, `template --list`, `completions --list-templates`; mutating
       commands (`trust`, `untrust`, `index`, `template -i … --no-input`) assert
       `stdout == ""` with status on stderr; `index` asserts `indexed N file(s)` on stderr;
       `trust --all` + companion `untrust --all` with the count asserted via a follow-up spawned
       `trust list`
-- [ ] Tests land in `tests/e2e/process_contract.rs` (audit §12's first candidate; spec: new gap
+- [x] Tests land in `tests/e2e/process_contract.rs` (audit §12's first candidate; spec: new gap
       tests are written directly into their final capability files) — not appended to the legacy
       dispatch catch-all; ticket 19 relocates **legacy** tests only, never these
-- [ ] In-crate unit: `Cli::run → Aborted(Interrupted)` mapping (today only `Cancelled` is
+- [x] In-crate unit: `Cli::run → Aborted(Interrupted)` mapping (today only `Cancelled` is
       tested); the chain `DialogError::UserInterrupted` → `Aborted(Interrupted)` → `main`
       documented in the test doc
-- [ ] Decision note recorded: **process-level 130 not approved** (the spec's condition — an
+- [x] Decision note recorded: **process-level 130 not approved** (the spec's condition — an
       approved portable PTY mechanism — is unmet; a PTY dependency remains out of scope; the
       question reopens only if that condition is met): with no signal handler in the binary, the
       only faithful injection is raw-mode PTY byte (`\x03`) delivery; no surveyed Rust project
@@ -45,7 +45,21 @@ mapping link gains its missing unit. The PTY/130 question is closed with a recor
       `ExitStatus::code()==Some(130)` remains distinguishable from signal death if ever
       revisited. The PTY ecosystem references are **triage research external to the audit** —
       verify against upstream sources
-- [ ] New tests each carry the executes-vs-asserts note and named defect class
+- [x] New tests each carry the executes-vs-asserts note and named defect class
+
+## Comments
+
+Resolved in commit `ea40a75d` (merged into `integration-e2e-suite`).
+- `tests/e2e/support.rs::Run` gained `code()`, `is_failure()`, `assert_code(n)`, `assert_success()`, `assert_never_exit_101()`, `assert_stdout_eq()`, and `assert_stderr_eq()`. Zero `src/` changes.
+- Implemented `tests/e2e/process_contract.rs` wired into `tests/e2e.rs`:
+  - `exit_code_zero_for_help_and_version` (0 + exact stdout/stderr)
+  - `argv_failure_exits_code_two_on_invalid_command_or_flags` (2 + exact streams for unknown subcommand, missing required flag, invalid enum value)
+  - `domain_failure_exits_code_one_for_untrusted_root` (1 + never 101)
+  - `stream_contracts_exact_outputs_and_mutating_empty_stdout` (exact stdout/stderr splits, including `template -i alpha --no-input` writing `wrote <path>/alpha.md` to stderr)
+  - `trust_all_and_untrust_all_count_asserted_via_trust_list`
+- `Cli::run → Aborted(Interrupted)` verified in-crate via `user_interrupted_during_template_picker_returns_aborted_interrupted` in `src/cli/mod.rs`.
+- Recorded decision: process-level exit 130 not approved (no PTY crate dependency permitted); exit-130 remains asserted as in-crate mapping only.
+- All tests carry executes-vs-asserts notes and named defect classes.
 
 **Evidence:** audit §10 E-3 (clap exit-2 unreachable in-crate), §6 exit-code/stream rows
 (five zero-assertion stdout commands incl. `trust clean`), §14 P1.6 + P1.11; spec §Gap tests

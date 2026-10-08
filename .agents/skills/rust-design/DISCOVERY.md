@@ -1,173 +1,141 @@
-# Discovery
+# Discovery: Multi-Lens Scouting & Hypothesis Ledger
 
-## Contents
-
-1. [Overview & Scope Traversal](#overview--scope-traversal)
-2. [Multi-Lens Read-Only Scouting](#multi-lens-read-only-scouting)
-3. [Predictability, Cohesion, & Layout Indicators](#predictability-cohesion--layout-indicators)
-4. [Search Directions: Expansion & Compression](#search-directions-expansion--compression)
-5. [Latent Concepts & Misplaced Seams](#latent-concepts--misplaced-seams)
-6. [Removable Debt & The Deletion Dividend](#removable-debt--the-deletion-dividend)
-7. [Depth Propagation](#depth-propagation)
-8. [The Indicator Hypothesis](#the-indicator-hypothesis)
-9. [Candidate Output Expectations](#candidate-output-expectations)
+| Section | Focus / Key Concepts | Line Target |
+| :--- | :--- | :--- |
+| [1. Scouting Protocol & Rules](#1-scouting-protocol--rules) | Read-only scout isolation, execution constraints | Line 13 |
+| [2. The 10 Architectural Lenses](#2-the-10-architectural-lenses) | 10 modular scout directives and focus targets | Line 23 |
+| [3. The Indicator Hypothesis](#3-the-indicator-hypothesis) | Translating raw tool signals into domain questions (SSOT) | Line 89 |
+| [4. Expected Architectural Value (EAV)](#4-expected-architectural-value-eav) | EAV formula, scoring factors, consequential triggers | Line 104 |
+| [5. Candidate Output & Ledger Schema](#5-candidate-output--ledger-schema) | Scout reporting schema and `ledger.json` format | Line 124 |
 
 ---
 
-## Overview & Scope Traversal
-
-Find design candidates before choosing abstractions. Discovery asks where knowledge is misplaced, fragmented, duplicated, implicit, or unnecessarily exposed.
-
-Work at the scale of the requested scope, traversing upward or downward as evidence demands. Probe each inventory unit before concluding; read candidate implementations deeply rather than treating tool graphs or AST summaries as the design.
-
----
-
-## Multi-Lens Read-Only Scouting
+## 1. Scouting Protocol & Rules
 
 During architectural discovery, the orchestrator dispatches read-only investigations across ten distinct lenses.
 
-### Strict Scout Isolation Rules
-
-Scouts inspect source code, documentation, and AST facts. They are **forbidden** from running builds, tests, or diagnostic scripts. Only the main orchestrator runs CLI tools. Each lens reports up to 5 ranked hypotheses citing exact `file:line` locations, estimated SLoC deletion dividend, and Expected Architectural Value (EAV).
-
-- **Lens 1: Modern Rust & Upstream Capabilities**
-  Upstream language or standard library features that obsolete hand-rolled machinery (for example: `std::sync::Exclusive`, modern GAT patterns, slice chunking, `portable_simd`, or upstream crate capabilities).
-- **Lens 2: Data-Oriented Layout & Memory Footprint**
-  Memory layout inefficiencies, padding holes, cache-line misses, Struct-of-Arrays opportunities, and unnecessary heap boxing.
-- **Lens 3: Allocation, Lifecycles & Zero-Copy**
-  Defensive `.clone()` calls, unbounded per-item allocations, missing arena or bump allocators for scoped lifetimes, and opportunities for borrowed views or `Cow<'a, T>`.
-- **Lens 4: Seam Placement & Knowledge Asymmetry**
-  Callers bypassing public abstractions, direct field manipulation, leaked storage or serialization types, and improper visibility declarations.
-- **Lens 5: State & Invariant Ownership**
-  Invariants split across multiple types, mutable state disconnected from enforcing logic, invalid finite states representable in structs, and runtime assertions that could be compile-time typestates. Identifies runtime invariant leakage (defensive `assert!`, `panic!`, unhandled `.unwrap()`) that should be lifted into constructor-validated domain types ("parse, don't validate").
-- **Lens 6: Boundary Crossings & Vertical Leakage**
-  Internal child error types exposed in ancestor APIs, low-level configuration bubbling upward, and circular imports between sibling modules. Identifies tight coupling to volatile internal representations (raw database/wire schemas leaked across seams) that block safe expand-and-contract migrations.
-- **Lens 7: Concurrency, I/O & Contention**
-  Lock contention, overly coarse `Mutex` scopes, blocking operations on async reactors, serialization round-trips, and missing batching channels. Identifies unbounded resource buffering (`unbounded_channel()`, unbounded in-memory queues) and uncontained panic propagation across thread or task boundaries that risk cascading failure.
-- **Lens 8: Algorithmic Scaling & Hot-Path Complexity**
-  $O(n^2)$ lookups, redundant hashing on hot paths, repeated traversals, and opportunities for memoization or early-exit fast paths.
-- **Lens 9: Deletion Dividend & Layer Thinning**
-  Forwarding wrappers, redundant facade traits, one-to-one adapters, dead type conversions, and compatibility scaffolding that can be deleted.
-- **Lens 10: Checks That Can't Fail & Test Ergonomics**
-  Tautological tests, over-mocked boundaries that hide implementation regressions, tests asserting default states, and unasserted error pathways.
-
-### Scout Synthesis & Cross-Examination
-
-Before hypotheses are committed to the Hypothesis Ledger, the orchestrator synthesizes scout reports to identify compounding transformations. For example, a Lens 2 data-layout reorganization may directly enable a Lens 3 zero-copy parser. Conflicting hypotheses are reconciled by prioritizing higher Expected Architectural Value.
-
-## Predictability, Cohesion, & Layout Indicators
-
-File and directory layouts represent the cognitive map of a Rust codebase. A design must adhere to the **Principle of Least Surprise (POLS)**: an engineer inspecting a module should find state, logic, and types exactly where their semantic ownership implies.
-
-1. **SLoC Concentration (>500 SLoC):** A single `.rs` file exceeding 500 SLoC is a primary indicator of mixed lifecycles, entangled invariants, or multiple independent modules trapped in one file.
-2. **Disjoint Reference Clusters (Intra-File Incohesion):** In knowledge graph analysis (via `codegraph` or `rustgraph`), types and functions within the same file that have zero references to each other, but heavy references to distinct external modules, represent misplaced responsibilities grouped by accident.
-3. **Feature Envy (Cross-Boundary Attraction):** A type or function in `module_a.rs` that references fields, methods, or errors in `module_b.rs` more frequently than its own file belongs inside `module_b.rs`.
-4. **Asymmetric / Sprawling Import Footprint:** A file importing numerous distinct sibling modules to perform a single operation indicates an unencapsulated coordinator rather than a cohesive owner.
-5. **Bypassed Seams (Deep Path Traversal):** Callers reaching deep into child submodules (e.g. `use crate::pipeline::stage::internal::parse_header;`) rather than using the parent interface indicate a misplaced or ineffective seam.
-6. **"Junk Drawer" Anti-Patterns:** Files named `utils.rs`, `helpers.rs`, `common.rs`, or `misc.rs` violate predictability. Functions in utility files must be relocated to the domain type they operate upon or encapsulated behind an intentional seam.
+- **Strict Scout Isolation Rule:** Scouts inspect source code, documentation, and AST facts. They are forbidden from running builds, tests, or diagnostic scripts. Only the main orchestrator runs CLI tools.
+- **Reporting Limit:** Each lens reports up to 5 ranked hypotheses citing exact `file:line` locations, estimated SLoC deletion dividend, and Expected Architectural Value (EAV).
+- **Synthesis:** Before hypotheses are committed to `ledger.json`, the orchestrator synthesizes scout findings to identify compounding transformations and resolve conflicts.
 
 ---
 
-## Search Directions: Expansion & Compression
+## 2. The 10 Architectural Lenses
 
-Deepening candidates appear through **expansion** and **compression**.
+Dispatch parallel subagents using these self-contained directives:
 
-### Expansion Candidates
+### Lens 1: Modern Rust & Upstream Capabilities
 
-One scope may contain multiple coherent concerns whose structure is hidden.
-Signals include: independent invariants, distinct state or lifecycle, distinct domain vocabulary, policy mixed with low-level mechanism, unrelated dependency subsets, hidden state transitions.
+- **Target:** Upstream language or standard library features that obsolete hand-rolled machinery.
+- **Inspect:** `std::sync::Exclusive`, modern GAT patterns, slice chunking, `portable_simd`, or upstream crate capabilities.
+- **Objective:** Eliminate custom utilities in favor of canonical standard library or compiler intrinsics.
 
-### Compression Candidates
+### Lens 2: Data-Oriented Layout & Memory Footprint
 
-Several pieces may collectively represent too little.
-Signals include: forwarding functions, one-to-one delegation chains, pass-through modules, wrappers exposing nearly everything they hide, helpers whose callers must know execution order, duplicated orchestration, distributed policy.
+- **Target:** Inefficient memory layout, struct padding holes, and cache misses.
+- **Inspect:** Struct field ordering, alignment padding, opportunities for Struct-of-Arrays (SoA) layout, and hot/cold field segregation.
+- **Objective:** Maximize CPU cache-line saturation and eliminate padding waste.
 
----
+### Lens 3: Allocation, Lifecycles & Zero-Copy
 
-## Latent Concepts & Misplaced Seams
+- **Target:** Unnecessary heap allocations and defensive copying.
+- **Inspect:** Defensive `.clone()` calls, unbounded per-item allocations, missing arena or bump allocators for scoped lifecycles, and opportunities for borrowed views or `Cow<'a, T>`.
+- **Objective:** Eliminate runtime allocations on hot paths.
 
-### Find Latent Concepts
+### Lens 4: Seam Placement & Knowledge Asymmetry
 
-Look for concepts already implemented implicitly:
+- **Target:** Callers knowing too much about implementation mechanisms.
+- **Inspect:** Callers bypassing abstractions, direct struct field manipulation, leaked storage or serialization representations, and loose visibility.
+- **Objective:** Move knowledge behind deep, minimal interfaces.
 
-- Primitives carrying unstated domain semantics
-- Repeated validation of the same value
-- Boolean or `Option` combinations representing closed states
-- Invalid states representable in ordinary data
-- Data and operations jointly enforcing an unstated invariant
+### Lens 5: State & Invariant Ownership
 
-Record the semantic concept and caller burden first before selecting a Rust representation.
+- **Target:** Invariants distributed across callers or enforced only at runtime.
+- **Inspect:** Invariants split across multiple types, mutable state disconnected from logic, invalid states representable in structs, and runtime assertions that could be compile-time typestates.
+- **Objective:** Enforce "parse, don't validate" to eliminate invalid states at construction.
 
-### Find Misplaced Seams
+### Lens 6: Boundary Crossings & Vertical Leakage
 
-Inspect where knowledge crosses architectural levels:
+- **Target:** Lower-level details bubbling upward through module boundaries.
+- **Inspect:** Internal child error types exposed in ancestor APIs, low-level configuration bubbling upward, and circular imports between sibling modules.
+- **Objective:** Isolate internal churn so changes do not propagate across seams.
 
-- Callers constructing internal representations
-- Parents coordinating child ordering requirements
-- Storage, serialization, hashing, or protocol types escaping upward
-- Child-specific failures leaking through unrelated parent interfaces
-- Callers bypassing an intended seam through descendant imports
+### Lens 7: Concurrency, I/O & Contention
 
----
+- **Target:** Lock contention, blocking operations, and unbounded queues.
+- **Inspect:** Coarse `Mutex` scopes, blocking operations on async reactors, serialization round-trips, unbounded channels (`unbounded_channel()`), and uncontained panic propagation across task boundaries.
+- **Objective:** Bound resource consumption and isolate worker failures.
 
-## Removable Debt & The Deletion Dividend
+### Lens 8: Algorithmic Scaling & Hot-Path Complexity
 
-Every redesign search includes subtraction. Removal is a primary candidate transformation, not deferred cleanup.
+- **Target:** Computational complexity and scaling bottlenecks.
+- **Inspect:** $O(n^2)$ lookups, redundant hashing on hot paths, repeated traversals, and opportunities for memoization or early-exit fast paths.
+- **Objective:** Reduce big-O computational and memory scaling on hot paths.
 
-Look for:
+### Lens 9: Deletion Dividend & Layer Thinning
 
-- Shallow abstractions superseded by another owner
-- Obsolete compatibility scaffolding
-- Parallel representations of the same concept
-- Production seams introduced only for tests
-- Traits or generic parameters without meaningful variation
-- Conversions whose source or destination can disappear
+- **Target:** Redundant, obsolete, or pass-through structure.
+- **Inspect:** Forwarding wrappers, redundant facade traits, one-to-one adapters, dead type conversions, and compatibility scaffolding.
+- **Objective:** Delete architectural complexity and thin unnecessary layers.
 
----
+### Lens 10: Checks That Can't Fail & Test Ergonomics
 
-## Depth Propagation
-
-For every promising lower-level candidate, inspect its parent:
-
-- Which concepts would the parent stop understanding?
-- Which invariants would move behind the child seam?
-- Which dependencies would disappear from the parent?
-- Would the parent operate at a more coherent abstraction level?
-- Would changes remain below the parent seam?
-
-A locally tidy abstraction with no simplifying effect on its callers is weak evidence for a seam.
+- **Target:** Fragile, tautological, or over-mocked tests.
+- **Inspect:** Tests asserting default states, tautological assertions, over-mocked boundaries hiding regressions, and missing error-path verification.
+- **Objective:** Ensure tests verify domain behavior through intended seams.
 
 ---
 
-## The Indicator Hypothesis
+## 3. The Indicator Hypothesis
 
-Diagnostic indicators (complexity, CRAP, duplication, fan-out, file size) do not establish design verdicts or scores. Instead, formulate questions about domain ownership:
+Diagnostic indicators (complexity, CRAP, duplication, fan-out, file size) are indicators, not verdicts. Translate raw signals into domain ownership questions:
 
-```text
-high complexity     -> what knowledge is entangled here?
-token duplication   -> is the same policy or only similar syntax repeated?
-high fan-out        -> is responsibility broad, or is the seam leaking mechanisms?
-large file (>500)   -> is it incohesive, or a single large cohesive implementation?
-many tiny modules   -> do they hide distinct knowledge, or fragment one responsibility?
-```
+| Tool Signal | Domain Ownership Question |
+| :--- | :--- |
+| **High Complexity** | What knowledge is entangled here? |
+| **Token Duplication** | Is the same policy or only similar syntax repeated? |
+| **High Fan-Out** | Is responsibility broad, or is the seam leaking mechanisms? |
+| **Large File (>500 SLoC)** | Is it incohesive, or a single cohesive implementation? |
+| **Many Tiny Modules** | Do they hide distinct knowledge, or fragment one responsibility? |
+
+Do not combine indicators into an aggregate score. Treat each gauge as an isolated semantic dimension.
 
 ---
 
-## Candidate Output Expectations
+## 4. Expected Architectural Value (EAV)
 
-For each candidate hypothesis, record:
+Rank candidate redesigns in `ledger.json` using Expected Architectural Value:
+
+$$\text{EAV} = \frac{\text{Structural or Computational Gain (1–5)} \times \text{Confidence (0.0–1.0)}}{\text{Blast Radius (1–5)} + \text{Implementation Friction (1–5)}}$$
+
+### Consequential Candidate Triggers
+
+A candidate is consequential if $\text{EAV} \ge 1.0$, or if it satisfies at least one observable trigger:
+
+1. Changes or bypasses a public API signature, visibility boundary, or trait contract.
+2. Alters cross-module or cross-crate dependency direction (introducing or removing edges/cycles).
+3. Transfers ownership of mutable state, memory layout, or invariant enforcement across types or files.
+4. Reduces big-O computational or memory scaling on identifiable hot paths.
+5. Targets a component explicitly named in the user prompt.
+
+---
+
+## 5. Candidate Output & Ledger Schema
+
+Each scout reports findings using this standardized record:
 
 ```text
 id: HYP-###
 lens: [Lens Name]
+target: [file:line]
 thesis: [Transformational thesis]
-current seam and caller knowledge at issue:
-proposed direction and parent effect:
-what becomes removable (Deletion Dividend):
-estimated EAV (Gain * Confidence / (Blast Radius + Friction)):
+current seam and caller knowledge: [What callers must currently know]
+proposed direction: [Seam relocation, consolidation, or deletion]
+what becomes removable (Deletion Dividend): [Obsolete code]
+estimated EAV: [Gain * Confidence / (Blast Radius + Friction)]
 drop condition: [Concrete condition triggering immediate rollback]
-selected gauges and raw evidence:
-uncertainty:
+risk: [Potential implementation or lifetime hazard]
+verify: [Specific behavior or invariant needing empirical test proof]
 ```
 
-A review records expected effects as predictions in `ledger.json`. An implementation later adds observations using the same comparison basis.
+Store candidate hypotheses in `.design/YYYY-MM-DD-<mode>-<target-slug>/ledger.json` sorted by descending EAV.
