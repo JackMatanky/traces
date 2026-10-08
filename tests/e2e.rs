@@ -2,6 +2,8 @@
 //! inherently-interactive flow, drives it in-process) against fully isolated
 //! sandboxes. See `support` for isolation guarantees.
 
+#[path = "common/mod.rs"]
+mod common;
 #[path = "e2e/support.rs"]
 mod support;
 

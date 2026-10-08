@@ -129,15 +129,17 @@ impl Sandbox {
     /// Writes `.traces/config.toml` pointing to a local `templates` directory
     /// and creates that directory.
     pub(crate) fn write_config(&self) {
-        std::fs::create_dir_all(self.root().join(".traces"))
-            .expect("create .traces dir");
         std::fs::create_dir_all(self.root().join("templates"))
             .expect("create templates dir");
-        std::fs::write(
-            self.root().join(".traces/config.toml"),
-            "[templates]\ndirectory = \"templates\"\n",
-        )
-        .expect("write config file");
+        self.write_config_fixture(&super::common::ConfigFixture::minimal());
+    }
+
+    /// Writes a declarative [`ConfigFixture`] to `.traces/config.toml`.
+    pub(crate) fn write_config_fixture(
+        &self,
+        fixture: &super::common::ConfigFixture,
+    ) -> std::path::PathBuf {
+        fixture.write_to(self.root()).expect("write config fixture")
     }
 
     /// Writes a Note at `rel_path` relative to the project root, creating
