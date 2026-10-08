@@ -600,4 +600,94 @@ mod tests {
             assert_eq!(scope.to_upsert(&upserted), Vec::<&Note>::new());
         }
     }
+
+    /// Guards the documented fail-open at its only inducible point: a
+    /// persistence failure inside a reconciled Stale pass must still
+    /// materialize the full unpersisted delta into the returned index
+    /// instead of failing the refresh.
+    ///
+    /// Executes vs asserts: builds the real reconciled pass
+    /// (`RefreshPlan::collect` → reconcile) over an edited note, then
+    /// induces the persist failure at the `PersistFailed` construction
+    /// point — the one failure the public API cannot reach, because the
+    /// store re-creates its file — and asserts only the materialization
+    /// contract. Also asserts the store itself is untouched: a fresh
+    /// service still loads the pre-edit content.
+    ///
+    /// Defect class: unobservable-reload (a refresh that dropped its delta
+    /// on persist failure, or lied about what it kept in memory).
+    #[test]
+    fn fail_open_materializes_the_unpersisted_delta_into_the_returned_index() {
+        use std::{fs, io, path::Path};
+
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        use crate::{index::error::StoreError, test_support::parse_note};
+
+        let temp = tempfile::tempdir().expect("create temp dir");
+        fs::write(temp.path().join("note.md"), "---\ntitle: old\n---\n# A")
+            .expect("write note");
+        let indexer = IndexerService::for_tests(temp.path());
+        indexer
+            .persist(&indexer.build().expect("build index"))
+            .expect("persist index");
+
+        fs::write(temp.path().join("note.md"), "---\ntitle: new\n---\n# A")
+            .expect("rewrite note");
+        let plan =
+            RefreshPlan::collect(temp.path()).expect("collect refresh plan");
+        let persisted_links = plan
+            .store()
+            .read_all_links(plan.persisted_files())
+            .expect("read persisted links");
+        let modified = vec![parse_note("note.md", "---\ntitle: new\n---\n# A")];
+        let pending = plan
+            .reconcile(modified, persisted_links)
+            .expect("reconcile stale pass");
+
+        let failed = PersistFailed {
+            source: IndexError::Store(StoreError::Io {
+                path: temp.path().join(".traces/index.redb"),
+                source: io::Error::other("induced persist failure"),
+            }),
+            pass: Box::new(pending),
+        };
+
+        // Fail-open: the unpersisted delta is materialized in memory.
+        let index = failed.into_index().expect("fail-open materialization");
+        let note = index
+            .entries()
+            .iter()
+            .find(|entry| entry.file().path() == Path::new("note.md"))
+            .and_then(crate::index::FileEntry::note)
+            .expect("note entry");
+        assert_eq!(
+            note.frontmatter()
+                .and_then(|fm| fm.fields().values().next())
+                .and_then(|value| value.as_str()),
+            Some("new"),
+            "unpersisted delta must survive in the returned index"
+        );
+
+        // The store itself was never written: a fresh service loads the
+        // pre-edit content.
+        let persisted = IndexerService::for_tests(temp.path())
+            .load()
+            .expect("load untouched store");
+        let persisted_note = persisted
+            .entries()
+            .iter()
+            .find(|entry| entry.file().path() == Path::new("note.md"))
+            .and_then(crate::index::FileEntry::note)
+            .expect("persisted note entry");
+        assert_eq!(
+            persisted_note
+                .frontmatter()
+                .and_then(|fm| fm.fields().values().next())
+                .and_then(|value| value.as_str()),
+            Some("old"),
+            "fail-open must not persist the delta as a side effect"
+        );
+    }
 }
