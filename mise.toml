@@ -62,8 +62,7 @@ HK_MISE = "1"
 ADR_DIRECTORY = "docs/adr/"
 # Coverage filename-exclusion regex, consumed by `coverage:lcov`/`coverage:html`
 # as cargo-llvm-cov's --ignore-filename-regex. Ported from the deleted
-# tarpaulin.toml exclude-files; keep in sync with .cargo/mutants.toml's
-# exclude globs. POSIX ERE only: no lookahead, no (?:...), no \d \w \s —
+# tarpaulin.toml exclude-files. POSIX ERE only: no lookahead, no (?:...), no \d \w \s —
 # an invalid regex silently disables ALL exclusions (defaults included).
 COVERAGE_IGNORE_REGEX = 'src/main\.rs$|src/cli($|/)|src/(.*/)?error\.rs$'
 
@@ -201,10 +200,14 @@ cargo build "${extra[@]+"${extra[@]}"}"
 '''
 
 [tasks.watch]
-description = "Watch `cargo check`/`cargo test` on changes"
+description = "Watch `cargo check` + the canonical test suite on changes"
 outputs = []
 cache = { enabled = false }
-run = "cargo watch -x check -x test"
+# The canonical runner (ticket 18): unit/integration/E2E phases with the
+# right feature configuration per phase, plus all-features doctests — not
+# bare `cargo test`, which silently dropped the integration suite and ran
+# E2E under the wrong configuration.
+run = "cargo watch -x check -s 'mise run test --no-docs'"
 
 [tasks."modules:tree"]
 description = "Print the crate's module tree (`cargo modules structure`)"
