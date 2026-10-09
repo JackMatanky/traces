@@ -59,6 +59,18 @@ and NOT pinned as an assertion. A potential wipe-and-recreate enhancement
 for header-level damage is recorded for ticket 15's ledger (product change
 → would need its own spec).
 
+### Review remediation (2026-10-09): original corruption criterion restored
+
+The ruling above describes the original implementation, not the current
+contract. `IndexStore::create_db` now recognizes redb's specific
+magic-number-mismatch error as recoverable corruption and recreates that
+file; unrelated I/O errors still propagate. The spawned
+`fully_corrupted_index_self_heals_on_the_next_query` test overwrites the
+entire file with garbage, checks the recovered query result, and checks
+that the rebuilt store accepts later writes. The fail-open unit now injects
+failure through the service's reconciliation branch and checks returned
+unpersisted content against the still-old on-disk store.
+
 ### Deliverables
 
 - `tests/integration/index_refresh.rs` (new, wired in `tests/integration.rs`):
@@ -67,12 +79,11 @@ for header-level damage is recorded for ticket 15's ledger (product change
   via `load()` + `QueryService::run` (new `#beta` tag resolves a.md, removed
   `#alpha` gone, rewritten task text visible). The refresh is the act; the
   observation path is non-mutating.
-- In-crate fail-open unit: `src/index/refresh.rs::tests::fail_open_
-  materializes_the_unpersisted_delta_into_the_returned_index` — builds the
-  real reconciled Stale pass, constructs `PersistFailed` at the only
-  inducible point (private fields, in-module), asserts the unpersisted delta
-  materializes in the returned index AND the store stays untouched (fresh
-  service still loads pre-edit content). Defect class: unobservable-reload.
+- In-crate fail-open unit: `src/index/refresh.rs::tests::
+  refresh_service_returns_unpersisted_delta_when_persistence_fails` —
+  builds a reconciled Stale pass, injects persistence failure through the
+  service branch, and asserts the returned delta and untouched store.
+  Defect class: unobservable-reload.
 - `tests/e2e/index.rs` (new, wired in `tests/e2e.rs`):
   - `content_edit_between_spawns_is_query_visible` (stale-secondary-index)
   - `path_set_changes_between_spawns_prune_ghosts_and_resolve_links` —
@@ -82,8 +93,8 @@ for header-level damage is recorded for ticket 15's ledger (product change
     canonical portable recipe (`filetime` dev-dependency added); query after
     the metadata-neutral edit still shows the old text, rebuild shows the
     new; the ticket-04 staleness recipe is not used (unobservable-reload)
-  - `table_level_corruption_self_heals_on_the_next_query` — magic-preserving
-    byte corruption, exit-0 exact-output self-heal, store accepts writes
+  - `fully_corrupted_index_self_heals_on_the_next_query` — complete
+    garbage overwrite, exit-0 exact-output self-heal, store accepts writes
     after (panic-on-corruption)
 - Pre-existing flake repaired: `src/query/service.rs::
   runs_from_store_matching_in_memory_lists` compared whole `QuerySet`s,

@@ -15,36 +15,15 @@
 use std::{
     fmt::Write as _,
     fs,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
-pub const CONFIG_DIR_NAME: &str = ".traces";
 pub const CONFIG_FILE_REL: &str = ".traces/config.toml";
 pub const DEFAULT_TEMPLATES_DIR_NAME: &str = "templates";
 pub const DEFAULT_SCHEMAS_DIR_REL: &str = ".traces/schemas";
-pub const DEFAULT_SCHEMA_VALUES_DIR_REL: &str = ".traces/schemas/values";
 
 pub const MINIMAL_CONFIG_TOML: &str =
     "[templates]\ndirectory = \"templates\"\n";
-
-/// Safely joins a relative path onto a root, rejecting absolute paths
-/// and directory traversal.
-pub fn safe_join(root: &Path, rel: &Path) -> PathBuf {
-    assert!(!rel.is_absolute(), "path must be relative: {}", rel.display());
-    for comp in rel.components() {
-        assert!(
-            !matches!(
-                comp,
-                Component::ParentDir
-                    | Component::RootDir
-                    | Component::Prefix(_)
-            ),
-            "path traversal or root component forbidden: {}",
-            rel.display()
-        );
-    }
-    root.join(rel)
-}
 
 /// Explicit declarative configuration fixture.
 ///
@@ -216,14 +195,6 @@ mod tests {
         ));
         assert!(toml.contains("tag_filters = [\"task\", \"todo\"]"));
         assert!(toml.contains("symbol = \"?\""));
-    }
-
-    #[test]
-    fn joins_safe_paths() {
-        let root = Path::new("/tmp/test_project");
-        let joined = safe_join(root, Path::new(DEFAULT_SCHEMA_VALUES_DIR_REL));
-        assert_eq!(joined, root.join(DEFAULT_SCHEMA_VALUES_DIR_REL));
-        assert_eq!(CONFIG_DIR_NAME, ".traces");
     }
 
     #[test]

@@ -533,6 +533,7 @@ src/index/service.rs: pub fn refresh_with_report(
 src/index/service.rs: pub struct IndexerService {
 src/index/service.rs: pub(crate) fn rebuild(&self) -> IndexResult<WorkspaceIndex> {
 src/index/service.rs: pub(crate) fn refresh_store(&self) -> IndexResult<IndexStore> {
+src/index/service.rs: pub(super) fn apply_reconciled_with(
 src/index/service.rs: pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
 src/index/sort.rs: pub(crate) fn as_slice(&self) -> &[T] {
 src/index/sort.rs: pub(crate) fn assumed_sorted(rows: Vec<T>) -> Self {

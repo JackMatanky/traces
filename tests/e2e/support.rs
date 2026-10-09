@@ -154,8 +154,8 @@ impl Sandbox {
         }
     }
 
-    /// Adopts caller-owned temporary directories (used by `golden_path`,
-    /// which must create its directories before `Init` runs in-process).
+    /// Adopts caller-owned temporary directories for the spawned `init`
+    /// command in the workspace workflow.
     pub(crate) fn from_dirs(
         project: TempDir,
         state_dir: TempDir,

@@ -153,20 +153,19 @@ set -euo pipefail
 
 echo "==> Verifying layer discipline boundaries..."
 
-if git grep -E 'use traces_pkm::' tests/e2e/ >/dev/null 2>&1; then
-    echo "ERROR: tests/e2e/ must not import from traces_pkm::" >&2
-    git grep -n -E 'use traces_pkm::' tests/e2e/ >&2
+if git grep -n -E '(^|[^[:alnum:]_])traces_pkm([^[:alnum:]_]|$)' tests/e2e.rs tests/e2e/ >&2; then
+    echo "ERROR: E2E tests must not reference traces_pkm" >&2
     exit 1
 fi
 
-e2e_process_refs=$(git grep -n -E 'std::process' tests/e2e/ ':!tests/e2e/support.rs' || true)
+e2e_process_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ ':!tests/e2e/support.rs' || true)
 if [[ -n "${e2e_process_refs}" ]]; then
     echo "ERROR: tests/e2e/ must not use std::process outside support.rs" >&2
     echo "${e2e_process_refs}" >&2
     exit 1
 fi
 
-int_cmd_refs=$(git grep -n -E 'std::process::Command|CARGO_BIN_EXE' tests/integration/ || true)
+int_cmd_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])|CARGO_BIN_EXE' tests/integration.rs tests/integration/ || true)
 if [[ -n "${int_cmd_refs}" ]]; then
     echo "ERROR: tests/integration/ must not spawn child processes or reference CARGO_BIN_EXE" >&2
     echo "${int_cmd_refs}" >&2

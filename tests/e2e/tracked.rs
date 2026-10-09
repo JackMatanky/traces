@@ -1,6 +1,5 @@
-//! Proves `traces tracked list`/`traces tracked clean` end-to-end — currently
-//! zero process-level coverage; only in-process unit tests exist in
-//! `src/cli/tracked.rs`.
+//! Proves `traces tracked list` and `traces tracked clean` through spawned
+//! commands and a real tracked-config store.
 //!
 //! The tracked-config store is populated by `ConfigService::load` (see
 //! `src/cli/tracked.rs`'s module docs), not by `trust`.

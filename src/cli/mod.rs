@@ -1098,9 +1098,7 @@ mod tests {
             cli::CwdGuard,
             config::{Config, ConfigService},
             dialog::PresetDialogProvider,
-            query::{
-                QueryBuilderError, QueryError, SourceSelector, TaskPathStyle,
-            },
+            query::{QueryBuilderError, QueryError, SourceSelector},
             template::{
                 TemplateError, TemplatePathInput, TemplateService, WriteMode,
                 WriteOutcome,
@@ -1157,84 +1155,6 @@ mod tests {
                 WriteOutcome::Written(_) => None,
             };
             previewed.expect("dry run always previews, never writes")
-        }
-
-        /// Verifies that sequential CLI queries run against a project with a
-        /// persisted index without error, observing the persisted state via
-        /// `load()`.
-        #[test]
-        fn indexing_then_page_and_task_queries_observe_the_same_project_state()
-        {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let (service, project) = seed_book_project(temp.path());
-            let _guard = CwdGuard::enter(&project);
-
-            let index_outcome = Cli::try_parse_from(["traces", "index"])
-                .expect("parse index argv")
-                .run(&service, Arc::new(PresetDialogProvider::new()))
-                .expect("index succeeds");
-            assert_eq!(index_outcome, CommandOutcome::Completed);
-
-            let list_outcome = Cli::try_parse_from([
-                "traces", "list", "--from", "#book", "--sort", "rating",
-            ])
-            .expect("parse list argv")
-            .run(&service, Arc::new(PresetDialogProvider::new()))
-            .expect("list succeeds");
-            assert_eq!(list_outcome, CommandOutcome::Completed);
-            let list_index = Arc::new(
-                IndexerService::for_tests(&project)
-                    .load()
-                    .expect("load persisted index without refresh"),
-            );
-            let _list = QueryService::new("class")
-                .run(
-                    &list_index,
-                    QueryBuilder::pages(
-                        SourceSelector::parse("#book").expect("valid source"),
-                    ),
-                )
-                .sort("rating", true)
-                .expect("valid sort")
-                .list("file.path")
-                .expect("valid list");
-
-            let table_outcome = Cli::try_parse_from([
-                "traces",
-                "table",
-                "--column",
-                "file.name",
-                "--column",
-                "rating",
-            ])
-            .expect("parse table argv")
-            .run(&service, Arc::new(PresetDialogProvider::new()))
-            .expect("table succeeds");
-            assert_eq!(table_outcome, CommandOutcome::Completed);
-            let table_index = Arc::new(
-                IndexerService::for_tests(&project)
-                    .load()
-                    .expect("load persisted index without refresh"),
-            );
-            let _table = QueryService::new("class")
-                .run(&table_index, QueryBuilder::pages(SourceSelector::All))
-                .table(&["Name", "Rating"], &["file.name", "rating"])
-                .expect("valid table");
-
-            let task_outcome = Cli::try_parse_from(["traces", "task"])
-                .expect("parse task argv")
-                .run(&service, Arc::new(PresetDialogProvider::new()))
-                .expect("task succeeds");
-            assert_eq!(task_outcome, CommandOutcome::Completed);
-            let task_index = Arc::new(
-                IndexerService::for_tests(&project)
-                    .load()
-                    .expect("load persisted index without refresh"),
-            );
-            let _tasks = QueryService::new("class")
-                .run(&task_index, QueryBuilder::tasks(SourceSelector::All))
-                .task_list(TaskPathStyle::default())
-                .expect("valid task_list");
         }
 
         #[test]

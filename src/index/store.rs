@@ -764,8 +764,8 @@ impl IndexStore {
 
     /// Opens (or creates) the database file.
     ///
-    /// Recovers by wipe-and-recreate if `Database::create` itself reports
-    /// container-level corruption.
+    /// Recovers by wipe-and-recreate on redb corruption or a bad file header.
+    /// Redb reports a magic-number mismatch as an `InvalidData` I/O error.
     fn create_db(path: &Path) -> StoreResult<redb::Database> {
         let wrap = |source: redb::DatabaseError| StoreError::Redb {
             path: path.to_path_buf(),
@@ -773,12 +773,22 @@ impl IndexStore {
         };
         match redb::Database::create(path) {
             Ok(db) => Ok(db),
-            Err(redb::DatabaseError::Storage(
-                redb::StorageError::Corrupted(_),
-            )) => {
-                fs::remove_file(path).map_err(|source| StoreError::Io {
+            Err(source)
+                if matches!(
+                    &source,
+                    redb::DatabaseError::Storage(
+                        redb::StorageError::Corrupted(_)
+                    )
+                ) || matches!(
+                    &source,
+                    redb::DatabaseError::Storage(redb::StorageError::Io(error))
+                        if error.kind() == std::io::ErrorKind::InvalidData
+                            && error.to_string() == "Not a redb database: magic number mismatch"
+                ) =>
+            {
+                fs::remove_file(path).map_err(|error| StoreError::Io {
                     path: path.to_path_buf(),
-                    source,
+                    source: error,
                 })?;
                 redb::Database::create(path).map_err(wrap)
             }

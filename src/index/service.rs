@@ -14,7 +14,10 @@ use rayon::prelude::*;
 use super::{
     INDEX_FILE, IndexError, IndexResult, WorkspaceIndex,
     inlinks::{InlinkMap, LinkResolver},
-    refresh::{PendingApply, RefreshPlan, RefreshReport, RefreshState},
+    refresh::{
+        PendingApply, PersistFailed, Persisted, RefreshPlan, RefreshReport,
+        RefreshState,
+    },
     sort::SortedByPath,
     store::{IndexDimensions, IndexStore, PersistRequest},
 };
@@ -127,7 +130,9 @@ impl IndexerService {
                 store,
                 files,
             } => Self::assemble_unchanged(&store, files),
-            RefreshState::Stale(pending) => self.apply_reconciled(*pending),
+            RefreshState::Stale(pending) => {
+                self.apply_reconciled_with(*pending, PendingApply::apply)
+            }
         }
     }
 
@@ -145,13 +150,26 @@ impl IndexerService {
         ))
     }
 
-    fn apply_reconciled(
+    /// Persists a reconciled pass, retaining its index in memory on write
+    /// failure.
+    ///
+    /// `persist` receives the pending rows and the configured index dimensions.
+    ///
+    /// # Errors
+    ///
+    /// - [`IndexError::Store`] if materializing the index cannot read unchanged
+    ///   notes.
+    pub(super) fn apply_reconciled_with(
         &self,
         pending: PendingApply,
+        persist: impl FnOnce(
+            PendingApply,
+            IndexDimensions,
+        ) -> Result<Persisted, PersistFailed>,
     ) -> IndexResult<(WorkspaceIndex, RefreshReport)> {
         let report = pending.report();
         let dimensions = IndexDimensions::for_class_field(&self.class_field);
-        let index = match pending.apply(dimensions) {
+        let index = match persist(pending, dimensions) {
             Ok(persisted) => {
                 Self::log_report(&report);
                 persisted.into_index()?

@@ -136,40 +136,27 @@ fn same_size_mtime_restored_edit_reads_the_store_not_a_rebuild() {
     rebuilt.assert_stdout_eq("- [ ] omega task (a.md)\n");
 }
 
-/// Verifies corruption self-heal at process level: table-level corruption
-/// (redb magic preserved) makes the next spawned query exit 0 with correct
-/// output, a rebuilt store, and no panic.
-///
-/// The corruption arrangement preserves the redb file magic and trashes
-/// everything after it — the damage class the store recovers from by
-/// treating the tables as empty and re-upserting every file (the same
-/// contract the integration persistence file owns at service level).
-/// Header-level destruction (a wholly garbage file) is a different damage
-/// class the store does not recover from; per the ticket-12 ruling that
-/// boundary is documented, not pinned.
+/// Verifies corruption self-heal at process level: replacing the entire index
+/// with garbage makes the next spawned query exit 0 with correct output, a
+/// rebuilt store, and no panic.
 ///
 /// Executes vs asserts:
-/// - Executes: `traces index`, byte-level table corruption of
-///   `.traces/index.redb`, then `traces list`, then a further edit + `traces
-///   index` + `traces list` to prove the store accepts writes.
+/// - Executes: `traces index`, overwrite `.traces/index.redb` with garbage,
+///   then `traces list`, then a further edit + `traces index` + `traces list`
+///   to prove the store accepts writes.
 /// - Asserts: exit 0, never 101, exact pre-corruption output, and the post-heal
 ///   edit query-visible.
 ///
 /// Defect class: panic-on-corruption.
 #[test]
-fn table_level_corruption_self_heals_on_the_next_query() {
+fn fully_corrupted_index_self_heals_on_the_next_query() {
     let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("a.md", "# A\n");
     sandbox.write_note("b.md", "# B\n");
     sandbox.run(&["index"]).assert_success();
 
     let db = sandbox.root().join(".traces/index.redb");
-    let mut bytes = fs::read(&db).expect("read valid index file");
-    bytes
-        .get_mut(9..)
-        .expect("index file longer than the redb magic number")
-        .fill(0xFF);
-    fs::write(&db, bytes).expect("corrupt index tables");
+    fs::write(&db, b"garbage").expect("replace index with garbage");
 
     let healed = sandbox.run(&["list"]);
     healed.assert_success();

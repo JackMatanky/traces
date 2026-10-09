@@ -606,18 +606,13 @@ mod tests {
     /// materialize the full unpersisted delta into the returned index
     /// instead of failing the refresh.
     ///
-    /// Executes vs asserts: builds the real reconciled pass
-    /// (`RefreshPlan::collect` → reconcile) over an edited note, then
-    /// induces the persist failure at the `PersistFailed` construction
-    /// point — the one failure the public API cannot reach, because the
-    /// store re-creates its file — and asserts only the materialization
-    /// contract. Also asserts the store itself is untouched: a fresh
-    /// service still loads the pre-edit content.
+    /// Executes vs asserts: builds a real reconciled pass over an edited
+    /// note, injects a persist failure into the service's production
+    /// apply branch, and checks the returned delta and untouched store.
     ///
-    /// Defect class: unobservable-reload (a refresh that dropped its delta
-    /// on persist failure, or lied about what it kept in memory).
+    /// Defect class: unobservable-reload.
     #[test]
-    fn fail_open_materializes_the_unpersisted_delta_into_the_returned_index() {
+    fn refresh_service_returns_unpersisted_delta_when_persistence_fails() {
         use std::{fs, io, path::Path};
 
         use pretty_assertions::assert_eq;
@@ -646,16 +641,19 @@ mod tests {
             .reconcile(modified, persisted_links)
             .expect("reconcile stale pass");
 
-        let failed = PersistFailed {
-            source: IndexError::Store(StoreError::Io {
-                path: temp.path().join(".traces/index.redb"),
-                source: io::Error::other("induced persist failure"),
-            }),
-            pass: Box::new(pending),
-        };
-
-        // Fail-open: the unpersisted delta is materialized in memory.
-        let index = failed.into_index().expect("fail-open materialization");
+        let (index, report) = indexer
+            .apply_reconciled_with(pending, |pending, _dimensions| {
+                Err(PersistFailed {
+                    source: IndexError::Store(StoreError::Io {
+                        path: temp.path().join(".traces/index.redb"),
+                        source: io::Error::other("induced persist failure"),
+                    }),
+                    pass: Box::new(pending),
+                })
+            })
+            .expect("fail-open refresh");
+        assert_eq!(report.upserted_count(), 1);
+        assert_eq!(report.deleted_count(), 0);
         let note = index
             .entries()
             .iter()

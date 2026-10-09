@@ -193,26 +193,9 @@ mod tests {
             assert!(!root.path().join(".traces").exists());
         }
 
-        /// Exercises the interactive `traces init` dialog pipeline with both
-        /// preset custom paths and defaults, and confirms
-        /// already-initialized refusal.
-        ///
-        /// Relocated from `tests/e2e/init.rs` to keep in-process dialog mocking
-        /// inside the crate boundary while E2E tests execute only
-        /// spawned binaries.
-        ///
-        /// Executes vs asserts:
-        /// - Executes: `Init.run(&provider)` with `PresetDialogProvider`
-        ///   queueing custom answers ("custom/templates", "notes") and default
-        ///   empty answers.
-        /// - Asserts: written `.traces/config.toml` matches input paths,
-        ///   `.traces/templates` directory is created, and existing `.traces`
-        ///   directory fails with `CliError::InitAlreadyInitialized`.
-        ///
-        /// Defect class: layer-discipline (moves in-process mock out of
-        /// black-box E2E suite).
+        /// Checks user-selected paths through the in-process dialog seam.
         #[test]
-        fn scaffolds_preset_defaults_and_refuses_existing_traces_dir() {
+        fn scaffolds_config_with_custom_template_and_output_paths() {
             let preset = tempfile::tempdir().expect("create preset temp dir");
             {
                 let _guard = CwdGuard::enter(preset.path());
@@ -223,9 +206,22 @@ mod tests {
                 Init.run(&provider).expect("run preset init");
             }
 
-            assert_config(preset.path(), "custom/templates", "notes");
+            let config = read_config(preset.path());
+            let templates = config.get("templates").expect("templates table");
+            assert_eq!(
+                templates.get("directory").and_then(toml::Value::as_str),
+                Some("custom/templates")
+            );
+            assert_eq!(
+                templates.get("output_dir").and_then(toml::Value::as_str),
+                Some("notes")
+            );
             assert!(preset.path().join(".traces/templates").is_dir());
+        }
 
+        /// Checks that the dialog's defaults are written to the local config.
+        #[test]
+        fn scaffolds_config_with_default_template_and_output_paths() {
             let defaults =
                 tempfile::tempdir().expect("create defaults temp dir");
             {
@@ -235,9 +231,22 @@ mod tests {
                 Init.run(&provider).expect("run default init");
             }
 
-            assert_config(defaults.path(), ".traces/templates", ".");
+            let config = read_config(defaults.path());
+            let templates = config.get("templates").expect("templates table");
+            assert_eq!(
+                templates.get("directory").and_then(toml::Value::as_str),
+                Some(".traces/templates")
+            );
+            assert_eq!(
+                templates.get("output_dir").and_then(toml::Value::as_str),
+                Some(".")
+            );
             assert!(defaults.path().join(".traces/templates").is_dir());
+        }
 
+        /// Existing initialization must not be overwritten.
+        #[test]
+        fn refuses_existing_traces_directory() {
             let existing =
                 tempfile::tempdir().expect("create existing temp dir");
             fs::create_dir(existing.path().join(".traces"))
@@ -254,27 +263,11 @@ mod tests {
             assert!(matches!(error, CliError::InitAlreadyInitialized { .. }));
         }
 
-        fn assert_config(
-            root: &Path,
-            expected_directory: &str,
-            expected_output_dir: &str,
-        ) {
+        fn read_config(root: &Path) -> toml::Value {
             let config_path = root.join(".traces/config.toml");
             let contents =
                 fs::read_to_string(config_path).expect("read config");
-            let value: toml::Value =
-                toml::from_str(&contents).expect("parse config");
-            let templates = value
-                .get("templates")
-                .and_then(toml::Value::as_table)
-                .expect("templates table");
-
-            assert_eq!(table_str(templates, "directory"), expected_directory);
-            assert_eq!(table_str(templates, "output_dir"), expected_output_dir);
-        }
-
-        fn table_str<'a>(table: &'a toml::value::Table, key: &str) -> &'a str {
-            table.get(key).and_then(toml::Value::as_str).expect("string value")
+            toml::from_str(&contents).expect("parse config")
         }
     }
 }
