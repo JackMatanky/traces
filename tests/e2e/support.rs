@@ -58,13 +58,17 @@ use tempfile::TempDir;
 /// Path to the product binary used by end-to-end tests.
 pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
 
-/// Runs a single test in a process with a controlled ambient ignored-dir
-/// setting.
-pub(crate) fn run_with_ambient_ignored_dirs(test_name: &str) -> Output {
+/// Runs a single test with one controlled ambient variable in its parent
+/// process, without mutating this test process's environment.
+pub(crate) fn run_with_ambient_env(
+    test_name: &str,
+    key: &str,
+    value: &str,
+) -> Output {
     Command::new(std::env::current_exe().expect("current test executable"))
         .args(["--exact", test_name])
         .env("TRACES_E2E_AMBIENT_CHILD", "1")
-        .env("TRACES_IGNORED_DIRS", "secret")
+        .env(key, value)
         .output()
         .expect("spawn isolated test process")
 }

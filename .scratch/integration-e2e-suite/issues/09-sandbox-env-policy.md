@@ -47,7 +47,7 @@ Resolved in commit `d3e2a2c3` (merged into `integration-e2e-suite`).
   path (`TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS` never pre-declared).
   Accessors: `state_dir()`, `config_home()`. Zero `src/` changes; all
   `std::process` use stays inside `support.rs` (`check:layers` green).
-- New `tests/e2e/env_policy.rs` (6 tests, all carrying executes-vs-asserts
+  New `tests/e2e/env_policy.rs` (7 tests, all carrying executes-vs-asserts
   notes and the assumed-hermeticity defect class):
   - `spawned_child_receives_exactly_the_declared_policy_table` — child env
     equals the declared table entry-for-entry; opt-in variables absent.
@@ -67,6 +67,11 @@ Resolved in commit `d3e2a2c3` (merged into `integration-e2e-suite`).
     (AC: "a test fails if `TRACES_STATE_DIR` plumbing breaks").
   - `opt_in_ignored_dirs_prune_only_when_explicitly_declared` — `index`
     sees 2 files by default, 1 with `TRACES_IGNORED_DIRS=secret`.
+  - `ambient_timezone_does_not_shift_naive_datetime_rendering` — a naive
+    `2024-02-03T12:00:00` renders as the UTC instant (`1706961600`) through
+    the spawned `template --dry-run` while the isolated parent runs with
+    `TZ=Pacific/Honolulu`, proving the `TZ=UTC` policy row reaches the
+    binary's date parsing (the env-table assertion alone cannot).
 - Windows behavior verified structurally (policy table); execution proof
   lands with ticket 18's non-Linux job, per the AC.
 - Gate: `check:layers`, `check:visibility` (empty diff), full suite

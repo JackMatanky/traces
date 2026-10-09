@@ -97,7 +97,8 @@ impl IndexerService {
     /// - `IndexError::Scan` if a directory cannot be read.
     /// - `IndexError::Inspect` if file metadata cannot be inspected.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or parsed,
-    ///   or an unchanged note cannot be recalled.
+    ///   or an unchanged note cannot be recalled, or the file's contents are
+    ///   unreadable or not UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
     /// - `IndexError::Store` if the persisted index cannot be opened or read.
@@ -114,7 +115,8 @@ impl IndexerService {
     /// - `IndexError::Scan` if a directory cannot be read.
     /// - `IndexError::Inspect` if file metadata cannot be inspected.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or parsed,
-    ///   or an unchanged note cannot be recalled.
+    ///   or an unchanged note cannot be recalled, or the file's contents are
+    ///   unreadable or not UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
     /// - `IndexError::Store` if the persisted index cannot be opened or read.
@@ -206,7 +208,8 @@ impl IndexerService {
     /// - [`IndexError::Scan`] if a directory cannot be read.
     /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
     /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or parsed,
-    ///   or an unchanged note cannot be recalled.
+    ///   unchanged notes cannot be recalled, or the file's contents are
+    ///   unreadable or not UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
     ///   project-relative path.
     /// - [`IndexError::Store`] if the database cannot be opened or read,

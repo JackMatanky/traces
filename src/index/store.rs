@@ -801,8 +801,9 @@ impl IndexStore {
         }
     }
 
-    /// Returns `true` if any core table is missing or schema-mismatched,
-    /// signaling that [`Self::open`] should wipe and recreate the database.
+    /// Returns `true` if the schema is partial or incompatible, signaling
+    /// that [`Self::open`] should recreate the database. All tables absent is a
+    /// fresh store that needs no replacement.
     fn rebuild_needed(db: &redb::Database, path: &Path) -> StoreResult<bool> {
         let read_txn = match db.begin_read() {
             Ok(txn) => txn,
@@ -818,14 +819,24 @@ impl IndexStore {
                 });
             }
         };
+        let mut present = false;
+        let mut missing = false;
         for spec in &TABLES {
-            if let Err(error) = spec.probe(&read_txn)
-                && Self::is_rebuild_trigger(&error)
-            {
-                return Ok(true);
+            match spec.probe(&read_txn) {
+                Ok(()) => present = true,
+                Err(redb::TableError::TableDoesNotExist(_)) => missing = true,
+                Err(error) if Self::is_rebuild_trigger(&error) => {
+                    return Ok(true);
+                }
+                Err(source) => {
+                    return Err(StoreError::Redb {
+                        path: path.to_path_buf(),
+                        source: Box::new(source.into()),
+                    });
+                }
             }
         }
-        Ok(false)
+        Ok(present && missing)
     }
 
     // --- Batch read helpers -------------------------------------------
@@ -1655,7 +1666,7 @@ mod tests {
         IndexerService, index::WorkspaceIndex,
         test_support::parse_note as parse,
     };
-    mod multimap_paths {
+    mod schema_recovery {
 
         use super::*;
 
@@ -1679,6 +1690,30 @@ mod tests {
             let paths =
                 reopened.paths_with_tag("x").expect("paths_with_tag works");
             assert_eq!(paths.as_ref(), <&[PathBuf]>::default());
+        }
+        #[test]
+        fn missing_notes_table_rebuilds_instead_of_hiding_unchanged_notes() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            fs::write(temp.path().join("note.md"), "- [ ] kept task")
+                .expect("write note");
+            let service = IndexerService::for_tests(temp.path());
+            let index = service.build().expect("build index");
+            service.persist(&index).expect("persist index");
+
+            let store = IndexStore::open(temp.path()).expect("open store");
+            let txn = store.begin_write().expect("begin write transaction");
+            txn.delete_table(NOTES).expect("delete notes table");
+            txn.commit().expect("commit partial schema");
+            drop(store);
+
+            let repaired =
+                service.refresh_store().expect("refresh partial schema");
+            let notes = repaired.read_all_notes().expect("read repaired notes");
+            let note = notes.as_slice().first().expect("note retained");
+            assert_eq!(
+                note.list_items().next().expect("task retained").clean_text(),
+                "kept task"
+            );
         }
     }
 

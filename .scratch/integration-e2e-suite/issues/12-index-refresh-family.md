@@ -90,9 +90,10 @@ unpersisted content against the still-old on-disk store.
     ambiguous `[[foo]]` re-resolves after deleting the sibling; exact `list`
     output + `inlinks` table row (stale-secondary-index)
   - `same_size_mtime_restored_edit_reads_the_store_not_a_rebuild` — the one
-    canonical portable recipe (`filetime` dev-dependency added); query after
-    the metadata-neutral edit still shows the old text, rebuild shows the
-    new; the ticket-04 staleness recipe is not used (unobservable-reload)
+    canonical portable recipe (mtime restored with std
+    `File::set_times`); query after the metadata-neutral edit still shows
+    the old text, rebuild shows the new; the ticket-04 staleness recipe is
+    not used (unobservable-reload)
   - `fully_corrupted_index_self_heals_on_the_next_query` — complete
     garbage overwrite, exit-0 exact-output self-heal, store accepts writes
     after (panic-on-corruption)
@@ -103,8 +104,8 @@ unpersisted content against the still-old on-disk store.
   parallel I/O — observed twice this session). Narrowed to the seam contract
   (row structure + list content), matching the existing
   `assert_rows_match` precedent in the integration persistence file.
-- `Cargo.toml`: `filetime = "0.2"` added to dev-dependencies (mtime restore
-  for the canary; std has no portable setter).
+- `Cargo.toml`: mtime restore for the canary uses std `File::set_times` —
+  no dev-dependency needed (std has had a portable setter since 1.75).
 - Persist→load codec fidelity remains owned by
   `tests/integration/index_persistence_roundtrip.rs` (untouched).
 - Gate: `check:layers`, `check:visibility` (empty diffs), full suite

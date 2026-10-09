@@ -133,8 +133,10 @@ fn state_store_follows_a_state_dir_override_not_the_default_accessor() {
 #[test]
 fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
     if std::env::var_os("TRACES_E2E_AMBIENT_CHILD").is_none() {
-        let child = super::support::run_with_ambient_ignored_dirs(
+        let child = super::support::run_with_ambient_env(
             "env_policy::opt_in_ignored_dirs_prune_only_when_explicitly_declared",
+            "TRACES_IGNORED_DIRS",
+            "secret",
         );
         let stdout = String::from_utf8_lossy(&child.stdout);
         assert!(
@@ -144,6 +146,11 @@ fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
         );
         return;
     }
+    assert_eq!(
+        std::env::var_os("TRACES_IGNORED_DIRS").as_deref(),
+        Some(OsStr::new("secret")),
+        "isolated child must receive the controlled ambient ignored-dir value"
+    );
     let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("open.md", "# open\n");
     sandbox.write_note("secret/hidden.md", "# hidden\n");
@@ -166,4 +173,44 @@ fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
         "stderr: {}",
         with.stderr
     );
+}
+
+/// Checks a naive date-time is interpreted in UTC by the spawned binary even
+/// when the test process inherits a non-UTC timezone.
+///
+/// Executes vs asserts:
+/// - Executes: `traces template --dry-run` under a separate parent with
+///   `TZ=Pacific/Honolulu`.
+/// - Asserts: the rendered timestamp is the UTC instant, not Honolulu time.
+///
+/// Defect class: assumed-hermeticity (ambient timezone shifting date queries).
+#[test]
+fn ambient_timezone_does_not_shift_naive_datetime_rendering() {
+    if std::env::var_os("TRACES_E2E_AMBIENT_CHILD").is_none() {
+        let child = super::support::run_with_ambient_env(
+            "env_policy::ambient_timezone_does_not_shift_naive_datetime_rendering",
+            "TZ",
+            "Pacific/Honolulu",
+        );
+        let stdout = String::from_utf8_lossy(&child.stdout);
+        assert!(
+            child.status.success() && stdout.contains("1 passed"),
+            "isolated test failed: stdout: {stdout}, stderr: {}",
+            String::from_utf8_lossy(&child.stderr)
+        );
+        return;
+    }
+    assert_eq!(
+        std::env::var_os("TZ").as_deref(),
+        Some(OsStr::new("Pacific/Honolulu")),
+        "isolated child must receive the controlled ambient timezone"
+    );
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox
+        .write_template("clock.md", "{{ '2024-02-03T12:00:00' | timestamp }}");
+
+    let rendered =
+        sandbox.run(&["template", "-i", "clock", "--dry-run", "--no-input"]);
+    rendered.assert_success();
+    rendered.assert_stdout_eq("1706961600");
 }

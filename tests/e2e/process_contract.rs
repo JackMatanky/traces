@@ -23,7 +23,11 @@ fn exit_code_zero_for_help_and_version() {
     let version = sandbox.run(&["--version"]);
     version.assert_code(0);
     version.assert_never_exit_101();
-    version.assert_stdout_eq("traces 0.1.0\n");
+    version.assert_stdout_eq(concat!(
+        "traces ",
+        env!("CARGO_PKG_VERSION"),
+        "\n"
+    ));
     version.assert_stderr_eq("");
 }
 

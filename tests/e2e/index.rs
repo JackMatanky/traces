@@ -138,11 +138,12 @@ fn same_size_mtime_restored_edit_reads_the_store_not_a_rebuild() {
 
     // Same byte length, same mtime: metadata fingerprints stay unchanged.
     fs::write(&note, "# A\n\n- [ ] omega task\n").expect("rewrite note");
-    filetime::set_file_mtime(
-        &note,
-        filetime::FileTime::from_system_time(original_mtime),
-    )
-    .expect("restore original mtime");
+    fs::File::options()
+        .write(true)
+        .open(&note)
+        .expect("open note to restore mtime")
+        .set_times(fs::FileTimes::new().set_modified(original_mtime))
+        .expect("restore original mtime");
 
     let reloaded = sandbox.run(&["task"]);
     reloaded.assert_success();
