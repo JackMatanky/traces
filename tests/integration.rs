@@ -10,11 +10,11 @@
 #![cfg(feature = "test-utils")]
 #[path = "common/mod.rs"]
 mod common;
-#[path = "integration/index_persistence_roundtrip.rs"]
-mod index_persistence_roundtrip;
-#[path = "integration/index_query.rs"]
-mod index_query;
-#[path = "integration/index_refresh.rs"]
-mod index_refresh;
+#[path = "integration/persistence.rs"]
+mod persistence;
+#[path = "integration/query.rs"]
+mod query;
+#[path = "integration/refresh.rs"]
+mod refresh;
 #[path = "integration/template_render.rs"]
 mod template_render;

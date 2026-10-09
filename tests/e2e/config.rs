@@ -304,3 +304,26 @@ fn malformed_global_config_fails_parse_for_trusted_local() {
         list.stderr
     );
 }
+
+// Relocated from the dissolved `dispatch.rs` (ticket 19): the never-trusted
+// load boundary belongs to the config capability.
+/// Checks an untrusted config makes `list` fail with the untrusted
+/// diagnostic, non-zero exit, and empty stdout.
+///
+/// Verifies that an untrusted root reaches the CLI error path, printing
+/// the expected diagnostic to stderr and exiting with a failure status.
+#[test]
+fn untrusted_root_fails_with_the_config_build_diagnostic() {
+    let sandbox = Sandbox::new();
+    sandbox.write_config(); // config exists, but was never trusted
+
+    let list = sandbox.run(&["list"]);
+
+    assert!(!list.is_success());
+    assert!(list.stdout.is_empty(), "stdout: {}", list.stdout);
+    assert!(
+        list.stderr.contains("traces::cli::config_build_untrusted"),
+        "stderr: {}",
+        list.stderr
+    );
+}
