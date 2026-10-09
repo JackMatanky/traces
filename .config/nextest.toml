@@ -4,8 +4,16 @@
 #   mise run test <filter> -- --status-level all
 #   NEXTEST_PROFILE=<profile> (see [profile.<name>] below)
 [profile.default]
-# During the run, list only failing tests; the final Summary line keeps counts.
-status-level = "fail"
+# Show slow-test markers as they happen (status-level "fail" alone would
+# hide them) while keeping passing output silent; the final Summary line
+# keeps counts.
+status-level = "slow"
+# A test running longer than the period is flagged slow in the stream and
+# retried/terminated after `terminate-after` repeats (nextest's hang guard:
+# a wedged test cannot stall the suite indefinitely).
+slow-timeout = { period = "30s", terminate-after = 2 }
+# Hard ceiling for the whole run; a wedged build/runner cannot hang CI.
+global-timeout = "20m"
 # Never replay captured stdout of passing tests (failure output unaffected:
 # failure-output defaults to immediate).
 success-output = "never"
