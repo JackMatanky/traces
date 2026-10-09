@@ -11,36 +11,47 @@ settle before tests are re-pathed into them).
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Integration tree instantiated post-pruning (~5 files): persistence, refresh, query
+- [x] Integration tree instantiated post-pruning (~5 files): persistence, refresh, query
       composition canaries, template render, and one config file **only if** config behavior
       landed at integration (default: E2E); `task_classification` absent by default per
       ticket 16's disposition
-- [ ] E2E capability files: query, template, trust, tracked, completions, init, index, config
+- [x] E2E capability files: query, template, trust, tracked, completions, init, index, config
       plus one generic process-contract file — the generic file is NOT named with meta-words
       (`cli.rs` rejected) and NOT grouped by error-renderer (no `cli_diagnostics.rs`
       catch-all); scope is argv/exit only
-- [ ] Legacy tests relocated to their capability names (only relocation — no assertion changes
+- [x] Legacy tests relocated to their capability names (only relocation — no assertion changes
       in this ticket) — including ticket 16's byte-equivalent-pair survivor and `untrust`
       smoke: this naming step is where they get their final integration home (16 deletes and
       flags; 19 places — mirroring 16's ACs)
-- [ ] `dispatch.rs` dissolves: its tests split into the capability files (§15 T7.1); the
+- [x] `dispatch.rs` dissolves: its tests split into the capability files (§15 T7.1); the
       generic process-contract file is named `process_contract.rs` (audit §12's first
       candidate — and ticket 10's gap tests already live there). §12's alternative — keep
       `dispatch.rs` narrowed to argv/exit — is explicitly **not** adopted: it preserves lineage
       naming for non-`Commands::run` scope, contradicting this ticket's organizing rule and the
       glossary AC below
-- [ ] Glossary alignment: marked-avoid terms removed from test names (`vault`, `checkbox
+- [x] Glossary alignment: marked-avoid terms removed from test names (`vault`, `checkbox
       line`); config-related tests avoid index-glossary words (`roundtrip`, `lifecycle`);
       `dispatch` terminology scoped to `Commands::run` only
-- [ ] Golden-path disposition **decided** from the ticket 15/16 ledger evidence — rename is the
+- [x] Golden-path disposition **decided** from the ticket 15/16 ledger evidence — rename is the
       expected outcome while its replacements (ticket 12) are young; deletion requires a
       separate future ticket with its own ledger row (US60's deferral stays intact)
-- [ ] `mise run test` + layer-enforcement checks + visibility freeze all green after the move
+- [x] `mise run test` + layer-enforcement checks + visibility freeze all green after the move
 
 **Evidence:** audit §12 (organizing rule, target shapes, vocabulary violations), §15 T7.1
 (dispatch split); spec §Naming. Note: spec marks cleanup (17) ∥ naming (this ticket) as
 parallel after pruning; the 17 edge exists only to prevent fixture-rename/re-path collisions —
 drop it if both run in a single session.
 **Defect class:** runner-heritage taxonomy (files named by lineage, not capability).
+
+## Comments
+
+Resolved by `d5f4b4f6` and `eefaff3c`, merged on `integration-e2e-suite`.
+The 14 `dispatch.rs` tests were relocated without dropping a case; the
+two accidentally weakened diagnostic assertions were restored. The generic
+process-contract file now owns exit/argv tests only; cross-command stream
+checks live in `workflow.rs` and batch trust checks in `trust.rs`. The
+first-run chain remains as `workflow.rs` rather than being deleted.
+Post-merge `mise run verify` passed: 3,150 unit, 43 integration, 55 E2E,
+and 83 doctests; layer and visibility checks passed.
