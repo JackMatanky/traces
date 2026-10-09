@@ -25,7 +25,7 @@ pub enum IndexError {
     /// A path rejected by lexical confinement validation.
     #[error(transparent)]
     Path(#[from] PathError),
-    /// A Markdown note could not be read or parsed.
+    /// A Markdown note could not be read or decoded as UTF-8.
     #[error("failed to parse note {path}")]
     NoteParse {
         path: PathBuf,

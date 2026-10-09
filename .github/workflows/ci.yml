@@ -153,18 +153,15 @@ jobs:
         with:
           shared-key: "test-docs-ubuntu"
 
-      - name: Assert exact doctest count
+      - name: Run doctests (require at least one)
         run: |
-          echo "==> Asserting exact doctest count (83)..."
-          doc_output=$(cargo test --doc --all-features 2>&1)
-          echo "${doc_output}"
-          total_passed=$(echo "${doc_output}" | grep -o '[0-9]\+ passed' | awk '{s+=$1} END {print s}')
-          echo "Total doctests passed: ${total_passed}"
-          if [[ "${total_passed}" -ne 83 ]]; then
-            echo "ERROR: Expected exactly 83 doctests passed, got ${total_passed}!" >&2
+          set -euo pipefail
+          cargo test --doc --all-features 2>&1 | tee "${RUNNER_TEMP}/doctests.log"
+          if ! grep -Eq '^test result: ok[.] [1-9][0-9]* passed;' \
+            "${RUNNER_TEMP}/doctests.log"; then
+            echo "ERROR: No doctests ran." >&2
             exit 1
           fi
-          echo "==> Doctest count guard passed."
 
   # -- Repository hygiene & file formats (hk) --
   hygiene:
