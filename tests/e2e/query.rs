@@ -110,7 +110,12 @@ fn unknown_sort_field_reports_a_did_you_mean_suggestion() {
     assert!(!list.is_success());
     assert!(list.stdout.is_empty(), "stdout: {}", list.stdout);
     assert!(
-        plain(&list.stderr).contains("did you mean"),
+        list.stderr.contains("traces::cli::query::failed"),
+        "stderr: {}",
+        list.stderr
+    );
+    assert!(
+        plain(&list.stderr).contains("did you mean `file.name`?"),
         "stderr: {}",
         list.stderr
     );
@@ -126,9 +131,13 @@ fn invalid_filter_expression_reports_its_location_and_repair() {
     let list = sandbox.run(&["list", "--where", "not a valid expression"]);
 
     assert!(!list.is_success());
-    assert!(list.stdout.is_empty(), "stdout: {}", list.stdout);
     assert!(
-        plain(&list.stderr).contains("traces::cli::query::failed"),
+        list.stderr.contains("traces::cli::query::failed"),
+        "stderr: {}",
+        list.stderr
+    );
+    assert!(
+        plain(&list.stderr).contains("a comparison operator"),
         "stderr: {}",
         list.stderr
     );

@@ -1,6 +1,6 @@
-//! End-to-end test harness: spawns the real `traces` binary (or, for `init`'s
-//! inherently-interactive flow, drives it in-process) against fully isolated
-//! sandboxes. See `support` for isolation guarantees.
+//! End-to-end test harness: spawns the real `traces` binary against isolated
+//! sandboxes, including the default non-interactive `init` path. See
+//! `support` for isolation guarantees.
 
 #[path = "common/mod.rs"]
 mod common;
