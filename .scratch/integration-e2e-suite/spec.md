@@ -33,7 +33,9 @@ From the maintainer's perspective: a test architecture whose every claim matches
   what the test actually runs; silent green is bounded precisely — explicit
   `cargo test --test integration` without the test feature **hard-errors**, bare `cargo test`
   still **skips** that target (documented Cargo behavior), so CI must assert **per-target
-  non-empty** results (lib, integration, e2e) plus an exact doctest count.
+  non-empty** results (lib, integration, e2e) and require at least one passing doctest. The
+  doctest guard is count-independent so adding or removing a valid example does not require
+  changing a pinned count.
 - **A hard E2E invariant:** every test under the E2E suite exercises product behavior only
   through the spawned binary, in an environment-scrubbed sandbox; a mechanical check in lint/CI
   keeps it that way.
@@ -69,9 +71,9 @@ From the maintainer's perspective: a test architecture whose every claim matches
 4. As a maintainer, I want an explicit `[[test]]` feature requirement on the integration suite, so
    that requesting it without the test feature fails loudly instead of running nothing.
 5. As a maintainer, I want CI to assert each expected suite ran non-empty (lib, integration,
-   e2e) with an exact doctest count, so that a target silently skipped by feature configuration
-   is detected (bare `cargo test` skipping the gated target is Cargo behavior we document, not
-   pretend to prevent).
+   e2e) and that at least one doctest passed, so skipped suites and a doctest phase that runs
+   zero tests fail without pinning the expected doctest count (bare cargo test skipping the
+   gated target is Cargo behavior we document, not pretend to prevent).
 6. As an agent implementing a ticket, I want every E2E test to go through the spawned binary, so
    that the behavior I'm guarding is the shipped behavior.
 7. As a maintainer, I want the in-process `init` assertions relocated to an in-crate component
@@ -249,9 +251,10 @@ whatever survives pruning.
 - Integration suite gains an explicit feature requirement in the manifest (repo precedent: benches
   already do this) — explicit selection without the feature is a hard error; `compile_error!` was
   rejected because it breaks featureless builds and IDE analysis. Bare `cargo test` still skips
-  the gated target (Cargo: "the target will be skipped"), which is why CI asserts **per-target
-  non-empty** counts (lib, integration, e2e) **and an exact doctest count**, so neither a skipped
-  target nor doctests silently lost during the facade re-path can pass unnoticed.
+  the gated target (Cargo: "the target will be skipped"), which is why CI asserts per-target
+  non-empty counts (lib, integration, e2e) and requires at least one passing doctest. The
+  doctest guard detects a zero-test phase without turning every valid example addition or removal
+  into a required CI count update.
 
 **E2E invariant**
 - Every E2E test executes product behavior only through the spawned binary — no in-process
@@ -386,10 +389,11 @@ whatever survives pruning.
 **Runner & CI**
 - Four phases separated by feature configuration — unit/component on the production
   configuration, integration on the test feature, E2E on the shipped (feature-off) binary, and
-  **doctests pinned explicitly to `--all-features`** (never default: test-support doctests are
-  cfg'd to the feature and a default run would silently drop ~5 of them — a doctest-count
-  assertion in CI catches exactly this), aggregated by the canonical test task. Rationale is the
-  guarantee, not current behavior (no cfg branch changes behavior today).
+  **doctests run with `--all-features`**: test-support doctests are cfg'd to
+  the feature, so a default run would silently drop ~5 of them. The canonical
+  runner supplies that feature; CI requires at least one passing doctest without
+  pinning the count. Rationale is the guarantee, not current behavior (no cfg
+  branch changes behavior today).
 - Watch task → canonical runner; broken feature-flag promise fixed; nextest timeouts +
   slow-test visibility; CI gains default-feature run and non-Linux E2E (gated on the sandbox
   Windows fix) and a split test job; module-filter and task-name docs corrected; coverage/

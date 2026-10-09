@@ -39,8 +39,9 @@ Resolved in commit `7ec3707`.
 - `tasks."check:visibility"` added to `mise.toml`, wired to `tasks.check`, `hk.pkl` `quality`, and `.github/workflows/ci.yml`.
 - Tested `#[expect(private_interfaces, …)]` tripwire by widening `ConfigLoadError` to `pub`: verified clippy failure, then reverted.
 
-> Note: compile-fail probes add doctests — the exact count ticket 03 pins is derived after this
-> ticket lands (03 is blocked by this one).
+> Note: these probes increased the doctest count before ticket 03's guard was
+> implemented. The CI guard requires at least one passing doctest and does not
+> pin the count, so future valid additions or removals need no magic-number update.
 
 **Evidence:** audit §14 P1.7 (config internals unnameable from `tests/`, `mod config` private);
 spec §Visibility freeze (Verification — baselines, token snapshot, compile-fail probes, tripwire,
