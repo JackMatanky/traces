@@ -132,20 +132,22 @@ fn state_store_follows_a_state_dir_override_not_the_default_accessor() {
 /// child).
 #[test]
 fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
-    if std::env::var_os("TRACES_E2E_AMBIENT_CHILD").is_none() {
-        let child = super::support::run_with_ambient_env(
-            "env_policy::opt_in_ignored_dirs_prune_only_when_explicitly_declared",
-            "TRACES_IGNORED_DIRS",
-            "secret",
-        );
-        let stdout = String::from_utf8_lossy(&child.stdout);
-        assert!(
-            child.status.success() && stdout.contains("1 passed"),
-            "isolated test failed: stdout: {stdout}, stderr: {}",
-            String::from_utf8_lossy(&child.stderr)
-        );
-        return;
-    }
+    let child = super::support::run_with_ambient_env(
+        "env_policy::opt_in_ignored_dirs_prune_only_when_explicitly_declared_child",
+        "TRACES_IGNORED_DIRS",
+        "secret",
+    );
+    let stdout = String::from_utf8_lossy(&child.stdout);
+    assert!(
+        child.status.success() && stdout.contains("1 passed"),
+        "isolated test failed: stdout: {stdout}, stderr: {}",
+        String::from_utf8_lossy(&child.stderr)
+    );
+}
+
+#[test]
+#[ignore = "run only from the controlled ambient-environment parent"]
+fn opt_in_ignored_dirs_prune_only_when_explicitly_declared_child() {
     assert_eq!(
         std::env::var_os("TRACES_IGNORED_DIRS").as_deref(),
         Some(OsStr::new("secret")),
@@ -186,20 +188,22 @@ fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
 /// Defect class: assumed-hermeticity (ambient timezone shifting date queries).
 #[test]
 fn ambient_timezone_does_not_shift_naive_datetime_rendering() {
-    if std::env::var_os("TRACES_E2E_AMBIENT_CHILD").is_none() {
-        let child = super::support::run_with_ambient_env(
-            "env_policy::ambient_timezone_does_not_shift_naive_datetime_rendering",
-            "TZ",
-            "Pacific/Honolulu",
-        );
-        let stdout = String::from_utf8_lossy(&child.stdout);
-        assert!(
-            child.status.success() && stdout.contains("1 passed"),
-            "isolated test failed: stdout: {stdout}, stderr: {}",
-            String::from_utf8_lossy(&child.stderr)
-        );
-        return;
-    }
+    let child = super::support::run_with_ambient_env(
+        "env_policy::ambient_timezone_does_not_shift_naive_datetime_rendering_child",
+        "TZ",
+        "Pacific/Honolulu",
+    );
+    let stdout = String::from_utf8_lossy(&child.stdout);
+    assert!(
+        child.status.success() && stdout.contains("1 passed"),
+        "isolated test failed: stdout: {stdout}, stderr: {}",
+        String::from_utf8_lossy(&child.stderr)
+    );
+}
+
+#[test]
+#[ignore = "run only from the controlled ambient-environment parent"]
+fn ambient_timezone_does_not_shift_naive_datetime_rendering_child() {
     assert_eq!(
         std::env::var_os("TZ").as_deref(),
         Some(OsStr::new("Pacific/Honolulu")),

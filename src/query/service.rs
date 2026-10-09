@@ -1284,6 +1284,11 @@ mod tests {
                     ),
                     "row {row_index} mismatch"
                 );
+                assert_eq!(
+                    from_store_row.note(),
+                    in_memory_row.note(),
+                    "row {row_index} note content mismatch"
+                );
             }
         }
     }

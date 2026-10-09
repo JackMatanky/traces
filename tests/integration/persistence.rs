@@ -237,39 +237,7 @@ fn line_source(line: u32) -> SourceLine {
 /// Asserts every query row in `loaded` matches the corresponding row in
 /// `in_memory`.
 fn assert_rows_match(loaded: &QuerySet, in_memory: &QuerySet, label: &str) {
-    assert_eq!(loaded.len(), in_memory.len(), "{label} count mismatch");
-    for (i, (loaded_row, in_memory_row)) in
-        loaded.iter().zip(in_memory.iter()).enumerate()
-    {
-        assert_eq!(
-            (
-                loaded_row.file().path(),
-                loaded_row.depth(),
-                loaded_row.line(),
-                loaded_row.parent(),
-            ),
-            (
-                in_memory_row.file().path(),
-                in_memory_row.depth(),
-                in_memory_row.line(),
-                in_memory_row.parent(),
-            ),
-            "{label} row {i} structural mismatch"
-        );
-        assert_eq!(
-            (
-                loaded_row.task_text(),
-                loaded_row.task_completed(),
-                loaded_row.status_symbol(),
-            ),
-            (
-                in_memory_row.task_text(),
-                in_memory_row.task_completed(),
-                in_memory_row.status_symbol(),
-            ),
-            "{label} row {i} task data mismatch"
-        );
-    }
+    assert_eq!(loaded, in_memory, "{label} rows differ after cold reload");
 }
 
 /// Proves `IndexerService::refresh_with_report` recovers from a corrupted

@@ -4,7 +4,7 @@
 use std::fs;
 
 use super::{
-    common::ConfigFixture,
+    config_fixture::ConfigFixture,
     support::{Sandbox, plain},
 };
 

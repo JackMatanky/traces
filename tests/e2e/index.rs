@@ -104,6 +104,28 @@ fn path_set_changes_between_spawns_prune_ghosts_and_resolve_links() {
     );
 }
 
+/// A target added after indexing must acquire inlinks on the next query.
+#[test]
+fn newly_created_link_target_resolves_inlinks_after_spawned_refresh() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_note("a.md", "links to [[new]]\n");
+    sandbox.run(&["index"]).assert_success();
+    sandbox.write_note("new.md", "# New\n");
+
+    let table =
+        sandbox.run(&["table", "--column", "file.name", "--column", "inlinks"]);
+    table.assert_success();
+    let new_row = table
+        .stdout
+        .lines()
+        .find(|line| line.starts_with("| new"))
+        .expect("new target row");
+    assert!(
+        new_row.contains("a.md"),
+        "new target must have its inlink: {new_row}"
+    );
+}
+
 /// Divergence canary: a same-size content edit with the mtime restored is
 /// invisible to a spawned query (metadata fingerprints match, so the store
 /// is reloaded) but visible after an explicit `traces index` rebuild —
@@ -183,6 +205,8 @@ fn fully_corrupted_index_self_heals_on_the_next_query() {
     healed.assert_success();
     healed.assert_never_exit_101();
     healed.assert_stdout_eq("- a.md\n- b.md\n");
+    assert!(db.is_file(), "query must restore the index file");
+    redb::Database::open(&db).expect("query must restore a valid database");
 
     // The healed store accepts writes again.
     sandbox.write_note("c.md", "# C\n");

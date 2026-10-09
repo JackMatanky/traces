@@ -45,7 +45,7 @@ path = "src/main.rs"
 # (Cargo: "the target will be skipped"). We document this standard behavior
 # rather than pretending to prevent it; CI fails on empty lib/integration/E2E
 # phases, and the canonical `mise run test` runner does the same for unfiltered
-# runs. CI also asserts the exact doctest count.
+# runs. CI also requires a nonzero doctest count.
 [[test]]
 name = "integration"
 required-features = ["test-utils"]

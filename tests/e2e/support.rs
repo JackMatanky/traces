@@ -58,16 +58,15 @@ use tempfile::TempDir;
 /// Path to the product binary used by end-to-end tests.
 pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
 
-/// Runs a single test with one controlled ambient variable in its parent
-/// process, without mutating this test process's environment.
+/// Runs an ignored child-only test with one controlled ambient variable,
+/// without mutating this test process's environment.
 pub(crate) fn run_with_ambient_env(
     test_name: &str,
     key: &str,
     value: &str,
 ) -> Output {
     Command::new(std::env::current_exe().expect("current test executable"))
-        .args(["--exact", test_name])
-        .env("TRACES_E2E_AMBIENT_CHILD", "1")
+        .args(["--ignored", "--exact", test_name])
         .env(key, value)
         .output()
         .expect("spawn isolated test process")
@@ -84,10 +83,6 @@ pub(crate) struct Run {
 impl Run {
     pub(crate) fn is_success(&self) -> bool {
         self.status.success()
-    }
-
-    pub(crate) fn is_failure(&self) -> bool {
-        !self.is_success()
     }
 
     pub(crate) fn code(&self) -> Option<i32> {
@@ -278,13 +273,15 @@ impl Sandbox {
     pub(crate) fn write_config(&self) {
         std::fs::create_dir_all(self.root().join("templates"))
             .expect("create templates dir");
-        self.write_config_fixture(&super::common::ConfigFixture::minimal());
+        self.write_config_fixture(
+            &super::config_fixture::ConfigFixture::minimal(),
+        );
     }
 
-    /// Writes a declarative [`ConfigFixture`] to `.traces/config.toml`.
+    /// Writes a configuration fixture to .traces/config.toml.
     pub(crate) fn write_config_fixture(
         &self,
-        fixture: &super::common::ConfigFixture,
+        fixture: &super::config_fixture::ConfigFixture,
     ) -> std::path::PathBuf {
         fixture.write_to(self.root()).expect("write config fixture")
     }

@@ -276,19 +276,15 @@ fn task_filter_shortcuts_narrow_output_accurately() {
     assert!(!in_progress.stdout.contains("Charlie done"));
 }
 
-/// Runs `task` with `--table`, `--count`, and `--from <file.md>`, proving
-/// tabular output, count output, and direct note file resolution.
+/// Task tables render both default headers and requested list columns.
 #[test]
-fn task_renders_tables_outputs_counts_and_resolves_bare_markdown_sources() {
+fn task_table_renders_default_and_custom_columns() {
     let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note(
         "todo.md",
         "- [ ] Alpha item \u{1f4c5} 2026-10-01 \u{1f53a}\n- [x] Beta item \
          \u{1f4c5} 2026-10-05 \u{1f53d}\n",
     );
-    sandbox.write_note("other.md", "- [ ] Gamma item\n");
-
-    // 1. Default --table rendering:
     let table = sandbox.run(&["task", "--table"]);
     assert!(table.is_success(), "stderr: {}", table.stderr);
     assert!(
@@ -305,7 +301,6 @@ fn task_renders_tables_outputs_counts_and_resolves_bare_markdown_sources() {
     );
     assert!(table.stdout.contains("Beta item") && table.stdout.contains("low"));
 
-    // 2. Custom --table columns:
     let custom_table = sandbox.run(&[
         "task",
         "--table",
@@ -325,25 +320,37 @@ fn task_renders_tables_outputs_counts_and_resolves_bare_markdown_sources() {
         custom_table.stdout.contains("Alpha item")
             && custom_table.stdout.contains("highest")
     );
+}
 
-    // 3. Count output: single integer on stdout, completely empty stderr
+/// Task count writes only a single integer to stdout.
+#[test]
+fn task_count_prints_only_the_match_total() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_note("todo.md", "- [ ] Alpha\n- [x] Beta\n");
+    sandbox.write_note("other.md", "- [ ] Gamma\n");
     let count = sandbox.run(&["task", "--count"]);
-    assert!(count.is_success(), "stderr: {}", count.stderr);
-    assert_eq!(count.stdout, "3\n");
-    assert_eq!(count.stderr, "");
+    count.assert_success();
+    count.assert_stdout_eq("3\n");
+    count.assert_stderr_eq("");
+}
 
-    // 4. Resolving bare .md paths via --from:
+/// A bare Markdown path selects that note for both task rows and counts.
+#[test]
+fn task_from_bare_markdown_path_selects_only_that_note() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_note("todo.md", "- [ ] Alpha item\n- [x] Beta item\n");
+    sandbox.write_note("other.md", "- [ ] Gamma item\n");
+
     let from_bare = sandbox.run(&["task", "--from", "todo.md"]);
-    assert!(from_bare.is_success(), "stderr: {}", from_bare.stderr);
+    from_bare.assert_success();
     assert!(from_bare.stdout.contains("Alpha item (todo.md)"));
     assert!(from_bare.stdout.contains("Beta item (todo.md)"));
     assert!(!from_bare.stdout.contains("Gamma item"));
 
-    // Count on bare .md source:
     let from_count = sandbox.run(&["task", "--from", "todo.md", "--count"]);
-    assert!(from_count.is_success(), "stderr: {}", from_count.stderr);
-    assert_eq!(from_count.stdout, "2\n");
-    assert_eq!(from_count.stderr, "");
+    from_count.assert_success();
+    from_count.assert_stdout_eq("2\n");
+    from_count.assert_stderr_eq("");
 }
 
 /// Runs `task --from` against a bare `.md` path that does not exist on

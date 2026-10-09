@@ -1,17 +1,4 @@
-//! Shared test arrangement utilities for both integration and E2E test suites.
-//!
-//! # Architecture Rules
-//!
-//! 1. **Zero Crate Exports**: This module imports NOTHING from `traces_pkm`.
-//! 2. **Feature-Independent**: Must compile identically with or without
-//!    `test-utils`.
-//! 3. **Layer Separation**: Arrangement only. Trust and CLI invocation remain
-//!    layer-local: integration tests trust via facade (`testing::TestProject`),
-//!    E2E via CLI spawn.
-//! 4. **Assertion Style Convention**: Tests written for this spec and onward
-//!    MUST convert `.expect` on behavior-under-test to assertions (`assert!`,
-//!    `assert_eq!`), reserving `.expect` strictly for test harness and fixture
-//!    setup invariants.
+//! On-disk configuration fixtures for spawned end-to-end tests.
 use std::{
     fmt::Write as _,
     fs,
@@ -110,16 +97,16 @@ impl ConfigFixture {
         let mut out = String::new();
         if let Some(tmpl) = &self.templates_dir {
             out.push_str("[templates]\n");
-            let _ = writeln!(out, "directory = \"{tmpl}\"");
+            let _ = writeln!(out, "directory = {}", toml_string(tmpl));
         }
 
         if self.schemas_dir.is_some() || self.schemas_class_field.is_some() {
             out.push_str("[schemas]\n");
             if let Some(dir) = &self.schemas_dir {
-                let _ = writeln!(out, "directory = \"{dir}\"");
+                let _ = writeln!(out, "directory = {}", toml_string(dir));
             }
             if let Some(cf) = &self.schemas_class_field {
-                let _ = writeln!(out, "class_field = \"{cf}\"");
+                let _ = writeln!(out, "class_field = {}", toml_string(cf));
             }
             out.push('\n');
         }
@@ -130,7 +117,7 @@ impl ConfigFixture {
                 let filters = self
                     .task_tag_filters
                     .iter()
-                    .map(|f| format!("\"{f}\""))
+                    .map(|filter| toml_string(filter))
                     .collect::<Vec<_>>()
                     .join(", ");
                 let _ = writeln!(out, "tag_filters = [{filters}]");
@@ -139,9 +126,13 @@ impl ConfigFixture {
 
             for (symbol, name, kind) in &self.task_statuses {
                 out.push_str("[[tasks.statuses]]\n");
-                let _ = writeln!(out, "symbol = \"{symbol}\"");
-                let _ = writeln!(out, "name = \"{name}\"");
-                let _ = writeln!(out, "kind = \"{kind}\"\n");
+                let _ = writeln!(
+                    out,
+                    "symbol = {}",
+                    toml_string(&symbol.to_string())
+                );
+                let _ = writeln!(out, "name = {}", toml_string(name));
+                let _ = writeln!(out, "kind = {}\n", toml_string(kind));
             }
         }
 
@@ -158,6 +149,19 @@ impl ConfigFixture {
         fs::write(&config_path, self.to_toml_string())?;
         Ok(config_path)
     }
+}
+
+fn toml_string(value: &str) -> String {
+    let table = toml::Table::from_iter([(
+        "value".to_owned(),
+        toml::Value::String(value.to_owned()),
+    )]);
+    toml::to_string(&table)
+        .expect("a string is serializable as TOML")
+        .strip_prefix("value = ")
+        .expect("the table contains only value")
+        .trim_end_matches('\n')
+        .to_owned()
 }
 
 #[cfg(test)]
@@ -195,6 +199,69 @@ mod tests {
         ));
         assert!(toml.contains("tag_filters = [\"task\", \"todo\"]"));
         assert!(toml.contains("symbol = \"?\""));
+    }
+
+    #[test]
+    fn serializes_special_characters_in_structured_values() {
+        let fixture = ConfigFixture::new()
+            .with_templates("dir\\\"name")
+            .with_schemas("schema\\path", Some("kind\"field"))
+            .with_task_tag_filters(&["todo\\daily", "a\"b"])
+            .with_task_status('"', "On\"\nhold", "in\\progress");
+        let doc: toml::Table =
+            toml::from_str(&fixture.to_toml_string()).expect("valid TOML");
+        let templates = doc
+            .get("templates")
+            .and_then(toml::Value::as_table)
+            .expect("templates section");
+        assert_eq!(
+            templates.get("directory").and_then(toml::Value::as_str),
+            Some("dir\\\"name")
+        );
+        let schemas = doc
+            .get("schemas")
+            .and_then(toml::Value::as_table)
+            .expect("schemas section");
+        assert_eq!(
+            schemas.get("directory").and_then(toml::Value::as_str),
+            Some("schema\\path")
+        );
+        assert_eq!(
+            schemas.get("class_field").and_then(toml::Value::as_str),
+            Some("kind\"field")
+        );
+
+        let tasks = doc
+            .get("tasks")
+            .and_then(toml::Value::as_table)
+            .expect("tasks section");
+        let filters = tasks
+            .get("tag_filters")
+            .and_then(toml::Value::as_array)
+            .expect("tag filters");
+        assert_eq!(
+            filters.first().and_then(toml::Value::as_str),
+            Some("todo\\daily")
+        );
+        assert_eq!(filters.get(1).and_then(toml::Value::as_str), Some("a\"b"));
+        let status = tasks
+            .get("statuses")
+            .and_then(toml::Value::as_array)
+            .and_then(|statuses| statuses.first())
+            .and_then(toml::Value::as_table)
+            .expect("configured status");
+        assert_eq!(
+            status.get("symbol").and_then(toml::Value::as_str),
+            Some("\"")
+        );
+        assert_eq!(
+            status.get("name").and_then(toml::Value::as_str),
+            Some("On\"\nhold")
+        );
+        assert_eq!(
+            status.get("kind").and_then(toml::Value::as_str),
+            Some("in\\progress")
+        );
     }
 
     #[test]

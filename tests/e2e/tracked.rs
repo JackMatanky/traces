@@ -49,4 +49,8 @@ fn clean_removes_a_stale_tracked_entry_and_reports_the_count() {
     let clean = sandbox.run(&["tracked", "clean"]);
     clean.assert_success();
     clean.assert_stderr_eq("removed 1 stale tracked entry\n");
+
+    let list = sandbox.run(&["tracked", "list"]);
+    list.assert_success();
+    list.assert_stdout_eq("");
 }

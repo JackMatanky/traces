@@ -2,8 +2,8 @@
 //! sandboxes, including the default non-interactive `init` path. See
 //! `support` for isolation guarantees.
 
-#[path = "common/mod.rs"]
-mod common;
+#[path = "e2e/config_fixture.rs"]
+mod config_fixture;
 #[path = "e2e/support.rs"]
 mod support;
 

@@ -2669,13 +2669,14 @@ mod tests {
                 "refresh must fail open on a corrupted previous note during \
                  backdating, not error",
             );
+            let note = refreshed
+                .entries()
+                .iter()
+                .find_map(FileEntry::note)
+                .expect("recovered note");
             assert_eq!(
-                refreshed
-                    .entries()
-                    .iter()
-                    .filter(|entry| entry.note().is_some())
-                    .count(),
-                1
+                note.headings().first().expect("recovered heading").text(),
+                "Revised"
             );
         }
     }

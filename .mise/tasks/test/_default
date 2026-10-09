@@ -11,7 +11,7 @@
 #USAGE   - integration phase on the test-utils feature
 #USAGE   - E2E phase against the shipped feature-off binary
 #USAGE   - doctests explicitly under --all-features (never default: test-support
-#USAGE     doctests would silently drop; the CI count assertion catches this)
+#USAGE     doctests would silently drop; CI requires a nonzero doctest count)
 #USAGE   Unfiltered nextest phases fail rather than silently running zero tests.
 #USAGE   Pass --no-docs to skip the doctest phase.
 #USAGE   """
@@ -114,7 +114,7 @@ main() {
   fi
 
   # Doctests: explicitly --all-features, never the default configuration —
-  # test-support doctests would silently drop (CI asserts the exact count).
+  # test-support doctests would silently drop (CI requires a nonzero count).
   if [[ "${usage_docs:-true}" == "true" ]]; then
     echo "==> test phase: docs (all-features)"
     mise run test:doc --feature all

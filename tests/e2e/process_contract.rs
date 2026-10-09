@@ -31,32 +31,22 @@ fn exit_code_zero_for_help_and_version() {
     version.assert_stderr_eq("");
 }
 
-/// Verifies that argv failures exit with status 2 and print usage/error to
-/// stderr, observing clap's process exit 2 which is structurally unreachable
-/// in-crate.
-///
-/// Executes vs asserts:
-/// - Executes: unknown subcommand (`nonexistent`), missing required flag
-///   (`table` without `--column`), and invalid enum value (`completions --shell
-///   tcsh`).
-/// - Asserts: numeric exit code 2, never 101, stdout `""`, and stderr contains
-///   the relevant diagnostic and usage or help guidance.
-///
-/// Defect class: unwitnessed-contract (clap exit-2 path unreachable in-crate).
+/// Unknown subcommands exit 2 and print usage to stderr.
 #[test]
-fn argv_failure_exits_code_two_on_invalid_command_or_flags() {
+fn unknown_subcommand_exits_two_with_usage() {
     let sandbox = Sandbox::new();
-
-    // Unknown subcommand
     let unknown = sandbox.run(&["nonexistent_command"]);
-    assert!(unknown.is_failure());
     unknown.assert_code(2);
     unknown.assert_never_exit_101();
     unknown.assert_stdout_eq("");
     assert!(unknown.stderr.contains("unrecognized subcommand"));
     assert!(unknown.stderr.contains("Usage:"), "stderr: {}", unknown.stderr);
+}
 
-    // Missing required flag: `table` requires at least one `--column`
+/// A missing required column exits 2 and names the flag in the diagnostic.
+#[test]
+fn table_without_column_exits_two_with_usage() {
+    let sandbox = Sandbox::new();
     let missing_col = sandbox.run(&["table"]);
     missing_col.assert_code(2);
     missing_col.assert_never_exit_101();
@@ -67,8 +57,12 @@ fn argv_failure_exits_code_two_on_invalid_command_or_flags() {
         "stderr: {}",
         missing_col.stderr
     );
+}
 
-    // Invalid enum value for `--shell`
+/// An unsupported completion shell exits 2 and directs the user to help.
+#[test]
+fn unsupported_completion_shell_exits_two_with_help_hint() {
+    let sandbox = Sandbox::new();
     let invalid_shell = sandbox.run(&["completions", "--shell", "tcsh"]);
     invalid_shell.assert_code(2);
     invalid_shell.assert_never_exit_101();
