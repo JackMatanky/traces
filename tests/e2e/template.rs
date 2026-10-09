@@ -200,3 +200,72 @@ fn renders_file_sourced_select_field_in_e2e_template() {
         "Category: Rust Programming (rust)"
     );
 }
+
+// Relocated from the dissolved `dispatch.rs` (ticket 19): dry-run and
+// render-error contracts join the write-path capability file.
+
+/// Checks `--dry-run` prints rendered content to stdout without writing a
+/// file.
+///
+/// A negative filesystem assertion: only a real process against a real disk
+/// can prove absence; a mock can't.
+#[test]
+fn dry_run_prints_rendered_content_to_stdout_without_writing() {
+    let sandbox = Sandbox::trusted_via_cli();
+    // Notes live under `notes/`, scoped away from `templates/`:
+    // `WorkspaceIndex` indexes every markdown file under the project root,
+    // including the template file itself, so an unscoped `query.from()`
+    // here would also count `report.md`.
+    sandbox.write_note("notes/a.md", "# A\n");
+    sandbox.write_note("notes/b.md", "# B\n");
+    sandbox.write_template(
+        "report.md",
+        "{{ query.from(\"notes/\") | length }} notes",
+    );
+
+    let template =
+        sandbox.run(&["template", "-i", "report", "--dry-run", "--no-input"]);
+
+    assert!(template.is_success(), "stderr: {}", template.stderr);
+    assert_eq!(template.stdout, "2 notes");
+    assert!(!sandbox.root().join("report.md").exists());
+}
+
+/// Checks a render error surfaces the stable `render_query_failed`
+/// diagnostic code.
+///
+/// That code is the contract external tooling greps stderr for. Proves it
+/// survives the full CLI error path, not just that the error value
+/// constructs correctly. Does not reassert the exact source location: see
+/// the trailing comment inside this test for why and where that's covered
+/// instead.
+#[test]
+fn render_error_reports_a_stable_diagnostic_code() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_template(
+        "broken.md",
+        "line one\n{{ query.from().sort(\"nope.bad\") }}\n",
+    );
+
+    let template =
+        sandbox.run(&["template", "-i", "broken", "--dry-run", "--no-input"]);
+
+    assert!(!template.is_success());
+    assert!(template.stdout.is_empty(), "stdout: {}", template.stdout);
+    assert!(
+        template.stderr.contains("traces::cli::template::render_query_failed"),
+        "stderr: {}",
+        template.stderr
+    );
+    // The exact `broken.md:2:<col>` location this error carries is verified
+    // unit-level against `minijinja::Error` directly, in `src/cli/error.rs`'s
+    // `location::line_column_returns_the_1_based_char_column` and
+    // `location::render_error_location_reports_name_line_and_column_for_a_real_render_error`
+    // tests, and end-to-end (in-process) in `src/cli/mod.rs`'s
+    // `query_workflows::template_render_errors_identify_the_failing_template_and_line_through_cli_dispatch`,
+    // which asserts the full `report.md:2:15` string. Not reasserted here:
+    // Miette line-wraps long causal chains across lines with a `│`
+    // continuation glyph that can land inside a path with no original
+    // whitespace there, so reconstructing it from captured stderr text is
+    // not reliable (see module docs).
+}

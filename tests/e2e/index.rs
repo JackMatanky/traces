@@ -183,3 +183,25 @@ fn table_level_corruption_self_heals_on_the_next_query() {
     grown.assert_success();
     grown.assert_stdout_eq("- a.md\n- b.md\n- c.md\n");
 }
+
+// Relocated from the dissolved `dispatch.rs` (ticket 19, ledger D12):
+// the no-explicit-index persistence claim is the stronger of the pair.
+/// Trusts a project, writes a note, and runs `list` with **no** prior
+/// `index` call — then checks that `.traces/index.redb` exists on disk.
+///
+/// Verifies that the `list` dispatch path invokes persistence on its
+/// initial cold path, leaving the index file present on disk.
+///
+/// Subsumes the deleted `trust_then_index_persists_the_file_index`
+/// (ticket 16, ledger D12): the no-explicit-index claim is the stronger
+/// of the pair.
+#[test]
+fn list_persists_the_file_index_without_an_explicit_index_command() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_note("a.md", "# A\n");
+
+    let list = sandbox.run(&["list"]);
+
+    assert!(list.is_success(), "stderr: {}", list.stderr);
+    assert!(sandbox.root().join(".traces/index.redb").is_file());
+}
