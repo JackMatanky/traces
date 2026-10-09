@@ -118,19 +118,32 @@ fn state_store_follows_a_state_dir_override_not_the_default_accessor() {
     );
 }
 
-/// Verifies opt-in environment variables reach the child only when the test
-/// declares them explicitly.
+/// Verifies sandbox commands ignore ambient variables while explicitly opted-in
+/// variables reach the child. The test runs in a separate process with
+/// `TRACES_IGNORED_DIRS=secret` set in its parent environment.
 ///
 /// Executes vs asserts:
-/// - Executes: `traces index` twice — once under the default policy, once with
-///   `TRACES_IGNORED_DIRS=secret` opted in via [`Sandbox::run_with_envs`].
+/// - Executes: `traces index` twice, first under the default policy and then
+///   with `TRACES_IGNORED_DIRS=secret` opted in via [`Sandbox::run_with_envs`].
 /// - Asserts: the default run indexes both notes; the opt-in run indexes only
 ///   the non-ignored note.
 ///
-/// Defect class: assumed-hermeticity (an opt-in variable leaking into the
-/// default table would flip the first assertion).
+/// Defect class: assumed-hermeticity (ambient ignored dirs leaking to the
+/// child).
 #[test]
 fn opt_in_ignored_dirs_prune_only_when_explicitly_declared() {
+    if std::env::var_os("TRACES_E2E_AMBIENT_CHILD").is_none() {
+        let child = super::support::run_with_ambient_ignored_dirs(
+            "env_policy::opt_in_ignored_dirs_prune_only_when_explicitly_declared",
+        );
+        let stdout = String::from_utf8_lossy(&child.stdout);
+        assert!(
+            child.status.success() && stdout.contains("1 passed"),
+            "isolated test failed: stdout: {stdout}, stderr: {}",
+            String::from_utf8_lossy(&child.stderr)
+        );
+        return;
+    }
     let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("open.md", "# open\n");
     sandbox.write_note("secret/hidden.md", "# hidden\n");

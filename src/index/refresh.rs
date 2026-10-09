@@ -601,19 +601,11 @@ mod tests {
         }
     }
 
-    /// Guards the documented fail-open at its only inducible point: a
-    /// persistence failure inside a reconciled Stale pass must still
-    /// materialize the full unpersisted delta into the returned index
-    /// instead of failing the refresh.
-    ///
-    /// Executes vs asserts: builds a real reconciled pass over an edited
-    /// note, injects a persist failure into the service's production
-    /// apply branch, and checks the returned delta and untouched store.
-    ///
-    /// Defect class: unobservable-reload.
+    /// A rejected store write materializes the reconciled in-memory delta
+    /// while leaving the previously persisted index untouched.
     #[test]
-    fn refresh_service_returns_unpersisted_delta_when_persistence_fails() {
-        use std::{fs, io, path::Path};
+    fn materializes_unpersisted_delta_when_store_write_fails() {
+        use std::{fs, io};
 
         use pretty_assertions::assert_eq;
 
@@ -641,17 +633,15 @@ mod tests {
             .reconcile(modified, persisted_links)
             .expect("reconcile stale pass");
 
-        let (index, report) = indexer
-            .apply_reconciled_with(pending, |pending, _dimensions| {
-                Err(PersistFailed {
-                    source: IndexError::Store(StoreError::Io {
-                        path: temp.path().join(".traces/index.redb"),
-                        source: io::Error::other("induced persist failure"),
-                    }),
-                    pass: Box::new(pending),
-                })
-            })
-            .expect("fail-open refresh");
+        let report = pending.report();
+        let index = super::super::materialize_apply(Err(PersistFailed {
+            source: IndexError::Store(StoreError::Io {
+                path: temp.path().join(".traces/index.redb"),
+                source: io::Error::other("induced persist failure"),
+            }),
+            pass: Box::new(pending),
+        }))
+        .expect("fail-open materialization");
         assert_eq!(report.upserted_count(), 1);
         assert_eq!(report.deleted_count(), 0);
         let note = index
@@ -668,8 +658,7 @@ mod tests {
             "unpersisted delta must survive in the returned index"
         );
 
-        // The store itself was never written: a fresh service loads the
-        // pre-edit content.
+        // Loading does not refresh, so it cannot repair the store under test.
         let persisted = IndexerService::for_tests(temp.path())
             .load()
             .expect("load untouched store");

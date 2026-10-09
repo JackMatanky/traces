@@ -14,10 +14,7 @@ use rayon::prelude::*;
 use super::{
     INDEX_FILE, IndexError, IndexResult, WorkspaceIndex,
     inlinks::{InlinkMap, LinkResolver},
-    refresh::{
-        PendingApply, PersistFailed, Persisted, RefreshPlan, RefreshReport,
-        RefreshState,
-    },
+    refresh::{RefreshPlan, RefreshReport, RefreshState},
     sort::SortedByPath,
     store::{IndexDimensions, IndexStore, PersistRequest},
 };
@@ -131,7 +128,16 @@ impl IndexerService {
                 files,
             } => Self::assemble_unchanged(&store, files),
             RefreshState::Stale(pending) => {
-                self.apply_reconciled_with(*pending, PendingApply::apply)
+                let pending = *pending;
+                let report = pending.report();
+                let dimensions =
+                    IndexDimensions::for_class_field(&self.class_field);
+                let persisted = pending.apply(dimensions);
+                if persisted.is_ok() {
+                    Self::log_report(&report);
+                }
+                let index = super::materialize_apply(persisted)?;
+                Ok((index, report))
             }
         }
     }
@@ -148,41 +154,6 @@ impl IndexerService {
             WorkspaceIndex::assemble(files, notes, links),
             RefreshReport::default(),
         ))
-    }
-
-    /// Persists a reconciled pass, retaining its index in memory on write
-    /// failure.
-    ///
-    /// `persist` receives the pending rows and the configured index dimensions.
-    ///
-    /// # Errors
-    ///
-    /// - [`IndexError::Store`] if materializing the index cannot read unchanged
-    ///   notes.
-    pub(super) fn apply_reconciled_with(
-        &self,
-        pending: PendingApply,
-        persist: impl FnOnce(
-            PendingApply,
-            IndexDimensions,
-        ) -> Result<Persisted, PersistFailed>,
-    ) -> IndexResult<(WorkspaceIndex, RefreshReport)> {
-        let report = pending.report();
-        let dimensions = IndexDimensions::for_class_field(&self.class_field);
-        let index = match persist(pending, dimensions) {
-            Ok(persisted) => {
-                Self::log_report(&report);
-                persisted.into_index()?
-            }
-            Err(failed) => {
-                tracing::warn!(
-                    source = %failed.source(),
-                    "failed to persist refreshed index"
-                );
-                failed.into_index()?
-            }
-        };
-        Ok((index, report))
     }
 
     fn prepare_pass(&self) -> IndexResult<RefreshState> {
@@ -320,8 +291,8 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if the database cannot be read or stored bytes are
-    ///   not a valid row.
+    /// - `IndexError::Store` if the index store cannot be opened or recovered,
+    ///   or persisted rows cannot be read or decoded.
     #[inline]
     #[cfg_attr(
         not(any(test, feature = "test-utils")),

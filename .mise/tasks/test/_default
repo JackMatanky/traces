@@ -1,5 +1,5 @@
 #!/bin/bash
-#MISE description="Canonical test run: unit (production), integration (test-utils), E2E (shipped binary), doctests (all-features)"
+#MISE description="Canonical test run: lib/bin units (production), integration (test-utils), E2E (shipped binary), doctests (all-features)"
 #MISE alias="t"
 #MISE sources=["@group:rust"]
 #MISE extends="gate:never-skip"
@@ -7,7 +7,7 @@
 #USAGE   help "Also run doctests after the three nextest phases"
 #USAGE   long_help """
 #USAGE   Enabled by default:
-#USAGE   - unit/component phase on the production configuration
+#USAGE   - library and binary unit/component tests on the production configuration
 #USAGE   - integration phase on the test-utils feature
 #USAGE   - E2E phase against the shipped feature-off binary
 #USAGE   - doctests explicitly under --all-features (never default: test-support
@@ -96,7 +96,7 @@ main() {
   parse_passthrough_tokens
 
   # Unit/component: production configuration (no test-utils, no features).
-  run_phase unit --no-default-features --lib \
+  run_phase unit --no-default-features --lib --bin traces-pkm \
     "${phase_args[@]+"${phase_args[@]}"}"
 
   # Integration: the cross-module suite requires the test-utils feature.

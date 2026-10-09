@@ -993,8 +993,7 @@ mod tests {
 
         use super::*;
         use crate::{
-            ConfigService, TrustRequest, cli::CwdGuard,
-            dialog::PresetDialogProvider,
+            ConfigService, cli::CwdGuard, dialog::PresetDialogProvider,
         };
 
         #[test]
@@ -1029,27 +1028,14 @@ mod tests {
         ) {
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path().join("project");
-            fs::create_dir_all(root.join(".traces")).expect("create dir");
-            fs::create_dir_all(root.join("templates"))
-                .expect("create empty templates dir");
-            fs::write(
-                root.join(".traces/config.toml"),
-                crate::test_support::LOCAL_CONFIG_TOML,
-            )
-            .expect("write config file");
-            let config = crate::config::LocalConfigFile::<
-                crate::config::Discovered,
-            >::try_new(
-                root.join(".traces/config.toml")
-            )
-            .expect("valid local config");
             let service = ConfigService::at(
                 temp.path().join("tracked-store"),
                 temp.path().join("trust-store"),
             );
-            service
-                .trust(&TrustRequest::from(&config))
-                .expect("trust project root");
+            let _ =
+                crate::test_support::create_trusted_project(&service, &root);
+            fs::create_dir_all(root.join("templates"))
+                .expect("create empty templates dir");
             let _guard = CwdGuard::enter(&root);
             let provider: Arc<dyn DialogProvider> =
                 Arc::new(PresetDialogProvider::new());

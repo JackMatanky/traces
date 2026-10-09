@@ -35,8 +35,8 @@ fn exit_code_zero_for_help_and_version() {
 /// - Executes: unknown subcommand (`nonexistent`), missing required flag
 ///   (`table` without `--column`), and invalid enum value (`completions --shell
 ///   tcsh`).
-/// - Asserts: numeric exit code 2, never 101, stdout `""`, and stderr
-///   diagnostic.
+/// - Asserts: numeric exit code 2, never 101, stdout `""`, and stderr contains
+///   the relevant diagnostic and usage or help guidance.
 ///
 /// Defect class: unwitnessed-contract (clap exit-2 path unreachable in-crate).
 #[test]
@@ -50,6 +50,7 @@ fn argv_failure_exits_code_two_on_invalid_command_or_flags() {
     unknown.assert_never_exit_101();
     unknown.assert_stdout_eq("");
     assert!(unknown.stderr.contains("unrecognized subcommand"));
+    assert!(unknown.stderr.contains("Usage:"), "stderr: {}", unknown.stderr);
 
     // Missing required flag: `table` requires at least one `--column`
     let missing_col = sandbox.run(&["table"]);
@@ -57,6 +58,11 @@ fn argv_failure_exits_code_two_on_invalid_command_or_flags() {
     missing_col.assert_never_exit_101();
     missing_col.assert_stdout_eq("");
     assert!(missing_col.stderr.contains("--column"));
+    assert!(
+        missing_col.stderr.contains("Usage:"),
+        "stderr: {}",
+        missing_col.stderr
+    );
 
     // Invalid enum value for `--shell`
     let invalid_shell = sandbox.run(&["completions", "--shell", "tcsh"]);
@@ -64,6 +70,11 @@ fn argv_failure_exits_code_two_on_invalid_command_or_flags() {
     invalid_shell.assert_never_exit_101();
     invalid_shell.assert_stdout_eq("");
     assert!(invalid_shell.stderr.contains("invalid value 'tcsh'"));
+    assert!(
+        invalid_shell.stderr.contains("try '--help'"),
+        "stderr: {}",
+        invalid_shell.stderr
+    );
 }
 
 /// Verifies that domain failures exit with status 1 and write the miette

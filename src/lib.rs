@@ -257,8 +257,7 @@ mod test_support {
     /// writes `.traces/config.toml` directly. Single-sourced here (ticket
     /// 17); the E2E harness keeps its own copy and imports nothing from the
     /// crate.
-    pub(crate) const LOCAL_CONFIG_TOML: &str =
-        "[templates]\ndirectory = \"templates\"\n";
+    const LOCAL_CONFIG_TOML: &str = "[templates]\ndirectory = \"templates\"\n";
 
     /// Encapsulates an isolated workspace fixture directory, configuration,
     /// trust records, and on-disk index persistence for tests.

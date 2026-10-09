@@ -75,8 +75,8 @@ jobs:
   # -- Tests --
   # Four canonical phases, split by job so a failure is legible in the
   # checks list. Feature configuration per phase mirrors `mise run test`:
-  # unit on the production configuration, integration on test-utils, E2E
-  # against the shipped feature-off binary, doctests on --all-features.
+  # library and binary units on the production configuration, integration on
+  # test-utils; E2E uses the shipped binary; doctests use --all-features.
   # NOTE: the crate has NO `default` feature — never pass `--features
   # default` (hard cargo error); the production configuration is
   # `--no-default-features`.
@@ -96,6 +96,9 @@ jobs:
       - run: >-
           cargo nextest run -p traces-pkm --no-default-features
           --no-tests fail -E 'kind(lib)'
+      - run: >-
+          cargo nextest run -p traces-pkm --no-default-features
+          --no-tests fail -E 'binary(traces-pkm)'
 
   test-integration:
     name: test (integration, test-utils)

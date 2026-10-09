@@ -41,6 +41,26 @@ pub(crate) use store::IndexStore;
 /// Project-relative index database path.
 const INDEX_FILE: &str = ".traces/index.redb";
 
+/// Materializes a stale pass from the store or its retained in-memory update.
+///
+/// # Errors
+///
+/// - [`IndexError::Store`] if materialization cannot read unchanged notes.
+fn materialize_apply(
+    persisted: Result<refresh::Persisted, refresh::PersistFailed>,
+) -> IndexResult<WorkspaceIndex> {
+    match persisted {
+        Ok(persisted) => persisted.into_index(),
+        Err(failed) => {
+            tracing::warn!(
+                source = %failed.source(),
+                "failed to persist refreshed index"
+            );
+            failed.into_index()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     /// Shared fixtures imported by `service.rs` and `store.rs` tests.

@@ -55,9 +55,9 @@ fn class_descendant_selector_expands_through_the_schema_graph() {
     unknown.assert_stdout_eq("");
 }
 
-/// Verifies inlinks render from the persisted store through a spawned query:
-/// each CLI invocation is a cold process, so the rendered `inlinks` column
-/// proves the cold link read persisted and survived the store round-trip.
+/// Verifies inlinks render in a spawned `table` query after a separate
+/// `index` invocation. The `table` command may refresh links before
+/// rendering; this does not establish that the links were read from the store.
 ///
 /// The integration differential compares complete rows, including inlinks;
 /// this test separately checks their rendering across the CLI process boundary.
@@ -67,10 +67,9 @@ fn class_descendant_selector_expands_through_the_schema_graph() {
 ///   --column file.name --column inlinks`.
 /// - Asserts: the target row's `inlinks` cell carries the linker path.
 ///
-/// Defect class: silent-wrong-answers (cold-path link rows lost or
-/// misattributed across the store round-trip).
+/// Defect class: silent-wrong-answers (inlinks omitted from the rendered row).
 #[test]
-fn inlinks_render_from_the_persisted_store() {
+fn inlinks_render_across_spawned_queries() {
     let sandbox = Sandbox::trusted_via_cli();
     sandbox.write_note("notes/foo.md", "# Foo\n");
     sandbox.write_note("a.md", "see [[notes/foo]]\n");

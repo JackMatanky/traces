@@ -55,8 +55,19 @@ use std::{
 
 use pretty_assertions::{assert_eq, assert_ne};
 use tempfile::TempDir;
-/// integration tests run.
+/// Path to the product binary used by end-to-end tests.
 pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
+
+/// Runs a single test in a process with a controlled ambient ignored-dir
+/// setting.
+pub(crate) fn run_with_ambient_ignored_dirs(test_name: &str) -> Output {
+    Command::new(std::env::current_exe().expect("current test executable"))
+        .args(["--exact", test_name])
+        .env("TRACES_E2E_AMBIENT_CHILD", "1")
+        .env("TRACES_IGNORED_DIRS", "secret")
+        .output()
+        .expect("spawn isolated test process")
+}
 
 /// Represents a captured process run with exit status and decoded output
 /// streams.

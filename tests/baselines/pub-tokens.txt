@@ -533,7 +533,6 @@ src/index/service.rs: pub fn refresh_with_report(
 src/index/service.rs: pub struct IndexerService {
 src/index/service.rs: pub(crate) fn rebuild(&self) -> IndexResult<WorkspaceIndex> {
 src/index/service.rs: pub(crate) fn refresh_store(&self) -> IndexResult<IndexStore> {
-src/index/service.rs: pub(super) fn apply_reconciled_with(
 src/index/service.rs: pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
 src/index/sort.rs: pub(crate) fn as_slice(&self) -> &[T] {
 src/index/sort.rs: pub(crate) fn assumed_sorted(rows: Vec<T>) -> Self {
@@ -641,7 +640,6 @@ src/lib.rs: pub use note::{
 src/lib.rs: pub use position::{PositionError, SourceLine};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
-src/lib.rs: pub(crate) const LOCAL_CONFIG_TOML: &str =
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
 src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;

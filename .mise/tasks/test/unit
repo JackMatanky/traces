@@ -1,5 +1,5 @@
 #!/bin/bash
-#MISE description="Run lib unit tests on the production configuration with `nextest`"
+#MISE description="Run nextest tests (all targets and features by default)"
 #MISE sources=["@group:rust"]
 #MISE extends="gate:never-skip"
 #USAGE flag "-m --mod <module>" {
@@ -8,9 +8,9 @@
 #USAGE   Scopes nextest to the named module using a filter expression. For example:
 #USAGE   - `-m index` filters to tests under module `index`
 #USAGE
-#USAGE   Lib-scoped by definition: integration/E2E tests are capability files
-#USAGE   without module paths, so `-m` never matches them (ticket 18 documents
-#USAGE   this; use `-E 'binary(integration)'`/`-E 'binary(e2e)'` for suites).
+#USAGE   Module filtering matches library test names; use -E with a binary()
+#USAGE   selector to select an integration or E2E target.
+#USAGE   For the feature-separated canonical suite, use mise run test.
 #USAGE   """
 #USAGE }
 #USAGE // `complete "module"` completes the value after `-m`/`--mod`, not the flag name.
