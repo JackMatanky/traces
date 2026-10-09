@@ -13,12 +13,9 @@ use super::support::Sandbox;
 /// `template --dry-run` in one project directory, matching a real first
 /// run.
 ///
-/// Exercises command sequence composition across seven spawned process steps
-/// in one project directory, demonstrating that `trust` unblocks later commands
-/// and `index` allows subsequent queries and template inspection to succeed.
-///
-/// Note: `list` could cold-rebuild on its own, and no command is attempted
-/// before `trust` to assert an untrusted failure here.
+/// Exercises seven spawned command steps in one project directory.
+/// After explicit trust and index commands, subsequent queries and template
+/// inspection succeed; this test does not assert the pre-trust failure path.
 #[test]
 fn init_trust_index_list_table_task_and_template_chain_through_one_project() {
     let root = tempfile::tempdir().expect("create project temp dir");
@@ -156,7 +153,10 @@ fn stream_contracts_exact_outputs_and_mutating_empty_stdout() {
     tmpl_inst.assert_code(0);
     tmpl_inst.assert_never_exit_101();
     tmpl_inst.assert_stdout_eq("");
-    tmpl_inst.assert_stderr_eq(&format!("wrote {root_str}/alpha.md\n"));
+    tmpl_inst.assert_stderr_eq(&format!(
+        "wrote {}\n",
+        canonical_root.join("alpha.md").display()
+    ));
 
     // Mutating: `trust clean`
     let clean = sandbox.run(&["trust", "clean"]);

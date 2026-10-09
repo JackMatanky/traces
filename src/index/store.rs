@@ -766,6 +766,11 @@ impl IndexStore {
     ///
     /// Recovers by wipe-and-recreate on redb corruption or a bad file header.
     /// Redb reports a magic-number mismatch as an `InvalidData` I/O error.
+    ///
+    /// # Errors
+    ///
+    /// - [`StoreError::Io`] if removing a corrupt database file fails.
+    /// - [`StoreError::Redb`] if opening or recreating the database fails.
     fn create_db(path: &Path) -> StoreResult<redb::Database> {
         let wrap = |source: redb::DatabaseError| StoreError::Redb {
             path: path.to_path_buf(),

@@ -206,7 +206,7 @@ cache = { enabled = false }
 # right feature configuration per phase, plus all-features doctests — not
 # bare `cargo test`, which silently dropped the integration suite and ran
 # E2E under the wrong configuration.
-run = "cargo watch -x check -s 'mise run test --no-docs'"
+run = "cargo watch -x check -s 'mise run test'"
 
 [tasks."modules:tree"]
 description = "Print the crate's module tree (`cargo modules structure`)"

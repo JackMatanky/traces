@@ -1,6 +1,4 @@
-//! Proves the real (non-dry-run) template render-and-write path at the
-//! process boundary — `dispatch.rs`'s `template` module only covers
-//! `--dry-run`.
+//! Exercises template rendering and writes through the spawned CLI.
 
 use pretty_assertions::assert_eq;
 
@@ -9,9 +7,8 @@ use super::support::Sandbox;
 /// Renders without `--dry-run` and checks the rendered file lands on disk
 /// at the default output path.
 ///
-/// The only test that lets the CLI commit a write — `dispatch.rs`'s
-/// `template` tests stay on `--dry-run`. Covers the highest-blast-radius
-/// mutating path the CLI has.
+/// Covers a default-path write; overwrite and redirected writes are tested
+/// separately below.
 #[test]
 fn writes_the_rendered_file_to_the_default_output_path() {
     let sandbox = Sandbox::trusted_via_cli();

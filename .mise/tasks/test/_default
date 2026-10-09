@@ -12,6 +12,7 @@
 #USAGE   - E2E phase against the shipped feature-off binary
 #USAGE   - doctests explicitly under --all-features (never default: test-support
 #USAGE     doctests would silently drop; the CI count assertion catches this)
+#USAGE   Unfiltered nextest phases fail rather than silently running zero tests.
 #USAGE   Pass --no-docs to skip the doctest phase.
 #USAGE   """
 #USAGE }
@@ -21,7 +22,8 @@
 #USAGE   Examples:
 #USAGE   - `mise run test -E 'test(index::refresh)'` - nextest filter expression
 #USAGE   - `mise run test refresh` - name substring filter
-#USAGE   - `mise run test --no-docs -E 'binary(e2e)'` - E2E suite only
+#USAGE   - `mise run test --no-docs -E 'binary(e2e)'` - E2E suite only;
+#USAGE     filtered runs skip empty phases and fail if no phase matches
 #USAGE   """
 #USAGE }
 
@@ -29,6 +31,7 @@
 set -euo pipefail
 
 declare -a phase_args=()
+matched_phases=0
 
 #######################################
 # Expands variadic passthrough arguments into phase_args (shared by all
@@ -50,9 +53,11 @@ parse_passthrough_tokens() {
 }
 
 #######################################
-# Runs one canonical phase via cargo nextest.
+# Runs one canonical phase, skipping empty filtered phases without hiding
+# a filter that matches no tests in any phase.
 # Globals:
-#   None
+#   phase_args
+#   matched_phases
 # Arguments:
 #   Phase label (for the progress line), then the nextest arguments.
 # Outputs:
@@ -64,7 +69,16 @@ run_phase() {
   local label="$1"
   shift
   echo "==> test phase: ${label}"
-  cargo nextest run -p traces-pkm "$@"
+  if ((${#phase_args[@]} > 0)); then
+    local matches
+    matches="$(cargo nextest list -p traces-pkm --message-format oneline "$@")"
+    if [[ -z "${matches}" ]]; then
+      echo "==> no matching ${label} tests"
+      return 0
+    fi
+    matched_phases=$((matched_phases + 1))
+  fi
+  cargo nextest run -p traces-pkm --no-tests fail "$@"
 }
 
 #######################################
@@ -82,17 +96,22 @@ main() {
   parse_passthrough_tokens
 
   # Unit/component: production configuration (no test-utils, no features).
-  run_phase unit --no-default-features -E 'kind(lib)' \
+  run_phase unit --no-default-features --lib \
     "${phase_args[@]+"${phase_args[@]}"}"
 
   # Integration: the cross-module suite requires the test-utils feature.
-  run_phase integration --features test-utils -E 'binary(integration)' \
+  run_phase integration --features test-utils --test integration \
     "${phase_args[@]+"${phase_args[@]}"}"
 
   # E2E: black-box suite against the shipped configuration — the binary is
   # built without test-utils on purpose (tests spawn it).
-  run_phase e2e --no-default-features -E 'binary(e2e)' \
+  run_phase e2e --no-default-features --test e2e \
     "${phase_args[@]+"${phase_args[@]}"}"
+
+  if ((${#phase_args[@]} > 0 && matched_phases == 0)); then
+    echo "ERROR: filter matched no tests in any phase" >&2
+    return 1
+  fi
 
   # Doctests: explicitly --all-features, never the default configuration —
   # test-support doctests would silently drop (CI asserts the exact count).

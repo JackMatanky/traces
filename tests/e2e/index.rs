@@ -33,9 +33,7 @@ fn content_edit_between_spawns_is_query_visible() {
     second.assert_stdout_eq("- [ ] new task (a.md)\n");
 }
 
-/// Verifies the path-set refresh branch between spawns: a deleted file's
-/// ghost row vanishes and wikilinks re-resolve through the distinct
-/// full-recompute path.
+/// Verifies path-set refresh between spawns after a deletion and a rename.
 ///
 /// `[[foo]]` is ambiguous while `notes/foo.md` and `archive/foo.md` both
 /// exist, so it resolves to nothing; deleting `archive/foo.md` must make
@@ -43,10 +41,10 @@ fn content_edit_between_spawns_is_query_visible() {
 /// without an explicit re-index in between.
 ///
 /// Executes vs asserts:
-/// - Executes: `traces index`, `traces list` + `traces table` (baseline), a
-///   file deletion, then `traces list` + `traces table` again.
-/// - Asserts: the deleted path disappears from `list`; the surviving target's
-///   `inlinks` column shows the previously-ambiguous linker.
+/// - Executes: `traces index`, then `traces list` before and after a deletion
+///   and a rename, and `traces table` after each path-set change.
+/// - Asserts: old paths disappear and the current target's `inlinks` column
+///   shows the previously-ambiguous linker without another explicit index.
 ///
 /// Defect class: stale-secondary-index (ghost rows / unresolved links
 /// surviving a path-set change).
@@ -81,6 +79,28 @@ fn path_set_changes_between_spawns_prune_ghosts_and_resolve_links() {
     assert!(
         foo_row.contains("a.md"),
         "deleted sibling must re-resolve the wikilink; row: {foo_row}"
+    );
+    fs::rename(
+        sandbox.root().join("notes/foo.md"),
+        sandbox.root().join("archive/foo.md"),
+    )
+    .expect("rename surviving foo");
+    let renamed = sandbox.run(&["list"]);
+    renamed.assert_success();
+    renamed.assert_never_exit_101();
+    renamed.assert_stdout_eq("- a.md\n- archive/foo.md\n");
+
+    let renamed_table =
+        sandbox.run(&["table", "--column", "file.name", "--column", "inlinks"]);
+    renamed_table.assert_success();
+    let renamed_row = renamed_table
+        .stdout
+        .lines()
+        .find(|line| line.starts_with("| foo"))
+        .expect("renamed foo row");
+    assert!(
+        renamed_row.contains("a.md"),
+        "renamed target must retain the resolved wikilink; row: {renamed_row}"
     );
 }
 

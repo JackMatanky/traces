@@ -242,19 +242,6 @@ impl Sandbox {
         }
     }
 
-    /// Returns the full declared policy table (passthrough + owned entries)
-    /// applied to every spawned child.
-    ///
-    /// Opt-in variables (`TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS`) are
-    /// deliberately absent; tests studying them add them explicitly.
-    pub(crate) fn env_policy_entries(&self) -> Vec<(String, OsString)> {
-        Self::passthrough_env()
-            .into_iter()
-            .chain(self.owned_env())
-            .map(|(key, value)| (key.to_owned(), value))
-            .collect()
-    }
-
     /// Applies the sandbox environment policy to `cmd`: default-deny via
     /// [`Command::env_clear`], then the passthrough allowlist and the
     /// sandbox-owned entries.

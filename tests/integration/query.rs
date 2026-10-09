@@ -620,51 +620,9 @@ fn filters_pages_handle_null_and_missing_temporal_operands() {
     assert_eq!(null_comp_rows.len(), 2);
 }
 
-/// Asserts two query sets agree row-for-row on the public structural
-/// accessors.
-fn assert_structural_parity(
-    from_store: &traces_pkm::testing::QuerySet,
-    from_memory: &traces_pkm::testing::QuerySet,
-    selector: &SourceSelector,
-) {
-    assert_eq!(
-        from_store.len(),
-        from_memory.len(),
-        "selector {selector:?}: row count"
-    );
-    for (position, (store_row, memory_row)) in
-        from_store.iter().zip(from_memory.iter()).enumerate()
-    {
-        assert_eq!(
-            (
-                store_row.file().path(),
-                store_row.depth(),
-                store_row.line(),
-                store_row.parent(),
-                store_row.task_text(),
-                store_row.task_completed(),
-                store_row.status_symbol(),
-            ),
-            (
-                memory_row.file().path(),
-                memory_row.depth(),
-                memory_row.line(),
-                memory_row.parent(),
-                memory_row.task_text(),
-                memory_row.task_completed(),
-                memory_row.status_symbol(),
-            ),
-            "selector {selector:?}: row {position} diverges"
-        );
-    }
-}
-
 /// Parity differential: in-memory ([`QueryService::run`]) and persisted-store
-/// ([`QueryService::sync_and_run`]) execution agree structurally across a
-/// representative selector set, including cold-path inlinks (the fixture's
-/// linked notes force the store leg through the cold `read_all_links` read;
-/// inlink values are asserted at process level in `tests/e2e/query.rs`
-/// because `QueryRow`'s inlinks accessor is crate-internal).
+/// ([`QueryService::sync_and_run`]) execution return equal rows across a
+/// representative selector set. Full row equality includes cold-path inlinks.
 ///
 /// Persist-first arrangement: the index is built and persisted BEFORE the
 /// differential runs, so `sync_and_run`'s internal refresh takes the Fresh
@@ -674,7 +632,7 @@ fn assert_structural_parity(
 ///
 /// Executes vs asserts:
 /// - Executes: real build/persist, then both execution paths per selector.
-/// - Asserts: row-for-row structural equality per selector.
+/// - Asserts: full row equality, including inlinks, per selector.
 ///
 /// Defect class: silent-wrong-answers (resolver prefilter false negatives,
 /// codec drift between in-memory and persisted row shapes).
@@ -705,6 +663,6 @@ fn store_backed_and_in_memory_queries_agree_across_representative_selectors() {
         let from_store = service
             .sync_and_run(&indexer, QueryBuilder::pages(selector.clone()))
             .expect("store-backed execution");
-        assert_structural_parity(&from_store, &from_memory, selector);
+        assert_eq!(from_store, from_memory, "selector {selector:?} diverges");
     }
 }

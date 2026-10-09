@@ -41,6 +41,8 @@ declare -a extra_args=()
 resolve_doc_features() {
   if [[ "${usage_feature:-all}" == "all" ]]; then
     doc_args=(--workspace --all-features)
+  elif [[ "${usage_feature}" == "default" ]]; then
+    doc_args=(--workspace)
   else
     doc_args=(--workspace --features "${usage_feature}")
   fi

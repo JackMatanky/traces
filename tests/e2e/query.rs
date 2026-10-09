@@ -59,11 +59,8 @@ fn class_descendant_selector_expands_through_the_schema_graph() {
 /// each CLI invocation is a cold process, so the rendered `inlinks` column
 /// proves the cold link read persisted and survived the store round-trip.
 ///
-/// This is the cold-path inlinks residue of the parity differential (the
-/// integration comparison in `tests/integration/query.rs` cannot reach
-/// `QueryRow`'s crate-internal inlinks accessor; a plain in-crate
-/// `list("inlinks")` test would near-duplicate the existing in-crate
-/// coverage).
+/// The integration differential compares complete rows, including inlinks;
+/// this test separately checks their rendering across the CLI process boundary.
 ///
 /// Executes vs asserts:
 /// - Executes: linked notes, `traces trust`, `traces index`, then `traces table
