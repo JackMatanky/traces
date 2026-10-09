@@ -226,7 +226,7 @@ Table:
 
 /// Proves `tasks.from(...).where(...)` rejects obsolete `task.<field>`
 /// syntax with the same actionable diagnostic proven at the library level in
-/// `tests/integration/index_query.rs`, confirming the `tasks` template
+/// `tests/integration/query.rs`, confirming the `tasks` template
 /// global routes through the identical `QueryBuilder::filter` validation as
 /// the `query` and `list.<field>` paths, rather than a namespace-specific
 /// bypass.

@@ -60,7 +60,7 @@ fn class_descendant_selector_expands_through_the_schema_graph() {
 /// proves the cold link read persisted and survived the store round-trip.
 ///
 /// This is the cold-path inlinks residue of the parity differential (the
-/// integration comparison in `tests/integration/index_query.rs` cannot reach
+/// integration comparison in `tests/integration/query.rs` cannot reach
 /// `QueryRow`'s crate-internal inlinks accessor; a plain in-crate
 /// `list("inlinks")` test would near-duplicate the existing in-crate
 /// coverage).
