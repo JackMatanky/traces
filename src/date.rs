@@ -578,7 +578,7 @@ impl<'de> Deserialize<'de> for DateValue {
 ///     "2026-07-29T14:30:00+00:00".parse().expect("equivalent offset");
 /// assert_eq!(utc, offset);
 ///
-/// // The local wall clock this value renders re-parses to the same instant.
+/// // Outside a DST fold hour, the local wall clock this value renders re-parses to the same instant.
 /// let round_trip: DateTimeValue =
 ///     utc.to_string().parse().expect("rendered spelling re-parses");
 /// assert_eq!(utc, round_trip);
@@ -1837,6 +1837,18 @@ mod tests {
         }
 
         #[test]
+        fn reports_local_zone_lookup_when_extreme_wall_clock_cannot_resolve() {
+            // Arrange
+            TzGuard::set("Etc/GMT-14");
+
+            // Act
+            let result = local_naive_to_utc(NaiveDateTime::MIN);
+
+            // Assert
+            assert!(matches!(result, Err(DateError::LocalZoneLookup { .. })));
+        }
+
+        #[test]
         fn promotes_a_date_value_to_local_zone_midnight() {
             TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
@@ -1859,6 +1871,26 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+
+        #[test]
+        fn fold_hour_display_re_parses_to_the_earlier_instant() {
+            // Arrange
+            TzGuard::set("America/New_York");
+            let later =
+                DateTimeValue::parse_iso("2026-11-01T06:30:00Z").unwrap();
+
+            // Act
+            let wall = later.to_string();
+            let reparsed = DateTimeValue::parse_iso(&wall).unwrap();
+
+            // Assert
+            assert_eq!(wall, "2026-11-01T01:30:00");
+            assert_eq!(
+                reparsed,
+                DateTimeValue::parse_iso("2026-11-01T05:30:00Z").unwrap()
+            );
+            assert_ne!(reparsed, later);
+        }
 
         #[test]
         fn renders_to_datetime_string_without_the_offset() {
@@ -1922,6 +1954,42 @@ mod tests {
                 DateTimeValue::parse_iso(&value.to_datetime_string())
                     .expect("formatted output re-parses");
             assert_eq!(reparsed, value);
+        }
+    }
+
+    mod golden_serde {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn date_and_datetime_keep_their_json_and_postcard_spellings() {
+            // Arrange
+            TzGuard::set("UTC");
+            let date = DateValue::parse_iso("2026-07-29").unwrap();
+            let datetime =
+                DateTimeValue::parse_iso("2026-07-29T14:30:05Z").unwrap();
+
+            // Act
+            let date_bytes = postcard::to_allocvec(&date).unwrap();
+            let datetime_bytes = postcard::to_allocvec(&datetime).unwrap();
+
+            // Assert
+            assert_eq!(serde_json::to_string(&date).unwrap(), "\"2026-07-29\"");
+            assert_eq!(
+                serde_json::to_string(&datetime).unwrap(),
+                "\"2026-07-29T14:30:05Z\""
+            );
+            assert_eq!(date_bytes, b"\x0a2026-07-29");
+            assert_eq!(datetime_bytes, b"\x142026-07-29T14:30:05Z");
+            assert_eq!(
+                postcard::from_bytes::<DateValue>(&date_bytes).unwrap(),
+                date
+            );
+            assert_eq!(
+                postcard::from_bytes::<DateTimeValue>(&datetime_bytes).unwrap(),
+                datetime
+            );
         }
     }
 
@@ -2617,6 +2685,119 @@ mod tests {
             assert_eq!(
                 shifted,
                 DateValue::parse_iso(expected).expect("expected date parses")
+            );
+        }
+
+        #[test]
+        fn point_shift_clamps_date_and_keeps_sub_day_precision() {
+            // Arrange
+            let jan =
+                DateValue::classify("2026-01-31").unwrap().unwrap().point();
+            let july =
+                DateValue::classify("2026-07-29").unwrap().unwrap().point();
+
+            // Act
+            let feb = jan.shift(1, DurationUnit::Month).unwrap();
+            let same_day = july.shift(5, DurationUnit::Hour).unwrap();
+
+            // Assert
+            assert_eq!(
+                feb.wall.date(),
+                NaiveDate::from_ymd_opt(2026, 2, 28).unwrap()
+            );
+            assert_eq!(feb.precision, Precision::Date);
+            assert_eq!(
+                same_day.wall.date(),
+                NaiveDate::from_ymd_opt(2026, 7, 29).unwrap()
+            );
+        }
+
+        #[test]
+        fn point_calendar_shift_preserves_noon_across_dst() {
+            // Arrange
+            TzGuard::set("America/New_York");
+            let point = DateValue::classify("2026-03-07T12:00:00")
+                .unwrap()
+                .unwrap()
+                .point();
+
+            // Act
+            let shifted = point.shift(1, DurationUnit::Day).unwrap();
+
+            // Assert
+            assert_eq!(shifted.wall.to_string(), "2026-03-08 12:00:00");
+        }
+
+        #[test]
+        fn zero_day_shift_re_resolves_fold_to_earlier_occurrence() {
+            // Arrange
+            TzGuard::set("America/New_York");
+            let point = DateValue::classify("2026-11-01T06:30:00Z")
+                .unwrap()
+                .unwrap()
+                .point();
+
+            // Act: calendar shifts re-resolve through the earliest-occurrence
+            // policy.
+            let shifted = point.shift(0, DurationUnit::Day).unwrap();
+
+            // Assert
+            assert_eq!(
+                shifted.instant,
+                DateTimeValue::parse_iso("2026-11-01T05:30:00Z")
+                    .unwrap()
+                    .into_inner()
+            );
+        }
+
+        #[test]
+        fn zero_day_shift_in_utc_keeps_the_instant() {
+            // Arrange
+            TzGuard::set("UTC");
+            let point = DateValue::classify("2026-07-29T14:30:00Z")
+                .unwrap()
+                .unwrap()
+                .point();
+
+            // Act
+            let shifted = point.shift(0, DurationUnit::Day).unwrap();
+
+            // Assert
+            assert_eq!(shifted.instant, point.instant);
+        }
+
+        #[test]
+        fn shift_reports_out_of_range_at_date_and_instant_limits() {
+            // Arrange
+            TzGuard::set("UTC");
+            let instant = DateTimeValue(DateTime::<Utc>::MAX_UTC);
+            let date = DateValue::from(NaiveDate::MAX);
+
+            // Act
+            let instant_result = instant.shift(1, DurationUnit::Day);
+            let date_result = date.shift(1, DurationUnit::Day);
+
+            // Assert
+            assert_eq!(instant_result, Err(DateError::OutOfRange));
+            assert_eq!(date_result, Err(DateError::OutOfRange));
+        }
+
+        #[test]
+        fn date_apply_restarts_each_sub_day_component_at_midnight() {
+            // Arrange
+            let date = DateValue::parse_iso("2026-07-29").unwrap();
+            let separate = DurationValue::parse("12h 12h").unwrap();
+            let together = DurationValue::parse("24h").unwrap();
+
+            // Act
+            let separate_date = date.apply(&separate).unwrap();
+            let together_date = date.apply(&together).unwrap();
+
+            // Assert
+            assert_eq!(separate_date, date);
+            assert_eq!(
+                together_date,
+                DateValue::parse_iso("2026-07-30").unwrap()
             );
         }
     }

@@ -1228,6 +1228,37 @@ pub enum DurationError {
 mod tests {
     use super::*;
 
+    mod golden_serde {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn written_durations_keep_their_json_and_postcard_spellings() {
+            // Arrange
+            let compound = DurationValue::parse("1h 30m").unwrap();
+            let minutes = DurationValue::parse("90m").unwrap();
+
+            // Act
+            let compound_bytes = postcard::to_allocvec(&compound).unwrap();
+            let minutes_bytes = postcard::to_allocvec(&minutes).unwrap();
+
+            // Assert
+            assert_eq!(serde_json::to_string(&compound).unwrap(), "\"1h 30m\"");
+            assert_eq!(serde_json::to_string(&minutes).unwrap(), "\"90m\"");
+            assert_eq!(compound_bytes, b"\x061h 30m");
+            assert_eq!(minutes_bytes, b"\x0390m");
+            assert_eq!(
+                postcard::from_bytes::<DurationValue>(&compound_bytes).unwrap(),
+                compound
+            );
+            assert_eq!(
+                postcard::from_bytes::<DurationValue>(&minutes_bytes).unwrap(),
+                minutes
+            );
+        }
+    }
+
     mod value {
         use super::*;
 
@@ -1899,33 +1930,21 @@ mod tests {
             }
 
             #[rstest]
-            #[case::simple("1h 30m")]
-            #[case::negative("-1h 30m")]
-            #[case::mixed_units("4 yrs, 6 wks")]
-            #[case::sub_second("500ms")]
-            #[case::float_values("0.5h 15m")]
-            #[case::float_non_associative("10000000000000000s 1s 1s")]
-            fn bit_exact_sigma_invariant_for_parsed_values(
+            #[case::simple("1h 30m", 5_400.0)]
+            #[case::negative("-1h 30m", -5_400.0)]
+            #[case::mixed_units("4 yrs, 6 wks", 129_772_800.0)]
+            #[case::sub_second("500ms", 0.5)]
+            #[case::float_values("0.5h 15m", 2_700.0)]
+            #[case::float_non_associative("10000000000000000s 1s 1s", 1.0e16)]
+            fn parsed_values_store_the_exact_literal_seconds(
                 #[case] input: &str,
+                #[case] expected: f64,
             ) {
                 // Arrange & Act
                 let dv = DurationValue::parse(input).unwrap();
-                let parts = dv.parts().unwrap();
-                let fold_total = DurationValue::fold_parts(parts);
 
-                // Assert: bit-exact equality between the fold over parts and
-                // the stored seconds, compared as raw `f64` so a signed-zero
-                // divergence could not hide behind `total_cmp`.
-                #[expect(
-                    clippy::float_cmp,
-                    reason = "the test pins the bit-exact Σ invariant with \
-                              raw `f64` `==`"
-                )]
-                let bit_exact = fold_total == dv.to_seconds().0;
-                assert!(
-                    bit_exact,
-                    "Σ fold must reconstruct stored seconds bit-exactly"
-                );
+                // Assert
+                assert_eq!(dv.to_seconds().0.to_bits(), expected.to_bits());
             }
             #[test]
             fn identifies_calendar_units_and_durations() {
@@ -1988,28 +2007,16 @@ mod tests {
             }
 
             #[test]
-            fn bit_exact_sigma_invariant_for_arithmetic_results() {
+            fn arithmetic_results_store_the_exact_literal_seconds() {
                 // Arrange
                 let a = DurationValue::parse("10000000000000000s").unwrap();
                 let b = DurationValue::parse("1s 1s").unwrap();
 
                 // Act
                 let sum = a + b;
-                let sum_parts = sum.parts().unwrap();
-                let fold_total = DurationValue::fold_parts(sum_parts);
 
-                // Assert: fold over the combined parts bit-exactly equals the
-                // stored seconds, compared as raw `f64`.
-                #[expect(
-                    clippy::float_cmp,
-                    reason = "the test pins the bit-exact Σ invariant with \
-                              raw `f64` `==`"
-                )]
-                let bit_exact = fold_total == sum.to_seconds().0;
-                assert!(
-                    bit_exact,
-                    "Σ fold must reconstruct stored seconds bit-exactly"
-                );
+                // Assert
+                assert_eq!(sum.to_seconds().0.to_bits(), 1.0e16_f64.to_bits());
             }
 
             #[test]
@@ -2052,14 +2059,13 @@ mod tests {
             }
 
             #[test]
-            fn mul_scales_parts_and_preserves_bit_exact_sigma() {
+            fn mul_stores_the_exact_literal_seconds() {
                 // Arrange
                 let dv = DurationValue::parse("1h 30m").unwrap();
 
                 // Act
                 let scaled = dv * 2.5;
                 let parts = scaled.parts().unwrap();
-                let fold_total = DurationValue::fold_parts(parts);
 
                 // Assert
                 assert_eq!(parts.len(), 2);
@@ -2071,15 +2077,9 @@ mod tests {
                     parts.get(1).copied(),
                     Some((75.0, DurationUnit::Minute))
                 );
-                #[expect(
-                    clippy::float_cmp,
-                    reason = "the test pins the bit-exact Σ invariant with \
-                              raw `f64` `==`"
-                )]
-                let bit_exact = fold_total == scaled.to_seconds().0;
-                assert!(
-                    bit_exact,
-                    "Σ fold must reconstruct stored seconds bit-exactly"
+                assert_eq!(
+                    scaled.to_seconds().0.to_bits(),
+                    13_500.0_f64.to_bits()
                 );
             }
 
