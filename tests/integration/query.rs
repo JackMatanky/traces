@@ -480,6 +480,33 @@ fn filters_pages_using_temporal_arithmetic_and_duration_scaling() {
     );
 }
 
+/// Proves bare ISO date literals filter like their quoted form instead of
+/// parsing as number arithmetic that matches notes without the field.
+#[test]
+fn filters_pages_using_unquoted_iso_date_literals() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let project = TestProject::untrusted(temp.path().join("project"));
+    project.write_note("has.md", "---\ndue: 2026-01-01\n---\n");
+    project.write_note("other.md", "---\ndue: 2026-06-01\n---\n");
+    project.write_note("nodue.md", "---\nstatus: draft\n---\n");
+    let index = Arc::new(project.build_index());
+    let service = QueryService::new("class");
+
+    for filter in ["due == 2026-01-01", "due < 2026-03-01"] {
+        let query = QueryBuilder::pages(SourceSelector::All)
+            .filter(filter)
+            .expect("valid date literal query");
+        let rows = service.run(&index, query);
+
+        assert_eq!(rows.len(), 1, "{filter}");
+        assert_eq!(
+            rows.get(0).expect("row").file().path(),
+            Path::new("has.md"),
+            "{filter}"
+        );
+    }
+}
+
 /// Proves query temporal registry functions (`date_add`, `date_diff`,
 /// `date_component`) evaluate with reference semantics across indexed notes.
 #[test]

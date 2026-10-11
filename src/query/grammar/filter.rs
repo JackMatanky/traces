@@ -981,7 +981,18 @@ impl FilterGrammar {
                 break;
             };
             tokens.next();
+            let rhs_span = tokens.next_span(input);
             let rhs = Self::parse_primary(input, tokens)?;
+            if is_number_only(&lhs) && is_number_only(&rhs) {
+                return Err(QuerySyntaxError::unexpected_end(
+                    QueryDialect::Filter,
+                    input,
+                    rhs_span,
+                    "a field, date, or duration operand (arithmetic on number \
+                     literals alone is not supported; quote date literals)",
+                )
+                .into());
+            }
             lhs = ValueExpr::Binary {
                 lhs: Box::new(lhs),
                 op,
@@ -989,6 +1000,19 @@ impl FilterGrammar {
             };
         }
         Ok(lhs)
+    }
+}
+
+/// Whether `expr` is arithmetic over number literals only.
+fn is_number_only(expr: &ValueExpr) -> bool {
+    match expr {
+        ValueExpr::Literal(NoteFieldValue::Number(_)) => true,
+        ValueExpr::Binary {
+            lhs,
+            rhs,
+            ..
+        } => is_number_only(lhs) && is_number_only(rhs),
+        _ => false,
     }
 }
 
@@ -1100,6 +1124,10 @@ enum FilterToken {
     #[regex("==|!=|>=|<=|>|<", |lex| CompareOp::try_from(lex.slice()))]
     Op(CompareOp),
     #[regex(r#""([^"\\]|\\.)*"|'([^'\\]|\\.)*'"#, string_callback)]
+    #[regex(
+        r"[0-9]{4}-[0-9]{2}(-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:[0-9]{2})?)?)?",
+        date_literal_callback
+    )]
     #[token("true", |_| NoteFieldValue::Bool(true), priority = 3)]
     #[token("false", |_| NoteFieldValue::Bool(false), priority = 3)]
     #[token("null", |_| NoteFieldValue::Null, priority = 3)]
@@ -1116,6 +1144,18 @@ enum FilterToken {
 )]
 fn string_callback(lex: &mut Lexer<'_, FilterToken>) -> NoteFieldValue {
     NoteFieldValue::String(lexical_unquote(lex.slice()))
+}
+
+/// Keeps a bare ISO date or date-time shape as the text of a string literal.
+///
+/// `ComparisonExpr::classify_literal` then promotes it exactly like the
+/// quoted form.
+#[expect(
+    clippy::needless_pass_by_ref_mut,
+    reason = "logos Callback trait requires &mut Lexer"
+)]
+fn date_literal_callback(lex: &mut Lexer<'_, FilterToken>) -> NoteFieldValue {
+    NoteFieldValue::String(lex.slice().to_owned())
 }
 
 #[cfg(test)]
@@ -1319,6 +1359,64 @@ mod tests {
                 rows.filter("due == \"2026-01-01\"").expect("valid filter");
 
             assert_eq!(filtered.len(), 1);
+        }
+
+        fn dated_rows() -> QuerySet {
+            rows_for_files(&[
+                ("has.md", "---\ndue: 2026-01-01\n---"),
+                ("other.md", "---\ndue: 2026-06-01\n---"),
+                ("nodue.md", "---\nstatus: draft\n---"),
+            ])
+        }
+
+        #[rstest]
+        #[case::equal("due == 2026-01-01", &["has"])]
+        #[case::less("due < 2026-03-01", &["has"])]
+        #[case::greater_equal("due >= 2026-03-01", &["other"])]
+        fn evaluates_unquoted_iso_date_literals(
+            #[case] expr: &str,
+            #[case] expected: &[&str],
+        ) {
+            let rows = dated_rows();
+
+            let filtered = rows.filter(expr).expect("valid filter");
+
+            assert_eq!(names(&filtered), expected);
+        }
+
+        #[rstest]
+        #[case::date("due != 2026-01-01", "due != \"2026-01-01\"")]
+        #[case::datetime(
+            "due < 2026-07-29T14:30:00Z",
+            "due < \"2026-07-29T14:30:00Z\""
+        )]
+        fn unquoted_iso_literal_matches_its_quoted_form(
+            #[case] unquoted: &str,
+            #[case] quoted: &str,
+        ) {
+            let rows = dated_rows();
+
+            let bare = rows.clone().filter(unquoted).expect("valid filter");
+            let string = rows.filter(quoted).expect("valid filter");
+
+            assert_eq!(names(&bare), names(&string));
+        }
+
+        #[rstest]
+        #[case::unpadded_date("due == 2026-1-1")]
+        #[case::number_arithmetic("1 + 2 == 3")]
+        fn rejects_arithmetic_on_number_literals_alone(#[case] expr: &str) {
+            assert!(matches!(
+                FilterExpr::parse(expr),
+                Err(QueryBuilderError::Syntax(_))
+            ));
+        }
+
+        #[rstest]
+        #[case::duration_times_number("dur(\"1d\") * 2 == dur(\"2d\")")]
+        #[case::number_times_duration("2 * dur(\"1d\") == dur(\"2d\")")]
+        fn accepts_duration_scaling_by_a_number(#[case] expr: &str) {
+            assert!(FilterExpr::parse(expr).is_ok());
         }
 
         #[test]
