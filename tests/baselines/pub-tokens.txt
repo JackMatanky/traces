@@ -350,9 +350,9 @@ src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 src/dirtree.rs: pub(crate) struct DirTree {
 src/duration/mod.rs: pub use value::{DurationError, DurationValue};
 src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
-src/duration/mod.rs: pub(crate) use value::DurationSeconds;
+src/duration/mod.rs: pub(crate) use value::{DurationComponent, DurationSeconds};
 src/duration/scan.rs: pub(super) enum ScanMode {
-src/duration/scan.rs: pub(super) fn apply_sign(parts: &mut [(f64, DurationUnit)], is_negative: bool) {
+src/duration/scan.rs: pub(super) fn apply_sign(
 src/duration/scan.rs: pub(super) fn can_start_duration_segment(bytes: &[u8], pos: usize) -> bool {
 src/duration/scan.rs: pub(super) fn has_digits_after_sign(
 src/duration/scan.rs: pub(super) fn parse_number(
@@ -374,12 +374,15 @@ src/duration/value.rs: pub(crate) const fn as_f64(self) -> f64 {
 src/duration/value.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
 src/duration/value.rs: pub(crate) fn as_str(&self) -> &str {
 src/duration/value.rs: pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
+src/duration/value.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
 src/duration/value.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
-src/duration/value.rs: pub(crate) fn is_calendar(&self) -> bool {
+src/duration/value.rs: pub(crate) fn has_calendar_component(&self) -> bool {
 src/duration/value.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/duration/value.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
-src/duration/value.rs: pub(crate) fn parts(&self) -> Option<&[(f64, DurationUnit)]> {
+src/duration/value.rs: pub(crate) magnitude: f64,
+src/duration/value.rs: pub(crate) struct DurationComponent {
 src/duration/value.rs: pub(crate) struct DurationSeconds(pub(crate) f64);
+src/duration/value.rs: pub(crate) unit: DurationUnit,
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =

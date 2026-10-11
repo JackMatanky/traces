@@ -1,13 +1,13 @@
 //! Duration parsing, validation, and arithmetic.
 //!
 //! Accepts human-readable duration strings like `"1h 30m"` or `"4 yrs, 6 wks"`
-//! and converts them to a total seconds value. Parts are `<number><unit>`
+//! and converts them to a total seconds value. Components are `<number><unit>`
 //! pairs, optionally separated by whitespace or commas.
 //!
 //! # Key types
 //!
 //! - [`DurationValue`] - A parsed duration carrying its total seconds, its
-//!   original spelling, and its retained written parts (which witness the
+//!   original spelling, and its retained written components (which witness the
 //!   calendar-versus-fixed regime).
 //! - [`DurationUnit`] - Unit registry (parsing and seconds conversion). Single
 //!   source of truth; callers should not maintain their own registries.
@@ -20,5 +20,5 @@ mod unit;
 mod value;
 
 pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
-pub(crate) use value::DurationSeconds;
+pub(crate) use value::{DurationComponent, DurationSeconds};
 pub use value::{DurationError, DurationValue};

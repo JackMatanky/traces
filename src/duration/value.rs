@@ -50,7 +50,7 @@ const DISPLAY_EXPONENT_LOWER: f64 = 1e-6;
 pub struct DurationValue {
     raw: Box<str>,
     seconds: DurationSeconds,
-    parts: Option<DurationParts>,
+    components: Option<Components>,
 }
 
 impl DurationValue {
@@ -100,11 +100,13 @@ impl DurationValue {
         Some(Self::parse(trimmed))
     }
 
-    /// Parses a duration string containing one or more `<number><unit>` parts.
+    /// Parses a duration string containing one or more `<number><unit>`
+    /// components.
     ///
     /// Accepts integers, decimals (`".5h"`), and exponential floats (`"1e3s"`),
     /// optional leading `+` or `-` on the first part, redundant `+` on
-    /// subsequent parts, and whitespace or comma separators between parts.
+    /// subsequent components, and whitespace or comma separators between
+    /// components.
     ///
     /// # Errors
     ///
@@ -136,8 +138,8 @@ impl DurationValue {
     /// preserving list precedence at inline note boundaries. Returns `None`
     /// if:
     ///
-    /// - The input does not start with a valid duration segment, or no parts
-    ///   could be parsed.
+    /// - The input does not start with a valid duration segment, or no
+    ///   components could be parsed.
     /// - A part after the first carries an explicit `-` or fails to parse; the
     ///   loop bails on the first error rather than returning the prefix parsed
     ///   so far.
@@ -171,7 +173,7 @@ impl DurationValue {
         let mut parsed_any = false;
         let mut is_negative = false;
         let mut last_end = 0;
-        let mut raw_parts = Vec::new();
+        let mut raw_components = Vec::new();
 
         while pos < len {
             let (number, kind, pos_after_part) =
@@ -187,7 +189,10 @@ impl DurationValue {
                 is_negative = true;
             }
 
-            raw_parts.push((number.abs(), kind));
+            raw_components.push(DurationComponent {
+                magnitude: number.abs(),
+                unit: kind,
+            });
             parsed_any = true;
             last_end = pos;
 
@@ -216,9 +221,9 @@ impl DurationValue {
             return Err(DurationError::Empty);
         }
 
-        scan::apply_sign(&mut raw_parts, is_negative);
+        scan::apply_sign(&mut raw_components, is_negative);
 
-        let total = Self::sum_nominal_seconds(&raw_parts);
+        let total = Self::sum_nominal_seconds(&raw_components);
         let seconds = DurationSeconds::try_from(total)?;
         let raw = match mode {
             scan::ScanMode::Whole => input.trim().into(),
@@ -229,13 +234,14 @@ impl DurationValue {
             Self {
                 raw,
                 seconds,
-                parts: Some(raw_parts.into_boxed_slice()),
+                components: Some(raw_components.into_boxed_slice()),
             },
             last_end,
         ))
     }
 
-    /// Folds duration parts in left-to-right order to compute total seconds.
+    /// Folds duration components in left-to-right order to compute total
+    /// seconds.
     #[inline]
     #[expect(
         clippy::suboptimal_flops,
@@ -243,10 +249,15 @@ impl DurationValue {
                   change user-visible Duration floats that tests pin with \
                   exact equality; not a hot path"
     )]
-    fn sum_nominal_seconds(parts: &[(f64, DurationUnit)]) -> f64 {
-        parts.iter().fold(0.0f64, |acc, &(magnitude, unit)| {
-            acc + magnitude * unit.nominal_seconds()
-        })
+    fn sum_nominal_seconds(components: &[DurationComponent]) -> f64 {
+        components.iter().fold(
+            0.0f64,
+            |acc,
+             &DurationComponent {
+                 magnitude,
+                 unit,
+             }| { acc + magnitude * unit.nominal_seconds() },
+        )
     }
 
     /// Synthesizes a canonical [`DurationValue`] from a [`DurationSeconds`]
@@ -266,7 +277,7 @@ impl DurationValue {
         Self {
             raw: Self::canonical_raw(seconds),
             seconds,
-            parts: None,
+            components: None,
         }
     }
 
@@ -326,9 +337,9 @@ impl DurationValue {
         }
     }
 
-    /// Returns the parsed duration parts, if retained.
+    /// Returns the parsed duration components, if retained.
     ///
-    /// Values parsed from text retain their written parts and witness the
+    /// Values parsed from text retain their written components and witness the
     /// regime:
     ///
     /// - [`Some`] containing a calendar unit ([`DurationUnit::Day`],
@@ -338,18 +349,18 @@ impl DurationValue {
     ///   seconds): fixed-magnitude semantics.
     #[inline]
     #[must_use]
-    pub(crate) fn parts(&self) -> Option<&[(f64, DurationUnit)]> {
-        self.parts.as_deref()
+    pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
+        self.components.as_deref()
     }
 
-    /// Returns `true` if this duration contains any calendar-application units
-    /// in its parsed parts.
+    /// Returns true if this duration contains any calendar-application units
+    /// in its parsed components.
     #[cfg(test)]
     #[inline]
     #[must_use]
-    pub(crate) fn is_calendar(&self) -> bool {
-        self.parts().is_some_and(|parts| {
-            parts.iter().any(|&(_, unit)| unit.is_calendar())
+    pub(crate) fn has_calendar_component(&self) -> bool {
+        self.components().is_some_and(|components| {
+            components.iter().any(|component| component.unit.is_calendar())
         })
     }
 
@@ -367,35 +378,44 @@ impl DurationValue {
         self.seconds
     }
 
-    /// Combines `rhs` with `self`, negating `rhs`'s parts (and seconds, in the
-    /// fixed regime) when `negate_rhs` is `true`; the single implementation
-    /// behind [`Add`] and [`Sub`].
+    /// Combines `rhs` with `self`, negating `rhs`'s components (and seconds, in
+    /// the fixed regime) when `negate_rhs` is `true`; the single
+    /// implementation behind [`Add`] and [`Sub`].
     ///
-    /// - Both operands [`Some`]: parts concatenate left-to-right and one fold
-    ///   over the combined parts preserves the bit-exact Σ invariant by
-    ///   construction.
+    /// - Both operands [`Some`]: components concatenate left-to-right and one
+    ///   fold over the combined components preserves the bit-exact Σ invariant
+    ///   by construction.
     /// - Either operand [`None`]: seconds add or subtract directly and the
     ///   result carries `None` (fixed regime).
     ///
     /// Negative zero normalizes to positive zero.
     fn combine(self, rhs: Self, negate_rhs: bool) -> Self {
-        if let (Some(lhs_parts), Some(rhs_parts)) = (self.parts, rhs.parts) {
+        if let (Some(lhs_components), Some(rhs_components)) =
+            (self.components, rhs.components)
+        {
             let mut combined = Vec::with_capacity(
-                lhs_parts.len().saturating_add(rhs_parts.len()),
+                lhs_components.len().saturating_add(rhs_components.len()),
             );
-            combined.extend_from_slice(&lhs_parts);
+            combined.extend_from_slice(&lhs_components);
             if negate_rhs {
-                combined
-                    .extend(rhs_parts.iter().map(|&(mag, unit)| (-mag, unit)));
+                combined.extend(rhs_components.iter().map(
+                    |&DurationComponent {
+                         magnitude,
+                         unit,
+                     }| DurationComponent {
+                        magnitude: -magnitude,
+                        unit,
+                    },
+                ));
             } else {
-                combined.extend_from_slice(&rhs_parts);
+                combined.extend_from_slice(&rhs_components);
             }
             let fold_total = Self::sum_nominal_seconds(&combined);
             let seconds = DurationSeconds::normalized(fold_total);
             Self {
                 raw: Self::canonical_raw(seconds),
                 seconds,
-                parts: Some(combined.into_boxed_slice()),
+                components: Some(combined.into_boxed_slice()),
             }
         } else {
             #[expect(
@@ -411,7 +431,7 @@ impl DurationValue {
             Self {
                 raw: Self::canonical_raw(seconds),
                 seconds,
-                parts: None,
+                components: None,
             }
         }
     }
@@ -502,9 +522,9 @@ impl Sub for DurationValue {
 
 /// Scales a duration by a scalar factor.
 ///
-/// With retained parts ([`Some`]), each part's magnitude scales by `rhs` and
-/// seconds come from the single left-to-right fold over the scaled parts; with
-/// [`None`], seconds scale directly.
+/// With retained components ([`Some`]), each part's magnitude scales by `rhs`
+/// and seconds come from the single left-to-right fold over the scaled
+/// components; with [`None`], seconds scale directly.
 ///
 /// A non-finite scalar (`NaN` or `±inf`) or overflow yields non-finite seconds,
 /// which consuming conversions reject with [`DurationError::NonFiniteSeconds`];
@@ -514,15 +534,25 @@ impl Mul<f64> for DurationValue {
 
     #[inline]
     fn mul(self, rhs: f64) -> Self {
-        if let Some(parts) = self.parts {
-            let scaled: Vec<(f64, DurationUnit)> =
-                parts.iter().map(|&(mag, unit)| (mag * rhs, unit)).collect();
+        if let Some(components) = self.components {
+            let scaled: Vec<DurationComponent> = components
+                .iter()
+                .map(
+                    |&DurationComponent {
+                         magnitude,
+                         unit,
+                     }| DurationComponent {
+                        magnitude: magnitude * rhs,
+                        unit,
+                    },
+                )
+                .collect();
             let fold_total = Self::sum_nominal_seconds(&scaled);
             let seconds = DurationSeconds::normalized(fold_total);
             Self {
                 raw: Self::canonical_raw(seconds),
                 seconds,
-                parts: Some(scaled.into_boxed_slice()),
+                components: Some(scaled.into_boxed_slice()),
             }
         } else {
             #[expect(
@@ -534,7 +564,7 @@ impl Mul<f64> for DurationValue {
             Self {
                 raw: Self::canonical_raw(seconds),
                 seconds,
-                parts: None,
+                components: None,
             }
         }
     }
@@ -575,8 +605,17 @@ impl<'de> Deserialize<'de> for DurationValue {
     }
 }
 
+/// One written duration magnitude and its unit.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct DurationComponent {
+    /// Signed magnitude, with the leading sign applied.
+    pub(crate) magnitude: f64,
+    /// Unit associated with this magnitude.
+    pub(crate) unit: DurationUnit,
+}
+
 /// Retained duration components in written left-to-right order.
-type DurationParts = Box<[(f64, DurationUnit)]>;
+type Components = Box<[DurationComponent]>;
 
 /// A duration measured in seconds.
 ///
@@ -1483,36 +1522,42 @@ mod tests {
                 assert!(matches!(err, DurationError::MissingNumber { .. }));
             }
         }
-        mod parts {
+        mod components {
             use pretty_assertions::assert_eq;
             use rstest::rstest;
 
             use super::*;
 
             #[test]
-            fn parts_carry_written_magnitude_with_whole_duration_sign_applied()
-            {
+            fn components_carry_written_magnitude_with_whole_duration_sign_applied()
+             {
                 // Arrange
                 let input = "-1h 30m";
 
                 // Act
                 let dv = DurationValue::parse(input).unwrap();
-                let parts = dv.parts().unwrap();
+                let components = dv.components().unwrap();
 
                 // Assert
-                assert_eq!(parts.len(), 2);
+                assert_eq!(components.len(), 2);
                 assert_eq!(
-                    parts.first().copied(),
-                    Some((-1.0, DurationUnit::Hour))
+                    components.first().copied(),
+                    Some(DurationComponent {
+                        magnitude: -1.0,
+                        unit: DurationUnit::Hour
+                    })
                 );
                 assert_eq!(
-                    parts.get(1).copied(),
-                    Some((-30.0, DurationUnit::Minute))
+                    components.get(1).copied(),
+                    Some(DurationComponent {
+                        magnitude: -30.0,
+                        unit: DurationUnit::Minute
+                    })
                 );
             }
 
             #[test]
-            fn prefix_retains_identical_parts_to_full_parse() {
+            fn prefix_retains_identical_components_to_full_parse() {
                 // Arrange
                 let text = "-1h 30m trailing";
 
@@ -1523,7 +1568,7 @@ mod tests {
 
                 // Assert
                 assert_eq!(consumed, 7);
-                assert_eq!(prefix_dv.parts(), full_dv.parts());
+                assert_eq!(prefix_dv.components(), full_dv.components());
                 assert_eq!(
                     prefix_dv.nominal_seconds(),
                     full_dv.nominal_seconds()
@@ -1563,16 +1608,16 @@ mod tests {
 
                 let cal =
                     DurationValue::parse("1mo 2d").expect("valid duration");
-                assert!(cal.is_calendar());
+                assert!(cal.has_calendar_component());
 
                 let fixed =
                     DurationValue::parse("2h 30m").expect("valid duration");
-                assert!(!fixed.is_calendar());
+                assert!(!fixed.has_calendar_component());
 
                 let synth = DurationValue::from_nominal_seconds(
                     DurationSeconds::try_from(86_400.0).unwrap(),
                 );
-                assert!(!synth.is_calendar());
+                assert!(!synth.has_calendar_component());
             }
         }
 
@@ -1582,7 +1627,7 @@ mod tests {
             use super::*;
 
             #[test]
-            fn add_and_sub_combine_parts_for_some_operands() {
+            fn add_and_sub_combine_components_for_some_operands() {
                 // Arrange
                 let expected = DurationValue::parse("1h 30m").unwrap();
 
@@ -1601,12 +1646,15 @@ mod tests {
                 );
 
                 // `Sub` keeps the negated rhs entry as the regime witness.
-                let sub_parts =
-                    sub.parts().expect("Some+Some Sub retains parts");
-                assert_eq!(sub_parts.len(), 3);
+                let sub_components =
+                    sub.components().expect("Some+Some Sub retains components");
+                assert_eq!(sub_components.len(), 3);
                 assert_eq!(
-                    sub_parts.last().copied(),
-                    Some((-30.0, DurationUnit::Minute))
+                    sub_components.last().copied(),
+                    Some(DurationComponent {
+                        magnitude: -30.0,
+                        unit: DurationUnit::Minute
+                    })
                 );
             }
 
@@ -1627,7 +1675,8 @@ mod tests {
             }
 
             #[test]
-            fn arithmetic_with_none_operand_clears_parts_and_adds_seconds() {
+            fn arithmetic_with_none_operand_clears_components_and_adds_seconds()
+            {
                 // Arrange
                 let none_dv = DurationValue::from_nominal_seconds(
                     DurationSeconds::try_from(3_600.0).unwrap(),
@@ -1638,7 +1687,7 @@ mod tests {
                 let sum = none_dv + some_dv;
 
                 // Assert
-                assert!(sum.parts().is_none());
+                assert!(sum.components().is_none());
                 assert_eq!(
                     sum.nominal_seconds(),
                     DurationSeconds::try_from(5_400.0).unwrap()
@@ -1646,7 +1695,7 @@ mod tests {
             }
 
             #[test]
-            fn sub_with_none_operand_clears_parts_and_subtracts_seconds() {
+            fn sub_with_none_operand_clears_components_and_subtracts_seconds() {
                 // Arrange
                 let none_dv = DurationValue::from_nominal_seconds(
                     DurationSeconds::try_from(3_600.0).unwrap(),
@@ -1658,7 +1707,7 @@ mod tests {
 
                 // Assert: mixed `Some`+`None` ⇒ `None` witness; seconds
                 // subtract directly as the fixed-regime operands.
-                assert!(diff.parts().is_none());
+                assert!(diff.components().is_none());
                 assert_eq!(
                     diff.nominal_seconds(),
                     DurationSeconds::try_from(1_800.0).unwrap()
@@ -1672,17 +1721,23 @@ mod tests {
 
                 // Act
                 let scaled = dv * 2.5;
-                let parts = scaled.parts().unwrap();
+                let components = scaled.components().unwrap();
 
                 // Assert
-                assert_eq!(parts.len(), 2);
+                assert_eq!(components.len(), 2);
                 assert_eq!(
-                    parts.first().copied(),
-                    Some((2.5, DurationUnit::Hour))
+                    components.first().copied(),
+                    Some(DurationComponent {
+                        magnitude: 2.5,
+                        unit: DurationUnit::Hour
+                    })
                 );
                 assert_eq!(
-                    parts.get(1).copied(),
-                    Some((75.0, DurationUnit::Minute))
+                    components.get(1).copied(),
+                    Some(DurationComponent {
+                        magnitude: 75.0,
+                        unit: DurationUnit::Minute
+                    })
                 );
                 assert_eq!(
                     scaled.nominal_seconds().0.to_bits(),

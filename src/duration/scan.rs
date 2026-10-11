@@ -1,4 +1,7 @@
-use super::{unit::DurationUnit, value::DurationError};
+use super::{
+    unit::DurationUnit,
+    value::{DurationComponent, DurationError},
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum ScanMode {
@@ -221,14 +224,17 @@ pub(super) fn parsed_unit(
     Ok((kind, end))
 }
 
-/// Negates every magnitude in `parts` when `is_negative` is `true`.
-pub(super) fn apply_sign(parts: &mut [(f64, DurationUnit)], is_negative: bool) {
+/// Negates every magnitude in `components` when `is_negative` is `true`.
+pub(super) fn apply_sign(
+    components: &mut [DurationComponent],
+    is_negative: bool,
+) {
     let sign = if is_negative {
         -1.0
     } else {
         1.0
     };
-    for (mag, _) in parts {
-        *mag *= sign;
+    for component in components {
+        component.magnitude *= sign;
     }
 }

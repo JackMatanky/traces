@@ -6,7 +6,9 @@ use num_traits::ToPrimitive as _;
 use super::value::{
     DateError, DatePoint, DateTimeValue, DateValue, local_naive_to_utc,
 };
-use crate::duration::{DurationSeconds, DurationUnit, DurationValue};
+use crate::duration::{
+    DurationComponent, DurationSeconds, DurationUnit, DurationValue,
+};
 
 impl DateValue {
     /// Shifts this civil date by `n` `unit`s.
@@ -30,7 +32,7 @@ impl DateValue {
 
     /// Applies `duration` to this civil date.
     ///
-    /// Pure civil arithmetic. Retained written parts apply in written
+    /// Pure civil arithmetic. Retained written components apply in written
     /// left-to-right order; a fixed magnitude applies as exact seconds on the
     /// civil wall clock.
     ///
@@ -42,10 +44,14 @@ impl DateValue {
         self,
         duration: &DurationValue,
     ) -> Result<Self, DateError> {
-        if let Some(parts) = duration.parts() {
+        if let Some(components) = duration.components() {
             let mut current = self;
-            for &(mag, unit) in parts {
-                current = current.apply_part(mag, unit)?;
+            for &DurationComponent {
+                magnitude,
+                unit,
+            } in components
+            {
+                current = current.apply_part(magnitude, unit)?;
             }
             Ok(current)
         } else {
@@ -220,12 +226,12 @@ impl DateTimeValue {
 
     /// Applies `duration` to this date-time.
     ///
-    /// - Retained written parts ([`DurationValue::parts`] is [`Some`]) apply in
-    ///   written left-to-right order: calendar units shift the local wall clock
-    ///   (wall time survives DST), sub-day units shift the stored instant
-    ///   exactly.
-    /// - A fixed magnitude ([`DurationValue::parts`] is [`None`]) applies as
-    ///   exact seconds to the stored instant.
+    /// - Retained written components ([`DurationValue::components`] is
+    ///   [`Some`]) apply in written left-to-right order: calendar units shift
+    ///   the local wall clock (wall time survives DST), sub-day units shift the
+    ///   stored instant exactly.
+    /// - A fixed magnitude ([`DurationValue::components`] is [`None`]) applies
+    ///   as exact seconds to the stored instant.
     ///
     /// # Errors
     ///
@@ -237,10 +243,14 @@ impl DateTimeValue {
         self,
         duration: &DurationValue,
     ) -> Result<Self, DateError> {
-        if let Some(parts) = duration.parts() {
+        if let Some(components) = duration.components() {
             let mut current = self;
-            for &(mag, unit) in parts {
-                current = current.apply_part(mag, unit)?;
+            for &DurationComponent {
+                magnitude,
+                unit,
+            } in components
+            {
+                current = current.apply_part(magnitude, unit)?;
             }
             Ok(current)
         } else {
