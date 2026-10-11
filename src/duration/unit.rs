@@ -113,7 +113,6 @@ impl DurationUnit {
 
     /// Returns `true` if this unit is a calendar application unit
     /// ([`Self::Day`], [`Self::Week`], [`Self::Month`], or [`Self::Year`]).
-    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) const fn is_calendar(self) -> bool {

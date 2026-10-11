@@ -243,17 +243,25 @@ src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> 
 src/config/trust.rs: pub(super) store: TrustStore,
 src/config/trust.rs: pub(super) struct Fixture {
 src/date/calendar.rs: pub(crate) enum Difference {
+src/date/calendar.rs: pub(crate) enum Edge {
+src/date/calendar.rs: pub(crate) enum Period {
+src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn diff(
+src/date/calendar.rs: pub(crate) fn diff(
+src/date/calendar.rs: pub(crate) fn end_of(self, period: Period) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn month_boundary(self, end: bool) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn shift(
+src/date/calendar.rs: pub(crate) fn shift(
+src/date/calendar.rs: pub(crate) fn start_of(self, period: Period) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/date/calendar.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn weekday_point(
+src/date/calendar.rs: pub(crate) fn with_weekday(
 src/date/calendar.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
 src/date/mod.rs: pub use value::{DateError, DateTimeValue, DateValue};
 src/date/mod.rs: pub(crate) use calendar::Difference;

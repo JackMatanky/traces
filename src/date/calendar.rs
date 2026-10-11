@@ -1,10 +1,11 @@
 use chrono::{
-    Datelike as _, Days, Months, NaiveDate, NaiveDateTime, TimeDelta, Weekday,
+    Datelike as _, Days, Months, NaiveDate, NaiveDateTime, NaiveTime,
+    TimeDelta, Weekday,
 };
 use num_traits::ToPrimitive as _;
 
 use super::value::{
-    DateError, DatePoint, DateTimeValue, DateValue, resolve_local,
+    DateError, DatePoint, DateTimeValue, DateValue, Point, resolve_local,
 };
 use crate::duration::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
@@ -148,81 +149,12 @@ impl DateTimeValue {
         n: i64,
         unit: DurationUnit,
     ) -> Result<Self, DateError> {
-        match unit {
-            DurationUnit::Year => {
-                let months = n.checked_mul(12).ok_or(DateError::OutOfRange)?;
-                self.shift_calendar_months(months)
-            }
-            DurationUnit::Month => self.shift_calendar_months(n),
-            DurationUnit::Week => {
-                let days = n.checked_mul(7).ok_or(DateError::OutOfRange)?;
-                self.shift_calendar_days(days)
-            }
-            DurationUnit::Day => self.shift_calendar_days(n),
-            DurationUnit::Hour
-            | DurationUnit::Minute
-            | DurationUnit::Second => {
-                let secs = unit
-                    .whole_nominal_seconds()
-                    .ok_or(DateError::OutOfRange)?
-                    .checked_mul(n)
-                    .ok_or(DateError::OutOfRange)?;
-                let delta = chrono::Duration::try_seconds(secs)
-                    .ok_or(DateError::OutOfRange)?;
-                let instant = self
-                    .0
-                    .checked_add_signed(delta)
-                    .ok_or(DateError::OutOfRange)?;
-                Ok(Self(instant))
-            }
-            DurationUnit::Millisecond => {
-                let delta = chrono::Duration::try_milliseconds(n)
-                    .ok_or(DateError::OutOfRange)?;
-                let instant = self
-                    .0
-                    .checked_add_signed(delta)
-                    .ok_or(DateError::OutOfRange)?;
-                Ok(Self(instant))
-            }
-        }
-    }
-
-    /// Shifts the local wall clock by `months` calendar months, then resolves
-    /// the result back to an instant through the local zone.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::OutOfRange`] if the local wall clock is unavailable or
-    ///   the month arithmetic overflows.
-    /// - [`DateError::LocalZoneLookup`] if the shifted wall clock cannot be
-    ///   resolved in the local zone.
-    fn shift_calendar_months(self, months: i64) -> Result<Self, DateError> {
-        let wall = self.local_wall().ok_or(DateError::OutOfRange)?;
-        let new_wall = shift_wall_months(wall, months)?;
-        let instant = resolve_local(new_wall)?;
-        Ok(Self(instant))
-    }
-
-    /// Shifts the local wall clock by `days` calendar days, then resolves the
-    /// result back to an instant through the local zone.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::OutOfRange`] if the local wall clock is unavailable or
-    ///   the day arithmetic overflows.
-    /// - [`DateError::LocalZoneLookup`] if the shifted wall clock cannot be
-    ///   resolved in the local zone.
-    fn shift_calendar_days(self, days: i64) -> Result<Self, DateError> {
-        let wall = self.local_wall().ok_or(DateError::OutOfRange)?;
-        let days_u64 = days.unsigned_abs();
-        let new_wall = if days >= 0 {
-            wall.checked_add_days(Days::new(days_u64))
+        if unit.is_calendar() {
+            let wall = self.local_wall().ok_or(DateError::OutOfRange)?;
+            Ok(Self(resolve_local(shift_wall_clock(wall, n, unit)?)?))
         } else {
-            wall.checked_sub_days(Days::new(days_u64))
+            Ok(Self(shift_wall_clock(self.0.naive_utc(), n, unit)?.and_utc()))
         }
-        .ok_or(DateError::OutOfRange)?;
-        let instant = resolve_local(new_wall)?;
-        Ok(Self(instant))
     }
 
     /// Applies `duration` to this date-time.
@@ -596,6 +528,302 @@ impl DatePoint {
             }
         }
     }
+}
+/// Calendar period used for date boundaries.
+#[expect(dead_code, reason = "periods are migrated into callers in phase 6.4")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Period {
+    Week,
+    Month,
+    Year,
+}
+
+/// Which side of a calendar period to select.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[expect(
+    dead_code,
+    reason = "period edges are migrated into callers in phase 6.4"
+)]
+pub(crate) enum Edge {
+    Start,
+    End,
+}
+
+#[expect(
+    dead_code,
+    reason = "Point arithmetic is migrated into callers in phase 6.4"
+)]
+impl Point {
+    /// Shifts a civil date without zone resolution or an instant in its own
+    /// frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns out-of-range or local-zone resolution errors.
+    pub(crate) fn shift(
+        self,
+        n: i64,
+        unit: DurationUnit,
+    ) -> Result<Self, DateError> {
+        match self {
+            Self::Civil {
+                precision,
+                ..
+            } => {
+                let wall = shift_wall_clock(self.wall(), n, unit)?;
+                Ok(Self::Civil {
+                    date: DateValue(wall.date()),
+                    precision,
+                })
+            }
+            Self::Instant(dt) => dt.shift(n, unit).map(Self::Instant),
+        }
+    }
+
+    fn advance_wall(self, delta: TimeDelta) -> Result<Self, DateError> {
+        match self {
+            Self::Civil {
+                date,
+                precision,
+            } => Ok(Self::Civil {
+                date: civil_advance(date, delta)?,
+                precision,
+            }),
+            Self::Instant(dt) => {
+                let wall = dt.local_wall().ok_or(DateError::OutOfRange)?;
+                let shifted = wall
+                    .checked_add_signed(delta)
+                    .ok_or(DateError::OutOfRange)?;
+                Ok(Self::Instant(DateTimeValue(resolve_local(shifted)?)))
+            }
+        }
+    }
+
+    fn advance_exact(self, delta: TimeDelta) -> Result<Self, DateError> {
+        match self {
+            Self::Civil {
+                date,
+                precision,
+            } => Ok(Self::Civil {
+                date: civil_advance(date, delta)?,
+                precision,
+            }),
+            Self::Instant(dt) => Ok(Self::Instant(DateTimeValue(
+                dt.utc()
+                    .checked_add_signed(delta)
+                    .ok_or(DateError::OutOfRange)?,
+            ))),
+        }
+    }
+
+    fn apply_component(
+        self,
+        component: DurationComponent,
+    ) -> Result<Self, DateError> {
+        let DurationComponent {
+            magnitude,
+            unit,
+        } = component;
+        if !magnitude.is_finite() {
+            return Err(DateError::OutOfRange);
+        }
+        if unit.is_calendar() {
+            let whole =
+                magnitude.trunc().to_i64().ok_or(DateError::OutOfRange)?;
+            let shifted = if whole != 0 {
+                self.shift(whole, unit)?
+            } else {
+                self
+            };
+            let remainder = magnitude.fract() * unit.nominal_seconds();
+            if remainder == 0.0 {
+                Ok(shifted)
+            } else {
+                shifted.advance_wall(time_delta_from_seconds(remainder)?)
+            }
+        } else {
+            self.advance_exact(time_delta_from_seconds(
+                magnitude * unit.nominal_seconds(),
+            )?)
+        }
+    }
+
+    /// Applies retained components in written order, or fixed seconds exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns out-of-range or local-zone resolution errors.
+    pub(crate) fn apply(
+        self,
+        duration: &DurationValue,
+    ) -> Result<Self, DateError> {
+        match duration.components() {
+            Some(components) => {
+                components.iter().try_fold(self, |point, &component| {
+                    point.apply_component(component)
+                })
+            }
+            None => self.advance_exact(
+                TimeDelta::try_from(duration.nominal_seconds())
+                    .map_err(|_| DateError::OutOfRange)?,
+            ),
+        }
+    }
+
+    fn with_date(self, date: NaiveDate) -> Result<Self, DateError> {
+        match self {
+            Self::Civil {
+                precision,
+                ..
+            } => Ok(Self::Civil {
+                date: DateValue(date),
+                precision,
+            }),
+            Self::Instant(_) => {
+                let wall = date.and_time(self.wall().time());
+                Ok(Self::Instant(DateTimeValue(resolve_local(wall)?)))
+            }
+        }
+    }
+
+    fn boundary(self, period: Period, edge: Edge) -> Result<Self, DateError> {
+        let date = self.wall().date();
+        let new_date = match (period, edge) {
+            (Period::Week, edge) => {
+                let iso = date.iso_week();
+                NaiveDate::from_isoywd_opt(
+                    iso.year(),
+                    iso.week(),
+                    if edge == Edge::Start {
+                        Weekday::Mon
+                    } else {
+                        Weekday::Sun
+                    },
+                )
+            }
+            (Period::Month, edge) => date.with_day(if edge == Edge::Start {
+                1
+            } else {
+                u32::from(date.num_days_in_month())
+            }),
+            (Period::Year, Edge::Start) => {
+                NaiveDate::from_ymd_opt(date.year(), 1, 1)
+            }
+            (Period::Year, Edge::End) => {
+                NaiveDate::from_ymd_opt(date.year(), 12, 31)
+            }
+        }
+        .ok_or(DateError::OutOfRange)?;
+        self.with_date(new_date)
+    }
+
+    /// Returns the first day of the period, preserving written precision and
+    /// time.
+    ///
+    /// # Errors
+    ///
+    /// Returns out-of-range or local-zone resolution errors.
+    pub(crate) fn start_of(self, period: Period) -> Result<Self, DateError> {
+        self.boundary(period, Edge::Start)
+    }
+
+    /// Returns the last day of the period, preserving written precision and
+    /// time.
+    ///
+    /// # Errors
+    ///
+    /// Returns out-of-range or local-zone resolution errors.
+    pub(crate) fn end_of(self, period: Period) -> Result<Self, DateError> {
+        self.boundary(period, Edge::End)
+    }
+
+    /// Selects a weekday of this point's ISO week.
+    ///
+    /// # Errors
+    ///
+    /// Returns out-of-range or local-zone resolution errors.
+    pub(crate) fn with_weekday(
+        self,
+        target: Weekday,
+    ) -> Result<Self, DateError> {
+        let iso = self.wall().date().iso_week();
+        let date = NaiveDate::from_isoywd_opt(iso.year(), iso.week(), target)
+            .ok_or(DateError::OutOfRange)?;
+        self.with_date(date)
+    }
+
+    /// Measures the difference to another point in the requested unit.
+    ///
+    /// # Errors
+    ///
+    /// Returns out-of-range when the measurement cannot be represented.
+    pub(crate) fn diff(
+        self,
+        to: Self,
+        unit: DurationUnit,
+    ) -> Result<Difference, DateError> {
+        match unit {
+            DurationUnit::Year => Ok(Difference::Whole(whole_years_between(
+                self.wall().date(),
+                to.wall().date(),
+            ))),
+            DurationUnit::Month => Ok(Difference::Whole(whole_months_between(
+                self.wall().date(),
+                to.wall().date(),
+            ))),
+            DurationUnit::Week
+            | DurationUnit::Day
+            | DurationUnit::Hour
+            | DurationUnit::Minute
+            | DurationUnit::Second
+            | DurationUnit::Millisecond => {
+                if self.has_time() && to.has_time() {
+                    let delta =
+                        to.instant().signed_duration_since(self.instant());
+                    let whole_seconds = delta
+                        .num_seconds()
+                        .to_f64()
+                        .ok_or(DateError::OutOfRange)?;
+                    Ok(Difference::Fractional(
+                        (whole_seconds + f64::from(delta.subsec_nanos()) / 1e9)
+                            / unit.nominal_seconds(),
+                    ))
+                } else if unit == DurationUnit::Millisecond {
+                    Ok(Difference::Whole(
+                        to.wall()
+                            .signed_duration_since(self.wall())
+                            .num_milliseconds(),
+                    ))
+                } else {
+                    let delta = to.wall().signed_duration_since(self.wall());
+                    let unit_secs = unit
+                        .whole_nominal_seconds()
+                        .ok_or(DateError::OutOfRange)?;
+                    #[expect(
+                        clippy::arithmetic_side_effects,
+                        reason = "fixed unit ratio is nonzero"
+                    )]
+                    let result = delta.num_seconds() / unit_secs;
+                    Ok(Difference::Whole(result))
+                }
+            }
+        }
+    }
+}
+
+#[expect(
+    dead_code,
+    reason = "civil arithmetic is migrated into callers in phase 6.4"
+)]
+fn civil_advance(
+    date: DateValue,
+    delta: TimeDelta,
+) -> Result<DateValue, DateError> {
+    date.naive_date()
+        .and_time(NaiveTime::MIN)
+        .checked_add_signed(delta)
+        .map(|wall| DateValue(wall.date()))
+        .ok_or(DateError::OutOfRange)
 }
 
 /// Result of measuring the difference between two date/time points.
