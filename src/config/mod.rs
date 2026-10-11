@@ -5,9 +5,9 @@
 //! 1. **Discover** local `.traces/config.toml` and optional global
 //!    `traces/config.toml` from a directory anchor ([`discovery`]).
 //! 2. **Track** discovered local configs in a best-effort store
-//!    ([`service::ConfigService`]).
+//!    ([`tracker::TrackerStore`]).
 //! 3. **Verify trust** before parsing local content; reject untrusted or stale
-//!    files ([`trust`]).
+//!    files ([`trust::TrustStore`]).
 //! 4. **Parse** TOML into [`raw::RawConfig`] ([`mod@file`]).
 //! 5. **Merge** global config before local so local values win
 //!    ([`service::ConfigService`]).
@@ -17,11 +17,16 @@
 //!
 //! # Main Types
 //!
-//! - [`ConfigService`] owns the load pipeline and trust administration.
+//! - [`ConfigService`] owns the load pipeline and delegates durable state to
+//!   its two stores.
+//! - [`trust::TrustStore`] and [`tracker::TrackerStore`] persist trust
+//!   decisions and the seen-config registry.
 //! - [`Config`] holds merged settings ready for consumers.
 //! - [`TaskConfig`] holds resolved task status mappings and tag filters.
 //! - [`TrustRequest`] names a workspace root or config file for trust
 //!   operations.
+//! - [`error::ConfigError`] composes the four stage errors raised by
+//!   [`ConfigService::load`].
 //!
 //! Filesystem paths are resolved by the [`crate::dirs`] module.
 
@@ -39,10 +44,9 @@ pub(crate) use builder::ConfigBuilder;
 pub(crate) use discovery::{
     LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE, TrustScope, trust_requests,
 };
-#[cfg(test)]
-pub(crate) use error::ConfigReadError;
 pub(crate) use error::{
-    ConfigDiscoveryError, ConfigError, ConfigTrustError, ConfigValueError,
+    ConfigDiscoveryError, ConfigError, ConfigReadError, ConfigTrustError,
+    ConfigValueError,
 };
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) use file::{Discovered, LocalConfigFile};

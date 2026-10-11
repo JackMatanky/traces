@@ -94,7 +94,6 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("notes/todo.md", "- [ ] task");
-            let _guard = CwdGuard::enter(project.root());
 
             Index.run(&project.config()).expect("run index command");
 
@@ -109,7 +108,6 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("first.md", "content");
-            let _guard = CwdGuard::enter(project.root());
             Index.run(&project.config()).expect("first index run");
 
             let reloaded =
@@ -123,7 +121,6 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("stale.md", "old");
-            let _guard = CwdGuard::enter(project.root());
             Index.run(&project.config()).expect("first index run");
             fs::remove_file(project.root().join("stale.md"))
                 .expect("remove stale");
@@ -182,7 +179,6 @@ mod tests {
             fs::set_permissions(&locked, fs::Permissions::from_mode(0o000))
                 .expect("revoke read permission");
             let _restore = RestorePermissions(&locked);
-            let _guard = CwdGuard::enter(project.root());
 
             let error = Index
                 .run(&project.config())

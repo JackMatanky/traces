@@ -506,14 +506,12 @@ mod tests {
     mod run {
 
         use super::*;
-        use crate::cli::CwdGuard;
 
         #[test]
         fn succeeds_for_a_trusted_project_root() {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("a.md", "# A\n");
-            let _guard = CwdGuard::enter(project.root());
             let list = List {
                 from: None,
                 filter: vec![],

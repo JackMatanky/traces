@@ -52,9 +52,14 @@ impl ConfigBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigValueError`] if `SchemasConfig`, `FrontmatterConfig`, or
-    /// `TaskConfig` field validation fails (e.g. invalid field key, escaping
-    /// subdirectory, or invalid `tag_filters` entry).
+    /// - [`ConfigValueError::InvalidSubDir`] when a configured template or
+    ///   schema directory escapes the workspace root.
+    /// - [`ConfigValueError::InvalidFieldKey`] when a `[frontmatter]` or
+    ///   `[schemas]` key name is invalid.
+    /// - [`ConfigValueError::InvalidTagFilter`] when a `[tasks] tag_filters`
+    ///   entry is not a valid tag.
+    /// - [`ConfigValueError::Task`] when a `[tasks]` status uses a prohibited
+    ///   delimiter symbol.
     pub(crate) fn build(self) -> Result<Config, ConfigValueError> {
         Ok(Config::new(
             self.resolve_templates()?,

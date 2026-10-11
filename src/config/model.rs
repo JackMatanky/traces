@@ -243,12 +243,12 @@ impl Config {
     ///
     /// Hashes a canonical, NUL-delimited encoding of every field this
     /// `Config` carries. The digest changes whenever any field a consumer
-    /// could read would change, and stays stable otherwise — including
-    /// across process restarts, since [`Blake3FileHash`] is a fixed BLAKE3
-    /// digest rather than a process-randomized hash. Intended for future
-    /// index cache invalidation: a persisted fingerprint lets a consumer
-    /// detect configuration drift without re-reading config files or
-    /// diffing their parsed representation.
+    /// could read would change, and stays stable otherwise, including across
+    /// process restarts, since [`Blake3FileHash`] is a fixed BLAKE3 digest
+    /// rather than a process-randomized hash. Intended for future index cache
+    /// invalidation: a persisted fingerprint lets a consumer detect
+    /// configuration drift without re-reading config files or diffing their
+    /// parsed representation.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -283,11 +283,19 @@ impl Config {
         let mut statuses: Vec<&TaskStatus> =
             self.tasks.statuses().iter().collect();
         statuses.sort_by_key(|status| status.symbol().as_char());
+        // Counts delimit the two variable-length sequences, so a status can
+        // never be re-read as a tag filter (or the reverse).
+        push_field(&mut canonical, &statuses.len().to_string());
         for status in statuses {
-            push_field(&mut canonical, &status.symbol().as_char().to_string());
+            let mut symbol = [0_u8; 4];
+            push_field(
+                &mut canonical,
+                status.symbol().as_char().encode_utf8(&mut symbol),
+            );
             push_field(&mut canonical, status.name());
-            push_field(&mut canonical, &format!("{:?}", status.kind()));
+            push_field(&mut canonical, status.kind().as_str());
         }
+        push_field(&mut canonical, &self.tasks.tag_filters().len().to_string());
         for tag in self.tasks.tag_filters() {
             push_field(&mut canonical, tag.as_str());
         }
@@ -690,9 +698,9 @@ impl TryFrom<RawTaskConfig> for TaskConfig {
 
     /// # Errors
     ///
-    /// - [`ConfigValueError::Task`] if a configured task status uses a
-    ///   prohibited delimiter symbol: `(`, `)`, `[`, `]`, `{`, or `}`.
-    /// - [`ConfigValueError::InvalidTagFilter`] when a `tag_filters` entry does
+    /// - `ConfigValueError::Task` if a configured task status uses a prohibited
+    ///   delimiter symbol: `(`, `)`, `[`, `]`, `{`, or `}`.
+    /// - `ConfigValueError::InvalidTagFilter` when a `tag_filters` entry does
     ///   not normalize into a valid [`Tag`].
     #[inline]
     fn try_from(raw: RawTaskConfig) -> Result<Self, Self::Error> {
@@ -914,26 +922,62 @@ mod tests {
 
     mod hash {
         use pretty_assertions::{assert_eq, assert_ne};
+        use rstest::rstest;
 
         use super::*;
 
-        #[test]
-        fn is_stable_across_repeated_calls() {
-            let config = Config::test_default(PathBuf::from("/project"));
+        fn field_name(name: &str) -> FieldName {
+            FieldName::try_from(name).expect("valid field name")
+        }
 
-            let first = config.hash();
-            let second = config.hash();
-
-            assert_eq!(first, second);
+        fn base() -> Config {
+            Config::for_test(
+                PathBuf::from("/project"),
+                Some(PathBuf::from("/project/local")),
+                Some(PathBuf::from("/global")),
+                PathBuf::from("/project/out"),
+            )
         }
 
         #[test]
-        fn changes_when_tag_filters_change() {
-            let base = Config::test_default(PathBuf::from("/project"));
-            let changed =
-                base.clone().with_tasks(TaskConfig::from_tags(&["#work"]));
+        fn is_equal_for_separately_built_equal_configs() {
+            assert_eq!(base().hash(), base().hash());
+        }
 
-            assert_ne!(base.hash(), changed.hash());
+        #[rstest]
+        #[case::root(|c: &mut Config| c.root = Arc::from(Path::new("/other")))]
+        #[case::local_templates(|c: &mut Config| c.templates.local = None)]
+        #[case::global_templates(|c: &mut Config| c.templates.global = None)]
+        #[case::output(|c: &mut Config| c.templates.output = PathBuf::from("/o"))]
+        #[case::class_field(|c: &mut Config| c.schemas.class_field = field_name("kind"))]
+        #[case::schemas_directory(|c: &mut Config| c.schemas.directory = PathBuf::from("/s"))]
+        #[case::title(|c: &mut Config| c.frontmatter.title = field_name("heading"))]
+        #[case::aliases(|c: &mut Config| c.frontmatter.aliases = field_name("akas"))]
+        #[case::tags(|c: &mut Config| c.frontmatter.tags = field_name("labels"))]
+        #[case::created_name(|c: &mut Config| c.frontmatter.date_created.name = field_name("made"))]
+        #[case::created_format(|c: &mut Config| c.frontmatter.date_created.format = "%Y".to_owned())]
+        #[case::modified_name(|c: &mut Config| c.frontmatter.date_modified.name = field_name("edited"))]
+        #[case::modified_format(|c: &mut Config| c.frontmatter.date_modified.format = "%Y".to_owned())]
+        #[case::tag_filters(|c: &mut Config| c.tasks = TaskConfig::from_tags(&["#work"]))]
+        #[case::added_status(|c: &mut Config| c.tasks.statuses.insert(TaskStatus::new(
+            TaskStatusSymbol::new('!'),
+            "Urgent",
+            TaskStatusType::Todo,
+        )).expect("insert status"))]
+        #[case::overridden_status_kind(|c: &mut Config| c.tasks.statuses.insert(TaskStatus::new(
+            TaskStatusSymbol::new(' '),
+            "Todo",
+            TaskStatusType::Done,
+        )).expect("insert status"))]
+        fn changes_when_a_resolved_field_changes(
+            #[case] mutate: fn(&mut Config),
+        ) {
+            let original = base();
+            let mut changed = original.clone();
+
+            mutate(&mut changed);
+
+            assert_ne!(original.hash(), changed.hash());
         }
     }
 

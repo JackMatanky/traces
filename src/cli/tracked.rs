@@ -16,7 +16,7 @@ use crate::config::TrackerStore;
 /// Arguments for `traces tracked`.
 ///
 /// Inspects or cleans the best-effort store of local config files that
-/// [`ConfigService::load`] has seen.
+/// [`crate::ConfigService::load`] has seen.
 #[derive(Debug, Args)]
 pub(super) struct Tracked {
     #[command(subcommand)]

@@ -193,6 +193,10 @@ impl DiscoveryOutcome {
 ///   ancestor directory.
 /// - [`ConfigDiscoveryError::Inaccessible`] when a filesystem path cannot be
 ///   inspected.
+/// - [`ConfigDiscoveryError::UnsupportedLocalCandidate`] when a file anchor or
+///   a discovered path is not a valid `.traces/config.toml`.
+/// - [`ConfigDiscoveryError::UnsupportedGlobalCandidate`] when the global
+///   config path is not named `config.toml`.
 #[inline]
 pub(crate) fn run(
     ctx: DiscoveryContext,

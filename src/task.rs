@@ -328,6 +328,23 @@ impl TaskStatusType {
         }
     }
 
+    /// Returns the stable lowercase identifier for this status type.
+    ///
+    /// Shared by query output and the config fingerprint, so it must not
+    /// change for an existing variant.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Todo => "todo",
+            Self::InProgress => "in-progress",
+            Self::OnHold => "on-hold",
+            Self::Done => "done",
+            Self::Cancelled => "cancelled",
+            Self::NonTask => "non-task",
+        }
+    }
+
     /// Derives the boolean completion rollup for this status type.
     ///
     /// Returns `true` for completed or cancelled tasks, and `false` for

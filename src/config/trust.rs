@@ -349,8 +349,8 @@ impl TrustStore {
     ///
     /// # Errors
     ///
-    /// - If the trust store cannot remove the root entry or its content-hash
-    ///   companion.
+    /// - [`ConfigTrustError::Tracker`] if the trust store cannot remove the
+    ///   root entry or its content-hash companion.
     #[inline]
     pub(crate) fn untrust(
         &self,
@@ -392,12 +392,317 @@ impl TrustStore {
 mod tests {
     use super::*;
 
-    #[test]
-    fn missing_baseline_displays_distinctly_from_stale() {
-        assert_eq!(
-            ConfigTrustStatus::MissingBaseline.to_string(),
-            "missing baseline"
-        );
-        assert_eq!(ConfigTrustStatus::Stale.to_string(), "stale");
+    mod fixtures {
+        use super::*;
+
+        /// Isolated trust store plus a project directory beneath one temp dir.
+        pub(super) struct Fixture {
+            temp: tempfile::TempDir,
+            pub(super) store: TrustStore,
+        }
+
+        impl Fixture {
+            pub(super) fn new() -> Self {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let store = TrustStore::at(temp.path().join("trust-store"));
+                Self {
+                    temp,
+                    store,
+                }
+            }
+
+            pub(super) fn project(&self, name: &str) -> PathBuf {
+                let root = self.temp.path().join(name);
+                fs::create_dir_all(&root).expect("create project dir");
+                root
+            }
+
+            pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
+                let path = root.join(".traces/config.toml");
+                fs::create_dir_all(path.parent().expect("config parent"))
+                    .expect("create config dir");
+                fs::write(&path, contents).expect("write config");
+                path
+            }
+
+            pub(super) fn config_request(path: &Path) -> TrustRequest {
+                let config =
+                    LocalConfigFile::<Discovered>::try_new(path.to_path_buf())
+                        .expect("valid local config path");
+                TrustRequest::from(&config)
+            }
+        }
+    }
+
+    use fixtures::Fixture;
+
+    mod formatting {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn missing_baseline_displays_distinctly_from_stale() {
+            assert_eq!(
+                ConfigTrustStatus::MissingBaseline.to_string(),
+                "missing baseline"
+            );
+            assert_eq!(ConfigTrustStatus::Stale.to_string(), "stale");
+        }
+    }
+
+    mod trust {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn records_workspace_trust() {
+            let fixture = Fixture::new();
+            let subject =
+                TrustRequest::from(fixture.project("project").as_path());
+
+            let result = fixture.store.trust(&subject);
+
+            assert!(result.is_ok());
+            assert_eq!(
+                fixture.store.trust_status(&subject).expect("status"),
+                ConfigTrustStatus::Trusted
+            );
+        }
+
+        #[test]
+        fn records_config_trust_and_hashes_content() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let subject =
+                Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
+
+            let result = fixture.store.trust(&subject);
+
+            assert!(result.is_ok());
+            assert_eq!(
+                fixture.store.trust_status(&subject).expect("status"),
+                ConfigTrustStatus::Trusted
+            );
+        }
+
+        #[test]
+        fn records_workspace_without_baseline_when_no_config_is_present() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+
+            fixture
+                .store
+                .trust(&TrustRequest::from(root.as_path()))
+                .expect("trust root");
+
+            let config_subject =
+                Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
+            assert_eq!(fixture.store.list().expect("list"), vec![
+                root.canonicalize().expect("canonicalize")
+            ]);
+            assert_eq!(
+                fixture.store.trust_status(&config_subject).expect("status"),
+                ConfigTrustStatus::MissingBaseline
+            );
+        }
+
+        #[test]
+        fn fails_with_hash_error_when_config_is_unreadable() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let config_path = Fixture::write_config(&root, "a = 1");
+            let subject = Fixture::config_request(&config_path);
+            fs::remove_file(&config_path).expect("remove config");
+
+            let result = fixture.store.trust(&subject);
+
+            assert!(matches!(result, Err(ConfigTrustError::Hash(_))));
+        }
+
+        #[test]
+        fn leaves_workspace_untrusted_when_config_is_unreadable() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let config_path = Fixture::write_config(&root, "a = 1");
+            let subject = Fixture::config_request(&config_path);
+            fs::remove_file(&config_path).expect("remove config");
+            fixture.store.trust(&subject).expect_err("hash failure");
+
+            let status = fixture.store.workspace_trust_status(&subject);
+
+            assert_eq!(
+                status.expect("status"),
+                WorkspaceTrustStatus::Untrusted
+            );
+        }
+    }
+
+    mod trust_status {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn returns_untrusted_for_unknown_workspace() {
+            let fixture = Fixture::new();
+            let subject =
+                TrustRequest::from(fixture.project("project").as_path());
+
+            let result = fixture.store.trust_status(&subject);
+
+            assert_eq!(result.expect("status"), ConfigTrustStatus::Untrusted);
+        }
+
+        #[test]
+        fn returns_untrusted_for_unknown_config() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let subject =
+                Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
+
+            let result = fixture.store.trust_status(&subject);
+
+            assert_eq!(result.expect("status"), ConfigTrustStatus::Untrusted);
+        }
+
+        #[test]
+        fn returns_stale_when_config_content_changes_after_trust() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let config_path = Fixture::write_config(&root, "a = 1");
+            let subject = Fixture::config_request(&config_path);
+            fixture.store.trust(&subject).expect("trust config");
+            fs::write(&config_path, "a = 2").expect("edit config");
+
+            let result = fixture.store.trust_status(&subject);
+
+            assert_eq!(result.expect("status"), ConfigTrustStatus::Stale);
+        }
+
+        #[test]
+        fn returns_missing_baseline_when_only_the_workspace_was_trusted() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let subject =
+                Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
+            fixture
+                .store
+                .trust(&TrustRequest::from(root.as_path()))
+                .expect("trust root");
+
+            let result = fixture.store.trust_status(&subject);
+
+            assert_eq!(
+                result.expect("status"),
+                ConfigTrustStatus::MissingBaseline
+            );
+        }
+    }
+
+    mod untrust {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn returns_zero_when_the_root_was_never_trusted() {
+            let fixture = Fixture::new();
+            let subject =
+                TrustRequest::from(fixture.project("project").as_path());
+
+            let result = fixture.store.untrust(&subject);
+
+            assert_eq!(result.expect("untrust"), 0);
+        }
+
+        #[test]
+        fn removes_trust_and_its_baseline() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let subject =
+                Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
+            fixture.store.trust(&subject).expect("trust config");
+
+            let removed = fixture.store.untrust(&subject);
+
+            assert_eq!(removed.expect("untrust"), 1);
+            assert_eq!(
+                fixture.store.trust_status(&subject).expect("status"),
+                ConfigTrustStatus::Untrusted
+            );
+        }
+    }
+
+    mod list {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn returns_empty_when_no_root_is_trusted() {
+            let fixture = Fixture::new();
+
+            let result = fixture.store.list();
+
+            assert_eq!(result.expect("list"), Vec::<PathBuf>::new());
+        }
+
+        #[test]
+        fn returns_the_canonical_trusted_roots() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            fixture
+                .store
+                .trust(&TrustRequest::from(root.as_path()))
+                .expect("trust root");
+
+            let result = fixture.store.list();
+
+            assert_eq!(result.expect("list"), vec![
+                root.canonicalize().expect("canonicalize")
+            ]);
+        }
+    }
+
+    mod clean {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn prunes_a_root_whose_directory_was_deleted() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            fixture
+                .store
+                .trust(&TrustRequest::from(root.as_path()))
+                .expect("trust root");
+            fs::remove_dir_all(&root).expect("remove project");
+
+            let removed = fixture.store.clean();
+
+            assert_eq!(removed.expect("clean"), 1);
+            assert_eq!(
+                fixture.store.list().expect("list"),
+                Vec::<PathBuf>::new()
+            );
+        }
+
+        #[test]
+        fn leaves_live_roots_untouched() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            fixture
+                .store
+                .trust(&TrustRequest::from(root.as_path()))
+                .expect("trust root");
+
+            let removed = fixture.store.clean();
+
+            assert_eq!(removed.expect("clean"), 0);
+            assert_eq!(fixture.store.list().expect("list").len(), 1);
+        }
     }
 }

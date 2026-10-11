@@ -129,15 +129,15 @@ impl Init {
 /// Errors raised while scaffolding a local config file on disk.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigScaffoldError {
-    /// The collected template and output directories could not be
-    /// serialised to TOML.
-    #[error("failed to serialise local config")]
+    /// The collected template and output directories could not be serialized
+    /// to TOML.
+    #[error("failed to serialize local config")]
     Serialize {
         /// Source TOML serialization error.
         #[source]
         source: toml::ser::Error,
     },
-    /// The serialised local config could not be written to disk.
+    /// The serialized local config could not be written to disk.
     ///
     /// Includes the case where the file already exists, since
     /// [`std::fs::File::create_new`] is used to prevent silent clobbering.
@@ -149,7 +149,7 @@ pub(crate) enum ConfigScaffoldError {
     },
 }
 
-/// Serialises `directory`/`output_dir` as the local template config and
+/// Serializes `directory`/`output_dir` as the local template config and
 /// writes it to `root.join(LOCAL_CONFIG_FILE)`.
 ///
 /// `[schemas]` and `[frontmatter]` are written as empty tables (their serde

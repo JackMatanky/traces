@@ -825,7 +825,6 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("todo.md", "- [ ] buy milk\n");
-            let _guard = CwdGuard::enter(project.root());
             let task = Task::default();
 
             task.run(&project.config()).expect("run task command");
@@ -853,7 +852,6 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("todo.md", "- [ ] buy milk\n");
-            let _guard = CwdGuard::enter(project.root());
             let task = Task {
                 presentation: TaskPresentationArgs {
                     count: true,

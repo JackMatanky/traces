@@ -375,19 +375,9 @@ impl QueryRow {
             TaskField::Status => QueryFieldValueRef::Note(
                 NoteFieldValueRef::String(task.status().name()),
             ),
-            TaskField::StatusType => {
-                QueryFieldValueRef::Note(NoteFieldValueRef::String(match task
-                    .status()
-                    .kind()
-                {
-                    crate::TaskStatusType::Todo => "todo",
-                    crate::TaskStatusType::InProgress => "in-progress",
-                    crate::TaskStatusType::OnHold => "on-hold",
-                    crate::TaskStatusType::Done => "done",
-                    crate::TaskStatusType::Cancelled => "cancelled",
-                    crate::TaskStatusType::NonTask => "non-task",
-                }))
-            }
+            TaskField::StatusType => QueryFieldValueRef::Note(
+                NoteFieldValueRef::String(task.status().kind().as_str()),
+            ),
             TaskField::StatusSymbol => {
                 QueryFieldValueRef::Owned(NoteFieldValue::String(
                     task.status().symbol().as_char().to_string(),

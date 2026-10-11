@@ -116,7 +116,6 @@ src/config/mod.rs: pub use service::ConfigService;
 src/config/mod.rs: pub use trust::TrustRequest;
 src/config/mod.rs: pub(crate) use builder::ConfigBuilder;
 src/config/mod.rs: pub(crate) use discovery::{
-src/config/mod.rs: pub(crate) use error::ConfigReadError;
 src/config/mod.rs: pub(crate) use error::{
 src/config/mod.rs: pub(crate) use file::{Discovered, LocalConfigFile};
 src/config/mod.rs: pub(crate) use model::DEFAULT_LOCAL_TEMPLATES_DIR;
@@ -212,6 +211,17 @@ src/config/service.rs: pub(crate) const fn trust_store(&self) -> &TrustStore {
 src/config/service.rs: pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
 src/config/service.rs: pub(crate) fn new() -> Self {
 src/config/service.rs: pub(crate) fn trust(
+src/config/tracker.rs: pub(crate) fn at(root: PathBuf) -> Self {
+src/config/tracker.rs: pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
+src/config/tracker.rs: pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
+src/config/tracker.rs: pub(crate) fn new() -> Self {
+src/config/tracker.rs: pub(crate) fn record(&self, config: &LocalConfigFile<Discovered>) {
+src/config/tracker.rs: pub(crate) struct TrackerStore {
+src/config/tracker.rs: pub(super) fn discovered(
+src/config/tracker.rs: pub(super) fn new() -> Self {
+src/config/tracker.rs: pub(super) fn write_config(&self, name: &str) -> PathBuf {
+src/config/tracker.rs: pub(super) store: TrackerStore,
+src/config/tracker.rs: pub(super) struct Fixture {
 src/config/trust.rs: pub enum ConfigTrustStatus {
 src/config/trust.rs: pub enum TrustRequest {
 src/config/trust.rs: pub(crate) const fn status(&self) -> ConfigTrustStatus {
@@ -231,6 +241,12 @@ src/config/trust.rs: pub(crate) fn untrust(
 src/config/trust.rs: pub(crate) fn workspace_trust_status(
 src/config/trust.rs: pub(crate) struct TrustStore {
 src/config/trust.rs: pub(crate) type TrustRequests = Vec<TrustRequest>;
+src/config/trust.rs: pub(super) fn config_request(path: &Path) -> TrustRequest {
+src/config/trust.rs: pub(super) fn new() -> Self {
+src/config/trust.rs: pub(super) fn project(&self, name: &str) -> PathBuf {
+src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
+src/config/trust.rs: pub(super) store: TrustStore,
+src/config/trust.rs: pub(super) struct Fixture {
 src/date.rs: pub enum DateError {
 src/date.rs: pub struct DateTimeValue(DateTime<Utc>);
 src/date.rs: pub struct DateValue(NaiveDate);
@@ -1318,6 +1334,7 @@ src/task.rs: pub struct TaskDateSetIter {
 src/task.rs: pub struct TaskStatus {
 src/task.rs: pub struct TaskStatusMap {
 src/task.rs: pub struct TaskStatusSymbol(char);
+src/task.rs: pub(crate) const fn as_str(self) -> &'static str {
 src/task.rs: pub(crate) const fn completed(self) -> Option<bool> {
 src/task.rs: pub(crate) const fn is_complete(self) -> bool {
 src/task.rs: pub(crate) fn by_name(&self, name: &str) -> Option<&TaskStatus> {

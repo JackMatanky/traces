@@ -31,25 +31,29 @@ use crate::{
 /// `CliError`).
 #[derive(Debug, Error)]
 pub(crate) enum ConfigError {
-    /// Phase 1 failure: candidate file discovery or ancestor traversal.
+    /// Discovery stage failure: candidate file discovery or ancestor
+    /// traversal.
     #[error(transparent)]
     Discovery(#[from] ConfigDiscoveryError),
-    /// Phase 2 failure: physical file reading or TOML syntax deserialization.
+    /// Read stage failure: physical file reading or TOML syntax
+    /// deserialization.
     #[error(transparent)]
     Read(#[from] ConfigReadError),
-    /// Phase 3 failure: workspace/config-file trust or tracking-store I/O.
+    /// Trust stage failure: workspace or config-file trust verification, or
+    /// trust-store and tracking-store I/O.
     #[error(transparent)]
     Trust(#[from] ConfigTrustError),
-    /// Phase 4 failure: semantic validation of parsed domain values.
+    /// Value stage failure: semantic validation of parsed domain values.
     #[error(transparent)]
     Value(#[from] ConfigValueError),
 }
 
-/// Convenience alias for Phase 1 discovery operations.
+/// Convenience alias for discovery-stage operations.
 pub(crate) type ConfigDiscoveryResult<T> =
     std::result::Result<T, ConfigDiscoveryError>;
 
-/// Phase 1: errors raised while discovering candidate config files on disk.
+/// Discovery stage: errors raised while discovering candidate config files on
+/// disk.
 ///
 /// Discovery checks never emit TOML syntax, trust, or domain model errors.
 #[derive(Debug, Error)]
@@ -89,7 +93,8 @@ pub(crate) enum ConfigDiscoveryError {
     },
 }
 
-/// Phase 2: errors raised while reading file contents or deserializing TOML.
+/// Read stage: errors raised while reading file contents or deserializing
+/// TOML.
 ///
 /// In-memory buffer parsing never emits path discovery or trust errors.
 #[derive(Debug, Error)]
@@ -114,7 +119,8 @@ pub(crate) enum ConfigReadError {
     },
 }
 
-/// Phase 3: errors raised while verifying trust or recording tracked configs.
+/// Trust stage: errors raised while verifying trust, or reading and writing
+/// the trust and tracking stores.
 ///
 /// Governs cryptographic trust verification and the shared
 /// [`crate::FilePathTracker`] I/O that backs both the trust store and the
@@ -124,7 +130,7 @@ pub enum ConfigTrustError {
     /// Workspace root or config file trust verification halted, requiring user
     /// action.
     #[error(
-        "workspace root {root} or config file {path} is untrusted: {status:?}"
+        "config file {path} (workspace root {root}) is untrusted: {status}"
     )]
     Untrusted {
         /// Untrusted workspace root.
@@ -142,7 +148,7 @@ pub enum ConfigTrustError {
     Hash(#[from] HashError),
 }
 
-/// Phase 4: errors raised while validating parsed domain model values.
+/// Value stage: errors raised while validating parsed domain model values.
 ///
 /// Pure in-memory construction; never emits I/O or trust errors.
 #[derive(Debug, Error)]

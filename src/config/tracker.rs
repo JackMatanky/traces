@@ -73,3 +73,130 @@ impl TrackerStore {
         self.store.clean(CleanMode::EntriesOnly).map_err(Into::into)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use super::*;
+
+    mod fixtures {
+        use super::*;
+
+        /// Isolated tracker store plus project directories beneath one temp
+        /// dir.
+        pub(super) struct Fixture {
+            temp: tempfile::TempDir,
+            pub(super) store: TrackerStore,
+        }
+
+        impl Fixture {
+            pub(super) fn new() -> Self {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let store = TrackerStore::at(temp.path().join("tracked-store"));
+                Self {
+                    temp,
+                    store,
+                }
+            }
+
+            /// Writes `<name>/.traces/config.toml` and returns its path.
+            pub(super) fn write_config(&self, name: &str) -> PathBuf {
+                let path =
+                    self.temp.path().join(name).join(".traces/config.toml");
+                fs::create_dir_all(path.parent().expect("config parent"))
+                    .expect("create config dir");
+                fs::write(&path, "").expect("write config");
+                path
+            }
+
+            pub(super) fn discovered(
+                path: &Path,
+            ) -> LocalConfigFile<Discovered> {
+                LocalConfigFile::<Discovered>::try_new(path.to_path_buf())
+                    .expect("valid local config path")
+            }
+        }
+    }
+
+    use fixtures::Fixture;
+
+    mod record {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn stores_the_canonical_config_path() {
+            let fixture = Fixture::new();
+            let path = fixture.write_config("project");
+
+            fixture.store.record(&Fixture::discovered(&path));
+
+            assert_eq!(fixture.store.list().expect("list"), vec![
+                path.canonicalize().expect("canonicalize")
+            ]);
+        }
+
+        #[test]
+        fn keeps_a_single_entry_when_recorded_twice() {
+            let fixture = Fixture::new();
+            let path = fixture.write_config("project");
+            let config = Fixture::discovered(&path);
+
+            fixture.store.record(&config);
+            fixture.store.record(&config);
+
+            assert_eq!(fixture.store.list().expect("list").len(), 1);
+        }
+    }
+
+    mod list {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn returns_empty_when_nothing_was_recorded() {
+            let fixture = Fixture::new();
+
+            let result = fixture.store.list();
+
+            assert_eq!(result.expect("list"), Vec::<PathBuf>::new());
+        }
+    }
+
+    mod clean {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn prunes_entries_whose_config_was_deleted() {
+            let fixture = Fixture::new();
+            let path = fixture.write_config("project");
+            fixture.store.record(&Fixture::discovered(&path));
+            fs::remove_file(&path).expect("remove config");
+
+            let removed = fixture.store.clean();
+
+            assert_eq!(removed.expect("clean"), 1);
+            assert_eq!(
+                fixture.store.list().expect("list"),
+                Vec::<PathBuf>::new()
+            );
+        }
+
+        #[test]
+        fn leaves_live_entries_untouched() {
+            let fixture = Fixture::new();
+            let path = fixture.write_config("project");
+            fixture.store.record(&Fixture::discovered(&path));
+
+            let removed = fixture.store.clean();
+
+            assert_eq!(removed.expect("clean"), 0);
+            assert_eq!(fixture.store.list().expect("list").len(), 1);
+        }
+    }
+}

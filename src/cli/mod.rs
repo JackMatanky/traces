@@ -261,6 +261,12 @@ fn load_config(service: &ConfigService) -> Result<Config, CliError> {
 /// [`Commands::run`] (`clippy::large_stack_frames` otherwise sums every
 /// match arm's locals, including every other arm's [`CliError`] payload,
 /// into those functions' frames).
+///
+/// # Errors
+///
+/// - [`CliError::CurrentDirectory`] if reading the current directory fails.
+/// - [`CliError::ConfigLoad`] if configuration discovery or loading fails.
+/// - Any [`CliError`] returned by `handler`.
 #[inline(never)]
 fn run_with_config(
     service: &ConfigService,

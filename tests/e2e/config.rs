@@ -121,13 +121,13 @@ fn missing_local_config_fails_at_the_discovery_stage() {
 }
 
 /// Verifies the stale-trust stage: editing the config after trust fails the
-/// load with `config_build_untrusted` and the Stale flavor.
+/// load with `config_build_untrusted` and the stale flavor.
 ///
 /// Executes vs asserts:
 /// - Executes: `traces trust`, then rewrites `.traces/config.toml` with
 ///   different bytes, then `traces list`.
 /// - Asserts: exit code 1, `traces::cli::config_build_untrusted`, and the
-///   `untrusted: Stale` flavor (not the never-trusted flavor).
+///   `untrusted: stale` flavor (not the never-trusted flavor).
 ///
 /// Defect class: unwitnessed-contract (failure-stage table).
 #[test]
@@ -148,8 +148,11 @@ fn edited_config_fails_at_the_trust_stage_as_stale() {
         "stderr: {}",
         list.stderr
     );
+    // The diagnostic wraps long paths across lines, so compare on tokens.
+    let flattened =
+        list.stderr.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(
-        list.stderr.contains("untrusted: Stale"),
+        flattened.contains("untrusted: stale"),
         "stale flavor expected; stderr: {}",
         list.stderr
     );

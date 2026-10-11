@@ -349,14 +349,13 @@ mod tests {
         #[test]
         fn writes_the_rendered_template_to_the_default_output_path() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(
+            let (root, config) = create_test_project(
                 temp.path(),
                 "{% for n in [1, 2] %}{{ n }}{% endfor %}",
             );
-            let _guard = CwdGuard::enter(&root);
 
             Template::new(PathBuf::from("daily"))
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect("run template command");
 
             let written =
@@ -390,11 +389,10 @@ mod tests {
         #[test]
         fn fails_when_template_cannot_be_resolved() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "");
-            let _guard = CwdGuard::enter(&root);
+            let (_root, config) = create_test_project(temp.path(), "");
 
             let error = Template::new(PathBuf::from("missing"))
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect_err("missing template fails");
 
             assert!(matches!(error, CliError::TemplateInstantiate { .. }));
@@ -403,8 +401,7 @@ mod tests {
         #[test]
         fn with_list_does_not_render_or_write_anything() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "content");
-            let _guard = CwdGuard::enter(&root);
+            let (root, config) = create_test_project(temp.path(), "content");
 
             Template {
                 name: None,
@@ -415,7 +412,7 @@ mod tests {
                 dry_run: false,
                 no_input: false,
             }
-            .run(&service, preset_provider())
+            .run(&config, preset_provider())
             .expect("run with --list succeeds");
 
             assert!(!root.join("daily.md").exists());
@@ -424,8 +421,7 @@ mod tests {
         #[test]
         fn with_list_and_no_available_templates_succeeds_with_no_output() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "");
-            let _guard = CwdGuard::enter(&root);
+            let (_root, config) = create_test_project(temp.path(), "");
 
             // Unlike the interactive picker (which errors NoTemplates on an
             // empty list), `--list` is a plain listing command: nothing to
@@ -439,15 +435,14 @@ mod tests {
                 dry_run: false,
                 no_input: false,
             }
-            .run(&service, preset_provider())
+            .run(&config, preset_provider())
             .expect("run with --list succeeds even when nothing is listed");
         }
 
         #[test]
         fn writes_to_the_output_flag_path() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "hello");
-            let _guard = CwdGuard::enter(&root);
+            let (root, config) = create_test_project(temp.path(), "hello");
 
             Template {
                 name: Some(PathBuf::from("daily")),
@@ -458,7 +453,7 @@ mod tests {
                 dry_run: false,
                 no_input: false,
             }
-            .run(&service, preset_provider())
+            .run(&config, preset_provider())
             .expect("run template command");
 
             let written = fs::read_to_string(root.join("elsewhere.md"))
@@ -469,13 +464,12 @@ mod tests {
         #[test]
         fn fails_when_output_already_exists_without_force() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "new");
+            let (root, config) = create_test_project(temp.path(), "new");
             fs::write(root.join("daily.md"), "old")
                 .expect("seed existing output");
-            let _guard = CwdGuard::enter(&root);
 
             let error = Template::new(PathBuf::from("daily"))
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect_err("existing output without force fails");
 
             assert!(matches!(error, CliError::TemplateInstantiate { .. }));
@@ -488,10 +482,9 @@ mod tests {
         #[test]
         fn overwrites_existing_output_with_force() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "new");
+            let (root, config) = create_test_project(temp.path(), "new");
             fs::write(root.join("daily.md"), "old")
                 .expect("seed existing output");
-            let _guard = CwdGuard::enter(&root);
 
             Template {
                 name: Some(PathBuf::from("daily")),
@@ -502,7 +495,7 @@ mod tests {
                 dry_run: false,
                 no_input: false,
             }
-            .run(&service, preset_provider())
+            .run(&config, preset_provider())
             .expect("force overwrites");
 
             assert_eq!(
@@ -514,8 +507,7 @@ mod tests {
         #[test]
         fn fails_when_the_output_flag_escapes_the_project_root() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "hello");
-            let _guard = CwdGuard::enter(&root);
+            let (_root, config) = create_test_project(temp.path(), "hello");
 
             let error = Template {
                 name: Some(PathBuf::from("daily")),
@@ -526,7 +518,7 @@ mod tests {
                 dry_run: false,
                 no_input: false,
             }
-            .run(&service, preset_provider())
+            .run(&config, preset_provider())
             .expect_err("escaping -o path fails");
 
             assert!(matches!(error, CliError::TemplateInstantiate { .. }));
@@ -535,10 +527,9 @@ mod tests {
         #[test]
         fn dry_run_writes_nothing_even_when_output_already_exists() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "new");
+            let (root, config) = create_test_project(temp.path(), "new");
             fs::write(root.join("daily.md"), "old")
                 .expect("seed existing output");
-            let _guard = CwdGuard::enter(&root);
             Template {
                 name: Some(PathBuf::from("daily")),
                 input: None,
@@ -548,7 +539,7 @@ mod tests {
                 dry_run: true,
                 no_input: false,
             }
-            .run(&service, preset_provider())
+            .run(&config, preset_provider())
             .expect("dry run succeeds even though the output already exists");
 
             assert_eq!(
@@ -560,17 +551,16 @@ mod tests {
         #[test]
         fn uses_the_injected_providers_queued_answer_by_default() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(
+            let (root, config) = create_test_project(
                 temp.path(),
                 "{{ ui.text_input(\"name\", \"anon\") }}",
             );
-            let _guard = CwdGuard::enter(&root);
             let provider: Arc<dyn DialogProvider> = Arc::new(
                 crate::PresetDialogProvider::new().with_text("claude"),
             );
 
             Template::new(PathBuf::from("daily"))
-                .run(&service, provider)
+                .run(&config, provider)
                 .expect("run template command");
 
             assert_eq!(
@@ -582,11 +572,10 @@ mod tests {
         #[test]
         fn no_input_ignores_the_injected_provider_and_uses_defaults() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(
+            let (root, config) = create_test_project(
                 temp.path(),
                 "{{ ui.text_input(\"name\", \"anon\") }}",
             );
-            let _guard = CwdGuard::enter(&root);
             // A provider whose queued answer must never be consulted once
             // `--no-input` is set.
             let provider: Arc<dyn DialogProvider> = Arc::new(
@@ -602,7 +591,7 @@ mod tests {
                 dry_run: false,
                 no_input: true,
             }
-            .run(&service, provider)
+            .run(&config, provider)
             .expect("run template command");
 
             assert_eq!(
@@ -614,17 +603,16 @@ mod tests {
         #[test]
         fn writes_nothing_when_a_ui_prompt_inside_render_is_cancelled() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(
+            let (root, config) = create_test_project(
                 temp.path(),
                 "{{ ui.confirm(\"Continue?\") }}",
             );
-            let _guard = CwdGuard::enter(&root);
 
             let provider: Arc<dyn DialogProvider> =
                 Arc::new(CancellingDialogProvider);
 
             let error = Template::new(PathBuf::from("daily"))
-                .run(&service, provider)
+                .run(&config, provider)
                 .expect_err("cancelled ui.* prompt fails render");
 
             assert_eq!(error.user_abort(), Some(UserAbort::Cancelled));
@@ -638,16 +626,14 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::cli::CwdGuard;
 
         #[test]
         fn with_no_name_and_no_available_templates_fails_with_no_templates() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "");
-            let _guard = CwdGuard::enter(&root);
+            let (_root, config) = create_test_project(temp.path(), "");
 
             let error = Template::interactive()
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect_err("no templates to pick from");
 
             assert!(matches!(error, CliError::NoTemplates));
@@ -656,14 +642,13 @@ mod tests {
         #[test]
         fn uses_provider_to_pick_template() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) =
+            let (root, config) =
                 create_test_project(temp.path(), "hello interactive");
-            let _guard = CwdGuard::enter(&root);
             let provider: Arc<dyn DialogProvider> =
                 Arc::new(crate::PresetDialogProvider::new().with_select(0));
 
             Template::interactive()
-                .run(&service, provider)
+                .run(&config, provider)
                 .expect("run interactive template command");
 
             assert_eq!(
@@ -675,11 +660,10 @@ mod tests {
         #[test]
         fn in_non_interactive_session_fails_with_picker_not_interactive() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(temp.path(), "hello");
-            let _guard = CwdGuard::enter(&root);
+            let (_root, config) = create_test_project(temp.path(), "hello");
 
             let error = Template::interactive()
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect_err("non-interactive picker fails");
 
             assert!(matches!(error, CliError::TemplatePicker {
@@ -694,12 +678,11 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::cli::CwdGuard;
 
         #[test]
         fn writes_a_schema_backed_template_through_cli_dispatch() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(
+            let (root, config) = create_test_project(
                 temp.path(),
                 "status={{ schema.get('book').field('status') | join(',') \
                  }};cover={% for item in \
@@ -730,10 +713,9 @@ mod tests {
                 "---\nclass: book\n---\n# Dune Log\n- [ ] finish reading\n",
             )
             .expect("write journal note");
-            let _guard = CwdGuard::enter(&root);
 
             Template::new(PathBuf::from("daily"))
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect("schema-backed template renders and writes");
 
             let written =
@@ -747,14 +729,13 @@ mod tests {
         #[test]
         fn fails_with_a_render_error_when_the_schema_name_is_unknown() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let (root, service) = create_test_project(
+            let (root, config) = create_test_project(
                 temp.path(),
                 "{{ schema.get('missing').field('status') }}",
             );
-            let _guard = CwdGuard::enter(&root);
 
             let error = Template::new(PathBuf::from("daily"))
-                .run(&service, preset_provider())
+                .run(&config, preset_provider())
                 .expect_err("unknown Schema name fails render, not panics");
 
             assert!(matches!(error, CliError::TemplateInstantiate {

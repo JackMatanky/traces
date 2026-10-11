@@ -18,7 +18,8 @@ use super::{UserAbort, init::ConfigScaffoldError};
 use crate::{
     DialogError,
     config::{
-        ConfigDiscoveryError, ConfigError, ConfigTrustError, ConfigValueError,
+        ConfigDiscoveryError, ConfigError, ConfigReadError, ConfigTrustError,
+        ConfigValueError,
     },
     index::IndexError,
     query::{QueryBuilderError, QueryDialect, QueryError},
@@ -156,8 +157,8 @@ pub enum CliError {
         source: io::Error,
     },
     /// Writing the local config file under `root` failed: the collected
-    /// template and output directories could not be serialised, or the
-    /// serialised file could not be written to disk.
+    /// template and output directories could not be serialized, or the
+    /// serialized file could not be written to disk.
     #[error("failed to write config file in {root}")]
     InitConfigWrite {
         /// The root being initialized.
@@ -483,7 +484,25 @@ fn config_load_help(source: &ConfigError) -> Box<dyn Display + '_> {
             "check that every [tasks] tag_filters entry is a valid tag, e.g. \
              \"task\" or \"#task\"",
         ),
-        _ => Box::new(
+        ConfigError::Read(ConfigReadError::Io {
+            ..
+        })
+        | ConfigError::Trust(
+            ConfigTrustError::Tracker(_) | ConfigTrustError::Hash(_),
+        ) => Box::new(
+            "check that the config file and the traces state directories are \
+             readable and writable",
+        ),
+        ConfigError::Read(ConfigReadError::Parse {
+            ..
+        })
+        | ConfigError::Discovery(_)
+        | ConfigError::Value(
+            ConfigValueError::InvalidSubDir {
+                ..
+            }
+            | ConfigValueError::Task(_),
+        ) => Box::new(
             "check that the config file contains valid TOML and its structure \
              matches the expected schema",
         ),
@@ -504,7 +523,7 @@ fn init_config_write_help(
             ..
         } => Box::new(
             "this is an internal error: the collected template and output \
-             directories could not be serialised to TOML",
+             directories could not be serialized to TOML",
         ),
     }
 }
@@ -819,15 +838,34 @@ mod tests {
         }
 
         #[test]
-        fn untrusted_config_message_names_the_config_path() {
+        fn untrusted_config_message_names_the_config_path_root_and_status() {
             let error = crate::config::ConfigTrustError::Untrusted {
                 root: PathBuf::from("/example/root"),
                 path: PathBuf::from("/example/root/.traces/config.toml"),
-                status: crate::config::ConfigTrustStatus::Untrusted,
+                status: crate::config::ConfigTrustStatus::MissingBaseline,
             };
 
-            assert!(
-                error.to_string().contains("/example/root/.traces/config.toml")
+            assert_eq!(
+                error.to_string(),
+                "config file /example/root/.traces/config.toml (workspace \
+                 root /example/root) is untrusted: missing baseline"
+            );
+        }
+
+        #[test]
+        fn config_load_trust_store_failure_points_at_state_directories() {
+            let error = CliError::ConfigLoad {
+                cwd: PathBuf::from("/some/project"),
+                source: ConfigError::Trust(state_source()),
+            };
+
+            assert_eq!(
+                error.help().map(|help| help.to_string()),
+                Some(
+                    "check that the config file and the traces state \
+                     directories are readable and writable"
+                        .to_owned()
+                )
             );
         }
 
@@ -1296,7 +1334,7 @@ mod tests {
                 error.help().map(|help| help.to_string()),
                 Some(
                     "this is an internal error: the collected template and \
-                     output directories could not be serialised to TOML"
+                     output directories could not be serialized to TOML"
                         .to_owned()
                 )
             );

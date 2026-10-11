@@ -441,7 +441,6 @@ mod tests {
     }
 
     mod trust_transitions {
-
         use super::*;
 
         #[test]
@@ -463,7 +462,7 @@ mod tests {
         }
 
         #[test]
-        fn returns_root_not_trusted_when_store_says_untrusted() {
+        fn halts_untrusted_when_the_root_is_not_trusted() {
             let temp = tempfile::tempdir().unwrap();
             let root = temp.path().join("project");
             let path = root.join(".traces/config.toml");
@@ -484,7 +483,7 @@ mod tests {
         }
 
         #[test]
-        fn returns_stale_config_content_when_baseline_missing() {
+        fn halts_with_missing_baseline_when_only_the_workspace_is_trusted() {
             let temp = tempfile::tempdir().unwrap();
             let root = temp.path().join("project");
             let path = root.join(".traces/config.toml");
@@ -508,7 +507,7 @@ mod tests {
         }
 
         #[test]
-        fn returns_stale_config_content_when_hash_mismatches() {
+        fn halts_stale_when_the_content_hash_differs() {
             let temp = tempfile::tempdir().unwrap();
             let root = temp.path().join("project");
             let path = root.join(".traces/config.toml");
@@ -534,7 +533,7 @@ mod tests {
         }
 
         #[test]
-        fn returns_trust_check_failed_on_io_error() {
+        fn fails_with_hash_error_when_the_config_is_unreadable() {
             let temp = tempfile::tempdir().unwrap();
             let root = temp.path().join("project");
             let path = root.join(".traces/config.toml");

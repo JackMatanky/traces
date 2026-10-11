@@ -540,7 +540,6 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("a.md", "# A\n");
-            let _guard = CwdGuard::enter(project.root());
             let table = Table {
                 from: None,
                 filter: vec![],
