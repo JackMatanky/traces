@@ -1,10 +1,10 @@
 //! ISO-8601 and RFC-3339 date and date-time parsing, formatting, and
 //! arithmetic.
 //!
-//! Single owner of date/time recognition, parsing, and canonical formatting
-//! across the crate. Every date-shaped string funnels through
-//! [`DateValue::parse_iso`]; every date-time-shaped string through
-//! [`DateTimeValue::parse_iso`].
+//! Recognition entry points are [`DateValue::classify`] and
+//! [`DateValue::parse_prefix`]. The strict typed parsers
+//! [`DateValue::parse_iso`] and [`DateTimeValue::parse_iso`] back their
+//! respective [`FromStr`] implementations.
 //!
 //! # Clock doctrine
 //!
@@ -26,11 +26,11 @@
 //!
 //! # Calendar owner
 //!
-//! This module owns date arithmetic for the crate: [`DateValue::shift`],
-//! [`DateValue::apply`], [`DateTimeValue::shift`], and [`DateTimeValue::apply`]
-//! apply calendar or fixed-duration semantics in exactly one place, and the
-//! template engine reaches this module through `DateTimeValue::parse_iso`,
-//! [`shift_wall`], [`DateTimeValue::shift`], and [`DatePoint::diff`].
+//! [`DateValue::shift`], [`DateValue::apply`], [`DateTimeValue::shift`], and
+//! [`DateTimeValue::apply`] implement typed arithmetic. [`DatePoint::shift`],
+//! [`DatePoint::apply`], [`DatePoint::diff`], [`DatePoint::month_boundary`],
+//! [`DatePoint::week_boundary`], [`DatePoint::year_boundary`], and
+//! [`DatePoint::weekday_point`] handle precision-aware calendar operations.
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
@@ -178,18 +178,6 @@ fn has_date_like_prefix(bytes: &[u8]) -> bool {
 fn has_four_digit_year(s: &str) -> bool {
     let bytes = s.as_bytes();
     bytes.get(0..4).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
-}
-
-/// Returns `true` if `s`'s first 10 bytes have the shape `YYYY-MM-DD`.
-#[cfg(test)]
-fn is_iso_shape(s: &str) -> bool {
-    let bytes = s.as_bytes();
-    bytes.len() >= 10
-        && bytes.get(0..4).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
-        && bytes.get(4) == Some(&b'-')
-        && bytes.get(5..7).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
-        && bytes.get(7) == Some(&b'-')
-        && bytes.get(8..10).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
 }
 
 impl DateValue {
@@ -383,13 +371,6 @@ impl DateValue {
         }
     }
 
-    /// Formats this date as `YYYY-MM-DD`.
-    #[inline]
-    #[must_use]
-    pub(crate) fn to_date_string(self) -> String {
-        self.to_string()
-    }
-
     /// Returns the wrapped [`NaiveDate`].
     #[must_use]
     pub(crate) const fn into_inner(self) -> NaiveDate {
@@ -549,15 +530,14 @@ impl FromStr for DateValue {
     }
 }
 
-/// Serializes as the canonical `YYYY-MM-DD` string (the crate-internal
-/// `to_date_string` formatter).
+/// Serializes as the canonical `YYYY-MM-DD` display string.
 impl Serialize for DateValue {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_date_string())
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -637,15 +617,6 @@ impl DateTimeValue {
             ParsedDateTimeShape::LocalNaive(wall) => local_naive_to_utc(wall)?,
         };
         Ok(Self(instant))
-    }
-
-    /// Formats this date-time exactly as [`Display`](fmt::Display) does: the
-    /// local wall clock without a UTC offset, carrying fractional seconds only
-    /// when the value has a nonzero nanosecond component.
-    #[inline]
-    #[must_use]
-    pub(crate) fn to_datetime_string(self) -> String {
-        self.to_string()
     }
 
     /// Returns the local wall-clock rendering of this instant.
@@ -1058,14 +1029,10 @@ pub(crate) enum DateTimeFormat {
     Rfc3339,
     /// `T`-separated with fractional seconds: `2026-07-29T14:30:00.123`.
     IsoTFractional,
-    /// `T`-separated with whole seconds: `2026-07-29T14:30:00`.
-    IsoTSeconds,
     /// `T`-separated minute-only precision: `2026-07-29T14:30`.
     IsoTMinute,
     /// Space-separated with fractional seconds: `2026-07-29 14:30:00.123`.
     IsoSpaceFractional,
-    /// Space-separated with whole seconds: `2026-07-29 14:30:00`.
-    IsoSpaceSeconds,
     /// Space-separated minute-only precision: `2026-07-29 14:30`.
     IsoSpaceMinute,
 }
@@ -1073,13 +1040,11 @@ pub(crate) enum DateTimeFormat {
 impl DateTimeFormat {
     /// Formats tried in order by [`DateTimeValue::parse_iso`] (most
     /// specific/unambiguous first).
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 5] = [
         Self::Rfc3339,
         Self::IsoTFractional,
-        Self::IsoTSeconds,
         Self::IsoTMinute,
         Self::IsoSpaceFractional,
-        Self::IsoSpaceSeconds,
         Self::IsoSpaceMinute,
     ];
 
@@ -1090,10 +1055,8 @@ impl DateTimeFormat {
         match self {
             Self::Rfc3339 => None,
             Self::IsoTFractional => Some("%Y-%m-%dT%H:%M:%S%.f"),
-            Self::IsoTSeconds => Some("%Y-%m-%dT%H:%M:%S"),
             Self::IsoTMinute => Some("%Y-%m-%dT%H:%M"),
             Self::IsoSpaceFractional => Some("%Y-%m-%d %H:%M:%S%.f"),
-            Self::IsoSpaceSeconds => Some("%Y-%m-%d %H:%M:%S"),
             Self::IsoSpaceMinute => Some("%Y-%m-%d %H:%M"),
         }
     }
@@ -1908,27 +1871,21 @@ mod tests {
         }
 
         #[test]
-        fn renders_to_datetime_string_without_the_offset() {
+        fn renders_to_display_without_the_offset() {
             TzGuard::set("UTC");
 
-            assert_eq!(
-                fixed_datetime().to_datetime_string(),
-                "2026-07-29T14:30:05"
-            );
+            assert_eq!(fixed_datetime().to_string(), "2026-07-29T14:30:05");
         }
 
         #[test]
-        fn round_trips_fractional_seconds_in_to_datetime_string() {
+        fn round_trips_fractional_seconds_in_display() {
             TzGuard::set("UTC");
 
             let with_nanos = DateTimeValue(
                 fixed_datetime().into_inner()
                     + chrono::TimeDelta::milliseconds(123),
             );
-            assert_eq!(
-                with_nanos.to_datetime_string(),
-                "2026-07-29T14:30:05.123"
-            );
+            assert_eq!(with_nanos.to_string(), "2026-07-29T14:30:05.123");
         }
 
         #[test]
@@ -1952,22 +1909,20 @@ mod tests {
         }
 
         #[test]
-        fn round_trips_a_date_value_through_to_date_string_and_parse_iso() {
+        fn round_trips_a_date_value_through_display_and_parse_iso() {
             let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            let reparsed = DateValue::parse_iso(&date.to_date_string())
+            let reparsed = DateValue::parse_iso(&date.to_string())
                 .expect("formatted output re-parses");
             assert_eq!(reparsed, date);
         }
 
         #[test]
-        fn round_trips_a_datetime_value_through_to_datetime_string_and_parse_iso()
-         {
+        fn round_trips_a_datetime_value_through_display_and_parse_iso() {
             TzGuard::keep();
 
             let value = fixed_datetime();
-            let reparsed =
-                DateTimeValue::parse_iso(&value.to_datetime_string())
-                    .expect("formatted output re-parses");
+            let reparsed = DateTimeValue::parse_iso(&value.to_string())
+                .expect("formatted output re-parses");
             assert_eq!(reparsed, value);
         }
     }
@@ -2013,13 +1968,6 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-
-        #[test]
-        fn detects_the_iso_shape_byte_pattern() {
-            assert!(is_iso_shape("2026-07-29"));
-            assert!(!is_iso_shape("2026-7-29"));
-            assert!(!is_iso_shape("2026/07/29"));
-        }
 
         #[rstest]
         #[case::has_offset_z("2026-07-29T14:30:00Z")]
@@ -2135,12 +2083,24 @@ mod tests {
         }
 
         #[test]
+        fn date_time_format_whole_seconds_parse_via_the_fractional_variant() {
+            // Arrange
+            let wall = NaiveDate::from_ymd_opt(2026, 7, 29)
+                .unwrap()
+                .and_hms_opt(14, 30, 0)
+                .unwrap();
+
+            // Act & Assert
+            for text in ["2026-07-29T14:30:00", "2026-07-29 14:30:00"] {
+                assert!(
+                    matches!(DateTimeFormat::parse_any(text), Ok(ParsedDateTimeShape::LocalNaive(w)) if w == wall)
+                );
+            }
+        }
+
+        #[test]
         fn datetime_format_pattern_maps_each_variant_to_its_strftime_spec() {
             assert_eq!(DateTimeFormat::Rfc3339.pattern(), None);
-            assert_eq!(
-                DateTimeFormat::IsoTSeconds.pattern(),
-                Some("%Y-%m-%dT%H:%M:%S")
-            );
             assert_eq!(
                 DateTimeFormat::IsoSpaceFractional.pattern(),
                 Some("%Y-%m-%d %H:%M:%S%.f")

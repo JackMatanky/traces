@@ -170,37 +170,37 @@ fn translate_iso_offset(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
     let mut parts: Vec<(&str, &'static str)> = Vec::new();
 
     parse_iso_components(date_part, false, &mut parts).map_err(|()| {
-        invalid_operation(
+        Error::new(
+            ErrorKind::InvalidOperation,
             format!("invalid ISO-8601 duration offset {input:?}"),
-            DateError::OutOfRange,
         )
     })?;
 
     if let Some(t) = time_part {
         if t.is_empty() {
-            return Err(invalid_operation(
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
                 format!(
                     "invalid ISO-8601 duration offset {input:?}: missing time \
                      components after 'T'"
                 ),
-                DateError::OutOfRange,
             ));
         }
         parse_iso_components(t, true, &mut parts).map_err(|()| {
-            invalid_operation(
+            Error::new(
+                ErrorKind::InvalidOperation,
                 format!("invalid ISO-8601 duration offset {input:?}"),
-                DateError::OutOfRange,
             )
         })?;
     }
 
     if parts.is_empty() {
-        return Err(invalid_operation(
+        return Err(Error::new(
+            ErrorKind::InvalidOperation,
             format!(
                 "invalid ISO-8601 duration offset {input:?}: no duration \
                  components"
             ),
-            DateError::OutOfRange,
         ));
     }
 
@@ -289,20 +289,17 @@ fn apply_offset_to_point(
     }
     if let Some(s) = offset_val.as_str() {
         let translated = translate_iso_offset(s)?;
-        let duration = DurationValue::parse(&translated).map_err(|_| {
-            invalid_operation(
-                format!("invalid duration offset {s:?}"),
-                DateError::OutOfRange,
-            )
+        let duration = DurationValue::parse(&translated).map_err(|source| {
+            invalid_operation(format!("invalid duration offset {s:?}"), source)
         })?;
         return point.apply(&duration).map_err(date_error);
     }
-    Err(invalid_operation(
+    Err(Error::new(
+        ErrorKind::InvalidOperation,
         format!(
             "expected integer days or duration string for offset, got \
              {offset_val:?}"
         ),
-        DateError::OutOfRange,
     ))
 }
 
@@ -359,12 +356,12 @@ fn parse_weekday_num(n: i64) -> TemplateEngineResult<chrono::Weekday> {
         5 => Ok(chrono::Weekday::Fri),
         6 => Ok(chrono::Weekday::Sat),
         7 => Ok(chrono::Weekday::Sun),
-        _ => Err(invalid_operation(
+        _ => Err(Error::new(
+            ErrorKind::InvalidOperation,
             format!(
                 "weekday index {n} is out of range (expected 0..=7 under ISO \
                  Monday convention)"
             ),
-            DateError::OutOfRange,
         )),
     }
 }

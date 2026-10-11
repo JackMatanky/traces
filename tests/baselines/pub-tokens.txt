@@ -246,7 +246,7 @@ src/date.rs: pub enum DateError {
 src/date.rs: pub struct DateTimeValue(DateTime<Utc>);
 src/date.rs: pub struct DateValue(NaiveDate);
 src/date.rs: pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
-src/date.rs: pub(crate) const ALL: [Self; 7] = [
+src/date.rs: pub(crate) const ALL: [Self; 5] = [
 src/date.rs: pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 src/date.rs: pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
 src/date.rs: pub(crate) const fn has_time(&self) -> bool {
@@ -284,8 +284,6 @@ src/date.rs: pub(crate) fn point(&self) -> DatePoint {
 src/date.rs: pub(crate) fn shift(
 src/date.rs: pub(crate) fn shift(
 src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn to_date_string(self) -> String {
-src/date.rs: pub(crate) fn to_datetime_string(self) -> String {
 src/date.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/date.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
 src/date.rs: pub(crate) fn wall_or_utc(self) -> NaiveDateTime {

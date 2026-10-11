@@ -601,10 +601,8 @@ fn field_value(value: NoteFieldValue) -> Value {
         NoteFieldValue::Number(n) => Value::from(n),
         NoteFieldValue::String(s) => Value::from(s),
         NoteFieldValue::Duration(dv) => Value::from(dv.as_str()),
-        NoteFieldValue::Date(value) => Value::from(value.to_date_string()),
-        NoteFieldValue::DateTime(value) => {
-            Value::from(value.to_datetime_string())
-        }
+        NoteFieldValue::Date(value) => Value::from(value.to_string()),
+        NoteFieldValue::DateTime(value) => Value::from(value.to_string()),
         NoteFieldValue::Link(link) => Value::from(link.target().to_owned()),
         NoteFieldValue::List(items) => {
             Value::from(items.into_iter().map(field_value).collect::<Vec<_>>())
