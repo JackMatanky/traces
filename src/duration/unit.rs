@@ -90,13 +90,42 @@ impl DurationUnit {
         UNIT_SPELLINGS.get(lower).copied()
     }
 
+    /// Canonical short spelling used in synthesized duration text.
+    #[must_use]
+    pub(crate) const fn spelling(self) -> &'static str {
+        match self {
+            Self::Millisecond => "ms",
+            Self::Second => "s",
+            Self::Minute => "m",
+            Self::Hour => "h",
+            Self::Day => "d",
+            Self::Week => "w",
+            Self::Month => "mo",
+            Self::Year => "y",
+        }
+    }
+
+    /// Singular and plural English names for human-readable durations.
+    #[must_use]
+    pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Millisecond => ("millisecond", "milliseconds"),
+            Self::Second => ("second", "seconds"),
+            Self::Minute => ("minute", "minutes"),
+            Self::Hour => ("hour", "hours"),
+            Self::Day => ("day", "days"),
+            Self::Week => ("week", "weeks"),
+            Self::Month => ("month", "months"),
+            Self::Year => ("year", "years"),
+        }
+    }
+
     /// Fixed seconds per unit for duration magnitude identity.
     ///
     /// The sole unit-ratio table in the crate. Calendar units (Day, Week,
-    /// Month, Year) get nominal fixed ratios here for value identity,
-    /// magnitude ordering, and fractional-remainder application; their
-    /// whole-count date-shifting behavior belongs to the date module's
-    /// calendar owner.
+    /// Month, Year) get nominal fixed ratios here for value identity, magnitude
+    /// ordering, and fractional-remainder application; their whole-count
+    /// date-shifting behavior belongs to the date module's calendar owner.
     #[must_use]
     pub(crate) const fn nominal_seconds(self) -> f64 {
         match self {
@@ -284,6 +313,65 @@ mod tests {
                          `{key}`"
                     );
                 }
+            }
+        }
+
+        mod names {
+            use pretty_assertions::assert_eq;
+            use rstest::rstest;
+
+            use super::*;
+
+            #[rstest]
+            #[case::millisecond(
+                DurationUnit::Millisecond,
+                "ms",
+                "millisecond",
+                "milliseconds",
+                0.001
+            )]
+            #[case::second(DurationUnit::Second, "s", "second", "seconds", 1.0)]
+            #[case::minute(
+                DurationUnit::Minute,
+                "m",
+                "minute",
+                "minutes",
+                60.0
+            )]
+            #[case::hour(DurationUnit::Hour, "h", "hour", "hours", 3_600.0)]
+            #[case::day(DurationUnit::Day, "d", "day", "days", 86_400.0)]
+            #[case::week(DurationUnit::Week, "w", "week", "weeks", 604_800.0)]
+            #[case::month(
+                DurationUnit::Month,
+                "mo",
+                "month",
+                "months",
+                2_592_000.0
+            )]
+            #[case::year(
+                DurationUnit::Year,
+                "y",
+                "year",
+                "years",
+                31_536_000.0
+            )]
+            fn supplies_short_and_human_names_with_nominal_seconds(
+                #[case] unit: DurationUnit,
+                #[case] short: &str,
+                #[case] singular: &str,
+                #[case] plural: &str,
+                #[case] seconds: f64,
+            ) {
+                // Act
+                let spelling = unit.spelling();
+                let names = unit.human_names();
+                let nominal_seconds = unit.nominal_seconds();
+
+                // Assert
+                assert_eq!(spelling, short);
+                assert_eq!(names, (singular, plural));
+                assert_eq!(nominal_seconds.to_bits(), seconds.to_bits());
+                assert_eq!(DurationUnit::from_spelling(spelling), Some(unit));
             }
         }
 

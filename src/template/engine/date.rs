@@ -39,13 +39,15 @@ use minijinja::{
     Environment, Error, ErrorKind,
     value::{Enumerator, Kwargs, Object, Value},
 };
-use num_traits::ToPrimitive as _;
 
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
     DATE_PATTERN, DateTimeValue, DurationSeconds, DurationUnit, DurationValue,
     UNIT_SPELLINGS_HINT,
-    date::{CivilPrecision, DateError, Difference, Period, Point},
+    date::{
+        CivilPrecision, DateComponent, DateError, Difference, Edge, Period,
+        Point, weekday_from_number,
+    },
 };
 
 const NAMESPACE_METHODS: &[&str] = &[
@@ -82,7 +84,8 @@ impl DateNamespace {
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         env.add_filter("date_format", date_format);
-        env.add_filter("durationformat", durationformat);
+        env.add_filter("duration_format", duration_format);
+        env.add_filter("durationformat", duration_format);
         env.add_filter("timestamp", timestamp);
         env.add_filter("date_add", date_add);
         env.add_filter("date_sub", date_sub);
@@ -296,13 +299,52 @@ fn apply_offset(
     ))
 }
 
+/// A named anchor for the `date.*` shorthands: where the value starts and how
+/// it is moved before the offset applies.
+#[derive(Copy, Clone)]
+enum Anchor {
+    Now,
+    Today,
+    Tomorrow,
+    Yesterday,
+    StartOf(Period),
+    EndOf(Period),
+    Weekday(chrono::Weekday),
+}
+
+impl Anchor {
+    /// The point a shorthand starts from when no reference is given.
+    fn base(self) -> Point {
+        match self {
+            Self::Now => now_point(),
+            Self::Today
+            | Self::Tomorrow
+            | Self::Yesterday
+            | Self::StartOf(_)
+            | Self::EndOf(_)
+            | Self::Weekday(_) => today_point(),
+        }
+    }
+
+    /// Moves `point` as this anchor requires.
+    fn transform(self, point: Point) -> Result<Point, DateError> {
+        match self {
+            Self::Now | Self::Today => Ok(point),
+            Self::Tomorrow => point.shift(1, DurationUnit::Day),
+            Self::Yesterday => point.shift(-1, DurationUnit::Day),
+            Self::StartOf(period) => point.start_of(period),
+            Self::EndOf(period) => point.end_of(period),
+            Self::Weekday(target) => point.with_weekday(target),
+        }
+    }
+}
+
 #[expect(
     clippy::too_many_arguments,
     reason = "accepts format, offset, reference, and reference_format options"
 )]
 fn resolve_anchor(
-    base_point: Point,
-    transform: impl FnOnce(Point) -> Result<Point, DateError>,
+    anchor: Anchor,
     format: Option<&str>,
     offset: Option<Value>,
     reference: Option<&str>,
@@ -326,9 +368,9 @@ fn resolve_anchor(
             parse_point(ref_text)?
         }
     } else {
-        base_point
+        anchor.base()
     };
-    point = transform(point).map_err(render_date_error)?;
+    point = anchor.transform(point).map_err(render_date_error)?;
 
     if let Some(off_val) = offset {
         point = apply_offset(point, &off_val)?;
@@ -339,212 +381,66 @@ fn resolve_anchor(
     render_with_pattern(wall.format(&pat), format)
 }
 
-fn weekday_from_number(n: i64) -> TemplateEngineResult<chrono::Weekday> {
-    match n {
-        0 | 1 => Ok(chrono::Weekday::Mon),
-        2 => Ok(chrono::Weekday::Tue),
-        3 => Ok(chrono::Weekday::Wed),
-        4 => Ok(chrono::Weekday::Thu),
-        5 => Ok(chrono::Weekday::Fri),
-        6 => Ok(chrono::Weekday::Sat),
-        7 => Ok(chrono::Weekday::Sun),
-        _ => Err(Error::new(
+/// Builds the shared `(format, offset, reference, reference_format, **kwargs)`
+/// template function for one anchor.
+fn shorthand(anchor: Anchor) -> Value {
+    Value::from_function(
+        move |format: Option<&str>,
+              offset: Option<Value>,
+              reference: Option<&str>,
+              reference_format: Option<&str>,
+              kwargs: Kwargs|
+              -> TemplateEngineResult<String> {
+            resolve_anchor(
+                anchor,
+                format,
+                offset,
+                reference,
+                reference_format,
+                &kwargs,
+            )
+        },
+    )
+}
+
+/// Maps a weekday number (`0` or `1` Monday through `7` Sunday) to a weekday.
+fn weekday_or_error(n: i64) -> TemplateEngineResult<chrono::Weekday> {
+    weekday_from_number(n).ok_or_else(|| {
+        Error::new(
             ErrorKind::InvalidOperation,
             format!(
                 "weekday index {n} is out of range (expected 0..=7 under ISO \
                  Monday convention)"
             ),
-        )),
-    }
+        )
+    })
 }
 
 impl Object for DateNamespace {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "dispatches all date shorthands and aliases"
-    )]
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         match key.as_str()? {
-            "now" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        now_point(),
-                        Ok,
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "today" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        Ok,
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "tomorrow" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.shift(1, DurationUnit::Day),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "yesterday" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.shift(-1, DurationUnit::Day),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "start_of_week" | "sow" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.start_of(Period::Week),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "end_of_week" | "eow" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.end_of(Period::Week),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "start_of_month" | "som" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.start_of(Period::Month),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "end_of_month" | "eom" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.end_of(Period::Month),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "start_of_year" | "soy" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.start_of(Period::Year),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "end_of_year" | "eoy" => Some(Value::from_function(
-                |format: Option<&str>,
-                 offset: Option<Value>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    resolve_anchor(
-                        today_point(),
-                        |pt| pt.end_of(Period::Year),
-                        format,
-                        offset,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
+            "now" => Some(shorthand(Anchor::Now)),
+            "today" => Some(shorthand(Anchor::Today)),
+            "tomorrow" => Some(shorthand(Anchor::Tomorrow)),
+            "yesterday" => Some(shorthand(Anchor::Yesterday)),
+            "start_of_week" | "sow" => {
+                Some(shorthand(Anchor::StartOf(Period::Week)))
+            }
+            "end_of_week" | "eow" => {
+                Some(shorthand(Anchor::EndOf(Period::Week)))
+            }
+            "start_of_month" | "som" => {
+                Some(shorthand(Anchor::StartOf(Period::Month)))
+            }
+            "end_of_month" | "eom" => {
+                Some(shorthand(Anchor::EndOf(Period::Month)))
+            }
+            "start_of_year" | "soy" => {
+                Some(shorthand(Anchor::StartOf(Period::Year)))
+            }
+            "end_of_year" | "eoy" => {
+                Some(shorthand(Anchor::EndOf(Period::Year)))
+            }
             "weekday" => Some(Value::from_function(
                 |n: i64,
                  format: Option<&str>,
@@ -552,10 +448,9 @@ impl Object for DateNamespace {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    let target = weekday_from_number(n)?;
+                    let target = weekday_or_error(n)?;
                     resolve_anchor(
-                        today_point(),
-                        move |pt| pt.with_weekday(target),
+                        Anchor::Weekday(target),
                         format,
                         None,
                         reference,
@@ -739,16 +634,6 @@ const MOMENT_TOKENS: &[(&str, &str)] = &[
     ("S", "%1f"),
 ];
 
-const DURATION_HUMAN_UNITS: &[(&str, &str, f64)] = &[
-    ("year", "years", 31_536_000.0),
-    ("month", "months", 2_592_000.0),
-    ("week", "weeks", 604_800.0),
-    ("day", "days", 86_400.0),
-    ("hour", "hours", 3_600.0),
-    ("minute", "minutes", 60.0),
-    ("second", "seconds", 1.0),
-];
-
 /// Returns the English ordinal suffix (`"st"`, `"nd"`, `"rd"`, `"th"`) for
 /// `day`.
 fn ordinal_suffix(day: u32) -> &'static str {
@@ -854,9 +739,9 @@ fn moment_to_strftime(
     Ok(result)
 }
 
-/// `{{ value | durationformat }}` renders a duration in human-readable compound
-/// format (e.g. `"3 days, 4 hours"`).
-fn durationformat(value: Value) -> TemplateEngineResult<String> {
+/// `{{ value | duration_format }}` / `durationformat` renders a duration in
+/// human-readable compound format (e.g. `"3 days, 4 hours"`).
+fn duration_format(value: Value) -> TemplateEngineResult<String> {
     let dv = if let Some(s) = value.as_str() {
         DurationValue::parse(s).map_err(|source| {
             invalid_operation(format!("invalid duration {s:?}"), source)
@@ -876,69 +761,8 @@ fn durationformat(value: Value) -> TemplateEngineResult<String> {
             "durationformat expects a duration string or number",
         ));
     };
-    Ok(format_human_duration(&dv))
+    Ok(dv.humanize())
 }
-
-/// Renders a [`DurationValue`] in human-readable compound format.
-fn format_human_duration(dv: &DurationValue) -> String {
-    let total_secs = dv.nominal_seconds().as_f64();
-    if total_secs == 0.0 {
-        return "0 seconds".to_owned();
-    }
-    let is_negative = total_secs < 0.0;
-    let mut rem = total_secs.abs();
-
-    let mut parts = Vec::new();
-    for &(singular, plural, unit_secs) in DURATION_HUMAN_UNITS {
-        if rem >= unit_secs {
-            let count = (rem / unit_secs).floor();
-            let Some(count_u64) = count.to_u64() else {
-                return if is_negative {
-                    format!("-{total_secs:e} seconds")
-                } else {
-                    format!("{total_secs:e} seconds")
-                };
-            };
-            rem = count.mul_add(-unit_secs, rem);
-            if count_u64 == 1 {
-                parts.push(format!("1 {singular}"));
-            } else {
-                parts.push(format!("{count_u64} {plural}"));
-            }
-        }
-    }
-
-    if rem > 0.0 {
-        let ms_f = rem * 1000.0;
-        let ms_round = ms_f.round();
-        if let Some(ms) = ms_round.to_u64()
-            && ms > 0
-        {
-            if ms == 1 {
-                parts.push("1 millisecond".to_owned());
-            } else {
-                parts.push(format!("{ms} milliseconds"));
-            }
-        } else if parts.is_empty() {
-            parts.push("< 1 millisecond".to_owned());
-        } else {
-            // Sub-millisecond residual after whole units are already present is
-            // omitted
-        }
-    }
-
-    if parts.is_empty() {
-        return "0 seconds".to_owned();
-    }
-
-    let joined = parts.join(", ");
-    if is_negative {
-        format!("-{joined}")
-    } else {
-        joined
-    }
-}
-
 /// `{{ value | timestamp }}` converts a piped date/time string to Unix seconds.
 ///
 /// A naive input means the reader's local zone, so it compares correctly
@@ -953,42 +777,17 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
     Ok(parse_point(value)?.instant().timestamp())
 }
 
-/// Returns the first or last day of the input's month at its original
+/// Returns the first or last day of the input's `period` at its original
 /// precision.
-fn month_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
+fn edge_of_period(
+    value: &str,
+    period: Period,
+    edge: Edge,
+) -> TemplateEngineResult<String> {
     let point = parse_point(value)?;
-    let shifted = if end {
-        point.end_of(Period::Month)
-    } else {
-        point.start_of(Period::Month)
-    }
-    .map_err(render_date_error)?;
-    let wall = shifted.wall();
-    let pat = shifted.canonical_pattern();
-    render_with_pattern(wall.format(pat), pat)
-}
-
-/// Returns the first or last day of the input's week at its original precision.
-fn week_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let point = parse_point(value)?;
-    let shifted = if end {
-        point.end_of(Period::Week)
-    } else {
-        point.start_of(Period::Week)
-    }
-    .map_err(render_date_error)?;
-    let wall = shifted.wall();
-    let pat = shifted.canonical_pattern();
-    render_with_pattern(wall.format(pat), pat)
-}
-
-/// Returns the first or last day of the input's year at its original precision.
-fn year_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let point = parse_point(value)?;
-    let shifted = if end {
-        point.end_of(Period::Year)
-    } else {
-        point.start_of(Period::Year)
+    let shifted = match edge {
+        Edge::Start => point.start_of(period),
+        Edge::End => point.end_of(period),
     }
     .map_err(render_date_error)?;
     let wall = shifted.wall();
@@ -997,19 +796,19 @@ fn year_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
 }
 
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
-    week_boundary(value, false)
+    edge_of_period(value, Period::Week, Edge::Start)
 }
 
 fn end_of_week(value: &str) -> TemplateEngineResult<String> {
-    week_boundary(value, true)
+    edge_of_period(value, Period::Week, Edge::End)
 }
 
 fn start_of_year(value: &str) -> TemplateEngineResult<String> {
-    year_boundary(value, false)
+    edge_of_period(value, Period::Year, Edge::Start)
 }
 
 fn end_of_year(value: &str) -> TemplateEngineResult<String> {
-    year_boundary(value, true)
+    edge_of_period(value, Period::Year, Edge::End)
 }
 
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
@@ -1181,7 +980,7 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if the first day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn start_of_month(value: &str) -> TemplateEngineResult<String> {
-    month_boundary(value, false)
+    edge_of_period(value, Period::Month, Edge::Start)
 }
 
 /// `{{ value | end_of_month }}` returns the last day of the input month.
@@ -1193,12 +992,12 @@ fn start_of_month(value: &str) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if the last day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn end_of_month(value: &str) -> TemplateEngineResult<String> {
-    month_boundary(value, true)
+    edge_of_period(value, Period::Month, Edge::End)
 }
 
-/// `{{ value | weekday }}` returns `0` for Monday through `6` for Sunday.
-/// When `n` is supplied, returns the formatted date of that weekday in
-/// `value`'s week.
+/// `{{ value | weekday }}` returns the ISO weekday number: `1` for Monday
+/// through `7` for Sunday. When `n` is supplied, returns the formatted date of
+/// that weekday in `value`'s week.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja Function trait extracts trailing Kwargs argument by \
@@ -1212,7 +1011,7 @@ fn weekday(
     let point = parse_point(value)?;
     if let Some(target_num) = n {
         let format = format_kwarg(&kwargs)?;
-        let target_weekday = weekday_from_number(target_num)?;
+        let target_weekday = weekday_or_error(target_num)?;
         let shifted =
             point.with_weekday(target_weekday).map_err(render_date_error)?;
         let wall = shifted.wall();
@@ -1220,7 +1019,7 @@ fn weekday(
         Ok(Value::from(render_with_pattern(wall.format(&pat), format)?))
     } else {
         kwargs.assert_all_used()?;
-        Ok(Value::from(point.wall().weekday().num_days_from_monday()))
+        Ok(Value::from(point.component(DateComponent::Weekday)))
     }
 }
 
@@ -1952,6 +1751,18 @@ mod tests {
         }
 
         #[test]
+        fn duration_format_is_an_alias_of_durationformat() {
+            let rendered = env()
+                .render_str(
+                    r"{{ 90 | duration_format }}|{{ 90 | durationformat }}",
+                    minijinja::context!(),
+                )
+                .expect("render succeeds");
+
+            assert_eq!(rendered, "1 minute, 30 seconds|1 minute, 30 seconds");
+        }
+
+        #[test]
         fn rejects_invalid_duration_value() {
             let error = env()
                 .render_str(
@@ -2236,14 +2047,14 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::monday("2026-07-20", 0)]
-        #[case::tuesday("2026-07-21", 1)]
-        #[case::wednesday("2026-07-22", 2)]
-        #[case::thursday("2026-07-23", 3)]
-        #[case::friday("2026-07-24", 4)]
-        #[case::saturday("2026-07-25", 5)]
-        #[case::sunday("2026-07-26", 6)]
-        fn returns_zero_indexed_from_monday(
+        #[case::monday("2026-07-20", 1)]
+        #[case::tuesday("2026-07-21", 2)]
+        #[case::wednesday("2026-07-22", 3)]
+        #[case::thursday("2026-07-23", 4)]
+        #[case::friday("2026-07-24", 5)]
+        #[case::saturday("2026-07-25", 6)]
+        #[case::sunday("2026-07-26", 7)]
+        fn returns_the_iso_weekday_number(
             #[case] input: &str,
             #[case] expected: u32,
         ) {

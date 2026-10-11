@@ -86,9 +86,9 @@ pub(super) fn scan_component(
     Ok((number, unit, after_unit))
 }
 
-/// Parses a decimal number starting at `pos`, supporting an optional
-/// leading `+` or `-` and an optional trailing exponent (`"1e5"`,
-/// `".5e-3"`), the same float syntax the [`super::value::DurationSeconds`]
+/// Parses a decimal number starting at `pos`, supporting an optional leading
+/// `+` or `-` and an optional trailing exponent (`"1e5"`, `".5e-3"`), the same
+/// float syntax the [`super::value::DurationSeconds`]
 /// [`Display`](std::fmt::Display) dialect emits for extreme magnitudes.
 pub(super) fn scan_number(
     bytes: &[u8],
@@ -126,8 +126,8 @@ pub(super) fn scan_number(
         }
     }
     // An exponent may follow a digit-bearing mantissa. A truncated exponent
-    // (`"1e"`, `"1e+"`) is not consumed: the `e` falls to the unit scanner
-    // and is reported as an unknown unit.
+    // (`"1e"`, `"1e+"`) is not consumed: the `e` falls to the unit scanner and
+    // is reported as an unknown unit.
     if has_digit && matches!(bytes.get(pos), Some(b'e' | b'E')) {
         let mut exp_pos = pos.saturating_add(1);
         if matches!(bytes.get(exp_pos), Some(b'+' | b'-')) {
@@ -155,8 +155,8 @@ pub(super) fn convert_number(
         });
     }
     // `start`/`end` are byte offsets produced by scanning only single-byte
-    // ASCII (`+`/`-`/`.`/digit/`e`/`E`), so they always land on char
-    // boundaries within `input`: a direct `str` slice can't fail.
+    // ASCII (`+`/`-`/`.`/digit/`e`/`E`), so they always land on char boundaries
+    // within `input`: a direct `str` slice can't fail.
     let Some(text) = input.get(start..end) else {
         return Err(DurationError::MissingNumber {
             input: input.to_owned(),

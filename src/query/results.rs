@@ -939,6 +939,8 @@ mod tests {
             );
             assert_eq!(row.field("file.created_at"), row.field("file.ctime"));
             assert_eq!(row.field("file.modified_at"), row.field("file.mtime"));
+            assert_eq!(row.field("file.cday"), row.field("file.cdate"));
+            assert_eq!(row.field("file.mday"), row.field("file.mdate"));
         }
 
         #[test]

@@ -1,6 +1,6 @@
 use chrono::{
     Datelike as _, Days, Months, NaiveDate, NaiveDateTime, NaiveTime,
-    TimeDelta, Weekday,
+    TimeDelta, Timelike as _, Weekday,
 };
 use num_traits::ToPrimitive as _;
 
@@ -42,6 +42,58 @@ pub(crate) enum Period {
 pub(crate) enum Edge {
     Start,
     End,
+}
+
+/// A named calendar or clock component of a [`Point`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DateComponent {
+    Year,
+    Month,
+    Day,
+    Hour,
+    Minute,
+    Second,
+    /// ISO weekday number, Monday = 1 through Sunday = 7.
+    Weekday,
+    /// ISO week number of the year.
+    Week,
+}
+
+impl DateComponent {
+    /// Resolves a component name, ASCII case-insensitively.
+    #[must_use]
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        const TABLE: [(&str, DateComponent); 8] = [
+            ("year", DateComponent::Year),
+            ("month", DateComponent::Month),
+            ("day", DateComponent::Day),
+            ("hour", DateComponent::Hour),
+            ("minute", DateComponent::Minute),
+            ("second", DateComponent::Second),
+            ("weekday", DateComponent::Weekday),
+            ("week", DateComponent::Week),
+        ];
+        TABLE
+            .iter()
+            .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
+            .map(|&(_, component)| component)
+    }
+}
+
+/// Maps a weekday number to a [`Weekday`]: `1` is Monday through `7` Sunday,
+/// and `0` is accepted as Monday.
+#[must_use]
+pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
+    match n {
+        0 | 1 => Some(Weekday::Mon),
+        2 => Some(Weekday::Tue),
+        3 => Some(Weekday::Wed),
+        4 => Some(Weekday::Thu),
+        5 => Some(Weekday::Fri),
+        6 => Some(Weekday::Sat),
+        7 => Some(Weekday::Sun),
+        _ => None,
+    }
 }
 
 impl Point {
@@ -241,6 +293,26 @@ impl Point {
         let date = NaiveDate::from_isoywd_opt(iso.year(), iso.week(), target)
             .ok_or(DateError::OutOfRange)?;
         self.with_date(date)
+    }
+
+    /// Returns one calendar or clock component of the local wall reading.
+    ///
+    /// Weekdays are ISO numbered, Monday = 1 through Sunday = 7.
+    #[must_use]
+    pub(crate) fn component(self, component: DateComponent) -> i64 {
+        let wall = self.wall();
+        match component {
+            DateComponent::Year => i64::from(wall.year()),
+            DateComponent::Month => i64::from(wall.month()),
+            DateComponent::Day => i64::from(wall.day()),
+            DateComponent::Hour => i64::from(wall.hour()),
+            DateComponent::Minute => i64::from(wall.minute()),
+            DateComponent::Second => i64::from(wall.second()),
+            DateComponent::Weekday => {
+                i64::from(wall.weekday().number_from_monday())
+            }
+            DateComponent::Week => i64::from(wall.iso_week().week()),
+        }
     }
 
     /// Measures the difference to another point in the requested unit.

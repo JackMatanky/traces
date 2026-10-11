@@ -9,9 +9,9 @@
 //! # Clock doctrine
 //!
 //! A naive datetime means what a human means: it is read in the process's local
-//! zone and stored as UTC (see [`resolve_local`]); a date-only value stays
-//! a zone-free civil date. Instants render as the local wall clock and travel
-//! as UTC for storage and comparison.
+//! zone and stored as UTC (see [`resolve_local`]); a date-only value stays a
+//! zone-free civil date. Instants render as the local wall clock and travel as
+//! UTC for storage and comparison.
 //!
 //! # Key types
 //!
@@ -35,7 +35,9 @@ mod calendar;
 mod parse;
 mod value;
 
-pub(crate) use calendar::{Difference, Period};
+pub(crate) use calendar::{
+    DateComponent, Difference, Edge, Period, weekday_from_number,
+};
 pub(crate) use value::{CivilPrecision, DATE_PATTERN, DATETIME_PATTERN, Point};
 pub use value::{DateError, DateTimeValue, DateValue};
 

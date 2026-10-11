@@ -33,8 +33,8 @@ impl Point {
     ///
     /// # Errors
     ///
-    /// Returns [`DateError::UnknownShape`] when no date-like prefix exists,
-    /// or the corresponding parsing or local-zone error for invalid dates.
+    /// Returns [`DateError::UnknownShape`] when no date-like prefix exists, or
+    /// the corresponding parsing or local-zone error for invalid dates.
     pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_like_date(trimmed.as_bytes()) {
@@ -158,8 +158,8 @@ impl Point {
 }
 
 impl DateValue {
-    /// Parses an ISO-8601 date string (`YYYY-MM-DD` or `YYYY-MM`) using
-    /// the recognition layer.
+    /// Parses an ISO-8601 date string (`YYYY-MM-DD` or `YYYY-MM`) using the
+    /// recognition layer.
     ///
     /// # Errors
     ///

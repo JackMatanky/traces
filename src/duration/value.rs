@@ -53,22 +53,43 @@ pub struct DurationValue {
     components: Option<Components>,
 }
 
-impl DurationValue {
-    /// The six fixed sub-year units used for greedy millisecond decomposition
-    /// in [`DurationValue::from_nominal_seconds`].
-    ///
-    /// Month and Year are intentionally omitted from magnitude-derived
-    /// conversion: their lengths are calendar-dependent and cannot be soundly
-    /// synthesized from a raw magnitude.
-    const SUB_YEAR_DECOMPOSITION_UNITS: [(DurationUnit, &str); 6] = [
-        (DurationUnit::Week, "w"),
-        (DurationUnit::Day, "d"),
-        (DurationUnit::Hour, "h"),
-        (DurationUnit::Minute, "m"),
-        (DurationUnit::Second, "s"),
-        (DurationUnit::Millisecond, "ms"),
-    ];
+/// The six fixed sub-year units used for greedy millisecond decomposition in
+/// [`DurationValue::from_nominal_seconds`].
+///
+/// Month and Year are intentionally omitted from magnitude-derived conversion:
+/// their lengths are calendar-dependent and cannot be soundly synthesized from
+/// a raw magnitude.
+const DECOMPOSITION_ORDER: [DurationUnit; 6] = [
+    DurationUnit::Week,
+    DurationUnit::Day,
+    DurationUnit::Hour,
+    DurationUnit::Minute,
+    DurationUnit::Second,
+    DurationUnit::Millisecond,
+];
 
+/// Units, largest first, used by [`DurationValue::humanize`].
+const HUMAN_ORDER: [DurationUnit; 7] = [
+    DurationUnit::Year,
+    DurationUnit::Month,
+    DurationUnit::Week,
+    DurationUnit::Day,
+    DurationUnit::Hour,
+    DurationUnit::Minute,
+    DurationUnit::Second,
+];
+
+/// Renders a magnitude too large for whole-unit counts in scientific notation.
+fn scientific_seconds_text(total_secs: f64, is_negative: bool) -> String {
+    let sign = if is_negative {
+        "-"
+    } else {
+        ""
+    };
+    format!("{sign}{total_secs:e} seconds")
+}
+
+impl DurationValue {
     /// Classifies `s` as a duration expression, returning `None` if it cannot
     /// start a duration.
     ///
@@ -281,11 +302,11 @@ impl DurationValue {
         }
     }
 
-    /// Synthesizes the canonical spelling for a fixed-magnitude duration:
-    /// the greedy sub-year decomposition of
-    /// [`Self::SUB_YEAR_DECOMPOSITION_UNITS`], or [`DurationSeconds`]'s
-    /// [`Display`](fmt::Display) dialect when the decomposition can't represent
-    /// the magnitude (see [`Self::from_nominal_seconds`]).
+    /// Synthesizes the canonical spelling for a fixed-magnitude duration: the
+    /// greedy sub-year decomposition of [`DECOMPOSITION_ORDER`], or
+    /// [`DurationSeconds`]'s [`Display`](fmt::Display) dialect when the
+    /// decomposition can't represent the magnitude (see
+    /// [`Self::from_nominal_seconds`]).
     ///
     /// Accumulates into one `String`: decomposition emits at most six integer
     /// counts, so no per-part intermediate strings are needed.
@@ -308,7 +329,7 @@ impl DurationValue {
             spelling.push('-');
         }
         let mut decomposed = false;
-        for &(unit, suffix) in &Self::SUB_YEAR_DECOMPOSITION_UNITS {
+        for unit in DECOMPOSITION_ORDER {
             let unit_ms = (unit.nominal_seconds() * 1_000.0)
                 .round()
                 .to_u64()
@@ -320,7 +341,7 @@ impl DurationValue {
                     spelling.push(' ');
                 }
                 // `u64`'s `Display` into a `String` is infallible.
-                let _ = write!(spelling, "{count}{suffix}");
+                let _ = write!(spelling, "{count}{}", unit.spelling());
                 decomposed = true;
             }
         }
@@ -334,6 +355,69 @@ impl DurationValue {
             spelling.into_boxed_str()
         } else {
             format!("{}s", DurationSeconds(total_secs)).into_boxed_str()
+        }
+    }
+
+    /// Renders this duration in human-readable compound English (for example
+    /// `"3 days, 4 hours"`), decomposing its nominal seconds greedily from
+    /// years down to seconds with a rounded millisecond remainder.
+    ///
+    /// Magnitudes too large for whole-unit counts render in scientific
+    /// notation; zero renders as `"0 seconds"`.
+    #[must_use]
+    pub(crate) fn humanize(&self) -> String {
+        let total_secs = self.seconds.as_f64();
+        if total_secs == 0.0 {
+            return "0 seconds".to_owned();
+        }
+        let is_negative = total_secs < 0.0;
+        let mut rem = total_secs.abs();
+
+        let mut parts = Vec::new();
+        for unit in HUMAN_ORDER {
+            let unit_secs = unit.nominal_seconds();
+            if rem >= unit_secs {
+                let count = (rem / unit_secs).floor();
+                let Some(count_u64) = count.to_u64() else {
+                    return scientific_seconds_text(total_secs, is_negative);
+                };
+                rem = count.mul_add(-unit_secs, rem);
+                let (singular, plural) = unit.human_names();
+                if count_u64 == 1 {
+                    parts.push(format!("1 {singular}"));
+                } else {
+                    parts.push(format!("{count_u64} {plural}"));
+                }
+            }
+        }
+
+        if rem > 0.0 {
+            let ms_round = (rem * 1000.0).round();
+            if let Some(ms) = ms_round.to_u64()
+                && ms > 0
+            {
+                if ms == 1 {
+                    parts.push("1 millisecond".to_owned());
+                } else {
+                    parts.push(format!("{ms} milliseconds"));
+                }
+            } else if parts.is_empty() {
+                parts.push("< 1 millisecond".to_owned());
+            } else {
+                // Sub-millisecond residual after whole units are already
+                // present is omitted.
+            }
+        }
+
+        if parts.is_empty() {
+            return "0 seconds".to_owned();
+        }
+
+        let joined = parts.join(", ");
+        if is_negative {
+            format!("-{joined}")
+        } else {
+            joined
         }
     }
 

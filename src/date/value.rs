@@ -303,8 +303,8 @@ impl From<DateTimeValue> for DateTime<Utc> {
 /// (civil date read as UTC, deterministic and shift-free) instead of surfacing
 /// [`DateError::LocalZoneLookup`], because the infallible conversion is
 /// consumed by equality, sort-key, and ordering paths that cannot propagate an
-/// error, while `TryFrom` would duplicate that fallback at each of them.
-/// All fallible entry points surface broken local-zone lookups as
+/// error, while `TryFrom` would duplicate that fallback at each of them. All
+/// fallible entry points surface broken local-zone lookups as
 /// [`DateError::LocalZoneLookup`] instead.
 impl From<DateValue> for DateTimeValue {
     #[inline]

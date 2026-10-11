@@ -242,19 +242,23 @@ src/config/trust.rs: pub(super) fn project(&self, name: &str) -> PathBuf {
 src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
 src/config/trust.rs: pub(super) store: TrustStore,
 src/config/trust.rs: pub(super) struct Fixture {
+src/date/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
+src/date/calendar.rs: pub(crate) enum DateComponent {
 src/date/calendar.rs: pub(crate) enum Difference {
 src/date/calendar.rs: pub(crate) enum Edge {
 src/date/calendar.rs: pub(crate) enum Period {
 src/date/calendar.rs: pub(crate) fn apply(
+src/date/calendar.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
 src/date/calendar.rs: pub(crate) fn diff(
 src/date/calendar.rs: pub(crate) fn end_of(self, period: Period) -> Result<Self, DateError> {
+src/date/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn start_of(self, period: Period) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/date/calendar.rs: pub(crate) fn with_weekday(
 src/date/mod.rs: pub use value::{DateError, DateTimeValue, DateValue};
-src/date/mod.rs: pub(crate) use calendar::{Difference, Period};
+src/date/mod.rs: pub(crate) use calendar::{
 src/date/mod.rs: pub(crate) use value::{CivilPrecision, DATE_PATTERN, DATETIME_PATTERN, Point};
 src/date/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
 src/date/parse.rs: pub(crate) const ALL: [Self; 2] = [Self::YearMonthDay, Self::YearMonth];
@@ -349,8 +353,10 @@ src/duration/scan.rs: pub(super) fn scan_unit(
 src/duration/scan.rs: pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
 src/duration/scan.rs: pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
 src/duration/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
+src/duration/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
 src/duration/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
 src/duration/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
+src/duration/unit.rs: pub(crate) const fn spelling(self) -> &'static str {
 src/duration/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
 src/duration/unit.rs: pub(crate) enum DurationUnit {
 src/duration/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
@@ -363,6 +369,7 @@ src/duration/value.rs: pub(crate) fn classify(s: &str) -> Option<Result<Self, Du
 src/duration/value.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
 src/duration/value.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
 src/duration/value.rs: pub(crate) fn has_calendar_component(&self) -> bool {
+src/duration/value.rs: pub(crate) fn humanize(&self) -> String {
 src/duration/value.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/duration/value.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
 src/duration/value.rs: pub(crate) magnitude: f64,
@@ -954,6 +961,7 @@ src/query/grammar/field.rs: pub(super) fn parse(name: &str) -> Option<Self> {
 src/query/grammar/filter.rs: pub(crate) enum ArithOp {
 src/query/grammar/filter.rs: pub(crate) enum FilterAtom {
 src/query/grammar/filter.rs: pub(crate) enum FilterFunction {
+src/query/grammar/filter.rs: pub(crate) enum QueryFunction {
 src/query/grammar/filter.rs: pub(crate) enum ValueExpr {
 src/query/grammar/filter.rs: pub(crate) fn and(self, other: Self) -> Self {
 src/query/grammar/filter.rs: pub(crate) fn is_matching(&self, row: &QueryRow) -> bool {
