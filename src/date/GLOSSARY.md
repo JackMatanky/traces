@@ -13,8 +13,7 @@ A parsed civil calendar date with no time-of-day component. `src/date/` is the
 crate's single owner of date recognition, parsing, and formatting; every
 date-shaped string — including serde deserialization — funnels through it.
 Enforces the four-digit year invariant (rejecting two-digit ambiguous years) and
-hoists precision (`YearMonth`, `Date`, `DateTime`) to the recognition layer,
-reducing `YYYY-MM` to day 1.
+retains month/day precision on civil points, reducing `YYYY-MM` to day 1.
 *Avoid*: NaiveDate, calendar value
 
 #### Date-Time

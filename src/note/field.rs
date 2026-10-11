@@ -95,23 +95,22 @@ impl NoteFieldValue {
     /// # Examples
     ///
     /// ```rust
-    /// use chrono::NaiveDate;
-    /// use traces_pkm::NoteFieldValue;
+    /// use traces_pkm::{DateValue, NoteFieldValue};
     ///
     /// let str_val = NoteFieldValue::String("2025-01-15T12:00:00".to_owned());
-    /// assert_eq!(str_val.as_date(), NaiveDate::from_ymd_opt(2025, 1, 15));
+    /// assert_eq!(str_val.as_date(), "2025-01-15".parse::<DateValue>().ok());
     ///
     /// let invalid = NoteFieldValue::String("not-a-date".to_owned());
     /// assert_eq!(invalid.as_date(), None);
     /// ```
     #[inline]
     #[must_use]
-    pub fn as_date(&self) -> Option<chrono::NaiveDate> {
+    pub fn as_date(&self) -> Option<DateValue> {
         match self {
-            Self::Date(value) => Some(value.naive_date()),
-            Self::DateTime(value) => Some(value.local_date().naive_date()),
-            Self::String(s) => DateValue::parse_prefix(s)
-                .map(|(rec, _)| rec.date().naive_date()),
+            Self::Date(value) => Some(*value),
+            Self::DateTime(value) => Some(value.local_date()),
+            Self::String(s) => crate::date::Point::parse_prefix(s)
+                .map(|(point, _)| point.date()),
             _ => None,
         }
     }
@@ -807,7 +806,7 @@ mod tests {
             );
             assert_eq!(
                 date_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 2)
+                Some(DateValue::parse_iso("2026-09-02").expect("valid date"))
             );
         }
 
@@ -819,7 +818,7 @@ mod tests {
             );
             assert_eq!(
                 datetime_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 2)
+                Some(DateValue::parse_iso("2026-09-02").expect("valid date"))
             );
         }
 
@@ -829,7 +828,7 @@ mod tests {
                 NoteFieldValue::String("2026-09-02T14:30:00".to_owned());
             assert_eq!(
                 str_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 2)
+                Some(DateValue::parse_iso("2026-09-02").expect("valid date"))
             );
         }
 
@@ -838,7 +837,7 @@ mod tests {
             let str_val = NoteFieldValue::String("2026-09".to_owned());
             assert_eq!(
                 str_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 1)
+                Some(DateValue::parse_iso("2026-09").expect("valid month"))
             );
         }
 

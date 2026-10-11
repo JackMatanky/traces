@@ -23,9 +23,9 @@ use super::{
     },
 };
 use crate::{
-    DateTimeValue, DurationSeconds, DurationUnit, DurationValue, LexError,
-    NoteFieldValue, NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec,
-    date::{DateError, DatePoint, Precision},
+    DurationSeconds, DurationUnit, DurationValue, LexError, NoteFieldValue,
+    NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec,
+    date::{CivilPrecision, DateError, Period, Point},
     lexical_unquote,
     query::{
         QueryRow,
@@ -276,19 +276,24 @@ impl ValueExpr {
     }
 }
 
-fn date_point(value: &NoteFieldValue) -> Option<DatePoint> {
+fn point_of(value: &NoteFieldValue) -> Option<Point> {
     match value {
-        NoteFieldValue::Date(date) => Some(DatePoint::new(
-            date.naive_date().and_hms_opt(0, 0, 0)?,
-            DateTimeValue::from(*date).utc(),
-            Precision::Date,
-        )),
-        NoteFieldValue::DateTime(datetime) => Some(DatePoint::new(
-            datetime.local_wall_or_utc(),
-            datetime.utc(),
-            Precision::DateTime,
-        )),
+        NoteFieldValue::Date(date) => Some(Point::Civil {
+            date: *date,
+            precision: CivilPrecision::Day,
+        }),
+        NoteFieldValue::DateTime(datetime) => Some(Point::Instant(*datetime)),
         _ => None,
+    }
+}
+
+fn field_value_of(point: Point) -> NoteFieldValue {
+    match point {
+        Point::Civil {
+            date,
+            ..
+        } => NoteFieldValue::Date(date),
+        Point::Instant(datetime) => NoteFieldValue::DateTime(datetime),
     }
 }
 
@@ -309,44 +314,29 @@ fn evaluate_binary(
     }
     match (left, op, right) {
         (
-            NoteFieldValue::Date(date),
+            date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Add,
             NoteFieldValue::Duration(duration),
         )
         | (
             NoteFieldValue::Duration(duration),
             ArithOp::Add,
-            NoteFieldValue::Date(date),
-        ) => Some(NoteFieldValue::Date(date.apply(&duration).ok()?)),
+            date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
+        ) => Some(field_value_of(point_of(&date)?.apply(&duration).ok()?)),
         (
-            NoteFieldValue::DateTime(datetime),
-            ArithOp::Add,
-            NoteFieldValue::Duration(duration),
-        )
-        | (
-            NoteFieldValue::Duration(duration),
-            ArithOp::Add,
-            NoteFieldValue::DateTime(datetime),
-        ) => Some(NoteFieldValue::DateTime(datetime.apply(&duration).ok()?)),
-        (
-            NoteFieldValue::Date(date),
+            date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Sub,
             NoteFieldValue::Duration(duration),
-        ) => Some(NoteFieldValue::Date(date.apply(&(duration * -1.0)).ok()?)),
-        (
-            NoteFieldValue::DateTime(datetime),
-            ArithOp::Sub,
-            NoteFieldValue::Duration(duration),
-        ) => Some(NoteFieldValue::DateTime(
-            datetime.apply(&(duration * -1.0)).ok()?,
+        ) => Some(field_value_of(
+            point_of(&date)?.apply(&(duration * -1.0)).ok()?,
         )),
         (
             date1 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Sub,
             date2 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
         ) => {
-            let diff = date_point(&date2)?
-                .diff(date_point(&date1)?, DurationUnit::Second)
+            let diff = point_of(&date2)?
+                .diff(point_of(&date1)?, DurationUnit::Second)
                 .ok()?;
             let seconds = diff.to_f64()?;
             Some(NoteFieldValue::Duration(DurationValue::from_nominal_seconds(
@@ -417,18 +407,8 @@ fn evaluate_registry_call(
                 }
                 let unit = DurationUnit::from_spelling(unit)?;
                 let n = (n.fract() == 0.0).then(|| n.to_i64()).flatten()?;
-                let shifted = date_point(date)?.shift(n, unit).ok()?;
-                match date {
-                    NoteFieldValue::Date(_) => Some(NoteFieldValue::Date(
-                        crate::DateValue::from(shifted.wall.date()),
-                    )),
-                    NoteFieldValue::DateTime(_) => {
-                        Some(NoteFieldValue::DateTime(DateTimeValue::from(
-                            shifted.instant,
-                        )))
-                    }
-                    _ => Some(NoteFieldValue::Null),
-                }
+                let shifted = point_of(date)?.shift(n, unit).ok()?;
+                Some(field_value_of(shifted))
             }
             _ => None,
         };
@@ -446,33 +426,33 @@ fn evaluate_registry_call(
         {
             return Some(NoteFieldValue::Null);
         }
-        let diff = date_point(date1)?.diff(date_point(date2)?, unit).ok()?;
+        let diff = point_of(date1)?.diff(point_of(date2)?, unit).ok()?;
         return Some(NoteFieldValue::Number(diff.to_f64()?));
     }
     if name.eq_ignore_ascii_case("date_component") {
         return evaluate_date_component(args);
     }
     if name.eq_ignore_ascii_case("sow") {
-        return date_boundary(args, |pt| pt.week_boundary(false));
+        return date_boundary(args, |pt| pt.start_of(Period::Week));
     }
     if name.eq_ignore_ascii_case("eow") {
-        return date_boundary(args, |pt| pt.week_boundary(true));
+        return date_boundary(args, |pt| pt.end_of(Period::Week));
     }
     if name.eq_ignore_ascii_case("som")
         || name.eq_ignore_ascii_case("start_of_month")
     {
-        return date_boundary(args, |pt| pt.month_boundary(false));
+        return date_boundary(args, |pt| pt.start_of(Period::Month));
     }
     if name.eq_ignore_ascii_case("eom")
         || name.eq_ignore_ascii_case("end_of_month")
     {
-        return date_boundary(args, |pt| pt.month_boundary(true));
+        return date_boundary(args, |pt| pt.end_of(Period::Month));
     }
     if name.eq_ignore_ascii_case("soy") {
-        return date_boundary(args, |pt| pt.year_boundary(false));
+        return date_boundary(args, |pt| pt.start_of(Period::Year));
     }
     if name.eq_ignore_ascii_case("eoy") {
-        return date_boundary(args, |pt| pt.year_boundary(true));
+        return date_boundary(args, |pt| pt.end_of(Period::Year));
     }
     if name.eq_ignore_ascii_case("date") {
         return match args {
@@ -485,20 +465,10 @@ fn evaluate_registry_call(
                 Some(NoteFieldValue::DateTime(*dt))
             }
             [NoteFieldValue::String(s)] => {
-                let rec = crate::DateValue::classify(s)?.ok()?;
-                Some(if rec.precision.has_time() {
-                    NoteFieldValue::DateTime(DateTimeValue::from(rec.instant()))
-                } else {
-                    NoteFieldValue::Date(rec.date())
-                })
+                Some(field_value_of(Point::parse(s).ok()?))
             }
             [NoteFieldValue::String(s), NoteFieldValue::String(fmt)] => {
-                let rec = crate::DateValue::parse_with(s, fmt).ok()?;
-                Some(if rec.precision.has_time() {
-                    NoteFieldValue::DateTime(DateTimeValue::from(rec.instant()))
-                } else {
-                    NoteFieldValue::Date(rec.date())
-                })
+                Some(field_value_of(Point::parse_with_pattern(s, fmt).ok()?))
             }
             [NoteFieldValue::Null] | [NoteFieldValue::Null, _] => {
                 Some(NoteFieldValue::Null)
@@ -511,23 +481,13 @@ fn evaluate_registry_call(
 
 fn date_boundary(
     args: &[NoteFieldValue],
-    op: impl FnOnce(DatePoint) -> Result<DatePoint, DateError>,
+    op: impl FnOnce(Point) -> Result<Point, DateError>,
 ) -> Option<NoteFieldValue> {
     let date = args.first()?;
     if matches!(date, NoteFieldValue::Null) {
         return Some(NoteFieldValue::Null);
     }
-    let pt = date_point(date)?;
-    let shifted = op(pt).ok()?;
-    match date {
-        NoteFieldValue::Date(_) => Some(NoteFieldValue::Date(
-            crate::DateValue::from(shifted.wall.date()),
-        )),
-        NoteFieldValue::DateTime(_) => {
-            Some(NoteFieldValue::DateTime(DateTimeValue::from(shifted.instant)))
-        }
-        _ => Some(NoteFieldValue::Null),
-    }
+    Some(field_value_of(op(point_of(date)?).ok()?))
 }
 fn evaluate_date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
     use chrono::{Datelike as _, Timelike as _};
@@ -537,7 +497,7 @@ fn evaluate_date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
     if matches!(date, NoteFieldValue::Null) {
         return Some(NoteFieldValue::Null);
     }
-    let wall = date_point(date)?.wall;
+    let wall = point_of(date)?.wall();
     let number = if component.eq_ignore_ascii_case("year") {
         f64::from(wall.year())
     } else if component.eq_ignore_ascii_case("month") {

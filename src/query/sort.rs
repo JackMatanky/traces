@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     DateTimeValue, DateValue, DurationSeconds, NoteFieldType, NoteFieldValue,
-    NoteFieldValueRef, note::normalize_zero,
+    NoteFieldValueRef, date::Point, note::normalize_zero,
 };
 
 /// Composite ordering clause made of one or more [`SortTerm`] values.
@@ -459,17 +459,17 @@ pub(super) enum TextShape {
 impl TextShape {
     /// Inspects free text for a date, date-time, or duration shape.
     ///
-    /// Delegates to [`DateValue::classify`] and
+    /// Delegates to [`Point::parse`] and
     /// [`crate::DurationValue::classify`].
     pub(super) fn classify(s: &str) -> Self {
         let trimmed = s.trim();
-        if let Some(Ok(rec)) = DateValue::classify(trimmed) {
-            return match rec.value {
-                crate::date::RecognizedDateValue::DateTime(dt) => {
-                    Self::DateTime(dt)
-                }
-                crate::date::RecognizedDateValue::Date(d) => Self::Date(d),
-            };
+        match Point::parse(trimmed) {
+            Ok(Point::Instant(dt)) => return Self::DateTime(dt),
+            Ok(Point::Civil {
+                date,
+                ..
+            }) => return Self::Date(date),
+            Err(_) => {}
         }
         if let Some(Ok(dv)) = crate::DurationValue::classify(trimmed) {
             return Self::Duration(dv);

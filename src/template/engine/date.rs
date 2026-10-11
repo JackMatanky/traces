@@ -16,7 +16,7 @@
 //!   built-in `format` filter.
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
-//! Date/time string parsing funnels through [`DateValue::classify`] via
+//! Date/time string parsing funnels through [`Point::parse`] via
 //! [`parse_wall`]. A full datetime is tried first, falling back to a bare ISO
 //! date (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) at midnight. Arithmetic
 //! filters re-serialize at the input's original precision via the calendar
@@ -43,12 +43,9 @@ use num_traits::ToPrimitive as _;
 
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
-    DATE_PATTERN, DateTimeValue, DateValue, DurationSeconds, DurationUnit,
-    DurationValue, UNIT_SPELLINGS_HINT,
-    date::{
-        DateError, DatePoint, DateShape, DateTimeShape, Difference, Precision,
-        RecognizedDate,
-    },
+    DATE_PATTERN, DateTimeValue, DurationSeconds, DurationUnit, DurationValue,
+    UNIT_SPELLINGS_HINT,
+    date::{CivilPrecision, DateError, Difference, Period, Point},
 };
 
 const NAMESPACE_METHODS: &[&str] = &[
@@ -116,19 +113,15 @@ impl DateNamespace {
     }
 }
 
-fn now_point() -> DatePoint {
-    let utc_now = Utc::now();
-    let wall = DateTimeValue::from(utc_now).local_wall_or_utc();
-    DatePoint::new(wall, utc_now, Precision::DateTime)
+fn now_point() -> Point {
+    Point::Instant(DateTimeValue::from(Utc::now()))
 }
 
-fn today_point() -> DatePoint {
-    let local = now_point();
-    DatePoint::new(
-        local.wall.date().and_hms_opt(0, 0, 0).unwrap_or(local.wall),
-        DateTimeValue::from(DateValue::from(local.wall.date())).utc(),
-        Precision::Date,
-    )
+fn today_point() -> Point {
+    Point::Civil {
+        date: now_point().date(),
+        precision: CivilPrecision::Day,
+    }
 }
 
 /// Translates an ISO-8601 duration offset (e.g., `"P1M"`, `"-P1M"`, `"P-1M"`,
@@ -281,9 +274,9 @@ fn scan_iso_components<'a>(
 }
 
 fn apply_offset(
-    point: DatePoint,
+    point: Point,
     offset_val: &Value,
-) -> TemplateEngineResult<DatePoint> {
+) -> TemplateEngineResult<Point> {
     if let Some(n) = offset_val.as_i64() {
         return point.shift(n, DurationUnit::Day).map_err(render_date_error);
     }
@@ -308,8 +301,8 @@ fn apply_offset(
     reason = "accepts format, offset, reference, and reference_format options"
 )]
 fn resolve_anchor(
-    base_point: DatePoint,
-    transform: impl FnOnce(DatePoint) -> Result<DatePoint, DateError>,
+    base_point: Point,
+    transform: impl FnOnce(Point) -> Result<Point, DateError>,
     format: Option<&str>,
     offset: Option<Value>,
     reference: Option<&str>,
@@ -327,12 +320,10 @@ fn resolve_anchor(
 
     let mut point = if let Some(ref_text) = reference {
         if let Some(ref_fmt) = reference_format {
-            let recognized = DateValue::parse_with(ref_text, ref_fmt)
-                .map_err(render_date_error)?;
-            recognized.point()
+            Point::parse_with_pattern(ref_text, ref_fmt)
+                .map_err(render_date_error)?
         } else {
-            let recognized = parse_point(ref_text)?;
-            recognized.point()
+            parse_point(ref_text)?
         }
     } else {
         base_point
@@ -343,8 +334,9 @@ fn resolve_anchor(
         point = apply_offset(point, &off_val)?;
     }
 
-    let pat = pattern_to_strftime(format, point.wall)?;
-    render_with_pattern(point.wall.format(&pat), format)
+    let wall = point.wall();
+    let pat = pattern_to_strftime(format, wall)?;
+    render_with_pattern(wall.format(&pat), format)
 }
 
 fn weekday_from_number(n: i64) -> TemplateEngineResult<chrono::Weekday> {
@@ -454,7 +446,7 @@ impl Object for DateNamespace {
                  -> TemplateEngineResult<String> {
                     resolve_anchor(
                         today_point(),
-                        |pt| pt.week_boundary(false),
+                        |pt| pt.start_of(Period::Week),
                         format,
                         offset,
                         reference,
@@ -472,7 +464,7 @@ impl Object for DateNamespace {
                  -> TemplateEngineResult<String> {
                     resolve_anchor(
                         today_point(),
-                        |pt| pt.week_boundary(true),
+                        |pt| pt.end_of(Period::Week),
                         format,
                         offset,
                         reference,
@@ -490,7 +482,7 @@ impl Object for DateNamespace {
                  -> TemplateEngineResult<String> {
                     resolve_anchor(
                         today_point(),
-                        |pt| pt.month_boundary(false),
+                        |pt| pt.start_of(Period::Month),
                         format,
                         offset,
                         reference,
@@ -508,7 +500,7 @@ impl Object for DateNamespace {
                  -> TemplateEngineResult<String> {
                     resolve_anchor(
                         today_point(),
-                        |pt| pt.month_boundary(true),
+                        |pt| pt.end_of(Period::Month),
                         format,
                         offset,
                         reference,
@@ -526,7 +518,7 @@ impl Object for DateNamespace {
                  -> TemplateEngineResult<String> {
                     resolve_anchor(
                         today_point(),
-                        |pt| pt.year_boundary(false),
+                        |pt| pt.start_of(Period::Year),
                         format,
                         offset,
                         reference,
@@ -544,7 +536,7 @@ impl Object for DateNamespace {
                  -> TemplateEngineResult<String> {
                     resolve_anchor(
                         today_point(),
-                        |pt| pt.year_boundary(true),
+                        |pt| pt.end_of(Period::Year),
                         format,
                         offset,
                         reference,
@@ -563,7 +555,7 @@ impl Object for DateNamespace {
                     let target = weekday_from_number(n)?;
                     resolve_anchor(
                         today_point(),
-                        move |pt| pt.weekday_point(target),
+                        move |pt| pt.with_weekday(target),
                         format,
                         None,
                         reference,
@@ -600,40 +592,15 @@ impl Object for DateNamespace {
     }
 }
 
-/// Parses `s` as a date or date-time expression via [`DateValue::classify`].
+/// Parses `s` as a date or date-time expression via [`Point::parse`].
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
 /// the full parse-failure chain.
-fn parse_point(s: &str) -> TemplateEngineResult<RecognizedDate> {
-    match DateValue::classify(s) {
-        Some(Ok(rec)) => Ok(rec),
-        Some(Err(err)) => {
-            Err(invalid_operation(format!("invalid date {s:?}"), err))
-        }
-        None => {
-            let trimmed = s.trim();
-            let source = match DateShape::parse_any(trimmed) {
-                Err(err) => err,
-                Ok(_) => match DateTimeShape::parse_any(trimmed) {
-                    Err(err) => err,
-                    Ok(_) => {
-                        return Err(invalid_operation(
-                            format!("invalid date {s:?}"),
-                            DateError::OutOfRange,
-                        ));
-                    }
-                },
-            };
-            Err(invalid_operation(
-                format!("invalid date {s:?}"),
-                DateError::Unparseable {
-                    input: trimmed.into(),
-                    source,
-                },
-            ))
-        }
-    }
+fn parse_point(s: &str) -> TemplateEngineResult<Point> {
+    Point::parse(s)
+        .map_err(|err| invalid_operation(format!("invalid date {s:?}"), err))
 }
+
 /// Extracts the shared `format="..."` kwarg every `date.*` namespace method
 /// takes, defaulting to [`DATE_PATTERN`], and rejects any other kwarg
 /// via [`Kwargs::assert_all_used`].
@@ -707,7 +674,7 @@ fn render_with_pattern(
 /// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
 ///   string.
 fn parse_wall(s: &str) -> Result<NaiveDateTime, Error> {
-    parse_point(s).map(|rec| rec.wall_or_utc())
+    parse_point(s).map(Point::wall)
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -989,29 +956,44 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 /// Returns the first or last day of the input's month at its original
 /// precision.
 fn month_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let recognized = parse_point(value)?;
-    let shifted =
-        recognized.point().month_boundary(end).map_err(render_date_error)?;
-    let pat = shifted.precision.format_pattern(shifted.wall);
-    render_with_pattern(shifted.wall.format(pat), pat)
+    let point = parse_point(value)?;
+    let shifted = if end {
+        point.end_of(Period::Month)
+    } else {
+        point.start_of(Period::Month)
+    }
+    .map_err(render_date_error)?;
+    let wall = shifted.wall();
+    let pat = shifted.canonical_pattern();
+    render_with_pattern(wall.format(pat), pat)
 }
 
 /// Returns the first or last day of the input's week at its original precision.
 fn week_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let recognized = parse_point(value)?;
-    let shifted =
-        recognized.point().week_boundary(end).map_err(render_date_error)?;
-    let pat = shifted.precision.format_pattern(shifted.wall);
-    render_with_pattern(shifted.wall.format(pat), pat)
+    let point = parse_point(value)?;
+    let shifted = if end {
+        point.end_of(Period::Week)
+    } else {
+        point.start_of(Period::Week)
+    }
+    .map_err(render_date_error)?;
+    let wall = shifted.wall();
+    let pat = shifted.canonical_pattern();
+    render_with_pattern(wall.format(pat), pat)
 }
 
 /// Returns the first or last day of the input's year at its original precision.
 fn year_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let recognized = parse_point(value)?;
-    let shifted =
-        recognized.point().year_boundary(end).map_err(render_date_error)?;
-    let pat = shifted.precision.format_pattern(shifted.wall);
-    render_with_pattern(shifted.wall.format(pat), pat)
+    let point = parse_point(value)?;
+    let shifted = if end {
+        point.end_of(Period::Year)
+    } else {
+        point.start_of(Period::Year)
+    }
+    .map_err(render_date_error)?;
+    let wall = shifted.wall();
+    let pat = shifted.canonical_pattern();
+    render_with_pattern(wall.format(pat), pat)
 }
 
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
@@ -1095,13 +1077,11 @@ fn date_sub(
 
 /// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration
 /// semantics per `unit`.
-///
-/// - Inputs with a time component ([`Precision::DateTime`]) shift calendar
-///   units on the local wall clock (preserving wall-clock hour across DST) and
-///   sub-day units exactly on the instant.
-/// - Civil inputs ([`Precision::Date`], [`Precision::YearMonth`]) shift
-///   entirely on the civil wall clock. Sub-day shifts on date-only inputs leave
-///   the calendar day unchanged.
+/// - Inputs with a time component ([`Point::Instant`]) shift calendar units on
+///   the local wall clock (preserving wall-clock hour across DST) and sub-day
+///   units exactly on the instant.
+/// - Civil inputs ([`Point::Civil`]) shift entirely on the civil wall clock.
+///   Sub-day shifts on date-only inputs leave the calendar day unchanged.
 ///
 /// # Errors
 ///
@@ -1112,11 +1092,11 @@ fn shift_by_unit(
     n: i64,
     unit: DurationUnit,
 ) -> TemplateEngineResult<String> {
-    let recognized = parse_point(value)?;
     let shifted_point =
-        recognized.point().shift(n, unit).map_err(render_date_error)?;
-    let pat = shifted_point.precision.format_pattern(shifted_point.wall);
-    render_with_pattern(shifted_point.wall.format(pat), pat)
+        parse_point(value)?.shift(n, unit).map_err(render_date_error)?;
+    let wall = shifted_point.wall();
+    let pat = shifted_point.canonical_pattern();
+    render_with_pattern(wall.format(pat), pat)
 }
 
 /// `{{ value | add_days(n) }}` is a convenience shortcut for
@@ -1229,21 +1209,18 @@ fn weekday(
     n: Option<i64>,
     kwargs: Kwargs,
 ) -> TemplateEngineResult<Value> {
-    let recognized = parse_point(value)?;
+    let point = parse_point(value)?;
     if let Some(target_num) = n {
         let format = format_kwarg(&kwargs)?;
         let target_weekday = weekday_from_number(target_num)?;
-        let shifted = recognized
-            .point()
-            .weekday_point(target_weekday)
-            .map_err(render_date_error)?;
-        let pat = pattern_to_strftime(format, shifted.wall)?;
-        Ok(Value::from(render_with_pattern(shifted.wall.format(&pat), format)?))
+        let shifted =
+            point.with_weekday(target_weekday).map_err(render_date_error)?;
+        let wall = shifted.wall();
+        let pat = pattern_to_strftime(format, wall)?;
+        Ok(Value::from(render_with_pattern(wall.format(&pat), format)?))
     } else {
         kwargs.assert_all_used()?;
-        Ok(Value::from(
-            recognized.wall_or_utc().weekday().num_days_from_monday(),
-        ))
+        Ok(Value::from(point.wall().weekday().num_days_from_monday()))
     }
 }
 
@@ -1282,8 +1259,7 @@ fn date_diff(
     let from = parse_point(value)?;
     let to = parse_point(other)?;
 
-    let diff =
-        from.point().diff(to.point(), unit).map_err(render_date_error)?;
+    let diff = from.diff(to, unit).map_err(render_date_error)?;
 
     match diff {
         Difference::Whole(n) => Ok(Value::from(n)),
@@ -1808,11 +1784,9 @@ mod tests {
         }
 
         /// Regression: for a datetime-shaped input that fails for a
-        /// datetime-specific reason, `ParsedDate::parse` used to try
-        /// [`DateTimeValue::parse_iso`] first, discard its error
-        /// unconditionally, then surface [`DateValue::parse_iso`]'s unrelated
-        /// shape-mismatch error instead, hiding the more specific cause (spec
-        /// N4).
+        /// datetime-specific reason, the old parser discarded the datetime
+        /// error and surfaced an unrelated date-only shape mismatch instead
+        /// (spec N4).
         #[test]
         fn surfaces_the_datetime_parsers_error_not_the_date_only_fallbacks() {
             use std::error::Error as _;

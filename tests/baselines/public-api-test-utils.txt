@@ -2292,7 +2292,7 @@ pub traces_pkm::NoteFieldValue::Number(f64)
 pub traces_pkm::NoteFieldValue::Object(indexmap::map::IndexMap<alloc::string::String, Self>)
 pub traces_pkm::NoteFieldValue::String(alloc::string::String)
 impl traces_pkm::NoteFieldValue
-pub fn traces_pkm::NoteFieldValue::as_date(&self) -> core::option::Option<chrono::naive::date::NaiveDate>
+pub fn traces_pkm::NoteFieldValue::as_date(&self) -> core::option::Option<traces_pkm::DateValue>
 pub fn traces_pkm::NoteFieldValue::as_ref(&self) -> traces_pkm::NoteFieldValueRef<'_>
 pub fn traces_pkm::NoteFieldValue::as_str(&self) -> core::option::Option<&str>
 impl core::clone::Clone for traces_pkm::NoteFieldValue

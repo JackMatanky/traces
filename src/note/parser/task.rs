@@ -209,7 +209,7 @@ impl<'a> TaskScan<'a> {
         fields
             .get(&FieldKeyRef::new(key_name))?
             .iter()
-            .find_map(|val| val.as_date().map(Into::into))
+            .find_map(NoteFieldValue::as_date)
     }
 
     /// Collapses in-line whitespace runs to single spaces, drops blank lines,

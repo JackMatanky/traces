@@ -13,10 +13,6 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Calendar precision of a zone-free point.
-#[expect(
-    dead_code,
-    reason = "Point is migrated into callers in phases 6.2-6.4"
-)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CivilPrecision {
     /// Year and month.
@@ -26,10 +22,6 @@ pub(crate) enum CivilPrecision {
 }
 
 /// A parsed date or date-time at the precision it was written.
-#[expect(
-    dead_code,
-    reason = "Point is migrated into callers in phases 6.2-6.4"
-)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Point {
     /// Zone-free calendar date.
@@ -41,10 +33,6 @@ pub(crate) enum Point {
     Instant(DateTimeValue),
 }
 
-#[expect(
-    dead_code,
-    reason = "Point is migrated into callers in phases 6.2-6.4"
-)]
 impl Point {
     /// Whether this point carries a time-of-day component.
     #[must_use]
@@ -109,109 +97,11 @@ impl Point {
     }
 }
 
-/// Precision of a recognized date or date-time string.
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) enum Precision {
-    /// Year-month precision (`YYYY-MM`).
-    YearMonth,
-    /// Date-only precision (`YYYY-MM-DD`).
-    Date,
-    /// Date-time precision (`YYYY-MM-DD[T ]HH:MM[:SS[...]]`).
-    DateTime,
-}
-
-impl Precision {
-    /// Returns `true` if this precision carries a time-of-day component.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn has_time(self) -> bool {
-        matches!(self, Self::DateTime)
-    }
-
-    /// Returns the strftime pattern for formatting at this precision.
-    #[inline]
-    #[must_use]
-    pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
-        use chrono::Timelike as _;
-        match self {
-            Self::YearMonth => "%Y-%m",
-            Self::Date => DATE_PATTERN,
-            Self::DateTime => {
-                if wall.nanosecond() == 0 {
-                    DATETIME_PATTERN
-                } else {
-                    "%Y-%m-%dT%H:%M:%S%.f"
-                }
-            }
-        }
-    }
-}
-
-/// A recognized date value, either a civil date or an instant date-time.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum RecognizedDateValue {
-    /// Civil date value.
-    Date(DateValue),
-    /// Instant date-time value.
-    DateTime(DateTimeValue),
-}
-
-/// A recognized date expression carrying its parsed value and precision.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct RecognizedDate {
-    /// The recognized date or date-time value.
-    pub(crate) value: RecognizedDateValue,
-    /// The precision of the recognized input.
-    pub(crate) precision: Precision,
-}
-
-impl RecognizedDate {
-    /// Returns the date portion as a [`DateValue`].
-    #[inline]
-    #[must_use]
-    pub(crate) fn date(&self) -> DateValue {
-        match self.value {
-            RecognizedDateValue::Date(d) => d,
-            RecognizedDateValue::DateTime(dt) => dt.local_date(),
-        }
-    }
-
-    /// Returns the local wall clock, falling back to UTC if the offset cannot
-    /// be applied.
-    #[inline]
-    #[must_use]
-    pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
-        match self.value {
-            RecognizedDateValue::Date(d) => {
-                d.0.and_hms_opt(0, 0, 0).unwrap_or(NaiveDateTime::MIN)
-            }
-            RecognizedDateValue::DateTime(dt) => dt.local_wall_or_utc(),
-        }
-    }
-
-    /// Returns the UTC instant for this recognized date.
-    #[inline]
-    #[must_use]
-    pub(crate) fn instant(&self) -> DateTime<Utc> {
-        match self.value {
-            RecognizedDateValue::Date(d) => DateTimeValue::from(d).utc(),
-            RecognizedDateValue::DateTime(dt) => dt.utc(),
-        }
-    }
-
-    /// Converts this recognized date into a [`DatePoint`].
-    #[inline]
-    #[must_use]
-    pub(crate) fn point(&self) -> DatePoint {
-        DatePoint::from_recognized(self)
-    }
-}
-
 /// A calendar date without timezone or time-of-day ([`NaiveDate`]).
 ///
 /// Wraps a [`NaiveDate`] representing a civil calendar date (`YYYY-MM-DD` or
-/// `YYYY-MM`). Parsing funnels through `classify`; deserialization uses the
-/// same parser.
+/// `YYYY-MM`). Parsed input keeps precision in `Point`; deserialization uses
+/// the same strict date parser.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DateValue(pub(super) NaiveDate);
@@ -461,53 +351,6 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     {
         let s = Cow::<'de, str>::deserialize(deserializer)?;
         Self::parse_iso(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-/// A point in time carrying both civil wall clock and UTC instant, plus its
-/// recognized precision.
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct DatePoint {
-    /// Civil wall-clock reading.
-    pub(crate) wall: NaiveDateTime,
-    /// Stored UTC instant.
-    pub(crate) instant: DateTime<Utc>,
-    /// Precision of the original recognized input.
-    pub(crate) precision: Precision,
-}
-
-impl DatePoint {
-    /// Constructs a point from its wall clock, UTC instant, and precision.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn new(
-        wall: NaiveDateTime,
-        instant: DateTime<Utc>,
-        precision: Precision,
-    ) -> Self {
-        Self {
-            wall,
-            instant,
-            precision,
-        }
-    }
-
-    /// Constructs a [`DatePoint`] from a [`RecognizedDate`].
-    #[inline]
-    #[must_use]
-    pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
-        Self {
-            wall: rec.wall_or_utc(),
-            instant: rec.instant(),
-            precision: rec.precision,
-        }
-    }
-
-    /// Returns `true` if this point carries a time-of-day component.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn has_time(&self) -> bool {
-        self.precision.has_time()
     }
 }
 
@@ -855,6 +698,46 @@ mod tests {
             let reparsed = DateTimeValue::parse_iso(&value.to_string())
                 .expect("formatted output re-parses");
             assert_eq!(reparsed, value);
+        }
+    }
+
+    mod point_api {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn has_time_only_for_instants() {
+            TzGuard::set("UTC");
+            assert!(!Point::parse("2026-07").unwrap().has_time());
+            assert!(!Point::parse("2026-07-29").unwrap().has_time());
+            assert!(Point::parse("2026-07-29T14:30:00Z").unwrap().has_time());
+        }
+
+        #[test]
+        fn canonical_pattern_preserves_civil_precision_and_fractional_seconds()
+        {
+            TzGuard::set("UTC");
+            assert_eq!(
+                Point::parse("2026-07").unwrap().canonical_pattern(),
+                "%Y-%m"
+            );
+            assert_eq!(
+                Point::parse("2026-07-29").unwrap().canonical_pattern(),
+                "%Y-%m-%d"
+            );
+            assert_eq!(
+                Point::parse("2026-07-29T14:30:00Z")
+                    .unwrap()
+                    .canonical_pattern(),
+                "%Y-%m-%dT%H:%M:%S"
+            );
+            assert_eq!(
+                Point::parse("2026-07-29T14:30:00.123Z")
+                    .unwrap()
+                    .canonical_pattern(),
+                "%Y-%m-%dT%H:%M:%S%.f"
+            );
         }
     }
 

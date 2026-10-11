@@ -32,6 +32,7 @@ use thiserror::Error;
 
 use crate::{
     DateValue,
+    date::Point,
     path::{FolderRef, RelativePath},
 };
 
@@ -87,7 +88,7 @@ impl FileMeta {
         created_at: Option<SystemTime>,
     ) -> Option<DateValue> {
         if let Some(name) = BaseNameRef::from_path(path)
-            && let Some((rec, _)) = DateValue::parse_prefix(name.as_str())
+            && let Some((rec, _)) = Point::parse_prefix(name.as_str())
         {
             return Some(rec.date());
         }

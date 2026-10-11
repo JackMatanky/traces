@@ -246,27 +246,16 @@ src/date/calendar.rs: pub(crate) enum Difference {
 src/date/calendar.rs: pub(crate) enum Edge {
 src/date/calendar.rs: pub(crate) enum Period {
 src/date/calendar.rs: pub(crate) fn apply(
-src/date/calendar.rs: pub(crate) fn apply(
-src/date/calendar.rs: pub(crate) fn apply(
-src/date/calendar.rs: pub(crate) fn apply(
-src/date/calendar.rs: pub(crate) fn diff(
 src/date/calendar.rs: pub(crate) fn diff(
 src/date/calendar.rs: pub(crate) fn end_of(self, period: Period) -> Result<Self, DateError> {
-src/date/calendar.rs: pub(crate) fn month_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date/calendar.rs: pub(crate) fn shift(
-src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn start_of(self, period: Period) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
-src/date/calendar.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date/calendar.rs: pub(crate) fn weekday_point(
 src/date/calendar.rs: pub(crate) fn with_weekday(
-src/date/calendar.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
 src/date/mod.rs: pub use value::{DateError, DateTimeValue, DateValue};
-src/date/mod.rs: pub(crate) use calendar::Difference;
-src/date/mod.rs: pub(crate) use parse::{DateShape, DateTimeShape};
-src/date/mod.rs: pub(crate) use value::{
+src/date/mod.rs: pub(crate) use calendar::{Difference, Period};
+src/date/mod.rs: pub(crate) use value::{CivilPrecision, DATE_PATTERN, DATETIME_PATTERN, Point};
 src/date/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
 src/date/parse.rs: pub(crate) const ALL: [Self; 2] = [Self::YearMonthDay, Self::YearMonth];
 src/date/parse.rs: pub(crate) const ALL: [Self; 5] = [
@@ -274,52 +263,31 @@ src/date/parse.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
 src/date/parse.rs: pub(crate) enum DateShape {
 src/date/parse.rs: pub(crate) enum DateTimeShape {
 src/date/parse.rs: pub(crate) enum ParsedDateTime {
-src/date/parse.rs: pub(crate) fn classify(
 src/date/parse.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_any(
 src/date/parse.rs: pub(crate) fn parse_any(
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(RecognizedDate, usize)> {
 src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
-src/date/parse.rs: pub(crate) fn parse_with(
 src/date/parse.rs: pub(crate) fn parse_with_pattern(
 src/date/value.rs: pub enum DateError {
 src/date/value.rs: pub struct DateTimeValue(pub(super) DateTime<Utc>);
 src/date/value.rs: pub struct DateValue(pub(super) NaiveDate);
 src/date/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 src/date/value.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
-src/date/value.rs: pub(crate) const fn has_time(&self) -> bool {
-src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
 src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
 src/date/value.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
-src/date/value.rs: pub(crate) const fn new(
 src/date/value.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) enum CivilPrecision {
 src/date/value.rs: pub(crate) enum Point {
-src/date/value.rs: pub(crate) enum Precision {
-src/date/value.rs: pub(crate) enum RecognizedDateValue {
 src/date/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
-src/date/value.rs: pub(crate) fn date(&self) -> DateValue {
 src/date/value.rs: pub(crate) fn date(self) -> DateValue {
-src/date/value.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
-src/date/value.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
-src/date/value.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/date/value.rs: pub(crate) fn local_date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
 src/date/value.rs: pub(crate) fn local_wall_or_utc(self) -> NaiveDateTime {
-src/date/value.rs: pub(crate) fn point(&self) -> DatePoint {
 src/date/value.rs: pub(crate) fn wall(self) -> NaiveDateTime {
-src/date/value.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
-src/date/value.rs: pub(crate) instant: DateTime<Utc>,
-src/date/value.rs: pub(crate) precision: Precision,
-src/date/value.rs: pub(crate) precision: Precision,
-src/date/value.rs: pub(crate) struct DatePoint {
-src/date/value.rs: pub(crate) struct RecognizedDate {
-src/date/value.rs: pub(crate) value: RecognizedDateValue,
-src/date/value.rs: pub(crate) wall: NaiveDateTime,
 src/date/value.rs: pub(super) fn resolve_local(
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
@@ -717,7 +685,7 @@ src/note/cursor.rs: pub(super) fn token_end(
 src/note/cursor.rs: pub(super) struct SourceText<'a>(&'a str);
 src/note/field.rs: pub enum NoteFieldValue {
 src/note/field.rs: pub enum NoteFieldValueRef<'a> {
-src/note/field.rs: pub fn as_date(&self) -> Option<chrono::NaiveDate> {
+src/note/field.rs: pub fn as_date(&self) -> Option<DateValue> {
 src/note/field.rs: pub fn as_ref(&self) -> NoteFieldValueRef<'_> {
 src/note/field.rs: pub fn as_str(&self) -> Option<&str> {
 src/note/field.rs: pub fn compare(&self, other: &Self) -> std::cmp::Ordering {

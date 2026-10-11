@@ -6,7 +6,8 @@
 //! tags.
 
 use crate::{
-    DateValue, DurationValue, Tag,
+    DurationValue, Tag,
+    date::Point,
     note::{Link, NoteFieldValue, cursor::SourceText},
 };
 
@@ -217,7 +218,7 @@ impl<'a> InlineValueParser<'a> {
     /// Parses an ISO date atom (`YYYY-MM-DD` or `YYYY-MM`) at `pos`.
     fn parse_date_at(&self, pos: usize) -> Option<ParsedAtom> {
         let remainder = self.source.from(pos)?;
-        let (rec, consumed) = DateValue::parse_prefix(remainder)?;
+        let (rec, consumed) = Point::parse_prefix(remainder)?;
         let end = self.source.advance(pos, consumed);
         if !self.is_atom_boundary(end) {
             return None;
@@ -445,6 +446,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+        use crate::DateValue;
 
         #[test]
         fn parses_a_valid_date_atom() {

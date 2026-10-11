@@ -7,8 +7,8 @@ use logos::{Filter, Lexer, Logos};
 
 use super::{FlushedMetadata, inline::parse_inline_value};
 use crate::{
-    DateValue, DelimiterType, FieldKey, Spanned, Tag, TaskDate, TaskDateType,
-    TaskPriority, note::NoteFieldValue,
+    DelimiterType, FieldKey, Spanned, Tag, TaskDate, TaskDateType,
+    TaskPriority, date::Point, note::NoteFieldValue,
 };
 
 /// Extracts inline fields from `text` in document order.
@@ -241,7 +241,7 @@ fn task_date_callback(
         .find(|&(_, ch)| !matches!(ch, ' ' | '\t'))
         .map_or(remainder.len(), |(offset, _)| offset);
     let after_ws = remainder.get(ws_end..).unwrap_or_default();
-    let Some((rec, consumed)) = DateValue::parse_prefix(after_ws) else {
+    let Some((rec, consumed)) = Point::parse_prefix(after_ws) else {
         return Filter::Skip;
     };
     if after_ws
@@ -319,7 +319,7 @@ pub(super) fn scan_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::DurationValue;
+    use crate::{DateValue, DurationValue};
     mod inline_fields {
         use pretty_assertions::assert_eq;
         use rstest::rstest;
