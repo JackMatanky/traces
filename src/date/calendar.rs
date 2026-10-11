@@ -53,7 +53,7 @@ impl DateValue {
             // `TimeDelta` conversion rejects non-finite input.
             let wall =
                 self.0.and_hms_opt(0, 0, 0).ok_or(DateError::OutOfRange)?;
-            let delta = TimeDelta::try_from(duration.to_seconds())
+            let delta = TimeDelta::try_from(duration.nominal_seconds())
                 .map_err(|_| DateError::OutOfRange)?;
             let shifted_wall =
                 wall.checked_add_signed(delta).ok_or(DateError::OutOfRange)?;
@@ -93,7 +93,7 @@ impl DateValue {
                 } else {
                     self
                 };
-                let rem_secs = mag.fract() * unit.fixed_seconds();
+                let rem_secs = mag.fract() * unit.nominal_seconds();
                 if rem_secs != 0.0 {
                     let wall = current
                         .0
@@ -113,7 +113,7 @@ impl DateValue {
             | DurationUnit::Millisecond => {
                 let wall =
                     self.0.and_hms_opt(0, 0, 0).ok_or(DateError::OutOfRange)?;
-                let delta = seconds_delta(mag * unit.fixed_seconds())?;
+                let delta = seconds_delta(mag * unit.nominal_seconds())?;
                 let shifted_wall = wall
                     .checked_add_signed(delta)
                     .ok_or(DateError::OutOfRange)?;
@@ -156,7 +156,7 @@ impl DateTimeValue {
             | DurationUnit::Minute
             | DurationUnit::Second => {
                 let secs = unit
-                    .fixed_seconds_i64()
+                    .whole_nominal_seconds()
                     .ok_or(DateError::OutOfRange)?
                     .checked_mul(n)
                     .ok_or(DateError::OutOfRange)?;
@@ -246,7 +246,7 @@ impl DateTimeValue {
         } else {
             // Fixed magnitude: exact seconds on the stored instant; the
             // `TimeDelta` conversion rejects non-finite input.
-            let delta = TimeDelta::try_from(duration.to_seconds())
+            let delta = TimeDelta::try_from(duration.nominal_seconds())
                 .map_err(|_| DateError::OutOfRange)?;
             let instant = self
                 .0
@@ -290,7 +290,7 @@ impl DateTimeValue {
                 } else {
                     self
                 };
-                let rem_secs = mag.fract() * unit.fixed_seconds();
+                let rem_secs = mag.fract() * unit.nominal_seconds();
                 if rem_secs != 0.0 {
                     let delta = seconds_delta(rem_secs)?;
                     // The nominal remainder advances the local wall clock
@@ -309,7 +309,7 @@ impl DateTimeValue {
             | DurationUnit::Minute
             | DurationUnit::Second
             | DurationUnit::Millisecond => {
-                let delta = seconds_delta(mag * unit.fixed_seconds())?;
+                let delta = seconds_delta(mag * unit.nominal_seconds())?;
                 let instant = self
                     .0
                     .checked_add_signed(delta)
@@ -562,7 +562,7 @@ impl DatePoint {
                         .ok_or(DateError::OutOfRange)?;
                     let result = (whole_seconds
                         + f64::from(delta.subsec_nanos()) / 1e9)
-                        / unit.fixed_seconds();
+                        / unit.nominal_seconds();
                     Ok(DateDiff::Exact(result))
                 } else if unit == DurationUnit::Millisecond {
                     let delta = to.wall.signed_duration_since(self.wall);
@@ -570,7 +570,7 @@ impl DatePoint {
                 } else {
                     let delta = to.wall.signed_duration_since(self.wall);
                     let unit_secs_i64 = unit
-                        .fixed_seconds_i64()
+                        .whole_nominal_seconds()
                         .ok_or(DateError::OutOfRange)?;
                     #[expect(
                         clippy::arithmetic_side_effects,
@@ -666,7 +666,7 @@ fn shift_wall(
         }
         DurationUnit::Second | DurationUnit::Minute | DurationUnit::Hour => {
             let secs = unit
-                .fixed_seconds_i64()
+                .whole_nominal_seconds()
                 .ok_or(DateError::OutOfRange)?
                 .checked_mul(n)
                 .ok_or(DateError::OutOfRange)?;

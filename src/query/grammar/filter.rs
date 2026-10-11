@@ -349,7 +349,7 @@ fn evaluate_binary(
                 .diff(date_point(&date1)?, DurationUnit::Second)
                 .ok()?;
             let seconds = diff.to_f64()?;
-            Some(NoteFieldValue::Duration(DurationValue::from_seconds(
+            Some(NoteFieldValue::Duration(DurationValue::from_nominal_seconds(
                 DurationSeconds::try_from(seconds).ok()?,
             )))
         }
@@ -415,7 +415,7 @@ fn evaluate_registry_call(
                 if matches!(date, NoteFieldValue::Null) {
                     return Some(NoteFieldValue::Null);
                 }
-                let unit = DurationUnit::parse(unit)?;
+                let unit = DurationUnit::from_spelling(unit)?;
                 let n = (n.fract() == 0.0).then(|| n.to_i64()).flatten()?;
                 let shifted = date_point(date)?.shift(n, unit).ok()?;
                 match date {
@@ -437,7 +437,7 @@ fn evaluate_registry_call(
         let (date1, date2, unit) = match args {
             [date1, date2] => (date1, date2, DurationUnit::Day),
             [date1, date2, NoteFieldValue::String(unit)] => {
-                (date1, date2, DurationUnit::parse(unit)?)
+                (date1, date2, DurationUnit::from_spelling(unit)?)
             }
             _ => return None,
         };
@@ -623,7 +623,7 @@ fn validate_call_args(
         {
             Some("valid duration")
         } else if args.len() == 3
-            && matches!(args.get(2), Some(ValueExpr::Literal(NoteFieldValue::String(unit))) if DurationUnit::parse(unit).is_none())
+            && matches!(args.get(2), Some(ValueExpr::Literal(NoteFieldValue::String(unit))) if DurationUnit::from_spelling(unit).is_none())
         {
             Some("recognized duration unit")
         } else {
@@ -632,7 +632,7 @@ fn validate_call_args(
     } else if name.eq_ignore_ascii_case("date_diff") {
         if !matches!(args.len(), 2 | 3) {
             Some("2 or 3 arguments for date_diff()")
-        } else if matches!(args.get(2), Some(ValueExpr::Literal(NoteFieldValue::String(unit))) if DurationUnit::parse(unit).is_none())
+        } else if matches!(args.get(2), Some(ValueExpr::Literal(NoteFieldValue::String(unit))) if DurationUnit::from_spelling(unit).is_none())
         {
             Some("recognized duration unit")
         } else {

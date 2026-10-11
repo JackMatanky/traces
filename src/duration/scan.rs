@@ -213,7 +213,7 @@ pub(super) fn parsed_unit(
             input: input.to_owned(),
         }
     })?;
-    let kind = DurationUnit::parse(unit_str).ok_or_else(|| {
+    let kind = DurationUnit::from_spelling(unit_str).ok_or_else(|| {
         DurationError::UnknownUnit {
             input: input.to_owned(),
         }

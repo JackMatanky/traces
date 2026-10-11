@@ -349,7 +349,7 @@ src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
 src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 src/dirtree.rs: pub(crate) struct DirTree {
 src/duration/mod.rs: pub use value::{DurationError, DurationValue};
-src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_HINT};
+src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 src/duration/mod.rs: pub(crate) use value::DurationSeconds;
 src/duration/scan.rs: pub(super) enum ScanMode {
 src/duration/scan.rs: pub(super) fn apply_sign(parts: &mut [(f64, DurationUnit)], is_negative: bool) {
@@ -362,19 +362,19 @@ src/duration/scan.rs: pub(super) fn parsed_unit(
 src/duration/scan.rs: pub(super) fn scan_part(
 src/duration/scan.rs: pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
 src/duration/scan.rs: pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
-src/duration/unit.rs: pub(crate) const UNIT_HINT: &str =
-src/duration/unit.rs: pub(crate) const fn fixed_seconds(self) -> f64 {
-src/duration/unit.rs: pub(crate) const fn fixed_seconds_i64(self) -> Option<i64> {
+src/duration/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
 src/duration/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
+src/duration/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
+src/duration/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
 src/duration/unit.rs: pub(crate) enum DurationUnit {
-src/duration/unit.rs: pub(crate) fn parse(unit: &str) -> Option<Self> {
+src/duration/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
 src/duration/value.rs: pub enum DurationError {
 src/duration/value.rs: pub struct DurationValue {
 src/duration/value.rs: pub(crate) const fn as_f64(self) -> f64 {
-src/duration/value.rs: pub(crate) const fn to_seconds(&self) -> DurationSeconds {
+src/duration/value.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
 src/duration/value.rs: pub(crate) fn as_str(&self) -> &str {
 src/duration/value.rs: pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
-src/duration/value.rs: pub(crate) fn from_seconds(seconds: DurationSeconds) -> Self {
+src/duration/value.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
 src/duration/value.rs: pub(crate) fn is_calendar(&self) -> bool {
 src/duration/value.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/duration/value.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
@@ -676,7 +676,7 @@ src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequ
 src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;
 src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
-src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_HINT};
+src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_SPELLINGS_HINT};
 src/lib.rs: pub(crate) use field::{
 src/lib.rs: pub(crate) use file::{BaseName, BaseNameRef, FileName};
 src/lib.rs: pub(crate) use file_tracker::{

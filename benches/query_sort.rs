@@ -519,8 +519,8 @@ fn bench_sort_nullable(c: &mut Criterion) {
 ///
 /// Fixture indexes are built outside timing from
 /// [`duration_field_note_source`]. Source strings are parsed during fixture
-/// construction, so timed key extraction calls `DurationValue::to_seconds()`
-/// without reparsing strings.
+/// construction, so timed key extraction calls
+/// `DurationValue::nominal_seconds()` without reparsing strings.
 ///
 /// Expected outcomes:
 /// - Cost stays in the broad range of the numeric sort anchor for the same `n`.

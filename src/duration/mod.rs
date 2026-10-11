@@ -19,6 +19,6 @@ mod scan;
 mod unit;
 mod value;
 
-pub(crate) use unit::{DurationUnit, UNIT_HINT};
+pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 pub(crate) use value::DurationSeconds;
 pub use value::{DurationError, DurationValue};

@@ -374,7 +374,9 @@ impl<'a> SortKey<'a> {
             NoteFieldValueRef::Date(value) => {
                 Self::DateTime(DateTimeValue::from(value))
             }
-            NoteFieldValueRef::Duration(dv) => Self::Duration(dv.to_seconds()),
+            NoteFieldValueRef::Duration(dv) => {
+                Self::Duration(dv.nominal_seconds())
+            }
             NoteFieldValueRef::String(s) => Self::from_text(Cow::Borrowed(s)),
             NoteFieldValueRef::Link(link) => {
                 Self::Text(Cow::Borrowed(link.target()))
@@ -395,7 +397,7 @@ impl<'a> SortKey<'a> {
             TextShape::Date(value) => {
                 Self::DateTime(DateTimeValue::from(value))
             }
-            TextShape::Duration(dv) => Self::Duration(dv.to_seconds()),
+            TextShape::Duration(dv) => Self::Duration(dv.nominal_seconds()),
             TextShape::Plain => Self::Text(s),
         }
     }

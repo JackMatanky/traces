@@ -1067,8 +1067,9 @@ mod tests {
             // A value rebuilt from its parsed seconds (no original
             // spelling to echo) renders in scientific notation, never a
             // silent "0s".
-            let synthesized =
-                DurationValue::from_seconds(note.duration_extreme.to_seconds());
+            let synthesized = DurationValue::from_nominal_seconds(
+                note.duration_extreme.nominal_seconds(),
+            );
             let rendered_extreme = synthesized.to_string();
             assert_ne!(rendered_extreme, "0s");
             assert!(rendered_extreme.contains('e'));

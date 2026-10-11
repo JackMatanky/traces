@@ -42,11 +42,11 @@ relative path, size, timestamps, and format classification.
 
 An elapsed duration carrying both its total seconds magnitude and written source
 components. `src/duration/` is the sole owner of duration recognition, parsing,
-and the unit registry (`UNIT_MAP`, `DurationUnit`, `fixed_seconds`). Compares and
+and the unit registry (`UNIT_SPELLINGS`, `DurationUnit`, `nominal_seconds`). Compares and
 hashes canonically by total seconds, so `1h 30m` and `90m` are equal. Negative
 zeros normalize (`-0m` equals `0m`) at construction; raw float comparisons follow
 a unified signed-zero doctrine (ticket 09 extraction home). The unit vocabulary
-maintains a strict sync contract between `UNIT_HINT` and `UNIT_MAP` (ticket 04 test
+maintains a strict sync contract between `UNIT_SPELLINGS_HINT` and `UNIT_SPELLINGS` (ticket 04 test
 home).
 *Avoid*: elapsed time, time span, interval
 

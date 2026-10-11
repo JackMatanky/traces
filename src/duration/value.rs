@@ -25,10 +25,10 @@ const DISPLAY_EXPONENT_LOWER: f64 = 1e-6;
 /// spelling.
 ///
 /// Fresh values come from the crate-internal `parse`, `parse_prefix`, and
-/// `from_seconds` constructors or the [`FromStr`] implementation; `Add`, `Sub`,
-/// and `Mul` derive new values from those. Parsing guarantees a finite seconds
-/// value; arithmetic such as [`Mul`] may produce non-finite values, which
-/// consuming conversions reject.
+/// `from_nominal_seconds` constructors or the [`FromStr`] implementation;
+/// `Add`, `Sub`, and `Mul` derive new values from those. Parsing guarantees a
+/// finite seconds value; arithmetic such as [`Mul`] may produce non-finite
+/// values, which consuming conversions reject.
 ///
 /// # Examples
 ///
@@ -55,7 +55,7 @@ pub struct DurationValue {
 
 impl DurationValue {
     /// The six fixed sub-year units used for greedy millisecond decomposition
-    /// in [`DurationValue::from_seconds`].
+    /// in [`DurationValue::from_nominal_seconds`].
     ///
     /// Month and Year are intentionally omitted from magnitude-derived
     /// conversion: their lengths are calendar-dependent and cannot be soundly
@@ -218,7 +218,7 @@ impl DurationValue {
 
         scan::apply_sign(&mut raw_parts, is_negative);
 
-        let total = Self::fold_parts(&raw_parts);
+        let total = Self::sum_nominal_seconds(&raw_parts);
         let seconds = DurationSeconds::try_from(total)?;
         let raw = match mode {
             scan::ScanMode::Whole => input.trim().into(),
@@ -243,9 +243,9 @@ impl DurationValue {
                   change user-visible Duration floats that tests pin with \
                   exact equality; not a hot path"
     )]
-    fn fold_parts(parts: &[(f64, DurationUnit)]) -> f64 {
+    fn sum_nominal_seconds(parts: &[(f64, DurationUnit)]) -> f64 {
         parts.iter().fold(0.0f64, |acc, &(magnitude, unit)| {
-            acc + magnitude * unit.fixed_seconds()
+            acc + magnitude * unit.nominal_seconds()
         })
     }
 
@@ -253,15 +253,16 @@ impl DurationValue {
     /// value.
     ///
     /// Greedily decomposes `seconds.0.abs()` into Weeks, Days, Hours, Minutes,
-    /// Seconds, and Milliseconds (ratios from [`DurationUnit::fixed_seconds`]);
-    /// Month and Year are omitted because their lengths are calendar-dependent.
-    /// Zero yields `"0s"`; a negative duration starts with `"-"`. When the
-    /// decomposition cannot represent a nonzero magnitude (a sub-millisecond
-    /// remainder rounds to zero, or `u64` overflows at the other extreme),
-    /// falls back to [`DurationSeconds`]'s [`Display`](fmt::Display) so the
-    /// result never lies as `"0s"`.
+    /// Seconds, and Milliseconds (ratios from
+    /// [`DurationUnit::nominal_seconds`]); Month and Year are omitted
+    /// because their lengths are calendar-dependent. Zero yields `"0s"`; a
+    /// negative duration starts with `"-"`. When the decomposition cannot
+    /// represent a nonzero magnitude (a sub-millisecond remainder rounds to
+    /// zero, or `u64` overflows at the other extreme), falls back to
+    /// [`DurationSeconds`]'s [`Display`](fmt::Display) so the result never
+    /// lies as `"0s"`.
     #[inline]
-    pub(crate) fn from_seconds(seconds: DurationSeconds) -> Self {
+    pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
         Self {
             raw: Self::canonical_raw(seconds),
             seconds,
@@ -273,7 +274,7 @@ impl DurationValue {
     /// the greedy sub-year decomposition of
     /// [`Self::SUB_YEAR_DECOMPOSITION_UNITS`], or [`DurationSeconds`]'s
     /// [`Display`](fmt::Display) dialect when the decomposition can't represent
-    /// the magnitude (see [`Self::from_seconds`]).
+    /// the magnitude (see [`Self::from_nominal_seconds`]).
     ///
     /// Accumulates into one `String`: decomposition emits at most six integer
     /// counts, so no per-part intermediate strings are needed.
@@ -297,8 +298,10 @@ impl DurationValue {
         }
         let mut decomposed = false;
         for &(unit, suffix) in &Self::SUB_YEAR_DECOMPOSITION_UNITS {
-            let unit_ms =
-                (unit.fixed_seconds() * 1_000.0).round().to_u64().unwrap_or(0);
+            let unit_ms = (unit.nominal_seconds() * 1_000.0)
+                .round()
+                .to_u64()
+                .unwrap_or(0);
             if total_ms >= unit_ms {
                 let count = total_ms / unit_ms;
                 total_ms %= unit_ms;
@@ -360,7 +363,7 @@ impl DurationValue {
     /// Returns the total duration as [`DurationSeconds`].
     #[inline]
     #[must_use]
-    pub(crate) const fn to_seconds(&self) -> DurationSeconds {
+    pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
         self.seconds
     }
 
@@ -387,7 +390,7 @@ impl DurationValue {
             } else {
                 combined.extend_from_slice(&rhs_parts);
             }
-            let fold_total = Self::fold_parts(&combined);
+            let fold_total = Self::sum_nominal_seconds(&combined);
             let seconds = DurationSeconds::normalized(fold_total);
             Self {
                 raw: Self::canonical_raw(seconds),
@@ -431,7 +434,7 @@ impl TryFrom<DurationValue> for TimeDelta {
     /// outside `TimeDelta`'s representable range.
     #[inline]
     fn try_from(duration: DurationValue) -> Result<Self, Self::Error> {
-        Self::try_from(duration.to_seconds())
+        Self::try_from(duration.nominal_seconds())
     }
 }
 
@@ -514,7 +517,7 @@ impl Mul<f64> for DurationValue {
         if let Some(parts) = self.parts {
             let scaled: Vec<(f64, DurationUnit)> =
                 parts.iter().map(|&(mag, unit)| (mag * rhs, unit)).collect();
-            let fold_total = Self::fold_parts(&scaled);
+            let fold_total = Self::sum_nominal_seconds(&scaled);
             let seconds = DurationSeconds::normalized(fold_total);
             Self {
                 raw: Self::canonical_raw(seconds),
@@ -579,11 +582,11 @@ type DurationParts = Box<[(f64, DurationUnit)]>;
 ///
 /// Wraps `f64` with NaN-safe ordering and arithmetic; operators do not
 /// re-validate finiteness, so overflow can yield a non-finite result. Parsing
-/// and [`DurationValue::from_seconds`] always produce finite values
+/// and [`DurationValue::from_nominal_seconds`] always produce finite values
 /// ([`DurationSeconds::try_from`] rejects non-finite input); seconds read back
-/// through [`DurationValue::to_seconds`] after arithmetic may not be. A signed
-/// zero normalizes to positive zero at construction, so `"-0m"` and `"0m"`
-/// compare, order, and hash identically.
+/// through [`DurationValue::nominal_seconds`] after arithmetic may not be. A
+/// signed zero normalizes to positive zero at construction, so `"-0m"` and
+/// `"0m"` compare, order, and hash identically.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct DurationSeconds(pub(crate) f64);
 
@@ -872,7 +875,7 @@ mod tests {
             #[case::years("1y", 31_536_000.0)]
             fn parses_single_unit(#[case] input: &str, #[case] expected: f64) {
                 assert_eq!(
-                    DurationValue::parse(input).unwrap().to_seconds(),
+                    DurationValue::parse(input).unwrap().nominal_seconds(),
                     DurationSeconds::try_from(expected).unwrap()
                 );
             }
@@ -884,7 +887,7 @@ mod tests {
             #[case::consecutive_separators("1  h  30  m")]
             fn parses_multi_part(#[case] input: &str) {
                 assert_eq!(
-                    DurationValue::parse(input).unwrap().to_seconds(),
+                    DurationValue::parse(input).unwrap().nominal_seconds(),
                     DurationSeconds::try_from(5_400.0).unwrap()
                 );
             }
@@ -892,7 +895,7 @@ mod tests {
             #[test]
             fn applies_the_leading_sign_to_the_whole_duration() {
                 assert_eq!(
-                    DurationValue::parse("-1h 30m").unwrap().to_seconds(),
+                    DurationValue::parse("-1h 30m").unwrap().nominal_seconds(),
                     DurationSeconds::try_from(-5_400.0).unwrap()
                 );
             }
@@ -909,7 +912,7 @@ mod tests {
             #[case::exponent_after_decimal(".5e2s", 50.0)]
             fn parses_decimal(#[case] input: &str, #[case] expected: f64) {
                 assert_eq!(
-                    DurationValue::parse(input).unwrap().to_seconds(),
+                    DurationValue::parse(input).unwrap().nominal_seconds(),
                     DurationSeconds::try_from(expected).unwrap()
                 );
             }
@@ -918,7 +921,7 @@ mod tests {
             fn trims_leading_trailing_whitespace() {
                 let d = DurationValue::parse(" 1h ").unwrap();
                 assert_eq!(
-                    d.to_seconds(),
+                    d.nominal_seconds(),
                     DurationSeconds::try_from(3_600.0).unwrap()
                 );
             }
@@ -929,7 +932,7 @@ mod tests {
             fn accepts_trailing_separator(#[case] input: &str) {
                 let d = DurationValue::parse(input).unwrap();
                 assert_eq!(
-                    d.to_seconds(),
+                    d.nominal_seconds(),
                     DurationSeconds::try_from(3_600.0).unwrap()
                 );
             }
@@ -938,7 +941,7 @@ mod tests {
             fn accepts_redundant_plus_on_non_leading_part() {
                 let d = DurationValue::parse("1h +30m").unwrap();
                 assert_eq!(
-                    d.to_seconds(),
+                    d.nominal_seconds(),
                     DurationSeconds::try_from(5_400.0).unwrap()
                 );
             }
@@ -1085,7 +1088,7 @@ mod tests {
                     assert_eq!(consumed, expected_consumed);
                     assert_eq!(dv.as_str(), expected_str);
                     assert_eq!(
-                        dv.to_seconds(),
+                        dv.nominal_seconds(),
                         DurationSeconds::try_from(expected_secs).unwrap()
                     );
                 }
@@ -1217,9 +1220,9 @@ mod tests {
             #[case::negative(-5_400.0, "-1h 30m")]
             fn synthesizes(#[case] raw_secs: f64, #[case] expected_str: &str) {
                 let secs = DurationSeconds::try_from(raw_secs).unwrap();
-                let dv = DurationValue::from_seconds(secs);
+                let dv = DurationValue::from_nominal_seconds(secs);
                 assert_eq!(dv.as_str(), expected_str);
-                assert_eq!(dv.to_seconds(), secs);
+                assert_eq!(dv.nominal_seconds(), secs);
             }
 
             #[rstest]
@@ -1231,7 +1234,7 @@ mod tests {
             )]
             fn handles(#[case] raw_secs: f64, #[case] expected_str: &str) {
                 let secs = DurationSeconds::try_from(raw_secs).unwrap();
-                let dv = DurationValue::from_seconds(secs);
+                let dv = DurationValue::from_nominal_seconds(secs);
                 assert_eq!(dv.as_str(), expected_str);
             }
 
@@ -1248,10 +1251,10 @@ mod tests {
             #[case::scientific_tiny(1e-300)]
             fn roundtrips_through_parser(#[case] raw_seconds: f64) {
                 let secs = DurationSeconds::try_from(raw_seconds).unwrap();
-                let synthesized = DurationValue::from_seconds(secs);
+                let synthesized = DurationValue::from_nominal_seconds(secs);
                 let reparsed = DurationValue::parse(synthesized.as_str())
                     .expect("synthesized string must parse");
-                assert_eq!(reparsed.to_seconds(), secs);
+                assert_eq!(reparsed.nominal_seconds(), secs);
             }
         }
 
@@ -1415,7 +1418,7 @@ mod tests {
             ) {
                 let seconds = DurationSeconds::try_from(value).unwrap();
                 assert_eq!(
-                    DurationValue::from_seconds(seconds).as_str(),
+                    DurationValue::from_nominal_seconds(seconds).as_str(),
                     expected
                 );
             }
@@ -1445,8 +1448,10 @@ mod tests {
                 let dv: DurationValue = serde_json::from_str(json).unwrap();
                 assert_eq!(dv.as_str(), "4 yrs, 6 wks");
                 assert_eq!(
-                    dv.to_seconds(),
-                    DurationValue::parse("4 yrs, 6 wks").unwrap().to_seconds()
+                    dv.nominal_seconds(),
+                    DurationValue::parse("4 yrs, 6 wks")
+                        .unwrap()
+                        .nominal_seconds()
                 );
             }
 
@@ -1466,7 +1471,7 @@ mod tests {
             fn roundtrips_valid_input() {
                 let d: DurationValue = "1h 30m".parse().unwrap();
                 assert_eq!(
-                    d.to_seconds(),
+                    d.nominal_seconds(),
                     DurationSeconds::try_from(5_400.0).unwrap()
                 );
             }
@@ -1519,7 +1524,10 @@ mod tests {
                 // Assert
                 assert_eq!(consumed, 7);
                 assert_eq!(prefix_dv.parts(), full_dv.parts());
-                assert_eq!(prefix_dv.to_seconds(), full_dv.to_seconds());
+                assert_eq!(
+                    prefix_dv.nominal_seconds(),
+                    full_dv.nominal_seconds()
+                );
             }
 
             #[rstest]
@@ -1537,7 +1545,10 @@ mod tests {
                 let dv = DurationValue::parse(input).unwrap();
 
                 // Assert
-                assert_eq!(dv.to_seconds().0.to_bits(), expected.to_bits());
+                assert_eq!(
+                    dv.nominal_seconds().0.to_bits(),
+                    expected.to_bits()
+                );
             }
             #[test]
             fn identifies_calendar_units_and_durations() {
@@ -1558,7 +1569,7 @@ mod tests {
                     DurationValue::parse("2h 30m").expect("valid duration");
                 assert!(!fixed.is_calendar());
 
-                let synth = DurationValue::from_seconds(
+                let synth = DurationValue::from_nominal_seconds(
                     DurationSeconds::try_from(86_400.0).unwrap(),
                 );
                 assert!(!synth.is_calendar());
@@ -1585,7 +1596,7 @@ mod tests {
                 assert_eq!(sum, expected);
                 let sub = expected - DurationValue::parse("30m").unwrap();
                 assert_eq!(
-                    sub.to_seconds(),
+                    sub.nominal_seconds(),
                     DurationSeconds::try_from(3_600.0).unwrap()
                 );
 
@@ -1609,13 +1620,16 @@ mod tests {
                 let sum = a + b;
 
                 // Assert
-                assert_eq!(sum.to_seconds().0.to_bits(), 1.0e16_f64.to_bits());
+                assert_eq!(
+                    sum.nominal_seconds().0.to_bits(),
+                    1.0e16_f64.to_bits()
+                );
             }
 
             #[test]
             fn arithmetic_with_none_operand_clears_parts_and_adds_seconds() {
                 // Arrange
-                let none_dv = DurationValue::from_seconds(
+                let none_dv = DurationValue::from_nominal_seconds(
                     DurationSeconds::try_from(3_600.0).unwrap(),
                 );
                 let some_dv = DurationValue::parse("30m").unwrap();
@@ -1626,7 +1640,7 @@ mod tests {
                 // Assert
                 assert!(sum.parts().is_none());
                 assert_eq!(
-                    sum.to_seconds(),
+                    sum.nominal_seconds(),
                     DurationSeconds::try_from(5_400.0).unwrap()
                 );
             }
@@ -1634,7 +1648,7 @@ mod tests {
             #[test]
             fn sub_with_none_operand_clears_parts_and_subtracts_seconds() {
                 // Arrange
-                let none_dv = DurationValue::from_seconds(
+                let none_dv = DurationValue::from_nominal_seconds(
                     DurationSeconds::try_from(3_600.0).unwrap(),
                 );
                 let some_dv = DurationValue::parse("30m").unwrap();
@@ -1646,7 +1660,7 @@ mod tests {
                 // subtract directly as the fixed-regime operands.
                 assert!(diff.parts().is_none());
                 assert_eq!(
-                    diff.to_seconds(),
+                    diff.nominal_seconds(),
                     DurationSeconds::try_from(1_800.0).unwrap()
                 );
             }
@@ -1671,7 +1685,7 @@ mod tests {
                     Some((75.0, DurationUnit::Minute))
                 );
                 assert_eq!(
-                    scaled.to_seconds().0.to_bits(),
+                    scaled.nominal_seconds().0.to_bits(),
                     13_500.0_f64.to_bits()
                 );
             }
@@ -1687,14 +1701,14 @@ mod tests {
                 let nan_dv = dv * f64::NAN;
 
                 // Assert
-                assert!(!inf_dv.to_seconds().0.is_finite());
+                assert!(!inf_dv.nominal_seconds().0.is_finite());
                 assert_eq!(inf_dv.as_str(), "infs");
                 assert!(matches!(
                     TimeDelta::try_from(inf_dv),
                     Err(DurationError::NonFiniteSeconds)
                 ));
 
-                assert!(!nan_dv.to_seconds().0.is_finite());
+                assert!(!nan_dv.nominal_seconds().0.is_finite());
                 assert!(matches!(
                     TimeDelta::try_from(nan_dv),
                     Err(DurationError::NonFiniteSeconds)
@@ -1710,13 +1724,13 @@ mod tests {
 
                 // Act
                 let huge = dv * f64::MAX;
-                assert!(huge.to_seconds().0.is_finite());
+                assert!(huge.nominal_seconds().0.is_finite());
                 let overflowed = huge * 2.0;
 
                 // Assert: the overflow leaves non-finite seconds that every
                 // consuming conversion rejects, and the display never lies as
                 // `"0s"`.
-                assert!(!overflowed.to_seconds().0.is_finite());
+                assert!(!overflowed.nominal_seconds().0.is_finite());
                 assert_eq!(overflowed.as_str(), "infs");
                 assert!(matches!(
                     TimeDelta::try_from(overflowed),
@@ -1808,7 +1822,7 @@ mod tests {
             fn extracts_seconds_from_duration_value() {
                 let dv = DurationValue::parse("1h").unwrap();
                 assert_eq!(
-                    dv.to_seconds(),
+                    dv.nominal_seconds(),
                     DurationSeconds::try_from(3_600.0).unwrap()
                 );
             }

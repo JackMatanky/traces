@@ -1,18 +1,18 @@
 /// Human-readable list of accepted unit spellings for error messages.
 ///
-/// Kept beside [`UNIT_MAP`] as a reminder to update both when a unit or
+/// Kept beside [`UNIT_SPELLINGS`] as a reminder to update both when a unit or
 /// spelling family is added to the registry: this lists one spelling per
 /// family, not every accepted alias.
-pub(crate) const UNIT_HINT: &str =
+pub(crate) const UNIT_SPELLINGS_HINT: &str =
     "\"years\"/\"y\", \"months\"/\"mo\", \"weeks\"/\"w\", \"days\"/\"d\", \
      \"hours\"/\"h\", \"minutes\"/\"m\", \"seconds\"/\"s\", or \"ms\"";
 
 /// Case-insensitive unit string to [`DurationUnit`] mapping.
 ///
 /// Contains all accepted abbreviations and full names. Keys are stored
-/// lowercase; lookup in [`DurationUnit::parse`] lowercases the input before
-/// matching.
-static UNIT_MAP: phf::Map<&'static str, DurationUnit> = phf::phf_map! {
+/// lowercase; lookup in [`DurationUnit::from_spelling`] lowercases the input
+/// before matching.
+static UNIT_SPELLINGS: phf::Map<&'static str, DurationUnit> = phf::phf_map! {
     "ms" => DurationUnit::Millisecond,
     "millisecond" => DurationUnit::Millisecond,
     "milliseconds" => DurationUnit::Millisecond,
@@ -81,13 +81,13 @@ impl DurationUnit {
     /// Accepts strings up to 16 bytes. Returns `None` if the string is empty,
     /// exceeds 16 bytes, or does not match a known unit name.
     #[must_use]
-    pub(crate) fn parse(unit: &str) -> Option<Self> {
+    pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
         let mut buf = [0u8; 16];
         let slice = buf.get_mut(..unit.len())?;
         slice.copy_from_slice(unit.as_bytes());
         slice.make_ascii_lowercase();
         let lower = core::str::from_utf8(slice).ok()?;
-        UNIT_MAP.get(lower).copied()
+        UNIT_SPELLINGS.get(lower).copied()
     }
 
     /// Fixed seconds per unit for duration magnitude identity.
@@ -98,7 +98,7 @@ impl DurationUnit {
     /// whole-count date-shifting behavior belongs to the date module's
     /// calendar owner.
     #[must_use]
-    pub(crate) const fn fixed_seconds(self) -> f64 {
+    pub(crate) const fn nominal_seconds(self) -> f64 {
         match self {
             Self::Millisecond => 0.001,
             Self::Second => 1.0,
@@ -121,7 +121,7 @@ impl DurationUnit {
     }
 
     /// Whole fixed seconds per unit as `i64`, derived from
-    /// [`Self::fixed_seconds`].
+    /// [`Self::nominal_seconds`].
     ///
     /// `None` only for [`Self::Millisecond`]; every other variant is listed
     /// explicitly, so adding a unit forces it to declare whether its ratio is a
@@ -129,14 +129,14 @@ impl DurationUnit {
     #[must_use]
     #[expect(
         clippy::as_conversions,
-        reason = "derives whole seconds from the sole fixed_seconds ratio \
+        reason = "derives whole seconds from the sole nominal_seconds ratio \
                   definition"
     )]
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "fixed_seconds for whole-second units always fit in i64"
+        reason = "nominal_seconds for whole-second units always fit in i64"
     )]
-    pub(crate) const fn fixed_seconds_i64(self) -> Option<i64> {
+    pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
         match self {
             Self::Millisecond => None,
             Self::Second
@@ -145,7 +145,7 @@ impl DurationUnit {
             | Self::Day
             | Self::Week
             | Self::Month
-            | Self::Year => Some(self.fixed_seconds() as i64),
+            | Self::Year => Some(self.nominal_seconds() as i64),
         }
     }
 }
@@ -171,7 +171,10 @@ mod tests {
                 #[case] input: &str,
                 #[case] expected: DurationUnit,
             ) {
-                assert_eq!(DurationUnit::parse(input).unwrap(), expected);
+                assert_eq!(
+                    DurationUnit::from_spelling(input).unwrap(),
+                    expected
+                );
             }
 
             #[rstest]
@@ -214,7 +217,10 @@ mod tests {
                 #[case] input: &str,
                 #[case] expected: DurationUnit,
             ) {
-                assert_eq!(DurationUnit::parse(input).unwrap(), expected);
+                assert_eq!(
+                    DurationUnit::from_spelling(input).unwrap(),
+                    expected
+                );
             }
 
             #[rstest]
@@ -223,15 +229,15 @@ mod tests {
             #[case::longer_than_16_bytes("aaaaaaaaaaaaaaaaa")]
             #[case::empty("")]
             fn rejects_unit(#[case] input: &str) {
-                assert!(DurationUnit::parse(input).is_none());
+                assert!(DurationUnit::from_spelling(input).is_none());
             }
             #[test]
             fn parses_all_unit_map_keys_into_their_expected_variants() {
-                for (key, expected_variant) in UNIT_MAP.entries() {
+                for (key, expected_variant) in UNIT_SPELLINGS.entries() {
                     assert_eq!(
-                        DurationUnit::parse(key),
+                        DurationUnit::from_spelling(key),
                         Some(*expected_variant),
-                        "UNIT_MAP entry `{key}` must parse as \
+                        "UNIT_SPELLINGS entry `{key}` must parse as \
                          `{expected_variant:?}`"
                     );
                 }
@@ -240,17 +246,17 @@ mod tests {
             #[test]
             fn verifies_unit_hint_and_unit_map_are_in_sync() {
                 let mut hint_variants = std::collections::HashSet::new();
-                let quoted_tokens = UNIT_HINT
+                let quoted_tokens = UNIT_SPELLINGS_HINT
                     .split('"')
                     .enumerate()
                     .filter(|(i, _)| i % 2 == 1)
                     .map(|(_, t)| t);
                 for token in quoted_tokens {
-                    let parsed = DurationUnit::parse(token);
+                    let parsed = DurationUnit::from_spelling(token);
                     assert!(
                         parsed.is_some(),
                         "hint spelling `{token}` must resolve in \
-                         DurationUnit::parse"
+                         DurationUnit::from_spelling"
                     );
                     hint_variants.extend(parsed);
                 }
@@ -268,14 +274,15 @@ mod tests {
                 for variant in all_variants {
                     assert!(
                         hint_variants.contains(&variant),
-                        "UNIT_HINT must cover {variant:?}"
+                        "UNIT_SPELLINGS_HINT must cover {variant:?}"
                     );
                 }
 
-                for (key, variant) in UNIT_MAP.entries() {
+                for (key, variant) in UNIT_SPELLINGS.entries() {
                     assert!(
                         hint_variants.contains(variant),
-                        "UNIT_HINT must cover variant for key `{key}`"
+                        "UNIT_SPELLINGS_HINT must cover variant for key \
+                         `{key}`"
                     );
                 }
             }
@@ -286,8 +293,8 @@ mod tests {
 
             #[test]
             fn fixed_seconds_are_positive_for_all_variants() {
-                for entry in UNIT_MAP.entries() {
-                    assert!(entry.1.fixed_seconds() > 0.0);
+                for entry in UNIT_SPELLINGS.entries() {
+                    assert!(entry.1.nominal_seconds() > 0.0);
                 }
             }
 
@@ -304,7 +311,7 @@ mod tests {
                     (DurationUnit::Year, Some(31_536_000)),
                 ];
                 for (unit, expected) in units {
-                    assert_eq!(unit.fixed_seconds_i64(), expected);
+                    assert_eq!(unit.whole_nominal_seconds(), expected);
                 }
             }
         }

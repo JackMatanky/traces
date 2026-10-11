@@ -44,7 +44,7 @@ use num_traits::ToPrimitive as _;
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
     DEFAULT_DATE_FORMAT, DateTimeValue, DateValue, DurationSeconds,
-    DurationUnit, DurationValue, UNIT_HINT,
+    DurationUnit, DurationValue, UNIT_SPELLINGS_HINT,
     date::{
         DateDiff, DateError, DateFormat, DatePoint, DateTimeFormat, Precision,
         RecognizedDate,
@@ -663,13 +663,14 @@ fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `unit` is not one of
-///   [`DurationUnit::parse`]'s accepted unit names or abbreviations.
+///   [`DurationUnit::from_spelling`]'s accepted unit names or abbreviations.
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `unit`.
 fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<DurationUnit> {
     let unit_str = kwargs.get::<Option<&str>>("unit")?.unwrap_or("days");
     kwargs.assert_all_used()?;
-    DurationUnit::parse(unit_str).ok_or_else(|| unknown_unit_error(unit_str))
+    DurationUnit::from_spelling(unit_str)
+        .ok_or_else(|| unknown_unit_error(unit_str))
 }
 
 /// Formats `formattable`, anything chrono's `.format(fmt)` produces
@@ -895,14 +896,14 @@ fn durationformat(value: Value) -> TemplateEngineResult<String> {
             invalid_operation(format!("invalid duration {s:?}"), source)
         })?
     } else if let Ok(f) = f64::try_from(value) {
-        DurationSeconds::try_from(f).map(DurationValue::from_seconds).map_err(
-            |source| {
+        DurationSeconds::try_from(f)
+            .map(DurationValue::from_nominal_seconds)
+            .map_err(|source| {
                 invalid_operation(
                     format!("out-of-range duration seconds {f}"),
                     source,
                 )
-            },
-        )?
+            })?
     } else {
         return Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -914,7 +915,7 @@ fn durationformat(value: Value) -> TemplateEngineResult<String> {
 
 /// Renders a [`DurationValue`] in human-readable compound format.
 fn format_human_duration(dv: &DurationValue) -> String {
-    let total_secs = dv.to_seconds().as_f64();
+    let total_secs = dv.nominal_seconds().as_f64();
     if total_secs == 0.0 {
         return "0 seconds".to_owned();
     }
@@ -1260,7 +1261,7 @@ fn weekday(
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` or `other` is not a parseable
 ///   date/time string (see [`parse_recognized`]) or `unit` is not one of
-///   [`DurationUnit::parse`]'s accepted names (see [`unit_kwarg`]).
+///   [`DurationUnit::from_spelling`]'s accepted names (see [`unit_kwarg`]).
 /// - [`ErrorKind::InvalidOperation`] if the difference overflows chrono's
 ///   representable range (see [`date_error`]).
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
@@ -1390,17 +1391,17 @@ fn date_error(error: DateError) -> Error {
 }
 
 /// Builds the error for a `unit="..."` kwarg naming anything outside
-/// [`DurationUnit::parse`]'s accepted unit names.
+/// [`DurationUnit::from_spelling`]'s accepted unit names.
 ///
-/// The expected-spellings hint comes from [`UNIT_HINT`], kept beside the
-/// unit registry so the message cannot drift from what [`unit_kwarg`]
+/// The expected-spellings hint comes from [`UNIT_SPELLINGS_HINT`], kept beside
+/// the unit registry so the message cannot drift from what [`unit_kwarg`]
 /// actually accepts.
 ///
 /// Shared by [`date_add`], [`date_sub`], and [`date_diff`] via [`unit_kwarg`].
 fn unknown_unit_error(unit: &str) -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
-        format!("unknown unit {unit:?} (expected {UNIT_HINT})"),
+        format!("unknown unit {unit:?} (expected {UNIT_SPELLINGS_HINT})"),
     )
 }
 
