@@ -43,7 +43,7 @@ impl QueryFieldValueRef<'_> {
                     .iter()
                     .map(|path| {
                         NoteFieldValue::String(
-                            path.to_string_lossy().into_owned(),
+                            crate::path::display_portable(path).into_owned(),
                         )
                     })
                     .collect(),
@@ -62,7 +62,7 @@ impl QueryFieldValueRef<'_> {
             }
             Self::Inlinks(inlinks) => {
                 append_joined(out, inlinks, |out, path| {
-                    out.push_str(&path.to_string_lossy());
+                    out.push_str(&crate::path::display_portable(path));
                 });
             }
         }
@@ -122,7 +122,10 @@ impl QueryFieldValueRef<'_> {
                         && inlinks.iter().zip(items.iter()).all(
                             |(path, item)| {
                                 item.as_str()
-                                    == Some(path.to_string_lossy().as_ref())
+                                    == Some(
+                                        crate::path::display_portable(path)
+                                            .as_ref(),
+                                    )
                             },
                         )
                 }
@@ -149,7 +152,9 @@ impl QueryFieldValueRef<'_> {
                 let Some(target_str) = target.as_str() else {
                     return false;
                 };
-                paths.iter().any(|path| path.to_string_lossy() == target_str)
+                paths.iter().any(|path| {
+                    crate::path::display_portable(path) == target_str
+                })
             }
         }
     }

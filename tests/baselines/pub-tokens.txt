@@ -835,6 +835,7 @@ src/path.rs: pub mod codec {
 src/path.rs: pub(crate) enum PathError {
 src/path.rs: pub(crate) fn as_path(self) -> &'a Path {
 src/path.rs: pub(crate) fn derive(root: &Path, path: &Path) -> Result<Self, PathError> {
+src/path.rs: pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
 src/path.rs: pub(crate) fn distance_to(self, other: FolderRef<'_>) -> usize {
 src/path.rs: pub(crate) fn fold_confinement<T>(
 src/path.rs: pub(crate) fn into_path_buf(self) -> PathBuf {

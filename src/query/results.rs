@@ -237,25 +237,28 @@ impl QueryRow {
     fn resolve_file_ref(&self, field: FileField) -> QueryFieldValueRef<'_> {
         let file = self.file();
         match field {
-            FileField::Path => file.path().to_str().map_or_else(
-                || {
-                    QueryFieldValueRef::Owned(NoteFieldValue::String(
-                        file.path().to_string_lossy().into_owned(),
-                    ))
-                },
-                |s| QueryFieldValueRef::Note(NoteFieldValueRef::String(s)),
-            ),
+            FileField::Path => match crate::path::display_portable(file.path())
+            {
+                std::borrow::Cow::Borrowed(s) => {
+                    QueryFieldValueRef::Note(NoteFieldValueRef::String(s))
+                }
+                std::borrow::Cow::Owned(s) => {
+                    QueryFieldValueRef::Owned(NoteFieldValue::String(s))
+                }
+            },
             FileField::Name => QueryFieldValueRef::Note(
                 NoteFieldValueRef::String(file.name().as_str()),
             ),
-            FileField::Folder => file.folder().as_path().to_str().map_or_else(
-                || {
-                    QueryFieldValueRef::Owned(NoteFieldValue::String(
-                        file.folder().as_path().to_string_lossy().into_owned(),
-                    ))
-                },
-                |s| QueryFieldValueRef::Note(NoteFieldValueRef::String(s)),
-            ),
+            FileField::Folder => {
+                match crate::path::display_portable(file.folder().as_path()) {
+                    std::borrow::Cow::Borrowed(s) => {
+                        QueryFieldValueRef::Note(NoteFieldValueRef::String(s))
+                    }
+                    std::borrow::Cow::Owned(s) => {
+                        QueryFieldValueRef::Owned(NoteFieldValue::String(s))
+                    }
+                }
+            }
             #[expect(
                 clippy::as_conversions,
                 clippy::cast_precision_loss,

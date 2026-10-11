@@ -21,12 +21,31 @@
 //! platform-specific open-at APIs.
 
 use std::{
+    borrow::Cow,
     convert::TryFrom,
-    path::{Component, Path, PathBuf},
+    path::{Component, MAIN_SEPARATOR, Path, PathBuf},
 };
 
 use strict_path::{PathBoundary, StrictPathError};
 use thiserror::Error;
+
+/// Rewrites platform-native path separators to `/` for stable, portable
+/// display and query output.
+///
+/// Internal storage and filesystem operations use platform-native encodings
+/// (see module docs); this normalizes only the *textual* representation
+/// shown to users or matched against `/`-separated query syntax. Borrowed on
+/// Unix, where `/` is already the separator; non-UTF-8 components are
+/// lossily converted, matching [`Path::to_string_lossy`].
+#[must_use]
+pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
+    let text = path.to_string_lossy();
+    if MAIN_SEPARATOR == '/' {
+        text
+    } else {
+        Cow::Owned(text.replace(MAIN_SEPARATOR, "/"))
+    }
+}
 
 /// A row addressable by its project-relative path.
 ///
@@ -409,6 +428,29 @@ pub mod codec {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod display_portable {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[cfg(not(windows))]
+        #[test]
+        fn keeps_forward_slashes_borrowed_on_unix() {
+            let normalized = display_portable(Path::new("notes/a.md"));
+
+            assert!(matches!(normalized, Cow::Borrowed(_)));
+            assert_eq!(normalized, "notes/a.md");
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn rewrites_native_backslashes_to_forward_slashes_on_windows() {
+            let normalized = display_portable(Path::new(r"archive\foo.md"));
+
+            assert_eq!(normalized, "archive/foo.md");
+        }
+    }
 
     mod relative_path {
         use pretty_assertions::assert_eq;

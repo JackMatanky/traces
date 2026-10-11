@@ -10,7 +10,7 @@
 //!   expansion.
 //! - Boolean combinators: Compound logic combining atoms with `and`, `or`, and
 //!   `not`.
-use std::{borrow::Cow, collections::BTreeSet, path::Path};
+use std::{collections::BTreeSet, path::Path};
 
 use logos::{Lexer, Logos};
 use regex::Regex;
@@ -285,19 +285,8 @@ impl GlobPattern {
 
     #[must_use]
     pub(crate) fn is_match(&self, path: &Path) -> bool {
-        let path = path.to_string_lossy();
-        let normalized = normalize_separators(path.as_ref());
+        let normalized = crate::path::display_portable(path);
         self.regex.is_match(&normalized)
-    }
-}
-
-/// Rewrites the platform separator to `/` so globs written with `/` match paths
-/// stored with the native separator. Borrowed on Unix.
-fn normalize_separators(path: &str) -> Cow<'_, str> {
-    if std::path::MAIN_SEPARATOR == '/' {
-        Cow::Borrowed(path)
-    } else {
-        Cow::Owned(path.replace(std::path::MAIN_SEPARATOR, "/"))
     }
 }
 
@@ -872,13 +861,15 @@ mod tests {
         }
     }
     mod glob_pattern {
+        use std::borrow::Cow;
+
         use super::*;
 
         #[cfg(not(windows))]
         #[test]
         fn keeps_backslashes_literal_on_unix() {
             let path = r"covers\dune.md";
-            let normalized = normalize_separators(path);
+            let normalized = crate::path::display_portable(Path::new(path));
 
             assert!(matches!(normalized, Cow::Borrowed(_)));
             assert_eq!(normalized, path);
@@ -890,7 +881,8 @@ mod tests {
         #[cfg(windows)]
         #[test]
         fn normalizes_windows_separators_for_slash_globs() {
-            let normalized = normalize_separators(r"notes\a.md");
+            let normalized =
+                crate::path::display_portable(Path::new(r"notes\a.md"));
             assert_eq!(normalized, "notes/a.md");
 
             let pattern =

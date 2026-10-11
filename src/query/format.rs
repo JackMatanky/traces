@@ -243,19 +243,26 @@ impl QueryDisplayFormat {
             let _ = write!(out, "- [{symbol}] {text}");
             match path_style {
                 TaskPathStyle::Suffix => {
-                    let _ = write!(out, " ({})", row.file().path().display());
+                    let _ = write!(
+                        out,
+                        " ({})",
+                        crate::path::display_portable(row.file().path())
+                    );
                 }
                 TaskPathStyle::Coordinates => {
                     if let Some(line) = row.line() {
                         let _ = write!(
                             out,
                             " ({}:{})",
-                            row.file().path().display(),
+                            crate::path::display_portable(row.file().path()),
                             line
                         );
                     } else {
-                        let _ =
-                            write!(out, " ({})", row.file().path().display());
+                        let _ = write!(
+                            out,
+                            " ({})",
+                            crate::path::display_portable(row.file().path())
+                        );
                     }
                 }
                 TaskPathStyle::None => {}
