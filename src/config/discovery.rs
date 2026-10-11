@@ -391,6 +391,25 @@ mod tests {
         }
 
         #[test]
+        fn scans_an_ignored_directory_given_a_non_canonical_spelling() {
+            let fixture = Fixture::new();
+            fixture.create_dir("p/target");
+            fixture.create_config("p/target/inner");
+            let dotted = fixture.path("p").join(".").join("target");
+
+            let found =
+                fixture.locator().local_subtree(&dotted).expect("subtree");
+
+            assert_eq!(
+                found
+                    .iter()
+                    .map(|config| config.root().file_name())
+                    .collect::<Vec<_>>(),
+                [Some(std::ffi::OsStr::new("inner"))]
+            );
+        }
+
+        #[test]
         fn finds_descendants_when_the_root_has_no_own_config() {
             let fixture = Fixture::new();
             let root = fixture.create_dir("root");
