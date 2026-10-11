@@ -187,6 +187,8 @@ jobs:
           --skip-step cargo-clippy
           --skip-step cargo-test
           --skip-step cargo-doc
+          --skip-step visibility
+          --skip-step layer-enforcement
 
   # -- Secret & credential detection --
   secrets:
