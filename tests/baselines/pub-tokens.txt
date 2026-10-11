@@ -242,61 +242,67 @@ src/config/trust.rs: pub(super) fn project(&self, name: &str) -> PathBuf {
 src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
 src/config/trust.rs: pub(super) store: TrustStore,
 src/config/trust.rs: pub(super) struct Fixture {
-src/date.rs: pub enum DateError {
-src/date.rs: pub struct DateTimeValue(DateTime<Utc>);
-src/date.rs: pub struct DateValue(NaiveDate);
-src/date.rs: pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
-src/date.rs: pub(crate) const ALL: [Self; 5] = [
-src/date.rs: pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
-src/date.rs: pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
-src/date.rs: pub(crate) const fn has_time(&self) -> bool {
-src/date.rs: pub(crate) const fn has_time(self) -> bool {
-src/date.rs: pub(crate) const fn into_inner(self) -> DateTime<Utc> {
-src/date.rs: pub(crate) const fn into_inner(self) -> NaiveDate {
-src/date.rs: pub(crate) const fn new(
-src/date.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
-src/date.rs: pub(crate) enum DateDiff {
-src/date.rs: pub(crate) enum DateFormat {
-src/date.rs: pub(crate) enum DateTimeFormat {
-src/date.rs: pub(crate) enum ParsedDateTimeShape {
-src/date.rs: pub(crate) enum Precision {
-src/date.rs: pub(crate) enum RecognizedDateValue {
-src/date.rs: pub(crate) fn apply(
-src/date.rs: pub(crate) fn apply(
-src/date.rs: pub(crate) fn apply(
-src/date.rs: pub(crate) fn classify(
-src/date.rs: pub(crate) fn date(&self) -> DateValue {
-src/date.rs: pub(crate) fn date(self) -> DateValue {
-src/date.rs: pub(crate) fn diff(
-src/date.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
-src/date.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
-src/date.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
-src/date.rs: pub(crate) fn is_equal_to_date(self, date: DateValue) -> bool {
-src/date.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
-src/date.rs: pub(crate) fn month_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn parse_any(
-src/date.rs: pub(crate) fn parse_any(
-src/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(RecognizedDate, usize)> {
-src/date.rs: pub(crate) fn parse_with(
-src/date.rs: pub(crate) fn point(&self) -> DatePoint {
-src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn to_f64(self) -> Option<f64> {
-src/date.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
-src/date.rs: pub(crate) fn wall_or_utc(self) -> NaiveDateTime {
-src/date.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn weekday_point(
-src/date.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date.rs: pub(crate) instant: DateTime<Utc>,
-src/date.rs: pub(crate) precision: Precision,
-src/date.rs: pub(crate) precision: Precision,
-src/date.rs: pub(crate) struct DatePoint {
-src/date.rs: pub(crate) struct RecognizedDate {
-src/date.rs: pub(crate) value: RecognizedDateValue,
-src/date.rs: pub(crate) wall: NaiveDateTime,
+src/date/calendar.rs: pub(crate) enum DateDiff {
+src/date/calendar.rs: pub(crate) fn apply(
+src/date/calendar.rs: pub(crate) fn apply(
+src/date/calendar.rs: pub(crate) fn apply(
+src/date/calendar.rs: pub(crate) fn diff(
+src/date/calendar.rs: pub(crate) fn month_boundary(self, end: bool) -> Result<Self, DateError> {
+src/date/calendar.rs: pub(crate) fn shift(
+src/date/calendar.rs: pub(crate) fn shift(
+src/date/calendar.rs: pub(crate) fn shift(
+src/date/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
+src/date/calendar.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Self, DateError> {
+src/date/calendar.rs: pub(crate) fn weekday_point(
+src/date/calendar.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
+src/date/mod.rs: pub use value::{DateError, DateTimeValue, DateValue};
+src/date/mod.rs: pub(crate) use calendar::DateDiff;
+src/date/mod.rs: pub(crate) use parse::{DateFormat, DateTimeFormat};
+src/date/mod.rs: pub(crate) use value::{
+src/date/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
+src/date/parse.rs: pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
+src/date/parse.rs: pub(crate) const ALL: [Self; 5] = [
+src/date/parse.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
+src/date/parse.rs: pub(crate) enum DateFormat {
+src/date/parse.rs: pub(crate) enum DateTimeFormat {
+src/date/parse.rs: pub(crate) enum ParsedDateTimeShape {
+src/date/parse.rs: pub(crate) fn classify(
+src/date/parse.rs: pub(crate) fn parse_any(
+src/date/parse.rs: pub(crate) fn parse_any(
+src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(RecognizedDate, usize)> {
+src/date/parse.rs: pub(crate) fn parse_with(
+src/date/value.rs: pub enum DateError {
+src/date/value.rs: pub struct DateTimeValue(pub(super) DateTime<Utc>);
+src/date/value.rs: pub struct DateValue(pub(super) NaiveDate);
+src/date/value.rs: pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
+src/date/value.rs: pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
+src/date/value.rs: pub(crate) const fn has_time(&self) -> bool {
+src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
+src/date/value.rs: pub(crate) const fn into_inner(self) -> DateTime<Utc> {
+src/date/value.rs: pub(crate) const fn into_inner(self) -> NaiveDate {
+src/date/value.rs: pub(crate) const fn new(
+src/date/value.rs: pub(crate) enum Precision {
+src/date/value.rs: pub(crate) enum RecognizedDateValue {
+src/date/value.rs: pub(crate) fn date(&self) -> DateValue {
+src/date/value.rs: pub(crate) fn date(self) -> DateValue {
+src/date/value.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
+src/date/value.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
+src/date/value.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
+src/date/value.rs: pub(crate) fn is_equal_to_date(self, date: DateValue) -> bool {
+src/date/value.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
+src/date/value.rs: pub(crate) fn point(&self) -> DatePoint {
+src/date/value.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
+src/date/value.rs: pub(crate) fn wall_or_utc(self) -> NaiveDateTime {
+src/date/value.rs: pub(crate) instant: DateTime<Utc>,
+src/date/value.rs: pub(crate) precision: Precision,
+src/date/value.rs: pub(crate) precision: Precision,
+src/date/value.rs: pub(crate) struct DatePoint {
+src/date/value.rs: pub(crate) struct RecognizedDate {
+src/date/value.rs: pub(crate) value: RecognizedDateValue,
+src/date/value.rs: pub(crate) wall: NaiveDateTime,
+src/date/value.rs: pub(super) fn local_naive_to_utc(
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
 src/delimiter.rs: pub(crate) const fn close_len(self) -> usize {
