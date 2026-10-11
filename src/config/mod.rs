@@ -1,35 +1,33 @@
-//! Loads TOML configuration from the filesystem into a resolved [`Config`].
+//! Loads Config Files into a resolved [`Config`].
 //!
-//! # Pipeline
+//! The discovery, read, trust and value stages separate failure types. Loading
+//! follows this order:
 //!
-//! 1. **Discover** local `.traces/config.toml` and optional global
-//!    `traces/config.toml` from a directory anchor
-//!    ([`discovery::ConfigLocator`]).
-//! 2. **Track** the local config in a best-effort store
-//!    ([`tracker::TrackerStore`]) and **verify trust** before parsing its
-//!    content; reject untrusted or stale files ([`trust::TrustStore`]). Both
-//!    steps happen in one transition, [`file::LocalConfigFile::into_trusted`].
-//! 3. **Parse** TOML into [`raw::RawConfig`] ([`mod@file`]).
-//! 4. **Merge** global config before local so local values win
-//!    ([`service::ConfigService`]).
+//! 1. [`discovery::ConfigLocator`] finds the nearest local Config File and an
+//!    optional global Config File without reading TOML.
+//! 2. [`file::LocalConfigFile::into_trusted`] records the local Tracked Config
+//!    Path in the Tracker Store on a best-effort basis, then performs Trust
+//!    Verification against the Trust Store before parsing local TOML.
+//! 3. [`mod@file`] parses the trusted local content and reads the global file
+//!    without a trust gate, producing [`raw::RawConfig`] values.
+//! 4. [`ConfigBuilder`] merges global defaults before local values, validates
+//!    them and resolves paths into [`Config`].
 //!
-//! Path resolution and default filling happen in [`model`], which produces the
-//! final [`Config`].
+//! Granting trust records a local Tracked Config Path before granting trust;
+//! revoking trust leaves that path tracked. [`crate::dirs`] supplies OS paths
+//! for both stores.
 //!
-//! # Main Types
+//! # Key Types
 //!
-//! - [`ConfigService`] owns the load pipeline and delegates durable state to
-//!   its two stores.
-//! - [`trust::TrustStore`] and [`tracker::TrackerStore`] persist trust
-//!   decisions and the seen-config registry.
-//! - [`Config`] holds merged settings ready for consumers.
-//! - [`TaskConfig`] holds resolved task status mappings and tag filters.
-//! - [`TrustRequest`] names a workspace root or config file for trust
-//!   operations.
-//! - [`error::ConfigError`] composes the four stage errors raised by
-//!   [`ConfigService::load`].
-//!
-//! Filesystem paths are resolved by the [`crate::dirs`] module.
+//! - [`ConfigService`]: loads configuration and administers trust.
+//! - [`Config`]: holds resolved values and the workspace root.
+//! - [`TaskConfig`]: holds Task Configuration status mappings and tag filters.
+//! - [`TrustRequest`]: identifies a workspace root or local Config File for
+//!   trust operations.
+//! - [`trust::TrustStore`]: persists trusted roots and Companion Hashes.
+//! - [`tracker::TrackerStore`]: persists Tracked Config Paths independently of
+//!   trust decisions.
+//! - [`error::ConfigError`]: combines failures from the four stages.
 
 mod builder;
 mod discovery;

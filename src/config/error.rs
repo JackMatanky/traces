@@ -1,18 +1,8 @@
-//! Stage-isolated error hierarchy for configuration discovery, reading, trust
-//! verification, and semantic domain validation.
+//! Separates errors across discovery, read, trust and value stages.
 //!
-//! # Architecture
-//!
-//! The configuration lifecycle is an orthogonal 4-stage pipeline:
-//!
-//! 1. [`ConfigDiscoveryError`] - candidate file discovery and ancestor walks.
-//! 2. [`ConfigReadError`] - physical file I/O and TOML syntax deserialization.
-//! 3. [`ConfigTrustError`] - workspace/config-file trust and tracking-store
-//!    I/O.
-//! 4. [`ConfigValueError`] - domain semantic validation of parsed values.
-//!
-//! Composed by [`ConfigError`] into the result [`crate::cli::CliError`]
-//! reports.
+//! [`ConfigError`] composes [`ConfigDiscoveryError`], [`ConfigReadError`],
+//! [`ConfigTrustError`] and [`ConfigValueError`] for callers such as
+//! [`crate::cli::CliError`]. Each stage reports only its own failures.
 
 use std::{io, path::PathBuf};
 
@@ -24,151 +14,138 @@ use crate::{
     task::TaskError,
 };
 
-/// Unified error type for the entire configuration subsystem.
-///
-/// Composes errors across the four sequential pipeline stages. Matches
-/// workspace naming convention (`IndexError`, `QueryError`, `SchemaError`,
-/// `CliError`).
+/// Combines failures from the discovery, read, trust and value stages.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigError {
-    /// Discovery stage failure: candidate file discovery or ancestor traversal.
+    /// Reports a discovery-stage failure before reading a Config File.
     #[error(transparent)]
     Discovery(#[from] ConfigDiscoveryError),
-    /// Read stage failure: physical file reading or TOML syntax
-    /// deserialization.
+    /// Reports a read-stage failure in file I/O or TOML deserialization.
     #[error(transparent)]
     Read(#[from] ConfigReadError),
-    /// Trust stage failure: workspace or config-file trust verification, or
-    /// trust-store and tracking-store I/O.
+    /// Reports a trust-stage failure in Trust Verification or store I/O.
     #[error(transparent)]
     Trust(#[from] ConfigTrustError),
-    /// Value stage failure: semantic validation of parsed domain values.
+    /// Reports a value-stage failure in parsed configuration validation.
     #[error(transparent)]
     Value(#[from] ConfigValueError),
 }
 
-/// Convenience alias for discovery-stage operations.
+/// Names the result type for discovery-stage operations.
 pub(crate) type ConfigDiscoveryResult<T> =
     std::result::Result<T, ConfigDiscoveryError>;
 
-/// Discovery stage: errors raised while discovering candidate config files on
-/// disk.
+/// Reports failures while discovering candidate Config Files on disk.
 ///
-/// Discovery checks never emit TOML syntax, trust, or domain model errors.
+/// Discovery does not read TOML or perform Trust Verification.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigDiscoveryError {
-    /// No local `.traces/config.toml` was found in any ancestor directory.
+    /// Reports the absence of a local Config File in the ancestor walk.
     #[error("no local config found from {cwd}")]
     NotFound {
-        /// Working directory from which ancestor discovery originated.
+        /// Holds the directory where ancestor discovery began.
         cwd: PathBuf,
     },
-    /// A filesystem path could not be accessed during ancestor traversal.
+    /// Reports a filesystem inspection failure during discovery.
     #[error("failed to access path {path} during discovery")]
     Inaccessible {
-        /// Path that could not be accessed.
+        /// Holds the path that could not be inspected.
         path: PathBuf,
-        /// Underlying I/O failure.
+        /// Holds the underlying I/O failure.
         #[source]
         source: io::Error,
     },
 }
 
-/// Read stage: errors raised while reading file contents or deserializing TOML.
+/// Reports failures while reading or deserializing a Config File.
 ///
-/// In-memory buffer parsing never emits path discovery or trust errors.
+/// Parsing an in-memory buffer does not discover paths or verify trust.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigReadError {
-    /// The physical config file could not be read from disk.
+    /// Reports a failed Config File read from disk.
     #[error("failed to read config file {path}")]
     Io {
-        /// File that failed to read.
+        /// Holds the Config File that could not be read.
         path: PathBuf,
-        /// Underlying I/O failure.
+        /// Holds the underlying I/O failure.
         #[source]
         source: io::Error,
     },
-    /// The config file content contains invalid TOML syntax.
+    /// Reports a Config File with invalid TOML syntax.
     #[error("failed to parse TOML syntax in {path}")]
     Parse {
-        /// File containing invalid TOML.
+        /// Holds the Config File containing invalid TOML.
         path: PathBuf,
-        /// Underlying TOML deserialization error.
+        /// Holds the underlying TOML deserialization error.
         #[source]
         source: Box<toml::de::Error>,
     },
 }
 
-/// Trust stage: errors raised while verifying trust, or reading and writing the
-/// trust and tracking stores.
+/// Reports failures during Trust Verification and store operations.
 ///
-/// Governs cryptographic trust verification and the shared
-/// [`crate::FilePathTracker`] I/O that backs both the trust store and the
-/// tracked-config store.
+/// Uses [`crate::FilePathTracker`] for the Trust Store and Tracker Store.
 #[derive(Debug, Error)]
 pub enum ConfigTrustError {
-    /// Workspace root or config file trust verification halted, requiring user
-    /// action.
+    /// Reports a Trust Status that requires user action before loading.
     #[error(
         "config file {path} (workspace root {root}) is untrusted: {status}"
     )]
     Untrusted {
-        /// Untrusted workspace root.
+        /// Holds the workspace root requiring Trust Verification.
         root: PathBuf,
-        /// Untrusted config file path.
+        /// Holds the local Config File that could not be trusted.
         path: PathBuf,
-        /// Specific trust condition causing the halt.
+        /// Holds the Trust Status that stopped loading.
         status: ConfigTrustStatus,
     },
-    /// The underlying file path tracker operation failed.
+    /// Reports a failed Trust Store or Tracker Store operation.
     #[error(transparent)]
     Tracker(#[from] FilePathTrackerError),
-    /// Hashing a config file failed.
+    /// Reports a failed Config File read for Trust Verification.
     #[error(transparent)]
     Hash(#[from] HashError),
 }
 
-/// Value stage: errors raised while validating parsed domain model values.
+/// Reports failures while validating parsed configuration values.
 ///
-/// Pure in-memory construction; never emits I/O or trust errors.
+/// In-memory validation does not read files or perform Trust Verification.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigValueError {
-    /// A configured template or schema subdirectory escaped the workspace root
-    /// or violated strict path security invariants.
+    /// Reports a Template Directory or schema path that fails confinement.
     #[error("invalid config subdirectory path {path}")]
     InvalidSubDir {
-        /// Subdirectory path that failed validation.
+        /// Holds the subdirectory that failed validation.
         path: PathBuf,
-        /// Underlying path confinement failure.
+        /// Holds the underlying path confinement failure.
         #[source]
         source: crate::path::PathError,
     },
-    /// A `[frontmatter]` or `[schemas]` config table named an invalid field
-    /// key.
+    /// Reports an invalid field key in a `frontmatter` or `schemas` table.
     #[error("invalid `{table}` config")]
     InvalidFieldKey {
-        /// The TOML table that failed validation ("frontmatter" or "schemas").
+        /// Names the TOML table that failed validation.
         table: &'static str,
-        /// The underlying validation failure.
+        /// Holds the underlying field-name validation failure.
         #[source]
         source: FieldNameError,
     },
-    /// A `[tasks] tag_filters` entry failed [`crate::Tag`] validation.
+    /// Reports a `tasks` tag-filter entry rejected by [`crate::Tag`].
     #[error("invalid `tasks.tag_filters` entry {entry:?}")]
     InvalidTagFilter {
-        /// The offending entry, before `#`-normalization.
+        /// Holds the entry before `#` normalization.
         entry: String,
-        /// The underlying tag validation failure.
+        /// Holds the underlying tag validation failure.
         #[source]
         source: TagError,
     },
-    /// A `[tasks]` configuration failed validation.
+    /// Reports an invalid Task Configuration.
     #[error(transparent)]
     Task(#[from] TaskError),
 }
 
 impl ConfigValueError {
-    /// Builds an invalid field-key error for a named config table.
+    /// Builds an invalid field-key error for a named configuration table.
     pub(crate) fn invalid_field_key(
         table: &'static str,
         source: FieldNameError,

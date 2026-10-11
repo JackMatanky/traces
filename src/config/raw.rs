@@ -1,155 +1,152 @@
-//! Deserializes TOML config into serde types that deny unknown fields.
+//! Deserializes Config File TOML into strict serde types.
 //!
-//! Preserves TOML values exactly as configured. Path resolution and
-//! local-over-global precedence are applied later by the builder pipeline.
+//! [`RawConfig`] retains configured values before
+//! [`super::builder::ConfigBuilder`] applies Configuration Scope precedence and
+//! resolves paths.
 
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Raw configuration data deserialized from TOML.
+/// Holds Config File values before merging and path resolution.
 ///
-/// Shared by local and global layers before merge precedence or path
-/// resolution is applied.
+/// Local and global Config Files share these raw tables and reject unknown
+/// keys.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawConfig {
-    /// The `[templates]` table.
+    /// Holds the `[templates]` table.
     #[serde(default)]
     pub(crate) templates: RawTemplateConfig,
-    /// The `[schemas]` table.
+    /// Holds the `[schemas]` table.
     #[serde(default)]
     pub(crate) schemas: RawSchemasConfig,
-    /// The `[frontmatter]` table.
+    /// Holds the `[frontmatter]` table.
     #[serde(default)]
     pub(crate) frontmatter: RawFrontmatterConfig,
-    /// The `[tasks]` table.
+    /// Holds the `[tasks]` table for Task Configuration.
     #[serde(default)]
     pub(crate) tasks: RawTaskConfig,
 }
 
-/// Raw `[templates]` table exactly as written in TOML.
+/// Holds the unmerged `[templates]` table from a Config File.
 ///
-/// Fields skip serialization when `None` during config scaffolding
-/// serialization (e.g. `traces init`).
+/// Serialization omits absent fields when scaffolding a Config File.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTemplateConfig {
-    /// Template directory as configured, before joining against the config
-    /// file's root.
+    /// Names the Template Directory before resolution against its Config File
+    /// root.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) directory: Option<PathBuf>,
-    /// Output directory for rendered templates.
+    /// Names the rendered-template output directory.
     ///
-    /// Relative values stay relative; absent values fall back to the config
-    /// root.
+    /// [`super::builder::ConfigBuilder`] resolves relative values against the
+    /// project root and uses that root when this field is absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) output_dir: Option<PathBuf>,
 }
 
-/// Raw `[schemas]` table exactly as written in TOML.
+/// Holds the unmerged `[schemas]` table from a Config File.
 ///
-/// Fields skip serialization when `None` during config scaffolding
-/// serialization (e.g. `traces init`).
+/// Serialization omits absent fields when scaffolding a Config File.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchemasConfig {
-    /// Frontmatter key naming a Note's File Class(es), before the `class`
-    /// default is applied.
+    /// Names the frontmatter key for a Note's File Class(es), before applying
+    /// the `class` default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) class_field: Option<String>,
-    /// Schema registry directory, before the `.traces/schemas/` default is
-    /// applied.
+    /// Names the schema directory before applying the `.traces/schemas/`
+    /// default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) directory: Option<PathBuf>,
 }
 
-/// Raw `[frontmatter]` table exactly as written in TOML.
+/// Holds the unmerged `[frontmatter]` table from a Config File.
 ///
-/// Fields skip serialization when `None` during config scaffolding
-/// serialization (e.g. `traces init`).
+/// Serialization omits absent fields when scaffolding a Config File.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawFrontmatterConfig {
-    /// Frontmatter key holding a Note's display title.
+    /// Names the frontmatter key holding a Note's display title.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) title: Option<String>,
-    /// Frontmatter key holding a Note's aliases.
+    /// Names the frontmatter key holding a Note's aliases.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) aliases: Option<String>,
-    /// Frontmatter key holding a Note's tags.
+    /// Names the frontmatter key holding a Note's tags.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tags: Option<String>,
-    /// Frontmatter key and date format used for the creation timestamp.
+    /// Holds the creation timestamp's frontmatter key and date format.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) date_created: Option<RawDateFieldConfig>,
-    /// Frontmatter key and date format used for the modification timestamp.
+    /// Holds the modification timestamp's frontmatter key and date format.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) date_modified: Option<RawDateFieldConfig>,
 }
 
-/// A `{name, format}` pair naming a date-valued frontmatter key.
+/// Holds an optional frontmatter key and format for a date field.
 ///
-/// Both fields are optional; missing values are resolved to role-aware defaults
-/// by [`super::model::DateFieldConfig`]. Fields skip serialization when `None`
-/// during config scaffolding serialization (e.g. `traces init`).
+/// [`super::model::DateFieldConfig`] supplies role-specific defaults for
+/// missing values. Serialization omits absent fields when scaffolding a Config
+/// File.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDateFieldConfig {
-    /// Frontmatter key name, if configured.
+    /// Names the frontmatter date key when configured.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) name: Option<String>,
-    /// Date format string applied to the key's value, if configured.
+    /// Specifies the date format for the key's value when configured.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) format: Option<String>,
 }
 
-/// Raw `[tasks]` table exactly as written in TOML.
+/// Holds the unmerged `[tasks]` table for Task Configuration.
 ///
-/// Fields skip serialization when empty during config scaffolding
-/// serialization (e.g. `traces init`).
+/// Serialization omits empty fields when scaffolding a Config File.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTaskConfig {
-    /// Tags that classify a status-marked list item as a Task.
+    /// Lists tags that classify status-marked items as Tasks.
     ///
-    /// Entries may omit the leading `#`; config resolution normalizes each
-    /// entry before constructing a [`crate::Tag`]. Empty means no
-    /// filter is configured: every status-marked list item becomes a Task.
+    /// Entries may omit `#`; [`super::builder::ConfigBuilder`] normalizes them
+    /// before constructing a [`crate::Tag`]. An empty list falls back to
+    /// global filters, or accepts every status-marked item if none exist.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) tag_filters: Vec<String>,
-    /// Task statuses that augment or override defaults by marker symbol.
+    /// Lists task statuses that augment or override defaults by symbol.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) statuses: Vec<RawTaskStatus>,
 }
 
-/// Raw `[[tasks.statuses]]` entry exactly as written in TOML.
+/// Holds a `[[tasks.statuses]]` entry from a Config File.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTaskStatus {
-    /// Marker character inside `[<char>]`.
+    /// Identifies the status marker inside `[<char>]`.
     pub(crate) symbol: char,
-    /// Display name for the status.
+    /// Names the status for display.
     pub(crate) name: String,
-    /// Workflow classification for the status.
+    /// Classifies the status in the task workflow.
     pub(crate) kind: RawTaskStatusKind,
 }
 
-/// Raw workflow classification accepted by `[[tasks.statuses]]`.
+/// Classifies a task status in `[[tasks.statuses]]`.
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum RawTaskStatusKind {
-    /// Not yet started.
+    /// Marks work that has not started.
     Todo,
-    /// Actively being worked on.
+    /// Marks work in progress.
     InProgress,
-    /// Paused, waiting on something external.
+    /// Marks work paused for an external dependency.
     OnHold,
-    /// Finished.
+    /// Marks completed work.
     Done,
-    /// Abandoned.
+    /// Marks abandoned work.
     Cancelled,
-    /// A status-marked item that is not a Task.
+    /// Excludes a status-marked item from Task recognition.
     NonTask,
 }
 

@@ -1,23 +1,24 @@
-//! Best-effort store of local config files discovery has seen.
+//! Records Tracked Config Paths independently of Trust Verification.
 //!
-//! [`TrackerStore`] records which `.traces/config.toml` paths configuration
-//! loading has observed, independent of whether their workspace is trusted.
+//! [`TrackerStore`] records local Config Files seen during loading or trust
+//! grants. Loading treats recording as best effort; grants require success.
 
 use std::path::{Path, PathBuf};
 
 use super::error::ConfigTrustError;
 use crate::{CleanMode, FilePathTracker, dirs};
 
-/// Registry of local config files observed by config loading and trust
-/// grants: best-effort on load, required on grant. Kept separate from
-/// [`super::trust::TrustStore`]'s trust decisions.
+/// Stores Tracked Config Paths separately from [`super::trust::TrustStore`].
+///
+/// Loading records paths on a best-effort basis; trust grants require a
+/// successful record before they add a trusted root.
 #[derive(Clone, Debug)]
 pub(crate) struct TrackerStore {
     store: FilePathTracker,
 }
 
 impl TrackerStore {
-    /// Creates a store backed by the OS-correct tracked-config directory.
+    /// Creates a Tracker Store in the OS tracked-config directory.
     #[must_use]
     #[inline]
     pub(crate) fn new() -> Self {
@@ -26,7 +27,7 @@ impl TrackerStore {
         }
     }
 
-    /// Creates a store backed by an explicit root. Test-only.
+    /// Creates a Tracker Store at an explicit root for tests.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -36,24 +37,25 @@ impl TrackerStore {
         }
     }
 
-    /// Records a config file path.
+    /// Records a Tracked Config Path, failing if the store cannot persist it.
     ///
-    /// Use when failing to record must abort the caller, as when granting
-    /// trust. Config loading uses [`Self::record_best_effort`].
+    /// Trust grants use this method; configuration loading uses
+    /// [`Self::record_best_effort`].
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] if the path cannot be canonicalized or
-    ///   the store cannot be written.
+    /// - [`Tracker`] if the path cannot be canonicalized or the store cannot be
+    ///   written.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
     pub(crate) fn record(&self, path: &Path) -> Result<(), ConfigTrustError> {
         self.store.record(path).map_err(Into::into)
     }
 
-    /// Records a config file path seen during loading.
+    /// Records a Tracked Config Path without failing configuration loading.
     ///
-    /// Tracking is bookkeeping, so failures warn and do not fail config
-    /// loading.
+    /// Logs a warning if [`Self::record`] fails.
     #[inline]
     pub(crate) fn record_best_effort(&self, path: &Path) {
         if let Err(error) = self.record(path) {
@@ -65,21 +67,25 @@ impl TrackerStore {
         }
     }
 
-    /// Lists the canonical paths of all live tracked configs.
+    /// Lists the canonical paths of live Tracked Config Paths.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] if reading the tracking store fails.
+    /// - [`Tracker`] if the Tracker Store cannot be read.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
     pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
         self.store.list_all(&[]).map_err(Into::into)
     }
 
-    /// Removes dangling tracked-config entries, returning the count removed.
+    /// Removes dangling Tracked Config Paths and returns the number removed.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] if reading or cleaning the store fails.
+    /// - [`Tracker`] if the Tracker Store cannot be read or cleaned.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
     pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
         self.store.clean(CleanMode::EntriesOnly).map_err(Into::into)
@@ -95,8 +101,7 @@ mod tests {
     mod fixtures {
         use super::*;
 
-        /// Isolated tracker store plus project directories beneath one temp
-        /// dir.
+        /// Holds an isolated Tracker Store and project directories for tests.
         pub(super) struct Fixture {
             temp: tempfile::TempDir,
             pub(super) store: TrackerStore,
@@ -112,7 +117,7 @@ mod tests {
                 }
             }
 
-            /// Writes `<name>/.traces/config.toml` and returns its path.
+            /// Writes a local Config File and returns its path.
             pub(super) fn write_config(&self, name: &str) -> PathBuf {
                 let path =
                     self.temp.path().join(name).join(".traces/config.toml");

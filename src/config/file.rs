@@ -1,15 +1,13 @@
-//! Tracks config-file lifecycle states using typestate markers.
+//! Tracks Config File lifecycle states with typestate markers.
 //!
-//! [`ConfigFile`] pairs a config path with source and lifecycle markers so the
-//! loader expresses valid transitions in types.
+//! [`ConfigFile`] carries a path and source marker through discovery, Trust
+//! Verification, and parsing without permitting out-of-order transitions.
 //!
-//! # Lifecycle
+//! # Key Types
 //!
-//! - [`Discovered`] means a candidate path was found or derived; whether the
-//!   file exists is not checked until trust verification reads it.
-//! - [`Trusted`] carries local TOML content verified against a trust baseline
-//!   after the path was recorded in the best-effort tracker store.
-//! - [`Parsed`] carries TOML decoded into [`RawConfig`].
+//! [`LocalConfigFile`] and [`GlobalConfigFile`] distinguish Config File
+//! sources. [`Discovered`], [`Trusted`], and [`Parsed`] mark lifecycle states;
+//! [`Trusted`] retains the content checked against a Companion Hash.
 
 use std::{
     marker::PhantomData,
@@ -23,56 +21,58 @@ use super::{
     trust::{ConfigTrustCheck, TrustRequest, TrustStore},
 };
 
-/// Name of the local project config directory, relative to the project root.
+/// Names the local Config File directory relative to the project root.
 pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
 
-/// File name shared by local and global config files.
+/// Names the file shared by local and global Config Files.
 pub(super) const CONFIG_FILE_NAME: &str = "config.toml";
 
-/// Path of a local project config file, relative to the project root.
+/// Names the local Config File relative to the project root.
 ///
-/// Must equal [`LOCAL_CONFIG_DIR`] joined with [`CONFIG_FILE_NAME`]; a test
-/// pins that, since `concat!` cannot reference constants.
+/// Matches [`LOCAL_CONFIG_DIR`] joined with [`CONFIG_FILE_NAME`]; a test pins
+/// this invariant because `concat!` cannot reference constants.
 pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
 
-/// Source marker for a local project config file.
+/// Marks a Config File as local to a project.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct IsLocal;
 
-/// Source marker for a global user config file.
+/// Marks a Config File as global to the user.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct IsGlobal;
 
-/// A config file discovered on disk, before tracking or trust checks.
+/// Marks a discovered Config File without asserting that it exists.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Discovered;
 
-/// Local config content verified against a trust baseline.
+/// Holds local Config File content that passed Trust Verification.
 ///
-/// Carries the exact content read during trust checking. Parsing reuses this
-/// string so a second filesystem read cannot race the trusted content.
+/// Parsing reuses the checked content, avoiding a second read that could race
+/// with a change on disk.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Trusted {
     content: String,
 }
 
-/// Raw config data parsed from one validated config file.
+/// Holds [`RawConfig`] parsed from a Config File.
 #[derive(Clone, Debug)]
 pub(crate) struct Parsed {
     raw: Box<RawConfig>,
 }
 
 impl Parsed {
-    /// Parses `path`'s content directly from disk.
+    /// Reads and parses a global Config File from disk.
     ///
-    /// Used for global config, which has no trust gate and thus no risk of a
-    /// second, independent read racing the first.
+    /// Global files have no Trust Verification gate, so parsing reads them
+    /// directly.
     ///
     /// # Errors
     ///
-    /// - [`ConfigReadError::Io`] when `path` cannot be read.
-    /// - [`ConfigReadError::Parse`] when `path`'s content cannot be parsed as
-    ///   TOML.
+    /// - [`Io`] if the Config File cannot be read.
+    /// - [`Parse`] if its content cannot be parsed as TOML.
+    ///
+    /// [`Io`]: ConfigReadError::Io
+    /// [`Parse`]: ConfigReadError::Parse
     fn read(path: &Path) -> Result<Self, ConfigReadError> {
         let content = std::fs::read_to_string(path).map_err(|source| {
             ConfigReadError::Io {
@@ -83,15 +83,16 @@ impl Parsed {
         Self::from_content(path, &content)
     }
 
-    /// Parses already-read `content` for `path`.
+    /// Parses Config File content already read from disk.
     ///
-    /// `path` is used only for error context. Local config content was read
-    /// while verifying trust, so this avoids a second independent read through
-    /// [`Self::read`].
+    /// The path supplies error context; local Trust Verification provides the
+    /// content, so parsing never reads it again.
     ///
     /// # Errors
     ///
-    /// - [`ConfigReadError::Parse`] when `content` cannot be parsed as TOML.
+    /// - [`Parse`] if the content cannot be parsed as TOML.
+    ///
+    /// [`Parse`]: ConfigReadError::Parse
     fn from_content(
         path: &Path,
         content: &str,
@@ -108,15 +109,15 @@ impl Parsed {
     }
 }
 
-/// A local project config file.
+/// Identifies a project-local [`ConfigFile`].
 pub(crate) type LocalConfigFile<State> = ConfigFile<IsLocal, State>;
 
-/// A global user config file.
+/// Identifies a user-global [`ConfigFile`].
 pub(crate) type GlobalConfigFile<State> = ConfigFile<IsGlobal, State>;
 
-/// A config file tracked through its lifecycle via typestate markers.
+/// Carries a Config File through source-specific lifecycle states.
 ///
-/// `Source` distinguishes local from global files; `State` enforces valid
+/// `Source` distinguishes local from global files; `State` restricts valid
 /// transitions at compile time.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigFile<Source, State> {
@@ -127,17 +128,17 @@ pub(crate) struct ConfigFile<Source, State> {
 }
 
 impl<Source, State> ConfigFile<Source, State> {
-    /// Root directory used for path resolution.
+    /// Returns the root used to resolve this Config File's paths.
     ///
-    /// For a local config this is the project root; for a global config it is
-    /// the global config directory.
+    /// Local files use the project root; global files use the global Config
+    /// File directory.
     #[inline]
     #[must_use]
     pub(crate) fn root(&self) -> &Path {
         &self.root
     }
 
-    /// Filesystem path to the config file.
+    /// Returns the Config File's filesystem path.
     #[inline]
     #[must_use]
     pub(crate) fn path(&self) -> &Path {
@@ -153,7 +154,7 @@ impl<Source, State> ConfigFile<Source, State> {
         }
     }
 
-    /// Moves the config file into the next lifecycle state.
+    /// Moves the Config File into the next lifecycle state.
     fn transition_to<NextState>(
         self,
         next_state: NextState,
@@ -168,18 +169,17 @@ impl<Source, State> ConfigFile<Source, State> {
 }
 
 impl LocalConfigFile<Discovered> {
-    /// Creates the discovered local config file of the project at `root`.
+    /// Derives a local Config File path from the project root.
     ///
-    /// Pure path arithmetic: the file need not exist.
-    #[inline]
+    /// Path construction does not require the file to exist.
     pub(crate) fn at(root: &Path) -> Self {
         Self::new(root.to_path_buf(), root.join(LOCAL_CONFIG_FILE), Discovered)
     }
 
-    /// Recognizes a `.traces/config.toml` path and derives its project root
-    /// from the parent of the `.traces` directory.
+    /// Derives the project root from a local Config File path.
     ///
-    /// Returns `None` when `path` is not shaped like a local config file.
+    /// Returns `None` unless the path ends in `.traces/config.toml` and the
+    /// `.traces` directory has a parent.
     #[inline]
     pub(crate) fn from_config_path(path: &Path) -> Option<Self> {
         let traces_dir = path.parent()?;
@@ -192,20 +192,22 @@ impl LocalConfigFile<Discovered> {
         Some(Self::new(root.to_path_buf(), path.to_path_buf(), Discovered))
     }
 
-    /// Records this file in the tracker, then verifies it against the trust
-    /// baseline.
+    /// Records a Tracked Config Path and performs Trust Verification.
     ///
-    /// Recording is best-effort and happens first, so a refused config is still
-    /// tracked. Returns the file carrying the content that was verified, ready
-    /// to parse.
+    /// The Tracker Store records the path best-effort before verification, so
+    /// refused Config Files remain tracked. On success, the returned file
+    /// carries the verified content for parsing.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Untrusted`] when the workspace is not trusted, the
-    ///   baseline is missing, or the content is stale.
-    /// - [`ConfigTrustError::Tracker`] when the trust-store I/O fails.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be read for
-    ///   hashing.
+    /// - [`Untrusted`] if the Trust Status is untrusted, stale, or missing a
+    ///   Companion Hash.
+    /// - [`Tracker`] if the Trust Store cannot be read.
+    /// - [`Hash`] if the Config File cannot be read for hashing.
+    ///
+    /// [`Untrusted`]: ConfigTrustError::Untrusted
+    /// [`Tracker`]: ConfigTrustError::Tracker
+    /// [`Hash`]: ConfigTrustError::Hash
     #[inline]
     pub(crate) fn into_trusted(
         self,
@@ -233,7 +235,7 @@ impl LocalConfigFile<Discovered> {
 }
 
 impl GlobalConfigFile<Discovered> {
-    /// Creates a discovered global config file for `dir/config.toml`.
+    /// Derives a global Config File path from its directory.
     #[inline]
     pub(super) fn in_dir(dir: &Path) -> Self {
         Self::new(dir.to_path_buf(), dir.join(CONFIG_FILE_NAME), Discovered)
@@ -241,14 +243,20 @@ impl GlobalConfigFile<Discovered> {
 }
 
 impl<Source> ConfigFile<Source, Parsed> {
-    /// Parsed raw config data.
+    /// Returns parsed [`RawConfig`] from this Config File.
     #[inline]
     #[must_use]
     pub(super) fn raw(&self) -> &RawConfig {
         &self.state.raw
     }
 
-    /// Builds a parsed file from in-memory `content` without trust checks.
+    /// Parses in-memory Config File content for tests.
+    ///
+    /// # Errors
+    ///
+    /// - [`Parse`] if the test content cannot be parsed as TOML.
+    ///
+    /// [`Parse`]: ConfigReadError::Parse
     #[cfg(test)]
     pub(crate) fn from_content_for_test(
         root: PathBuf,
@@ -263,6 +271,13 @@ impl<Source> ConfigFile<Source, Parsed> {
 impl TryFrom<LocalConfigFile<Trusted>> for LocalConfigFile<Parsed> {
     type Error = ConfigReadError;
 
+    /// Parses content already verified for the local Config File.
+    ///
+    /// # Errors
+    ///
+    /// - [`Parse`] if the verified content cannot be parsed as TOML.
+    ///
+    /// [`Parse`]: ConfigReadError::Parse
     #[inline]
     fn try_from(file: LocalConfigFile<Trusted>) -> Result<Self, Self::Error> {
         let parsed = Parsed::from_content(file.path(), &file.state.content)?;
@@ -273,6 +288,15 @@ impl TryFrom<LocalConfigFile<Trusted>> for LocalConfigFile<Parsed> {
 impl TryFrom<GlobalConfigFile<Discovered>> for GlobalConfigFile<Parsed> {
     type Error = ConfigReadError;
 
+    /// Reads and parses the discovered global Config File.
+    ///
+    /// # Errors
+    ///
+    /// - [`Io`] if the Config File cannot be read.
+    /// - [`Parse`] if its content cannot be parsed as TOML.
+    ///
+    /// [`Io`]: ConfigReadError::Io
+    /// [`Parse`]: ConfigReadError::Parse
     #[inline]
     fn try_from(
         file: GlobalConfigFile<Discovered>,
@@ -283,6 +307,7 @@ impl TryFrom<GlobalConfigFile<Discovered>> for GlobalConfigFile<Parsed> {
 }
 
 impl From<&LocalConfigFile<Discovered>> for TrustRequest {
+    /// Creates a [`TrustRequest`] for a discovered local Config File.
     #[inline]
     fn from(file: &LocalConfigFile<Discovered>) -> Self {
         Self::Config {

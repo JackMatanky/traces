@@ -1,14 +1,16 @@
-//! Resolved configuration model produced by the builder pipeline.
+//! Holds resolved configuration values after loading and validation.
 //!
-//! # Types
+//! Consumers read merged values through [`Config`]. Separate local and global
+//! template directories preserve lookup precedence.
 //!
-//! - [`Config`] merges local and global settings into read-only resolved
-//!   values.
-//! - [`TemplateConfig`] preserves local and global template directories.
-//! - [`SchemasConfig`] resolves the `[schemas]` class field and registry path.
-//! - [`FrontmatterConfig`] resolves `[frontmatter]` key names.
-//! - [`DateFieldConfig`] pairs a date frontmatter key with its format.
-//! - [`TaskConfig`] resolves `[tasks]` task statuses and tag filters.
+//! # Key Types
+//!
+//! - [`Config`]: resolved values and the workspace root.
+//! - [`TemplateConfig`]: local and global Template Directories.
+//! - [`SchemasConfig`]: schema registry and class field.
+//! - [`FrontmatterConfig`]: canonical metadata key names.
+//! - [`DateFieldConfig`]: date field name and format.
+//! - [`TaskConfig`]: Task Configuration statuses and tag filters.
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -28,32 +30,32 @@ use crate::{
     path::{PathError, RelativePath, SafeRelativePath},
 };
 
-/// Default local schemas directory when unconfigured.
+/// Names the default local schemas directory.
 pub(super) const DEFAULT_LOCAL_SCHEMAS_DIR: &str = ".traces/schemas/";
 
-/// Default `[templates] directory` for the local layer when unconfigured.
+/// Names the default local Template Directory.
 pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
 
-/// Default `[schemas] class_field` when unconfigured.
+/// Names the default schema class field.
 pub(super) const DEFAULT_CLASS_FIELD: &str = "class";
 
-/// Default `[frontmatter] title` key when unconfigured.
+/// Names the default title field.
 const DEFAULT_TITLE_FIELD: &str = "title";
 
-/// Default `[frontmatter] aliases` key when unconfigured.
+/// Names the default aliases field.
 const DEFAULT_ALIASES_FIELD: &str = "aliases";
 
-/// Default `[frontmatter] tags` key when unconfigured.
+/// Names the default tags field.
 const DEFAULT_TAGS_FIELD: &str = "tags";
 
-/// Default `[frontmatter] date_created.name` key when unconfigured.
+/// Names the default creation date field.
 const DEFAULT_DATE_CREATED_FIELD: &str = "date_created";
 
-/// Default `[frontmatter] date_modified.name` key when unconfigured.
+/// Names the default modification date field.
 const DEFAULT_DATE_MODIFIED_FIELD: &str = "date_modified";
 
-/// Resolved config ready for consumers after discovery, trust checks, and
-/// merging.
+/// Holds resolved Config File values after the discovery, read, trust and value
+/// stages.
 #[derive(Clone, Debug)]
 pub struct Config {
     root: Arc<Path>,
@@ -64,7 +66,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Creates a resolved config from builder-owned parts.
+    /// Assembles resolved values from builder-owned parts.
     #[inline]
     #[must_use]
     pub(super) fn new(
@@ -83,83 +85,77 @@ impl Config {
         }
     }
 
-    /// Returns the project root directory used as the local resolution base.
-    ///
-    /// Relative template and output paths are resolved against this root.
+    /// Returns the workspace root used to resolve relative local paths.
     #[inline]
     #[must_use]
     pub fn root(&self) -> &Path {
         &self.root
     }
 
-    /// Returns the local template directory, if configured.
+    /// Returns the local Template Directory, if configured.
     #[inline]
     #[must_use]
     pub fn local_template_dir(&self) -> Option<&Path> {
         self.templates.local()
     }
 
-    /// Returns the global template directory, if configured.
+    /// Returns the global Template Directory, if configured.
     #[inline]
     #[must_use]
     pub fn global_template_dir(&self) -> Option<&Path> {
         self.templates.global()
     }
 
-    /// Returns the resolved output directory, or [`root`] when no output
-    /// directory was configured.
+    /// Returns the resolved output directory, defaulting to [`Self::root`].
     ///
-    /// Relative configured paths are resolved against [`root`]; absolute paths
-    /// are preserved.
-    ///
-    /// [`root`]: Self::root
+    /// Resolves relative configured paths against the workspace root and
+    /// preserves absolute paths.
     #[inline]
     #[must_use]
     pub fn output_dir(&self) -> &Path {
         self.templates.output()
     }
 
-    /// Returns the resolved `[schemas]` settings.
+    /// Returns the resolved `SchemasConfig`.
     #[inline]
     #[must_use]
     pub const fn schemas(&self) -> &SchemasConfig {
         &self.schemas
     }
 
-    /// Returns the resolved `[frontmatter]` settings.
+    /// Returns the resolved `FrontmatterConfig`.
     #[inline]
     #[must_use]
     pub const fn frontmatter(&self) -> &FrontmatterConfig {
         &self.frontmatter
     }
 
-    /// Returns the resolved `[tasks]` settings.
+    /// Returns the resolved [`TaskConfig`].
     #[inline]
     #[must_use]
     pub const fn tasks(&self) -> &TaskConfig {
         &self.tasks
     }
 
-    /// Returns the project root as a cheaply shareable `'static` path, for
-    /// consumers (minijinja namespace objects) that cannot borrow `&Config`.
+    /// Shares the workspace root with consumers that cannot borrow [`Config`].
     #[inline]
     #[must_use]
     pub(crate) fn root_arc(&self) -> Arc<Path> {
         Arc::clone(&self.root)
     }
 
-    /// Returns the `[schemas] class_field` name as a cheaply shareable
-    /// `'static` string, for consumers that cannot borrow `&Config`.
+    /// Shares the schema class field with consumers that cannot borrow
+    /// [`Config`].
     #[inline]
     #[must_use]
     pub(crate) fn class_field_arc(&self) -> Arc<str> {
         Arc::from(self.schemas().class_field_name())
     }
 
-    /// Builds config directly for tests that do not exercise discovery.
+    /// Builds a resolved configuration without Config File discovery for tests.
     ///
-    /// Prefer [`super::service::ConfigService::at`] and TOML fixtures for
-    /// integration-style tests that need the real loading pipeline.
+    /// Use [`super::service::ConfigService::at`] with TOML fixtures to test the
+    /// real loading pipeline.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -180,7 +176,7 @@ impl Config {
         }
     }
 
-    /// Builds config with default paths rooted at `root` for tests.
+    /// Builds a test configuration with default paths under `root`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -198,7 +194,7 @@ impl Config {
         }
     }
 
-    /// Configures templates rooted at `root/templates` for tests.
+    /// Sets the local Template Directory to `root/templates` for tests.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -211,8 +207,7 @@ impl Config {
         self
     }
 
-    /// Overrides the `[frontmatter]` resolution on a test-built config, for
-    /// tests that exercise non-default label resolution.
+    /// Overrides canonical metadata key names in a test configuration.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -221,7 +216,7 @@ impl Config {
         self
     }
 
-    /// Overrides the `[tasks]` resolution on a test-built config.
+    /// Overrides Task Configuration in a test configuration.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -230,7 +225,7 @@ impl Config {
         self
     }
 
-    /// Overrides the `[schemas]` resolution on a test-built config.
+    /// Overrides schema settings in a test configuration.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -239,19 +234,13 @@ impl Config {
         self
     }
 
-    /// Computes a deterministic fingerprint over every resolved config value.
+    /// Computes a deterministic Config Fingerprint over every resolved value.
     ///
-    /// Hashes an injective encoding of every field this `Config` carries: each
-    /// variable-length value is length-prefixed, paths are hashed as raw OS
-    /// bytes, and optional paths carry a presence tag. Two configs therefore
-    /// share a digest only when every field is equal. The digest is stable
-    /// across process restarts, since [`Blake3Digest`] is a fixed BLAKE3
-    /// digest rather than a process-randomized hash. Task statuses are hashed
-    /// in symbol order, but tag filters in configured order, so reordering the
-    /// filters changes the digest. Intended for future index cache
-    /// invalidation: a persisted fingerprint lets a consumer detect
-    /// configuration drift without re-reading config files or diffing their
-    /// parsed representation.
+    /// Length-prefixes variable-length fields, hashes paths as raw OS bytes,
+    /// and tags optional paths for an unambiguous encoding. Hashes task
+    /// statuses in symbol order and tag filters in configured order, so
+    /// reordering filters changes the [`Blake3Digest`]. Persisted fingerprints
+    /// support index cache invalidation across process restarts.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -280,10 +269,9 @@ impl Config {
     }
 }
 
-/// Template directories and output path from merged config.
+/// Holds local and global Template Directories and the output directory.
 ///
-/// Local and global directories are kept separate so template lookup preserves
-/// local-first precedence without re-reading config files.
+/// Keeps local and global directories separate for local-first lookup.
 #[derive(Clone, Debug)]
 pub(super) struct TemplateConfig {
     local: Option<PathBuf>,
@@ -292,7 +280,7 @@ pub(super) struct TemplateConfig {
 }
 
 impl TemplateConfig {
-    /// Creates a template config from builder-owned parts.
+    /// Assembles resolved template directories and the output directory.
     #[inline]
     #[must_use]
     pub(super) const fn new(
@@ -307,29 +295,30 @@ impl TemplateConfig {
         }
     }
 
-    /// Returns the local project template directory, if set.
+    /// Returns the local Template Directory, if present.
     #[inline]
     #[must_use]
     pub(super) fn local(&self) -> Option<&Path> {
         self.local.as_deref()
     }
 
-    /// Returns the global template directory, if set.
+    /// Returns the global Template Directory, if present.
     #[inline]
     #[must_use]
     pub(super) fn global(&self) -> Option<&Path> {
         self.global.as_deref()
     }
 
-    /// Returns the configured output directory, or the config root when absent.
+    /// Returns the resolved output directory.
     #[inline]
     #[must_use]
     pub(super) fn output(&self) -> &Path {
         &self.output
     }
 
-    /// Feeds every field to `fp`. Destructures `Self` so a new field cannot be
-    /// left out of the fingerprint.
+    /// Feeds every field into the Config Fingerprint.
+    ///
+    /// Destructuring all fields forces new fields into this encoding.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
             local,
@@ -342,8 +331,7 @@ impl TemplateConfig {
     }
 }
 
-/// Schema settings providing the class field name and registry directory for
-/// template lookup.
+/// Holds the schema registry directory and class field name.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SchemasConfig {
     directory: PathBuf,
@@ -351,10 +339,10 @@ pub struct SchemasConfig {
 }
 
 impl SchemasConfig {
-    /// Creates schemas config from already-validated, resolved parts.
+    /// Assembles validated schema settings from resolved values.
     ///
-    /// `directory` must already be resolved against the originating config
-    /// layer's root; this constructor performs no further validation.
+    /// Requires `directory` to have been resolved against its Configuration
+    /// Scope root; this constructor performs no further validation.
     #[inline]
     #[must_use]
     pub(super) const fn new(
@@ -367,8 +355,9 @@ impl SchemasConfig {
         }
     }
 
-    /// Feeds every field to `fp`. Destructures `Self` so a new field cannot be
-    /// left out of the fingerprint.
+    /// Feeds every field into the Config Fingerprint.
+    ///
+    /// Destructuring all fields forces new fields into this encoding.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
             directory,
@@ -378,7 +367,7 @@ impl SchemasConfig {
         fp.path(directory);
     }
 
-    /// Returns the frontmatter key naming a Note's File Class(es).
+    /// Returns the frontmatter key for a note's file class.
     ///
     /// Defaults to `class` when unconfigured.
     #[inline]
@@ -389,19 +378,17 @@ impl SchemasConfig {
 
     /// Returns the schema registry directory.
     ///
-    /// Values produced by config loading are resolved against the root of the
-    /// layer that supplied a configured directory. When no layer configures a
-    /// directory, the default is resolved against the local project root.
-    /// `SchemasConfig::default()` keeps `.traces/schemas/` relative because it
-    /// has no config root.
+    /// Config File loading resolves a configured directory against its
+    /// Configuration Scope root, or the workspace root when unconfigured.
+    /// [`SchemasConfig::default`] retains a relative directory because it has
+    /// no workspace root.
     #[inline]
     #[must_use]
     pub fn directory(&self) -> &Path {
         &self.directory
     }
 
-    /// Builds schemas config directly for tests that do not exercise TOML
-    /// loading; `class_field` must pass field-name validation.
+    /// Builds test schema settings with a validated class field.
     ///
     /// # Panics
     ///
@@ -421,9 +408,7 @@ impl SchemasConfig {
         }
     }
 
-    /// Builds default schemas config with the directory resolved against
-    /// `root`, for test helpers that have a real project root to anchor against
-    /// (e.g. [`Config::test_default`]/[`Config::for_test`]).
+    /// Resolves the default schema directory against `root` for tests.
     #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     pub(super) fn default_for_root(root: &Path) -> Self {
@@ -435,10 +420,11 @@ impl SchemasConfig {
 }
 
 impl Default for SchemasConfig {
+    /// Builds schema defaults from the hardcoded class field.
+    ///
     /// # Panics
     ///
-    /// Never in practice: [`DEFAULT_CLASS_FIELD`] is a hardcoded, always-valid
-    /// field key.
+    /// Panics if [`DEFAULT_CLASS_FIELD`] stops being a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -455,8 +441,7 @@ impl Default for SchemasConfig {
     }
 }
 
-/// Resolved `[frontmatter]` settings mapping key names for title, aliases,
-/// tags, and date roles.
+/// Holds canonical metadata key names and date formats from `[frontmatter]`.
 #[derive(Clone, Debug)]
 pub struct FrontmatterConfig {
     title: FieldName,
@@ -467,48 +452,47 @@ pub struct FrontmatterConfig {
 }
 
 impl FrontmatterConfig {
-    /// Returns the frontmatter key holding a Note's display title.
+    /// Returns the frontmatter key for a note's display title.
     #[inline]
     #[must_use]
     pub fn title_name(&self) -> &str {
         self.title.as_str()
     }
 
-    /// Returns the frontmatter key holding a Note's aliases.
+    /// Returns the frontmatter key for a note's aliases.
     #[inline]
     #[must_use]
     pub fn aliases_name(&self) -> &str {
         self.aliases.as_str()
     }
 
-    /// Returns the frontmatter key holding a Note's tags.
+    /// Returns the frontmatter key for a note's tags.
     #[inline]
     #[must_use]
     pub fn tags_name(&self) -> &str {
         self.tags.as_str()
     }
 
-    /// Returns the creation-timestamp frontmatter key and date format.
+    /// Returns the creation date field name and format.
     #[inline]
     #[must_use]
     pub const fn date_created(&self) -> &DateFieldConfig {
         &self.date_created
     }
 
-    /// Returns the modification-timestamp frontmatter key and date format.
+    /// Returns the modification date field name and format.
     #[inline]
     #[must_use]
     pub const fn date_modified(&self) -> &DateFieldConfig {
         &self.date_modified
     }
 
-    /// Builds a frontmatter config with custom title/aliases keys for tests
-    /// that exercise non-default label resolution.
+    /// Builds test metadata settings with custom title and aliases keys.
     ///
     /// # Panics
     ///
-    /// If `title` or `aliases` fails `FieldName` validation (empty or
-    /// whitespace-only): a test-fixture bug, not a runtime error path.
+    /// Panics if `title` or `aliases` is empty, whitespace-only, or contains
+    /// `/`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -530,13 +514,11 @@ impl FrontmatterConfig {
         }
     }
 
-    /// Overrides the tags key on a test-built frontmatter config, for tests
-    /// that exercise non-default tags-key resolution.
+    /// Overrides the tags key in test metadata settings.
     ///
     /// # Panics
     ///
-    /// If `tags` fails `FieldName` validation (empty or whitespace-only): a
-    /// test-fixture bug, not a runtime error path.
+    /// Panics if `tags` is empty, whitespace-only, or contains `/`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -551,8 +533,9 @@ impl FrontmatterConfig {
         self
     }
 
-    /// Feeds every field to `fp`. Destructures `Self` so a new field cannot be
-    /// left out of the fingerprint.
+    /// Feeds every field into the Config Fingerprint.
+    ///
+    /// Destructuring all fields forces new fields into this encoding.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
             title,
@@ -570,10 +553,13 @@ impl FrontmatterConfig {
 }
 
 impl Default for FrontmatterConfig {
+    /// Builds canonical metadata defaults from hardcoded field names.
+    ///
     /// # Panics
     ///
-    /// Never in practice: [`DEFAULT_TITLE_FIELD`]/[`DEFAULT_ALIASES_FIELD`]/
-    /// [`DEFAULT_TAGS_FIELD`] are hardcoded, always-valid field keys.
+    /// Panics if [`DEFAULT_TITLE_FIELD`], [`DEFAULT_ALIASES_FIELD`],
+    /// [`DEFAULT_TAGS_FIELD`], [`DEFAULT_DATE_CREATED_FIELD`], or
+    /// [`DEFAULT_DATE_MODIFIED_FIELD`] stops being a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -603,10 +589,14 @@ impl Default for FrontmatterConfig {
 impl TryFrom<RawFrontmatterConfig> for FrontmatterConfig {
     type Error = ConfigValueError;
 
+    /// Resolves canonical metadata fields from raw Config File values.
+    ///
     /// # Errors
     ///
-    /// - [`ConfigValueError::InvalidFieldKey`] if `title`, `aliases`, or `tags`
-    ///   fails field name validation.
+    /// - [`InvalidFieldKey`] if a configured title, aliases, tags, creation
+    ///   date, or modification date key is empty or contains `/`.
+    ///
+    /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
     #[inline]
     fn try_from(raw: RawFrontmatterConfig) -> Result<Self, Self::Error> {
         let invalid_key =
@@ -638,8 +628,7 @@ impl TryFrom<RawFrontmatterConfig> for FrontmatterConfig {
     }
 }
 
-/// Resolved `[tasks]` settings: the task status lookup map and the tag filters
-/// that classify status-marked list items as Tasks.
+/// Holds task status mappings and tag filters from Task Configuration.
 #[derive(Clone, Debug)]
 pub struct TaskConfig {
     statuses: TaskStatusMap,
@@ -647,11 +636,7 @@ pub struct TaskConfig {
 }
 
 impl TaskConfig {
-    /// Returns the resolved task status lookup map.
-    ///
-    /// `pub(crate)`, not part of `Config`'s public accessor surface: the lookup
-    /// table is parser-internal plumbing, unlike [`Self::tag_filters`] which is
-    /// a genuine resolved-setting read.
+    /// Returns the task status lookup map used by the parser.
     #[inline]
     #[must_use]
     pub(crate) const fn statuses(&self) -> &TaskStatusMap {
@@ -660,15 +645,14 @@ impl TaskConfig {
 
     /// Returns the configured task tag filters.
     ///
-    /// Empty means no filter is configured: every status-marked list item
-    /// becomes a Task.
+    /// An empty list accepts every status-marked list item as a task.
     #[inline]
     #[must_use]
     pub fn tag_filters(&self) -> &[Tag] {
         &self.tag_filters
     }
 
-    /// Builds a task config with custom tag filters for tests.
+    /// Builds test Task Configuration with custom tag filters.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -679,13 +663,11 @@ impl TaskConfig {
         }
     }
 
-    /// Builds a task config with tag filters parsed from string slices for
-    /// tests.
+    /// Parses tag filters from string slices for test Task Configuration.
     ///
     /// # Panics
     ///
-    /// - Panics if a tag does not parse. Fixture-only code: a panic here means
-    ///   the test's fixture data is wrong.
+    /// Panics if any tag does not parse as a [`Tag`].
     #[cfg(any(test, feature = "test-utils"))]
     #[expect(
         clippy::expect_used,
@@ -700,8 +682,10 @@ impl TaskConfig {
         Self::for_test(tag_filters)
     }
 
-    /// Feeds statuses (in symbol order) and tag filters (in configured order)
-    /// to `fp`. Destructures `Self` so a new field cannot be left out.
+    /// Feeds statuses and tag filters into the Config Fingerprint.
+    ///
+    /// Hashes statuses in symbol order and filters in configured order.
+    /// Destructuring all fields forces new fields into this encoding.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
             statuses,
@@ -738,12 +722,14 @@ impl Default for TaskConfig {
 impl TryFrom<RawTaskConfig> for TaskConfig {
     type Error = ConfigValueError;
 
+    /// Resolves task statuses and tag filters from raw Config File values.
+    ///
     /// # Errors
     ///
-    /// - `ConfigValueError::Task` if a configured task status uses a prohibited
-    ///   delimiter symbol: `(`, `)`, `[`, `]`, `{`, or `}`.
-    /// - `ConfigValueError::InvalidTagFilter` when a `tag_filters` entry does
-    ///   not normalize into a valid [`Tag`].
+    /// - `ConfigValueError::Task` if a status symbol is `(`, `)`, `[`, `]`,
+    ///   `{`, or `}`.
+    /// - `ConfigValueError::InvalidTagFilter` if a tag filter cannot form a
+    ///   valid [`Tag`].
     #[inline]
     fn try_from(raw: RawTaskConfig) -> Result<Self, Self::Error> {
         let mut statuses = TaskStatusMap::default();
@@ -787,14 +773,10 @@ impl From<RawTaskStatusKind> for TaskStatusType {
     }
 }
 
-/// Resolved `[schemas]` settings providing the class field name and registry
-/// directory for template lookup.
+/// Holds a nonempty, lexically safe workspace-relative subdirectory.
 ///
-/// A safe, root-relative subdirectory path configured in TOML (e.g. `[schemas]
-/// directory`).
-///
-/// Guaranteed to be relative, contain only normal components (no `..`), and be
-/// non-empty.
+/// Rejects absolute paths, parent components, and paths with no named component
+/// before any filesystem checks.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigSubDir(RelativePath);
 
@@ -806,13 +788,14 @@ impl ConfigSubDir {
         self.0.as_ref()
     }
 
-    /// Resolves this subdirectory against `root`, guaranteeing the resolved
-    /// path stays within `root`.
+    /// Resolves this subdirectory within `root`.
     ///
     /// # Errors
     ///
-    /// - [`ConfigValueError::InvalidSubDir`] if the resolved path escapes
-    ///   `root` or fails verification.
+    /// - [`InvalidSubDir`] if the path escapes `root` or filesystem
+    ///   verification fails.
+    ///
+    /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve_against(
         &self,
         root: &Path,
@@ -825,12 +808,14 @@ impl ConfigSubDir {
             })
     }
 
-    /// Validates the configured `dir` and resolves it against `root`.
+    /// Validates `dir` and resolves it within `root`.
     ///
     /// # Errors
     ///
-    /// - [`ConfigValueError::InvalidSubDir`] if `dir` is absolute, contains
-    ///   `..`, or resolves outside `root`.
+    /// - [`InvalidSubDir`] if `dir` is lexically unsafe, escapes `root`, or
+    ///   fails filesystem verification.
+    ///
+    /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve(
         dir: &Path,
         root: &Path,
@@ -843,13 +828,15 @@ impl ConfigSubDir {
             .resolve_against(root)
     }
 
-    /// Validates a configured subdirectory, falling back to `default_rel` when
-    /// unconfigured.
+    /// Parses a configured subdirectory or its relative default.
     ///
     /// # Errors
     ///
-    /// - [`PathError`] if the raw or default value is not a valid safe relative
-    ///   path.
+    /// - [`Absolute`] if the selected path is absolute.
+    /// - [`UnsafeComponent`] if it has `..` or no named component.
+    ///
+    /// [`Absolute`]: PathError::Absolute
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
     pub(super) fn from_raw_or_default(
         raw: Option<PathBuf>,
         default_rel: &'static str,
@@ -864,6 +851,15 @@ impl ConfigSubDir {
 impl TryFrom<PathBuf> for ConfigSubDir {
     type Error = PathError;
 
+    /// Parses an owned, lexically safe relative subdirectory.
+    ///
+    /// # Errors
+    ///
+    /// - [`Absolute`] if `path` is absolute.
+    /// - [`UnsafeComponent`] if `path` has `..` or no named component.
+    ///
+    /// [`Absolute`]: PathError::Absolute
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
     #[inline]
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
         RelativePath::parse(&path).map(Self)
@@ -873,13 +869,22 @@ impl TryFrom<PathBuf> for ConfigSubDir {
 impl TryFrom<&str> for ConfigSubDir {
     type Error = PathError;
 
+    /// Parses a borrowed, lexically safe relative subdirectory.
+    ///
+    /// # Errors
+    ///
+    /// - [`Absolute`] if `s` is absolute.
+    /// - [`UnsafeComponent`] if `s` has `..` or no named component.
+    ///
+    /// [`Absolute`]: PathError::Absolute
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
     #[inline]
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         RelativePath::parse(Path::new(s)).map(Self)
     }
 }
 
-/// A frontmatter key name and its date format string.
+/// Holds a frontmatter date key and its format string.
 #[derive(Clone, Debug)]
 pub struct DateFieldConfig {
     name: FieldName,
@@ -887,27 +892,26 @@ pub struct DateFieldConfig {
 }
 
 impl DateFieldConfig {
-    /// Returns the frontmatter key name.
+    /// Returns the frontmatter date key name.
     #[inline]
     #[must_use]
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
-    /// Returns the date format string applied to the key's value.
+    /// Returns the date format used for this field's value.
     #[inline]
     #[must_use]
     pub fn format(&self) -> &str {
         &self.format
     }
 
-    /// Builds a default date field config for `name` using the shared default
-    /// date format.
+    /// Builds a date field from a hardcoded role name and default format.
     ///
     /// # Panics
     ///
-    /// Never in practice: callers only pass hardcoded, always-valid role-name
-    /// constants (`DEFAULT_DATE_CREATED_FIELD`/`DEFAULT_DATE_MODIFIED_FIELD`).
+    /// Panics if `name` is not a valid field key; callers pass only
+    /// [`DEFAULT_DATE_CREATED_FIELD`] or [`DEFAULT_DATE_MODIFIED_FIELD`].
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -923,12 +927,19 @@ impl DateFieldConfig {
         }
     }
 
-    /// Resolves a raw date-role table into a concrete config, filling missing
-    /// `name`/`format` from role-aware defaults.
+    /// Resolves a date field from raw values or role-specific defaults.
     ///
     /// # Errors
     ///
-    /// - [`FieldNameError`] if a configured `raw.name` fails validation.
+    /// - [`Empty`] if the configured name is empty or whitespace-only.
+    /// - [`ContainsSlash`] if the configured name contains `/`.
+    ///
+    /// [`Empty`]: FieldNameError::Empty
+    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    ///
+    /// # Panics
+    ///
+    /// Panics if `default_name` is invalid when `raw` is absent.
     #[inline]
     fn from_raw_or_default(
         raw: Option<RawDateFieldConfig>,
@@ -947,8 +958,9 @@ impl DateFieldConfig {
         })
     }
 
-    /// Feeds both fields to `fp`. Destructures `Self` so a new field cannot be
-    /// left out of the fingerprint.
+    /// Feeds both fields into the Config Fingerprint.
+    ///
+    /// Destructuring both fields forces new fields into this encoding.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
             name,
@@ -1003,8 +1015,8 @@ mod tests {
 
         #[test]
         fn matches_the_pinned_digest_for_a_fixed_config() {
-            // Persisted fingerprints must survive releases: a change to the
-            // encoding, field order, or `TaskStatusType::as_str` fails here.
+            // Persisted Config Fingerprints must survive releases; this pins
+            // the encoding and field order.
             let digest = base().hash().to_hex();
 
             assert_eq!(

@@ -1,10 +1,8 @@
-//! Merges local and global layers into one resolved [`Config`].
+//! Resolves local and global Config Files into one [`Config`].
 //!
-//! [`ConfigBuilder`] applies local-over-global precedence field by field,
-//! resolving relative paths (such as template directories) against each layer's
-//! own config file root before the local and global layers are merged, so a
-//! global config's relative paths never resolve against the local project root
-//! by mistake.
+//! [`ConfigBuilder`] applies Configuration Scope precedence field by field.
+//! It resolves each Template Directory against its own Config File root before
+//! merging values, so a global directory never uses the local project root.
 
 use std::path::PathBuf;
 
@@ -20,11 +18,10 @@ use super::{
 };
 use crate::FieldName;
 
-/// Merges local and optional global config files into a resolved [`Config`].
+/// Merges local and optional global Config Files into a resolved [`Config`].
 ///
-/// Applies local-over-global precedence for unconfigured fields, resolves
-/// template directories against their respective config file roots, and
-/// validates domain model invariants.
+/// Applies Configuration Scope precedence to unset values, resolves each
+/// Template Directory against its Config File root, and validates values.
 pub(crate) struct ConfigBuilder {
     root: PathBuf,
     local: LocalConfigFile<Parsed>,
@@ -32,8 +29,7 @@ pub(crate) struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    /// Creates a new builder for `root` with the local and global layers
-    /// (`local`, optional `global`).
+    /// Creates a builder for the project root and its Config Files.
     #[inline]
     #[must_use]
     pub(crate) fn new(
@@ -48,18 +44,21 @@ impl ConfigBuilder {
         }
     }
 
-    /// Merges local and global layers and builds the resolved [`Config`].
+    /// Builds the resolved [`Config`] using Configuration Scope precedence.
     ///
     /// # Errors
     ///
-    /// - [`ConfigValueError::InvalidSubDir`] when a configured template or
-    ///   schema directory escapes the workspace root.
-    /// - [`ConfigValueError::InvalidFieldKey`] when a `[frontmatter]` or
-    ///   `[schemas]` key name is invalid.
-    /// - [`ConfigValueError::InvalidTagFilter`] when a `[tasks] tag_filters`
-    ///   entry is not a valid tag.
-    /// - [`ConfigValueError::Task`] when a `[tasks]` status uses a prohibited
-    ///   delimiter symbol.
+    /// - [`InvalidSubDir`] if a Template Directory or schema directory is
+    ///   invalid or escapes its root.
+    /// - [`InvalidFieldKey`] if a `[frontmatter]` or `[schemas]` key is
+    ///   invalid.
+    /// - [`InvalidTagFilter`] if a `[tasks] tag_filters` entry is invalid.
+    /// - [`Task`] if a configured task status symbol is invalid.
+    ///
+    /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
+    /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
+    /// [`InvalidTagFilter`]: ConfigValueError::InvalidTagFilter
+    /// [`Task`]: ConfigValueError::Task
     pub(crate) fn build(self) -> Result<Config, ConfigValueError> {
         Ok(Config::new(
             self.resolve_templates()?,
@@ -242,7 +241,7 @@ mod tests {
         mod fixtures {
             use super::*;
 
-            /// Creates an existing directory for path-confined config
+            /// Creates an existing directory for path-confined Config File
             /// resolution.
             pub(super) fn temp_root(
                 temp: &tempfile::TempDir,

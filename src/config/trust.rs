@@ -1,12 +1,10 @@
-//! Trust request targets, trust status models, and the persistent trust store.
+//! Models trust requests and Trust Status, and persists Trust Verification.
 //!
-//! # Types
+//! # Key Types
 //!
-//! - [`TrustRequest`] names either a workspace root or one local config file.
-//! - [`ConfigTrustStatus`] describes root trust plus config-baseline states for
-//!   detecting stale local config files.
-//! - [`TrustStore`] owns cryptographic trust verification and the content-hash
-//!   companion file that backs it.
+//! - [`TrustRequest`]: identifies a workspace root or local Config File.
+//! - [`ConfigTrustStatus`]: reports the root and Companion Hash status.
+//! - [`TrustStore`]: grants, checks, and revokes trust for workspace roots.
 
 use std::{
     fmt::{self, Display, Formatter},
@@ -17,23 +15,21 @@ use std::{
 use super::error::ConfigTrustError;
 use crate::{Blake3Digest, CleanMode, FilePathTracker, dirs, hash::HashError};
 
-/// File-name suffix of the content-hash companion beside a trusted root.
 const COMPANION_SUFFIX: &str = ".hash";
 
-/// Targets a workspace root or config file for a trust operation.
+/// Targets a workspace root or Config File for a trust operation.
 ///
-/// Create via `TrustRequest::from` with a `&Path` for root-only trust, or with
-/// a `&LocalConfigFile<Discovered>` for config-file trust that also records a
-/// content baseline.
+/// A [`Path`] produces a root-only request. [`Self::Config`] retains a Config
+/// File path and root so trust grants can record a Companion Hash.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TrustRequest {
-    /// Trust a workspace root without binding to a config file.
+    /// Targets a workspace root without a Config File.
     Root(PathBuf),
-    /// Trust a specific config file and its root.
+    /// Targets a Config File and its workspace root.
     Config {
-        /// The workspace root.
+        /// Holds the workspace root.
         root: PathBuf,
-        /// The config file path.
+        /// Holds the Config File path.
         path: PathBuf,
     },
 }
@@ -73,31 +69,28 @@ impl From<&Path> for TrustRequest {
     }
 }
 
-/// Trust requests resolved from a single discovery operation.
+/// Collects trust requests resolved by one discovery operation.
 pub(crate) type TrustRequests = Vec<TrustRequest>;
 
-/// Scope for resolving trust subjects from a user-supplied path.
+/// Selects how a user-supplied path resolves to trust requests.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum TrustScope {
-    /// Resolve a single trust target.
+    /// Selects the nearest local Config File or a root-only request.
     NearestLocal,
-    /// Resolve descendant trust targets.
+    /// Selects Config Files in a subtree or the enclosing Config File.
     LocalSubtree,
 }
 
-/// Trust state for a config file relative to its workspace root.
+/// Describes the Trust Status of a Config File and its workspace root.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ConfigTrustStatus {
-    /// The workspace root is trusted and, when a baseline hash exists, the
-    /// config file's content still matches it.
+    /// Confirms root trust and, for a Config File, a matching Companion Hash.
     Trusted,
-    /// The workspace root is not trusted.
+    /// Indicates that the workspace root lacks trust.
     Untrusted,
-    /// The workspace root is trusted, but no content-hash baseline was ever
-    /// recorded for this config file.
+    /// Indicates that the trusted root lacks a Config File Companion Hash.
     MissingBaseline,
-    /// The workspace root is trusted and a baseline hash exists, but the config
-    /// file's current content no longer matches it.
+    /// Indicates that the Config File no longer matches its Companion Hash.
     Stale,
 }
 
@@ -113,26 +106,21 @@ impl Display for ConfigTrustStatus {
     }
 }
 
-/// Result of checking whether a local config file may be parsed.
+/// Couples Trust Verification with already-read Config File content.
 ///
-/// Only [`Self::Trusted`] carries already-read content. Keeping content and
-/// status together prevents callers from pairing trusted status with missing
-/// content.
+/// Only [`Self::Trusted`] carries content, preventing callers from treating
+/// unverified content as trusted.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ConfigTrustCheck {
-    /// The workspace root is not trusted.
+    /// Indicates that the workspace root lacks trust.
     Untrusted,
-    /// The workspace root is trusted and a baseline hash exists, but the config
-    /// file's current content no longer matches it.
+    /// Indicates that the Config File no longer matches its Companion Hash.
     Stale,
-    /// The workspace root is trusted, but no content-hash baseline was ever
-    /// recorded for this config file.
+    /// Indicates that the trusted root lacks a Config File Companion Hash.
     MissingBaseline,
-    /// The workspace root is trusted and the config file's content matches its
-    /// baseline hash.
+    /// Holds verified content matching the Companion Hash.
     ///
-    /// Carries the content read while verifying it, so parsing can reuse the
-    /// same buffer without a second filesystem read.
+    /// Reuses the bytes read for verification during parsing.
     Trusted(String),
 }
 
@@ -150,15 +138,16 @@ impl ConfigTrustCheck {
     }
 }
 
-/// Reads a config file as UTF-8 text for baseline hashing.
+/// Reads a Config File as UTF-8 text for Companion Hash computation.
 ///
-/// Trust recording and trust checking both go through this function so a
-/// baseline is only ever recorded for content that a later check can read.
+/// Both trust grants and checks use this reader, so a recorded hash always
+/// describes content that a later check can read.
 ///
 /// # Errors
 ///
-/// - [`ConfigTrustError::Hash`] when the file cannot be read, or is not valid
-///   UTF-8.
+/// - [`Hash`] if reading the file fails or its content is not valid UTF-8.
+///
+/// [`Hash`]: ConfigTrustError::Hash
 fn read_config(path: &Path) -> Result<String, ConfigTrustError> {
     fs::read_to_string(path).map_err(|source| {
         ConfigTrustError::Hash(HashError {
@@ -168,19 +157,16 @@ fn read_config(path: &Path) -> Result<String, ConfigTrustError> {
     })
 }
 
-/// Persistent store of trusted workspace roots and their config content
-/// baselines.
+/// Persists trusted workspace roots and their Companion Hashes.
 ///
-/// Owns cryptographic trust verification: granting, revoking, and checking
-/// trust for a workspace root, plus the content-hash companion file that
-/// detects stale local config.
+/// Owns Trust Verification when granting, revoking, or checking trust.
 #[derive(Clone, Debug)]
 pub(crate) struct TrustStore {
     store: FilePathTracker,
 }
 
 impl TrustStore {
-    /// Creates a store backed by the OS-correct trust-store directory.
+    /// Creates a Trust Store in the OS state directory.
     #[must_use]
     #[inline]
     pub(crate) fn new() -> Self {
@@ -189,7 +175,7 @@ impl TrustStore {
         }
     }
 
-    /// Creates a store backed by an explicit root. Test-only.
+    /// Creates a Trust Store at an explicit root for tests.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -199,17 +185,18 @@ impl TrustStore {
         }
     }
 
-    /// Grants trust for a workspace root.
+    /// Grants trust for a [`TrustRequest`]'s workspace root.
     ///
-    /// When `subject` carries a config file, hashes and records the content
-    /// baseline before granting workspace trust, so a hashing or write failure
-    /// never leaves the workspace trusted without a baseline.
+    /// For a Config File request, records its Companion Hash before trusting
+    /// the root; reading or recording failures prevent the trust grant.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] when trust cannot be recorded.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be read, or is
-    ///   not valid UTF-8.
+    /// - [`Tracker`] if recording the Companion Hash or root fails.
+    /// - [`Hash`] if reading the Config File fails or its content is not UTF-8.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
+    /// [`Hash`]: ConfigTrustError::Hash
     #[inline]
     pub(crate) fn trust(
         &self,
@@ -228,15 +215,18 @@ impl TrustStore {
         Ok(())
     }
 
-    /// Returns the trust status for `subject`.
+    /// Returns the Trust Status for a [`TrustRequest`].
     ///
-    /// For config-file subjects, checks the baseline hash. For root-only
-    /// subjects, checks only workspace presence.
+    /// Checks the Companion Hash for a Config File request; checks only root
+    /// presence for a root-only request.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] when the trust store cannot be read.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be hashed.
+    /// - [`Tracker`] if reading the Trust Store fails.
+    /// - [`Hash`] if reading the Config File fails or its content is not UTF-8.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
+    /// [`Hash`]: ConfigTrustError::Hash
     #[inline]
     pub(crate) fn trust_status(
         &self,
@@ -253,20 +243,19 @@ impl TrustStore {
         }
     }
 
-    /// Checks config-file trust and returns content only when trusted.
+    /// Checks Trust Status and returns Config File content only when trusted.
     ///
-    /// Takes `root` and `config_path` directly because a root-only
-    /// [`TrustRequest`] has no config path, while trusted parsing must carry
-    /// content.
-    ///
-    /// Reads the config file once and hashes the buffer in memory, returning
-    /// the same content for parsing to avoid a second filesystem read.
+    /// Reads and hashes content once so parsing can reuse verified bytes.
+    /// Accepts a root and Config File path separately because a root-only
+    /// [`TrustRequest`] has no Config File path.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] when the trust store cannot be read.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be read, or is
-    ///   not valid UTF-8.
+    /// - [`Tracker`] if reading the Trust Store or Companion Hash fails.
+    /// - [`Hash`] if reading the Config File fails or its content is not UTF-8.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
+    /// [`Hash`]: ConfigTrustError::Hash
     pub(crate) fn config_file_trust_check(
         &self,
         root: &Path,
@@ -289,15 +278,16 @@ impl TrustStore {
         }
     }
 
-    /// Removes trust for `subject`'s workspace root.
+    /// Revokes trust for a [`TrustRequest`]'s workspace root.
     ///
-    /// Removes the workspace and its config-baseline companion. Returns the
-    /// number of root entries removed.
+    /// Removes the root and its Companion Hash; returns the number of root
+    /// entries removed.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] if the trust store cannot remove the
-    ///   root entry or its content-hash companion.
+    /// - [`Tracker`] if removing the root or Companion Hash fails.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
     pub(crate) fn untrust(
         &self,
@@ -308,25 +298,28 @@ impl TrustStore {
             .map_err(Into::into)
     }
 
-    /// Lists the canonical paths of all currently trusted roots.
+    /// Lists the canonical paths of trusted workspace roots.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] if reading the trust store fails.
+    /// - [`Tracker`] if reading the Trust Store fails.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
     pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
         self.store.list_all(&[COMPANION_SUFFIX]).map_err(Into::into)
     }
 
-    /// Removes dangling trust entries and their content-hash companions.
+    /// Removes dangling trust entries and their Companion Hashes.
     ///
     /// Returns the number of root entries removed.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] if reading the trust store fails,
-    ///   removing a stale root entry fails, or removing an existing
-    ///   content-hash companion fails.
+    /// - [`Tracker`] if reading the Trust Store or removing a stale root or its
+    ///   Companion Hash fails.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
     pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
         self.store
@@ -345,7 +338,7 @@ mod tests {
     mod fixtures {
         use super::*;
 
-        /// Isolated trust store plus a project directory beneath one temp dir.
+        /// Holds an isolated Trust Store and a temporary project directory.
         pub(super) struct Fixture {
             temp: tempfile::TempDir,
             pub(super) store: TrustStore,

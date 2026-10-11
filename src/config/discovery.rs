@@ -1,17 +1,9 @@
-//! Locates config files on disk without reading their TOML.
+//! Locates Config Files on disk without reading their TOML.
 //!
-//! [`ConfigLocator`] holds the two ambient inputs discovery depends on, the
-//! walk ceilings and the global config directory, and answers three questions:
-//!
-//! - [`ConfigLocator::project`] finds the nearest local config plus the
-//!   optional global config for loading.
-//! - [`ConfigLocator::nearest_local`] finds the nearest local config at or
-//!   above a directory.
-//! - [`ConfigLocator::local_subtree`] finds the local configs at or below a
-//!   directory, falling back to the nearest enclosing one.
-//!
-//! Discovery knows nothing about trust or tracking; deciding what a found
-//! config means is up to the caller.
+//! [`ConfigLocator`] uses walk ceilings and the global config directory to find
+//! the nearest local Config File, its optional global counterpart, or local
+//! Config Files within a subtree. The Config Locator does not perform Trust
+//! Verification or write to the Tracker Store.
 
 use std::{
     io,
@@ -24,29 +16,29 @@ use super::{
 };
 use crate::{DirTree, dirs, env_vars};
 
-/// Directory under the OS config home that holds the global config file.
+/// Names the OS config home subdirectory holding the global Config File.
 const GLOBAL_CONFIG_DIR: &str = "traces";
 
-/// Config files found for one project load.
+/// Holds the Config Files discovered for one project load.
 #[derive(Debug)]
 pub(super) struct DiscoveredConfigs {
-    /// Nearest local config; merged after `global`.
+    /// Holds the nearest local Config File, merged after [`Self::global`].
     pub(super) local: LocalConfigFile<Discovered>,
-    /// Global config, when one exists; merged before `local`.
+    /// Holds the optional global Config File, merged before [`Self::local`].
     pub(super) global: Option<GlobalConfigFile<Discovered>>,
 }
 
-/// Finds config files relative to the ambient environment.
+/// Finds Config Files relative to the ambient environment.
 #[derive(Clone, Debug)]
 pub(super) struct ConfigLocator {
-    /// Directories an upward walk stops at without inspecting.
+    /// Holds directories that an upward walk stops at without inspecting.
     ceilings: Vec<PathBuf>,
-    /// Directory holding the global `config.toml`.
+    /// Holds the directory containing the global Config File.
     global_dir: PathBuf,
 }
 
 impl ConfigLocator {
-    /// Builds a locator from the process environment.
+    /// Builds a Config Locator from the process environment.
     #[must_use]
     pub(super) fn from_env() -> Self {
         Self {
@@ -55,7 +47,7 @@ impl ConfigLocator {
         }
     }
 
-    /// Builds a locator from explicit inputs. Lets tests control both.
+    /// Builds a Config Locator from explicit inputs for deterministic tests.
     #[cfg(test)]
     #[must_use]
     pub(super) const fn new(
@@ -68,15 +60,16 @@ impl ConfigLocator {
         }
     }
 
-    /// Finds the nearest local config at or above `cwd` and the optional global
-    /// config.
+    /// Finds the nearest local and optional global Config Files for `cwd`.
     ///
     /// # Errors
     ///
-    /// - [`ConfigDiscoveryError::NotFound`] when no local config exists in any
-    ///   ancestor directory.
-    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
-    ///   inspected.
+    /// - [`NotFound`] if no local Config File exists at or above `cwd` before a
+    ///   ceiling.
+    /// - [`Inaccessible`] if a candidate path cannot be inspected.
+    ///
+    /// [`NotFound`]: ConfigDiscoveryError::NotFound
+    /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
     pub(super) fn project(
         &self,
         cwd: &Path,
@@ -90,16 +83,18 @@ impl ConfigLocator {
         })
     }
 
-    /// Finds the nearest local config at or above `dir`, stopping at a ceiling.
-    /// Ceilings are exclusive: a ceiling directory, including `dir` itself, is
-    /// never searched.
+    /// Finds the nearest local Config File at or above `dir`.
+    ///
+    /// Ceilings are exclusive: the walk never inspects a ceiling directory,
+    /// even when `dir` is itself a ceiling.
     ///
     /// # Errors
     ///
-    /// - [`ConfigDiscoveryError::NotFound`] when no ancestor up to the ceiling
-    ///   has a local config.
-    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
-    ///   inspected.
+    /// - [`NotFound`] if no local Config File exists before a ceiling.
+    /// - [`Inaccessible`] if a candidate path cannot be inspected.
+    ///
+    /// [`NotFound`]: ConfigDiscoveryError::NotFound
+    /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
     pub(super) fn nearest_local(
         &self,
         dir: &Path,
@@ -118,16 +113,18 @@ impl ConfigLocator {
         })
     }
 
-    /// Finds every local config rooted at or below `dir`, ordered by root.
+    /// Finds local Config Files at or below `dir`, ordered by root.
     ///
-    /// When none exists there, falls back to the nearest enclosing config.
+    /// Falls back to [`Self::nearest_local`] when the subtree has none.
     ///
     /// # Errors
     ///
-    /// - [`ConfigDiscoveryError::NotFound`] when nothing at, below, or above
-    ///   `dir` has a local config.
-    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
-    ///   inspected.
+    /// - [`NotFound`] if neither the subtree nor its ancestors contain a local
+    ///   Config File before a ceiling.
+    /// - [`Inaccessible`] if a path cannot be inspected.
+    ///
+    /// [`NotFound`]: ConfigDiscoveryError::NotFound
+    /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
     pub(super) fn local_subtree(
         &self,
         dir: &Path,
@@ -141,15 +138,17 @@ impl ConfigLocator {
     }
 }
 
-/// Collects every local config directly rooted at a directory beneath `dir`,
-/// including `dir` itself.
+/// Collects local Config Files at or below `dir`.
 ///
-/// Prunes directories named by [`env_vars::is_ignored_dir`] together with
-/// their subtrees, so a config inside `node_modules` or `target` is not found.
-/// `dir` itself is never pruned: naming an ignored directory explicitly still
-/// scans it. Errors (including a vanished root) propagate as
-/// [`ConfigDiscoveryError::Inaccessible`]; unlike the Schema registry and
-/// Template loaders there is no degrade-to-empty policy here.
+/// Skips subtrees named by [`env_vars::is_ignored_dir`], but always scans `dir`
+/// itself, even if its name is ignored. Propagates traversal failures instead
+/// of treating them as an empty subtree.
+///
+/// # Errors
+///
+/// - [`Inaccessible`] if the root vanishes or a path cannot be inspected.
+///
+/// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn collect_descendant_configs(
     dir: &Path,
 ) -> ConfigDiscoveryResult<Vec<LocalConfigFile<Discovered>>> {
@@ -176,8 +175,15 @@ fn collect_descendant_configs(
     Ok(configs)
 }
 
-/// Reports whether `path` is a regular file, treating a missing path as absent
-/// rather than as an error.
+/// Reports whether `path` is a regular file.
+///
+/// Treats a missing path as absent rather than as an error.
+///
+/// # Errors
+///
+/// - [`Inaccessible`] if a path cannot be inspected for another reason.
+///
+/// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn is_config_file(path: &Path) -> ConfigDiscoveryResult<bool> {
     match path.metadata() {
         Ok(metadata) => Ok(metadata.is_file()),
@@ -234,8 +240,8 @@ mod tests {
             p
         }
 
-        /// A locator with no ceilings whose global directory is inside the
-        /// fixture, so tests never see the machine's real global config.
+        /// Builds a Config Locator with isolated global storage and no
+        /// ceilings.
         fn locator(&self) -> ConfigLocator {
             ConfigLocator::new(Vec::new(), self.path("global-home/traces"))
         }

@@ -1,21 +1,12 @@
-//! Orchestrates config loading and trust administration.
+//! Orchestrates Config File loading and trust administration.
 //!
-//! [`ConfigService`] is the single entry point for discovering, building, and
-//! trusting config files.
-//!
-//! # Loading Pipeline
-//!
-//! 1. Discover local and global TOML candidates from `cwd`.
-//! 2. Record the local candidate in the tracking store (best-effort), then
-//!    verify trust before parsing its content.
-//! 3. Parse TOML into [`super::raw::RawConfig`].
-//! 4. Merge global before local so local values win.
-//!
-//! Granting trust records a config subject in the tracking store first, so
-//! every trusted root that has a local config has that config path tracked.
-//! [`ConfigService::trust_subjects`] resolves a user-supplied path into trust
-//! subjects. Durable state lives in two stores owned by [`ConfigService`]:
-//! [`TrustStore`] and [`TrackerStore`].
+//! [`ConfigService`] discovers Config Files, verifies Trust Status before
+//! reading local content, and builds the effective Configuration Scope. It
+//! records each local Tracked Config Path in the [`TrackerStore`] on a
+//! best-effort basis. Granting trust records that path before writing to the
+//! [`TrustStore`], so every trusted root with a local Config File has its path
+//! tracked. [`ConfigService::trust_subjects`] resolves user-supplied paths into
+//! trust requests.
 
 use std::{
     io,
@@ -37,15 +28,12 @@ use super::{
     trust::{TrustRequest, TrustRequests, TrustScope, TrustStore},
 };
 
-/// Entry point for config loading and trust administration.
+/// Coordinates Config File loading and trust administration.
 ///
-/// Filesystem discovery (`load`) and `TrustRequest` operations (`trust`,
-/// `untrust`) are separate surfaces on this type.
-///
-/// Durable state lives in two stores:
-///
-/// - `TrackerStore` records config files discovery has seen.
-/// - `TrustStore` records workspace roots and config content baselines.
+/// Loading uses discovery, read, trust and value stages. Trust Verification
+/// precedes parsing local content; global Config Files need no trust check. The
+/// Tracker Store records Tracked Config Paths, while the Trust Store records
+/// workspace roots and Companion Hashes.
 #[derive(Clone, Debug)]
 pub struct ConfigService {
     tracked: TrackerStore,
@@ -53,8 +41,7 @@ pub struct ConfigService {
 }
 
 impl ConfigService {
-    /// Creates a service backed by the OS-correct tracked-config and trust
-    /// stores.
+    /// Creates a service backed by the OS Tracker Store and Trust Store.
     #[must_use]
     #[inline]
     pub(crate) fn new() -> Self {
@@ -64,11 +51,9 @@ impl ConfigService {
         }
     }
 
-    /// Creates a service backed by explicit tracked-config and trust-store
-    /// roots.
+    /// Creates a service with explicit Tracker Store and Trust Store roots.
     ///
-    /// Test-only constructor for `crate::cli::trust` tests that need isolated
-    /// stores instead of real OS state directories.
+    /// Tests use isolated stores instead of the OS state directories.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -86,55 +71,50 @@ impl ConfigService {
         &self.trust
     }
 
-    /// Returns the tracked-config store.
+    /// Returns the Tracker Store.
     #[inline]
     #[must_use]
     pub(crate) const fn tracker_store(&self) -> &TrackerStore {
         &self.tracked
     }
 
-    /// Discovers and builds config from `cwd` in one service-owned pipeline.
+    /// Discovers and builds the effective Configuration Scope from `cwd`.
     ///
     /// # Errors
     ///
-    /// - [`ConfigError::Discovery`] when no local config is found or discovery
-    ///   cannot inspect a path.
-    /// - [`ConfigError::Read`] when a selected config file cannot be read or
-    ///   parsed.
-    /// - [`ConfigError::Trust`] when the local config's workspace is not
-    ///   trusted, is missing its baseline hash, or is stale, or when the trust
-    ///   store cannot be read or the config file cannot be hashed.
-    /// - [`ConfigError::Value`] when a parsed config value fails domain
-    ///   validation.
+    /// - [`Discovery`] if discovery finds no local Config File or cannot
+    ///   inspect a path.
+    /// - [`Read`] if reading or parsing a selected Config File fails.
+    /// - [`Trust`] if Trust Verification rejects the local Config File or
+    ///   reading the Trust Store or Config File for verification fails.
+    /// - [`Value`] if validation rejects a parsed value.
+    ///
+    /// [`Discovery`]: ConfigError::Discovery
+    /// [`Read`]: ConfigError::Read
+    /// [`Trust`]: ConfigError::Trust
+    /// [`Value`]: ConfigError::Value
     #[inline]
     pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
         let discovered = ConfigLocator::from_env().project(cwd)?;
         self.build(discovered)
     }
 
-    /// Builds a [`Config`] from discovered files.
+    /// Builds a [`Config`] from discovered Config Files.
     ///
-    /// Parses and merges global settings before local settings, resolving the
-    /// final output directory.
-    ///
-    /// Trust and tracking notes:
-    ///
-    /// - The local config's root is checked against the trust store before
-    ///   parsing; a global config is never checked.
-    /// - Recording the local config in the tracking store is best-effort; a
-    ///   write failure does not fail the build.
+    /// Merges global values before local values. Records the local Tracked
+    /// Config Path on a best-effort basis, then performs Trust Verification
+    /// before parsing local content.
     ///
     /// # Errors
     ///
-    /// - [`ConfigError::Trust`] when the local config's workspace is not
-    ///   trusted, is missing its baseline hash, or is stale
-    ///   ([`ConfigTrustError::Untrusted`]), or when the trust store cannot be
-    ///   read or the config file cannot be hashed
-    ///   ([`ConfigTrustError::Tracker`], [`ConfigTrustError::Hash`]).
-    /// - [`ConfigError::Read`] when a selected local or global config file
-    ///   cannot be read or parsed.
-    /// - [`ConfigError::Value`] when a parsed config value fails domain
-    ///   validation.
+    /// - [`Trust`] if Trust Verification rejects the local Config File or
+    ///   reading the Trust Store or Config File for verification fails.
+    /// - [`Read`] if reading or parsing a selected Config File fails.
+    /// - [`Value`] if validation rejects a parsed value.
+    ///
+    /// [`Trust`]: ConfigError::Trust
+    /// [`Read`]: ConfigError::Read
+    /// [`Value`]: ConfigError::Value
     fn build(
         &self,
         discovered: DiscoveredConfigs,
@@ -155,17 +135,18 @@ impl ConfigService {
             .map_err(Into::into)
     }
 
-    /// Grants trust for `subject`.
+    /// Grants trust for a [`TrustRequest`].
     ///
-    /// A config subject is recorded in the tracker first, so a trusted root
-    /// that has a local config always has that config path tracked. A failure
-    /// to record aborts the grant. A root-only subject has nothing to track.
+    /// Records a local Tracked Config Path first, aborting the grant if that
+    /// fails. A root-only request has no path to track.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] when the config path cannot be tracked,
-    ///   or trust cannot be recorded.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be hashed.
+    /// - [`Tracker`] if recording the path or trust fails.
+    /// - [`Hash`] if reading the Config File for hashing fails.
+    ///
+    /// [`Tracker`]: ConfigTrustError::Tracker
+    /// [`Hash`]: ConfigTrustError::Hash
     #[inline]
     pub(crate) fn trust(
         &self,
@@ -177,13 +158,12 @@ impl ConfigService {
         self.trust.trust(subject)
     }
 
-    /// Removes trust for `subject`'s workspace root, leaving the tracker
-    /// untouched.
+    /// Revokes trust for a [`TrustRequest`] without untracking its path.
     ///
     /// # Errors
     ///
-    /// - `ConfigTrustError::Tracker` when the trust store cannot remove the
-    ///   root entry or its content-hash companion.
+    /// - `ConfigTrustError::Tracker` if removing the root or Companion Hash
+    ///   fails.
     #[inline]
     pub fn untrust(
         &self,
@@ -192,25 +172,24 @@ impl ConfigService {
         self.trust.untrust(subject)
     }
 
-    /// Resolves a user-supplied path into trust subjects.
+    /// Resolves a user-supplied path into trust requests.
     ///
-    /// The canonical path is the workspace identity. A path that does not exist
-    /// yet falls back to the given path, so a directory about to be created can
-    /// still be named.
-    ///
-    /// - An explicit `.traces/config.toml` path denotes that config.
-    /// - Any other file resolves through its parent directory.
-    /// - A directory with [`TrustScope::NearestLocal`] resolves to the nearest
-    ///   enclosing local config, or to a root-only request when none exists.
-    /// - A directory with [`TrustScope::LocalSubtree`] resolves to every local
-    ///   config at or below it, else the enclosing one.
+    /// Canonical paths identify workspaces; missing paths retain their given
+    /// spelling. A Config File path identifies that file, while another file
+    /// resolves through its parent. [`TrustScope::NearestLocal`] chooses the
+    /// nearest enclosing local Config File or a root-only request;
+    /// [`TrustScope::LocalSubtree`] collects Config Files at or below the
+    /// directory, or the enclosing Config File.
     ///
     /// # Errors
     ///
-    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
-    ///   canonicalized for a reason other than not existing, or inspected.
-    /// - [`ConfigDiscoveryError::NotFound`] when [`TrustScope::LocalSubtree`]
-    ///   finds no local config at, below, or above the directory.
+    /// - [`Inaccessible`] if inspecting a path or canonicalizing it fails for a
+    ///   reason other than its absence.
+    /// - [`NotFound`] if [`TrustScope::LocalSubtree`] finds no local Config
+    ///   File at, below, or above the directory.
+    ///
+    /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
+    /// [`NotFound`]: ConfigDiscoveryError::NotFound
     #[inline]
     pub(crate) fn trust_subjects(
         path: &Path,
@@ -220,7 +199,16 @@ impl ConfigService {
     }
 }
 
-/// Resolves `path` against `locator`; see [`ConfigService::trust_subjects`].
+/// Resolves a path with a [`ConfigLocator`] using
+/// [`ConfigService::trust_subjects`] rules.
+///
+/// # Errors
+///
+/// - [`Inaccessible`] if inspecting or canonicalizing a path fails.
+/// - [`NotFound`] if subtree discovery finds no local Config File.
+///
+/// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
+/// [`NotFound`]: ConfigDiscoveryError::NotFound
 fn resolve_trust_subjects(
     locator: &ConfigLocator,
     path: &Path,
@@ -254,11 +242,16 @@ fn resolve_trust_subjects(
     }
 }
 
-/// Canonicalizes `path`, falling back to it when it does not exist.
+/// Canonicalizes a path while retaining its spelling if it does not exist.
 ///
-/// Any other failure (permission denied, symlink loop) is unexpected for a
-/// trust operation, where the canonical path is the workspace identity, so it
-/// propagates instead of silently trusting a possibly different path.
+/// Other failures propagate rather than trusting a possibly different path.
+///
+/// # Errors
+///
+/// - [`Inaccessible`] if canonicalization fails for a reason other than the
+///   path not existing.
+///
+/// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn canonical_or_given(path: &Path) -> ConfigDiscoveryResult<PathBuf> {
     match path.canonicalize() {
         Ok(canonical) => Ok(canonical),
@@ -272,7 +265,7 @@ fn canonical_or_given(path: &Path) -> ConfigDiscoveryResult<PathBuf> {
     }
 }
 
-/// One config-file trust request per discovered local config.
+/// Collects one [`TrustRequest`] per discovered local Config File.
 fn config_requests(files: &[LocalConfigFile<FileDiscovered>]) -> TrustRequests {
     files.iter().map(TrustRequest::from).collect()
 }
@@ -341,9 +334,7 @@ mod tests {
                 .expect("trust candidate root");
         }
 
-        /// Locator confined to the fixture: the walk stops at the temp dir and
-        /// the global config lives inside it, so tests never see the machine's
-        /// real ancestors or user config.
+        /// Confines discovery to fixture directories and Config Files.
         fn locator(&self) -> ConfigLocator {
             ConfigLocator::new(
                 vec![self.temp.path().to_path_buf()],
@@ -351,7 +342,21 @@ mod tests {
             )
         }
 
-        /// `ConfigService::load` against [`Self::locator`].
+        /// Loads through [`Self::locator`] without reading OS state.
+        ///
+        /// # Errors
+        ///
+        /// - [`Discovery`] if discovery finds no local Config File or cannot
+        ///   inspect a path.
+        /// - [`Trust`] if Trust Verification rejects the local Config File or
+        ///   reading the Trust Store or Config File for verification fails.
+        /// - [`Read`] if reading or parsing a Config File fails.
+        /// - [`Value`] if validation rejects a parsed value.
+        ///
+        /// [`Discovery`]: ConfigError::Discovery
+        /// [`Trust`]: ConfigError::Trust
+        /// [`Read`]: ConfigError::Read
+        /// [`Value`]: ConfigError::Value
         fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
             self.service.build(self.locator().project(cwd)?)
         }
@@ -364,14 +369,11 @@ mod tests {
 
         #[test]
         fn returns_discovery_error_when_no_config_found() {
-            // Arrange
             let fixture = Fixture::new();
             let cwd = fixture.target_dir("project/notes/daily");
 
-            // Act
             let result = fixture.load(&cwd);
 
-            // Assert
             assert!(matches!(
                 result,
                 Err(ConfigError::Discovery(
@@ -382,7 +384,6 @@ mod tests {
 
         #[test]
         fn discovers_and_builds_trusted_local_config() {
-            // Arrange
             let fixture = Fixture::new();
             let root = fixture.target_dir("project");
             let cwd = root.join("notes/daily");
@@ -395,10 +396,8 @@ mod tests {
             );
             fixture.trust_config(&config_path);
 
-            // Act
             let result = fixture.load(&cwd);
 
-            // Assert
             let config = result.expect("load trusted local config");
             assert_eq!(config.root(), root.as_path());
             assert_eq!(config.output_dir(), root.join("notes"));
@@ -406,7 +405,6 @@ mod tests {
 
         #[test]
         fn fails_to_load_when_tag_filter_is_invalid() {
-            // Arrange
             let fixture = Fixture::new();
             let root = fixture.target_dir("project");
             let cwd = root.join("notes");
@@ -420,10 +418,8 @@ mod tests {
             );
             fixture.trust_config(&config_path);
 
-            // Act
             let result = fixture.load(&cwd);
 
-            // Assert
             assert!(matches!(
                 result,
                 Err(ConfigError::Value(
@@ -563,15 +559,12 @@ mod tests {
 
         #[test]
         fn records_candidate_in_tracking_store() {
-            // Arrange
             let fixture = Fixture::new();
             let (cwd, config_path, candidates) = local_candidates(&fixture);
             fixture.trust_config(&config_path);
 
-            // Act
             let result = fixture.service.build(candidates);
 
-            // Assert
             let config = result.expect("build trusted config");
             assert_eq!(config.root(), cwd.as_path());
             let tracked = fixture
@@ -586,7 +579,6 @@ mod tests {
 
         #[test]
         fn succeeds_even_when_tracking_store_write_fails() {
-            // Arrange
             let fixture = Fixture::new();
             let (cwd, config_path, candidates) = local_candidates(&fixture);
             fixture
@@ -597,31 +589,26 @@ mod tests {
                 )))
                 .expect("trust config without tracking it");
 
-            // Occupy the tracked-store path with a file so directory creation
-            // fails
+            // Block Tracker Store directory creation to exercise
+            // best-effort tracking.
             fs::write(&fixture.tracked_root, "").expect("block tracking store");
 
-            // Act
             let result = fixture.service.build(candidates);
 
-            // Assert
             let config = result.expect("build despite tracking write failure");
             assert_eq!(config.root(), cwd.as_path());
         }
 
         #[test]
         fn fails_with_untrusted_when_trust_verification_halts() {
-            // Arrange
             let fixture = Fixture::new();
             let (_cwd, config_path, candidates) = local_candidates(&fixture);
             fixture.trust_config(&config_path);
             fs::write(&config_path, "directory = \"changed\"")
                 .expect("edit config after trusting");
 
-            // Act
             let result = fixture.service.build(candidates);
 
-            // Assert
             assert!(matches!(
                 result,
                 Err(ConfigError::Trust(ConfigTrustError::Untrusted {
@@ -766,8 +753,8 @@ mod tests {
             )
             .expect("resolve");
 
-            // The missing path cannot be canonicalized, so the scan keeps the
-            // given spelling of the root.
+            // Retain the given root spelling when the missing path cannot
+            // be canonicalized.
             let expected =
                 TrustRequest::from(&Fixture::discovered_config(&child_config));
             assert_eq!(requests, vec![expected]);
