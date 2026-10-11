@@ -273,22 +273,21 @@ impl<T> yoke::erased::ErasedDestructor for traces_pkm::cli::UserAbort where T: '
 pub fn traces_pkm::cli::run() -> core::result::Result<traces_pkm::cli::CommandOutcome, traces_pkm::cli::CliError>
 pub type traces_pkm::cli::CliResult = core::result::Result<(), traces_pkm::cli::CliError>
 #[non_exhaustive] pub enum traces_pkm::DateError
-pub traces_pkm::DateError::InvalidYearDigits
-pub traces_pkm::DateError::InvalidYearDigits::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::InvalidValue
+pub traces_pkm::DateError::InvalidValue::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::InvalidValue::reason: &'static str
 pub traces_pkm::DateError::LocalZoneLookup
 pub traces_pkm::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
 pub traces_pkm::DateError::OutOfRange
 pub traces_pkm::DateError::UnknownShape
-pub traces_pkm::DateError::Unparseable
-pub traces_pkm::DateError::Unparseable::input: alloc::boxed::Box<str>
-pub traces_pkm::DateError::Unparseable::source: chrono::format::ParseError
+pub traces_pkm::DateError::YearNotFourDigits
+pub traces_pkm::DateError::YearNotFourDigits::input: alloc::boxed::Box<str>
 impl core::clone::Clone for traces_pkm::DateError
 pub fn traces_pkm::DateError::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DateError
 impl core::cmp::PartialEq for traces_pkm::DateError
 pub fn traces_pkm::DateError::eq(&self, &Self) -> bool
 impl core::error::Error for traces_pkm::DateError
-pub fn traces_pkm::DateError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Debug for traces_pkm::DateError
 pub fn traces_pkm::DateError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DateError
@@ -400,20 +399,15 @@ impl<T> tracing::instrument::WithSubscriber for traces_pkm::DialogError
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::DialogError where T: 'static
 #[non_exhaustive] pub enum traces_pkm::DurationError
 pub traces_pkm::DurationError::Empty
-pub traces_pkm::DurationError::InvalidNumber
-pub traces_pkm::DurationError::InvalidNumber::input: alloc::string::String
 pub traces_pkm::DurationError::MalformedNumber
-pub traces_pkm::DurationError::MalformedNumber::input: alloc::string::String
 pub traces_pkm::DurationError::MalformedNumber::source: core::num::float_parse::ParseFloatError
+pub traces_pkm::DurationError::MisplacedSign
 pub traces_pkm::DurationError::MissingNumber
-pub traces_pkm::DurationError::MissingNumber::input: alloc::string::String
 pub traces_pkm::DurationError::MissingUnit
-pub traces_pkm::DurationError::MissingUnit::input: alloc::string::String
-pub traces_pkm::DurationError::NonFiniteNumber
-pub traces_pkm::DurationError::NonFiniteNumber::input: alloc::string::String
 pub traces_pkm::DurationError::NonFiniteSeconds
+pub traces_pkm::DurationError::NumberOverflow
+pub traces_pkm::DurationError::SecondsOutOfRange
 pub traces_pkm::DurationError::UnknownUnit
-pub traces_pkm::DurationError::UnknownUnit::input: alloc::string::String
 impl core::clone::Clone for traces_pkm::DurationError
 pub fn traces_pkm::DurationError::clone(&self) -> Self
 impl core::error::Error for traces_pkm::DurationError

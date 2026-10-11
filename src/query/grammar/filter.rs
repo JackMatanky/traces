@@ -67,8 +67,7 @@ impl FilterExpr {
                             expected: "a finite numeric literal",
                         }),
                         Err(_) => {
-                            if let Some(Ok(dv)) = DurationValue::classify(&word)
-                            {
+                            if let Ok(dv) = DurationValue::parse(&word) {
                                 Ok(Spanned::new(
                                     FilterToken::Literal(
                                         NoteFieldValue::Duration(dv),

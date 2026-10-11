@@ -12,7 +12,7 @@
 /// use traces_pkm::{DateError, DateValue};
 ///
 /// let err = "26-08-22".parse::<DateValue>().expect_err("short year");
-/// assert!(matches!(err, DateError::InvalidYearDigits { .. }));
+/// assert!(matches!(err, DateError::YearNotFourDigits { .. }));
 /// ```
 ///
 /// [`DateValue`]: crate::DateValue
@@ -24,22 +24,19 @@ pub enum DateError {
     #[error("not a date or date-time shape")]
     UnknownShape,
     /// No accepted date/time shape matched `input` (e.g., `"2026/08/22"`).
-    ///
-    /// Wraps the last-attempted format's [`chrono::ParseError`].
-    #[error("`{input}` is not a recognized date/time: {source}")]
-    Unparseable {
+    #[error("`{input}` is not a recognized date/time: {reason}")]
+    InvalidValue {
         /// The raw input that failed to parse.
         input: Box<str>,
-        /// The last-attempted format's underlying parse failure.
-        #[source]
-        source: chrono::ParseError,
+        /// Why the last-attempted shape rejected the input.
+        reason: &'static str,
     },
     /// `input` does not begin with 4 ASCII digits (e.g., `"26-08-22"`).
     ///
     /// The `chrono` `%Y` specifier accepts fewer digits, silently misreading
     /// the year.
     #[error("`{input}` does not have a 4-digit year")]
-    InvalidYearDigits {
+    YearNotFourDigits {
         /// The raw input that failed to parse.
         input: Box<str>,
     },

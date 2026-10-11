@@ -873,13 +873,12 @@ mod tests {
         }
 
         #[test]
-        fn displays_unparseable_error_naming_the_input_and_source() {
+        fn displays_invalid_value_error_naming_the_input_and_reason() {
             let err = DateValue::parse_iso("2026/08/22")
                 .expect_err("unrecognized shape");
             assert_eq!(
                 err.to_string(),
-                "`2026/08/22` is not a recognized date/time: input contains \
-                 invalid characters"
+                "`2026/08/22` is not a recognized date/time: not enough input"
             );
         }
 
@@ -891,15 +890,6 @@ mod tests {
                 err.to_string(),
                 "`26-08-22` does not have a 4-digit year"
             );
-        }
-
-        #[test]
-        fn exposes_the_chrono_source_for_an_unparseable_error() {
-            use std::error::Error as _;
-            let err = DateValue::parse_iso("2026/08/22")
-                .expect_err("unrecognized shape");
-            let source = err.source().expect("chrono parse error is chained");
-            assert_eq!(source.to_string(), "input contains invalid characters");
         }
 
         #[test]

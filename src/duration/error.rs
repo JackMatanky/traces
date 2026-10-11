@@ -6,6 +6,8 @@
 /// - Validating raw seconds;
 /// - Converting a duration or seconds value to a `TimeDelta`.
 ///
+/// Parse failures carry no copy of the input: the caller already holds it.
+///
 /// # Examples
 ///
 /// ```rust
@@ -22,54 +24,40 @@ pub enum DurationError {
     Empty,
 
     /// A unit appears without a preceding number (e.g., `"h"` or `"hours"`).
-    #[error("no number before unit in `{input}`")]
-    MissingNumber {
-        /// The raw input that failed to parse.
-        input: String,
-    },
+    #[error("no number before unit")]
+    MissingNumber,
 
     /// The number portion has a malformed sign (e.g., `"+h"`), or a part after
     /// the first carries an explicit `-` (e.g., `"1h -30m"`).
-    #[error("invalid number in `{input}`")]
-    InvalidNumber {
-        /// The raw input that failed to parse.
-        input: String,
-    },
+    #[error("misplaced sign in duration")]
+    MisplacedSign,
 
     /// The number portion is not valid float syntax (e.g., a bare `"."`).
-    #[error("invalid number syntax in `{input}`: {source}")]
+    #[error("invalid number syntax: {source}")]
     MalformedNumber {
-        /// The raw input that failed to parse.
-        input: String,
         /// The underlying float-parse failure.
         #[source]
         source: std::num::ParseFloatError,
     },
 
     /// A number appears without a trailing unit (e.g., `"1"` or `"42"`).
-    #[error("no unit after number in `{input}`")]
-    MissingUnit {
-        /// The raw input that failed to parse.
-        input: String,
-    },
+    #[error("no unit after number")]
+    MissingUnit,
 
     /// The unit string is not recognized (e.g., `"1x"`).
-    #[error("unknown unit in `{input}`")]
-    UnknownUnit {
-        /// The raw input that failed to parse.
-        input: String,
-    },
+    #[error("unknown unit")]
+    UnknownUnit,
 
     /// A single part's number overflows to infinity (e.g., a 400-digit
     /// literal).
-    #[error("number overflows to infinity in `{input}`")]
-    NonFiniteNumber {
-        /// The raw input that failed to parse.
-        input: String,
-    },
+    #[error("number overflows to infinity")]
+    NumberOverflow,
 
-    /// A raw seconds value is `NaN` or infinite, or does not fit
-    /// `TimeDelta`'s representable range.
+    /// A raw seconds value is `NaN` or infinite.
     #[error("duration seconds must be finite")]
     NonFiniteSeconds,
+
+    /// A finite seconds value does not fit `TimeDelta`'s representable range.
+    #[error("duration seconds are outside the representable range")]
+    SecondsOutOfRange,
 }

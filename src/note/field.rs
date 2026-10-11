@@ -521,7 +521,7 @@ impl From<FieldValueRef<'_>> for NoteFieldValue {
                     Self::Null
                 } else if let Some(link) = Link::parse_wikilink(trimmed) {
                     Self::Link(link)
-                } else if let Some(Ok(dv)) = DurationValue::classify(trimmed) {
+                } else if let Ok(dv) = DurationValue::parse(trimmed) {
                     Self::Duration(dv)
                 } else {
                     Self::String(s.into_owned())

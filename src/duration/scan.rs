@@ -76,12 +76,11 @@ pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
 pub(super) fn scan_component(
     bytes: &[u8],
     pos: usize,
-    input: &str,
 ) -> Result<(f64, DurationUnit, usize), DurationError> {
-    let (number, after_number) = scan_number(bytes, pos, input)?;
+    let (number, after_number) = scan_number(bytes, pos)?;
     let mut cursor = after_number;
     skip_whitespace(bytes, &mut cursor);
-    let (unit, after_unit) = scan_unit(bytes, cursor, input)?;
+    let (unit, after_unit) = scan_unit(bytes, cursor)?;
     Ok((number, unit, after_unit))
 }
 
@@ -92,7 +91,6 @@ pub(super) fn scan_component(
 pub(super) fn scan_number(
     bytes: &[u8],
     mut pos: usize,
-    input: &str,
 ) -> Result<(f64, usize), DurationError> {
     let num_start = pos;
     if let Some(&b) = bytes.get(pos)
@@ -102,9 +100,7 @@ pub(super) fn scan_number(
             bytes.get(pos.saturating_add(1)),
             bytes.get(pos.saturating_add(2)),
         ) {
-            return Err(DurationError::InvalidNumber {
-                input: input.to_owned(),
-            });
+            return Err(DurationError::MisplacedSign);
         }
         pos = pos.saturating_add(1);
     }
@@ -139,37 +135,31 @@ pub(super) fn scan_number(
             pos = exp_pos;
         }
     }
-    convert_number(num_start, pos, input)
+    convert_number(bytes, num_start, pos)
 }
 
-/// Validates and converts a parsed number byte span into `f64`.
+/// Validates and converts a scanned number byte span into `f64`.
 pub(super) fn convert_number(
+    bytes: &[u8],
     start: usize,
     end: usize,
-    input: &str,
 ) -> Result<(f64, usize), DurationError> {
     if start == end {
-        return Err(DurationError::MissingNumber {
-            input: input.to_owned(),
-        });
+        return Err(DurationError::MissingNumber);
     }
-    // `start`/`end` are byte offsets produced by scanning only single-byte
-    // ASCII (`+`/`-`/`.`/digit/`e`/`E`), so they always land on char boundaries
-    // within `input`: a direct `str` slice can't fail.
-    let Some(text) = input.get(start..end) else {
-        return Err(DurationError::MissingNumber {
-            input: input.to_owned(),
-        });
+    // The span holds only single-byte ASCII (`+`/`-`/`.`/digit/`e`/`E`), so
+    // slicing and UTF-8 decoding cannot fail.
+    let Some(text) =
+        bytes.get(start..end).and_then(|span| core::str::from_utf8(span).ok())
+    else {
+        return Err(DurationError::MissingNumber);
     };
     let number: f64 =
         text.parse().map_err(|source| DurationError::MalformedNumber {
-            input: input.to_owned(),
             source,
         })?;
     if !number.is_finite() {
-        return Err(DurationError::NonFiniteNumber {
-            input: input.to_owned(),
-        });
+        return Err(DurationError::NumberOverflow);
     }
     Ok((number, end))
 }
@@ -178,7 +168,6 @@ pub(super) fn convert_number(
 pub(super) fn scan_unit(
     bytes: &[u8],
     mut pos: usize,
-    input: &str,
 ) -> Result<(DurationUnit, usize), DurationError> {
     let unit_start = pos;
     while pos < bytes.len() {
@@ -190,36 +179,25 @@ pub(super) fn scan_unit(
         }
         pos = pos.saturating_add(1);
     }
-    resolve_unit(bytes, unit_start, pos, input)
+    resolve_unit(bytes, unit_start, pos)
 }
 
-/// Validates and converts a parsed unit byte span into [`DurationUnit`].
+/// Validates and converts a scanned unit byte span into [`DurationUnit`].
 pub(super) fn resolve_unit(
     bytes: &[u8],
     start: usize,
     end: usize,
-    input: &str,
 ) -> Result<(DurationUnit, usize), DurationError> {
     if start == end {
-        return Err(DurationError::MissingUnit {
-            input: input.to_owned(),
-        });
+        return Err(DurationError::MissingUnit);
     }
     let Some(unit_slice) = bytes.get(start..end) else {
-        return Err(DurationError::MissingUnit {
-            input: input.to_owned(),
-        });
+        return Err(DurationError::MissingUnit);
     };
-    let unit_str = core::str::from_utf8(unit_slice).map_err(|_| {
-        DurationError::UnknownUnit {
-            input: input.to_owned(),
-        }
-    })?;
-    let kind = DurationUnit::from_spelling(unit_str).ok_or_else(|| {
-        DurationError::UnknownUnit {
-            input: input.to_owned(),
-        }
-    })?;
+    let unit_str = core::str::from_utf8(unit_slice)
+        .map_err(|_| DurationError::UnknownUnit)?;
+    let kind = DurationUnit::from_spelling(unit_str)
+        .ok_or(DurationError::UnknownUnit)?;
     Ok((kind, end))
 }
 

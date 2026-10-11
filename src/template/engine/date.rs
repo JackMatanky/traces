@@ -1160,10 +1160,10 @@ fn render_date_error(error: DateError) -> Error {
         ),
         DateError::OutOfRange
         | DateError::UnknownShape
-        | DateError::Unparseable {
+        | DateError::InvalidValue {
             ..
         }
-        | DateError::InvalidYearDigits {
+        | DateError::YearNotFourDigits {
             ..
         } => date_out_of_range_error(),
     }

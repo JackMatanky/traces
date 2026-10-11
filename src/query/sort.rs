@@ -460,7 +460,7 @@ impl TextShape {
     /// Inspects free text for a date, date-time, or duration shape.
     ///
     /// Delegates to [`Point::parse`] and
-    /// [`crate::DurationValue::classify`].
+    /// [`crate::DurationValue::parse`].
     pub(super) fn classify(s: &str) -> Self {
         let trimmed = s.trim();
         match Point::parse(trimmed) {
@@ -471,7 +471,7 @@ impl TextShape {
             }) => return Self::Date(date),
             Err(_) => {}
         }
-        if let Some(Ok(dv)) = crate::DurationValue::classify(trimmed) {
+        if let Ok(dv) = crate::DurationValue::parse(trimmed) {
             return Self::Duration(dv);
         }
         Self::Plain

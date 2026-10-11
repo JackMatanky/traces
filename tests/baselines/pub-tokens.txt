@@ -271,7 +271,7 @@ src/date/parse.rs: pub(crate) enum DateTimeShape {
 src/date/parse.rs: pub(crate) enum ParsedDateTime {
 src/date/parse.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_any(
-src/date/parse.rs: pub(crate) fn parse_any(
+src/date/parse.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
@@ -367,7 +367,6 @@ src/duration/value.rs: pub struct DurationValue {
 src/duration/value.rs: pub(crate) const fn as_f64(self) -> f64 {
 src/duration/value.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
 src/duration/value.rs: pub(crate) fn as_str(&self) -> &str {
-src/duration/value.rs: pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
 src/duration/value.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
 src/duration/value.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
 src/duration/value.rs: pub(crate) fn has_calendar_component(&self) -> bool {

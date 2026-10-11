@@ -90,37 +90,6 @@ fn scientific_seconds_text(total_secs: f64, is_negative: bool) -> String {
 }
 
 impl DurationValue {
-    /// Classifies `s` as a duration expression, returning `None` if it cannot
-    /// start a duration.
-    ///
-    /// Employs a cheap `O(1)` shape gate upfront that returns `None` without
-    /// allocation when the first byte cannot begin a duration segment, or
-    /// when `s` is empty or whitespace. Otherwise delegates to
-    /// [`Self::parse`].
-    ///
-    /// # Errors
-    ///
-    /// Returns `Some(Err(_))` with:
-    ///
-    /// - [`DurationError::MissingNumber`] if a segment has a unit without a
-    ///   number.
-    /// - [`DurationError::MissingUnit`] if a number appears without a unit.
-    /// - [`DurationError::UnknownUnit`] if a unit is unrecognized.
-    /// - [`DurationError::InvalidNumber`] if a non-leading part carries a
-    ///   negative sign.
-    /// - [`DurationError::MalformedNumber`] if float syntax is invalid.
-    /// - [`DurationError::NonFiniteNumber`] if a literal overflows to infinity.
-    /// - [`DurationError::NonFiniteSeconds`] if the folded total is non-finite.
-    #[must_use]
-    pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
-        let trimmed = s.trim();
-        let bytes = trimmed.as_bytes();
-        if bytes.is_empty() || !scan::can_start_component(bytes, 0) {
-            return None;
-        }
-        Some(Self::parse(trimmed))
-    }
-
     /// Parses a duration string containing one or more `<number><unit>`
     /// components.
     ///
@@ -136,10 +105,10 @@ impl DurationValue {
     ///   number.
     /// - [`DurationError::MissingUnit`] if a number appears without a unit.
     /// - [`DurationError::UnknownUnit`] if a unit is unrecognized.
-    /// - [`DurationError::InvalidNumber`] if a non-leading part carries a
+    /// - [`DurationError::MisplacedSign`] if a non-leading part carries a
     ///   negative sign.
     /// - [`DurationError::MalformedNumber`] if float syntax is invalid.
-    /// - [`DurationError::NonFiniteNumber`] if a literal overflows to infinity.
+    /// - [`DurationError::NumberOverflow`] if a literal overflows to infinity.
     /// - [`DurationError::NonFiniteSeconds`] if the folded total is non-finite.
     pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
         let trimmed = input.trim();
@@ -198,14 +167,12 @@ impl DurationValue {
 
         while pos < len {
             let (number, kind, pos_after_part) =
-                scan::scan_component(bytes, pos, input)?;
+                scan::scan_component(bytes, pos)?;
             pos = pos_after_part;
 
             if number.is_sign_negative() {
                 if parsed_any {
-                    return Err(DurationError::InvalidNumber {
-                        input: input.to_owned(),
-                    });
+                    return Err(DurationError::MisplacedSign);
                 }
                 is_negative = true;
             }
@@ -534,8 +501,9 @@ impl TryFrom<DurationValue> for TimeDelta {
     type Error = DurationError;
 
     /// Converts to a [`TimeDelta`] via the duration's total seconds, returning
-    /// a `NonFiniteSeconds` error when the seconds value is non-finite or
-    /// outside `TimeDelta`'s representable range.
+    /// [`DurationError::NonFiniteSeconds`] when the seconds value is
+    /// non-finite and [`DurationError::SecondsOutOfRange`] when it is outside
+    /// `TimeDelta`'s representable range.
     #[inline]
     fn try_from(duration: DurationValue) -> Result<Self, Self::Error> {
         Self::try_from(duration.nominal_seconds())
@@ -764,9 +732,10 @@ impl TryFrom<f64> for DurationSeconds {
 impl TryFrom<DurationSeconds> for TimeDelta {
     type Error = DurationError;
 
-    /// Converts to a [`TimeDelta`], returning a `NonFiniteSeconds` error when
-    /// the seconds value is non-finite or outside `TimeDelta`'s representable
-    /// range.
+    /// Converts to a [`TimeDelta`], returning
+    /// [`DurationError::NonFiniteSeconds`] for `NaN`/infinity and
+    /// [`DurationError::SecondsOutOfRange`] for a finite value outside
+    /// `TimeDelta`'s representable range.
     #[inline]
     fn try_from(seconds: DurationSeconds) -> Result<Self, Self::Error> {
         let total = seconds.0;
@@ -781,15 +750,15 @@ impl TryFrom<DurationSeconds> for TimeDelta {
             (whole, frac * 1_000_000_000.0)
         };
         let mut nanos_rounded =
-            nanos.round().to_i64().ok_or(DurationError::NonFiniteSeconds)?;
+            nanos.round().to_i64().ok_or(DurationError::SecondsOutOfRange)?;
         if nanos_rounded >= 1_000_000_000 {
             secs += 1.0;
             nanos_rounded = nanos_rounded.saturating_sub(1_000_000_000);
         }
-        let secs_i64 = secs.to_i64().ok_or(DurationError::NonFiniteSeconds)?;
+        let secs_i64 = secs.to_i64().ok_or(DurationError::SecondsOutOfRange)?;
         let nanos_u32 = u32::try_from(nanos_rounded)
-            .map_err(|_| DurationError::NonFiniteSeconds)?;
-        Self::new(secs_i64, nanos_u32).ok_or(DurationError::NonFiniteSeconds)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        Self::new(secs_i64, nanos_u32).ok_or(DurationError::SecondsOutOfRange)
     }
 }
 
@@ -1028,13 +997,13 @@ mod tests {
                 #[case::negative_sign("-h")]
                 fn rejects_sign_without_digit(#[case] input: &str) {
                     let err = DurationValue::parse(input).unwrap_err();
-                    assert!(matches!(err, DurationError::InvalidNumber { .. }));
+                    assert!(matches!(err, DurationError::MisplacedSign));
                 }
 
                 #[test]
                 fn rejects_negative_on_non_leading_part() {
                     let err = DurationValue::parse("1h -30m").unwrap_err();
-                    assert!(matches!(err, DurationError::InvalidNumber { .. }));
+                    assert!(matches!(err, DurationError::MisplacedSign));
                 }
 
                 #[test]
@@ -1053,18 +1022,14 @@ mod tests {
                 {
                     let overflowing = format!("1{}h", "0".repeat(400));
                     let err = DurationValue::parse(&overflowing).unwrap_err();
-                    assert!(matches!(
-                        &err,
-                        DurationError::NonFiniteNumber { input }
-                        if input == &overflowing
-                    ));
+                    assert!(matches!(err, DurationError::NumberOverflow));
                 }
 
                 #[test]
                 fn rejects_a_multi_part_fold_overflowing_to_infinity() {
                     // Each part is finite (1e308 is below `f64::MAX`), but
                     // their Σ overflows: the parse-level guard is
-                    // `NonFiniteSeconds`, not `NonFiniteNumber`, which
+                    // `NonFiniteSeconds`, not `NumberOverflow`, which
                     // targets per-part magnitudes.
                     let huge =
                         format!("1{}s 1{}s", "0".repeat(308), "0".repeat(308));
@@ -1078,7 +1043,7 @@ mod tests {
                 fn rejects_unit_without_number(#[case] input: &str) {
                     assert!(matches!(
                         DurationValue::parse(input),
-                        Err(DurationError::MissingNumber { .. })
+                        Err(DurationError::MissingNumber)
                     ));
                 }
 
@@ -1088,7 +1053,7 @@ mod tests {
                 fn rejects_number_without_unit(#[case] input: &str) {
                     assert!(matches!(
                         DurationValue::parse(input),
-                        Err(DurationError::MissingUnit { .. })
+                        Err(DurationError::MissingUnit)
                     ));
                 }
 
@@ -1105,9 +1070,9 @@ mod tests {
                 }
 
                 #[rstest]
-                #[case("1fortnight", "unknown unit in `1fortnight`")]
-                #[case("hours", "no number before unit in `hours`")]
-                #[case("42", "no unit after number in `42`")]
+                #[case("1fortnight", "unknown unit")]
+                #[case("hours", "no number before unit")]
+                #[case("42", "no unit after number")]
                 fn returns_error_message(
                     #[case] input: &str,
                     #[case] expected: &str,
@@ -1163,58 +1128,57 @@ mod tests {
                 }
             }
 
-            mod classify {
+            mod shape_rejection {
                 use pretty_assertions::assert_eq;
                 use rstest::rstest;
 
                 use super::*;
 
                 #[test]
-                fn returns_none_for_non_temporal_text() {
-                    assert!(DurationValue::classify("hello").is_none());
-                    assert!(DurationValue::classify("").is_none());
-                    assert!(DurationValue::classify("+").is_none());
-                    assert!(DurationValue::classify(".").is_none());
-                }
-
-                #[test]
-                fn returns_some_err_for_shape_matching_but_invalid_input() {
-                    let res1 = DurationValue::classify("1x")
-                        .expect("starts like duration");
+                fn rejects_non_temporal_text_with_the_expected_variant() {
                     assert!(matches!(
-                        res1,
-                        Err(DurationError::UnknownUnit { .. })
+                        DurationValue::parse("hello"),
+                        Err(DurationError::MissingNumber)
                     ));
-
-                    let res2 = DurationValue::classify("1")
-                        .expect("starts like duration");
                     assert!(matches!(
-                        res2,
-                        Err(DurationError::MissingUnit { .. })
+                        DurationValue::parse(""),
+                        Err(DurationError::Empty)
                     ));
-
-                    let res3 = DurationValue::classify("1h 1x")
-                        .expect("starts like duration");
                     assert!(matches!(
-                        res3,
-                        Err(DurationError::UnknownUnit { .. })
+                        DurationValue::parse("+"),
+                        Err(DurationError::MisplacedSign)
+                    ));
+                    assert!(matches!(
+                        DurationValue::parse("."),
+                        Err(DurationError::MalformedNumber { .. })
                     ));
                 }
 
                 #[test]
-                fn returns_some_ok_for_valid_input() {
-                    let res = DurationValue::classify("1h 30m")
-                        .expect("starts like duration");
-                    assert!(res.is_ok());
+                fn rejects_shape_matching_but_invalid_input() {
+                    assert!(matches!(
+                        DurationValue::parse("1x"),
+                        Err(DurationError::UnknownUnit)
+                    ));
+                    assert!(matches!(
+                        DurationValue::parse("1"),
+                        Err(DurationError::MissingUnit)
+                    ));
+                    assert!(matches!(
+                        DurationValue::parse("1h 1x"),
+                        Err(DurationError::UnknownUnit)
+                    ));
                 }
 
                 #[test]
-                fn pins_one_h_one_x_divergence_between_classify_and_prefix() {
-                    let classified = DurationValue::classify("1h 1x");
-                    assert!(matches!(
-                        classified,
-                        Some(Err(DurationError::UnknownUnit { .. }))
-                    ));
+                fn accepts_valid_input() {
+                    assert!(DurationValue::parse("1h 30m").is_ok());
+                }
+
+                #[test]
+                fn pins_one_h_one_x_divergence_between_parse_and_prefix() {
+                    let parsed = DurationValue::parse("1h 1x");
+                    assert!(matches!(parsed, Err(DurationError::UnknownUnit)));
 
                     let prefixed = DurationValue::parse_prefix("1h 1x");
                     assert!(prefixed.is_none());
@@ -1534,7 +1498,7 @@ mod tests {
             fn returns_error_for_invalid_input() {
                 let err =
                     "not a duration".parse::<DurationValue>().unwrap_err();
-                assert!(matches!(err, DurationError::MissingNumber { .. }));
+                assert!(matches!(err, DurationError::MissingNumber));
             }
         }
         mod components {
@@ -1958,7 +1922,7 @@ mod tests {
             let seconds =
                 DurationSeconds::try_from(input_secs).expect("finite seconds");
             let result = TimeDelta::try_from(seconds);
-            assert!(matches!(result, Err(DurationError::NonFiniteSeconds)));
+            assert!(matches!(result, Err(DurationError::SecondsOutOfRange)));
         }
     }
 }

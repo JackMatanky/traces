@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc, format::ParseErrorKind};
 
 use super::{
     error::DateError,
@@ -44,7 +44,7 @@ impl Point {
             return Err(DateError::UnknownShape);
         }
         if !starts_with_year(trimmed) {
-            return Err(DateError::InvalidYearDigits {
+            return Err(DateError::YearNotFourDigits {
                 input: trimmed.into(),
             });
         }
@@ -55,9 +55,9 @@ impl Point {
         // Date-only shapes cannot match the date-time cascade.
         if trimmed.len() <= 10 {
             return DateShape::parse_any(trimmed).map(civil).map_err(
-                |source| DateError::Unparseable {
+                |reason| DateError::InvalidValue {
                     input: trimmed.into(),
-                    source,
+                    reason,
                 },
             );
         }
@@ -71,7 +71,7 @@ impl Point {
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok(date) => Ok(civil(date)),
                 Err(date_err) => {
-                    let source = if matches!(
+                    let reason = if matches!(
                         trimmed.as_bytes().get(10),
                         Some(b'T' | b' ')
                     ) {
@@ -79,9 +79,9 @@ impl Point {
                     } else {
                         date_err
                     };
-                    Err(DateError::Unparseable {
+                    Err(DateError::InvalidValue {
                         input: trimmed.into(),
-                        source,
+                        reason,
                     })
                 }
             },
@@ -153,9 +153,9 @@ impl Point {
                 date: DateValue(date),
                 precision: CivilPrecision::Day,
             })
-            .map_err(|source| DateError::Unparseable {
+            .map_err(|source| DateError::InvalidValue {
                 input: trimmed_text.into(),
-                source,
+                reason: parse_reason(source),
             })
     }
 }
@@ -166,20 +166,20 @@ impl DateValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidYearDigits`] if `s` does not begin with 4 ASCII
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
     ///   digits.
-    /// - [`DateError::Unparseable`] if no accepted shape matches.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_with_year(trimmed) {
-            return Err(DateError::InvalidYearDigits {
+            return Err(DateError::YearNotFourDigits {
                 input: trimmed.into(),
             });
         }
         DateShape::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
-            |source| DateError::Unparseable {
+            |reason| DateError::InvalidValue {
                 input: trimmed.into(),
-                source,
+                reason,
             },
         )
     }
@@ -197,22 +197,22 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidYearDigits`] if `s` does not begin with 4 ASCII
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
     ///   digits.
-    /// - [`DateError::Unparseable`] if no accepted shape matches.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
     /// - [`DateError::LocalZoneLookup`] if the local timezone lookup fails
     ///   while resolving a naive input.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_with_year(trimmed) {
-            return Err(DateError::InvalidYearDigits {
+            return Err(DateError::YearNotFourDigits {
                 input: trimmed.into(),
             });
         }
-        let shape = DateTimeShape::parse_any(trimmed).map_err(|source| {
-            DateError::Unparseable {
+        let shape = DateTimeShape::parse_any(trimmed).map_err(|reason| {
+            DateError::InvalidValue {
                 input: trimmed.into(),
-                source,
+                reason,
             }
         })?;
         let instant = match shape {
@@ -241,7 +241,7 @@ impl DateShape {
     /// order.
     pub(crate) fn parse_any(
         s: &str,
-    ) -> Result<(NaiveDate, CivilPrecision), chrono::ParseError> {
+    ) -> Result<(NaiveDate, CivilPrecision), &'static str> {
         let [first, rest @ ..] = Self::ALL;
         let mut result = first.parse_precision(s);
         for format in rest {
@@ -256,30 +256,27 @@ impl DateShape {
     fn parse_precision(
         self,
         s: &str,
-    ) -> Result<(NaiveDate, CivilPrecision), chrono::ParseError> {
+    ) -> Result<(NaiveDate, CivilPrecision), &'static str> {
         match self {
-            Self::YearMonthDay => {
-                let pat = DATE_PATTERN;
-                NaiveDate::parse_from_str(s, pat)
-                    .map(|d| (d, CivilPrecision::Day))
+            Self::YearMonthDay => NaiveDate::parse_from_str(s, DATE_PATTERN)
+                .map(|d| (d, CivilPrecision::Day))
+                .map_err(parse_reason),
+            Self::YearMonth => {
+                Self::parse_year_month(s).map(|d| (d, CivilPrecision::Month))
             }
-            Self::YearMonth => match Self::parse_year_month(s) {
-                Some(d) => Ok((d, CivilPrecision::Month)),
-                None => NaiveDate::parse_from_str(s, "%Y-%m")
-                    .map(|d| (d, CivilPrecision::Month)),
-            },
         }
     }
 
     /// Parses `"YYYY-MM"`, defaulting the day to 1.
-    fn parse_year_month(s: &str) -> Option<NaiveDate> {
-        let (year_str, month_str) = s.split_once('-')?;
+    fn parse_year_month(s: &str) -> Result<NaiveDate, &'static str> {
+        let (year_str, month_str) =
+            s.split_once('-').ok_or("not enough input")?;
         if year_str.len() != 4 || month_str.len() != 2 {
-            return None;
+            return Err("not enough input");
         }
-        let year: i32 = year_str.parse().ok()?;
-        let month: u32 = month_str.parse().ok()?;
-        NaiveDate::from_ymd_opt(year, month, 1)
+        let year: i32 = year_str.parse().map_err(|_| "invalid input")?;
+        let month: u32 = month_str.parse().map_err(|_| "invalid input")?;
+        NaiveDate::from_ymd_opt(year, month, 1).ok_or("a field is out of range")
     }
 }
 
@@ -326,9 +323,7 @@ impl DateTimeShape {
 
     /// Attempts to parse `s` across all recognized date-time formats in
     /// priority order.
-    pub(crate) fn parse_any(
-        s: &str,
-    ) -> Result<ParsedDateTime, chrono::ParseError> {
+    pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
         let [first, rest @ ..] = Self::ALL;
         let mut result = first.parse_shape(s);
         for format in rest {
@@ -337,7 +332,7 @@ impl DateTimeShape {
             }
             result = format.parse_shape(s);
         }
-        result
+        result.map_err(parse_reason)
     }
 
     /// Parses according to this format, returning a parsed datetime shape.
@@ -353,6 +348,21 @@ impl DateTimeShape {
         }
     }
 }
+
+/// Maps a chrono parse failure to a short static reason, so errors carry no
+/// allocation or foreign error type.
+fn parse_reason(error: chrono::ParseError) -> &'static str {
+    match error.kind() {
+        ParseErrorKind::OutOfRange => "a field is out of range",
+        ParseErrorKind::Impossible => "the date does not exist",
+        ParseErrorKind::NotEnough => "not enough input",
+        ParseErrorKind::TooShort => "input is too short",
+        ParseErrorKind::TooLong => "unexpected trailing input",
+        ParseErrorKind::BadFormat => "bad format pattern",
+        _ => "invalid input",
+    }
+}
+
 /// The parsed shape of a date-time string before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParsedDateTime {
@@ -423,25 +433,25 @@ mod tests {
         fn accepts_a_five_digit_year_prefix_as_having_four_digits() {
             // The `starts_with_year` guard only checks the first 4 bytes;
             // a longer numeric prefix still passes this guard and is rejected
-            // later, by the format cascade, as Unparseable rather than
-            // InvalidYearDigits.
+            // later, by the format cascade, as InvalidValue rather than
+            // YearNotFourDigits.
             assert!(starts_with_year("20265-01-01"));
             assert!(matches!(
                 DateValue::parse_iso("20265-01-01"),
-                Err(DateError::Unparseable { .. })
+                Err(DateError::InvalidValue { .. })
             ));
         }
 
         #[test]
         fn date_value_rejects_a_short_year_with_invalid_year_digits() {
             let result = DateValue::parse_iso("26-08-22");
-            assert!(matches!(result, Err(DateError::InvalidYearDigits { .. })));
+            assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
         }
 
         #[test]
         fn datetime_value_rejects_a_short_year_with_invalid_year_digits() {
             let result = DateTimeValue::parse_iso("26-08-22T14:30:00");
-            assert!(matches!(result, Err(DateError::InvalidYearDigits { .. })));
+            assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
         }
 
         #[rstest]
@@ -451,20 +461,20 @@ mod tests {
         fn rejects_a_malformed_year_month_as_unparseable(#[case] input: &str) {
             assert!(matches!(
                 DateValue::parse_iso(input),
-                Err(DateError::Unparseable { .. })
+                Err(DateError::InvalidValue { .. })
             ));
         }
 
         #[test]
         fn rejects_an_unrecognized_date_shape_as_unparseable() {
             let result = DateValue::parse_iso("2026/08/22");
-            assert!(matches!(result, Err(DateError::Unparseable { .. })));
+            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
         }
 
         #[test]
         fn rejects_an_unrecognized_datetime_shape_as_unparseable() {
             let result = DateTimeValue::parse_iso("2026-07-29Tinvalid");
-            assert!(matches!(result, Err(DateError::Unparseable { .. })));
+            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
         }
 
         #[test]
@@ -537,7 +547,7 @@ mod tests {
             }
             assert!(matches!(
                 Point::parse("26-08-22"),
-                Err(DateError::InvalidYearDigits { .. })
+                Err(DateError::YearNotFourDigits { .. })
             ));
             assert_eq!(
                 Point::parse("2026/08/22"),
@@ -547,13 +557,13 @@ mod tests {
             let failures = ["2026-13", "2026-02-30"];
             let messages = failures.map(|text| {
                 let err = Point::parse(text).unwrap_err();
-                assert!(matches!(err, DateError::Unparseable { .. }));
+                assert!(matches!(err, DateError::InvalidValue { .. }));
                 err.to_string()
             });
             assert_eq!(messages, [
-                "`2026-13` is not a recognized date/time: input is out of \
+                "`2026-13` is not a recognized date/time: a field is out of \
                  range",
-                "`2026-02-30` is not a recognized date/time: trailing input",
+                "`2026-02-30` is not a recognized date/time: not enough input",
             ]);
         }
 
@@ -567,13 +577,13 @@ mod tests {
         #[test]
         fn returns_error_for_shape_matching_but_invalid_input() {
             let res1 = Point::parse("2026-13");
-            assert!(matches!(res1, Err(DateError::Unparseable { .. })));
+            assert!(matches!(res1, Err(DateError::InvalidValue { .. })));
 
             let res2 = Point::parse("26-08-22");
-            assert!(matches!(res2, Err(DateError::InvalidYearDigits { .. })));
+            assert!(matches!(res2, Err(DateError::YearNotFourDigits { .. })));
 
             let res3 = Point::parse("2026-07-29Tinvalid");
-            assert!(matches!(res3, Err(DateError::Unparseable { .. })));
+            assert!(matches!(res3, Err(DateError::InvalidValue { .. })));
         }
 
         #[test]
