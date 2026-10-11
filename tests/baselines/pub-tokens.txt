@@ -290,9 +290,9 @@ src/date/value.rs: pub(crate) fn date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/date/value.rs: pub(crate) fn local_date(self) -> DateValue {
-src/date/value.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
-src/date/value.rs: pub(crate) fn local_wall_or_utc(self) -> NaiveDateTime {
-src/date/value.rs: pub(crate) fn wall(self) -> NaiveDateTime {
+src/date/value.rs: pub(crate) fn local_datetime(self) -> NaiveDateTime {
+src/date/value.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
+src/date/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
 src/date/value.rs: pub(super) fn resolve_local(
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {

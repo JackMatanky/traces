@@ -17,17 +17,17 @@
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
 //! Date/time string parsing funnels through [`DatePoint::parse`] via
-//! [`parse_wall`]. A full datetime is tried first, falling back to a bare ISO
-//! date (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) at midnight. Arithmetic
-//! filters re-serialize at the input's original precision via the calendar
-//! owner.
+//! [`parse_local_datetime`]. A full datetime is tried first, falling back to a
+//! bare ISO date (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) at midnight.
+//! Arithmetic filters re-serialize at the input's original precision via the
+//! calendar owner.
 //!
 //! # Clock doctrine
 //!
-//! A naive datetime input means the reader's local wall clock: it parses to a
+//! A naive datetime input means the reader's local clock time: it parses to a
 //! UTC instant through the core date module's DST resolver, while a date-only
-//! input stays a zone-free civil date. Human-facing filters render the local
-//! wall clock; `timestamp`, `is_past`, `is_future`, and fixed-unit
+//! input stays a zone-free calendar date. Human-facing filters render the local
+//! clock time; `timestamp`, `is_past`, `is_future`, and fixed-unit
 //! [`date_diff`] measure the stored UTC instant. `date.now()`,
 //! `date.today()`, `date.tomorrow()`, `date.yesterday()`, and
 //! `date.from_timestamp()` read or render the local clock for display.
@@ -121,7 +121,7 @@ fn now_date_point() -> DatePoint {
 }
 
 fn today_date_point() -> DatePoint {
-    DatePoint::Civil {
+    DatePoint::Calendar {
         date: now_date_point().date(),
         date_precision: DatePrecision::Day,
     }
@@ -380,9 +380,9 @@ fn resolve_anchor(
         date_point = apply_offset(date_point, &off_val)?;
     }
 
-    let wall = date_point.wall();
-    let pat = pattern_to_strftime(format, wall)?;
-    render_with_pattern(wall.format(&pat), format)
+    let local_datetime = date_point.local_datetime();
+    let pat = pattern_to_strftime(format, local_datetime)?;
+    render_with_pattern(local_datetime.format(&pat), format)
 }
 
 /// Builds the shared `(format, offset, reference, reference_format, **kwargs)`
@@ -475,10 +475,11 @@ impl Object for DateNamespace {
                                 format!("timestamp {unix_ts} is out of range"),
                             )
                         })?;
-                    // Display is human-facing: the local wall clock of the
+                    // Display is human-facing: the local clock time of the
                     // instant, via the crate's canonical conversion
                     // (`.naive_utc()` would show the UTC clock instead).
-                    let local = DateTimeValue::from(utc).local_wall_or_utc();
+                    let local =
+                        DateTimeValue::from(utc).local_datetime_or_utc();
                     render_with_pattern(local.format(format), format)
                 },
             )),
@@ -564,16 +565,16 @@ fn render_with_pattern(
     Ok(rendered)
 }
 
-/// The shared date/time string parser for filters that work on the human wall
-/// clock (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
+/// The shared date/time string parser for filters that work on the human clock
+/// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
 /// parse via [`parse_point`] directly.
 ///
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
 ///   string.
-fn parse_wall(s: &str) -> Result<NaiveDateTime, Error> {
-    parse_date_point(s).map(DatePoint::wall)
+fn parse_local_datetime(s: &str) -> Result<NaiveDateTime, Error> {
+    parse_date_point(s).map(DatePoint::local_datetime)
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -589,11 +590,11 @@ fn parse_wall(s: &str) -> Result<NaiveDateTime, Error> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_wall`].
+///   string; see [`parse_local_datetime`].
 /// - [`ErrorKind::InvalidOperation`] if `pattern` is an invalid strftime
 ///   pattern or contains an unsupported moment token.
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
-    let datetime = parse_wall(value)?;
+    let datetime = parse_local_datetime(value)?;
     let translated = pattern_to_strftime(pattern, datetime)?;
     render_with_pattern(datetime.format(&translated), pattern)
 }
@@ -794,9 +795,9 @@ fn render_period_edge(
         PeriodEdge::End => date_point.end_of(calendar_period),
     }
     .map_err(render_date_error)?;
-    let wall = shifted.wall();
+    let local_datetime = shifted.local_datetime();
     let pat = shifted.canonical_pattern();
-    render_with_pattern(wall.format(pat), pat)
+    render_with_pattern(local_datetime.format(pat), pat)
 }
 
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
@@ -821,11 +822,12 @@ fn end_of_year(value: &str) -> TemplateEngineResult<String> {
 /// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
-/// Sub-day shifts on date-only values are civil and do not change the date.
+/// Sub-day shifts on date-only values are calendar-only and do not change the
+/// date.
 ///
-/// `"years"`, `"months"`, `"weeks"`, and `"days"` preserve the civil wall
-/// clock across a DST transition; the remaining units shift the exact
-/// instant, so the wall clock can land earlier or later than a naive `n`-unit
+/// `"years"`, `"months"`, `"weeks"`, and `"days"` preserve the local clock
+/// time across a DST transition; the remaining units shift the exact
+/// instant, so the clock time can land earlier or later than a naive `n`-unit
 /// shift (see [`shift_by_unit`]).
 ///
 /// # Errors
@@ -853,7 +855,8 @@ fn date_add(
 /// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
-/// Sub-day shifts on date-only values are civil and do not change the date.
+/// Sub-day shifts on date-only values are calendar-only and do not change the
+/// date.
 ///
 /// # Errors
 ///
@@ -881,10 +884,10 @@ fn date_sub(
 /// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration
 /// semantics per `unit`.
 /// - Inputs with a time component ([`DatePoint::Instant`]) shift calendar units
-///   on the local wall clock (preserving wall-clock hour across DST) and
+///   on the local clock time (preserving clock-time hour across DST) and
 ///   sub-day units exactly on the instant.
-/// - Civil inputs ([`DatePoint::Civil`]) shift entirely on the civil wall
-///   clock. Sub-day shifts on date-only inputs leave the calendar day
+/// - Calendar inputs ([`DatePoint::Calendar`]) shift entirely on the calendar
+///   clock time. Sub-day shifts on date-only inputs leave the calendar day
 ///   unchanged.
 ///
 /// # Errors
@@ -898,9 +901,9 @@ fn shift_by_unit(
 ) -> TemplateEngineResult<String> {
     let shifted_date_point =
         parse_date_point(value)?.shift(n, unit).map_err(render_date_error)?;
-    let wall = shifted_date_point.wall();
+    let local_datetime = shifted_date_point.local_datetime();
     let pat = shifted_date_point.canonical_pattern();
-    render_with_pattern(wall.format(pat), pat)
+    render_with_pattern(local_datetime.format(pat), pat)
 }
 
 /// `{{ value | add_days(n) }}` is a convenience shortcut for
@@ -1020,9 +1023,12 @@ fn weekday(
         let shifted = date_point
             .with_weekday(target_weekday)
             .map_err(render_date_error)?;
-        let wall = shifted.wall();
-        let pat = pattern_to_strftime(format, wall)?;
-        Ok(Value::from(render_with_pattern(wall.format(&pat), format)?))
+        let local_datetime = shifted.local_datetime();
+        let pat = pattern_to_strftime(format, local_datetime)?;
+        Ok(Value::from(render_with_pattern(
+            local_datetime.format(&pat),
+            format,
+        )?))
     } else {
         kwargs.assert_all_used()?;
         Ok(Value::from(date_point.component(DateComponent::Weekday)))
@@ -1097,13 +1103,14 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
 }
 
 /// `{% if value is is_leap_year %}` accepts either an integer year (`2024 is
-/// is_leap_year`) or a date/time string checked through [`parse_wall`].
+/// is_leap_year`) or a date/time string checked through
+/// [`parse_local_datetime`].
 ///
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] (via [`leap_year_input_error`]) if `value`
 ///   is neither an integer year representable as [`i32`] nor a parseable
-///   date/time string; see [`parse_wall`].
+///   date/time string; see [`parse_local_datetime`].
 /// - [`ErrorKind::InvalidOperation`] if the year is outside [`NaiveDate`]'s
 ///   representable range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
@@ -1111,7 +1118,7 @@ fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
         i32::try_from(year)
             .map_err(|_out_of_range| leap_year_input_error(value))?
     } else if let Some(s) = value.as_str() {
-        parse_wall(s)?.year()
+        parse_local_datetime(s)?.year()
     } else {
         return Err(leap_year_input_error(value));
     };
@@ -1429,7 +1436,7 @@ mod tests {
         }
 
         #[test]
-        fn formats_in_the_local_wall_clock() {
+        fn formats_in_the_local_clock_time() {
             TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             // Midnight UTC reads as 02:00 local on the same calendar day.
@@ -1523,10 +1530,10 @@ mod tests {
         }
 
         #[test]
-        fn renders_an_explicit_offset_input_in_the_local_wall_clock() {
+        fn renders_an_explicit_offset_input_in_the_local_clock_time() {
             TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
-            // The everyday spelling is the reader's wall clock: 14:30Z is 16:30
+            // The everyday spelling is the reader's clock time: 14:30Z is 16:30
             // local, not the UTC 12:30 the old behavior printed.
             let rendered = env()
                 .render_str(
@@ -1539,10 +1546,10 @@ mod tests {
         }
 
         #[test]
-        fn reformats_a_naive_input_to_its_own_wall_clock() {
+        fn reformats_a_naive_input_to_its_own_clock_time() {
             TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
-            // A naive datetime means the reader's wall clock, so displaying it
+            // A naive datetime means the reader's clock time, so displaying it
             // back yields the written time in any zone.
             let rendered = env()
                 .render_str(
@@ -2272,10 +2279,10 @@ mod tests {
 
             // Regression: the mixed-precision branch previously subtracted
             // whichever naive representations the two parsers happened to
-            // produce; it must subtract civil wall clocks under the pinned
+            // produce; it must subtract calendar clocks under the pinned
             // zone instead. A naive 14:30 local input and its 12:30Z
             // explicit-offset equivalent both resolve to the same 14:30
-            // local wall clock, so both land on the same 14-hour truncated
+            // local clock time, so both land on the same 14-hour truncated
             // difference (the mixed branch is i64, not f64).
             let rendered = env()
                 .render_str(
@@ -2357,10 +2364,10 @@ mod tests {
         }
 
         /// Pins the declared split between calendar and exact units: a day unit
-        /// shifts the civil wall clock across the 2026-03-08 gap, while 24
+        /// shifts the calendar clock across the 2026-03-08 gap, while 24
         /// hours shifts the instant and lands an hour later on the clock.
         #[test]
-        fn a_day_unit_preserves_the_wall_clock_across_a_dst_gap_while_hours_do_not()
+        fn a_day_unit_preserves_the_clock_time_across_a_dst_gap_while_hours_do_not()
          {
             TzGuard::set("America/New_York");
 

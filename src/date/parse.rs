@@ -32,7 +32,7 @@ fn starts_with_year(s: &str) -> bool {
 }
 
 impl DatePoint {
-    /// Parses a date or date-time shape, retaining civil precision.
+    /// Parses a date or date-time shape, retaining date precision.
     ///
     /// # Errors
     ///
@@ -48,13 +48,13 @@ impl DatePoint {
                 input: trimmed.into(),
             });
         }
-        let civil = |(date, date_precision)| Self::Civil {
+        let calendar_point = |(date, date_precision)| Self::Calendar {
             date: DateValue(date),
             date_precision,
         };
         // Date-only shapes cannot match the date-time cascade.
         if trimmed.len() <= 10 {
-            return DateShape::parse_any(trimmed).map(civil).map_err(
+            return DateShape::parse_any(trimmed).map(calendar_point).map_err(
                 |reason| DateError::InvalidValue {
                     input: trimmed.into(),
                     reason,
@@ -65,11 +65,11 @@ impl DatePoint {
             Ok(ParsedDateTime::Instant(instant)) => {
                 Ok(Self::Instant(DateTimeValue(instant)))
             }
-            Ok(ParsedDateTime::Unzoned(wall)) => {
-                Ok(Self::Instant(DateTimeValue(resolve_local(wall)?)))
+            Ok(ParsedDateTime::Unzoned(local_datetime)) => {
+                Ok(Self::Instant(DateTimeValue(resolve_local(local_datetime)?)))
             }
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
-                Ok(date) => Ok(civil(date)),
+                Ok(date) => Ok(calendar_point(date)),
                 Err(date_err) => {
                     let reason = if matches!(
                         trimmed.as_bytes().get(10),
@@ -95,7 +95,7 @@ impl DatePoint {
         if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
             if let Some(prefix) = s.get(..10)
                 && let Ok(
-                    date_point @ Self::Civil {
+                    date_point @ Self::Calendar {
                         date_precision: DatePrecision::Day,
                         ..
                     },
@@ -107,7 +107,7 @@ impl DatePoint {
         }
         if let Some(prefix) = s.get(..7)
             && let Ok(
-                date_point @ Self::Civil {
+                date_point @ Self::Calendar {
                     date_precision: DatePrecision::Month,
                     ..
                 },
@@ -133,14 +133,16 @@ impl DatePoint {
         {
             return Ok(Self::Instant(DateTimeValue(dt.with_timezone(&Utc))));
         }
-        if let Ok(wall) =
+        if let Ok(local_datetime) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::Instant(DateTimeValue(resolve_local(wall)?)));
+            return Ok(Self::Instant(DateTimeValue(resolve_local(
+                local_datetime,
+            )?)));
         }
         if trimmed_pattern == "%Y-%m"
             && let Ok(
-                date_point @ Self::Civil {
+                date_point @ Self::Calendar {
                     date_precision: DatePrecision::Month,
                     ..
                 },
@@ -149,7 +151,7 @@ impl DatePoint {
             return Ok(date_point);
         }
         NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
-            .map(|date| Self::Civil {
+            .map(|date| Self::Calendar {
                 date: DateValue(date),
                 date_precision: DatePrecision::Day,
             })
@@ -217,7 +219,9 @@ impl DateTimeValue {
         })?;
         let instant = match shape {
             ParsedDateTime::Instant(instant) => instant,
-            ParsedDateTime::Unzoned(wall) => resolve_local(wall)?,
+            ParsedDateTime::Unzoned(local_datetime) => {
+                resolve_local(local_datetime)?
+            }
         };
         Ok(Self(instant))
     }
@@ -499,7 +503,7 @@ mod tests {
         #[test]
         fn date_time_format_whole_seconds_parse_via_the_fractional_variant() {
             // Arrange
-            let wall = NaiveDate::from_ymd_opt(2026, 7, 29)
+            let local_datetime = NaiveDate::from_ymd_opt(2026, 7, 29)
                 .unwrap()
                 .and_hms_opt(14, 30, 0)
                 .unwrap();
@@ -507,7 +511,7 @@ mod tests {
             // Act & Assert
             for text in ["2026-07-29T14:30:00", "2026-07-29 14:30:00"] {
                 assert!(
-                    matches!(DateTimeShape::parse_any(text), Ok(ParsedDateTime::Unzoned(w)) if w == wall)
+                    matches!(DateTimeShape::parse_any(text), Ok(ParsedDateTime::Unzoned(w)) if w == local_datetime)
                 );
             }
         }
@@ -624,7 +628,7 @@ mod tests {
             let pat = shifted_date_point.canonical_pattern();
             assert_eq!(pat, "%Y-%m");
             assert_eq!(
-                shifted_date_point.wall().format(pat).to_string(),
+                shifted_date_point.local_datetime().format(pat).to_string(),
                 "2026-08"
             );
         }
@@ -654,7 +658,7 @@ mod tests {
                 date_point.shift(1, DurationUnit::Hour).expect("shifted");
             let pat = shifted.canonical_pattern();
             assert_eq!(
-                shifted.wall().format(pat).to_string(),
+                shifted.local_datetime().format(pat).to_string(),
                 "2026-07-29T15:30:00.123"
             );
         }

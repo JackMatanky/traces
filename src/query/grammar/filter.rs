@@ -328,7 +328,7 @@ impl ValueExpr {
 
 fn date_point_of(value: &NoteFieldValue) -> Option<DatePoint> {
     match value {
-        NoteFieldValue::Date(date) => Some(DatePoint::Civil {
+        NoteFieldValue::Date(date) => Some(DatePoint::Calendar {
             date: *date,
             date_precision: DatePrecision::Day,
         }),
@@ -341,7 +341,7 @@ fn date_point_of(value: &NoteFieldValue) -> Option<DatePoint> {
 
 fn field_value_of(date_point: DatePoint) -> NoteFieldValue {
     match date_point {
-        DatePoint::Civil {
+        DatePoint::Calendar {
             date,
             ..
         } => NoteFieldValue::Date(date),

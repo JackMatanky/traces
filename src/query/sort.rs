@@ -465,7 +465,7 @@ impl TextShape {
         let trimmed = s.trim();
         match DatePoint::parse(trimmed) {
             Ok(DatePoint::Instant(dt)) => return Self::DateTime(dt),
-            Ok(DatePoint::Civil {
+            Ok(DatePoint::Calendar {
                 date,
                 ..
             }) => return Self::Date(date),

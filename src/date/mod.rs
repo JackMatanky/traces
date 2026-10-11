@@ -11,8 +11,8 @@
 //!
 //! A naive datetime means what a human means: it is read in the process's local
 //! zone and stored as UTC (see [`resolve_local`]); a date-only value stays a
-//! zone-free civil date. Instants render as the local wall clock and travel as
-//! UTC for storage and comparison.
+//! zone-free calendar date. Instants render as the local clock time and travel
+//! as UTC for storage and comparison.
 //!
 //! # Key types
 //!
@@ -20,7 +20,7 @@
 //! - [`DateTimeValue`] - Parsed UTC date-time instant.
 //! - [`parse::DateShape`] - Format grammar for calendar date recognition.
 //! - [`parse::DateTimeShape`] - Format grammar for date-time recognition.
-//! - [`DatePoint`] - Civil date or UTC instant with written precision.
+//! - [`DatePoint`] - Calendar date or UTC instant with written precision.
 //! - [`Difference`] - Result of a calendar-owner difference measurement.
 //! - [`DateError`] - Error type for parsing, local-zone resolution, and
 //!   calendar arithmetic failures.

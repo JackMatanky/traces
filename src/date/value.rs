@@ -27,7 +27,7 @@ pub(crate) enum DatePrecision {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePoint {
     /// Zone-free calendar date.
-    Civil {
+    Calendar {
         date: DateValue,
         date_precision: DatePrecision,
     },
@@ -46,7 +46,7 @@ impl DatePoint {
     #[must_use]
     pub(crate) fn date(self) -> DateValue {
         match self {
-            Self::Civil {
+            Self::Calendar {
                 date,
                 ..
             } => date,
@@ -54,15 +54,15 @@ impl DatePoint {
         }
     }
 
-    /// Civil wall clock, or local clock for an instant.
+    /// Calendar clock time, or local clock for an instant.
     #[must_use]
-    pub(crate) fn wall(self) -> NaiveDateTime {
+    pub(crate) fn local_datetime(self) -> NaiveDateTime {
         match self {
-            Self::Civil {
+            Self::Calendar {
                 date,
                 ..
             } => date.naive_date().and_time(NaiveTime::MIN),
-            Self::Instant(dt) => dt.local_wall_or_utc(),
+            Self::Instant(dt) => dt.local_datetime_or_utc(),
         }
     }
 
@@ -70,7 +70,7 @@ impl DatePoint {
     #[must_use]
     pub(crate) fn instant(self) -> DateTime<Utc> {
         match self {
-            Self::Civil {
+            Self::Calendar {
                 date,
                 ..
             } => DateTimeValue::from(date).utc(),
@@ -83,15 +83,15 @@ impl DatePoint {
     pub(crate) fn canonical_pattern(self) -> &'static str {
         use chrono::Timelike as _;
         match self {
-            Self::Civil {
+            Self::Calendar {
                 date_precision: DatePrecision::Month,
                 ..
             } => "%Y-%m",
-            Self::Civil {
+            Self::Calendar {
                 date_precision: DatePrecision::Day,
                 ..
             } => DATE_PATTERN,
-            Self::Instant(_) if self.wall().nanosecond() == 0 => {
+            Self::Instant(_) if self.local_datetime().nanosecond() == 0 => {
                 DATETIME_PATTERN
             }
             Self::Instant(_) => "%Y-%m-%dT%H:%M:%S%.f",
@@ -101,7 +101,7 @@ impl DatePoint {
 
 /// A calendar date without timezone or time-of-day ([`NaiveDate`]).
 ///
-/// Wraps a [`NaiveDate`] representing a civil calendar date (`YYYY-MM-DD` or
+/// Wraps a [`NaiveDate`] representing a calendar date (`YYYY-MM-DD` or
 /// `YYYY-MM`). Parsed input keeps precision in `DatePoint`; deserialization
 /// uses the same strict date parser.
 #[repr(transparent)]
@@ -198,7 +198,7 @@ impl<'de> Deserialize<'de> for DateValue {
 ///     "2026-07-29T14:30:00+00:00".parse().expect("equivalent offset");
 /// assert_eq!(utc, offset);
 ///
-/// // Outside a DST fold hour, the local wall clock this value renders re-parses to the same instant.
+/// // Outside a DST fold hour, the local clock time this value renders re-parses to the same instant.
 /// let round_trip: DateTimeValue =
 ///     utc.to_string().parse().expect("rendered spelling re-parses");
 /// assert_eq!(utc, round_trip);
@@ -208,7 +208,7 @@ impl<'de> Deserialize<'de> for DateValue {
 pub struct DateTimeValue(pub(super) DateTime<Utc>);
 
 impl DateTimeValue {
-    /// Returns the local wall-clock rendering of this instant.
+    /// Returns the local clock-time rendering of this instant.
     ///
     /// Every human-facing rendering goes through this conversion: the offset
     /// comes from [`Local::offset_from_utc_datetime`] and is applied with
@@ -217,18 +217,18 @@ impl DateTimeValue {
     /// there).
     #[inline]
     #[must_use]
-    pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
+    pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
         let naive_utc = self.0.naive_utc();
         let offset = Local.offset_from_utc_datetime(&naive_utc);
         naive_utc.checked_add_offset(offset.fix())
     }
 
-    /// Returns the local wall clock, falling back to the UTC wall clock when
-    /// the local offset cannot be applied (see [`Self::local_wall`]).
+    /// Returns the local clock time, falling back to the UTC clock time when
+    /// the local offset cannot be applied (see [`Self::local_datetime`]).
     #[inline]
     #[must_use]
-    pub(crate) fn local_wall_or_utc(self) -> NaiveDateTime {
-        self.local_wall().unwrap_or_else(|| self.0.naive_utc())
+    pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+        self.local_datetime().unwrap_or_else(|| self.0.naive_utc())
     }
 
     /// Returns the local calendar date of this instant, discarding time-of-day.
@@ -238,7 +238,7 @@ impl DateTimeValue {
     #[inline]
     #[must_use]
     pub(crate) fn local_date(self) -> DateValue {
-        DateValue(self.local_wall_or_utc().date())
+        DateValue(self.local_datetime_or_utc().date())
     }
 
     /// Returns `true` if this date-time is exactly local-zone midnight on
@@ -255,24 +255,24 @@ impl DateTimeValue {
     }
 }
 
-/// Renders the local wall clock without a UTC offset, so a date or time
+/// Renders the local clock time without a UTC offset, so a date or time
 /// component reads as the reader's own clock.
 ///
 /// Fractional seconds appear only for a nonzero nanosecond component, so
 /// `DateTimeShape::LocalTSeconds` input keeps its full sub-second precision.
-/// When the local offset cannot be applied, the UTC wall clock renders instead
-/// of panicking (see `DateTimeValue::local_wall`).
+/// When the local offset cannot be applied, the UTC clock time renders instead
+/// of panicking (see `DateTimeValue::local_datetime`).
 impl fmt::Display for DateTimeValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use chrono::Timelike as _;
-        let wall = self.local_wall_or_utc();
-        let format = if wall.nanosecond() == 0 {
+        let local_datetime = self.local_datetime_or_utc();
+        let format = if local_datetime.nanosecond() == 0 {
             DATETIME_PATTERN
         } else {
             "%Y-%m-%dT%H:%M:%S%.f"
         };
-        write!(f, "{}", wall.format(format))
+        write!(f, "{}", local_datetime.format(format))
     }
 }
 
@@ -298,14 +298,14 @@ impl From<DateTimeValue> for DateTime<Utc> {
 }
 
 /// Promotes a [`DateValue`] to a [`DateTimeValue`] at midnight in the local
-/// zone: a zone-free civil date has no instant until a reader's zone supplies
-/// one.
+/// zone: a zone-free calendar date has no instant until a reader's zone
+/// supplies one.
 ///
 /// On zone-lookup failure, this promotion degrades to the neutral UTC frame
-/// (civil date read as UTC, deterministic and shift-free) instead of surfacing
-/// [`DateError::LocalZoneLookup`], because the infallible conversion is
-/// consumed by equality, sort-key, and ordering paths that cannot propagate an
-/// error, while `TryFrom` would duplicate that fallback at each of them. All
+/// (calendar date read as UTC, deterministic and shift-free) instead of
+/// surfacing [`DateError::LocalZoneLookup`], because the infallible conversion
+/// is consumed by equality, sort-key, and ordering paths that cannot propagate
+/// an error, while `TryFrom` would duplicate that fallback at each of them. All
 /// fallible entry points surface broken local-zone lookups as
 /// [`DateError::LocalZoneLookup`] instead.
 impl From<DateValue> for DateTimeValue {
@@ -356,10 +356,10 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     }
 }
 
-/// Resolves a naive local wall-clock datetime to a UTC instant under the
+/// Resolves a naive local datetime to a UTC instant under the
 /// crate's DST doctrine.
 ///
-/// A wall-clock time written without a zone is read in the process's local zone
+/// A clock time written without a zone is read in the process's local zone
 /// and stored as UTC. Resolution never fails on a DST boundary:
 ///
 /// - Ambiguous fall-back times resolve to their earliest occurrence;
@@ -373,55 +373,59 @@ impl<'de> Deserialize<'de> for DateTimeValue {
 ///
 /// # Errors
 ///
-/// - [`DateError::LocalZoneLookup`] if the lookup finds no offset for `wall` or
-///   a probe (a broken tz-data/OS environment rather than a DST boundary), or
-///   if applying the resolved offset would leave `NaiveDateTime`'s range.
+/// - [`DateError::LocalZoneLookup`] if the lookup finds no offset for
+///   `local_datetime` or a probe (a broken tz-data/OS environment rather than a
+///   DST boundary), or if applying the resolved offset would leave
+///   `NaiveDateTime`'s range.
 ///
 /// [`Disambiguation::Compatible`]:
 ///     https://docs.rs/jiff/latest/jiff/tz/enum.Disambiguation.html
 /// [chrono#1701]: https://github.com/chronotope/chrono/issues/1701
 pub(super) fn resolve_local(
-    wall: NaiveDateTime,
+    local_datetime: NaiveDateTime,
 ) -> Result<DateTime<Utc>, DateError> {
     let zone_lookup = || DateError::LocalZoneLookup {
-        input: wall.to_string().into(),
+        input: local_datetime.to_string().into(),
     };
     // The checked forms return `None` instead of panicking when the instant
     // leaves `NaiveDateTime`'s range (impossible for the parsers' 4-digit-year
     // inputs).
-    match Local.offset_from_local_datetime(&wall) {
+    match Local.offset_from_local_datetime(&local_datetime) {
         MappedLocalTime::Single(offset) => {
-            let instant =
-                wall.checked_sub_offset(offset).ok_or_else(zone_lookup)?;
+            let instant = local_datetime
+                .checked_sub_offset(offset)
+                .ok_or_else(zone_lookup)?;
             Ok(instant.and_utc())
         }
         MappedLocalTime::Ambiguous(a, b) => {
             // `chrono` orders an ambiguous pair by offset (tzfile data) or
             // transition side (POSIX rules); the earliest occurrence has the
-            // larger offset, since instant = wall - offset.
+            // larger offset, since instant = local_datetime - offset.
             let earliest = if a.local_minus_utc() >= b.local_minus_utc() {
                 a
             } else {
                 b
             };
-            let instant =
-                wall.checked_sub_offset(earliest).ok_or_else(zone_lookup)?;
+            let instant = local_datetime
+                .checked_sub_offset(earliest)
+                .ok_or_else(zone_lookup)?;
             Ok(instant.and_utc())
         }
         MappedLocalTime::None => {
             // A gap resolves `None` across the whole skipped span, so no probe
             // inside it resolves; the pre-transition offset shifts the gap time
             // forward by exactly the gap.
-            let offset = offset_across_gap(wall, &zone_lookup)?;
-            let instant =
-                wall.checked_sub_offset(offset).ok_or_else(zone_lookup)?;
+            let offset = offset_across_gap(local_datetime, &zone_lookup)?;
+            let instant = local_datetime
+                .checked_sub_offset(offset)
+                .ok_or_else(zone_lookup)?;
             Ok(instant.and_utc())
         }
     }
 }
 
 /// Finds the offset in effect just before a DST gap by stepping back one hour
-/// at a time from `wall` (the widest recorded gap is 24 hours).
+/// at a time from `local_datetime` (the widest recorded gap is 24 hours).
 ///
 /// # Errors
 ///
@@ -429,11 +433,11 @@ pub(super) fn resolve_local(
 ///   25-hour backward search (a broken tz-data/OS lookup rather than a gap), or
 ///   if stepping the probe back would leave `NaiveDateTime`'s range.
 fn offset_across_gap(
-    wall: NaiveDateTime,
+    local_datetime: NaiveDateTime,
     zone_lookup: &impl Fn() -> DateError,
 ) -> Result<FixedOffset, DateError> {
     let hour = TimeDelta::try_hours(1).ok_or_else(zone_lookup)?;
-    let mut probe = wall;
+    let mut probe = local_datetime;
     for _ in 0..25 {
         probe = probe.checked_sub_signed(hour).ok_or_else(zone_lookup)?;
         if let MappedLocalTime::Single(offset)
@@ -454,8 +458,8 @@ mod tests {
         test_support::TzGuard,
     };
 
-    /// Local-zone doctrine: a naive datetime means the reader's local wall
-    /// clock, resolved to UTC through the DST resolver; a date-only value
+    /// Local-zone doctrine: a naive datetime means the reader's local clock
+    /// time, resolved to UTC through the DST resolver; a date-only value
     /// stays zone-free until a zone is needed. Every test here injects `TZ`
     /// via [`TzGuard`] so the asserted zone is deterministic.
     mod local_zone {
@@ -482,7 +486,7 @@ mod tests {
             TzGuard::set("America/New_York");
 
             let parsed = DateTimeValue::parse_iso("2026-11-01 01:30:00")
-                .expect("ambiguous wall clock still parses");
+                .expect("ambiguous clock time still parses");
 
             // 01:30 happens twice (EDT, then EST); the earliest occurrence
             // is the EDT reading, 05:30Z.
@@ -498,7 +502,7 @@ mod tests {
             TzGuard::set("America/New_York");
 
             let parsed = DateTimeValue::parse_iso("2026-03-08 02:30:00")
-                .expect("gap wall clock still parses, never fails");
+                .expect("gap clock time still parses, never fails");
 
             // 02:30 does not exist; interpreting it with the pre-transition
             // offset shifts it forward by the one-hour gap to 03:30 EDT.
@@ -514,9 +518,9 @@ mod tests {
             TzGuard::set("America/New_York");
 
             let before = DateTimeValue::parse_iso("2026-03-08 01:59:59")
-                .expect("wall clock one second before the gap parses");
+                .expect("clock time one second before the gap parses");
             let after = DateTimeValue::parse_iso("2026-03-08 03:00:00")
-                .expect("wall clock at the gap's end parses");
+                .expect("clock time at the gap's end parses");
 
             // A real gap resolves `None` only inside the gap; the adjacent
             // local times must resolve normally, not be swept into a silent
@@ -534,7 +538,8 @@ mod tests {
         }
 
         #[test]
-        fn reports_local_zone_lookup_when_extreme_wall_clock_cannot_resolve() {
+        fn reports_local_zone_lookup_when_extreme_local_datetime_cannot_resolve()
+         {
             // Arrange
             TzGuard::set("Etc/GMT-14");
 
@@ -553,7 +558,7 @@ mod tests {
 
             let promoted = DateTimeValue::from(date);
 
-            // Civil midnight in UTC+2 is 22:00Z on the previous day, so this
+            // Calendar midnight in UTC+2 is 22:00Z on the previous day, so this
             // pins the promotion to the local zone rather than UTC.
             assert_eq!(
                 promoted.utc(),
@@ -577,11 +582,11 @@ mod tests {
                 DateTimeValue::parse_iso("2026-11-01T06:30:00Z").unwrap();
 
             // Act
-            let wall = later.to_string();
-            let reparsed = DateTimeValue::parse_iso(&wall).unwrap();
+            let local_datetime = later.to_string();
+            let reparsed = DateTimeValue::parse_iso(&local_datetime).unwrap();
 
             // Assert
-            assert_eq!(wall, "2026-11-01T01:30:00");
+            assert_eq!(local_datetime, "2026-11-01T01:30:00");
             assert_eq!(
                 reparsed,
                 DateTimeValue::parse_iso("2026-11-01T05:30:00Z").unwrap()
@@ -865,10 +870,10 @@ mod tests {
         }
 
         #[test]
-        fn displays_the_local_wall_clock_of_the_instant() {
+        fn displays_the_local_clock_time_of_the_instant() {
             TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
-            // The everyday human spelling is the local wall clock, so a
+            // The everyday human spelling is the local clock time, so a
             // 14:30:05Z instant reads as 16:30:05 local.
             assert_eq!(fixed_datetime().to_string(), "2026-07-29T16:30:05");
         }

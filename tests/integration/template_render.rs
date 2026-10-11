@@ -543,7 +543,7 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
         assert_eq!(std::fs::read_to_string(path).expect("read report"), "1");
     }
 }
-/// Proves date.now renders local wall clock while storage stays UTC under
+/// Proves date.now renders local clock time while storage stays UTC under
 /// injected TZ.
 #[test]
 fn template_seam_renders_local_clock_under_injected_tz() {

@@ -47,7 +47,7 @@ pub enum DateError {
     /// deterministically.
     #[error("local timezone lookup failed for `{input}`")]
     LocalZoneLookup {
-        /// The naive wall-clock input that could not be resolved.
+        /// The naive clock-time input that could not be resolved.
         input: Box<str>,
     },
     /// A date/time arithmetic operation overflowed or exceeded the

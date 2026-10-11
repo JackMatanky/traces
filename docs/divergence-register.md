@@ -10,7 +10,7 @@ This register documents intentional architectural and behavioral divergences bet
 
 ## Entry 1: UTC Storage of Instants
 
-- **Divergence**: Traces stores all date-time instants as UTC in index and memory, while rendering human displays as the local wall clock.
+- **Divergence**: Traces stores all date-time instants as UTC in index and memory, while rendering human displays as the local clock time.
 - **External Behavior**: Dataview and Templater often preserve local timezone offsets or arbitrary strings in memory, leading to offset mismatches across machines or synchronization boundaries.
 - **Rationale**: Eliminates cross-platform timezone comparison defects while maintaining human-intuitive local displays.
 - **Specification**: Spec Story 12, Decision D9.
@@ -24,9 +24,9 @@ This register documents intentional architectural and behavioral divergences bet
 
 ### Entry 3: Dual Regime for Duration Identity vs. Application (Luxon Parity)
 
-- **Divergence**: Duration equality and hashing compare canonical total seconds (`1d == 24h`, `1mo == 30d`), but duration application treats calendar units (`d`, `w`, `mo`, `y`) as calendar units on the civil wall clock.
+- **Divergence**: Duration equality and hashing compare canonical total seconds (`1d == 24h`, `1mo == 30d`), but duration application treats calendar units (`d`, `w`, `mo`, `y`) as calendar units on the calendar clock.
 - **External Behavior**: Strict physical duration models treat all units as fixed seconds; pure calendar models reject cross-unit equality.
-- **Rationale**: Follows Luxon's dual-regime convention: users expect `1d == 24h` in numeric comparisons, but expect adding `1d` across a Daylight Saving Time shift to preserve wall-clock time rather than advancing 24 physical hours.
+- **Rationale**: Follows Luxon's dual-regime convention: users expect `1d == 24h` in numeric comparisons, but expect adding `1d` across a Daylight Saving Time shift to preserve clock time rather than advancing 24 physical hours.
 - **Specification**: Spec Decision A2′, Decision D13; backed by Seam 1 test pins.
 
 ### Entry 4: Explicit NoteFieldType Rank
@@ -87,8 +87,8 @@ This register documents intentional architectural and behavioral divergences bet
 
 ### Entry 12: Calendar Unit vs. Sub-Hour Exact Application
 
-- **Divergence**: Applying days, weeks, months, or years shifts the civil wall-clock date, whereas sub-day units (hours, minutes, seconds, milliseconds) apply as exact physical durations on the instant.
-- **External Behavior**: Naive timestamp libraries treat `+ 1 day` as `+ 86400 seconds`, which drifts the wall clock across DST boundaries.
+- **Divergence**: Applying days, weeks, months, or years shifts the calendar clock date, whereas sub-day units (hours, minutes, seconds, milliseconds) apply as exact physical durations on the instant.
+- **External Behavior**: Naive timestamp libraries treat `+ 1 day` as `+ 86400 seconds`, which drifts the clock time across DST boundaries.
 - **Rationale**: Replicates PostgreSQL `interval '1 day'` vs `interval '24 hours'` semantics: human calendar intent differs between "tomorrow at this time" and "in exactly 86,400 seconds."
 - **Specification**: Spec Decision D13.
 
@@ -108,9 +108,9 @@ This register documents intentional architectural and behavioral divergences bet
 
 ### Entry 15: RFC 3339 `…Z` Serialization
 
-- **Divergence**: `Serialize for DateTimeValue` emits explicit RFC 3339 `…Z` UTC representations (`to_rfc3339_opts(SecondsFormat::AutoSi, true)`), whereas `Display` renders the everyday local wall clock.
+- **Divergence**: `Serialize for DateTimeValue` emits explicit RFC 3339 `…Z` UTC representations (`to_rfc3339_opts(SecondsFormat::AutoSi, true)`), whereas `Display` renders the everyday local clock time.
 - **External Behavior**: Some libraries serialize using the same format as human display, losing timezone context across serialization boundaries.
-- **Rationale**: Interoperable data interchange requires explicit UTC offsets, while human display requires local wall clocks.
+- **Rationale**: Interoperable data interchange requires explicit UTC offsets, while human display requires local clock times.
 - **Specification**: Spec Story 41, Decision RPT-F3.
 
 ### Entry 16: Computed Duration Display Synthesis
