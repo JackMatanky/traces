@@ -450,20 +450,6 @@ mod tests {
             assert!(!root.path().join(".traces").exists());
         }
 
-        #[test]
-        fn undo_leaves_a_config_file_it_did_not_create() {
-            let root = tempfile::tempdir().expect("create temp dir");
-            let traces = root.path().join(".traces");
-            fs::create_dir(&traces).expect("create .traces");
-            let foreign = root.path().join(LOCAL_CONFIG_FILE);
-            fs::write(&foreign, "planted").expect("plant config");
-
-            Init::undo(std::slice::from_ref(&traces));
-
-            assert_eq!(fs::read_to_string(&foreign).expect("read"), "planted");
-            assert!(traces.is_dir());
-        }
-
         /// Existing initialization must not be overwritten.
         #[test]
         fn refuses_existing_traces_directory() {
@@ -491,7 +477,29 @@ mod tests {
         }
     }
 
+    mod undo {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn undo_leaves_a_config_file_it_did_not_create() {
+            let root = tempfile::tempdir().expect("create temp dir");
+            let traces = root.path().join(".traces");
+            fs::create_dir(&traces).expect("create .traces");
+            let foreign = root.path().join(LOCAL_CONFIG_FILE);
+            fs::write(&foreign, "planted").expect("plant config");
+
+            Init::undo(std::slice::from_ref(&traces));
+
+            assert_eq!(fs::read_to_string(&foreign).expect("read"), "planted");
+            assert!(traces.is_dir());
+        }
+    }
+
     mod scaffold_local {
+        use pretty_assertions::assert_eq;
+
         use super::*;
 
         #[test]
@@ -510,7 +518,16 @@ mod tests {
             let contents =
                 fs::read_to_string(root.path().join(LOCAL_CONFIG_FILE))
                     .expect("read written config");
-            assert!(contents.contains("templates"));
+            let written: RawConfig =
+                toml::from_str(&contents).expect("parse written config");
+            assert_eq!(
+                written.templates.directory.as_deref(),
+                Some(Path::new("templates"))
+            );
+            assert_eq!(
+                written.templates.output_dir.as_deref(),
+                Some(Path::new("notes"))
+            );
         }
 
         #[test]

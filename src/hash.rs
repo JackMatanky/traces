@@ -7,7 +7,7 @@
 
 use std::{
     fmt::{self, Display, Formatter},
-    fs, io,
+    io,
     path::{Path, PathBuf},
 };
 
@@ -22,13 +22,6 @@ use thiserror::Error;
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Blake3Digest(blake3::Hash);
 
-impl From<&str> for Blake3Digest {
-    #[inline]
-    fn from(content: &str) -> Self {
-        Self(blake3::hash(content.as_bytes()))
-    }
-}
-
 impl Blake3Digest {
     /// Computes the BLAKE3 hash of `path`'s current contents.
     ///
@@ -39,9 +32,10 @@ impl Blake3Digest {
     /// # Errors
     ///
     /// - `HashError` if `path` cannot be read
+    #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn from_path(path: &Path) -> Result<Self, HashError> {
-        let contents = fs::read(path).map_err(|source| HashError {
+        let contents = std::fs::read(path).map_err(|source| HashError {
             path: path.to_path_buf(),
             source,
         })?;
@@ -53,6 +47,13 @@ impl Blake3Digest {
     #[must_use]
     pub fn to_hex(self) -> impl AsRef<str> + Display {
         self.0.to_hex()
+    }
+}
+
+impl From<&str> for Blake3Digest {
+    #[inline]
+    fn from(content: &str) -> Self {
+        Self(blake3::hash(content.as_bytes()))
     }
 }
 
@@ -177,7 +178,7 @@ pub struct HashError {
 mod tests {
     use super::*;
 
-    mod file_hash {
+    mod blake3_digest {
         use std::fs;
 
         use pretty_assertions::{assert_eq, assert_ne};
@@ -252,26 +253,26 @@ mod tests {
         }
     }
 
-    mod fingerprint {
+    mod blake3_hasher {
         use pretty_assertions::assert_ne;
 
         use super::*;
 
         fn digest(feed: impl FnOnce(&mut Blake3Hasher)) -> Blake3Digest {
-            let mut fp = Blake3Hasher::new();
-            feed(&mut fp);
-            fp.finish()
+            let mut hasher = Blake3Hasher::new();
+            feed(&mut hasher);
+            hasher.finish()
         }
 
         #[test]
         fn length_prefixes_keep_adjacent_fields_apart() {
-            let first = digest(|fp| {
-                fp.bytes(b"a\0b");
-                fp.bytes(b"c");
+            let first = digest(|hasher| {
+                hasher.bytes(b"a\0b");
+                hasher.bytes(b"c");
             });
-            let second = digest(|fp| {
-                fp.bytes(b"a");
-                fp.bytes(b"b\0c");
+            let second = digest(|hasher| {
+                hasher.bytes(b"a");
+                hasher.bytes(b"b\0c");
             });
 
             assert_ne!(first, second);
@@ -279,8 +280,9 @@ mod tests {
 
         #[test]
         fn an_absent_optional_path_differs_from_an_empty_one() {
-            let absent = digest(|fp| fp.optional_path(None));
-            let empty = digest(|fp| fp.optional_path(Some(Path::new(""))));
+            let absent = digest(|hasher| hasher.optional_path(None));
+            let empty =
+                digest(|hasher| hasher.optional_path(Some(Path::new(""))));
 
             assert_ne!(absent, empty);
         }
@@ -290,11 +292,11 @@ mod tests {
         fn paths_differing_only_in_non_utf8_bytes_stay_distinct() {
             use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
-            let first = digest(|fp| {
-                fp.path(Path::new(OsStr::from_bytes(b"/p\xFF")));
+            let first = digest(|hasher| {
+                hasher.path(Path::new(OsStr::from_bytes(b"/p\xFF")));
             });
-            let second = digest(|fp| {
-                fp.path(Path::new(OsStr::from_bytes(b"/p\xFE")));
+            let second = digest(|hasher| {
+                hasher.path(Path::new(OsStr::from_bytes(b"/p\xFE")));
             });
 
             assert_ne!(first, second);

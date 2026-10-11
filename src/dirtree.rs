@@ -78,7 +78,15 @@ impl<'a> DirNodeRef<'a> {
     pub(crate) fn file_name(self) -> &'a OsStr {
         self.0.file_name()
     }
+
+    /// Returns the node's full path.
+    #[inline]
+    #[must_use]
+    pub(crate) fn path(self) -> &'a Path {
+        self.0.path()
+    }
 }
+
 impl DirNode {
     /// Adapts one raw walkdir item into this module's interface.
     ///

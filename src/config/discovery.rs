@@ -91,6 +91,8 @@ impl ConfigLocator {
     }
 
     /// Finds the nearest local config at or above `dir`, stopping at a ceiling.
+    /// Ceilings are exclusive: a ceiling directory, including `dir` itself, is
+    /// never searched.
     ///
     /// # Errors
     ///
@@ -142,17 +144,20 @@ impl ConfigLocator {
 /// Collects every local config directly rooted at a directory beneath `dir`,
 /// including `dir` itself.
 ///
-/// Walks the whole tree unpruned: a config may sit anywhere, so every directory
-/// is probed. Errors (including a vanished root) propagate as
+/// Prunes directories named by [`env_vars::is_ignored_dir`] together with
+/// their subtrees, so a config inside `node_modules` or `target` is not found.
+/// `dir` itself is never pruned: naming an ignored directory explicitly still
+/// scans it. Errors (including a vanished root) propagate as
 /// [`ConfigDiscoveryError::Inaccessible`]; unlike the Schema registry and
 /// Template loaders there is no degrade-to-empty policy here.
 fn collect_descendant_configs(
     dir: &Path,
 ) -> ConfigDiscoveryResult<Vec<LocalConfigFile<Discovered>>> {
+    let root = dir.to_path_buf();
     let mut configs = Vec::new();
-    for node in DirTree::descendants(dir)
-        .filter(|node| env_vars::is_ignored_dir(node.file_name()))
-    {
+    for node in DirTree::descendants(dir).filter(move |node| {
+        node.path() != root && env_vars::is_ignored_dir(node.file_name())
+    }) {
         let node = node.map_err(|error| {
             let (path, source) = error.into_parts();
             ConfigDiscoveryError::Inaccessible {
@@ -320,6 +325,24 @@ mod tests {
                 Err(ConfigDiscoveryError::NotFound { .. })
             ));
         }
+
+        #[test]
+        fn does_not_search_a_ceiling_directory_that_is_the_start_dir() {
+            let fixture = Fixture::new();
+            let dir = fixture.create_dir("project");
+            fixture.create_config("project");
+            let locator = ConfigLocator::new(
+                vec![dir.clone()],
+                fixture.path("global-home/traces"),
+            );
+
+            let result = locator.nearest_local(&dir);
+
+            assert!(matches!(
+                result,
+                Err(ConfigDiscoveryError::NotFound { .. })
+            ));
+        }
     }
 
     mod local_subtree {
@@ -339,6 +362,32 @@ mod tests {
                 fixture.locator().local_subtree(&parent).expect("subtree");
 
             assert_eq!(roots(&found), [parent, child]);
+        }
+
+        #[test]
+        fn skips_configs_inside_ignored_directories() {
+            let fixture = Fixture::new();
+            let project = fixture.create_dir("p");
+            fixture.create_config("p");
+            fixture.create_config("p/node_modules/dep");
+
+            let found =
+                fixture.locator().local_subtree(&project).expect("subtree");
+
+            assert_eq!(roots(&found), [project]);
+        }
+
+        #[test]
+        fn scans_an_ignored_directory_named_explicitly() {
+            let fixture = Fixture::new();
+            let ignored = fixture.create_dir("p/target");
+            fixture.create_config("p");
+            fixture.create_config("p/target/inner");
+
+            let found =
+                fixture.locator().local_subtree(&ignored).expect("subtree");
+
+            assert_eq!(roots(&found), [fixture.path("p/target/inner")]);
         }
 
         #[test]

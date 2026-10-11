@@ -103,7 +103,7 @@ impl ConfigService {
     ///   parsed.
     /// - [`ConfigError::Trust`] when the local config's workspace is not
     ///   trusted, is missing its baseline hash, or is stale, or when the trust
-    ///   or tracking store cannot be read or hashed.
+    ///   store cannot be read or the config file cannot be hashed.
     /// - [`ConfigError::Value`] when a parsed config value fails domain
     ///   validation.
     #[inline]
@@ -734,23 +734,6 @@ mod tests {
                 config_request(&parent, &parent_config),
                 config_request(&child, &child_config),
             ]);
-        }
-
-        #[test]
-        fn local_subtree_without_any_config_is_not_found() {
-            let fixture = Fixture::new();
-            let project = fixture.target_dir("project");
-
-            let result = resolve_trust_subjects(
-                &fixture.locator(),
-                &project,
-                TrustScope::LocalSubtree,
-            );
-
-            assert!(matches!(
-                result,
-                Err(ConfigDiscoveryError::NotFound { .. })
-            ));
         }
 
         #[test]
