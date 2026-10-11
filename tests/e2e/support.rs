@@ -122,6 +122,36 @@ impl Run {
     }
 }
 
+/// Strips `prefix` and `suffix` from `text`, then asserts the remainder
+/// names the same filesystem entity as `expected` — compared by
+/// canonicalized identity, not string form.
+///
+/// OS-level cwd resolution can represent one real directory differently
+/// across commands or platforms: POSIX `getcwd()` always resolves symlinks
+/// (e.g. macOS's `/tmp` -> `/private/tmp`), while Windows's raw
+/// `current_dir` can preserve a short (8.3) alias one command reports but
+/// another, which explicitly canonicalizes (e.g. trust discovery), does
+/// not. String-comparing two commands' own reports is inherently fragile;
+/// comparing canonicalized paths is not.
+pub(crate) fn assert_reports_same_path(
+    text: &str,
+    prefix: &str,
+    suffix: &str,
+    expected: &Path,
+) {
+    let message =
+        format!("{text:?} missing prefix {prefix:?} or suffix {suffix:?}");
+    let reported = text
+        .strip_prefix(prefix)
+        .and_then(|s| s.strip_suffix(suffix))
+        .expect(&message);
+    assert_eq!(
+        Path::new(reported).canonicalize().expect("canonicalize reported path"),
+        expected.canonicalize().expect("canonicalize expected path"),
+        "reported path mismatch; text: {text}"
+    );
+}
+
 /// Strips Miette box-drawing continuation glyphs and collapses whitespace runs
 /// to single spaces.
 ///

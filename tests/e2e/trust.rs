@@ -1,9 +1,7 @@
 //! Proves the trust → untrust → subsequent-command-fails round trip at the
 //! process boundary — previously only unit-tested in-process.
 
-use pretty_assertions::assert_eq;
-
-use super::support::Sandbox;
+use super::support::{self, Sandbox};
 
 /// Untrusts a trusted project, then checks a later `list` fails with the
 /// untrusted diagnostic.
@@ -55,14 +53,11 @@ fn trust_all_and_untrust_all_count_asserted_via_trust_list() {
     // un-resolved tempdir path despite both naming the same directory.
     let list_after_trust = sandbox.run(&["trust", "list"]);
     list_after_trust.assert_code(0);
-    let reported_root = list_after_trust.stdout.trim_end_matches('\n');
-    assert_eq!(
-        std::path::Path::new(reported_root)
-            .canonicalize()
-            .expect("canonicalize reported root"),
-        sandbox.root().canonicalize().expect("canonicalize sandbox root"),
-        "trust list root mismatch; stdout: {}",
-        list_after_trust.stdout
+    support::assert_reports_same_path(
+        &list_after_trust.stdout,
+        "",
+        "\n",
+        sandbox.root(),
     );
 
     // Untrust via --all

@@ -7,7 +7,7 @@
 
 use pretty_assertions::assert_eq;
 
-use super::support::Sandbox;
+use super::support::{self, Sandbox};
 
 /// Chains `init` → `trust` → `index` → `list` → `table` → `task` →
 /// `template --dry-run` in one project directory, matching a real first
@@ -103,42 +103,35 @@ fn stream_contracts_exact_outputs_and_mutating_empty_stdout() {
     trust.assert_code(0);
     trust.assert_never_exit_101();
     trust.assert_stdout_eq("");
-    // Captures the raw reported root (not an independently computed
-    // canonical form) for self-consistent reuse below: Windows's
-    // `current_dir` can echo a short (8.3) alias distinct from the
-    // sandbox's own un-resolved tempdir path despite both naming the same
-    // directory, so only this process's own report is safe to compare
-    // against its own later output.
-    let root_str = trust
-        .stderr
-        .strip_prefix("trusted ")
-        .and_then(|s| s.strip_suffix('\n'))
-        .expect("trust stderr reports the trusted root")
-        .to_owned();
-    let reported_root = std::path::PathBuf::from(&root_str);
-    assert_eq!(
-        reported_root.canonicalize().expect("canonicalize reported root"),
-        sandbox.root().canonicalize().expect("canonicalize sandbox root"),
-        "trusted root mismatch; stderr: {}",
-        trust.stderr
+    support::assert_reports_same_path(
+        &trust.stderr,
+        "trusted ",
+        "\n",
+        sandbox.root(),
     );
-    let config_path_str = reported_root
-        .join(".traces/config.toml")
-        .to_string_lossy()
-        .into_owned();
 
     // Query stream: `trust list`
     let trust_list = sandbox.run(&["trust", "list"]);
     trust_list.assert_code(0);
     trust_list.assert_never_exit_101();
-    trust_list.assert_stdout_eq(&format!("{root_str}\n"));
+    support::assert_reports_same_path(
+        &trust_list.stdout,
+        "",
+        "\n",
+        sandbox.root(),
+    );
     trust_list.assert_stderr_eq("");
 
     // Query stream: `trust --show`
     let trust_show = sandbox.run(&["trust", "--show"]);
     trust_show.assert_code(0);
     trust_show.assert_never_exit_101();
-    trust_show.assert_stdout_eq(&format!("{config_path_str}\ttrusted\n"));
+    support::assert_reports_same_path(
+        &trust_show.stdout,
+        "",
+        "\ttrusted\n",
+        &sandbox.root().join(".traces/config.toml"),
+    );
     trust_show.assert_stderr_eq("");
 
     // Query stream: `template --list`
@@ -160,17 +153,24 @@ fn stream_contracts_exact_outputs_and_mutating_empty_stdout() {
     index.assert_code(0);
     index.assert_never_exit_101();
     index.assert_stdout_eq("");
-    index.assert_stderr_eq(&format!("indexed 2 file(s) under {root_str}\n"));
+    support::assert_reports_same_path(
+        &index.stderr,
+        "indexed 2 file(s) under ",
+        "\n",
+        sandbox.root(),
+    );
 
     // Mutating: `template -i alpha --no-input`
     let tmpl_inst = sandbox.run(&["template", "-i", "alpha", "--no-input"]);
     tmpl_inst.assert_code(0);
     tmpl_inst.assert_never_exit_101();
     tmpl_inst.assert_stdout_eq("");
-    tmpl_inst.assert_stderr_eq(&format!(
-        "wrote {}\n",
-        reported_root.join("alpha.md").display()
-    ));
+    support::assert_reports_same_path(
+        &tmpl_inst.stderr,
+        "wrote ",
+        "\n",
+        &sandbox.root().join("alpha.md"),
+    );
 
     // Mutating: `trust clean`
     let clean = sandbox.run(&["trust", "clean"]);
@@ -184,5 +184,10 @@ fn stream_contracts_exact_outputs_and_mutating_empty_stdout() {
     untrust.assert_code(0);
     untrust.assert_never_exit_101();
     untrust.assert_stdout_eq("");
-    untrust.assert_stderr_eq(&format!("untrusted {root_str}\n"));
+    support::assert_reports_same_path(
+        &untrust.stderr,
+        "untrusted ",
+        "\n",
+        sandbox.root(),
+    );
 }
