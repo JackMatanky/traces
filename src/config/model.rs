@@ -392,7 +392,7 @@ impl SchemasConfig {
     ///
     /// # Panics
     ///
-    /// Panics if `class_field` is not a valid field key.
+    /// - `class_field` is not a valid field key.
     #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     #[expect(
@@ -424,7 +424,7 @@ impl Default for SchemasConfig {
     ///
     /// # Panics
     ///
-    /// Panics if [`DEFAULT_CLASS_FIELD`] stops being a valid field key.
+    /// - [`DEFAULT_CLASS_FIELD`] stops being a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -491,8 +491,7 @@ impl FrontmatterConfig {
     ///
     /// # Panics
     ///
-    /// Panics if `title` or `aliases` is empty, whitespace-only, or contains
-    /// `/`.
+    /// - `title` or `aliases` is empty, whitespace-only, or contains `/`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -518,7 +517,7 @@ impl FrontmatterConfig {
     ///
     /// # Panics
     ///
-    /// Panics if `tags` is empty, whitespace-only, or contains `/`.
+    /// - `tags` is empty, whitespace-only, or contains `/`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -557,9 +556,9 @@ impl Default for FrontmatterConfig {
     ///
     /// # Panics
     ///
-    /// Panics if [`DEFAULT_TITLE_FIELD`], [`DEFAULT_ALIASES_FIELD`],
-    /// [`DEFAULT_TAGS_FIELD`], [`DEFAULT_DATE_CREATED_FIELD`], or
-    /// [`DEFAULT_DATE_MODIFIED_FIELD`] stops being a valid field key.
+    /// - [`DEFAULT_TITLE_FIELD`], [`DEFAULT_ALIASES_FIELD`],
+    ///   [`DEFAULT_TAGS_FIELD`], [`DEFAULT_DATE_CREATED_FIELD`], or
+    ///   [`DEFAULT_DATE_MODIFIED_FIELD`] stops being a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -667,7 +666,7 @@ impl TaskConfig {
     ///
     /// # Panics
     ///
-    /// Panics if any tag does not parse as a [`Tag`].
+    /// - Any tag does not parse as a [`Tag`].
     #[cfg(any(test, feature = "test-utils"))]
     #[expect(
         clippy::expect_used,
@@ -910,8 +909,8 @@ impl DateFieldConfig {
     ///
     /// # Panics
     ///
-    /// Panics if `name` is not a valid field key; callers pass only
-    /// [`DEFAULT_DATE_CREATED_FIELD`] or [`DEFAULT_DATE_MODIFIED_FIELD`].
+    /// - `name` is not a valid field key; callers pass only
+    ///   [`DEFAULT_DATE_CREATED_FIELD`] or [`DEFAULT_DATE_MODIFIED_FIELD`].
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -939,7 +938,7 @@ impl DateFieldConfig {
     ///
     /// # Panics
     ///
-    /// Panics if `default_name` is invalid when `raw` is absent.
+    /// - `default_name` is invalid when `raw` is absent.
     #[inline]
     fn from_raw_or_default(
         raw: Option<RawDateFieldConfig>,
