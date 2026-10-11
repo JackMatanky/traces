@@ -88,9 +88,10 @@ impl FileMeta {
         created_at: Option<SystemTime>,
     ) -> Option<DateValue> {
         if let Some(name) = BaseNameRef::from_path(path)
-            && let Some((rec, _)) = DatePoint::parse_prefix(name.as_str())
+            && let Some((date_point, _)) =
+                DatePoint::parse_prefix(name.as_str())
         {
-            return Some(rec.date());
+            return Some(date_point.date());
         }
         created_at.map(DateValue::from)
     }

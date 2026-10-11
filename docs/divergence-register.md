@@ -141,9 +141,9 @@ This register documents intentional architectural and behavioral divergences bet
 - **Rationale**: Prevents the Dataview `.week` footgun; ISO-8601 week calculations are mathematically correct and standard.
 - **Specification**: Spec Story 4, Week mandate L109.
 
-### Entry 20: No Lenient Format Guessing in `Point::parse_with_pattern`
+### Entry 20: No Lenient Format Guessing in `DatePoint::parse_with_pattern`
 
-- **Divergence**: `Point::parse_with_pattern(text, pattern)` enforces a strict contract: matching formats succeed; non-matching text or invalid format patterns return explicit errors, rejecting heuristic guessing.
+- **Divergence**: `DatePoint::parse_with_pattern(text, pattern)` enforces a strict contract: matching formats succeed; non-matching text or invalid format patterns return explicit errors, rejecting heuristic guessing.
 - **External Behavior**: Templater and moment.js attempt heuristic format recovery when a format pattern fails to match.
 - **Rationale**: Silent or heuristic date parsing causes subtle data corruption in notes and queries; strict errors ensure predictable behavior.
 

@@ -230,9 +230,9 @@ pub(crate) enum QueryFunction {
     DateDiff,
     /// `date_component(date, name)`.
     DateComponent,
-    /// First day of a period (`sow`, `som`, `soy` and long spellings).
+    /// First day of a calendar period (`sow`, `som`, `soy` and long spellings).
     StartOf(CalendarPeriod),
-    /// Last day of a period (`eow`, `eom`, `eoy` and long spellings).
+    /// Last day of a calendar period (`eow`, `eom`, `eoy` and long spellings).
     EndOf(CalendarPeriod),
     /// `date(text[, pattern])`: date literal conversion.
     Date,
@@ -326,11 +326,11 @@ impl ValueExpr {
     }
 }
 
-fn point_of(value: &NoteFieldValue) -> Option<DatePoint> {
+fn date_point_of(value: &NoteFieldValue) -> Option<DatePoint> {
     match value {
         NoteFieldValue::Date(date) => Some(DatePoint::Civil {
             date: *date,
-            precision: DatePrecision::Day,
+            date_precision: DatePrecision::Day,
         }),
         NoteFieldValue::DateTime(datetime) => {
             Some(DatePoint::Instant(*datetime))
@@ -339,8 +339,8 @@ fn point_of(value: &NoteFieldValue) -> Option<DatePoint> {
     }
 }
 
-fn field_value_of(point: DatePoint) -> NoteFieldValue {
-    match point {
+fn field_value_of(date_point: DatePoint) -> NoteFieldValue {
+    match date_point {
         DatePoint::Civil {
             date,
             ..
@@ -374,19 +374,21 @@ fn evaluate_binary(
             NoteFieldValue::Duration(duration),
             ArithOp::Add,
             date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-        ) => Some(field_value_of(point_of(&date)?.apply(&duration).ok()?)),
+        ) => Some(field_value_of(date_point_of(&date)?.apply(&duration).ok()?)),
         (
             date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Sub,
             NoteFieldValue::Duration(duration),
-        ) => Some(field_value_of(point_of(&date)?.apply(&-duration).ok()?)),
+        ) => {
+            Some(field_value_of(date_point_of(&date)?.apply(&-duration).ok()?))
+        }
         (
             date1 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Sub,
             date2 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
         ) => {
-            let diff = point_of(&date2)?
-                .diff(point_of(&date1)?, DurationUnit::Second)
+            let diff = date_point_of(&date2)?
+                .diff(date_point_of(&date1)?, DurationUnit::Second)
                 .ok()?;
             let seconds = diff.to_f64()?;
             Some(NoteFieldValue::Duration(DurationValue::from_nominal_seconds(
@@ -435,11 +437,13 @@ fn evaluate_registry_call(
         QueryFunction::DateAdd => evaluate_date_add(args),
         QueryFunction::DateDiff => evaluate_date_diff(args),
         QueryFunction::DateComponent => evaluate_date_component(args),
-        QueryFunction::StartOf(period) => {
-            date_boundary(args, |pt| pt.start_of(period))
+        QueryFunction::StartOf(calendar_period) => {
+            date_boundary(args, |date_point| {
+                date_point.start_of(calendar_period)
+            })
         }
-        QueryFunction::EndOf(period) => {
-            date_boundary(args, |pt| pt.end_of(period))
+        QueryFunction::EndOf(calendar_period) => {
+            date_boundary(args, |date_point| date_point.end_of(calendar_period))
         }
         QueryFunction::Date => evaluate_date(args),
     }
@@ -464,7 +468,7 @@ fn evaluate_date_add(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
             }
             let unit = DurationUnit::from_spelling(unit)?;
             let n = (n.fract() == 0.0).then(|| n.to_i64()).flatten()?;
-            let shifted = point_of(date)?.shift(n, unit).ok()?;
+            let shifted = date_point_of(date)?.shift(n, unit).ok()?;
             Some(field_value_of(shifted))
         }
         _ => None,
@@ -484,7 +488,7 @@ fn evaluate_date_diff(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
     {
         return Some(NoteFieldValue::Null);
     }
-    let diff = point_of(date1)?.diff(point_of(date2)?, unit).ok()?;
+    let diff = date_point_of(date1)?.diff(date_point_of(date2)?, unit).ok()?;
     Some(NoteFieldValue::Number(diff.to_f64()?))
 }
 
@@ -519,7 +523,7 @@ fn date_boundary(
     if matches!(date, NoteFieldValue::Null) {
         return Some(NoteFieldValue::Null);
     }
-    Some(field_value_of(op(point_of(date)?).ok()?))
+    Some(field_value_of(op(date_point_of(date)?).ok()?))
 }
 
 fn evaluate_date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
@@ -531,7 +535,9 @@ fn evaluate_date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
         return Some(NoteFieldValue::Null);
     }
     let component = DateComponent::from_name(component)?;
-    Some(NoteFieldValue::Number(point_of(date)?.component(component).to_f64()?))
+    Some(NoteFieldValue::Number(
+        date_point_of(date)?.component(component).to_f64()?,
+    ))
 }
 
 fn is_unrecognized_unit(expr: Option<&ValueExpr>) -> bool {

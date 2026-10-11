@@ -14,7 +14,7 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
-/// Calendar precision of a zone-free point.
+/// Calendar precision of a zone-free date point.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePrecision {
     /// Year and month.
@@ -29,20 +29,20 @@ pub(crate) enum DatePoint {
     /// Zone-free calendar date.
     Civil {
         date: DateValue,
-        precision: DatePrecision,
+        date_precision: DatePrecision,
     },
     /// UTC instant.
     Instant(DateTimeValue),
 }
 
 impl DatePoint {
-    /// Whether this point carries a time-of-day component.
+    /// Whether this date point carries a time-of-day component.
     #[must_use]
     pub(crate) const fn has_time(self) -> bool {
         matches!(self, Self::Instant(_))
     }
 
-    /// Calendar date of this point in the local zone.
+    /// Calendar date of this date point in the local zone.
     #[must_use]
     pub(crate) fn date(self) -> DateValue {
         match self {
@@ -66,7 +66,7 @@ impl DatePoint {
         }
     }
 
-    /// UTC instant represented by this point.
+    /// UTC instant represented by this date point.
     #[must_use]
     pub(crate) fn instant(self) -> DateTime<Utc> {
         match self {
@@ -84,11 +84,11 @@ impl DatePoint {
         use chrono::Timelike as _;
         match self {
             Self::Civil {
-                precision: DatePrecision::Month,
+                date_precision: DatePrecision::Month,
                 ..
             } => "%Y-%m",
             Self::Civil {
-                precision: DatePrecision::Day,
+                date_precision: DatePrecision::Day,
                 ..
             } => DATE_PATTERN,
             Self::Instant(_) if self.wall().nanosecond() == 0 => {
@@ -645,7 +645,7 @@ mod tests {
         }
     }
 
-    mod point_api {
+    mod date_point_api {
         use pretty_assertions::assert_eq;
 
         use super::*;
@@ -661,8 +661,7 @@ mod tests {
         }
 
         #[test]
-        fn canonical_pattern_preserves_civil_precision_and_fractional_seconds()
-        {
+        fn canonical_pattern_preserves_date_precision_and_fractional_seconds() {
             TzGuard::set("UTC");
             assert_eq!(
                 DatePoint::parse("2026-07").unwrap().canonical_pattern(),

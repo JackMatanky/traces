@@ -48,9 +48,9 @@ impl DatePoint {
                 input: trimmed.into(),
             });
         }
-        let civil = |(date, precision)| Self::Civil {
+        let civil = |(date, date_precision)| Self::Civil {
             date: DateValue(date),
-            precision,
+            date_precision,
         };
         // Date-only shapes cannot match the date-time cascade.
         if trimmed.len() <= 10 {
@@ -95,25 +95,25 @@ impl DatePoint {
         if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
             if let Some(prefix) = s.get(..10)
                 && let Ok(
-                    point @ Self::Civil {
-                        precision: DatePrecision::Day,
+                    date_point @ Self::Civil {
+                        date_precision: DatePrecision::Day,
                         ..
                     },
                 ) = Self::parse(prefix)
             {
-                return Some((point, 10));
+                return Some((date_point, 10));
             }
             return None;
         }
         if let Some(prefix) = s.get(..7)
             && let Ok(
-                point @ Self::Civil {
-                    precision: DatePrecision::Month,
+                date_point @ Self::Civil {
+                    date_precision: DatePrecision::Month,
                     ..
                 },
             ) = Self::parse(prefix)
         {
-            return Some((point, 7));
+            return Some((date_point, 7));
         }
         None
     }
@@ -140,18 +140,18 @@ impl DatePoint {
         }
         if trimmed_pattern == "%Y-%m"
             && let Ok(
-                point @ Self::Civil {
-                    precision: DatePrecision::Month,
+                date_point @ Self::Civil {
+                    date_precision: DatePrecision::Month,
                     ..
                 },
             ) = Self::parse(trimmed_text)
         {
-            return Ok(point);
+            return Ok(date_point);
         }
         NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
             .map(|date| Self::Civil {
                 date: DateValue(date),
-                precision: DatePrecision::Day,
+                date_precision: DatePrecision::Day,
             })
             .map_err(|source| DateError::InvalidValue {
                 input: trimmed_text.into(),
@@ -526,7 +526,7 @@ mod tests {
         }
     }
 
-    mod point_parsing {
+    mod date_point_parsing {
         use pretty_assertions::assert_eq;
 
         use super::*;
@@ -590,7 +590,7 @@ mod tests {
         }
 
         #[test]
-        fn returns_point_with_appropriate_precision() {
+        fn returns_date_point_with_appropriate_precision() {
             TzGuard::keep();
 
             let ym = DatePoint::parse("2026-07").expect("valid year-month");
@@ -615,15 +615,18 @@ mod tests {
 
         #[test]
         fn demo_contract_year_month_shifts_and_reformats_as_year_month() {
-            let recognized =
+            let date_point =
                 DatePoint::parse("2026-07").expect("valid year-month");
-            assert_eq!(recognized.canonical_pattern(), "%Y-%m");
+            assert_eq!(date_point.canonical_pattern(), "%Y-%m");
 
-            let shifted_point =
-                recognized.shift(1, DurationUnit::Month).expect("shifted");
-            let pat = shifted_point.canonical_pattern();
+            let shifted_date_point =
+                date_point.shift(1, DurationUnit::Month).expect("shifted");
+            let pat = shifted_date_point.canonical_pattern();
             assert_eq!(pat, "%Y-%m");
-            assert_eq!(shifted_point.wall().format(pat).to_string(), "2026-08");
+            assert_eq!(
+                shifted_date_point.wall().format(pat).to_string(),
+                "2026-08"
+            );
         }
 
         #[test]
@@ -632,23 +635,23 @@ mod tests {
             let d = DateValue::parse_iso("2026-07-01").expect("valid");
             assert_eq!(ym, d);
 
-            let ym_rec = DatePoint::parse("2026-07").unwrap();
-            let d_rec = DatePoint::parse("2026-07-01").unwrap();
-            assert_eq!(ym_rec.canonical_pattern(), "%Y-%m");
-            assert_eq!(d_rec.canonical_pattern(), "%Y-%m-%d");
-            assert_eq!(ym_rec.date(), d_rec.date());
+            let year_month_point = DatePoint::parse("2026-07").unwrap();
+            let day_point = DatePoint::parse("2026-07-01").unwrap();
+            assert_eq!(year_month_point.canonical_pattern(), "%Y-%m");
+            assert_eq!(day_point.canonical_pattern(), "%Y-%m-%d");
+            assert_eq!(year_month_point.date(), day_point.date());
         }
 
         #[test]
         fn round_trips_fractional_seconds_through_shift_and_format() {
             TzGuard::set("UTC");
 
-            let recognized = DatePoint::parse("2026-07-29T14:30:00.123")
+            let date_point = DatePoint::parse("2026-07-29T14:30:00.123")
                 .expect("valid fractional datetime");
-            assert_eq!(recognized.canonical_pattern(), "%Y-%m-%dT%H:%M:%S%.f");
+            assert_eq!(date_point.canonical_pattern(), "%Y-%m-%dT%H:%M:%S%.f");
 
             let shifted =
-                recognized.shift(1, DurationUnit::Hour).expect("shifted");
+                date_point.shift(1, DurationUnit::Hour).expect("shifted");
             let pat = shifted.canonical_pattern();
             assert_eq!(
                 shifted.wall().format(pat).to_string(),

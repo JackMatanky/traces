@@ -110,7 +110,7 @@ impl NoteFieldValue {
             Self::Date(value) => Some(*value),
             Self::DateTime(value) => Some(value.local_date()),
             Self::String(s) => crate::date::DatePoint::parse_prefix(s)
-                .map(|(point, _)| point.date()),
+                .map(|(date_point, _)| date_point.date()),
             _ => None,
         }
     }

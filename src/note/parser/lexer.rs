@@ -241,7 +241,7 @@ fn task_date_callback(
         .find(|&(_, ch)| !matches!(ch, ' ' | '\t'))
         .map_or(remainder.len(), |(offset, _)| offset);
     let after_ws = remainder.get(ws_end..).unwrap_or_default();
-    let Some((rec, consumed)) = DatePoint::parse_prefix(after_ws) else {
+    let Some((date_point, consumed)) = DatePoint::parse_prefix(after_ws) else {
         return Filter::Skip;
     };
     if after_ws
@@ -252,7 +252,7 @@ fn task_date_callback(
         return Filter::Skip;
     }
     lex.bump(ws_end.saturating_add(consumed));
-    Filter::Emit(TaskDate::new(kind, rec.date()))
+    Filter::Emit(TaskDate::new(kind, date_point.date()))
 }
 
 /// Parses a Markdown tag following the leading `#` character.

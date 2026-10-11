@@ -218,12 +218,12 @@ impl<'a> InlineValueParser<'a> {
     /// Parses an ISO date atom (`YYYY-MM-DD` or `YYYY-MM`) at `pos`.
     fn parse_date_at(&self, pos: usize) -> Option<ParsedAtom> {
         let remainder = self.source.from(pos)?;
-        let (rec, consumed) = DatePoint::parse_prefix(remainder)?;
+        let (date_point, consumed) = DatePoint::parse_prefix(remainder)?;
         let end = self.source.advance(pos, consumed);
         if !self.is_atom_boundary(end) {
             return None;
         }
-        Some(ParsedAtom::new(NoteFieldValue::Date(rec.date()), end))
+        Some(ParsedAtom::new(NoteFieldValue::Date(date_point.date()), end))
     }
 
     /// Parses a finite `f64` number atom at `pos`.

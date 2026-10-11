@@ -116,14 +116,14 @@ impl DateNamespace {
     }
 }
 
-fn now_point() -> DatePoint {
+fn now_date_point() -> DatePoint {
     DatePoint::Instant(DateTimeValue::from(Utc::now()))
 }
 
-fn today_point() -> DatePoint {
+fn today_date_point() -> DatePoint {
     DatePoint::Civil {
-        date: now_point().date(),
-        precision: DatePrecision::Day,
+        date: now_date_point().date(),
+        date_precision: DatePrecision::Day,
     }
 }
 
@@ -277,18 +277,20 @@ fn scan_iso_components<'a>(
 }
 
 fn apply_offset(
-    point: DatePoint,
+    date_point: DatePoint,
     offset_val: &Value,
 ) -> TemplateEngineResult<DatePoint> {
     if let Some(n) = offset_val.as_i64() {
-        return point.shift(n, DurationUnit::Day).map_err(render_date_error);
+        return date_point
+            .shift(n, DurationUnit::Day)
+            .map_err(render_date_error);
     }
     if let Some(s) = offset_val.as_str() {
         let translated = iso_offset_to_text(s)?;
         let duration = DurationValue::parse(&translated).map_err(|source| {
             invalid_operation(format!("invalid duration offset {s:?}"), source)
         })?;
-        return point.apply(&duration).map_err(render_date_error);
+        return date_point.apply(&duration).map_err(render_date_error);
     }
     Err(Error::new(
         ErrorKind::InvalidOperation,
@@ -313,28 +315,30 @@ enum Anchor {
 }
 
 impl Anchor {
-    /// The point a shorthand starts from when no reference is given.
+    /// The date point a shorthand starts from when no reference is given.
     fn base(self) -> DatePoint {
         match self {
-            Self::Now => now_point(),
+            Self::Now => now_date_point(),
             Self::Today
             | Self::Tomorrow
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => today_point(),
+            | Self::Weekday(_) => today_date_point(),
         }
     }
 
-    /// Moves `point` as this anchor requires.
-    fn transform(self, point: DatePoint) -> Result<DatePoint, DateError> {
+    /// Moves `date_point` as this anchor requires.
+    fn transform(self, date_point: DatePoint) -> Result<DatePoint, DateError> {
         match self {
-            Self::Now | Self::Today => Ok(point),
-            Self::Tomorrow => point.shift(1, DurationUnit::Day),
-            Self::Yesterday => point.shift(-1, DurationUnit::Day),
-            Self::StartOf(period) => point.start_of(period),
-            Self::EndOf(period) => point.end_of(period),
-            Self::Weekday(target) => point.with_weekday(target),
+            Self::Now | Self::Today => Ok(date_point),
+            Self::Tomorrow => date_point.shift(1, DurationUnit::Day),
+            Self::Yesterday => date_point.shift(-1, DurationUnit::Day),
+            Self::StartOf(calendar_period) => {
+                date_point.start_of(calendar_period)
+            }
+            Self::EndOf(calendar_period) => date_point.end_of(calendar_period),
+            Self::Weekday(target) => date_point.with_weekday(target),
         }
     }
 }
@@ -360,23 +364,23 @@ fn resolve_anchor(
         reference_format.or(kwargs.get::<Option<&str>>("reference_format")?);
     kwargs.assert_all_used()?;
 
-    let mut point = if let Some(ref_text) = reference {
+    let mut date_point = if let Some(ref_text) = reference {
         if let Some(ref_fmt) = reference_format {
             DatePoint::parse_with_pattern(ref_text, ref_fmt)
                 .map_err(render_date_error)?
         } else {
-            parse_point(ref_text)?
+            parse_date_point(ref_text)?
         }
     } else {
         anchor.base()
     };
-    point = anchor.transform(point).map_err(render_date_error)?;
+    date_point = anchor.transform(date_point).map_err(render_date_error)?;
 
     if let Some(off_val) = offset {
-        point = apply_offset(point, &off_val)?;
+        date_point = apply_offset(date_point, &off_val)?;
     }
 
-    let wall = point.wall();
+    let wall = date_point.wall();
     let pat = pattern_to_strftime(format, wall)?;
     render_with_pattern(wall.format(&pat), format)
 }
@@ -491,7 +495,7 @@ impl Object for DateNamespace {
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
 /// the full parse-failure chain.
-fn parse_point(s: &str) -> TemplateEngineResult<DatePoint> {
+fn parse_date_point(s: &str) -> TemplateEngineResult<DatePoint> {
     DatePoint::parse(s)
         .map_err(|err| invalid_operation(format!("invalid date {s:?}"), err))
 }
@@ -569,7 +573,7 @@ fn render_with_pattern(
 /// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
 ///   string.
 fn parse_wall(s: &str) -> Result<NaiveDateTime, Error> {
-    parse_point(s).map(DatePoint::wall)
+    parse_date_point(s).map(DatePoint::wall)
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -774,20 +778,20 @@ fn duration_format(value: Value) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_point`].
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
-    Ok(parse_point(value)?.instant().timestamp())
+    Ok(parse_date_point(value)?.instant().timestamp())
 }
 
-/// Returns the first or last day of the input's `period` at its original
-/// precision.
-fn edge_of_period(
+/// Returns the first or last day of the input's `calendar_period` at its
+/// original precision.
+fn render_period_edge(
     value: &str,
-    period: CalendarPeriod,
-    edge: PeriodEdge,
+    calendar_period: CalendarPeriod,
+    period_edge: PeriodEdge,
 ) -> TemplateEngineResult<String> {
-    let point = parse_point(value)?;
-    let shifted = match edge {
-        PeriodEdge::Start => point.start_of(period),
-        PeriodEdge::End => point.end_of(period),
+    let date_point = parse_date_point(value)?;
+    let shifted = match period_edge {
+        PeriodEdge::Start => date_point.start_of(calendar_period),
+        PeriodEdge::End => date_point.end_of(calendar_period),
     }
     .map_err(render_date_error)?;
     let wall = shifted.wall();
@@ -796,19 +800,19 @@ fn edge_of_period(
 }
 
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, CalendarPeriod::Week, PeriodEdge::Start)
+    render_period_edge(value, CalendarPeriod::Week, PeriodEdge::Start)
 }
 
 fn end_of_week(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, CalendarPeriod::Week, PeriodEdge::End)
+    render_period_edge(value, CalendarPeriod::Week, PeriodEdge::End)
 }
 
 fn start_of_year(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, CalendarPeriod::Year, PeriodEdge::Start)
+    render_period_edge(value, CalendarPeriod::Year, PeriodEdge::Start)
 }
 
 fn end_of_year(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, CalendarPeriod::Year, PeriodEdge::End)
+    render_period_edge(value, CalendarPeriod::Year, PeriodEdge::End)
 }
 
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
@@ -892,10 +896,10 @@ fn shift_by_unit(
     n: i64,
     unit: DurationUnit,
 ) -> TemplateEngineResult<String> {
-    let shifted_point =
-        parse_point(value)?.shift(n, unit).map_err(render_date_error)?;
-    let wall = shifted_point.wall();
-    let pat = shifted_point.canonical_pattern();
+    let shifted_date_point =
+        parse_date_point(value)?.shift(n, unit).map_err(render_date_error)?;
+    let wall = shifted_date_point.wall();
+    let pat = shifted_date_point.canonical_pattern();
     render_with_pattern(wall.format(pat), pat)
 }
 
@@ -981,7 +985,7 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if the first day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn start_of_month(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, CalendarPeriod::Month, PeriodEdge::Start)
+    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::Start)
 }
 
 /// `{{ value | end_of_month }}` returns the last day of the input month.
@@ -993,7 +997,7 @@ fn start_of_month(value: &str) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if the last day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn end_of_month(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, CalendarPeriod::Month, PeriodEdge::End)
+    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::End)
 }
 
 /// `{{ value | weekday }}` returns the ISO weekday number: `1` for Monday
@@ -1009,18 +1013,19 @@ fn weekday(
     n: Option<i64>,
     kwargs: Kwargs,
 ) -> TemplateEngineResult<Value> {
-    let point = parse_point(value)?;
+    let date_point = parse_date_point(value)?;
     if let Some(target_num) = n {
         let format = format_kwarg(&kwargs)?;
         let target_weekday = weekday_or_error(target_num)?;
-        let shifted =
-            point.with_weekday(target_weekday).map_err(render_date_error)?;
+        let shifted = date_point
+            .with_weekday(target_weekday)
+            .map_err(render_date_error)?;
         let wall = shifted.wall();
         let pat = pattern_to_strftime(format, wall)?;
         Ok(Value::from(render_with_pattern(wall.format(&pat), format)?))
     } else {
         kwargs.assert_all_used()?;
-        Ok(Value::from(point.component(DateComponent::Weekday)))
+        Ok(Value::from(date_point.component(DateComponent::Weekday)))
     }
 }
 
@@ -1056,8 +1061,8 @@ fn date_diff(
     kwargs: Kwargs,
 ) -> TemplateEngineResult<Value> {
     let unit = unit_kwarg(&kwargs)?;
-    let from = parse_point(value)?;
-    let to = parse_point(other)?;
+    let from = parse_date_point(value)?;
+    let to = parse_date_point(other)?;
 
     let diff = from.diff(to, unit).map_err(render_date_error)?;
 
@@ -1078,7 +1083,7 @@ fn date_diff(
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_point`].
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
-    Ok(parse_point(value)?.instant() < Utc::now())
+    Ok(parse_date_point(value)?.instant() < Utc::now())
 }
 
 /// `{% if value is is_future %}` mirrors [`is_past`] for future instants.
@@ -1088,7 +1093,7 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_point`].
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
-    Ok(parse_point(value)?.instant() > Utc::now())
+    Ok(parse_date_point(value)?.instant() > Utc::now())
 }
 
 /// `{% if value is is_leap_year %}` accepts either an integer year (`2024 is
