@@ -44,7 +44,7 @@ use criterion::{
 };
 #[derive(serde::Serialize, serde::Deserialize)]
 struct PathWrapper {
-    #[serde(with = "traces_pkm::path_codec")]
+    #[serde(with = "traces_pkm::testing::path_codec")]
     path: PathBuf,
 }
 

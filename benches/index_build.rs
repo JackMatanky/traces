@@ -35,7 +35,7 @@ use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, Throughput,
     criterion_group, criterion_main,
 };
-use traces_pkm::{IndexerService, WorkspaceIndex};
+use traces_pkm::testing::{IndexerService, WorkspaceIndex};
 #[expect(
     dead_code,
     reason = "shared benchmark common helpers are compiled into each bench \

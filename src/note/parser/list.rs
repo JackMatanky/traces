@@ -477,7 +477,7 @@ mod tests {
     use super::*;
     use crate::{
         Note, SourceLine, Tag, TaskStatusMap, note::ListItem,
-        parse_note_str as parse,
+        test_support::parse_note_str as parse,
     };
 
     /// Collects the raw text of every task in document order.

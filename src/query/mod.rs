@@ -52,7 +52,7 @@
 //! # {
 //! use std::sync::Arc;
 //!
-//! use traces_pkm::{
+//! use traces_pkm::testing::{
 //!     IndexerService, QueryBuilder, QueryService, SourceSelector,
 //! };
 //!
@@ -107,19 +107,17 @@ pub(super) mod test_support {
     use std::path::Path;
 
     use super::*;
-    /// Writes `files` under `temp` and returns an all-notes page query.
-    pub(super) fn rows_for_files(
-        _temp: &Path,
-        files: &[(&str, &str)],
-    ) -> QuerySet {
-        let index = crate::build_test_index(files);
+    /// Builds an in-memory index over `files` and returns an all-notes page
+    /// query.
+    pub(super) fn rows_for_files(files: &[(&str, &str)]) -> QuerySet {
+        let index = crate::test_support::build_test_index(files);
         QueryService::new("class")
             .run(&index, QueryBuilder::pages(SourceSelector::All))
     }
 
-    /// Writes one Markdown Note and returns an all-notes page query.
-    pub(super) fn rows_for(temp: &Path, content: &str) -> QuerySet {
-        rows_for_files(temp, &[("note.md", content)])
+    /// Builds an all-notes page query over one in-memory Markdown note.
+    pub(super) fn rows_for(content: &str) -> QuerySet {
+        rows_for_files(&[("note.md", content)])
     }
 
     pub(super) fn find_entry<'a>(

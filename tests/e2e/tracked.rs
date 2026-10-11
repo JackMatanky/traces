@@ -1,11 +1,11 @@
-//! Proves `traces tracked list`/`traces tracked clean` end-to-end — currently
-//! zero process-level coverage; only in-process unit tests exist in
-//! `src/cli/tracked.rs`.
+//! Proves `traces tracked list` and `traces tracked clean` through spawned
+//! commands and a real tracked-config store.
 //!
 //! The tracked-config store is populated by `ConfigService::load` (see
-//! `src/cli/tracked.rs`'s module docs), not by `trust`. `Sandbox::trusted()`
-//! only runs `traces trust`, so every test here runs a load-triggering
-//! command (`index`) first to record the local config as a tracked entry.
+//! `src/cli/tracked.rs`'s module docs), not by `trust`.
+//! `Sandbox::trusted_via_cli()` only runs `traces trust`, so every test here
+//! runs a load-triggering command (`index`) first to record the local config as
+//! a tracked entry.
 
 use super::support::Sandbox;
 
@@ -17,7 +17,7 @@ use super::support::Sandbox;
 /// are actually wired to it.
 #[test]
 fn list_prints_every_tracked_config_path() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     let index = sandbox.run(&["index"]);
     assert!(index.is_success(), "stderr: {}", index.stderr);
 
@@ -31,20 +31,26 @@ fn list_prints_every_tracked_config_path() {
 }
 
 /// Deletes a tracked entry's config file to make it stale, then checks
-/// `tracked clean` reports removing exactly one entry.
+/// `tracked clean` reports the removal in its structured message.
 ///
 /// The staleness check runs against a real path on a real filesystem after
 /// a real deletion — a fixture-backed unit test could fake staleness
-/// without proving `clean` actually rechecks disk state.
+/// without proving `clean` actually rechecks disk state. The assertion is
+/// the full structured message (count + noun, singular), not a trivia
+/// `contains('1')` (ticket 16, §14 P2.24).
 #[test]
 fn clean_removes_a_stale_tracked_entry_and_reports_the_count() {
-    let sandbox = Sandbox::trusted();
+    let sandbox = Sandbox::trusted_via_cli();
     let index = sandbox.run(&["index"]);
     assert!(index.is_success(), "stderr: {}", index.stderr);
     std::fs::remove_file(sandbox.root().join(".traces/config.toml"))
         .expect("delete tracked config to make the entry stale");
 
     let clean = sandbox.run(&["tracked", "clean"]);
-    assert!(clean.is_success(), "stderr: {}", clean.stderr);
-    assert!(clean.stderr.contains('1'), "stderr: {}", clean.stderr);
+    clean.assert_success();
+    clean.assert_stderr_eq("removed 1 stale tracked entry\n");
+
+    let list = sandbox.run(&["tracked", "list"]);
+    list.assert_success();
+    list.assert_stdout_eq("");
 }

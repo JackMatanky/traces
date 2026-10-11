@@ -36,6 +36,12 @@ Resolved in commit `1d66d93c` (merged in `integration-e2e-suite`).
 - All audit §11 doc claims corrected in `dispatch.rs`, `golden_path.rs`, `support.rs`, `src/lib.rs`, and `index_persistence_roundtrip.rs`.
 - Test inventory list diff confirmed completely empty (0 tests added, 0 tests removed, 0 tests renamed).
 
+Review remediation (2026-10-09): the same-shape sibling was removed rather
+than re-pinned. Its `Cli::run` assertions only observed completion; three
+separately computed query results were discarded. Spawned query scenarios
+already assert actual output. The original no-test-removal criterion above
+records this ticket's historical scope.
+
 **Evidence:** audit §11 table; §14 P0 items 1–2; test counts 3,127 + 76 at audit HEAD as
 context only. Defect examples:
 `src/cli/mod.rs::query_workflows::table_reflects_a_note_edit…` (assertion path re-syncs from

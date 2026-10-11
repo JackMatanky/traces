@@ -1,133 +1,123 @@
 #!/bin/bash
-#MISE description="Run tests with `nextest` (+ `doc-tests` by default)"
+#MISE description="Canonical test run: lib/bin units (production), integration (test-utils), E2E (shipped binary), doctests (all-features)"
 #MISE alias="t"
 #MISE sources=["@group:rust"]
 #MISE extends="gate:never-skip"
-#USAGE flag "-m --mod <module>" {
-#USAGE   help "Run tests for a specific module only"
-#USAGE   long_help """
-#USAGE   Scopes nextest to the named module using a filter expression. For example:
-#USAGE   - `-m index` filters to tests under module `index`
-#USAGE   """
-#USAGE }
-#USAGE // `complete "module"` completes the value after `-m`/`--mod`, not the flag name.
-#USAGE complete "module" run="sed -nE 's/^(pub )?mod ([a-z_]+);$/\\2/p' src/lib.rs"
-#USAGE flag "--feature <feature>" default="all" {
-#USAGE   help "Cargo feature to activate (e.g. all, default, or specific feature)"
-#USAGE   long_help """
-#USAGE   Selects Cargo feature set:
-#USAGE   - `all`: passes `--all-features`
-#USAGE   - `default`: passes no feature flags
-#USAGE   - any other value passes `--features <feature>`
-#USAGE   """
-#USAGE }
 #USAGE flag "--docs" negate="--no-docs" default=#true {
-#USAGE   help "Also run doc-tests via cargo test --doc after nextest"
+#USAGE   help "Also run doctests after the three nextest phases"
 #USAGE   long_help """
 #USAGE   Enabled by default:
-#USAGE   - runs unit/integration tests via `nextest`, then
-#USAGE   - documentation tests via `cargo test --doc`.
-#USAGE   Pass `--no-docs` to run only nextest.
+#USAGE   - library and binary unit/component tests on the production configuration
+#USAGE   - integration phase on the test-utils feature
+#USAGE   - E2E phase against the shipped feature-off binary
+#USAGE   - doctests explicitly under --all-features (never default: test-support
+#USAGE     doctests would silently drop; CI requires a nonzero doctest count)
+#USAGE   Unfiltered nextest phases fail rather than silently running zero tests.
+#USAGE   Pass --no-docs to skip the doctest phase.
 #USAGE   """
 #USAGE }
 #USAGE arg "[args]" var=#true {
-#USAGE   help "Extra arguments forwarded to nextest run"
+#USAGE   help "Filter arguments forwarded to every nextest phase"
 #USAGE   long_help """
 #USAGE   Examples:
-#USAGE   - `mise run test index::query` - run tests matching name substring
-#USAGE   - `mise run test --test init_cli` - run integration test binary
-#USAGE   - `mise run test --lib` - run unit tests in library target only
-#USAGE   - `mise run test -E 'test(/^index::/)'` - filter with nextest filter expression DSL
-#USAGE   - `mise run test -m index` - filter to module via `-m`
-#USAGE   - `mise run test --no-docs` - skip doctests and run unit tests only
+#USAGE   - `mise run test -E 'test(index::refresh)'` - nextest filter expression
+#USAGE   - `mise run test refresh` - name substring filter
+#USAGE   - `mise run test --no-docs -E 'binary(e2e)'` - E2E suite only;
+#USAGE     filtered runs skip empty phases and fail if no phase matches
 #USAGE   """
 #USAGE }
 
 # shellcheck disable=SC2154  # usage_* are injected by mise
 set -euo pipefail
 
+declare -a phase_args=()
+matched_phases=0
+
 #######################################
-# Forwards feature, module, and passthrough arguments to test:unit.
+# Expands variadic passthrough arguments into phase_args (shared by all
+# three nextest phases).
 # Globals:
-#   MISE_TASK_DIR
-#   usage_feature
-#   usage_mod
 #   usage_args
+#   phase_args
 # Arguments:
 #   None
 # Outputs:
-#   Unit test output to STDOUT/STDERR.
+#   None
 # Returns:
-#   Status of test:unit execution.
+#   0 on success.
 #######################################
-run_unit_phase() {
-  declare -a unit_cmd=(mise run test:unit)
-  [[ -n "${usage_feature:-}" ]] && unit_cmd+=(--feature "${usage_feature}")
-  [[ -n "${usage_mod:-}" ]] && unit_cmd+=(-m "${usage_mod}")
-
-  # usage_args is shell-quoted (var=#true arg); eval parses it into the
-  # extra array.
-  declare -a extra=()
-  eval "extra=(${usage_args:-})"
-  if [[ "${#extra[@]}" -gt 0 ]]; then
-    unit_cmd+=(-- "${extra[@]}")
-  fi
-
-  "${unit_cmd[@]}"
+parse_passthrough_tokens() {
+  # usage_args arrives shell-quoted (var=#true arg); eval expands it into
+  # array elements.
+  eval "phase_args+=(${usage_args:-})"
 }
 
 #######################################
-# Evaluates whether doc tests are enabled and applicable for this run.
+# Runs one canonical phase, skipping empty filtered phases without hiding
+# a filter that matches no tests in any phase.
+# Globals:
+#   phase_args
+#   matched_phases
+# Arguments:
+#   Phase label (for the progress line), then the nextest arguments.
+# Outputs:
+#   Phase header and nextest output to STDOUT/STDERR.
+# Returns:
+#   Status of cargo nextest.
+#######################################
+run_phase() {
+  local label="$1"
+  shift
+  echo "==> test phase: ${label}"
+  if ((${#phase_args[@]} > 0)); then
+    local matches
+    matches="$(cargo nextest list -p traces-pkm --message-format oneline "$@")"
+    if [[ -z "${matches}" ]]; then
+      echo "==> no matching ${label} tests"
+      return 0
+    fi
+    matched_phases=$((matched_phases + 1))
+  fi
+  cargo nextest run -p traces-pkm --no-tests fail "$@"
+}
+
+#######################################
+# Coordinates the four canonical phases.
 # Globals:
 #   usage_docs
 # Arguments:
-#   None
-# Outputs:
-#   None
-# Returns:
-#   0 if doc phase should run, 1 if skipped.
-#######################################
-should_run_doc_phase() {
-  if [[ "${usage_docs:-true}" != "true" ]]; then
-    return 1
-  fi
-  return 0
-}
-
-#######################################
-# Forwards feature arguments to test:doc.
-# Globals:
-#   MISE_TASK_DIR
-#   usage_feature
-# Arguments:
-#   None
-# Outputs:
-#   Doc test output to STDOUT/STDERR.
-# Returns:
-#   Status of test:doc execution.
-#######################################
-run_doc_phase() {
-  declare -a doc_cmd=(mise run test:doc)
-  [[ -n "${usage_feature:-}" ]] && doc_cmd+=(--feature "${usage_feature}")
-
-  "${doc_cmd[@]}"
-}
-
-#######################################
-# Coordinates sequential execution of unit tests followed by doc tests.
-# Globals:
-#   None
-# Arguments:
 #   CLI arguments vector.
 # Outputs:
-#   Test progress information.
+#   Phase headers and test output to STDOUT/STDERR.
 # Returns:
-#   Exit status of failed phase, or 0 on success.
+#   Exit status of the first failing phase.
 #######################################
 main() {
-  run_unit_phase
-  if should_run_doc_phase; then
-    run_doc_phase
+  parse_passthrough_tokens
+
+  # Unit/component: production configuration (no test-utils, no features).
+  run_phase unit --no-default-features --lib --bin traces-pkm \
+    "${phase_args[@]+"${phase_args[@]}"}"
+
+  # Integration: the cross-module suite requires the test-utils feature.
+  run_phase integration --features test-utils --test integration \
+    "${phase_args[@]+"${phase_args[@]}"}"
+
+  # E2E: black-box suite against the shipped configuration — the binary is
+  # built without test-utils on purpose (tests spawn it).
+  run_phase e2e --no-default-features --test e2e \
+    "${phase_args[@]+"${phase_args[@]}"}"
+
+  if ((${#phase_args[@]} > 0 && matched_phases == 0)); then
+    echo "ERROR: filter matched no tests in any phase" >&2
+    return 1
+  fi
+
+  # Doctests: explicitly --all-features, never the default configuration —
+  # test-support doctests would silently drop (CI requires a nonzero count).
+  if [[ "${usage_docs:-true}" == "true" ]]; then
+    echo "==> test phase: docs (all-features)"
+    mise run test:doc --feature all
   fi
 }
 

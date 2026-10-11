@@ -63,7 +63,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        TestProject, TrustRequest, config::ConfigTrustStatus, fixture_service,
+        TrustRequest,
+        config::ConfigTrustStatus,
+        test_support::{TestProject, fixture_service},
     };
     #[derive(Debug, Parser)]
     struct TestCli {

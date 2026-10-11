@@ -614,7 +614,7 @@ mod tests {
         super::{ListItem, ListItemType, NoteFieldValue},
         *,
     };
-    use crate::{DateValue, SourceLine, parse_note_str as parse};
+    use crate::{DateValue, SourceLine, test_support::parse_note_str as parse};
 
     fn parse_with_tasks(src: &str, tasks: &crate::TaskConfig) -> Note {
         let frontmatter = crate::config::FrontmatterConfig::default();

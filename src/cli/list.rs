@@ -100,7 +100,7 @@ impl List {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TestProject;
+    use crate::test_support::TestProject;
     mod render {
         use std::{fs, path::Path};
 

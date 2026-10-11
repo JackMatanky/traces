@@ -575,13 +575,6 @@ impl ConfigService {
     }
 }
 
-impl Default for ConfigService {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{

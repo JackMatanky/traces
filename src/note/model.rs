@@ -589,7 +589,7 @@ mod tests {
                 .with_depth(1);
             let item = ListItem::for_test("item", ListItemType::Plain)
                 .with_fields(item_fields)
-                .with_tags(vec![crate::parse_tag("#task")]);
+                .with_tags(vec![crate::test_support::parse_tag("#task")]);
             let outlink = Link::new("target", "text", LinkType::Wikilink);
 
             let mut inline_fields = IndexMap::new();
@@ -604,7 +604,7 @@ mod tests {
                 vec![item, child],
                 vec![outlink],
                 inline_fields,
-                vec![crate::parse_tag("#book")],
+                vec![crate::test_support::parse_tag("#book")],
                 vec![Heading::new(
                     3,
                     "Plain heading".to_owned(),

@@ -62,8 +62,7 @@ HK_MISE = "1"
 ADR_DIRECTORY = "docs/adr/"
 # Coverage filename-exclusion regex, consumed by `coverage:lcov`/`coverage:html`
 # as cargo-llvm-cov's --ignore-filename-regex. Ported from the deleted
-# tarpaulin.toml exclude-files; keep in sync with .cargo/mutants.toml's
-# exclude globs. POSIX ERE only: no lookahead, no (?:...), no \d \w \s —
+# tarpaulin.toml exclude-files. POSIX ERE only: no lookahead, no (?:...), no \d \w \s —
 # an invalid regex silently disables ALL exclusions (defaults included).
 COVERAGE_IGNORE_REGEX = 'src/main\.rs$|src/cli($|/)|src/(.*/)?error\.rs$'
 
@@ -116,6 +115,71 @@ hk check \
   --skip-step cargo-test \
   --skip-step cargo-doc \
   --skip-step cargo-deny
+mise run check:visibility
+mise run check:layers
+'''
+
+[tasks."check:visibility"]
+description = "Verify public API and pub-token baselines against surface expansion"
+extends = "gate:never-skip"
+run = '''
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Checking for glob re-exports in src/..."
+if git grep -E 'pub use .*\*' src/ >/dev/null 2>&1; then
+    echo "ERROR: Glob re-exports (pub use ...*) forbidden in src/" >&2
+    exit 1
+fi
+
+echo "==> Verifying default-features public API baseline..."
+cargo public-api --color=never | diff -u tests/baselines/public-api-default.txt -
+
+echo "==> Verifying test-utils public API baseline..."
+cargo public-api --features test-utils --color=never | diff -u tests/baselines/public-api-test-utils.txt -
+
+echo "==> Verifying pub-token declaration snapshot..."
+git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort | diff -u tests/baselines/pub-tokens.txt -
+
+echo "==> Visibility freeze check passed."
+'''
+
+[tasks."check:layers"]
+description = "Verify test layer isolation and boundary discipline"
+extends = "gate:never-skip"
+run = '''
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Verifying layer discipline boundaries..."
+
+if git grep -n -E '(^|[^[:alnum:]_])traces_pkm[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ tests/common/ >&2; then
+    echo "ERROR: E2E tests must not reference traces_pkm" >&2
+    exit 1
+fi
+
+e2e_process_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ tests/common/ ':!tests/e2e/support.rs' || true)
+if [[ -n "${e2e_process_refs}" ]]; then
+    echo "ERROR: tests/e2e/ must not use std::process outside support.rs" >&2
+    echo "${e2e_process_refs}" >&2
+    exit 1
+fi
+
+int_cmd_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])|CARGO_BIN_EXE' tests/integration.rs tests/integration/ tests/common/ || true)
+if [[ -n "${int_cmd_refs}" ]]; then
+    echo "ERROR: tests/integration/ must not spawn child processes or reference CARGO_BIN_EXE" >&2
+    echo "${int_cmd_refs}" >&2
+    exit 1
+fi
+
+cwd_refs=$(git grep -n -E 'set_current_dir' tests/ || true)
+if [[ -n "${cwd_refs}" ]]; then
+    echo "ERROR: env::set_current_dir is forbidden in tests/" >&2
+    echo "${cwd_refs}" >&2
+    exit 1
+fi
+
+echo "==> Layer discipline checks passed."
 '''
 
 [tasks.build]
@@ -135,10 +199,14 @@ cargo build "${extra[@]+"${extra[@]}"}"
 '''
 
 [tasks.watch]
-description = "Watch `cargo check`/`cargo test` on changes"
+description = "Watch `cargo check` + the canonical test suite on changes"
 outputs = []
 cache = { enabled = false }
-run = "cargo watch -x check -x test"
+# The canonical runner (ticket 18): unit/integration/E2E phases with the
+# right feature configuration per phase, plus all-features doctests — not
+# bare `cargo test`, which silently dropped the integration suite and ran
+# E2E under the wrong configuration.
+run = "cargo watch -x check -s 'mise run test'"
 
 [tasks."modules:tree"]
 description = "Print the crate's module tree (`cargo modules structure`)"

@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use super::{
     INDEX_FILE, IndexError, IndexResult, WorkspaceIndex,
     inlinks::{InlinkMap, LinkResolver},
-    refresh::{PendingApply, RefreshPlan, RefreshReport, RefreshState},
+    refresh::{RefreshPlan, RefreshReport, RefreshState},
     sort::SortedByPath,
     store::{IndexDimensions, IndexStore, PersistRequest},
 };
@@ -66,7 +66,8 @@ impl IndexerService {
     ///
     /// - `IndexError::Scan` if a directory cannot be read.
     /// - `IndexError::Inspect` if a file's metadata cannot be inspected.
-    /// - `IndexError::NoteParse` if a Markdown file cannot be read or parsed.
+    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
+    ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
     #[inline]
@@ -96,11 +97,12 @@ impl IndexerService {
     ///
     /// - `IndexError::Scan` if a directory cannot be read.
     /// - `IndexError::Inspect` if file metadata cannot be inspected.
-    /// - `IndexError::NoteParse` if a Markdown file cannot be read or parsed,
-    ///   or an unchanged note cannot be recalled.
+    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
+    ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
-    /// - `IndexError::Store` if the persisted index cannot be opened or read.
+    /// - `IndexError::Store` if the persisted index cannot be opened or read,
+    ///   including when unchanged notes cannot be recalled.
     #[inline]
     pub fn refresh(&self) -> IndexResult<WorkspaceIndex> {
         let (index, _) = self.refresh_with_report()?;
@@ -113,11 +115,12 @@ impl IndexerService {
     ///
     /// - `IndexError::Scan` if a directory cannot be read.
     /// - `IndexError::Inspect` if file metadata cannot be inspected.
-    /// - `IndexError::NoteParse` if a Markdown file cannot be read or parsed,
-    ///   or an unchanged note cannot be recalled.
+    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
+    ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
-    /// - `IndexError::Store` if the persisted index cannot be opened or read.
+    /// - `IndexError::Store` if the persisted index cannot be opened or read,
+    ///   including when unchanged notes cannot be recalled.
     #[inline]
     pub fn refresh_with_report(
         &self,
@@ -127,7 +130,18 @@ impl IndexerService {
                 store,
                 files,
             } => Self::assemble_unchanged(&store, files),
-            RefreshState::Stale(pending) => self.apply_reconciled(*pending),
+            RefreshState::Stale(pending) => {
+                let pending = *pending;
+                let report = pending.report();
+                let dimensions =
+                    IndexDimensions::for_class_field(&self.class_field);
+                let persisted = pending.apply(dimensions);
+                if persisted.is_ok() {
+                    Self::log_report(&report);
+                }
+                let index = super::materialize_apply(persisted)?;
+                Ok((index, report))
+            }
         }
     }
 
@@ -143,28 +157,6 @@ impl IndexerService {
             WorkspaceIndex::assemble(files, notes, links),
             RefreshReport::default(),
         ))
-    }
-
-    fn apply_reconciled(
-        &self,
-        pending: PendingApply,
-    ) -> IndexResult<(WorkspaceIndex, RefreshReport)> {
-        let report = pending.report();
-        let dimensions = IndexDimensions::for_class_field(&self.class_field);
-        let index = match pending.apply(dimensions) {
-            Ok(persisted) => {
-                Self::log_report(&report);
-                persisted.into_index()?
-            }
-            Err(failed) => {
-                tracing::warn!(
-                    source = %failed.source(),
-                    "failed to persist refreshed index"
-                );
-                failed.into_index()?
-            }
-        };
-        Ok((index, report))
     }
 
     fn prepare_pass(&self) -> IndexResult<RefreshState> {
@@ -192,7 +184,8 @@ impl IndexerService {
     ///
     /// - [`IndexError::Scan`] if a directory cannot be read.
     /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
-    /// - [`IndexError::NoteParse`] if a note cannot be read or parsed.
+    /// - [`IndexError::NoteParse`] if a note cannot be read or decoded as
+    ///   UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
     ///   project-relative path.
     /// - [`IndexError::Store`] if persisting the rebuilt index fails.
@@ -216,8 +209,8 @@ impl IndexerService {
     ///
     /// - [`IndexError::Scan`] if a directory cannot be read.
     /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
-    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or parsed,
-    ///   or an unchanged note cannot be recalled.
+    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
+    ///   as UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
     ///   project-relative path.
     /// - [`IndexError::Store`] if the database cannot be opened or read,
@@ -302,8 +295,8 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if the database cannot be read or stored bytes are
-    ///   not a valid row.
+    /// - `IndexError::Store` if the index store cannot be opened or recovered,
+    ///   or persisted rows cannot be read or decoded.
     #[inline]
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
@@ -1199,8 +1192,8 @@ mod tests {
                  non-Unicode path"
             );
             let mut notes = vec![
-                crate::parse_note(&weird, "link to [[normal]]"),
-                crate::parse_note(&normal, "link to [[weird]]"),
+                crate::test_support::parse_note(&weird, "link to [[normal]]"),
+                crate::test_support::parse_note(&normal, "link to [[weird]]"),
             ];
             notes.sort_by(|a, b| a.path().cmp(b.path()));
             let mut links = std::collections::HashMap::new();
@@ -1738,6 +1731,52 @@ mod tests {
             assert_eq!(novel.as_ref(), [PathBuf::from("b.md")]);
             let book = store.paths_with_file_class("book").expect("read book");
             assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
+        }
+
+        /// Regression (ticket 04, ruled correct-as-designed): executes the
+        /// Fresh arm of `refresh_with_report` — file metadata unchanged — and
+        /// asserts persisted selector axes are served unchanged when the
+        /// config's `class_field` differs from the one the index was built
+        /// under. Defect class: unwitnessed freshness contract.
+        ///
+        /// Executes-vs-asserts: the seam executes the real metadata
+        /// fingerprint comparison and Fresh-arm assembly; only derived-row
+        /// outcomes are asserted. The E2E staleness recipe (edit config →
+        /// re-trust → query stale rows) is deliberately asserted nowhere —
+        /// it would pin behavior ticket 04 left to the healing contract
+        /// (`traces index`).
+        #[test]
+        fn fresh_refresh_serves_persisted_class_axes_unchanged_when_class_field_config_changes()
+         {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            fs::write(
+                root.join("a.md"),
+                "---\nclass: Book\nkind: Novel\n---\n# A",
+            )
+            .expect("write a");
+            let built = Config::test_default(root.to_path_buf());
+            let builder = IndexerService::from(&built);
+            let index = builder.build().expect("build index");
+            builder.persist(&index).expect("persist index");
+
+            // Act: same untouched files, service under class_field = "kind"
+            let changed = Config::test_default(root.to_path_buf())
+                .with_schemas(SchemasConfig::for_test("kind"));
+            let (_refreshed, report) = IndexerService::from(&changed)
+                .refresh_with_report()
+                .expect("refresh with report");
+
+            // Assert: Fresh arm — zero rows touched, old-field axis intact,
+            // new-field value never derived
+            assert_eq!(report, RefreshReport::default());
+            let store = IndexStore::open(root).expect("open store");
+            let book = store.paths_with_file_class("book").expect("read book");
+            assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
+            let novel =
+                store.paths_with_file_class("novel").expect("read novel");
+            assert_eq!(novel.as_ref(), <&[PathBuf]>::default());
         }
 
         #[rstest]

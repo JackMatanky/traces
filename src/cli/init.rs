@@ -192,5 +192,82 @@ mod tests {
             assert_eq!(error.user_abort(), Some(UserAbort::Cancelled));
             assert!(!root.path().join(".traces").exists());
         }
+
+        /// Checks user-selected paths through the in-process dialog seam.
+        #[test]
+        fn scaffolds_config_with_custom_template_and_output_paths() {
+            let preset = tempfile::tempdir().expect("create preset temp dir");
+            {
+                let _guard = CwdGuard::enter(preset.path());
+                let provider = crate::PresetDialogProvider::new()
+                    .with_text("custom/templates")
+                    .with_text("notes");
+
+                Init.run(&provider).expect("run preset init");
+            }
+
+            let config = read_config(preset.path());
+            let templates = config.get("templates").expect("templates table");
+            assert_eq!(
+                templates.get("directory").and_then(toml::Value::as_str),
+                Some("custom/templates")
+            );
+            assert_eq!(
+                templates.get("output_dir").and_then(toml::Value::as_str),
+                Some("notes")
+            );
+            assert!(preset.path().join(".traces/templates").is_dir());
+        }
+
+        /// Checks that the dialog's defaults are written to the local config.
+        #[test]
+        fn scaffolds_config_with_default_template_and_output_paths() {
+            let defaults =
+                tempfile::tempdir().expect("create defaults temp dir");
+            {
+                let _guard = CwdGuard::enter(defaults.path());
+                let provider = crate::PresetDialogProvider::new();
+
+                Init.run(&provider).expect("run default init");
+            }
+
+            let config = read_config(defaults.path());
+            let templates = config.get("templates").expect("templates table");
+            assert_eq!(
+                templates.get("directory").and_then(toml::Value::as_str),
+                Some(".traces/templates")
+            );
+            assert_eq!(
+                templates.get("output_dir").and_then(toml::Value::as_str),
+                Some(".")
+            );
+            assert!(defaults.path().join(".traces/templates").is_dir());
+        }
+
+        /// Existing initialization must not be overwritten.
+        #[test]
+        fn refuses_existing_traces_directory() {
+            let existing =
+                tempfile::tempdir().expect("create existing temp dir");
+            fs::create_dir(existing.path().join(".traces"))
+                .expect("create existing traces dir");
+            let result = {
+                let _guard = CwdGuard::enter(existing.path());
+                let provider = crate::PresetDialogProvider::new();
+
+                Init.run(&provider)
+            };
+
+            let error =
+                result.expect_err("existing .traces directory fails init");
+            assert!(matches!(error, CliError::InitAlreadyInitialized { .. }));
+        }
+
+        fn read_config(root: &Path) -> toml::Value {
+            let config_path = root.join(".traces/config.toml");
+            let contents =
+                fs::read_to_string(config_path).expect("read config");
+            toml::from_str(&contents).expect("parse config")
+        }
     }
 }

@@ -1,18 +1,33 @@
 //! Shared end-to-end test harness: spawns the real `traces` binary against a
-//! fully isolated [`Sandbox`], or (for `init`'s inherently-interactive flow)
-//! drives the crate in-process under a [`CwdGuard`].
+//! fully isolated [`Sandbox`].
+//!
+//! # Environment policy
+//!
+//! The child environment is an explicit policy, not a blanket wipe or an
+//! inherit-and-override ([`Sandbox::apply_env_policy`]):
+//!
+//! - **Sandbox-owned**: `TRACES_STATE_DIR`, `XDG_CONFIG_HOME`, `TZ=UTC`, and
+//!   the platform home anchors (`HOME` on Unix; `APPDATA`, `LOCALAPPDATA`,
+//!   `USERPROFILE` on Windows) always carry sandbox-provided values, so every
+//!   derived state/config location lands inside the sandbox.
+//! - **Passthrough allowlist**: `PATH` (all platforms), `SystemRoot`, `TEMP`,
+//!   `TMP` (Windows) are copied from this test process; the child cannot run
+//!   tooling without them.
+//! - **Opt-in**: `TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS` are never set by
+//!   default; tests studying them set them explicitly via
+//!   [`Sandbox::run_with_envs`].
+//!
+//! Everything else is dropped: a shell-exported variable cannot leak into any
+//! child unless it is allow-listed or explicitly opted in.
 //!
 //! # Isolation
 //!
-//! Two environment variables, set only on the spawned child (never on this
+//! Sandbox-owned variables are set only on the spawned child (never on this
 //! test process itself) so every test stays parallel-safe with no shared
-//! mutable state:
-//!
-//! - `TRACES_STATE_DIR` isolates the trust store and tracked-config store
-//!   (`src/dirs.rs`'s dedicated override for exactly this).
-//! - `XDG_CONFIG_HOME` isolates global config/template discovery, so a
-//!   developer machine's real `~/.config/traces/config.toml` (if any) never
-//!   leaks into a test.
+//! mutable state. `TRACES_STATE_DIR` isolates the trust and tracked-config
+//! stores (`src/dirs.rs`'s dedicated override); `XDG_CONFIG_HOME` isolates
+//! global config/template discovery, so a developer machine's real
+//! `~/.config/traces/config.toml` (if any) never leaks into a test.
 //!
 //! # Diagnostic text is wrap-fragile
 //!
@@ -29,35 +44,33 @@
 //!   Miette).
 //! - [`plain`] output (used only for short single-bullet messages confirmed to
 //!   wrap at real word boundaries with no glyph inside the reconstructed span).
-//!
-//! # `CwdGuard` and process cwd
-//!
-//! The process current directory is global mutable state shared by every
-//! thread. This crate's own `#[cfg(test)]` unit tests serialize cwd-mutating
-//! tests behind an internal `pub(crate)` mutex (see `src/cwd.rs`), which is
-//! not reachable from this external test binary. [`CwdGuard`] here does
-//! **not** share that lock: cwd-mutating e2e tests (`init`, `golden_path`)
-//! must not run concurrently with each other or with in-crate cwd-guarded
-//! tests. This is acceptable because `cargo test` runs each integration test
-//! *binary* single-threaded relative to other binaries by default is false in
-//! general, but within this one binary `init` and `golden_path` are the only
-//! two cwd-mutating tests and `cargo test`'s default per-binary test
-//! parallelism still runs them concurrently with each other unless scoped;
-//! both tests hold the guard for their entire cwd-dependent section, so a
-//! second guard's `enter` simply blocks nothing — there is no lock — meaning
-//! true concurrent cwd mutation between them is a known, accepted limitation
-//! of this lightweight harness, not a guarantee.
 use std::{
-    env,
+    ffi::{OsStr, OsString},
+    io::Read,
     path::Path,
-    process::{Command, ExitStatus, Output},
+    process::{Command, ExitStatus, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
+use pretty_assertions::{assert_eq, assert_ne};
 use tempfile::TempDir;
-
-/// Stores the absolute path to the compiled `traces` binary set by Cargo before
-/// integration tests run.
+/// Path to the product binary used by end-to-end tests.
 pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
+
+/// Runs an ignored child-only test with one controlled ambient variable,
+/// without mutating this test process's environment.
+pub(crate) fn run_with_ambient_env(
+    test_name: &str,
+    key: &str,
+    value: &str,
+) -> Output {
+    Command::new(std::env::current_exe().expect("current test executable"))
+        .args(["--ignored", "--exact", test_name])
+        .env(key, value)
+        .output()
+        .expect("spawn isolated test process")
+}
 
 /// Represents a captured process run with exit status and decoded output
 /// streams.
@@ -70,6 +83,42 @@ pub(crate) struct Run {
 impl Run {
     pub(crate) fn is_success(&self) -> bool {
         self.status.success()
+    }
+
+    pub(crate) fn code(&self) -> Option<i32> {
+        self.status.code()
+    }
+
+    pub(crate) fn assert_code(&self, expected: i32) {
+        assert_eq!(
+            self.code(),
+            Some(expected),
+            "expected exit code {expected}, got {:?}\nstdout: {}\nstderr: {}",
+            self.code(),
+            self.stdout,
+            self.stderr
+        );
+    }
+
+    pub(crate) fn assert_success(&self) {
+        self.assert_code(0);
+    }
+
+    pub(crate) fn assert_never_exit_101(&self) {
+        assert_ne!(
+            self.code(),
+            Some(101),
+            "process panicked with exit code 101!\nstderr: {}",
+            self.stderr
+        );
+    }
+
+    pub(crate) fn assert_stdout_eq(&self, expected: &str) {
+        assert_eq!(self.stdout, expected);
+    }
+
+    pub(crate) fn assert_stderr_eq(&self, expected: &str) {
+        assert_eq!(self.stderr, expected);
     }
 }
 
@@ -115,8 +164,8 @@ impl Sandbox {
         }
     }
 
-    /// Adopts caller-owned temporary directories (used by `golden_path`,
-    /// which must create its directories before `Init` runs in-process).
+    /// Adopts caller-owned temporary directories for the spawned `init`
+    /// command in the workspace workflow.
     pub(crate) fn from_dirs(
         project: TempDir,
         state_dir: TempDir,
@@ -133,18 +182,108 @@ impl Sandbox {
         self.project.path()
     }
 
+    /// Returns the sandbox state directory (`TRACES_STATE_DIR`): the root
+    /// under which the trust and tracked-config stores must land.
+    pub(crate) fn state_dir(&self) -> &Path {
+        self.state_dir.path()
+    }
+
+    /// Returns the sandbox global-config home (`XDG_CONFIG_HOME`): the parent
+    /// directory under which global config/template discovery resolves.
+    pub(crate) fn config_home(&self) -> &Path {
+        self.config_home.path()
+    }
+
+    /// Passthrough allowlist entries copied from this test process.
+    fn passthrough_env() -> Vec<(&'static str, OsString)> {
+        let base = vec![("PATH", std::env::var_os("PATH").unwrap_or_default())];
+        #[cfg(windows)]
+        {
+            let mut passthrough = base;
+            for key in ["SystemRoot", "TEMP", "TMP"] {
+                if let Some(value) = std::env::var_os(key) {
+                    passthrough.push((key, value));
+                }
+            }
+            passthrough
+        }
+        #[cfg(not(windows))]
+        base
+    }
+
+    /// Sandbox-owned entries: every derived state/config location the binary
+    /// can resolve carries a sandbox-provided value, never the host's.
+    fn owned_env(&self) -> Vec<(&'static str, OsString)> {
+        // Windows entries are cfg-gated because the config resolver reads
+        // `APPDATA` (not `XDG_CONFIG_HOME`) there; `dirs.rs` anchors its
+        // Windows `HOME` on `USERPROFILE`. On Unix, `HOME` anchors the
+        // `XDG_*` fallbacks.
+        #[cfg(windows)]
+        {
+            vec![
+                (
+                    "TRACES_STATE_DIR",
+                    self.state_dir.path().as_os_str().to_owned(),
+                ),
+                (
+                    "XDG_CONFIG_HOME",
+                    self.config_home.path().as_os_str().to_owned(),
+                ),
+                ("APPDATA", self.config_home.path().as_os_str().to_owned()),
+                ("LOCALAPPDATA", self.state_dir.path().as_os_str().to_owned()),
+                ("USERPROFILE", self.state_dir.path().as_os_str().to_owned()),
+                ("TZ", OsString::from("UTC")),
+            ]
+        }
+        #[cfg(not(windows))]
+        {
+            vec![
+                (
+                    "TRACES_STATE_DIR",
+                    self.state_dir.path().as_os_str().to_owned(),
+                ),
+                (
+                    "XDG_CONFIG_HOME",
+                    self.config_home.path().as_os_str().to_owned(),
+                ),
+                ("HOME", self.state_dir.path().as_os_str().to_owned()),
+                ("TZ", OsString::from("UTC")),
+            ]
+        }
+    }
+
+    /// Applies the sandbox environment policy to `cmd`: default-deny via
+    /// [`Command::env_clear`], then the passthrough allowlist and the
+    /// sandbox-owned entries.
+    ///
+    /// Unlisted variables are dropped, so a shell-exported variable cannot
+    /// leak into any child unless it is allow-listed or explicitly opted in.
+    fn apply_env_policy(&self, cmd: &mut Command) {
+        cmd.env_clear();
+        for (key, value) in Self::passthrough_env() {
+            cmd.env(key, value);
+        }
+        for (key, value) in self.owned_env() {
+            cmd.env(key, value);
+        }
+    }
+
     /// Writes `.traces/config.toml` pointing to a local `templates` directory
     /// and creates that directory.
     pub(crate) fn write_config(&self) {
-        std::fs::create_dir_all(self.root().join(".traces"))
-            .expect("create .traces dir");
         std::fs::create_dir_all(self.root().join("templates"))
             .expect("create templates dir");
-        std::fs::write(
-            self.root().join(".traces/config.toml"),
-            "[templates]\ndirectory = \"templates\"\n",
-        )
-        .expect("write config file");
+        self.write_config_fixture(
+            &super::config_fixture::ConfigFixture::minimal(),
+        );
+    }
+
+    /// Writes a configuration fixture to .traces/config.toml.
+    pub(crate) fn write_config_fixture(
+        &self,
+        fixture: &super::config_fixture::ConfigFixture,
+    ) -> std::path::PathBuf {
+        fixture.write_to(self.root()).expect("write config fixture")
     }
 
     /// Writes a Note at `rel_path` relative to the project root, creating
@@ -181,15 +320,13 @@ impl Sandbox {
 
     /// Builds a `traces` [`Command`] invocation configured for this sandbox.
     ///
-    /// Sets binary path, project root working directory, and isolation
-    /// environment variables on the child process without mutating the test
-    /// process environment.
+    /// Sets binary path, project root working directory, and applies the
+    /// sandbox environment policy ([`Self::apply_env_policy`]) on the child
+    /// process without mutating the test process environment.
     pub(crate) fn command(&self, args: &[&str]) -> Command {
         let mut cmd = Command::new(TRACES_BIN);
-        cmd.args(args)
-            .current_dir(self.root())
-            .env("TRACES_STATE_DIR", self.state_dir.path())
-            .env("XDG_CONFIG_HOME", self.config_home.path());
+        cmd.args(args).current_dir(self.root());
+        self.apply_env_policy(&mut cmd);
         cmd
     }
 
@@ -207,12 +344,92 @@ impl Sandbox {
         }
     }
 
+    /// Executes `args` with explicit opt-in environment entries layered on
+    /// top of the sandbox policy, and captures output in a [`Run`].
+    ///
+    /// This is the only sanctioned way to study opt-in variables
+    /// (`TRACES_CEILING_DIRS`, `TRACES_IGNORED_DIRS`) from a test: they are
+    /// never part of the default policy table.
+    pub(crate) fn run_with_envs(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &OsStr)],
+    ) -> Run {
+        let mut cmd = self.command(args);
+        for (key, value) in envs {
+            cmd.env(key, value);
+        }
+        let Output {
+            status,
+            stdout,
+            stderr,
+        } = cmd.output().expect("spawn traces");
+        Run {
+            status,
+            stdout: String::from_utf8_lossy(&stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        }
+    }
+
+    /// Executes `args` with stdin detached, bounded by a std-only watchdog:
+    /// if the child outlives `timeout` it is killed and `None` is returned,
+    /// so an interactive hang can never wedge the suite.
+    ///
+    /// `Command::output` cannot bound a hang; this poll loop (`try_wait` +
+    /// timed kill) needs no dependency and no ticket-18 runner timeout. The
+    /// child's output is small (far below the OS pipe buffer), so reading it
+    /// after exit cannot deadlock the poll.
+    pub(crate) fn run_with_watchdog(
+        &self,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Option<Run> {
+        let mut child = self
+            .command(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn traces");
+        let started = Instant::now();
+        let status = loop {
+            if let Some(status) = child.try_wait().expect("poll child status") {
+                break status;
+            }
+            if started.elapsed() >= timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "not async code; the watchdog bounds a spawned child \
+                          on a std-only poll loop, and a dependency like \
+                          wait-timeout is out of scope for this ticket"
+            )]
+            thread::sleep(Duration::from_millis(50));
+        };
+        let mut stdout_pipe = child.stdout.take().expect("piped stdout");
+        let mut stderr_pipe = child.stderr.take().expect("piped stderr");
+        let mut stdout = String::new();
+        let mut stderr = String::new();
+        stdout_pipe.read_to_string(&mut stdout).expect("read child stdout");
+        stderr_pipe.read_to_string(&mut stderr).expect("read child stderr");
+        Some(Run {
+            status,
+            stdout,
+            stderr,
+        })
+    }
+
     /// Constructs a trusted [`Sandbox`] by writing configuration and
-    /// dispatching `traces trust`.
+    /// dispatching `traces trust` — the trusted-via-CLI arrangement: the
+    /// child binary itself records the trust, so a broken trust flow fails
+    /// here and not three assertions later.
     ///
     /// Exercises the trust flow as a side effect for fixtures requiring a
     /// trusted root.
-    pub(crate) fn trusted() -> Self {
+    pub(crate) fn trusted_via_cli() -> Self {
         let sandbox = Self::new();
         sandbox.write_config();
         let trust = sandbox.run(&["trust"]);
@@ -222,35 +439,5 @@ impl Sandbox {
             trust.stderr
         );
         sandbox
-    }
-}
-
-/// Enters `path` as the process current directory for the guard's lifetime,
-/// restoring the original directory on drop.
-///
-/// See the module docs' "`CwdGuard` and process cwd" section for this
-/// harness's serialization limitations relative to the crate's own
-/// in-process `#[cfg(test)]` cwd guard.
-pub(crate) struct CwdGuard {
-    original: std::path::PathBuf,
-}
-
-impl CwdGuard {
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "test helper mirroring crate-internal CwdGuard"
-    )]
-    pub(crate) fn enter(path: &Path) -> Self {
-        let original = env::current_dir().expect("read current dir");
-        env::set_current_dir(path).expect("enter temp dir");
-        Self {
-            original,
-        }
-    }
-}
-
-impl Drop for CwdGuard {
-    fn drop(&mut self) {
-        env::set_current_dir(&self.original).expect("restore current dir");
     }
 }

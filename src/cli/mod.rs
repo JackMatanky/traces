@@ -520,7 +520,10 @@ mod tests {
         use std::{fs, path::Path, sync::Arc};
 
         use super::*;
-        use crate::{TestProject, cli::CwdGuard, dialog::PresetDialogProvider};
+        use crate::{
+            cli::CwdGuard, dialog::PresetDialogProvider,
+            test_support::TestProject,
+        };
 
         pub(super) struct CancellingSelect;
         impl DialogProvider for CancellingSelect {
@@ -990,8 +993,7 @@ mod tests {
 
         use super::*;
         use crate::{
-            ConfigService, TrustRequest, cli::CwdGuard,
-            dialog::PresetDialogProvider,
+            ConfigService, cli::CwdGuard, dialog::PresetDialogProvider,
         };
 
         #[test]
@@ -1026,27 +1028,14 @@ mod tests {
         ) {
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path().join("project");
-            fs::create_dir_all(root.join(".traces")).expect("create dir");
-            fs::create_dir_all(root.join("templates"))
-                .expect("create empty templates dir");
-            fs::write(
-                root.join(".traces/config.toml"),
-                "[templates]\ndirectory = \"templates\"\n",
-            )
-            .expect("write config file");
-            let config = crate::config::LocalConfigFile::<
-                crate::config::Discovered,
-            >::try_new(
-                root.join(".traces/config.toml")
-            )
-            .expect("valid local config");
             let service = ConfigService::at(
                 temp.path().join("tracked-store"),
                 temp.path().join("trust-store"),
             );
-            service
-                .trust(&TrustRequest::from(&config))
-                .expect("trust project root");
+            let _ =
+                crate::test_support::create_trusted_project(&service, &root);
+            fs::create_dir_all(root.join("templates"))
+                .expect("create empty templates dir");
             let _guard = CwdGuard::enter(&root);
             let provider: Arc<dyn DialogProvider> =
                 Arc::new(PresetDialogProvider::new());
@@ -1092,17 +1081,15 @@ mod tests {
 
         use super::*;
         use crate::{
-            TestProject,
             cli::CwdGuard,
             config::{Config, ConfigService},
             dialog::PresetDialogProvider,
-            query::{
-                QueryBuilderError, QueryError, SourceSelector, TaskPathStyle,
-            },
+            query::{QueryBuilderError, QueryError, SourceSelector},
             template::{
                 TemplateError, TemplatePathInput, TemplateService, WriteMode,
                 WriteOutcome,
             },
+            test_support::TestProject,
         };
 
         /// Writes a trusted project under `root/project` with two Notes
@@ -1157,81 +1144,6 @@ mod tests {
         }
 
         #[test]
-        fn indexing_then_page_and_task_queries_observe_the_same_project_state()
-        {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let (service, project) = seed_book_project(temp.path());
-            let _guard = CwdGuard::enter(&project);
-
-            let index_outcome = Cli::try_parse_from(["traces", "index"])
-                .expect("parse index argv")
-                .run(&service, Arc::new(PresetDialogProvider::new()))
-                .expect("index succeeds");
-            assert_eq!(index_outcome, CommandOutcome::Completed);
-
-            let list_outcome = Cli::try_parse_from([
-                "traces", "list", "--from", "#book", "--sort", "rating",
-            ])
-            .expect("parse list argv")
-            .run(&service, Arc::new(PresetDialogProvider::new()))
-            .expect("list succeeds");
-            assert_eq!(list_outcome, CommandOutcome::Completed);
-            let list_index = Arc::new(
-                IndexerService::for_tests(&project)
-                    .refresh()
-                    .expect("refresh index"),
-            );
-            let _list = QueryService::new("class")
-                .run(
-                    &list_index,
-                    QueryBuilder::pages(
-                        SourceSelector::parse("#book").expect("valid source"),
-                    ),
-                )
-                .sort("rating", true)
-                .expect("valid sort")
-                .list("file.path")
-                .expect("valid list");
-
-            let table_outcome = Cli::try_parse_from([
-                "traces",
-                "table",
-                "--column",
-                "file.name",
-                "--column",
-                "rating",
-            ])
-            .expect("parse table argv")
-            .run(&service, Arc::new(PresetDialogProvider::new()))
-            .expect("table succeeds");
-            assert_eq!(table_outcome, CommandOutcome::Completed);
-            let table_index = Arc::new(
-                IndexerService::for_tests(&project)
-                    .refresh()
-                    .expect("refresh index"),
-            );
-            let _table = QueryService::new("class")
-                .run(&table_index, QueryBuilder::pages(SourceSelector::All))
-                .table(&["Name", "Rating"], &["file.name", "rating"])
-                .expect("valid table");
-
-            let task_outcome = Cli::try_parse_from(["traces", "task"])
-                .expect("parse task argv")
-                .run(&service, Arc::new(PresetDialogProvider::new()))
-                .expect("task succeeds");
-            assert_eq!(task_outcome, CommandOutcome::Completed);
-            let task_index = Arc::new(
-                IndexerService::for_tests(&project)
-                    .refresh()
-                    .expect("refresh index"),
-            );
-            let _tasks = QueryService::new("class")
-                .run(&task_index, QueryBuilder::tasks(SourceSelector::All))
-                .task_list(TaskPathStyle::default())
-                .expect("valid task_list");
-        }
-
-        #[test]
         fn table_reflects_a_note_edit_made_between_two_cli_invocations_with_no_explicit_index_command()
          {
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -1276,21 +1188,18 @@ mod tests {
             assert_eq!(second_outcome, CommandOutcome::Completed);
 
             // `table`'s own stdout isn't captured (see the module doc above),
-            // so confirm the edit reached the persisted store - which is
-            // exactly what the CLI command just queried - via the same
-            // `run_from_store` seam `table`'s render path uses internally.
-            let store = IndexerService::for_tests(&project)
-                .refresh_store()
-                .expect("store already current after the second cli call");
+            // so confirm the edit reached the persisted store without
+            // re-syncing by using `load()` rather than
+            // `refresh_store()`.
+            let index = Arc::new(
+                IndexerService::for_tests(&project)
+                    .load()
+                    .expect("load persisted index without refresh"),
+            );
             let rendered = QueryService::new("class")
-                .run_from_store(
-                    &store,
-                    QueryBuilder::pages(SourceSelector::All),
-                )
-                .expect("query from store")
+                .run(&index, QueryBuilder::pages(SourceSelector::All))
                 .table(&["Name", "Rating"], &["file.name", "rating"])
                 .expect("valid table");
-
             assert!(
                 rendered.contains("| 2 "),
                 "expected dune's updated rating to appear:\n{rendered}"
@@ -1454,9 +1363,48 @@ mod tests {
 
         use super::*;
         use crate::{
-            TestProject, cli::CwdGuard, config::ConfigService,
-            dialog::PresetDialogProvider,
+            cli::CwdGuard, config::ConfigService, dialog::PresetDialogProvider,
+            test_support::TestProject,
         };
+
+        struct InterruptingSelect;
+        impl DialogProvider for InterruptingSelect {
+            fn is_interactive(&self) -> bool {
+                true
+            }
+
+            fn text(
+                &self,
+                _: &str,
+                _: Option<&str>,
+            ) -> Result<String, crate::DialogError> {
+                Ok(String::new())
+            }
+
+            fn confirm(
+                &self,
+                _: &str,
+                _: Option<bool>,
+            ) -> Result<bool, crate::DialogError> {
+                Ok(true)
+            }
+
+            fn select(
+                &self,
+                _: &str,
+                _: &[String],
+            ) -> Result<usize, crate::DialogError> {
+                Err(crate::DialogError::UserInterrupted)
+            }
+
+            fn multi_select(
+                &self,
+                _: &str,
+                _: &[String],
+            ) -> Result<Vec<usize>, crate::DialogError> {
+                Err(crate::DialogError::UserInterrupted)
+            }
+        }
 
         #[test]
         fn no_command_returns_no_command_error() {
@@ -1493,6 +1441,44 @@ mod tests {
             .expect("user abort is not an error");
             assert_eq!(outcome, CommandOutcome::Aborted(UserAbort::Cancelled));
         }
+
+        /// Verifies that a user interrupt (`Ctrl-C`) during interactive dialog
+        /// input
+        /// maps to `CommandOutcome::Aborted(UserAbort::Interrupted)`.
+        ///
+        /// Chain of custody:
+        /// 1. `DialogProvider` returns `DialogError::UserInterrupted` (e.g.
+        ///    from SIGINT / Ctrl-C).
+        /// 2. `Template::run` wraps prompt errors into
+        ///    `CliError::TemplatePicker { source }`.
+        /// 3. `CliError::user_abort()` maps `DialogError::UserInterrupted` to
+        ///    `UserAbort::Interrupted`.
+        /// 4. `Cli::run` returns
+        ///    `Ok(CommandOutcome::Aborted(UserAbort::Interrupted))`.
+        /// 5. `src/main.rs` matches `Aborted(UserAbort::Interrupted)` and exits
+        ///    with code 130.
+        ///
+        /// Defect class: unwitnessed-contract (mapping link was previously
+        /// untested).
+        #[test]
+        fn user_interrupted_during_template_picker_returns_aborted_interrupted()
+        {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let project = TestProject::trusted(temp.path().join("project"));
+            project.write_template("daily.md", "content");
+            let _guard = CwdGuard::enter(project.root());
+
+            let outcome = Cli {
+                command: None,
+                input: Some(None),
+            }
+            .run(project.service(), Arc::new(InterruptingSelect))
+            .expect("user abort is not an error");
+            assert_eq!(
+                outcome,
+                CommandOutcome::Aborted(UserAbort::Interrupted)
+            );
+        }
     }
 
     mod current_dir_and_config {
@@ -1500,8 +1486,8 @@ mod tests {
 
         use super::*;
         use crate::{
-            PresetDialogProvider, TestProject, cli::CwdGuard,
-            config::ConfigLoadError,
+            PresetDialogProvider, cli::CwdGuard, config::ConfigLoadError,
+            test_support::TestProject,
         };
 
         #[test]

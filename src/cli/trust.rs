@@ -226,7 +226,7 @@ mod tests {
     }
     use fixtures::*;
 
-    use crate::{TestProject, fixture_service};
+    use crate::test_support::{TestProject, fixture_service};
 
     mod parsing {
         use pretty_assertions::assert_eq;

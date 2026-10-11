@@ -397,8 +397,8 @@ mod tests {
             use std::fs;
 
             use crate::{
-                IndexerService, QueryService,
-                query::{QueryBuilder, SourceSelector},
+                index::IndexerService,
+                query::{QueryBuilder, QueryService, SourceSelector},
             };
 
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -447,8 +447,8 @@ mod tests {
             use std::fs;
 
             use crate::{
-                IndexerService, QueryService,
-                query::{QueryBuilder, SourceSelector},
+                index::IndexerService,
+                query::{QueryBuilder, QueryService, SourceSelector},
             };
 
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -478,8 +478,8 @@ mod tests {
             use std::fs;
 
             use crate::{
-                IndexerService, QueryService,
-                query::{QueryBuilder, SourceSelector},
+                index::IndexerService,
+                query::{QueryBuilder, QueryService, SourceSelector},
             };
 
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -521,8 +521,8 @@ mod tests {
             use std::fs;
 
             use crate::{
-                IndexerService, QueryService,
-                query::{QueryBuilder, SourceSelector},
+                index::IndexerService,
+                query::{QueryBuilder, QueryService, SourceSelector},
             };
 
             let temp = tempfile::tempdir().expect("create temp dir");

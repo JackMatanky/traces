@@ -410,7 +410,7 @@ mod tests {
         full_env(directory).render_str(source, minijinja::context!())
     }
 
-    use crate::{write_note, write_schema};
+    use crate::test_support::{write_note, write_schema};
 
     mod get_value {
         use super::*;

@@ -47,16 +47,65 @@
 //!   Interactive and preset dialog prompts.
 //! - [`parse_markdown`], [`MarkdownParserInput`]: Note parsing entry points.
 //!
-//! Available with the `test-utils` feature:
+//! Available with the `test-utils` feature under `testing`:
 //!
-//! - `Config`, `ConfigService`, `TrustRequest`: Project configuration and trust
-//!   verification.
-//! - `WorkspaceIndex`, `IndexerService`: Persistent index engine and services.
-//! - `QueryBuilder`, `QuerySet`, `QueryService`: Query planning and execution.
-//! - `Schema`, `SchemaService`: Schema registry and inheritance graph.
-//! - `TemplateService`, `CommitPolicy`, `WriteMode`: Template rendering and
-//!   file writes.
-//! - `Blake3FileHash`, `Blake3PathHash`: BLAKE3 hashing primitives.
+//! - `testing::Config`, `testing::ConfigService`, `testing::TrustRequest`:
+//!   Project configuration and trust verification.
+//! - `testing::WorkspaceIndex`, `testing::IndexerService`: Persistent index
+//!   engine and services.
+//! - `testing::QueryBuilder`, `testing::QuerySet`, `testing::QueryService`:
+//!   Query planning and execution.
+//! - `testing::Schema`, `testing::SchemaService`: Schema registry and
+//!   inheritance graph.
+//! - `testing::TemplateService`, `testing::CommitPolicy`, `testing::WriteMode`:
+//!   Template rendering and file writes.
+//! - `testing::Blake3FileHash`, `testing::Blake3PathHash`: BLAKE3 hashing
+//!   primitives.
+//! # Visibility Probes
+//!
+//! Internal configuration structures remain private to the crate and unnameable
+//! from outside. Each compile-fail probe is paired with a positive-control
+//! doctest verifying that the corresponding public interface is nameable.
+//!
+//! ```compile_fail
+//! // ConfigLoadError must not be nameable from outside the crate.
+//! use traces_pkm::ConfigLoadError;
+//! ```
+//!
+//! ```rust
+//! // Positive control: CliError is the public error entrypoint.
+//! use traces_pkm::cli::CliError;
+//! ```
+//!
+//! ```compile_fail
+//! // ConfigBuilder must not be nameable from outside the crate.
+//! use traces_pkm::ConfigBuilder;
+//! ```
+//!
+//! ```rust
+//! // Positive control: Note is a public item always available.
+//! use traces_pkm::Note;
+//! ```
+//!
+//! ```compile_fail
+//! // SchemasConfig must not be nameable from outside the crate.
+//! use traces_pkm::SchemasConfig;
+//! ```
+//!
+//! ```rust
+//! // Positive control: Tag is a public item always available.
+//! use traces_pkm::Tag;
+//! ```
+//!
+//! ```compile_fail
+//! // FrontmatterConfig must not be nameable from outside the crate.
+//! use traces_pkm::FrontmatterConfig;
+//! ```
+//!
+//! ```rust
+//! // Positive control: TaskStatus is a public item always available.
+//! use traces_pkm::TaskStatus;
+//! ```
 
 pub mod cli;
 mod config;
@@ -85,9 +134,6 @@ mod task;
 mod template;
 mod yaml;
 
-#[cfg(any(test, feature = "test-utils"))]
-pub use config::{Config, ConfigService, TaskConfig, TrustRequest};
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
 pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 pub use date::{DateError, DateTimeValue, DateValue};
@@ -102,23 +148,13 @@ pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_HINT};
 pub(crate) use field::{
     FieldKey, FieldKeyRef, FieldName, FieldNameError, FieldNameRef, FieldValue,
 };
-#[cfg(any(test, feature = "test-utils"))]
-pub use file::FileFormat;
 pub use file::FileMeta;
 pub(crate) use file::{BaseName, BaseNameRef, FileName};
 pub(crate) use file_tracker::{
     CleanMode, FilePathTracker, FilePathTrackerError,
 };
-#[cfg(any(test, feature = "test-utils"))]
-pub use hash::{Blake3FileHash, Blake3PathHash};
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) use hash::{Blake3FileHash, Blake3PathHash};
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) use index::IndexerService;
-#[cfg(any(test, feature = "test-utils"))]
-pub use index::{
-    FileEntry, IndexerService, InlinkMap, RefreshReport, WorkspaceIndex,
-};
 pub(crate) use lexer::{
     LexError, SpannedTokenStream, TokenSpec, lexical_unquote,
 };
@@ -127,39 +163,49 @@ pub use note::{
     Heading, ListItem, ListItemType, ListText, MarkdownParserInput, Note,
     NoteFieldValue, NoteFieldValueRef, TaskListItem, parse_markdown,
 };
-#[cfg(any(test, feature = "test-utils"))]
-pub use path::codec as path_codec;
 pub(crate) use position::{BytePos, ByteSpan, LineIndex, Spanned};
 pub use position::{PositionError, SourceLine};
-#[cfg(any(test, feature = "test-utils"))]
-pub use query::{
-    QueryBuilder, QueryBuilderError, QueryResult, QueryRow, QueryService,
-    QuerySet, SourceSelector,
-};
-#[cfg(any(test, feature = "test-utils"))]
-pub use schema::{Schema, SchemaFieldDef, SchemaService, SchemaServiceError};
 pub use tag::{Tag, TagError};
 pub use task::{
     TaskDate, TaskDateSet, TaskDateSetIter, TaskDateType, TaskError,
     TaskPriority, TaskStatus, TaskStatusMap, TaskStatusSymbol, TaskStatusType,
 };
-#[cfg(not(any(test, feature = "test-utils")))]
 #[expect(unused_imports, reason = "crate re-export")]
 pub(crate) use template::TemplateService;
+
 #[cfg(any(test, feature = "test-utils"))]
-pub use template::{
-    CommitPolicy, RenderFailureKind, TemplatePathInput, TemplateService,
-    WriteMode, WriteOutcome,
-};
-#[cfg(any(test, feature = "test-utils"))]
-pub use test_support::TzGuard;
-#[cfg(any(test, feature = "test-utils"))]
-pub use test_support::{
-    DEFAULT_SCHEMA_VALUES_DIR, DEFAULT_SCHEMAS_DIR, DEFAULT_TEMPLATES_DIR,
-    TestProject, build_test_index, create_trusted_project, fixture_service,
-    parse_note, parse_note_str, parse_tag, resolve_safe_path, write_note,
-    write_schema, write_template,
-};
+pub mod testing {
+    //! Test-only exports for integration tests and benchmarks.
+    //!
+    //! The membership of this module is frozen: exactly the 45 identifiers
+    //! required by external test targets under the `test-utils` feature.
+
+    pub use crate::{
+        config::{Config, ConfigService, TaskConfig, TrustRequest},
+        file::FileFormat,
+        hash::{Blake3FileHash, Blake3PathHash},
+        index::{
+            FileEntry, IndexerService, InlinkMap, RefreshReport, WorkspaceIndex,
+        },
+        path::codec as path_codec,
+        query::{
+            QueryBuilder, QueryBuilderError, QueryResult, QueryRow,
+            QueryService, QuerySet, SourceSelector,
+        },
+        schema::{Schema, SchemaFieldDef, SchemaService, SchemaServiceError},
+        template::{
+            CommitPolicy, RenderFailureKind, TemplatePathInput,
+            TemplateService, WriteMode, WriteOutcome,
+        },
+        test_support::{
+            DEFAULT_SCHEMA_VALUES_DIR, DEFAULT_SCHEMAS_DIR,
+            DEFAULT_TEMPLATES_DIR, TestProject, TzGuard, build_test_index,
+            create_trusted_project, fixture_service, parse_note,
+            parse_note_str, parse_tag, resolve_safe_path, write_note,
+            write_schema, write_template,
+        },
+    };
+}
 
 /// Build isolated fixtures for the crate's own `#[cfg(test)]` suites and,
 /// under the `test-utils` feature, for external `tests/`/`benches/`
@@ -193,8 +239,8 @@ mod test_support {
 
     use crate::{
         Config, ConfigService, IndexerService, MarkdownParserInput, Note, Tag,
-        WorkspaceIndex,
         config::{Discovered, LocalConfigFile, TrustRequest},
+        index::WorkspaceIndex,
         parse_markdown,
     };
 
@@ -207,13 +253,19 @@ mod test_support {
     /// Default schema values directory relative to project root.
     pub const DEFAULT_SCHEMA_VALUES_DIR: &str = ".traces/schemas/values";
 
+    /// Minimal local config TOML shared by every crate-side fixture that
+    /// writes `.traces/config.toml` directly. Single-sourced here (ticket
+    /// 17); the E2E harness keeps its own copy and imports nothing from the
+    /// crate.
+    const LOCAL_CONFIG_TOML: &str = "[templates]\ndirectory = \"templates\"\n";
+
     /// Encapsulates an isolated workspace fixture directory, configuration,
     /// trust records, and on-disk index persistence for tests.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::TestProject;
+    /// # use traces_pkm::testing::TestProject;
     /// let temp = tempfile::tempdir().unwrap();
     /// let project = TestProject::trusted(temp.path().join("project"));
     /// project.write_note("notes/sample.md", "# Sample\n");
@@ -266,11 +318,8 @@ mod test_support {
                 config_path.parent().expect("config parent"),
             )
             .expect("create config parent");
-            std::fs::write(
-                &config_path,
-                "[templates]\ndirectory = \"templates\"\n",
-            )
-            .expect("write config file");
+            std::fs::write(&config_path, LOCAL_CONFIG_TOML)
+                .expect("write config file");
             let service = Self::project_service(&root);
             Self {
                 root,
@@ -310,11 +359,13 @@ mod test_support {
             &self.service
         }
 
-        /// Returns test [`Config`] rooted at this project, with templates
-        /// configured if `templates/` exists.
+        /// Returns test [`Config`] rooted at this project, configuring the
+        /// local `templates/` directory only when that directory exists on
+        /// disk — the directory-existence flip is the accessor's whole
+        /// contract, hence the name.
         #[inline]
         #[must_use]
-        pub fn config(&self) -> Config {
+        pub fn config_with_templates_if_present(&self) -> Config {
             let base = Config::test_default(&self.root);
             if self.root.join(DEFAULT_TEMPLATES_DIR).is_dir() {
                 base.with_templates()
@@ -449,7 +500,7 @@ mod test_support {
         #[inline]
         #[must_use]
         pub fn indexer(&self) -> IndexerService {
-            IndexerService::from(&self.config())
+            IndexerService::from(&self.config_with_templates_if_present())
         }
 
         /// Builds an in-memory index from disk files.
@@ -483,7 +534,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::parse_note;
+    /// # use traces_pkm::testing::parse_note;
     /// let note = parse_note("notes/daily.md", "# Today\n\n- [ ] Task");
     /// assert_eq!(note.path().to_str(), Some("notes/daily.md"));
     /// ```
@@ -498,7 +549,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::parse_note_str;
+    /// # use traces_pkm::testing::parse_note_str;
     /// let note = parse_note_str("# Sample\n\nContent");
     /// assert_eq!(note.path().to_str(), Some("note.md"));
     /// ```
@@ -514,7 +565,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::build_test_index;
+    /// # use traces_pkm::testing::build_test_index;
     /// let index = build_test_index(&[("a.md", "# A"), ("b.md", "# B")]);
     /// assert_eq!(index.entries().len(), 2);
     /// ```
@@ -534,7 +585,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::parse_tag;
+    /// # use traces_pkm::testing::parse_tag;
     /// let tag = parse_tag("#projects/active");
     /// assert_eq!(tag.as_str(), "#projects/active");
     /// ```
@@ -578,9 +629,10 @@ mod test_support {
         ConfigService::at(root.join("tracked-store"), root.join("trust-store"))
     }
 
-    /// Writes a minimal local config at `root/.traces/config.toml` pointing at
-    /// `root/templates` (creating that directory), and records `root` as
-    /// trusted in `service`'s trust store.
+    /// Writes a minimal local config at `root/.traces/config.toml` configuring
+    /// `templates` as the template directory name, and records `root` as
+    /// trusted in `service`'s trust store. Note: does not create the template
+    /// directory on disk.
     ///
     /// # Panics
     ///
@@ -597,11 +649,8 @@ mod test_support {
         let config_path = root.join(".traces/config.toml");
         std::fs::create_dir_all(config_path.parent().expect("config parent"))
             .expect("create config parent");
-        std::fs::write(
-            &config_path,
-            "[templates]\ndirectory = \"templates\"\n",
-        )
-        .expect("write config file");
+        std::fs::write(&config_path, LOCAL_CONFIG_TOML)
+            .expect("write config file");
         let config =
             LocalConfigFile::<Discovered>::try_new(config_path.clone())
                 .expect("valid local config");
@@ -919,23 +968,21 @@ mod test_support {
             }
 
             #[test]
-            fn manages_trust_and_untrust_lifecycle() {
-                let temp = tempfile::tempdir().expect("create temp dir");
-                let project = TestProject::untrusted(temp.path().join("proj"));
-                project.trust();
-                let removed = project.untrust();
-                assert_eq!(removed, 1);
-            }
-
-            #[test]
             fn config_detects_templates_directory() {
                 let temp = tempfile::tempdir().expect("create temp dir");
                 let project = TestProject::empty(temp.path().join("proj"));
-                assert!(project.config().local_template_dir().is_none());
+                assert!(
+                    project
+                        .config_with_templates_if_present()
+                        .local_template_dir()
+                        .is_none()
+                );
 
                 project.write_template("test.md", "content");
                 assert_eq!(
-                    project.config().local_template_dir(),
+                    project
+                        .config_with_templates_if_present()
+                        .local_template_dir(),
                     Some(project.root().join("templates").as_path())
                 );
             }
@@ -967,6 +1014,29 @@ mod test_support {
                 let paths: Vec<&Path> =
                     index.entries().iter().map(|e| e.file().path()).collect();
                 assert_eq!(paths, [Path::new("a.md")]);
+            }
+        }
+        mod visibility {
+            use pretty_assertions::assert_eq;
+
+            #[test]
+            fn retains_config_internals_under_expected_names() {
+                assert_eq!(
+                    std::any::type_name::<crate::config::ConfigLoadError>(),
+                    "traces_pkm::config::error::ConfigLoadError"
+                );
+                assert_eq!(
+                    std::any::type_name::<crate::config::ConfigBuilder>(),
+                    "traces_pkm::config::builder::ConfigBuilder"
+                );
+                assert_eq!(
+                    std::any::type_name::<crate::config::SchemasConfig>(),
+                    "traces_pkm::config::model::SchemasConfig"
+                );
+                assert_eq!(
+                    std::any::type_name::<crate::config::FrontmatterConfig>(),
+                    "traces_pkm::config::model::FrontmatterConfig"
+                );
             }
         }
     }

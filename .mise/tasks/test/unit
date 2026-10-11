@@ -1,5 +1,5 @@
 #!/bin/bash
-#MISE description="Run unit and integration tests with `nextest`"
+#MISE description="Run nextest tests (all targets and features by default)"
 #MISE sources=["@group:rust"]
 #MISE extends="gate:never-skip"
 #USAGE flag "-m --mod <module>" {
@@ -7,16 +7,21 @@
 #USAGE   long_help """
 #USAGE   Scopes nextest to the named module using a filter expression. For example:
 #USAGE   - `-m index` filters to tests under module `index`
+#USAGE
+#USAGE   Module filtering matches library test names; use -E with a binary()
+#USAGE   selector to select an integration or E2E target.
+#USAGE   For the feature-separated canonical suite, use mise run test.
 #USAGE   """
 #USAGE }
 #USAGE // `complete "module"` completes the value after `-m`/`--mod`, not the flag name.
 #USAGE complete "module" run="sed -nE 's/^(pub )?mod ([a-z_]+);$/\\2/p' src/lib.rs"
 #USAGE flag "--feature <feature>" default="all" {
-#USAGE   help "Cargo feature to activate (e.g. all, default, or specific feature)"
+#USAGE   help "Cargo feature to activate (all, none, or a specific feature)"
 #USAGE   long_help """
 #USAGE   Selects Cargo feature set:
 #USAGE   - `all`: passes `--all-features`
-#USAGE   - `default`: passes no feature flags
+#USAGE   - `none`: production configuration (no feature flags — the crate has no
+#USAGE     `default` feature, so the old `default` value was a hard cargo error)
 #USAGE   - any other value passes `--features <feature>`
 #USAGE   """
 #USAGE }
@@ -25,9 +30,9 @@
 #USAGE   long_help """
 #USAGE   Examples:
 #USAGE   - `mise run test:unit index::query` - run tests matching name substring
-#USAGE   - `mise run test:unit --test init_cli` - run integration test binary
-#USAGE   - `mise run test:unit --lib` - run unit tests in library target only
-#USAGE   - `mise run test:unit -E 'test(/^index::/)'` - filter with nextest filter expression DSL
+#USAGE   - `mise run test:unit --test integration` - run the integration binary
+#USAGE   - `mise run test:unit --test e2e` - run the E2E binary
+#USAGE   - `mise run test:unit -E 'test(/^index::/)'` - nextest filter DSL
 #USAGE   """
 #USAGE }
 
@@ -51,6 +56,11 @@ declare -a unit_args=()
 resolve_package_feature_args() {
   if [[ "${usage_feature:-all}" == "all" ]]; then
     unit_args+=(-p traces-pkm --all-features)
+  elif [[ "${usage_feature:-all}" == "none" ]]; then
+    # Production configuration: the crate defines no `default` feature, so
+    # no feature flags are passed (the old `--features default` value was a
+    # hard cargo error).
+    unit_args+=(-p traces-pkm --no-default-features)
   else
     unit_args+=(-p traces-pkm --features "${usage_feature}")
   fi

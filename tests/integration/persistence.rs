@@ -1,56 +1,31 @@
-//! Promotes `src/index/mod.rs`'s internal
-//! `persist_then_load_recovers_the_same_records_and_notes` test to prove the
-//! public round-trip contract: `WorkspaceIndex::build` → `persist` → `load` in
-//! a fresh `WorkspaceIndex` value, simulating a new process. Also covers redb
-//! persistence invariance without the `LISTS` table (ADR 0005) and recovery
-//! from a corrupted `.traces/index.redb` file, both through the public
+//! Proves the public round-trip contract: `WorkspaceIndex::build` → `persist` →
+//! `load` in a fresh `WorkspaceIndex` value, simulating a new process. Also
+//! covers redb persistence invariance without the `LISTS` table (ADR 0005) and
+//! recovery from a corrupted `.traces/index.redb` file, both through the public
 //! `IndexerService` surface alone.
+//!
+//! The deleted `persist_then_load_recovers_the_same_file_count_and_paths`
+//! (ticket 16, ledger D2) is subsumed by the in-crate persistence roundtrip
+//! units; the unique re-query-after-source-deletion contract stays here.
 
 use std::sync::Arc;
 
 use chrono::NaiveDate;
 use pretty_assertions::assert_eq;
 use traces_pkm::{
-    FileEntry, QueryBuilder, QueryService, QuerySet, SourceLine,
-    SourceSelector, TaskDateType, TaskListItem, TaskPriority, TaskStatusType,
-    TestProject,
+    SourceLine, TaskDateType, TaskListItem, TaskPriority, TaskStatusType,
+    testing::{
+        FileEntry, QueryBuilder, QueryService, QuerySet, SourceSelector,
+        TestProject,
+    },
 };
-/// Builds an index, persists it, and reloads it into a fresh `WorkspaceIndex`,
-/// checking records survive intact.
-///
-/// `src/index/mod.rs` covers the identical round trip with an internal unit
-/// test. This is the only test proving `build`/`persist`/`load` still work when
-/// called only through their `pub` signatures.
-#[test]
-fn persist_then_load_recovers_the_same_file_count_and_paths() {
-    let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
-    project.write_note("a.md", "# A\n");
-    project.write_note("b.md", "# B\n");
-    let (indexer, built) = project.build_and_persist();
-
-    let loaded = indexer.load().expect("load persisted index");
-
-    assert_eq!(loaded.entries().len(), built.entries().len());
-    let mut loaded_paths: Vec<_> = loaded
-        .entries()
-        .iter()
-        .map(|entry| entry.file().path().to_path_buf())
-        .collect();
-    loaded_paths.sort();
-    assert_eq!(loaded_paths, vec![
-        std::path::PathBuf::from("a.md"),
-        std::path::PathBuf::from("b.md"),
-    ]);
-}
-
 /// Proves list items with tasks persist inside `Note` in the `NOTES` table and
 /// reload with full metadata and hierarchy through a fresh service instance,
 /// simulating a new process.
 #[test]
 fn reloads_flat_list_items_with_metadata_and_hierarchy() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     let markdown = "\
 - [ ] Root task 📅 2025-06-01 🔺
   - [ ] Subtask
@@ -143,7 +118,7 @@ fn reloads_flat_list_items_with_metadata_and_hierarchy() {
 #[test]
 fn preserves_query_rows_and_list_metadata_across_cold_reload() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     // Note 1: rich task outline with custom markers, priorities, and dates.
     let tasks_md = r"# Tasks
@@ -262,39 +237,7 @@ fn line_source(line: u32) -> SourceLine {
 /// Asserts every query row in `loaded` matches the corresponding row in
 /// `in_memory`.
 fn assert_rows_match(loaded: &QuerySet, in_memory: &QuerySet, label: &str) {
-    assert_eq!(loaded.len(), in_memory.len(), "{label} count mismatch");
-    for (i, (loaded_row, in_memory_row)) in
-        loaded.iter().zip(in_memory.iter()).enumerate()
-    {
-        assert_eq!(
-            (
-                loaded_row.file().path(),
-                loaded_row.depth(),
-                loaded_row.line(),
-                loaded_row.parent(),
-            ),
-            (
-                in_memory_row.file().path(),
-                in_memory_row.depth(),
-                in_memory_row.line(),
-                in_memory_row.parent(),
-            ),
-            "{label} row {i} structural mismatch"
-        );
-        assert_eq!(
-            (
-                loaded_row.task_text(),
-                loaded_row.task_completed(),
-                loaded_row.status_symbol(),
-            ),
-            (
-                in_memory_row.task_text(),
-                in_memory_row.task_completed(),
-                in_memory_row.status_symbol(),
-            ),
-            "{label} row {i} task data mismatch"
-        );
-    }
+    assert_eq!(loaded, in_memory, "{label} rows differ after cold reload");
 }
 
 /// Proves `IndexerService::refresh_with_report` recovers from a corrupted
@@ -309,7 +252,7 @@ fn assert_rows_match(loaded: &QuerySet, in_memory: &QuerySet, label: &str) {
 fn refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted()
  {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("a.md", "# A\n");
     project.write_note("b.md", "# B\n");
     let (indexer, built) = project.build_and_persist();

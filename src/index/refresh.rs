@@ -554,7 +554,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::parse_note;
+        use crate::test_support::parse_note;
 
         #[test]
         fn returns_all_modified_notes_for_upsert() {
@@ -599,5 +599,82 @@ mod tests {
 
             assert_eq!(scope.to_upsert(&upserted), Vec::<&Note>::new());
         }
+    }
+
+    /// A rejected store write materializes the reconciled in-memory delta
+    /// while leaving the previously persisted index untouched.
+    #[test]
+    fn materializes_unpersisted_delta_when_store_write_fails() {
+        use std::{fs, io};
+
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        use crate::{index::error::StoreError, test_support::parse_note};
+
+        let temp = tempfile::tempdir().expect("create temp dir");
+        fs::write(temp.path().join("note.md"), "---\ntitle: old\n---\n# A")
+            .expect("write note");
+        let indexer = IndexerService::for_tests(temp.path());
+        indexer
+            .persist(&indexer.build().expect("build index"))
+            .expect("persist index");
+
+        fs::write(temp.path().join("note.md"), "---\ntitle: new\n---\n# A")
+            .expect("rewrite note");
+        let plan =
+            RefreshPlan::collect(temp.path()).expect("collect refresh plan");
+        let persisted_links = plan
+            .store()
+            .read_all_links(plan.persisted_files())
+            .expect("read persisted links");
+        let modified = vec![parse_note("note.md", "---\ntitle: new\n---\n# A")];
+        let pending = plan
+            .reconcile(modified, persisted_links)
+            .expect("reconcile stale pass");
+
+        let report = pending.report();
+        let index = super::super::materialize_apply(Err(PersistFailed {
+            source: IndexError::Store(StoreError::Io {
+                path: temp.path().join(".traces/index.redb"),
+                source: io::Error::other("induced persist failure"),
+            }),
+            pass: Box::new(pending),
+        }))
+        .expect("fail-open materialization");
+        assert_eq!(report.upserted_count(), 1);
+        assert_eq!(report.deleted_count(), 0);
+        let note = index
+            .entries()
+            .iter()
+            .find(|entry| entry.file().path() == Path::new("note.md"))
+            .and_then(crate::index::FileEntry::note)
+            .expect("note entry");
+        assert_eq!(
+            note.frontmatter()
+                .and_then(|fm| fm.fields().values().next())
+                .and_then(|value| value.as_str()),
+            Some("new"),
+            "unpersisted delta must survive in the returned index"
+        );
+
+        // Loading does not refresh, so it cannot repair the store under test.
+        let persisted = IndexerService::for_tests(temp.path())
+            .load()
+            .expect("load untouched store");
+        let persisted_note = persisted
+            .entries()
+            .iter()
+            .find(|entry| entry.file().path() == Path::new("note.md"))
+            .and_then(crate::index::FileEntry::note)
+            .expect("persisted note entry");
+        assert_eq!(
+            persisted_note
+                .frontmatter()
+                .and_then(|fm| fm.fields().values().next())
+                .and_then(|value| value.as_str()),
+            Some("old"),
+            "fail-open must not persist the delta as a side effect"
+        );
     }
 }

@@ -75,6 +75,11 @@ impl CwdGuard {
     ///
     /// Panics if the current directory cannot be read or the change fails,
     /// since both indicate a broken test environment.
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "CwdGuard is the sole authorized caller of \
+                  env::set_current_dir"
+    )]
     #[inline]
     #[must_use]
     pub(crate) fn enter(dir: &Path) -> Self {
@@ -109,6 +114,11 @@ impl CwdGuard {
 
 #[cfg(test)]
 impl Drop for CwdGuard {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "CwdGuard is the sole authorized caller of \
+                  env::set_current_dir"
+    )]
     #[inline]
     fn drop(&mut self) {
         env::set_current_dir(&self.original).expect("restore original cwd");

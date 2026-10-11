@@ -7,8 +7,11 @@ use std::sync::Arc;
 use pretty_assertions::{assert_eq, assert_ne};
 use rstest::rstest;
 use traces_pkm::{
-    CommitPolicy, PresetDialogProvider, TemplatePathInput, TemplateService,
-    TestProject, TzGuard, WriteMode, WriteOutcome,
+    PresetDialogProvider,
+    testing::{
+        CommitPolicy, TemplatePathInput, TemplateService, TestProject, TzGuard,
+        WriteMode, WriteOutcome,
+    },
 };
 
 /// Renders a template whose query counts real indexed notes, and checks
@@ -20,14 +23,14 @@ use traces_pkm::{
 #[test]
 fn renders_a_query_over_real_indexed_notes_and_writes_the_result() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/a.md", "# A\n");
     project.write_note("notes/b.md", "# B\n");
     project.write_template(
         "report.md",
         "{{ query.from(\"notes/\") | length }} notes",
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid test schema directory");
@@ -56,7 +59,7 @@ fn renders_a_query_over_real_indexed_notes_and_writes_the_result() {
 #[test]
 fn renders_a_file_sourced_select_field_in_template_rendering() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     project.write_schema_value(
         "categories.toml",
@@ -77,7 +80,7 @@ fn renders_a_file_sourced_select_field_in_template_rendering() {
         "Category: {{ schema.get('topic').field('category')[0].label }} ({{ \
          schema.get('topic').field('category')[0].value }})",
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid test schema directory");
@@ -111,7 +114,7 @@ fn renders_a_file_sourced_select_field_in_template_rendering() {
 #[test]
 fn renders_tasks_and_lists_pipelines_with_transforms_and_formatters() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
 
     let work_md = r"---
 project: alpha
@@ -155,7 +158,7 @@ Table:
 "#;
     project.write_template("dashboard.md", template_body);
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -223,7 +226,7 @@ Table:
 
 /// Proves `tasks.from(...).where(...)` rejects obsolete `task.<field>`
 /// syntax with the same actionable diagnostic proven at the library level in
-/// `tests/integration/index_query.rs`, confirming the `tasks` template
+/// `tests/integration/query.rs`, confirming the `tasks` template
 /// global routes through the identical `QueryBuilder::filter` validation as
 /// the `query` and `list.<field>` paths, rather than a namespace-specific
 /// bypass.
@@ -232,14 +235,14 @@ fn tasks_pipeline_rejects_obsolete_task_field_syntax_with_diagnostic() {
     use std::error::Error as StdError;
 
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("todo.md", "- [ ] one\n");
     project.write_template(
         "broken.md",
         "{{ tasks.from().where('task.completed == true') | count }}",
     );
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -274,11 +277,11 @@ fn lists_pipeline_rejects_task_list_formatter_on_non_task_rows() {
     use std::error::Error as StdError;
 
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("todo.md", "- Plain bullet\n");
     project.write_template("broken.md", "{{ lists.from().task_list() }}");
 
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let template_service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -307,14 +310,14 @@ fn lists_pipeline_rejects_task_list_formatter_on_non_task_rows() {
 #[test]
 fn query_date_arithmetic_agrees_with_template_calendar_shift() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/jan.md", "---\nwhen: 2026-01-31\n---\n");
     project.write_note("notes/feb.md", "---\nwhen: 2026-02-15\n---\n");
     project.write_template(
         "calendar.md",
         r#"{{ query.from("notes/").where('when + dur("1 month") == "2026-02-28"') | length }}|{{ "2026-01-31" | date_add(1, unit="months") }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -344,12 +347,12 @@ fn query_date_arithmetic_agrees_with_template_calendar_shift() {
 #[test]
 fn template_shorthands_support_iso_offsets_and_reference_format() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "offsets.md",
         r#"{{ date.now("YYYY-MM-DD", "P1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.now("YYYY-MM-DD", "P-1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.sow(reference="2026-02-01", reference_format="%Y-%m-%d") }}|{{ date.eow(reference="2026-02-01", reference_format="%Y-%m-%d") }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -378,12 +381,12 @@ fn template_shorthands_support_iso_offsets_and_reference_format() {
 #[test]
 fn template_filters_support_bucketing_aliases_and_weekday_arg() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "bucketing.md",
         r#"{{ "2026-02-01" | sow }}|{{ "2026-02-01" | eow }}|{{ "2026-07-29" | som }}|{{ "2026-07-29" | eom }}|{{ "2026-07-29" | soy }}|{{ "2026-07-29" | eoy }}|{{ "2026-07-29" | weekday(1) }}|{{ "2026-07-29" | weekday(7) }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -415,12 +418,12 @@ fn template_filters_support_bucketing_aliases_and_weekday_arg() {
 #[case::far_out_of_range(99)]
 fn template_weekday_rejects_out_of_range_day_index(#[case] invalid_idx: i64) {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "invalid_weekday.md",
         &format!(r#"{{{{ "2026-07-29" | weekday({invalid_idx}) }}}}"#),
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -435,14 +438,14 @@ fn template_weekday_rejects_out_of_range_day_index(#[case] invalid_idx: i64) {
 #[test]
 fn file_day_resolves_in_query_with_filename_precedence() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/2026-07-29-daily.md", "---\ntitle: Daily\n---\n");
     project.write_note("notes/plain.md", "---\ntitle: Plain\n---\n");
     project.write_template(
         "file_day.md",
         r#"{{ query.from("notes/").where('file.day == "2026-07-29"') | length }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -467,12 +470,12 @@ fn file_day_resolves_in_query_with_filename_precedence() {
 #[test]
 fn template_shorthands_reject_malformed_iso_offsets() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "invalid_offset.md",
         r#"{{ date.now("YYYY-MM-DD", "P1Q2D", "2026-05-15", "%Y-%m-%d") }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -489,13 +492,13 @@ fn template_shorthands_reject_malformed_iso_offsets() {
 #[test]
 fn file_day_persists_at_index_time_across_query_time_zone_changes() {
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_note("notes/2026-07-29-daily.md", "---\ntitle: Daily\n---\n");
     project.write_template(
         "file_day_tz.md",
         r#"{{ query.from("notes/").where('file.day == "2026-07-29"') | length }}"#,
     );
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -545,9 +548,9 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 fn template_seam_renders_local_clock_under_injected_tz() {
     TzGuard::set("Etc/GMT-5"); // UTC+05:00
     let temp = tempfile::tempdir().expect("create temp dir");
-    let project = TestProject::trusted(temp.path().join("project"));
+    let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template("clock.md", r#"{{ date.now("%Y") }}"#);
-    let config = project.config();
+    let config = project.config_with_templates_if_present();
     let service =
         TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
             .expect("valid template service");
@@ -568,4 +571,152 @@ fn template_seam_renders_local_clock_under_injected_tz() {
     .expect("commit mode must write");
     let content = std::fs::read_to_string(path).expect("read report");
     assert_eq!(content.len(), 4);
+}
+
+/// Proves `@class` source expansion resolves through the schema graph at the
+/// template composition root: transitive `extends` rows match `@book*`, the
+/// `class(book, children)` form matches direct extenders only, exact `@book`
+/// matches nothing when no note carries that class, and an unknown class
+/// degrades to a literal match without error or hierarchy expansion
+/// (`@horror` finds the horror-classed note but has no descendants).
+///
+/// This is the class-expander's external reachability proof: the expander is
+/// `pub(crate)` and `QueryService::new` leaves it `None` (a direct
+/// query-service `@class` test would be vacuous), so coverage enters through
+/// the template service, which attaches the expander internally from the
+/// configured schemas directory. Replaces the graph-reachability coverage of
+/// the deleted `schema_field_resolution.rs` (field-inheritance internals
+/// stay with their source-local in-crate twins in `src/schema`).
+///
+/// Executes vs asserts:
+/// - Executes: schemas written to the default schemas dir (`book` ← `sci_fi` ←
+///   `novel`, `book` ← `memoir`), classed notes, then `TemplateService::
+///   render_to_file` over `query.from(...)` sources.
+/// - Asserts: exact rendered counts — descendants include the depth-2 `novel`
+///   note, children exclude it, exact `@book` matches nothing, unknown
+///   `@horror` degrades to its literal match, and the transitive subtree
+///   `@sci_fi*` finds only the novel note.
+///
+/// Defect class: reachability-transfer (class expansion silently
+/// unreachable from any external entry point).
+#[test]
+fn renders_class_expanded_source_selectors_through_the_schema_graph() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let project = TestProject::untrusted(temp.path().join("project"));
+    project.write_schema("book", "");
+    project.write_schema("sci_fi", "extends = [\"book\"]");
+    project.write_schema("novel", "extends = [\"sci_fi\"]");
+    project.write_schema("memoir", "extends = [\"book\"]");
+    project.write_note("shelf/a.md", "---\nclass: novel\n---\n# A\n");
+    project.write_note("shelf/b.md", "---\nclass: memoir\n---\n# B\n");
+    project.write_note("shelf/c.md", "---\nclass: horror\n---\n# C\n");
+    project.write_note("shelf/d.md", "# D\n");
+    project.write_template(
+        "classes.md",
+        "{{ query.from(\"@book*\") | length }}-{{ query.from(\"class(book, \
+         children)\") | length }}-{{ query.from(\"@book\") | length }}-{{ \
+         query.from(\"@horror\") | length }}-{{ query.from(\"@sci_fi*\") | \
+         length }}",
+    );
+
+    let config = project.config_with_templates_if_present();
+    let template_service =
+        TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
+            .expect("valid test schema directory");
+    let input = TemplatePathInput::parse(std::path::Path::new("classes"))
+        .expect("valid template input");
+
+    let outcome = template_service
+        .render_to_file(
+            &input,
+            None,
+            WriteMode::Commit(CommitPolicy::CreateNew),
+        )
+        .expect("render class report");
+
+    let written = match outcome {
+        WriteOutcome::Written(path) => Some(path),
+        WriteOutcome::Previewed(_) => None,
+    }
+    .expect("Commit mode must write");
+    assert_eq!(
+        std::fs::read_to_string(written).expect("read class report"),
+        "2-1-0-1-1",
+        "descendants, children, exact, unknown-literal, transitive counts"
+    );
+}
+
+/// Guards the cross-render freshness constraint named in code on
+/// `INDEX_CACHE_KEY` (`src/template/engine/query.rs`: "A cache field on
+/// `QueryOps` itself would wrongly persist across independent renders on a
+/// reused `Environment`/`TemplateEngine`"): the refreshed index is cached in
+/// render-scoped `State` temp storage, so a second render on the same
+/// service must observe filesystem changes made after the first render.
+///
+/// All other template integration tests are single-render; this is the only
+/// one rendering twice with a mutation in between.
+///
+/// Executes vs asserts:
+/// - Executes: two `render_to_file` calls on one `TemplateService` with a note
+///   written to disk between them.
+/// - Asserts: the first render counts 1 note, the second counts 2 — a
+///   render-lifetime cache field would have served the stale count.
+///
+/// Defect class: stale-cross-render-cache.
+#[test]
+fn index_cache_does_not_persist_across_independent_renders() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let project = TestProject::untrusted(temp.path().join("project"));
+    project.write_note("a.md", "# A #fresh\n");
+    // The counted tag is assembled dynamically so the template file (which
+    // is inside the project and indexed too) does not itself match the
+    // selector.
+    project.write_template(
+        "count.md",
+        "{{ query.from(\"#fres\" ~ \"h\") | length }}",
+    );
+
+    let config = project.config_with_templates_if_present();
+    let template_service =
+        TemplateService::new(&config, Arc::new(PresetDialogProvider::new()))
+            .expect("valid test schema directory");
+    let input = TemplatePathInput::parse(std::path::Path::new("count"))
+        .expect("valid template input");
+
+    let first = template_service
+        .render_to_file(
+            &input,
+            None,
+            WriteMode::Commit(CommitPolicy::CreateNew),
+        )
+        .expect("first render");
+    let first_path = match first {
+        WriteOutcome::Written(path) => Some(path),
+        WriteOutcome::Previewed(_) => None,
+    }
+    .expect("Commit mode must write");
+    assert_eq!(
+        std::fs::read_to_string(first_path).expect("read first render"),
+        "1"
+    );
+
+    project.write_note("b.md", "# B #fresh\n");
+
+    let second = template_service
+        .render_to_file(
+            &input,
+            Some(std::path::Path::new("second.md")),
+            WriteMode::Commit(CommitPolicy::CreateNew),
+        )
+        .expect("second render");
+    let second_path = match second {
+        WriteOutcome::Written(path) => Some(path),
+        WriteOutcome::Previewed(_) => None,
+    }
+    .expect("Commit mode must write");
+    assert_eq!(
+        std::fs::read_to_string(second_path).expect("read second render"),
+        "2",
+        "the second render must observe the note written after the first"
+    );
 }

@@ -39,7 +39,7 @@ use crate::{
 /// # {
 /// use std::sync::Arc;
 ///
-/// use traces_pkm::{
+/// use traces_pkm::testing::{
 ///     IndexerService, QueryBuilder, QueryService, SourceSelector,
 /// };
 ///
@@ -618,7 +618,7 @@ mod tests {
         }
 
         fn build_book_index() -> Arc<WorkspaceIndex> {
-            crate::build_test_index(&[(
+            crate::test_support::build_test_index(&[(
                 "book.md",
                 "---\ntitle: Dune\n---\nGenre:: Sci-fi\n\nShelved as #book.",
             )])
@@ -1252,9 +1252,44 @@ mod tests {
             let in_memory =
                 service.run(&index, QueryBuilder::lists(SourceSelector::All));
 
-            // Persisted list items must reconstruct rows identical to the
-            // in-memory path without reparsing Markdown.
-            assert_eq!(from_store, in_memory);
+            // Persisted list items must reconstruct rows structurally
+            // identical to the in-memory path without reparsing Markdown.
+            // FileMeta stat fields (mtime, created_at) are captured by two
+            // independent filesystem scans and may differ in sub-second
+            // precision or birth-time availability under parallel I/O, so
+            // the assertion covers the seam contract — row structure and
+            // list content — not incidental stat captures.
+            assert_eq!(from_store.len(), in_memory.len(), "row count");
+            for (row_index, (from_store_row, in_memory_row)) in
+                from_store.iter().zip(in_memory.iter()).enumerate()
+            {
+                assert_eq!(
+                    (
+                        from_store_row.file().path(),
+                        from_store_row.depth(),
+                        from_store_row.line(),
+                        from_store_row.parent(),
+                        from_store_row.task_text(),
+                        from_store_row.task_completed(),
+                        from_store_row.status_symbol(),
+                    ),
+                    (
+                        in_memory_row.file().path(),
+                        in_memory_row.depth(),
+                        in_memory_row.line(),
+                        in_memory_row.parent(),
+                        in_memory_row.task_text(),
+                        in_memory_row.task_completed(),
+                        in_memory_row.status_symbol(),
+                    ),
+                    "row {row_index} mismatch"
+                );
+                assert_eq!(
+                    from_store_row.note(),
+                    in_memory_row.note(),
+                    "row {row_index} note content mismatch"
+                );
+            }
         }
     }
 }
