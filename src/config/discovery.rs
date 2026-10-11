@@ -4,12 +4,19 @@
 //! reading TOML content. It produces [`DiscoveryOutcome`], which the builder
 //! pipeline consumes.
 //!
-//! # Scopes
+//! # Entry Points
 //!
-//! - [`DiscoveryScope::Full`] selects local and global candidates for config
-//!   loading.
-//! - [`DiscoveryScope::NearestLocal`] resolves a single trust target.
-//! - [`DiscoveryScope::LocalSubtree`] resolves descendant trust targets.
+//! - [`DiscoveryContext`] pairs a discovery operation with the only anchor
+//!   shape it accepts; [`run`] executes it. [`DiscoveryContext::Full`] selects
+//!   local and global candidates for config loading,
+//!   [`DiscoveryContext::NearestLocal`] one local config, and
+//!   [`DiscoveryContext::LocalSubtree`] the nearest local config plus its
+//!   descendants.
+//! - [`TrustScope`] selects how [`trust_requests`] resolves a user-supplied
+//!   path into trust subjects.
+//!
+//! [`DiscoveryScope`] only tags the resulting [`DiscoveryOutcome`] with the
+//! operation that produced it.
 
 use std::{
     io,
@@ -469,7 +476,7 @@ mod tests {
 
         fn create_config(&self, rel_dir: &str) -> PathBuf {
             let p = self.path(rel_dir).join(LOCAL_CONFIG_FILE);
-            fs::create_dir_all(p.parent().unwrap())
+            fs::create_dir_all(p.parent().expect("config parent"))
                 .expect("create config parent");
             fs::write(&p, "[templates]\n").expect("write config");
             p
@@ -485,13 +492,21 @@ mod tests {
         }
     }
 
+    fn local_roots(outcome: &DiscoveryOutcome) -> Vec<PathBuf> {
+        outcome.local().iter().map(|file| file.root().to_path_buf()).collect()
+    }
+
+    fn local_paths(outcome: &DiscoveryOutcome) -> Vec<PathBuf> {
+        outcome.local().iter().map(|file| file.path().to_path_buf()).collect()
+    }
+
     mod engine {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[test]
-        fn run_full_returns_kind_anchor_and_nearest_local() {
+        fn returns_kind_anchor_and_nearest_local_for_full_discovery() {
             // Arrange
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
@@ -504,16 +519,14 @@ mod tests {
             let result = run(ctx);
 
             // Assert
-            assert!(result.is_ok());
-            let discovered = result.unwrap();
+            let discovered = result.expect("discover full");
             assert_eq!(discovered.kind(), DiscoveryScope::Full);
             assert_eq!(discovered.anchor(), &DiscoveryAnchor::Directory(cwd));
-            assert_eq!(discovered.local().len(), 1);
-            assert_eq!(discovered.local().first().unwrap().root(), project);
+            assert_eq!(local_roots(&discovered), [project]);
         }
 
         #[test]
-        fn run_nearest_local_returns_only_nearest() {
+        fn returns_only_the_nearest_local_for_nearest_local_discovery() {
             // Arrange
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
@@ -527,15 +540,13 @@ mod tests {
             let result = run(ctx);
 
             // Assert
-            assert!(result.is_ok());
-            let discovered = result.unwrap();
+            let discovered = result.expect("discover nearest local");
             assert_eq!(discovered.kind(), DiscoveryScope::NearestLocal);
-            assert_eq!(discovered.local().len(), 1);
-            assert_eq!(discovered.local().first().unwrap().root(), project);
+            assert_eq!(local_roots(&discovered), [project]);
         }
 
         #[test]
-        fn run_local_subtree_discovers_nearest_and_descendants() {
+        fn discovers_nearest_and_descendants_for_local_subtree() {
             // Arrange
             let fixture = Fixture::new();
             let parent = fixture.create_dir("parent");
@@ -551,12 +562,9 @@ mod tests {
             let result = run(ctx);
 
             // Assert
-            assert!(result.is_ok());
-            let discovered = result.unwrap();
+            let discovered = result.expect("discover local subtree");
             assert_eq!(discovered.kind(), DiscoveryScope::LocalSubtree);
-            assert_eq!(discovered.local().len(), 2);
-            assert_eq!(discovered.local().first().unwrap().root(), parent);
-            assert_eq!(discovered.local().get(1).unwrap().root(), child);
+            assert_eq!(local_roots(&discovered), [parent, child]);
             assert_eq!(discovered.global(), []);
         }
 
@@ -575,13 +583,8 @@ mod tests {
             let result = run(ctx);
 
             // Assert
-            assert!(result.is_ok());
-            let discovered = result.unwrap();
-            assert_eq!(discovered.local().len(), 1);
-            assert_eq!(
-                discovered.local().first().unwrap().path(),
-                child_config.as_path()
-            );
+            let discovered = result.expect("discover local subtree");
+            assert_eq!(local_paths(&discovered), [child_config]);
         }
 
         #[test]
@@ -601,13 +604,8 @@ mod tests {
             let result = run(ctx);
 
             // Assert
-            assert!(result.is_ok());
-            let discovered = result.unwrap();
-            assert_eq!(discovered.local().len(), 1);
-            assert_eq!(
-                discovered.local().first().unwrap().root(),
-                fixture.path("ancestor")
-            );
+            let discovered = result.expect("discover local subtree");
+            assert_eq!(local_roots(&discovered), [fixture.path("ancestor")]);
         }
 
         #[test]
@@ -624,68 +622,72 @@ mod tests {
             let result = run(ctx);
 
             // Assert
-            assert!(result.is_ok());
-            let discovered = result.unwrap();
-            assert_eq!(discovered.local().len(), 1);
-            assert_eq!(
-                discovered.local().first().unwrap().root(),
-                fixture.path("project")
-            );
+            let discovered = result.expect("discover local subtree");
+            assert_eq!(local_roots(&discovered), [fixture.path("project")]);
         }
 
         #[test]
-        fn trust_requests_nearest_local_with_config_returns_discovered_request()
-        {
+        fn returns_a_config_request_for_the_nearest_local_config() {
             // Arrange
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
-            fixture.create_config("project");
+            let config = fixture.create_config("project");
 
             // Act
-            let result = trust_requests(&project, TrustScope::NearestLocal);
+            let requests = trust_requests(&project, TrustScope::NearestLocal)
+                .expect("resolve trust requests");
+
             // Assert
-            assert!(result.is_ok());
-            let requests = result.unwrap();
-            assert_eq!(requests.len(), 1);
+            assert_eq!(requests, vec![TrustRequest::Config {
+                root: project.canonicalize().expect("canonical root"),
+                path: config.canonicalize().expect("canonical config"),
+            }]);
         }
 
         #[test]
-        fn trust_requests_nearest_local_without_config_returns_root_fallback() {
+        fn falls_back_to_a_root_request_when_nearest_local_has_no_config() {
             // Arrange
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
 
             // Act
-            let result = trust_requests(&project, TrustScope::NearestLocal);
+            let requests = trust_requests(&project, TrustScope::NearestLocal)
+                .expect("resolve trust requests");
+
             // Assert
-            assert!(result.is_ok());
-            let requests = result.unwrap();
-            assert_eq!(requests.len(), 1);
+            assert_eq!(requests, vec![TrustRequest::Root(
+                project.canonicalize().expect("canonical root")
+            )]);
         }
 
         #[test]
-        fn trust_requests_local_subtree_returns_discovered_requests() {
+        fn returns_config_requests_for_every_local_subtree_config() {
             // Arrange
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
-            fixture.create_config("project");
+            let config = fixture.create_config("project");
+
+            // Act
+            let requests = trust_requests(&project, TrustScope::LocalSubtree)
+                .expect("resolve trust requests");
+
+            // Assert
+            assert_eq!(requests, vec![TrustRequest::Config {
+                root: project.canonicalize().expect("canonical root"),
+                path: config.canonicalize().expect("canonical config"),
+            }]);
+        }
+
+        #[test]
+        fn fails_with_not_found_when_local_subtree_has_no_config() {
+            // Arrange
+            let fixture = Fixture::new();
+            let project = fixture.create_dir("project");
 
             // Act
             let result = trust_requests(&project, TrustScope::LocalSubtree);
+
             // Assert
-            assert!(result.is_ok());
-            let requests = result.unwrap();
-            assert_eq!(requests.len(), 1);
-        }
-
-        #[test]
-        fn trust_requests_local_subtree_without_config_is_error() {
-            // Arrange
-            let fixture = Fixture::new();
-            let project = fixture.create_dir("project");
-
-            // Act
-            let result = trust_requests(&project, TrustScope::LocalSubtree);
             assert!(matches!(
                 result,
                 Err(ConfigDiscoveryError::NotFound { .. })
@@ -750,63 +752,61 @@ mod tests {
             }
         }
 
-        #[test]
-        fn is_config_file_returns_false_for_missing_path() {
-            // Arrange
-            let fixture = Fixture::new();
-            let path = fixture.path("missing.toml");
+        mod is_config_file {
+            use super::*;
 
-            // Act
-            let result = is_config_file(&path);
+            #[test]
+            fn returns_false_for_a_missing_path() {
+                // Arrange
+                let fixture = Fixture::new();
+                let path = fixture.path("missing.toml");
 
-            // Assert
-            assert!(result.is_ok());
-            assert!(!result.unwrap());
+                // Act
+                let result = is_config_file(&path);
+
+                // Assert
+                assert!(!result.expect("check missing path"));
+            }
+
+            #[test]
+            fn fails_with_inaccessible_when_a_parent_is_not_a_directory() {
+                // Arrange
+                let fixture = Fixture::new();
+                let blocking_file = fixture.create_file("blocking");
+                let unreachable_path = blocking_file.join("config.toml");
+
+                // Act
+                let result = is_config_file(&unreachable_path);
+
+                // Assert
+                assert!(matches!(
+                    result,
+                    Err(ConfigDiscoveryError::Inaccessible { .. })
+                ));
+            }
         }
+    }
+
+    mod nearest_local_from_dir_with_ceilings {
+        use super::*;
 
         #[test]
-        fn is_config_file_returns_path_inaccessible_when_parent_is_not_a_directory()
-         {
+        fn fails_with_not_found_when_the_ceiling_is_reached() {
             // Arrange
             let fixture = Fixture::new();
-            let blocking_file = fixture.create_file("blocking");
-            let unreachable_path = blocking_file.join("config.toml");
+            let nested_dir = fixture.create_dir("ceiling/a/b/c");
+            let ceiling_dir = fixture.path("ceiling");
 
             // Act
-            let result = is_config_file(&unreachable_path);
+            let result = nearest_local_from_dir_with_ceilings(&nested_dir, [
+                ceiling_dir.as_path(),
+            ]);
 
             // Assert
             assert!(matches!(
                 result,
-                Err(ConfigDiscoveryError::Inaccessible { .. })
+                Err(ConfigDiscoveryError::NotFound { .. })
             ));
         }
-
-        #[test]
-        fn is_local_config_path_requires_both_filename_and_parent() {
-            // Both conditions satisfied
-            assert!(is_local_config_path(&PathBuf::from(
-                "/project/.traces/config.toml"
-            )));
-            // Only filename matches, parent does not
-            assert!(!is_local_config_path(&PathBuf::from(
-                "/project/other/config.toml"
-            )));
-            // Only parent matches, filename does not
-            assert!(!is_local_config_path(&PathBuf::from(
-                "/project/.traces/other.toml"
-            )));
-        }
-    }
-    #[test]
-    fn nearest_local_stops_at_ceiling_directory() {
-        let temp = tempfile::tempdir().unwrap();
-        let ceiling_dir = temp.path().join("ceiling");
-        let nested_dir = ceiling_dir.join("a/b/c");
-        std::fs::create_dir_all(&nested_dir).unwrap();
-
-        let result =
-            nearest_local_from_dir_with_ceilings(&nested_dir, [&*ceiling_dir]);
-        assert!(matches!(result, Err(ConfigDiscoveryError::NotFound { .. })));
     }
 }

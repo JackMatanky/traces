@@ -241,14 +241,17 @@ impl Config {
     /// Computes a deterministic fingerprint over every resolved config
     /// value.
     ///
-    /// Hashes a canonical, NUL-delimited encoding of every field this
-    /// `Config` carries. The digest changes whenever any field a consumer
-    /// could read would change, and stays stable otherwise, including across
-    /// process restarts, since [`Blake3FileHash`] is a fixed BLAKE3 digest
-    /// rather than a process-randomized hash. Intended for future index cache
-    /// invalidation: a persisted fingerprint lets a consumer detect
-    /// configuration drift without re-reading config files or diffing their
-    /// parsed representation.
+    /// Hashes an injective encoding of every field this `Config` carries:
+    /// each variable-length value is length-prefixed, paths are hashed as raw
+    /// OS bytes, and optional paths carry a presence tag. Two configs
+    /// therefore share a digest only when every field is equal. The digest is
+    /// stable across process restarts, since [`Blake3FileHash`] is a fixed
+    /// BLAKE3 digest rather than a process-randomized hash. Task statuses are
+    /// hashed in symbol order, but tag filters in configured order, so
+    /// reordering the filters changes the digest. Intended for
+    /// future index cache invalidation: a persisted fingerprint lets a
+    /// consumer detect configuration drift without re-reading config files or
+    /// diffing their parsed representation.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -260,46 +263,40 @@ impl Config {
         )
     )]
     pub(crate) fn hash(&self) -> Blake3FileHash {
-        let mut canonical = String::new();
-        push_field(&mut canonical, self.root.to_string_lossy().as_ref());
-        push_path(&mut canonical, self.templates.local());
-        push_path(&mut canonical, self.templates.global());
-        push_field(
-            &mut canonical,
-            self.templates.output().to_string_lossy().as_ref(),
-        );
-        push_field(&mut canonical, self.schemas.class_field_name());
-        push_field(
-            &mut canonical,
-            self.schemas.directory().to_string_lossy().as_ref(),
-        );
-        push_field(&mut canonical, self.frontmatter.title_name());
-        push_field(&mut canonical, self.frontmatter.aliases_name());
-        push_field(&mut canonical, self.frontmatter.tags_name());
-        push_field(&mut canonical, self.frontmatter.date_created().name());
-        push_field(&mut canonical, self.frontmatter.date_created().format());
-        push_field(&mut canonical, self.frontmatter.date_modified().name());
-        push_field(&mut canonical, self.frontmatter.date_modified().format());
+        let mut hasher = blake3::Hasher::new();
+        put_path(&mut hasher, &self.root);
+        put_optional_path(&mut hasher, self.templates.local());
+        put_optional_path(&mut hasher, self.templates.global());
+        put_path(&mut hasher, self.templates.output());
+        put_bytes(&mut hasher, self.schemas.class_field_name().as_bytes());
+        put_path(&mut hasher, self.schemas.directory());
+        put_bytes(&mut hasher, self.frontmatter.title_name().as_bytes());
+        put_bytes(&mut hasher, self.frontmatter.aliases_name().as_bytes());
+        put_bytes(&mut hasher, self.frontmatter.tags_name().as_bytes());
+        for date in
+            [self.frontmatter.date_created(), self.frontmatter.date_modified()]
+        {
+            put_bytes(&mut hasher, date.name().as_bytes());
+            put_bytes(&mut hasher, date.format().as_bytes());
+        }
         let mut statuses: Vec<&TaskStatus> =
             self.tasks.statuses().iter().collect();
-        statuses.sort_by_key(|status| status.symbol().as_char());
-        // Counts delimit the two variable-length sequences, so a status can
-        // never be re-read as a tag filter (or the reverse).
-        push_field(&mut canonical, &statuses.len().to_string());
+        statuses.sort_unstable_by_key(|status| status.symbol().as_char());
+        put_len(&mut hasher, statuses.len());
         for status in statuses {
             let mut symbol = [0_u8; 4];
-            push_field(
-                &mut canonical,
-                status.symbol().as_char().encode_utf8(&mut symbol),
+            put_bytes(
+                &mut hasher,
+                status.symbol().as_char().encode_utf8(&mut symbol).as_bytes(),
             );
-            push_field(&mut canonical, status.name());
-            push_field(&mut canonical, status.kind().as_str());
+            put_bytes(&mut hasher, status.name().as_bytes());
+            put_bytes(&mut hasher, status.kind().as_str().as_bytes());
         }
-        push_field(&mut canonical, &self.tasks.tag_filters().len().to_string());
+        put_len(&mut hasher, self.tasks.tag_filters().len());
         for tag in self.tasks.tag_filters() {
-            push_field(&mut canonical, tag.as_str());
+            put_bytes(&mut hasher, tag.as_str().as_bytes());
         }
-        Blake3FileHash::from(canonical.as_str())
+        Blake3FileHash::from_hasher(&hasher)
     }
 }
 
@@ -888,18 +885,40 @@ impl DateFieldConfig {
     }
 }
 
-/// Appends `field` to `canonical`, NUL-delimited, for [`Config::hash`].
-fn push_field(canonical: &mut String, field: &str) {
-    canonical.push_str(field);
-    canonical.push('\0');
+/// Feeds `bytes` to `hasher` behind a little-endian `u64` length prefix.
+///
+/// The prefix makes the concatenated encoding injective: no field value, even
+/// one containing delimiter bytes, can be re-read as a different field split.
+fn put_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    put_len(hasher, bytes.len());
+    hasher.update(bytes);
 }
 
-/// Appends an optional path to `canonical`, empty string when `None`.
-fn push_path(canonical: &mut String, path: Option<&Path>) {
-    push_field(
-        canonical,
-        path.map(Path::to_string_lossy).as_deref().unwrap_or_default(),
-    );
+/// Feeds `len` to `hasher` as a little-endian `u64`.
+///
+/// Saturates instead of truncating; a length above `u64::MAX` is unreachable
+/// for in-memory data.
+fn put_len(hasher: &mut blake3::Hasher, len: usize) {
+    hasher.update(&u64::try_from(len).unwrap_or(u64::MAX).to_le_bytes());
+}
+
+/// Feeds `path`'s raw OS bytes to `hasher`, so non-UTF-8 paths stay distinct.
+fn put_path(hasher: &mut blake3::Hasher, path: &Path) {
+    put_bytes(hasher, path.as_os_str().as_encoded_bytes());
+}
+
+/// Feeds an optional path to `hasher`, tagging presence so `None` differs
+/// from an empty path.
+fn put_optional_path(hasher: &mut blake3::Hasher, path: Option<&Path>) {
+    match path {
+        Some(path) => {
+            hasher.update(&[1]);
+            put_path(hasher, path);
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -942,6 +961,53 @@ mod tests {
         #[test]
         fn is_equal_for_separately_built_equal_configs() {
             assert_eq!(base().hash(), base().hash());
+        }
+
+        #[test]
+        fn matches_the_pinned_digest_for_a_fixed_config() {
+            // Persisted fingerprints must survive releases: a change to the
+            // encoding, field order, or `TaskStatusType::as_str` fails here.
+            let digest = base().hash().to_hex();
+
+            assert_eq!(
+                digest.as_ref(),
+                "ce5503dd2df8687312cdd13cdff34d5490a8aacc1615d5f8765ee39f3ce6887b"
+            );
+        }
+
+        #[test]
+        fn differs_when_a_nul_moves_between_adjacent_fields() {
+            let mut first = base();
+            first.frontmatter.title = field_name("a\0b");
+            first.frontmatter.aliases = field_name("c");
+            let mut second = base();
+            second.frontmatter.title = field_name("a");
+            second.frontmatter.aliases = field_name("b\0c");
+
+            assert_ne!(first.hash(), second.hash());
+        }
+
+        #[test]
+        fn differs_when_an_optional_path_is_absent_versus_empty() {
+            let mut absent = base();
+            absent.templates.global = None;
+            let mut empty = base();
+            empty.templates.global = Some(PathBuf::new());
+
+            assert_ne!(absent.hash(), empty.hash());
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn differs_for_roots_that_differ_only_in_non_utf8_bytes() {
+            use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+
+            let mut first = base();
+            first.root = Arc::from(Path::new(OsStr::from_bytes(b"/p\xFF")));
+            let mut second = base();
+            second.root = Arc::from(Path::new(OsStr::from_bytes(b"/p\xFE")));
+
+            assert_ne!(first.hash(), second.hash());
         }
 
         #[rstest]
@@ -1096,8 +1162,8 @@ mod tests {
             let config = TaskConfig::try_from(raw).expect("valid tag filters");
 
             assert_eq!(config.tag_filters(), [
-                Tag::parse("#task").unwrap(),
-                Tag::parse("#todo").unwrap(),
+                Tag::parse("#task").expect("valid tag"),
+                Tag::parse("#todo").expect("valid tag"),
             ]);
         }
 

@@ -1,4 +1,4 @@
-//! Phase-isolated error hierarchy for configuration discovery, reading, trust
+//! Stage-isolated error hierarchy for configuration discovery, reading, trust
 //! verification, and semantic domain validation.
 //!
 //! # Architecture

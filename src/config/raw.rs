@@ -152,3 +152,23 @@ pub(crate) enum RawTaskStatusKind {
     /// A status-marked item that is not a Task.
     NonTask,
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::RawConfig;
+
+    #[rstest]
+    #[case::unknown_schema_key("[schemas]\nbogus = 1")]
+    #[case::unknown_frontmatter_key("[frontmatter]\nbogus = 1")]
+    #[case::unknown_date_field_key(
+        "[frontmatter.date_created]\nname = \"created\"\nbogus = 1"
+    )]
+    fn rejects_unknown_fields(#[case] content: &str) {
+        let result = toml::from_str::<RawConfig>(content);
+
+        let error = result.expect_err("unknown field should fail");
+        assert!(error.to_string().contains("bogus"));
+    }
+}

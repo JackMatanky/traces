@@ -247,284 +247,455 @@ mod tests {
     use super::*;
 
     mod build {
-        use pretty_assertions::assert_eq;
-
         use super::*;
 
-        mod schemas {
-            use pretty_assertions::assert_eq;
-
+        mod fixtures {
             use super::*;
 
-            #[test]
-            fn resolves_default_to_local_root_when_global_directory_is_unset() {
-                // Arrange
-                let temp = tempfile::tempdir().expect("create temp dir");
-                let root = temp_root(&temp, "project");
+            /// Creates an existing directory for path-confined config
+            /// resolution.
+            pub(super) fn temp_root(
+                temp: &tempfile::TempDir,
+                name: &str,
+            ) -> PathBuf {
+                let root = temp.path().join(name);
+                std::fs::create_dir_all(&root).expect("create project dir");
+                root
+            }
+
+            pub(super) fn build_values(
+                temp: &tempfile::TempDir,
+                local_toml: &str,
+                global_toml: Option<&str>,
+            ) -> Result<Config, ConfigValueError> {
+                let root = temp_root(temp, "project");
                 let local = LocalConfigFile::<Parsed>::from_content_for_test(
                     root.clone(),
                     root.join(".traces/config.toml"),
-                    "",
+                    local_toml,
                 )
                 .expect("parse local config");
-                let global_root = temp_root(&temp, "global");
-                let global = GlobalConfigFile::<Parsed>::from_content_for_test(
-                    global_root.clone(),
-                    global_root.join("config.toml"),
-                    "",
-                )
-                .expect("parse global config");
+                let global = global_toml.map(|content| {
+                    let global_root = temp_root(temp, "global");
+                    GlobalConfigFile::<Parsed>::from_content_for_test(
+                        global_root.clone(),
+                        global_root.join("config.toml"),
+                        content,
+                    )
+                    .expect("parse global config")
+                });
+                ConfigBuilder::new(root, local, global).build()
+            }
+        }
 
-                // Act
-                let config =
-                    ConfigBuilder::new(root.clone(), local, Some(global))
-                        .build()
-                        .expect("build config");
+        mod defaults {
+            use pretty_assertions::assert_eq;
 
-                // Assert
+            use super::fixtures::build_values;
+
+            #[test]
+            fn creates_default_config_when_local_and_global_are_empty() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let root = temp.path().join("project");
+
+                let config = build_values(&temp, "", None)
+                    .expect("build default config");
+
+                assert_eq!(config.root(), root.as_path());
+                assert_eq!(config.schemas().class_field_name(), "class");
                 assert_eq!(
                     config.schemas().directory(),
-                    root.join(".traces/schemas/").as_path()
+                    root.join(".traces/schemas").as_path()
+                );
+            }
+
+            #[test]
+            fn resolves_default_to_local_root_when_global_directory_is_unset() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let root = temp.path().join("project");
+
+                let config = build_values(&temp, "", Some(""))
+                    .expect("build config with global layer");
+
+                assert_eq!(
+                    config.schemas().directory(),
+                    root.join(".traces/schemas").as_path()
                 );
             }
         }
-        /// Creates a real, existing directory under `temp` for a config root.
-        /// Schema/template directory resolution validates the root exists on
-        /// disk, so fabricated non-existent paths no longer work.
-        fn temp_root(temp: &tempfile::TempDir, name: &str) -> PathBuf {
-            let root = temp.path().join(name);
-            std::fs::create_dir_all(&root).unwrap();
-            root
+
+        mod precedence {
+            use pretty_assertions::assert_eq;
+
+            use super::fixtures::build_values;
+
+            #[test]
+            fn uses_local_class_field_over_global() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let local = "[schemas]\nclass_field = \"type\"";
+                let global = "[schemas]\nclass_field = \"global_type\"";
+
+                let config = build_values(&temp, local, Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(config.schemas().class_field_name(), "type");
+            }
         }
 
-        #[test]
-        fn creates_default_config_when_local_and_global_are_empty() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local_path = root.join(".traces/config.toml");
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                local_path,
-                "",
-            )
-            .unwrap();
+        mod directories {
+            use pretty_assertions::assert_eq;
 
-            let builder = ConfigBuilder::new(root.clone(), local, None);
-            let config = builder.build().expect("build default config");
+            use super::fixtures::build_values;
 
-            assert_eq!(config.root(), root.as_path());
-            assert_eq!(config.schemas().class_field_name(), "class");
-            assert_eq!(
-                config.schemas().directory(),
-                root.join(".traces/schemas").as_path()
-            );
-        }
+            #[test]
+            fn resolves_local_template_directory_against_local_root() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let root = temp.path().join("project");
+                let local = "[templates]\ndirectory = \"my_templates\"";
+                let global = "[templates]\ndirectory = \"global_templates\"";
 
-        #[test]
-        fn applies_local_over_global_precedence() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local_path = root.join(".traces/config.toml");
-            let local_toml = r#"
-[templates]
-directory = "my_templates"
+                let config = build_values(&temp, local, Some(global))
+                    .expect("build merged config");
 
-[schemas]
-class_field = "type"
-"#;
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                local_path,
-                local_toml,
-            )
-            .unwrap();
+                assert_eq!(
+                    config.local_template_dir(),
+                    Some(root.join("my_templates").as_path())
+                );
+            }
 
-            let global_root = temp_root(&temp, "global");
-            let global_path = global_root.join("config.toml");
-            let global_toml = r#"
-[templates]
-directory = "global_templates"
-output_dir = "global_output"
+            #[test]
+            fn resolves_global_template_directory_against_global_root() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let global_root = temp.path().join("global");
+                let global = "[templates]\ndirectory = \"global_templates\"";
 
-[schemas]
-class_field = "global_type"
-directory = "global_schemas"
-"#;
-            let global = GlobalConfigFile::<Parsed>::from_content_for_test(
-                global_root.clone(),
-                global_path,
-                global_toml,
-            )
-            .unwrap();
-
-            let builder = ConfigBuilder::new(root.clone(), local, Some(global));
-            let config = builder.build().expect("build merged config");
-
-            assert_eq!(
-                config.local_template_dir(),
-                Some(root.join("my_templates").as_path())
-            );
-            assert_eq!(
-                config.global_template_dir(),
-                Some(global_root.join("global_templates").as_path())
-            );
-            assert_eq!(
-                config.output_dir(),
-                root.join("global_output").as_path()
-            );
-            assert_eq!(config.schemas().class_field_name(), "type");
-            assert_eq!(
-                config.schemas().directory(),
-                global_root.join("global_schemas").as_path()
-            );
-        }
-
-        #[test]
-        fn uses_local_tag_filters_over_global_when_local_is_non_empty() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local_path = root.join(".traces/config.toml");
-            let local_toml = "[tasks]\ntag_filters = [\"task\"]\n";
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                local_path,
-                local_toml,
-            )
-            .unwrap();
-
-            let global_root = temp_root(&temp, "global");
-            let global_path = global_root.join("config.toml");
-            let global_toml = "[tasks]\ntag_filters = [\"todo\"]\n";
-            let global = GlobalConfigFile::<Parsed>::from_content_for_test(
-                global_root,
-                global_path,
-                global_toml,
-            )
-            .unwrap();
-
-            let builder = ConfigBuilder::new(root, local, Some(global));
-            let config = builder.build().expect("build merged config");
-
-            assert_eq!(config.tasks().tag_filters(), [crate::Tag::parse(
-                "#task"
-            )
-            .unwrap()]);
-        }
-
-        #[test]
-        fn falls_back_to_global_tag_filters_when_local_is_empty() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local_path = root.join(".traces/config.toml");
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                local_path,
-                "",
-            )
-            .unwrap();
-
-            let global_root = temp_root(&temp, "global");
-            let global_path = global_root.join("config.toml");
-            let global_toml = "[tasks]\ntag_filters = [\"todo\"]\n";
-            let global = GlobalConfigFile::<Parsed>::from_content_for_test(
-                global_root,
-                global_path,
-                global_toml,
-            )
-            .unwrap();
-
-            let builder = ConfigBuilder::new(root, local, Some(global));
-            let config = builder.build().expect("build merged config");
-
-            assert_eq!(config.tasks().tag_filters(), [crate::Tag::parse(
-                "#todo"
-            )
-            .unwrap()]);
-        }
-
-        #[test]
-        fn uses_local_task_statuses_over_global_when_local_is_non_empty() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                root.join(".traces/config.toml"),
-                "[[tasks.statuses]]\nsymbol = \"?\"\nname = \"Blocked\"\nkind \
-                 = \"on-hold\"\n",
-            )
-            .unwrap();
-            let global_root = temp_root(&temp, "global");
-            let global = GlobalConfigFile::<Parsed>::from_content_for_test(
-                global_root.clone(),
-                global_root.join("config.toml"),
-                "[[tasks.statuses]]\nsymbol = \"~\"\nname = \"Waiting\"\nkind \
-                 = \"todo\"\n",
-            )
-            .unwrap();
-
-            let config = ConfigBuilder::new(root, local, Some(global))
-                .build()
+                let config = build_values(
+                    &temp,
+                    "[templates]\ndirectory = \"my_templates\"",
+                    Some(global),
+                )
                 .expect("build merged config");
 
-            let status = config
-                .tasks()
-                .statuses()
-                .by_symbol('?'.into())
-                .expect("local status");
-            assert_eq!(status.name(), "Blocked");
-            assert_eq!(status.kind(), crate::TaskStatusType::OnHold);
-            assert!(config.tasks().statuses().by_symbol('~'.into()).is_none());
+                assert_eq!(
+                    config.global_template_dir(),
+                    Some(global_root.join("global_templates").as_path())
+                );
+            }
+
+            #[test]
+            fn resolves_global_schema_directory_against_global_root() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let global_root = temp.path().join("global");
+                let global = "[schemas]\ndirectory = \"global_schemas\"";
+
+                let config = build_values(&temp, "", Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(
+                    config.schemas().directory(),
+                    global_root.join("global_schemas").as_path()
+                );
+            }
+
+            #[test]
+            fn resolves_global_output_directory_against_local_root() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let root = temp.path().join("project");
+                let global = "[templates]\noutput_dir = \"global_output\"";
+
+                let config = build_values(&temp, "", Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(
+                    config.output_dir(),
+                    root.join("global_output").as_path()
+                );
+            }
         }
 
-        #[test]
-        fn falls_back_to_global_task_statuses_when_local_is_empty() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                root.join(".traces/config.toml"),
-                "",
-            )
-            .unwrap();
-            let global_root = temp_root(&temp, "global");
-            let global = GlobalConfigFile::<Parsed>::from_content_for_test(
-                global_root.clone(),
-                global_root.join("config.toml"),
-                "[[tasks.statuses]]\nsymbol = \"?\"\nname = \"Blocked\"\nkind \
-                 = \"on-hold\"\n",
-            )
-            .unwrap();
+        mod tag_filters {
+            use pretty_assertions::assert_eq;
 
-            let config = ConfigBuilder::new(root, local, Some(global))
-                .build()
-                .expect("build merged config");
+            use super::fixtures::build_values;
 
-            let status = config
-                .tasks()
-                .statuses()
-                .by_symbol('?'.into())
-                .expect("global status");
-            assert_eq!(status.name(), "Blocked");
-            assert_eq!(status.kind(), crate::TaskStatusType::OnHold);
+            #[test]
+            fn uses_local_tag_filters_over_global_when_local_is_non_empty() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let local = "[tasks]\ntag_filters = [\"task\"]\n";
+                let global = "[tasks]\ntag_filters = [\"todo\"]\n";
+                let expected = crate::Tag::parse("#task").expect("valid tag");
+
+                let config = build_values(&temp, local, Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(config.tasks().tag_filters(), [expected]);
+            }
+
+            #[test]
+            fn falls_back_to_global_tag_filters_when_local_is_empty() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let global = "[tasks]\ntag_filters = [\"todo\"]\n";
+                let expected = crate::Tag::parse("#todo").expect("valid tag");
+
+                let config = build_values(&temp, "", Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(config.tasks().tag_filters(), [expected]);
+            }
         }
 
-        #[test]
-        fn fails_to_build_when_a_tag_filter_entry_is_invalid() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp_root(&temp, "project");
-            let local_path = root.join(".traces/config.toml");
-            let local_toml = "[tasks]\ntag_filters = [\"1invalid\"]\n";
-            let local = LocalConfigFile::<Parsed>::from_content_for_test(
-                root.clone(),
-                local_path,
-                local_toml,
-            )
-            .unwrap();
+        mod task_statuses {
+            use pretty_assertions::assert_eq;
 
-            let builder = ConfigBuilder::new(root, local, None);
-            let error = builder.build().expect_err("invalid tag filter entry");
+            use super::fixtures::build_values;
 
-            assert!(matches!(error, ConfigValueError::InvalidTagFilter { .. }));
+            #[test]
+            fn uses_local_task_statuses_over_global_when_local_is_non_empty() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let local = r#"[[tasks.statuses]]
+symbol = "?"
+name = "Blocked"
+kind = "on-hold"
+"#;
+                let global = r#"[[tasks.statuses]]
+symbol = "~"
+name = "Waiting"
+kind = "todo"
+"#;
+
+                let config = build_values(&temp, local, Some(global))
+                    .expect("build merged config");
+
+                let status = config
+                    .tasks()
+                    .statuses()
+                    .by_symbol('?'.into())
+                    .expect("local status");
+                assert_eq!(status.name(), "Blocked");
+                assert_eq!(status.kind(), crate::TaskStatusType::OnHold);
+                assert!(
+                    config.tasks().statuses().by_symbol('~'.into()).is_none()
+                );
+            }
+
+            #[test]
+            fn falls_back_to_global_task_statuses_when_local_is_empty() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let global = r#"[[tasks.statuses]]
+symbol = "?"
+name = "Blocked"
+kind = "on-hold"
+"#;
+
+                let config = build_values(&temp, "", Some(global))
+                    .expect("build merged config");
+
+                let status = config
+                    .tasks()
+                    .statuses()
+                    .by_symbol('?'.into())
+                    .expect("global status");
+                assert_eq!(status.name(), "Blocked");
+                assert_eq!(status.kind(), crate::TaskStatusType::OnHold);
+            }
+        }
+
+        mod errors {
+            use super::{ConfigValueError, fixtures::build_values};
+
+            #[test]
+            fn fails_to_build_when_a_tag_filter_entry_is_invalid() {
+                let temp = tempfile::tempdir().expect("create temp dir");
+                let local = "[tasks]\ntag_filters = [\"1invalid\"]\n";
+
+                let result = build_values(&temp, local, None);
+
+                assert!(matches!(
+                    result,
+                    Err(ConfigValueError::InvalidTagFilter { .. })
+                ));
+            }
+        }
+
+        mod values {
+            use pretty_assertions::assert_eq;
+            use rstest::rstest;
+
+            use super::{Config, ConfigValueError, fixtures::build_values};
+
+            #[rstest]
+            #[case::title(|c: &Config| c.frontmatter().title_name().to_owned(), "title")]
+            #[case::aliases(|c: &Config| c.frontmatter().aliases_name().to_owned(), "aliases")]
+            #[case::tags(|c: &Config| c.frontmatter().tags_name().to_owned(), "tags")]
+            #[case::date_created_name(|c: &Config| c.frontmatter().date_created().name().to_owned(), "date_created")]
+            #[case::date_created_format(|c: &Config| c.frontmatter().date_created().format().to_owned(), "%Y-%m-%dT%H:%M:%S")]
+            #[case::date_modified_name(|c: &Config| c.frontmatter().date_modified().name().to_owned(), "date_modified")]
+            #[case::date_modified_format(|c: &Config| c.frontmatter().date_modified().format().to_owned(), "%Y-%m-%dT%H:%M:%S")]
+            fn defaults_each_field_when_unconfigured(
+                #[case] accessor: fn(&Config) -> String,
+                #[case] expected: &str,
+            ) {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let config = build_values(&temp, "[templates]", None)
+                    .expect("build default config");
+
+                assert_eq!(accessor(&config), expected);
+            }
+
+            #[rstest]
+            #[case::class_field("[schemas]\nclass_field = \"kind\"", |c: &Config| c.schemas().class_field_name().to_owned(), "kind")]
+            #[case::schema_directory("[schemas]\ndirectory = \"custom/schemas\"", |c: &Config| c.schemas().directory().strip_prefix(c.root()).expect("schema dir under root").to_string_lossy().into_owned(), "custom/schemas")]
+            #[case::title("[frontmatter]\ntitle = \"Title\"", |c: &Config| c.frontmatter().title_name().to_owned(), "Title")]
+            #[case::aliases("[frontmatter]\naliases = \"Aliases\"", |c: &Config| c.frontmatter().aliases_name().to_owned(), "Aliases")]
+            #[case::tags("[frontmatter]\ntags = \"Categories\"", |c: &Config| c.frontmatter().tags_name().to_owned(), "Categories")]
+            #[case::output_dir("[templates]\noutput_dir = \"local_out\"", |c: &Config| c.output_dir().strip_prefix(c.root()).expect("output dir under root").to_string_lossy().into_owned(), "local_out")]
+            fn parses_each_configured_field(
+                #[case] toml: &str,
+                #[case] accessor: fn(&Config) -> String,
+                #[case] expected: &str,
+            ) {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let config =
+                    build_values(&temp, toml, None).expect("build config");
+
+                assert_eq!(accessor(&config), expected);
+            }
+
+            #[rstest]
+            #[case::title("[frontmatter]\ntitle = \"local_title\"", "[frontmatter]\ntitle = \"global_title\"", |c: &Config| c.frontmatter().title_name().to_owned(), "local_title")]
+            #[case::aliases("[frontmatter]\naliases = \"aka\"", "[frontmatter]\naliases = \"aliases\"", |c: &Config| c.frontmatter().aliases_name().to_owned(), "aka")]
+            #[case::output_dir("[templates]\noutput_dir = \"local_out\"", "[templates]\noutput_dir = \"global_out\"", |c: &Config| c.output_dir().strip_prefix(c.root()).expect("output dir under root").to_string_lossy().into_owned(), "local_out")]
+            fn prioritizes_local_field_over_global(
+                #[case] local: &str,
+                #[case] global: &str,
+                #[case] accessor: fn(&Config) -> String,
+                #[case] expected: &str,
+            ) {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let config = build_values(&temp, local, Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(accessor(&config), expected);
+            }
+
+            #[rstest]
+            #[case::class_field_whitespace(
+                "[schemas]\nclass_field = \"   \"",
+                "schemas"
+            )]
+            #[case::class_field_slash(
+                "[schemas]\nclass_field = \"a/b\"",
+                "schemas"
+            )]
+            #[case::date_created_name_whitespace(
+                "[frontmatter.date_created]\nname = \"   \"",
+                "frontmatter"
+            )]
+            #[case::title_empty("[frontmatter]\ntitle = \"\"", "frontmatter")]
+            #[case::aliases_whitespace(
+                "[frontmatter]\naliases = \"   \"",
+                "frontmatter"
+            )]
+            #[case::tags_empty("[frontmatter]\ntags = \"\"", "frontmatter")]
+            fn rejects_invalid_field_keys(
+                #[case] toml: &str,
+                #[case] table: &str,
+            ) {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let result = build_values(&temp, toml, None);
+
+                assert!(
+                    matches!(result, Err(ConfigValueError::InvalidFieldKey { table: actual, .. }) if actual == table)
+                );
+            }
+
+            #[rstest]
+            #[case::created(
+                "[frontmatter.date_created]\nname = \"created\"\nformat = \
+                 \"%Y-%m-%d\"",
+                true,
+                "created",
+                "%Y-%m-%d"
+            )]
+            #[case::modified(
+                "[frontmatter.date_modified]\nname = \"modified\"\nformat = \
+                 \"%Y-%m-%dT%H:%M:%S\"",
+                false,
+                "modified",
+                "%Y-%m-%dT%H:%M:%S"
+            )]
+            #[case::created_name_only(
+                "[frontmatter.date_created]\nname = \"created_at\"",
+                true,
+                "created_at",
+                "%Y-%m-%dT%H:%M:%S"
+            )]
+            #[case::modified_format_only(
+                "[frontmatter.date_modified]\nformat = \"%Y-%m-%d\"",
+                false,
+                "date_modified",
+                "%Y-%m-%d"
+            )]
+            fn resolves_date_field_name_and_format(
+                #[case] toml: &str,
+                #[case] created: bool,
+                #[case] expected_name: &str,
+                #[case] expected_format: &str,
+            ) {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let config =
+                    build_values(&temp, toml, None).expect("build date config");
+                let date = if created {
+                    config.frontmatter().date_created()
+                } else {
+                    config.frontmatter().date_modified()
+                };
+
+                assert_eq!(date.name(), expected_name);
+                assert_eq!(date.format(), expected_format);
+            }
+
+            #[test]
+            fn falls_back_to_global_aliases_when_local_omits_aliases() {
+                let temp = tempfile::tempdir().expect("temp dir");
+                let local = "[frontmatter]\ntitle = \"local_title\"";
+                let global = "[frontmatter]\naliases = \"aka\"";
+
+                let config = build_values(&temp, local, Some(global))
+                    .expect("build merged config");
+
+                assert_eq!(config.frontmatter().title_name(), "local_title");
+                assert_eq!(config.frontmatter().aliases_name(), "aka");
+            }
+
+            #[test]
+            fn leaves_global_template_dir_empty_when_missing() {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let config = build_values(
+                    &temp,
+                    "[templates]\noutput_dir = \"local_out\"",
+                    None,
+                )
+                .expect("build config");
+
+                assert_eq!(config.global_template_dir(), None);
+            }
+
+            #[test]
+            fn uses_local_root_when_output_dir_missing() {
+                let temp = tempfile::tempdir().expect("temp dir");
+
+                let config = build_values(&temp, "[templates]", None)
+                    .expect("build config");
+
+                assert_eq!(config.output_dir(), config.root());
+            }
         }
     }
 }

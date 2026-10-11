@@ -27,7 +27,18 @@ impl From<&str> for Blake3FileHash {
         Self(blake3::hash(content.as_bytes()))
     }
 }
+
 impl Blake3FileHash {
+    /// Finalizes `hasher` into a digest.
+    ///
+    /// Lets in-crate callers fingerprint structured data without first
+    /// serializing it into a buffer.
+    #[inline]
+    #[must_use]
+    pub(crate) fn from_hasher(hasher: &blake3::Hasher) -> Self {
+        Self(hasher.finalize())
+    }
+
     /// Computes the BLAKE3 hash of `path`'s current contents.
     ///
     /// Reads `path` fully into memory before hashing. Use this only when the

@@ -333,12 +333,8 @@ impl Diagnostic for CliError {
         match self {
             Self::ConfigLoad {
                 cwd,
-                source: ConfigError::Discovery(_),
-            } => Some(config_discovery_help(cwd)),
-            Self::ConfigLoad {
                 source,
-                ..
-            } => Some(config_load_help(source)),
+            } => Some(config_load_help(cwd, source)),
             Self::Trust {
                 root,
                 ..
@@ -455,18 +451,18 @@ fn root_help<'a>(root: &'a Path, suffix: &str) -> Box<dyn Display + 'a> {
     Box::new(format!("check that {} {suffix}", root.display()))
 }
 
-/// Builds diagnostic help text for [`CliError::ConfigLoad`] discovery errors.
-fn config_discovery_help(cwd: &Path) -> Box<dyn Display + '_> {
-    Box::new(format!(
-        "run `traces init` to scaffold local configuration, or check that {} \
-         is readable",
-        cwd.display()
-    ))
-}
-
-/// Builds diagnostic help text for non-discovery [`ConfigError`] stages.
-fn config_load_help(source: &ConfigError) -> Box<dyn Display + '_> {
+/// Builds diagnostic help text for [`CliError::ConfigLoad`] failures raised at
+/// any [`ConfigError`] stage.
+fn config_load_help<'a>(
+    cwd: &'a Path,
+    source: &ConfigError,
+) -> Box<dyn Display + 'a> {
     match source {
+        ConfigError::Discovery(_) => Box::new(format!(
+            "run `traces init` to scaffold local configuration, or check that \
+             {} is readable",
+            cwd.display()
+        )),
         ConfigError::Trust(ConfigTrustError::Untrusted {
             ..
         }) => Box::new(
@@ -496,7 +492,6 @@ fn config_load_help(source: &ConfigError) -> Box<dyn Display + '_> {
         ConfigError::Read(ConfigReadError::Parse {
             ..
         })
-        | ConfigError::Discovery(_)
         | ConfigError::Value(
             ConfigValueError::InvalidSubDir {
                 ..

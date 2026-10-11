@@ -1197,6 +1197,20 @@ mod tests {
         ) {
             assert_eq!(kind.is_complete(), expected);
         }
+
+        #[rstest]
+        #[case::todo(TaskStatusType::Todo, "todo")]
+        #[case::in_progress(TaskStatusType::InProgress, "in-progress")]
+        #[case::on_hold(TaskStatusType::OnHold, "on-hold")]
+        #[case::done(TaskStatusType::Done, "done")]
+        #[case::cancelled(TaskStatusType::Cancelled, "cancelled")]
+        #[case::non_task(TaskStatusType::NonTask, "non-task")]
+        fn renders_the_stable_identifier_for_each_status_type(
+            #[case] kind: TaskStatusType,
+            #[case] expected: &str,
+        ) {
+            assert_eq!(kind.as_str(), expected);
+        }
     }
 
     mod status_map {

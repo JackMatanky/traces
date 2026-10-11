@@ -3,9 +3,8 @@
 //! # Types
 //!
 //! - [`TrustRequest`] names either a workspace root or one local config file.
-//! - [`WorkspaceTrustStatus`] describes root trust.
-//! - [`ConfigTrustStatus`] adds config-baseline states for detecting stale
-//!   local config files.
+//! - [`ConfigTrustStatus`] describes root trust plus config-baseline states for
+//!   detecting stale local config files.
 //! - [`TrustStore`] owns cryptographic trust verification and the content-hash
 //!   companion file that backs it.
 
@@ -99,15 +98,6 @@ impl From<&LocalConfigFile<Tracked>> for TrustRequest {
 /// Trust requests resolved from a single discovery operation.
 pub(crate) type TrustRequests = Vec<TrustRequest>;
 
-/// Trust state for a workspace root.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum WorkspaceTrustStatus {
-    /// The workspace root is trusted.
-    Trusted,
-    /// The workspace root is not trusted.
-    Untrusted,
-}
-
 /// Trust state for a config file relative to its workspace root.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ConfigTrustStatus {
@@ -133,16 +123,6 @@ impl Display for ConfigTrustStatus {
             Self::MissingBaseline => "missing baseline",
             Self::Stale => "stale",
         })
-    }
-}
-
-impl From<WorkspaceTrustStatus> for ConfigTrustStatus {
-    #[inline]
-    fn from(status: WorkspaceTrustStatus) -> Self {
-        match status {
-            WorkspaceTrustStatus::Trusted => Self::Trusted,
-            WorkspaceTrustStatus::Untrusted => Self::Untrusted,
-        }
     }
 }
 
@@ -185,6 +165,24 @@ impl ConfigTrustCheck {
 
 const COMPANION_SUFFIX: &str = ".hash";
 
+/// Reads a config file as UTF-8 text for baseline hashing.
+///
+/// Trust recording and trust checking both go through this function so a
+/// baseline is only ever recorded for content that a later check can read.
+///
+/// # Errors
+///
+/// - [`ConfigTrustError::Hash`] when the file cannot be read, or is not valid
+///   UTF-8.
+fn read_config(path: &Path) -> Result<String, ConfigTrustError> {
+    fs::read_to_string(path).map_err(|source| {
+        ConfigTrustError::Hash(HashError {
+            path: path.to_path_buf(),
+            source,
+        })
+    })
+}
+
 /// Persistent store of trusted workspace roots and their config content
 /// baselines.
 ///
@@ -225,14 +223,16 @@ impl TrustStore {
     /// # Errors
     ///
     /// - [`ConfigTrustError::Tracker`] when trust cannot be recorded.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be hashed.
+    /// - [`ConfigTrustError::Hash`] when the config file cannot be read, or is
+    ///   not valid UTF-8.
     #[inline]
     pub(crate) fn trust(
         &self,
         subject: &TrustRequest,
     ) -> Result<(), ConfigTrustError> {
         if let Some(config_file) = subject.config_file() {
-            let digest = Blake3FileHash::from_path(config_file)?;
+            let content = read_config(config_file)?;
+            let digest = Blake3FileHash::from(content.as_str());
             self.store.write_companion(
                 subject.root_path(),
                 COMPANION_SUFFIX,
@@ -257,49 +257,15 @@ impl TrustStore {
         &self,
         subject: &TrustRequest,
     ) -> Result<ConfigTrustStatus, ConfigTrustError> {
-        if subject.config_file().is_some() {
-            self.config_trust_status(subject)
-        } else {
-            self.workspace_trust_status(subject).map(ConfigTrustStatus::from)
+        match subject.config_file() {
+            Some(config_file) => self
+                .config_file_trust_check(subject.root_path(), config_file)
+                .map(|check| check.status()),
+            None if self.store.contains(subject.root_path())? => {
+                Ok(ConfigTrustStatus::Trusted)
+            }
+            None => Ok(ConfigTrustStatus::Untrusted),
         }
-    }
-
-    /// Returns the workspace-root trust status.
-    ///
-    /// # Errors
-    ///
-    /// - [`ConfigTrustError::Tracker`] when the trust store cannot be read.
-    pub(crate) fn workspace_trust_status(
-        &self,
-        subject: &TrustRequest,
-    ) -> Result<WorkspaceTrustStatus, ConfigTrustError> {
-        if self.store.contains(subject.root_path())? {
-            Ok(WorkspaceTrustStatus::Trusted)
-        } else {
-            Ok(WorkspaceTrustStatus::Untrusted)
-        }
-    }
-
-    /// Returns the config-file trust status.
-    ///
-    /// # Errors
-    ///
-    /// - [`ConfigTrustError::Tracker`] when the trust store cannot be read.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be hashed.
-    #[inline]
-    pub(crate) fn config_trust_status(
-        &self,
-        subject: &TrustRequest,
-    ) -> Result<ConfigTrustStatus, ConfigTrustError> {
-        let Some(config_file) = subject.config_file() else {
-            return Ok(if self.store.contains(subject.root_path())? {
-                ConfigTrustStatus::Trusted
-            } else {
-                ConfigTrustStatus::Untrusted
-            });
-        };
-        self.config_file_trust_check(subject.root_path(), config_file)
-            .map(|check| check.status())
     }
 
     /// Checks config-file trust and returns content only when trusted.
@@ -314,7 +280,8 @@ impl TrustStore {
     /// # Errors
     ///
     /// - [`ConfigTrustError::Tracker`] when the trust store cannot be read.
-    /// - [`ConfigTrustError::Hash`] when the config file cannot be read.
+    /// - [`ConfigTrustError::Hash`] when the config file cannot be read, or is
+    ///   not valid UTF-8.
     pub(crate) fn config_file_trust_check(
         &self,
         root: &Path,
@@ -328,12 +295,7 @@ impl TrustStore {
         else {
             return Ok(ConfigTrustCheck::MissingBaseline);
         };
-        let content = fs::read_to_string(config_path).map_err(|source| {
-            ConfigTrustError::Hash(HashError {
-                path: config_path.to_path_buf(),
-                source,
-            })
-        })?;
+        let content = read_config(config_path)?;
         let current = Blake3FileHash::from(content.as_str());
         if recorded.trim() == current.to_hex().as_ref() {
             Ok(ConfigTrustCheck::Trusted(content))
@@ -462,9 +424,8 @@ mod tests {
             let subject =
                 TrustRequest::from(fixture.project("project").as_path());
 
-            let result = fixture.store.trust(&subject);
+            fixture.store.trust(&subject).expect("trust root");
 
-            assert!(result.is_ok());
             assert_eq!(
                 fixture.store.trust_status(&subject).expect("status"),
                 ConfigTrustStatus::Trusted
@@ -472,39 +433,17 @@ mod tests {
         }
 
         #[test]
-        fn records_config_trust_and_hashes_content() {
+        fn records_config_trust_when_content_is_readable() {
             let fixture = Fixture::new();
             let root = fixture.project("project");
             let subject =
                 Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
 
-            let result = fixture.store.trust(&subject);
+            fixture.store.trust(&subject).expect("trust config");
 
-            assert!(result.is_ok());
             assert_eq!(
                 fixture.store.trust_status(&subject).expect("status"),
                 ConfigTrustStatus::Trusted
-            );
-        }
-
-        #[test]
-        fn records_workspace_without_baseline_when_no_config_is_present() {
-            let fixture = Fixture::new();
-            let root = fixture.project("project");
-
-            fixture
-                .store
-                .trust(&TrustRequest::from(root.as_path()))
-                .expect("trust root");
-
-            let config_subject =
-                Fixture::config_request(&Fixture::write_config(&root, "a = 1"));
-            assert_eq!(fixture.store.list().expect("list"), vec![
-                root.canonicalize().expect("canonicalize")
-            ]);
-            assert_eq!(
-                fixture.store.trust_status(&config_subject).expect("status"),
-                ConfigTrustStatus::MissingBaseline
             );
         }
 
@@ -530,12 +469,23 @@ mod tests {
             fs::remove_file(&config_path).expect("remove config");
             fixture.store.trust(&subject).expect_err("hash failure");
 
-            let status = fixture.store.workspace_trust_status(&subject);
+            let status =
+                fixture.store.trust_status(&TrustRequest::from(root.as_path()));
 
-            assert_eq!(
-                status.expect("status"),
-                WorkspaceTrustStatus::Untrusted
-            );
+            assert_eq!(status.expect("status"), ConfigTrustStatus::Untrusted);
+        }
+
+        #[test]
+        fn fails_with_hash_error_when_config_is_not_utf8() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let config_path = Fixture::write_config(&root, "");
+            fs::write(&config_path, [0xff_u8, 0xfe]).expect("write bytes");
+            let subject = Fixture::config_request(&config_path);
+
+            let result = fixture.store.trust(&subject);
+
+            assert!(matches!(result, Err(ConfigTrustError::Hash(_))));
         }
     }
 
@@ -597,6 +547,31 @@ mod tests {
             assert_eq!(
                 result.expect("status"),
                 ConfigTrustStatus::MissingBaseline
+            );
+        }
+    }
+
+    mod config_file_trust_check {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn returns_the_trusted_content_when_the_baseline_matches() {
+            let fixture = Fixture::new();
+            let root = fixture.project("project");
+            let config_path = Fixture::write_config(&root, "a = 1");
+            fixture
+                .store
+                .trust(&Fixture::config_request(&config_path))
+                .expect("trust config");
+
+            let result =
+                fixture.store.config_file_trust_check(&root, &config_path);
+
+            assert_eq!(
+                result.expect("check"),
+                ConfigTrustCheck::Trusted("a = 1".to_owned())
             );
         }
     }
