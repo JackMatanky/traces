@@ -280,20 +280,27 @@ src/date/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S"
 src/date/value.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 src/date/value.rs: pub(crate) const fn has_time(&self) -> bool {
 src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
+src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
 src/date/value.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
 src/date/value.rs: pub(crate) const fn new(
 src/date/value.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
+src/date/value.rs: pub(crate) enum CivilPrecision {
+src/date/value.rs: pub(crate) enum Point {
 src/date/value.rs: pub(crate) enum Precision {
 src/date/value.rs: pub(crate) enum RecognizedDateValue {
+src/date/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
 src/date/value.rs: pub(crate) fn date(&self) -> DateValue {
+src/date/value.rs: pub(crate) fn date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
 src/date/value.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
 src/date/value.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
+src/date/value.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/date/value.rs: pub(crate) fn local_date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
 src/date/value.rs: pub(crate) fn local_wall_or_utc(self) -> NaiveDateTime {
 src/date/value.rs: pub(crate) fn point(&self) -> DatePoint {
+src/date/value.rs: pub(crate) fn wall(self) -> NaiveDateTime {
 src/date/value.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
 src/date/value.rs: pub(crate) instant: DateTime<Utc>,
 src/date/value.rs: pub(crate) precision: Precision,

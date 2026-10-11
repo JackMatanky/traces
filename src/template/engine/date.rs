@@ -1384,6 +1384,7 @@ fn render_date_error(error: DateError) -> Error {
             },
         ),
         DateError::OutOfRange
+        | DateError::UnknownShape
         | DateError::Unparseable {
             ..
         }

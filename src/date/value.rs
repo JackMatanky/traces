@@ -12,6 +12,103 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
+/// Calendar precision of a zone-free point.
+#[expect(
+    dead_code,
+    reason = "Point is migrated into callers in phases 6.2-6.4"
+)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum CivilPrecision {
+    /// Year and month.
+    Month,
+    /// Full calendar date.
+    Day,
+}
+
+/// A parsed date or date-time at the precision it was written.
+#[expect(
+    dead_code,
+    reason = "Point is migrated into callers in phases 6.2-6.4"
+)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Point {
+    /// Zone-free calendar date.
+    Civil {
+        date: DateValue,
+        precision: CivilPrecision,
+    },
+    /// UTC instant.
+    Instant(DateTimeValue),
+}
+
+#[expect(
+    dead_code,
+    reason = "Point is migrated into callers in phases 6.2-6.4"
+)]
+impl Point {
+    /// Whether this point carries a time-of-day component.
+    #[must_use]
+    pub(crate) const fn has_time(self) -> bool {
+        matches!(self, Self::Instant(_))
+    }
+
+    /// Calendar date of this point in the local zone.
+    #[must_use]
+    pub(crate) fn date(self) -> DateValue {
+        match self {
+            Self::Civil {
+                date,
+                ..
+            } => date,
+            Self::Instant(dt) => dt.local_date(),
+        }
+    }
+
+    /// Civil wall clock, or local clock for an instant.
+    #[must_use]
+    pub(crate) fn wall(self) -> NaiveDateTime {
+        match self {
+            Self::Civil {
+                date,
+                ..
+            } => date.naive_date().and_time(NaiveTime::MIN),
+            Self::Instant(dt) => dt.local_wall_or_utc(),
+        }
+    }
+
+    /// UTC instant represented by this point.
+    #[must_use]
+    pub(crate) fn instant(self) -> DateTime<Utc> {
+        match self {
+            Self::Civil {
+                date,
+                ..
+            } => DateTimeValue::from(date).utc(),
+            Self::Instant(dt) => dt.utc(),
+        }
+    }
+
+    /// Canonical strftime pattern preserving written precision.
+    #[must_use]
+    pub(crate) fn canonical_pattern(self) -> &'static str {
+        use chrono::Timelike as _;
+        match self {
+            Self::Civil {
+                precision: CivilPrecision::Month,
+                ..
+            } => "%Y-%m",
+            Self::Civil {
+                precision: CivilPrecision::Day,
+                ..
+            } => DATE_PATTERN,
+            Self::Instant(_) if self.wall().nanosecond() == 0 => {
+                DATETIME_PATTERN
+            }
+            Self::Instant(_) => "%Y-%m-%dT%H:%M:%S%.f",
+        }
+    }
+}
+
 /// Precision of a recognized date or date-time string.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Precision {
@@ -523,6 +620,9 @@ fn offset_across_gap(
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum DateError {
+    /// The input has no recognized date or date-time shape.
+    #[error("not a date or date-time shape")]
+    UnknownShape,
     /// No accepted date/time shape matched `input` (e.g., `"2026/08/22"`).
     ///
     /// Wraps the last-attempted format's [`chrono::ParseError`].

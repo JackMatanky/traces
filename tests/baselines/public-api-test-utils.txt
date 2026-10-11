@@ -2022,6 +2022,7 @@ pub traces_pkm::DateError::InvalidYearDigits::input: alloc::boxed::Box<str>
 pub traces_pkm::DateError::LocalZoneLookup
 pub traces_pkm::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
 pub traces_pkm::DateError::OutOfRange
+pub traces_pkm::DateError::UnknownShape
 pub traces_pkm::DateError::Unparseable
 pub traces_pkm::DateError::Unparseable::input: alloc::boxed::Box<str>
 pub traces_pkm::DateError::Unparseable::source: chrono::format::ParseError
