@@ -1,8 +1,8 @@
 //! Register date and time helpers for templates.
 //!
-//! [`DateOps`] provides the `date` namespace object registered as a minijinja
-//! global by [`super::TemplateEngine`]. It also registers the flat `date_*`
-//! filters and `is_*` tests used in pipelines.
+//! [`DateNamespace`] provides the `date` namespace object registered as a
+//! minijinja global by [`super::TemplateEngine`]. It also registers the flat
+//! `date_*` filters and `is_*` tests used in pipelines.
 //!
 //! Template-facing operations split into three groups:
 //!
@@ -17,7 +17,7 @@
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
 //! Date/time string parsing funnels through [`DateValue::classify`] via
-//! [`parse_date`]. A full datetime is tried first, falling back to a bare ISO
+//! [`parse_wall`]. A full datetime is tried first, falling back to a bare ISO
 //! date (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) at midnight. Arithmetic
 //! filters re-serialize at the input's original precision via the calendar
 //! owner.
@@ -51,7 +51,7 @@ use crate::{
     },
 };
 
-const METHODS: &[&str] = &[
+const NAMESPACE_METHODS: &[&str] = &[
     "now",
     "today",
     "tomorrow",
@@ -73,9 +73,9 @@ const METHODS: &[&str] = &[
 ];
 /// Backs the `date` namespace object. Stateless; see the module docs.
 #[derive(Debug)]
-pub(super) struct DateOps;
+pub(super) struct DateNamespace;
 
-impl DateOps {
+impl DateNamespace {
     /// Registers the `date` global plus every flat `date_*` filter and `is_*`
     /// test this module owns.
     ///
@@ -116,14 +116,14 @@ impl DateOps {
     }
 }
 
-fn local_point() -> DatePoint {
+fn now_point() -> DatePoint {
     let utc_now = Utc::now();
     let wall = DateTimeValue::from(utc_now).local_wall_or_utc();
     DatePoint::new(wall, utc_now, Precision::DateTime)
 }
 
 fn today_point() -> DatePoint {
-    let local = local_point();
+    let local = now_point();
     DatePoint::new(
         local.wall.date().and_hms_opt(0, 0, 0).unwrap_or(local.wall),
         DateTimeValue::from(DateValue::from(local.wall.date())).utc(),
@@ -141,7 +141,7 @@ fn today_point() -> DatePoint {
 /// - [`ErrorKind::InvalidOperation`] if `input` has an ISO duration prefix (`P`
 ///   or `p`) but contains malformed components, invalid units, or unconsumed
 ///   trailing text.
-fn translate_iso_offset(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
+fn iso_offset_to_text(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
     let trimmed = input.trim();
     let (lead_neg, after_lead_sign) = match trimmed.strip_prefix('-') {
         Some(s) => (true, s),
@@ -169,7 +169,7 @@ fn translate_iso_offset(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
 
     let mut parts: Vec<(&str, &'static str)> = Vec::new();
 
-    parse_iso_components(date_part, false, &mut parts).map_err(|()| {
+    scan_iso_components(date_part, false, &mut parts).map_err(|()| {
         Error::new(
             ErrorKind::InvalidOperation,
             format!("invalid ISO-8601 duration offset {input:?}"),
@@ -186,7 +186,7 @@ fn translate_iso_offset(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
                 ),
             ));
         }
-        parse_iso_components(t, true, &mut parts).map_err(|()| {
+        scan_iso_components(t, true, &mut parts).map_err(|()| {
             Error::new(
                 ErrorKind::InvalidOperation,
                 format!("invalid ISO-8601 duration offset {input:?}"),
@@ -219,7 +219,7 @@ fn translate_iso_offset(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
     Ok(Cow::Owned(out))
 }
 
-fn parse_iso_components<'a>(
+fn scan_iso_components<'a>(
     part: &'a str,
     is_time: bool,
     parts: &mut Vec<(&'a str, &'static str)>,
@@ -280,19 +280,19 @@ fn parse_iso_components<'a>(
     Ok(())
 }
 
-fn apply_offset_to_point(
+fn apply_offset(
     point: DatePoint,
     offset_val: &Value,
 ) -> TemplateEngineResult<DatePoint> {
     if let Some(n) = offset_val.as_i64() {
-        return point.shift(n, DurationUnit::Day).map_err(date_error);
+        return point.shift(n, DurationUnit::Day).map_err(render_date_error);
     }
     if let Some(s) = offset_val.as_str() {
-        let translated = translate_iso_offset(s)?;
+        let translated = iso_offset_to_text(s)?;
         let duration = DurationValue::parse(&translated).map_err(|source| {
             invalid_operation(format!("invalid duration offset {s:?}"), source)
         })?;
-        return point.apply(&duration).map_err(date_error);
+        return point.apply(&duration).map_err(render_date_error);
     }
     Err(Error::new(
         ErrorKind::InvalidOperation,
@@ -307,7 +307,7 @@ fn apply_offset_to_point(
     clippy::too_many_arguments,
     reason = "accepts format, offset, reference, and reference_format options"
 )]
-fn resolve_shorthand(
+fn resolve_anchor(
     base_point: DatePoint,
     transform: impl FnOnce(DatePoint) -> Result<DatePoint, DateError>,
     format: Option<&str>,
@@ -327,27 +327,27 @@ fn resolve_shorthand(
 
     let mut point = if let Some(ref_text) = reference {
         if let Some(ref_fmt) = reference_format {
-            let recognized =
-                DateValue::parse_with(ref_text, ref_fmt).map_err(date_error)?;
+            let recognized = DateValue::parse_with(ref_text, ref_fmt)
+                .map_err(render_date_error)?;
             recognized.point()
         } else {
-            let recognized = parse_recognized(ref_text)?;
+            let recognized = parse_point(ref_text)?;
             recognized.point()
         }
     } else {
         base_point
     };
-    point = transform(point).map_err(date_error)?;
+    point = transform(point).map_err(render_date_error)?;
 
     if let Some(off_val) = offset {
-        point = apply_offset_to_point(point, &off_val)?;
+        point = apply_offset(point, &off_val)?;
     }
 
-    let pat = translate_pattern(format, point.wall)?;
-    format_with(point.wall.format(&pat), format)
+    let pat = pattern_to_strftime(format, point.wall)?;
+    render_with_pattern(point.wall.format(&pat), format)
 }
 
-fn parse_weekday_num(n: i64) -> TemplateEngineResult<chrono::Weekday> {
+fn weekday_from_number(n: i64) -> TemplateEngineResult<chrono::Weekday> {
     match n {
         0 | 1 => Ok(chrono::Weekday::Mon),
         2 => Ok(chrono::Weekday::Tue),
@@ -366,7 +366,7 @@ fn parse_weekday_num(n: i64) -> TemplateEngineResult<chrono::Weekday> {
     }
 }
 
-impl Object for DateOps {
+impl Object for DateNamespace {
     #[expect(
         clippy::too_many_lines,
         reason = "dispatches all date shorthands and aliases"
@@ -380,8 +380,8 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
-                        local_point(),
+                    resolve_anchor(
+                        now_point(),
                         Ok,
                         format,
                         offset,
@@ -398,7 +398,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         Ok,
                         format,
@@ -416,7 +416,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.shift(1, DurationUnit::Day),
                         format,
@@ -434,7 +434,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.shift(-1, DurationUnit::Day),
                         format,
@@ -452,7 +452,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.week_boundary(false),
                         format,
@@ -470,7 +470,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.week_boundary(true),
                         format,
@@ -488,7 +488,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.month_boundary(false),
                         format,
@@ -506,7 +506,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.month_boundary(true),
                         format,
@@ -524,7 +524,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.year_boundary(false),
                         format,
@@ -542,7 +542,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    resolve_shorthand(
+                    resolve_anchor(
                         today_point(),
                         |pt| pt.year_boundary(true),
                         format,
@@ -560,8 +560,8 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    let target = parse_weekday_num(n)?;
-                    resolve_shorthand(
+                    let target = weekday_from_number(n)?;
+                    resolve_anchor(
                         today_point(),
                         move |pt| pt.weekday_point(target),
                         format,
@@ -588,7 +588,7 @@ impl Object for DateOps {
                     // instant, via the crate's canonical conversion
                     // (`.naive_utc()` would show the UTC clock instead).
                     let local = DateTimeValue::from(utc).local_wall_or_utc();
-                    format_with(local.format(format), format)
+                    render_with_pattern(local.format(format), format)
                 },
             )),
             _ => None,
@@ -596,7 +596,7 @@ impl Object for DateOps {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(METHODS)
+        Enumerator::Str(NAMESPACE_METHODS)
     }
 }
 
@@ -604,7 +604,7 @@ impl Object for DateOps {
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
 /// the full parse-failure chain.
-fn parse_recognized(s: &str) -> TemplateEngineResult<RecognizedDate> {
+fn parse_point(s: &str) -> TemplateEngineResult<RecognizedDate> {
     match DateValue::classify(s) {
         Some(Ok(rec)) => Ok(rec),
         Some(Err(err)) => {
@@ -682,17 +682,17 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<DurationUnit> {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `format` is not a strftime specifier
+/// - [`ErrorKind::InvalidOperation`] if `pattern` is not a strftime specifier
 ///   `formattable` can render, for example `%Q`.
-fn format_with(
+fn render_with_pattern(
     formattable: impl std::fmt::Display,
-    format: &str,
+    pattern: &str,
 ) -> TemplateEngineResult<String> {
     let mut rendered = String::new();
     write!(rendered, "{formattable}").map_err(|_fmt_error| {
         Error::new(
             ErrorKind::InvalidOperation,
-            format!("invalid date format {format:?}"),
+            format!("invalid date format {pattern:?}"),
         )
     })?;
     Ok(rendered)
@@ -700,14 +700,14 @@ fn format_with(
 
 /// The shared date/time string parser for filters that work on the human wall
 /// clock (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
-/// parse via [`parse_recognized`] directly.
+/// parse via [`parse_point`] directly.
 ///
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
 ///   string.
-fn parse_date(s: &str) -> Result<NaiveDateTime, Error> {
-    parse_recognized(s).map(|rec| rec.wall_or_utc())
+fn parse_wall(s: &str) -> Result<NaiveDateTime, Error> {
+    parse_point(s).map(|rec| rec.wall_or_utc())
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -723,29 +723,29 @@ fn parse_date(s: &str) -> Result<NaiveDateTime, Error> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date`].
-/// - [`ErrorKind::InvalidOperation`] if `format` is an invalid strftime pattern
-///   or contains an unsupported moment token.
-fn date_format(value: &str, format: &str) -> TemplateEngineResult<String> {
-    let datetime = parse_date(value)?;
-    let pattern = translate_pattern(format, datetime)?;
-    format_with(datetime.format(&pattern), format)
+///   string; see [`parse_wall`].
+/// - [`ErrorKind::InvalidOperation`] if `pattern` is an invalid strftime
+///   pattern or contains an unsupported moment token.
+fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
+    let datetime = parse_wall(value)?;
+    let translated = pattern_to_strftime(pattern, datetime)?;
+    render_with_pattern(datetime.format(&translated), pattern)
 }
 
-/// Translates `format` to a strftime pattern.
+/// Translates `pattern` to a strftime pattern.
 ///
-/// If `format` contains `%`, it is treated as a strftime pattern and passed
+/// If `pattern` contains `%`, it is treated as a strftime pattern and passed
 /// through. Otherwise, it is translated from common moment-dialect tokens:
 /// bracket literals (`[Daily]`), `YYYY MM DD HH mm ss` family, `Do`/`S`
 /// ordinals, and `dddd`/`ddd`/`MMM`/`MMMM`.
-fn translate_pattern(
-    format: &str,
+fn pattern_to_strftime(
+    pattern: &str,
     datetime: NaiveDateTime,
 ) -> TemplateEngineResult<String> {
-    if format.contains('%') {
-        return Ok(format.to_owned());
+    if pattern.contains('%') {
+        return Ok(pattern.to_owned());
     }
-    translate_moment_dialect(format, datetime)
+    moment_to_strftime(pattern, datetime)
 }
 
 const MOMENT_TOKENS: &[(&str, &str)] = &[
@@ -797,7 +797,7 @@ fn ordinal_suffix(day: u32) -> &'static str {
 }
 
 /// Translates a moment-dialect pattern into a strftime format string.
-fn translate_moment_dialect(
+fn moment_to_strftime(
     pattern: &str,
     datetime: NaiveDateTime,
 ) -> TemplateEngineResult<String> {
@@ -981,34 +981,37 @@ fn format_human_duration(dv: &DurationValue) -> String {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+///   string; see [`parse_point`].
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
-    Ok(parse_recognized(value)?.instant().timestamp())
+    Ok(parse_point(value)?.instant().timestamp())
 }
 
 /// Returns the first or last day of the input's month at its original
 /// precision.
 fn month_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let recognized = parse_recognized(value)?;
-    let shifted = recognized.point().month_boundary(end).map_err(date_error)?;
+    let recognized = parse_point(value)?;
+    let shifted =
+        recognized.point().month_boundary(end).map_err(render_date_error)?;
     let pat = shifted.precision.format_pattern(shifted.wall);
-    format_with(shifted.wall.format(pat), pat)
+    render_with_pattern(shifted.wall.format(pat), pat)
 }
 
 /// Returns the first or last day of the input's week at its original precision.
 fn week_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let recognized = parse_recognized(value)?;
-    let shifted = recognized.point().week_boundary(end).map_err(date_error)?;
+    let recognized = parse_point(value)?;
+    let shifted =
+        recognized.point().week_boundary(end).map_err(render_date_error)?;
     let pat = shifted.precision.format_pattern(shifted.wall);
-    format_with(shifted.wall.format(pat), pat)
+    render_with_pattern(shifted.wall.format(pat), pat)
 }
 
 /// Returns the first or last day of the input's year at its original precision.
 fn year_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
-    let recognized = parse_recognized(value)?;
-    let shifted = recognized.point().year_boundary(end).map_err(date_error)?;
+    let recognized = parse_point(value)?;
+    let shifted =
+        recognized.point().year_boundary(end).map_err(render_date_error)?;
     let pat = shifted.precision.format_pattern(shifted.wall);
-    format_with(shifted.wall.format(pat), pat)
+    render_with_pattern(shifted.wall.format(pat), pat)
 }
 
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
@@ -1038,7 +1041,7 @@ fn end_of_year(value: &str) -> TemplateEngineResult<String> {
 /// `"years"`, `"months"`, `"weeks"`, and `"days"` preserve the civil wall
 /// clock across a DST transition; the remaining units shift the exact
 /// instant, so the wall clock can land earlier or later than a naive `n`-unit
-/// shift (see [`date_shift_unit`]).
+/// shift (see [`shift_by_unit`]).
 ///
 /// # Errors
 ///
@@ -1056,7 +1059,7 @@ fn date_add(
     kwargs: Kwargs,
 ) -> TemplateEngineResult<String> {
     let unit = unit_kwarg(&kwargs)?;
-    date_shift_unit(value, n, unit)
+    shift_by_unit(value, n, unit)
 }
 
 /// `{{ value | date_sub(n, unit="days") }}` subtracts `n` `unit`s from a piped
@@ -1083,7 +1086,7 @@ fn date_sub(
     kwargs: Kwargs,
 ) -> TemplateEngineResult<String> {
     let unit = unit_kwarg(&kwargs)?;
-    date_shift_unit(
+    shift_by_unit(
         value,
         n.checked_neg().ok_or_else(date_out_of_range_error)?,
         unit,
@@ -1103,17 +1106,17 @@ fn date_sub(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or the shift
-///   overflows chrono's representable range (see [`date_error`]).
-fn date_shift_unit(
+///   overflows chrono's representable range (see [`render_date_error`]).
+fn shift_by_unit(
     value: &str,
     n: i64,
     unit: DurationUnit,
 ) -> TemplateEngineResult<String> {
-    let recognized = parse_recognized(value)?;
+    let recognized = parse_point(value)?;
     let shifted_point =
-        recognized.point().shift(n, unit).map_err(date_error)?;
+        recognized.point().shift(n, unit).map_err(render_date_error)?;
     let pat = shifted_point.precision.format_pattern(shifted_point.wall);
-    format_with(shifted_point.wall.format(pat), pat)
+    render_with_pattern(shifted_point.wall.format(pat), pat)
 }
 
 /// `{{ value | add_days(n) }}` is a convenience shortcut for
@@ -1125,7 +1128,7 @@ fn date_shift_unit(
 ///   overflows chrono's representable range.
 fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
-    date_shift_unit(value, n_i64, DurationUnit::Day)
+    shift_by_unit(value, n_i64, DurationUnit::Day)
 }
 
 /// `{{ value | sub_days(n) }}` is a convenience shortcut for
@@ -1138,7 +1141,7 @@ fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     let n_i64 = n_i64.checked_neg().ok_or_else(date_out_of_range_error)?;
-    date_shift_unit(value, n_i64, DurationUnit::Day)
+    shift_by_unit(value, n_i64, DurationUnit::Day)
 }
 
 /// `{{ value | add_months(n) }}` is a convenience shortcut for
@@ -1149,7 +1152,7 @@ fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
 ///   overflows chrono's representable range.
 fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
-    date_shift_unit(value, i64::from(n), DurationUnit::Month)
+    shift_by_unit(value, i64::from(n), DurationUnit::Month)
 }
 
 /// `{{ value | sub_months(n) }}` is a convenience shortcut for
@@ -1162,7 +1165,7 @@ fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
-    date_shift_unit(value, n_i64, DurationUnit::Month)
+    shift_by_unit(value, n_i64, DurationUnit::Month)
 }
 
 /// `{{ value | add_years(n) }}` is a convenience shortcut for
@@ -1173,7 +1176,7 @@ fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
 ///   overflows chrono's representable range.
 fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
-    date_shift_unit(value, i64::from(n), DurationUnit::Year)
+    shift_by_unit(value, i64::from(n), DurationUnit::Year)
 }
 
 /// `{{ value | sub_years(n) }}` is a convenience shortcut for
@@ -1186,7 +1189,7 @@ fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
-    date_shift_unit(value, n_i64, DurationUnit::Year)
+    shift_by_unit(value, n_i64, DurationUnit::Year)
 }
 
 /// `{{ value | start_of_month }}` returns the first day of the input month.
@@ -1194,7 +1197,7 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+///   string; see [`parse_point`].
 /// - [`ErrorKind::InvalidOperation`] if the first day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn start_of_month(value: &str) -> TemplateEngineResult<String> {
@@ -1206,7 +1209,7 @@ fn start_of_month(value: &str) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+///   string; see [`parse_point`].
 /// - [`ErrorKind::InvalidOperation`] if the last day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn end_of_month(value: &str) -> TemplateEngineResult<String> {
@@ -1226,16 +1229,16 @@ fn weekday(
     n: Option<i64>,
     kwargs: Kwargs,
 ) -> TemplateEngineResult<Value> {
-    let recognized = parse_recognized(value)?;
+    let recognized = parse_point(value)?;
     if let Some(target_num) = n {
         let format = format_kwarg(&kwargs)?;
-        let target_weekday = parse_weekday_num(target_num)?;
+        let target_weekday = weekday_from_number(target_num)?;
         let shifted = recognized
             .point()
             .weekday_point(target_weekday)
-            .map_err(date_error)?;
-        let pat = translate_pattern(format, shifted.wall)?;
-        Ok(Value::from(format_with(shifted.wall.format(&pat), format)?))
+            .map_err(render_date_error)?;
+        let pat = pattern_to_strftime(format, shifted.wall)?;
+        Ok(Value::from(render_with_pattern(shifted.wall.format(&pat), format)?))
     } else {
         kwargs.assert_all_used()?;
         Ok(Value::from(
@@ -1259,10 +1262,10 @@ fn weekday(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` or `other` is not a parseable
-///   date/time string (see [`parse_recognized`]) or `unit` is not one of
+///   date/time string (see [`parse_point`]) or `unit` is not one of
 ///   [`DurationUnit::from_spelling`]'s accepted names (see [`unit_kwarg`]).
 /// - [`ErrorKind::InvalidOperation`] if the difference overflows chrono's
-///   representable range (see [`date_error`]).
+///   representable range (see [`render_date_error`]).
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `unit`.
 #[expect(
@@ -1276,10 +1279,11 @@ fn date_diff(
     kwargs: Kwargs,
 ) -> TemplateEngineResult<Value> {
     let unit = unit_kwarg(&kwargs)?;
-    let from = parse_recognized(value)?;
-    let to = parse_recognized(other)?;
+    let from = parse_point(value)?;
+    let to = parse_point(other)?;
 
-    let diff = from.point().diff(to.point(), unit).map_err(date_error)?;
+    let diff =
+        from.point().diff(to.point(), unit).map_err(render_date_error)?;
 
     match diff {
         Difference::Whole(n) => Ok(Value::from(n)),
@@ -1296,9 +1300,9 @@ fn date_diff(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+///   string; see [`parse_point`].
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
-    Ok(parse_recognized(value)?.instant() < Utc::now())
+    Ok(parse_point(value)?.instant() < Utc::now())
 }
 
 /// `{% if value is is_future %}` mirrors [`is_past`] for future instants.
@@ -1306,19 +1310,19 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+///   string; see [`parse_point`].
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
-    Ok(parse_recognized(value)?.instant() > Utc::now())
+    Ok(parse_point(value)?.instant() > Utc::now())
 }
 
 /// `{% if value is is_leap_year %}` accepts either an integer year (`2024 is
-/// is_leap_year`) or a date/time string checked through [`parse_date`].
+/// is_leap_year`) or a date/time string checked through [`parse_wall`].
 ///
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] (via [`leap_year_input_error`]) if `value`
 ///   is neither an integer year representable as [`i32`] nor a parseable
-///   date/time string; see [`parse_date`].
+///   date/time string; see [`parse_wall`].
 /// - [`ErrorKind::InvalidOperation`] if the year is outside [`NaiveDate`]'s
 ///   representable range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
@@ -1326,7 +1330,7 @@ fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
         i32::try_from(year)
             .map_err(|_out_of_range| leap_year_input_error(value))?
     } else if let Some(s) = value.as_str() {
-        parse_date(s)?.year()
+        parse_wall(s)?.year()
     } else {
         return Err(leap_year_input_error(value));
     };
@@ -1369,7 +1373,7 @@ fn date_out_of_range_error() -> Error {
 /// attached. Parse-shape failures cannot occur here: shift and diff receive
 /// already-parsed values, but the match stays exhaustive per
 /// `pat-exhaustive-enum`.
-fn date_error(error: DateError) -> Error {
+fn render_date_error(error: DateError) -> Error {
     match error {
         DateError::LocalZoneLookup {
             input,
@@ -1414,7 +1418,7 @@ mod tests {
         // the render below must own `TZ` against concurrent tests.
         TzGuard::keep();
         let mut env = Environment::new();
-        DateOps.register(&mut env);
+        DateNamespace.register(&mut env);
         env
     }
 
@@ -1437,14 +1441,14 @@ mod tests {
 
         #[test]
         fn get_value_returns_none_for_an_unknown_key() {
-            let ops = Arc::new(DateOps);
+            let ops = Arc::new(DateNamespace);
 
             assert!(ops.get_value(&Value::from("later")).is_none());
         }
 
         #[test]
         fn get_value_returns_none_for_a_non_string_key() {
-            let ops = Arc::new(DateOps);
+            let ops = Arc::new(DateNamespace);
 
             assert!(ops.get_value(&Value::from(1)).is_none());
         }
@@ -1675,16 +1679,19 @@ mod tests {
 
         #[test]
         fn enumerate_lists_every_method() {
-            let ops = Arc::new(DateOps);
+            let ops = Arc::new(DateNamespace);
 
-            assert!(matches!(ops.enumerate(), Enumerator::Str(METHODS)));
+            assert!(matches!(
+                ops.enumerate(),
+                Enumerator::Str(NAMESPACE_METHODS)
+            ));
         }
 
         #[test]
         fn every_enumerated_method_resolves_via_get_value() {
-            let ops = Arc::new(DateOps);
+            let ops = Arc::new(DateNamespace);
 
-            for method in METHODS {
+            for method in NAMESPACE_METHODS {
                 assert!(
                     ops.get_value(&Value::from(*method)).is_some(),
                     "{method:?} is enumerated but get_value has no matching \
@@ -1917,7 +1924,7 @@ mod tests {
                 .unwrap()
                 .and_hms_opt(14, 30, 0)
                 .unwrap();
-            let translated = translate_pattern(sample_pattern, dt).unwrap();
+            let translated = pattern_to_strftime(sample_pattern, dt).unwrap();
             assert!(!translated.contains("%+"));
         }
     }
@@ -2000,7 +2007,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             let translated =
-                translate_iso_offset(input).expect("translation succeeds");
+                iso_offset_to_text(input).expect("translation succeeds");
             assert_eq!(translated, expected);
         }
 
@@ -2008,7 +2015,7 @@ mod tests {
         fn borrows_standard_durations_without_allocation() {
             let standard = "1d 2h";
             let translated =
-                translate_iso_offset(standard).expect("borrow succeeds");
+                iso_offset_to_text(standard).expect("borrow succeeds");
             assert!(matches!(translated, Cow::Borrowed(_)));
             assert_eq!(translated, "1d 2h");
         }
@@ -2025,7 +2032,7 @@ mod tests {
         #[case::trailing_unconsumed_text("P1Mfoo")]
         fn rejects_malformed_iso_offsets(#[case] invalid: &str) {
             assert!(
-                translate_iso_offset(invalid).is_err(),
+                iso_offset_to_text(invalid).is_err(),
                 "expected {invalid:?} to fail"
             );
         }
@@ -2707,7 +2714,7 @@ mod tests {
 
         #[test]
         fn preserves_the_local_zone_lookup_diagnosis() {
-            let error = date_error(DateError::LocalZoneLookup {
+            let error = render_date_error(DateError::LocalZoneLookup {
                 input: "2026-03-08 02:30:00".into(),
             });
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -2728,7 +2735,7 @@ mod tests {
 
         #[test]
         fn keeps_the_range_message_for_an_overflow() {
-            let error = date_error(DateError::OutOfRange);
+            let error = render_date_error(DateError::OutOfRange);
             assert!(
                 error
                     .to_string()

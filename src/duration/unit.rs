@@ -232,7 +232,7 @@ mod tests {
                 assert!(DurationUnit::from_spelling(input).is_none());
             }
             #[test]
-            fn parses_all_unit_map_keys_into_their_expected_variants() {
+            fn parses_all_unit_spelling_keys_into_their_expected_variants() {
                 for (key, expected_variant) in UNIT_SPELLINGS.entries() {
                     assert_eq!(
                         DurationUnit::from_spelling(key),
@@ -244,7 +244,7 @@ mod tests {
             }
 
             #[test]
-            fn verifies_unit_hint_and_unit_map_are_in_sync() {
+            fn verifies_unit_spelling_hint_and_catalog_are_in_sync() {
                 let mut hint_variants = std::collections::HashSet::new();
                 let quoted_tokens = UNIT_SPELLINGS_HINT
                     .split('"')
@@ -292,14 +292,15 @@ mod tests {
             use super::*;
 
             #[test]
-            fn fixed_seconds_are_positive_for_all_variants() {
+            fn nominal_seconds_are_positive_for_all_variants() {
                 for entry in UNIT_SPELLINGS.entries() {
                     assert!(entry.1.nominal_seconds() > 0.0);
                 }
             }
 
             #[test]
-            fn fixed_seconds_i64_matches_fixed_seconds_for_each_variant() {
+            fn whole_nominal_seconds_matches_nominal_seconds_for_each_variant()
+            {
                 let units = [
                     (DurationUnit::Millisecond, None),
                     (DurationUnit::Second, Some(1)),

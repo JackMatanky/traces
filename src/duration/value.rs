@@ -1443,7 +1443,7 @@ mod tests {
             #[case::huge_positive(1e300, "1e300s")]
             #[case::huge_negative(-1e300, "-1e300s")]
             #[case::tiny_positive(0.0004, "0.0004s")]
-            fn from_seconds_never_lies_about_a_nonzero_magnitude(
+            fn from_nominal_seconds_never_lies_about_a_nonzero_magnitude(
                 #[case] value: f64,
                 #[case] expected: &str,
             ) {
