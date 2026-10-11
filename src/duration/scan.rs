@@ -10,7 +10,7 @@ pub(super) enum ScanMode {
 }
 
 /// Returns `true` if `bytes[pos]` can begin a numeric duration token.
-pub(super) fn can_start_duration_segment(bytes: &[u8], pos: usize) -> bool {
+pub(super) fn can_start_component(bytes: &[u8], pos: usize) -> bool {
     let Some(&b) = bytes.get(pos) else {
         return false;
     };
@@ -74,15 +74,15 @@ pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
 
 /// Scans one `<number><unit>` part starting at `pos`, returning the
 /// magnitude, unit, and end offset.
-pub(super) fn scan_part(
+pub(super) fn scan_component(
     bytes: &[u8],
     pos: usize,
     input: &str,
 ) -> Result<(f64, DurationUnit, usize), DurationError> {
-    let (number, after_number) = parse_number(bytes, pos, input)?;
+    let (number, after_number) = scan_number(bytes, pos, input)?;
     let mut cursor = after_number;
     skip_whitespace(bytes, &mut cursor);
-    let (unit, after_unit) = parse_unit(bytes, cursor, input)?;
+    let (unit, after_unit) = scan_unit(bytes, cursor, input)?;
     Ok((number, unit, after_unit))
 }
 
@@ -90,7 +90,7 @@ pub(super) fn scan_part(
 /// leading `+` or `-` and an optional trailing exponent (`"1e5"`,
 /// `".5e-3"`), the same float syntax the [`super::value::DurationSeconds`]
 /// [`Display`](std::fmt::Display) dialect emits for extreme magnitudes.
-pub(super) fn parse_number(
+pub(super) fn scan_number(
     bytes: &[u8],
     mut pos: usize,
     input: &str,
@@ -140,11 +140,11 @@ pub(super) fn parse_number(
             pos = exp_pos;
         }
     }
-    parsed_number(num_start, pos, input)
+    convert_number(num_start, pos, input)
 }
 
 /// Validates and converts a parsed number byte span into `f64`.
-pub(super) fn parsed_number(
+pub(super) fn convert_number(
     start: usize,
     end: usize,
     input: &str,
@@ -176,7 +176,7 @@ pub(super) fn parsed_number(
 }
 
 /// Parses a unit string starting at `pos`.
-pub(super) fn parse_unit(
+pub(super) fn scan_unit(
     bytes: &[u8],
     mut pos: usize,
     input: &str,
@@ -191,11 +191,11 @@ pub(super) fn parse_unit(
         }
         pos = pos.saturating_add(1);
     }
-    parsed_unit(bytes, unit_start, pos, input)
+    resolve_unit(bytes, unit_start, pos, input)
 }
 
 /// Validates and converts a parsed unit byte span into [`DurationUnit`].
-pub(super) fn parsed_unit(
+pub(super) fn resolve_unit(
     bytes: &[u8],
     start: usize,
     end: usize,
@@ -225,7 +225,7 @@ pub(super) fn parsed_unit(
 }
 
 /// Negates every magnitude in `components` when `is_negative` is `true`.
-pub(super) fn apply_sign(
+pub(super) fn apply_leading_sign(
     components: &mut [DurationComponent],
     is_negative: bool,
 ) {

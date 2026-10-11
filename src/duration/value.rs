@@ -15,11 +15,11 @@ use super::{scan, unit::DurationUnit};
 
 /// At or above this magnitude, [`DurationSeconds`]'s [`Display`](fmt::Display)
 /// switches to scientific notation.
-const DISPLAY_EXPONENT_UPPER: f64 = 1e15;
+const SCIENTIFIC_ABOVE: f64 = 1e15;
 
 /// Below this magnitude (excluding exact zero), [`DurationSeconds`]'s
 /// [`Display`](fmt::Display) switches to scientific notation.
-const DISPLAY_EXPONENT_LOWER: f64 = 1e-6;
+const SCIENTIFIC_BELOW: f64 = 1e-6;
 
 /// A validated duration expression with its total seconds and original source
 /// spelling.
@@ -48,7 +48,7 @@ const DISPLAY_EXPONENT_LOWER: f64 = 1e-6;
 /// ```
 #[derive(Clone, Debug)]
 pub struct DurationValue {
-    raw: Box<str>,
+    spelling: Box<str>,
     seconds: DurationSeconds,
     components: Option<Components>,
 }
@@ -94,7 +94,7 @@ impl DurationValue {
     pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
         let trimmed = s.trim();
         let bytes = trimmed.as_bytes();
-        if bytes.is_empty() || !scan::can_start_duration_segment(bytes, 0) {
+        if bytes.is_empty() || !scan::can_start_component(bytes, 0) {
             return None;
         }
         Some(Self::parse(trimmed))
@@ -125,7 +125,7 @@ impl DurationValue {
         if trimmed.is_empty() {
             return Err(DurationError::Empty);
         }
-        Self::scan_duration(trimmed, scan::ScanMode::Whole).map(|(val, _)| val)
+        Self::scan(trimmed, scan::ScanMode::Whole).map(|(val, _)| val)
     }
 
     /// Parses a duration prefix from `input`, returning the parsed
@@ -145,11 +145,11 @@ impl DurationValue {
     ///   so far.
     /// - The folded total is not finite.
     pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
-        Self::scan_duration(input, scan::ScanMode::Prefix).ok()
+        Self::scan(input, scan::ScanMode::Prefix).ok()
     }
 
     /// Scans a duration in either whole-input or prefix mode.
-    fn scan_duration(
+    fn scan(
         input: &str,
         mode: scan::ScanMode,
     ) -> Result<(Self, usize), DurationError> {
@@ -164,7 +164,7 @@ impl DurationValue {
                 }
             }
             scan::ScanMode::Prefix => {
-                if len == 0 || !scan::can_start_duration_segment(bytes, pos) {
+                if len == 0 || !scan::can_start_component(bytes, pos) {
                     return Err(DurationError::Empty);
                 }
             }
@@ -177,7 +177,7 @@ impl DurationValue {
 
         while pos < len {
             let (number, kind, pos_after_part) =
-                scan::scan_part(bytes, pos, input)?;
+                scan::scan_component(bytes, pos, input)?;
             pos = pos_after_part;
 
             if number.is_sign_negative() {
@@ -207,7 +207,7 @@ impl DurationValue {
                     let mut next_pos = pos;
                     scan::skip_whitespace(bytes, &mut next_pos);
                     if next_pos < len
-                        && scan::can_start_duration_segment(bytes, next_pos)
+                        && scan::can_start_component(bytes, next_pos)
                     {
                         pos = next_pos;
                     } else {
@@ -221,18 +221,18 @@ impl DurationValue {
             return Err(DurationError::Empty);
         }
 
-        scan::apply_sign(&mut raw_components, is_negative);
+        scan::apply_leading_sign(&mut raw_components, is_negative);
 
         let total = Self::sum_nominal_seconds(&raw_components);
         let seconds = DurationSeconds::try_from(total)?;
-        let raw = match mode {
+        let spelling = match mode {
             scan::ScanMode::Whole => input.trim().into(),
             scan::ScanMode::Prefix => input[..last_end].trim().into(),
         };
 
         Ok((
             Self {
-                raw,
+                spelling,
                 seconds,
                 components: Some(raw_components.into_boxed_slice()),
             },
@@ -275,13 +275,13 @@ impl DurationValue {
     #[inline]
     pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
         Self {
-            raw: Self::canonical_raw(seconds),
+            spelling: Self::canonical_spelling(seconds),
             seconds,
             components: None,
         }
     }
 
-    /// Synthesizes the canonical raw spelling for a fixed-magnitude duration:
+    /// Synthesizes the canonical spelling for a fixed-magnitude duration:
     /// the greedy sub-year decomposition of
     /// [`Self::SUB_YEAR_DECOMPOSITION_UNITS`], or [`DurationSeconds`]'s
     /// [`Display`](fmt::Display) dialect when the decomposition can't represent
@@ -294,7 +294,7 @@ impl DurationValue {
         reason = "unit_ms is non-zero (>= 1) and total_ms >= unit_ms, so \
                   division and modulo never panic"
     )]
-    fn canonical_raw(seconds: DurationSeconds) -> Box<str> {
+    fn canonical_spelling(seconds: DurationSeconds) -> Box<str> {
         let total_secs = seconds.0;
         if total_secs == 0.0 {
             return "0s".into();
@@ -303,9 +303,9 @@ impl DurationValue {
         let is_negative = total_secs < 0.0;
         let rem = total_secs.abs();
         let mut total_ms = (rem * 1_000.0).round().to_u64().unwrap_or(0);
-        let mut raw = String::new();
+        let mut spelling = String::new();
         if is_negative {
-            raw.push('-');
+            spelling.push('-');
         }
         let mut decomposed = false;
         for &(unit, suffix) in &Self::SUB_YEAR_DECOMPOSITION_UNITS {
@@ -317,10 +317,10 @@ impl DurationValue {
                 let count = total_ms / unit_ms;
                 total_ms %= unit_ms;
                 if decomposed {
-                    raw.push(' ');
+                    spelling.push(' ');
                 }
                 // `u64`'s `Display` into a `String` is infallible.
-                let _ = write!(raw, "{count}{suffix}");
+                let _ = write!(spelling, "{count}{suffix}");
                 decomposed = true;
             }
         }
@@ -331,7 +331,7 @@ impl DurationValue {
         // was written for a nonzero `total_secs`; fall back to the honest
         // `DurationSeconds` dialect instead of lying with `"0s"`.
         if decomposed {
-            raw.into_boxed_str()
+            spelling.into_boxed_str()
         } else {
             format!("{}s", DurationSeconds(total_secs)).into_boxed_str()
         }
@@ -364,11 +364,11 @@ impl DurationValue {
         })
     }
 
-    /// Returns the raw duration text.
+    /// Returns the duration spelling.
     #[inline]
     #[must_use]
     pub(crate) fn as_str(&self) -> &str {
-        &self.raw
+        &self.spelling
     }
 
     /// Returns the total duration as [`DurationSeconds`].
@@ -379,7 +379,7 @@ impl DurationValue {
     }
 
     /// Combines `rhs` with `self`, negating `rhs`'s components (and seconds, in
-    /// the fixed regime) when `negate_rhs` is `true`; the single
+    /// the fixed regime) when `subtract` is `true`; the single
     /// implementation behind [`Add`] and [`Sub`].
     ///
     /// - Both operands [`Some`]: components concatenate left-to-right and one
@@ -389,7 +389,7 @@ impl DurationValue {
     ///   result carries `None` (fixed regime).
     ///
     /// Negative zero normalizes to positive zero.
-    fn combine(self, rhs: Self, negate_rhs: bool) -> Self {
+    fn combine(self, rhs: Self, subtract: bool) -> Self {
         if let (Some(lhs_components), Some(rhs_components)) =
             (self.components, rhs.components)
         {
@@ -397,7 +397,7 @@ impl DurationValue {
                 lhs_components.len().saturating_add(rhs_components.len()),
             );
             combined.extend_from_slice(&lhs_components);
-            if negate_rhs {
+            if subtract {
                 combined.extend(rhs_components.iter().map(
                     |&DurationComponent {
                          magnitude,
@@ -411,9 +411,9 @@ impl DurationValue {
                 combined.extend_from_slice(&rhs_components);
             }
             let fold_total = Self::sum_nominal_seconds(&combined);
-            let seconds = DurationSeconds::normalized(fold_total);
+            let seconds = DurationSeconds::canonicalize_zero(fold_total);
             Self {
-                raw: Self::canonical_raw(seconds),
+                spelling: Self::canonical_spelling(seconds),
                 seconds,
                 components: Some(combined.into_boxed_slice()),
             }
@@ -423,13 +423,13 @@ impl DurationValue {
                 reason = "duration arithmetic preserves total_cmp ordering \
                           and handles overflow without panicking"
             )]
-            let seconds = if negate_rhs {
+            let seconds = if subtract {
                 self.seconds - rhs.seconds
             } else {
                 self.seconds + rhs.seconds
             };
             Self {
-                raw: Self::canonical_raw(seconds),
+                spelling: Self::canonical_spelling(seconds),
                 seconds,
                 components: None,
             }
@@ -463,7 +463,7 @@ impl TryFrom<DurationValue> for TimeDelta {
 impl fmt::Display for DurationValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.raw)
+        f.write_str(&self.spelling)
     }
 }
 
@@ -548,9 +548,9 @@ impl Mul<f64> for DurationValue {
                 )
                 .collect();
             let fold_total = Self::sum_nominal_seconds(&scaled);
-            let seconds = DurationSeconds::normalized(fold_total);
+            let seconds = DurationSeconds::canonicalize_zero(fold_total);
             Self {
-                raw: Self::canonical_raw(seconds),
+                spelling: Self::canonical_spelling(seconds),
                 seconds,
                 components: Some(scaled.into_boxed_slice()),
             }
@@ -562,7 +562,7 @@ impl Mul<f64> for DurationValue {
             )]
             let seconds = self.seconds * rhs;
             Self {
-                raw: Self::canonical_raw(seconds),
+                spelling: Self::canonical_spelling(seconds),
                 seconds,
                 components: None,
             }
@@ -588,7 +588,7 @@ impl Serialize for DurationValue {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.raw)
+        serializer.serialize_str(&self.spelling)
     }
 }
 
@@ -634,7 +634,7 @@ impl DurationSeconds {
     /// so the type's invariant (see the type docs) holds everywhere, not just
     /// at parse time.
     #[inline]
-    fn normalized(value: f64) -> Self {
+    fn canonicalize_zero(value: f64) -> Self {
         Self(if value == 0.0 {
             0.0
         } else {
@@ -657,7 +657,7 @@ impl TryFrom<f64> for DurationSeconds {
     #[inline]
     fn try_from(secs: f64) -> Result<Self, Self::Error> {
         secs.is_finite()
-            .then(|| Self::normalized(secs))
+            .then(|| Self::canonicalize_zero(secs))
             .ok_or(DurationError::NonFiniteSeconds)
     }
 }
@@ -720,16 +720,14 @@ impl Ord for DurationSeconds {
 }
 
 /// Renders in scientific notation once the magnitude reaches or clears
-/// [`DISPLAY_EXPONENT_UPPER`] or falls below [`DISPLAY_EXPONENT_LOWER`] (exact
+/// [`SCIENTIFIC_ABOVE`] or falls below [`SCIENTIFIC_BELOW`] (exact
 /// zero excluded), so an extreme magnitude never dumps a hundreds-of-digits
 /// decimal literal.
 impl fmt::Display for DurationSeconds {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.0;
         let abs = value.abs();
-        if abs != 0.0
-            && !(DISPLAY_EXPONENT_LOWER..DISPLAY_EXPONENT_UPPER).contains(&abs)
-        {
+        if abs != 0.0 && !(SCIENTIFIC_BELOW..SCIENTIFIC_ABOVE).contains(&abs) {
             write!(f, "{value:e}")
         } else {
             write!(f, "{value}")
@@ -751,7 +749,7 @@ impl Add for DurationSeconds {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
-        Self::normalized(self.0 + rhs.0)
+        Self::canonicalize_zero(self.0 + rhs.0)
     }
 }
 
@@ -760,7 +758,7 @@ impl Sub for DurationSeconds {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
-        Self::normalized(self.0 - rhs.0)
+        Self::canonicalize_zero(self.0 - rhs.0)
     }
 }
 
@@ -769,7 +767,7 @@ impl Mul<f64> for DurationSeconds {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self {
-        Self::normalized(self.0 * rhs)
+        Self::canonicalize_zero(self.0 * rhs)
     }
 }
 
@@ -779,7 +777,7 @@ impl Mul<DurationSeconds> for f64 {
 
     #[inline]
     fn mul(self, rhs: DurationSeconds) -> DurationSeconds {
-        DurationSeconds::normalized(self * rhs.0)
+        DurationSeconds::canonicalize_zero(self * rhs.0)
     }
 }
 
@@ -1227,10 +1225,7 @@ mod tests {
                 #[case::minus_sign("-30m")]
                 #[case::sign_with_decimal("+.5h")]
                 fn accepts_valid_start(#[case] input: &str) {
-                    assert!(scan::can_start_duration_segment(
-                        input.as_bytes(),
-                        0
-                    ));
+                    assert!(scan::can_start_component(input.as_bytes(), 0));
                 }
 
                 #[rstest]
@@ -1239,10 +1234,7 @@ mod tests {
                 #[case::lone_sign("+")]
                 #[case::lone_decimal_point(".")]
                 fn rejects_invalid_start(#[case] input: &str) {
-                    assert!(!scan::can_start_duration_segment(
-                        input.as_bytes(),
-                        0
-                    ));
+                    assert!(!scan::can_start_component(input.as_bytes(), 0));
                 }
             }
         }
@@ -1433,9 +1425,9 @@ mod tests {
             #[case::huge_positive(1e300, "1e300")]
             #[case::huge_negative(-1e300, "-1e300")]
             #[case::tiny_positive(1e-300, "1e-300")]
-            #[case::at_upper_threshold(DISPLAY_EXPONENT_UPPER, "1e15")]
+            #[case::at_upper_threshold(SCIENTIFIC_ABOVE, "1e15")]
             #[case::just_below_upper_threshold(1e14, "100000000000000")]
-            #[case::at_lower_threshold(DISPLAY_EXPONENT_LOWER, "0.000001")]
+            #[case::at_lower_threshold(SCIENTIFIC_BELOW, "0.000001")]
             #[case::just_above_lower_threshold(0.0004, "0.0004")]
             fn seconds_display_switches_dialect_by_magnitude(
                 #[case] value: f64,

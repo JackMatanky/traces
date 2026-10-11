@@ -352,14 +352,14 @@ src/duration/mod.rs: pub use value::{DurationError, DurationValue};
 src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 src/duration/mod.rs: pub(crate) use value::{DurationComponent, DurationSeconds};
 src/duration/scan.rs: pub(super) enum ScanMode {
-src/duration/scan.rs: pub(super) fn apply_sign(
-src/duration/scan.rs: pub(super) fn can_start_duration_segment(bytes: &[u8], pos: usize) -> bool {
+src/duration/scan.rs: pub(super) fn apply_leading_sign(
+src/duration/scan.rs: pub(super) fn can_start_component(bytes: &[u8], pos: usize) -> bool {
+src/duration/scan.rs: pub(super) fn convert_number(
 src/duration/scan.rs: pub(super) fn has_digits_after_sign(
-src/duration/scan.rs: pub(super) fn parse_number(
-src/duration/scan.rs: pub(super) fn parse_unit(
-src/duration/scan.rs: pub(super) fn parsed_number(
-src/duration/scan.rs: pub(super) fn parsed_unit(
-src/duration/scan.rs: pub(super) fn scan_part(
+src/duration/scan.rs: pub(super) fn resolve_unit(
+src/duration/scan.rs: pub(super) fn scan_component(
+src/duration/scan.rs: pub(super) fn scan_number(
+src/duration/scan.rs: pub(super) fn scan_unit(
 src/duration/scan.rs: pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
 src/duration/scan.rs: pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
 src/duration/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
