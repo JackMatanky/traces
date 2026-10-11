@@ -12,7 +12,7 @@ use super::{
     SortArgs,
     error::{CliError, CliResult},
 };
-use crate::{Config, ConfigService};
+use crate::Config;
 
 /// Field path rendered for each `traces list` bullet.
 const LIST_FIELD: &str = "file.path";
@@ -58,10 +58,9 @@ impl List {
         reason = "list output is primary command output, not diagnostic text; \
                   mirrors the precedent in crate::cli::task"
     )]
-    pub(super) fn run(&self, service: &ConfigService) -> CliResult {
-        let config = super::load_config(service)?;
+    pub(super) fn run(&self, config: &Config) -> CliResult {
         let root = config.root();
-        let (rendered, count) = self.render(&config)?;
+        let (rendered, count) = self.render(config)?;
         print!("{rendered}");
         eprintln!("{count} page(s) from {}", root.display());
         Ok(())
@@ -521,7 +520,7 @@ mod tests {
                 sort: SortArgs::default(),
             };
 
-            list.run(project.service()).expect("run list command");
+            list.run(&project.config()).expect("run list command");
         }
     }
 }

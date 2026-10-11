@@ -8,15 +8,16 @@ src/cli/cwd.rs: pub(crate) struct Cwd(PathBuf);
 src/cli/cwd.rs: pub(crate) struct CwdGuard {
 src/cli/error.rs: pub enum CliError {
 src/cli/error.rs: pub type CliResult = std::result::Result<(), CliError>;
-src/cli/error.rs: pub(super) fn state_source() -> ConfigStateError {
+src/cli/error.rs: pub(super) fn state_source() -> ConfigTrustError {
 src/cli/error.rs: pub(super) fn user_abort(&self) -> Option<UserAbort> {
 src/cli/index.rs: pub(super) fn record_paths(index: &WorkspaceIndex) -> Vec<String> {
-src/cli/index.rs: pub(super) fn run(&self, service: &ConfigService) -> CliResult {
+src/cli/index.rs: pub(super) fn run(&self, config: &Config) -> CliResult {
 src/cli/index.rs: pub(super) struct Index;
 src/cli/init.rs: pub fn run(self, provider: &dyn DialogProvider) -> CliResult {
 src/cli/init.rs: pub struct Init;
+src/cli/init.rs: pub(crate) enum ConfigScaffoldError {
 src/cli/init.rs: pub(super) struct CancellingDialogProvider;
-src/cli/list.rs: pub(super) fn run(&self, service: &ConfigService) -> CliResult {
+src/cli/list.rs: pub(super) fn run(&self, config: &Config) -> CliResult {
 src/cli/list.rs: pub(super) struct List {
 src/cli/mod.rs: pub enum CommandOutcome {
 src/cli/mod.rs: pub enum UserAbort {
@@ -28,9 +29,9 @@ src/cli/mod.rs: pub(crate) use cwd::CwdGuard;
 src/cli/mod.rs: pub(super) fn dispatch_argv_and_read_output(
 src/cli/mod.rs: pub(super) struct CancellingSelect;
 src/cli/mod.rs: pub(super) struct SortArgs {
-src/cli/table.rs: pub(super) fn run(&self, service: &ConfigService) -> Result<(), CliError> {
+src/cli/table.rs: pub(super) fn run(&self, config: &Config) -> Result<(), CliError> {
 src/cli/table.rs: pub(super) struct Table {
-src/cli/task.rs: pub(super) fn run(&self, service: &ConfigService) -> CliResult {
+src/cli/task.rs: pub(super) fn run(&self, config: &Config) -> CliResult {
 src/cli/task.rs: pub(super) struct Task {
 src/cli/task.rs: pub(super) struct TaskFilterArgs {
 src/cli/task.rs: pub(super) struct TaskPresentationArgs {
@@ -52,20 +53,20 @@ src/cli/template.rs: pub(super) struct CancellingDialogProvider;
 src/cli/template.rs: pub(super) struct Template {
 src/cli/tracked.rs: pub(super) fn action_args(action: TrackedAction) -> Tracked {
 src/cli/tracked.rs: pub(super) fn parse(args: &[&str]) -> Tracked {
-src/cli/tracked.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/tracked.rs: pub(super) fn run(self, tracked: &TrackerStore) -> CliResult {
 src/cli/tracked.rs: pub(super) struct TestCli {
 src/cli/tracked.rs: pub(super) struct Tracked {
 src/cli/tracked.rs: pub(super) tracked: Tracked,
 src/cli/trust.rs: pub(super) fn action_args(action: TrustAction) -> Trust {
 src/cli/trust.rs: pub(super) fn parse(args: &[&str]) -> Trust {
-src/cli/trust.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/trust.rs: pub(super) fn run(self, trust: &TrustStore) -> CliResult {
 src/cli/trust.rs: pub(super) fn trust_args(path: Option<PathBuf>) -> Trust {
 src/cli/trust.rs: pub(super) struct TestCli {
 src/cli/trust.rs: pub(super) struct Trust {
 src/cli/trust.rs: pub(super) trust: Trust,
-src/cli/untrust.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
+src/cli/untrust.rs: pub(super) fn run(self, trust: &TrustStore) -> CliResult {
 src/cli/untrust.rs: pub(super) struct Untrust {
-src/config/builder.rs: pub(crate) fn build(self) -> Result<Config, ConfigBuilderError> {
+src/config/builder.rs: pub(crate) fn build(self) -> Result<Config, ConfigValueError> {
 src/config/builder.rs: pub(crate) fn new(
 src/config/builder.rs: pub(crate) struct ConfigBuilder {
 src/config/discovery.rs: pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
@@ -73,33 +74,31 @@ src/config/discovery.rs: pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/con
 src/config/discovery.rs: pub(crate) const fn anchor(&self) -> &DiscoveryAnchor {
 src/config/discovery.rs: pub(crate) const fn kind(&self) -> DiscoveryScope {
 src/config/discovery.rs: pub(crate) enum DiscoveryAnchor {
+src/config/discovery.rs: pub(crate) enum DiscoveryContext {
 src/config/discovery.rs: pub(crate) enum DiscoveryScope {
-src/config/discovery.rs: pub(crate) fn new(
-src/config/discovery.rs: pub(crate) fn run(ctx: DiscoveryContext) -> DiscoveryResult<DiscoveryOutcome> {
+src/config/discovery.rs: pub(crate) enum TrustScope {
+src/config/discovery.rs: pub(crate) fn run(
 src/config/discovery.rs: pub(crate) fn trust_requests(
-src/config/discovery.rs: pub(crate) struct DiscoveryContext {
 src/config/discovery.rs: pub(crate) struct DiscoveryOutcome {
 src/config/discovery.rs: pub(super) fn global(&self) -> &[GlobalConfigFile<Discovered>] {
-src/config/discovery.rs: pub(super) fn into_parts(self) -> (DiscoveryScope, DiscoveryAnchor) {
 src/config/discovery.rs: pub(super) fn into_parts(self) -> OutcomeParts {
 src/config/discovery.rs: pub(super) fn local(&self) -> &[LocalConfigFile<Discovered>] {
 src/config/discovery.rs: pub(super) fn new(
 src/config/discovery.rs: pub(super) fn path(&self) -> &Path {
 src/config/discovery.rs: pub(super) fn with_kind(
-src/config/error.rs: pub enum ConfigStateError {
-src/config/error.rs: pub(crate) enum ConfigBuilderError {
-src/config/error.rs: pub(crate) enum ConfigFileError {
-src/config/error.rs: pub(crate) enum ConfigLoadError {
-src/config/error.rs: pub(crate) enum ConfigScaffoldError {
-src/config/error.rs: pub(crate) enum DiscoveryError {
+src/config/error.rs: pub enum ConfigTrustError {
+src/config/error.rs: pub(crate) enum ConfigDiscoveryError {
+src/config/error.rs: pub(crate) enum ConfigError {
+src/config/error.rs: pub(crate) enum ConfigReadError {
+src/config/error.rs: pub(crate) enum ConfigValueError {
 src/config/error.rs: pub(crate) fn invalid_field_key(
-src/config/error.rs: pub(crate) type DiscoveryResult<T> = std::result::Result<T, DiscoveryError>;
+src/config/error.rs: pub(crate) type ConfigDiscoveryResult<T> =
 src/config/file.rs: pub(crate) enum TrustOutcome {
 src/config/file.rs: pub(crate) fn from_content_for_test(
 src/config/file.rs: pub(crate) fn into_tracked(
 src/config/file.rs: pub(crate) fn path(&self) -> &Path {
 src/config/file.rs: pub(crate) fn root(&self) -> &Path {
-src/config/file.rs: pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigFileError> {
+src/config/file.rs: pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
 src/config/file.rs: pub(crate) fn verify_trust(
 src/config/file.rs: pub(crate) struct ConfigFile<Source, State> {
 src/config/file.rs: pub(crate) struct Discovered;
@@ -111,17 +110,20 @@ src/config/file.rs: pub(crate) struct Trusted {
 src/config/file.rs: pub(crate) type GlobalConfigFile<State> = ConfigFile<IsGlobal, State>;
 src/config/file.rs: pub(crate) type LocalConfigFile<State> = ConfigFile<IsLocal, State>;
 src/config/file.rs: pub(super) fn raw(&self) -> &RawConfig {
-src/config/file.rs: pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigFileError> {
+src/config/file.rs: pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
 src/config/mod.rs: pub use model::{Config, FrontmatterConfig, SchemasConfig, TaskConfig};
 src/config/mod.rs: pub use service::ConfigService;
 src/config/mod.rs: pub use trust::TrustRequest;
 src/config/mod.rs: pub(crate) use builder::ConfigBuilder;
 src/config/mod.rs: pub(crate) use discovery::{
+src/config/mod.rs: pub(crate) use error::ConfigReadError;
 src/config/mod.rs: pub(crate) use error::{
 src/config/mod.rs: pub(crate) use file::{Discovered, LocalConfigFile};
 src/config/mod.rs: pub(crate) use model::DEFAULT_LOCAL_TEMPLATES_DIR;
+src/config/mod.rs: pub(crate) use raw::{RawConfig, RawTemplateConfig};
+src/config/mod.rs: pub(crate) use tracker::TrackerStore;
 src/config/mod.rs: pub(crate) use trust::ConfigTrustStatus;
-src/config/mod.rs: pub(crate) use trust::TrustRequests;
+src/config/mod.rs: pub(crate) use trust::{TrustRequests, TrustStore};
 src/config/model.rs: pub const fn date_created(&self) -> &DateFieldConfig {
 src/config/model.rs: pub const fn date_modified(&self) -> &DateFieldConfig {
 src/config/model.rs: pub const fn frontmatter(&self) -> &FrontmatterConfig {
@@ -159,6 +161,7 @@ src/config/model.rs: pub struct TaskConfig {
 src/config/model.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
 src/config/model.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
 src/config/model.rs: pub(crate) fn class_field_arc(&self) -> Arc<str> {
+src/config/model.rs: pub(crate) fn hash(&self) -> Blake3FileHash {
 src/config/model.rs: pub(crate) fn resolve_against(
 src/config/model.rs: pub(crate) fn root_arc(&self) -> Arc<Path> {
 src/config/model.rs: pub(crate) struct ConfigSubDir(RelativePath);
@@ -204,27 +207,29 @@ src/config/raw.rs: pub(crate) title: Option<String>,
 src/config/service.rs: pub fn at(tracked_root: PathBuf, trusted_root: PathBuf) -> Self {
 src/config/service.rs: pub fn untrust(
 src/config/service.rs: pub struct ConfigService {
-src/config/service.rs: pub(crate) const fn status(&self) -> ConfigTrustStatus {
-src/config/service.rs: pub(crate) enum ConfigTrustCheck {
-src/config/service.rs: pub(crate) fn clean_tracked_store(
-src/config/service.rs: pub(crate) fn clean_trusted_store(
-src/config/service.rs: pub(crate) fn config_file_trust_check(
-src/config/service.rs: pub(crate) fn config_trust_status(
-src/config/service.rs: pub(crate) fn list_tracked(
-src/config/service.rs: pub(crate) fn list_trusted(
-src/config/service.rs: pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigLoadError> {
+src/config/service.rs: pub(crate) const fn tracker_store(&self) -> &TrackerStore {
+src/config/service.rs: pub(crate) const fn trust_store(&self) -> &TrustStore {
+src/config/service.rs: pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
 src/config/service.rs: pub(crate) fn new() -> Self {
-src/config/service.rs: pub(crate) fn scaffold_local(
-src/config/service.rs: pub(crate) fn track_seen_config(
 src/config/service.rs: pub(crate) fn trust(
-src/config/service.rs: pub(crate) fn trust_requests(
-src/config/service.rs: pub(crate) fn trust_status(
-src/config/service.rs: pub(crate) fn workspace_trust_status(
+src/config/trust.rs: pub enum ConfigTrustStatus {
 src/config/trust.rs: pub enum TrustRequest {
-src/config/trust.rs: pub(crate) enum ConfigTrustStatus {
+src/config/trust.rs: pub(crate) const fn status(&self) -> ConfigTrustStatus {
+src/config/trust.rs: pub(crate) enum ConfigTrustCheck {
 src/config/trust.rs: pub(crate) enum WorkspaceTrustStatus {
+src/config/trust.rs: pub(crate) fn at(root: PathBuf) -> Self {
+src/config/trust.rs: pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
 src/config/trust.rs: pub(crate) fn config_file(&self) -> Option<&Path> {
+src/config/trust.rs: pub(crate) fn config_file_trust_check(
+src/config/trust.rs: pub(crate) fn config_trust_status(
+src/config/trust.rs: pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
+src/config/trust.rs: pub(crate) fn new() -> Self {
 src/config/trust.rs: pub(crate) fn root_path(&self) -> &Path {
+src/config/trust.rs: pub(crate) fn trust(
+src/config/trust.rs: pub(crate) fn trust_status(
+src/config/trust.rs: pub(crate) fn untrust(
+src/config/trust.rs: pub(crate) fn workspace_trust_status(
+src/config/trust.rs: pub(crate) struct TrustStore {
 src/config/trust.rs: pub(crate) type TrustRequests = Vec<TrustRequest>;
 src/date.rs: pub enum DateError {
 src/date.rs: pub struct DateTimeValue(DateTime<Utc>);
@@ -602,6 +607,7 @@ src/lib.rs: pub const DEFAULT_TEMPLATES_DIR: &str = "templates";
 src/lib.rs: pub fn build_and_persist(&self) -> (IndexerService, WorkspaceIndex) {
 src/lib.rs: pub fn build_index(&self) -> WorkspaceIndex {
 src/lib.rs: pub fn build_test_index(notes: &[(&str, &str)]) -> Arc<WorkspaceIndex> {
+src/lib.rs: pub fn config(&self) -> Config {
 src/lib.rs: pub fn config_with_templates_if_present(&self) -> Config {
 src/lib.rs: pub fn create_trusted_project(
 src/lib.rs: pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
@@ -1319,6 +1325,7 @@ src/task.rs: pub(crate) fn by_symbol(
 src/task.rs: pub(crate) fn by_type(&self, kind: TaskStatusType) -> &[TaskStatus] {
 src/task.rs: pub(crate) fn insert(
 src/task.rs: pub(crate) fn insert(&mut self, date: TaskDate) {
+src/task.rs: pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskStatus> {
 src/task.rs: pub(crate) fn new<S: Into<String>>(
 src/task.rs: pub(crate) fn resolve(&self, symbol: char) -> TaskStatus {
 src/template/engine.rs: pub(super) content: String,

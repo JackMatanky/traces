@@ -170,7 +170,7 @@ mod tests {
         use super::*;
         use crate::{
             cli::{CwdGuard, error::CliError},
-            config::ConfigLoadError,
+            config::ConfigError,
         };
 
         #[test]
@@ -189,7 +189,7 @@ mod tests {
             .expect_err("no config discoverable");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Discovery(_),
+                source: ConfigError::Discovery(_),
                 ..
             }));
         }
@@ -203,7 +203,7 @@ mod tests {
         use super::*;
         use crate::{
             cli::{CwdGuard, error::CliError},
-            config::ConfigLoadError,
+            config::ConfigError,
         };
 
         #[test]
@@ -231,7 +231,7 @@ mod tests {
                 .expect_err("untrusted root fails");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Build(_),
+                source: ConfigError::Trust(_),
                 ..
             }));
         }

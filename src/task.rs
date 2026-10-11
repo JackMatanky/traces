@@ -185,6 +185,24 @@ impl TaskStatusMap {
         self.kinds.get(&kind).map_or(&[], Vec::as_slice)
     }
 
+    /// Returns every configured status, including defaults, in unspecified
+    /// order.
+    ///
+    /// Callers needing a stable order must sort the result themselves, e.g. by
+    /// [`TaskStatus::symbol`].
+    #[inline]
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "no current caller outside tests; consumed by \
+                      Config::hash's future index-fingerprint use"
+        )
+    )]
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskStatus> {
+        self.symbols.values()
+    }
+
     /// Adds a status, or overrides the existing status sharing its symbol.
     ///
     /// Overriding removes the replaced status's stale by-name and by-type
@@ -1248,6 +1266,20 @@ mod tests {
             assert!(done_symbols.contains(&TaskStatusSymbol::new('X')));
 
             assert_eq!(map.by_type(TaskStatusType::NonTask), []);
+        }
+
+        #[test]
+        fn iter_visits_every_default_status_exactly_once() {
+            let map = TaskStatusMap::default();
+
+            let mut symbols: Vec<char> =
+                map.iter().map(|status| status.symbol().as_char()).collect();
+            symbols.sort_unstable();
+
+            let mut expected = vec![' ', 'x', 'X', '/', '-', '!'];
+            expected.sort_unstable();
+
+            assert_eq!(symbols, expected);
         }
 
         #[test]

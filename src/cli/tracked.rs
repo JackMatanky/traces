@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use clap::{Args, Subcommand};
 
 use super::error::{CliError, CliResult};
-use crate::ConfigService;
+use crate::config::TrackerStore;
 
 /// Arguments for `traces tracked`.
 ///
@@ -30,10 +30,10 @@ impl Tracked {
     ///
     /// - [`CliError`] if the dispatched action fails.
     #[inline]
-    pub(super) fn run(self, service: &ConfigService) -> CliResult {
+    pub(super) fn run(self, tracked: &TrackerStore) -> CliResult {
         match self.action {
-            TrackedAction::List => Self::list(service),
-            TrackedAction::Clean => Self::clean(service),
+            TrackedAction::List => Self::list(tracked),
+            TrackedAction::Clean => Self::clean(tracked),
         }
     }
 
@@ -47,9 +47,9 @@ impl Tracked {
         reason = "tracked list's output is data meant to be piped, not \
                   diagnostic text; mirrors the precedent in crate::cli::trust"
     )]
-    fn list(service: &ConfigService) -> CliResult {
+    fn list(tracked: &TrackerStore) -> CliResult {
         let paths: Vec<PathBuf> =
-            service.list_tracked().map_err(|source| CliError::TrackedList {
+            tracked.list().map_err(|source| CliError::TrackedList {
                 source,
             })?;
         for path in &paths {
@@ -63,12 +63,11 @@ impl Tracked {
     /// # Errors
     ///
     /// - [`CliError::TrackedClean`] if cleaning the tracked-config store fails.
-    fn clean(service: &ConfigService) -> CliResult {
-        let removed = service.clean_tracked_store().map_err(|source| {
-            CliError::TrackedClean {
+    fn clean(tracked: &TrackerStore) -> CliResult {
+        let removed =
+            tracked.clean().map_err(|source| CliError::TrackedClean {
                 source,
-            }
-        })?;
+            })?;
         match removed {
             1 => eprintln!("removed 1 stale tracked entry"),
             n => eprintln!("removed {n} stale tracked entries"),
@@ -145,7 +144,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             action_args(TrackedAction::List)
-                .run(&service)
+                .run(service.tracker_store())
                 .expect("list empty tracked store");
         }
     }
@@ -159,7 +158,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             action_args(TrackedAction::Clean)
-                .run(&service)
+                .run(service.tracker_store())
                 .expect("clean empty tracked store");
         }
     }

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use super::{
     Config, FrontmatterConfig, SchemasConfig, TaskConfig,
-    error::{ConfigBuilderError, ConfigFileError},
+    error::ConfigValueError,
     file::{GlobalConfigFile, LocalConfigFile, Parsed},
     model::{
         ConfigSubDir, DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR,
@@ -52,10 +52,10 @@ impl ConfigBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigBuilderError`] if `SchemasConfig`, `FrontmatterConfig`,
-    /// or `TaskConfig` field validation fails (e.g. invalid field key, escaping
+    /// Returns [`ConfigValueError`] if `SchemasConfig`, `FrontmatterConfig`, or
+    /// `TaskConfig` field validation fails (e.g. invalid field key, escaping
     /// subdirectory, or invalid `tag_filters` entry).
-    pub(crate) fn build(self) -> Result<Config, ConfigBuilderError> {
+    pub(crate) fn build(self) -> Result<Config, ConfigValueError> {
         Ok(Config::new(
             self.resolve_templates()?,
             self.resolve_schemas()?,
@@ -65,7 +65,7 @@ impl ConfigBuilder {
         ))
     }
 
-    fn resolve_templates(&self) -> Result<TemplateConfig, ConfigBuilderError> {
+    fn resolve_templates(&self) -> Result<TemplateConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
 
@@ -75,7 +75,7 @@ impl ConfigBuilder {
             .as_ref()
             .map(|dir| {
                 ConfigSubDir::try_from(dir.clone())
-                    .map_err(|source| ConfigFileError::InvalidSubDir {
+                    .map_err(|source| ConfigValueError::InvalidSubDir {
                         path: dir.clone(),
                         source,
                     })?
@@ -89,7 +89,7 @@ impl ConfigBuilder {
             .and_then(|g| {
                 g.raw().templates.directory.as_ref().map(|dir| {
                     ConfigSubDir::try_from(dir.clone())
-                        .map_err(|source| ConfigFileError::InvalidSubDir {
+                        .map_err(|source| ConfigValueError::InvalidSubDir {
                             path: dir.clone(),
                             source,
                         })?
@@ -119,7 +119,7 @@ impl ConfigBuilder {
         ))
     }
 
-    fn resolve_schemas(&self) -> Result<SchemasConfig, ConfigBuilderError> {
+    fn resolve_schemas(&self) -> Result<SchemasConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
 
@@ -131,7 +131,7 @@ impl ConfigBuilder {
             .unwrap_or_else(|| DEFAULT_CLASS_FIELD.to_owned()),
         )
         .map_err(|source| {
-            ConfigFileError::invalid_field_key("schemas", source)
+            ConfigValueError::invalid_field_key("schemas", source)
         })?;
 
         let (raw_dir, dir_root) = match &local_raw.schemas.directory {
@@ -148,7 +148,7 @@ impl ConfigBuilder {
             raw_dir.clone(),
             DEFAULT_LOCAL_SCHEMAS_DIR,
         )
-        .map_err(|source| ConfigFileError::InvalidSubDir {
+        .map_err(|source| ConfigValueError::InvalidSubDir {
             path: raw_dir
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_LOCAL_SCHEMAS_DIR)),
             source,
@@ -160,7 +160,7 @@ impl ConfigBuilder {
 
     fn resolve_frontmatter(
         &self,
-    ) -> Result<FrontmatterConfig, ConfigBuilderError> {
+    ) -> Result<FrontmatterConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
 
@@ -186,10 +186,10 @@ impl ConfigBuilder {
                 global_raw.and_then(|g| g.frontmatter.date_modified.as_ref()),
             ),
         };
-        Ok(FrontmatterConfig::try_from(raw_frontmatter)?)
+        FrontmatterConfig::try_from(raw_frontmatter)
     }
 
-    fn resolve_tasks(&self) -> Result<TaskConfig, ConfigBuilderError> {
+    fn resolve_tasks(&self) -> Result<TaskConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
 
@@ -207,7 +207,7 @@ impl ConfigBuilder {
                 local_raw.tasks.statuses.clone()
             },
         };
-        Ok(TaskConfig::try_from(raw_tasks)?)
+        TaskConfig::try_from(raw_tasks)
     }
 }
 
@@ -519,12 +519,7 @@ directory = "global_schemas"
             let builder = ConfigBuilder::new(root, local, None);
             let error = builder.build().expect_err("invalid tag filter entry");
 
-            assert!(matches!(
-                error,
-                ConfigBuilderError::ConfigFile(
-                    crate::config::error::ConfigFileError::InvalidTagFilter { .. }
-                )
-            ));
+            assert!(matches!(error, ConfigValueError::InvalidTagFilter { .. }));
         }
     }
 }

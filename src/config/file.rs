@@ -20,10 +20,10 @@ use std::{
 #[cfg(test)]
 use super::trust::TrustRequest;
 use super::{
-    error::ConfigFileError,
+    error::{ConfigDiscoveryError, ConfigReadError, ConfigTrustError},
     raw::RawConfig,
-    service::{ConfigService, ConfigTrustCheck},
-    trust::ConfigTrustStatus,
+    tracker::TrackerStore,
+    trust::{ConfigTrustCheck, ConfigTrustStatus, TrustStore},
 };
 
 /// Source marker for a local project config file.
@@ -65,12 +65,12 @@ impl Parsed {
     ///
     /// # Errors
     ///
-    /// - [`ConfigFileError::Io`] when `path` cannot be read.
-    /// - [`ConfigFileError::Parse`] when `path`'s content cannot be parsed as
+    /// - [`ConfigReadError::Io`] when `path` cannot be read.
+    /// - [`ConfigReadError::Parse`] when `path`'s content cannot be parsed as
     ///   TOML.
-    fn read(path: &Path) -> Result<Self, ConfigFileError> {
+    fn read(path: &Path) -> Result<Self, ConfigReadError> {
         let content = std::fs::read_to_string(path).map_err(|source| {
-            ConfigFileError::Io {
+            ConfigReadError::Io {
                 path: path.to_path_buf(),
                 source,
             }
@@ -86,13 +86,13 @@ impl Parsed {
     ///
     /// # Errors
     ///
-    /// - [`ConfigFileError::Parse`] when `content` cannot be parsed as TOML.
+    /// - [`ConfigReadError::Parse`] when `content` cannot be parsed as TOML.
     fn from_content(
         path: &Path,
         content: &str,
-    ) -> Result<Self, ConfigFileError> {
+    ) -> Result<Self, ConfigReadError> {
         let raw = toml::from_str::<RawConfig>(content).map_err(|source| {
-            ConfigFileError::Parse {
+            ConfigReadError::Parse {
                 path: path.to_path_buf(),
                 source: Box::new(source),
             }
@@ -170,24 +170,25 @@ impl LocalConfigFile<Discovered> {
     ///
     /// # Errors
     ///
-    /// - [`ConfigFileError::UnsupportedLocalConfigFile`] when `path` does not
-    ///   end with `.traces/config.toml` or has no parent `.traces` directory.
+    /// - [`ConfigDiscoveryError::UnsupportedLocalCandidate`] when `path` does
+    ///   not end with `.traces/config.toml` or has no parent `.traces`
+    ///   directory.
     #[inline]
-    pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigFileError> {
+    pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
         let Some(traces_dir) = path.parent() else {
-            return Err(ConfigFileError::UnsupportedLocalConfigFile {
+            return Err(ConfigDiscoveryError::UnsupportedLocalCandidate {
                 path,
             });
         };
         if traces_dir.file_name() != Some(".traces".as_ref())
             || path.file_name() != Some("config.toml".as_ref())
         {
-            return Err(ConfigFileError::UnsupportedLocalConfigFile {
+            return Err(ConfigDiscoveryError::UnsupportedLocalCandidate {
                 path,
             });
         }
         let Some(root) = traces_dir.parent() else {
-            return Err(ConfigFileError::UnsupportedLocalConfigFile {
+            return Err(ConfigDiscoveryError::UnsupportedLocalCandidate {
                 path,
             });
         };
@@ -197,9 +198,9 @@ impl LocalConfigFile<Discovered> {
     #[inline]
     pub(crate) fn into_tracked(
         self,
-        store: &ConfigService,
+        tracked: &TrackerStore,
     ) -> LocalConfigFile<Tracked> {
-        store.track_seen_config(&self);
+        tracked.record(&self);
         self.transition_to(Tracked)
     }
 }
@@ -211,17 +212,17 @@ impl GlobalConfigFile<Discovered> {
     ///
     /// # Errors
     ///
-    /// - [`ConfigFileError::UnsupportedGlobalConfigFile`] when `path` is not
-    ///   named `config.toml` or has no parent directory.
+    /// - [`ConfigDiscoveryError::UnsupportedGlobalCandidate`] when `path` is
+    ///   not named `config.toml` or has no parent directory.
     #[inline]
-    pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigFileError> {
+    pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
         if path.file_name() != Some("config.toml".as_ref()) {
-            return Err(ConfigFileError::UnsupportedGlobalConfigFile {
+            return Err(ConfigDiscoveryError::UnsupportedGlobalCandidate {
                 path,
             });
         }
         let Some(root) = path.parent() else {
-            return Err(ConfigFileError::UnsupportedGlobalConfigFile {
+            return Err(ConfigDiscoveryError::UnsupportedGlobalCandidate {
                 path,
             });
         };
@@ -247,15 +248,16 @@ impl LocalConfigFile<Tracked> {
     ///
     /// # Errors
     ///
-    /// - [`ConfigFileError::TrustCheckFailed`] when the underlying path tracker
+    /// - [`ConfigTrustError::Tracker`] when the underlying trust-store I/O
     ///   fails.
+    /// - [`ConfigTrustError::Hash`] when hashing the config file fails.
     pub(crate) fn verify_trust(
         self,
-        state: &ConfigService,
-    ) -> Result<TrustOutcome, ConfigFileError> {
+        trust: &TrustStore,
+    ) -> Result<TrustOutcome, ConfigTrustError> {
         let root = self.root().to_path_buf();
         let path = self.path().to_path_buf();
-        match state.config_file_trust_check(&root, &path) {
+        match trust.config_file_trust_check(&root, &path) {
             Ok(ConfigTrustCheck::Trusted(content)) => {
                 Ok(TrustOutcome::Trusted(self.transition_to(Trusted {
                     content,
@@ -271,10 +273,7 @@ impl LocalConfigFile<Tracked> {
                 self,
                 ConfigTrustStatus::MissingBaseline,
             )),
-            Err(source) => Err(ConfigFileError::TrustCheckFailed {
-                root,
-                source: Box::new(source),
-            }),
+            Err(source) => Err(source),
         }
     }
 }
@@ -288,7 +287,7 @@ impl<Source> ConfigFile<Source, Parsed> {
 }
 
 impl TryFrom<LocalConfigFile<Trusted>> for LocalConfigFile<Parsed> {
-    type Error = ConfigFileError;
+    type Error = ConfigReadError;
 
     #[inline]
     fn try_from(file: LocalConfigFile<Trusted>) -> Result<Self, Self::Error> {
@@ -298,7 +297,7 @@ impl TryFrom<LocalConfigFile<Trusted>> for LocalConfigFile<Parsed> {
 }
 
 impl TryFrom<GlobalConfigFile<Discovered>> for GlobalConfigFile<Parsed> {
-    type Error = ConfigFileError;
+    type Error = ConfigReadError;
 
     #[inline]
     fn try_from(
@@ -314,7 +313,7 @@ impl<Source> ConfigFile<Source, Parsed> {
         root: PathBuf,
         path: PathBuf,
         content: &str,
-    ) -> Result<Self, ConfigFileError> {
+    ) -> Result<Self, ConfigReadError> {
         let parsed = Parsed::from_content(&path, content)?;
         Ok(Self::new(root, path, parsed))
     }
@@ -355,7 +354,7 @@ mod tests {
                     .expect_err(&format!("expected rejection for {path}"));
             assert!(matches!(
                 error,
-                ConfigFileError::UnsupportedLocalConfigFile { .. }
+                ConfigDiscoveryError::UnsupportedLocalCandidate { .. }
             ));
         }
     }
@@ -387,7 +386,7 @@ mod tests {
                     .expect_err(&format!("expected rejection for {path}"));
             assert!(matches!(
                 error,
-                ConfigFileError::UnsupportedGlobalConfigFile { .. }
+                ConfigDiscoveryError::UnsupportedGlobalCandidate { .. }
             ));
         }
     }
@@ -400,16 +399,13 @@ mod tests {
         #[test]
         fn transitions_to_tracked_state() {
             let temp = tempfile::tempdir().expect("temp");
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let store = TrackerStore::at(temp.path().join("tracked"));
             let file = LocalConfigFile::<Discovered>::try_new(PathBuf::from(
                 "/project/.traces/config.toml",
             ))
             .unwrap();
 
-            let tracked = file.into_tracked(&state);
+            let tracked = file.into_tracked(&store);
 
             assert_eq!(
                 tracked.path(),
@@ -420,10 +416,7 @@ mod tests {
         #[test]
         fn records_seen_config_in_store() {
             let temp = tempfile::tempdir().expect("temp");
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let store = TrackerStore::at(temp.path().join("tracked"));
 
             // Create a real file so canonicalization succeeds
             let project_dir = temp.path().join("project");
@@ -436,7 +429,7 @@ mod tests {
                     .unwrap();
 
             // Act
-            let _ = file.into_tracked(&state);
+            let _ = file.into_tracked(&store);
 
             let tracked =
                 crate::FilePathTracker::at(temp.path().join("tracked"));
@@ -459,15 +452,13 @@ mod tests {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(&path, "").unwrap();
 
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let tracked_store = TrackerStore::at(temp.path().join("tracked"));
+            let trust_store = TrustStore::at(temp.path().join("trust"));
             let file = LocalConfigFile::<Discovered>::try_new(path).unwrap();
-            let tracked = file.into_tracked(&state);
-            state.trust(&TrustRequest::from(&tracked)).unwrap();
+            let tracked = file.into_tracked(&tracked_store);
+            trust_store.trust(&TrustRequest::from(&tracked)).unwrap();
 
-            let result = tracked.verify_trust(&state);
+            let result = tracked.verify_trust(&trust_store);
             assert!(matches!(result, Ok(TrustOutcome::Trusted(_))));
         }
 
@@ -479,15 +470,13 @@ mod tests {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(&path, "").unwrap();
 
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let tracked_store = TrackerStore::at(temp.path().join("tracked"));
+            let trust_store = TrustStore::at(temp.path().join("trust"));
 
             let file = LocalConfigFile::<Discovered>::try_new(path).unwrap();
-            let tracked = file.into_tracked(&state);
+            let tracked = file.into_tracked(&tracked_store);
 
-            let result = tracked.verify_trust(&state);
+            let result = tracked.verify_trust(&trust_store);
             assert!(matches!(
                 result,
                 Ok(TrustOutcome::Halted(_, ConfigTrustStatus::Untrusted))
@@ -502,18 +491,16 @@ mod tests {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(&path, "").unwrap();
 
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let tracked_store = TrackerStore::at(temp.path().join("tracked"));
+            let trust_store = TrustStore::at(temp.path().join("trust"));
             let file = LocalConfigFile::<Discovered>::try_new(path).unwrap();
-            let tracked = file.into_tracked(&state);
+            let tracked = file.into_tracked(&tracked_store);
 
             // Grant trust to the WORKSPACE, which creates no baseline config
             // hash.
-            state.trust(&TrustRequest::from(root.as_path())).unwrap();
+            trust_store.trust(&TrustRequest::from(root.as_path())).unwrap();
 
-            let result = tracked.verify_trust(&state);
+            let result = tracked.verify_trust(&trust_store);
             assert!(matches!(
                 result,
                 Ok(TrustOutcome::Halted(_, ConfigTrustStatus::MissingBaseline))
@@ -528,20 +515,18 @@ mod tests {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(&path, "old").unwrap();
 
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let tracked_store = TrackerStore::at(temp.path().join("tracked"));
+            let trust_store = TrustStore::at(temp.path().join("trust"));
             let file =
                 LocalConfigFile::<Discovered>::try_new(path.clone()).unwrap();
-            let tracked = file.into_tracked(&state);
+            let tracked = file.into_tracked(&tracked_store);
 
-            state.trust(&TrustRequest::from(&tracked)).unwrap();
+            trust_store.trust(&TrustRequest::from(&tracked)).unwrap();
 
             // Modify file after trust
             std::fs::write(&path, "new").unwrap();
 
-            let result = tracked.verify_trust(&state);
+            let result = tracked.verify_trust(&trust_store);
             assert!(matches!(
                 result,
                 Ok(TrustOutcome::Halted(_, ConfigTrustStatus::Stale))
@@ -556,27 +541,22 @@ mod tests {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(&path, "").unwrap();
 
-            let state = ConfigService::at(
-                temp.path().join("tracked"),
-                temp.path().join("trust"),
-            );
+            let tracked_store = TrackerStore::at(temp.path().join("tracked"));
+            let trust_store = TrustStore::at(temp.path().join("trust"));
             let file =
                 LocalConfigFile::<Discovered>::try_new(path.clone()).unwrap();
-            let tracked = file.into_tracked(&state);
+            let tracked = file.into_tracked(&tracked_store);
 
             // Grant trust so the companion file exists.
-            state.trust(&TrustRequest::from(&tracked)).unwrap();
+            trust_store.trust(&TrustRequest::from(&tracked)).unwrap();
 
             // Delete the config file so hashing it fails with an I/O error.
             std::fs::remove_file(&path).unwrap();
 
             // Checking trust will now try to hash the deleted config file,
             // causing an I/O error.
-            let result = tracked.verify_trust(&state);
-            assert!(matches!(
-                result,
-                Err(ConfigFileError::TrustCheckFailed { .. })
-            ));
+            let result = tracked.verify_trust(&trust_store);
+            assert!(matches!(result, Err(ConfigTrustError::Hash(_))));
         }
     }
 
@@ -608,8 +588,8 @@ mod tests {
             let result = Parsed::read(&path);
 
             let err = result.unwrap_err();
-            assert!(matches!(err, ConfigFileError::Parse { .. }));
-            assert!(err.to_string().contains("failed to parse config file"));
+            assert!(matches!(err, ConfigReadError::Parse { .. }));
+            assert!(err.to_string().contains("failed to parse TOML syntax"));
         }
 
         #[test]
@@ -619,7 +599,7 @@ mod tests {
 
             let result = Parsed::read(&path);
 
-            assert!(matches!(result, Err(ConfigFileError::Io { .. })));
+            assert!(matches!(result, Err(ConfigReadError::Io { .. })));
         }
     }
 

@@ -1,149 +1,159 @@
-//! Errors from config discovery, file validation, loading, and trust-state
-//! operations.
+//! Phase-isolated error hierarchy for configuration discovery, reading, trust
+//! verification, and semantic domain validation.
 //!
-//! Every variant here crosses a `config` submodule boundary: raised in one file
-//! and consumed in another, or composed by [`ConfigLoadError`] into the result
-//! [`crate::cli::CliError`] reports. File-local parsing or construction
-//! failures that never propagate past their origin file stay defined there.
+//! # Architecture
+//!
+//! The configuration lifecycle is an orthogonal 4-stage pipeline:
+//!
+//! 1. [`ConfigDiscoveryError`] - candidate file discovery and ancestor walks.
+//! 2. [`ConfigReadError`] - physical file I/O and TOML syntax deserialization.
+//! 3. [`ConfigTrustError`] - workspace/config-file trust and tracking-store
+//!    I/O.
+//! 4. [`ConfigValueError`] - domain semantic validation of parsed values.
+//!
+//! Composed by [`ConfigError`] into the result [`crate::cli::CliError`]
+//! reports.
 
 use std::{io, path::PathBuf};
 
 use thiserror::Error;
 
-use super::{discovery::DiscoveryScope, trust::ConfigTrustStatus};
+use super::trust::ConfigTrustStatus;
 use crate::{
     FieldNameError, FilePathTrackerError, TagError, hash::HashError,
     task::TaskError,
 };
 
-/// Errors from the full config-loading pipeline.
+/// Unified error type for the entire configuration subsystem.
+///
+/// Composes errors across the four sequential pipeline stages. Matches
+/// workspace naming convention (`IndexError`, `QueryError`, `SchemaError`,
+/// `CliError`).
 #[derive(Debug, Error)]
-pub(crate) enum ConfigLoadError {
-    /// Discovery failed before any config could be loaded.
+pub(crate) enum ConfigError {
+    /// Phase 1 failure: candidate file discovery or ancestor traversal.
     #[error(transparent)]
-    Discovery(#[from] DiscoveryError),
-    /// Build failed after discovery selected candidate config files.
+    Discovery(#[from] ConfigDiscoveryError),
+    /// Phase 2 failure: physical file reading or TOML syntax deserialization.
     #[error(transparent)]
-    Build(#[from] ConfigBuilderError),
+    Read(#[from] ConfigReadError),
+    /// Phase 3 failure: workspace/config-file trust or tracking-store I/O.
+    #[error(transparent)]
+    Trust(#[from] ConfigTrustError),
+    /// Phase 4 failure: semantic validation of parsed domain values.
+    #[error(transparent)]
+    Value(#[from] ConfigValueError),
 }
 
-/// Convenience alias for config discovery operations.
-pub(crate) type DiscoveryResult<T> = std::result::Result<T, DiscoveryError>;
+/// Convenience alias for Phase 1 discovery operations.
+pub(crate) type ConfigDiscoveryResult<T> =
+    std::result::Result<T, ConfigDiscoveryError>;
 
-/// Errors raised while finding candidate config files.
+/// Phase 1: errors raised while discovering candidate config files on disk.
+///
+/// Discovery checks never emit TOML syntax, trust, or domain model errors.
 #[derive(Debug, Error)]
-pub(crate) enum DiscoveryError {
+pub(crate) enum ConfigDiscoveryError {
     /// No local `.traces/config.toml` was found in any ancestor directory.
     #[error("no local config found from {cwd}")]
-    LocalConfigAbsent {
-        /// The working directory from which discovery started.
+    NotFound {
+        /// Working directory from which ancestor discovery originated.
         cwd: PathBuf,
     },
-    /// A filesystem path could not be inspected during discovery.
+    /// A filesystem path could not be accessed during ancestor traversal.
     #[error("failed to access path {path} during discovery")]
-    PathInaccessible {
+    Inaccessible {
         /// Path that could not be accessed.
         path: PathBuf,
-        /// Source I/O error.
+        /// Underlying I/O failure.
         #[source]
         source: io::Error,
     },
-    /// [`DiscoveryScope::Full`] does not accept a file anchor.
-    ///
-    /// Full discovery always requires a directory root so it can walk ancestors
-    /// to find the nearest local config.
-    #[error("{kind:?} discovery cannot be anchored at file {path}")]
-    UnsupportedFileAnchor {
-        /// Discovery kind that rejected the anchor.
-        kind: DiscoveryScope,
-        /// Unsupported file anchor path.
-        path: PathBuf,
-    },
-    /// [`DiscoveryScope::Full`] cannot be used for trust-request resolution.
-    ///
-    /// Trust resolution supports only [`DiscoveryScope::NearestLocal`] and
-    /// [`DiscoveryScope::LocalSubtree`].
-    #[error("{scope:?} discovery cannot be used for trust request resolution")]
-    UnsupportedTrustScope {
-        /// Unsupported discovery scope.
-        scope: DiscoveryScope,
-    },
-    /// A discovered config file path or source combination was invalid.
-    #[error(transparent)]
-    ConfigFile(#[from] ConfigFileError),
-}
-
-/// Errors raised while building a [`super::Config`] from discovered files.
-#[derive(Debug, Error)]
-pub(crate) enum ConfigBuilderError {
-    /// Config file trust validation halted, requiring user action.
-    #[error("config file {path} is untrusted: {status:?}")]
-    Untrusted {
-        /// The untrusted workspace root.
-        root: PathBuf,
-        /// The untrusted config file.
-        path: PathBuf,
-        /// The trust status that caused the halt.
-        status: ConfigTrustStatus,
-    },
-    /// A config file failed path validation, tracking, or parsing.
-    #[error(transparent)]
-    ConfigFile(#[from] ConfigFileError),
-}
-
-/// Errors raised while validating config paths, trust state, or TOML content.
-#[derive(Debug, Error)]
-pub(crate) enum ConfigFileError {
-    /// The path is not a local `.traces/config.toml` file.
+    /// The discovered path is not a valid local `.traces/config.toml`
+    /// candidate.
     ///
     /// Local config paths must end with `.traces/config.toml` and have a parent
     /// directory named `.traces`.
-    #[error("unsupported local config file {path}")]
-    UnsupportedLocalConfigFile {
+    #[error("unsupported local config path {path}")]
+    UnsupportedLocalCandidate {
         /// Rejected local config path.
         path: PathBuf,
     },
-    /// The path is not a supported global `config.toml` file.
+    /// The discovered path is not a valid global `config.toml` candidate.
     ///
     /// Global config paths must end with `config.toml`.
-    #[error("unsupported global config file {path}")]
-    UnsupportedGlobalConfigFile {
+    #[error("unsupported global config path {path}")]
+    UnsupportedGlobalCandidate {
         /// Rejected global config path.
         path: PathBuf,
     },
-    /// The config file contains invalid TOML.
-    #[error("failed to parse config file {path}")]
-    Parse {
-        /// File containing invalid TOML.
-        path: PathBuf,
-        /// TOML deserialization error.
-        #[source]
-        source: Box<toml::de::Error>,
-    },
-    /// The config file could not be read.
+}
+
+/// Phase 2: errors raised while reading file contents or deserializing TOML.
+///
+/// In-memory buffer parsing never emits path discovery or trust errors.
+#[derive(Debug, Error)]
+pub(crate) enum ConfigReadError {
+    /// The physical config file could not be read from disk.
     #[error("failed to read config file {path}")]
     Io {
         /// File that failed to read.
         path: PathBuf,
-        /// Underlying I/O error.
+        /// Underlying I/O failure.
         #[source]
-        source: std::io::Error,
+        source: io::Error,
     },
-    /// Trust verification failed before the file could be parsed.
-    #[error("failed to check trust for {root}")]
-    TrustCheckFailed {
-        /// Workspace root being checked.
+    /// The config file content contains invalid TOML syntax.
+    #[error("failed to parse TOML syntax in {path}")]
+    Parse {
+        /// File containing invalid TOML.
+        path: PathBuf,
+        /// Underlying TOML deserialization error.
+        #[source]
+        source: Box<toml::de::Error>,
+    },
+}
+
+/// Phase 3: errors raised while verifying trust or recording tracked configs.
+///
+/// Governs cryptographic trust verification and the shared
+/// [`crate::FilePathTracker`] I/O that backs both the trust store and the
+/// tracked-config store.
+#[derive(Debug, Error)]
+pub enum ConfigTrustError {
+    /// Workspace root or config file trust verification halted, requiring user
+    /// action.
+    #[error(
+        "workspace root {root} or config file {path} is untrusted: {status:?}"
+    )]
+    Untrusted {
+        /// Untrusted workspace root.
         root: PathBuf,
-        /// Underlying trust-store or hash error.
-        source: Box<ConfigStateError>,
+        /// Untrusted config file path.
+        path: PathBuf,
+        /// Specific trust condition causing the halt.
+        status: ConfigTrustStatus,
     },
-    /// A configured subdirectory path was invalid (absolute, contained `..`, or
-    /// escaped root).
+    /// The underlying file path tracker operation failed.
+    #[error(transparent)]
+    Tracker(#[from] FilePathTrackerError),
+    /// Hashing a config file failed.
+    #[error(transparent)]
+    Hash(#[from] HashError),
+}
+
+/// Phase 4: errors raised while validating parsed domain model values.
+///
+/// Pure in-memory construction; never emits I/O or trust errors.
+#[derive(Debug, Error)]
+pub(crate) enum ConfigValueError {
+    /// A configured template or schema subdirectory escaped the workspace root
+    /// or violated strict path security invariants.
     #[error("invalid config subdirectory path {path}")]
     InvalidSubDir {
         /// Subdirectory path that failed validation.
         path: PathBuf,
-        /// Underlying path validation failure.
+        /// Underlying path confinement failure.
         #[source]
         source: crate::path::PathError,
     },
@@ -171,7 +181,7 @@ pub(crate) enum ConfigFileError {
     Task(#[from] TaskError),
 }
 
-impl ConfigFileError {
+impl ConfigValueError {
     /// Builds an invalid field-key error for a named config table.
     pub(crate) fn invalid_field_key(
         table: &'static str,
@@ -182,38 +192,4 @@ impl ConfigFileError {
             source,
         }
     }
-}
-
-/// Errors from config tracking or trust-state operations.
-#[derive(Debug, Error)]
-pub enum ConfigStateError {
-    /// The underlying file path tracker operation failed.
-    #[error(transparent)]
-    Tracker(#[from] FilePathTrackerError),
-    /// Hashing a config file failed.
-    #[error(transparent)]
-    Hash(#[from] HashError),
-}
-
-/// Errors raised while scaffolding a local config file on disk.
-#[derive(Debug, Error)]
-pub(crate) enum ConfigScaffoldError {
-    /// The collected template and output directories could not be serialised to
-    /// TOML.
-    #[error("failed to serialise local config")]
-    Serialize {
-        /// Source TOML serialization error.
-        #[source]
-        source: toml::ser::Error,
-    },
-    /// The serialised local config could not be written to disk.
-    ///
-    /// This includes the case where the file already exists, since
-    /// [`std::fs::File::create_new`] is used to prevent silent clobbering.
-    #[error("failed to write local config file")]
-    Write {
-        /// Source filesystem error.
-        #[source]
-        source: io::Error,
-    },
 }

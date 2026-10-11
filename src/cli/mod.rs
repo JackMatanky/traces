@@ -39,7 +39,7 @@ pub use error::{CliError, CliResult};
 
 use crate::{
     Config, ConfigService, DialogProvider,
-    config::{DiscoveryScope, TrustRequests},
+    config::{TrustRequests, TrustScope},
     index::{IndexStore, IndexerService},
     query::{
         QueryBuilder, QueryError, QueryMode, QueryService, QuerySet,
@@ -126,12 +126,12 @@ impl Cli {
         let result = match self.command {
             Some(command) => command.run(service, provider),
             None => match self.input {
-                Some(Some(name)) => {
-                    template::Template::new(name).run(service, provider)
-                }
-                Some(None) => {
-                    template::Template::interactive().run(service, provider)
-                }
+                Some(Some(name)) => run_with_config(service, |config| {
+                    template::Template::new(name).run(config, provider)
+                }),
+                Some(None) => run_with_config(service, |config| {
+                    template::Template::interactive().run(config, provider)
+                }),
                 None => Err(CliError::NoCommand),
             },
         };
@@ -185,15 +185,25 @@ impl Commands {
     ) -> CliResult {
         match self {
             Self::Init(args) => args.run(provider.as_ref()),
-            Self::Trust(args) => args.run(service),
-            Self::Untrust(args) => args.run(service),
-            Self::Index(args) => args.run(service),
-            Self::List(args) => args.run(service),
-            Self::Table(args) => args.run(service),
-            Self::Task(args) => args.run(service),
-            Self::Template(args) => args.run(service, provider),
+            Self::Trust(args) => args.run(service.trust_store()),
+            Self::Untrust(args) => args.run(service.trust_store()),
+            Self::Index(args) => {
+                run_with_config(service, |config| args.run(config))
+            }
+            Self::List(args) => {
+                run_with_config(service, |config| args.run(config))
+            }
+            Self::Table(args) => {
+                run_with_config(service, |config| args.run(config))
+            }
+            Self::Task(args) => {
+                run_with_config(service, |config| args.run(config))
+            }
+            Self::Template(args) => {
+                run_with_config(service, |config| args.run(config, provider))
+            }
             Self::Completions(args) => args.run(service),
-            Self::Tracked(args) => args.run(service),
+            Self::Tracked(args) => args.run(service.tracker_store()),
         }
     }
 }
@@ -241,6 +251,22 @@ fn load_config(service: &ConfigService) -> Result<Config, CliError> {
         cwd,
         source,
     })
+}
+
+/// Loads the current configuration and runs `handler` against a reference to
+/// it.
+///
+/// Isolates the [`Config`]-sized stack temporary in its own non-inlined
+/// frame, away from the larger multi-arm dispatch frames in [`Cli::run`] and
+/// [`Commands::run`] (`clippy::large_stack_frames` otherwise sums every
+/// match arm's locals, including every other arm's [`CliError`] payload,
+/// into those functions' frames).
+#[inline(never)]
+fn run_with_config(
+    service: &ConfigService,
+    handler: impl FnOnce(&Config) -> CliResult,
+) -> CliResult {
+    handler(&load_config(service)?)
 }
 
 /// Shared `--sort`/`--asc`/`--desc` CLI arguments for [`list::List`] and
@@ -488,7 +514,6 @@ fn query_error(root: &Path, source: QueryError) -> CliError {
 ///   current directory fails.
 /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
 fn resolve_trust_subjects(
-    service: &ConfigService,
     path: Option<&Path>,
     all: bool,
 ) -> Result<TrustRequests, CliError> {
@@ -500,11 +525,11 @@ fn resolve_trust_subjects(
         cwd.as_ref()
     };
     let scope = if all {
-        DiscoveryScope::LocalSubtree
+        TrustScope::LocalSubtree
     } else {
-        DiscoveryScope::NearestLocal
+        TrustScope::NearestLocal
     };
-    service.trust_requests(path, scope).map_err(|source| {
+    crate::config::trust_requests(path, scope).map_err(|source| {
         CliError::TrustTargetResolve {
             path: path.to_path_buf(),
             source,
@@ -1486,7 +1511,7 @@ mod tests {
 
         use super::*;
         use crate::{
-            PresetDialogProvider, cli::CwdGuard, config::ConfigLoadError,
+            PresetDialogProvider, cli::CwdGuard, config::ConfigError,
             test_support::TestProject,
         };
 
@@ -1514,7 +1539,7 @@ mod tests {
                 load_config(&service).expect_err("no config should fail");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Discovery(_),
+                source: ConfigError::Discovery(_),
                 ..
             }));
         }
@@ -1544,13 +1569,11 @@ kind = "todo"
                 .expect_err("prohibited delimiter config must fail");
 
             let is_prohibited = matches!(&error, CliError::ConfigLoad {
-                source: crate::config::ConfigLoadError::Build(
-                    crate::config::ConfigBuilderError::ConfigFile(
-                        crate::config::ConfigFileError::Task(
-                            crate::task::TaskError::ProhibitedStatusSymbol {
-                                symbol: '[',
-                            },
-                        ),
+                source: crate::config::ConfigError::Value(
+                    crate::config::ConfigValueError::Task(
+                        crate::task::TaskError::ProhibitedStatusSymbol {
+                            symbol: '[',
+                        },
                     ),
                 ),
                 ..

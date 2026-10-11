@@ -6,15 +6,20 @@
 
 use std::{
     fs,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
 use clap::Args;
+use thiserror::Error;
 
 use super::error::{CliError, CliResult};
 use crate::{
     DialogProvider,
-    config::{ConfigService, DEFAULT_LOCAL_TEMPLATES_DIR, LOCAL_CONFIG_DIR},
+    config::{
+        DEFAULT_LOCAL_TEMPLATES_DIR, LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE,
+        RawConfig, RawTemplateConfig,
+    },
 };
 
 const DEFAULT_OUTPUT_DIRECTORY: &str = ".";
@@ -101,7 +106,7 @@ impl Init {
         Ok(())
     }
 
-    /// Writes the local config file under `root` via [`ConfigService`].
+    /// Writes the local config file under `root`.
     ///
     /// # Errors
     ///
@@ -112,13 +117,82 @@ impl Init {
         directory: &Path,
         output_dir: &Path,
     ) -> CliResult {
-        ConfigService::scaffold_local(root, directory, output_dir).map_err(
-            |source| CliError::InitConfigWrite {
+        scaffold_local(root, directory, output_dir).map_err(|source| {
+            CliError::InitConfigWrite {
                 root: root.to_path_buf(),
                 source,
-            },
-        )
+            }
+        })
     }
+}
+
+/// Errors raised while scaffolding a local config file on disk.
+#[derive(Debug, Error)]
+pub(crate) enum ConfigScaffoldError {
+    /// The collected template and output directories could not be
+    /// serialised to TOML.
+    #[error("failed to serialise local config")]
+    Serialize {
+        /// Source TOML serialization error.
+        #[source]
+        source: toml::ser::Error,
+    },
+    /// The serialised local config could not be written to disk.
+    ///
+    /// Includes the case where the file already exists, since
+    /// [`std::fs::File::create_new`] is used to prevent silent clobbering.
+    #[error("failed to write local config file")]
+    Write {
+        /// Source filesystem error.
+        #[source]
+        source: io::Error,
+    },
+}
+
+/// Serialises `directory`/`output_dir` as the local template config and
+/// writes it to `root.join(LOCAL_CONFIG_FILE)`.
+///
+/// `[schemas]` and `[frontmatter]` are written as empty tables (their serde
+/// defaults), so a freshly scaffolded config behaves identically to one that
+/// omits those tables entirely.
+///
+/// Uses [`std::fs::File::create_new`] rather than [`std::fs::write`] so this
+/// fails atomically if the file already exists, preventing a concurrent
+/// `traces init` or a file planted between the existence check and write
+/// from being silently clobbered.
+///
+/// # Errors
+///
+/// - [`ConfigScaffoldError::Serialize`] when TOML serialization fails.
+/// - [`ConfigScaffoldError::Write`] when the file already exists, or creating
+///   or writing it fails.
+fn scaffold_local(
+    root: &Path,
+    directory: &Path,
+    output_dir: &Path,
+) -> Result<(), ConfigScaffoldError> {
+    let config = RawConfig {
+        templates: RawTemplateConfig {
+            directory: Some(directory.to_path_buf()),
+            output_dir: Some(output_dir.to_path_buf()),
+        },
+        ..RawConfig::default()
+    };
+    let contents = toml::to_string(&config).map_err(|source| {
+        ConfigScaffoldError::Serialize {
+            source,
+        }
+    })?;
+    let mut file = fs::File::create_new(root.join(LOCAL_CONFIG_FILE)).map_err(
+        |source| ConfigScaffoldError::Write {
+            source,
+        },
+    )?;
+    file.write_all(contents.as_bytes()).map_err(|source| {
+        ConfigScaffoldError::Write {
+            source,
+        }
+    })
 }
 
 /// The user's chosen template/output directories, collected interactively.
@@ -268,6 +342,53 @@ mod tests {
             let contents =
                 fs::read_to_string(config_path).expect("read config");
             toml::from_str(&contents).expect("parse config")
+        }
+    }
+
+    mod scaffold_local {
+        use super::*;
+
+        #[test]
+        fn writes_the_local_config_file() {
+            let root = tempfile::tempdir().expect("create temp dir");
+            fs::create_dir(root.path().join(".traces"))
+                .expect("create .traces dir");
+
+            scaffold_local(
+                root.path(),
+                Path::new("templates"),
+                Path::new("notes"),
+            )
+            .expect("scaffold local config");
+
+            let contents =
+                fs::read_to_string(root.path().join(LOCAL_CONFIG_FILE))
+                    .expect("read written config");
+            assert!(contents.contains("templates"));
+        }
+
+        #[test]
+        fn refuses_to_overwrite_an_existing_config_file() {
+            let root = tempfile::tempdir().expect("create temp dir");
+            fs::create_dir(root.path().join(".traces"))
+                .expect("create .traces dir");
+            scaffold_local(
+                root.path(),
+                Path::new("templates"),
+                Path::new("notes"),
+            )
+            .expect("first scaffold succeeds");
+
+            let error = scaffold_local(
+                root.path(),
+                Path::new("other"),
+                Path::new("elsewhere"),
+            )
+            .expect_err(
+                "second scaffold at the same root must fail, not clobber",
+            );
+
+            assert!(matches!(error, ConfigScaffoldError::Write { .. }));
         }
     }
 }

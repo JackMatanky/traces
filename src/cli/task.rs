@@ -13,7 +13,7 @@ use super::{
     SortArgs,
     error::{CliError, CliResult},
 };
-use crate::{Config, ConfigService, query::TaskPathStyle};
+use crate::{Config, query::TaskPathStyle};
 
 /// Default table column headers when `--table` is passed without `--column`.
 const DEFAULT_TABLE_HEADERS: &[&str] =
@@ -188,10 +188,9 @@ impl Task {
                   mirrors the precedent in crate::cli::list and \
                   crate::cli::table"
     )]
-    pub(super) fn run(&self, service: &ConfigService) -> CliResult {
-        let config = super::load_config(service)?;
+    pub(super) fn run(&self, config: &Config) -> CliResult {
         let root = config.root();
-        let (rendered, count) = self.render(&config)?;
+        let (rendered, count) = self.render(config)?;
         print!("{rendered}");
         if !self.presentation.count {
             eprintln!("{count} task(s) from {}", root.display());
@@ -810,8 +809,16 @@ mod tests {
     }
 
     mod run {
+        use std::sync::Arc;
+
+        use clap::Parser;
+
         use super::*;
-        use crate::{cli::CwdGuard, config::ConfigLoadError};
+        use crate::{
+            PresetDialogProvider,
+            cli::{Cli, CwdGuard},
+            config::ConfigError,
+        };
 
         #[test]
         fn runs_successfully_for_a_trusted_project_root() {
@@ -821,7 +828,7 @@ mod tests {
             let _guard = CwdGuard::enter(project.root());
             let task = Task::default();
 
-            task.run(project.service()).expect("run task command");
+            task.run(&project.config()).expect("run task command");
         }
 
         #[test]
@@ -829,13 +836,14 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::untrusted(temp.path().join("project"));
             let _guard = CwdGuard::enter(project.root());
-            let task = Task::default();
 
-            let error =
-                task.run(project.service()).expect_err("untrusted root fails");
+            let error = Cli::try_parse_from(["traces", "task"])
+                .expect("parse task command")
+                .run(project.service(), Arc::new(PresetDialogProvider::new()))
+                .expect_err("untrusted root fails");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Build(_),
+                source: ConfigError::Trust(_),
                 ..
             }));
         }
@@ -854,7 +862,7 @@ mod tests {
                 ..Default::default()
             };
 
-            task.run(project.service()).expect("run task command with count");
+            task.run(&project.config()).expect("run task command with count");
         }
     }
 

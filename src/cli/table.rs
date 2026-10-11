@@ -9,7 +9,7 @@
 use clap::Args;
 
 use super::{SortArgs, error::CliError};
-use crate::{Config, ConfigService};
+use crate::Config;
 
 /// Arguments for `traces table`.
 ///
@@ -57,10 +57,9 @@ impl Table {
         reason = "table output is primary command output, not diagnostic \
                   text; mirrors the precedent in crate::cli::task"
     )]
-    pub(super) fn run(&self, service: &ConfigService) -> Result<(), CliError> {
-        let config = super::load_config(service)?;
+    pub(super) fn run(&self, config: &Config) -> Result<(), CliError> {
         let root = config.root();
-        let (rendered, count) = self.render(&config)?;
+        let (rendered, count) = self.render(config)?;
         print!("{rendered}");
         eprintln!("{count} page(s) from {}", root.display());
         Ok(())
@@ -525,8 +524,16 @@ mod tests {
 
     mod run {
 
+        use std::sync::Arc;
+
+        use clap::Parser;
+
         use super::*;
-        use crate::{cli::CwdGuard, config::ConfigLoadError};
+        use crate::{
+            PresetDialogProvider,
+            cli::{Cli, CwdGuard},
+            config::ConfigError,
+        };
 
         #[test]
         fn succeeds_for_a_trusted_project_root() {
@@ -541,7 +548,7 @@ mod tests {
                 columns: vec!["file.path".to_owned()],
             };
 
-            table.run(project.service()).expect("run table command");
+            table.run(&project.config()).expect("run table command");
         }
 
         #[test]
@@ -549,18 +556,19 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let project = TestProject::untrusted(temp.path().join("project"));
             let _guard = CwdGuard::enter(project.root());
-            let table = Table {
-                from: None,
-                filter: vec![],
-                sort: SortArgs::default(),
-                columns: vec!["file.path".to_owned()],
-            };
 
-            let error =
-                table.run(project.service()).expect_err("untrusted root fails");
+            let error = Cli::try_parse_from([
+                "traces",
+                "table",
+                "--column",
+                "file.path",
+            ])
+            .expect("parse table command")
+            .run(project.service(), Arc::new(PresetDialogProvider::new()))
+            .expect_err("untrusted root fails");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Build(_),
+                source: ConfigError::Trust(_),
                 ..
             }));
         }

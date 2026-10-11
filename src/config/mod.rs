@@ -32,22 +32,26 @@ mod file;
 mod model;
 mod raw;
 mod service;
+mod tracker;
 mod trust;
 
 pub(crate) use builder::ConfigBuilder;
 pub(crate) use discovery::{
-    DiscoveryScope, LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE,
+    LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE, TrustScope, trust_requests,
 };
+#[cfg(test)]
+pub(crate) use error::ConfigReadError;
 pub(crate) use error::{
-    ConfigBuilderError, ConfigFileError, ConfigLoadError, ConfigScaffoldError,
-    ConfigStateError, DiscoveryError,
+    ConfigDiscoveryError, ConfigError, ConfigTrustError, ConfigValueError,
 };
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) use file::{Discovered, LocalConfigFile};
 pub(crate) use model::DEFAULT_LOCAL_TEMPLATES_DIR;
 pub use model::{Config, FrontmatterConfig, SchemasConfig, TaskConfig};
+pub(crate) use raw::{RawConfig, RawTemplateConfig};
 pub use service::ConfigService;
+pub(crate) use tracker::TrackerStore;
 #[cfg(test)]
 pub(crate) use trust::ConfigTrustStatus;
 pub use trust::TrustRequest;
-pub(crate) use trust::TrustRequests;
+pub(crate) use trust::{TrustRequests, TrustStore};

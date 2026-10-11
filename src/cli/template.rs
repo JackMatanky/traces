@@ -13,7 +13,7 @@ use clap::{ArgGroup, Args};
 
 use super::error::{CliError, CliResult};
 use crate::{
-    Config, ConfigService, DialogError, DialogProvider, PresetDialogProvider,
+    Config, DialogError, DialogProvider, PresetDialogProvider,
     template::{
         TemplateError, TemplatePathInput, TemplateService, WriteMode,
         WriteOutcome,
@@ -118,15 +118,14 @@ impl Template {
     ///   fails.
     pub(super) fn run(
         self,
-        service: &ConfigService,
+        config: &Config,
         provider: Arc<dyn DialogProvider>,
     ) -> CliResult {
-        let config = super::load_config(service)?;
         if self.list {
-            Self::list_templates(&config);
+            Self::list_templates(config);
             return Ok(());
         }
-        self.execute(&config, provider)
+        self.execute(config, provider)
     }
 
     fn execute(
@@ -280,17 +279,17 @@ mod tests {
             Arc::new(crate::PresetDialogProvider::new())
         }
         /// Sets up a trusted project with a template directory and optional
-        /// template file, returning the project root and a ready-to-use
-        /// [`ConfigService`].
+        /// template file, returning the project root and its loaded
+        /// [`Config`].
         pub(super) fn create_test_project(
             temp: &Path,
             template_content: &str,
-        ) -> (PathBuf, ConfigService) {
+        ) -> (PathBuf, Config) {
             let project = TestProject::trusted(temp.join("project"));
             if !template_content.is_empty() {
                 project.write_template("daily.md", template_content);
             }
-            (project.root().to_path_buf(), project.service().clone())
+            (project.root().to_path_buf(), project.config())
         }
 
         pub(super) struct CancellingDialogProvider;
@@ -337,12 +336,14 @@ mod tests {
     mod run {
         use std::{fs, path::PathBuf, sync::Arc};
 
+        use clap::Parser;
         use pretty_assertions::assert_eq;
 
         use super::*;
         use crate::{
-            cli::{CwdGuard, UserAbort},
-            config::ConfigLoadError,
+            PresetDialogProvider,
+            cli::{Cli, CwdGuard, UserAbort},
+            config::ConfigError,
         };
 
         #[test]
@@ -371,12 +372,17 @@ mod tests {
             fs::create_dir_all(&templates_dir).expect("create templates dir");
             let _guard = CwdGuard::enter(project.root());
 
-            let error = Template::new(PathBuf::from("daily"))
-                .run(project.service(), preset_provider())
-                .expect_err("untrusted root fails");
+            let error =
+                Cli::try_parse_from(["traces", "template", "-i", "daily"])
+                    .expect("parse template command")
+                    .run(
+                        project.service(),
+                        Arc::new(PresetDialogProvider::new()),
+                    )
+                    .expect_err("untrusted root fails");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Build(_),
+                source: ConfigError::Trust(_),
                 ..
             }));
         }

@@ -15,14 +15,14 @@ use std::{
 };
 
 use super::{
-    error::ConfigFileError,
+    error::ConfigValueError,
     raw::{
         RawDateFieldConfig, RawFrontmatterConfig, RawTaskConfig,
         RawTaskStatusKind,
     },
 };
 use crate::{
-    FieldName, FieldNameError, Tag, TaskStatus, TaskStatusMap,
+    Blake3FileHash, FieldName, FieldNameError, Tag, TaskStatus, TaskStatusMap,
     TaskStatusSymbol, TaskStatusType,
     path::{PathError, RelativePath, SafeRelativePath},
 };
@@ -236,6 +236,62 @@ impl Config {
     pub fn with_schemas(mut self, schemas: SchemasConfig) -> Self {
         self.schemas = schemas;
         self
+    }
+
+    /// Computes a deterministic fingerprint over every resolved config
+    /// value.
+    ///
+    /// Hashes a canonical, NUL-delimited encoding of every field this
+    /// `Config` carries. The digest changes whenever any field a consumer
+    /// could read would change, and stays stable otherwise — including
+    /// across process restarts, since [`Blake3FileHash`] is a fixed BLAKE3
+    /// digest rather than a process-randomized hash. Intended for future
+    /// index cache invalidation: a persisted fingerprint lets a consumer
+    /// detect configuration drift without re-reading config files or
+    /// diffing their parsed representation.
+    #[inline]
+    #[must_use]
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "no current caller outside tests; reserved for future \
+                      index cache invalidation"
+        )
+    )]
+    pub(crate) fn hash(&self) -> Blake3FileHash {
+        let mut canonical = String::new();
+        push_field(&mut canonical, self.root.to_string_lossy().as_ref());
+        push_path(&mut canonical, self.templates.local());
+        push_path(&mut canonical, self.templates.global());
+        push_field(
+            &mut canonical,
+            self.templates.output().to_string_lossy().as_ref(),
+        );
+        push_field(&mut canonical, self.schemas.class_field_name());
+        push_field(
+            &mut canonical,
+            self.schemas.directory().to_string_lossy().as_ref(),
+        );
+        push_field(&mut canonical, self.frontmatter.title_name());
+        push_field(&mut canonical, self.frontmatter.aliases_name());
+        push_field(&mut canonical, self.frontmatter.tags_name());
+        push_field(&mut canonical, self.frontmatter.date_created().name());
+        push_field(&mut canonical, self.frontmatter.date_created().format());
+        push_field(&mut canonical, self.frontmatter.date_modified().name());
+        push_field(&mut canonical, self.frontmatter.date_modified().format());
+        let mut statuses: Vec<&TaskStatus> =
+            self.tasks.statuses().iter().collect();
+        statuses.sort_by_key(|status| status.symbol().as_char());
+        for status in statuses {
+            push_field(&mut canonical, &status.symbol().as_char().to_string());
+            push_field(&mut canonical, status.name());
+            push_field(&mut canonical, &format!("{:?}", status.kind()));
+        }
+        for tag in self.tasks.tag_filters() {
+            push_field(&mut canonical, tag.as_str());
+        }
+        Blake3FileHash::from(canonical.as_str())
     }
 }
 
@@ -519,16 +575,16 @@ impl Default for FrontmatterConfig {
 }
 
 impl TryFrom<RawFrontmatterConfig> for FrontmatterConfig {
-    type Error = ConfigFileError;
+    type Error = ConfigValueError;
 
     /// # Errors
     ///
-    /// - [`ConfigFileError::InvalidFieldKey`] if `title`, `aliases`, or `tags`
+    /// - [`ConfigValueError::InvalidFieldKey`] if `title`, `aliases`, or `tags`
     ///   fails field name validation.
     #[inline]
     fn try_from(raw: RawFrontmatterConfig) -> Result<Self, Self::Error> {
         let invalid_key =
-            |source| ConfigFileError::invalid_field_key("frontmatter", source);
+            |source| ConfigValueError::invalid_field_key("frontmatter", source);
         Ok(Self {
             title: FieldName::try_from(
                 raw.title.unwrap_or_else(|| DEFAULT_TITLE_FIELD.to_owned()),
@@ -630,13 +686,13 @@ impl Default for TaskConfig {
 }
 
 impl TryFrom<RawTaskConfig> for TaskConfig {
-    type Error = ConfigFileError;
+    type Error = ConfigValueError;
 
     /// # Errors
     ///
-    /// - [`ConfigFileError::Task`] if a configured task status uses a
+    /// - [`ConfigValueError::Task`] if a configured task status uses a
     ///   prohibited delimiter symbol: `(`, `)`, `[`, `]`, `{`, or `}`.
-    /// - [`ConfigFileError::InvalidTagFilter`] when a `tag_filters` entry does
+    /// - [`ConfigValueError::InvalidTagFilter`] when a `tag_filters` entry does
     ///   not normalize into a valid [`Tag`].
     #[inline]
     fn try_from(raw: RawTaskConfig) -> Result<Self, Self::Error> {
@@ -653,7 +709,7 @@ impl TryFrom<RawTaskConfig> for TaskConfig {
             .into_iter()
             .map(|entry| {
                 Tag::parse_lenient(&entry).map_err(|source| {
-                    ConfigFileError::InvalidTagFilter {
+                    ConfigValueError::InvalidTagFilter {
                         entry,
                         source,
                     }
@@ -705,15 +761,15 @@ impl ConfigSubDir {
     ///
     /// # Errors
     ///
-    /// - [`ConfigFileError::InvalidSubDir`] if the resolved path escapes `root`
-    ///   or fails verification.
+    /// - [`ConfigValueError::InvalidSubDir`] if the resolved path escapes
+    ///   `root` or fails verification.
     pub(crate) fn resolve_against(
         &self,
         root: &Path,
-    ) -> Result<PathBuf, ConfigFileError> {
+    ) -> Result<PathBuf, ConfigValueError> {
         SafeRelativePath::parse(root, self.as_path())
             .map(SafeRelativePath::into_path_buf)
-            .map_err(|source| ConfigFileError::InvalidSubDir {
+            .map_err(|source| ConfigValueError::InvalidSubDir {
                 path: self.as_path().to_path_buf(),
                 source,
             })
@@ -824,6 +880,20 @@ impl DateFieldConfig {
     }
 }
 
+/// Appends `field` to `canonical`, NUL-delimited, for [`Config::hash`].
+fn push_field(canonical: &mut String, field: &str) {
+    canonical.push_str(field);
+    canonical.push('\0');
+}
+
+/// Appends an optional path to `canonical`, empty string when `None`.
+fn push_path(canonical: &mut String, path: Option<&Path>) {
+    push_field(
+        canonical,
+        path.map(Path::to_string_lossy).as_deref().unwrap_or_default(),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -839,6 +909,31 @@ mod tests {
             let second = config.root_arc();
 
             assert!(Arc::ptr_eq(&first, &second));
+        }
+    }
+
+    mod hash {
+        use pretty_assertions::{assert_eq, assert_ne};
+
+        use super::*;
+
+        #[test]
+        fn is_stable_across_repeated_calls() {
+            let config = Config::test_default(PathBuf::from("/project"));
+
+            let first = config.hash();
+            let second = config.hash();
+
+            assert_eq!(first, second);
+        }
+
+        #[test]
+        fn changes_when_tag_filters_change() {
+            let base = Config::test_default(PathBuf::from("/project"));
+            let changed =
+                base.clone().with_tasks(TaskConfig::from_tags(&["#work"]));
+
+            assert_ne!(base.hash(), changed.hash());
         }
     }
 
@@ -926,7 +1021,7 @@ mod tests {
                 .resolve_against(&root)
                 .expect_err("schema directory escapes root through symlink");
 
-            assert!(matches!(error, ConfigFileError::InvalidSubDir {
+            assert!(matches!(error, ConfigValueError::InvalidSubDir {
                 source: crate::path::PathError::OutsideRoot,
                 ..
             }));
@@ -1024,7 +1119,7 @@ mod tests {
 
             let error = TaskConfig::try_from(raw).expect_err("invalid entry");
 
-            assert!(matches!(error, ConfigFileError::InvalidTagFilter {
+            assert!(matches!(error, ConfigValueError::InvalidTagFilter {
                 entry,
                 ..
             } if entry == "1invalid"));
@@ -1039,7 +1134,7 @@ mod tests {
 
             let error = TaskConfig::try_from(raw).expect_err("blank entry");
 
-            assert!(matches!(error, ConfigFileError::InvalidTagFilter { .. }));
+            assert!(matches!(error, ConfigValueError::InvalidTagFilter { .. }));
         }
 
         #[test]
@@ -1058,7 +1153,7 @@ mod tests {
 
             assert!(matches!(
                 error,
-                ConfigFileError::Task(TaskError::ProhibitedStatusSymbol {
+                ConfigValueError::Task(TaskError::ProhibitedStatusSymbol {
                     symbol: '['
                 })
             ));

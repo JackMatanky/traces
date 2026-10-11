@@ -53,7 +53,7 @@ impl<T> yoke::erased::ErasedDestructor for traces_pkm::cli::init::Init where T: 
 #[non_exhaustive] pub enum traces_pkm::cli::CliError
 pub traces_pkm::cli::CliError::ConfigLoad
 pub traces_pkm::cli::CliError::ConfigLoad::cwd: std::path::PathBuf
-pub traces_pkm::cli::CliError::ConfigLoad::source: error::ConfigLoadError
+pub traces_pkm::cli::CliError::ConfigLoad::source: error::ConfigError
 pub traces_pkm::cli::CliError::CurrentDirectory
 pub traces_pkm::cli::CliError::CurrentDirectory::source: core::io::error::Error
 pub traces_pkm::cli::CliError::Index
@@ -63,7 +63,7 @@ pub traces_pkm::cli::CliError::InitAlreadyInitialized
 pub traces_pkm::cli::CliError::InitAlreadyInitialized::root: std::path::PathBuf
 pub traces_pkm::cli::CliError::InitConfigWrite
 pub traces_pkm::cli::CliError::InitConfigWrite::root: std::path::PathBuf
-pub traces_pkm::cli::CliError::InitConfigWrite::source: error::ConfigScaffoldError
+pub traces_pkm::cli::CliError::InitConfigWrite::source: super::init::ConfigScaffoldError
 pub traces_pkm::cli::CliError::InitPrompt
 pub traces_pkm::cli::CliError::InitPrompt::source: traces_pkm::DialogError
 pub traces_pkm::cli::CliError::InitScaffold
@@ -83,25 +83,25 @@ pub traces_pkm::cli::CliError::TemplateInstantiate::source: traces_pkm::template
 pub traces_pkm::cli::CliError::TemplatePicker
 pub traces_pkm::cli::CliError::TemplatePicker::source: traces_pkm::DialogError
 pub traces_pkm::cli::CliError::TrackedClean
-pub traces_pkm::cli::CliError::TrackedClean::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrackedClean::source: traces_pkm::config::error::ConfigTrustError
 pub traces_pkm::cli::CliError::TrackedList
-pub traces_pkm::cli::CliError::TrackedList::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrackedList::source: traces_pkm::config::error::ConfigTrustError
 pub traces_pkm::cli::CliError::Trust
 pub traces_pkm::cli::CliError::Trust::root: std::path::PathBuf
-pub traces_pkm::cli::CliError::Trust::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::Trust::source: traces_pkm::config::error::ConfigTrustError
 pub traces_pkm::cli::CliError::TrustClean
-pub traces_pkm::cli::CliError::TrustClean::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustClean::source: traces_pkm::config::error::ConfigTrustError
 pub traces_pkm::cli::CliError::TrustList
-pub traces_pkm::cli::CliError::TrustList::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustList::source: traces_pkm::config::error::ConfigTrustError
 pub traces_pkm::cli::CliError::TrustShow
 pub traces_pkm::cli::CliError::TrustShow::root: std::path::PathBuf
-pub traces_pkm::cli::CliError::TrustShow::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::TrustShow::source: traces_pkm::config::error::ConfigTrustError
 pub traces_pkm::cli::CliError::TrustTargetResolve
 pub traces_pkm::cli::CliError::TrustTargetResolve::path: std::path::PathBuf
-pub traces_pkm::cli::CliError::TrustTargetResolve::source: error::DiscoveryError
+pub traces_pkm::cli::CliError::TrustTargetResolve::source: error::ConfigDiscoveryError
 pub traces_pkm::cli::CliError::Untrust
 pub traces_pkm::cli::CliError::Untrust::root: std::path::PathBuf
-pub traces_pkm::cli::CliError::Untrust::source: traces_pkm::config::error::ConfigStateError
+pub traces_pkm::cli::CliError::Untrust::source: traces_pkm::config::error::ConfigTrustError
 impl core::error::Error for traces_pkm::cli::CliError
 pub fn traces_pkm::cli::CliError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Debug for traces_pkm::cli::CliError

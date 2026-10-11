@@ -7,7 +7,7 @@
 use clap::Args;
 
 use super::error::{CliError, CliResult};
-use crate::{ConfigService, IndexerService};
+use crate::{Config, IndexerService};
 
 /// Arguments for `traces index`.
 ///
@@ -35,14 +35,13 @@ impl Index {
     #[expect(
         clippy::unused_self,
         reason = "keeps the dispatch signature consistent with every other \
-                  command handler (all args.run(&self, service)) so the \
+                  command handler (all args.run(&self, config)) so the \
                   Commands::run match arms are uniform"
     )]
-    pub(super) fn run(&self, service: &ConfigService) -> CliResult {
-        let config = super::load_config(service)?;
+    pub(super) fn run(&self, config: &Config) -> CliResult {
         let root = config.root().to_path_buf();
         let index =
-            IndexerService::from(&config).rebuild().map_err(|source| {
+            IndexerService::from(config).rebuild().map_err(|source| {
                 CliError::Index {
                     root: root.clone(),
                     source,
@@ -77,14 +76,16 @@ mod tests {
     use crate::test_support::TestProject;
 
     mod index {
-        use std::{fs, path::Path};
+        use std::{fs, path::Path, sync::Arc};
 
+        use clap::Parser;
         use miette::Diagnostic;
-        use pretty_assertions::assert_eq;
 
         use super::*;
         use crate::{
-            DirTreeError, cli::CwdGuard, config::ConfigLoadError,
+            DirTreeError, PresetDialogProvider,
+            cli::{Cli, CwdGuard},
+            config::ConfigError,
             index::IndexError,
         };
 
@@ -95,7 +96,7 @@ mod tests {
             project.write_note("notes/todo.md", "- [ ] task");
             let _guard = CwdGuard::enter(project.root());
 
-            Index.run(project.service()).expect("run index command");
+            Index.run(&project.config()).expect("run index command");
 
             let loaded =
                 project.indexer().load().expect("load persisted index");
@@ -109,7 +110,7 @@ mod tests {
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("first.md", "content");
             let _guard = CwdGuard::enter(project.root());
-            Index.run(project.service()).expect("first index run");
+            Index.run(&project.config()).expect("first index run");
 
             let reloaded =
                 project.indexer().load().expect("reload persisted index");
@@ -123,12 +124,12 @@ mod tests {
             let project = TestProject::trusted(temp.path().join("project"));
             project.write_note("stale.md", "old");
             let _guard = CwdGuard::enter(project.root());
-            Index.run(project.service()).expect("first index run");
+            Index.run(&project.config()).expect("first index run");
             fs::remove_file(project.root().join("stale.md"))
                 .expect("remove stale");
             project.write_note("fresh.md", "new");
 
-            Index.run(project.service()).expect("second index run");
+            Index.run(&project.config()).expect("second index run");
 
             let loaded =
                 project.indexer().load().expect("load persisted index");
@@ -143,11 +144,13 @@ mod tests {
             let project = TestProject::untrusted(temp.path().join("project"));
             let _guard = CwdGuard::enter(project.root());
 
-            let error =
-                Index.run(project.service()).expect_err("untrusted root fails");
+            let error = Cli::try_parse_from(["traces", "index"])
+                .expect("parse index command")
+                .run(project.service(), Arc::new(PresetDialogProvider::new()))
+                .expect_err("untrusted root fails");
 
             assert!(matches!(error, CliError::ConfigLoad {
-                source: ConfigLoadError::Build(_),
+                source: ConfigError::Trust(_),
                 ..
             }));
             assert_eq!(
@@ -182,7 +185,7 @@ mod tests {
             let _guard = CwdGuard::enter(project.root());
 
             let error = Index
-                .run(project.service())
+                .run(&project.config())
                 .expect_err("unreadable subdirectory fails");
 
             assert!(matches!(error, CliError::Index {

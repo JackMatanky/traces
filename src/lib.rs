@@ -68,8 +68,8 @@
 //! doctest verifying that the corresponding public interface is nameable.
 //!
 //! ```compile_fail
-//! // ConfigLoadError must not be nameable from outside the crate.
-//! use traces_pkm::ConfigLoadError;
+//! // ConfigError must not be nameable from outside the crate.
+//! use traces_pkm::ConfigError;
 //! ```
 //!
 //! ```rust
@@ -357,6 +357,19 @@ mod test_support {
         #[must_use]
         pub fn service(&self) -> &ConfigService {
             &self.service
+        }
+
+        /// Loads this project's effective configuration.
+        ///
+        /// # Panics
+        ///
+        /// Panics if discovery, trust verification, or parsing fails.
+        /// Fixture-only code: a panic here means the fixture setup itself is
+        /// broken.
+        #[inline]
+        #[must_use]
+        pub fn config(&self) -> Config {
+            self.service.load(&self.root).expect("load fixture config")
         }
 
         /// Returns test [`Config`] rooted at this project, configuring the
@@ -1022,8 +1035,8 @@ mod test_support {
             #[test]
             fn retains_config_internals_under_expected_names() {
                 assert_eq!(
-                    std::any::type_name::<crate::config::ConfigLoadError>(),
-                    "traces_pkm::config::error::ConfigLoadError"
+                    std::any::type_name::<crate::config::ConfigError>(),
+                    "traces_pkm::config::error::ConfigError"
                 );
                 assert_eq!(
                     std::any::type_name::<crate::config::ConfigBuilder>(),

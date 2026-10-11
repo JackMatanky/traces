@@ -14,12 +14,11 @@ use std::{
 use miette::Diagnostic;
 use thiserror::Error;
 
-use super::UserAbort;
+use super::{UserAbort, init::ConfigScaffoldError};
 use crate::{
     DialogError,
     config::{
-        ConfigBuilderError, ConfigFileError, ConfigLoadError,
-        ConfigScaffoldError, ConfigStateError, DiscoveryError,
+        ConfigDiscoveryError, ConfigError, ConfigTrustError, ConfigValueError,
     },
     index::IndexError,
     query::{QueryBuilderError, QueryDialect, QueryError},
@@ -38,12 +37,13 @@ pub type CliResult = std::result::Result<(), CliError>;
 #[derive(Debug, Error)]
 #[expect(
     private_interfaces,
-    reason = "ConfigFileError, ConfigLoadError, ConfigStateError, \
-              DiscoveryError, and QueryError stay pub(crate); construction \
-              inside crate::cli, callers use CliError's Display/Diagnostic \
-              surface, never these types directly. TemplateError and \
-              IndexError are pub only under cfg(any(test, feature = \
-              \"test-utils\")), where WorkspaceIndex::build/refresh and \
+    reason = "ConfigError, ConfigDiscoveryError, ConfigReadError, \
+              ConfigTrustError, ConfigValueError, and QueryError stay \
+              pub(crate); construction inside crate::cli, callers use \
+              CliError's Display/Diagnostic surface, never these types \
+              directly. TemplateError and IndexError are pub only under \
+              cfg(any(test, feature = \"test-utils\")), where \
+              WorkspaceIndex::build/refresh and \
               TemplateService::render_to_file are themselves pub for external \
               benchmark/test use"
 )]
@@ -67,7 +67,7 @@ pub enum CliError {
         cwd: PathBuf,
         /// Source configuration loading error.
         #[source]
-        source: ConfigLoadError,
+        source: ConfigError,
     },
     /// Resolving a `traces trust` user-provided target failed.
     #[error("failed to resolve trust target {path}")]
@@ -76,7 +76,7 @@ pub enum CliError {
         path: PathBuf,
         /// Source discovery error.
         #[source]
-        source: DiscoveryError,
+        source: ConfigDiscoveryError,
     },
     /// Trusting `root` failed while updating the store or hashing config.
     #[error("failed to trust {root}")]
@@ -85,7 +85,7 @@ pub enum CliError {
         root: PathBuf,
         /// Source trust-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Removing trust for `root` failed.
     #[error("failed to untrust {root}")]
@@ -94,7 +94,7 @@ pub enum CliError {
         root: PathBuf,
         /// Source trust-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Reading trust status for `root` failed.
     #[error("failed to show trust status for {root}")]
@@ -103,35 +103,35 @@ pub enum CliError {
         root: PathBuf,
         /// Source trust-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Listing the trust store failed.
     #[error("failed to list trusted directories")]
     TrustList {
         /// Source trust-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Cleaning the trust store failed.
     #[error("failed to clean the trust store")]
     TrustClean {
         /// Source trust-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Listing the tracked-config store failed.
     #[error("failed to list tracked configs")]
     TrackedList {
         /// Source tracked-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Cleaning the tracked-config store failed.
     #[error("failed to clean the tracked-config store")]
     TrackedClean {
         /// Source tracked-store error.
         #[source]
-        source: ConfigStateError,
+        source: ConfigTrustError,
     },
     /// Collecting `traces init` input interactively failed.
     #[error("failed to collect init input")]
@@ -332,12 +332,12 @@ impl Diagnostic for CliError {
         match self {
             Self::ConfigLoad {
                 cwd,
-                source: ConfigLoadError::Discovery(_),
+                source: ConfigError::Discovery(_),
             } => Some(config_discovery_help(cwd)),
             Self::ConfigLoad {
-                source: ConfigLoadError::Build(source),
+                source,
                 ..
-            } => Some(config_build_help(source)),
+            } => Some(config_load_help(source)),
             Self::Trust {
                 root,
                 ..
@@ -463,27 +463,27 @@ fn config_discovery_help(cwd: &Path) -> Box<dyn Display + '_> {
     ))
 }
 
-/// Builds diagnostic help text for a [`ConfigBuilderError`].
-fn config_build_help(source: &ConfigBuilderError) -> Box<dyn Display + '_> {
+/// Builds diagnostic help text for non-discovery [`ConfigError`] stages.
+fn config_load_help(source: &ConfigError) -> Box<dyn Display + '_> {
     match source {
-        ConfigBuilderError::Untrusted {
+        ConfigError::Trust(ConfigTrustError::Untrusted {
             ..
-        } => Box::new(
+        }) => Box::new(
             "run `traces trust` to trust this project root, then try again",
         ),
-        ConfigBuilderError::ConfigFile(ConfigFileError::InvalidFieldKey {
+        ConfigError::Value(ConfigValueError::InvalidFieldKey {
             ..
         }) => Box::new(
             "check that [frontmatter] and [schemas] key names in the config \
              file are non-empty",
         ),
-        ConfigBuilderError::ConfigFile(ConfigFileError::InvalidTagFilter {
+        ConfigError::Value(ConfigValueError::InvalidTagFilter {
             ..
         }) => Box::new(
             "check that every [tasks] tag_filters entry is a valid tag, e.g. \
              \"task\" or \"#task\"",
         ),
-        ConfigBuilderError::ConfigFile(_) => Box::new(
+        _ => Box::new(
             "check that the config file contains valid TOML and its structure \
              matches the expected schema",
         ),
@@ -537,18 +537,18 @@ fn query_help(source: &QueryError) -> Box<dyn Display + 'static> {
 }
 
 /// Selects the diagnostic code for a [`CliError::ConfigLoad`] source.
-const fn config_load_code(source: &ConfigLoadError) -> &'static str {
+const fn config_load_code(source: &ConfigError) -> &'static str {
     match source {
-        ConfigLoadError::Discovery(_) => "traces::cli::config_discovery_failed",
-        ConfigLoadError::Build(ConfigBuilderError::Untrusted {
+        ConfigError::Discovery(_) => "traces::cli::config_discovery_failed",
+        ConfigError::Trust(ConfigTrustError::Untrusted {
             ..
         }) => "traces::cli::config_build_untrusted",
-        ConfigLoadError::Build(ConfigBuilderError::ConfigFile(
-            ConfigFileError::InvalidFieldKey {
-                ..
-            },
-        )) => "traces::cli::config_build_invalid_field_key",
-        ConfigLoadError::Build(ConfigBuilderError::ConfigFile(_)) => {
+        ConfigError::Value(ConfigValueError::InvalidFieldKey {
+            ..
+        }) => "traces::cli::config_build_invalid_field_key",
+        ConfigError::Read(_)
+        | ConfigError::Trust(_)
+        | ConfigError::Value(_) => {
             "traces::cli::config_build_config_file_failed"
         }
     }
@@ -750,8 +750,8 @@ mod tests {
 
         use super::*;
 
-        pub(super) fn state_source() -> ConfigStateError {
-            ConfigStateError::Hash(crate::hash::HashError {
+        pub(super) fn state_source() -> ConfigTrustError {
+            ConfigTrustError::Hash(crate::hash::HashError {
                 path: PathBuf::from("/some/project/.traces/config.toml"),
                 source: io::Error::other("boom"),
             })
@@ -766,7 +766,9 @@ mod tests {
         use serde::ser::Error as SerdeError;
 
         use super::*;
-        use crate::{DirTreeError, query::QuerySyntaxError};
+        use crate::{
+            DirTreeError, config::ConfigReadError, query::QuerySyntaxError,
+        };
 
         #[test]
         fn current_directory() {
@@ -790,8 +792,8 @@ mod tests {
             let cwd = PathBuf::from("/some/project");
             let error = CliError::ConfigLoad {
                 cwd: cwd.clone(),
-                source: ConfigLoadError::Discovery(
-                    DiscoveryError::LocalConfigAbsent {
+                source: ConfigError::Discovery(
+                    ConfigDiscoveryError::NotFound {
                         cwd,
                     },
                 ),
@@ -818,7 +820,7 @@ mod tests {
 
         #[test]
         fn untrusted_config_message_names_the_config_path() {
-            let error = crate::config::ConfigBuilderError::Untrusted {
+            let error = crate::config::ConfigTrustError::Untrusted {
                 root: PathBuf::from("/example/root"),
                 path: PathBuf::from("/example/root/.traces/config.toml"),
                 status: crate::config::ConfigTrustStatus::Untrusted,
@@ -830,15 +832,19 @@ mod tests {
         }
 
         #[test]
-        fn config_load_build_config_file() {
+        fn config_load_read_parse() {
             let cwd = PathBuf::from("/some/project");
+            let path = PathBuf::from("/some/project/.traces/config.toml");
+            let source = toml::from_str::<
+                std::collections::HashMap<String, String>,
+            >("not valid toml ===")
+            .expect_err("malformed toml");
             let error = CliError::ConfigLoad {
                 cwd,
-                source: ConfigLoadError::Build(crate::config::ConfigBuilderError::ConfigFile(
-                    crate::config::ConfigFileError::UnsupportedLocalConfigFile {
-                        path: PathBuf::from("/some/project/config.toml"),
-                    },
-                )),
+                source: ConfigError::Read(ConfigReadError::Parse {
+                    path,
+                    source: Box::new(source),
+                }),
             };
 
             assert_eq!(
@@ -1131,7 +1137,7 @@ mod tests {
         fn trust_target_resolve() {
             let error = CliError::TrustTargetResolve {
                 path: PathBuf::from("/some/path"),
-                source: DiscoveryError::LocalConfigAbsent {
+                source: ConfigDiscoveryError::NotFound {
                     cwd: PathBuf::from("/some/path"),
                 },
             };
@@ -1160,7 +1166,7 @@ mod tests {
             let root = PathBuf::from("/some/project");
             let error = CliError::Untrust {
                 root,
-                source: ConfigStateError::Hash(crate::hash::HashError {
+                source: ConfigTrustError::Hash(crate::hash::HashError {
                     path: PathBuf::from("/some/project/.traces/config.toml"),
                     source: io::Error::other("boom"),
                 }),
@@ -1187,7 +1193,7 @@ mod tests {
             let root = PathBuf::from("/some/project");
             let error = CliError::TrustShow {
                 root,
-                source: ConfigStateError::Hash(crate::hash::HashError {
+                source: ConfigTrustError::Hash(crate::hash::HashError {
                     path: PathBuf::from("/some/project/.traces/config.toml"),
                     source: io::Error::other("boom"),
                 }),

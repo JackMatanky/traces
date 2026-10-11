@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use clap::Args;
 
 use super::error::{CliError, CliResult};
-use crate::ConfigService;
+use crate::config::TrustStore;
 
 /// Arguments for `traces untrust`.
 ///
@@ -35,15 +35,12 @@ impl Untrust {
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::Untrust`] if updating the trust store fails.
     #[inline]
-    pub(super) fn run(self, service: &ConfigService) -> CliResult {
-        let subjects = super::resolve_trust_subjects(
-            service,
-            self.path.as_deref(),
-            self.all,
-        )?;
+    pub(super) fn run(self, trust: &TrustStore) -> CliResult {
+        let subjects =
+            super::resolve_trust_subjects(self.path.as_deref(), self.all)?;
         for subject in subjects {
             let root = subject.root_path().to_path_buf();
-            if let Err(source) = service.untrust(&subject) {
+            if let Err(source) = trust.untrust(&subject) {
                 return Err(CliError::Untrust {
                     root,
                     source,
@@ -63,7 +60,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        TrustRequest,
+        ConfigService, TrustRequest,
         config::ConfigTrustStatus,
         test_support::{TestProject, fixture_service},
     };
@@ -139,11 +136,12 @@ mod tests {
             super::trust_root(&service, &root);
 
             super::untrust_args(Some(root.clone()), false)
-                .run(&service)
+                .run(service.trust_store())
                 .expect("untrust root");
 
             assert_eq!(
                 service
+                    .trust_store()
                     .trust_status(&TrustRequest::from(root.as_path()))
                     .expect("check trust"),
                 ConfigTrustStatus::Untrusted
@@ -162,11 +160,12 @@ mod tests {
             let _guard = CwdGuard::enter(&cwd);
 
             super::untrust_args(None, false)
-                .run(&service)
+                .run(service.trust_store())
                 .expect("untrust cwd");
 
             assert_eq!(
                 service
+                    .trust_store()
                     .trust_status(&TrustRequest::from(root.as_path()))
                     .expect("check trust"),
                 ConfigTrustStatus::Untrusted
@@ -186,11 +185,11 @@ mod tests {
             super::trust_root(&service, &child);
 
             super::untrust_args(Some(parent), true)
-                .run(&service)
+                .run(service.trust_store())
                 .expect("untrust all configs");
 
             assert_eq!(
-                service.list_trusted().expect("list trusted"),
+                service.trust_store().list().expect("list trusted"),
                 Vec::<std::path::PathBuf>::new()
             );
         }

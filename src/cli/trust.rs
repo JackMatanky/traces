@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use clap::{Args, Subcommand};
 
 use super::error::{CliError, CliResult};
-use crate::{ConfigService, TrustRequest};
+use crate::{TrustRequest, config::TrustStore};
 
 /// Arguments for `traces trust`.
 ///
@@ -40,12 +40,12 @@ impl Trust {
     ///
     /// - [`CliError`] if the dispatched trust action fails.
     #[inline]
-    pub(super) fn run(self, service: &ConfigService) -> CliResult {
+    pub(super) fn run(self, trust: &TrustStore) -> CliResult {
         match self.action {
-            Some(TrustAction::List) => Self::list(service),
-            Some(TrustAction::Clean) => Self::clean(service),
-            None if self.show => self.show(service),
-            None => self.trust(service),
+            Some(TrustAction::List) => Self::list(trust),
+            Some(TrustAction::Clean) => Self::clean(trust),
+            None if self.show => self.show(trust),
+            None => self.trust(trust),
         }
     }
 
@@ -59,9 +59,9 @@ impl Trust {
         reason = "trust list's output is data meant to be piped, not \
                   diagnostic text; see the print_stderr precedent this mirrors"
     )]
-    fn list(service: &ConfigService) -> CliResult {
+    fn list(trust: &TrustStore) -> CliResult {
         let roots: Vec<PathBuf> =
-            service.list_trusted().map_err(|source| CliError::TrustList {
+            trust.list().map_err(|source| CliError::TrustList {
                 source,
             })?;
         for root in &roots {
@@ -75,11 +75,9 @@ impl Trust {
     /// # Errors
     ///
     /// - [`CliError::TrustClean`] if cleaning the trust store fails.
-    fn clean(service: &ConfigService) -> CliResult {
-        let removed = service.clean_trusted_store().map_err(|source| {
-            CliError::TrustClean {
-                source,
-            }
+    fn clean(trust: &TrustStore) -> CliResult {
+        let removed = trust.clean().map_err(|source| CliError::TrustClean {
+            source,
         })?;
         match removed {
             1 => eprintln!("removed 1 stale trust entry"),
@@ -99,14 +97,14 @@ impl Trust {
         reason = "trust --show's output is data meant to be piped, not \
                   diagnostic text; see the print_stderr precedent this mirrors"
     )]
-    fn show(&self, service: &ConfigService) -> CliResult {
-        self.for_each_subject(service, |subject: TrustRequest| {
+    fn show(&self, trust: &TrustStore) -> CliResult {
+        self.for_each_subject(|subject: TrustRequest| {
             let root = subject.root_path().to_path_buf();
             let path = subject
                 .config_file()
                 .unwrap_or_else(|| subject.root_path())
                 .to_path_buf();
-            let state = service.trust_status(&subject).map_err(|source| {
+            let state = trust.trust_status(&subject).map_err(|source| {
                 CliError::TrustShow {
                     root,
                     source,
@@ -123,10 +121,10 @@ impl Trust {
     ///
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::Trust`] if updating the trust store fails.
-    fn trust(&self, service: &ConfigService) -> CliResult {
-        self.for_each_subject(service, |subject: TrustRequest| {
+    fn trust(&self, trust: &TrustStore) -> CliResult {
+        self.for_each_subject(|subject: TrustRequest| {
             let root = subject.root_path().to_path_buf();
-            if let Err(source) = service.trust(&subject) {
+            if let Err(source) = trust.trust(&subject) {
                 return Err(CliError::Trust {
                     root,
                     source,
@@ -147,14 +145,10 @@ impl Trust {
     /// - Any [`CliError`] returned by `visit`.
     fn for_each_subject(
         &self,
-        service: &ConfigService,
         mut visit: impl FnMut(TrustRequest) -> CliResult,
     ) -> CliResult {
-        let subjects = super::resolve_trust_subjects(
-            service,
-            self.path.as_deref(),
-            self.all,
-        )?;
+        let subjects =
+            super::resolve_trust_subjects(self.path.as_deref(), self.all)?;
         for subject in subjects {
             visit(subject)?;
         }
@@ -309,13 +303,17 @@ mod tests {
             let service = fixture_service(temp.path());
             let _guard = CwdGuard::enter(&cwd);
 
-            super::trust_args(None).run(&service).expect("trust cwd");
+            super::trust_args(None)
+                .run(service.trust_store())
+                .expect("trust cwd");
 
-            assert_eq!(service.list_trusted().expect("list trusted"), vec![
-                root.canonicalize().expect("canonicalize root")
-            ]);
+            assert_eq!(
+                service.trust_store().list().expect("list trusted"),
+                vec![root.canonicalize().expect("canonicalize root")]
+            );
             assert_eq!(
                 service
+                    .trust_store()
                     .trust_status(&TrustRequest::from(root.as_path()))
                     .expect("check trust"),
                 ConfigTrustStatus::Trusted
@@ -331,12 +329,13 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::trust_args(Some(config_file))
-                .run(&service)
+                .run(service.trust_store())
                 .expect("trust config file");
 
-            assert_eq!(service.list_trusted().expect("list trusted"), vec![
-                root.canonicalize().expect("canonicalize root")
-            ]);
+            assert_eq!(
+                service.trust_store().list().expect("list trusted"),
+                vec![root.canonicalize().expect("canonicalize root")]
+            );
         }
 
         #[test]
@@ -347,14 +346,16 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::trust_args(Some(root.clone()))
-                .run(&service)
+                .run(service.trust_store())
                 .expect("trust directory");
 
-            assert_eq!(service.list_trusted().expect("list trusted"), vec![
-                root.canonicalize().expect("canonicalize root")
-            ]);
+            assert_eq!(
+                service.trust_store().list().expect("list trusted"),
+                vec![root.canonicalize().expect("canonicalize root")]
+            );
             assert_eq!(
                 service
+                    .trust_store()
                     .trust_status(&TrustRequest::from(root.as_path()))
                     .expect("check trust"),
                 ConfigTrustStatus::Trusted
@@ -373,9 +374,12 @@ mod tests {
             let mut args = super::trust_args(Some(parent));
             args.all = true;
 
-            args.run(&service).expect("trust all configs");
+            args.run(service.trust_store()).expect("trust all configs");
 
-            assert_eq!(service.list_trusted().expect("list trusted").len(), 2);
+            assert_eq!(
+                service.trust_store().list().expect("list trusted").len(),
+                2
+            );
         }
     }
 
@@ -393,10 +397,10 @@ mod tests {
             let mut args = super::trust_args(Some(root));
             args.show = true;
 
-            args.run(&service).expect("show trust status");
+            args.run(service.trust_store()).expect("show trust status");
 
             assert_eq!(
-                service.list_trusted().expect("list trusted"),
+                service.trust_store().list().expect("list trusted"),
                 Vec::<std::path::PathBuf>::new()
             );
         }
@@ -411,7 +415,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::action_args(TrustAction::List)
-                .run(&service)
+                .run(service.trust_store())
                 .expect("list empty trust store");
         }
     }
@@ -427,16 +431,16 @@ mod tests {
             TestProject::empty(&root).write_file(".traces/config.toml", "");
             let service = fixture_service(temp.path());
             super::trust_args(Some(root.clone()))
-                .run(&service)
+                .run(service.trust_store())
                 .expect("trust root");
             fs::remove_dir_all(&root).expect("delete project dir");
 
             super::action_args(TrustAction::Clean)
-                .run(&service)
+                .run(service.trust_store())
                 .expect("clean trust store");
 
             assert_eq!(
-                service.list_trusted().expect("list trusted"),
+                service.trust_store().list().expect("list trusted"),
                 Vec::<std::path::PathBuf>::new()
             );
         }
@@ -447,7 +451,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::action_args(TrustAction::Clean)
-                .run(&service)
+                .run(service.trust_store())
                 .expect("clean empty trust store");
         }
     }
