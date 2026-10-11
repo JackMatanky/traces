@@ -75,7 +75,7 @@ impl Init {
                     )
                 });
         if let Err(error) = result {
-            Self::undo(&root, &created);
+            Self::undo(&created);
             return Err(error);
         }
         eprintln!("initialised traces in {}", root.display());
@@ -122,6 +122,11 @@ impl Init {
             root: root.to_path_buf(),
             source,
         };
+        if templates_dir.metadata().is_ok_and(|meta| !meta.is_dir()) {
+            return Err(scaffold_error(io::Error::from(
+                io::ErrorKind::NotADirectory,
+            )));
+        }
         let traces_dir = root.join(LOCAL_CONFIG_DIR);
         fs::create_dir(&traces_dir).map_err(scaffold_error)?;
         created.push(traces_dir);
@@ -157,12 +162,12 @@ impl Init {
         })
     }
 
-    /// Removes what a failed run created. Never recursive: a directory that
-    /// gained other content in the meantime is left alone.
-    fn undo(root: &Path, created: &[PathBuf]) {
-        // Best effort: the original error is the one worth reporting.
-        drop(fs::remove_file(root.join(LOCAL_CONFIG_FILE)));
+    /// Removes the directories a failed run created, newest first. Never
+    /// recursive: a directory that gained other content is left alone, which
+    /// also protects a config file this run did not create.
+    fn undo(created: &[PathBuf]) {
         for dir in created.iter().rev() {
+            // Best effort: the original error is the one worth reporting.
             drop(fs::remove_dir(dir));
         }
     }
@@ -225,16 +230,21 @@ fn scaffold_local(
             source,
         }
     })?;
-    let mut file = fs::File::create_new(root.join(LOCAL_CONFIG_FILE)).map_err(
-        |source| ConfigScaffoldError::Write {
-            source,
-        },
-    )?;
-    file.write_all(contents.as_bytes()).map_err(|source| {
+    let path = root.join(LOCAL_CONFIG_FILE);
+    let mut file = fs::File::create_new(&path).map_err(|source| {
         ConfigScaffoldError::Write {
             source,
         }
-    })
+    })?;
+    if let Err(source) = file.write_all(contents.as_bytes()) {
+        // `create_new` succeeded, so a half-written file is ours to remove.
+        drop(file);
+        drop(fs::remove_file(&path));
+        return Err(ConfigScaffoldError::Write {
+            source,
+        });
+    }
+    Ok(())
 }
 
 /// The user's chosen template/output directories, collected interactively.
@@ -404,32 +414,54 @@ mod tests {
         }
 
         /// A failure after `.traces` exists must not block a re-run.
-        #[cfg(unix)]
         #[test]
         fn cleans_up_after_a_mid_run_failure() {
-            use std::os::unix::fs::PermissionsExt;
-
             let root = tempfile::tempdir().expect("create temp dir");
-            let docs = root.path().join("docs");
-            fs::create_dir(&docs).expect("create docs dir");
-            fs::set_permissions(&docs, fs::Permissions::from_mode(0o555))
-                .expect("make docs read-only");
             let _guard = CwdGuard::enter(root.path());
+            // A parent that is a regular file lets `.traces` be created and
+            // the nested template directory fail, on any platform and user.
+            fs::write(root.path().join("docs"), "").expect("create blocker");
             let failing =
                 crate::PresetDialogProvider::new().with_text("docs/templates");
 
-            let result = Init.run(&failing);
+            let error = Init.run(&failing).expect_err("blocked parent fails");
 
-            fs::set_permissions(&docs, fs::Permissions::from_mode(0o755))
-                .expect("restore docs permissions");
-            let error = result.expect_err("read-only parent fails scaffold");
             assert!(matches!(error, CliError::InitScaffold { .. }));
             assert!(!root.path().join(".traces").exists());
+            fs::remove_file(root.path().join("docs")).expect("remove blocker");
             Init.run(
                 &crate::PresetDialogProvider::new().with_text("docs/templates"),
             )
             .expect("re-run succeeds after cleanup");
-            assert!(docs.join("templates").is_dir());
+            assert!(root.path().join("docs/templates").is_dir());
+        }
+
+        #[test]
+        fn rejects_a_template_directory_that_is_a_file_without_writing() {
+            let root = tempfile::tempdir().expect("create temp dir");
+            let _guard = CwdGuard::enter(root.path());
+            fs::write(root.path().join("templates"), "").expect("create file");
+            let provider =
+                crate::PresetDialogProvider::new().with_text("templates");
+
+            let error = Init.run(&provider).expect_err("a file is not a dir");
+
+            assert!(matches!(error, CliError::InitScaffold { .. }));
+            assert!(!root.path().join(".traces").exists());
+        }
+
+        #[test]
+        fn undo_leaves_a_config_file_it_did_not_create() {
+            let root = tempfile::tempdir().expect("create temp dir");
+            let traces = root.path().join(".traces");
+            fs::create_dir(&traces).expect("create .traces");
+            let foreign = root.path().join(LOCAL_CONFIG_FILE);
+            fs::write(&foreign, "planted").expect("plant config");
+
+            Init::undo(std::slice::from_ref(&traces));
+
+            assert_eq!(fs::read_to_string(&foreign).expect("read"), "planted");
+            assert!(traces.is_dir());
         }
 
         /// Existing initialization must not be overwritten.

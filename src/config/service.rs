@@ -182,7 +182,7 @@ impl ConfigService {
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Tracker`] when the trust store cannot remove the
+    /// - `ConfigTrustError::Tracker` when the trust store cannot remove the
     ///   root entry or its content-hash companion.
     #[inline]
     pub fn untrust(
@@ -216,34 +216,40 @@ impl ConfigService {
         path: &Path,
         scope: TrustScope,
     ) -> ConfigDiscoveryResult<TrustRequests> {
-        let start = canonical_or_given(path)?;
-        let locator = ConfigLocator::from_env();
-        if let Some(config) = LocalConfigFile::from_config_path(&start) {
-            return match scope {
-                TrustScope::NearestLocal => {
-                    Ok(vec![TrustRequest::from(&config)])
-                }
-                TrustScope::LocalSubtree => {
-                    Ok(config_requests(&locator.local_subtree(config.root())?))
-                }
-            };
-        }
-        let dir = if start.is_file() {
-            start.parent().unwrap_or(&start)
-        } else {
-            &start
-        };
-        match scope {
-            TrustScope::NearestLocal => match locator.nearest_local(dir) {
-                Ok(config) => Ok(vec![TrustRequest::from(&config)]),
-                Err(ConfigDiscoveryError::NotFound {
-                    ..
-                }) => Ok(vec![TrustRequest::from(dir)]),
-                Err(error) => Err(error),
-            },
+        resolve_trust_subjects(&ConfigLocator::from_env(), path, scope)
+    }
+}
+
+/// Resolves `path` against `locator`; see [`ConfigService::trust_subjects`].
+fn resolve_trust_subjects(
+    locator: &ConfigLocator,
+    path: &Path,
+    scope: TrustScope,
+) -> ConfigDiscoveryResult<TrustRequests> {
+    let start = canonical_or_given(path)?;
+    if let Some(config) = LocalConfigFile::from_config_path(&start) {
+        return match scope {
+            TrustScope::NearestLocal => Ok(vec![TrustRequest::from(&config)]),
             TrustScope::LocalSubtree => {
-                Ok(config_requests(&locator.local_subtree(dir)?))
+                Ok(config_requests(&locator.local_subtree(config.root())?))
             }
+        };
+    }
+    let dir = if start.is_file() {
+        start.parent().unwrap_or(&start)
+    } else {
+        &start
+    };
+    match scope {
+        TrustScope::NearestLocal => match locator.nearest_local(dir) {
+            Ok(config) => Ok(vec![TrustRequest::from(&config)]),
+            Err(ConfigDiscoveryError::NotFound {
+                ..
+            }) => Ok(vec![TrustRequest::from(dir)]),
+            Err(error) => Err(error),
+        },
+        TrustScope::LocalSubtree => {
+            Ok(config_requests(&locator.local_subtree(dir)?))
         }
     }
 }
@@ -334,6 +340,21 @@ mod tests {
                 .trust(&TrustRequest::from(&config))
                 .expect("trust candidate root");
         }
+
+        /// Locator confined to the fixture: the walk stops at the temp dir and
+        /// the global config lives inside it, so tests never see the machine's
+        /// real ancestors or user config.
+        fn locator(&self) -> ConfigLocator {
+            ConfigLocator::new(
+                vec![self.temp.path().to_path_buf()],
+                self.temp.path().join("global-home"),
+            )
+        }
+
+        /// `ConfigService::load` against [`Self::locator`].
+        fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
+            self.service.build(self.locator().project(cwd)?)
+        }
     }
 
     mod load {
@@ -348,7 +369,7 @@ mod tests {
             let cwd = fixture.target_dir("project/notes/daily");
 
             // Act
-            let result = fixture.service.load(&cwd);
+            let result = fixture.load(&cwd);
 
             // Assert
             assert!(matches!(
@@ -375,7 +396,7 @@ mod tests {
             fixture.trust_config(&config_path);
 
             // Act
-            let result = fixture.service.load(&cwd);
+            let result = fixture.load(&cwd);
 
             // Assert
             let config = result.expect("load trusted local config");
@@ -400,7 +421,7 @@ mod tests {
             fixture.trust_config(&config_path);
 
             // Act
-            let result = fixture.service.load(&cwd);
+            let result = fixture.load(&cwd);
 
             // Assert
             assert!(matches!(
@@ -633,7 +654,8 @@ mod tests {
             let project = fixture.target_dir("project");
             let config = Fixture::create_config(&project, "");
 
-            let requests = ConfigService::trust_subjects(
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
                 &project,
                 TrustScope::NearestLocal,
             )
@@ -647,7 +669,8 @@ mod tests {
             let fixture = Fixture::new();
             let project = fixture.target_dir("project");
 
-            let requests = ConfigService::trust_subjects(
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
                 &project,
                 TrustScope::NearestLocal,
             )
@@ -662,7 +685,8 @@ mod tests {
             let project = fixture.target_dir("project");
             let config = Fixture::create_config(&project, "");
 
-            let requests = ConfigService::trust_subjects(
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
                 &config,
                 TrustScope::NearestLocal,
             )
@@ -681,9 +705,12 @@ mod tests {
                 .expect("create notes");
             fs::write(&note, "").expect("write note");
 
-            let requests =
-                ConfigService::trust_subjects(&note, TrustScope::NearestLocal)
-                    .expect("resolve");
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
+                &note,
+                TrustScope::NearestLocal,
+            )
+            .expect("resolve");
 
             assert_eq!(requests, vec![config_request(&project, &config)]);
         }
@@ -696,7 +723,8 @@ mod tests {
             let parent_config = Fixture::create_config(&parent, "");
             let child_config = Fixture::create_config(&child, "");
 
-            let requests = ConfigService::trust_subjects(
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
                 &parent,
                 TrustScope::LocalSubtree,
             )
@@ -713,7 +741,8 @@ mod tests {
             let fixture = Fixture::new();
             let project = fixture.target_dir("project");
 
-            let result = ConfigService::trust_subjects(
+            let result = resolve_trust_subjects(
+                &fixture.locator(),
                 &project,
                 TrustScope::LocalSubtree,
             );
@@ -722,6 +751,43 @@ mod tests {
                 result,
                 Err(ConfigDiscoveryError::NotFound { .. })
             ));
+        }
+
+        #[test]
+        fn a_path_that_does_not_exist_yet_is_named_as_given() {
+            let fixture = Fixture::new();
+            let missing = fixture.temp.path().join("not/created/yet");
+
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
+                &missing,
+                TrustScope::NearestLocal,
+            )
+            .expect("resolve");
+
+            assert_eq!(requests, vec![TrustRequest::Root(missing)]);
+        }
+
+        #[test]
+        fn a_missing_config_path_scans_its_project_root_for_the_subtree() {
+            let fixture = Fixture::new();
+            let project = fixture.target_dir("project");
+            let child = fixture.target_dir("project/child");
+            let child_config = Fixture::create_config(&child, "");
+            let missing = project.join(".traces/config.toml");
+
+            let requests = resolve_trust_subjects(
+                &fixture.locator(),
+                &missing,
+                TrustScope::LocalSubtree,
+            )
+            .expect("resolve");
+
+            // The missing path cannot be canonicalized, so the scan keeps the
+            // given spelling of the root.
+            let expected =
+                TrustRequest::from(&Fixture::discovered_config(&child_config));
+            assert_eq!(requests, vec![expected]);
         }
     }
 }

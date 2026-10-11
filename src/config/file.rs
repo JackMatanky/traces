@@ -5,7 +5,8 @@
 //!
 //! # Lifecycle
 //!
-//! - [`Discovered`] means the path exists on disk but has not been trusted.
+//! - [`Discovered`] means a candidate path was found or derived; whether the
+//!   file exists is not checked until trust verification reads it.
 //! - [`Trusted`] carries local TOML content verified against a trust baseline
 //!   after the path was recorded in the best-effort tracker store.
 //! - [`Parsed`] carries TOML decoded into [`RawConfig`].
@@ -218,11 +219,15 @@ impl LocalConfigFile<Discovered> {
                     content,
                 }))
             }
-            other => Err(ConfigTrustError::Untrusted {
-                root: self.root,
-                path: self.path,
-                status: other.status(),
-            }),
+            other @ (ConfigTrustCheck::Untrusted
+            | ConfigTrustCheck::Stale
+            | ConfigTrustCheck::MissingBaseline) => {
+                Err(ConfigTrustError::Untrusted {
+                    root: self.root,
+                    path: self.path,
+                    status: other.status(),
+                })
+            }
         }
     }
 }

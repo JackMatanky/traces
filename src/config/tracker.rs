@@ -8,8 +8,9 @@ use std::path::{Path, PathBuf};
 use super::error::ConfigTrustError;
 use crate::{CleanMode, FilePathTracker, dirs};
 
-/// Best-effort registry of local config files observed during config loading,
-/// kept separate from [`super::trust::TrustStore`]'s trust decisions.
+/// Registry of local config files observed by config loading and trust
+/// grants: best-effort on load, required on grant. Kept separate from
+/// [`super::trust::TrustStore`]'s trust decisions.
 #[derive(Clone, Debug)]
 pub(crate) struct TrackerStore {
     store: FilePathTracker,
@@ -152,6 +153,18 @@ mod tests {
 
             assert_eq!(fixture.store.list().expect("list").len(), 1);
         }
+
+        #[test]
+        fn reports_a_missing_path() {
+            let fixture = Fixture::new();
+
+            let error = fixture
+                .store
+                .record(Path::new("/nonexistent/x"))
+                .expect_err("missing path cannot be recorded");
+
+            assert!(matches!(error, ConfigTrustError::Tracker(_)));
+        }
     }
 
     mod record_best_effort {
@@ -169,18 +182,6 @@ mod tests {
                 fixture.store.list().expect("list"),
                 Vec::<PathBuf>::new()
             );
-        }
-
-        #[test]
-        fn record_reports_a_missing_path() {
-            let fixture = Fixture::new();
-
-            let error = fixture
-                .store
-                .record(Path::new("/nonexistent/x"))
-                .expect_err("missing path cannot be recorded");
-
-            assert!(matches!(error, ConfigTrustError::Tracker(_)));
         }
     }
 

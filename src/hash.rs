@@ -14,7 +14,7 @@ use std::{
 use thiserror::Error;
 
 /// Stores a BLAKE3 digest: of file contents ([`Self::from_path`],
-/// `From<&str>`) or of structured values built with [`Blake3Hasher`].
+/// `From<&str>`) or of structured values built with `Blake3Hasher`.
 ///
 /// Prefer hashing already-loaded content when the caller has it. Hashing a path
 /// and then reading the same path again creates a time-of-check to time-of-use
@@ -56,7 +56,14 @@ impl Blake3Digest {
     }
 }
 
-/// Incremental, injective encoder behind structured fingerprints.
+impl Display for Blake3Digest {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Incremental, injective encoder behind structured digests.
 ///
 /// Every field is length-prefixed with a little-endian `u64`, so no value, even
 /// one containing delimiter bytes, can be re-read as a different field split.
@@ -67,7 +74,7 @@ impl Blake3Digest {
 pub(crate) struct Blake3Hasher(blake3::Hasher);
 
 impl Blake3Hasher {
-    /// Starts an empty fingerprint.
+    /// Starts an empty hasher.
     #[must_use]
     pub(crate) fn new() -> Self {
         Self(blake3::Hasher::new())
@@ -105,17 +112,10 @@ impl Blake3Hasher {
         }
     }
 
-    /// Finalizes the fingerprint into a digest.
+    /// Finalizes the hasher into a digest.
     #[must_use]
     pub(crate) fn finish(self) -> Blake3Digest {
         Blake3Digest(self.0.finalize())
-    }
-}
-
-impl Display for Blake3Digest {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 

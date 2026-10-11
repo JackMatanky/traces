@@ -326,13 +326,17 @@ mod tests {
                 TestProject::empty(&root).write_file(".traces/config.toml", "");
             let service = fixture_service(temp.path());
 
-            super::trust_args(Some(config_file))
+            super::trust_args(Some(config_file.clone()))
                 .run(&service)
                 .expect("trust config file");
 
             assert_eq!(
                 service.trust_store().list().expect("list trusted"),
                 vec![root.canonicalize().expect("canonicalize root")]
+            );
+            assert_eq!(
+                service.tracker_store().list().expect("list tracked"),
+                vec![config_file.canonicalize().expect("canonicalize config")]
             );
         }
 

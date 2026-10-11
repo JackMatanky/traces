@@ -135,7 +135,6 @@ impl ConfigLocator {
             local.push(self.nearest_local(dir)?);
         }
         local.sort_by(|left, right| left.root().cmp(right.root()));
-        local.dedup_by(|left, right| left.root() == right.root());
         Ok(local)
     }
 }
