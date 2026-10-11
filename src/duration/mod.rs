@@ -15,10 +15,12 @@
 //!   with [`Ord`], [`Add`], [`Sub`], and [`Mul`].
 //! - [`DurationError`] - Error type for parse and conversion failures.
 
+mod error;
 mod scan;
 mod unit;
 mod value;
 
+pub use error::DurationError;
 pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
+pub use value::DurationValue;
 pub(crate) use value::{DurationComponent, DurationSeconds};
-pub use value::{DurationError, DurationValue};

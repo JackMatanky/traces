@@ -32,14 +32,16 @@
 //! arithmetic.
 
 mod calendar;
+mod error;
 mod parse;
 mod value;
 
 pub(crate) use calendar::{
     DateComponent, Difference, Edge, Period, weekday_from_number,
 };
+pub use error::DateError;
 pub(crate) use value::{CivilPrecision, DATE_PATTERN, DATETIME_PATTERN, Point};
-pub use value::{DateError, DateTimeValue, DateValue};
+pub use value::{DateTimeValue, DateValue};
 
 #[cfg(test)]
 mod fixtures {

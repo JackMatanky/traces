@@ -257,7 +257,9 @@ src/date/calendar.rs: pub(crate) fn shift(
 src/date/calendar.rs: pub(crate) fn start_of(self, period: Period) -> Result<Self, DateError> {
 src/date/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/date/calendar.rs: pub(crate) fn with_weekday(
-src/date/mod.rs: pub use value::{DateError, DateTimeValue, DateValue};
+src/date/error.rs: pub enum DateError {
+src/date/mod.rs: pub use error::DateError;
+src/date/mod.rs: pub use value::{DateTimeValue, DateValue};
 src/date/mod.rs: pub(crate) use calendar::{
 src/date/mod.rs: pub(crate) use value::{CivilPrecision, DATE_PATTERN, DATETIME_PATTERN, Point};
 src/date/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
@@ -274,7 +276,6 @@ src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
 src/date/parse.rs: pub(crate) fn parse_with_pattern(
-src/date/value.rs: pub enum DateError {
 src/date/value.rs: pub struct DateTimeValue(pub(super) DateTime<Utc>);
 src/date/value.rs: pub struct DateValue(pub(super) NaiveDate);
 src/date/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
@@ -338,7 +339,9 @@ src/dirtree.rs: pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
 src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
 src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 src/dirtree.rs: pub(crate) struct DirTree {
-src/duration/mod.rs: pub use value::{DurationError, DurationValue};
+src/duration/error.rs: pub enum DurationError {
+src/duration/mod.rs: pub use error::DurationError;
+src/duration/mod.rs: pub use value::DurationValue;
 src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 src/duration/mod.rs: pub(crate) use value::{DurationComponent, DurationSeconds};
 src/duration/scan.rs: pub(super) enum ScanMode {
@@ -360,7 +363,6 @@ src/duration/unit.rs: pub(crate) const fn spelling(self) -> &'static str {
 src/duration/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
 src/duration/unit.rs: pub(crate) enum DurationUnit {
 src/duration/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
-src/duration/value.rs: pub enum DurationError {
 src/duration/value.rs: pub struct DurationValue {
 src/duration/value.rs: pub(crate) const fn as_f64(self) -> f64 {
 src/duration/value.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {

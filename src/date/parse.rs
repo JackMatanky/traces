@@ -1,8 +1,11 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
-use super::value::{
-    CivilPrecision, DATE_PATTERN, DateError, DateTimeValue, DateValue, Point,
-    resolve_local,
+use super::{
+    error::DateError,
+    value::{
+        CivilPrecision, DATE_PATTERN, DateTimeValue, DateValue, Point,
+        resolve_local,
+    },
 };
 
 /// Returns `true` if `bytes` begins with a date-like prefix.

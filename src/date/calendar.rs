@@ -4,7 +4,10 @@ use chrono::{
 };
 use num_traits::ToPrimitive as _;
 
-use super::value::{DateError, DateTimeValue, DateValue, Point, resolve_local};
+use super::{
+    error::DateError,
+    value::{DateTimeValue, DateValue, Point, resolve_local},
+};
 use crate::duration::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
 };

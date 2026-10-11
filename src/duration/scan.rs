@@ -1,6 +1,5 @@
 use super::{
-    unit::DurationUnit,
-    value::{DurationComponent, DurationError},
+    error::DurationError, unit::DurationUnit, value::DurationComponent,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
