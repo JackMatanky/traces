@@ -36,7 +36,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{DateTimeValue, DateValue, date::Point};
+use crate::{DateTimeValue, DateValue, date::DatePoint};
 
 /// Stores an exact schema field identifier.
 ///
@@ -827,9 +827,9 @@ impl<'a> FieldStringValue<'a> {
         coercion: DateTimeCoercion,
     ) -> FieldValueRef<'a> {
         if coercion == DateTimeCoercion::Classify {
-            return match Point::parse(&self.0) {
-                Ok(Point::Instant(dt)) => FieldValueRef::DateTime(dt),
-                Ok(Point::Civil {
+            return match DatePoint::parse(&self.0) {
+                Ok(DatePoint::Instant(dt)) => FieldValueRef::DateTime(dt),
+                Ok(DatePoint::Civil {
                     date,
                     ..
                 }) => FieldValueRef::Date(date),

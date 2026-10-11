@@ -8,7 +8,7 @@ use logos::{Filter, Lexer, Logos};
 use super::{FlushedMetadata, inline::parse_inline_value};
 use crate::{
     DelimiterType, FieldKey, Spanned, Tag, TaskDate, TaskDateType,
-    TaskPriority, date::Point, note::NoteFieldValue,
+    TaskPriority, date::DatePoint, note::NoteFieldValue,
 };
 
 /// Extracts inline fields from `text` in document order.
@@ -241,7 +241,7 @@ fn task_date_callback(
         .find(|&(_, ch)| !matches!(ch, ' ' | '\t'))
         .map_or(remainder.len(), |(offset, _)| offset);
     let after_ws = remainder.get(ws_end..).unwrap_or_default();
-    let Some((rec, consumed)) = Point::parse_prefix(after_ws) else {
+    let Some((rec, consumed)) = DatePoint::parse_prefix(after_ws) else {
         return Filter::Skip;
     };
     if after_ws

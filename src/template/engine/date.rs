@@ -16,7 +16,7 @@
 //!   built-in `format` filter.
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
-//! Date/time string parsing funnels through [`Point::parse`] via
+//! Date/time string parsing funnels through [`DatePoint::parse`] via
 //! [`parse_wall`]. A full datetime is tried first, falling back to a bare ISO
 //! date (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) at midnight. Arithmetic
 //! filters re-serialize at the input's original precision via the calendar
@@ -45,8 +45,8 @@ use crate::{
     DATE_PATTERN, DateTimeValue, DurationSeconds, DurationUnit, DurationValue,
     UNIT_SPELLINGS_HINT,
     date::{
-        CivilPrecision, DateComponent, DateError, Difference, Edge, Period,
-        Point, weekday_from_number,
+        CalendarPeriod, DateComponent, DateError, DatePoint, DatePrecision,
+        Difference, PeriodEdge, weekday_from_number,
     },
 };
 
@@ -116,14 +116,14 @@ impl DateNamespace {
     }
 }
 
-fn now_point() -> Point {
-    Point::Instant(DateTimeValue::from(Utc::now()))
+fn now_point() -> DatePoint {
+    DatePoint::Instant(DateTimeValue::from(Utc::now()))
 }
 
-fn today_point() -> Point {
-    Point::Civil {
+fn today_point() -> DatePoint {
+    DatePoint::Civil {
         date: now_point().date(),
-        precision: CivilPrecision::Day,
+        precision: DatePrecision::Day,
     }
 }
 
@@ -277,9 +277,9 @@ fn scan_iso_components<'a>(
 }
 
 fn apply_offset(
-    point: Point,
+    point: DatePoint,
     offset_val: &Value,
-) -> TemplateEngineResult<Point> {
+) -> TemplateEngineResult<DatePoint> {
     if let Some(n) = offset_val.as_i64() {
         return point.shift(n, DurationUnit::Day).map_err(render_date_error);
     }
@@ -307,14 +307,14 @@ enum Anchor {
     Today,
     Tomorrow,
     Yesterday,
-    StartOf(Period),
-    EndOf(Period),
+    StartOf(CalendarPeriod),
+    EndOf(CalendarPeriod),
     Weekday(chrono::Weekday),
 }
 
 impl Anchor {
     /// The point a shorthand starts from when no reference is given.
-    fn base(self) -> Point {
+    fn base(self) -> DatePoint {
         match self {
             Self::Now => now_point(),
             Self::Today
@@ -327,7 +327,7 @@ impl Anchor {
     }
 
     /// Moves `point` as this anchor requires.
-    fn transform(self, point: Point) -> Result<Point, DateError> {
+    fn transform(self, point: DatePoint) -> Result<DatePoint, DateError> {
         match self {
             Self::Now | Self::Today => Ok(point),
             Self::Tomorrow => point.shift(1, DurationUnit::Day),
@@ -362,7 +362,7 @@ fn resolve_anchor(
 
     let mut point = if let Some(ref_text) = reference {
         if let Some(ref_fmt) = reference_format {
-            Point::parse_with_pattern(ref_text, ref_fmt)
+            DatePoint::parse_with_pattern(ref_text, ref_fmt)
                 .map_err(render_date_error)?
         } else {
             parse_point(ref_text)?
@@ -424,22 +424,22 @@ impl Object for DateNamespace {
             "tomorrow" => Some(shorthand(Anchor::Tomorrow)),
             "yesterday" => Some(shorthand(Anchor::Yesterday)),
             "start_of_week" | "sow" => {
-                Some(shorthand(Anchor::StartOf(Period::Week)))
+                Some(shorthand(Anchor::StartOf(CalendarPeriod::Week)))
             }
             "end_of_week" | "eow" => {
-                Some(shorthand(Anchor::EndOf(Period::Week)))
+                Some(shorthand(Anchor::EndOf(CalendarPeriod::Week)))
             }
             "start_of_month" | "som" => {
-                Some(shorthand(Anchor::StartOf(Period::Month)))
+                Some(shorthand(Anchor::StartOf(CalendarPeriod::Month)))
             }
             "end_of_month" | "eom" => {
-                Some(shorthand(Anchor::EndOf(Period::Month)))
+                Some(shorthand(Anchor::EndOf(CalendarPeriod::Month)))
             }
             "start_of_year" | "soy" => {
-                Some(shorthand(Anchor::StartOf(Period::Year)))
+                Some(shorthand(Anchor::StartOf(CalendarPeriod::Year)))
             }
             "end_of_year" | "eoy" => {
-                Some(shorthand(Anchor::EndOf(Period::Year)))
+                Some(shorthand(Anchor::EndOf(CalendarPeriod::Year)))
             }
             "weekday" => Some(Value::from_function(
                 |n: i64,
@@ -487,12 +487,12 @@ impl Object for DateNamespace {
     }
 }
 
-/// Parses `s` as a date or date-time expression via [`Point::parse`].
+/// Parses `s` as a date or date-time expression via [`DatePoint::parse`].
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
 /// the full parse-failure chain.
-fn parse_point(s: &str) -> TemplateEngineResult<Point> {
-    Point::parse(s)
+fn parse_point(s: &str) -> TemplateEngineResult<DatePoint> {
+    DatePoint::parse(s)
         .map_err(|err| invalid_operation(format!("invalid date {s:?}"), err))
 }
 
@@ -569,7 +569,7 @@ fn render_with_pattern(
 /// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
 ///   string.
 fn parse_wall(s: &str) -> Result<NaiveDateTime, Error> {
-    parse_point(s).map(Point::wall)
+    parse_point(s).map(DatePoint::wall)
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -781,13 +781,13 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 /// precision.
 fn edge_of_period(
     value: &str,
-    period: Period,
-    edge: Edge,
+    period: CalendarPeriod,
+    edge: PeriodEdge,
 ) -> TemplateEngineResult<String> {
     let point = parse_point(value)?;
     let shifted = match edge {
-        Edge::Start => point.start_of(period),
-        Edge::End => point.end_of(period),
+        PeriodEdge::Start => point.start_of(period),
+        PeriodEdge::End => point.end_of(period),
     }
     .map_err(render_date_error)?;
     let wall = shifted.wall();
@@ -796,19 +796,19 @@ fn edge_of_period(
 }
 
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, Period::Week, Edge::Start)
+    edge_of_period(value, CalendarPeriod::Week, PeriodEdge::Start)
 }
 
 fn end_of_week(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, Period::Week, Edge::End)
+    edge_of_period(value, CalendarPeriod::Week, PeriodEdge::End)
 }
 
 fn start_of_year(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, Period::Year, Edge::Start)
+    edge_of_period(value, CalendarPeriod::Year, PeriodEdge::Start)
 }
 
 fn end_of_year(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, Period::Year, Edge::End)
+    edge_of_period(value, CalendarPeriod::Year, PeriodEdge::End)
 }
 
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
@@ -876,11 +876,12 @@ fn date_sub(
 
 /// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration
 /// semantics per `unit`.
-/// - Inputs with a time component ([`Point::Instant`]) shift calendar units on
-///   the local wall clock (preserving wall-clock hour across DST) and sub-day
-///   units exactly on the instant.
-/// - Civil inputs ([`Point::Civil`]) shift entirely on the civil wall clock.
-///   Sub-day shifts on date-only inputs leave the calendar day unchanged.
+/// - Inputs with a time component ([`DatePoint::Instant`]) shift calendar units
+///   on the local wall clock (preserving wall-clock hour across DST) and
+///   sub-day units exactly on the instant.
+/// - Civil inputs ([`DatePoint::Civil`]) shift entirely on the civil wall
+///   clock. Sub-day shifts on date-only inputs leave the calendar day
+///   unchanged.
 ///
 /// # Errors
 ///
@@ -980,7 +981,7 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if the first day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn start_of_month(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, Period::Month, Edge::Start)
+    edge_of_period(value, CalendarPeriod::Month, PeriodEdge::Start)
 }
 
 /// `{{ value | end_of_month }}` returns the last day of the input month.
@@ -992,7 +993,7 @@ fn start_of_month(value: &str) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if the last day of the month is outside
 ///   chrono's representable range; see [`date_out_of_range_error`].
 fn end_of_month(value: &str) -> TemplateEngineResult<String> {
-    edge_of_period(value, Period::Month, Edge::End)
+    edge_of_period(value, CalendarPeriod::Month, PeriodEdge::End)
 }
 
 /// `{{ value | weekday }}` returns the ISO weekday number: `1` for Monday

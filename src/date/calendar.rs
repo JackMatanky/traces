@@ -6,7 +6,7 @@ use num_traits::ToPrimitive as _;
 
 use super::{
     error::DateError,
-    value::{DateTimeValue, DateValue, Point, resolve_local},
+    value::{DatePoint, DateTimeValue, DateValue, resolve_local},
 };
 use crate::duration::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
@@ -34,7 +34,7 @@ impl DateTimeValue {
 
 /// Calendar period used for date boundaries.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Period {
+pub(crate) enum CalendarPeriod {
     Week,
     Month,
     Year,
@@ -42,12 +42,12 @@ pub(crate) enum Period {
 
 /// Which side of a calendar period to select.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Edge {
+pub(crate) enum PeriodEdge {
     Start,
     End,
 }
 
-/// A named calendar or clock component of a [`Point`].
+/// A named calendar or clock component of a [`DatePoint`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateComponent {
     Year,
@@ -99,7 +99,7 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
     }
 }
 
-impl Point {
+impl DatePoint {
     /// Shifts a civil date without zone resolution or an instant in its own
     /// frame.
     ///
@@ -232,30 +232,36 @@ impl Point {
         }
     }
 
-    fn boundary(self, period: Period, edge: Edge) -> Result<Self, DateError> {
+    fn boundary(
+        self,
+        period: CalendarPeriod,
+        edge: PeriodEdge,
+    ) -> Result<Self, DateError> {
         let date = self.wall().date();
         let new_date = match (period, edge) {
-            (Period::Week, edge) => {
+            (CalendarPeriod::Week, edge) => {
                 let iso = date.iso_week();
                 NaiveDate::from_isoywd_opt(
                     iso.year(),
                     iso.week(),
-                    if edge == Edge::Start {
+                    if edge == PeriodEdge::Start {
                         Weekday::Mon
                     } else {
                         Weekday::Sun
                     },
                 )
             }
-            (Period::Month, edge) => date.with_day(if edge == Edge::Start {
-                1
-            } else {
-                u32::from(date.num_days_in_month())
-            }),
-            (Period::Year, Edge::Start) => {
+            (CalendarPeriod::Month, edge) => {
+                date.with_day(if edge == PeriodEdge::Start {
+                    1
+                } else {
+                    u32::from(date.num_days_in_month())
+                })
+            }
+            (CalendarPeriod::Year, PeriodEdge::Start) => {
                 NaiveDate::from_ymd_opt(date.year(), 1, 1)
             }
-            (Period::Year, Edge::End) => {
+            (CalendarPeriod::Year, PeriodEdge::End) => {
                 NaiveDate::from_ymd_opt(date.year(), 12, 31)
             }
         }
@@ -269,8 +275,11 @@ impl Point {
     /// # Errors
     ///
     /// Returns out-of-range or local-zone resolution errors.
-    pub(crate) fn start_of(self, period: Period) -> Result<Self, DateError> {
-        self.boundary(period, Edge::Start)
+    pub(crate) fn start_of(
+        self,
+        period: CalendarPeriod,
+    ) -> Result<Self, DateError> {
+        self.boundary(period, PeriodEdge::Start)
     }
 
     /// Returns the last day of the period, preserving written precision and
@@ -279,8 +288,11 @@ impl Point {
     /// # Errors
     ///
     /// Returns out-of-range or local-zone resolution errors.
-    pub(crate) fn end_of(self, period: Period) -> Result<Self, DateError> {
-        self.boundary(period, Edge::End)
+    pub(crate) fn end_of(
+        self,
+        period: CalendarPeriod,
+    ) -> Result<Self, DateError> {
+        self.boundary(period, PeriodEdge::End)
     }
 
     /// Selects a weekday of this point's ISO week.
@@ -411,7 +423,7 @@ impl Difference {
 
 /// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from
 /// nanoseconds (the fraction rounded to the nearest nanosecond) and rejecting
-/// overflow of either component for `Point::apply`.
+/// overflow of either component for `DatePoint::apply`.
 fn time_delta_from_seconds(part_secs: f64) -> Result<TimeDelta, DateError> {
     let ds = DurationSeconds::try_from(part_secs)
         .map_err(|_| DateError::OutOfRange)?;
@@ -563,12 +575,12 @@ mod tests {
 
     use super::*;
     use crate::{
-        date::{CivilPrecision, fixtures::fixed_datetime},
+        date::{DatePrecision, fixtures::fixed_datetime},
         test_support::TzGuard,
     };
 
-    fn point(text: &str) -> Point {
-        Point::parse(text).expect("valid point")
+    fn point(text: &str) -> DatePoint {
+        DatePoint::parse(text).expect("valid point")
     }
 
     mod calendar_owner {
@@ -579,12 +591,12 @@ mod tests {
 
         #[test]
         fn apply_advances_the_instant_by_the_duration() {
-            let base = Point::Instant(fixed_datetime());
+            let base = DatePoint::Instant(fixed_datetime());
             let one_hour = DurationValue::parse("1h").expect("valid duration");
             let forward = base.apply(&one_hour).expect("no overflow");
             assert_eq!(
                 forward,
-                Point::Instant(DateTimeValue(
+                DatePoint::Instant(DateTimeValue(
                     base.instant() + TimeDelta::hours(1)
                 ))
             );
@@ -592,12 +604,12 @@ mod tests {
 
         #[test]
         fn apply_rewinds_the_instant_by_negated_duration() {
-            let base = Point::Instant(fixed_datetime());
+            let base = DatePoint::Instant(fixed_datetime());
             let one_hour = DurationValue::parse("1h").expect("valid duration");
             let back = base.apply(&(one_hour * -1.0)).expect("no overflow");
             assert_eq!(
                 back,
-                Point::Instant(DateTimeValue(
+                DatePoint::Instant(DateTimeValue(
                     base.instant() - TimeDelta::hours(1)
                 ))
             );
@@ -606,7 +618,7 @@ mod tests {
         #[test]
         fn overflows_near_the_representable_range_in_apply() {
             let near_max =
-                Point::Instant(DateTimeValue(DateTime::<Utc>::MAX_UTC));
+                DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MAX_UTC));
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
             assert_eq!(near_max.apply(&one_second).ok(), None);
@@ -615,7 +627,7 @@ mod tests {
         #[test]
         fn underflows_near_the_representable_range_in_apply() {
             let near_min =
-                Point::Instant(DateTimeValue(DateTime::<Utc>::MIN_UTC));
+                DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MIN_UTC));
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
             assert_eq!(near_min.apply(&(one_second * -1.0)).ok(), None);
@@ -977,10 +989,10 @@ mod tests {
             // Arrange
             TzGuard::set("UTC");
             let instant =
-                Point::Instant(DateTimeValue(DateTime::<Utc>::MAX_UTC));
-            let date = Point::Civil {
+                DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MAX_UTC));
+            let date = DatePoint::Civil {
                 date: DateValue::from(NaiveDate::MAX),
-                precision: CivilPrecision::Day,
+                precision: DatePrecision::Day,
             };
 
             // Act
@@ -1017,8 +1029,8 @@ mod tests {
         #[test]
         fn week_boundary_returns_iso_monday_spanning_month_boundaries() {
             let pt = point("2026-02-01");
-            let sow = pt.start_of(Period::Week).expect("sow");
-            let eow = pt.end_of(Period::Week).expect("eow");
+            let sow = pt.start_of(CalendarPeriod::Week).expect("sow");
+            let eow = pt.end_of(CalendarPeriod::Week).expect("eow");
             assert_eq!(
                 sow.wall().date(),
                 DateValue::parse_iso("2026-01-26").unwrap().naive_date()
@@ -1032,8 +1044,8 @@ mod tests {
         #[test]
         fn year_boundary_returns_first_and_last_day_of_year() {
             let pt = point("2026-07-29");
-            let soy = pt.start_of(Period::Year).expect("soy");
-            let eoy = pt.end_of(Period::Year).expect("eoy");
+            let soy = pt.start_of(CalendarPeriod::Year).expect("soy");
+            let eoy = pt.end_of(CalendarPeriod::Year).expect("eoy");
             assert_eq!(
                 soy.wall().date(),
                 DateValue::parse_iso("2026-01-01").unwrap().naive_date()

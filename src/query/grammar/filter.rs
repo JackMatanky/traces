@@ -25,7 +25,9 @@ use super::{
 use crate::{
     DurationSeconds, DurationUnit, DurationValue, LexError, NoteFieldValue,
     NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec,
-    date::{CivilPrecision, DateComponent, DateError, Period, Point},
+    date::{
+        CalendarPeriod, DateComponent, DateError, DatePoint, DatePrecision,
+    },
     lexical_unquote,
     query::{
         QueryRow,
@@ -229,9 +231,9 @@ pub(crate) enum QueryFunction {
     /// `date_component(date, name)`.
     DateComponent,
     /// First day of a period (`sow`, `som`, `soy` and long spellings).
-    StartOf(Period),
+    StartOf(CalendarPeriod),
     /// Last day of a period (`eow`, `eom`, `eoy` and long spellings).
-    EndOf(Period),
+    EndOf(CalendarPeriod),
     /// `date(text[, pattern])`: date literal conversion.
     Date,
 }
@@ -243,18 +245,18 @@ impl QueryFunction {
         ("date_diff", Self::DateDiff),
         ("date_component", Self::DateComponent),
         ("date", Self::Date),
-        ("sow", Self::StartOf(Period::Week)),
-        ("start_of_week", Self::StartOf(Period::Week)),
-        ("eow", Self::EndOf(Period::Week)),
-        ("end_of_week", Self::EndOf(Period::Week)),
-        ("som", Self::StartOf(Period::Month)),
-        ("start_of_month", Self::StartOf(Period::Month)),
-        ("eom", Self::EndOf(Period::Month)),
-        ("end_of_month", Self::EndOf(Period::Month)),
-        ("soy", Self::StartOf(Period::Year)),
-        ("start_of_year", Self::StartOf(Period::Year)),
-        ("eoy", Self::EndOf(Period::Year)),
-        ("end_of_year", Self::EndOf(Period::Year)),
+        ("sow", Self::StartOf(CalendarPeriod::Week)),
+        ("start_of_week", Self::StartOf(CalendarPeriod::Week)),
+        ("eow", Self::EndOf(CalendarPeriod::Week)),
+        ("end_of_week", Self::EndOf(CalendarPeriod::Week)),
+        ("som", Self::StartOf(CalendarPeriod::Month)),
+        ("start_of_month", Self::StartOf(CalendarPeriod::Month)),
+        ("eom", Self::EndOf(CalendarPeriod::Month)),
+        ("end_of_month", Self::EndOf(CalendarPeriod::Month)),
+        ("soy", Self::StartOf(CalendarPeriod::Year)),
+        ("start_of_year", Self::StartOf(CalendarPeriod::Year)),
+        ("eoy", Self::EndOf(CalendarPeriod::Year)),
+        ("end_of_year", Self::EndOf(CalendarPeriod::Year)),
     ];
 
     /// Resolves a function name, ASCII case-insensitively.
@@ -324,24 +326,26 @@ impl ValueExpr {
     }
 }
 
-fn point_of(value: &NoteFieldValue) -> Option<Point> {
+fn point_of(value: &NoteFieldValue) -> Option<DatePoint> {
     match value {
-        NoteFieldValue::Date(date) => Some(Point::Civil {
+        NoteFieldValue::Date(date) => Some(DatePoint::Civil {
             date: *date,
-            precision: CivilPrecision::Day,
+            precision: DatePrecision::Day,
         }),
-        NoteFieldValue::DateTime(datetime) => Some(Point::Instant(*datetime)),
+        NoteFieldValue::DateTime(datetime) => {
+            Some(DatePoint::Instant(*datetime))
+        }
         _ => None,
     }
 }
 
-fn field_value_of(point: Point) -> NoteFieldValue {
+fn field_value_of(point: DatePoint) -> NoteFieldValue {
     match point {
-        Point::Civil {
+        DatePoint::Civil {
             date,
             ..
         } => NoteFieldValue::Date(date),
-        Point::Instant(datetime) => NoteFieldValue::DateTime(datetime),
+        DatePoint::Instant(datetime) => NoteFieldValue::DateTime(datetime),
     }
 }
 
@@ -495,10 +499,10 @@ fn evaluate_date(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
             Some(NoteFieldValue::DateTime(*dt))
         }
         [NoteFieldValue::String(s)] => {
-            Some(field_value_of(Point::parse(s).ok()?))
+            Some(field_value_of(DatePoint::parse(s).ok()?))
         }
         [NoteFieldValue::String(s), NoteFieldValue::String(fmt)] => {
-            Some(field_value_of(Point::parse_with_pattern(s, fmt).ok()?))
+            Some(field_value_of(DatePoint::parse_with_pattern(s, fmt).ok()?))
         }
         [NoteFieldValue::Null] | [NoteFieldValue::Null, _] => {
             Some(NoteFieldValue::Null)
@@ -509,7 +513,7 @@ fn evaluate_date(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
 
 fn date_boundary(
     args: &[NoteFieldValue],
-    op: impl FnOnce(Point) -> Result<Point, DateError>,
+    op: impl FnOnce(DatePoint) -> Result<DatePoint, DateError>,
 ) -> Option<NoteFieldValue> {
     let date = args.first()?;
     if matches!(date, NoteFieldValue::Null) {

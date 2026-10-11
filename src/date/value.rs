@@ -16,7 +16,7 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Calendar precision of a zone-free point.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum CivilPrecision {
+pub(crate) enum DatePrecision {
     /// Year and month.
     Month,
     /// Full calendar date.
@@ -25,17 +25,17 @@ pub(crate) enum CivilPrecision {
 
 /// A parsed date or date-time at the precision it was written.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Point {
+pub(crate) enum DatePoint {
     /// Zone-free calendar date.
     Civil {
         date: DateValue,
-        precision: CivilPrecision,
+        precision: DatePrecision,
     },
     /// UTC instant.
     Instant(DateTimeValue),
 }
 
-impl Point {
+impl DatePoint {
     /// Whether this point carries a time-of-day component.
     #[must_use]
     pub(crate) const fn has_time(self) -> bool {
@@ -84,11 +84,11 @@ impl Point {
         use chrono::Timelike as _;
         match self {
             Self::Civil {
-                precision: CivilPrecision::Month,
+                precision: DatePrecision::Month,
                 ..
             } => "%Y-%m",
             Self::Civil {
-                precision: CivilPrecision::Day,
+                precision: DatePrecision::Day,
                 ..
             } => DATE_PATTERN,
             Self::Instant(_) if self.wall().nanosecond() == 0 => {
@@ -102,8 +102,8 @@ impl Point {
 /// A calendar date without timezone or time-of-day ([`NaiveDate`]).
 ///
 /// Wraps a [`NaiveDate`] representing a civil calendar date (`YYYY-MM-DD` or
-/// `YYYY-MM`). Parsed input keeps precision in `Point`; deserialization uses
-/// the same strict date parser.
+/// `YYYY-MM`). Parsed input keeps precision in `DatePoint`; deserialization
+/// uses the same strict date parser.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DateValue(pub(super) NaiveDate);
@@ -653,9 +653,11 @@ mod tests {
         #[test]
         fn has_time_only_for_instants() {
             TzGuard::set("UTC");
-            assert!(!Point::parse("2026-07").unwrap().has_time());
-            assert!(!Point::parse("2026-07-29").unwrap().has_time());
-            assert!(Point::parse("2026-07-29T14:30:00Z").unwrap().has_time());
+            assert!(!DatePoint::parse("2026-07").unwrap().has_time());
+            assert!(!DatePoint::parse("2026-07-29").unwrap().has_time());
+            assert!(
+                DatePoint::parse("2026-07-29T14:30:00Z").unwrap().has_time()
+            );
         }
 
         #[test]
@@ -663,21 +665,21 @@ mod tests {
         {
             TzGuard::set("UTC");
             assert_eq!(
-                Point::parse("2026-07").unwrap().canonical_pattern(),
+                DatePoint::parse("2026-07").unwrap().canonical_pattern(),
                 "%Y-%m"
             );
             assert_eq!(
-                Point::parse("2026-07-29").unwrap().canonical_pattern(),
+                DatePoint::parse("2026-07-29").unwrap().canonical_pattern(),
                 "%Y-%m-%d"
             );
             assert_eq!(
-                Point::parse("2026-07-29T14:30:00Z")
+                DatePoint::parse("2026-07-29T14:30:00Z")
                     .unwrap()
                     .canonical_pattern(),
                 "%Y-%m-%dT%H:%M:%S"
             );
             assert_eq!(
-                Point::parse("2026-07-29T14:30:00.123Z")
+                DatePoint::parse("2026-07-29T14:30:00.123Z")
                     .unwrap()
                     .canonical_pattern(),
                 "%Y-%m-%dT%H:%M:%S%.f"
