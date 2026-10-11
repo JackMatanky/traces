@@ -242,7 +242,7 @@ src/config/trust.rs: pub(super) fn project(&self, name: &str) -> PathBuf {
 src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
 src/config/trust.rs: pub(super) store: TrustStore,
 src/config/trust.rs: pub(super) struct Fixture {
-src/date/calendar.rs: pub(crate) enum DateDiff {
+src/date/calendar.rs: pub(crate) enum Difference {
 src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn apply(
@@ -256,16 +256,16 @@ src/date/calendar.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Sel
 src/date/calendar.rs: pub(crate) fn weekday_point(
 src/date/calendar.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
 src/date/mod.rs: pub use value::{DateError, DateTimeValue, DateValue};
-src/date/mod.rs: pub(crate) use calendar::DateDiff;
-src/date/mod.rs: pub(crate) use parse::{DateFormat, DateTimeFormat};
+src/date/mod.rs: pub(crate) use calendar::Difference;
+src/date/mod.rs: pub(crate) use parse::{DateShape, DateTimeShape};
 src/date/mod.rs: pub(crate) use value::{
 src/date/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
-src/date/parse.rs: pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
+src/date/parse.rs: pub(crate) const ALL: [Self; 2] = [Self::YearMonthDay, Self::YearMonth];
 src/date/parse.rs: pub(crate) const ALL: [Self; 5] = [
 src/date/parse.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
-src/date/parse.rs: pub(crate) enum DateFormat {
-src/date/parse.rs: pub(crate) enum DateTimeFormat {
-src/date/parse.rs: pub(crate) enum ParsedDateTimeShape {
+src/date/parse.rs: pub(crate) enum DateShape {
+src/date/parse.rs: pub(crate) enum DateTimeShape {
+src/date/parse.rs: pub(crate) enum ParsedDateTime {
 src/date/parse.rs: pub(crate) fn classify(
 src/date/parse.rs: pub(crate) fn parse_any(
 src/date/parse.rs: pub(crate) fn parse_any(

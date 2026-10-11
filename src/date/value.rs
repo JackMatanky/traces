@@ -270,7 +270,7 @@ impl DateTimeValue {
 /// component reads as the reader's own clock.
 ///
 /// Fractional seconds appear only for a nonzero nanosecond component, so
-/// `DateTimeFormat::IsoTFractional` input keeps its full sub-second precision.
+/// `DateTimeShape::LocalTSeconds` input keeps its full sub-second precision.
 /// When the local offset cannot be applied, the UTC wall clock renders instead
 /// of panicking (see `DateTimeValue::local_wall`).
 impl fmt::Display for DateTimeValue {

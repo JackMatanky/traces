@@ -46,7 +46,7 @@ use crate::{
     DEFAULT_DATE_FORMAT, DateTimeValue, DateValue, DurationSeconds,
     DurationUnit, DurationValue, UNIT_SPELLINGS_HINT,
     date::{
-        DateDiff, DateError, DateFormat, DatePoint, DateTimeFormat, Precision,
+        DateError, DatePoint, DateShape, DateTimeShape, Difference, Precision,
         RecognizedDate,
     },
 };
@@ -612,9 +612,9 @@ fn parse_recognized(s: &str) -> TemplateEngineResult<RecognizedDate> {
         }
         None => {
             let trimmed = s.trim();
-            let source = match DateFormat::parse_any(trimmed) {
+            let source = match DateShape::parse_any(trimmed) {
                 Err(err) => err,
-                Ok(_) => match DateTimeFormat::parse_any(trimmed) {
+                Ok(_) => match DateTimeShape::parse_any(trimmed) {
                     Err(err) => err,
                     Ok(_) => {
                         return Err(invalid_operation(
@@ -1283,8 +1283,8 @@ fn date_diff(
     let diff = from.point().diff(to.point(), unit).map_err(date_error)?;
 
     match diff {
-        DateDiff::Whole(n) => Ok(Value::from(n)),
-        DateDiff::Exact(f) => Ok(Value::from(f)),
+        Difference::Whole(n) => Ok(Value::from(n)),
+        Difference::Fractional(f) => Ok(Value::from(f)),
     }
 }
 

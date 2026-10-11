@@ -17,10 +17,10 @@
 //!
 //! - [`DateValue`] - Parsed calendar date with no time-of-day component.
 //! - [`DateTimeValue`] - Parsed UTC date-time instant.
-//! - [`DateFormat`] - Format grammar for calendar date recognition.
-//! - [`DateTimeFormat`] - Format grammar for date-time recognition.
+//! - [`DateShape`] - Format grammar for calendar date recognition.
+//! - [`DateTimeShape`] - Format grammar for date-time recognition.
 //! - [`DatePoint`] - Wall-clock/instant pair measured by the calendar owner.
-//! - [`DateDiff`] - Result of a calendar-owner difference measurement.
+//! - [`Difference`] - Result of a calendar-owner difference measurement.
 //! - [`DateError`] - Error type for parsing, local-zone resolution, and
 //!   calendar arithmetic failures.
 //!
@@ -36,8 +36,8 @@ mod calendar;
 mod parse;
 mod value;
 
-pub(crate) use calendar::DateDiff;
-pub(crate) use parse::{DateFormat, DateTimeFormat};
+pub(crate) use calendar::Difference;
+pub(crate) use parse::{DateShape, DateTimeShape};
 pub(crate) use value::{
     DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT, DatePoint, Precision,
     RecognizedDate, RecognizedDateValue,

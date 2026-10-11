@@ -547,14 +547,14 @@ impl DatePoint {
         self,
         to: Self,
         unit: DurationUnit,
-    ) -> Result<DateDiff, DateError> {
+    ) -> Result<Difference, DateError> {
         let both_datetimes = self.has_time() && to.has_time();
         match unit {
-            DurationUnit::Year => Ok(DateDiff::Whole(signed_years_since(
+            DurationUnit::Year => Ok(Difference::Whole(signed_years_since(
                 self.wall.date(),
                 to.wall.date(),
             ))),
-            DurationUnit::Month => Ok(DateDiff::Whole(signed_months_since(
+            DurationUnit::Month => Ok(Difference::Whole(signed_months_since(
                 self.wall.date(),
                 to.wall.date(),
             ))),
@@ -573,10 +573,10 @@ impl DatePoint {
                     let result = (whole_seconds
                         + f64::from(delta.subsec_nanos()) / 1e9)
                         / unit.nominal_seconds();
-                    Ok(DateDiff::Exact(result))
+                    Ok(Difference::Fractional(result))
                 } else if unit == DurationUnit::Millisecond {
                     let delta = to.wall.signed_duration_since(self.wall);
-                    Ok(DateDiff::Whole(delta.num_milliseconds()))
+                    Ok(Difference::Whole(delta.num_milliseconds()))
                 } else {
                     let delta = to.wall.signed_duration_since(self.wall);
                     let unit_secs_i64 = unit
@@ -589,7 +589,7 @@ impl DatePoint {
                                   this division never panics"
                     )]
                     let result = delta.num_seconds() / unit_secs_i64;
-                    Ok(DateDiff::Whole(result))
+                    Ok(Difference::Whole(result))
                 }
             }
         }
@@ -598,21 +598,21 @@ impl DatePoint {
 
 /// Result of measuring the difference between two date/time points.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum DateDiff {
+pub(crate) enum Difference {
     /// Whole units elapsed.
     Whole(i64),
-    /// Exact fractional units elapsed.
-    Exact(f64),
+    /// Fractional units elapsed.
+    Fractional(f64),
 }
 
-impl DateDiff {
+impl Difference {
     /// Returns the measured difference magnitude as an `f64`.
     #[inline]
     #[must_use]
     pub(crate) fn to_f64(self) -> Option<f64> {
         match self {
             Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
-            Self::Exact(n) => Some(n),
+            Self::Fractional(n) => Some(n),
         }
     }
 }
@@ -1101,13 +1101,13 @@ mod tests {
             let diff_hours = point_of(&dt1, true)
                 .diff(point_of(&dt2, true), DurationUnit::Hour)
                 .unwrap();
-            assert_eq!(diff_hours, DateDiff::Exact(1.5));
+            assert_eq!(diff_hours, Difference::Fractional(1.5));
 
             // When either point is date-only, fixed units return whole i64:
             let diff_civil = point_of(&dt1, true)
                 .diff(point_of(&dt2, false), DurationUnit::Hour)
                 .unwrap();
-            assert_eq!(diff_civil, DateDiff::Whole(1));
+            assert_eq!(diff_civil, Difference::Whole(1));
 
             // Calendar units return whole counts:
             let d1 = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
@@ -1126,7 +1126,7 @@ mod tests {
                 DurationUnit::Month,
             )
             .unwrap();
-            assert_eq!(diff_months, DateDiff::Whole(2));
+            assert_eq!(diff_months, Difference::Whole(2));
         }
 
         #[test]
@@ -1397,8 +1397,8 @@ mod tests {
 
         #[test]
         fn date_diff_to_f64_projects_whole_and_exact_variants() {
-            assert_eq!(DateDiff::Whole(42).to_f64(), Some(42.0));
-            assert_eq!(DateDiff::Exact(2.5).to_f64(), Some(2.5));
+            assert_eq!(Difference::Whole(42).to_f64(), Some(42.0));
+            assert_eq!(Difference::Fractional(2.5).to_f64(), Some(2.5));
         }
     }
 }

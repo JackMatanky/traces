@@ -59,7 +59,7 @@ impl DateValue {
         // Date-only shapes are at most 10 bytes; even the shortest date-time
         // shape (YYYY-M-DTH:M) is 12, so the date-time cascade cannot match.
         if trimmed.len() <= 10 {
-            return Some(match DateFormat::parse_any(trimmed) {
+            return Some(match DateShape::parse_any(trimmed) {
                 Ok((date, precision)) => Ok(RecognizedDate {
                     value: RecognizedDateValue::Date(Self(date)),
                     precision,
@@ -71,16 +71,12 @@ impl DateValue {
             });
         }
 
-        match DateTimeFormat::parse_any(trimmed) {
-            Ok(ParsedDateTimeShape::Rfc3339(instant)) => {
-                Some(Ok(RecognizedDate {
-                    value: RecognizedDateValue::DateTime(DateTimeValue(
-                        instant,
-                    )),
-                    precision: Precision::DateTime,
-                }))
-            }
-            Ok(ParsedDateTimeShape::LocalNaive(wall)) => {
+        match DateTimeShape::parse_any(trimmed) {
+            Ok(ParsedDateTime::Instant(instant)) => Some(Ok(RecognizedDate {
+                value: RecognizedDateValue::DateTime(DateTimeValue(instant)),
+                precision: Precision::DateTime,
+            })),
+            Ok(ParsedDateTime::LocalWall(wall)) => {
                 match local_naive_to_utc(wall) {
                     Ok(instant) => Some(Ok(RecognizedDate {
                         value: RecognizedDateValue::DateTime(DateTimeValue(
@@ -91,7 +87,7 @@ impl DateValue {
                     Err(err) => Some(Err(err)),
                 }
             }
-            Err(datetime_err) => match DateFormat::parse_any(trimmed) {
+            Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok((date, precision)) => Some(Ok(RecognizedDate {
                     value: RecognizedDateValue::Date(Self(date)),
                     precision,
@@ -158,7 +154,7 @@ impl DateValue {
                 input: trimmed.into(),
             });
         }
-        DateFormat::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
+        DateShape::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
             |source| DateError::Unparseable {
                 input: trimmed.into(),
                 source,
@@ -222,7 +218,7 @@ impl DateValue {
 
 impl DateTimeValue {
     /// Parses an RFC 3339 or ISO-8601 date-time string using
-    /// [`DateTimeFormat::ALL`].
+    /// [`DateTimeShape::ALL`].
     ///
     /// Surrounding whitespace is ignored. The cascade matches shapes only: a
     /// matched naive input then resolves through [`local_naive_to_utc`] (an
@@ -244,15 +240,15 @@ impl DateTimeValue {
                 input: trimmed.into(),
             });
         }
-        let shape = DateTimeFormat::parse_any(trimmed).map_err(|source| {
+        let shape = DateTimeShape::parse_any(trimmed).map_err(|source| {
             DateError::Unparseable {
                 input: trimmed.into(),
                 source,
             }
         })?;
         let instant = match shape {
-            ParsedDateTimeShape::Rfc3339(instant) => instant,
-            ParsedDateTimeShape::LocalNaive(wall) => local_naive_to_utc(wall)?,
+            ParsedDateTime::Instant(instant) => instant,
+            ParsedDateTime::LocalWall(wall) => local_naive_to_utc(wall)?,
         };
         Ok(Self(instant))
     }
@@ -261,16 +257,16 @@ impl DateTimeValue {
 /// Recognized date input format shapes tried in order by
 /// [`DateValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateFormat {
+pub(crate) enum DateShape {
     /// Full ISO date: `2026-07-29`.
-    Full,
+    YearMonthDay,
     /// Year-month reduced precision: `2026-07`. Day defaults to 1.
     YearMonth,
 }
 
-impl DateFormat {
+impl DateShape {
     /// Formats tried in order by [`DateValue::parse_iso`].
-    pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
+    pub(crate) const ALL: [Self; 2] = [Self::YearMonthDay, Self::YearMonth];
 
     /// Attempts to parse `s` across all recognized date formats in priority
     /// order.
@@ -293,7 +289,7 @@ impl DateFormat {
         s: &str,
     ) -> Result<(NaiveDate, Precision), chrono::ParseError> {
         match self {
-            Self::Full => {
+            Self::YearMonthDay => {
                 let pat = DEFAULT_DATE_FORMAT;
                 NaiveDate::parse_from_str(s, pat).map(|d| (d, Precision::Date))
             }
@@ -320,28 +316,29 @@ impl DateFormat {
 /// Recognized date-time input format shapes tried in order by
 /// [`DateTimeValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateTimeFormat {
+pub(crate) enum DateTimeShape {
     /// RFC 3339 format with offset: `2026-07-29T14:30:00Z`.
     Rfc3339,
-    /// `T`-separated with fractional seconds: `2026-07-29T14:30:00.123`.
-    IsoTFractional,
+    /// `T`-separated seconds, optionally fractional: `2026-07-29T14:30:00.123`.
+    LocalTSeconds,
     /// `T`-separated minute-only precision: `2026-07-29T14:30`.
-    IsoTMinute,
-    /// Space-separated with fractional seconds: `2026-07-29 14:30:00.123`.
-    IsoSpaceFractional,
+    LocalTMinutes,
+    /// Space-separated seconds, optionally fractional: `2026-07-29
+    /// 14:30:00.123`.
+    LocalSpaceSeconds,
     /// Space-separated minute-only precision: `2026-07-29 14:30`.
-    IsoSpaceMinute,
+    LocalSpaceMinutes,
 }
 
-impl DateTimeFormat {
+impl DateTimeShape {
     /// Formats tried in order by [`DateTimeValue::parse_iso`] (most
     /// specific/unambiguous first).
     pub(crate) const ALL: [Self; 5] = [
         Self::Rfc3339,
-        Self::IsoTFractional,
-        Self::IsoTMinute,
-        Self::IsoSpaceFractional,
-        Self::IsoSpaceMinute,
+        Self::LocalTSeconds,
+        Self::LocalTMinutes,
+        Self::LocalSpaceSeconds,
+        Self::LocalSpaceMinutes,
     ];
 
     /// Returns the strftime pattern for this format, or `None` for
@@ -350,10 +347,10 @@ impl DateTimeFormat {
     pub(crate) const fn pattern(self) -> Option<&'static str> {
         match self {
             Self::Rfc3339 => None,
-            Self::IsoTFractional => Some("%Y-%m-%dT%H:%M:%S%.f"),
-            Self::IsoTMinute => Some("%Y-%m-%dT%H:%M"),
-            Self::IsoSpaceFractional => Some("%Y-%m-%d %H:%M:%S%.f"),
-            Self::IsoSpaceMinute => Some("%Y-%m-%d %H:%M"),
+            Self::LocalTSeconds => Some("%Y-%m-%dT%H:%M:%S%.f"),
+            Self::LocalTMinutes => Some("%Y-%m-%dT%H:%M"),
+            Self::LocalSpaceSeconds => Some("%Y-%m-%d %H:%M:%S%.f"),
+            Self::LocalSpaceMinutes => Some("%Y-%m-%d %H:%M"),
         }
     }
 
@@ -361,7 +358,7 @@ impl DateTimeFormat {
     /// priority order.
     pub(crate) fn parse_any(
         s: &str,
-    ) -> Result<ParsedDateTimeShape, chrono::ParseError> {
+    ) -> Result<ParsedDateTime, chrono::ParseError> {
         let [first, rest @ ..] = Self::ALL;
         let mut result = first.parse_shape(s);
         for format in rest {
@@ -377,22 +374,22 @@ impl DateTimeFormat {
     fn parse_shape(
         self,
         s: &str,
-    ) -> Result<ParsedDateTimeShape, chrono::ParseError> {
+    ) -> Result<ParsedDateTime, chrono::ParseError> {
         match self.pattern() {
             None => DateTime::parse_from_rfc3339(s)
-                .map(|dt| ParsedDateTimeShape::Rfc3339(dt.with_timezone(&Utc))),
+                .map(|dt| ParsedDateTime::Instant(dt.with_timezone(&Utc))),
             Some(pat) => NaiveDateTime::parse_from_str(s, pat)
-                .map(ParsedDateTimeShape::LocalNaive),
+                .map(ParsedDateTime::LocalWall),
         }
     }
 }
 /// The parsed shape of a date-time string before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum ParsedDateTimeShape {
+pub(crate) enum ParsedDateTime {
     /// Explicit RFC 3339 instant.
-    Rfc3339(DateTime<Utc>),
+    Instant(DateTime<Utc>),
     /// Local naive datetime that must resolve through [`local_naive_to_utc`].
-    LocalNaive(NaiveDateTime),
+    LocalWall(NaiveDateTime),
 }
 
 #[cfg(test)]
@@ -530,20 +527,20 @@ mod tests {
             // Act & Assert
             for text in ["2026-07-29T14:30:00", "2026-07-29 14:30:00"] {
                 assert!(
-                    matches!(DateTimeFormat::parse_any(text), Ok(ParsedDateTimeShape::LocalNaive(w)) if w == wall)
+                    matches!(DateTimeShape::parse_any(text), Ok(ParsedDateTime::LocalWall(w)) if w == wall)
                 );
             }
         }
 
         #[test]
         fn datetime_format_pattern_maps_each_variant_to_its_strftime_spec() {
-            assert_eq!(DateTimeFormat::Rfc3339.pattern(), None);
+            assert_eq!(DateTimeShape::Rfc3339.pattern(), None);
             assert_eq!(
-                DateTimeFormat::IsoSpaceFractional.pattern(),
+                DateTimeShape::LocalSpaceSeconds.pattern(),
                 Some("%Y-%m-%d %H:%M:%S%.f")
             );
             assert_eq!(
-                DateTimeFormat::IsoSpaceMinute.pattern(),
+                DateTimeShape::LocalSpaceMinutes.pattern(),
                 Some("%Y-%m-%d %H:%M")
             );
         }
