@@ -476,7 +476,7 @@ mod tests {
                 let filename_day = DateValue::parse_iso("2026-07-29").unwrap();
                 let created_day = DateValue::parse_iso("2025-01-01").unwrap();
                 let created_time = SystemTime::from(
-                    crate::DateTimeValue::from(created_day).into_inner(),
+                    crate::DateTimeValue::from(created_day).utc(),
                 );
 
                 // Act
@@ -494,7 +494,7 @@ mod tests {
                 // Arrange
                 let created_day = DateValue::parse_iso("2026-03-15").unwrap();
                 let created_time = SystemTime::from(
-                    crate::DateTimeValue::from(created_day).into_inner(),
+                    crate::DateTimeValue::from(created_day).utc(),
                 );
 
                 // Act

@@ -135,7 +135,7 @@ mod template;
 mod yaml;
 
 pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
-pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
+pub(crate) use date::{DATE_PATTERN, DATETIME_PATTERN};
 pub use date::{DateError, DateTimeValue, DateValue};
 pub(crate) use delimiter::DelimiterType;
 pub use dialog::{

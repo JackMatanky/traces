@@ -108,10 +108,10 @@ impl NoteFieldValue {
     #[must_use]
     pub fn as_date(&self) -> Option<chrono::NaiveDate> {
         match self {
-            Self::Date(value) => Some(value.into_inner()),
-            Self::DateTime(value) => Some(value.date().into_inner()),
+            Self::Date(value) => Some(value.naive_date()),
+            Self::DateTime(value) => Some(value.local_date().naive_date()),
             Self::String(s) => DateValue::parse_prefix(s)
-                .map(|(rec, _)| rec.date().into_inner()),
+                .map(|(rec, _)| rec.date().naive_date()),
             _ => None,
         }
     }
@@ -376,14 +376,12 @@ impl NoteFieldValueRef<'_> {
             }
             Self::Date(value) => match literal {
                 NoteFieldValue::Date(other) => value == other,
-                NoteFieldValue::DateTime(other) => {
-                    other.is_equal_to_date(*value)
-                }
+                NoteFieldValue::DateTime(other) => other.is_midnight_of(*value),
                 _ => false,
             },
             Self::DateTime(value) => match literal {
                 NoteFieldValue::DateTime(other) => value == other,
-                NoteFieldValue::Date(other) => value.is_equal_to_date(*other),
+                NoteFieldValue::Date(other) => value.is_midnight_of(*other),
                 _ => false,
             },
             Self::Duration(dv) => match literal {

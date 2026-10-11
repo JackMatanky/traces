@@ -43,8 +43,8 @@ use num_traits::ToPrimitive as _;
 
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
-    DEFAULT_DATE_FORMAT, DateTimeValue, DateValue, DurationSeconds,
-    DurationUnit, DurationValue, UNIT_SPELLINGS_HINT,
+    DATE_PATTERN, DateTimeValue, DateValue, DurationSeconds, DurationUnit,
+    DurationValue, UNIT_SPELLINGS_HINT,
     date::{
         DateError, DatePoint, DateShape, DateTimeShape, Difference, Precision,
         RecognizedDate,
@@ -118,7 +118,7 @@ impl DateOps {
 
 fn local_point() -> DatePoint {
     let utc_now = Utc::now();
-    let wall = DateTimeValue::from(utc_now).wall_or_utc();
+    let wall = DateTimeValue::from(utc_now).local_wall_or_utc();
     DatePoint::new(wall, utc_now, Precision::DateTime)
 }
 
@@ -126,7 +126,7 @@ fn today_point() -> DatePoint {
     let local = local_point();
     DatePoint::new(
         local.wall.date().and_hms_opt(0, 0, 0).unwrap_or(local.wall),
-        DateTimeValue::from(DateValue::from(local.wall.date())).into_inner(),
+        DateTimeValue::from(DateValue::from(local.wall.date())).utc(),
         Precision::Date,
     )
 }
@@ -318,7 +318,7 @@ fn resolve_shorthand(
 ) -> TemplateEngineResult<String> {
     let format = format
         .or(kwargs.get::<Option<&str>>("format")?)
-        .unwrap_or(DEFAULT_DATE_FORMAT);
+        .unwrap_or(DATE_PATTERN);
     let offset = offset.or(kwargs.get::<Option<Value>>("offset")?);
     let reference = reference.or(kwargs.get::<Option<&str>>("reference")?);
     let reference_format =
@@ -587,7 +587,7 @@ impl Object for DateOps {
                     // Display is human-facing: the local wall clock of the
                     // instant, via the crate's canonical conversion
                     // (`.naive_utc()` would show the UTC clock instead).
-                    let local = DateTimeValue::from(utc).wall_or_utc();
+                    let local = DateTimeValue::from(utc).local_wall_or_utc();
                     format_with(local.format(format), format)
                 },
             )),
@@ -635,7 +635,7 @@ fn parse_recognized(s: &str) -> TemplateEngineResult<RecognizedDate> {
     }
 }
 /// Extracts the shared `format="..."` kwarg every `date.*` namespace method
-/// takes, defaulting to [`DEFAULT_DATE_FORMAT`], and rejects any other kwarg
+/// takes, defaulting to [`DATE_PATTERN`], and rejects any other kwarg
 /// via [`Kwargs::assert_all_used`].
 ///
 /// This is the one place all five
@@ -649,8 +649,7 @@ fn parse_recognized(s: &str) -> TemplateEngineResult<RecognizedDate> {
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `format`.
 fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
-    let format =
-        kwargs.get::<Option<&str>>("format")?.unwrap_or(DEFAULT_DATE_FORMAT);
+    let format = kwargs.get::<Option<&str>>("format")?.unwrap_or(DATE_PATTERN);
     kwargs.assert_all_used()?;
     Ok(format)
 }
@@ -1251,7 +1250,7 @@ fn weekday(
 /// The `unit` kwarg defaults to `"days"` and accepts `"years"`, `"months"`,
 /// `"weeks"`, `"hours"`, `"minutes"`, `"seconds"`, or `"ms"`.
 /// `"years"`/`"months"` are calendar counts: whole units elapsed, day-of-month
-/// aware (see the date module's `signed_years_since`/`signed_months_since`),
+/// aware (see the date module's `whole_years_between`/`whole_months_between`),
 /// always an `i64` regardless of input precision. The remaining units,
 /// including `"weeks"`, `"ms"`, and the default `"days"`, are fixed-duration:
 /// `f64` when both inputs carry a time component, otherwise an `i64` whole-unit

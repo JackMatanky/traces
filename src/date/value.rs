@@ -7,10 +7,10 @@ use chrono::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// [`DateValue`]'s canonical output format: `2026-07-29`.
-pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
+pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
-pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
+pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Precision of a recognized date or date-time string.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -38,10 +38,10 @@ impl Precision {
         use chrono::Timelike as _;
         match self {
             Self::YearMonth => "%Y-%m",
-            Self::Date => DEFAULT_DATE_FORMAT,
+            Self::Date => DATE_PATTERN,
             Self::DateTime => {
                 if wall.nanosecond() == 0 {
-                    DEFAULT_DATETIME_FORMAT
+                    DATETIME_PATTERN
                 } else {
                     "%Y-%m-%dT%H:%M:%S%.f"
                 }
@@ -75,7 +75,7 @@ impl RecognizedDate {
     pub(crate) fn date(&self) -> DateValue {
         match self.value {
             RecognizedDateValue::Date(d) => d,
-            RecognizedDateValue::DateTime(dt) => dt.date(),
+            RecognizedDateValue::DateTime(dt) => dt.local_date(),
         }
     }
 
@@ -88,7 +88,7 @@ impl RecognizedDate {
             RecognizedDateValue::Date(d) => {
                 d.0.and_hms_opt(0, 0, 0).unwrap_or(NaiveDateTime::MIN)
             }
-            RecognizedDateValue::DateTime(dt) => dt.wall_or_utc(),
+            RecognizedDateValue::DateTime(dt) => dt.local_wall_or_utc(),
         }
     }
 
@@ -97,8 +97,8 @@ impl RecognizedDate {
     #[must_use]
     pub(crate) fn instant(&self) -> DateTime<Utc> {
         match self.value {
-            RecognizedDateValue::Date(d) => DateTimeValue::from(d).into_inner(),
-            RecognizedDateValue::DateTime(dt) => dt.into_inner(),
+            RecognizedDateValue::Date(d) => DateTimeValue::from(d).utc(),
+            RecognizedDateValue::DateTime(dt) => dt.utc(),
         }
     }
 
@@ -122,7 +122,7 @@ pub struct DateValue(pub(super) NaiveDate);
 impl DateValue {
     /// Returns the wrapped [`NaiveDate`].
     #[must_use]
-    pub(crate) const fn into_inner(self) -> NaiveDate {
+    pub(crate) const fn naive_date(self) -> NaiveDate {
         self.0
     }
 }
@@ -131,14 +131,14 @@ impl DateValue {
 impl fmt::Display for DateValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.format(DEFAULT_DATE_FORMAT))
+        write!(f, "{}", self.0.format(DATE_PATTERN))
     }
 }
 
 impl From<DateValue> for NaiveDate {
     #[inline]
     fn from(value: DateValue) -> Self {
-        value.into_inner()
+        value.naive_date()
     }
 }
 impl From<NaiveDate> for DateValue {
@@ -152,8 +152,8 @@ impl From<SystemTime> for DateValue {
     #[inline]
     fn from(time: SystemTime) -> Self {
         // A file's calendar date means the reader's local day (the same
-        // doctrine as `DateTimeValue::date`), not the UTC calendar day.
-        DateTimeValue::from(time).date()
+        // doctrine as `DateTimeValue::local_date`), not the UTC calendar day.
+        DateTimeValue::from(time).local_date()
     }
 }
 
@@ -238,7 +238,7 @@ impl DateTimeValue {
     /// the local offset cannot be applied (see [`Self::local_wall`]).
     #[inline]
     #[must_use]
-    pub(crate) fn wall_or_utc(self) -> NaiveDateTime {
+    pub(crate) fn local_wall_or_utc(self) -> NaiveDateTime {
         self.local_wall().unwrap_or_else(|| self.0.naive_utc())
     }
 
@@ -248,20 +248,20 @@ impl DateTimeValue {
     /// of [`NaiveDateTime`]'s range), the UTC date renders instead.
     #[inline]
     #[must_use]
-    pub(crate) fn date(self) -> DateValue {
-        DateValue(self.wall_or_utc().date())
+    pub(crate) fn local_date(self) -> DateValue {
+        DateValue(self.local_wall_or_utc().date())
     }
 
     /// Returns `true` if this date-time is exactly local-zone midnight on
     /// `date` (see the [`From<DateValue>`] promotion).
     #[must_use]
-    pub(crate) fn is_equal_to_date(self, date: DateValue) -> bool {
+    pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
         self.0 == Self::from(date).0
     }
 
     /// Returns the wrapped [`DateTime<Utc>`].
     #[must_use]
-    pub(crate) const fn into_inner(self) -> DateTime<Utc> {
+    pub(crate) const fn utc(self) -> DateTime<Utc> {
         self.0
     }
 }
@@ -277,9 +277,9 @@ impl fmt::Display for DateTimeValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use chrono::Timelike as _;
-        let wall = self.wall_or_utc();
+        let wall = self.local_wall_or_utc();
         let format = if wall.nanosecond() == 0 {
-            DEFAULT_DATETIME_FORMAT
+            DATETIME_PATTERN
         } else {
             "%Y-%m-%dT%H:%M:%S%.f"
         };
@@ -304,7 +304,7 @@ impl From<DateTime<Utc>> for DateTimeValue {
 impl From<DateTimeValue> for DateTime<Utc> {
     #[inline]
     fn from(value: DateTimeValue) -> Self {
-        value.into_inner()
+        value.utc()
     }
 }
 
@@ -324,7 +324,7 @@ impl From<DateValue> for DateTimeValue {
     fn from(date: DateValue) -> Self {
         let midnight = date.0.and_time(NaiveTime::MIN);
         Self(
-            local_naive_to_utc(midnight)
+            resolve_local(midnight)
                 .unwrap_or_else(|_zone_failure| midnight.and_utc()),
         )
     }
@@ -438,7 +438,7 @@ impl DatePoint {
 /// [`Disambiguation::Compatible`]:
 ///     https://docs.rs/jiff/latest/jiff/tz/enum.Disambiguation.html
 /// [chrono#1701]: https://github.com/chronotope/chrono/issues/1701
-pub(super) fn local_naive_to_utc(
+pub(super) fn resolve_local(
     wall: NaiveDateTime,
 ) -> Result<DateTime<Utc>, DateError> {
     let zone_lookup = || DateError::LocalZoneLookup {
@@ -470,7 +470,7 @@ pub(super) fn local_naive_to_utc(
             // A gap resolves `None` across the whole skipped span, so no probe
             // inside it resolves; the pre-transition offset shifts the gap time
             // forward by exactly the gap.
-            let offset = resolve_gap_offset(wall, &zone_lookup)?;
+            let offset = offset_across_gap(wall, &zone_lookup)?;
             let instant =
                 wall.checked_sub_offset(offset).ok_or_else(zone_lookup)?;
             Ok(instant.and_utc())
@@ -486,7 +486,7 @@ pub(super) fn local_naive_to_utc(
 /// - [`DateError::LocalZoneLookup`] if no nearby local time resolves within the
 ///   25-hour backward search (a broken tz-data/OS lookup rather than a gap), or
 ///   if stepping the probe back would leave `NaiveDateTime`'s range.
-fn resolve_gap_offset(
+fn offset_across_gap(
     wall: NaiveDateTime,
     zone_lookup: &impl Fn() -> DateError,
 ) -> Result<FixedOffset, DateError> {
@@ -652,7 +652,7 @@ mod tests {
             TzGuard::set("Etc/GMT-14");
 
             // Act
-            let result = local_naive_to_utc(NaiveDateTime::MIN);
+            let result = resolve_local(NaiveDateTime::MIN);
 
             // Assert
             assert!(matches!(result, Err(DateError::LocalZoneLookup { .. })));
@@ -669,7 +669,7 @@ mod tests {
             // Civil midnight in UTC+2 is 22:00Z on the previous day, so this
             // pins the promotion to the local zone rather than UTC.
             assert_eq!(
-                promoted.into_inner(),
+                promoted.utc(),
                 Utc.with_ymd_and_hms(2026, 7, 28, 22, 0, 0)
                     .single()
                     .expect("unambiguous instant")
@@ -714,8 +714,7 @@ mod tests {
             TzGuard::set("UTC");
 
             let with_nanos = DateTimeValue(
-                fixed_datetime().into_inner()
-                    + chrono::TimeDelta::milliseconds(123),
+                fixed_datetime().utc() + chrono::TimeDelta::milliseconds(123),
             );
             assert_eq!(with_nanos.to_string(), "2026-07-29T14:30:05.123");
         }
@@ -724,7 +723,7 @@ mod tests {
         fn extracts_the_calendar_date_discarding_time_of_day() {
             TzGuard::set("UTC");
 
-            let extracted = fixed_datetime().date();
+            let extracted = fixed_datetime().local_date();
             let expected =
                 DateValue::parse_iso("2026-07-29").expect("valid date");
             assert_eq!(extracted, expected);
@@ -734,7 +733,7 @@ mod tests {
         fn extracts_the_local_calendar_date_of_the_instant() {
             TzGuard::set("Etc/GMT-12"); // UTC+12: 14:30Z is already July 30
 
-            let extracted = fixed_datetime().date();
+            let extracted = fixed_datetime().local_date();
             let expected =
                 DateValue::parse_iso("2026-07-30").expect("valid date");
             assert_eq!(extracted, expected);
@@ -799,16 +798,16 @@ mod tests {
         use super::*;
 
         #[test]
-        fn requires_exact_midnight_in_is_equal_to_date() {
+        fn requires_exact_midnight_in_is_midnight_of() {
             TzGuard::keep();
 
             let midnight = DateTimeValue::from(
                 DateValue::parse_iso("2026-07-29").expect("valid date"),
             );
-            assert!(midnight.is_equal_to_date(
+            assert!(midnight.is_midnight_of(
                 DateValue::parse_iso("2026-07-29").expect("valid date")
             ));
-            assert!(!fixed_datetime().is_equal_to_date(
+            assert!(!fixed_datetime().is_midnight_of(
                 DateValue::parse_iso("2026-07-29").expect("valid date")
             ));
         }
@@ -862,7 +861,7 @@ mod tests {
 
         #[test]
         fn round_trips_through_chrono_date_time_utc() {
-            let chrono_dt = fixed_datetime().into_inner();
+            let chrono_dt = fixed_datetime().utc();
             let converted = DateTimeValue::from(chrono_dt);
             assert_eq!(converted, fixed_datetime());
             let back: DateTime<Utc> = converted.into();

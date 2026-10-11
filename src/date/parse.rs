@@ -1,12 +1,12 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
 use super::value::{
-    DEFAULT_DATE_FORMAT, DateError, DateTimeValue, DateValue, Precision,
-    RecognizedDate, RecognizedDateValue, local_naive_to_utc,
+    DATE_PATTERN, DateError, DateTimeValue, DateValue, Precision,
+    RecognizedDate, RecognizedDateValue, resolve_local,
 };
 
 /// Returns `true` if `bytes` begins with a date-like prefix.
-fn has_date_like_prefix(bytes: &[u8]) -> bool {
+fn starts_like_date(bytes: &[u8]) -> bool {
     if bytes.len() >= 5
         && bytes.get(0..2).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
         && bytes.get(2) == Some(&b'-')
@@ -23,7 +23,7 @@ fn has_date_like_prefix(bytes: &[u8]) -> bool {
 }
 
 /// Returns `true` if `s`'s first four bytes are ASCII digits.
-fn has_four_digit_year(s: &str) -> bool {
+fn starts_with_year(s: &str) -> bool {
     let bytes = s.as_bytes();
     bytes.get(0..4).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
 }
@@ -46,11 +46,11 @@ impl DateValue {
     ) -> Option<Result<RecognizedDate, DateError>> {
         let trimmed = s.trim();
         let bytes = trimmed.as_bytes();
-        if bytes.is_empty() || !has_date_like_prefix(bytes) {
+        if bytes.is_empty() || !starts_like_date(bytes) {
             return None;
         }
 
-        if !has_four_digit_year(trimmed) {
+        if !starts_with_year(trimmed) {
             return Some(Err(DateError::InvalidYearDigits {
                 input: trimmed.into(),
             }));
@@ -76,17 +76,15 @@ impl DateValue {
                 value: RecognizedDateValue::DateTime(DateTimeValue(instant)),
                 precision: Precision::DateTime,
             })),
-            Ok(ParsedDateTime::LocalWall(wall)) => {
-                match local_naive_to_utc(wall) {
-                    Ok(instant) => Some(Ok(RecognizedDate {
-                        value: RecognizedDateValue::DateTime(DateTimeValue(
-                            instant,
-                        )),
-                        precision: Precision::DateTime,
-                    })),
-                    Err(err) => Some(Err(err)),
-                }
-            }
+            Ok(ParsedDateTime::LocalWall(wall)) => match resolve_local(wall) {
+                Ok(instant) => Some(Ok(RecognizedDate {
+                    value: RecognizedDateValue::DateTime(DateTimeValue(
+                        instant,
+                    )),
+                    precision: Precision::DateTime,
+                })),
+                Err(err) => Some(Err(err)),
+            },
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok((date, precision)) => Some(Ok(RecognizedDate {
                     value: RecognizedDateValue::Date(Self(date)),
@@ -149,7 +147,7 @@ impl DateValue {
     /// - [`DateError::Unparseable`] if no accepted shape matches.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
-        if !has_four_digit_year(trimmed) {
+        if !starts_with_year(trimmed) {
             return Err(DateError::InvalidYearDigits {
                 input: trimmed.into(),
             });
@@ -189,7 +187,7 @@ impl DateValue {
         if let Ok(naive_dt) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_fmt)
         {
-            let instant = local_naive_to_utc(naive_dt)?;
+            let instant = resolve_local(naive_dt)?;
             return Ok(RecognizedDate {
                 value: RecognizedDateValue::DateTime(DateTimeValue(instant)),
                 precision: Precision::DateTime,
@@ -221,7 +219,7 @@ impl DateTimeValue {
     /// [`DateTimeShape::ALL`].
     ///
     /// Surrounding whitespace is ignored. The cascade matches shapes only: a
-    /// matched naive input then resolves through [`local_naive_to_utc`] (an
+    /// matched naive input then resolves through [`resolve_local`] (an
     /// explicit-offset input already is the instant). Resolution runs once
     /// after the cascade, because a resolution failure must not retry later
     /// formats.
@@ -235,7 +233,7 @@ impl DateTimeValue {
     ///   while resolving a naive input.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
-        if !has_four_digit_year(trimmed) {
+        if !starts_with_year(trimmed) {
             return Err(DateError::InvalidYearDigits {
                 input: trimmed.into(),
             });
@@ -248,7 +246,7 @@ impl DateTimeValue {
         })?;
         let instant = match shape {
             ParsedDateTime::Instant(instant) => instant,
-            ParsedDateTime::LocalWall(wall) => local_naive_to_utc(wall)?,
+            ParsedDateTime::LocalWall(wall) => resolve_local(wall)?,
         };
         Ok(Self(instant))
     }
@@ -290,7 +288,7 @@ impl DateShape {
     ) -> Result<(NaiveDate, Precision), chrono::ParseError> {
         match self {
             Self::YearMonthDay => {
-                let pat = DEFAULT_DATE_FORMAT;
+                let pat = DATE_PATTERN;
                 NaiveDate::parse_from_str(s, pat).map(|d| (d, Precision::Date))
             }
             Self::YearMonth => match Self::parse_year_month(s) {
@@ -388,7 +386,7 @@ impl DateTimeShape {
 pub(crate) enum ParsedDateTime {
     /// Explicit RFC 3339 instant.
     Instant(DateTime<Utc>),
-    /// Local naive datetime that must resolve through [`local_naive_to_utc`].
+    /// Local naive datetime that must resolve through [`resolve_local`].
     LocalWall(NaiveDateTime),
 }
 
@@ -446,16 +444,16 @@ mod tests {
         #[case::empty("")]
         #[case::non_digit_year("abcd-01-01")]
         fn rejects_a_missing_four_digit_year(#[case] input: &str) {
-            assert!(!has_four_digit_year(input));
+            assert!(!starts_with_year(input));
         }
 
         #[test]
         fn accepts_a_five_digit_year_prefix_as_having_four_digits() {
-            // The `has_four_digit_year` guard only checks the first 4 bytes;
+            // The `starts_with_year` guard only checks the first 4 bytes;
             // a longer numeric prefix still passes this guard and is rejected
             // later, by the format cascade, as Unparseable rather than
             // InvalidYearDigits.
-            assert!(has_four_digit_year("20265-01-01"));
+            assert!(starts_with_year("20265-01-01"));
             assert!(matches!(
                 DateValue::parse_iso("20265-01-01"),
                 Err(DateError::Unparseable { .. })
@@ -737,9 +735,7 @@ mod tests {
             assert_eq!(parsed_dt.precision, Precision::DateTime);
             assert_eq!(
                 parsed_dt.instant(),
-                DateTimeValue::parse_iso("2026-07-29T14:30:00Z")
-                    .unwrap()
-                    .into_inner()
+                DateTimeValue::parse_iso("2026-07-29T14:30:00Z").unwrap().utc()
             );
 
             let parsed_ym = DateValue::parse_with("2026-07", "%Y-%m")

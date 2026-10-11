@@ -4,7 +4,7 @@ use chrono::{
 use num_traits::ToPrimitive as _;
 
 use super::value::{
-    DateError, DatePoint, DateTimeValue, DateValue, local_naive_to_utc,
+    DateError, DatePoint, DateTimeValue, DateValue, resolve_local,
 };
 use crate::duration::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
@@ -14,8 +14,8 @@ impl DateValue {
     /// Shifts this civil date by `n` `unit`s.
     ///
     /// Pure civil arithmetic: zone-free dates never touch the DST resolver.
-    /// Delegates to [`shift_wall`] at midnight and keeps the resulting calendar
-    /// day, so per-unit semantics live in exactly one place.
+    /// Delegates to [`shift_wall_clock`] at midnight and keeps the resulting
+    /// calendar day, so per-unit semantics live in exactly one place.
     ///
     /// # Errors
     ///
@@ -27,7 +27,7 @@ impl DateValue {
         unit: DurationUnit,
     ) -> Result<Self, DateError> {
         let wall = self.0.and_hms_opt(0, 0, 0).ok_or(DateError::OutOfRange)?;
-        shift_wall(wall, n, unit).map(|shifted| Self(shifted.date()))
+        shift_wall_clock(wall, n, unit).map(|shifted| Self(shifted.date()))
     }
 
     /// Applies `duration` to this civil date.
@@ -105,7 +105,7 @@ impl DateValue {
                         .0
                         .and_hms_opt(0, 0, 0)
                         .ok_or(DateError::OutOfRange)?;
-                    let delta = seconds_delta(rem_secs)?;
+                    let delta = time_delta_from_seconds(rem_secs)?;
                     let shifted_wall = wall
                         .checked_add_signed(delta)
                         .ok_or(DateError::OutOfRange)?;
@@ -119,7 +119,8 @@ impl DateValue {
             | DurationUnit::Millisecond => {
                 let wall =
                     self.0.and_hms_opt(0, 0, 0).ok_or(DateError::OutOfRange)?;
-                let delta = seconds_delta(mag * unit.nominal_seconds())?;
+                let delta =
+                    time_delta_from_seconds(mag * unit.nominal_seconds())?;
                 let shifted_wall = wall
                     .checked_add_signed(delta)
                     .ok_or(DateError::OutOfRange)?;
@@ -197,8 +198,8 @@ impl DateTimeValue {
     ///   resolved in the local zone.
     fn shift_calendar_months(self, months: i64) -> Result<Self, DateError> {
         let wall = self.local_wall().ok_or(DateError::OutOfRange)?;
-        let new_wall = shift_months(wall, months)?;
-        let instant = local_naive_to_utc(new_wall)?;
+        let new_wall = shift_wall_months(wall, months)?;
+        let instant = resolve_local(new_wall)?;
         Ok(Self(instant))
     }
 
@@ -220,7 +221,7 @@ impl DateTimeValue {
             wall.checked_sub_days(Days::new(days_u64))
         }
         .ok_or(DateError::OutOfRange)?;
-        let instant = local_naive_to_utc(new_wall)?;
+        let instant = resolve_local(new_wall)?;
         Ok(Self(instant))
     }
 
@@ -302,7 +303,7 @@ impl DateTimeValue {
                 };
                 let rem_secs = mag.fract() * unit.nominal_seconds();
                 if rem_secs != 0.0 {
-                    let delta = seconds_delta(rem_secs)?;
+                    let delta = time_delta_from_seconds(rem_secs)?;
                     // The nominal remainder advances the local wall clock
                     // rather than the stored instant across DST.
                     let wall =
@@ -310,7 +311,7 @@ impl DateTimeValue {
                     let shifted_wall = wall
                         .checked_add_signed(delta)
                         .ok_or(DateError::OutOfRange)?;
-                    let instant = local_naive_to_utc(shifted_wall)?;
+                    let instant = resolve_local(shifted_wall)?;
                     current = Self(instant);
                 }
                 Ok(current)
@@ -319,7 +320,8 @@ impl DateTimeValue {
             | DurationUnit::Minute
             | DurationUnit::Second
             | DurationUnit::Millisecond => {
-                let delta = seconds_delta(mag * unit.nominal_seconds())?;
+                let delta =
+                    time_delta_from_seconds(mag * unit.nominal_seconds())?;
                 let instant = self
                     .0
                     .checked_add_signed(delta)
@@ -350,13 +352,13 @@ impl DatePoint {
             let wall = dt.local_wall().ok_or(DateError::OutOfRange)?;
             Ok(Self {
                 wall,
-                instant: dt.into_inner(),
+                instant: dt.utc(),
                 precision: self.precision,
             })
         } else {
-            let shifted_wall = shift_wall(self.wall, n, unit)?;
+            let shifted_wall = shift_wall_clock(self.wall, n, unit)?;
             let shifted_date = DateValue(shifted_wall.date());
-            let instant = DateTimeValue::from(shifted_date).into_inner();
+            let instant = DateTimeValue::from(shifted_date).utc();
             Ok(Self {
                 wall: shifted_wall,
                 instant,
@@ -383,16 +385,16 @@ impl DatePoint {
             let wall = dt.local_wall().ok_or(DateError::OutOfRange)?;
             Ok(Self {
                 wall,
-                instant: dt.into_inner(),
+                instant: dt.utc(),
                 precision: self.precision,
             })
         } else {
             let date = DateValue(self.wall.date()).apply(duration)?;
             let wall = date
-                .into_inner()
+                .naive_date()
                 .and_hms_opt(0, 0, 0)
                 .ok_or(DateError::OutOfRange)?;
-            let instant = DateTimeValue::from(date).into_inner();
+            let instant = DateTimeValue::from(date).utc();
             Ok(Self {
                 wall,
                 instant,
@@ -422,9 +424,9 @@ impl DatePoint {
             .ok_or(DateError::OutOfRange)?;
         let wall = date.and_time(self.wall.time());
         let instant = if self.has_time() {
-            local_naive_to_utc(wall)?
+            resolve_local(wall)?
         } else {
-            DateTimeValue::from(DateValue(date)).into_inner()
+            DateTimeValue::from(DateValue(date)).utc()
         };
         Ok(Self {
             wall,
@@ -455,9 +457,9 @@ impl DatePoint {
                 .ok_or(DateError::OutOfRange)?;
         let wall = new_date.and_time(self.wall.time());
         let instant = if self.has_time() {
-            local_naive_to_utc(wall)?
+            resolve_local(wall)?
         } else {
-            DateTimeValue::from(DateValue(new_date)).into_inner()
+            DateTimeValue::from(DateValue(new_date)).utc()
         };
         Ok(Self {
             wall,
@@ -485,9 +487,9 @@ impl DatePoint {
         .ok_or(DateError::OutOfRange)?;
         let wall = new_date.and_time(self.wall.time());
         let instant = if self.has_time() {
-            local_naive_to_utc(wall)?
+            resolve_local(wall)?
         } else {
-            DateTimeValue::from(DateValue(new_date)).into_inner()
+            DateTimeValue::from(DateValue(new_date)).utc()
         };
         Ok(Self {
             wall,
@@ -516,9 +518,9 @@ impl DatePoint {
                 .ok_or(DateError::OutOfRange)?;
         let wall = new_date.and_time(self.wall.time());
         let instant = if self.has_time() {
-            local_naive_to_utc(wall)?
+            resolve_local(wall)?
         } else {
-            DateTimeValue::from(DateValue(new_date)).into_inner()
+            DateTimeValue::from(DateValue(new_date)).utc()
         };
         Ok(Self {
             wall,
@@ -536,7 +538,7 @@ impl DatePoint {
     ///   clocks as `i64`.
     /// - Calendar units ([`DurationUnit::Year`], [`DurationUnit::Month`])
     ///   measure elapsed calendar periods using day-of-month aware whole counts
-    ///   ([`signed_years_since`], [`signed_months_since`]).
+    ///   ([`whole_years_between`], [`whole_months_between`]).
     ///
     /// # Errors
     ///
@@ -550,11 +552,11 @@ impl DatePoint {
     ) -> Result<Difference, DateError> {
         let both_datetimes = self.has_time() && to.has_time();
         match unit {
-            DurationUnit::Year => Ok(Difference::Whole(signed_years_since(
+            DurationUnit::Year => Ok(Difference::Whole(whole_years_between(
                 self.wall.date(),
                 to.wall.date(),
             ))),
-            DurationUnit::Month => Ok(Difference::Whole(signed_months_since(
+            DurationUnit::Month => Ok(Difference::Whole(whole_months_between(
                 self.wall.date(),
                 to.wall.date(),
             ))),
@@ -621,7 +623,7 @@ impl Difference {
 /// nanoseconds (the fraction rounded to the nearest nanosecond) and rejecting
 /// overflow of either component. The single whole/sub-second split for
 /// [`DateValue::apply_part`] and [`DateTimeValue::apply_part`].
-fn seconds_delta(part_secs: f64) -> Result<TimeDelta, DateError> {
+fn time_delta_from_seconds(part_secs: f64) -> Result<TimeDelta, DateError> {
     let ds = DurationSeconds::try_from(part_secs)
         .map_err(|_| DateError::OutOfRange)?;
     TimeDelta::try_from(ds).map_err(|_| DateError::OutOfRange)
@@ -639,7 +641,7 @@ fn seconds_delta(part_secs: f64) -> Result<TimeDelta, DateError> {
 /// # Errors
 ///
 /// - [`DateError::OutOfRange`] if the shift overflows representable bounds.
-fn shift_wall(
+fn shift_wall_clock(
     wall: NaiveDateTime,
     n: i64,
     unit: DurationUnit,
@@ -647,9 +649,9 @@ fn shift_wall(
     match unit {
         DurationUnit::Year => {
             let months = n.checked_mul(12).ok_or(DateError::OutOfRange)?;
-            shift_months(wall, months)
+            shift_wall_months(wall, months)
         }
-        DurationUnit::Month => shift_months(wall, n),
+        DurationUnit::Month => shift_wall_months(wall, n),
         DurationUnit::Week => {
             let days = n.checked_mul(7).ok_or(DateError::OutOfRange)?;
             let days_u64 = days.unsigned_abs();
@@ -695,7 +697,7 @@ fn shift_wall(
 ///
 /// - [`DateError::OutOfRange`] if `months` does not fit a `u32` or the
 ///   arithmetic overflows representable bounds.
-fn shift_months(
+fn shift_wall_months(
     wall: NaiveDateTime,
     months: i64,
 ) -> Result<NaiveDateTime, DateError> {
@@ -714,7 +716,7 @@ fn shift_months(
 /// Delegates to chrono's [`NaiveDate::years_since`], which is day-of-year
 /// aware: a year is not "up" until `to`'s month/day reaches `from`'s. This
 /// wrapper accepts either ordering.
-fn signed_years_since(from: NaiveDate, to: NaiveDate) -> i64 {
+fn whole_years_between(from: NaiveDate, to: NaiveDate) -> i64 {
     let (earlier, later, sign) = if to >= from {
         (from, to, 1)
     } else {
@@ -739,13 +741,13 @@ fn signed_years_since(from: NaiveDate, to: NaiveDate) -> i64 {
 }
 
 /// Whole calendar months from `from` to `to`, signed. See
-/// [`signed_years_since`].
+/// [`whole_years_between`].
 ///
 /// Chrono has no `months_since` equivalent, so this mirrors
 /// [`NaiveDate::years_since`]'s algorithm at month granularity: total calendar
 /// months between the dates, minus one when the day-of-month has not yet been
 /// reached.
-fn signed_months_since(from: NaiveDate, to: NaiveDate) -> i64 {
+fn whole_months_between(from: NaiveDate, to: NaiveDate) -> i64 {
     let (earlier, later, sign) = if to >= from {
         (from, to, 1)
     } else {
@@ -786,7 +788,7 @@ mod tests {
             let forward = base.apply(&one_hour).expect("no overflow");
             assert_eq!(
                 forward,
-                DateTimeValue(base.into_inner() + TimeDelta::hours(1))
+                DateTimeValue(base.utc() + TimeDelta::hours(1))
             );
         }
 
@@ -795,10 +797,7 @@ mod tests {
             let base = fixed_datetime();
             let one_hour = DurationValue::parse("1h").expect("valid duration");
             let back = base.apply(&(one_hour * -1.0)).expect("no overflow");
-            assert_eq!(
-                back,
-                DateTimeValue(base.into_inner() - TimeDelta::hours(1))
-            );
+            assert_eq!(back, DateTimeValue(base.utc() - TimeDelta::hours(1)));
         }
 
         #[test]
@@ -1090,8 +1089,8 @@ mod tests {
                     Precision::Date
                 };
                 DatePoint::new(
-                    value.wall_or_utc(),
-                    value.into_inner(),
+                    value.local_wall_or_utc(),
+                    value.utc(),
                     precision,
                 )
             };
@@ -1114,13 +1113,13 @@ mod tests {
             let d2 = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
             let diff_months = DatePoint::new(
                 d1.and_hms_opt(0, 0, 0).unwrap(),
-                dt1.into_inner(),
+                dt1.utc(),
                 Precision::Date,
             )
             .diff(
                 DatePoint::new(
                     d2.and_hms_opt(0, 0, 0).unwrap(),
-                    dt2.into_inner(),
+                    dt2.utc(),
                     Precision::Date,
                 ),
                 DurationUnit::Month,
@@ -1255,9 +1254,7 @@ mod tests {
             // Assert
             assert_eq!(
                 shifted.instant,
-                DateTimeValue::parse_iso("2026-11-01T05:30:00Z")
-                    .unwrap()
-                    .into_inner()
+                DateTimeValue::parse_iso("2026-11-01T05:30:00Z").unwrap().utc()
             );
         }
 
@@ -1322,19 +1319,19 @@ mod tests {
         fn week_boundary_returns_iso_monday_spanning_month_boundaries() {
             let sunday = DateValue::parse_iso("2026-02-01").unwrap();
             let pt = DatePoint::new(
-                sunday.into_inner().and_hms_opt(0, 0, 0).unwrap(),
-                DateTimeValue::from(sunday).into_inner(),
+                sunday.naive_date().and_hms_opt(0, 0, 0).unwrap(),
+                DateTimeValue::from(sunday).utc(),
                 Precision::Date,
             );
             let sow = pt.week_boundary(false).expect("sow");
             let eow = pt.week_boundary(true).expect("eow");
             assert_eq!(
                 sow.wall.date(),
-                DateValue::parse_iso("2026-01-26").unwrap().into_inner()
+                DateValue::parse_iso("2026-01-26").unwrap().naive_date()
             );
             assert_eq!(
                 eow.wall.date(),
-                DateValue::parse_iso("2026-02-01").unwrap().into_inner()
+                DateValue::parse_iso("2026-02-01").unwrap().naive_date()
             );
         }
 
@@ -1342,19 +1339,19 @@ mod tests {
         fn year_boundary_returns_first_and_last_day_of_year() {
             let date = DateValue::parse_iso("2026-07-29").unwrap();
             let pt = DatePoint::new(
-                date.into_inner().and_hms_opt(0, 0, 0).unwrap(),
-                DateTimeValue::from(date).into_inner(),
+                date.naive_date().and_hms_opt(0, 0, 0).unwrap(),
+                DateTimeValue::from(date).utc(),
                 Precision::Date,
             );
             let soy = pt.year_boundary(false).expect("soy");
             let eoy = pt.year_boundary(true).expect("eoy");
             assert_eq!(
                 soy.wall.date(),
-                DateValue::parse_iso("2026-01-01").unwrap().into_inner()
+                DateValue::parse_iso("2026-01-01").unwrap().naive_date()
             );
             assert_eq!(
                 eoy.wall.date(),
-                DateValue::parse_iso("2026-12-31").unwrap().into_inner()
+                DateValue::parse_iso("2026-12-31").unwrap().naive_date()
             );
         }
 
@@ -1362,19 +1359,19 @@ mod tests {
         fn weekday_point_maps_to_target_weekday_in_iso_week() {
             let wednesday = DateValue::parse_iso("2026-07-29").unwrap();
             let pt = DatePoint::new(
-                wednesday.into_inner().and_hms_opt(0, 0, 0).unwrap(),
-                DateTimeValue::from(wednesday).into_inner(),
+                wednesday.naive_date().and_hms_opt(0, 0, 0).unwrap(),
+                DateTimeValue::from(wednesday).utc(),
                 Precision::Date,
             );
             let mon = pt.weekday_point(Weekday::Mon).expect("mon");
             let sun = pt.weekday_point(Weekday::Sun).expect("sun");
             assert_eq!(
                 mon.wall.date(),
-                DateValue::parse_iso("2026-07-27").unwrap().into_inner()
+                DateValue::parse_iso("2026-07-27").unwrap().naive_date()
             );
             assert_eq!(
                 sun.wall.date(),
-                DateValue::parse_iso("2026-08-02").unwrap().into_inner()
+                DateValue::parse_iso("2026-08-02").unwrap().naive_date()
             );
         }
 
@@ -1382,15 +1379,15 @@ mod tests {
         fn date_point_apply_shifts_point_by_compound_duration() {
             let wednesday = DateValue::parse_iso("2026-07-29").unwrap();
             let pt = DatePoint::new(
-                wednesday.into_inner().and_hms_opt(0, 0, 0).unwrap(),
-                DateTimeValue::from(wednesday).into_inner(),
+                wednesday.naive_date().and_hms_opt(0, 0, 0).unwrap(),
+                DateTimeValue::from(wednesday).utc(),
                 Precision::Date,
             );
             let dur = DurationValue::parse("1w 2d").unwrap();
             let shifted = pt.apply(&dur).expect("apply succeeds");
             assert_eq!(
                 shifted.wall.date(),
-                DateValue::parse_iso("2026-08-07").unwrap().into_inner()
+                DateValue::parse_iso("2026-08-07").unwrap().naive_date()
             );
             assert_eq!(shifted.precision, Precision::Date);
         }

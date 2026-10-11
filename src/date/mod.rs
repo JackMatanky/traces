@@ -9,7 +9,7 @@
 //! # Clock doctrine
 //!
 //! A naive datetime means what a human means: it is read in the process's local
-//! zone and stored as UTC (see [`local_naive_to_utc`]); a date-only value stays
+//! zone and stored as UTC (see [`resolve_local`]); a date-only value stays
 //! a zone-free civil date. Instants render as the local wall clock and travel
 //! as UTC for storage and comparison.
 //!
@@ -39,8 +39,8 @@ mod value;
 pub(crate) use calendar::Difference;
 pub(crate) use parse::{DateShape, DateTimeShape};
 pub(crate) use value::{
-    DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT, DatePoint, Precision,
-    RecognizedDate, RecognizedDateValue,
+    DATE_PATTERN, DATETIME_PATTERN, DatePoint, Precision, RecognizedDate,
+    RecognizedDateValue,
 };
 pub use value::{DateError, DateTimeValue, DateValue};
 

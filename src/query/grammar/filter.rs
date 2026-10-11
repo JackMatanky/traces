@@ -279,13 +279,13 @@ impl ValueExpr {
 fn date_point(value: &NoteFieldValue) -> Option<DatePoint> {
     match value {
         NoteFieldValue::Date(date) => Some(DatePoint::new(
-            date.into_inner().and_hms_opt(0, 0, 0)?,
-            DateTimeValue::from(*date).into_inner(),
+            date.naive_date().and_hms_opt(0, 0, 0)?,
+            DateTimeValue::from(*date).utc(),
             Precision::Date,
         )),
         NoteFieldValue::DateTime(datetime) => Some(DatePoint::new(
-            datetime.wall_or_utc(),
-            datetime.into_inner(),
+            datetime.local_wall_or_utc(),
+            datetime.utc(),
             Precision::DateTime,
         )),
         _ => None,

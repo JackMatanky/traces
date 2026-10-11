@@ -276,25 +276,25 @@ src/date/parse.rs: pub(crate) fn parse_with(
 src/date/value.rs: pub enum DateError {
 src/date/value.rs: pub struct DateTimeValue(pub(super) DateTime<Utc>);
 src/date/value.rs: pub struct DateValue(pub(super) NaiveDate);
-src/date/value.rs: pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
-src/date/value.rs: pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
+src/date/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
+src/date/value.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 src/date/value.rs: pub(crate) const fn has_time(&self) -> bool {
 src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
-src/date/value.rs: pub(crate) const fn into_inner(self) -> DateTime<Utc> {
-src/date/value.rs: pub(crate) const fn into_inner(self) -> NaiveDate {
+src/date/value.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
 src/date/value.rs: pub(crate) const fn new(
+src/date/value.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) enum Precision {
 src/date/value.rs: pub(crate) enum RecognizedDateValue {
 src/date/value.rs: pub(crate) fn date(&self) -> DateValue {
-src/date/value.rs: pub(crate) fn date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
 src/date/value.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
 src/date/value.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
-src/date/value.rs: pub(crate) fn is_equal_to_date(self, date: DateValue) -> bool {
+src/date/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
+src/date/value.rs: pub(crate) fn local_date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
+src/date/value.rs: pub(crate) fn local_wall_or_utc(self) -> NaiveDateTime {
 src/date/value.rs: pub(crate) fn point(&self) -> DatePoint {
 src/date/value.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
-src/date/value.rs: pub(crate) fn wall_or_utc(self) -> NaiveDateTime {
 src/date/value.rs: pub(crate) instant: DateTime<Utc>,
 src/date/value.rs: pub(crate) precision: Precision,
 src/date/value.rs: pub(crate) precision: Precision,
@@ -302,7 +302,7 @@ src/date/value.rs: pub(crate) struct DatePoint {
 src/date/value.rs: pub(crate) struct RecognizedDate {
 src/date/value.rs: pub(crate) value: RecognizedDateValue,
 src/date/value.rs: pub(crate) wall: NaiveDateTime,
-src/date/value.rs: pub(super) fn local_naive_to_utc(
+src/date/value.rs: pub(super) fn resolve_local(
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
 src/delimiter.rs: pub(crate) const fn close_len(self) -> usize {
@@ -676,7 +676,7 @@ src/lib.rs: pub use position::{PositionError, SourceLine};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
-src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
+src/lib.rs: pub(crate) use date::{DATE_PATTERN, DATETIME_PATTERN};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;
 src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
 src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_SPELLINGS_HINT};
