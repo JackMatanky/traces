@@ -23,6 +23,11 @@ files remain the detailed record and are cited inline — they live in
 | `crates` | [24-part-crates.md](units/24-part-crates.md) |
 | `codebase` | [24-part-codebase.md](units/24-part-codebase.md) |
 | `decomp` | [24-part-decomposition.md](units/24-part-decomposition.md) |
+| `stress-d` | [24-stress-test-dispatch-triggers.md](units/24-stress-test-dispatch-triggers.md) (adversarial pass, Q1/Q2, 2026-10-07) |
+| `stress-r` | [24-stress-test-resolve-ranking.md](units/24-stress-test-resolve-ranking.md) (adversarial pass, Q3/Q6) |
+| `stress-s` | [24-stress-test-snippet-frontmatter.md](units/24-stress-test-snippet-frontmatter.md) (adversarial pass, Q4/Q5) |
+| `stress-a` | [24-stress-test-aggression.md](units/24-stress-test-aggression.md) (aggression/anti-timidity pass, all six) |
+| `order` | [24-client-ordering-verification.md](units/24-client-ordering-verification.md) (Helix/Neovim-core/nvim-cmp ordering sweep, closes ST-K4) |
 
 **Corpus caveat** (all units): `docs/refs/lsp_spec.md`'s completion body is an unmaterialized Jekyll
 include (`{% include_relative language/completion.md %}`, `lsp_spec.md:659`) — the local file has TOC +
@@ -39,6 +44,9 @@ section below. Zed line numbers are against `zed-industries/zed` @ main fetched 
 ---
 
 ## 0. The four decision bullets at a glance
+
+> **Superseded in part by §11** (2026-10-07 stress-test revision). The grilling uses §11's
+> revised recommendations; this table is the pre-stress-test draft.
 
 Ticket 24's four bullets, answered (details in §1–§4; the seams and conflicts in §7–§9 are what the
 grilling should pressure-test):
@@ -667,6 +675,139 @@ trigger Q1/Q2/Q7, resolve Q3, item-shape S-5 refinement, capability §6 Zed colu
 | **31** (config trust) | Completion config access must route through the untrusted-roots decision (§7.14) |
 | **34** (packaging) | Classifier seam + `scan_marker_prefix` visibility widening (`dispatch:266-267`) |
 | **09/12/11/14** (substrate) | No changes; all units consumed them as settled constraints (`decomp:5-21`) |
+
+---
+
+## 11. Stress-test disposition & revised recommendations (2026-10-07, pre-grilling)
+
+The round-1 draft recommendations (Q1–Q6) were attacked by four adversarial subagent passes —
+three conflict hunts (`stress-d` Q1/Q2, `stress-r` Q3/Q6, `stress-s` Q4/Q5) and one anti-timidity
+aggression pass (`stress-a`). All findings dispositioned here; **§11.2 is the authoritative
+recommendation set for the grilling**. One draft recommendation was refuted and flipped (Q4).
+
+### 11.1 Disposition of findings
+
+Accepted (A) / rejected (R) / deferred (D). "→ N" = folded into §11.2's numbered contract lines.
+
+| ID | Sev | Disposition |
+| :-- | :-- | :--- |
+| ST-D1 + ST-A7 | H | **A** — one content snapshot per `(uri, version)` (Note+LineIndex+region table), shared by completion/hover/diagnostics; incremental splice at `didChange` is the target design, full scan the fallback; promoted to §7 contract 15; snapshot-vs-rescan + degenerate S2-miss row (≤0.3 ms p99) owed to 33 |
+| ST-D2 | H | **A** — strict-19 body `:`: completes only in open `[`-bracket inline-field shape (C8) or whole-line bare-field (`Key:`); every other prose colon declines on the miss path |
+| ST-D3 + ST-T8 | M | **A** — bare `[` tie-break: seed `[]` list with `isIncomplete: true`; C8 requires following key-char/`::`; `- [` + non-checkbox char declines checkbox layer, C8 only on `::` shape (answers 23's owed ambiguity) |
+| ST-D4 | H | **A** — C11 claimed narrowly: inside `](`, date-shaped guard (`^\d{4}-\d{2}(-\d{2})?` prefix), candidates = 18's ±7 set, entry via word-char/`Invoked`; if grilling refuses, amend 18 to "declined" — the §10 "deferral satisfied" claim cannot stand as written |
+| ST-D5 | M | **A (modified)** — 23's stage-2: fold top-K date values into the initial `📅 ` response (one round trip, strictly better under 20 ms); the enumerated `isIncomplete` seeding exception is kept for bare-`[` only |
+| ST-D6 | M | **A** — C13 predicate relaxed to `[!?` so `[` (registered) opens the 13-type list; `!` not registered |
+| ST-D7 | L | **A** — dispatcher return contract = `ContextKind` + replace range + filter word (consumed by item shape, filterText, `data.c`) |
+| ST-D8 | L | **A** — L1 code veto is fence-language-aware from day one (allowlist seam for 21-Phase-2 `traces-query`) |
+| ST-T1 + ST-A1 + ST-A3 | H | **A** — hardcode `[ # : @ . ^ >` in code; drop all config/phase machinery; `.` unconditional (22 is resolved and filed the request); `^`/`>` unconditional (17 resolved both features in scope); `(`/`"` join by code change when 21-Phase-2 lands |
+| ST-T2 + ST-T6 | H | **A** — degenerate-path contract: every trigger char (registered or not — Zed fans out the union) misses in O(line), ≤0.3 ms, never reaching S3–S8; non-empty responses only inside classified contexts; per-trigger histogram row owed to 33 |
+| ST-T3 | M | **A** — `/` joins the set with an `[[`-interior guard (rumdl's `/` requires `](`; disjoint by §2.3's own argument); no wikilink path-segment menu flicker in Zed |
+| ST-T4 | M | **A** — `|` alias vehicle closed: no `|` registration; alias candidates (15's data) ride the `[[target` response, capped, sortText group after the target itself |
+| ST-T5 | M | **A** — "both servers keep `isIncomplete: false`" reworded: Traces emits cap-conditional (+ seeding); 32 documents the rumdl-side ask and OR-coupling risk; no authority claimed over rumdl |
+| ST-T7 | L | **A** — Invoked-first contexts enumerated (C6 frontmatter keys, C16 include/extends names, template root names) and handed to 29's sparse-client floor; Zed `trigger_in_words` default owed as a verification item |
+| ST-A5 | M | **A** — §9.12 closed: v1 query-context entry = `Invoked` + `#`/`@`-inside-`{{ }}`; field-name completion in filters is invoke-discoverable until Phase 2 (stated limitation) |
+| ST-R1 + ST-A6 | H | **A** — resolve budget tightened p95 **≤1 ms** (stretch ≤0.5; work is µs-class) + new 33 row: 20-item burst ≤20 ms gate time; D7 duration histogram promoted to **launch gate**; escape if it fails = idle-time pre-resolution, not budget relaxation |
+| ST-R1b | M | **A** — server-side per-resolve deadline with fail-open (return item unchanged) is **required** (Zed cancels nothing); drop the "clients cancel stale resolve" rationale |
+| ST-R2 + ST-R5 | H | **A (inverts draft default)** — documentation is shipped **eagerly up to measured size N**, deferred only when prose > N, chosen per (session openness × doc size); Zed skips resolve for items that already have docs, so eager short docs collapse the ~20-item serial burst to the single selected item; also fixes the sparse-client floor (no-resolveSupport clients get the same short docs); N picked by measured S8 arms at implementation, not by default |
+| ST-R3 | M | **A** — D5.3 amended: one bounded, overlay-only resolve-time read is legal (create-note flow keeps docs); fallback order overlay → eager artifact → return unchanged |
+| ST-R4 | M | **A** — counts/layer badges mirror into top-level `detail` (zk-style, ≤~15 B/item) when they must be visible (Zed never renders `labelDetails`); handoff to 16/19 |
+| item-defaults | — | **A (reframe)** — ls-types/lsp-types 0.97 share the `CompletionList.item_defaults` omission; workaround is an upstream PR to tower-lsp-community/ls-types, not a permanent wall |
+| ST-S1 + ST-S2 | H | **A — draft Q4 (zero snippets, option B) refuted and FLIPPED to (A)**: A1's "user types `\|`" flow types it *outside* the link (cursor after `]]`); `snippetSupport` is verified true for all five primaries; no-auto-pair A1 is stock Neovim's default and 15 names Neovim the primary PKM demographic — (B) withdrew the ticket's own example from the primary demographic |
+| ST-S3 | M | **A** — corrected delta wording: the C13/S-18/R7 chain was already deferred either way; (B)'s real saving was one snippet body + escaping arm + one test |
+| ST-S4 | M | **A** — ladder guard added: `\|` between cursor and closing `]]` (e.g. `[[proj\|di]]`) **declines** in v1 (rare mid-edit state; prevents broken Markdown; Markdown Oxide's handling noted as future upgrade) |
+| ST-S5 | M | **A** — 5-minute bracket auto-pair check across VS Code/Zed/stock-Neovim/Helix = pre-implementation acceptance item, recorded in the Q4 decision record |
+| ST-S6 | — | **A** — state table (A1/B1/D1/alias-continuation) folded into Q4's contract; Q6-validity question noted as future-only (moot while plain track never keeps a bare `\|`) |
+| ST-F1 + ST-F4 | H | **A** — "values owned by 20" replaced: values are a **region with owners by key shape** — tag-list keys → C5 (16), schema-bound keys → C7/C17 (20), `[[`-inside-frontmatter-values → C1's completer with frontmatter-local range (new rung, capability add), else decline |
+| ST-F2 | MH | **A** — after-key predicate restated as a sustained position property: frontmatter line whose first `:` splits a bare-word key and the cursor is anywhere after it; explicit stances for indented nested keys (work), `- key:` sequence items (work), quoted keys (decline, documented) |
+| ST-F3 | M | **A** — before-`:` guards: bare-word check on the key shape, `#`-comment lines excluded, block-scalar/quoted-continuation interiors excluded via L1's memoized span marks (scan-based, never per-request YAML parse) |
+| ST-F5 | M | **A** — sequencing line recorded: C7/C17 ship with 20's implementation (dispatch returns empty, not erroring, until then); unbound-note value positions decline (no inferred-value completion in v1) |
+| ST-F6 | M | **A** — classifier emits `AfterKey { key }` (first-`:` split grammar), consumed by 20/C5; §8 correction: 20's key-position row is subsumed by 19's layer-1 key completion; 20 contributes value positions only |
+| ST-F7 | L | **A** — frontmatter region wins over `{{ }}` depth; `{{ }}` inside frontmatter values is YAML text (no template completion there in v1) |
+| ST-F8 | L | **A** — handoff to 20: chrono, not jiff (its tables still say jiff); format-aware placeholder only |
+| ST-K1 + ST-A2 | H | **A** — Q6's acceptance bound to three named counterweights: `sortText` = absolute only at empty input; `preselect` = rank-0 where honored (VS Code/Neovim; Zed/Helix absent — degradation noted to 23); **filterText split-word builder invariant** (natural typed form word-initial in `filterText`, enforced at the item builder — the sole ranking counterweight in Zed) with one test per context; degradation notes handed to 19/20/22; 20's "recently opened" class returned for a data-source decision (didOpen-session MRU vs drop) |
+| ST-K2 | M | **A** — filterText invariant (above); group order stated best-effort except at empty input |
+| ST-K3 | L | **A** — sortText gap-encoding declared empty-input-only, said plainly |
+| ST-K4 | M | **A — closed by `order` sweep**: Helix never reads `sortText` (empty-input order = our response array order — same observable result, weaker recovery guarantee: worded into the contract); Neovim core holds and is *stronger* than claimed (sortText ASC even under typed query with default `completeopt`; fuzzy rung opt-in and gated off at empty prefix); nvim-cmp refutes the general claim (sortText is the 7th comparator; source priority/recently-used/locality/kind dominate at empty input — **carved out: order under nvim-cmp is nvim-cmp's**); Neovim preselect is version-split (no-op on 0.12, honored on 0.13+ with `completeopt+=preselect`) — also fixes ST-K6 |
+| ST-K5 | L | **A** — S-4 tiebreak reworded: sortText unique per item by construction; further tiebreak unspecified client behavior |
+| ST-K6 | L | **A** — 23 handoff note: `preselect` no-ops in Zed/Helix; config order *is* the visible order there |
+| ST-A8 | L | **A** — dispatcher described as three tests + one dispatch; L0 is a contract line (trigger_kind never classifies); ticket 34's span-containment interface explicitly NOT designed in 24 — lexical v1, spans swap behind the enum when 11 lands |
+| ST-A9 | L | **A** — Q5 records the key→value handoff: word-char/`Invoked` entry (editor-dependent, accepted); commitCharacters and `command` re-trigger rechecked and still banned |
+| ST-A10 | L | **A (recorded restraint)** — global recency layer, tries, in-handler rayon, incremental filtering, prepared parse trees: correctly absent; table transcribed so they are not re-litigated |
+| caution list §3 | — | **A** — nine absence-of-evidence rows carried forward as risk items (rumdl resolveProvider, Neovim preselect honoring, VS Code details-pane resolve, `[[T\|]]` validity, multi-cursor matrix, MS cursor-gate, `enumerate()` side effects, post-accept trigger re-fire, Zed menu leftovers) |
+
+### 11.2 Revised recommendations (authoritative for the grilling)
+
+**Q1 — context detection**: layered hybrid as in §1, now with: content snapshot contract
+(one per `(uri, version)`, shared across handlers); return contract `ContextKind` + range +
+filter word; bare-`[` seeding; strict-19 body-`:` guard; C11 claimed (date-guarded) or 18
+amended; fence-language-aware code veto; L0 demoted to a contract line; the `[!?` callout
+relaxation; `- [t` answered (decline→C8-on-`::`).
+
+**Q2 — trigger set**: hardcoded `[ # : @ . ^ > /` — no config/phase machinery; `/` guarded
+to `[[`-interior; degenerate-path contract (O(line), ≤0.3 ms, any request including rumdl's
+union fan-out); `|` never registered, alias candidates ride the target-time response;
+`isIncomplete` claimed on our side only; Invoked-first contexts enumerated;
+`(`/`"` deferred with §9.12's entry mode stated.
+
+**Q3 — resolve split**: `resolveProvider: true`; detail always initial; immutable fields never
+deferred; documentation **eager up to measured size N, deferred only above N** (per session
+openness × doc size); stateless `data`; server-side deadline + fail-open required; one bounded
+overlay-only resolve-time read permitted; resolve p95 ≤1 ms + 20-burst ≤20 ms rows to 33;
+histogram = launch gate; counts/badges mirrored into `detail`; itemDefaults = upstream PR path.
+
+**Q4 — wikilink insert (FLIPPED)**: option (A) — range covers existing trailing `]]`; snippet
+`[[T|${1:}]]$0` gated on `snippetSupport` (true in all five primaries); state-aware plain
+track for gated-off clients: paired → `[[T|` (slot pre-opened, cursor inside), fresh → `[[T]]`
+(user adds `|`); `[[proj|di]]`-with-pipe guard declines; S-18 kept as the recorded rule for any
+future snippet re-adoption; auto-pair check = pre-implementation acceptance item.
+
+**Q5 — frontmatter `:`**: keys before (19's layers, guarded against comments/scalars via L1
+span marks), values after as a region with owners by key shape (16 tags / 20 schema+file /
+15 `[[` values / decline); after-key is a sustained position property emitting `AfterKey { key }`;
+frontmatter wins over `{{ }}` depth; sequencing and unbound-note lines recorded.
+
+**Q6 — ranking**: accept client re-sort, bound to the three counterweights — (a) our order is
+absolute at empty input via sortText **and the response array order** (Helix ignores sortText
+and uses array order; same observable for Traces); (b) `preselect` = rank-0 where honored
+(VS Code yes; Neovim 0.13+ with `completeopt+=preselect`, no-op on 0.12; Zed/Helix read it
+never/never-advertised — degradations noted to 23); (c) **filterText split-word builder
+invariant** (natural typed form word-initial, enforced at the item builder, one test per
+context — the sole ranking counterweight in Zed, a visibility-critical aid in Neovim's
+startswith matcher). Carve-out recorded: under nvim-cmp our order is never absolute
+(source priority/recently-used/locality dominate) — accepted, nvim-cmp users get cmp's own
+relevance; gap-encoding stays empty-input-only.
+
+### 11.3 Handoff deltas (extends §8/§10)
+
+- **15**: C1 range decision (A) + plain-track branches; the pipe-guard; the alias-vehicle
+  item-shape note; frontmatter `[[`-value rung; the two missing ownership rows (`](` completion,
+  standard-link navigation) still travel via 32.
+- **18**: C11 claimed (dispatch lands in 24's ladder) — or explicit amendment if refused.
+- **19**: sustained after-key predicate; before-branch guards; exclusive C6 ownership.
+- **20**: value enumeration (Select/Boolean/Date/File/class only); key row subsumed;
+  cap-conditional `isIncomplete`; chrono-not-jiff; recency data-source decision.
+- **16**: C5's entry predicate supplied by 24's classifier (after-key on tag-list keys).
+- **23**: stage-2 vehicle = folded top-K dates in the initial response (not `triggerSuggest`);
+  preselect degradation note.
+- **29**: Invoked-only floor list; seeding exception; labelDetails-mirror note; C13 example
+  column in `capability:68` is stale.
+- **31**: completion config access via the untrusted-roots decision (§7.14) — unchanged.
+- **32**: `](` ownership pick; rumdl `isIncomplete` ask + OR-coupling risk; 15's imprecise
+  "Traces handles wikilink completion" comment corrected (rumdl never completed wikilinks).
+- **33**: resolve ≤1 ms + burst ≤20 ms rows; degenerate/miss-path row (per-trigger histogram);
+  S1/S2 shared-snapshot measurement; launch-gate sentence for the resolve histogram.
+- **34**: classifier enum seam stands; span-containment interface out of scope for 24.
+- **ls-types**: upstream PR for `CompletionList.item_defaults`.
+
+### 11.4 Verification gates (pre-implementation, cheap)
+
+1. Bracket auto-pair defaults across VS Code / Zed / stock-Neovim / Helix (ST-S5).
+2. Multi-cursor plain-insert matrix before 29 documents support (`snippet:516-521`).
+3. Zed `trigger_in_words` / `show_edit_predictions_in_menu` default (ST-T7).
+4. ~~Helix + Neovim-core + nvim-cmp ordering sweep (ST-K4)~~ — **closed 2026-10-07** by `order`;
+   corrections folded into §11.2's Q6.
+5. Post-accept trigger re-fire semantics (whether accept re-fires registered chars — affects
+   the key→value handoff; if they do re-fire, strictly better, no design change).
 
 ---
 
