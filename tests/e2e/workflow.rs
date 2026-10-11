@@ -98,20 +98,34 @@ fn stream_contracts_exact_outputs_and_mutating_empty_stdout() {
     sandbox.write_template("alpha.md", "Template alpha content\n");
     sandbox.write_note("notes/first.md", "# First note\n");
 
-    let canonical_root =
-        sandbox.root().canonicalize().expect("canonicalize root");
-    let root_str = canonical_root.to_string_lossy();
-    let config_path_str = canonical_root
-        .join(".traces/config.toml")
-        .to_string_lossy()
-        .into_owned();
-
     // Mutating: `trust`
     let trust = sandbox.run(&["trust"]);
     trust.assert_code(0);
     trust.assert_never_exit_101();
     trust.assert_stdout_eq("");
-    trust.assert_stderr_eq(&format!("trusted {root_str}\n"));
+    // Captures the raw reported root (not an independently computed
+    // canonical form) for self-consistent reuse below: Windows's
+    // `current_dir` can echo a short (8.3) alias distinct from the
+    // sandbox's own un-resolved tempdir path despite both naming the same
+    // directory, so only this process's own report is safe to compare
+    // against its own later output.
+    let root_str = trust
+        .stderr
+        .strip_prefix("trusted ")
+        .and_then(|s| s.strip_suffix('\n'))
+        .expect("trust stderr reports the trusted root")
+        .to_owned();
+    let reported_root = std::path::PathBuf::from(&root_str);
+    assert_eq!(
+        reported_root.canonicalize().expect("canonicalize reported root"),
+        sandbox.root().canonicalize().expect("canonicalize sandbox root"),
+        "trusted root mismatch; stderr: {}",
+        trust.stderr
+    );
+    let config_path_str = reported_root
+        .join(".traces/config.toml")
+        .to_string_lossy()
+        .into_owned();
 
     // Query stream: `trust list`
     let trust_list = sandbox.run(&["trust", "list"]);
@@ -155,7 +169,7 @@ fn stream_contracts_exact_outputs_and_mutating_empty_stdout() {
     tmpl_inst.assert_stdout_eq("");
     tmpl_inst.assert_stderr_eq(&format!(
         "wrote {}\n",
-        canonical_root.join("alpha.md").display()
+        reported_root.join("alpha.md").display()
     ));
 
     // Mutating: `trust clean`

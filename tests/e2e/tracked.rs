@@ -7,6 +7,8 @@
 //! runs a load-triggering command (`index`) first to record the local config as
 //! a tracked entry.
 
+use std::path::Path;
+
 use super::support::Sandbox;
 
 /// Runs `index` to populate the tracked-config store, then checks `tracked
@@ -23,11 +25,9 @@ fn list_prints_every_tracked_config_path() {
 
     let list = sandbox.run(&["tracked", "list"]);
     assert!(list.is_success(), "stderr: {}", list.stderr);
-    assert!(
-        list.stdout.contains(".traces/config.toml"),
-        "stdout: {}",
-        list.stdout
-    );
+    let expected_suffix =
+        Path::new(".traces").join("config.toml").to_string_lossy().into_owned();
+    assert!(list.stdout.contains(&expected_suffix), "stdout: {}", list.stdout);
 }
 
 /// Deletes a tracked entry's config file to make it stale, then checks
