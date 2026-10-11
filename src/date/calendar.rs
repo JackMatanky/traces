@@ -83,12 +83,13 @@ impl DateComponent {
     }
 }
 
-/// Maps a weekday number to a [`Weekday`]: `1` is Monday through `7` Sunday,
-/// and `0` is accepted as Monday.
+/// Maps an ISO weekday number to a [`Weekday`]: `1` is Monday through `7`
+/// Sunday. `0` is rejected because Sunday-based conventions disagree on it
+/// (Sunday is `0` in some and `1` in others).
 #[must_use]
 pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
     match n {
-        0 | 1 => Some(Weekday::Mon),
+        1 => Some(Weekday::Mon),
         2 => Some(Weekday::Tue),
         3 => Some(Weekday::Wed),
         4 => Some(Weekday::Thu),

@@ -413,6 +413,7 @@ fn template_filters_support_bucketing_aliases_and_weekday_arg() {
 
 /// Proves template weekday rejects out-of-range argument.
 #[rstest]
+#[case::zero(0)]
 #[case::above_range(8)]
 #[case::negative(-1)]
 #[case::far_out_of_range(99)]

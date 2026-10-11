@@ -407,14 +407,14 @@ fn shorthand(anchor: Anchor) -> Value {
     )
 }
 
-/// Maps a weekday number (`0` or `1` Monday through `7` Sunday) to a weekday.
+/// Maps an ISO weekday number (`1` Monday through `7` Sunday) to a weekday.
 fn weekday_or_error(n: i64) -> TemplateEngineResult<chrono::Weekday> {
     weekday_from_number(n).ok_or_else(|| {
         Error::new(
             ErrorKind::InvalidOperation,
             format!(
-                "weekday index {n} is out of range (expected 0..=7 under ISO \
-                 Monday convention)"
+                "weekday index {n} is out of range (expected 1..=7, Monday = \
+                 1 through Sunday = 7)"
             ),
         )
     })

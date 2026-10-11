@@ -149,7 +149,7 @@ This register documents intentional architectural and behavioral divergences bet
 
 ### Entry 21: ISO Weekday Numbering in the Template `weekday` Filter
 
-- **Divergence**: The template `weekday` filter without an argument returns the ISO weekday number, Monday = 1 through Sunday = 7, matching `date_component(..., "weekday")` in queries. `weekday(n)` still accepts `0..=7` (`0` and `1` both select Monday).
+- **Divergence**: The template `weekday` filter without an argument returns the ISO weekday number, Monday = 1 through Sunday = 7, matching `date_component(..., "weekday")` in queries. `weekday(n)` accepts only `1..=7`; `0` is rejected because Sunday-based conventions disagree on it (Sunday is `0` in Moment.js and `1` in US-style 1-7 numbering).
 - **External Behavior**: Moment.js and Templater return `0`-`6`, Sunday-based.
 - **Rationale**: One weekday numbering across templates and queries, consistent with the pinned ISO Monday weeks of Entry 7.
 - **Specification**: Spec Story 18, Ticket 07.
