@@ -17,11 +17,15 @@ Once the per-feature completion decisions (tickets 15 links, 16 tags, 19 frontma
 
 Research layout (decided 2026-10-07): the consolidated research file is
 [`research/24-completion-architecture.md`](../research/24-completion-architecture.md) (repo
-convention: one research file per ticket); the 12 evidence files it cites by `tag:line` live in
-[`research/units/`](../research/units/). Merging those 12 into fewer files would invalidate ~216
+convention: one research file per ticket); the 12 evidence files it cites by `tag:line` lived in
+`research/units/`. Merging those 12 into fewer files would invalidate ~216
 line-relative citation edges (130 in the consolidation, 85 unit↔unit, plus audits), so **merging is
 deferred**: at resolution, delete (or archive) `research/units/` and keep the consolidation as the
 single permanent research record — the same shape as tickets 15–23.
+
+> **Executed 2026-10-07**: `research/units/` deleted after the resolution commit; evidence is
+> recoverable from git history (`61cb98ab`, `428afe65` + cleanup commit). The consolidation's
+> shorthand table now names the files without links.
 
 ## Answer
 

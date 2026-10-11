@@ -3,31 +3,32 @@
 Date: 2026-10-07. Status: research consolidation for the **grilling session** on
 [issues/24-completion-architecture.md](../issues/24-completion-architecture.md) (`Status: claimed`,
 not resolved). This file integrates every ticket-24 research input into one place; the per-unit
-files remain the detailed record and are cited inline — they live in
-[`units/`](units/) (moved there 2026-10-07; citation tags resolve via this table, so the
-`tag:line` citations are path-independent).
+files remain the detailed record and are cited inline — they lived in
+`research/units/` and are **deleted at resolution** (2026-10-07), recoverable from git history
+(commits `61cb98ab`, `428afe65`); citation tags resolve via this table, so the `tag:line`
+citations stay meaningful — retrieve the named file from history to follow one.
 
 **Citation shorthand** (file : line):
 
 | Tag | File |
 | :-- | :--- |
-| `dispatch` | [24-completion-dispatch-architecture.md](units/24-completion-dispatch-architecture.md) (unit 1) |
-| `trigger` | [24-completion-trigger-characters-rumdl.md](units/24-completion-trigger-characters-rumdl.md) (unit 2) |
-| `item-shape` | [24-completion-item-shape-and-ranking.md](units/24-completion-item-shape-and-ranking.md) (unit 3) |
-| `resolve` | [24-completion-resolve-lazy-detail.md](units/24-completion-resolve-lazy-detail.md) (unit 4) |
-| `snippet` | [24-snippet-completion-insertions.md](units/24-snippet-completion-insertions.md) (unit 5) |
-| `latency` | [24-completion-latency-architecture.md](units/24-completion-latency-architecture.md) (unit 6) |
-| `novel` | [24-novel-embedded-context-precedent.md](units/24-novel-embedded-context-precedent.md) (unit 7) |
-| `capability` | [24-completion-capability-negotiation.md](units/24-completion-capability-negotiation.md) (unit 8) |
-| `zed` | [24-zed-client-reality.md](units/24-zed-client-reality.md) (Zed primary-target verification pass, 2026-10-07) |
-| `crates` | [24-part-crates.md](units/24-part-crates.md) |
-| `codebase` | [24-part-codebase.md](units/24-part-codebase.md) |
-| `decomp` | [24-part-decomposition.md](units/24-part-decomposition.md) |
-| `stress-d` | [24-stress-test-dispatch-triggers.md](units/24-stress-test-dispatch-triggers.md) (adversarial pass, Q1/Q2, 2026-10-07) |
-| `stress-r` | [24-stress-test-resolve-ranking.md](units/24-stress-test-resolve-ranking.md) (adversarial pass, Q3/Q6) |
-| `stress-s` | [24-stress-test-snippet-frontmatter.md](units/24-stress-test-snippet-frontmatter.md) (adversarial pass, Q4/Q5) |
-| `stress-a` | [24-stress-test-aggression.md](units/24-stress-test-aggression.md) (aggression/anti-timidity pass, all six) |
-| `order` | [24-client-ordering-verification.md](units/24-client-ordering-verification.md) (Helix/Neovim-core/nvim-cmp ordering sweep, closes ST-K4) |
+| `dispatch` | `24-completion-dispatch-architecture.md` (unit 1) |
+| `trigger` | `24-completion-trigger-characters-rumdl.md` (unit 2) |
+| `item-shape` | `24-completion-item-shape-and-ranking.md` (unit 3) |
+| `resolve` | `24-completion-resolve-lazy-detail.md` (unit 4) |
+| `snippet` | `24-snippet-completion-insertions.md` (unit 5) |
+| `latency` | `24-completion-latency-architecture.md` (unit 6) |
+| `novel` | `24-novel-embedded-context-precedent.md` (unit 7) |
+| `capability` | `24-completion-capability-negotiation.md` (unit 8) |
+| `zed` | `24-zed-client-reality.md` (Zed primary-target verification pass, 2026-10-07) |
+| `crates` | `24-part-crates.md` |
+| `codebase` | `24-part-codebase.md` |
+| `decomp` | `24-part-decomposition.md` |
+| `stress-d` | `24-stress-test-dispatch-triggers.md` (adversarial pass, Q1/Q2, 2026-10-07) |
+| `stress-r` | `24-stress-test-resolve-ranking.md` (adversarial pass, Q3/Q6) |
+| `stress-s` | `24-stress-test-snippet-frontmatter.md` (adversarial pass, Q4/Q5) |
+| `stress-a` | `24-stress-test-aggression.md` (aggression/anti-timidity pass, all six) |
+| `order` | `24-client-ordering-verification.md` (Helix/Neovim-core/nvim-cmp ordering sweep, closes ST-K4) |
 
 **Corpus caveat** (all units): `docs/refs/lsp_spec.md`'s completion body is an unmaterialized Jekyll
 include (`{% include_relative language/completion.md %}`, `lsp_spec.md:659`) — the local file has TOC +
