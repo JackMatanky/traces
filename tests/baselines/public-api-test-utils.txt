@@ -3064,6 +3064,9 @@ pub fn traces_pkm::DurationValue::mul(self, f64) -> Self
 impl core::ops::arith::Mul<traces_pkm::DurationValue> for f64
 pub type f64::Output = traces_pkm::DurationValue
 pub fn f64::mul(self, traces_pkm::DurationValue) -> traces_pkm::DurationValue
+impl core::ops::arith::Neg for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::neg(self) -> Self
 impl core::ops::arith::Sub for traces_pkm::DurationValue
 pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::sub(self, Self) -> Self

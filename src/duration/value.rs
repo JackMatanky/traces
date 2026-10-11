@@ -3,7 +3,7 @@ use std::{
     cmp::Ordering,
     fmt::{self, Write as _},
     hash::Hash,
-    ops::{Add, Mul, Sub},
+    ops::{Add, Mul, Neg, Sub},
     str::FromStr,
 };
 
@@ -651,6 +651,21 @@ impl Mul<f64> for DurationValue {
                 components: None,
             }
         }
+    }
+}
+
+/// Negation; identical to scaling by `-1.0`.
+impl Neg for DurationValue {
+    type Output = Self;
+
+    #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "duration scaling preserves non-finite results without \
+                  panicking"
+    )]
+    fn neg(self) -> Self {
+        self * -1.0
     }
 }
 
@@ -1819,6 +1834,20 @@ mod tests {
                     scaled.nominal_seconds().0.to_bits(),
                     13_500.0_f64.to_bits()
                 );
+            }
+
+            #[test]
+            fn neg_equals_scaling_by_minus_one() {
+                // Arrange
+                let dv = DurationValue::parse("1h").unwrap();
+
+                // Act
+                let negated = -dv.clone();
+                let scaled = dv * -1.0;
+
+                // Assert
+                assert_eq!(negated, DurationValue::parse("-1h").unwrap());
+                assert_eq!(negated.as_str(), scaled.as_str());
             }
 
             #[test]

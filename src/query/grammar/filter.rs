@@ -376,9 +376,7 @@ fn evaluate_binary(
             date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Sub,
             NoteFieldValue::Duration(duration),
-        ) => Some(field_value_of(
-            point_of(&date)?.apply(&(duration * -1.0)).ok()?,
-        )),
+        ) => Some(field_value_of(point_of(&date)?.apply(&-duration).ok()?)),
         (
             date1 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
             ArithOp::Sub,
@@ -901,9 +899,9 @@ impl FilterGrammar {
             ValueExpr::Literal(NoteFieldValue::Number(number)) => {
                 Ok(ValueExpr::Literal(NoteFieldValue::Number(-number)))
             }
-            ValueExpr::Literal(NoteFieldValue::Duration(duration)) => Ok(
-                ValueExpr::Literal(NoteFieldValue::Duration(duration * -1.0)),
-            ),
+            ValueExpr::Literal(NoteFieldValue::Duration(duration)) => {
+                Ok(ValueExpr::Literal(NoteFieldValue::Duration(-duration)))
+            }
             _ => Err(QuerySyntaxError::unexpected_end(
                 QueryDialect::Filter,
                 input,
