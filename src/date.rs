@@ -220,6 +220,21 @@ impl DateValue {
             }));
         }
 
+        // Date-only shapes are at most 10 bytes; even the shortest date-time
+        // shape (YYYY-M-DTH:M) is 12, so the date-time cascade cannot match.
+        if trimmed.len() <= 10 {
+            return Some(match DateFormat::parse_any(trimmed) {
+                Ok((date, precision)) => Ok(RecognizedDate {
+                    value: RecognizedDateValue::Date(Self(date)),
+                    precision,
+                }),
+                Err(source) => Err(DateError::Unparseable {
+                    input: trimmed.into(),
+                    source,
+                }),
+            });
+        }
+
         match DateTimeFormat::parse_any(trimmed) {
             Ok(ParsedDateTimeShape::Rfc3339(instant)) => {
                 Some(Ok(RecognizedDate {
@@ -2141,6 +2156,41 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+
+        #[test]
+        fn classify_short_inputs_match_pre_gate_results() {
+            // Arrange
+            let cases = [
+                ("2026-07-29", Precision::Date),
+                ("2026-07", Precision::YearMonth),
+                ("2026-1-1", Precision::Date),
+            ];
+
+            // Act & Assert
+            for (text, precision) in cases {
+                assert_eq!(
+                    DateValue::classify(text).unwrap().unwrap().precision,
+                    precision
+                );
+            }
+            assert!(matches!(
+                DateValue::classify("26-08-22"),
+                Some(Err(DateError::InvalidYearDigits { .. }))
+            ));
+            assert!(DateValue::classify("2026/08/22").is_none());
+
+            let failures = ["2026-13", "2026-02-30"];
+            let messages = failures.map(|text| {
+                let err = DateValue::classify(text).unwrap().unwrap_err();
+                assert!(matches!(err, DateError::Unparseable { .. }));
+                err.to_string()
+            });
+            assert_eq!(messages, [
+                "`2026-13` is not a recognized date/time: input is out of \
+                 range",
+                "`2026-02-30` is not a recognized date/time: trailing input",
+            ]);
+        }
 
         #[test]
         fn returns_none_for_non_temporal_text() {
