@@ -147,6 +147,15 @@ pub enum CliError {
         /// The root that already has a `.traces` directory.
         root: PathBuf,
     },
+    /// The chosen template directory is not a valid workspace-relative path.
+    #[error("invalid template directory {directory}")]
+    InitInvalidTemplateDir {
+        /// The directory as typed by the user.
+        directory: PathBuf,
+        /// Source path-validation error.
+        #[source]
+        source: ConfigValueError,
+    },
     /// Scaffolding `.traces`/`.traces/templates` under `root` failed.
     #[error("failed to scaffold traces in {root}")]
     InitScaffold {
@@ -286,6 +295,9 @@ impl Diagnostic for CliError {
             Self::InitAlreadyInitialized {
                 ..
             } => "traces::cli::init::already_initialized",
+            Self::InitInvalidTemplateDir {
+                ..
+            } => "traces::cli::init::invalid_template_dir",
             Self::InitScaffold {
                 ..
             } => "traces::cli::init::scaffold_failed",
@@ -422,6 +434,12 @@ const fn static_help(error: &CliError) -> Option<&'static str> {
         } => Some(
             "remove the existing .traces directory or run init from a \
              different directory",
+        ),
+        CliError::InitInvalidTemplateDir {
+            ..
+        } => Some(
+            "use a directory inside the project: relative, without `..`, and \
+             not through a symlink that leaves it",
         ),
         CliError::InitScaffold {
             ..

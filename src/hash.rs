@@ -1,7 +1,7 @@
-//! Hash file contents and path bytes with BLAKE3.
+//! Hash file contents, framed fields, and path bytes with BLAKE3.
 //!
 //! Main types:
-//! - [`Blake3FileHash`] - BLAKE3 digest of file contents
+//! - [`Blake3Digest`] - BLAKE3 digest of file contents or framed fields
 //! - [`Blake3PathHash`] - BLAKE3 hex digest of path bytes
 //! - [`HashError`] - File-read failure while hashing contents
 
@@ -13,32 +13,23 @@ use std::{
 
 use thiserror::Error;
 
-/// Stores a BLAKE3 hash of file contents.
+/// Stores a BLAKE3 digest: of file contents ([`Self::from_path`],
+/// `From<&str>`) or of structured values built with [`Blake3Hasher`].
 ///
 /// Prefer hashing already-loaded content when the caller has it. Hashing a path
-/// and then reading the same path again creates a time-of-check to
-/// time-of-use window where the file contents can change between reads.
+/// and then reading the same path again creates a time-of-check to time-of-use
+/// window where the file contents can change between reads.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Blake3FileHash(blake3::Hash);
+pub struct Blake3Digest(blake3::Hash);
 
-impl From<&str> for Blake3FileHash {
+impl From<&str> for Blake3Digest {
     #[inline]
     fn from(content: &str) -> Self {
         Self(blake3::hash(content.as_bytes()))
     }
 }
 
-impl Blake3FileHash {
-    /// Finalizes `hasher` into a digest.
-    ///
-    /// Lets in-crate callers fingerprint structured data without first
-    /// serializing it into a buffer.
-    #[inline]
-    #[must_use]
-    pub(crate) fn from_hasher(hasher: &blake3::Hasher) -> Self {
-        Self(hasher.finalize())
-    }
-
+impl Blake3Digest {
     /// Computes the BLAKE3 hash of `path`'s current contents.
     ///
     /// Reads `path` fully into memory before hashing. Use this only when the
@@ -65,7 +56,63 @@ impl Blake3FileHash {
     }
 }
 
-impl Display for Blake3FileHash {
+/// Incremental, injective encoder behind structured fingerprints.
+///
+/// Every field is length-prefixed with a little-endian `u64`, so no value, even
+/// one containing delimiter bytes, can be re-read as a different field split.
+/// Paths are fed as raw OS bytes, and optional paths carry a presence tag so
+/// `None` differs from an empty path. The framing is part of every persisted
+/// digest: changing it invalidates them.
+#[derive(Debug)]
+pub(crate) struct Blake3Hasher(blake3::Hasher);
+
+impl Blake3Hasher {
+    /// Starts an empty fingerprint.
+    #[must_use]
+    pub(crate) fn new() -> Self {
+        Self(blake3::Hasher::new())
+    }
+
+    /// Feeds `bytes` behind a length prefix.
+    pub(crate) fn bytes(&mut self, bytes: &[u8]) {
+        self.len(bytes.len());
+        self.0.update(bytes);
+    }
+
+    /// Feeds `len` as a little-endian `u64`.
+    ///
+    /// Saturates instead of truncating; a length above `u64::MAX` is
+    /// unreachable for in-memory data.
+    pub(crate) fn len(&mut self, len: usize) {
+        self.0.update(&u64::try_from(len).unwrap_or(u64::MAX).to_le_bytes());
+    }
+
+    /// Feeds `path`'s raw OS bytes, so non-UTF-8 paths stay distinct.
+    pub(crate) fn path(&mut self, path: &Path) {
+        self.bytes(path.as_os_str().as_encoded_bytes());
+    }
+
+    /// Feeds an optional path behind a presence tag.
+    pub(crate) fn optional_path(&mut self, path: Option<&Path>) {
+        match path {
+            Some(path) => {
+                self.0.update(&[1]);
+                self.path(path);
+            }
+            None => {
+                self.0.update(&[0]);
+            }
+        }
+    }
+
+    /// Finalizes the fingerprint into a digest.
+    #[must_use]
+    pub(crate) fn finish(self) -> Blake3Digest {
+        Blake3Digest(self.0.finalize())
+    }
+}
+
+impl Display for Blake3Digest {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
@@ -145,8 +192,8 @@ mod tests {
             fs::write(&path, "hello").expect("write file");
 
             // Act
-            let first = Blake3FileHash::from_path(path.as_path());
-            let second = Blake3FileHash::from_path(path.as_path());
+            let first = Blake3Digest::from_path(path.as_path());
+            let second = Blake3Digest::from_path(path.as_path());
 
             // Assert
             assert!(first.is_ok());
@@ -164,8 +211,8 @@ mod tests {
             fs::write(&path2, "goodbye").expect("write file 2");
 
             // Act
-            let first = Blake3FileHash::from_path(path1.as_path());
-            let second = Blake3FileHash::from_path(path2.as_path());
+            let first = Blake3Digest::from_path(path1.as_path());
+            let second = Blake3Digest::from_path(path2.as_path());
 
             // Assert
             assert!(first.is_ok());
@@ -180,7 +227,7 @@ mod tests {
             let path = temp.path().join("missing.txt");
 
             // Act
-            let result = Blake3FileHash::from_path(path.as_path());
+            let result = Blake3Digest::from_path(path.as_path());
 
             // Assert
             assert!(matches!(result, Err(HashError { .. })));
@@ -193,7 +240,7 @@ mod tests {
             let path = temp.path().join("file.txt");
             fs::write(&path, "hello").expect("write file");
             let hash =
-                Blake3FileHash::from_path(path.as_path()).expect("hash file");
+                Blake3Digest::from_path(path.as_path()).expect("hash file");
 
             // Act
             let display_string = format!("{hash}");
@@ -202,6 +249,55 @@ mod tests {
             assert_eq!(display_string.len(), 64);
             let expected_raw_hash = blake3::hash(b"hello").to_hex().to_string();
             assert_eq!(display_string, expected_raw_hash);
+        }
+    }
+
+    mod fingerprint {
+        use pretty_assertions::assert_ne;
+
+        use super::*;
+
+        fn digest(feed: impl FnOnce(&mut Blake3Hasher)) -> Blake3Digest {
+            let mut fp = Blake3Hasher::new();
+            feed(&mut fp);
+            fp.finish()
+        }
+
+        #[test]
+        fn length_prefixes_keep_adjacent_fields_apart() {
+            let first = digest(|fp| {
+                fp.bytes(b"a\0b");
+                fp.bytes(b"c");
+            });
+            let second = digest(|fp| {
+                fp.bytes(b"a");
+                fp.bytes(b"b\0c");
+            });
+
+            assert_ne!(first, second);
+        }
+
+        #[test]
+        fn an_absent_optional_path_differs_from_an_empty_one() {
+            let absent = digest(|fp| fp.optional_path(None));
+            let empty = digest(|fp| fp.optional_path(Some(Path::new(""))));
+
+            assert_ne!(absent, empty);
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn paths_differing_only_in_non_utf8_bytes_stay_distinct() {
+            use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+
+            let first = digest(|fp| {
+                fp.path(Path::new(OsStr::from_bytes(b"/p\xFF")));
+            });
+            let second = digest(|fp| {
+                fp.path(Path::new(OsStr::from_bytes(b"/p\xFE")));
+            });
+
+            assert_ne!(first, second);
         }
     }
 

@@ -185,8 +185,8 @@ impl Commands {
     ) -> CliResult {
         match self {
             Self::Init(args) => args.run(provider.as_ref()),
-            Self::Trust(args) => args.run(service.trust_store()),
-            Self::Untrust(args) => args.run(service.trust_store()),
+            Self::Trust(args) => args.run(service),
+            Self::Untrust(args) => args.run(service),
             Self::Index(args) => {
                 run_with_config(service, |config| args.run(config))
             }
@@ -256,11 +256,11 @@ fn load_config(service: &ConfigService) -> Result<Config, CliError> {
 /// Loads the current configuration and runs `handler` against a reference to
 /// it.
 ///
-/// Isolates the [`Config`]-sized stack temporary in its own non-inlined
-/// frame, away from the larger multi-arm dispatch frames in [`Cli::run`] and
-/// [`Commands::run`] (`clippy::large_stack_frames` otherwise sums every
-/// match arm's locals, including every other arm's [`CliError`] payload,
-/// into those functions' frames).
+/// Isolates the [`Config`]-sized stack temporary in its own non-inlined frame,
+/// away from the larger multi-arm dispatch frames in [`Cli::run`] and
+/// [`Commands::run`] (`clippy::large_stack_frames` otherwise sums every match
+/// arm's locals, including every other arm's [`CliError`] payload, into those
+/// functions' frames).
 ///
 /// # Errors
 ///
@@ -365,8 +365,8 @@ fn refresh_query<'a>(
     run_query_builder_from_store(config, &store, builder, has_classes)
 }
 
-/// Synchronizes `root`'s index store and returns page-level records selected
-/// by `from`, filtered by `filters` (composed as AND), and ordered by `order`.
+/// Synchronizes `root`'s index store and returns page-level records selected by
+/// `from`, filtered by `filters` (composed as AND), and ordered by `order`.
 ///
 /// Shared by [`list::List`] and [`table::Table`].
 ///
@@ -390,8 +390,8 @@ fn refresh_page_query(
     )
 }
 
-/// Synchronizes `root`'s index store and returns task-level records selected
-/// by `from`, filtered by `filters` (composed as AND), and ordered by `order`.
+/// Synchronizes `root`'s index store and returns task-level records selected by
+/// `from`, filtered by `filters` (composed as AND), and ordered by `order`.
 ///
 /// Shared by [`task::Task`].
 ///
@@ -410,8 +410,8 @@ fn refresh_task_query<'a>(
 
 /// Parses an optional source expression string into a [`SourceSelector`].
 ///
-/// Normalizes unadorned relative paths pointing to existing `.md` files
-/// under `config`'s root by appending the `.md` extension.
+/// Normalizes unadorned relative paths pointing to existing `.md` files under
+/// `config`'s root by appending the `.md` extension.
 ///
 /// # Errors
 ///
@@ -431,8 +431,8 @@ fn parse_source(
 /// `root` by appending the `.md` extension.
 ///
 /// Leaves tags (`#tag`), classes (`@Class`), folder globs, and already-quoted
-/// expressions untouched. Paths containing whitespace are enclosed in quotes
-/// so the query source lexer tokenizes them as a single quoted path atom.
+/// expressions untouched. Paths containing whitespace are enclosed in quotes so
+/// the query source lexer tokenizes them as a single quoted path atom.
 fn normalize_source_input<'a>(
     root: &Path,
     input: &'a str,
@@ -535,7 +535,7 @@ fn resolve_trust_subjects(
     } else {
         TrustScope::NearestLocal
     };
-    crate::config::trust_requests(path, scope).map_err(|source| {
+    ConfigService::trust_subjects(path, scope).map_err(|source| {
         CliError::TrustTargetResolve {
             path: path.to_path_buf(),
             source,

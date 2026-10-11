@@ -6,74 +6,36 @@
 //! # Loading Pipeline
 //!
 //! 1. Discover local and global TOML candidates from `cwd`.
-//! 2. Record local candidates in the tracking store.
-//! 3. Verify trust before parsing local content.
-//! 4. Parse TOML into [`super::raw::RawConfig`].
-//! 5. Merge global before local so local values win.
+//! 2. Record the local candidate in the tracking store (best-effort), then
+//!    verify trust before parsing its content.
+//! 3. Parse TOML into [`super::raw::RawConfig`].
+//! 4. Merge global before local so local values win.
 //!
-//! Trust administration resolves subjects and persists durable state through
-//! two stores owned by [`ConfigService`]: [`TrustStore`] and
-//! [`TrackerStore`].
+//! Granting trust records a config subject in the tracking store first, so
+//! every trusted root that has a local config has that config path tracked.
+//! [`ConfigService::trust_subjects`] resolves a user-supplied path into trust
+//! subjects. Durable state lives in two stores owned by [`ConfigService`]:
+//! [`TrustStore`] and [`TrackerStore`].
 
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use super::{
     ConfigBuilder,
-    discovery::{self, DiscoveryContext, DiscoveryOutcome},
+    discovery::{ConfigLocator, DiscoveredConfigs},
     error::{
         ConfigDiscoveryError, ConfigDiscoveryResult, ConfigError,
         ConfigTrustError,
     },
     file::{
-        Discovered as FileDiscovered, GlobalConfigFile, LocalConfigFile,
-        Parsed, TrustOutcome, Trusted,
+        Discovered as FileDiscovered, GlobalConfigFile, LocalConfigFile, Parsed,
     },
     model::Config,
     tracker::TrackerStore,
-    trust::{TrustRequest, TrustStore},
+    trust::{TrustRequest, TrustRequests, TrustScope, TrustStore},
 };
-
-/// Selects the deepest local config containing the discovery anchor, plus the
-/// optional global config merged before it.
-#[derive(Debug)]
-struct ConfigBuilderInput {
-    /// Selected local config; this is merged after `global`.
-    local: LocalConfigFile<FileDiscovered>,
-    /// Optional global config; this is merged before `local`.
-    global: Option<GlobalConfigFile<FileDiscovered>>,
-}
-
-impl TryFrom<DiscoveryOutcome> for ConfigBuilderInput {
-    type Error = ConfigError;
-
-    #[inline]
-    fn try_from(outcome: DiscoveryOutcome) -> Result<Self, Self::Error> {
-        let (_kind, anchor, discovered_locals, discovered_globals) =
-            outcome.into_parts();
-        let anchor_path = anchor.path().to_path_buf();
-
-        let discovered_locals = discovered_locals.into_vec();
-        if discovered_locals.is_empty() {
-            return Err(ConfigDiscoveryError::NotFound {
-                cwd: anchor_path,
-            }
-            .into());
-        }
-
-        let local = discovered_locals
-            .into_iter()
-            .filter(|file| anchor_path.starts_with(file.root()))
-            .max_by_key(|file| file.root().components().count())
-            .ok_or(ConfigDiscoveryError::NotFound {
-                cwd: anchor_path,
-            })?;
-        let global = discovered_globals.into_iter().next();
-        Ok(Self {
-            local,
-            global,
-        })
-    }
-}
 
 /// Entry point for config loading and trust administration.
 ///
@@ -146,41 +108,24 @@ impl ConfigService {
     ///   validation.
     #[inline]
     pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
-        let discovered = Self::discover(cwd)?;
+        let discovered = ConfigLocator::from_env().project(cwd)?;
         self.build(discovered)
     }
 
-    /// Discovers config files from `cwd`.
+    /// Builds a [`Config`] from discovered files.
     ///
-    /// The local project config is required; the global config is optional.
-    ///
-    /// # Errors
-    ///
-    /// - [`ConfigDiscoveryError::NotFound`] when no local config exists in any
-    ///   ancestor directory.
-    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be accessed.
-    #[inline]
-    fn discover(cwd: &Path) -> ConfigDiscoveryResult<DiscoveryOutcome> {
-        discovery::run(DiscoveryContext::Full(cwd.to_path_buf()))
-    }
-
-    /// Builds a [`Config`] from discovered candidates.
-    ///
-    /// Selects the local and optional global config files according to
-    /// [`ConfigBuilderInput`]'s precedence rules. Parses and merges global
-    /// settings before local settings, resolving the final output directory.
+    /// Parses and merges global settings before local settings, resolving the
+    /// final output directory.
     ///
     /// Trust and tracking notes:
     ///
-    /// - The local candidate's root is checked against the trust store before
-    ///   parsing; a global candidate is never checked.
-    /// - Recording the candidate in the tracking store is best-effort; a write
-    ///   failure does not fail the build.
+    /// - The local config's root is checked against the trust store before
+    ///   parsing; a global config is never checked.
+    /// - Recording the local config in the tracking store is best-effort; a
+    ///   write failure does not fail the build.
     ///
     /// # Errors
     ///
-    /// - [`ConfigDiscoveryError::NotFound`] when discovery output selected no
-    ///   local config, or none contains the discovery anchor.
     /// - [`ConfigError::Trust`] when the local config's workspace is not
     ///   trusted, is missing its baseline hash, or is stale
     ///   ([`ConfigTrustError::Untrusted`]), or when the trust store cannot be
@@ -192,12 +137,16 @@ impl ConfigService {
     ///   validation.
     fn build(
         &self,
-        discovered: DiscoveryOutcome,
+        discovered: DiscoveredConfigs,
     ) -> Result<Config, ConfigError> {
-        let input = ConfigBuilderInput::try_from(discovered)?;
-        let (root, trusted_local) = self.verify_trust(input.local)?;
+        let DiscoveredConfigs {
+            local,
+            global,
+        } = discovered;
+        let trusted_local = local.into_trusted(&self.tracked, &self.trust)?;
+        let root = trusted_local.root().to_path_buf();
         let parsed_local = LocalConfigFile::<Parsed>::try_from(trusted_local)?;
-        let parsed_global = match input.global {
+        let parsed_global = match global {
             Some(global) => Some(GlobalConfigFile::<Parsed>::try_from(global)?),
             None => None,
         };
@@ -206,79 +155,120 @@ impl ConfigService {
             .map_err(Into::into)
     }
 
-    /// Verifies trust for `local`, returning its project root and the trusted
-    /// file ready to parse.
+    /// Grants trust for `subject`.
+    ///
+    /// A config subject is recorded in the tracker first, so a trusted root
+    /// that has a local config always has that config path tracked. A failure
+    /// to record aborts the grant. A root-only subject has nothing to track.
     ///
     /// # Errors
     ///
-    /// - [`ConfigTrustError::Untrusted`] if trust verification halts instead of
-    ///   confirming trust.
-    /// - [`ConfigTrustError::Tracker`] if the trust store cannot be read.
-    /// - [`ConfigTrustError::Hash`] if the config file cannot be read for
-    ///   hashing.
-    fn verify_trust(
-        &self,
-        local: LocalConfigFile<FileDiscovered>,
-    ) -> Result<(PathBuf, LocalConfigFile<Trusted>), ConfigTrustError> {
-        let tracked_local = local.into_tracked(&self.tracked);
-        let trusted_local = match tracked_local.verify_trust(&self.trust)? {
-            TrustOutcome::Trusted(trusted) => trusted,
-            TrustOutcome::Halted(file, status) => {
-                return Err(ConfigTrustError::Untrusted {
-                    root: file.root().to_path_buf(),
-                    path: file.path().to_path_buf(),
-                    status,
-                });
-            }
-        };
-        let root = trusted_local.root().to_path_buf();
-        Ok((root, trusted_local))
-    }
-
-    /// Grants trust for a workspace root.
-    ///
-    /// # Errors
-    ///
-    /// - [`ConfigTrustError::Tracker`] when trust cannot be recorded.
+    /// - [`ConfigTrustError::Tracker`] when the config path cannot be tracked,
+    ///   or trust cannot be recorded.
     /// - [`ConfigTrustError::Hash`] when the config file cannot be hashed.
     #[inline]
-    #[cfg_attr(
-        not(any(test, feature = "test-utils")),
-        expect(
-            dead_code,
-            reason = "no current caller in cli; kept for the test_support \
-                      create_trusted_project/trust_project fixtures"
-        )
-    )]
     pub(crate) fn trust(
         &self,
         subject: &TrustRequest,
     ) -> Result<(), ConfigTrustError> {
+        if let Some(config_file) = subject.config_file() {
+            self.tracked.record(config_file)?;
+        }
         self.trust.trust(subject)
     }
 
-    /// Removes trust for `subject`'s workspace root.
+    /// Removes trust for `subject`'s workspace root, leaving the tracker
+    /// untouched.
     ///
     /// # Errors
     ///
     /// - [`ConfigTrustError::Tracker`] when the trust store cannot remove the
     ///   root entry or its content-hash companion.
     #[inline]
-    #[cfg_attr(
-        not(any(test, feature = "test-utils")),
-        expect(
-            dead_code,
-            reason = "pub fn on a privately-nested module; no current caller \
-                      in cli, kept for the test_support fixtures and as a \
-                      genuine administrative API"
-        )
-    )]
     pub fn untrust(
         &self,
         subject: &TrustRequest,
     ) -> Result<usize, ConfigTrustError> {
         self.trust.untrust(subject)
     }
+
+    /// Resolves a user-supplied path into trust subjects.
+    ///
+    /// The canonical path is the workspace identity. A path that does not exist
+    /// yet falls back to the given path, so a directory about to be created can
+    /// still be named.
+    ///
+    /// - An explicit `.traces/config.toml` path denotes that config.
+    /// - Any other file resolves through its parent directory.
+    /// - A directory with [`TrustScope::NearestLocal`] resolves to the nearest
+    ///   enclosing local config, or to a root-only request when none exists.
+    /// - A directory with [`TrustScope::LocalSubtree`] resolves to every local
+    ///   config at or below it, else the enclosing one.
+    ///
+    /// # Errors
+    ///
+    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
+    ///   canonicalized for a reason other than not existing, or inspected.
+    /// - [`ConfigDiscoveryError::NotFound`] when [`TrustScope::LocalSubtree`]
+    ///   finds no local config at, below, or above the directory.
+    #[inline]
+    pub(crate) fn trust_subjects(
+        path: &Path,
+        scope: TrustScope,
+    ) -> ConfigDiscoveryResult<TrustRequests> {
+        let start = canonical_or_given(path)?;
+        let locator = ConfigLocator::from_env();
+        if let Some(config) = LocalConfigFile::from_config_path(&start) {
+            return match scope {
+                TrustScope::NearestLocal => {
+                    Ok(vec![TrustRequest::from(&config)])
+                }
+                TrustScope::LocalSubtree => {
+                    Ok(config_requests(&locator.local_subtree(config.root())?))
+                }
+            };
+        }
+        let dir = if start.is_file() {
+            start.parent().unwrap_or(&start)
+        } else {
+            &start
+        };
+        match scope {
+            TrustScope::NearestLocal => match locator.nearest_local(dir) {
+                Ok(config) => Ok(vec![TrustRequest::from(&config)]),
+                Err(ConfigDiscoveryError::NotFound {
+                    ..
+                }) => Ok(vec![TrustRequest::from(dir)]),
+                Err(error) => Err(error),
+            },
+            TrustScope::LocalSubtree => {
+                Ok(config_requests(&locator.local_subtree(dir)?))
+            }
+        }
+    }
+}
+
+/// Canonicalizes `path`, falling back to it when it does not exist.
+///
+/// Any other failure (permission denied, symlink loop) is unexpected for a
+/// trust operation, where the canonical path is the workspace identity, so it
+/// propagates instead of silently trusting a possibly different path.
+fn canonical_or_given(path: &Path) -> ConfigDiscoveryResult<PathBuf> {
+    match path.canonicalize() {
+        Ok(canonical) => Ok(canonical),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => {
+            Ok(path.to_path_buf())
+        }
+        Err(source) => Err(ConfigDiscoveryError::Inaccessible {
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+/// One config-file trust request per discovered local config.
+fn config_requests(files: &[LocalConfigFile<FileDiscovered>]) -> TrustRequests {
+    files.iter().map(TrustRequest::from).collect()
 }
 
 #[cfg(test)]
@@ -290,7 +280,6 @@ mod tests {
 
     use super::*;
     use crate::config::{
-        discovery::{DiscoveryAnchor, DiscoveryScope},
         error::{ConfigDiscoveryError, ConfigValueError},
         file::{Discovered, LocalConfigFile},
         trust::ConfigTrustStatus,
@@ -335,7 +324,7 @@ mod tests {
         fn discovered_config(
             config_path: &Path,
         ) -> LocalConfigFile<Discovered> {
-            LocalConfigFile::<Discovered>::try_new(config_path.to_path_buf())
+            LocalConfigFile::from_config_path(config_path)
                 .expect("valid local config")
         }
 
@@ -423,6 +412,117 @@ mod tests {
         }
     }
 
+    mod trust {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn granting_a_config_subject_records_it_in_the_tracker() {
+            let fixture = Fixture::new();
+            let root = fixture.target_dir("project");
+            let config_path = Fixture::create_config(&root, "");
+
+            fixture.trust_config(&config_path);
+
+            assert_eq!(
+                fixture.service.tracker_store().list().expect("list"),
+                vec![config_path.canonicalize().expect("canonicalize")]
+            );
+        }
+
+        #[test]
+        fn granting_a_root_only_subject_tracks_nothing() {
+            let fixture = Fixture::new();
+            let root = fixture.target_dir("project");
+
+            fixture
+                .service
+                .trust(&TrustRequest::from(root.as_path()))
+                .expect("trust root");
+
+            assert_eq!(
+                fixture.service.tracker_store().list().expect("list"),
+                Vec::<PathBuf>::new()
+            );
+        }
+
+        #[test]
+        fn a_failing_tracker_aborts_the_grant() {
+            let fixture = Fixture::new();
+            let root = fixture.target_dir("project");
+            let config_path = Fixture::create_config(&root, "");
+            fs::write(&fixture.tracked_root, "").expect("block tracking store");
+            let request =
+                TrustRequest::from(&Fixture::discovered_config(&config_path));
+
+            let error = fixture
+                .service
+                .trust(&request)
+                .expect_err("tracking failure aborts the grant");
+
+            assert!(matches!(error, ConfigTrustError::Tracker(_)));
+            assert_eq!(
+                fixture
+                    .service
+                    .trust_store()
+                    .trust_status(&request)
+                    .expect("status"),
+                ConfigTrustStatus::Untrusted
+            );
+        }
+
+        #[test]
+        fn granting_a_missing_config_fails() {
+            let fixture = Fixture::new();
+            let root = fixture.target_dir("project");
+            let request = TrustRequest::Config {
+                path: root.join(".traces/config.toml"),
+                root,
+            };
+
+            let result = fixture.service.trust(&request);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn untrust_keeps_the_config_tracked() {
+            let fixture = Fixture::new();
+            let root = fixture.target_dir("project");
+            let config_path = Fixture::create_config(&root, "");
+            fixture.trust_config(&config_path);
+
+            fixture
+                .service
+                .untrust(&TrustRequest::from(root.as_path()))
+                .expect("untrust");
+
+            assert_eq!(
+                fixture.service.tracker_store().list().expect("list").len(),
+                1
+            );
+        }
+
+        #[test]
+        fn a_refused_load_still_tracks_the_config() {
+            let fixture = Fixture::new();
+            let root = fixture.target_dir("project");
+            Fixture::create_config(&root, "");
+
+            let result = fixture.service.load(&root);
+
+            assert!(matches!(
+                result,
+                Err(ConfigError::Trust(ConfigTrustError::Untrusted { .. }))
+            ));
+            assert_eq!(
+                fixture.service.tracker_store().list().expect("list").len(),
+                1
+            );
+        }
+    }
+
     mod build {
         use pretty_assertions::assert_eq;
 
@@ -430,15 +530,13 @@ mod tests {
 
         fn local_candidates(
             fixture: &Fixture,
-        ) -> (PathBuf, PathBuf, DiscoveryOutcome) {
+        ) -> (PathBuf, PathBuf, DiscoveredConfigs) {
             let cwd = fixture.target_dir("project");
             let config_path = Fixture::create_config(&cwd, "");
-            let local = Fixture::discovered_config(&config_path);
-            let candidates = DiscoveryOutcome::new(
-                DiscoveryAnchor::Directory(cwd.clone()),
-                vec![local],
-                Vec::new(),
-            );
+            let candidates = DiscoveredConfigs {
+                local: LocalConfigFile::at(&cwd),
+                global: None,
+            };
             (cwd, config_path, candidates)
         }
 
@@ -470,7 +568,13 @@ mod tests {
             // Arrange
             let fixture = Fixture::new();
             let (cwd, config_path, candidates) = local_candidates(&fixture);
-            fixture.trust_config(&config_path);
+            fixture
+                .service
+                .trust_store()
+                .trust(&TrustRequest::from(&Fixture::discovered_config(
+                    &config_path,
+                )))
+                .expect("trust config without tracking it");
 
             // Occupy the tracked-store path with a file so directory creation
             // fails
@@ -507,117 +611,117 @@ mod tests {
         }
     }
 
-    mod builder_input {
+    mod trust_subjects {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
-        fn local(
-            temp: &tempfile::TempDir,
-            name: &str,
-        ) -> LocalConfigFile<FileDiscovered> {
-            LocalConfigFile::<FileDiscovered>::try_new(
-                temp.path().join(name).join(".traces/config.toml"),
-            )
-            .expect("valid local candidate")
+        fn canonical(path: &Path) -> PathBuf {
+            path.canonicalize().expect("canonicalize")
         }
 
-        fn global(
-            temp: &tempfile::TempDir,
-            name: &str,
-        ) -> GlobalConfigFile<FileDiscovered> {
-            GlobalConfigFile::<FileDiscovered>::try_new(
-                temp.path().join(name).join("config.toml"),
-            )
-            .expect("valid global candidate")
+        fn config_request(root: &Path, config: &Path) -> TrustRequest {
+            TrustRequest::Config {
+                root: canonical(root),
+                path: canonical(config),
+            }
         }
 
         #[test]
-        fn rejects_full_discovery_without_local() {
-            let fixture = tempfile::tempdir().expect("temp dir");
-            let anchor = fixture.path().join("project");
-            let outcome = DiscoveryOutcome::with_kind(
-                DiscoveryScope::Full,
-                DiscoveryAnchor::Directory(anchor.clone()),
-                Vec::new(), // Empty locals
-                Vec::new(),
-            );
+        fn nearest_local_returns_the_directorys_config() {
+            let fixture = Fixture::new();
+            let project = fixture.target_dir("project");
+            let config = Fixture::create_config(&project, "");
 
-            let error = ConfigBuilderInput::try_from(outcome)
-                .expect_err("missing locals");
+            let requests = ConfigService::trust_subjects(
+                &project,
+                TrustScope::NearestLocal,
+            )
+            .expect("resolve");
+
+            assert_eq!(requests, vec![config_request(&project, &config)]);
+        }
+
+        #[test]
+        fn nearest_local_without_a_config_falls_back_to_the_root() {
+            let fixture = Fixture::new();
+            let project = fixture.target_dir("project");
+
+            let requests = ConfigService::trust_subjects(
+                &project,
+                TrustScope::NearestLocal,
+            )
+            .expect("resolve");
+
+            assert_eq!(requests, vec![TrustRequest::Root(canonical(&project))]);
+        }
+
+        #[test]
+        fn an_explicit_config_path_denotes_that_config() {
+            let fixture = Fixture::new();
+            let project = fixture.target_dir("project");
+            let config = Fixture::create_config(&project, "");
+
+            let requests = ConfigService::trust_subjects(
+                &config,
+                TrustScope::NearestLocal,
+            )
+            .expect("resolve");
+
+            assert_eq!(requests, vec![config_request(&project, &config)]);
+        }
+
+        #[test]
+        fn a_non_config_file_resolves_through_its_parent() {
+            let fixture = Fixture::new();
+            let project = fixture.target_dir("project");
+            let config = Fixture::create_config(&project, "");
+            let note = project.join("notes/todo.md");
+            fs::create_dir_all(note.parent().expect("note parent"))
+                .expect("create notes");
+            fs::write(&note, "").expect("write note");
+
+            let requests =
+                ConfigService::trust_subjects(&note, TrustScope::NearestLocal)
+                    .expect("resolve");
+
+            assert_eq!(requests, vec![config_request(&project, &config)]);
+        }
+
+        #[test]
+        fn local_subtree_returns_every_config_beneath_the_directory() {
+            let fixture = Fixture::new();
+            let parent = fixture.target_dir("parent");
+            let child = fixture.target_dir("parent/child");
+            let parent_config = Fixture::create_config(&parent, "");
+            let child_config = Fixture::create_config(&child, "");
+
+            let requests = ConfigService::trust_subjects(
+                &parent,
+                TrustScope::LocalSubtree,
+            )
+            .expect("resolve");
+
+            assert_eq!(requests, vec![
+                config_request(&parent, &parent_config),
+                config_request(&child, &child_config),
+            ]);
+        }
+
+        #[test]
+        fn local_subtree_without_any_config_is_not_found() {
+            let fixture = Fixture::new();
+            let project = fixture.target_dir("project");
+
+            let result = ConfigService::trust_subjects(
+                &project,
+                TrustScope::LocalSubtree,
+            );
 
             assert!(matches!(
-                error,
-                ConfigError::Discovery(ConfigDiscoveryError::NotFound {
-                    cwd
-                }) if cwd == anchor
+                result,
+                Err(ConfigDiscoveryError::NotFound { .. })
             ));
-        }
-
-        #[test]
-        fn rejects_full_discovery_without_anchor_local() {
-            let fixture = tempfile::tempdir().expect("temp dir");
-            let local = local(&fixture, "project");
-            let anchor = fixture.path().join("other");
-            let outcome = DiscoveryOutcome::with_kind(
-                DiscoveryScope::Full,
-                DiscoveryAnchor::Directory(anchor.clone()),
-                vec![local],
-                Vec::new(),
-            );
-
-            let error = ConfigBuilderInput::try_from(outcome)
-                .expect_err("missing anchor local");
-
-            assert!(matches!(
-                error,
-                ConfigError::Discovery(ConfigDiscoveryError::NotFound {
-                    cwd
-                }) if cwd == anchor
-            ));
-        }
-
-        #[test]
-        fn selects_nearest_local_for_full_discovery() {
-            let fixture = tempfile::tempdir().expect("temp dir");
-            let parent = local(&fixture, "parent");
-            let child = local(&fixture, "parent/child");
-            let anchor = fixture.path().join("parent/child/notes");
-
-            let outcome = DiscoveryOutcome::with_kind(
-                DiscoveryScope::Full,
-                DiscoveryAnchor::Directory(anchor),
-                vec![parent, child.clone()],
-                Vec::new(),
-            );
-
-            let input = ConfigBuilderInput::try_from(outcome)
-                .expect("select builder input");
-
-            assert_eq!(input.local.root(), child.root());
-        }
-
-        #[test]
-        fn selects_first_discovered_global() {
-            let fixture = tempfile::tempdir().expect("temp dir");
-            let local = local(&fixture, "project");
-            let global1 = global(&fixture, "global1");
-            let global2 = global(&fixture, "global2");
-
-            let outcome = DiscoveryOutcome::with_kind(
-                DiscoveryScope::Full,
-                DiscoveryAnchor::Directory(local.root().to_path_buf()),
-                vec![local],
-                vec![global1.clone(), global2],
-            );
-
-            // Act
-            let result = ConfigBuilderInput::try_from(outcome);
-
-            // Assert
-            let input = result.expect("select builder input");
-            let global = input.global.expect("expected global");
-            assert_eq!(global.path(), global1.path());
         }
     }
 }

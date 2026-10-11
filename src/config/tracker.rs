@@ -3,12 +3,9 @@
 //! [`TrackerStore`] records which `.traces/config.toml` paths configuration
 //! loading has observed, independent of whether their workspace is trusted.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use super::{
-    error::ConfigTrustError,
-    file::{Discovered, LocalConfigFile},
-};
+use super::error::ConfigTrustError;
 use crate::{CleanMode, FilePathTracker, dirs};
 
 /// Best-effort registry of local config files observed during config loading,
@@ -38,15 +35,29 @@ impl TrackerStore {
         }
     }
 
-    /// Records that discovery saw a config file.
+    /// Records a config file path.
     ///
-    /// Best-effort: tracking is bookkeeping, so write failures warn and do not
-    /// fail config loading.
+    /// Use when failing to record must abort the caller, as when granting
+    /// trust. Config loading uses [`Self::record_best_effort`].
+    ///
+    /// # Errors
+    ///
+    /// - [`ConfigTrustError::Tracker`] if the path cannot be canonicalized or
+    ///   the store cannot be written.
     #[inline]
-    pub(crate) fn record(&self, config: &LocalConfigFile<Discovered>) {
-        if let Err(error) = self.store.record(config.path()) {
+    pub(crate) fn record(&self, path: &Path) -> Result<(), ConfigTrustError> {
+        self.store.record(path).map_err(Into::into)
+    }
+
+    /// Records a config file path seen during loading.
+    ///
+    /// Tracking is bookkeeping, so failures warn and do not fail config
+    /// loading.
+    #[inline]
+    pub(crate) fn record_best_effort(&self, path: &Path) {
+        if let Err(error) = self.record(path) {
             tracing::warn!(
-                path = %config.path().display(),
+                path = %path.display(),
                 error = %error,
                 "failed to record seen config file"
             );
@@ -109,13 +120,6 @@ mod tests {
                 fs::write(&path, "").expect("write config");
                 path
             }
-
-            pub(super) fn discovered(
-                path: &Path,
-            ) -> LocalConfigFile<Discovered> {
-                LocalConfigFile::<Discovered>::try_new(path.to_path_buf())
-                    .expect("valid local config path")
-            }
         }
     }
 
@@ -131,7 +135,7 @@ mod tests {
             let fixture = Fixture::new();
             let path = fixture.write_config("project");
 
-            fixture.store.record(&Fixture::discovered(&path));
+            fixture.store.record(&path).expect("record");
 
             assert_eq!(fixture.store.list().expect("list"), vec![
                 path.canonicalize().expect("canonicalize")
@@ -142,12 +146,41 @@ mod tests {
         fn keeps_a_single_entry_when_recorded_twice() {
             let fixture = Fixture::new();
             let path = fixture.write_config("project");
-            let config = Fixture::discovered(&path);
 
-            fixture.store.record(&config);
-            fixture.store.record(&config);
+            fixture.store.record(&path).expect("first record");
+            fixture.store.record(&path).expect("second record");
 
             assert_eq!(fixture.store.list().expect("list").len(), 1);
+        }
+    }
+
+    mod record_best_effort {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn swallows_a_missing_path() {
+            let fixture = Fixture::new();
+
+            fixture.store.record_best_effort(Path::new("/nonexistent/x"));
+
+            assert_eq!(
+                fixture.store.list().expect("list"),
+                Vec::<PathBuf>::new()
+            );
+        }
+
+        #[test]
+        fn record_reports_a_missing_path() {
+            let fixture = Fixture::new();
+
+            let error = fixture
+                .store
+                .record(Path::new("/nonexistent/x"))
+                .expect_err("missing path cannot be recorded");
+
+            assert!(matches!(error, ConfigTrustError::Tracker(_)));
         }
     }
 
@@ -175,7 +208,7 @@ mod tests {
         fn prunes_entries_whose_config_was_deleted() {
             let fixture = Fixture::new();
             let path = fixture.write_config("project");
-            fixture.store.record(&Fixture::discovered(&path));
+            fixture.store.record(&path).expect("record");
             fs::remove_file(&path).expect("remove config");
 
             let removed = fixture.store.clean();
@@ -191,7 +224,7 @@ mod tests {
         fn leaves_live_entries_untouched() {
             let fixture = Fixture::new();
             let path = fixture.write_config("project");
-            fixture.store.record(&Fixture::discovered(&path));
+            fixture.store.record(&path).expect("record");
 
             let removed = fixture.store.clean();
 

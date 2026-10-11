@@ -14,13 +14,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{
-    error::ConfigTrustError,
-    file::{Discovered, LocalConfigFile, Tracked},
-};
-use crate::{
-    Blake3FileHash, CleanMode, FilePathTracker, dirs, hash::HashError,
-};
+use super::error::ConfigTrustError;
+use crate::{Blake3Digest, CleanMode, FilePathTracker, dirs, hash::HashError};
+
+/// File-name suffix of the content-hash companion beside a trusted root.
+const COMPANION_SUFFIX: &str = ".hash";
 
 /// Targets a workspace root or config file for a trust operation.
 ///
@@ -75,28 +73,17 @@ impl From<&Path> for TrustRequest {
     }
 }
 
-impl From<&LocalConfigFile<Discovered>> for TrustRequest {
-    #[inline]
-    fn from(file: &LocalConfigFile<Discovered>) -> Self {
-        Self::Config {
-            root: file.root().to_path_buf(),
-            path: file.path().to_path_buf(),
-        }
-    }
-}
-
-impl From<&LocalConfigFile<Tracked>> for TrustRequest {
-    #[inline]
-    fn from(file: &LocalConfigFile<Tracked>) -> Self {
-        Self::Config {
-            root: file.root().to_path_buf(),
-            path: file.path().to_path_buf(),
-        }
-    }
-}
-
 /// Trust requests resolved from a single discovery operation.
 pub(crate) type TrustRequests = Vec<TrustRequest>;
+
+/// Scope for resolving trust subjects from a user-supplied path.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum TrustScope {
+    /// Resolve a single trust target.
+    NearestLocal,
+    /// Resolve descendant trust targets.
+    LocalSubtree,
+}
 
 /// Trust state for a config file relative to its workspace root.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -135,14 +122,14 @@ impl Display for ConfigTrustStatus {
 pub(crate) enum ConfigTrustCheck {
     /// The workspace root is not trusted.
     Untrusted,
-    /// The workspace root is trusted and a baseline hash exists, but the
-    /// config file's current content no longer matches it.
+    /// The workspace root is trusted and a baseline hash exists, but the config
+    /// file's current content no longer matches it.
     Stale,
     /// The workspace root is trusted, but no content-hash baseline was ever
     /// recorded for this config file.
     MissingBaseline,
-    /// The workspace root is trusted and the config file's content matches
-    /// its baseline hash.
+    /// The workspace root is trusted and the config file's content matches its
+    /// baseline hash.
     ///
     /// Carries the content read while verifying it, so parsing can reuse the
     /// same buffer without a second filesystem read.
@@ -162,8 +149,6 @@ impl ConfigTrustCheck {
         }
     }
 }
-
-const COMPANION_SUFFIX: &str = ".hash";
 
 /// Reads a config file as UTF-8 text for baseline hashing.
 ///
@@ -232,7 +217,7 @@ impl TrustStore {
     ) -> Result<(), ConfigTrustError> {
         if let Some(config_file) = subject.config_file() {
             let content = read_config(config_file)?;
-            let digest = Blake3FileHash::from(content.as_str());
+            let digest = Blake3Digest::from(content.as_str());
             self.store.write_companion(
                 subject.root_path(),
                 COMPANION_SUFFIX,
@@ -296,7 +281,7 @@ impl TrustStore {
             return Ok(ConfigTrustCheck::MissingBaseline);
         };
         let content = read_config(config_path)?;
-        let current = Blake3FileHash::from(content.as_str());
+        let current = Blake3Digest::from(content.as_str());
         if recorded.trim() == current.to_hex().as_ref() {
             Ok(ConfigTrustCheck::Trusted(content))
         } else {
@@ -352,7 +337,10 @@ impl TrustStore {
 
 #[cfg(test)]
 mod tests {
+    use fixtures::Fixture;
+
     use super::*;
+    use crate::config::file::LocalConfigFile;
 
     mod fixtures {
         use super::*;
@@ -388,15 +376,12 @@ mod tests {
             }
 
             pub(super) fn config_request(path: &Path) -> TrustRequest {
-                let config =
-                    LocalConfigFile::<Discovered>::try_new(path.to_path_buf())
-                        .expect("valid local config path");
+                let config = LocalConfigFile::from_config_path(path)
+                    .expect("valid local config path");
                 TrustRequest::from(&config)
             }
         }
     }
-
-    use fixtures::Fixture;
 
     mod formatting {
         use pretty_assertions::assert_eq;

@@ -31,8 +31,7 @@ use crate::{
 /// `CliError`).
 #[derive(Debug, Error)]
 pub(crate) enum ConfigError {
-    /// Discovery stage failure: candidate file discovery or ancestor
-    /// traversal.
+    /// Discovery stage failure: candidate file discovery or ancestor traversal.
     #[error(transparent)]
     Discovery(#[from] ConfigDiscoveryError),
     /// Read stage failure: physical file reading or TOML syntax
@@ -73,28 +72,9 @@ pub(crate) enum ConfigDiscoveryError {
         #[source]
         source: io::Error,
     },
-    /// The discovered path is not a valid local `.traces/config.toml`
-    /// candidate.
-    ///
-    /// Local config paths must end with `.traces/config.toml` and have a parent
-    /// directory named `.traces`.
-    #[error("unsupported local config path {path}")]
-    UnsupportedLocalCandidate {
-        /// Rejected local config path.
-        path: PathBuf,
-    },
-    /// The discovered path is not a valid global `config.toml` candidate.
-    ///
-    /// Global config paths must end with `config.toml`.
-    #[error("unsupported global config path {path}")]
-    UnsupportedGlobalCandidate {
-        /// Rejected global config path.
-        path: PathBuf,
-    },
 }
 
-/// Read stage: errors raised while reading file contents or deserializing
-/// TOML.
+/// Read stage: errors raised while reading file contents or deserializing TOML.
 ///
 /// In-memory buffer parsing never emits path discovery or trust errors.
 #[derive(Debug, Error)]
@@ -119,8 +99,8 @@ pub(crate) enum ConfigReadError {
     },
 }
 
-/// Trust stage: errors raised while verifying trust, or reading and writing
-/// the trust and tracking stores.
+/// Trust stage: errors raised while verifying trust, or reading and writing the
+/// trust and tracking stores.
 ///
 /// Governs cryptographic trust verification and the shared
 /// [`crate::FilePathTracker`] I/O that backs both the trust store and the

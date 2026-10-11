@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use clap::Args;
 
 use super::error::{CliError, CliResult};
-use crate::config::TrustStore;
+use crate::ConfigService;
 
 /// Arguments for `traces untrust`.
 ///
@@ -35,12 +35,12 @@ impl Untrust {
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::Untrust`] if updating the trust store fails.
     #[inline]
-    pub(super) fn run(self, trust: &TrustStore) -> CliResult {
+    pub(super) fn run(self, service: &ConfigService) -> CliResult {
         let subjects =
             super::resolve_trust_subjects(self.path.as_deref(), self.all)?;
         for subject in subjects {
             let root = subject.root_path().to_path_buf();
-            if let Err(source) = trust.untrust(&subject) {
+            if let Err(source) = service.untrust(&subject) {
                 return Err(CliError::Untrust {
                     root,
                     source,
@@ -136,7 +136,7 @@ mod tests {
             super::trust_root(&service, &root);
 
             super::untrust_args(Some(root.clone()), false)
-                .run(service.trust_store())
+                .run(&service)
                 .expect("untrust root");
 
             assert_eq!(
@@ -160,7 +160,7 @@ mod tests {
             let _guard = CwdGuard::enter(&cwd);
 
             super::untrust_args(None, false)
-                .run(service.trust_store())
+                .run(&service)
                 .expect("untrust cwd");
 
             assert_eq!(
@@ -185,7 +185,7 @@ mod tests {
             super::trust_root(&service, &child);
 
             super::untrust_args(Some(parent), true)
-                .run(service.trust_store())
+                .run(&service)
                 .expect("untrust all configs");
 
             assert_eq!(

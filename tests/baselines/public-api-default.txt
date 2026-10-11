@@ -64,6 +64,9 @@ pub traces_pkm::cli::CliError::InitAlreadyInitialized::root: std::path::PathBuf
 pub traces_pkm::cli::CliError::InitConfigWrite
 pub traces_pkm::cli::CliError::InitConfigWrite::root: std::path::PathBuf
 pub traces_pkm::cli::CliError::InitConfigWrite::source: super::init::ConfigScaffoldError
+pub traces_pkm::cli::CliError::InitInvalidTemplateDir
+pub traces_pkm::cli::CliError::InitInvalidTemplateDir::directory: std::path::PathBuf
+pub traces_pkm::cli::CliError::InitInvalidTemplateDir::source: error::ConfigValueError
 pub traces_pkm::cli::CliError::InitPrompt
 pub traces_pkm::cli::CliError::InitPrompt::source: traces_pkm::DialogError
 pub traces_pkm::cli::CliError::InitScaffold

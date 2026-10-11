@@ -22,8 +22,9 @@ use super::{
     },
 };
 use crate::{
-    Blake3FileHash, FieldName, FieldNameError, Tag, TaskStatus, TaskStatusMap,
+    Blake3Digest, FieldName, FieldNameError, Tag, TaskStatus, TaskStatusMap,
     TaskStatusSymbol, TaskStatusType,
+    hash::Blake3Hasher,
     path::{PathError, RelativePath, SafeRelativePath},
 };
 
@@ -238,20 +239,19 @@ impl Config {
         self
     }
 
-    /// Computes a deterministic fingerprint over every resolved config
-    /// value.
+    /// Computes a deterministic fingerprint over every resolved config value.
     ///
-    /// Hashes an injective encoding of every field this `Config` carries:
-    /// each variable-length value is length-prefixed, paths are hashed as raw
-    /// OS bytes, and optional paths carry a presence tag. Two configs
-    /// therefore share a digest only when every field is equal. The digest is
-    /// stable across process restarts, since [`Blake3FileHash`] is a fixed
-    /// BLAKE3 digest rather than a process-randomized hash. Task statuses are
-    /// hashed in symbol order, but tag filters in configured order, so
-    /// reordering the filters changes the digest. Intended for
-    /// future index cache invalidation: a persisted fingerprint lets a
-    /// consumer detect configuration drift without re-reading config files or
-    /// diffing their parsed representation.
+    /// Hashes an injective encoding of every field this `Config` carries: each
+    /// variable-length value is length-prefixed, paths are hashed as raw OS
+    /// bytes, and optional paths carry a presence tag. Two configs therefore
+    /// share a digest only when every field is equal. The digest is stable
+    /// across process restarts, since [`Blake3Digest`] is a fixed BLAKE3
+    /// digest rather than a process-randomized hash. Task statuses are hashed
+    /// in symbol order, but tag filters in configured order, so reordering the
+    /// filters changes the digest. Intended for future index cache
+    /// invalidation: a persisted fingerprint lets a consumer detect
+    /// configuration drift without re-reading config files or diffing their
+    /// parsed representation.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -262,41 +262,21 @@ impl Config {
                       index cache invalidation"
         )
     )]
-    pub(crate) fn hash(&self) -> Blake3FileHash {
-        let mut hasher = blake3::Hasher::new();
-        put_path(&mut hasher, &self.root);
-        put_optional_path(&mut hasher, self.templates.local());
-        put_optional_path(&mut hasher, self.templates.global());
-        put_path(&mut hasher, self.templates.output());
-        put_bytes(&mut hasher, self.schemas.class_field_name().as_bytes());
-        put_path(&mut hasher, self.schemas.directory());
-        put_bytes(&mut hasher, self.frontmatter.title_name().as_bytes());
-        put_bytes(&mut hasher, self.frontmatter.aliases_name().as_bytes());
-        put_bytes(&mut hasher, self.frontmatter.tags_name().as_bytes());
-        for date in
-            [self.frontmatter.date_created(), self.frontmatter.date_modified()]
-        {
-            put_bytes(&mut hasher, date.name().as_bytes());
-            put_bytes(&mut hasher, date.format().as_bytes());
-        }
-        let mut statuses: Vec<&TaskStatus> =
-            self.tasks.statuses().iter().collect();
-        statuses.sort_unstable_by_key(|status| status.symbol().as_char());
-        put_len(&mut hasher, statuses.len());
-        for status in statuses {
-            let mut symbol = [0_u8; 4];
-            put_bytes(
-                &mut hasher,
-                status.symbol().as_char().encode_utf8(&mut symbol).as_bytes(),
-            );
-            put_bytes(&mut hasher, status.name().as_bytes());
-            put_bytes(&mut hasher, status.kind().as_str().as_bytes());
-        }
-        put_len(&mut hasher, self.tasks.tag_filters().len());
-        for tag in self.tasks.tag_filters() {
-            put_bytes(&mut hasher, tag.as_str().as_bytes());
-        }
-        Blake3FileHash::from_hasher(&hasher)
+    pub(crate) fn hash(&self) -> Blake3Digest {
+        let Self {
+            root,
+            templates,
+            schemas,
+            frontmatter,
+            tasks,
+        } = self;
+        let mut fp = Blake3Hasher::new();
+        fp.path(root);
+        templates.feed_into(&mut fp);
+        schemas.feed_into(&mut fp);
+        frontmatter.feed_into(&mut fp);
+        tasks.feed_into(&mut fp);
+        fp.finish()
     }
 }
 
@@ -347,6 +327,19 @@ impl TemplateConfig {
     pub(super) fn output(&self) -> &Path {
         &self.output
     }
+
+    /// Feeds every field to `fp`. Destructures `Self` so a new field cannot be
+    /// left out of the fingerprint.
+    fn feed_into(&self, fp: &mut Blake3Hasher) {
+        let Self {
+            local,
+            global,
+            output,
+        } = self;
+        fp.optional_path(local.as_deref());
+        fp.optional_path(global.as_deref());
+        fp.path(output);
+    }
 }
 
 /// Schema settings providing the class field name and registry directory for
@@ -372,6 +365,17 @@ impl SchemasConfig {
             directory,
             class_field,
         }
+    }
+
+    /// Feeds every field to `fp`. Destructures `Self` so a new field cannot be
+    /// left out of the fingerprint.
+    fn feed_into(&self, fp: &mut Blake3Hasher) {
+        let Self {
+            directory,
+            class_field,
+        } = self;
+        fp.bytes(class_field.as_str().as_bytes());
+        fp.path(directory);
     }
 
     /// Returns the frontmatter key naming a Note's File Class(es).
@@ -546,6 +550,23 @@ impl FrontmatterConfig {
             .expect("test fixture tags is a valid field key");
         self
     }
+
+    /// Feeds every field to `fp`. Destructures `Self` so a new field cannot be
+    /// left out of the fingerprint.
+    fn feed_into(&self, fp: &mut Blake3Hasher) {
+        let Self {
+            title,
+            aliases,
+            tags,
+            date_created,
+            date_modified,
+        } = self;
+        fp.bytes(title.as_str().as_bytes());
+        fp.bytes(aliases.as_str().as_bytes());
+        fp.bytes(tags.as_str().as_bytes());
+        date_created.feed_into(fp);
+        date_modified.feed_into(fp);
+    }
 }
 
 impl Default for FrontmatterConfig {
@@ -678,6 +699,30 @@ impl TaskConfig {
             tags.iter().map(|&t| Tag::parse(t).expect("valid tag")).collect();
         Self::for_test(tag_filters)
     }
+
+    /// Feeds statuses (in symbol order) and tag filters (in configured order)
+    /// to `fp`. Destructures `Self` so a new field cannot be left out.
+    fn feed_into(&self, fp: &mut Blake3Hasher) {
+        let Self {
+            statuses,
+            tag_filters,
+        } = self;
+        let mut ordered: Vec<&TaskStatus> = statuses.iter().collect();
+        ordered.sort_unstable_by_key(|status| status.symbol().as_char());
+        fp.len(ordered.len());
+        for status in ordered {
+            let mut symbol = [0_u8; 4];
+            fp.bytes(
+                status.symbol().as_char().encode_utf8(&mut symbol).as_bytes(),
+            );
+            fp.bytes(status.name().as_bytes());
+            fp.bytes(status.kind().as_str().as_bytes());
+        }
+        fp.len(tag_filters.len());
+        for tag in tag_filters {
+            fp.bytes(tag.as_str().as_bytes());
+        }
+    }
 }
 
 impl Default for TaskConfig {
@@ -778,6 +823,24 @@ impl ConfigSubDir {
                 path: self.as_path().to_path_buf(),
                 source,
             })
+    }
+
+    /// Validates the configured `dir` and resolves it against `root`.
+    ///
+    /// # Errors
+    ///
+    /// - [`ConfigValueError::InvalidSubDir`] if `dir` is absolute, contains
+    ///   `..`, or resolves outside `root`.
+    pub(crate) fn resolve(
+        dir: &Path,
+        root: &Path,
+    ) -> Result<PathBuf, ConfigValueError> {
+        Self::try_from(dir.to_path_buf())
+            .map_err(|source| ConfigValueError::InvalidSubDir {
+                path: dir.to_path_buf(),
+                source,
+            })?
+            .resolve_against(root)
     }
 
     /// Validates a configured subdirectory, falling back to `default_rel` when
@@ -883,41 +946,16 @@ impl DateFieldConfig {
             },
         })
     }
-}
 
-/// Feeds `bytes` to `hasher` behind a little-endian `u64` length prefix.
-///
-/// The prefix makes the concatenated encoding injective: no field value, even
-/// one containing delimiter bytes, can be re-read as a different field split.
-fn put_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
-    put_len(hasher, bytes.len());
-    hasher.update(bytes);
-}
-
-/// Feeds `len` to `hasher` as a little-endian `u64`.
-///
-/// Saturates instead of truncating; a length above `u64::MAX` is unreachable
-/// for in-memory data.
-fn put_len(hasher: &mut blake3::Hasher, len: usize) {
-    hasher.update(&u64::try_from(len).unwrap_or(u64::MAX).to_le_bytes());
-}
-
-/// Feeds `path`'s raw OS bytes to `hasher`, so non-UTF-8 paths stay distinct.
-fn put_path(hasher: &mut blake3::Hasher, path: &Path) {
-    put_bytes(hasher, path.as_os_str().as_encoded_bytes());
-}
-
-/// Feeds an optional path to `hasher`, tagging presence so `None` differs
-/// from an empty path.
-fn put_optional_path(hasher: &mut blake3::Hasher, path: Option<&Path>) {
-    match path {
-        Some(path) => {
-            hasher.update(&[1]);
-            put_path(hasher, path);
-        }
-        None => {
-            hasher.update(&[0]);
-        }
+    /// Feeds both fields to `fp`. Destructures `Self` so a new field cannot be
+    /// left out of the fingerprint.
+    fn feed_into(&self, fp: &mut Blake3Hasher) {
+        let Self {
+            name,
+            format,
+        } = self;
+        fp.bytes(name.as_str().as_bytes());
+        fp.bytes(format.as_bytes());
     }
 }
 
@@ -973,41 +1011,6 @@ mod tests {
                 digest.as_ref(),
                 "ce5503dd2df8687312cdd13cdff34d5490a8aacc1615d5f8765ee39f3ce6887b"
             );
-        }
-
-        #[test]
-        fn differs_when_a_nul_moves_between_adjacent_fields() {
-            let mut first = base();
-            first.frontmatter.title = field_name("a\0b");
-            first.frontmatter.aliases = field_name("c");
-            let mut second = base();
-            second.frontmatter.title = field_name("a");
-            second.frontmatter.aliases = field_name("b\0c");
-
-            assert_ne!(first.hash(), second.hash());
-        }
-
-        #[test]
-        fn differs_when_an_optional_path_is_absent_versus_empty() {
-            let mut absent = base();
-            absent.templates.global = None;
-            let mut empty = base();
-            empty.templates.global = Some(PathBuf::new());
-
-            assert_ne!(absent.hash(), empty.hash());
-        }
-
-        #[cfg(unix)]
-        #[test]
-        fn differs_for_roots_that_differ_only_in_non_utf8_bytes() {
-            use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
-
-            let mut first = base();
-            first.root = Arc::from(Path::new(OsStr::from_bytes(b"/p\xFF")));
-            let mut second = base();
-            second.root = Arc::from(Path::new(OsStr::from_bytes(b"/p\xFE")));
-
-            assert_ne!(first.hash(), second.hash());
         }
 
         #[rstest]

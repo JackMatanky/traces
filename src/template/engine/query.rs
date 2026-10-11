@@ -37,8 +37,8 @@
 //! [`QuerySet::table`], [`QuerySet::list`], [`QuerySet::task_list`], and
 //! `count` (an alias for [`QuerySet::len`]) are terminal instead: they render
 //! final markdown/scalar output and end a chain rather than continue it. Each
-//! is reachable both as a `call_method` (`rows.table(["Name"],
-//! ["file.name"])`) and as a pipeline filter, registered once by
+//! is reachable both as a `call_method` (`rows.table(["Name"], ["file.name"])`)
+//! and as a pipeline filter, registered once by
 //! [`QueryOps::register_terminal_filters`] (`rows | table(["Name"],
 //! ["file.name"])`). Both forms call the same [`QuerySet`] method.
 //!
@@ -180,8 +180,8 @@ impl QueryOps {
     }
 
     /// Registers `table`, `list`, `task_list`, and `count` as pipeline filters:
-    /// `rows | table(["Name"], ["file.name"])`, mirroring the call-method
-    /// form `rows.table(["Name"], ["file.name"])` documented on
+    /// `rows | table(["Name"], ["file.name"])`, mirroring the call-method form
+    /// `rows.table(["Name"], ["file.name"])` documented on
     /// [`Object::call_method`] for [`QuerySet`]. Registered once, not per
     /// instance: these filters carry no state and apply to any [`QuerySet`]
     /// regardless of which namespace produced it.
@@ -212,9 +212,9 @@ impl QueryOps {
         Ok(Value::from_object(self.service.run(&index, builder)))
     }
 
-    /// Returns this render's cached [`WorkspaceIndex`], refreshing and
-    /// caching it first if not already cached this render. See
-    /// [`INDEX_CACHE_KEY`] and [`super::cache::cached`].
+    /// Returns this render's cached [`WorkspaceIndex`], refreshing and caching
+    /// it first if not already cached this render. See [`INDEX_CACHE_KEY`] and
+    /// [`super::cache::cached`].
     ///
     /// # Errors
     ///
@@ -1669,12 +1669,8 @@ mod tests {
                                \"?\"\nname = \"Blocked\"\nkind = \
                                \"on-hold\"\n\n[schemas]\nclass_field = \
                                \"kind\"\n";
-            let config_path =
-                project.write_file(".traces/config.toml", config_toml);
-            let discovered = crate::config::LocalConfigFile::<
-                crate::config::Discovered,
-            >::try_new(config_path)
-            .expect("valid local config");
+            project.write_file(".traces/config.toml", config_toml);
+            let discovered = crate::config::LocalConfigFile::at(project.root());
             project
                 .service()
                 .trust(&crate::config::TrustRequest::from(&discovered))
@@ -1786,8 +1782,8 @@ mod tests {
                 "- [ ] buy milk\n- [x] pay rent\n",
             );
 
-            // A page-level query over the same Note returns exactly one
-            // row; the task-level query must not collapse back to it.
+            // A page-level query over the same Note returns exactly one row;
+            // the task-level query must not collapse back to it.
             let pages = render(temp.path(), "{{ query.from() | length }}")
                 .expect("render succeeds");
             let tasks = render(temp.path(), "{{ tasks.from() | length }}")

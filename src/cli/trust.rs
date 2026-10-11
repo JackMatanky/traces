@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use clap::{Args, Subcommand};
 
 use super::error::{CliError, CliResult};
-use crate::{TrustRequest, config::TrustStore};
+use crate::{ConfigService, TrustRequest, config::TrustStore};
 
 /// Arguments for `traces trust`.
 ///
@@ -40,12 +40,12 @@ impl Trust {
     ///
     /// - [`CliError`] if the dispatched trust action fails.
     #[inline]
-    pub(super) fn run(self, trust: &TrustStore) -> CliResult {
+    pub(super) fn run(self, service: &ConfigService) -> CliResult {
         match self.action {
-            Some(TrustAction::List) => Self::list(trust),
-            Some(TrustAction::Clean) => Self::clean(trust),
-            None if self.show => self.show(trust),
-            None => self.trust(trust),
+            Some(TrustAction::List) => Self::list(service.trust_store()),
+            Some(TrustAction::Clean) => Self::clean(service.trust_store()),
+            None if self.show => self.show(service.trust_store()),
+            None => self.trust(service),
         }
     }
 
@@ -121,10 +121,10 @@ impl Trust {
     ///
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::Trust`] if updating the trust store fails.
-    fn trust(&self, trust: &TrustStore) -> CliResult {
+    fn trust(&self, service: &ConfigService) -> CliResult {
         self.for_each_subject(|subject: TrustRequest| {
             let root = subject.root_path().to_path_buf();
-            if let Err(source) = trust.trust(&subject) {
+            if let Err(source) = service.trust(&subject) {
                 return Err(CliError::Trust {
                     root,
                     source,
@@ -303,9 +303,7 @@ mod tests {
             let service = fixture_service(temp.path());
             let _guard = CwdGuard::enter(&cwd);
 
-            super::trust_args(None)
-                .run(service.trust_store())
-                .expect("trust cwd");
+            super::trust_args(None).run(&service).expect("trust cwd");
 
             assert_eq!(
                 service.trust_store().list().expect("list trusted"),
@@ -329,7 +327,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::trust_args(Some(config_file))
-                .run(service.trust_store())
+                .run(&service)
                 .expect("trust config file");
 
             assert_eq!(
@@ -346,7 +344,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::trust_args(Some(root.clone()))
-                .run(service.trust_store())
+                .run(&service)
                 .expect("trust directory");
 
             assert_eq!(
@@ -374,7 +372,7 @@ mod tests {
             let mut args = super::trust_args(Some(parent));
             args.all = true;
 
-            args.run(service.trust_store()).expect("trust all configs");
+            args.run(&service).expect("trust all configs");
 
             assert_eq!(
                 service.trust_store().list().expect("list trusted").len(),
@@ -397,7 +395,7 @@ mod tests {
             let mut args = super::trust_args(Some(root));
             args.show = true;
 
-            args.run(service.trust_store()).expect("show trust status");
+            args.run(&service).expect("show trust status");
 
             assert_eq!(
                 service.trust_store().list().expect("list trusted"),
@@ -415,7 +413,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::action_args(TrustAction::List)
-                .run(service.trust_store())
+                .run(&service)
                 .expect("list empty trust store");
         }
     }
@@ -431,12 +429,12 @@ mod tests {
             TestProject::empty(&root).write_file(".traces/config.toml", "");
             let service = fixture_service(temp.path());
             super::trust_args(Some(root.clone()))
-                .run(service.trust_store())
+                .run(&service)
                 .expect("trust root");
             fs::remove_dir_all(&root).expect("delete project dir");
 
             super::action_args(TrustAction::Clean)
-                .run(service.trust_store())
+                .run(&service)
                 .expect("clean trust store");
 
             assert_eq!(
@@ -451,7 +449,7 @@ mod tests {
             let service = fixture_service(temp.path());
 
             super::action_args(TrustAction::Clean)
-                .run(service.trust_store())
+                .run(&service)
                 .expect("clean empty trust store");
         }
     }

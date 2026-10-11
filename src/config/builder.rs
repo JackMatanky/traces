@@ -78,28 +78,18 @@ impl ConfigBuilder {
             .templates
             .directory
             .as_ref()
-            .map(|dir| {
-                ConfigSubDir::try_from(dir.clone())
-                    .map_err(|source| ConfigValueError::InvalidSubDir {
-                        path: dir.clone(),
-                        source,
-                    })?
-                    .resolve_against(self.local.root())
-            })
+            .map(|dir| ConfigSubDir::resolve(dir, self.local.root()))
             .transpose()?;
 
         let global_template_dir = self
             .global
             .as_ref()
             .and_then(|g| {
-                g.raw().templates.directory.as_ref().map(|dir| {
-                    ConfigSubDir::try_from(dir.clone())
-                        .map_err(|source| ConfigValueError::InvalidSubDir {
-                            path: dir.clone(),
-                            source,
-                        })?
-                        .resolve_against(g.root())
-                })
+                g.raw()
+                    .templates
+                    .directory
+                    .as_ref()
+                    .map(|dir| ConfigSubDir::resolve(dir, g.root()))
             })
             .transpose()?;
         let output_dir = merge_optional(

@@ -59,35 +59,27 @@ src/cli/tracked.rs: pub(super) struct Tracked {
 src/cli/tracked.rs: pub(super) tracked: Tracked,
 src/cli/trust.rs: pub(super) fn action_args(action: TrustAction) -> Trust {
 src/cli/trust.rs: pub(super) fn parse(args: &[&str]) -> Trust {
-src/cli/trust.rs: pub(super) fn run(self, trust: &TrustStore) -> CliResult {
+src/cli/trust.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
 src/cli/trust.rs: pub(super) fn trust_args(path: Option<PathBuf>) -> Trust {
 src/cli/trust.rs: pub(super) struct TestCli {
 src/cli/trust.rs: pub(super) struct Trust {
 src/cli/trust.rs: pub(super) trust: Trust,
-src/cli/untrust.rs: pub(super) fn run(self, trust: &TrustStore) -> CliResult {
+src/cli/untrust.rs: pub(super) fn run(self, service: &ConfigService) -> CliResult {
 src/cli/untrust.rs: pub(super) struct Untrust {
 src/config/builder.rs: pub(crate) fn build(self) -> Result<Config, ConfigValueError> {
 src/config/builder.rs: pub(crate) fn new(
 src/config/builder.rs: pub(crate) struct ConfigBuilder {
 src/config/builder.rs: pub(super) fn build_values(
 src/config/builder.rs: pub(super) fn temp_root(
-src/config/discovery.rs: pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
-src/config/discovery.rs: pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
-src/config/discovery.rs: pub(crate) const fn anchor(&self) -> &DiscoveryAnchor {
-src/config/discovery.rs: pub(crate) const fn kind(&self) -> DiscoveryScope {
-src/config/discovery.rs: pub(crate) enum DiscoveryAnchor {
-src/config/discovery.rs: pub(crate) enum DiscoveryContext {
-src/config/discovery.rs: pub(crate) enum DiscoveryScope {
-src/config/discovery.rs: pub(crate) enum TrustScope {
-src/config/discovery.rs: pub(crate) fn run(
-src/config/discovery.rs: pub(crate) fn trust_requests(
-src/config/discovery.rs: pub(crate) struct DiscoveryOutcome {
-src/config/discovery.rs: pub(super) fn global(&self) -> &[GlobalConfigFile<Discovered>] {
-src/config/discovery.rs: pub(super) fn into_parts(self) -> OutcomeParts {
-src/config/discovery.rs: pub(super) fn local(&self) -> &[LocalConfigFile<Discovered>] {
-src/config/discovery.rs: pub(super) fn new(
-src/config/discovery.rs: pub(super) fn path(&self) -> &Path {
-src/config/discovery.rs: pub(super) fn with_kind(
+src/config/discovery.rs: pub(super) const fn new(
+src/config/discovery.rs: pub(super) fn from_env() -> Self {
+src/config/discovery.rs: pub(super) fn local_subtree(
+src/config/discovery.rs: pub(super) fn nearest_local(
+src/config/discovery.rs: pub(super) fn project(
+src/config/discovery.rs: pub(super) global: Option<GlobalConfigFile<Discovered>>,
+src/config/discovery.rs: pub(super) local: LocalConfigFile<Discovered>,
+src/config/discovery.rs: pub(super) struct ConfigLocator {
+src/config/discovery.rs: pub(super) struct DiscoveredConfigs {
 src/config/error.rs: pub enum ConfigTrustError {
 src/config/error.rs: pub(crate) enum ConfigDiscoveryError {
 src/config/error.rs: pub(crate) enum ConfigError {
@@ -95,36 +87,37 @@ src/config/error.rs: pub(crate) enum ConfigReadError {
 src/config/error.rs: pub(crate) enum ConfigValueError {
 src/config/error.rs: pub(crate) fn invalid_field_key(
 src/config/error.rs: pub(crate) type ConfigDiscoveryResult<T> =
-src/config/file.rs: pub(crate) enum TrustOutcome {
+src/config/file.rs: pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
+src/config/file.rs: pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
+src/config/file.rs: pub(crate) fn at(root: &Path) -> Self {
+src/config/file.rs: pub(crate) fn from_config_path(path: &Path) -> Option<Self> {
 src/config/file.rs: pub(crate) fn from_content_for_test(
-src/config/file.rs: pub(crate) fn into_tracked(
+src/config/file.rs: pub(crate) fn into_trusted(
 src/config/file.rs: pub(crate) fn path(&self) -> &Path {
 src/config/file.rs: pub(crate) fn root(&self) -> &Path {
-src/config/file.rs: pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
-src/config/file.rs: pub(crate) fn verify_trust(
 src/config/file.rs: pub(crate) struct ConfigFile<Source, State> {
 src/config/file.rs: pub(crate) struct Discovered;
 src/config/file.rs: pub(crate) struct IsGlobal;
 src/config/file.rs: pub(crate) struct IsLocal;
 src/config/file.rs: pub(crate) struct Parsed {
-src/config/file.rs: pub(crate) struct Tracked;
 src/config/file.rs: pub(crate) struct Trusted {
 src/config/file.rs: pub(crate) type GlobalConfigFile<State> = ConfigFile<IsGlobal, State>;
 src/config/file.rs: pub(crate) type LocalConfigFile<State> = ConfigFile<IsLocal, State>;
+src/config/file.rs: pub(super) const CONFIG_FILE_NAME: &str = "config.toml";
+src/config/file.rs: pub(super) fn in_dir(dir: &Path) -> Self {
 src/config/file.rs: pub(super) fn raw(&self) -> &RawConfig {
-src/config/file.rs: pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
 src/config/mod.rs: pub use model::{Config, FrontmatterConfig, SchemasConfig, TaskConfig};
 src/config/mod.rs: pub use service::ConfigService;
 src/config/mod.rs: pub use trust::TrustRequest;
 src/config/mod.rs: pub(crate) use builder::ConfigBuilder;
-src/config/mod.rs: pub(crate) use discovery::{
 src/config/mod.rs: pub(crate) use error::{
-src/config/mod.rs: pub(crate) use file::{Discovered, LocalConfigFile};
-src/config/mod.rs: pub(crate) use model::DEFAULT_LOCAL_TEMPLATES_DIR;
+src/config/mod.rs: pub(crate) use file::LocalConfigFile;
+src/config/mod.rs: pub(crate) use file::{LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE};
+src/config/mod.rs: pub(crate) use model::{ConfigSubDir, DEFAULT_LOCAL_TEMPLATES_DIR};
 src/config/mod.rs: pub(crate) use raw::{RawConfig, RawTemplateConfig};
 src/config/mod.rs: pub(crate) use tracker::TrackerStore;
 src/config/mod.rs: pub(crate) use trust::ConfigTrustStatus;
-src/config/mod.rs: pub(crate) use trust::{TrustRequests, TrustStore};
+src/config/mod.rs: pub(crate) use trust::{TrustRequests, TrustScope, TrustStore};
 src/config/model.rs: pub const fn date_created(&self) -> &DateFieldConfig {
 src/config/model.rs: pub const fn date_modified(&self) -> &DateFieldConfig {
 src/config/model.rs: pub const fn frontmatter(&self) -> &FrontmatterConfig {
@@ -162,7 +155,8 @@ src/config/model.rs: pub struct TaskConfig {
 src/config/model.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
 src/config/model.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
 src/config/model.rs: pub(crate) fn class_field_arc(&self) -> Arc<str> {
-src/config/model.rs: pub(crate) fn hash(&self) -> Blake3FileHash {
+src/config/model.rs: pub(crate) fn hash(&self) -> Blake3Digest {
+src/config/model.rs: pub(crate) fn resolve(
 src/config/model.rs: pub(crate) fn resolve_against(
 src/config/model.rs: pub(crate) fn root_arc(&self) -> Arc<Path> {
 src/config/model.rs: pub(crate) struct ConfigSubDir(RelativePath);
@@ -213,13 +207,14 @@ src/config/service.rs: pub(crate) const fn trust_store(&self) -> &TrustStore {
 src/config/service.rs: pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
 src/config/service.rs: pub(crate) fn new() -> Self {
 src/config/service.rs: pub(crate) fn trust(
+src/config/service.rs: pub(crate) fn trust_subjects(
 src/config/tracker.rs: pub(crate) fn at(root: PathBuf) -> Self {
 src/config/tracker.rs: pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
 src/config/tracker.rs: pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
 src/config/tracker.rs: pub(crate) fn new() -> Self {
-src/config/tracker.rs: pub(crate) fn record(&self, config: &LocalConfigFile<Discovered>) {
+src/config/tracker.rs: pub(crate) fn record(&self, path: &Path) -> Result<(), ConfigTrustError> {
+src/config/tracker.rs: pub(crate) fn record_best_effort(&self, path: &Path) {
 src/config/tracker.rs: pub(crate) struct TrackerStore {
-src/config/tracker.rs: pub(super) fn discovered(
 src/config/tracker.rs: pub(super) fn new() -> Self {
 src/config/tracker.rs: pub(super) fn write_config(&self, name: &str) -> PathBuf {
 src/config/tracker.rs: pub(super) store: TrackerStore,
@@ -228,6 +223,7 @@ src/config/trust.rs: pub enum ConfigTrustStatus {
 src/config/trust.rs: pub enum TrustRequest {
 src/config/trust.rs: pub(crate) const fn status(&self) -> ConfigTrustStatus {
 src/config/trust.rs: pub(crate) enum ConfigTrustCheck {
+src/config/trust.rs: pub(crate) enum TrustScope {
 src/config/trust.rs: pub(crate) fn at(root: PathBuf) -> Self {
 src/config/trust.rs: pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
 src/config/trust.rs: pub(crate) fn config_file(&self) -> Option<&Path> {
@@ -444,13 +440,19 @@ src/file_tracker.rs: pub(crate) fn write_companion(
 src/file_tracker.rs: pub(crate) struct FilePathTracker {
 src/hash.rs: pub fn from_path(path: &Path) -> Result<Self, HashError> {
 src/hash.rs: pub fn to_hex(self) -> impl AsRef<str> + Display {
-src/hash.rs: pub struct Blake3FileHash(blake3::Hash);
+src/hash.rs: pub struct Blake3Digest(blake3::Hash);
 src/hash.rs: pub struct Blake3PathHash([u8; 64]);
 src/hash.rs: pub struct HashError {
 src/hash.rs: pub(crate) fn as_str(&self) -> &str {
-src/hash.rs: pub(crate) fn from_hasher(hasher: &blake3::Hasher) -> Self {
+src/hash.rs: pub(crate) fn bytes(&mut self, bytes: &[u8]) {
+src/hash.rs: pub(crate) fn finish(self) -> Blake3Digest {
+src/hash.rs: pub(crate) fn len(&mut self, len: usize) {
+src/hash.rs: pub(crate) fn new() -> Self {
+src/hash.rs: pub(crate) fn optional_path(&mut self, path: Option<&Path>) {
+src/hash.rs: pub(crate) fn path(&mut self, path: &Path) {
 src/hash.rs: pub(crate) path: PathBuf,
 src/hash.rs: pub(crate) source: io::Error,
+src/hash.rs: pub(crate) struct Blake3Hasher(blake3::Hasher);
 src/index/codec.rs: pub(super) fn as_bytes(&self) -> &'a [u8] {
 src/index/codec.rs: pub(super) fn decode_row<T: DeserializeOwned>(
 src/index/codec.rs: pub(super) fn encode_row<'a, T: Serialize>(
@@ -670,7 +672,7 @@ src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_HINT};
 src/lib.rs: pub(crate) use field::{
 src/lib.rs: pub(crate) use file::{BaseName, BaseNameRef, FileName};
 src/lib.rs: pub(crate) use file_tracker::{
-src/lib.rs: pub(crate) use hash::{Blake3FileHash, Blake3PathHash};
+src/lib.rs: pub(crate) use hash::{Blake3Digest, Blake3PathHash};
 src/lib.rs: pub(crate) use index::IndexerService;
 src/lib.rs: pub(crate) use lexer::{
 src/lib.rs: pub(crate) use note::NoteFieldType;

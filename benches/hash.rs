@@ -1,8 +1,8 @@
 //! Performance benchmark suite for BLAKE3 hashing.
 //!
 //! Exposes and monitors the CPU cost of two hashing paths used throughout the
-//! crate: [`Blake3FileHash`] (file content hashing via
-//! [`Blake3FileHash::from_path`]) and [`Blake3PathHash`] (path-bytes hashing
+//! crate: [`Blake3Digest`] (file content hashing via
+//! [`Blake3Digest::from_path`]) and [`Blake3PathHash`] (path-bytes hashing
 //! via [`From<&Path>`]). Every trust check and tracked-config lookup hashes a
 //! config file or canonical path through one of these, so regressions here
 //! directly degrade query-time trust verification.
@@ -10,7 +10,7 @@
 //! ### Data Flow Diagram
 //!
 //! ```text
-//! [Path] ──(Blake3FileHash::from_path)──► [BLAKE3-256 file digest]
+//! [Path] ──(Blake3Digest::from_path)──► [BLAKE3-256 file digest]
 //! [Path] ──(Blake3PathHash::from)───────► [64-byte hex path digest]
 //! ```
 //!
@@ -18,11 +18,11 @@
 //!
 //! To profile hashing CPU bottlenecks:
 //! ```bash
-//! cargo flamegraph --bench hash -- --bench "Blake3FileHash::from_path/1mb"
+//! cargo flamegraph --bench hash -- --bench "Blake3Digest::from_path/1mb"
 //! ```
 //!
 //! Run via `mise run bench -f hash` (or `mise run bench -m hash`): this crate's
-//! `test-utils`-gated public surface (`Blake3FileHash`, `Blake3PathHash`) is
+//! `test-utils`-gated public surface (`Blake3Digest`, `Blake3PathHash`) is
 //! only reachable with `--features test-utils`, which the mise task supplies.
 
 #![expect(
@@ -35,7 +35,7 @@ use std::hint::black_box;
 use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
-use traces_pkm::testing::{Blake3FileHash, Blake3PathHash};
+use traces_pkm::testing::{Blake3Digest, Blake3PathHash};
 #[expect(
     dead_code,
     reason = "shared benchmark common helpers are compiled into each bench \
@@ -53,7 +53,7 @@ use common::cache::drop_page_cache;
 ///
 /// Parameters: varies `BenchmarkId` `1kb` vs. `1mb`; reports byte throughput.
 /// Fixture files are zero-filled and written outside timing. Timed work is
-/// [`Blake3FileHash::from_path`]: open, read into a fresh buffer, hash, and
+/// [`Blake3Digest::from_path`]: open, read into a fresh buffer, hash, and
 /// return a digest. Benchmark setup asks the OS to drop or bypass cached pages
 /// for this fixture file where a safe per-file primitive exists.
 ///
@@ -65,7 +65,7 @@ use common::cache::drop_page_cache;
 /// - `1 MiB` throughput fails to improve over `1 KiB`, indicating filesystem
 ///   read, allocation/copy, or hashing work needs investigation.
 fn bench_file_hash(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Blake3FileHash::from_path");
+    let mut group = c.benchmark_group("Blake3Digest::from_path");
     group.sample_size(10);
     for (label, size) in [("1kb", 1024_usize), ("1mb", 1024 * 1024)] {
         group.throughput(Throughput::Bytes(
@@ -81,10 +81,9 @@ fn bench_file_hash(c: &mut Criterion) {
                 b.iter_batched(
                     || drop_page_cache(path).expect("drop file page cache"),
                     |()| {
-                        let hash = Blake3FileHash::from_path(black_box(
-                            path.as_path(),
-                        ))
-                        .expect("hash file");
+                        let hash =
+                            Blake3Digest::from_path(black_box(path.as_path()))
+                                .expect("hash file");
                         black_box(hash);
                     },
                     criterion::BatchSize::SmallInput,

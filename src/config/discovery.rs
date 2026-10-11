@@ -1,22 +1,17 @@
-//! Turns a filesystem anchor into typed config-file candidates.
+//! Locates config files on disk without reading their TOML.
 //!
-//! Discovery reads the filesystem to locate `.traces/config.toml` files without
-//! reading TOML content. It produces [`DiscoveryOutcome`], which the builder
-//! pipeline consumes.
+//! [`ConfigLocator`] holds the two ambient inputs discovery depends on, the
+//! walk ceilings and the global config directory, and answers three questions:
 //!
-//! # Entry Points
+//! - [`ConfigLocator::project`] finds the nearest local config plus the
+//!   optional global config for loading.
+//! - [`ConfigLocator::nearest_local`] finds the nearest local config at or
+//!   above a directory.
+//! - [`ConfigLocator::local_subtree`] finds the local configs at or below a
+//!   directory, falling back to the nearest enclosing one.
 //!
-//! - [`DiscoveryContext`] pairs a discovery operation with the only anchor
-//!   shape it accepts; [`run`] executes it. [`DiscoveryContext::Full`] selects
-//!   local and global candidates for config loading,
-//!   [`DiscoveryContext::NearestLocal`] one local config, and
-//!   [`DiscoveryContext::LocalSubtree`] the nearest local config plus its
-//!   descendants.
-//! - [`TrustScope`] selects how [`trust_requests`] resolves a user-supplied
-//!   path into trust subjects.
-//!
-//! [`DiscoveryScope`] only tags the resulting [`DiscoveryOutcome`] with the
-//! operation that produced it.
+//! Discovery knows nothing about trust or tracking; deciding what a found
+//! config means is up to the caller.
 
 use std::{
     io,
@@ -26,381 +21,122 @@ use std::{
 use super::{
     error::{ConfigDiscoveryError, ConfigDiscoveryResult},
     file::{Discovered, GlobalConfigFile, LocalConfigFile},
-    trust::{TrustRequest, TrustRequests},
 };
-use crate::{DirTree, dirs};
+use crate::{DirTree, dirs, env_vars};
 
-/// Relative path to the local project config directory.
-///
-/// Re-exported at [`super::LOCAL_CONFIG_DIR`] for `crate::cli::init`, which
-/// needs the bare directory without deriving it from [`LOCAL_CONFIG_FILE`]'s
-/// parent.
-pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
+/// Directory under the OS config home that holds the global config file.
+const GLOBAL_CONFIG_DIR: &str = "traces";
 
-/// Relative path to a local project config file.
-///
-/// Re-exported at [`super::LOCAL_CONFIG_FILE`] for `crate::cli::init`.
-pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
-const GLOBAL_CONFIG_FILE: &str = "traces/config.toml";
-
-/// Validated scope and filesystem anchor for one discovery run.
-///
-/// Each variant pairs a scope with the only anchor shape it accepts: `Full` is
-/// directory-only because it walks ancestors to find the nearest local config,
-/// which a file anchor would make meaningless. Replaces a runtime anchor-shape
-/// check with an unrepresentable invalid state.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DiscoveryContext {
-    /// Find the nearest local config and optional global config, from a
-    /// directory.
-    Full(PathBuf),
-    /// Find only the nearest local config, from a file or directory.
-    NearestLocal(DiscoveryAnchor),
-    /// Find the nearest local config plus descendant local configs, from a file
-    /// or directory.
-    LocalSubtree(DiscoveryAnchor),
+/// Config files found for one project load.
+#[derive(Debug)]
+pub(super) struct DiscoveredConfigs {
+    /// Nearest local config; merged after `global`.
+    pub(super) local: LocalConfigFile<Discovered>,
+    /// Global config, when one exists; merged before `local`.
+    pub(super) global: Option<GlobalConfigFile<Discovered>>,
 }
 
-/// Operation describing which config files to discover.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DiscoveryScope {
-    /// Find the nearest local config and optional global config.
-    Full,
-    /// Find only the nearest local config.
-    NearestLocal,
-    /// Find the nearest local config plus descendant local configs.
-    LocalSubtree,
+/// Finds config files relative to the ambient environment.
+#[derive(Clone, Debug)]
+pub(super) struct ConfigLocator {
+    /// Directories an upward walk stops at without inspecting.
+    ceilings: Vec<PathBuf>,
+    /// Directory holding the global `config.toml`.
+    global_dir: PathBuf,
 }
 
-/// Scope for resolving trust subjects from a user-supplied path.
-///
-/// Trust resolution never supports [`DiscoveryScope::Full`] (there is no
-/// "resolve every ancestor as a trust subject" operation), so this type omits
-/// that variant instead of rejecting it at runtime.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum TrustScope {
-    /// Resolve a single trust target.
-    NearestLocal,
-    /// Resolve descendant trust targets.
-    LocalSubtree,
-}
-
-/// Filesystem starting point for a discovery operation.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DiscoveryAnchor {
-    /// Directory-rooted discovery.
-    Directory(PathBuf),
-    /// File-rooted discovery.
-    File(PathBuf),
-}
-
-impl DiscoveryAnchor {
-    /// Returns the path carried by this filesystem anchor.
-    #[inline]
+impl ConfigLocator {
+    /// Builds a locator from the process environment.
     #[must_use]
-    pub(super) fn path(&self) -> &Path {
-        match self {
-            Self::Directory(path) | Self::File(path) => path,
+    pub(super) fn from_env() -> Self {
+        Self {
+            ceilings: env_vars::CEILING_DIRS.iter().cloned().collect(),
+            global_dir: dirs::CONFIG_HOME.join(GLOBAL_CONFIG_DIR),
         }
     }
-}
 
-type OutcomeParts = (
-    DiscoveryScope,
-    DiscoveryAnchor,
-    Box<[LocalConfigFile<Discovered>]>,
-    Box<[GlobalConfigFile<Discovered>]>,
-);
-
-/// Config-file candidates handed to the builder pipeline.
-///
-/// Carries the discovery kind, filesystem anchor, and files found on disk. Pass
-/// this token through unchanged to the builder, or parse it into validated
-/// downstream input.
-#[derive(Clone, Debug)]
-pub(crate) struct DiscoveryOutcome {
-    kind: DiscoveryScope,
-    anchor: DiscoveryAnchor,
-    local: Box<[LocalConfigFile<Discovered>]>,
-    global: Box<[GlobalConfigFile<Discovered>]>,
-}
-
-impl DiscoveryOutcome {
-    /// Creates a full-discovery outcome from a directory anchor.
-    #[inline]
+    /// Builds a locator from explicit inputs. Lets tests control both.
+    #[cfg(test)]
     #[must_use]
-    pub(super) fn new(
-        anchor: DiscoveryAnchor,
-        local: Vec<LocalConfigFile<Discovered>>,
-        global: Vec<GlobalConfigFile<Discovered>>,
-    ) -> Self {
-        Self::with_kind(DiscoveryScope::Full, anchor, local, global)
-    }
-
-    /// Creates an outcome from the results of a discovery operation.
-    #[inline]
-    #[must_use]
-    pub(super) fn with_kind(
-        kind: DiscoveryScope,
-        anchor: DiscoveryAnchor,
-        local: Vec<LocalConfigFile<Discovered>>,
-        global: Vec<GlobalConfigFile<Discovered>>,
+    pub(super) const fn new(
+        ceilings: Vec<PathBuf>,
+        global_dir: PathBuf,
     ) -> Self {
         Self {
-            kind,
-            anchor,
-            local: local.into_boxed_slice(),
-            global: global.into_boxed_slice(),
+            ceilings,
+            global_dir,
         }
     }
 
-    /// Returns the discovery operation that produced this outcome.
-    #[cfg(test)]
-    #[inline]
-    #[must_use]
-    pub(crate) const fn kind(&self) -> DiscoveryScope {
-        self.kind
+    /// Finds the nearest local config at or above `cwd` and the optional global
+    /// config.
+    ///
+    /// # Errors
+    ///
+    /// - [`ConfigDiscoveryError::NotFound`] when no local config exists in any
+    ///   ancestor directory.
+    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
+    ///   inspected.
+    pub(super) fn project(
+        &self,
+        cwd: &Path,
+    ) -> ConfigDiscoveryResult<DiscoveredConfigs> {
+        let local = self.nearest_local(cwd)?;
+        let global = GlobalConfigFile::in_dir(&self.global_dir);
+        let global = is_config_file(global.path())?.then_some(global);
+        Ok(DiscoveredConfigs {
+            local,
+            global,
+        })
     }
 
-    /// Returns the filesystem anchor used for discovery.
-    #[cfg(test)]
-    #[inline]
-    #[must_use]
-    pub(crate) const fn anchor(&self) -> &DiscoveryAnchor {
-        &self.anchor
-    }
-
-    /// Returns local config candidates found during discovery (empty if none).
-    #[inline]
-    #[must_use]
-    pub(super) fn local(&self) -> &[LocalConfigFile<Discovered>] {
-        &self.local
-    }
-
-    /// Returns global config candidates found during discovery (empty if none).
-    #[cfg(test)]
-    #[inline]
-    #[must_use]
-    pub(super) fn global(&self) -> &[GlobalConfigFile<Discovered>] {
-        &self.global
-    }
-
-    /// Consumes the outcome into its private fields for builder input parsing.
-    #[inline]
-    pub(super) fn into_parts(self) -> OutcomeParts {
-        (self.kind, self.anchor, self.local, self.global)
-    }
-}
-
-/// Runs the discovery operation described by `ctx`.
-///
-/// # Errors
-///
-/// - [`ConfigDiscoveryError::NotFound`] when no local config exists in any
-///   ancestor directory.
-/// - [`ConfigDiscoveryError::Inaccessible`] when a filesystem path cannot be
-///   inspected.
-/// - [`ConfigDiscoveryError::UnsupportedLocalCandidate`] when a file anchor or
-///   a discovered path is not a valid `.traces/config.toml`.
-/// - [`ConfigDiscoveryError::UnsupportedGlobalCandidate`] when the global
-///   config path is not named `config.toml`.
-#[inline]
-pub(crate) fn run(
-    ctx: DiscoveryContext,
-) -> ConfigDiscoveryResult<DiscoveryOutcome> {
-    match ctx {
-        DiscoveryContext::Full(dir) => full(dir),
-        DiscoveryContext::NearestLocal(anchor) => nearest_local(anchor),
-        DiscoveryContext::LocalSubtree(anchor) => local_subtree(anchor),
-    }
-}
-
-/// Resolves trust requests from one user-supplied filesystem path.
-///
-/// Resolution rules:
-///
-/// - A **file path** resolves to that local config.
-/// - A **directory** with [`TrustScope::NearestLocal`] resolves to the nearest
-///   local config, falling back to a root-only request when none is found.
-/// - A **directory** with [`TrustScope::LocalSubtree`] yields only discovered
-///   config requests.
-///
-/// # Errors
-///
-/// - [`ConfigDiscoveryError::Inaccessible`] when a filesystem path cannot be
-///   inspected.
-/// - [`ConfigDiscoveryError::NotFound`] when [`TrustScope::LocalSubtree`]
-///   discovery has no local root to walk from.
-#[inline]
-pub(crate) fn trust_requests(
-    path: &Path,
-    scope: TrustScope,
-) -> ConfigDiscoveryResult<TrustRequests> {
-    let start = match path.canonicalize() {
-        Ok(canonical) => canonical,
-        // The path may legitimately not exist yet (e.g. a trust target that
-        // will be created); fall back to the given path. Any other error
-        // (permission denied, symlink loop) is unexpected for a trust
-        // operation, where the canonical path is the workspace identity.
-        // Propagate it instead of silently trusting a possibly-different,
-        // non-canonical path.
-        Err(source) if source.kind() == io::ErrorKind::NotFound => {
-            path.to_path_buf()
+    /// Finds the nearest local config at or above `dir`, stopping at a ceiling.
+    ///
+    /// # Errors
+    ///
+    /// - [`ConfigDiscoveryError::NotFound`] when no ancestor up to the ceiling
+    ///   has a local config.
+    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
+    ///   inspected.
+    pub(super) fn nearest_local(
+        &self,
+        dir: &Path,
+    ) -> ConfigDiscoveryResult<LocalConfigFile<Discovered>> {
+        for ancestor in dir.ancestors() {
+            if self.ceilings.iter().any(|ceiling| ceiling == ancestor) {
+                break;
+            }
+            let candidate = LocalConfigFile::at(ancestor);
+            if is_config_file(candidate.path())? {
+                return Ok(candidate);
+            }
         }
-        Err(source) => {
-            return Err(ConfigDiscoveryError::Inaccessible {
-                path: path.to_path_buf(),
-                source,
-            });
-        }
-    };
-    let anchor = trust_anchor(&start);
-    let allow_root_fallback = matches!(scope, TrustScope::NearestLocal);
-
-    match discovered_requests(scope, anchor) {
-        Ok(requests) => Ok(requests),
         Err(ConfigDiscoveryError::NotFound {
-            ..
-        }) if allow_root_fallback => {
-            Ok(vec![TrustRequest::from(start.as_path())])
-        }
-        Err(error) => Err(error),
+            cwd: dir.to_path_buf(),
+        })
     }
-}
 
-fn discovered_requests(
-    scope: TrustScope,
-    anchor: DiscoveryAnchor,
-) -> ConfigDiscoveryResult<TrustRequests> {
-    let ctx = match scope {
-        TrustScope::NearestLocal => DiscoveryContext::NearestLocal(anchor),
-        TrustScope::LocalSubtree => DiscoveryContext::LocalSubtree(anchor),
-    };
-    let outcome = run(ctx)?;
-    let requests: Vec<TrustRequest> =
-        outcome.local().iter().map(TrustRequest::from).collect();
-    Ok(requests)
-}
-
-fn trust_anchor(path: &Path) -> DiscoveryAnchor {
-    if is_local_config_path(path) {
-        DiscoveryAnchor::File(path.to_path_buf())
-    } else if path.is_file() {
-        DiscoveryAnchor::Directory(
-            path.parent().map_or_else(|| path.to_path_buf(), Path::to_path_buf),
-        )
-    } else {
-        DiscoveryAnchor::Directory(path.to_path_buf())
-    }
-}
-
-fn is_local_config_path(path: &Path) -> bool {
-    path.file_name() == Some("config.toml".as_ref())
-        && path.parent().and_then(Path::file_name) == Some(".traces".as_ref())
-}
-
-fn full(cwd: PathBuf) -> ConfigDiscoveryResult<DiscoveryOutcome> {
-    let local = nearest_local_from_dir(&cwd)?;
-    let global = global_from_default_path()?;
-    Ok(DiscoveryOutcome::new(
-        DiscoveryAnchor::Directory(cwd),
-        vec![local],
-        global,
-    ))
-}
-
-fn nearest_local(
-    anchor: DiscoveryAnchor,
-) -> ConfigDiscoveryResult<DiscoveryOutcome> {
-    let local = local_from_anchor(&anchor)?;
-    Ok(DiscoveryOutcome::with_kind(
-        DiscoveryScope::NearestLocal,
-        anchor,
-        vec![local],
-        Vec::new(),
-    ))
-}
-
-fn local_subtree(
-    anchor: DiscoveryAnchor,
-) -> ConfigDiscoveryResult<DiscoveryOutcome> {
-    let resolved_file_root;
-    let scan_root: &Path = match &anchor {
-        DiscoveryAnchor::Directory(dir) => dir.as_path(),
-        DiscoveryAnchor::File(path) => {
-            let start = path.parent().unwrap_or(path);
-            resolved_file_root =
-                nearest_local_from_dir(start)?.root().to_path_buf();
-            &resolved_file_root
+    /// Finds every local config rooted at or below `dir`, ordered by root.
+    ///
+    /// When none exists there, falls back to the nearest enclosing config.
+    ///
+    /// # Errors
+    ///
+    /// - [`ConfigDiscoveryError::NotFound`] when nothing at, below, or above
+    ///   `dir` has a local config.
+    /// - [`ConfigDiscoveryError::Inaccessible`] when a path cannot be
+    ///   inspected.
+    pub(super) fn local_subtree(
+        &self,
+        dir: &Path,
+    ) -> ConfigDiscoveryResult<Vec<LocalConfigFile<Discovered>>> {
+        let mut local = collect_descendant_configs(dir)?;
+        if local.is_empty() {
+            local.push(self.nearest_local(dir)?);
         }
-    };
-    let mut local = collect_descendant_configs(scan_root)?;
-    if local.is_empty() {
-        local = vec![local_from_anchor(&anchor)?];
-    }
-    local.sort_by(|left, right| left.root().cmp(right.root()));
-    local.dedup_by(|left, right| left.root() == right.root());
-    Ok(DiscoveryOutcome::with_kind(
-        DiscoveryScope::LocalSubtree,
-        anchor,
-        local,
-        Vec::new(),
-    ))
-}
-
-fn local_from_anchor(
-    anchor: &DiscoveryAnchor,
-) -> ConfigDiscoveryResult<LocalConfigFile<Discovered>> {
-    match anchor {
-        DiscoveryAnchor::File(path) => {
-            LocalConfigFile::<Discovered>::try_new(path.clone())
-        }
-        DiscoveryAnchor::Directory(dir) => nearest_local_from_dir(dir),
-    }
-}
-
-fn nearest_local_from_dir(
-    cwd: &Path,
-) -> ConfigDiscoveryResult<LocalConfigFile<Discovered>> {
-    nearest_local_from_dir_with_ceilings(
-        cwd,
-        crate::env_vars::CEILING_DIRS.iter().map(PathBuf::as_path),
-    )
-}
-
-fn nearest_local_from_dir_with_ceilings<'a>(
-    cwd: &Path,
-    ceilings: impl IntoIterator<Item = &'a Path>,
-) -> ConfigDiscoveryResult<LocalConfigFile<Discovered>> {
-    let ceiling_set: Vec<&Path> = ceilings.into_iter().collect();
-    for ancestor in cwd.ancestors() {
-        if ceiling_set.contains(&ancestor) {
-            break;
-        }
-        let path = ancestor.join(LOCAL_CONFIG_FILE);
-        if is_config_file(&path)? {
-            return LocalConfigFile::<Discovered>::try_new(path);
-        }
-    }
-    Err(ConfigDiscoveryError::NotFound {
-        cwd: cwd.to_path_buf(),
-    })
-}
-
-/// Checks the default global config path, returning a candidate if the file
-/// exists.
-///
-/// # Errors
-///
-/// - [`ConfigDiscoveryError::Inaccessible`] when config file metadata cannot be
-///   read
-fn global_from_default_path()
--> ConfigDiscoveryResult<Vec<GlobalConfigFile<Discovered>>> {
-    let global_config_path = dirs::CONFIG_HOME.join(GLOBAL_CONFIG_FILE);
-    if is_config_file(&global_config_path)? {
-        Ok(vec![GlobalConfigFile::<Discovered>::try_new(global_config_path)?])
-    } else {
-        Ok(Vec::new())
+        local.sort_by(|left, right| left.root().cmp(right.root()));
+        local.dedup_by(|left, right| left.root() == right.root());
+        Ok(local)
     }
 }
 
@@ -416,7 +152,7 @@ fn collect_descendant_configs(
 ) -> ConfigDiscoveryResult<Vec<LocalConfigFile<Discovered>>> {
     let mut configs = Vec::new();
     for node in DirTree::descendants(dir)
-        .filter(|node| crate::env_vars::is_ignored_dir(node.file_name()))
+        .filter(|node| env_vars::is_ignored_dir(node.file_name()))
     {
         let node = node.map_err(|error| {
             let (path, source) = error.into_parts();
@@ -428,14 +164,16 @@ fn collect_descendant_configs(
         if !node.file_type().is_dir() {
             continue;
         }
-        let config_file = node.path().join(LOCAL_CONFIG_FILE);
-        if is_config_file(&config_file)? {
-            configs.push(LocalConfigFile::<Discovered>::try_new(config_file)?);
+        let candidate = LocalConfigFile::at(node.path());
+        if is_config_file(candidate.path())? {
+            configs.push(candidate);
         }
     }
     Ok(configs)
 }
 
+/// Reports whether `path` is a regular file, treating a missing path as absent
+/// rather than as an error.
 fn is_config_file(path: &Path) -> ConfigDiscoveryResult<bool> {
     match path.metadata() {
         Ok(metadata) => Ok(metadata.is_file()),
@@ -452,6 +190,7 @@ mod tests {
     use std::fs;
 
     use super::*;
+    use crate::config::file::LOCAL_CONFIG_FILE;
 
     struct Fixture {
         temp: tempfile::TempDir,
@@ -490,322 +229,183 @@ mod tests {
             fs::write(&p, "").expect("write file");
             p
         }
+
+        /// A locator with no ceilings whose global directory is inside the
+        /// fixture, so tests never see the machine's real global config.
+        fn locator(&self) -> ConfigLocator {
+            ConfigLocator::new(Vec::new(), self.path("global-home/traces"))
+        }
     }
 
-    fn local_roots(outcome: &DiscoveryOutcome) -> Vec<PathBuf> {
-        outcome.local().iter().map(|file| file.root().to_path_buf()).collect()
+    fn roots(files: &[LocalConfigFile<Discovered>]) -> Vec<PathBuf> {
+        files.iter().map(|file| file.root().to_path_buf()).collect()
     }
 
-    fn local_paths(outcome: &DiscoveryOutcome) -> Vec<PathBuf> {
-        outcome.local().iter().map(|file| file.path().to_path_buf()).collect()
-    }
-
-    mod engine {
+    mod project {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[test]
-        fn returns_kind_anchor_and_nearest_local_for_full_discovery() {
-            // Arrange
+        fn finds_the_nearest_local_config_from_a_nested_directory() {
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
             let cwd = fixture.create_dir("project/notes/daily");
             fixture.create_config("project");
 
-            let ctx = DiscoveryContext::Full(cwd.clone());
+            let found = fixture.locator().project(&cwd).expect("discover");
 
-            // Act
-            let result = run(ctx);
-
-            // Assert
-            let discovered = result.expect("discover full");
-            assert_eq!(discovered.kind(), DiscoveryScope::Full);
-            assert_eq!(discovered.anchor(), &DiscoveryAnchor::Directory(cwd));
-            assert_eq!(local_roots(&discovered), [project]);
+            assert_eq!(found.local.root(), project.as_path());
+            assert!(found.global.is_none());
         }
 
         #[test]
-        fn returns_only_the_nearest_local_for_nearest_local_discovery() {
-            // Arrange
+        fn nearest_local_wins_over_an_outer_one() {
             let fixture = Fixture::new();
-            let project = fixture.create_dir("project");
-            let cwd = fixture.create_dir("project/notes/daily");
-            fixture.create_config("project");
+            fixture.create_config("parent");
+            let child = fixture.create_dir("parent/child");
+            fixture.create_config("parent/child");
+            let cwd = fixture.create_dir("parent/child/notes");
 
-            let ctx =
-                DiscoveryContext::NearestLocal(DiscoveryAnchor::Directory(cwd));
+            let found = fixture.locator().project(&cwd).expect("discover");
 
-            // Act
-            let result = run(ctx);
-
-            // Assert
-            let discovered = result.expect("discover nearest local");
-            assert_eq!(discovered.kind(), DiscoveryScope::NearestLocal);
-            assert_eq!(local_roots(&discovered), [project]);
+            assert_eq!(found.local.root(), child.as_path());
         }
 
         #[test]
-        fn discovers_nearest_and_descendants_for_local_subtree() {
-            // Arrange
+        fn includes_the_global_config_when_it_exists() {
+            let fixture = Fixture::new();
+            let cwd = fixture.create_dir("project");
+            fixture.create_config("project");
+            let global_dir = fixture.create_dir("global-home/traces");
+            fs::write(global_dir.join("config.toml"), "")
+                .expect("write global");
+
+            let found = fixture.locator().project(&cwd).expect("discover");
+
+            let global = found.global.expect("global config");
+            assert_eq!(global.path(), global_dir.join("config.toml"));
+        }
+
+        #[test]
+        fn fails_with_not_found_without_a_local_config() {
+            let fixture = Fixture::new();
+            let cwd = fixture.create_dir("project/notes");
+
+            let result = fixture.locator().project(&cwd);
+
+            assert!(matches!(
+                result,
+                Err(ConfigDiscoveryError::NotFound { .. })
+            ));
+        }
+    }
+
+    mod nearest_local {
+        use super::*;
+
+        #[test]
+        fn fails_with_not_found_when_the_ceiling_is_reached() {
+            let fixture = Fixture::new();
+            let nested_dir = fixture.create_dir("ceiling/a/b/c");
+            fixture.create_config("ceiling");
+            let locator = ConfigLocator::new(
+                vec![fixture.path("ceiling")],
+                fixture.path("global-home/traces"),
+            );
+
+            let result = locator.nearest_local(&nested_dir);
+
+            assert!(matches!(
+                result,
+                Err(ConfigDiscoveryError::NotFound { .. })
+            ));
+        }
+    }
+
+    mod local_subtree {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn discovers_the_directory_and_its_descendants() {
             let fixture = Fixture::new();
             let parent = fixture.create_dir("parent");
             let child = fixture.create_dir("parent/child");
             fixture.create_config("parent");
             fixture.create_config("parent/child");
 
-            let ctx = DiscoveryContext::LocalSubtree(
-                DiscoveryAnchor::Directory(parent.clone()),
-            );
+            let found =
+                fixture.locator().local_subtree(&parent).expect("subtree");
 
-            // Act
-            let result = run(ctx);
-
-            // Assert
-            let discovered = result.expect("discover local subtree");
-            assert_eq!(discovered.kind(), DiscoveryScope::LocalSubtree);
-            assert_eq!(local_roots(&discovered), [parent, child]);
-            assert_eq!(discovered.global(), []);
+            assert_eq!(roots(&found), [parent, child]);
         }
 
         #[test]
-        fn local_subtree_finds_descendants_when_root_has_no_own_config() {
-            // Arrange
+        fn finds_descendants_when_the_root_has_no_own_config() {
             let fixture = Fixture::new();
             let root = fixture.create_dir("root");
             let child_config = fixture.create_config("root/child");
 
-            let ctx = DiscoveryContext::LocalSubtree(
-                DiscoveryAnchor::Directory(root),
+            let found =
+                fixture.locator().local_subtree(&root).expect("subtree");
+
+            assert_eq!(
+                found.iter().map(LocalConfigFile::path).collect::<Vec<_>>(),
+                [child_config.as_path()]
             );
-
-            // Act
-            let result = run(ctx);
-
-            // Assert
-            let discovered = result.expect("discover local subtree");
-            assert_eq!(local_paths(&discovered), [child_config]);
         }
 
         #[test]
-        fn local_subtree_excludes_unrelated_sibling_when_anchor_has_no_config()
-        {
-            // Arrange
+        fn falls_back_to_the_enclosing_config_excluding_siblings() {
             let fixture = Fixture::new();
             fixture.create_config("ancestor");
             fixture.create_config("ancestor/sibling");
-            let anchor_dir = fixture.create_dir("ancestor/target");
+            let target = fixture.create_dir("ancestor/target");
 
-            let ctx = DiscoveryContext::LocalSubtree(
-                DiscoveryAnchor::Directory(anchor_dir),
-            );
+            let found =
+                fixture.locator().local_subtree(&target).expect("subtree");
 
-            // Act
-            let result = run(ctx);
-
-            // Assert
-            let discovered = result.expect("discover local subtree");
-            assert_eq!(local_roots(&discovered), [fixture.path("ancestor")]);
+            assert_eq!(roots(&found), [fixture.path("ancestor")]);
         }
 
         #[test]
-        fn local_subtree_resolves_file_anchor_to_its_project() {
-            // Arrange
-            let fixture = Fixture::new();
-            fixture.create_config("project");
-            let note = fixture.create_file("project/notes/todo.md");
-
-            let ctx =
-                DiscoveryContext::LocalSubtree(DiscoveryAnchor::File(note));
-
-            // Act
-            let result = run(ctx);
-
-            // Assert
-            let discovered = result.expect("discover local subtree");
-            assert_eq!(local_roots(&discovered), [fixture.path("project")]);
-        }
-
-        #[test]
-        fn returns_a_config_request_for_the_nearest_local_config() {
-            // Arrange
-            let fixture = Fixture::new();
-            let project = fixture.create_dir("project");
-            let config = fixture.create_config("project");
-
-            // Act
-            let requests = trust_requests(&project, TrustScope::NearestLocal)
-                .expect("resolve trust requests");
-
-            // Assert
-            assert_eq!(requests, vec![TrustRequest::Config {
-                root: project.canonicalize().expect("canonical root"),
-                path: config.canonicalize().expect("canonical config"),
-            }]);
-        }
-
-        #[test]
-        fn falls_back_to_a_root_request_when_nearest_local_has_no_config() {
-            // Arrange
+        fn fails_with_not_found_when_nothing_encloses_or_descends() {
             let fixture = Fixture::new();
             let project = fixture.create_dir("project");
 
-            // Act
-            let requests = trust_requests(&project, TrustScope::NearestLocal)
-                .expect("resolve trust requests");
+            let result = fixture.locator().local_subtree(&project);
 
-            // Assert
-            assert_eq!(requests, vec![TrustRequest::Root(
-                project.canonicalize().expect("canonical root")
-            )]);
-        }
-
-        #[test]
-        fn returns_config_requests_for_every_local_subtree_config() {
-            // Arrange
-            let fixture = Fixture::new();
-            let project = fixture.create_dir("project");
-            let config = fixture.create_config("project");
-
-            // Act
-            let requests = trust_requests(&project, TrustScope::LocalSubtree)
-                .expect("resolve trust requests");
-
-            // Assert
-            assert_eq!(requests, vec![TrustRequest::Config {
-                root: project.canonicalize().expect("canonical root"),
-                path: config.canonicalize().expect("canonical config"),
-            }]);
-        }
-
-        #[test]
-        fn fails_with_not_found_when_local_subtree_has_no_config() {
-            // Arrange
-            let fixture = Fixture::new();
-            let project = fixture.create_dir("project");
-
-            // Act
-            let result = trust_requests(&project, TrustScope::LocalSubtree);
-
-            // Assert
             assert!(matches!(
                 result,
                 Err(ConfigDiscoveryError::NotFound { .. })
             ));
         }
-
-        mod trust_anchor {
-            use super::*;
-
-            #[test]
-            fn returns_file_anchor_for_local_config_path() {
-                let path = PathBuf::from("/project/.traces/config.toml");
-                let anchor = trust_anchor(&path);
-                assert!(
-                    matches!(anchor, DiscoveryAnchor::File(p) if p == path)
-                );
-            }
-
-            #[test]
-            fn returns_directory_anchor_for_regular_directory() {
-                let path = PathBuf::from("/project/notes");
-                let anchor = trust_anchor(&path);
-                assert!(
-                    matches!(anchor, DiscoveryAnchor::Directory(p) if p == path)
-                );
-            }
-
-            #[test]
-            fn returns_directory_anchor_for_non_config_file() {
-                let fixture = Fixture::new();
-                let note = fixture.create_file("project/notes/todo.md");
-                let project_notes = fixture.path("project/notes");
-
-                let anchor = trust_anchor(&note);
-
-                assert!(matches!(
-                    anchor,
-                    DiscoveryAnchor::Directory(p) if p == project_notes
-                ));
-            }
-        }
-
-        mod is_local_config_path {
-            use super::*;
-
-            #[test]
-            fn returns_true_for_traces_config_toml() {
-                let path = PathBuf::from("/project/.traces/config.toml");
-                assert!(is_local_config_path(&path));
-            }
-
-            #[test]
-            fn returns_false_for_config_toml_without_traces_parent() {
-                let path = PathBuf::from("/project/config.toml");
-                assert!(!is_local_config_path(&path));
-            }
-
-            #[test]
-            fn returns_false_for_non_config_file_in_traces() {
-                let path = PathBuf::from("/project/.traces/other.toml");
-                assert!(!is_local_config_path(&path));
-            }
-        }
-
-        mod is_config_file {
-            use super::*;
-
-            #[test]
-            fn returns_false_for_a_missing_path() {
-                // Arrange
-                let fixture = Fixture::new();
-                let path = fixture.path("missing.toml");
-
-                // Act
-                let result = is_config_file(&path);
-
-                // Assert
-                assert!(!result.expect("check missing path"));
-            }
-
-            #[test]
-            fn fails_with_inaccessible_when_a_parent_is_not_a_directory() {
-                // Arrange
-                let fixture = Fixture::new();
-                let blocking_file = fixture.create_file("blocking");
-                let unreachable_path = blocking_file.join("config.toml");
-
-                // Act
-                let result = is_config_file(&unreachable_path);
-
-                // Assert
-                assert!(matches!(
-                    result,
-                    Err(ConfigDiscoveryError::Inaccessible { .. })
-                ));
-            }
-        }
     }
 
-    mod nearest_local_from_dir_with_ceilings {
+    mod is_config_file {
         use super::*;
 
         #[test]
-        fn fails_with_not_found_when_the_ceiling_is_reached() {
-            // Arrange
+        fn returns_false_for_a_missing_path() {
             let fixture = Fixture::new();
-            let nested_dir = fixture.create_dir("ceiling/a/b/c");
-            let ceiling_dir = fixture.path("ceiling");
 
-            // Act
-            let result = nearest_local_from_dir_with_ceilings(&nested_dir, [
-                ceiling_dir.as_path(),
-            ]);
+            let result = is_config_file(&fixture.path("missing.toml"));
 
-            // Assert
+            assert!(!result.expect("check missing path"));
+        }
+
+        #[test]
+        fn fails_with_inaccessible_when_a_parent_is_not_a_directory() {
+            let fixture = Fixture::new();
+            let blocking_file = fixture.create_file("blocking");
+
+            let result = is_config_file(&blocking_file.join("config.toml"));
+
             assert!(matches!(
                 result,
-                Err(ConfigDiscoveryError::NotFound { .. })
+                Err(ConfigDiscoveryError::Inaccessible { .. })
             ));
         }
     }

@@ -5,11 +5,9 @@
 //!
 //! # Lifecycle
 //!
-//! - [`Discovered`] means the path exists on disk but has not been tracked or
-//!   trusted.
-//! - [`Tracked`] means local discovery recorded the path in the best-effort
-//!   store.
-//! - [`Trusted`] carries local TOML content verified against a trust baseline.
+//! - [`Discovered`] means the path exists on disk but has not been trusted.
+//! - [`Trusted`] carries local TOML content verified against a trust baseline
+//!   after the path was recorded in the best-effort tracker store.
 //! - [`Parsed`] carries TOML decoded into [`RawConfig`].
 
 use std::{
@@ -17,14 +15,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(test)]
-use super::trust::TrustRequest;
 use super::{
-    error::{ConfigDiscoveryError, ConfigReadError, ConfigTrustError},
+    error::{ConfigReadError, ConfigTrustError},
     raw::RawConfig,
     tracker::TrackerStore,
-    trust::{ConfigTrustCheck, ConfigTrustStatus, TrustStore},
+    trust::{ConfigTrustCheck, TrustRequest, TrustStore},
 };
+
+/// Name of the local project config directory, relative to the project root.
+pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
+
+/// File name shared by local and global config files.
+pub(super) const CONFIG_FILE_NAME: &str = "config.toml";
+
+/// Path of a local project config file, relative to the project root.
+///
+/// Must equal [`LOCAL_CONFIG_DIR`] joined with [`CONFIG_FILE_NAME`]; a test
+/// pins that, since `concat!` cannot reference constants.
+pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
 
 /// Source marker for a local project config file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -37,10 +45,6 @@ pub(crate) struct IsGlobal;
 /// A config file discovered on disk, before tracking or trust checks.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Discovered;
-
-/// A local config file recorded in the best-effort tracking store.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Tracked;
 
 /// Local config content verified against a trust baseline.
 ///
@@ -163,114 +167,71 @@ impl<Source, State> ConfigFile<Source, State> {
 }
 
 impl LocalConfigFile<Discovered> {
-    /// Creates a discovered local config file from a `.traces/config.toml`
-    /// path.
+    /// Creates the discovered local config file of the project at `root`.
     ///
-    /// Derives the project root from the parent of the `.traces` directory.
+    /// Pure path arithmetic: the file need not exist.
+    #[inline]
+    pub(crate) fn at(root: &Path) -> Self {
+        Self::new(root.to_path_buf(), root.join(LOCAL_CONFIG_FILE), Discovered)
+    }
+
+    /// Recognizes a `.traces/config.toml` path and derives its project root
+    /// from the parent of the `.traces` directory.
+    ///
+    /// Returns `None` when `path` is not shaped like a local config file.
+    #[inline]
+    pub(crate) fn from_config_path(path: &Path) -> Option<Self> {
+        let traces_dir = path.parent()?;
+        if path.file_name() != Some(CONFIG_FILE_NAME.as_ref())
+            || traces_dir.file_name() != Some(LOCAL_CONFIG_DIR.as_ref())
+        {
+            return None;
+        }
+        let root = traces_dir.parent()?;
+        Some(Self::new(root.to_path_buf(), path.to_path_buf(), Discovered))
+    }
+
+    /// Records this file in the tracker, then verifies it against the trust
+    /// baseline.
+    ///
+    /// Recording is best-effort and happens first, so a refused config is still
+    /// tracked. Returns the file carrying the content that was verified, ready
+    /// to parse.
     ///
     /// # Errors
     ///
-    /// - [`ConfigDiscoveryError::UnsupportedLocalCandidate`] when `path` does
-    ///   not end with `.traces/config.toml` or has no parent `.traces`
-    ///   directory.
+    /// - [`ConfigTrustError::Untrusted`] when the workspace is not trusted, the
+    ///   baseline is missing, or the content is stale.
+    /// - [`ConfigTrustError::Tracker`] when the trust-store I/O fails.
+    /// - [`ConfigTrustError::Hash`] when the config file cannot be read for
+    ///   hashing.
     #[inline]
-    pub(crate) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
-        let Some(traces_dir) = path.parent() else {
-            return Err(ConfigDiscoveryError::UnsupportedLocalCandidate {
-                path,
-            });
-        };
-        if traces_dir.file_name() != Some(".traces".as_ref())
-            || path.file_name() != Some("config.toml".as_ref())
-        {
-            return Err(ConfigDiscoveryError::UnsupportedLocalCandidate {
-                path,
-            });
-        }
-        let Some(root) = traces_dir.parent() else {
-            return Err(ConfigDiscoveryError::UnsupportedLocalCandidate {
-                path,
-            });
-        };
-        Ok(Self::new(root.to_path_buf(), path, Discovered))
-    }
-
-    /// Records this file and transitions it to the tracked state.
-    ///
-    /// Records the file in the tracker store on a best-effort basis: failures
-    /// are logged, never returned. It always transitions to [`Tracked`].
-    #[inline]
-    pub(crate) fn into_tracked(
+    pub(crate) fn into_trusted(
         self,
-        tracked: &TrackerStore,
-    ) -> LocalConfigFile<Tracked> {
-        tracked.record(&self);
-        self.transition_to(Tracked)
+        tracker: &TrackerStore,
+        trust: &TrustStore,
+    ) -> Result<LocalConfigFile<Trusted>, ConfigTrustError> {
+        tracker.record_best_effort(self.path());
+        match trust.config_file_trust_check(self.root(), self.path())? {
+            ConfigTrustCheck::Trusted(content) => {
+                Ok(self.transition_to(Trusted {
+                    content,
+                }))
+            }
+            other => Err(ConfigTrustError::Untrusted {
+                root: self.root,
+                path: self.path,
+                status: other.status(),
+            }),
+        }
     }
 }
 
 impl GlobalConfigFile<Discovered> {
-    /// Creates a discovered global config file from a `config.toml` path.
-    ///
-    /// Derives the root directory from the file's parent.
-    ///
-    /// # Errors
-    ///
-    /// - [`ConfigDiscoveryError::UnsupportedGlobalCandidate`] when `path` is
-    ///   not named `config.toml` or has no parent directory.
+    /// Creates a discovered global config file for `dir/config.toml`.
     #[inline]
-    pub(super) fn try_new(path: PathBuf) -> Result<Self, ConfigDiscoveryError> {
-        if path.file_name() != Some("config.toml".as_ref()) {
-            return Err(ConfigDiscoveryError::UnsupportedGlobalCandidate {
-                path,
-            });
-        }
-        let Some(root) = path.parent() else {
-            return Err(ConfigDiscoveryError::UnsupportedGlobalCandidate {
-                path,
-            });
-        };
-        Ok(Self::new(root.to_path_buf(), path, Discovered))
-    }
-}
-
-/// Result of checking whether a tracked config file may be parsed.
-pub(crate) enum TrustOutcome {
-    /// The file is trusted and ready to be parsed.
-    Trusted(LocalConfigFile<Trusted>),
-    /// The file is untrusted, missing its baseline hash, or stale.
-    Halted(LocalConfigFile<Tracked>, ConfigTrustStatus),
-}
-
-impl LocalConfigFile<Tracked> {
-    /// Verifies the trust status of this tracked config file.
-    ///
-    /// Yields [`TrustOutcome::Trusted`] when the workspace is trusted and the
-    /// content hash matches the baseline. Yields [`TrustOutcome::Halted`] when
-    /// trust is absent, the baseline is missing, or the content is stale,
-    /// allowing the caller to prompt the user.
-    ///
-    /// # Errors
-    ///
-    /// - [`ConfigTrustError::Tracker`] when the underlying trust-store I/O
-    ///   fails.
-    /// - [`ConfigTrustError::Hash`] when hashing the config file fails.
-    pub(crate) fn verify_trust(
-        self,
-        trust: &TrustStore,
-    ) -> Result<TrustOutcome, ConfigTrustError> {
-        let check = trust.config_file_trust_check(self.root(), self.path())?;
-        Ok(match check {
-            ConfigTrustCheck::Trusted(content) => {
-                TrustOutcome::Trusted(self.transition_to(Trusted {
-                    content,
-                }))
-            }
-            other => {
-                let status = other.status();
-                TrustOutcome::Halted(self, status)
-            }
-        })
+    pub(super) fn in_dir(dir: &Path) -> Self {
+        Self::new(dir.to_path_buf(), dir.join(CONFIG_FILE_NAME), Discovered)
     }
 }
 
@@ -280,6 +241,17 @@ impl<Source> ConfigFile<Source, Parsed> {
     #[must_use]
     pub(super) fn raw(&self) -> &RawConfig {
         &self.state.raw
+    }
+
+    /// Builds a parsed file from in-memory `content` without trust checks.
+    #[cfg(test)]
+    pub(crate) fn from_content_for_test(
+        root: PathBuf,
+        path: PathBuf,
+        content: &str,
+    ) -> Result<Self, ConfigReadError> {
+        let parsed = Parsed::from_content(&path, content)?;
+        Ok(Self::new(root, path, parsed))
     }
 }
 
@@ -305,15 +277,13 @@ impl TryFrom<GlobalConfigFile<Discovered>> for GlobalConfigFile<Parsed> {
     }
 }
 
-#[cfg(test)]
-impl<Source> ConfigFile<Source, Parsed> {
-    pub(crate) fn from_content_for_test(
-        root: PathBuf,
-        path: PathBuf,
-        content: &str,
-    ) -> Result<Self, ConfigReadError> {
-        let parsed = Parsed::from_content(&path, content)?;
-        Ok(Self::new(root, path, parsed))
+impl From<&LocalConfigFile<Discovered>> for TrustRequest {
+    #[inline]
+    fn from(file: &LocalConfigFile<Discovered>) -> Self {
+        Self::Config {
+            root: file.root().to_path_buf(),
+            path: file.path().to_path_buf(),
+        }
     }
 }
 
@@ -323,8 +293,46 @@ mod tests {
 
     use super::*;
 
-    mod local_constructor {
+    mod layout {
         use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn constants_agree() {
+            assert_eq!(
+                LOCAL_CONFIG_FILE,
+                format!("{LOCAL_CONFIG_DIR}/{CONFIG_FILE_NAME}")
+            );
+        }
+
+        #[test]
+        fn at_places_the_config_under_the_root() {
+            let root = Path::new("/project");
+
+            let config = LocalConfigFile::at(root);
+
+            assert_eq!(config.root(), root);
+            assert_eq!(
+                config.path(),
+                Path::new("/project/.traces/config.toml")
+            );
+        }
+
+        #[test]
+        fn in_dir_places_the_global_config_in_the_directory() {
+            let dir = Path::new("/config/traces");
+
+            let config = GlobalConfigFile::in_dir(dir);
+
+            assert_eq!(config.root(), dir);
+            assert_eq!(config.path(), Path::new("/config/traces/config.toml"));
+        }
+    }
+
+    mod from_config_path {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
 
         use super::*;
 
@@ -333,94 +341,37 @@ mod tests {
             let root = PathBuf::from("/project");
             let path = root.join(".traces/config.toml");
 
-            let config = LocalConfigFile::<Discovered>::try_new(path.clone())
+            let config = LocalConfigFile::from_config_path(&path)
                 .expect("valid local config path");
 
             assert_eq!(config.root(), root.as_path());
             assert_eq!(config.path(), path.as_path());
         }
 
-        use rstest::rstest;
-
         #[rstest]
         #[case("/project/config.toml")] // parent is not .traces
         #[case("/project/.traces/other.toml")] // file is not config.toml
         #[case("config.toml")] // no parent
-        fn rejects_invalid_paths(#[case] path: &str) {
-            let error =
-                LocalConfigFile::<Discovered>::try_new(PathBuf::from(path))
-                    .expect_err(&format!("expected rejection for {path}"));
-            assert!(matches!(
-                error,
-                ConfigDiscoveryError::UnsupportedLocalCandidate { .. }
-            ));
-        }
-    }
-
-    mod global_constructor {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn derives_root_from_parent_directory() {
-            let root = PathBuf::from("/config/traces");
-            let path = root.join("config.toml");
-
-            let config = GlobalConfigFile::<Discovered>::try_new(path.clone())
-                .expect("valid global config path");
-
-            assert_eq!(config.root(), root.as_path());
-            assert_eq!(config.path(), path.as_path());
-        }
-
-        use rstest::rstest;
-
-        #[rstest]
-        #[case("/config/traces/settings.toml")] // file is not config.toml
-        fn rejects_invalid_paths(#[case] path: &str) {
-            let error =
-                GlobalConfigFile::<Discovered>::try_new(PathBuf::from(path))
-                    .expect_err(&format!("expected rejection for {path}"));
-            assert!(matches!(
-                error,
-                ConfigDiscoveryError::UnsupportedGlobalCandidate { .. }
-            ));
-        }
-    }
-
-    mod tracking_transitions {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn transitions_to_tracked_state() {
-            let temp = tempfile::tempdir().expect("temp");
-            let store = TrackerStore::at(temp.path().join("tracked"));
-            let file = LocalConfigFile::<Discovered>::try_new(PathBuf::from(
-                "/project/.traces/config.toml",
-            ))
-            .expect("valid local config path");
-
-            let tracked = file.into_tracked(&store);
-
+        fn rejects_other_paths(#[case] path: &str) {
             assert_eq!(
-                tracked.path(),
-                Path::new("/project/.traces/config.toml")
+                LocalConfigFile::from_config_path(Path::new(path)),
+                None
             );
         }
     }
 
-    mod trust_transitions {
+    mod into_trusted {
+        use pretty_assertions::assert_eq;
+
         use super::*;
+        use crate::config::trust::ConfigTrustStatus;
 
         struct Fixture {
             _temp: tempfile::TempDir,
             root: PathBuf,
             path: PathBuf,
-            tracked_store: TrackerStore,
-            trust_store: TrustStore,
+            tracker: TrackerStore,
+            trust: TrustStore,
         }
 
         impl Fixture {
@@ -431,98 +382,103 @@ mod tests {
                 std::fs::create_dir_all(path.parent().expect("config parent"))
                     .expect("create config directory");
                 std::fs::write(&path, content).expect("write config");
-                let tracked_store =
-                    TrackerStore::at(temp.path().join("tracked"));
-                let trust_store = TrustStore::at(temp.path().join("trust"));
+                let tracker = TrackerStore::at(temp.path().join("tracked"));
+                let trust = TrustStore::at(temp.path().join("trust"));
                 Self {
                     _temp: temp,
                     root,
                     path,
-                    tracked_store,
-                    trust_store,
+                    tracker,
+                    trust,
                 }
             }
 
-            fn tracked(&self) -> LocalConfigFile<Tracked> {
-                LocalConfigFile::<Discovered>::try_new(self.path.clone())
+            fn discovered(&self) -> LocalConfigFile<Discovered> {
+                LocalConfigFile::from_config_path(&self.path)
                     .expect("discover config")
-                    .into_tracked(&self.tracked_store)
+            }
+
+            fn grant_baseline(&self) {
+                self.trust
+                    .trust(&TrustRequest::from(&self.discovered()))
+                    .expect("trust config");
+            }
+
+            fn refusal(&self) -> ConfigTrustError {
+                self.discovered()
+                    .into_trusted(&self.tracker, &self.trust)
+                    .expect_err("config is refused")
             }
         }
 
         #[test]
-        fn transitions_to_trusted_when_store_says_trusted() {
+        fn yields_trusted_file_when_baseline_matches() {
             let fixture = Fixture::new("");
-            let tracked = fixture.tracked();
-            fixture
-                .trust_store
-                .trust(&TrustRequest::from(&tracked))
-                .expect("trust config");
+            fixture.grant_baseline();
 
-            let result = tracked.verify_trust(&fixture.trust_store);
+            let trusted = fixture
+                .discovered()
+                .into_trusted(&fixture.tracker, &fixture.trust)
+                .expect("trusted");
 
-            assert!(matches!(result, Ok(TrustOutcome::Trusted(_))));
+            assert_eq!(trusted.path(), fixture.path.as_path());
         }
 
         #[test]
-        fn halts_untrusted_when_the_root_is_not_trusted() {
+        fn refuses_untrusted_when_the_root_is_not_trusted() {
             let fixture = Fixture::new("");
-            let tracked = fixture.tracked();
 
-            let result = tracked.verify_trust(&fixture.trust_store);
-
-            assert!(matches!(
-                result,
-                Ok(TrustOutcome::Halted(_, ConfigTrustStatus::Untrusted))
-            ));
+            assert!(matches!(fixture.refusal(), ConfigTrustError::Untrusted {
+                status: ConfigTrustStatus::Untrusted,
+                ..
+            }));
         }
 
         #[test]
-        fn halts_with_missing_baseline_when_only_the_workspace_is_trusted() {
+        fn refuses_missing_baseline_when_only_the_workspace_is_trusted() {
             let fixture = Fixture::new("");
-            let tracked = fixture.tracked();
             fixture
-                .trust_store
+                .trust
                 .trust(&TrustRequest::from(fixture.root.as_path()))
                 .expect("trust workspace without config baseline");
 
-            let result = tracked.verify_trust(&fixture.trust_store);
-
-            assert!(matches!(
-                result,
-                Ok(TrustOutcome::Halted(_, ConfigTrustStatus::MissingBaseline))
-            ));
+            assert!(matches!(fixture.refusal(), ConfigTrustError::Untrusted {
+                status: ConfigTrustStatus::MissingBaseline,
+                ..
+            }));
         }
 
         #[test]
-        fn halts_stale_when_the_content_hash_differs() {
+        fn refuses_stale_when_the_content_hash_differs() {
             let fixture = Fixture::new("old");
-            let tracked = fixture.tracked();
-            fixture
-                .trust_store
-                .trust(&TrustRequest::from(&tracked))
-                .expect("trust original config");
+            fixture.grant_baseline();
             std::fs::write(&fixture.path, "new").expect("change config");
 
-            let result = tracked.verify_trust(&fixture.trust_store);
+            assert!(matches!(fixture.refusal(), ConfigTrustError::Untrusted {
+                status: ConfigTrustStatus::Stale,
+                ..
+            }));
+        }
 
-            assert!(matches!(
-                result,
-                Ok(TrustOutcome::Halted(_, ConfigTrustStatus::Stale))
-            ));
+        #[test]
+        fn tracks_the_path_even_when_refused() {
+            let fixture = Fixture::new("");
+
+            let error = fixture.refusal();
+
+            assert!(matches!(error, ConfigTrustError::Untrusted { .. }));
+            assert_eq!(fixture.tracker.list().expect("list").len(), 1);
         }
 
         #[test]
         fn fails_with_hash_error_when_the_config_is_unreadable() {
             let fixture = Fixture::new("");
-            let tracked = fixture.tracked();
-            fixture
-                .trust_store
-                .trust(&TrustRequest::from(&tracked))
-                .expect("trust config before removal");
+            fixture.grant_baseline();
             std::fs::remove_file(&fixture.path).expect("remove config");
 
-            let result = tracked.verify_trust(&fixture.trust_store);
+            let result = fixture
+                .discovered()
+                .into_trusted(&fixture.tracker, &fixture.trust);
 
             assert!(matches!(result, Err(ConfigTrustError::Hash(_))));
         }

@@ -64,6 +64,9 @@ pub traces_pkm::cli::CliError::InitAlreadyInitialized::root: std::path::PathBuf
 pub traces_pkm::cli::CliError::InitConfigWrite
 pub traces_pkm::cli::CliError::InitConfigWrite::root: std::path::PathBuf
 pub traces_pkm::cli::CliError::InitConfigWrite::source: super::init::ConfigScaffoldError
+pub traces_pkm::cli::CliError::InitInvalidTemplateDir
+pub traces_pkm::cli::CliError::InitInvalidTemplateDir::directory: std::path::PathBuf
+pub traces_pkm::cli::CliError::InitInvalidTemplateDir::source: error::ConfigValueError
 pub traces_pkm::cli::CliError::InitPrompt
 pub traces_pkm::cli::CliError::InitPrompt::source: traces_pkm::DialogError
 pub traces_pkm::cli::CliError::InitScaffold
@@ -758,72 +761,72 @@ impl<T> either::into_either::IntoEither for traces_pkm::testing::WriteOutcome
 impl<T> tracing::instrument::Instrument for traces_pkm::testing::WriteOutcome
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::WriteOutcome
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::WriteOutcome where T: 'static
-pub struct traces_pkm::testing::Blake3FileHash(_)
-impl traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::from_path(&std::path::Path) -> core::result::Result<Self, traces_pkm::hash::HashError>
-pub fn traces_pkm::testing::Blake3FileHash::to_hex(self) -> impl core::convert::AsRef<str> + core::fmt::Display
-impl core::clone::Clone for traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::clone(&self) -> Self
-impl core::cmp::Eq for traces_pkm::testing::Blake3FileHash
-impl core::cmp::PartialEq for traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::eq(&self, &Self) -> bool
-impl core::convert::From<&str> for traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::from(&str) -> Self
-impl core::fmt::Debug for traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::fmt::Display for traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for traces_pkm::testing::Blake3FileHash
-impl core::marker::StructuralPartialEq for traces_pkm::testing::Blake3FileHash
-impl core::marker::Freeze for traces_pkm::testing::Blake3FileHash
-impl core::marker::Send for traces_pkm::testing::Blake3FileHash
-impl core::marker::Sync for traces_pkm::testing::Blake3FileHash
-impl core::marker::Unpin for traces_pkm::testing::Blake3FileHash
-impl core::marker::UnsafeUnpin for traces_pkm::testing::Blake3FileHash
-impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::testing::Blake3FileHash
-impl core::panic::unwind_safe::UnwindSafe for traces_pkm::testing::Blake3FileHash
-impl<D> owo_colors::OwoColorize for traces_pkm::testing::Blake3FileHash
-impl<Q, K> equivalent::Equivalent<K> for traces_pkm::testing::Blake3FileHash where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn traces_pkm::testing::Blake3FileHash::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::testing::Blake3FileHash where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn traces_pkm::testing::Blake3FileHash::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for traces_pkm::testing::Blake3FileHash where U: core::convert::From<T>
-pub fn traces_pkm::testing::Blake3FileHash::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for traces_pkm::testing::Blake3FileHash where U: core::convert::Into<T>
-pub type traces_pkm::testing::Blake3FileHash::Error = never
-pub fn traces_pkm::testing::Blake3FileHash::try_from(U) -> core::result::Result<T, never>
-impl<T, U> core::convert::TryInto<U> for traces_pkm::testing::Blake3FileHash where U: core::convert::TryFrom<T>
-pub type traces_pkm::testing::Blake3FileHash::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn traces_pkm::testing::Blake3FileHash::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for traces_pkm::testing::Blake3FileHash where T: core::clone::Clone
-pub type traces_pkm::testing::Blake3FileHash::Owned = T
-pub fn traces_pkm::testing::Blake3FileHash::clone_into(&self, &mut T)
-pub fn traces_pkm::testing::Blake3FileHash::to_owned(&self) -> T
-impl<T> alloc::string::ToString for traces_pkm::testing::Blake3FileHash where T: core::fmt::Display + ?core::marker::Sized
-pub fn traces_pkm::testing::Blake3FileHash::to_string(&self) -> alloc::string::String
-impl<T> core::any::Any for traces_pkm::testing::Blake3FileHash where T: 'static + ?core::marker::Sized
-pub fn traces_pkm::testing::Blake3FileHash::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for traces_pkm::testing::Blake3FileHash where T: ?core::marker::Sized
-pub fn traces_pkm::testing::Blake3FileHash::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for traces_pkm::testing::Blake3FileHash where T: ?core::marker::Sized
-pub fn traces_pkm::testing::Blake3FileHash::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for traces_pkm::testing::Blake3FileHash where T: core::clone::Clone
-pub unsafe fn traces_pkm::testing::Blake3FileHash::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for traces_pkm::testing::Blake3FileHash
-pub fn traces_pkm::testing::Blake3FileHash::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::testing::Blake3FileHash
-pub type traces_pkm::testing::Blake3FileHash::Init = T
-pub const traces_pkm::testing::Blake3FileHash::ALIGN: usize
-pub unsafe fn traces_pkm::testing::Blake3FileHash::deref<'a>(usize) -> &'a T
-pub unsafe fn traces_pkm::testing::Blake3FileHash::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn traces_pkm::testing::Blake3FileHash::drop(usize)
-pub unsafe fn traces_pkm::testing::Blake3FileHash::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> dyn_clone::DynClone for traces_pkm::testing::Blake3FileHash where T: core::clone::Clone
-pub fn traces_pkm::testing::Blake3FileHash::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
-impl<T> either::into_either::IntoEither for traces_pkm::testing::Blake3FileHash
-impl<T> tracing::instrument::Instrument for traces_pkm::testing::Blake3FileHash
-impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::Blake3FileHash
-impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::Blake3FileHash where T: 'static
+pub struct traces_pkm::testing::Blake3Digest(_)
+impl traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::from_path(&std::path::Path) -> core::result::Result<Self, traces_pkm::hash::HashError>
+pub fn traces_pkm::testing::Blake3Digest::to_hex(self) -> impl core::convert::AsRef<str> + core::fmt::Display
+impl core::clone::Clone for traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::clone(&self) -> Self
+impl core::cmp::Eq for traces_pkm::testing::Blake3Digest
+impl core::cmp::PartialEq for traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::eq(&self, &Self) -> bool
+impl core::convert::From<&str> for traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::from(&str) -> Self
+impl core::fmt::Debug for traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for traces_pkm::testing::Blake3Digest
+impl core::marker::StructuralPartialEq for traces_pkm::testing::Blake3Digest
+impl core::marker::Freeze for traces_pkm::testing::Blake3Digest
+impl core::marker::Send for traces_pkm::testing::Blake3Digest
+impl core::marker::Sync for traces_pkm::testing::Blake3Digest
+impl core::marker::Unpin for traces_pkm::testing::Blake3Digest
+impl core::marker::UnsafeUnpin for traces_pkm::testing::Blake3Digest
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::testing::Blake3Digest
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::testing::Blake3Digest
+impl<D> owo_colors::OwoColorize for traces_pkm::testing::Blake3Digest
+impl<Q, K> equivalent::Equivalent<K> for traces_pkm::testing::Blake3Digest where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::testing::Blake3Digest::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces_pkm::testing::Blake3Digest where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces_pkm::testing::Blake3Digest::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces_pkm::testing::Blake3Digest where U: core::convert::From<T>
+pub fn traces_pkm::testing::Blake3Digest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::testing::Blake3Digest where U: core::convert::Into<T>
+pub type traces_pkm::testing::Blake3Digest::Error = never
+pub fn traces_pkm::testing::Blake3Digest::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::testing::Blake3Digest where U: core::convert::TryFrom<T>
+pub type traces_pkm::testing::Blake3Digest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::testing::Blake3Digest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces_pkm::testing::Blake3Digest where T: core::clone::Clone
+pub type traces_pkm::testing::Blake3Digest::Owned = T
+pub fn traces_pkm::testing::Blake3Digest::clone_into(&self, &mut T)
+pub fn traces_pkm::testing::Blake3Digest::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces_pkm::testing::Blake3Digest where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces_pkm::testing::Blake3Digest::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces_pkm::testing::Blake3Digest where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::testing::Blake3Digest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::testing::Blake3Digest where T: ?core::marker::Sized
+pub fn traces_pkm::testing::Blake3Digest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::testing::Blake3Digest where T: ?core::marker::Sized
+pub fn traces_pkm::testing::Blake3Digest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces_pkm::testing::Blake3Digest where T: core::clone::Clone
+pub unsafe fn traces_pkm::testing::Blake3Digest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces_pkm::testing::Blake3Digest
+pub fn traces_pkm::testing::Blake3Digest::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::testing::Blake3Digest
+pub type traces_pkm::testing::Blake3Digest::Init = T
+pub const traces_pkm::testing::Blake3Digest::ALIGN: usize
+pub unsafe fn traces_pkm::testing::Blake3Digest::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::testing::Blake3Digest::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::testing::Blake3Digest::drop(usize)
+pub unsafe fn traces_pkm::testing::Blake3Digest::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces_pkm::testing::Blake3Digest where T: core::clone::Clone
+pub fn traces_pkm::testing::Blake3Digest::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces_pkm::testing::Blake3Digest
+impl<T> tracing::instrument::Instrument for traces_pkm::testing::Blake3Digest
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::Blake3Digest
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::Blake3Digest where T: 'static
 pub struct traces_pkm::testing::Blake3PathHash(_)
 impl core::clone::Clone for traces_pkm::testing::Blake3PathHash
 pub fn traces_pkm::testing::Blake3PathHash::clone(&self) -> Self

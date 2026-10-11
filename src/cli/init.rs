@@ -17,8 +17,8 @@ use super::error::{CliError, CliResult};
 use crate::{
     DialogProvider,
     config::{
-        DEFAULT_LOCAL_TEMPLATES_DIR, LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE,
-        RawConfig, RawTemplateConfig,
+        ConfigSubDir, DEFAULT_LOCAL_TEMPLATES_DIR, LOCAL_CONFIG_DIR,
+        LOCAL_CONFIG_FILE, RawConfig, RawTemplateConfig,
     },
 };
 
@@ -34,12 +34,17 @@ pub struct Init;
 impl Init {
     /// Runs `traces init` using the current directory as the project root.
     ///
+    /// Nothing is written when the chosen template directory is invalid, and
+    /// everything this run created is removed again if a later step fails.
+    ///
     /// # Errors
     ///
     /// - [`CliError::CurrentDirectory`] if the current directory cannot be
     ///   read.
     /// - [`CliError::InitPrompt`] if collecting input interactively fails.
     /// - [`CliError::InitAlreadyInitialized`] if `.traces` already exists.
+    /// - [`CliError::InitInvalidTemplateDir`] if the template directory is
+    ///   absolute, contains `..`, or resolves outside the project.
     /// - [`CliError::InitScaffold`] if directory scaffolding fails.
     /// - [`CliError::InitConfigWrite`] if serializing or writing the local
     ///   config file fails.
@@ -47,8 +52,32 @@ impl Init {
     pub fn run(self, provider: &dyn DialogProvider) -> CliResult {
         let root = super::current_dir()?.into_inner();
         let input = Self::collect_config(provider)?;
-        Self::scaffold_directory(&root)?;
-        Self::write_config_file(&root, &input.directory, &input.output_dir)?;
+        let traces_dir = root.join(LOCAL_CONFIG_DIR);
+        if traces_dir.exists() {
+            return Err(CliError::InitAlreadyInitialized {
+                root,
+            });
+        }
+        let templates_dir = ConfigSubDir::resolve(&input.directory, &root)
+            .map_err(|source| CliError::InitInvalidTemplateDir {
+                directory: input.directory.clone(),
+                source,
+            })?;
+
+        let mut created = Vec::new();
+        let result =
+            Self::scaffold_directories(&root, &templates_dir, &mut created)
+                .and_then(|()| {
+                    Self::write_config_file(
+                        &root,
+                        &input.directory,
+                        &input.output_dir,
+                    )
+                });
+        if let Err(error) = result {
+            Self::undo(&root, &created);
+            return Err(error);
+        }
         eprintln!("initialised traces in {}", root.display());
         Ok(())
     }
@@ -77,32 +106,35 @@ impl Init {
         })
     }
 
-    /// Scaffolds `.traces/` and `.traces/templates/`.
+    /// Creates `.traces/` and every missing directory down to `templates_dir`,
+    /// recording each directory it creates in `created` (in creation order) so
+    /// a failure can be undone.
     ///
     /// # Errors
     ///
-    /// - [`CliError::InitAlreadyInitialized`] if `.traces` already exists under
-    ///   `root`.
-    /// - [`CliError::InitScaffold`] if creating directories fails.
-    fn scaffold_directory(root: &Path) -> CliResult {
+    /// - [`CliError::InitScaffold`] if creating a directory fails.
+    fn scaffold_directories(
+        root: &Path,
+        templates_dir: &Path,
+        created: &mut Vec<PathBuf>,
+    ) -> CliResult {
+        let scaffold_error = |source| CliError::InitScaffold {
+            root: root.to_path_buf(),
+            source,
+        };
         let traces_dir = root.join(LOCAL_CONFIG_DIR);
-        if traces_dir.exists() {
-            return Err(CliError::InitAlreadyInitialized {
-                root: root.to_path_buf(),
-            });
+        fs::create_dir(&traces_dir).map_err(scaffold_error)?;
+        created.push(traces_dir);
+
+        let mut missing: Vec<&Path> = templates_dir
+            .ancestors()
+            .take_while(|dir| *dir != root && !dir.exists())
+            .collect();
+        missing.reverse();
+        for dir in missing {
+            fs::create_dir(dir).map_err(scaffold_error)?;
+            created.push(dir.to_path_buf());
         }
-        fs::create_dir(&traces_dir).map_err(|source| {
-            CliError::InitScaffold {
-                root: root.to_path_buf(),
-                source,
-            }
-        })?;
-        fs::create_dir(root.join(DEFAULT_LOCAL_TEMPLATES_DIR)).map_err(
-            |source| CliError::InitScaffold {
-                root: root.to_path_buf(),
-                source,
-            },
-        )?;
         Ok(())
     }
 
@@ -124,13 +156,23 @@ impl Init {
             }
         })
     }
+
+    /// Removes what a failed run created. Never recursive: a directory that
+    /// gained other content in the meantime is left alone.
+    fn undo(root: &Path, created: &[PathBuf]) {
+        // Best effort: the original error is the one worth reporting.
+        drop(fs::remove_file(root.join(LOCAL_CONFIG_FILE)));
+        for dir in created.iter().rev() {
+            drop(fs::remove_dir(dir));
+        }
+    }
 }
 
 /// Errors raised while scaffolding a local config file on disk.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigScaffoldError {
-    /// The collected template and output directories could not be serialized
-    /// to TOML.
+    /// The collected template and output directories could not be serialized to
+    /// TOML.
     #[error("failed to serialize local config")]
     Serialize {
         /// Source TOML serialization error.
@@ -149,17 +191,17 @@ pub(crate) enum ConfigScaffoldError {
     },
 }
 
-/// Serializes `directory`/`output_dir` as the local template config and
-/// writes it to `root.join(LOCAL_CONFIG_FILE)`.
+/// Serializes `directory`/`output_dir` as the local template config and writes
+/// it to `root.join(LOCAL_CONFIG_FILE)`.
 ///
 /// `[schemas]` and `[frontmatter]` are written as empty tables (their serde
 /// defaults), so a freshly scaffolded config behaves identically to one that
 /// omits those tables entirely.
 ///
 /// Uses [`std::fs::File::create_new`] rather than [`std::fs::write`] so this
-/// fails atomically if the file already exists, preventing a concurrent
-/// `traces init` or a file planted between the existence check and write
-/// from being silently clobbered.
+/// fails atomically if the file already exists, preventing a concurrent `traces
+/// init` or a file planted between the existence check and write from being
+/// silently clobbered.
 ///
 /// # Errors
 ///
@@ -290,7 +332,8 @@ mod tests {
                 templates.get("output_dir").and_then(toml::Value::as_str),
                 Some("notes")
             );
-            assert!(preset.path().join(".traces/templates").is_dir());
+            assert!(preset.path().join("custom/templates").is_dir());
+            assert!(!preset.path().join(".traces/templates").exists());
         }
 
         /// Checks that the dialog's defaults are written to the local config.
@@ -316,6 +359,77 @@ mod tests {
                 Some(".")
             );
             assert!(defaults.path().join(".traces/templates").is_dir());
+        }
+
+        #[rstest::rstest]
+        #[case::absolute("/etc/templates")]
+        #[case::parent("../outside")]
+        #[case::nested_parent("a/../../outside")]
+        fn rejects_invalid_template_directory_without_writing(
+            #[case] input: &str,
+        ) {
+            let root = tempfile::tempdir().expect("create temp dir");
+            let _guard = CwdGuard::enter(root.path());
+            let provider = crate::PresetDialogProvider::new().with_text(input);
+
+            let error = Init
+                .run(&provider)
+                .expect_err("invalid template directory fails init");
+
+            assert!(matches!(error, CliError::InitInvalidTemplateDir { .. }));
+            assert!(!root.path().join(".traces").exists());
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn rejects_symlink_escape_without_writing() {
+            let outside = tempfile::tempdir().expect("create outside dir");
+            let root = tempfile::tempdir().expect("create temp dir");
+            std::os::unix::fs::symlink(
+                outside.path(),
+                root.path().join("link"),
+            )
+            .expect("create escaping symlink");
+            let _guard = CwdGuard::enter(root.path());
+            let provider =
+                crate::PresetDialogProvider::new().with_text("link/templates");
+
+            let error = Init
+                .run(&provider)
+                .expect_err("escaping template directory fails init");
+
+            assert!(matches!(error, CliError::InitInvalidTemplateDir { .. }));
+            assert!(!root.path().join(".traces").exists());
+            assert!(!outside.path().join("templates").exists());
+        }
+
+        /// A failure after `.traces` exists must not block a re-run.
+        #[cfg(unix)]
+        #[test]
+        fn cleans_up_after_a_mid_run_failure() {
+            use std::os::unix::fs::PermissionsExt;
+
+            let root = tempfile::tempdir().expect("create temp dir");
+            let docs = root.path().join("docs");
+            fs::create_dir(&docs).expect("create docs dir");
+            fs::set_permissions(&docs, fs::Permissions::from_mode(0o555))
+                .expect("make docs read-only");
+            let _guard = CwdGuard::enter(root.path());
+            let failing =
+                crate::PresetDialogProvider::new().with_text("docs/templates");
+
+            let result = Init.run(&failing);
+
+            fs::set_permissions(&docs, fs::Permissions::from_mode(0o755))
+                .expect("restore docs permissions");
+            let error = result.expect_err("read-only parent fails scaffold");
+            assert!(matches!(error, CliError::InitScaffold { .. }));
+            assert!(!root.path().join(".traces").exists());
+            Init.run(
+                &crate::PresetDialogProvider::new().with_text("docs/templates"),
+            )
+            .expect("re-run succeeds after cleanup");
+            assert!(docs.join("templates").is_dir());
         }
 
         /// Existing initialization must not be overwritten.

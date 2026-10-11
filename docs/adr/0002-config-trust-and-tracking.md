@@ -55,30 +55,22 @@ this ADR covers where both live.
 
 ## Decision Outcome
 
-Use mise's symlink-based tracking pattern for **both** stores, kept in separate
-directories under the XDG **state** dir (following mise, which places
-`TRACKED_CONFIGS` and `TRUSTED_CONFIGS` under its state dir, not its data dir):
+Use mise's symlink-based tracking pattern for **both** stores, kept in separate directories under the XDG **state** dir (following mise, which places `TRACKED_CONFIGS` and `TRUSTED_CONFIGS` under its state dir, not its data dir):
 
-- **Trust store** — `~/.local/state/traces/trusted-configs/`. The `traces trust`
-  command records trust by creating a symlink named by the BLAKE3 hash of the
-  directory's canonical path, pointing back to the directory. `traces trust`
-  (run from within or targeting a directory) creates this symlink. Config
-  loading — and, by extension, any template rendering that config's settings
-  drive — checks whether the workspace's project root has a corresponding
-  symlink before proceeding; if not, it errors with a suggestion to run `traces
-  trust`.
-- **Tracking store** — `~/.local/state/traces/tracked-configs/`. Each time
-  `ConfigService` loads a config file, its canonical path is recorded as a
-  hashed symlink here. This is *not* on the discovery hot path (discovery is the
-  upward cwd walk); the tracking store exists so cross-project operations can
-  list/act on every config traces has ever loaded, from anywhere.
+- **Trust store**: `~/.local/state/traces/trusted-configs/`. The `traces trust` command records trust by creating a symlink named by the BLAKE3 hash of the directory's canonical path, pointing back to the directory. Config loading, and by extension any template rendering that config's settings drive, checks whether the workspace's project root has a corresponding symlink before proceeding; if not, it errors with a suggestion to run `traces trust`.
+- **Tracking store**: `~/.local/state/traces/tracked-configs/`. Each time `ConfigService` loads a config file, or trust is granted to one, its canonical path is recorded as a hashed symlink here. This is *not* on the discovery hot path (discovery is the upward cwd walk); the tracking store exists so cross-project operations can list/act on every config traces has ever loaded, from anywhere.
 
-Both stores share the same hash-keyed-symlink shape and a common cross-platform
-helper, differing only in their root directory and their meaning.
+Both stores share the same hash-keyed-symlink shape and a common cross-platform helper, differing only in their root directory and their meaning.
 
-Resolve the state dir via `dirs::state_dir()` (falling back to
-`dirs::data_dir()` where a platform lacks a distinct state dir), not a
-hard-coded path.
+Resolve the state dir via `dirs::state_dir()` (falling back to `dirs::data_dir()` where a platform lacks a distinct state dir), not a hard-coded path.
+
+**Update: grants track before they trust.** Loading recorded a config in the tracking store, but `traces trust` wrote only to the trust store, so a trusted root could have a config traces had never tracked. Both paths now enforce one invariant: every trusted root that has a local config has that config path in the tracking store.
+
+- Load: `LocalConfigFile::into_trusted` records the path best-effort (a tracker failure warns and never fails the load), then verifies trust. A refused config is still tracked.
+- Grant: `ConfigService::trust` records a config subject with the fallible `TrackerStore::record` before granting trust. If recording fails, the grant aborts and the root stays untrusted. A root-only grant has no config to track.
+- Revoke: `untrust` leaves the tracking store alone, since tracking stays independent of trust.
+
+Granting trust to a missing config now fails with a tracker error where it previously failed with a hash error.
 
 ### Consequences
 

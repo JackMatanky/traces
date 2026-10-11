@@ -59,7 +59,7 @@
 //!   inheritance graph.
 //! - `testing::TemplateService`, `testing::CommitPolicy`, `testing::WriteMode`:
 //!   Template rendering and file writes.
-//! - `testing::Blake3FileHash`, `testing::Blake3PathHash`: BLAKE3 hashing
+//! - `testing::Blake3Digest`, `testing::Blake3PathHash`: BLAKE3 hashing
 //!   primitives.
 //! # Visibility Probes
 //!
@@ -153,7 +153,7 @@ pub(crate) use file::{BaseName, BaseNameRef, FileName};
 pub(crate) use file_tracker::{
     CleanMode, FilePathTracker, FilePathTrackerError,
 };
-pub(crate) use hash::{Blake3FileHash, Blake3PathHash};
+pub(crate) use hash::{Blake3Digest, Blake3PathHash};
 pub(crate) use index::IndexerService;
 pub(crate) use lexer::{
     LexError, SpannedTokenStream, TokenSpec, lexical_unquote,
@@ -183,7 +183,7 @@ pub mod testing {
     pub use crate::{
         config::{Config, ConfigService, TaskConfig, TrustRequest},
         file::FileFormat,
-        hash::{Blake3FileHash, Blake3PathHash},
+        hash::{Blake3Digest, Blake3PathHash},
         index::{
             FileEntry, IndexerService, InlinkMap, RefreshReport, WorkspaceIndex,
         },
@@ -239,7 +239,7 @@ mod test_support {
 
     use crate::{
         Config, ConfigService, IndexerService, MarkdownParserInput, Note, Tag,
-        config::{Discovered, LocalConfigFile, TrustRequest},
+        config::{LocalConfigFile, TrustRequest},
         index::WorkspaceIndex,
         parse_markdown,
     };
@@ -396,9 +396,7 @@ mod test_support {
         ///   wrong.
         #[inline]
         pub fn trust(&self) {
-            let config_path = self.root.join(".traces/config.toml");
-            let config = LocalConfigFile::<Discovered>::try_new(config_path)
-                .expect("valid local config for trust");
+            let config = LocalConfigFile::at(&self.root);
             self.service
                 .trust(&TrustRequest::from(&config))
                 .expect("trust project config");
@@ -664,9 +662,7 @@ mod test_support {
             .expect("create config parent");
         std::fs::write(&config_path, LOCAL_CONFIG_TOML)
             .expect("write config file");
-        let config =
-            LocalConfigFile::<Discovered>::try_new(config_path.clone())
-                .expect("valid local config");
+        let config = LocalConfigFile::at(root);
         service
             .trust(&TrustRequest::from(&config))
             .expect("trust project config");
