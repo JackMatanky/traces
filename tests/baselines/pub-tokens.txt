@@ -267,12 +267,15 @@ src/date/parse.rs: pub(crate) enum DateShape {
 src/date/parse.rs: pub(crate) enum DateTimeShape {
 src/date/parse.rs: pub(crate) enum ParsedDateTime {
 src/date/parse.rs: pub(crate) fn classify(
+src/date/parse.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_any(
 src/date/parse.rs: pub(crate) fn parse_any(
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(RecognizedDate, usize)> {
+src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
 src/date/parse.rs: pub(crate) fn parse_with(
+src/date/parse.rs: pub(crate) fn parse_with_pattern(
 src/date/value.rs: pub enum DateError {
 src/date/value.rs: pub struct DateTimeValue(pub(super) DateTime<Utc>);
 src/date/value.rs: pub struct DateValue(pub(super) NaiveDate);

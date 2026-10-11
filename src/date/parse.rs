@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
 use super::value::{
-    DATE_PATTERN, DateError, DateTimeValue, DateValue, Precision,
-    RecognizedDate, RecognizedDateValue, resolve_local,
+    CivilPrecision, DATE_PATTERN, DateError, DateTimeValue, DateValue, Point,
+    Precision, RecognizedDate, RecognizedDateValue, resolve_local,
 };
 
 /// Returns `true` if `bytes` begins with a date-like prefix.
@@ -26,6 +26,143 @@ fn starts_like_date(bytes: &[u8]) -> bool {
 fn starts_with_year(s: &str) -> bool {
     let bytes = s.as_bytes();
     bytes.get(0..4).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
+}
+
+#[expect(
+    dead_code,
+    reason = "Point parser is migrated into callers in phase 6.4"
+)]
+impl Point {
+    /// Parses a date or date-time shape, retaining civil precision.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DateError::UnknownShape`] when no date-like prefix exists,
+    /// or the corresponding parsing or local-zone error for invalid dates.
+    pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_like_date(trimmed.as_bytes()) {
+            return Err(DateError::UnknownShape);
+        }
+        if !starts_with_year(trimmed) {
+            return Err(DateError::InvalidYearDigits {
+                input: trimmed.into(),
+            });
+        }
+        let civil = |(date, precision)| Self::Civil {
+            date: DateValue(date),
+            precision: if precision == Precision::YearMonth {
+                CivilPrecision::Month
+            } else {
+                CivilPrecision::Day
+            },
+        };
+        // Date-only shapes cannot match the date-time cascade.
+        if trimmed.len() <= 10 {
+            return DateShape::parse_any(trimmed).map(civil).map_err(
+                |source| DateError::Unparseable {
+                    input: trimmed.into(),
+                    source,
+                },
+            );
+        }
+        match DateTimeShape::parse_any(trimmed) {
+            Ok(ParsedDateTime::Instant(instant)) => {
+                Ok(Self::Instant(DateTimeValue(instant)))
+            }
+            Ok(ParsedDateTime::LocalWall(wall)) => {
+                Ok(Self::Instant(DateTimeValue(resolve_local(wall)?)))
+            }
+            Err(datetime_err) => match DateShape::parse_any(trimmed) {
+                Ok(date) => Ok(civil(date)),
+                Err(date_err) => {
+                    let source = if matches!(
+                        trimmed.as_bytes().get(10),
+                        Some(b'T' | b' ')
+                    ) {
+                        datetime_err
+                    } else {
+                        date_err
+                    };
+                    Err(DateError::Unparseable {
+                        input: trimmed.into(),
+                        source,
+                    })
+                }
+            },
+        }
+    }
+
+    /// Parses a 10-byte day or 7-byte month date prefix and its byte length.
+    #[must_use]
+    pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
+        let bytes = s.as_bytes();
+        if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
+            if let Some(prefix) = s.get(..10)
+                && let Ok(
+                    point @ Self::Civil {
+                        precision: CivilPrecision::Day,
+                        ..
+                    },
+                ) = Self::parse(prefix)
+            {
+                return Some((point, 10));
+            }
+            return None;
+        }
+        if let Some(prefix) = s.get(..7)
+            && let Ok(
+                point @ Self::Civil {
+                    precision: CivilPrecision::Month,
+                    ..
+                },
+            ) = Self::parse(prefix)
+        {
+            return Some((point, 7));
+        }
+        None
+    }
+
+    /// Parses a date or date-time with a chrono strftime pattern.
+    ///
+    /// # Errors
+    ///
+    /// Returns parsing or local-zone errors when the pattern cannot resolve.
+    pub(crate) fn parse_with_pattern(
+        text: &str,
+        pattern: &str,
+    ) -> Result<Self, DateError> {
+        let trimmed_text = text.trim();
+        let trimmed_pattern = pattern.trim();
+        if let Ok(dt) = DateTime::parse_from_str(trimmed_text, trimmed_pattern)
+        {
+            return Ok(Self::Instant(DateTimeValue(dt.with_timezone(&Utc))));
+        }
+        if let Ok(wall) =
+            NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
+        {
+            return Ok(Self::Instant(DateTimeValue(resolve_local(wall)?)));
+        }
+        if trimmed_pattern == "%Y-%m"
+            && let Ok(
+                point @ Self::Civil {
+                    precision: CivilPrecision::Month,
+                    ..
+                },
+            ) = Self::parse(trimmed_text)
+        {
+            return Ok(point);
+        }
+        NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
+            .map(|date| Self::Civil {
+                date: DateValue(date),
+                precision: CivilPrecision::Day,
+            })
+            .map_err(|source| DateError::Unparseable {
+                input: trimmed_text.into(),
+                source,
+            })
+    }
 }
 
 impl DateValue {
