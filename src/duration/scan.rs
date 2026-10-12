@@ -2,9 +2,9 @@ use super::{error::DurationError, unit::DurationUnit};
 
 /// A byte cursor over duration text.
 ///
-/// Every method that consumes input advances the cursor; a method that
-/// returns an error leaves it at an unspecified position, because a failed
-/// scan aborts the whole parse.
+/// Every method that consumes input advances the cursor; a method that returns
+/// an error leaves it at an unspecified position, because a failed scan aborts
+/// the whole parse.
 #[derive(Copy, Clone, Debug)]
 pub(super) struct Scanner<'a> {
     bytes: &'a [u8],
@@ -116,9 +116,9 @@ impl<'a> Scanner<'a> {
             }
             self.bump();
         }
-        // An exponent may follow a digit-bearing mantissa. A truncated
-        // exponent (`"1e"`, `"1e+"`) is not consumed: the `e` falls to the
-        // unit scanner and is reported as an unknown unit.
+        // An exponent may follow a digit-bearing mantissa. A truncated exponent
+        // (`"1e"`, `"1e+"`) is not consumed: the `e` falls to the unit scanner
+        // and is reported as an unknown unit.
         if has_digit && matches!(self.byte_at(0), Some(b'e' | b'E')) {
             self.skip_exponent();
         }
@@ -144,8 +144,8 @@ impl<'a> Scanner<'a> {
         if start == self.pos {
             return Err(DurationError::MissingNumber);
         }
-        // The span holds only single-byte ASCII (`+`/`-`/`.`/digit/`e`/`E`),
-        // so slicing and UTF-8 decoding cannot fail.
+        // The span holds only single-byte ASCII (`+`/`-`/`.`/digit/`e`/`E`), so
+        // slicing and UTF-8 decoding cannot fail.
         let Some(text) = self
             .bytes
             .get(start..self.pos)

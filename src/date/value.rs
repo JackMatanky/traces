@@ -230,8 +230,7 @@ impl DateTimeValue {
             MappedLocalTime::Ambiguous(a, b) => {
                 // `chrono` orders an ambiguous pair by offset (tzfile data) or
                 // transition side (POSIX rules); the earliest occurrence has
-                // the larger offset, since instant =
-                // local_datetime - offset.
+                // the larger offset, since instant = local_datetime - offset.
                 let earliest = if a.local_minus_utc() >= b.local_minus_utc() {
                     a
                 } else {
@@ -244,9 +243,8 @@ impl DateTimeValue {
             }
             MappedLocalTime::None => {
                 // A gap resolves `None` across the whole skipped span, so no
-                // probe inside it resolves; the pre-transition
-                // offset shifts the gap time forward by exactly
-                // the gap.
+                // probe inside it resolves; the pre-transition offset shifts
+                // the gap time forward by exactly the gap.
                 let offset =
                     Self::offset_across_gap(local_datetime, &zone_lookup)?;
                 let instant = local_datetime
@@ -424,9 +422,8 @@ impl DatePoint {
         }
     }
 
-    /// Local datetime reading of this date point: midnight for a calendar
-    /// date, the local clock time (UTC when the offset cannot apply) for an
-    /// instant.
+    /// Local datetime reading of this date point: midnight for a calendar date,
+    /// the local clock time (UTC when the offset cannot apply) for an instant.
     #[must_use]
     pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
         match self {
@@ -476,9 +473,9 @@ mod tests {
     };
 
     /// Local-zone doctrine: a naive datetime means the reader's local clock
-    /// time, resolved to UTC through the DST resolver; a date-only value
-    /// stays zone-free until a zone is needed. Every test here injects `TZ`
-    /// via [`TzGuard`] so the asserted zone is deterministic.
+    /// time, resolved to UTC through the DST resolver; a date-only value stays
+    /// zone-free until a zone is needed. Every test here injects `TZ` via
+    /// [`TzGuard`] so the asserted zone is deterministic.
     mod local_zone {
         use pretty_assertions::assert_eq;
 
@@ -505,8 +502,8 @@ mod tests {
             let parsed = DateTimeValue::parse_iso("2026-11-01 01:30:00")
                 .expect("ambiguous clock time still parses");
 
-            // 01:30 happens twice (EDT, then EST); the earliest occurrence
-            // is the EDT reading, 05:30Z.
+            // 01:30 happens twice (EDT, then EST); the earliest occurrence is
+            // the EDT reading, 05:30Z.
             assert_eq!(
                 parsed,
                 DateTimeValue::parse_iso("2026-11-01T05:30:00Z")

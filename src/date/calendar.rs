@@ -301,10 +301,7 @@ impl DatePoint {
         self,
         component: DurationComponent,
     ) -> Result<Self, DateError> {
-        let DurationComponent {
-            magnitude,
-            unit,
-        } = component;
+        let (magnitude, unit) = (component.magnitude(), component.unit());
         if !magnitude.is_finite() {
             return Err(DateError::OutOfRange);
         }

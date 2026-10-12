@@ -364,7 +364,9 @@ src/duration/unit.rs: pub(crate) enum DurationUnit {
 src/duration/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
 src/duration/value.rs: pub struct DurationValue {
 src/duration/value.rs: pub(crate) const fn as_f64(self) -> f64 {
+src/duration/value.rs: pub(crate) const fn magnitude(self) -> f64 {
 src/duration/value.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
+src/duration/value.rs: pub(crate) const fn unit(self) -> DurationUnit {
 src/duration/value.rs: pub(crate) fn as_str(&self) -> &str {
 src/duration/value.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
 src/duration/value.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
@@ -372,10 +374,8 @@ src/duration/value.rs: pub(crate) fn has_calendar_component(&self) -> bool {
 src/duration/value.rs: pub(crate) fn humanize(&self) -> String {
 src/duration/value.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/duration/value.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
-src/duration/value.rs: pub(crate) magnitude: f64,
 src/duration/value.rs: pub(crate) struct DurationComponent {
 src/duration/value.rs: pub(crate) struct DurationSeconds(f64);
-src/duration/value.rs: pub(crate) unit: DurationUnit,
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =

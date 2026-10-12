@@ -181,9 +181,9 @@ impl DateTimeValue {
     ///
     /// Surrounding whitespace is ignored. The cascade matches shapes only: a
     /// matched naive input then resolves through [`DateTimeValue::from_local`]
-    /// (an explicit-offset input already is the instant). Resolution runs
-    /// once after the cascade, because a resolution failure must not retry
-    /// later formats.
+    /// (an explicit-offset input already is the instant). Resolution runs once
+    /// after the cascade, because a resolution failure must not retry later
+    /// formats.
     ///
     /// # Errors
     ///
@@ -374,8 +374,8 @@ fn parse_reason(error: chrono::ParseError) -> &'static str {
     }
 }
 
-/// Returns `true` if `bytes` begins with a date-like prefix: two or four
-/// ASCII digits followed by `-`.
+/// Returns `true` if `bytes` begins with a date-like prefix: two or four ASCII
+/// digits followed by `-`.
 fn starts_like_date(bytes: &[u8]) -> bool {
     bytes.len() >= 5
         && [2, 4].into_iter().any(|digits| {
@@ -473,8 +473,8 @@ mod tests {
 
         #[test]
         fn accepts_a_five_digit_year_prefix_as_having_four_digits() {
-            // The `starts_with_year` guard only checks the first 4 bytes;
-            // a longer numeric prefix still passes this guard and is rejected
+            // The `starts_with_year` guard only checks the first 4 bytes; a
+            // longer numeric prefix still passes this guard and is rejected
             // later, by the format cascade, as InvalidValue rather than
             // YearNotFourDigits.
             assert!(starts_with_year("20265-01-01"));

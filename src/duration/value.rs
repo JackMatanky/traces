@@ -42,7 +42,7 @@ use super::{error::DurationError, scan, unit::DurationUnit};
 pub struct DurationValue {
     spelling: Box<str>,
     seconds: DurationSeconds,
-    components: Option<Components>,
+    components: Option<Box<[DurationComponent]>>,
 }
 
 impl DurationValue {
@@ -81,8 +81,7 @@ impl DurationValue {
     /// including the leading-sign rule: only the first part may carry an
     /// explicit `-`; a redundant `+` is accepted anywhere. In prefix mode,
     /// commas are treated as atom delimiters rather than part separators,
-    /// preserving list precedence at inline note boundaries. Returns `None`
-    /// if:
+    /// preserving list precedence at inline note boundaries. Returns `None` if:
     ///
     /// - The input does not start with a valid duration segment, or no
     ///   components could be parsed.
@@ -99,13 +98,12 @@ impl DurationValue {
     ///
     /// Greedily decomposes `seconds.0.abs()` into Weeks, Days, Hours, Minutes,
     /// Seconds, and Milliseconds (ratios from
-    /// [`DurationUnit::nominal_seconds`]); Month and Year are omitted
-    /// because their lengths are calendar-dependent. Zero yields `"0s"`; a
-    /// negative duration starts with `"-"`. When the decomposition cannot
-    /// represent a nonzero magnitude (a sub-millisecond remainder rounds to
-    /// zero, or `u64` overflows at the other extreme), falls back to
-    /// [`DurationSeconds`]'s [`Display`](fmt::Display) so the result never
-    /// lies as `"0s"`.
+    /// [`DurationUnit::nominal_seconds`]); Month and Year are omitted because
+    /// their lengths are calendar-dependent. Zero yields `"0s"`; a negative
+    /// duration starts with `"-"`. When the decomposition cannot represent a
+    /// nonzero magnitude (a sub-millisecond remainder rounds to zero, or `u64`
+    /// overflows at the other extreme), falls back to [`DurationSeconds`]'s
+    /// [`Display`](fmt::Display) so the result never lies as `"0s"`.
     #[inline]
     pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
         Self {
@@ -195,8 +193,8 @@ impl DurationValue {
         self.components.as_deref()
     }
 
-    /// Returns true if this duration contains any calendar-application units
-    /// in its parsed components.
+    /// Returns true if this duration contains any calendar-application units in
+    /// its parsed components.
     #[cfg(test)]
     #[inline]
     #[must_use]
@@ -379,8 +377,8 @@ impl DurationValue {
     }
 
     /// Combines `rhs` with `self`, negating `rhs`'s components (and seconds, in
-    /// the fixed regime) when `subtract` is `true`; the single
-    /// implementation behind [`Add`] and [`Sub`].
+    /// the fixed regime) when `subtract` is `true`; the single implementation
+    /// behind [`Add`] and [`Sub`].
     ///
     /// - Both operands [`Some`]: components concatenate left-to-right and one
     ///   fold over the combined components preserves the bit-exact Σ invariant
@@ -450,8 +448,8 @@ impl TryFrom<DurationValue> for TimeDelta {
     type Error = DurationError;
 
     /// Converts to a [`TimeDelta`] via the duration's total seconds, returning
-    /// [`DurationError::NonFiniteSeconds`] when the seconds value is
-    /// non-finite and [`DurationError::SecondsOutOfRange`] when it is outside
+    /// [`DurationError::NonFiniteSeconds`] when the seconds value is non-finite
+    /// and [`DurationError::SecondsOutOfRange`] when it is outside
     /// `TimeDelta`'s representable range.
     #[inline]
     fn try_from(duration: DurationValue) -> Result<Self, Self::Error> {
@@ -625,13 +623,26 @@ impl<'de> Deserialize<'de> for DurationValue {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct DurationComponent {
     /// Signed magnitude, with the leading sign applied.
-    pub(crate) magnitude: f64,
+    magnitude: f64,
     /// Unit associated with this magnitude.
-    pub(crate) unit: DurationUnit,
+    unit: DurationUnit,
 }
 
-/// Retained duration components in written left-to-right order.
-type Components = Box<[DurationComponent]>;
+impl DurationComponent {
+    /// Returns the signed magnitude.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn magnitude(self) -> f64 {
+        self.magnitude
+    }
+
+    /// Returns the unit of the magnitude.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn unit(self) -> DurationUnit {
+        self.unit
+    }
+}
 
 /// A duration measured in seconds.
 ///
@@ -737,9 +748,9 @@ impl Ord for DurationSeconds {
 }
 
 /// Renders in scientific notation once the magnitude reaches or clears
-/// [`SCIENTIFIC_ABOVE`] or falls below [`SCIENTIFIC_BELOW`] (exact
-/// zero excluded), so an extreme magnitude never dumps a hundreds-of-digits
-/// decimal literal.
+/// [`SCIENTIFIC_ABOVE`] or falls below [`SCIENTIFIC_BELOW`] (exact zero
+/// excluded), so an extreme magnitude never dumps a hundreds-of-digits decimal
+/// literal.
 impl fmt::Display for DurationSeconds {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.0;
