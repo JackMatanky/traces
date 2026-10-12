@@ -7,7 +7,7 @@
 //! `docs/divergence-register.md`; a `-` tag means the behavior must not change.
 //!
 //! The adapter is the only code that changes between stages: it renders results
-//! through public-shaped accessors and reduces errors to a stable class name,
+//! through public-shaped accessors and reduces errors to their variant name,
 //! so the transcript never depends on a dependency's message wording.
 //!
 //! Remove this module once the migration lands and the doctrine cases are
@@ -42,22 +42,34 @@ mod probe {
 
     fn date_error_class(error: &DateError) -> &'static str {
         match error {
-            DateError::UnknownShape => "NotADate",
+            DateError::UnknownShape => "UnknownShape",
             DateError::YearNotFourDigits {
                 ..
             } => "YearNotFourDigits",
             DateError::InvalidValue {
                 ..
-            } => "Invalid",
+            } => "InvalidValue",
             DateError::LocalZoneLookup {
                 ..
-            } => "Zone",
+            } => "LocalZoneLookup",
             DateError::OutOfRange => "OutOfRange",
         }
     }
 
-    fn duration_error_class(_error: &DurationError) -> &'static str {
-        "Invalid"
+    fn duration_error_class(error: &DurationError) -> &'static str {
+        match error {
+            DurationError::Empty => "Empty",
+            DurationError::MissingNumber => "MissingNumber",
+            DurationError::MisplacedSign => "MisplacedSign",
+            DurationError::MalformedNumber {
+                ..
+            } => "MalformedNumber",
+            DurationError::MissingUnit => "MissingUnit",
+            DurationError::UnknownUnit => "UnknownUnit",
+            DurationError::NumberOverflow => "NumberOverflow",
+            DurationError::NonFiniteSeconds => "NonFiniteSeconds",
+            DurationError::SecondsOutOfRange => "SecondsOutOfRange",
+        }
     }
 
     fn json<T: serde::Serialize>(value: &T) -> String {
