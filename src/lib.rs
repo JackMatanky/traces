@@ -109,7 +109,6 @@
 
 pub mod cli;
 mod config;
-mod date;
 mod delimiter;
 mod dialog;
 mod dirs;
@@ -132,13 +131,12 @@ mod strsim;
 mod tag;
 mod task;
 mod template;
+mod temporal;
 #[cfg(test)]
 mod temporal_oracle;
 mod yaml;
 
 pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
-pub(crate) use date::{DATE_PATTERN, DATETIME_PATTERN};
-pub use date::{DateError, DateTimeValue, DateValue};
 pub(crate) use delimiter::DelimiterType;
 pub use dialog::{
     DialogError, DialogProvider, DialogResult, PresetDialogProvider,
@@ -174,6 +172,8 @@ pub use task::{
 };
 #[expect(unused_imports, reason = "crate re-export")]
 pub(crate) use template::TemplateService;
+pub(crate) use temporal::{DATE_PATTERN, DATETIME_PATTERN};
+pub use temporal::{DateError, DateTimeValue, DateValue};
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod testing {

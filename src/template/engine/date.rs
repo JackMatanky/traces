@@ -44,7 +44,7 @@ use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
     DATE_PATTERN, DateTimeValue, DurationSeconds, DurationUnit, DurationValue,
     UNIT_SPELLINGS_HINT,
-    date::{
+    temporal::{
         CalendarPeriod, DateComponent, DateError, DatePoint, DatePrecision,
         Difference, PeriodEdge, weekday_from_number,
     },

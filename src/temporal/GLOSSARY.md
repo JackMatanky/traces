@@ -9,7 +9,7 @@ Date and Date-Time parsing, local-zone resolution, and calendar arithmetic.
 <!-- rumdl-disable-next-line MD024 -->
 #### Date
 
-A parsed calendar date with no time-of-day component. `src/date/` is the
+A parsed calendar date with no time-of-day component. `src/temporal/` is the
 crate's single owner of date recognition, parsing, and formatting; every
 date-shaped string — including serde deserialization — funnels through it.
 Enforces the four-digit year invariant (rejecting two-digit ambiguous years) and
@@ -19,8 +19,8 @@ retains month/day precision on date points, reducing `YYYY-MM` to day 1.
 #### Date-Time
 
 A parsed date-time point, stored as UTC and rendered as the reader's local clock
-time. Shares `src/date/`'s parser with Date, where naive input represents the
-local zone, resolved to UTC at parse time. DST ambiguities resolve to the
+time. Shares `src/temporal/`'s parser with Date, where naive input represents
+the local zone, resolved to UTC at parse time. DST ambiguities resolve to the
 earliest occurrence (RFC 5545 / Temporal `'compatible'`), spring-forward gaps
 advance across the gap, and zone lookup failures surface as explicit errors.
 Comparing across Date and Date-Time promotes the Date at local midnight, with a
@@ -29,7 +29,7 @@ declared exception falling back to the neutral UTC frame if zone lookup fails.
 
 #### Calendar Owner & Regime
 
-`src/date/` is the single calendar owner for shift, diff, and duration
+`src/temporal/` is the single calendar owner for shift, diff, and duration
 application; query and template engines are callers over it, owning no duplicate
 calendar arithmetic. Operates under a dual regime: identity equals total magnitude
 in seconds, while application treats day, week, month, and year as calendar units

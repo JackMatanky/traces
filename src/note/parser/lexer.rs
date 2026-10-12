@@ -8,7 +8,7 @@ use logos::{Filter, Lexer, Logos};
 use super::{FlushedMetadata, inline::parse_inline_value};
 use crate::{
     DelimiterType, FieldKey, Spanned, Tag, TaskDate, TaskDateType,
-    TaskPriority, date::DatePoint, note::NoteFieldValue,
+    TaskPriority, note::NoteFieldValue, temporal::DatePoint,
 };
 
 /// Extracts inline fields from `text` in document order.

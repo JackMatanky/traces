@@ -32,8 +32,8 @@ use thiserror::Error;
 
 use crate::{
     DateValue,
-    date::DatePoint,
     path::{FolderRef, RelativePath},
+    temporal::DatePoint,
 };
 
 /// Metadata captured for one regular file under a project root.

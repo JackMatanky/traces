@@ -242,58 +242,6 @@ src/config/trust.rs: pub(super) fn project(&self, name: &str) -> PathBuf {
 src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
 src/config/trust.rs: pub(super) store: TrustStore,
 src/config/trust.rs: pub(super) struct Fixture {
-src/date/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
-src/date/calendar.rs: pub(crate) enum CalendarPeriod {
-src/date/calendar.rs: pub(crate) enum DateComponent {
-src/date/calendar.rs: pub(crate) enum Difference {
-src/date/calendar.rs: pub(crate) enum PeriodEdge {
-src/date/calendar.rs: pub(crate) fn apply(
-src/date/calendar.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
-src/date/calendar.rs: pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
-src/date/calendar.rs: pub(crate) fn end_of(
-src/date/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
-src/date/calendar.rs: pub(crate) fn shift(
-src/date/calendar.rs: pub(crate) fn shift(
-src/date/calendar.rs: pub(crate) fn start_of(
-src/date/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
-src/date/calendar.rs: pub(crate) fn with_weekday(
-src/date/error.rs: pub enum DateError {
-src/date/mod.rs: pub use error::DateError;
-src/date/mod.rs: pub use value::{DateTimeValue, DateValue};
-src/date/mod.rs: pub(crate) use calendar::{
-src/date/mod.rs: pub(crate) use value::{
-src/date/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
-src/date/parse.rs: pub(crate) const ALL: [Self; 5] = [
-src/date/parse.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
-src/date/parse.rs: pub(crate) enum DateShape {
-src/date/parse.rs: pub(crate) enum DateTimeShape {
-src/date/parse.rs: pub(crate) enum ParsedDateTime {
-src/date/parse.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
-src/date/parse.rs: pub(crate) fn parse_any(
-src/date/parse.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
-src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
-src/date/parse.rs: pub(crate) fn parse_with_pattern(
-src/date/value.rs: pub struct DateTimeValue(DateTime<Utc>);
-src/date/value.rs: pub struct DateValue(NaiveDate);
-src/date/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
-src/date/value.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
-src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
-src/date/value.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
-src/date/value.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
-src/date/value.rs: pub(crate) enum DatePoint {
-src/date/value.rs: pub(crate) enum DatePrecision {
-src/date/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
-src/date/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
-src/date/value.rs: pub(crate) fn date(self) -> DateValue {
-src/date/value.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
-src/date/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
-src/date/value.rs: pub(crate) fn local_date(self) -> DateValue {
-src/date/value.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
-src/date/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
-src/date/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
-src/date/value.rs: pub(super) fn from_local(
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
 src/delimiter.rs: pub(crate) const fn close_len(self) -> usize {
@@ -660,7 +608,6 @@ src/lib.rs: pub mod testing {
 src/lib.rs: pub struct TestProject {
 src/lib.rs: pub struct TzGuard {
 src/lib.rs: pub use crate::{
-src/lib.rs: pub use date::{DateError, DateTimeValue, DateValue};
 src/lib.rs: pub use dialog::{
 src/lib.rs: pub use duration::{DurationError, DurationValue};
 src/lib.rs: pub use file::FileMeta;
@@ -668,8 +615,8 @@ src/lib.rs: pub use note::{
 src/lib.rs: pub use position::{PositionError, SourceLine};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
+src/lib.rs: pub use temporal::{DateError, DateTimeValue, DateValue};
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
-src/lib.rs: pub(crate) use date::{DATE_PATTERN, DATETIME_PATTERN};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;
 src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
 src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_SPELLINGS_HINT};
@@ -682,6 +629,7 @@ src/lib.rs: pub(crate) use lexer::{
 src/lib.rs: pub(crate) use note::NoteFieldType;
 src/lib.rs: pub(crate) use position::{BytePos, ByteSpan, LineIndex, Spanned};
 src/lib.rs: pub(crate) use template::TemplateService;
+src/lib.rs: pub(crate) use temporal::{DATE_PATTERN, DATETIME_PATTERN};
 src/note/cursor.rs: pub(super) const fn len(&self) -> usize {
 src/note/cursor.rs: pub(super) const fn new(source: &'a str) -> Self {
 src/note/cursor.rs: pub(super) fn advance(&self, pos: usize, bytes: usize) -> usize {
@@ -1439,6 +1387,58 @@ src/template/writer.rs: pub(super) fn trusted(root: &Path, candidate: PathBuf) -
 src/template/writer.rs: pub(super) fn with_declared(
 src/template/writer.rs: pub(super) fn write(
 src/template/writer.rs: pub(super) struct TemplateWriteTarget<'a> {
+src/temporal/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
+src/temporal/calendar.rs: pub(crate) enum CalendarPeriod {
+src/temporal/calendar.rs: pub(crate) enum DateComponent {
+src/temporal/calendar.rs: pub(crate) enum Difference {
+src/temporal/calendar.rs: pub(crate) enum PeriodEdge {
+src/temporal/calendar.rs: pub(crate) fn apply(
+src/temporal/calendar.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
+src/temporal/calendar.rs: pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
+src/temporal/calendar.rs: pub(crate) fn end_of(
+src/temporal/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
+src/temporal/calendar.rs: pub(crate) fn shift(
+src/temporal/calendar.rs: pub(crate) fn shift(
+src/temporal/calendar.rs: pub(crate) fn start_of(
+src/temporal/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
+src/temporal/calendar.rs: pub(crate) fn with_weekday(
+src/temporal/error.rs: pub enum DateError {
+src/temporal/mod.rs: pub use error::DateError;
+src/temporal/mod.rs: pub use value::{DateTimeValue, DateValue};
+src/temporal/mod.rs: pub(crate) use calendar::{
+src/temporal/mod.rs: pub(crate) use value::{
+src/temporal/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
+src/temporal/parse.rs: pub(crate) const ALL: [Self; 5] = [
+src/temporal/parse.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
+src/temporal/parse.rs: pub(crate) enum DateShape {
+src/temporal/parse.rs: pub(crate) enum DateTimeShape {
+src/temporal/parse.rs: pub(crate) enum ParsedDateTime {
+src/temporal/parse.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
+src/temporal/parse.rs: pub(crate) fn parse_any(
+src/temporal/parse.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
+src/temporal/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/temporal/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/temporal/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
+src/temporal/parse.rs: pub(crate) fn parse_with_pattern(
+src/temporal/value.rs: pub struct DateTimeValue(DateTime<Utc>);
+src/temporal/value.rs: pub struct DateValue(NaiveDate);
+src/temporal/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
+src/temporal/value.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
+src/temporal/value.rs: pub(crate) const fn has_time(self) -> bool {
+src/temporal/value.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
+src/temporal/value.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
+src/temporal/value.rs: pub(crate) enum DatePoint {
+src/temporal/value.rs: pub(crate) enum DatePrecision {
+src/temporal/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/temporal/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/temporal/value.rs: pub(crate) fn date(self) -> DateValue {
+src/temporal/value.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
+src/temporal/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
+src/temporal/value.rs: pub(crate) fn local_date(self) -> DateValue {
+src/temporal/value.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
+src/temporal/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+src/temporal/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+src/temporal/value.rs: pub(super) fn from_local(
 src/temporal_oracle.rs: pub(super) fn apply(input: &str, duration: &str) -> String {
 src/temporal_oracle.rs: pub(super) fn boundary(input: &str, period: &str, edge: &str) -> String {
 src/temporal_oracle.rs: pub(super) fn component(input: &str, name: &str) -> String {

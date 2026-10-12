@@ -21,8 +21,8 @@ use serde::{Deserialize, Serialize};
 use super::Link;
 use crate::{
     DateTimeValue, DateValue, DurationValue, Tag,
-    date::{DatePoint, DatePrecision},
     field::FieldValueRef,
+    temporal::{DatePoint, DatePrecision},
 };
 
 /// A metadata value parsed from YAML frontmatter or inline field text.

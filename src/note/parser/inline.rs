@@ -7,8 +7,8 @@
 
 use crate::{
     DurationValue, Tag,
-    date::DatePoint,
     note::{Link, NoteFieldValue, cursor::SourceText},
+    temporal::DatePoint,
 };
 
 /// An atom parsed at some position: its value and the exclusive byte offset

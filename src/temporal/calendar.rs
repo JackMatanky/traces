@@ -583,7 +583,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        date::{DatePrecision, fixtures::fixed_datetime},
+        temporal::{DatePrecision, fixtures::fixed_datetime},
         test_support::TzGuard,
     };
 

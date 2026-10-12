@@ -34,7 +34,7 @@ mod probe {
     use crate::{
         DateError, DateTimeValue, DateValue, DurationError, DurationUnit,
         DurationValue,
-        date::{
+        temporal::{
             CalendarPeriod, DateComponent, DatePoint, DatePrecision,
             Difference, weekday_from_number,
         },

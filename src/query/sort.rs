@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     DateTimeValue, DateValue, DurationSeconds, NoteFieldType, NoteFieldValue,
-    NoteFieldValueRef, date::DatePoint, note::normalize_zero,
+    NoteFieldValueRef, note::normalize_zero, temporal::DatePoint,
 };
 
 /// Composite ordering clause made of one or more [`SortTerm`] values.

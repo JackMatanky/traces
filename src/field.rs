@@ -36,7 +36,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{DateTimeValue, DateValue, date::DatePoint};
+use crate::{DateTimeValue, DateValue, temporal::DatePoint};
 
 /// Stores an exact schema field identifier.
 ///

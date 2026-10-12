@@ -24,15 +24,14 @@ use super::{
 };
 use crate::{
     DurationSeconds, DurationUnit, DurationValue, LexError, NoteFieldValue,
-    NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec,
-    date::{CalendarPeriod, DateComponent, DateError, DatePoint},
-    lexical_unquote,
+    NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec, lexical_unquote,
     query::{
         QueryRow,
         error::{QueryBuilderError, QueryDialect, QuerySyntaxError},
         sort::TextShape,
         value::QueryFieldValueRef,
     },
+    temporal::{CalendarPeriod, DateComponent, DateError, DatePoint},
 };
 
 /// Parsed filter expression AST used by [`crate::query::QuerySet::filter`].
