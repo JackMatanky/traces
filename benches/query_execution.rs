@@ -45,8 +45,8 @@ mod common;
 use common::{
     WORKSPACE_FILE_COUNTS,
     content::{
-        ProjectShape, metadata_lookup_note_source, task_note_source,
-        task_triplet_note_source,
+        ProjectShape, date_field_note_source, metadata_lookup_note_source,
+        task_note_source, task_triplet_note_source,
     },
     project::{build_index_arc, build_index_arc_from_note_source},
 };
@@ -269,6 +269,56 @@ fn bench_filter_by_metadata_field_count(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measures filter cost for date and date-time predicates at a fixed
+/// 20,000-note workspace size.
+///
+/// Parameters: varies the predicate shape over `{date_compare,
+/// datetime_compare, date_arithmetic}`; reports 20,000 input rows per
+/// iteration. Fixture indexes are built outside timing by
+/// `date_field_note_source`; `due` is a calendar date and `seen` a UTC
+/// date-time.
+///
+/// Expected outcomes:
+/// - `date_compare` and `datetime_compare` stay near the `rating > 2` filter in
+///   [`bench_filter_by_metadata_field_count`], because both operands are
+///   already parsed values.
+/// - `date_arithmetic` costs more per row because each row applies a duration
+///   to a date point.
+///
+/// Unexpected outcomes:
+/// - Any variant growing by an order of magnitude over `date_compare`,
+///   indicating per-row date parsing, zone lookup, or allocation in the
+///   comparison path.
+fn bench_filter_by_date(c: &mut Criterion) {
+    const FILTERS: [(&str, &str); 3] = [
+        ("date_compare", r#"due > "2026-06-15""#),
+        ("datetime_compare", r#"seen > "2026-07-29T12:00:00Z""#),
+        ("date_arithmetic", r#"due + dur("1 month") > "2026-07-01""#),
+    ];
+    let mut group = c.benchmark_group("QueryService::run/filter_by_date");
+    let service = QueryService::new("class");
+    let n = 20_000_usize;
+    let index =
+        build_index_arc_from_note_source(n, |i, _| date_field_note_source(i));
+    group.throughput(Throughput::Elements(
+        u64::try_from(n).expect("note count fits u64"),
+    ));
+    for (name, filter) in FILTERS {
+        group.bench_function(name, |b| {
+            b.iter_batched(
+                || {
+                    QueryBuilder::pages(SourceSelector::All)
+                        .filter(filter)
+                        .expect("valid filter")
+                },
+                |query| service.run(&index, query),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
+}
+
 /// Measures task expansion throughput across a task-density x
 /// workspace-size matrix.
 ///
@@ -486,6 +536,7 @@ criterion_group! {
     config = common::criterion_config();
     targets = bench_run_pages, bench_run_tasks, bench_query_tasks_density,
         bench_run_pages_by_metadata, bench_filter_by_metadata_field_count,
-        bench_clone_query_set, bench_into_iter_owned, bench_filter_then_sort
+        bench_filter_by_date, bench_clone_query_set, bench_into_iter_owned,
+        bench_filter_then_sort
 }
 criterion_main!(benches);

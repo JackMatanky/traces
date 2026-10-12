@@ -168,6 +168,23 @@ pub(crate) fn duration_field_note_source(note_index: usize) -> String {
     )
 }
 
+/// Returns note content with one calendar-date and one date-time metadata
+/// field.
+///
+/// `due` cycles through the months of 2026 and `seen` through the hours of one
+/// day, so the temporal parsers see varied date and date-time literals.
+pub(crate) fn date_field_note_source(note_index: usize) -> String {
+    let day_of_year = note_index % 365;
+    let month = day_of_year / 31 + 1;
+    let day = day_of_year % 28 + 1;
+    format!(
+        "---\ndue: 2026-{month:02}-{day:02}\nseen: \
+         2026-07-29T{:02}:{:02}:00Z\n---\n\n# Note {note_index}\n",
+        note_index % 24,
+        (note_index * 7) % 60,
+    )
+}
+
 /// Returns note content with one sortable frontmatter text field (`title`).
 ///
 /// Titles use pseudo-randomized index order matching `plain_note_source`'s
