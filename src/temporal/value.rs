@@ -468,7 +468,7 @@ impl DatePoint {
 mod tests {
     use super::*;
     use crate::{
-        duration::DurationValue, temporal::fixtures::fixed_datetime,
+        temporal::{DurationValue, fixtures::fixed_datetime},
         test_support::TzGuard,
     };
 

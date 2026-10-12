@@ -31,16 +31,40 @@
 //! [`DatePoint::shift`], [`DatePoint::apply`], [`DatePoint::diff`],
 //! [`DatePoint::start_of`], [`DatePoint::end_of`], and
 //! [`DatePoint::with_weekday`] own precision-aware calendar arithmetic.
+//!
+//! Duration parsing, validation, and arithmetic.
+//!
+//! Accepts human-readable duration strings like `"1h 30m"` or `"4 yrs, 6 wks"`
+//! and converts them to a total seconds value. Components are `<number><unit>`
+//! pairs, optionally separated by whitespace or commas.
+//!
+//! # Key types
+//!
+//! - [`DurationValue`] - A parsed duration carrying its total seconds, its
+//!   original spelling, and its retained written components (which witness the
+//!   calendar-versus-fixed regime).
+//! - [`DurationUnit`] - Unit registry (parsing and seconds conversion). Single
+//!   source of truth; callers should not maintain their own registries.
+//! - [`DurationSeconds`] - An `f64` newtype that is finite on construction,
+//!   with [`Ord`], [`Add`](std::ops::Add), [`Sub`](std::ops::Sub), and
+//!   [`Mul`](std::ops::Mul).
+//! - [`DurationError`] - Error type for parse and conversion failures.
 
 mod calendar;
+mod duration;
 mod error;
 mod parse;
+mod scan;
+mod unit;
 mod value;
 
 pub(crate) use calendar::{
     CalendarPeriod, DateComponent, Difference, PeriodEdge, weekday_from_number,
 };
-pub use error::DateError;
+pub use duration::DurationValue;
+pub(crate) use duration::{DurationComponent, DurationSeconds};
+pub use error::{DateError, DurationError};
+pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 pub(crate) use value::{
     DATE_PATTERN, DATETIME_PATTERN, DatePoint, DatePrecision,
 };

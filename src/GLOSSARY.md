@@ -41,7 +41,7 @@ relative path, size, timestamps, and format classification.
 #### Duration
 
 An elapsed duration carrying both its total seconds magnitude and written source
-components. `src/duration/` is the sole owner of duration recognition, parsing,
+components. `src/temporal/` is the sole owner of duration recognition, parsing,
 and the unit registry (`UNIT_SPELLINGS`, `DurationUnit`, `nominal_seconds`). Compares and
 hashes canonically by total seconds, so `1h 30m` and `90m` are equal. Negative
 zeros normalize (`-0m` equals `0m`) at construction; raw float comparisons follow

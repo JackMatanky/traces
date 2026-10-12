@@ -8,7 +8,7 @@ use super::{
     error::DateError,
     value::{DatePoint, DateTimeValue, DateValue},
 };
-use crate::duration::{
+use crate::temporal::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
 };
 

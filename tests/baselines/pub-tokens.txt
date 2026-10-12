@@ -287,43 +287,6 @@ src/dirtree.rs: pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
 src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
 src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 src/dirtree.rs: pub(crate) struct DirTree {
-src/duration/error.rs: pub enum DurationError {
-src/duration/mod.rs: pub use error::DurationError;
-src/duration/mod.rs: pub use value::DurationValue;
-src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
-src/duration/mod.rs: pub(crate) use value::{DurationComponent, DurationSeconds};
-src/duration/scan.rs: pub(super) const fn is_at_end(&self) -> bool {
-src/duration/scan.rs: pub(super) const fn new(input: &'a str) -> Self {
-src/duration/scan.rs: pub(super) const fn position(&self) -> usize {
-src/duration/scan.rs: pub(super) enum ScanMode {
-src/duration/scan.rs: pub(super) fn can_start_component(&self) -> bool {
-src/duration/scan.rs: pub(super) fn component(
-src/duration/scan.rs: pub(super) fn skip_separators(&mut self) {
-src/duration/scan.rs: pub(super) fn skip_to_next_component(&mut self) -> bool {
-src/duration/scan.rs: pub(super) fn skip_whitespace(&mut self) {
-src/duration/scan.rs: pub(super) struct Scanner<'a> {
-src/duration/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
-src/duration/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
-src/duration/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
-src/duration/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
-src/duration/unit.rs: pub(crate) const fn spelling(self) -> &'static str {
-src/duration/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
-src/duration/unit.rs: pub(crate) enum DurationUnit {
-src/duration/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
-src/duration/value.rs: pub struct DurationValue {
-src/duration/value.rs: pub(crate) const fn as_f64(self) -> f64 {
-src/duration/value.rs: pub(crate) const fn magnitude(self) -> f64 {
-src/duration/value.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
-src/duration/value.rs: pub(crate) const fn unit(self) -> DurationUnit {
-src/duration/value.rs: pub(crate) fn as_str(&self) -> &str {
-src/duration/value.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
-src/duration/value.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
-src/duration/value.rs: pub(crate) fn has_calendar_component(&self) -> bool {
-src/duration/value.rs: pub(crate) fn humanize(&self) -> String {
-src/duration/value.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
-src/duration/value.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
-src/duration/value.rs: pub(crate) struct DurationComponent {
-src/duration/value.rs: pub(crate) struct DurationSeconds(f64);
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =
@@ -609,17 +572,15 @@ src/lib.rs: pub struct TestProject {
 src/lib.rs: pub struct TzGuard {
 src/lib.rs: pub use crate::{
 src/lib.rs: pub use dialog::{
-src/lib.rs: pub use duration::{DurationError, DurationValue};
 src/lib.rs: pub use file::FileMeta;
 src/lib.rs: pub use note::{
 src/lib.rs: pub use position::{PositionError, SourceLine};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
-src/lib.rs: pub use temporal::{DateError, DateTimeValue, DateValue};
+src/lib.rs: pub use temporal::{
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;
 src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
-src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_SPELLINGS_HINT};
 src/lib.rs: pub(crate) use field::{
 src/lib.rs: pub(crate) use file::{BaseName, BaseNameRef, FileName};
 src/lib.rs: pub(crate) use file_tracker::{
@@ -629,7 +590,7 @@ src/lib.rs: pub(crate) use lexer::{
 src/lib.rs: pub(crate) use note::NoteFieldType;
 src/lib.rs: pub(crate) use position::{BytePos, ByteSpan, LineIndex, Spanned};
 src/lib.rs: pub(crate) use template::TemplateService;
-src/lib.rs: pub(crate) use temporal::{DATE_PATTERN, DATETIME_PATTERN};
+src/lib.rs: pub(crate) use temporal::{
 src/note/cursor.rs: pub(super) const fn len(&self) -> usize {
 src/note/cursor.rs: pub(super) const fn new(source: &'a str) -> Self {
 src/note/cursor.rs: pub(super) fn advance(&self, pos: usize, bytes: usize) -> usize {
@@ -1402,10 +1363,28 @@ src/temporal/calendar.rs: pub(crate) fn shift(
 src/temporal/calendar.rs: pub(crate) fn start_of(
 src/temporal/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/temporal/calendar.rs: pub(crate) fn with_weekday(
+src/temporal/duration.rs: pub struct DurationValue {
+src/temporal/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
+src/temporal/duration.rs: pub(crate) const fn magnitude(self) -> f64 {
+src/temporal/duration.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
+src/temporal/duration.rs: pub(crate) const fn unit(self) -> DurationUnit {
+src/temporal/duration.rs: pub(crate) fn as_str(&self) -> &str {
+src/temporal/duration.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
+src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
+src/temporal/duration.rs: pub(crate) fn has_calendar_component(&self) -> bool {
+src/temporal/duration.rs: pub(crate) fn humanize(&self) -> String {
+src/temporal/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
+src/temporal/duration.rs: pub(crate) struct DurationComponent {
+src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
 src/temporal/error.rs: pub enum DateError {
-src/temporal/mod.rs: pub use error::DateError;
+src/temporal/error.rs: pub enum DurationError {
+src/temporal/mod.rs: pub use duration::DurationValue;
+src/temporal/mod.rs: pub use error::{DateError, DurationError};
 src/temporal/mod.rs: pub use value::{DateTimeValue, DateValue};
 src/temporal/mod.rs: pub(crate) use calendar::{
+src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSeconds};
+src/temporal/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 src/temporal/mod.rs: pub(crate) use value::{
 src/temporal/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
 src/temporal/parse.rs: pub(crate) const ALL: [Self; 5] = [
@@ -1420,6 +1399,24 @@ src/temporal/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateErro
 src/temporal/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
 src/temporal/parse.rs: pub(crate) fn parse_with_pattern(
+src/temporal/scan.rs: pub(super) const fn is_at_end(&self) -> bool {
+src/temporal/scan.rs: pub(super) const fn new(input: &'a str) -> Self {
+src/temporal/scan.rs: pub(super) const fn position(&self) -> usize {
+src/temporal/scan.rs: pub(super) enum ScanMode {
+src/temporal/scan.rs: pub(super) fn can_start_component(&self) -> bool {
+src/temporal/scan.rs: pub(super) fn component(
+src/temporal/scan.rs: pub(super) fn skip_separators(&mut self) {
+src/temporal/scan.rs: pub(super) fn skip_to_next_component(&mut self) -> bool {
+src/temporal/scan.rs: pub(super) fn skip_whitespace(&mut self) {
+src/temporal/scan.rs: pub(super) struct Scanner<'a> {
+src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
+src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
+src/temporal/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
+src/temporal/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
+src/temporal/unit.rs: pub(crate) const fn spelling(self) -> &'static str {
+src/temporal/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
+src/temporal/unit.rs: pub(crate) enum DurationUnit {
+src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
 src/temporal/value.rs: pub struct DateTimeValue(DateTime<Utc>);
 src/temporal/value.rs: pub struct DateValue(NaiveDate);
 src/temporal/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";

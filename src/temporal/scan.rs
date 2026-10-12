@@ -94,7 +94,7 @@ impl<'a> Scanner<'a> {
 
     /// Scans a decimal number with an optional leading `+` or `-` and an
     /// optional trailing exponent (`"1e5"`, `".5e-3"`), the same float syntax
-    /// the [`super::value::DurationSeconds`] [`Display`](std::fmt::Display)
+    /// the [`super::duration::DurationSeconds`] [`Display`](std::fmt::Display)
     /// dialect emits for extreme magnitudes.
     fn number(&mut self) -> Result<f64, DurationError> {
         let start = self.pos;

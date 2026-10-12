@@ -113,7 +113,6 @@ mod delimiter;
 mod dialog;
 mod dirs;
 mod dirtree;
-mod duration;
 mod env_vars;
 mod field;
 mod file;
@@ -143,8 +142,6 @@ pub use dialog::{
     TerminalDialogProvider,
 };
 pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
-pub use duration::{DurationError, DurationValue};
-pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_SPELLINGS_HINT};
 pub(crate) use field::{
     FieldKey, FieldKeyRef, FieldName, FieldNameError, FieldNameRef, FieldValue,
 };
@@ -172,8 +169,13 @@ pub use task::{
 };
 #[expect(unused_imports, reason = "crate re-export")]
 pub(crate) use template::TemplateService;
-pub(crate) use temporal::{DATE_PATTERN, DATETIME_PATTERN};
-pub use temporal::{DateError, DateTimeValue, DateValue};
+pub(crate) use temporal::{
+    DATE_PATTERN, DATETIME_PATTERN, DurationSeconds, DurationUnit,
+    UNIT_SPELLINGS_HINT,
+};
+pub use temporal::{
+    DateError, DateTimeValue, DateValue, DurationError, DurationValue,
+};
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod testing {
