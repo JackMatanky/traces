@@ -1,8 +1,19 @@
+//! The closed set of time units the crate accepts, with one row of facts per
+//! unit.
+//!
+//! This module's registry is the only place a unit's accepted spellings,
+//! nominal length, frame, and human names are stated; callers read those facts
+//! from [`DurationUnit`] instead of keeping private copies. Calendar units
+//! ([`DurationUnit::Day`], [`DurationUnit::Week`], [`DurationUnit::Month`],
+//! [`DurationUnit::Year`]) take effect on the local clock; exact units
+//! ([`DurationUnit::Hour`] and smaller) are exact elapsed time.
+
 /// A recognized duration unit.
 ///
-/// Single source of truth for unit parsing and seconds conversion. Match on
-/// [`DurationUnit`] directly for type-safe dispatch rather than converting to
-/// strings.
+/// Selecting a variant fixes the unit's accepted spellings, canonical short
+/// spelling, nominal length in seconds, frame (calendar or exact), and human
+/// names. Match on [`DurationUnit`] directly for type-safe dispatch rather
+/// than converting to strings.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum DurationUnit {
     /// Thousandths of a second (`"ms"`, `"millisecond(s)"`).
@@ -13,21 +24,21 @@ pub(crate) enum DurationUnit {
     Minute,
     /// Hours (`"h"`, `"hr(s)"`, `"hour(s)"`).
     Hour,
-    /// Days (`"d"`, `"day(s)"`); a calendar application unit.
+    /// Days (`"d"`, `"day(s)"`); a calendar unit.
     Day,
-    /// Weeks (`"w"`, `"wk(s)"`, `"week(s)"`); a calendar application unit.
+    /// Weeks (`"w"`, `"wk(s)"`, `"week(s)"`); a calendar unit.
     Week,
-    /// Months (`"mo(s)"`, `"month(s)"`); a calendar application unit.
+    /// Months (`"mo(s)"`, `"month(s)"`); a calendar unit.
     Month,
-    /// Years (`"y"`, `"yr(s)"`, `"year(s)"`); a calendar application unit.
+    /// Years (`"y"`, `"yr(s)"`, `"year(s)"`); a calendar unit.
     Year,
 }
 
 impl DurationUnit {
-    /// Case-insensitive lookup of a unit string.
+    /// Looks up a unit from its case-insensitive spelling.
     ///
-    /// Accepts strings up to 16 bytes. Returns `None` if the string is empty,
-    /// exceeds 16 bytes, or does not match a known unit name.
+    /// Accepts strings up to 16 bytes; returns [`None`] if the string is
+    /// empty, exceeds 16 bytes, or does not match a registered unit spelling.
     #[must_use]
     pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
         let mut buf = [0u8; 16];
@@ -38,7 +49,7 @@ impl DurationUnit {
         UNIT_SPELLINGS.get(lower).copied()
     }
 
-    /// Canonical short spelling used in synthesized duration text.
+    /// Returns the canonical short spelling used in synthesized duration text.
     #[must_use]
     pub(crate) const fn spelling(self) -> &'static str {
         match self {
@@ -53,7 +64,8 @@ impl DurationUnit {
         }
     }
 
-    /// Singular and plural English names for human-readable durations.
+    /// Returns the singular and plural English names for human-readable
+    /// durations.
     #[must_use]
     pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
         match self {
@@ -68,12 +80,14 @@ impl DurationUnit {
         }
     }
 
-    /// Fixed seconds per unit for duration magnitude identity.
+    /// Returns the fixed nominal seconds per unit, the sole unit-ratio table
+    /// in the crate.
     ///
-    /// The sole unit-ratio table in the crate. Calendar units (Day, Week,
-    /// Month, Year) get nominal fixed ratios here for value identity, magnitude
-    /// ordering, and fractional-remainder application; their whole-count
-    /// date-shifting behavior belongs to the date module's calendar owner.
+    /// Calendar units ([`Self::Day`], [`Self::Week`], [`Self::Month`],
+    /// [`Self::Year`]) get nominal fixed ratios here for value identity,
+    /// magnitude ordering, and fractional-remainder application; their
+    /// whole-count date-shifting behavior belongs to the calendar owner
+    /// modules.
     #[must_use]
     pub(crate) const fn nominal_seconds(self) -> f64 {
         match self {
@@ -88,20 +102,20 @@ impl DurationUnit {
         }
     }
 
-    /// Returns `true` if this unit is a calendar application unit
-    /// ([`Self::Day`], [`Self::Week`], [`Self::Month`], or [`Self::Year`]).
+    /// Returns `true` if this unit is a calendar unit ([`Self::Day`],
+    /// [`Self::Week`], [`Self::Month`], or [`Self::Year`]).
     #[inline]
     #[must_use]
     pub(crate) const fn is_calendar(self) -> bool {
         matches!(self, Self::Day | Self::Week | Self::Month | Self::Year)
     }
 
-    /// Whole fixed seconds per unit as `i64`, derived from
+    /// Returns the whole fixed seconds per unit as `i64`, derived from
     /// [`Self::nominal_seconds`].
     ///
-    /// `None` only for [`Self::Millisecond`]; every other variant is listed
-    /// explicitly, so adding a unit forces it to declare whether its ratio is a
-    /// whole number of seconds.
+    /// [`None`] only for [`Self::Millisecond`]; every other variant is listed
+    /// explicitly, so adding a unit forces it to declare whether its ratio is
+    /// a whole number of seconds.
     #[must_use]
     #[expect(
         clippy::as_conversions,
@@ -180,227 +194,414 @@ static UNIT_SPELLINGS: phf::Map<&'static str, DurationUnit> = phf::phf_map! {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
 
-    mod unit {
+    /// Every [`DurationUnit`] variant, for suite-wide iteration; replaced by
+    /// the catalog's own `ALL` when the unit table lands.
+    const ALL_UNITS: [DurationUnit; 8] = [
+        DurationUnit::Millisecond,
+        DurationUnit::Second,
+        DurationUnit::Minute,
+        DurationUnit::Hour,
+        DurationUnit::Day,
+        DurationUnit::Week,
+        DurationUnit::Month,
+        DurationUnit::Year,
+    ];
+
+    /// Returns the quoted tokens of [`UNIT_SPELLINGS_HINT`] in order.
+    fn hint_tokens() -> impl Iterator<Item = &'static str> {
+        UNIT_SPELLINGS_HINT
+            .split('"')
+            .enumerate()
+            .filter(|(i, _)| i % 2 == 1)
+            .map(|(_, token)| token)
+    }
+
+    mod lookup {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
         use super::*;
 
-        mod parse {
-            use pretty_assertions::assert_eq;
-            use rstest::rstest;
+        #[rstest]
+        #[case::milliseconds("ms", DurationUnit::Millisecond)]
+        #[case::seconds("s", DurationUnit::Second)]
+        #[case::minutes("m", DurationUnit::Minute)]
+        #[case::hours("h", DurationUnit::Hour)]
+        #[case::days("d", DurationUnit::Day)]
+        #[case::weeks("w", DurationUnit::Week)]
+        #[case::months("mo", DurationUnit::Month)]
+        #[case::years("y", DurationUnit::Year)]
+        fn accepts_each_compact_spelling(
+            #[case] input: &str,
+            #[case] expected: DurationUnit,
+        ) {
+            // Arrange: `input` and `expected` are the case literals.
+            // Act
+            let actual = DurationUnit::from_spelling(input);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{input}` should parse as {expected:?}"
+            );
+        }
 
-            use super::*;
+        #[rstest]
+        #[case::sec("sec", DurationUnit::Second)]
+        #[case::secs("secs", DurationUnit::Second)]
+        #[case::min("min", DurationUnit::Minute)]
+        #[case::mins("mins", DurationUnit::Minute)]
+        #[case::hr("hr", DurationUnit::Hour)]
+        #[case::hrs("hrs", DurationUnit::Hour)]
+        #[case::wk("wk", DurationUnit::Week)]
+        #[case::wks("wks", DurationUnit::Week)]
+        #[case::mos("mos", DurationUnit::Month)]
+        #[case::yr("yr", DurationUnit::Year)]
+        #[case::yrs("yrs", DurationUnit::Year)]
+        fn accepts_each_long_alias(
+            #[case] input: &str,
+            #[case] expected: DurationUnit,
+        ) {
+            // Arrange: `input` and `expected` are the case literals.
+            // Act
+            let actual = DurationUnit::from_spelling(input);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{input}` should parse as {expected:?}"
+            );
+        }
 
-            #[rstest]
-            #[case::single_upper("H", DurationUnit::Hour)]
-            #[case::all_upper("HOUR", DurationUnit::Hour)]
-            #[case::lower_plural("hours", DurationUnit::Hour)]
-            fn is_case_insensitive(
-                #[case] input: &str,
-                #[case] expected: DurationUnit,
-            ) {
+        #[rstest]
+        #[case::millisecond("millisecond", DurationUnit::Millisecond)]
+        #[case::milliseconds("milliseconds", DurationUnit::Millisecond)]
+        #[case::second("second", DurationUnit::Second)]
+        #[case::seconds("seconds", DurationUnit::Second)]
+        #[case::minute("minute", DurationUnit::Minute)]
+        #[case::minutes("minutes", DurationUnit::Minute)]
+        #[case::hour("hour", DurationUnit::Hour)]
+        #[case::hours("hours", DurationUnit::Hour)]
+        #[case::day("day", DurationUnit::Day)]
+        #[case::days("days", DurationUnit::Day)]
+        #[case::week("week", DurationUnit::Week)]
+        #[case::weeks("weeks", DurationUnit::Week)]
+        #[case::month("month", DurationUnit::Month)]
+        #[case::months("months", DurationUnit::Month)]
+        #[case::year("year", DurationUnit::Year)]
+        #[case::years("years", DurationUnit::Year)]
+        fn accepts_each_full_name(
+            #[case] input: &str,
+            #[case] expected: DurationUnit,
+        ) {
+            // Arrange: `input` and `expected` are the case literals.
+            // Act
+            let actual = DurationUnit::from_spelling(input);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{input}` should parse as {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::hour_letter("H", DurationUnit::Hour)]
+        #[case::hour_word("HOUR", DurationUnit::Hour)]
+        #[case::months_abbrev_upper("MOS", DurationUnit::Month)]
+        #[case::years_abbrev_upper("YRS", DurationUnit::Year)]
+        fn accepts_upper_case_spelling(
+            #[case] input: &str,
+            #[case] expected: DurationUnit,
+        ) {
+            // Arrange: `input` and `expected` are the case literals.
+            // Act
+            let actual = DurationUnit::from_spelling(input);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{input}` should parse case-insensitively as {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::empty("")]
+        #[case::unknown_word("fortnight")]
+        #[case::leading_space(" h")]
+        #[case::trailing_space("h ")]
+        #[case::non_ascii_microsecond("µs")]
+        #[case::microsecond_excluded("us")]
+        #[case::nanosecond_excluded("ns")]
+        #[case::sixteen_unknown_bytes("aaaaaaaaaaaaaaaa")]
+        #[case::over_sixteen_bytes("aaaaaaaaaaaaaaaaa")]
+        fn rejects_unrecognized_unit_spelling(#[case] input: &str) {
+            // Arrange: `input` is the case literal.
+            // Act
+            let actual = DurationUnit::from_spelling(input);
+            // Assert
+            assert_eq!(actual, None, "`{input}` must not resolve to a unit");
+        }
+    }
+
+    mod accessors {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::millisecond(DurationUnit::Millisecond, "ms")]
+        #[case::second(DurationUnit::Second, "s")]
+        #[case::minute(DurationUnit::Minute, "m")]
+        #[case::hour(DurationUnit::Hour, "h")]
+        #[case::day(DurationUnit::Day, "d")]
+        #[case::week(DurationUnit::Week, "w")]
+        #[case::month(DurationUnit::Month, "mo")]
+        #[case::year(DurationUnit::Year, "y")]
+        fn returns_canonical_spelling_for_each_unit(
+            #[case] unit: DurationUnit,
+            #[case] expected: &str,
+        ) {
+            // Arrange: `unit` and `expected` are the case literals.
+            // Act
+            let actual = unit.spelling();
+            // Assert
+            assert_eq!(
+                actual, expected,
+                "canonical spelling of {unit:?} must stay `{expected}`"
+            );
+            assert_eq!(
+                DurationUnit::from_spelling(actual),
+                Some(unit),
+                "canonical spelling `{actual}` must parse back to {unit:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::millisecond(
+            DurationUnit::Millisecond,
+            "millisecond",
+            "milliseconds"
+        )]
+        #[case::second(DurationUnit::Second, "second", "seconds")]
+        #[case::minute(DurationUnit::Minute, "minute", "minutes")]
+        #[case::hour(DurationUnit::Hour, "hour", "hours")]
+        #[case::day(DurationUnit::Day, "day", "days")]
+        #[case::week(DurationUnit::Week, "week", "weeks")]
+        #[case::month(DurationUnit::Month, "month", "months")]
+        #[case::year(DurationUnit::Year, "year", "years")]
+        fn returns_human_names_for_each_unit(
+            #[case] unit: DurationUnit,
+            #[case] singular: &str,
+            #[case] plural: &str,
+        ) {
+            // Arrange: `unit`, `singular`, and `plural` are the case literals.
+            // Act
+            let actual = unit.human_names();
+            // Assert
+            assert_eq!(
+                actual,
+                (singular, plural),
+                "human names of {unit:?} must be ({singular}, {plural})"
+            );
+        }
+
+        #[rstest]
+        #[case::millisecond(DurationUnit::Millisecond, 0.001)]
+        #[case::second(DurationUnit::Second, 1.0)]
+        #[case::minute(DurationUnit::Minute, 60.0)]
+        #[case::hour(DurationUnit::Hour, 3_600.0)]
+        #[case::day(DurationUnit::Day, 86_400.0)]
+        #[case::week(DurationUnit::Week, 7.0 * 86_400.0)]
+        #[case::month(DurationUnit::Month, 30.0 * 86_400.0)]
+        #[case::year(DurationUnit::Year, 365.0 * 86_400.0)]
+        fn returns_nominal_seconds_for_each_unit(
+            #[case] unit: DurationUnit,
+            #[case] expected: f64,
+        ) {
+            // Arrange: `unit` and `expected` (a literal day multiple for the
+            // calendar units) are the case literals.
+            // Act
+            let actual = unit.nominal_seconds();
+            // Assert
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "nominal seconds of {unit:?} must be exactly {expected}"
+            );
+        }
+
+        #[rstest]
+        #[case::millisecond(DurationUnit::Millisecond, None)]
+        #[case::second(DurationUnit::Second, Some(1))]
+        #[case::minute(DurationUnit::Minute, Some(60))]
+        #[case::hour(DurationUnit::Hour, Some(3_600))]
+        #[case::day(DurationUnit::Day, Some(86_400))]
+        #[case::week(DurationUnit::Week, Some(604_800))]
+        #[case::month(DurationUnit::Month, Some(2_592_000))]
+        #[case::year(DurationUnit::Year, Some(31_536_000))]
+        fn returns_whole_nominal_seconds_for_each_unit(
+            #[case] unit: DurationUnit,
+            #[case] expected: Option<i64>,
+        ) {
+            // Arrange: `unit` and `expected` are the case literals.
+            // Act
+            let actual = unit.whole_nominal_seconds();
+            // Assert
+            assert_eq!(
+                actual, expected,
+                "whole nominal seconds of {unit:?} must be {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::day(DurationUnit::Day)]
+        #[case::week(DurationUnit::Week)]
+        #[case::month(DurationUnit::Month)]
+        #[case::year(DurationUnit::Year)]
+        fn returns_true_for_calendar_units(#[case] unit: DurationUnit) {
+            // Arrange: `unit` is a calendar-unit case literal.
+            // Act
+            let actual = unit.is_calendar();
+            // Assert
+            assert!(actual, "{unit:?} must be a calendar unit");
+        }
+
+        #[rstest]
+        #[case::millisecond(DurationUnit::Millisecond)]
+        #[case::second(DurationUnit::Second)]
+        #[case::minute(DurationUnit::Minute)]
+        #[case::hour(DurationUnit::Hour)]
+        fn returns_false_for_exact_units(#[case] unit: DurationUnit) {
+            // Arrange: `unit` is an exact-unit case literal.
+            // Act
+            let actual = unit.is_calendar();
+            // Assert
+            assert!(!actual, "{unit:?} must be an exact unit");
+        }
+    }
+
+    mod invariants {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn matches_every_unit_exhaustively() {
+            // Arrange: a match with no wildcard arm; adding a `DurationUnit`
+            // variant stops this test compiling until the new unit is
+            // classified.
+            fn frame(unit: DurationUnit) -> bool {
+                match unit {
+                    DurationUnit::Millisecond
+                    | DurationUnit::Second
+                    | DurationUnit::Minute
+                    | DurationUnit::Hour => false,
+                    DurationUnit::Day
+                    | DurationUnit::Week
+                    | DurationUnit::Month
+                    | DurationUnit::Year => true,
+                }
+            }
+            let units = ALL_UNITS;
+
+            // Act
+            let classified: Vec<bool> =
+                units.iter().copied().map(frame).collect();
+
+            // Assert
+            for (unit, is_calendar) in units.iter().zip(&classified) {
                 assert_eq!(
-                    DurationUnit::from_spelling(input).unwrap(),
-                    expected
+                    *is_calendar,
+                    unit.is_calendar(),
+                    "exhaustive match must classify {unit:?} the same way as \
+                     is_calendar"
                 );
-            }
-
-            #[rstest]
-            #[case::ms("ms", DurationUnit::Millisecond)]
-            #[case::millisecond("millisecond", DurationUnit::Millisecond)]
-            #[case::milliseconds("milliseconds", DurationUnit::Millisecond)]
-            #[case::s("s", DurationUnit::Second)]
-            #[case::sec("sec", DurationUnit::Second)]
-            #[case::secs("secs", DurationUnit::Second)]
-            #[case::second("second", DurationUnit::Second)]
-            #[case::seconds("seconds", DurationUnit::Second)]
-            #[case::m("m", DurationUnit::Minute)]
-            #[case::min("min", DurationUnit::Minute)]
-            #[case::mins("mins", DurationUnit::Minute)]
-            #[case::minute("minute", DurationUnit::Minute)]
-            #[case::minutes("minutes", DurationUnit::Minute)]
-            #[case::h("h", DurationUnit::Hour)]
-            #[case::hr("hr", DurationUnit::Hour)]
-            #[case::hrs("hrs", DurationUnit::Hour)]
-            #[case::hour("hour", DurationUnit::Hour)]
-            #[case::hours("hours", DurationUnit::Hour)]
-            #[case::d("d", DurationUnit::Day)]
-            #[case::day("day", DurationUnit::Day)]
-            #[case::days("days", DurationUnit::Day)]
-            #[case::w("w", DurationUnit::Week)]
-            #[case::wk("wk", DurationUnit::Week)]
-            #[case::wks("wks", DurationUnit::Week)]
-            #[case::week("week", DurationUnit::Week)]
-            #[case::weeks("weeks", DurationUnit::Week)]
-            #[case::mo("mo", DurationUnit::Month)]
-            #[case::mos("mos", DurationUnit::Month)]
-            #[case::month("month", DurationUnit::Month)]
-            #[case::months("months", DurationUnit::Month)]
-            #[case::y("y", DurationUnit::Year)]
-            #[case::yr("yr", DurationUnit::Year)]
-            #[case::yrs("yrs", DurationUnit::Year)]
-            #[case::year("year", DurationUnit::Year)]
-            #[case::years("years", DurationUnit::Year)]
-            fn parses_all_units_and_abbreviations(
-                #[case] input: &str,
-                #[case] expected: DurationUnit,
-            ) {
-                assert_eq!(
-                    DurationUnit::from_spelling(input).unwrap(),
-                    expected
-                );
-            }
-
-            #[rstest]
-            #[case::unknown("foo")]
-            #[case::exactly_16_bytes("aaaaaaaaaaaaaaaa")]
-            #[case::longer_than_16_bytes("aaaaaaaaaaaaaaaaa")]
-            #[case::empty("")]
-            fn rejects_unit(#[case] input: &str) {
-                assert!(DurationUnit::from_spelling(input).is_none());
-            }
-            #[test]
-            fn parses_all_unit_spelling_keys_into_their_expected_variants() {
-                for (key, expected_variant) in UNIT_SPELLINGS.entries() {
-                    assert_eq!(
-                        DurationUnit::from_spelling(key),
-                        Some(*expected_variant),
-                        "UNIT_SPELLINGS entry `{key}` must parse as \
-                         `{expected_variant:?}`"
-                    );
-                }
-            }
-
-            #[test]
-            fn verifies_unit_spelling_hint_and_catalog_are_in_sync() {
-                let mut hint_variants = std::collections::HashSet::new();
-                let quoted_tokens = UNIT_SPELLINGS_HINT
-                    .split('"')
-                    .enumerate()
-                    .filter(|(i, _)| i % 2 == 1)
-                    .map(|(_, t)| t);
-                for token in quoted_tokens {
-                    let parsed = DurationUnit::from_spelling(token);
-                    assert!(
-                        parsed.is_some(),
-                        "hint spelling `{token}` must resolve in \
-                         DurationUnit::from_spelling"
-                    );
-                    hint_variants.extend(parsed);
-                }
-
-                let all_variants = [
-                    DurationUnit::Millisecond,
-                    DurationUnit::Second,
-                    DurationUnit::Minute,
-                    DurationUnit::Hour,
-                    DurationUnit::Day,
-                    DurationUnit::Week,
-                    DurationUnit::Month,
-                    DurationUnit::Year,
-                ];
-                for variant in all_variants {
-                    assert!(
-                        hint_variants.contains(&variant),
-                        "UNIT_SPELLINGS_HINT must cover {variant:?}"
-                    );
-                }
-
-                for (key, variant) in UNIT_SPELLINGS.entries() {
-                    assert!(
-                        hint_variants.contains(variant),
-                        "UNIT_SPELLINGS_HINT must cover variant for key \
-                         `{key}`"
-                    );
-                }
             }
         }
 
-        mod names {
-            use pretty_assertions::assert_eq;
-            use rstest::rstest;
+        #[test]
+        fn assigns_a_unique_compact_spelling_per_unit() {
+            // Arrange
+            let units = ALL_UNITS;
 
-            use super::*;
+            // Act
+            let spellings: HashSet<&str> =
+                units.iter().map(|unit| unit.spelling()).collect();
 
-            #[rstest]
-            #[case::millisecond(
-                DurationUnit::Millisecond,
-                "ms",
-                "millisecond",
-                "milliseconds",
-                0.001
-            )]
-            #[case::second(DurationUnit::Second, "s", "second", "seconds", 1.0)]
-            #[case::minute(
-                DurationUnit::Minute,
-                "m",
-                "minute",
-                "minutes",
-                60.0
-            )]
-            #[case::hour(DurationUnit::Hour, "h", "hour", "hours", 3_600.0)]
-            #[case::day(DurationUnit::Day, "d", "day", "days", 86_400.0)]
-            #[case::week(DurationUnit::Week, "w", "week", "weeks", 604_800.0)]
-            #[case::month(
-                DurationUnit::Month,
-                "mo",
-                "month",
-                "months",
-                2_592_000.0
-            )]
-            #[case::year(
-                DurationUnit::Year,
-                "y",
-                "year",
-                "years",
-                31_536_000.0
-            )]
-            fn supplies_short_and_human_names_with_nominal_seconds(
-                #[case] unit: DurationUnit,
-                #[case] short: &str,
-                #[case] singular: &str,
-                #[case] plural: &str,
-                #[case] seconds: f64,
-            ) {
-                // Act
-                let spelling = unit.spelling();
-                let names = unit.human_names();
-                let nominal_seconds = unit.nominal_seconds();
+            // Assert
+            assert_eq!(
+                spellings.len(),
+                units.len(),
+                "no compact spelling may be shared between two units"
+            );
+        }
 
-                // Assert
-                assert_eq!(spelling, short);
-                assert_eq!(names, (singular, plural));
-                assert_eq!(nominal_seconds.to_bits(), seconds.to_bits());
-                assert_eq!(DurationUnit::from_spelling(spelling), Some(unit));
+        #[test]
+        fn resolves_every_registered_spelling() {
+            // Arrange: the registry itself is the arranged input.
+            // Act
+            // Assert
+            for (key, variant) in UNIT_SPELLINGS.entries() {
+                assert_eq!(
+                    DurationUnit::from_spelling(key),
+                    Some(*variant),
+                    "UNIT_SPELLINGS entry `{key}` must parse as {variant:?}"
+                );
             }
         }
 
-        mod seconds {
-            use super::*;
+        #[test]
+        fn covers_every_compact_spelling_in_the_error_hint() {
+            // Arrange
+            let hint_tokens: HashSet<&str> = hint_tokens().collect();
 
-            #[test]
-            fn nominal_seconds_are_positive_for_all_variants() {
-                for entry in UNIT_SPELLINGS.entries() {
-                    assert!(entry.1.nominal_seconds() > 0.0);
-                }
+            // Act
+            // Assert
+            for unit in ALL_UNITS {
+                assert!(
+                    hint_tokens.contains(unit.spelling()),
+                    "UNIT_SPELLINGS_HINT must list the compact spelling `{}` \
+                     of {unit:?}",
+                    unit.spelling()
+                );
+            }
+        }
+
+        #[test]
+        fn keeps_the_error_hint_catalog_in_sync() {
+            // Arrange
+            let hint_tokens = hint_tokens();
+
+            // Act
+            let mut hint_variants = HashSet::new();
+            for token in hint_tokens {
+                let parsed = DurationUnit::from_spelling(token);
+                assert!(
+                    parsed.is_some(),
+                    "hint spelling `{token}` must resolve in \
+                     DurationUnit::from_spelling"
+                );
+                hint_variants.extend(parsed);
             }
 
-            #[test]
-            fn whole_nominal_seconds_matches_nominal_seconds_for_each_variant()
-            {
-                let units = [
-                    (DurationUnit::Millisecond, None),
-                    (DurationUnit::Second, Some(1)),
-                    (DurationUnit::Minute, Some(60)),
-                    (DurationUnit::Hour, Some(3_600)),
-                    (DurationUnit::Day, Some(86_400)),
-                    (DurationUnit::Week, Some(604_800)),
-                    (DurationUnit::Month, Some(2_592_000)),
-                    (DurationUnit::Year, Some(31_536_000)),
-                ];
-                for (unit, expected) in units {
-                    assert_eq!(unit.whole_nominal_seconds(), expected);
-                }
+            // Assert
+            for variant in ALL_UNITS {
+                assert!(
+                    hint_variants.contains(&variant),
+                    "UNIT_SPELLINGS_HINT must cover {variant:?}"
+                );
+            }
+            for (key, variant) in UNIT_SPELLINGS.entries() {
+                assert!(
+                    hint_variants.contains(variant),
+                    "UNIT_SPELLINGS_HINT must cover variant for key `{key}`"
+                );
             }
         }
     }
