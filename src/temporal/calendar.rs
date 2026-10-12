@@ -1,9 +1,29 @@
+//! Vocabulary shared by date-point arithmetic and its callers: calendar
+//! periods, period edges, components, and differences.
+//!
+//! This module owns the names that date-point arithmetic and its query and
+//! template callers share. It holds no arithmetic of its own: the calendar
+//! owner modules apply [`CalendarPeriod`] and [`PeriodEdge`] at date-point
+//! boundaries, resolve [`DateComponent`] names, and project [`Difference`]
+//! measurements, while the free functions here supply the zone-free datetime
+//! shifting and sub-second splitting those owners share.
+//!
+//! # Key Types
+//!
+//! - [`CalendarPeriod`]: a calendar period that date-point boundaries select.
+//! - [`PeriodEdge`]: which side of a calendar period a boundary selects.
+//! - [`DateComponent`]: a named calendar or clock component of a date point.
+//! - [`Difference`]: the measured difference between two date points.
+
 use chrono::{Days, Months, NaiveDateTime, TimeDelta, Weekday};
 
 use super::error::DateError;
 use crate::temporal::{DurationSeconds, DurationUnit};
 
-/// Calendar period used for date boundaries.
+/// A calendar period that date-point boundaries select.
+///
+/// Selecting a variant fixes the span a start-of or end-of boundary lands
+/// on: the ISO week, the calendar month, or the calendar year.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CalendarPeriod {
     /// The ISO week, Monday through Sunday.
@@ -14,7 +34,10 @@ pub(crate) enum CalendarPeriod {
     Year,
 }
 
-/// Which side of a calendar period to select.
+/// Which side of a calendar period a boundary selects.
+///
+/// Selecting a variant fixes whether a boundary lands on the first or the
+/// last day of the period.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PeriodEdge {
     /// First day of the period.
@@ -46,7 +69,11 @@ pub(crate) enum DateComponent {
 }
 
 impl DateComponent {
-    /// Resolves a component name, ASCII case-insensitively.
+    /// Resolves a component name to its [`DateComponent`].
+    ///
+    /// Matching is ASCII case-insensitive across the eight registered names
+    /// (`year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`,
+    /// `week`); any other string returns [`None`].
     #[must_use]
     pub(crate) fn from_name(name: &str) -> Option<Self> {
         const TABLE: [(&str, DateComponent); 8] = [
@@ -76,7 +103,11 @@ pub(crate) enum Difference {
 }
 
 impl Difference {
-    /// Returns the measured difference magnitude as an `f64`.
+    /// Projects the measured difference as an `f64`.
+    ///
+    /// Whole magnitudes convert through the standard integer-to-floating
+    /// conversion; fractional magnitudes pass through unchanged, non-finite
+    /// values included.
     #[inline]
     #[must_use]
     pub(crate) fn to_f64(self) -> Option<f64> {
@@ -87,9 +118,11 @@ impl Difference {
     }
 }
 
-/// Maps an ISO weekday number to a [`Weekday`]: `1` is Monday through `7`
-/// Sunday. `0` is rejected because Sunday-based conventions disagree on it
-/// (Sunday is `0` in some and `1` in others).
+/// Maps an ISO weekday number to its [`Weekday`], returning [`None`] for
+/// anything outside `1..=7`.
+///
+/// `0` is rejected because Sunday-based conventions disagree on it (Sunday
+/// is `0` in some and `1` in others).
 #[must_use]
 pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
     match n {
@@ -105,8 +138,10 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
 }
 
 /// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from
-/// nanoseconds (the fraction rounded to the nearest nanosecond) and rejecting
-/// overflow of either component for `DatePoint::apply`.
+/// the fraction rounded to the nearest nanosecond.
+///
+/// The split lets calendar arithmetic keep whole days while the remainder
+/// carries the sub-second part for `DatePoint::apply`.
 ///
 /// # Errors
 ///
@@ -120,14 +155,17 @@ pub(super) fn time_delta_from_seconds(
     TimeDelta::try_from(ds).map_err(|_| DateError::OutOfRange)
 }
 
-/// Shifts a calendar datetime by `n` `unit`s.
+/// Shifts a calendar datetime by `n` in the chosen `unit` and returns the
+/// result.
 ///
-/// - Calendar units shift calendar days; Month and Year clamp to the last day
-///   of the target month (chrono's documented behavior).
-/// - Sub-day units shift the time exactly.
+/// Calendar units shift calendar days; month and year shifts clamp to the
+/// last day of the target month (the documented `chrono` behavior). Exact
+/// units shift elapsed time, so the clock reading moves by the same amount
+/// regardless of the calendar.
 ///
-/// No zone is consulted: callers wanting DST-aware local-clock semantics route
-/// through [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
+/// No zone is consulted: callers wanting DST-aware local-clock semantics
+/// route through
+/// [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
 ///
 /// # Errors
 ///
@@ -184,9 +222,11 @@ pub(super) fn shift_datetime(
     }
 }
 
-/// Shifts `local_datetime` by `months` calendar months (positive or negative).
+/// Shifts `local_datetime` by `months` calendar months (positive or
+/// negative) and returns the result.
 ///
-/// Clamps to the last day of the target month per chrono's documented behavior.
+/// The result clamps to the last day of the target month, per the documented
+/// `chrono` behavior.
 ///
 /// # Errors
 ///
@@ -210,15 +250,188 @@ pub(super) fn shift_datetime_months(
 mod tests {
     use super::*;
 
-    mod date_point_boundaries {
+    mod lookup {
         use pretty_assertions::assert_eq;
+        use rstest::rstest;
 
         use super::*;
 
-        #[test]
-        fn date_diff_to_f64_projects_whole_and_exact_variants() {
-            assert_eq!(Difference::Whole(42).to_f64(), Some(42.0));
-            assert_eq!(Difference::Fractional(2.5).to_f64(), Some(2.5));
+        #[rstest]
+        #[case::year("year", DateComponent::Year)]
+        #[case::month("month", DateComponent::Month)]
+        #[case::day("day", DateComponent::Day)]
+        #[case::hour("hour", DateComponent::Hour)]
+        #[case::minute("minute", DateComponent::Minute)]
+        #[case::second("second", DateComponent::Second)]
+        #[case::weekday("weekday", DateComponent::Weekday)]
+        #[case::week("week", DateComponent::Week)]
+        fn resolves_each_registered_component_name(
+            #[case] name: &str,
+            #[case] expected: DateComponent,
+        ) {
+            // Arrange: `name` and `expected` are the case literals.
+            // Act
+            let actual = DateComponent::from_name(name);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{name}` should resolve to {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::upper_case("YEAR", DateComponent::Year)]
+        #[case::title_case("Second", DateComponent::Second)]
+        #[case::mixed_case("WeEk", DateComponent::Week)]
+        #[case::upper_weekday("WEEKDAY", DateComponent::Weekday)]
+        fn resolves_names_ascii_case_insensitively(
+            #[case] name: &str,
+            #[case] expected: DateComponent,
+        ) {
+            // Arrange: `name` and `expected` are the case literals.
+            // Act
+            let actual = DateComponent::from_name(name);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{name}` should resolve case-insensitively to {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::empty("")]
+        #[case::plural("years")]
+        #[case::abbreviated("yr")]
+        #[case::leading_space(" day")]
+        #[case::trailing_space("day ")]
+        #[case::compound("year-month")]
+        #[case::unrecognized("quarter")]
+        fn rejects_names_outside_the_registry(#[case] name: &str) {
+            // Arrange: `name` is the case literal.
+            // Act
+            let actual = DateComponent::from_name(name);
+            // Assert
+            assert_eq!(
+                actual, None,
+                "`{name}` must not resolve to a component"
+            );
+        }
+
+        #[rstest]
+        #[case::monday(1, Weekday::Mon)]
+        #[case::tuesday(2, Weekday::Tue)]
+        #[case::wednesday(3, Weekday::Wed)]
+        #[case::thursday(4, Weekday::Thu)]
+        #[case::friday(5, Weekday::Fri)]
+        #[case::saturday(6, Weekday::Sat)]
+        #[case::sunday(7, Weekday::Sun)]
+        fn maps_iso_weekday_numbers_to_weekdays(
+            #[case] number: i64,
+            #[case] expected: Weekday,
+        ) {
+            // Arrange: `number` and `expected` are the case literals.
+            // Act
+            let actual = weekday_from_number(number);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "ISO weekday number {number} should map to {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::zero(0)]
+        #[case::negative_one(-1)]
+        #[case::eight(8)]
+        #[case::i64_min(i64::MIN)]
+        fn rejects_weekday_numbers_outside_the_iso_range(#[case] number: i64) {
+            // Arrange: `number` is the case literal.
+            // Act
+            let actual = weekday_from_number(number);
+            // Assert
+            assert_eq!(
+                actual, None,
+                "weekday number {number} must not map to a weekday"
+            );
+        }
+    }
+
+    mod conversions {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::positive(Difference::Whole(42), 42.0)]
+        #[case::negative(Difference::Whole(-7), -7.0)]
+        #[case::zero(Difference::Whole(0), 0.0)]
+        #[case::i64_max(
+            Difference::Whole(i64::MAX),
+            9_223_372_036_854_775_808.0
+        )]
+        #[case::i64_min(
+            Difference::Whole(i64::MIN),
+            -9_223_372_036_854_775_808.0
+        )]
+        fn projects_whole_differences_as_f64(
+            #[case] difference: Difference,
+            #[case] expected: f64,
+        ) {
+            // Arrange: `difference` and `expected` are the case literals.
+            // Act
+            let actual = difference.to_f64();
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "{difference:?} should project as {expected}"
+            );
+        }
+
+        #[rstest]
+        #[case::two_and_a_half(Difference::Fractional(2.5), 2.5)]
+        #[case::negative_fraction(Difference::Fractional(-0.25), -0.25)]
+        #[case::zero(Difference::Fractional(0.0), 0.0)]
+        fn projects_fractional_differences_as_f64(
+            #[case] difference: Difference,
+            #[case] expected: f64,
+        ) {
+            // Arrange: `difference` and `expected` are the case literals.
+            // Act
+            let actual = difference.to_f64();
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "{difference:?} should project as {expected}"
+            );
+        }
+
+        #[rstest]
+        #[case::not_a_number(f64::NAN)]
+        #[case::positive_infinity(f64::INFINITY)]
+        #[case::negative_infinity(f64::NEG_INFINITY)]
+        fn projects_non_finite_fractional_differences_unchanged(
+            #[case] magnitude: f64,
+        ) {
+            // Arrange: `magnitude` is the case literal; only the fractional
+            // variant can carry a non-finite magnitude.
+            let difference = Difference::Fractional(magnitude);
+
+            // Act
+            let actual = difference.to_f64();
+
+            // Assert: bits compare equal for non-finite values, where `==`
+            // would report every NaN as unequal.
+            assert_eq!(
+                actual.map(f64::to_bits),
+                Some(magnitude.to_bits()),
+                "{difference:?} should project its magnitude unchanged"
+            );
         }
     }
 }
