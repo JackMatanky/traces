@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
-use chrono::NaiveDate;
+use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{DateTimeValue, error::DateError};
@@ -22,6 +22,56 @@ impl DateValue {
     #[must_use]
     pub(crate) const fn naive_date(self) -> NaiveDate {
         self.0
+    }
+
+    /// Whole calendar months from `self` to `to`, signed.
+    ///
+    /// Chrono has no `months_since` equivalent, so this mirrors
+    /// [`NaiveDate::years_since`]'s algorithm at month granularity: total
+    /// calendar months between the dates, minus one when the day-of-month has
+    /// not yet been reached. Either ordering is accepted.
+    pub(super) fn whole_months_until(self, to: Self) -> i64 {
+        let (from, to) = (self.naive_date(), to.naive_date());
+        let (earlier, later, sign) = if to >= from {
+            (from, to, 1)
+        } else {
+            (to, from, -1)
+        };
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "year/month/day are all bounded by NaiveDate's \
+                      representable range (~±262,000 years), so the year \
+                      subtraction, ×12 month conversion, day comparison, and \
+                      sign multiply can't overflow i64"
+        )]
+        let months = sign
+            * (i64::from(later.year() - earlier.year()) * 12
+                + i64::from(later.month())
+                - i64::from(earlier.month())
+                - i64::from(later.day() < earlier.day()));
+        months
+    }
+
+    /// Whole calendar years from `self` to `to`, signed.
+    ///
+    /// A year is not "up" until `to`'s month and day reach `self`'s, which is
+    /// the whole-month count truncated to years.
+    pub(super) fn whole_years_until(self, to: Self) -> i64 {
+        self.whole_months_until(to) / 12
+    }
+
+    /// Moves the date by `delta` read from midnight, keeping the date part.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the result is outside chrono's date
+    ///   range.
+    pub(super) fn advance(self, delta: TimeDelta) -> Result<Self, DateError> {
+        self.naive_date()
+            .and_time(NaiveTime::MIN)
+            .checked_add_signed(delta)
+            .map(|local_datetime| Self::from(local_datetime.date()))
+            .ok_or(DateError::OutOfRange)
     }
 }
 
@@ -92,7 +142,36 @@ impl<'de> Deserialize<'de> for DateValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::TzGuard;
+    use crate::{
+        temporal::{DatePoint, DurationValue},
+        test_support::TzGuard,
+    };
+
+    fn point_at(text: &str) -> DatePoint {
+        DatePoint::parse(text).expect("valid date point")
+    }
+
+    mod calendar_owner {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn date_value_calendar_arithmetic_handles_sub_day_units() {
+            let base = point_at("2026-07-29");
+
+            // Sub-day 1 hour shift is a no-op on date (stays 2026-07-29)
+            let one_hour = DurationValue::parse("1h").unwrap();
+            assert_eq!(base.apply(&one_hour).unwrap(), base);
+
+            // 24 hour shift advances the calendar date
+            let twenty_four_hours = DurationValue::parse("24h").unwrap();
+            assert_eq!(
+                base.apply(&twenty_four_hours).unwrap(),
+                point_at("2026-07-30")
+            );
+        }
+    }
 
     mod formatting {
         use pretty_assertions::assert_eq;

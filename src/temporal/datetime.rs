@@ -6,7 +6,9 @@ use chrono::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{DateValue, error::DateError};
+use super::{
+    DateValue, DurationUnit, calendar::shift_datetime, error::DateError,
+};
 
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
@@ -197,6 +199,31 @@ impl DateTimeValue {
         }
         Err(zone_lookup())
     }
+
+    /// Shifts calendar units in the local datetime frame and clock units in
+    /// UTC.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the shift overflows, or the local
+    ///   datetime of a calendar-unit shift is outside chrono's range.
+    /// - [`DateError::LocalZoneLookup`] if the shifted local datetime cannot be
+    ///   resolved to an instant.
+    pub(crate) fn shift(
+        self,
+        n: i64,
+        unit: DurationUnit,
+    ) -> Result<Self, DateError> {
+        if unit.is_calendar() {
+            let local_datetime =
+                self.local_datetime().ok_or(DateError::OutOfRange)?;
+            Self::from_local(shift_datetime(local_datetime, n, unit)?)
+        } else {
+            Ok(Self::from(
+                shift_datetime(self.utc().naive_utc(), n, unit)?.and_utc(),
+            ))
+        }
+    }
 }
 
 /// Renders the local clock time without a UTC offset, so a date or time
@@ -298,7 +325,14 @@ impl<'de> Deserialize<'de> for DateTimeValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{temporal::fixtures::fixed_datetime, test_support::TzGuard};
+    use crate::{
+        temporal::{DatePoint, fixtures::fixed_datetime},
+        test_support::TzGuard,
+    };
+
+    fn point_at(text: &str) -> DatePoint {
+        DatePoint::parse(text).expect("valid date point")
+    }
 
     /// Local-zone doctrine: a naive datetime means the reader's local clock
     /// time, resolved to UTC through the DST resolver; a date-only value stays
@@ -596,6 +630,62 @@ mod tests {
             let restored: DateTimeValue =
                 serde_json::from_str(&json).expect("deserializable");
             assert_eq!(restored, dt);
+        }
+    }
+
+    mod calendar_owner {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn clock_shift_keeps_fractional_seconds() {
+            // Arrange
+            TzGuard::set("UTC");
+            let base = point_at("2026-07-29T14:30:00.123");
+
+            // Act
+            let shifted = base.shift(1, DurationUnit::Hour).unwrap();
+
+            // Assert
+            assert_eq!(
+                shifted
+                    .local_datetime_or_utc()
+                    .format(shifted.canonical_pattern())
+                    .to_string(),
+                "2026-07-29T15:30:00.123"
+            );
+        }
+
+        #[test]
+        fn zero_day_shift_re_resolves_fold_to_earlier_occurrence() {
+            // Arrange
+            TzGuard::set("America/New_York");
+            let second_occurrence = point_at("2026-11-01T06:30:00Z");
+
+            // Act: calendar shifts re-resolve through the earliest-occurrence
+            // policy.
+            let shifted =
+                second_occurrence.shift(0, DurationUnit::Day).unwrap();
+
+            // Assert
+            assert_eq!(
+                shifted.instant(),
+                point_at("2026-11-01T05:30:00Z").instant()
+            );
+        }
+
+        #[test]
+        fn zero_day_shift_in_utc_keeps_the_instant() {
+            // Arrange
+            TzGuard::set("UTC");
+            let date_point = point_at("2026-07-29T14:30:00Z");
+
+            // Act
+            let shifted = date_point.shift(0, DurationUnit::Day).unwrap();
+
+            // Assert
+            assert_eq!(shifted.instant(), date_point.instant());
         }
     }
 }
