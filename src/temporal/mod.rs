@@ -51,24 +51,27 @@
 //! - [`DurationError`] - Error type for parse and conversion failures.
 
 mod calendar;
+mod date;
+mod datetime;
 mod duration;
 mod error;
 mod parse;
+mod point;
 mod scan;
 mod unit;
-mod value;
 
 pub(crate) use calendar::{
     CalendarPeriod, DateComponent, Difference, PeriodEdge, weekday_from_number,
 };
+pub(crate) use date::DATE_PATTERN;
+pub use date::DateValue;
+pub(crate) use datetime::DATETIME_PATTERN;
+pub use datetime::DateTimeValue;
 pub use duration::DurationValue;
 pub(crate) use duration::{DurationComponent, DurationSeconds};
 pub use error::{DateError, DurationError};
+pub(crate) use point::{DatePoint, DatePrecision};
 pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
-pub(crate) use value::{
-    DATE_PATTERN, DATETIME_PATTERN, DatePoint, DatePrecision,
-};
-pub use value::{DateTimeValue, DateValue};
 
 #[cfg(test)]
 mod fixtures {

@@ -1,100 +1,15 @@
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
 use chrono::{
-    DateTime, FixedOffset, Local, MappedLocalTime, NaiveDate, NaiveDateTime,
-    NaiveTime, Offset as _, SecondsFormat, TimeDelta, TimeZone as _,
-    Timelike as _, Utc,
+    DateTime, FixedOffset, Local, MappedLocalTime, NaiveDateTime, NaiveTime,
+    Offset as _, SecondsFormat, TimeDelta, TimeZone as _, Timelike as _, Utc,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::error::DateError;
-
-/// [`DateValue`]'s canonical output format: `2026-07-29`.
-pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
+use super::{DateValue, error::DateError};
 
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
-
-/// A calendar date without timezone or time-of-day ([`NaiveDate`]).
-///
-/// Wraps a [`NaiveDate`] representing a calendar date (`YYYY-MM-DD` or
-/// `YYYY-MM`). Parsed input keeps precision in `DatePoint`; deserialization
-/// uses the same strict date parser.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DateValue(NaiveDate);
-
-impl DateValue {
-    /// Returns the wrapped [`NaiveDate`].
-    #[must_use]
-    pub(crate) const fn naive_date(self) -> NaiveDate {
-        self.0
-    }
-}
-
-/// Renders as the canonical `YYYY-MM-DD` string.
-impl fmt::Display for DateValue {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.format(DATE_PATTERN))
-    }
-}
-
-impl From<DateValue> for NaiveDate {
-    #[inline]
-    fn from(value: DateValue) -> Self {
-        value.naive_date()
-    }
-}
-impl From<NaiveDate> for DateValue {
-    #[inline]
-    fn from(date: NaiveDate) -> Self {
-        Self(date)
-    }
-}
-
-impl From<SystemTime> for DateValue {
-    #[inline]
-    fn from(time: SystemTime) -> Self {
-        // A file's calendar date means the reader's local day (the same
-        // doctrine as `DateTimeValue::local_date`), not the UTC calendar day.
-        DateTimeValue::from(time).local_date()
-    }
-}
-
-impl FromStr for DateValue {
-    type Err = DateError;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse_iso(s)
-    }
-}
-
-/// Serializes as the canonical `YYYY-MM-DD` display string.
-impl Serialize for DateValue {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-/// Deserializes via the crate-internal `parse_iso` parser, so the
-/// four-digit-year rule and `YYYY-MM` acceptance apply identically to inline
-/// and deserialized dates.
-impl<'de> Deserialize<'de> for DateValue {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = Cow::<'de, str>::deserialize(deserializer)?;
-        Self::parse_iso(&s).map_err(serde::de::Error::custom)
-    }
-}
 
 /// Parsed UTC date-time instant.
 ///
@@ -155,7 +70,7 @@ impl DateTimeValue {
     #[inline]
     #[must_use]
     pub(crate) fn local_date(self) -> DateValue {
-        DateValue(self.local_datetime_or_utc().date())
+        DateValue::from(self.local_datetime_or_utc().date())
     }
 
     /// Returns `true` if this date-time is exactly local-zone midnight on
@@ -337,7 +252,7 @@ impl From<DateTimeValue> for DateTime<Utc> {
 impl From<DateValue> for DateTimeValue {
     #[inline]
     fn from(date: DateValue) -> Self {
-        let midnight = date.0.and_time(NaiveTime::MIN);
+        let midnight = date.naive_date().and_time(NaiveTime::MIN);
         Self::from_local(midnight)
             .unwrap_or_else(|_zone_failure| Self(midnight.and_utc()))
     }
@@ -380,97 +295,10 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     }
 }
 
-/// Calendar precision of a zone-free date point.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DatePrecision {
-    /// Year and month.
-    Month,
-    /// Full calendar date.
-    Day,
-}
-
-/// A parsed date or date-time at the precision it was written.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DatePoint {
-    /// Zone-free calendar date.
-    Calendar {
-        /// The calendar date; month precision stores the first of the month.
-        date: DateValue,
-        /// How much of `date` was written.
-        date_precision: DatePrecision,
-    },
-    /// UTC instant.
-    Instant(DateTimeValue),
-}
-
-impl DatePoint {
-    /// Whether this date point carries a time-of-day component.
-    #[must_use]
-    pub(crate) const fn has_time(self) -> bool {
-        matches!(self, Self::Instant(_))
-    }
-
-    /// Calendar date of this date point in the local zone.
-    #[must_use]
-    pub(crate) fn date(self) -> DateValue {
-        match self {
-            Self::Calendar {
-                date,
-                ..
-            } => date,
-            Self::Instant(dt) => dt.local_date(),
-        }
-    }
-
-    /// Local datetime reading of this date point: midnight for a calendar date,
-    /// the local clock time (UTC when the offset cannot apply) for an instant.
-    #[must_use]
-    pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
-        match self {
-            Self::Calendar {
-                date,
-                ..
-            } => date.naive_date().and_time(NaiveTime::MIN),
-            Self::Instant(dt) => dt.local_datetime_or_utc(),
-        }
-    }
-
-    /// UTC instant represented by this date point.
-    #[must_use]
-    pub(crate) fn instant(self) -> DateTime<Utc> {
-        match self {
-            Self::Calendar {
-                date,
-                ..
-            } => DateTimeValue::from(date).utc(),
-            Self::Instant(dt) => dt.utc(),
-        }
-    }
-
-    /// Canonical strftime pattern preserving written precision.
-    #[must_use]
-    pub(crate) fn canonical_pattern(self) -> &'static str {
-        match self {
-            Self::Calendar {
-                date_precision: DatePrecision::Month,
-                ..
-            } => "%Y-%m",
-            Self::Calendar {
-                date_precision: DatePrecision::Day,
-                ..
-            } => DATE_PATTERN,
-            Self::Instant(dt) => dt.canonical_pattern(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        temporal::{DurationValue, fixtures::fixed_datetime},
-        test_support::TzGuard,
-    };
+    use crate::{temporal::fixtures::fixed_datetime, test_support::TzGuard};
 
     /// Local-zone doctrine: a naive datetime means the reader's local clock
     /// time, resolved to UTC through the DST resolver; a date-only value stays
@@ -646,14 +474,6 @@ mod tests {
         }
 
         #[test]
-        fn round_trips_a_date_value_through_display_and_parse_iso() {
-            let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            let reparsed = DateValue::parse_iso(&date.to_string())
-                .expect("formatted output re-parses");
-            assert_eq!(reparsed, date);
-        }
-
-        #[test]
         fn round_trips_a_datetime_value_through_display_and_parse_iso() {
             TzGuard::keep();
 
@@ -661,87 +481,6 @@ mod tests {
             let reparsed = DateTimeValue::parse_iso(&value.to_string())
                 .expect("formatted output re-parses");
             assert_eq!(reparsed, value);
-        }
-    }
-
-    mod date_point {
-        use pretty_assertions::assert_eq;
-        use rstest::rstest;
-
-        use super::*;
-
-        #[test]
-        fn has_time_is_false_for_a_calendar_point() {
-            let point = DatePoint::Calendar {
-                date: DateValue(NaiveDate::MIN),
-                date_precision: DatePrecision::Day,
-            };
-
-            assert!(!point.has_time());
-        }
-
-        #[test]
-        fn has_time_is_true_for_an_instant() {
-            assert!(DatePoint::Instant(fixed_datetime()).has_time());
-        }
-
-        #[rstest]
-        #[case::month("2026-07", "%Y-%m")]
-        #[case::day("2026-07-29", "%Y-%m-%d")]
-        #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
-        #[case::fractional_seconds(
-            "2026-07-29T14:30:00.123Z",
-            "%Y-%m-%dT%H:%M:%S%.f"
-        )]
-        fn canonical_pattern_preserves_precision_and_fractional_seconds(
-            #[case] text: &str,
-            #[case] expected: &str,
-        ) {
-            // Arrange
-            TzGuard::set("UTC");
-            let point = DatePoint::parse(text).expect("valid date point");
-
-            // Act
-            let pattern = point.canonical_pattern();
-
-            // Assert
-            assert_eq!(pattern, expected);
-        }
-    }
-
-    mod golden_serde {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn date_and_datetime_keep_their_json_and_postcard_spellings() {
-            // Arrange
-            TzGuard::set("UTC");
-            let date = DateValue::parse_iso("2026-07-29").unwrap();
-            let datetime =
-                DateTimeValue::parse_iso("2026-07-29T14:30:05Z").unwrap();
-
-            // Act
-            let date_bytes = postcard::to_allocvec(&date).unwrap();
-            let datetime_bytes = postcard::to_allocvec(&datetime).unwrap();
-
-            // Assert
-            assert_eq!(serde_json::to_string(&date).unwrap(), "\"2026-07-29\"");
-            assert_eq!(
-                serde_json::to_string(&datetime).unwrap(),
-                "\"2026-07-29T14:30:05Z\""
-            );
-            assert_eq!(date_bytes, b"\x0a2026-07-29");
-            assert_eq!(datetime_bytes, b"\x142026-07-29T14:30:05Z");
-            assert_eq!(
-                postcard::from_bytes::<DateValue>(&date_bytes).unwrap(),
-                date
-            );
-            assert_eq!(
-                postcard::from_bytes::<DateTimeValue>(&datetime_bytes).unwrap(),
-                datetime
-            );
         }
     }
 
@@ -784,33 +523,6 @@ mod tests {
         }
 
         #[test]
-        fn converts_from_system_time_to_the_local_date() {
-            TzGuard::set("Etc/GMT+5"); // UTC-05:00, no DST
-
-            let system_time = std::time::SystemTime::UNIX_EPOCH
-                + std::time::Duration::from_secs(1_000);
-
-            // 00:16:40Z is 19:16:40 on December 31 in UTC-5.
-            assert_eq!(
-                DateValue::from(system_time),
-                DateValue::parse_iso("1969-12-31").expect("valid date")
-            );
-        }
-
-        #[test]
-        fn converts_from_system_time_to_date_value() {
-            TzGuard::set("UTC");
-
-            let system_time = std::time::SystemTime::UNIX_EPOCH
-                + std::time::Duration::from_secs(1_000);
-            let converted = DateValue::from(system_time);
-            assert_eq!(
-                converted,
-                DateValue::parse_iso("1970-01-01").expect("valid date")
-            );
-        }
-
-        #[test]
         fn round_trips_through_chrono_date_time_utc() {
             let chrono_dt = fixed_datetime().utc();
             let converted = DateTimeValue::from(chrono_dt);
@@ -818,43 +530,12 @@ mod tests {
             let back: DateTime<Utc> = converted.into();
             assert_eq!(back, chrono_dt);
         }
-
-        #[test]
-        fn converts_date_value_into_naive_date_via_from_trait() {
-            let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            let naive: NaiveDate = date.into();
-            assert_eq!(
-                naive,
-                NaiveDate::from_ymd_opt(2026, 7, 29).expect("valid date")
-            );
-        }
-
-        #[test]
-        fn converts_from_naive_date_via_from_trait() {
-            let naive =
-                NaiveDate::from_ymd_opt(2026, 7, 29).expect("valid date");
-            let date: DateValue = naive.into();
-            assert_eq!(
-                date,
-                DateValue::parse_iso("2026-07-29").expect("valid date")
-            );
-        }
     }
 
     mod ordering {
         use pretty_assertions::assert_eq;
 
         use super::*;
-
-        #[test]
-        fn compares_dates_chronologically() {
-            let earlier =
-                DateValue::parse_iso("2026-01-01").expect("valid date");
-            let later = DateValue::parse_iso("2026-12-31").expect("valid date");
-            assert!(earlier < later);
-            assert!(later > earlier);
-            assert_eq!(earlier.cmp(&earlier), std::cmp::Ordering::Equal);
-        }
 
         #[test]
         fn compares_datetimes_chronologically() {
@@ -875,12 +556,6 @@ mod tests {
         use super::*;
 
         #[test]
-        fn displays_a_date_value_as_its_canonical_string() {
-            let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            assert_eq!(date.to_string(), "2026-07-29");
-        }
-
-        #[test]
         fn displays_a_datetime_value_as_its_canonical_string() {
             TzGuard::set("UTC");
 
@@ -894,35 +569,6 @@ mod tests {
             // The everyday human spelling is the local clock time, so a
             // 14:30:05Z instant reads as 16:30:05 local.
             assert_eq!(fixed_datetime().to_string(), "2026-07-29T16:30:05");
-        }
-
-        #[test]
-        fn displays_invalid_value_error_naming_the_input_and_reason() {
-            let err = DateValue::parse_iso("2026/08/22")
-                .expect_err("unrecognized shape");
-            assert_eq!(
-                err.to_string(),
-                "`2026/08/22` is not a recognized date/time: invalid input"
-            );
-        }
-
-        #[test]
-        fn displays_year_not_four_digits_error_naming_the_input() {
-            let err = DateValue::parse_iso("26-08-22")
-                .expect_err("short year rejected");
-            assert_eq!(
-                err.to_string(),
-                "`26-08-22` does not have a 4-digit year"
-            );
-        }
-
-        #[test]
-        fn round_trips_a_date_value_through_json() {
-            let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            let json = serde_json::to_string(&date).expect("serializable");
-            let restored: DateValue =
-                serde_json::from_str(&json).expect("deserializable");
-            assert_eq!(restored, date);
         }
 
         #[test]
@@ -950,96 +596,6 @@ mod tests {
             let restored: DateTimeValue =
                 serde_json::from_str(&json).expect("deserializable");
             assert_eq!(restored, dt);
-        }
-
-        #[test]
-        fn deserializes_year_month_precision_date_through_json() {
-            let restored: DateValue =
-                serde_json::from_str("\"2026-07\"").expect("deserializable");
-            assert_eq!(
-                restored,
-                DateValue::parse_iso("2026-07-01").expect("valid date")
-            );
-        }
-
-        #[test]
-        fn rejects_a_two_digit_year_through_json_deserialization() {
-            let err = serde_json::from_str::<DateValue>("\"26-08-22\"")
-                .expect_err("short year rejected");
-            assert!(err.to_string().contains("does not have a 4-digit year"));
-        }
-
-        #[test]
-        fn is_usable_as_a_hash_set_key() {
-            let mut set = std::collections::HashSet::new();
-            set.insert(DateValue::parse_iso("2026-07-29").expect("valid date"));
-            set.insert(DateValue::parse_iso("2026-07-29").expect("valid date"));
-            set.insert(DateValue::parse_iso("2026-07-30").expect("valid date"));
-            assert_eq!(set.len(), 2);
-        }
-    }
-
-    mod hostile_yaml_note {
-        use pretty_assertions::{assert_eq, assert_ne};
-
-        use super::*;
-
-        #[derive(Deserialize)]
-        struct HostileNote {
-            duration_extreme: DurationValue,
-            duration_zero: DurationValue,
-            date: DateValue,
-            datetime: DateTimeValue,
-        }
-
-        #[test]
-        fn parses_round_trips_and_displays_without_panic_or_lying() {
-            let extreme_digits = "9".repeat(50);
-            let yaml = format!(
-                "duration_extreme: {extreme_digits}y\nduration_zero: \
-                 \"-0m\"\ndate: \"2026-07\"\ndatetime: \
-                 \"2026-07-29T14:30:00Z\"\n"
-            );
-
-            let note = noyalib::from_str::<HostileNote>(&yaml)
-                .expect("hostile note deserializes without panicking");
-
-            // A value rebuilt from its parsed seconds (no original
-            // spelling to echo) renders in scientific notation, never a
-            // silent "0s".
-            let synthesized = DurationValue::from_nominal_seconds(
-                note.duration_extreme.nominal_seconds(),
-            );
-            let rendered_extreme = synthesized.to_string();
-            assert_ne!(rendered_extreme, "0s");
-            assert!(rendered_extreme.contains('e'));
-
-            // "-0m": equals and orders as zero, not a hidden negative.
-            assert_eq!(
-                note.duration_zero,
-                DurationValue::parse("0m").expect("valid duration")
-            );
-            assert!(note.duration_zero >= DurationValue::parse("0m").unwrap());
-
-            // "YYYY-MM" date: precision defaults to day 1, matches inline
-            // parsing exactly.
-            assert_eq!(
-                note.date,
-                DateValue::parse_iso("2026-07-01").expect("valid date")
-            );
-
-            // "…Z" datetime: parses to the same instant as the explicit-offset
-            // spelling (naive would mean the local zone) and re-serializes
-            // with the same spelling.
-            assert_eq!(
-                note.datetime,
-                DateTimeValue::parse_iso("2026-07-29T14:30:00+00:00")
-                    .expect("valid datetime")
-            );
-            assert_eq!(
-                serde_json::to_string(&note.datetime).expect("serializable"),
-                "\"2026-07-29T14:30:00Z\""
-            );
         }
     }
 }
