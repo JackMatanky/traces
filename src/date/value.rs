@@ -22,7 +22,7 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 /// uses the same strict date parser.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DateValue(pub(super) NaiveDate);
+pub struct DateValue(NaiveDate);
 
 impl DateValue {
     /// Returns the wrapped [`NaiveDate`].
@@ -122,7 +122,7 @@ impl<'de> Deserialize<'de> for DateValue {
 /// ```
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DateTimeValue(pub(super) DateTime<Utc>);
+pub struct DateTimeValue(DateTime<Utc>);
 
 impl DateTimeValue {
     /// Returns the local clock-time rendering of this instant.

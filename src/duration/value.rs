@@ -643,7 +643,7 @@ type Components = Box<[DurationComponent]>;
 /// signed zero normalizes to positive zero at construction, so `"-0m"` and
 /// `"0m"` compare, order, and hash identically.
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct DurationSeconds(pub(crate) f64);
+pub(crate) struct DurationSeconds(f64);
 
 impl DurationSeconds {
     /// Returns the raw seconds value as `f64`.

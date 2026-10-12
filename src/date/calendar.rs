@@ -118,7 +118,7 @@ impl DatePoint {
                 let local_datetime =
                     shift_datetime(self.local_datetime_or_utc(), n, unit)?;
                 Ok(Self::Calendar {
-                    date: DateValue(local_datetime.date()),
+                    date: DateValue::from(local_datetime.date()),
                     date_precision,
                 })
             }
@@ -289,7 +289,7 @@ impl DatePoint {
                 date: date.advance(delta)?,
                 date_precision,
             }),
-            Self::Instant(dt) => Ok(Self::Instant(DateTimeValue(
+            Self::Instant(dt) => Ok(Self::Instant(DateTimeValue::from(
                 dt.utc()
                     .checked_add_signed(delta)
                     .ok_or(DateError::OutOfRange)?,
@@ -335,7 +335,7 @@ impl DatePoint {
                 date_precision,
                 ..
             } => Ok(Self::Calendar {
-                date: DateValue(date),
+                date: DateValue::from(date),
                 date_precision,
             }),
             Self::Instant(_) => {
@@ -431,7 +431,7 @@ impl DateValue {
         self.naive_date()
             .and_time(NaiveTime::MIN)
             .checked_add_signed(delta)
-            .map(|local_datetime| Self(local_datetime.date()))
+            .map(|local_datetime| Self::from(local_datetime.date()))
             .ok_or(DateError::OutOfRange)
     }
 }
@@ -456,7 +456,9 @@ impl DateTimeValue {
                 self.local_datetime().ok_or(DateError::OutOfRange)?;
             Self::from_local(shift_datetime(local_datetime, n, unit)?)
         } else {
-            Ok(Self(shift_datetime(self.0.naive_utc(), n, unit)?.and_utc()))
+            Ok(Self::from(
+                shift_datetime(self.utc().naive_utc(), n, unit)?.and_utc(),
+            ))
         }
     }
 }
@@ -605,7 +607,7 @@ mod tests {
             let forward = base.apply(&one_hour).expect("no overflow");
             assert_eq!(
                 forward,
-                DatePoint::Instant(DateTimeValue(
+                DatePoint::Instant(DateTimeValue::from(
                     base.instant() + TimeDelta::hours(1)
                 ))
             );
@@ -618,7 +620,7 @@ mod tests {
             let back = base.apply(&(-one_hour)).expect("no overflow");
             assert_eq!(
                 back,
-                DatePoint::Instant(DateTimeValue(
+                DatePoint::Instant(DateTimeValue::from(
                     base.instant() - TimeDelta::hours(1)
                 ))
             );
@@ -626,8 +628,9 @@ mod tests {
 
         #[test]
         fn overflows_near_the_representable_range_in_apply() {
-            let near_max =
-                DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MAX_UTC));
+            let near_max = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MAX_UTC,
+            ));
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
             assert_eq!(near_max.apply(&one_second).ok(), None);
@@ -635,8 +638,9 @@ mod tests {
 
         #[test]
         fn underflows_near_the_representable_range_in_apply() {
-            let near_min =
-                DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MIN_UTC));
+            let near_min = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MIN_UTC,
+            ));
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
             assert_eq!(near_min.apply(&(-one_second)).ok(), None);
@@ -1085,8 +1089,9 @@ mod tests {
         fn shift_reports_out_of_range_at_date_and_instant_limits() {
             // Arrange
             TzGuard::set("UTC");
-            let instant =
-                DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MAX_UTC));
+            let instant = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MAX_UTC,
+            ));
             let date = DatePoint::Calendar {
                 date: DateValue::from(NaiveDate::MAX),
                 date_precision: DatePrecision::Day,

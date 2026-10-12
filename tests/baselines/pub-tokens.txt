@@ -275,8 +275,8 @@ src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/date/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
 src/date/parse.rs: pub(crate) fn parse_with_pattern(
-src/date/value.rs: pub struct DateTimeValue(pub(super) DateTime<Utc>);
-src/date/value.rs: pub struct DateValue(pub(super) NaiveDate);
+src/date/value.rs: pub struct DateTimeValue(DateTime<Utc>);
+src/date/value.rs: pub struct DateValue(NaiveDate);
 src/date/value.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 src/date/value.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 src/date/value.rs: pub(crate) const fn has_time(self) -> bool {
@@ -374,7 +374,7 @@ src/duration/value.rs: pub(crate) fn parse(input: &str) -> Result<Self, Duration
 src/duration/value.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
 src/duration/value.rs: pub(crate) magnitude: f64,
 src/duration/value.rs: pub(crate) struct DurationComponent {
-src/duration/value.rs: pub(crate) struct DurationSeconds(pub(crate) f64);
+src/duration/value.rs: pub(crate) struct DurationSeconds(f64);
 src/duration/value.rs: pub(crate) unit: DurationUnit,
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {

@@ -53,7 +53,7 @@ mod fixtures {
     use super::DateTimeValue;
 
     pub(super) fn fixed_datetime() -> DateTimeValue {
-        DateTimeValue(
+        DateTimeValue::from(
             Utc.with_ymd_and_hms(2026, 7, 29, 14, 30, 5).single().expect(
                 "2026-07-29 14:30:05 UTC is a valid, unambiguous instant",
             ),

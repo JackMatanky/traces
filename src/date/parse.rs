@@ -29,7 +29,7 @@ impl DatePoint {
             });
         }
         let calendar_point = |(date, date_precision)| Self::Calendar {
-            date: DateValue(date),
+            date: DateValue::from(date),
             date_precision,
         };
         // Date-only shapes cannot match the date-time cascade.
@@ -43,7 +43,7 @@ impl DatePoint {
         }
         match DateTimeShape::parse_any(trimmed) {
             Ok(ParsedDateTime::Instant(instant)) => {
-                Ok(Self::Instant(DateTimeValue(instant)))
+                Ok(Self::Instant(DateTimeValue::from(instant)))
             }
             Ok(ParsedDateTime::Unzoned(local_datetime)) => {
                 Ok(Self::Instant(DateTimeValue::from_local(local_datetime)?))
@@ -117,7 +117,9 @@ impl DatePoint {
         let trimmed_pattern = pattern.trim();
         if let Ok(dt) = DateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::Instant(DateTimeValue(dt.with_timezone(&Utc))));
+            return Ok(Self::Instant(DateTimeValue::from(
+                dt.with_timezone(&Utc),
+            )));
         }
         if let Ok(local_datetime) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
@@ -138,7 +140,7 @@ impl DatePoint {
         }
         NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
             .map(|date| Self::Calendar {
-                date: DateValue(date),
+                date: DateValue::from(date),
                 date_precision: DatePrecision::Day,
             })
             .map_err(|source| DateError::InvalidValue {
@@ -164,7 +166,7 @@ impl DateValue {
                 input: trimmed.into(),
             });
         }
-        DateShape::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
+        DateShape::parse_any(trimmed).map(|(date, _)| Self::from(date)).map_err(
             |reason| DateError::InvalidValue {
                 input: trimmed.into(),
                 reason,
@@ -204,7 +206,7 @@ impl DateTimeValue {
             }
         })?;
         match shape {
-            ParsedDateTime::Instant(instant) => Ok(Self(instant)),
+            ParsedDateTime::Instant(instant) => Ok(Self::from(instant)),
             ParsedDateTime::Unzoned(local_datetime) => {
                 Self::from_local(local_datetime)
             }
@@ -458,7 +460,7 @@ mod tests {
             // Assert
             let expected = NaiveDate::from_ymd_opt(year, month, day)
                 .expect("valid fixture date");
-            assert_eq!(parsed, DateValue(expected));
+            assert_eq!(parsed, DateValue::from(expected));
         }
 
         #[rstest]
