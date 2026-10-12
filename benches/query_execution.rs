@@ -1,7 +1,7 @@
 //! Performance benchmark suite for query execution.
 //!
-//! Exposes and monitors the CPU cost of [`QueryService::run`] over pre-built
-//! page and task indexes.
+//! Exposes and monitors the CPU cost of [`QueryService::run`] over page and
+//! task indexes prepared ahead of each timed run.
 //!
 //! ### Data Flow Diagram
 //!
@@ -80,8 +80,8 @@ const TASK_DENSITY_FILE_COUNTS: &[usize] = &[100, 1_000, 10_000];
 /// - Cost scales linearly with indexed entries.
 ///
 /// Unexpected outcomes:
-/// - Super-linear scaling with note count, indicating row materialization or
-///   source iteration does redundant work.
+/// - Scaling faster than linear with note count, indicating row materialization
+///   or source iteration does redundant work.
 fn bench_run_pages(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryService::run");
     group.plot_config(
@@ -151,8 +151,8 @@ fn bench_run_tasks(c: &mut Criterion) {
 /// Parameters: varies [`WORKSPACE_FILE_COUNTS`]; reports input note throughput.
 ///
 /// Fixture: [`ProjectShape::Plain`] in-memory indexes are built outside timing.
-/// Query construction is untimed setup; timed work runs `All pages ->
-/// filter("rating > 2") -> sort("rating")`.
+/// Query construction is performed outside the timed window; timed work runs
+/// `All pages -> filter("rating > 2") -> sort("rating")`.
 ///
 /// This group covers the combined end-to-end path only. The filter-width and
 /// sort-only benchmarks are diagnostic context, but they are not a controlled
@@ -344,8 +344,8 @@ fn bench_filter_by_date(c: &mut Criterion) {
 ///   × `tasks_per_note`), independent of which factor grows.
 ///
 /// Unexpected outcomes:
-/// - Super-linear growth with task density at fixed file count, or with file
-///   count at fixed task density, indicating per-note allocation churn or
+/// - Growth faster than linear with task density at fixed file count, or with
+///   file count at fixed task density, indicating per-note allocation churn or
 ///   inefficient slice traversal in `Note::tasks()`.
 fn bench_query_tasks_density(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryService::run/tasks_density");
@@ -389,8 +389,8 @@ fn bench_query_tasks_density(c: &mut Criterion) {
 /// Parameters: varies [`WORKSPACE_FILE_COUNTS`]; `n` is a size-sensitivity
 /// probe, not processed work inside the timed clone.
 ///
-/// Fixture: a plain in-memory index and unmaterialized no-transform
-/// [`QuerySet`] are built outside timing.
+/// Fixture: a plain in-memory index and a no-transform [`QuerySet`] are built
+/// outside timing.
 ///
 /// `QuerySet::base` is `Arc<Vec<QueryRow>>`, so cloning should copy the `Arc`
 /// and empty plan state, not row data.
@@ -425,8 +425,8 @@ fn bench_clone_query_set(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measures `QuerySet`'s owned `IntoIterator::into_iter()` sole-owner path,
-/// swept over workspace size and row shape.
+/// Measures the owned `IntoIterator::into_iter()` sole-owner path of
+/// `QuerySet`, swept over workspace size and row shape.
 ///
 /// Parameters: varies [`WORKSPACE_FILE_COUNTS`] and shape (`pages`, `tasks`);
 /// reports output rows (`n` or `3 * n`). Query construction happens in
@@ -443,9 +443,9 @@ fn bench_clone_query_set(c: &mut Criterion) {
 ///   regressions.
 ///
 /// Unexpected outcomes:
-/// - Cost approaching [`bench_clone_query_set`]'s deep-copy levels or growing
-///   super-linearly with `n`, indicating `Arc::try_unwrap` failed on the fresh
-///   set and `into_iter` clones row bodies.
+/// - Cost approaching the deep-copy levels of [`bench_clone_query_set`] or
+///   growing super-linearly with `n`, indicating `Arc::try_unwrap` failed on
+///   the fresh set and `into_iter` clones row bodies.
 fn bench_into_iter_owned(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryService::run/into_iter_owned");
     group.plot_config(

@@ -157,8 +157,8 @@ pub(crate) fn nullable_rating_note_source(note_index: usize) -> String {
 
 /// Returns note content with one sortable duration-literal metadata field.
 ///
-/// `estimate` values cycle through 1-12 hours and 0-59 minutes so
-/// `DurationValue::parse` sees varied, non-trivial literals.
+/// `estimate` values cycle through 1 to 12 hours and 0 to 59 minutes so
+/// `DurationValue::parse` sees varied, complex literals.
 pub(crate) fn duration_field_note_source(note_index: usize) -> String {
     format!(
         "---\nestimate: {}h{}m\n---\n\n# Note {note_index}\nBody text for \
@@ -191,8 +191,8 @@ pub(crate) fn date_field_note_source(note_index: usize) -> String {
 
 /// Returns note content with one sortable frontmatter text field (`title`).
 ///
-/// Titles use pseudo-randomized index order matching `plain_note_source`'s
-/// shuffle so timsort does not measure near-linear sorted input.
+/// Titles use pseudo-randomized index order, matching the shuffle used by
+/// `plain_note_source`, so timsort does not measure near-linear sorted input.
 pub(crate) fn title_field_note_source(note_index: usize) -> String {
     format!(
         "---\ntitle: Note {:06}\n---\n\n# Note {note_index}\nBody text for \
@@ -283,8 +283,8 @@ pub(crate) fn task_triplet_note_source(note_index: usize) -> String {
     task_note_source(note_index, 3)
 }
 
-/// Status markers cycling through every default [`TaskStatusType`]: todo
-/// (`[ ]`), in-progress (`[/]`), done (`[x]`), cancelled (`[-]`), and on-hold
+/// Status markers cycling through every default [`TaskStatusType`]: to-do
+/// (`[ ]`), in-progress (`[/]`), done (`[x]`), canceled (`[-]`), and on-hold
 /// (`[!]`).
 ///
 /// [`TaskStatusType`]: traces_pkm::TaskStatusType
@@ -307,11 +307,11 @@ const SORT_FIXTURE_WORDS: [&str; 8] =
 ///
 /// Marker, priority, due-date day/month, and word selection each use a
 /// distinct multiplicative hash of the item's global index (derived from
-/// `note_index` and `item_index`), so the four resulting sort keys
-/// (`list.text`, `list.due`, `list.priority`, `list.status`) are decorrelated:
-/// an input ordering that is nearly sorted for one field is not nearly sorted
-/// for the others. This defeats comparison-sort fast paths that a uniform or
-/// monotonic fixture would hide.
+/// `note_index` and `item_index`). The four resulting sort keys
+/// (`list.text`, `list.due`, `list.priority`, `list.status`) do not correlate
+/// with each other. An input ordering that is nearly sorted for one field is
+/// not nearly sorted for the others. This defeats comparison-sort fast paths
+/// that a uniform or monotonic fixture would hide.
 pub(crate) fn task_sort_fixture_source(
     note_index: usize,
     item_count: usize,
