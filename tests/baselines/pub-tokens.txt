@@ -1399,6 +1399,7 @@ src/temporal/duration.rs: pub(crate) struct DurationComponent {
 src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
+src/temporal/fixtures.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
 src/temporal/mod.rs: pub use date::DateValue;
 src/temporal/mod.rs: pub use datetime::DateTimeValue;
 src/temporal/mod.rs: pub use duration::DurationValue;
@@ -1409,7 +1410,6 @@ src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSeconds};
 src/temporal/mod.rs: pub(crate) use point::{DatePoint, DatePrecision};
 src/temporal/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
-src/temporal/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
 src/temporal/point.rs: pub(crate) enum DatePoint {
 src/temporal/point.rs: pub(crate) enum DatePrecision {

@@ -14,14 +14,14 @@
 //! value stays a zone-free calendar date. Instants render as the local clock
 //! time and travel as UTC for storage and comparison.
 //!
-//! # Key types
+//! # Key Types
 //!
-//! - [`DateValue`] - Parsed calendar date with no time-of-day component.
-//! - [`DateTimeValue`] - Parsed UTC date-time instant.
-//! - [`DatePoint`] - Calendar date or UTC instant with written precision.
-//! - [`Difference`] - Result of a calendar-owner difference measurement.
-//! - [`DateError`] - Error type for parsing, local-zone resolution, and
-//!   calendar arithmetic failures.
+//! - [`DateValue`]: Parsed calendar date with no time-of-day component.
+//! - [`DateTimeValue`]: Parsed UTC date-time instant.
+//! - [`DatePoint`]: Calendar date or UTC instant with written precision.
+//! - [`Difference`]: Result of a calendar-owner difference measurement.
+//! - [`DateError`]: Error type for parsing, local-zone resolution, and calendar
+//!   arithmetic failures.
 //!
 //! # Calendar owner
 //!
@@ -36,23 +36,25 @@
 //! and converts them to a total seconds value. Components are `<number><unit>`
 //! pairs, optionally separated by whitespace or commas.
 //!
-//! # Key types
+//! # Key Types
 //!
-//! - [`DurationValue`] - A parsed duration carrying its total seconds, its
+//! - [`DurationValue`]: A parsed duration carrying its total seconds, its
 //!   original spelling, and its retained written components (which witness the
 //!   calendar-versus-fixed regime).
-//! - [`DurationUnit`] - Unit registry (parsing and seconds conversion). Single
+//! - [`DurationUnit`]: Unit registry (parsing and seconds conversion). Single
 //!   source of truth; callers should not maintain their own registries.
-//! - [`DurationSeconds`] - An `f64` newtype that is finite on construction,
-//!   with [`Ord`], [`Add`](std::ops::Add), [`Sub`](std::ops::Sub), and
+//! - [`DurationSeconds`]: An `f64` newtype that is finite on construction, with
+//!   [`Ord`], [`Add`](std::ops::Add), [`Sub`](std::ops::Sub), and
 //!   [`Mul`](std::ops::Mul).
-//! - [`DurationError`] - Error type for parse and conversion failures.
+//! - [`DurationError`]: Error type for parse and conversion failures.
 
 mod calendar;
 mod date;
 mod datetime;
 mod duration;
 mod error;
+#[cfg(test)]
+mod fixtures;
 mod point;
 mod scan;
 mod unit;
@@ -69,18 +71,3 @@ pub(crate) use duration::{DurationComponent, DurationSeconds};
 pub use error::{DateError, DurationError};
 pub(crate) use point::{DatePoint, DatePrecision};
 pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
-
-#[cfg(test)]
-mod fixtures {
-    use chrono::{TimeZone as _, Utc};
-
-    use super::DateTimeValue;
-
-    pub(super) fn fixed_datetime() -> DateTimeValue {
-        DateTimeValue::from(
-            Utc.with_ymd_and_hms(2026, 7, 29, 14, 30, 5).single().expect(
-                "2026-07-29 14:30:05 UTC is a valid, unambiguous instant",
-            ),
-        )
-    }
-}
