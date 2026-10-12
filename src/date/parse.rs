@@ -2,10 +2,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc, format::ParseErrorKind};
 
 use super::{
     error::DateError,
-    value::{
-        DATE_PATTERN, DatePoint, DatePrecision, DateTimeValue, DateValue,
-        resolve_local,
-    },
+    value::{DATE_PATTERN, DatePoint, DatePrecision, DateTimeValue, DateValue},
 };
 
 impl DatePoint {
@@ -49,7 +46,7 @@ impl DatePoint {
                 Ok(Self::Instant(DateTimeValue(instant)))
             }
             Ok(ParsedDateTime::Unzoned(local_datetime)) => {
-                Ok(Self::Instant(DateTimeValue(resolve_local(local_datetime)?)))
+                Ok(Self::Instant(DateTimeValue::from_local(local_datetime)?))
             }
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok(date) => Ok(calendar_point(date)),
@@ -125,9 +122,9 @@ impl DatePoint {
         if let Ok(local_datetime) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::Instant(DateTimeValue(resolve_local(
+            return Ok(Self::Instant(DateTimeValue::from_local(
                 local_datetime,
-            )?)));
+            )?));
         }
         if trimmed_pattern == "%Y-%m"
             && let Ok(
@@ -181,10 +178,10 @@ impl DateTimeValue {
     /// [`DateTimeShape::ALL`].
     ///
     /// Surrounding whitespace is ignored. The cascade matches shapes only: a
-    /// matched naive input then resolves through [`resolve_local`] (an
-    /// explicit-offset input already is the instant). Resolution runs once
-    /// after the cascade, because a resolution failure must not retry later
-    /// formats.
+    /// matched naive input then resolves through [`DateTimeValue::from_local`]
+    /// (an explicit-offset input already is the instant). Resolution runs
+    /// once after the cascade, because a resolution failure must not retry
+    /// later formats.
     ///
     /// # Errors
     ///
@@ -206,17 +203,17 @@ impl DateTimeValue {
                 reason,
             }
         })?;
-        let instant = match shape {
-            ParsedDateTime::Instant(instant) => instant,
+        match shape {
+            ParsedDateTime::Instant(instant) => Ok(Self(instant)),
             ParsedDateTime::Unzoned(local_datetime) => {
-                resolve_local(local_datetime)?
+                Self::from_local(local_datetime)
             }
-        };
-        Ok(Self(instant))
+        }
     }
 }
 
-/// Recognized date input format shapes tried in order by
+/// Recognized date input format shapes, tried in order by
+/// [`DateShape::parse_any`] for [`DatePoint::parse`] and
 /// [`DateValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateShape {
@@ -356,7 +353,8 @@ impl DateTimeShape {
 pub(crate) enum ParsedDateTime {
     /// Explicit RFC 3339 instant.
     Instant(DateTime<Utc>),
-    /// Local naive datetime that must resolve through [`resolve_local`].
+    /// Local naive datetime that must resolve through
+    /// [`DateTimeValue::from_local`].
     Unzoned(NaiveDateTime),
 }
 
@@ -403,41 +401,64 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::has_offset_z("2026-07-29T14:30:00Z")]
-        #[case::has_numeric_offset("2026-07-29T14:30:00+00:00")]
-        #[case::has_fractional_seconds("2026-07-29T14:30:00.123")]
-        #[case::t_separated_with_seconds("2026-07-29T14:30:00")]
-        #[case::t_separated_minute_only("2026-07-29T14:30")]
-        #[case::space_separated_fractional("2026-07-29 14:30:00.123")]
-        #[case::space_separated_with_seconds("2026-07-29 14:30:00")]
-        #[case::space_separated_minute_only("2026-07-29 14:30")]
-        fn accepts_every_datetime_shape(#[case] input: &str) {
-            TzGuard::keep();
+        #[case::utc_offset("2026-07-29T14:30:00Z", "2026-07-29T14:30:00")]
+        #[case::numeric_offset(
+            "2026-07-29T14:30:00+02:00",
+            "2026-07-29T12:30:00"
+        )]
+        #[case::fractional_seconds(
+            "2026-07-29T14:30:00.123",
+            "2026-07-29T14:30:00.123"
+        )]
+        #[case::t_separated_with_seconds(
+            "2026-07-29T14:30:00",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::t_separated_minute_only(
+            "2026-07-29T14:30",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::space_separated_fractional(
+            "2026-07-29 14:30:00.123",
+            "2026-07-29T14:30:00.123"
+        )]
+        #[case::space_separated_with_seconds(
+            "2026-07-29 14:30:00",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::space_separated_minute_only(
+            "2026-07-29 14:30",
+            "2026-07-29T14:30:00"
+        )]
+        fn parses_every_datetime_shape_to_the_expected_instant(
+            #[case] input: &str,
+            #[case] expected_utc_rendering: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
 
-            assert!(
-                DateTimeValue::parse_iso(input).is_ok(),
-                "{input} should parse"
-            );
+            // Act
+            let parsed = DateTimeValue::parse_iso(input).expect("valid shape");
+
+            // Assert
+            assert_eq!(parsed.to_string(), expected_utc_rendering);
         }
 
-        #[test]
-        fn accepts_full_iso_date_shape() {
-            assert!(DateValue::parse_iso("2026-07-29").is_ok());
-        }
+        #[rstest]
+        #[case::full_date("2026-07-29", (2026, 7, 29))]
+        #[case::year_month("2026-08", (2026, 8, 1))]
+        #[case::missing_leading_zeros("2026-8-22", (2026, 8, 22))]
+        fn parses_date_shapes_to_the_expected_date(
+            #[case] input: &str,
+            #[case] (year, month, day): (i32, u32, u32),
+        ) {
+            // Act
+            let parsed = DateValue::parse_iso(input).expect("valid shape");
 
-        #[test]
-        fn accepts_year_month_reduced_precision_date_shape() {
-            let year_month =
-                DateValue::parse_iso("2026-08").expect("year-month parses");
-            let expected = DateValue(
-                NaiveDate::from_ymd_opt(2026, 8, 1).expect("valid date"),
-            );
-            assert_eq!(year_month, expected);
-        }
-
-        #[test]
-        fn accepts_missing_leading_zeros() {
-            assert!(DateValue::parse_iso("2026-8-22").is_ok());
+            // Assert
+            let expected = NaiveDate::from_ymd_opt(year, month, day)
+                .expect("valid fixture date");
+            assert_eq!(parsed, DateValue(expected));
         }
 
         #[rstest]
@@ -462,13 +483,13 @@ mod tests {
         }
 
         #[test]
-        fn date_value_rejects_a_short_year_with_invalid_year_digits() {
+        fn date_value_rejects_a_short_year_with_year_not_four_digits() {
             let result = DateValue::parse_iso("26-08-22");
             assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
         }
 
         #[test]
-        fn datetime_value_rejects_a_short_year_with_invalid_year_digits() {
+        fn datetime_value_rejects_a_short_year_with_year_not_four_digits() {
             let result = DateTimeValue::parse_iso("26-08-22T14:30:00");
             assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
         }
@@ -477,7 +498,10 @@ mod tests {
         #[case::invalid_month_number("2026-13")]
         #[case::non_numeric_month("2026-ab")]
         #[case::single_digit_month("2026-7")]
-        fn rejects_a_malformed_year_month_as_unparseable(#[case] input: &str) {
+        #[case::slashes("2026/08/22")]
+        fn date_value_rejects_malformed_input_as_invalid_value(
+            #[case] input: &str,
+        ) {
             assert!(matches!(
                 DateValue::parse_iso(input),
                 Err(DateError::InvalidValue { .. })
@@ -485,34 +509,9 @@ mod tests {
         }
 
         #[test]
-        fn rejects_an_unrecognized_date_shape_as_unparseable() {
-            let result = DateValue::parse_iso("2026/08/22");
-            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
-        }
-
-        #[test]
-        fn rejects_an_unrecognized_datetime_shape_as_unparseable() {
+        fn datetime_value_rejects_an_unrecognized_shape_as_invalid_value() {
             let result = DateTimeValue::parse_iso("2026-07-29Tinvalid");
             assert!(matches!(result, Err(DateError::InvalidValue { .. })));
-        }
-
-        #[test]
-        fn date_value_parses_via_from_str() {
-            let date: DateValue = "2026-07-29".parse().expect("valid date");
-            let expected =
-                DateValue::parse_iso("2026-07-29").expect("valid date");
-            assert_eq!(date, expected);
-        }
-
-        #[test]
-        fn datetime_value_parses_via_from_str() {
-            TzGuard::keep();
-
-            let datetime: DateTimeValue =
-                "2026-07-29T14:30:00".parse().expect("valid datetime");
-            let expected = DateTimeValue::parse_iso("2026-07-29T14:30:00")
-                .expect("valid datetime");
-            assert_eq!(datetime, expected);
         }
 
         #[test]

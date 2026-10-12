@@ -2,7 +2,8 @@ use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
 use chrono::{
     DateTime, FixedOffset, Local, MappedLocalTime, NaiveDate, NaiveDateTime,
-    NaiveTime, Offset as _, SecondsFormat, TimeDelta, TimeZone as _, Utc,
+    NaiveTime, Offset as _, SecondsFormat, TimeDelta, TimeZone as _,
+    Timelike as _, Utc,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -113,7 +114,8 @@ impl<'de> Deserialize<'de> for DateValue {
 ///     "2026-07-29T14:30:00+00:00".parse().expect("equivalent offset");
 /// assert_eq!(utc, offset);
 ///
-/// // Outside a DST fold hour, the local clock time this value renders re-parses to the same instant.
+/// // Outside a DST fold hour, the local clock time this value renders
+/// // re-parses to the same instant.
 /// let round_trip: DateTimeValue =
 ///     utc.to_string().parse().expect("rendered spelling re-parses");
 /// assert_eq!(utc, round_trip);
@@ -168,6 +170,120 @@ impl DateTimeValue {
     pub(crate) const fn utc(self) -> DateTime<Utc> {
         self.0
     }
+
+    /// Canonical strftime pattern for this instant: whole seconds, plus
+    /// fractional seconds only when the nanosecond component is nonzero.
+    ///
+    /// Local offsets are whole seconds, so the UTC and local readings share
+    /// their nanosecond component and no zone lookup is needed.
+    #[must_use]
+    pub(crate) fn canonical_pattern(self) -> &'static str {
+        if self.0.nanosecond() == 0 {
+            DATETIME_PATTERN
+        } else {
+            "%Y-%m-%dT%H:%M:%S%.f"
+        }
+    }
+
+    /// Resolves a naive local datetime to an instant under the crate's DST
+    /// doctrine.
+    ///
+    /// A clock time written without a zone is read in the process's local zone
+    /// and stored as UTC. Resolution never fails on a DST boundary:
+    ///
+    /// - Ambiguous fall-back times resolve to their earliest occurrence;
+    /// - Spring-forward gaps shift forward by the gap, matching Temporal's
+    ///   `'compatible'` disambiguation and jiff's
+    ///   [`Disambiguation::Compatible`].
+    ///
+    /// Only a broken tz-data/OS lookup or an offset application outside
+    /// `NaiveDateTime`'s range errors. On the `WebAssembly` target, chrono's
+    /// `Local` reports every local time as unambiguous ([chrono#1701]), so the
+    /// ambiguous arm is unreachable there.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if the lookup finds no offset for
+    ///   `local_datetime` or a probe (a broken tz-data/OS environment rather
+    ///   than a DST boundary), or if applying the resolved offset would leave
+    ///   `NaiveDateTime`'s range.
+    ///
+    /// [`Disambiguation::Compatible`]:
+    ///     https://docs.rs/jiff/latest/jiff/tz/enum.Disambiguation.html
+    /// [chrono#1701]: https://github.com/chronotope/chrono/issues/1701
+    pub(super) fn from_local(
+        local_datetime: NaiveDateTime,
+    ) -> Result<Self, DateError> {
+        let zone_lookup = || DateError::LocalZoneLookup {
+            input: local_datetime.to_string().into(),
+        };
+        // The checked forms return `None` instead of panicking when the instant
+        // leaves `NaiveDateTime`'s range (impossible for the parsers'
+        // 4-digit-year inputs).
+        match Local.offset_from_local_datetime(&local_datetime) {
+            MappedLocalTime::Single(offset) => {
+                let instant = local_datetime
+                    .checked_sub_offset(offset)
+                    .ok_or_else(zone_lookup)?;
+                Ok(Self(instant.and_utc()))
+            }
+            MappedLocalTime::Ambiguous(a, b) => {
+                // `chrono` orders an ambiguous pair by offset (tzfile data) or
+                // transition side (POSIX rules); the earliest occurrence has
+                // the larger offset, since instant =
+                // local_datetime - offset.
+                let earliest = if a.local_minus_utc() >= b.local_minus_utc() {
+                    a
+                } else {
+                    b
+                };
+                let instant = local_datetime
+                    .checked_sub_offset(earliest)
+                    .ok_or_else(zone_lookup)?;
+                Ok(Self(instant.and_utc()))
+            }
+            MappedLocalTime::None => {
+                // A gap resolves `None` across the whole skipped span, so no
+                // probe inside it resolves; the pre-transition
+                // offset shifts the gap time forward by exactly
+                // the gap.
+                let offset =
+                    Self::offset_across_gap(local_datetime, &zone_lookup)?;
+                let instant = local_datetime
+                    .checked_sub_offset(offset)
+                    .ok_or_else(zone_lookup)?;
+                Ok(Self(instant.and_utc()))
+            }
+        }
+    }
+
+    /// Finds the offset in effect just before a DST gap by stepping back one
+    /// hour at a time from `local_datetime` (the widest recorded gap is 24
+    /// hours).
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if no nearby local time resolves within
+    ///   the 25-hour backward search (a broken tz-data/OS lookup rather than a
+    ///   gap), or if stepping the probe back would leave `NaiveDateTime`'s
+    ///   range.
+    fn offset_across_gap(
+        local_datetime: NaiveDateTime,
+        zone_lookup: &impl Fn() -> DateError,
+    ) -> Result<FixedOffset, DateError> {
+        let hour = TimeDelta::try_hours(1).ok_or_else(zone_lookup)?;
+        let mut probe = local_datetime;
+        for _ in 0..25 {
+            probe = probe.checked_sub_signed(hour).ok_or_else(zone_lookup)?;
+            if let MappedLocalTime::Single(offset)
+            | MappedLocalTime::Ambiguous(offset, _) =
+                Local.offset_from_local_datetime(&probe)
+            {
+                return Ok(offset);
+            }
+        }
+        Err(zone_lookup())
+    }
 }
 
 /// Renders the local clock time without a UTC offset, so a date or time
@@ -180,14 +296,11 @@ impl DateTimeValue {
 impl fmt::Display for DateTimeValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use chrono::Timelike as _;
-        let local_datetime = self.local_datetime_or_utc();
-        let format = if local_datetime.nanosecond() == 0 {
-            DATETIME_PATTERN
-        } else {
-            "%Y-%m-%dT%H:%M:%S%.f"
-        };
-        write!(f, "{}", local_datetime.format(format))
+        write!(
+            f,
+            "{}",
+            self.local_datetime_or_utc().format(self.canonical_pattern())
+        )
     }
 }
 
@@ -227,10 +340,8 @@ impl From<DateValue> for DateTimeValue {
     #[inline]
     fn from(date: DateValue) -> Self {
         let midnight = date.0.and_time(NaiveTime::MIN);
-        Self(
-            resolve_local(midnight)
-                .unwrap_or_else(|_zone_failure| midnight.and_utc()),
-        )
+        Self::from_local(midnight)
+            .unwrap_or_else(|_zone_failure| Self(midnight.and_utc()))
     }
 }
 
@@ -342,7 +453,6 @@ impl DatePoint {
     /// Canonical strftime pattern preserving written precision.
     #[must_use]
     pub(crate) fn canonical_pattern(self) -> &'static str {
-        use chrono::Timelike as _;
         match self {
             Self::Calendar {
                 date_precision: DatePrecision::Month,
@@ -352,108 +462,9 @@ impl DatePoint {
                 date_precision: DatePrecision::Day,
                 ..
             } => DATE_PATTERN,
-            Self::Instant(_)
-                if self.local_datetime_or_utc().nanosecond() == 0 =>
-            {
-                DATETIME_PATTERN
-            }
-            Self::Instant(_) => "%Y-%m-%dT%H:%M:%S%.f",
+            Self::Instant(dt) => dt.canonical_pattern(),
         }
     }
-}
-
-/// Resolves a naive local datetime to a UTC instant under the
-/// crate's DST doctrine.
-///
-/// A clock time written without a zone is read in the process's local zone
-/// and stored as UTC. Resolution never fails on a DST boundary:
-///
-/// - Ambiguous fall-back times resolve to their earliest occurrence;
-/// - Spring-forward gaps shift forward by the gap, matching Temporal's
-///   `'compatible'` disambiguation and jiff's [`Disambiguation::Compatible`].
-///
-/// Only a broken tz-data/OS lookup or an offset application outside
-/// `NaiveDateTime`'s range errors. On the `WebAssembly` target, chrono's
-/// `Local` reports every local time as unambiguous ([chrono#1701]), so the
-/// ambiguous arm is unreachable there.
-///
-/// # Errors
-///
-/// - [`DateError::LocalZoneLookup`] if the lookup finds no offset for
-///   `local_datetime` or a probe (a broken tz-data/OS environment rather than a
-///   DST boundary), or if applying the resolved offset would leave
-///   `NaiveDateTime`'s range.
-///
-/// [`Disambiguation::Compatible`]:
-///     https://docs.rs/jiff/latest/jiff/tz/enum.Disambiguation.html
-/// [chrono#1701]: https://github.com/chronotope/chrono/issues/1701
-pub(super) fn resolve_local(
-    local_datetime: NaiveDateTime,
-) -> Result<DateTime<Utc>, DateError> {
-    let zone_lookup = || DateError::LocalZoneLookup {
-        input: local_datetime.to_string().into(),
-    };
-    // The checked forms return `None` instead of panicking when the instant
-    // leaves `NaiveDateTime`'s range (impossible for the parsers' 4-digit-year
-    // inputs).
-    match Local.offset_from_local_datetime(&local_datetime) {
-        MappedLocalTime::Single(offset) => {
-            let instant = local_datetime
-                .checked_sub_offset(offset)
-                .ok_or_else(zone_lookup)?;
-            Ok(instant.and_utc())
-        }
-        MappedLocalTime::Ambiguous(a, b) => {
-            // `chrono` orders an ambiguous pair by offset (tzfile data) or
-            // transition side (POSIX rules); the earliest occurrence has the
-            // larger offset, since instant = local_datetime - offset.
-            let earliest = if a.local_minus_utc() >= b.local_minus_utc() {
-                a
-            } else {
-                b
-            };
-            let instant = local_datetime
-                .checked_sub_offset(earliest)
-                .ok_or_else(zone_lookup)?;
-            Ok(instant.and_utc())
-        }
-        MappedLocalTime::None => {
-            // A gap resolves `None` across the whole skipped span, so no probe
-            // inside it resolves; the pre-transition offset shifts the gap time
-            // forward by exactly the gap.
-            let offset = offset_across_gap(local_datetime, &zone_lookup)?;
-            let instant = local_datetime
-                .checked_sub_offset(offset)
-                .ok_or_else(zone_lookup)?;
-            Ok(instant.and_utc())
-        }
-    }
-}
-
-/// Finds the offset in effect just before a DST gap by stepping back one hour
-/// at a time from `local_datetime` (the widest recorded gap is 24 hours).
-///
-/// # Errors
-///
-/// - [`DateError::LocalZoneLookup`] if no nearby local time resolves within the
-///   25-hour backward search (a broken tz-data/OS lookup rather than a gap), or
-///   if stepping the probe back would leave `NaiveDateTime`'s range.
-fn offset_across_gap(
-    local_datetime: NaiveDateTime,
-    zone_lookup: &impl Fn() -> DateError,
-) -> Result<FixedOffset, DateError> {
-    let hour = TimeDelta::try_hours(1).ok_or_else(zone_lookup)?;
-    let mut probe = local_datetime;
-    for _ in 0..25 {
-        probe = probe.checked_sub_signed(hour).ok_or_else(zone_lookup)?;
-        if let MappedLocalTime::Single(offset)
-        | MappedLocalTime::Ambiguous(offset, _) =
-            Local.offset_from_local_datetime(&probe)
-        {
-            return Ok(offset);
-        }
-    }
-    Err(zone_lookup())
 }
 
 #[cfg(test)]
@@ -550,7 +561,7 @@ mod tests {
             TzGuard::set("Etc/GMT-14");
 
             // Act
-            let result = resolve_local(NaiveDateTime::MIN);
+            let result = DateTimeValue::from_local(NaiveDateTime::MIN);
 
             // Assert
             assert!(matches!(result, Err(DateError::LocalZoneLookup { .. })));
@@ -899,7 +910,7 @@ mod tests {
         }
 
         #[test]
-        fn displays_invalid_year_digits_error_naming_the_input() {
+        fn displays_year_not_four_digits_error_naming_the_input() {
             let err = DateValue::parse_iso("26-08-22")
                 .expect_err("short year rejected");
             assert_eq!(

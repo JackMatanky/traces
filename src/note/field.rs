@@ -20,7 +20,9 @@ use serde::{Deserialize, Serialize};
 
 use super::Link;
 use crate::{
-    DateTimeValue, DateValue, DurationValue, Tag, field::FieldValueRef,
+    DateTimeValue, DateValue, DurationValue, Tag,
+    date::{DatePoint, DatePrecision},
+    field::FieldValueRef,
 };
 
 /// A metadata value parsed from YAML frontmatter or inline field text.
@@ -109,8 +111,25 @@ impl NoteFieldValue {
         match self {
             Self::Date(value) => Some(*value),
             Self::DateTime(value) => Some(value.local_date()),
-            Self::String(s) => crate::date::DatePoint::parse_prefix(s)
+            Self::String(s) => DatePoint::parse_prefix(s)
                 .map(|(date_point, _)| date_point.date()),
+            _ => None,
+        }
+    }
+
+    /// Returns this value as a day-precision date point if it is
+    /// [`NoteFieldValue::Date`] or [`NoteFieldValue::DateTime`].
+    ///
+    /// Strings are not parsed: query evaluation only treats typed date values
+    /// as dates.
+    #[must_use]
+    pub(crate) const fn as_date_point(&self) -> Option<DatePoint> {
+        match self {
+            Self::Date(date) => Some(DatePoint::Calendar {
+                date: *date,
+                date_precision: DatePrecision::Day,
+            }),
+            Self::DateTime(datetime) => Some(DatePoint::Instant(*datetime)),
             _ => None,
         }
     }
@@ -139,6 +158,21 @@ impl NoteFieldValue {
             Self::Link(v) => NoteFieldValueRef::Link(v),
             Self::List(v) => NoteFieldValueRef::List(v),
             Self::Object(v) => NoteFieldValueRef::Object(v),
+        }
+    }
+}
+
+impl From<DatePoint> for NoteFieldValue {
+    /// Converts a calendar point to [`NoteFieldValue::Date`] and an instant to
+    /// [`NoteFieldValue::DateTime`], dropping the written precision.
+    #[inline]
+    fn from(date_point: DatePoint) -> Self {
+        match date_point {
+            DatePoint::Calendar {
+                date,
+                ..
+            } => Self::Date(date),
+            DatePoint::Instant(datetime) => Self::DateTime(datetime),
         }
     }
 }

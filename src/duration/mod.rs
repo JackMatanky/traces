@@ -12,7 +12,8 @@
 //! - [`DurationUnit`] - Unit registry (parsing and seconds conversion). Single
 //!   source of truth; callers should not maintain their own registries.
 //! - [`DurationSeconds`] - An `f64` newtype that is finite on construction,
-//!   with [`Ord`], [`Add`], [`Sub`], and [`Mul`].
+//!   with [`Ord`], [`Add`](std::ops::Add), [`Sub`](std::ops::Sub), and
+//!   [`Mul`](std::ops::Mul).
 //! - [`DurationError`] - Error type for parse and conversion failures.
 
 mod error;

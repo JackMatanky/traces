@@ -136,7 +136,8 @@ impl DurationValue {
             if rem >= unit_secs {
                 let count = (rem / unit_secs).floor();
                 let Some(count_u64) = count.to_u64() else {
-                    return scientific_seconds_text(total_secs, is_negative);
+                    // `{:e}` already carries the sign of a negative magnitude.
+                    return format!("{total_secs:e} seconds");
                 };
                 rem = count.mul_add(-unit_secs, rem);
                 let (singular, plural) = unit.human_names();
@@ -224,35 +225,30 @@ impl DurationValue {
         input: &str,
         mode: scan::ScanMode,
     ) -> Result<(Self, usize), DurationError> {
-        let bytes = input.as_bytes();
-        let len = bytes.len();
-        let mut pos = 0;
+        let mut scanner = scan::Scanner::new(input);
         match mode {
             scan::ScanMode::Whole => {
-                scan::skip_separators(bytes, &mut pos);
-                if pos >= len {
+                scanner.skip_separators();
+                if scanner.is_at_end() {
                     return Err(DurationError::Empty);
                 }
             }
             scan::ScanMode::Prefix => {
-                if len == 0 || !scan::can_start_component(bytes, pos) {
+                if !scanner.can_start_component() {
                     return Err(DurationError::Empty);
                 }
             }
         }
 
-        let mut parsed_any = false;
         let mut is_negative = false;
         let mut last_end = 0;
         let mut raw_components = Vec::new();
 
-        while pos < len {
-            let (number, kind, pos_after_part) =
-                scan::scan_component(bytes, pos)?;
-            pos = pos_after_part;
+        while !scanner.is_at_end() {
+            let (number, unit) = scanner.component()?;
 
             if number.is_sign_negative() {
-                if parsed_any {
+                if !raw_components.is_empty() {
                     return Err(DurationError::MisplacedSign);
                 }
                 is_negative = true;
@@ -260,37 +256,34 @@ impl DurationValue {
 
             raw_components.push(DurationComponent {
                 magnitude: number.abs(),
-                unit: kind,
+                unit,
             });
-            parsed_any = true;
-            last_end = pos;
+            last_end = scanner.position();
 
             match mode {
                 scan::ScanMode::Whole => {
-                    scan::skip_separators(bytes, &mut pos);
-                    if pos >= len {
+                    scanner.skip_separators();
+                    if scanner.is_at_end() {
                         break;
                     }
                 }
                 scan::ScanMode::Prefix => {
-                    let mut next_pos = pos;
-                    scan::skip_whitespace(bytes, &mut next_pos);
-                    if next_pos < len
-                        && scan::can_start_component(bytes, next_pos)
-                    {
-                        pos = next_pos;
-                    } else {
+                    if !scanner.skip_to_next_component() {
                         break;
                     }
                 }
             }
         }
 
-        if !parsed_any {
+        if raw_components.is_empty() {
             return Err(DurationError::Empty);
         }
 
-        scan::apply_leading_sign(&mut raw_components, is_negative);
+        if is_negative {
+            for component in &mut raw_components {
+                component.magnitude = -component.magnitude;
+            }
+        }
 
         let total = Self::sum_nominal_seconds(&raw_components);
         let seconds = DurationSeconds::try_from(total)?;
@@ -831,16 +824,6 @@ const HUMAN_ORDER: [DurationUnit; 7] = [
     DurationUnit::Second,
 ];
 
-/// Renders a magnitude too large for whole-unit counts in scientific notation.
-fn scientific_seconds_text(total_secs: f64, is_negative: bool) -> String {
-    let sign = if is_negative {
-        "-"
-    } else {
-        ""
-    };
-    format!("{sign}{total_secs:e} seconds")
-}
-
 /// At or above this magnitude, [`DurationSeconds`]'s [`Display`](fmt::Display)
 /// switches to scientific notation.
 const SCIENTIFIC_ABOVE: f64 = 1e15;
@@ -1212,7 +1195,7 @@ mod tests {
                 #[case::minus_sign("-30m")]
                 #[case::sign_with_decimal("+.5h")]
                 fn accepts_valid_start(#[case] input: &str) {
-                    assert!(scan::can_start_component(input.as_bytes(), 0));
+                    assert!(scan::Scanner::new(input).can_start_component());
                 }
 
                 #[rstest]
@@ -1221,7 +1204,7 @@ mod tests {
                 #[case::lone_sign("+")]
                 #[case::lone_decimal_point(".")]
                 fn rejects_invalid_start(#[case] input: &str) {
-                    assert!(!scan::can_start_component(input.as_bytes(), 0));
+                    assert!(!scan::Scanner::new(input).can_start_component());
                 }
             }
         }

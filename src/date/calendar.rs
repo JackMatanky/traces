@@ -6,7 +6,7 @@ use num_traits::ToPrimitive as _;
 
 use super::{
     error::DateError,
-    value::{DatePoint, DateTimeValue, DateValue, resolve_local},
+    value::{DatePoint, DateTimeValue, DateValue},
 };
 use crate::duration::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
@@ -223,61 +223,39 @@ impl DatePoint {
 
     /// Measures the difference to another date point in the requested unit.
     ///
-    /// # Errors
-    ///
-    /// - [`DateError::OutOfRange`] if the elapsed seconds cannot be converted
-    ///   to `f64` or `unit` has no whole-second length.
-    pub(crate) fn diff(
-        self,
-        to: Self,
-        unit: DurationUnit,
-    ) -> Result<Difference, DateError> {
+    /// Years and months are whole calendar counts of the local dates.
+    /// Fixed-length units are fractional when both points carry a time and
+    /// whole, truncated toward zero, otherwise.
+    pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
+        let local_delta = || {
+            to.local_datetime_or_utc()
+                .signed_duration_since(self.local_datetime_or_utc())
+        };
         match unit {
-            DurationUnit::Year => Ok(Difference::Whole(whole_years_between(
-                self.local_datetime_or_utc().date(),
-                to.local_datetime_or_utc().date(),
-            ))),
-            DurationUnit::Month => Ok(Difference::Whole(whole_months_between(
-                self.local_datetime_or_utc().date(),
-                to.local_datetime_or_utc().date(),
-            ))),
-            DurationUnit::Week
-            | DurationUnit::Day
-            | DurationUnit::Hour
-            | DurationUnit::Minute
-            | DurationUnit::Second
-            | DurationUnit::Millisecond => {
-                if self.has_time() && to.has_time() {
-                    let delta =
-                        to.instant().signed_duration_since(self.instant());
-                    let whole_seconds = delta
-                        .num_seconds()
-                        .to_f64()
-                        .ok_or(DateError::OutOfRange)?;
-                    Ok(Difference::Fractional(
-                        (whole_seconds + f64::from(delta.subsec_nanos()) / 1e9)
-                            / unit.nominal_seconds(),
-                    ))
-                } else if unit == DurationUnit::Millisecond {
-                    Ok(Difference::Whole(
-                        to.local_datetime_or_utc()
-                            .signed_duration_since(self.local_datetime_or_utc())
-                            .num_milliseconds(),
-                    ))
-                } else {
-                    let delta = to
-                        .local_datetime_or_utc()
-                        .signed_duration_since(self.local_datetime_or_utc());
-                    let unit_secs = unit
-                        .whole_nominal_seconds()
-                        .ok_or(DateError::OutOfRange)?;
-                    #[expect(
-                        clippy::arithmetic_side_effects,
-                        reason = "fixed unit ratio is nonzero"
-                    )]
-                    let result = delta.num_seconds() / unit_secs;
-                    Ok(Difference::Whole(result))
-                }
+            DurationUnit::Year => {
+                Difference::Whole(self.date().whole_years_until(to.date()))
+            }
+            DurationUnit::Month => {
+                Difference::Whole(self.date().whole_months_until(to.date()))
+            }
+            fixed if self.has_time() && to.has_time() => {
+                let seconds =
+                    to.instant().signed_duration_since(self.instant());
+                Difference::Fractional(
+                    seconds.as_seconds_f64() / fixed.nominal_seconds(),
+                )
+            }
+            DurationUnit::Week => Difference::Whole(local_delta().num_weeks()),
+            DurationUnit::Day => Difference::Whole(local_delta().num_days()),
+            DurationUnit::Hour => Difference::Whole(local_delta().num_hours()),
+            DurationUnit::Minute => {
+                Difference::Whole(local_delta().num_minutes())
+            }
+            DurationUnit::Second => {
+                Difference::Whole(local_delta().num_seconds())
+            }
+            DurationUnit::Millisecond => {
+                Difference::Whole(local_delta().num_milliseconds())
             }
         }
     }
@@ -288,7 +266,7 @@ impl DatePoint {
                 date,
                 date_precision,
             } => Ok(Self::Calendar {
-                date: calendar_advance(date, delta)?,
+                date: date.advance(delta)?,
                 date_precision,
             }),
             Self::Instant(dt) => {
@@ -297,7 +275,7 @@ impl DatePoint {
                 let shifted = local_datetime
                     .checked_add_signed(delta)
                     .ok_or(DateError::OutOfRange)?;
-                Ok(Self::Instant(DateTimeValue(resolve_local(shifted)?)))
+                Ok(Self::Instant(DateTimeValue::from_local(shifted)?))
             }
         }
     }
@@ -308,7 +286,7 @@ impl DatePoint {
                 date,
                 date_precision,
             } => Ok(Self::Calendar {
-                date: calendar_advance(date, delta)?,
+                date: date.advance(delta)?,
                 date_precision,
             }),
             Self::Instant(dt) => Ok(Self::Instant(DateTimeValue(
@@ -363,7 +341,7 @@ impl DatePoint {
             Self::Instant(_) => {
                 let local_datetime =
                     date.and_time(self.local_datetime_or_utc().time());
-                Ok(Self::Instant(DateTimeValue(resolve_local(local_datetime)?)))
+                Ok(Self::Instant(DateTimeValue::from_local(local_datetime)?))
             }
         }
     }
@@ -406,6 +384,58 @@ impl DatePoint {
     }
 }
 
+impl DateValue {
+    /// Whole calendar months from `self` to `to`, signed.
+    ///
+    /// Chrono has no `months_since` equivalent, so this mirrors
+    /// [`NaiveDate::years_since`]'s algorithm at month granularity: total
+    /// calendar months between the dates, minus one when the day-of-month has
+    /// not yet been reached. Either ordering is accepted.
+    fn whole_months_until(self, to: Self) -> i64 {
+        let (from, to) = (self.naive_date(), to.naive_date());
+        let (earlier, later, sign) = if to >= from {
+            (from, to, 1)
+        } else {
+            (to, from, -1)
+        };
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "year/month/day are all bounded by NaiveDate's \
+                      representable range (~±262,000 years), so the year \
+                      subtraction, ×12 month conversion, day comparison, and \
+                      sign multiply can't overflow i64"
+        )]
+        let months = sign
+            * (i64::from(later.year() - earlier.year()) * 12
+                + i64::from(later.month())
+                - i64::from(earlier.month())
+                - i64::from(later.day() < earlier.day()));
+        months
+    }
+
+    /// Whole calendar years from `self` to `to`, signed.
+    ///
+    /// A year is not "up" until `to`'s month and day reach `self`'s, which is
+    /// the whole-month count truncated to years.
+    fn whole_years_until(self, to: Self) -> i64 {
+        self.whole_months_until(to) / 12
+    }
+
+    /// Moves the date by `delta` read from midnight, keeping the date part.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the result is outside chrono's date
+    ///   range.
+    fn advance(self, delta: TimeDelta) -> Result<Self, DateError> {
+        self.naive_date()
+            .and_time(NaiveTime::MIN)
+            .checked_add_signed(delta)
+            .map(|local_datetime| Self(local_datetime.date()))
+            .ok_or(DateError::OutOfRange)
+    }
+}
+
 impl DateTimeValue {
     /// Shifts calendar units in the local datetime frame and clock units in
     /// UTC.
@@ -424,7 +454,7 @@ impl DateTimeValue {
         if unit.is_calendar() {
             let local_datetime =
                 self.local_datetime().ok_or(DateError::OutOfRange)?;
-            Ok(Self(resolve_local(shift_datetime(local_datetime, n, unit)?)?))
+            Self::from_local(shift_datetime(local_datetime, n, unit)?)
         } else {
             Ok(Self(shift_datetime(self.0.naive_utc(), n, unit)?.and_utc()))
         }
@@ -448,20 +478,14 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
     }
 }
 
-fn calendar_advance(
-    date: DateValue,
-    delta: TimeDelta,
-) -> Result<DateValue, DateError> {
-    date.naive_date()
-        .and_time(NaiveTime::MIN)
-        .checked_add_signed(delta)
-        .map(|local_datetime| DateValue(local_datetime.date()))
-        .ok_or(DateError::OutOfRange)
-}
-
 /// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from
 /// nanoseconds (the fraction rounded to the nearest nanosecond) and rejecting
 /// overflow of either component for `DatePoint::apply`.
+///
+/// # Errors
+///
+/// - [`DateError::OutOfRange`] if `part_secs` is not finite or its whole
+///   seconds do not fit a [`TimeDelta`].
 fn time_delta_from_seconds(part_secs: f64) -> Result<TimeDelta, DateError> {
     let ds = DurationSeconds::try_from(part_secs)
         .map_err(|_| DateError::OutOfRange)?;
@@ -552,63 +576,6 @@ fn shift_datetime_months(
         local_datetime.checked_sub_months(Months::new(months_u32))
     }
     .ok_or(DateError::OutOfRange)
-}
-
-/// Whole calendar years from `from` to `to`, signed.
-///
-/// Delegates to chrono's [`NaiveDate::years_since`], which is day-of-year
-/// aware: a year is not "up" until `to`'s month/day reaches `from`'s. This
-/// wrapper accepts either ordering.
-fn whole_years_between(from: NaiveDate, to: NaiveDate) -> i64 {
-    let (earlier, later, sign) = if to >= from {
-        (from, to, 1)
-    } else {
-        (to, from, -1)
-    };
-    #[expect(
-        clippy::expect_used,
-        reason = "earlier/later are ordered by construction just above, so \
-                  years_since's None case (base > self) is unreachable here"
-    )]
-    let years = later.years_since(earlier).expect(
-        "later >= earlier by construction, so years_since can't return None",
-    );
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "sign is always ±1 and years is bounded by NaiveDate's \
-                  representable range (~±262,000), so this multiply can't \
-                  overflow i64"
-    )]
-    let result = sign * i64::from(years);
-    result
-}
-
-/// Whole calendar months from `from` to `to`, signed. See
-/// [`whole_years_between`].
-///
-/// Chrono has no `months_since` equivalent, so this mirrors
-/// [`NaiveDate::years_since`]'s algorithm at month granularity: total calendar
-/// months between the dates, minus one when the day-of-month has not yet been
-/// reached.
-fn whole_months_between(from: NaiveDate, to: NaiveDate) -> i64 {
-    let (earlier, later, sign) = if to >= from {
-        (from, to, 1)
-    } else {
-        (to, from, -1)
-    };
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "year/month/day are all bounded by NaiveDate's representable \
-                  range (~±262,000 years), so the year subtraction, ×12 month \
-                  conversion, day comparison, and sign multiply can't \
-                  overflow i64"
-    )]
-    let result = sign
-        * (i64::from(later.year() - earlier.year()) * 12
-            + i64::from(later.month())
-            - i64::from(earlier.month())
-            - i64::from(later.day() < earlier.day()));
-    result
 }
 
 #[cfg(test)]
@@ -919,19 +886,17 @@ mod tests {
 
             // When both date points carry a time component, fixed units return
             // exact f64:
-            let diff_hours = dt1.diff(dt2, DurationUnit::Hour).unwrap();
+            let diff_hours = dt1.diff(dt2, DurationUnit::Hour);
             assert_eq!(diff_hours, Difference::Fractional(1.5));
 
             // When either date point is date-only, fixed units return whole
             // i64:
-            let diff_calendar =
-                dt1.diff(date_only, DurationUnit::Hour).unwrap();
+            let diff_calendar = dt1.diff(date_only, DurationUnit::Hour);
             assert_eq!(diff_calendar, Difference::Whole(1));
 
             // Calendar units return whole counts:
             let diff_months = point_at("2026-01-15")
-                .diff(point_at("2026-03-15"), DurationUnit::Month)
-                .unwrap();
+                .diff(point_at("2026-03-15"), DurationUnit::Month);
             assert_eq!(diff_months, Difference::Whole(2));
         }
 

@@ -29,17 +29,21 @@ Chosen option: "Lex bare ISO dates as one literal and also reject number-only
 arithmetic", because users naturally write unquoted dates and the quoted and
 unquoted forms must mean the same thing.
 
-A bare `YYYY-MM[-DD[THH:MM[:SS[.f]]][Z|+hh:mm]]` lexes as one literal and is
-promoted to a Date or DateTime exactly like its quoted form (an invalid shape
-such as `2026-13-45` stays a string, as when quoted). Arithmetic whose operands
-are all number literals is a query-build error, so shapes the lexer does not
-claim (`2026-1-1`) fail loudly instead of matching missing fields.
+A bare `YYYY-MM[-DD[THH:MM[:SS[.f]]][Z|+hh:mm]]` lexes as one date literal and
+is promoted to a Date or DateTime exactly like its quoted form. A date-shaped
+token that is not a real date (`2026-02-30`, `2026-13-45`) is a query-build
+error: a bare word is never a string, so treating it as one would let a typo
+silently match or exclude every row. Arithmetic whose operands are all number
+literals is also a query-build error, so shapes the lexer does not claim
+(`2026-1-1`) fail loudly instead of matching missing fields.
 
 ### Consequences
 
 - Good, because `due == 2026-01-01` and `due == "2026-01-01"` agree.
 - Good, because number-only arithmetic can no longer silently become `Null`.
 - Bad, because `1 + 2 == 3` is now a build error rather than a `Null` compare.
+- Bad, because a number-only subtraction written like a date (`2026-12`) now
+  lexes as a date literal.
 
 ### Confirmation
 

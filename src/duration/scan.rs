@@ -1,6 +1,214 @@
-use super::{
-    error::DurationError, unit::DurationUnit, value::DurationComponent,
-};
+use super::{error::DurationError, unit::DurationUnit};
+
+/// A byte cursor over duration text.
+///
+/// Every method that consumes input advances the cursor; a method that
+/// returns an error leaves it at an unspecified position, because a failed
+/// scan aborts the whole parse.
+#[derive(Copy, Clone, Debug)]
+pub(super) struct Scanner<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Scanner<'a> {
+    /// Starts a cursor at the beginning of `input`.
+    pub(super) const fn new(input: &'a str) -> Self {
+        Self {
+            bytes: input.as_bytes(),
+            pos: 0,
+        }
+    }
+
+    /// Returns the byte offset of the cursor.
+    pub(super) const fn position(&self) -> usize {
+        self.pos
+    }
+
+    /// Returns `true` if the cursor is past the last byte.
+    pub(super) const fn is_at_end(&self) -> bool {
+        self.pos >= self.bytes.len()
+    }
+
+    /// Returns `true` if a numeric duration token can begin at the cursor.
+    pub(super) fn can_start_component(&self) -> bool {
+        match self.byte_at(0) {
+            Some(byte) if byte.is_ascii_digit() => true,
+            Some(b'.') => self.byte_at(1).is_some_and(|b| b.is_ascii_digit()),
+            Some(b'+' | b'-') => self.has_digits_after_sign(),
+            _ => false,
+        }
+    }
+
+    /// Advances past whitespace and commas.
+    pub(super) fn skip_separators(&mut self) {
+        while self
+            .byte_at(0)
+            .is_some_and(|byte| byte.is_ascii_whitespace() || byte == b',')
+        {
+            self.bump();
+        }
+    }
+
+    /// Advances past ASCII whitespace.
+    pub(super) fn skip_whitespace(&mut self) {
+        while self.byte_at(0).is_some_and(|byte| byte.is_ascii_whitespace()) {
+            self.bump();
+        }
+    }
+
+    /// Moves to the next component if whitespace is followed by a token that
+    /// can start one, returning whether it moved. The cursor stays put
+    /// otherwise.
+    pub(super) fn skip_to_next_component(&mut self) -> bool {
+        let mut lookahead = *self;
+        lookahead.skip_whitespace();
+        let can_continue =
+            !lookahead.is_at_end() && lookahead.can_start_component();
+        if can_continue {
+            *self = lookahead;
+        }
+        can_continue
+    }
+
+    /// Scans one `<number><unit>` part, returning the magnitude and unit.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::MisplacedSign`] if a sign is not followed by a digit
+    ///   or a `.` and a digit.
+    /// - [`DurationError::MissingNumber`] if no number starts at the cursor.
+    /// - [`DurationError::MalformedNumber`] if the number is not valid float
+    ///   syntax.
+    /// - [`DurationError::NumberOverflow`] if the number overflows to infinity.
+    /// - [`DurationError::MissingUnit`] if no unit follows the number.
+    /// - [`DurationError::UnknownUnit`] if the unit is not recognized.
+    pub(super) fn component(
+        &mut self,
+    ) -> Result<(f64, DurationUnit), DurationError> {
+        let number = self.number()?;
+        self.skip_whitespace();
+        let unit = self.unit()?;
+        Ok((number, unit))
+    }
+
+    /// Scans a decimal number with an optional leading `+` or `-` and an
+    /// optional trailing exponent (`"1e5"`, `".5e-3"`), the same float syntax
+    /// the [`super::value::DurationSeconds`] [`Display`](std::fmt::Display)
+    /// dialect emits for extreme magnitudes.
+    fn number(&mut self) -> Result<f64, DurationError> {
+        let start = self.pos;
+        if matches!(self.byte_at(0), Some(b'+' | b'-')) {
+            if !self.has_digits_after_sign() {
+                return Err(DurationError::MisplacedSign);
+            }
+            self.bump();
+        }
+        let mut has_decimal = false;
+        let mut has_digit = false;
+        while let Some(byte) = self.byte_at(0) {
+            if byte.is_ascii_digit() {
+                has_digit = true;
+            } else if byte == b'.' && !has_decimal {
+                has_decimal = true;
+            } else {
+                break;
+            }
+            self.bump();
+        }
+        // An exponent may follow a digit-bearing mantissa. A truncated
+        // exponent (`"1e"`, `"1e+"`) is not consumed: the `e` falls to the
+        // unit scanner and is reported as an unknown unit.
+        if has_digit && matches!(self.byte_at(0), Some(b'e' | b'E')) {
+            self.skip_exponent();
+        }
+        self.convert_number(start)
+    }
+
+    /// Consumes an `e`/`E` exponent at the cursor when it has digits.
+    fn skip_exponent(&mut self) {
+        let mut offset = 1;
+        if matches!(self.byte_at(offset), Some(b'+' | b'-')) {
+            offset = offset.saturating_add(1);
+        }
+        if self.byte_at(offset).is_some_and(|b| b.is_ascii_digit()) {
+            while self.byte_at(offset).is_some_and(|b| b.is_ascii_digit()) {
+                offset = offset.saturating_add(1);
+            }
+            self.pos = self.pos.saturating_add(offset);
+        }
+    }
+
+    /// Converts the scanned number span `start..cursor` into `f64`.
+    fn convert_number(&self, start: usize) -> Result<f64, DurationError> {
+        if start == self.pos {
+            return Err(DurationError::MissingNumber);
+        }
+        // The span holds only single-byte ASCII (`+`/`-`/`.`/digit/`e`/`E`),
+        // so slicing and UTF-8 decoding cannot fail.
+        let Some(text) = self
+            .bytes
+            .get(start..self.pos)
+            .and_then(|span| core::str::from_utf8(span).ok())
+        else {
+            return Err(DurationError::MissingNumber);
+        };
+        let number: f64 =
+            text.parse().map_err(|source| DurationError::MalformedNumber {
+                source,
+            })?;
+        if number.is_finite() {
+            Ok(number)
+        } else {
+            Err(DurationError::NumberOverflow)
+        }
+    }
+
+    /// Scans a run of ASCII letters as a unit spelling.
+    fn unit(&mut self) -> Result<DurationUnit, DurationError> {
+        let start = self.pos;
+        while self.byte_at(0).is_some_and(|byte| byte.is_ascii_alphabetic()) {
+            self.bump();
+        }
+        self.resolve_unit(start)
+    }
+
+    /// Converts the scanned unit span `start..cursor` into a [`DurationUnit`].
+    fn resolve_unit(
+        &self,
+        start: usize,
+    ) -> Result<DurationUnit, DurationError> {
+        if start == self.pos {
+            return Err(DurationError::MissingUnit);
+        }
+        let Some(unit_slice) = self.bytes.get(start..self.pos) else {
+            return Err(DurationError::MissingUnit);
+        };
+        let spelling = core::str::from_utf8(unit_slice)
+            .map_err(|_| DurationError::UnknownUnit)?;
+        DurationUnit::from_spelling(spelling).ok_or(DurationError::UnknownUnit)
+    }
+
+    /// Returns `true` if the bytes after the sign at the cursor begin a valid
+    /// number: a digit, or `.` followed by one.
+    fn has_digits_after_sign(&self) -> bool {
+        match self.byte_at(1) {
+            Some(byte) if byte.is_ascii_digit() => true,
+            Some(b'.') => self.byte_at(2).is_some_and(|b| b.is_ascii_digit()),
+            _ => false,
+        }
+    }
+
+    /// Returns the byte `offset` bytes past the cursor.
+    fn byte_at(&self, offset: usize) -> Option<u8> {
+        self.bytes.get(self.pos.saturating_add(offset)).copied()
+    }
+
+    /// Moves the cursor one byte forward.
+    fn bump(&mut self) {
+        self.pos = self.pos.saturating_add(1);
+    }
+}
 
 /// How far a scan may stop before the end of the input.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -9,212 +217,4 @@ pub(super) enum ScanMode {
     Whole,
     /// Scanning stops at the first byte that cannot continue a component.
     Prefix,
-}
-
-/// Scans one `<number><unit>` part starting at `pos`, returning the
-/// magnitude, unit, and end offset.
-pub(super) fn scan_component(
-    bytes: &[u8],
-    pos: usize,
-) -> Result<(f64, DurationUnit, usize), DurationError> {
-    let (number, after_number) = scan_number(bytes, pos)?;
-    let mut cursor = after_number;
-    skip_whitespace(bytes, &mut cursor);
-    let (unit, after_unit) = scan_unit(bytes, cursor)?;
-    Ok((number, unit, after_unit))
-}
-
-/// Parses a decimal number starting at `pos`, supporting an optional leading
-/// `+` or `-` and an optional trailing exponent (`"1e5"`, `".5e-3"`), the same
-/// float syntax the [`super::value::DurationSeconds`]
-/// [`Display`](std::fmt::Display) dialect emits for extreme magnitudes.
-pub(super) fn scan_number(
-    bytes: &[u8],
-    mut pos: usize,
-) -> Result<(f64, usize), DurationError> {
-    let num_start = pos;
-    if let Some(&b) = bytes.get(pos)
-        && (b == b'+' || b == b'-')
-    {
-        if !has_digits_after_sign(
-            bytes.get(pos.saturating_add(1)),
-            bytes.get(pos.saturating_add(2)),
-        ) {
-            return Err(DurationError::MisplacedSign);
-        }
-        pos = pos.saturating_add(1);
-    }
-    let mut has_decimal = false;
-    let mut has_digit = false;
-    while pos < bytes.len() {
-        let Some(&b) = bytes.get(pos) else {
-            break;
-        };
-        if b.is_ascii_digit() {
-            has_digit = true;
-            pos = pos.saturating_add(1);
-        } else if b == b'.' && !has_decimal {
-            has_decimal = true;
-            pos = pos.saturating_add(1);
-        } else {
-            break;
-        }
-    }
-    // An exponent may follow a digit-bearing mantissa. A truncated exponent
-    // (`"1e"`, `"1e+"`) is not consumed: the `e` falls to the unit scanner and
-    // is reported as an unknown unit.
-    if has_digit && matches!(bytes.get(pos), Some(b'e' | b'E')) {
-        let mut exp_pos = pos.saturating_add(1);
-        if matches!(bytes.get(exp_pos), Some(b'+' | b'-')) {
-            exp_pos = exp_pos.saturating_add(1);
-        }
-        if bytes.get(exp_pos).is_some_and(u8::is_ascii_digit) {
-            while bytes.get(exp_pos).is_some_and(u8::is_ascii_digit) {
-                exp_pos = exp_pos.saturating_add(1);
-            }
-            pos = exp_pos;
-        }
-    }
-    convert_number(bytes, num_start, pos)
-}
-
-/// Validates and converts a scanned number byte span into `f64`.
-pub(super) fn convert_number(
-    bytes: &[u8],
-    start: usize,
-    end: usize,
-) -> Result<(f64, usize), DurationError> {
-    if start == end {
-        return Err(DurationError::MissingNumber);
-    }
-    // The span holds only single-byte ASCII (`+`/`-`/`.`/digit/`e`/`E`), so
-    // slicing and UTF-8 decoding cannot fail.
-    let Some(text) =
-        bytes.get(start..end).and_then(|span| core::str::from_utf8(span).ok())
-    else {
-        return Err(DurationError::MissingNumber);
-    };
-    let number: f64 =
-        text.parse().map_err(|source| DurationError::MalformedNumber {
-            source,
-        })?;
-    if !number.is_finite() {
-        return Err(DurationError::NumberOverflow);
-    }
-    Ok((number, end))
-}
-
-/// Parses a unit string starting at `pos`.
-pub(super) fn scan_unit(
-    bytes: &[u8],
-    mut pos: usize,
-) -> Result<(DurationUnit, usize), DurationError> {
-    let unit_start = pos;
-    while pos < bytes.len() {
-        let Some(&b) = bytes.get(pos) else {
-            break;
-        };
-        if !b.is_ascii_alphabetic() {
-            break;
-        }
-        pos = pos.saturating_add(1);
-    }
-    resolve_unit(bytes, unit_start, pos)
-}
-
-/// Validates and converts a scanned unit byte span into [`DurationUnit`].
-pub(super) fn resolve_unit(
-    bytes: &[u8],
-    start: usize,
-    end: usize,
-) -> Result<(DurationUnit, usize), DurationError> {
-    if start == end {
-        return Err(DurationError::MissingUnit);
-    }
-    let Some(unit_slice) = bytes.get(start..end) else {
-        return Err(DurationError::MissingUnit);
-    };
-    let unit_str = core::str::from_utf8(unit_slice)
-        .map_err(|_| DurationError::UnknownUnit)?;
-    let kind = DurationUnit::from_spelling(unit_str)
-        .ok_or(DurationError::UnknownUnit)?;
-    Ok((kind, end))
-}
-
-/// Negates every magnitude in `components` when `is_negative` is `true`.
-pub(super) fn apply_leading_sign(
-    components: &mut [DurationComponent],
-    is_negative: bool,
-) {
-    let sign = if is_negative {
-        -1.0
-    } else {
-        1.0
-    };
-    for component in components {
-        component.magnitude *= sign;
-    }
-}
-
-/// Returns `true` if `bytes[pos]` can begin a numeric duration token.
-pub(super) fn can_start_component(bytes: &[u8], pos: usize) -> bool {
-    let Some(&b) = bytes.get(pos) else {
-        return false;
-    };
-    if b.is_ascii_digit() {
-        return true;
-    }
-    if b == b'.' {
-        return bytes
-            .get(pos.saturating_add(1))
-            .is_some_and(u8::is_ascii_digit);
-    }
-    if b == b'+' || b == b'-' {
-        return has_digits_after_sign(
-            bytes.get(pos.saturating_add(1)),
-            bytes.get(pos.saturating_add(2)),
-        );
-    }
-    false
-}
-
-/// Returns `true` if the bytes following a `+`/`-` sign begin a valid
-/// number: a digit, or `.` followed by one.
-pub(super) fn has_digits_after_sign(
-    next: Option<&u8>,
-    next_next: Option<&u8>,
-) -> bool {
-    match next {
-        Some(c) if c.is_ascii_digit() => true,
-        Some(b'.') => next_next.is_some_and(u8::is_ascii_digit),
-        _ => false,
-    }
-}
-
-/// Advances `pos` past whitespace and commas.
-pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
-    let len = bytes.len();
-    while *pos < len {
-        let Some(&b) = bytes.get(*pos) else {
-            break;
-        };
-        if !b.is_ascii_whitespace() && b != b',' {
-            break;
-        }
-        *pos = (*pos).saturating_add(1);
-    }
-}
-
-/// Advances `pos` past ASCII whitespace.
-pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
-    let len = bytes.len();
-    while *pos < len {
-        let Some(&b) = bytes.get(*pos) else {
-            break;
-        };
-        if !b.is_ascii_whitespace() {
-            break;
-        }
-        *pos = (*pos).saturating_add(1);
-    }
 }

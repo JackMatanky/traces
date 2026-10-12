@@ -4,15 +4,15 @@
 //! Recognition entry points are [`DatePoint::parse`],
 //! [`DatePoint::parse_prefix`], and [`DatePoint::parse_with_pattern`]. The
 //! strict typed parsers [`DateValue::parse_iso`] and
-//! [`DateTimeValue::parse_iso`] back their respective [`FromStr`]
-//! implementations.
+//! [`DateTimeValue::parse_iso`] back their respective
+//! [`FromStr`](std::str::FromStr) implementations.
 //!
 //! # Clock doctrine
 //!
 //! A naive datetime means what a human means: it is read in the process's local
-//! zone and stored as UTC (see [`resolve_local`]); a date-only value stays a
-//! zone-free calendar date. Instants render as the local clock time and travel
-//! as UTC for storage and comparison.
+//! zone and stored as UTC (see [`DateTimeValue::from_local`]); a date-only
+//! value stays a zone-free calendar date. Instants render as the local clock
+//! time and travel as UTC for storage and comparison.
 //!
 //! # Key types
 //!

@@ -249,7 +249,7 @@ src/date/calendar.rs: pub(crate) enum Difference {
 src/date/calendar.rs: pub(crate) enum PeriodEdge {
 src/date/calendar.rs: pub(crate) fn apply(
 src/date/calendar.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
-src/date/calendar.rs: pub(crate) fn diff(
+src/date/calendar.rs: pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
 src/date/calendar.rs: pub(crate) fn end_of(
 src/date/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/date/calendar.rs: pub(crate) fn shift(
@@ -285,6 +285,7 @@ src/date/value.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) enum DatePoint {
 src/date/value.rs: pub(crate) enum DatePrecision {
 src/date/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/date/value.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
 src/date/value.rs: pub(crate) fn date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/date/value.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
@@ -292,7 +293,7 @@ src/date/value.rs: pub(crate) fn local_date(self) -> DateValue {
 src/date/value.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
 src/date/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
 src/date/value.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
-src/date/value.rs: pub(super) fn resolve_local(
+src/date/value.rs: pub(super) fn from_local(
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
 src/delimiter.rs: pub(crate) const fn close_len(self) -> usize {
@@ -343,17 +344,16 @@ src/duration/mod.rs: pub use error::DurationError;
 src/duration/mod.rs: pub use value::DurationValue;
 src/duration/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 src/duration/mod.rs: pub(crate) use value::{DurationComponent, DurationSeconds};
+src/duration/scan.rs: pub(super) const fn is_at_end(&self) -> bool {
+src/duration/scan.rs: pub(super) const fn new(input: &'a str) -> Self {
+src/duration/scan.rs: pub(super) const fn position(&self) -> usize {
 src/duration/scan.rs: pub(super) enum ScanMode {
-src/duration/scan.rs: pub(super) fn apply_leading_sign(
-src/duration/scan.rs: pub(super) fn can_start_component(bytes: &[u8], pos: usize) -> bool {
-src/duration/scan.rs: pub(super) fn convert_number(
-src/duration/scan.rs: pub(super) fn has_digits_after_sign(
-src/duration/scan.rs: pub(super) fn resolve_unit(
-src/duration/scan.rs: pub(super) fn scan_component(
-src/duration/scan.rs: pub(super) fn scan_number(
-src/duration/scan.rs: pub(super) fn scan_unit(
-src/duration/scan.rs: pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
-src/duration/scan.rs: pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
+src/duration/scan.rs: pub(super) fn can_start_component(&self) -> bool {
+src/duration/scan.rs: pub(super) fn component(
+src/duration/scan.rs: pub(super) fn skip_separators(&mut self) {
+src/duration/scan.rs: pub(super) fn skip_to_next_component(&mut self) -> bool {
+src/duration/scan.rs: pub(super) fn skip_whitespace(&mut self) {
+src/duration/scan.rs: pub(super) struct Scanner<'a> {
 src/duration/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
 src/duration/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
 src/duration/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
@@ -696,6 +696,7 @@ src/note/field.rs: pub fn as_date(&self) -> Option<DateValue> {
 src/note/field.rs: pub fn as_ref(&self) -> NoteFieldValueRef<'_> {
 src/note/field.rs: pub fn as_str(&self) -> Option<&str> {
 src/note/field.rs: pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
+src/note/field.rs: pub(crate) const fn as_date_point(&self) -> Option<DatePoint> {
 src/note/field.rs: pub(crate) const fn rank(self) -> u8 {
 src/note/field.rs: pub(crate) enum NoteFieldType {
 src/note/field.rs: pub(crate) fn append_text(&self, out: &mut String) {

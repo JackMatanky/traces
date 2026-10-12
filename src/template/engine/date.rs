@@ -116,17 +116,6 @@ impl DateNamespace {
     }
 }
 
-fn now_date_point() -> DatePoint {
-    DatePoint::Instant(DateTimeValue::from(Utc::now()))
-}
-
-fn today_date_point() -> DatePoint {
-    DatePoint::Calendar {
-        date: now_date_point().date(),
-        date_precision: DatePrecision::Day,
-    }
-}
-
 /// Translates an ISO-8601 duration offset (e.g., `"P1M"`, `"-P1M"`, `"P-1M"`,
 /// `"P1DT2H"`) to standard `<number><unit>` duration text accepted by
 /// [`DurationValue`]. Returns borrowed input when `input` is not an ISO
@@ -317,14 +306,18 @@ enum Anchor {
 impl Anchor {
     /// The date point a shorthand starts from when no reference is given.
     fn base(self) -> DatePoint {
+        let now = DatePoint::Instant(DateTimeValue::from(Utc::now()));
         match self {
-            Self::Now => now_date_point(),
+            Self::Now => now,
             Self::Today
             | Self::Tomorrow
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => today_date_point(),
+            | Self::Weekday(_) => DatePoint::Calendar {
+                date: now.date(),
+                date_precision: DatePrecision::Day,
+            },
         }
     }
 
@@ -341,48 +334,58 @@ impl Anchor {
             Self::Weekday(target) => date_point.with_weekday(target),
         }
     }
-}
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "accepts format, offset, reference, and reference_format options"
-)]
-fn resolve_anchor(
-    anchor: Anchor,
-    format: Option<&str>,
-    offset: Option<Value>,
-    reference: Option<&str>,
-    reference_format: Option<&str>,
-    kwargs: &Kwargs,
-) -> TemplateEngineResult<String> {
-    let format = format
-        .or(kwargs.get::<Option<&str>>("format")?)
-        .unwrap_or(DATE_PATTERN);
-    let offset = offset.or(kwargs.get::<Option<Value>>("offset")?);
-    let reference = reference.or(kwargs.get::<Option<&str>>("reference")?);
-    let reference_format =
-        reference_format.or(kwargs.get::<Option<&str>>("reference_format")?);
-    kwargs.assert_all_used()?;
+    /// Renders the anchored date point after the optional reference, offset
+    /// and format arguments, which may also arrive as kwargs.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorKind::InvalidOperation`] if the reference, offset, or format is
+    ///   invalid, or the anchored date point is out of range.
+    /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides
+    ///   `format`, `offset`, `reference`, or `reference_format`.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "accepts format, offset, reference, and reference_format \
+                  options"
+    )]
+    fn render(
+        self,
+        format: Option<&str>,
+        offset: Option<Value>,
+        reference: Option<&str>,
+        reference_format: Option<&str>,
+        kwargs: &Kwargs,
+    ) -> TemplateEngineResult<String> {
+        let format = format
+            .or(kwargs.get::<Option<&str>>("format")?)
+            .unwrap_or(DATE_PATTERN);
+        let offset = offset.or(kwargs.get::<Option<Value>>("offset")?);
+        let reference = reference.or(kwargs.get::<Option<&str>>("reference")?);
+        let reference_format = reference_format
+            .or(kwargs.get::<Option<&str>>("reference_format")?);
+        kwargs.assert_all_used()?;
 
-    let mut date_point = if let Some(ref_text) = reference {
-        if let Some(ref_fmt) = reference_format {
-            DatePoint::parse_with_pattern(ref_text, ref_fmt)
-                .map_err(render_date_error)?
+        let mut date_point = if let Some(ref_text) = reference {
+            if let Some(ref_fmt) = reference_format {
+                DatePoint::parse_with_pattern(ref_text, ref_fmt)
+                    .map_err(render_date_error)?
+            } else {
+                parse_date_point(ref_text)?
+            }
         } else {
-            parse_date_point(ref_text)?
+            self.base()
+        };
+        date_point = self.transform(date_point).map_err(render_date_error)?;
+
+        if let Some(off_val) = offset {
+            date_point = apply_offset(date_point, &off_val)?;
         }
-    } else {
-        anchor.base()
-    };
-    date_point = anchor.transform(date_point).map_err(render_date_error)?;
 
-    if let Some(off_val) = offset {
-        date_point = apply_offset(date_point, &off_val)?;
+        let local_datetime = date_point.local_datetime_or_utc();
+        let pat = pattern_to_strftime(format, local_datetime)?;
+        render_with_pattern(local_datetime.format(&pat), format)
     }
-
-    let local_datetime = date_point.local_datetime_or_utc();
-    let pat = pattern_to_strftime(format, local_datetime)?;
-    render_with_pattern(local_datetime.format(&pat), format)
 }
 
 /// Builds the shared `(format, offset, reference, reference_format, **kwargs)`
@@ -395,14 +398,7 @@ fn shorthand(anchor: Anchor) -> Value {
               reference_format: Option<&str>,
               kwargs: Kwargs|
               -> TemplateEngineResult<String> {
-            resolve_anchor(
-                anchor,
-                format,
-                offset,
-                reference,
-                reference_format,
-                &kwargs,
-            )
+            anchor.render(format, offset, reference, reference_format, &kwargs)
         },
     )
 }
@@ -453,8 +449,7 @@ impl Object for DateNamespace {
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
                     let target = weekday_or_error(n)?;
-                    resolve_anchor(
-                        Anchor::Weekday(target),
+                    Anchor::Weekday(target).render(
                         format,
                         None,
                         reference,
@@ -567,7 +562,7 @@ fn render_with_pattern(
 
 /// The shared date/time string parser for filters that work on the human clock
 /// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
-/// parse via [`parse_point`] directly.
+/// parse via [`parse_date_point`] directly.
 ///
 /// # Errors
 ///
@@ -777,7 +772,7 @@ fn duration_format(value: Value) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_point`].
+///   string; see [`parse_date_point`].
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
     Ok(parse_date_point(value)?.instant().timestamp())
 }
@@ -800,18 +795,86 @@ fn render_period_edge(
     render_with_pattern(local_datetime.format(pat), pat)
 }
 
+/// `{{ value | start_of_week }}` returns the first day (Monday) of the ISO week
+/// containing the input, at the input's original precision.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
+///   representable range or its local time cannot be resolved; see
+///   [`render_date_error`].
 fn start_of_week(value: &str) -> TemplateEngineResult<String> {
     render_period_edge(value, CalendarPeriod::Week, PeriodEdge::Start)
 }
 
+/// `{{ value | end_of_week }}` returns the last day (Sunday) of the ISO week
+/// containing the input, at the input's original precision.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
+///   representable range or its local time cannot be resolved; see
+///   [`render_date_error`].
 fn end_of_week(value: &str) -> TemplateEngineResult<String> {
     render_period_edge(value, CalendarPeriod::Week, PeriodEdge::End)
 }
 
+/// `{{ value | start_of_month }}` returns the first day of the month containing
+/// the input, at the input's original precision.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
+///   representable range or its local time cannot be resolved; see
+///   [`render_date_error`].
+fn start_of_month(value: &str) -> TemplateEngineResult<String> {
+    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::Start)
+}
+
+/// `{{ value | end_of_month }}` returns the last day of the month containing
+/// the input, at the input's original precision.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
+///   representable range or its local time cannot be resolved; see
+///   [`render_date_error`].
+fn end_of_month(value: &str) -> TemplateEngineResult<String> {
+    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::End)
+}
+
+/// `{{ value | start_of_year }}` returns the first day of the year containing
+/// the input, at the input's original precision.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
+///   representable range or its local time cannot be resolved; see
+///   [`render_date_error`].
 fn start_of_year(value: &str) -> TemplateEngineResult<String> {
     render_period_edge(value, CalendarPeriod::Year, PeriodEdge::Start)
 }
 
+/// `{{ value | end_of_year }}` returns the last day of the year containing the
+/// input, at the input's original precision.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
+///   representable range or its local time cannot be resolved; see
+///   [`render_date_error`].
 fn end_of_year(value: &str) -> TemplateEngineResult<String> {
     render_period_edge(value, CalendarPeriod::Year, PeriodEdge::End)
 }
@@ -979,30 +1042,6 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, n_i64, DurationUnit::Year)
 }
 
-/// `{{ value | start_of_month }}` returns the first day of the input month.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_point`].
-/// - [`ErrorKind::InvalidOperation`] if the first day of the month is outside
-///   chrono's representable range; see [`date_out_of_range_error`].
-fn start_of_month(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::Start)
-}
-
-/// `{{ value | end_of_month }}` returns the last day of the input month.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_point`].
-/// - [`ErrorKind::InvalidOperation`] if the last day of the month is outside
-///   chrono's representable range; see [`date_out_of_range_error`].
-fn end_of_month(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::End)
-}
-
 /// `{{ value | weekday }}` returns the ISO weekday number: `1` for Monday
 /// through `7` for Sunday. When `n` is supplied, returns the formatted date of
 /// that weekday in `value`'s week.
@@ -1041,7 +1080,7 @@ fn weekday(
 /// The `unit` kwarg defaults to `"days"` and accepts `"years"`, `"months"`,
 /// `"weeks"`, `"hours"`, `"minutes"`, `"seconds"`, or `"ms"`.
 /// `"years"`/`"months"` are calendar counts: whole units elapsed, day-of-month
-/// aware (see the date module's `whole_years_between`/`whole_months_between`),
+/// aware (see `DateValue::whole_months_until`),
 /// always an `i64` regardless of input precision. The remaining units,
 /// including `"weeks"`, `"ms"`, and the default `"days"`, are fixed-duration:
 /// `f64` when both inputs carry a time component, otherwise an `i64` whole-unit
@@ -1050,10 +1089,8 @@ fn weekday(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` or `other` is not a parseable
-///   date/time string (see [`parse_point`]) or `unit` is not one of
+///   date/time string (see [`parse_date_point`]) or `unit` is not one of
 ///   [`DurationUnit::from_spelling`]'s accepted names (see [`unit_kwarg`]).
-/// - [`ErrorKind::InvalidOperation`] if the difference overflows chrono's
-///   representable range (see [`render_date_error`]).
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `unit`.
 #[expect(
@@ -1070,12 +1107,10 @@ fn date_diff(
     let from = parse_date_point(value)?;
     let to = parse_date_point(other)?;
 
-    let diff = from.diff(to, unit).map_err(render_date_error)?;
-
-    match diff {
-        Difference::Whole(n) => Ok(Value::from(n)),
-        Difference::Fractional(f) => Ok(Value::from(f)),
-    }
+    Ok(match from.diff(to, unit) {
+        Difference::Whole(n) => Value::from(n),
+        Difference::Fractional(f) => Value::from(f),
+    })
 }
 
 /// `{% if value is is_past %}` returns `true` when the piped date/time string
@@ -1087,7 +1122,7 @@ fn date_diff(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_point`].
+///   string; see [`parse_date_point`].
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
     Ok(parse_date_point(value)?.instant() < Utc::now())
 }
@@ -1097,7 +1132,7 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_point`].
+///   string; see [`parse_date_point`].
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
     Ok(parse_date_point(value)?.instant() > Utc::now())
 }
@@ -1733,6 +1768,7 @@ mod tests {
         #[case::fractional_seconds("1.5s", "1 second, 500 milliseconds")]
         #[case::sub_millisecond_residual("0.0001s", "< 1 millisecond")]
         #[case::extreme_magnitudes("1e300s", "1e300 seconds")]
+        #[case::negative_extreme_magnitudes("-1e300s", "-1e300 seconds")]
         #[case::negative_fractional_seconds(
             "-1.5s",
             "-1 second, 500 milliseconds"
