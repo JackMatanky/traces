@@ -145,8 +145,8 @@ pub(crate) fn metadata_lookup_note_source(
 /// Returns note content with `rating` present on 7 of every 10 notes and
 /// omitted entirely on the remainder.
 ///
-/// Used by sort benchmarks that need a field resolving to `SortKey::Null` on
-/// a meaningful fraction of rows, not synthetic `ProjectShape` variance.
+/// Used by sort benchmarks that need a field resolving to `SortKey::Null` on a
+/// meaningful fraction of rows, not synthetic `ProjectShape` variance.
 pub(crate) fn nullable_rating_note_source(note_index: usize) -> String {
     if note_index % 10 < 7 {
         plain_note_source(note_index)
@@ -168,19 +168,23 @@ pub(crate) fn duration_field_note_source(note_index: usize) -> String {
     )
 }
 
-/// Returns note content with one calendar-date and one date-time metadata
-/// field.
+/// Returns note content with calendar-date, date-time, and duration metadata
+/// fields.
 ///
-/// `due` cycles through the months of 2026 and `seen` through the hours of one
-/// day, so the temporal parsers see varied date and date-time literals.
+/// `due` cycles through the months of 2026, `seen` through the hours of one
+/// day, and `estimate` through 1 to 12 hours and 0 to 59 minutes, so the
+/// temporal parsers see varied date, date-time, and duration literals.
 pub(crate) fn date_field_note_source(note_index: usize) -> String {
     let day_of_year = note_index % 365;
     let month = day_of_year / 31 + 1;
     let day = day_of_year % 28 + 1;
     format!(
         "---\ndue: 2026-{month:02}-{day:02}\nseen: \
-         2026-07-29T{:02}:{:02}:00Z\n---\n\n# Note {note_index}\n",
+         2026-07-29T{:02}:{:02}:00Z\nestimate: {}h{}m\n---\n\n# Note \
+         {note_index}\n",
         note_index % 24,
+        (note_index * 7) % 60,
+        (note_index % 12) + 1,
         (note_index * 7) % 60,
     )
 }

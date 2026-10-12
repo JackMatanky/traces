@@ -56,12 +56,12 @@ use common::{
 // ----------------------------------------------------------- //
 
 const QUERY_METADATA_FIELD_COUNTS: &[usize] = &[1, 5, 10, 20];
-/// Task-per-note sweep for [`bench_query_tasks_density`]: sparse, moderate,
-/// and heavy task lists per note.
+/// Task-per-note sweep for [`bench_query_tasks_density`]: sparse, moderate, and
+/// heavy task lists per note.
 const TASK_DENSITY_COUNTS: &[usize] = &[1, 10, 100];
 
-/// Workspace file-count sweep for [`bench_query_tasks_density`], independent
-/// of the shared `WORKSPACE_FILE_COUNTS` tiers.
+/// Workspace file-count sweep for [`bench_query_tasks_density`], independent of
+/// the shared `WORKSPACE_FILE_COUNTS` tiers.
 const TASK_DENSITY_FILE_COUNTS: &[usize] = &[100, 1_000, 10_000];
 
 // ----------------------------------------------------------- //
@@ -208,9 +208,11 @@ fn bench_run_pages_by_metadata(c: &mut Criterion) {
 /// 20,000-note workspace size.
 ///
 /// Parameters: varies metadata field count over `{1, 5, 10, 20}`; reports
-/// 20,000 input rows per iteration. Fixture indexes are built outside timing by
-/// `metadata_lookup_note_source`, which places `rating` after the synthetic
-/// fields so accidental linear metadata lookup is visible.
+/// 20,000 input rows per iteration.
+///
+/// Fixture indexes are built outside timing by `metadata_lookup_note_source`,
+/// which places `rating` after the synthetic fields so accidental linear
+/// metadata lookup is visible.
 ///
 /// Runs `rows_floor` (unfiltered page selection across varied field width)
 /// alongside `filter` (`rating > 2`).
@@ -269,14 +271,15 @@ fn bench_filter_by_metadata_field_count(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measures filter cost for date and date-time predicates at a fixed
+/// Measures filter cost for date, date-time, and duration predicates at a fixed
 /// 20,000-note workspace size.
 ///
 /// Parameters: varies the predicate shape over `{date_compare,
-/// datetime_compare, date_arithmetic}`; reports 20,000 input rows per
-/// iteration. Fixture indexes are built outside timing by
-/// `date_field_note_source`; `due` is a calendar date and `seen` a UTC
-/// date-time.
+/// datetime_compare, date_arithmetic, date_function, shorthand_period,
+/// duration_compare}`; reports 20,000 input rows per iteration.
+///
+/// Fixture indexes are built outside timing by `date_field_note_source`; `due`
+/// is a calendar date, `seen` a UTC date-time, and `estimate` a duration.
 ///
 /// Expected outcomes:
 /// - `date_compare` and `datetime_compare` stay near the `rating > 2` filter in
@@ -284,16 +287,23 @@ fn bench_filter_by_metadata_field_count(c: &mut Criterion) {
 ///   already parsed values.
 /// - `date_arithmetic` costs more per row because each row applies a duration
 ///   to a date point.
+/// - `date_function` and `shorthand_period` cost more than `date_compare`
+///   because each row evaluates a calendar function before comparing.
+/// - `duration_compare` stays near `date_compare`: both compare two parsed
+///   values.
 ///
 /// Unexpected outcomes:
 /// - Any variant growing by an order of magnitude over `date_compare`,
 ///   indicating per-row date parsing, zone lookup, or allocation in the
 ///   comparison path.
 fn bench_filter_by_date(c: &mut Criterion) {
-    const FILTERS: [(&str, &str); 3] = [
+    const FILTERS: [(&str, &str); 6] = [
         ("date_compare", r#"due > "2026-06-15""#),
         ("datetime_compare", r#"seen > "2026-07-29T12:00:00Z""#),
         ("date_arithmetic", r#"due + dur("1 month") > "2026-07-01""#),
+        ("date_function", r#"date("2026-06-15") < due"#),
+        ("shorthand_period", r#"eom(due) > "2026-06-30""#),
+        ("duration_compare", r#"estimate > "6h""#),
     ];
     let mut group = c.benchmark_group("QueryService::run/filter_by_date");
     let service = QueryService::new("class");
@@ -319,13 +329,15 @@ fn bench_filter_by_date(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measures task expansion throughput across a task-density x
-/// workspace-size matrix.
+/// Measures task expansion throughput across a task-density x workspace-size
+/// matrix.
 ///
 /// Parameters: sweeps [`TASK_DENSITY_COUNTS`] (`1, 10, 100` tasks per note)
 /// across [`TASK_DENSITY_FILE_COUNTS`] (`100, 1_000, 10_000` files); reports
-/// total expanded task-row throughput. Fixture indexes are built outside
-/// timing through `task_note_source` and `WorkspaceIndex::for_test`.
+/// total expanded task-row throughput.
+///
+/// Fixture indexes are built outside timing through `task_note_source` and
+/// `WorkspaceIndex::for_test`.
 ///
 /// Expected outcomes:
 /// - Execution time scales linearly with total expanded task rows (`file_count`
