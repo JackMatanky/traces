@@ -12,51 +12,40 @@ use crate::duration::{
     DurationComponent, DurationSeconds, DurationUnit, DurationValue,
 };
 
-impl DateTimeValue {
-    /// Shifts calendar units in the local datetime frame and clock units in
-    /// UTC.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error on overflow or failed local-zone resolution.
-    pub(crate) fn shift(
-        self,
-        n: i64,
-        unit: DurationUnit,
-    ) -> Result<Self, DateError> {
-        if unit.is_calendar() {
-            let local_datetime =
-                self.local_datetime().ok_or(DateError::OutOfRange)?;
-            Ok(Self(resolve_local(shift_datetime(local_datetime, n, unit)?)?))
-        } else {
-            Ok(Self(shift_datetime(self.0.naive_utc(), n, unit)?.and_utc()))
-        }
-    }
-}
-
 /// Calendar period used for date boundaries.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CalendarPeriod {
+    /// The ISO week, Monday through Sunday.
     Week,
+    /// The calendar month.
     Month,
+    /// The calendar year.
     Year,
 }
 
 /// Which side of a calendar period to select.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PeriodEdge {
+    /// First day of the period.
     Start,
+    /// Last day of the period.
     End,
 }
 
 /// A named calendar or clock component of a [`DatePoint`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateComponent {
+    /// Calendar year.
     Year,
+    /// Calendar month, 1 through 12.
     Month,
+    /// Day of the month, 1 through 31.
     Day,
+    /// Hour of the day, 0 through 23.
     Hour,
+    /// Minute of the hour, 0 through 59.
     Minute,
+    /// Second of the minute, 0 through 59.
     Second,
     /// ISO weekday number, Monday = 1 through Sunday = 7.
     Weekday,
@@ -85,30 +74,37 @@ impl DateComponent {
     }
 }
 
-/// Maps an ISO weekday number to a [`Weekday`]: `1` is Monday through `7`
-/// Sunday. `0` is rejected because Sunday-based conventions disagree on it
-/// (Sunday is `0` in some and `1` in others).
-#[must_use]
-pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
-    match n {
-        1 => Some(Weekday::Mon),
-        2 => Some(Weekday::Tue),
-        3 => Some(Weekday::Wed),
-        4 => Some(Weekday::Thu),
-        5 => Some(Weekday::Fri),
-        6 => Some(Weekday::Sat),
-        7 => Some(Weekday::Sun),
-        _ => None,
+/// Result of measuring the difference between two date points.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum Difference {
+    /// Whole units elapsed.
+    Whole(i64),
+    /// Fractional units elapsed.
+    Fractional(f64),
+}
+
+impl Difference {
+    /// Returns the measured difference magnitude as an `f64`.
+    #[inline]
+    #[must_use]
+    pub(crate) fn to_f64(self) -> Option<f64> {
+        match self {
+            Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
+            Self::Fractional(n) => Some(n),
+        }
     }
 }
 
 impl DatePoint {
-    /// Shifts a calendar date without zone resolution or an instant in its own
-    /// frame.
+    /// Shifts by `n` whole `unit`s: calendar units move the date or local
+    /// datetime, clock units move the exact instant (calendar dates move only
+    /// when the shift crosses midnight).
     ///
     /// # Errors
     ///
-    /// Returns out-of-range or local-zone resolution errors.
+    /// - [`DateError::OutOfRange`] if the shift overflows chrono's range.
+    /// - [`DateError::LocalZoneLookup`] if an instant's shifted local datetime
+    ///   cannot be resolved.
     pub(crate) fn shift(
         self,
         n: i64,
@@ -120,13 +116,169 @@ impl DatePoint {
                 ..
             } => {
                 let local_datetime =
-                    shift_datetime(self.local_datetime(), n, unit)?;
+                    shift_datetime(self.local_datetime_or_utc(), n, unit)?;
                 Ok(Self::Calendar {
                     date: DateValue(local_datetime.date()),
                     date_precision,
                 })
             }
             Self::Instant(dt) => dt.shift(n, unit).map(Self::Instant),
+        }
+    }
+
+    /// Applies retained components in written order, or fixed seconds exactly.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if a component is non-finite, a calendar
+    ///   magnitude does not fit `i64`, or any shift overflows.
+    /// - [`DateError::LocalZoneLookup`] if an instant's shifted local datetime
+    ///   cannot be resolved.
+    pub(crate) fn apply(
+        self,
+        duration: &DurationValue,
+    ) -> Result<Self, DateError> {
+        match duration.components() {
+            Some(components) => {
+                components.iter().try_fold(self, |date_point, &component| {
+                    date_point.apply_component(component)
+                })
+            }
+            None => self.advance_exact(
+                TimeDelta::try_from(duration.nominal_seconds())
+                    .map_err(|_| DateError::OutOfRange)?,
+            ),
+        }
+    }
+
+    /// Returns the first day of the period, preserving written precision and
+    /// time.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the boundary date is outside chrono's
+    ///   date range.
+    /// - [`DateError::LocalZoneLookup`] if an instant's boundary datetime
+    ///   cannot be resolved.
+    pub(crate) fn start_of(
+        self,
+        calendar_period: CalendarPeriod,
+    ) -> Result<Self, DateError> {
+        self.boundary(calendar_period, PeriodEdge::Start)
+    }
+
+    /// Returns the last day of the period, preserving written precision and
+    /// time.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the boundary date is outside chrono's
+    ///   date range.
+    /// - [`DateError::LocalZoneLookup`] if an instant's boundary datetime
+    ///   cannot be resolved.
+    pub(crate) fn end_of(
+        self,
+        calendar_period: CalendarPeriod,
+    ) -> Result<Self, DateError> {
+        self.boundary(calendar_period, PeriodEdge::End)
+    }
+
+    /// Selects a weekday of this date point's ISO week.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the ISO week's `target` day is outside
+    ///   chrono's date range.
+    /// - [`DateError::LocalZoneLookup`] if an instant's new local datetime
+    ///   cannot be resolved.
+    pub(crate) fn with_weekday(
+        self,
+        target: Weekday,
+    ) -> Result<Self, DateError> {
+        let iso = self.local_datetime_or_utc().date().iso_week();
+        let date = NaiveDate::from_isoywd_opt(iso.year(), iso.week(), target)
+            .ok_or(DateError::OutOfRange)?;
+        self.with_date(date)
+    }
+
+    /// Returns one calendar or clock component of the local datetime reading.
+    ///
+    /// Weekdays are ISO numbered, Monday = 1 through Sunday = 7.
+    #[must_use]
+    pub(crate) fn component(self, component: DateComponent) -> i64 {
+        let local_datetime = self.local_datetime_or_utc();
+        match component {
+            DateComponent::Year => i64::from(local_datetime.year()),
+            DateComponent::Month => i64::from(local_datetime.month()),
+            DateComponent::Day => i64::from(local_datetime.day()),
+            DateComponent::Hour => i64::from(local_datetime.hour()),
+            DateComponent::Minute => i64::from(local_datetime.minute()),
+            DateComponent::Second => i64::from(local_datetime.second()),
+            DateComponent::Weekday => {
+                i64::from(local_datetime.weekday().number_from_monday())
+            }
+            DateComponent::Week => i64::from(local_datetime.iso_week().week()),
+        }
+    }
+
+    /// Measures the difference to another date point in the requested unit.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if the elapsed seconds cannot be converted
+    ///   to `f64` or `unit` has no whole-second length.
+    pub(crate) fn diff(
+        self,
+        to: Self,
+        unit: DurationUnit,
+    ) -> Result<Difference, DateError> {
+        match unit {
+            DurationUnit::Year => Ok(Difference::Whole(whole_years_between(
+                self.local_datetime_or_utc().date(),
+                to.local_datetime_or_utc().date(),
+            ))),
+            DurationUnit::Month => Ok(Difference::Whole(whole_months_between(
+                self.local_datetime_or_utc().date(),
+                to.local_datetime_or_utc().date(),
+            ))),
+            DurationUnit::Week
+            | DurationUnit::Day
+            | DurationUnit::Hour
+            | DurationUnit::Minute
+            | DurationUnit::Second
+            | DurationUnit::Millisecond => {
+                if self.has_time() && to.has_time() {
+                    let delta =
+                        to.instant().signed_duration_since(self.instant());
+                    let whole_seconds = delta
+                        .num_seconds()
+                        .to_f64()
+                        .ok_or(DateError::OutOfRange)?;
+                    Ok(Difference::Fractional(
+                        (whole_seconds + f64::from(delta.subsec_nanos()) / 1e9)
+                            / unit.nominal_seconds(),
+                    ))
+                } else if unit == DurationUnit::Millisecond {
+                    Ok(Difference::Whole(
+                        to.local_datetime_or_utc()
+                            .signed_duration_since(self.local_datetime_or_utc())
+                            .num_milliseconds(),
+                    ))
+                } else {
+                    let delta = to
+                        .local_datetime_or_utc()
+                        .signed_duration_since(self.local_datetime_or_utc());
+                    let unit_secs = unit
+                        .whole_nominal_seconds()
+                        .ok_or(DateError::OutOfRange)?;
+                    #[expect(
+                        clippy::arithmetic_side_effects,
+                        reason = "fixed unit ratio is nonzero"
+                    )]
+                    let result = delta.num_seconds() / unit_secs;
+                    Ok(Difference::Whole(result))
+                }
+            }
         }
     }
 
@@ -199,28 +351,6 @@ impl DatePoint {
         }
     }
 
-    /// Applies retained components in written order, or fixed seconds exactly.
-    ///
-    /// # Errors
-    ///
-    /// Returns out-of-range or local-zone resolution errors.
-    pub(crate) fn apply(
-        self,
-        duration: &DurationValue,
-    ) -> Result<Self, DateError> {
-        match duration.components() {
-            Some(components) => {
-                components.iter().try_fold(self, |date_point, &component| {
-                    date_point.apply_component(component)
-                })
-            }
-            None => self.advance_exact(
-                TimeDelta::try_from(duration.nominal_seconds())
-                    .map_err(|_| DateError::OutOfRange)?,
-            ),
-        }
-    }
-
     fn with_date(self, date: NaiveDate) -> Result<Self, DateError> {
         match self {
             Self::Calendar {
@@ -232,7 +362,7 @@ impl DatePoint {
             }),
             Self::Instant(_) => {
                 let local_datetime =
-                    date.and_time(self.local_datetime().time());
+                    date.and_time(self.local_datetime_or_utc().time());
                 Ok(Self::Instant(DateTimeValue(resolve_local(local_datetime)?)))
             }
         }
@@ -243,7 +373,7 @@ impl DatePoint {
         calendar_period: CalendarPeriod,
         period_edge: PeriodEdge,
     ) -> Result<Self, DateError> {
-        let date = self.local_datetime().date();
+        let date = self.local_datetime_or_utc().date();
         let new_date = match (calendar_period, period_edge) {
             (CalendarPeriod::Week, period_edge) => {
                 let iso = date.iso_week();
@@ -274,126 +404,47 @@ impl DatePoint {
         .ok_or(DateError::OutOfRange)?;
         self.with_date(new_date)
     }
+}
 
-    /// Returns the first day of the period, preserving written precision and
-    /// time.
+impl DateTimeValue {
+    /// Shifts calendar units in the local datetime frame and clock units in
+    /// UTC.
     ///
     /// # Errors
     ///
-    /// Returns out-of-range or local-zone resolution errors.
-    pub(crate) fn start_of(
+    /// - [`DateError::OutOfRange`] if the shift overflows, or the local
+    ///   datetime of a calendar-unit shift is outside chrono's range.
+    /// - [`DateError::LocalZoneLookup`] if the shifted local datetime cannot be
+    ///   resolved to an instant.
+    pub(crate) fn shift(
         self,
-        calendar_period: CalendarPeriod,
-    ) -> Result<Self, DateError> {
-        self.boundary(calendar_period, PeriodEdge::Start)
-    }
-
-    /// Returns the last day of the period, preserving written precision and
-    /// time.
-    ///
-    /// # Errors
-    ///
-    /// Returns out-of-range or local-zone resolution errors.
-    pub(crate) fn end_of(
-        self,
-        calendar_period: CalendarPeriod,
-    ) -> Result<Self, DateError> {
-        self.boundary(calendar_period, PeriodEdge::End)
-    }
-
-    /// Selects a weekday of this date point's ISO week.
-    ///
-    /// # Errors
-    ///
-    /// Returns out-of-range or local-zone resolution errors.
-    pub(crate) fn with_weekday(
-        self,
-        target: Weekday,
-    ) -> Result<Self, DateError> {
-        let iso = self.local_datetime().date().iso_week();
-        let date = NaiveDate::from_isoywd_opt(iso.year(), iso.week(), target)
-            .ok_or(DateError::OutOfRange)?;
-        self.with_date(date)
-    }
-
-    /// Returns one calendar or clock component of the local datetime reading.
-    ///
-    /// Weekdays are ISO numbered, Monday = 1 through Sunday = 7.
-    #[must_use]
-    pub(crate) fn component(self, component: DateComponent) -> i64 {
-        let local_datetime = self.local_datetime();
-        match component {
-            DateComponent::Year => i64::from(local_datetime.year()),
-            DateComponent::Month => i64::from(local_datetime.month()),
-            DateComponent::Day => i64::from(local_datetime.day()),
-            DateComponent::Hour => i64::from(local_datetime.hour()),
-            DateComponent::Minute => i64::from(local_datetime.minute()),
-            DateComponent::Second => i64::from(local_datetime.second()),
-            DateComponent::Weekday => {
-                i64::from(local_datetime.weekday().number_from_monday())
-            }
-            DateComponent::Week => i64::from(local_datetime.iso_week().week()),
-        }
-    }
-
-    /// Measures the difference to another date point in the requested unit.
-    ///
-    /// # Errors
-    ///
-    /// Returns out-of-range when the measurement cannot be represented.
-    pub(crate) fn diff(
-        self,
-        to: Self,
+        n: i64,
         unit: DurationUnit,
-    ) -> Result<Difference, DateError> {
-        match unit {
-            DurationUnit::Year => Ok(Difference::Whole(whole_years_between(
-                self.local_datetime().date(),
-                to.local_datetime().date(),
-            ))),
-            DurationUnit::Month => Ok(Difference::Whole(whole_months_between(
-                self.local_datetime().date(),
-                to.local_datetime().date(),
-            ))),
-            DurationUnit::Week
-            | DurationUnit::Day
-            | DurationUnit::Hour
-            | DurationUnit::Minute
-            | DurationUnit::Second
-            | DurationUnit::Millisecond => {
-                if self.has_time() && to.has_time() {
-                    let delta =
-                        to.instant().signed_duration_since(self.instant());
-                    let whole_seconds = delta
-                        .num_seconds()
-                        .to_f64()
-                        .ok_or(DateError::OutOfRange)?;
-                    Ok(Difference::Fractional(
-                        (whole_seconds + f64::from(delta.subsec_nanos()) / 1e9)
-                            / unit.nominal_seconds(),
-                    ))
-                } else if unit == DurationUnit::Millisecond {
-                    Ok(Difference::Whole(
-                        to.local_datetime()
-                            .signed_duration_since(self.local_datetime())
-                            .num_milliseconds(),
-                    ))
-                } else {
-                    let delta = to
-                        .local_datetime()
-                        .signed_duration_since(self.local_datetime());
-                    let unit_secs = unit
-                        .whole_nominal_seconds()
-                        .ok_or(DateError::OutOfRange)?;
-                    #[expect(
-                        clippy::arithmetic_side_effects,
-                        reason = "fixed unit ratio is nonzero"
-                    )]
-                    let result = delta.num_seconds() / unit_secs;
-                    Ok(Difference::Whole(result))
-                }
-            }
+    ) -> Result<Self, DateError> {
+        if unit.is_calendar() {
+            let local_datetime =
+                self.local_datetime().ok_or(DateError::OutOfRange)?;
+            Ok(Self(resolve_local(shift_datetime(local_datetime, n, unit)?)?))
+        } else {
+            Ok(Self(shift_datetime(self.0.naive_utc(), n, unit)?.and_utc()))
         }
+    }
+}
+
+/// Maps an ISO weekday number to a [`Weekday`]: `1` is Monday through `7`
+/// Sunday. `0` is rejected because Sunday-based conventions disagree on it
+/// (Sunday is `0` in some and `1` in others).
+#[must_use]
+pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
+    match n {
+        1 => Some(Weekday::Mon),
+        2 => Some(Weekday::Tue),
+        3 => Some(Weekday::Wed),
+        4 => Some(Weekday::Thu),
+        5 => Some(Weekday::Fri),
+        6 => Some(Weekday::Sat),
+        7 => Some(Weekday::Sun),
+        _ => None,
     }
 }
 
@@ -406,27 +457,6 @@ fn calendar_advance(
         .checked_add_signed(delta)
         .map(|local_datetime| DateValue(local_datetime.date()))
         .ok_or(DateError::OutOfRange)
-}
-
-/// Result of measuring the difference between two date points.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum Difference {
-    /// Whole units elapsed.
-    Whole(i64),
-    /// Fractional units elapsed.
-    Fractional(f64),
-}
-
-impl Difference {
-    /// Returns the measured difference magnitude as an `f64`.
-    #[inline]
-    #[must_use]
-    pub(crate) fn to_f64(self) -> Option<f64> {
-        match self {
-            Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
-            Self::Fractional(n) => Some(n),
-        }
-    }
 }
 
 /// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from
@@ -591,7 +621,7 @@ mod tests {
         test_support::TzGuard,
     };
 
-    fn date_point(text: &str) -> DatePoint {
+    fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
     }
 
@@ -618,7 +648,7 @@ mod tests {
         fn apply_rewinds_the_instant_by_negated_duration() {
             let base = DatePoint::Instant(fixed_datetime());
             let one_hour = DurationValue::parse("1h").expect("valid duration");
-            let back = base.apply(&(one_hour * -1.0)).expect("no overflow");
+            let back = base.apply(&(-one_hour)).expect("no overflow");
             assert_eq!(
                 back,
                 DatePoint::Instant(DateTimeValue(
@@ -642,7 +672,7 @@ mod tests {
                 DatePoint::Instant(DateTimeValue(DateTime::<Utc>::MIN_UTC));
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
-            assert_eq!(near_min.apply(&(one_second * -1.0)).ok(), None);
+            assert_eq!(near_min.apply(&(-one_second)).ok(), None);
         }
 
         #[test]
@@ -651,12 +681,12 @@ mod tests {
             TzGuard::set("America/New_York");
 
             // Saturday March 7, 2026 at 12:00 EST (UTC 17:00:00)
-            let base = date_point("2026-03-07 12:00:00");
+            let base = point_at("2026-03-07 12:00:00");
 
             // A one-day `shift` keeps 12:00 on the clock time across the gap.
             let shifted_day = base.shift(1, DurationUnit::Day).unwrap();
             assert_eq!(
-                shifted_day.local_datetime().to_string(),
+                shifted_day.local_datetime_or_utc().to_string(),
                 "2026-03-08 12:00:00"
             );
 
@@ -665,7 +695,7 @@ mod tests {
             let shifted_7d = base.shift(7, DurationUnit::Day).unwrap();
             assert_eq!(shifted_week, shifted_7d);
             assert_eq!(
-                shifted_week.local_datetime().to_string(),
+                shifted_week.local_datetime_or_utc().to_string(),
                 "2026-03-14 12:00:00"
             );
 
@@ -673,7 +703,7 @@ mod tests {
             let shifted_168h = base.shift(168, DurationUnit::Hour).unwrap();
             assert_ne!(shifted_week, shifted_168h);
             assert_eq!(
-                shifted_168h.local_datetime().to_string(),
+                shifted_168h.local_datetime_or_utc().to_string(),
                 "2026-03-14 13:00:00"
             );
 
@@ -693,12 +723,12 @@ mod tests {
             // Yet they shift a date differently:
             // 2026-01-15 + 1 month = 2026-02-15 (28 days later)
             // 2026-01-15 + 30 days = 2026-02-14 (30 days later)
-            let base = date_point("2026-01-15");
+            let base = point_at("2026-01-15");
             let shifted_month = base.apply(&one_month).unwrap();
             let shifted_days = base.apply(&thirty_days).unwrap();
 
-            assert_eq!(shifted_month, date_point("2026-02-15"));
-            assert_eq!(shifted_days, date_point("2026-02-14"));
+            assert_eq!(shifted_month, point_at("2026-02-15"));
+            assert_eq!(shifted_days, point_at("2026-02-14"));
             assert_ne!(shifted_month, shifted_days);
         }
 
@@ -707,15 +737,15 @@ mod tests {
             // Chrono's `checked_add_months` clamps to the target month's last
             // day; the calendar owner delegates to it, so the clamp is pinned
             // here.
-            let jan_31_non_leap = date_point("2023-01-31");
+            let jan_31_non_leap = point_at("2023-01-31");
             let feb_clamped =
                 jan_31_non_leap.shift(1, DurationUnit::Month).unwrap();
-            assert_eq!(feb_clamped, date_point("2023-02-28"));
+            assert_eq!(feb_clamped, point_at("2023-02-28"));
 
-            let jan_31_leap = date_point("2024-01-31");
+            let jan_31_leap = point_at("2024-01-31");
             let feb_leap_clamped =
                 jan_31_leap.shift(1, DurationUnit::Month).unwrap();
-            assert_eq!(feb_leap_clamped, date_point("2024-02-29"));
+            assert_eq!(feb_leap_clamped, point_at("2024-02-29"));
         }
 
         #[test]
@@ -728,25 +758,25 @@ mod tests {
             assert_eq!(one_day, twenty_four_hours);
 
             // Saturday March 7, 2026 at 12:00:00 EST (UTC 17:00:00)
-            let base = date_point("2026-03-07 12:00:00");
+            let base = point_at("2026-03-07 12:00:00");
 
             // 1d shifts local clock time to Sunday March 8, 2026 at 12:00:00
             // EDT (UTC 16:00:00)
             let shifted_day = base.apply(&one_day).unwrap();
             assert_eq!(
-                shifted_day.local_datetime().to_string(),
+                shifted_day.local_datetime_or_utc().to_string(),
                 "2026-03-08 12:00:00"
             );
-            assert_eq!(shifted_day, date_point("2026-03-08T16:00:00Z"));
+            assert_eq!(shifted_day, point_at("2026-03-08T16:00:00Z"));
 
             // 24h shifts stored UTC instant by 24 hours -> Sunday March 8 at
             // 13:00:00 EDT (UTC 17:00:00)
             let shifted_hours = base.apply(&twenty_four_hours).unwrap();
             assert_eq!(
-                shifted_hours.local_datetime().to_string(),
+                shifted_hours.local_datetime_or_utc().to_string(),
                 "2026-03-08 13:00:00"
             );
-            assert_eq!(shifted_hours, date_point("2026-03-08T17:00:00Z"));
+            assert_eq!(shifted_hours, point_at("2026-03-08T17:00:00Z"));
 
             // Equal values, different shifts across DST
             assert_ne!(shifted_day, shifted_hours);
@@ -765,7 +795,7 @@ mod tests {
             assert_eq!(one_week, hours_168);
 
             // Saturday March 7, 2026 at 12:00:00 EST
-            let base = date_point("2026-03-07 12:00:00");
+            let base = point_at("2026-03-07 12:00:00");
 
             let shifted_week = base.apply(&one_week).unwrap();
             let shifted_7d = base.apply(&seven_days).unwrap();
@@ -774,14 +804,14 @@ mod tests {
             // The `1w` and `7d` forms shift identically.
             assert_eq!(shifted_week, shifted_7d);
             assert_eq!(
-                shifted_week.local_datetime().to_string(),
+                shifted_week.local_datetime_or_utc().to_string(),
                 "2026-03-14 12:00:00"
             );
 
             // The `1w` and `168h` forms differ across the DST transition.
             assert_ne!(shifted_week, shifted_168h);
             assert_eq!(
-                shifted_168h.local_datetime().to_string(),
+                shifted_168h.local_datetime_or_utc().to_string(),
                 "2026-03-14 13:00:00"
             );
         }
@@ -791,7 +821,7 @@ mod tests {
             TzGuard::set("America/New_York");
 
             // Saturday March 7, 2026 at 02:30:00 EST (UTC 07:30:00)
-            let base = date_point("2026-03-07 02:30:00");
+            let base = point_at("2026-03-07 02:30:00");
 
             let d_1d_1h = DurationValue::parse("1d 1h").unwrap();
             let d_1h_1d = DurationValue::parse("1h 1d").unwrap();
@@ -804,9 +834,9 @@ mod tests {
             // to 03:30 EDT = 07:30 UTC), then 1h advances the instant to
             // 08:30 UTC (04:30 EDT).
             let res_1d_1h = base.apply(&d_1d_1h).unwrap();
-            assert_eq!(res_1d_1h, date_point("2026-03-08T08:30:00Z"));
+            assert_eq!(res_1d_1h, point_at("2026-03-08T08:30:00Z"));
             assert_eq!(
-                res_1d_1h.local_datetime().to_string(),
+                res_1d_1h.local_datetime_or_utc().to_string(),
                 "2026-03-08 04:30:00"
             );
 
@@ -814,9 +844,9 @@ mod tests {
             // (08:30 UTC), then 1d shifts the clock time to Sunday 03:30 EDT
             // (07:30 UTC).
             let res_1h_1d = base.apply(&d_1h_1d).unwrap();
-            assert_eq!(res_1h_1d, date_point("2026-03-08T07:30:00Z"));
+            assert_eq!(res_1h_1d, point_at("2026-03-08T07:30:00Z"));
             assert_eq!(
-                res_1h_1d.local_datetime().to_string(),
+                res_1h_1d.local_datetime_or_utc().to_string(),
                 "2026-03-08 03:30:00"
             );
 
@@ -829,7 +859,7 @@ mod tests {
             TzGuard::set("America/New_York");
 
             // Saturday March 7, 2026 at 06:00 EST (UTC 11:00:00)
-            let base = date_point("2026-03-07 06:00:00");
+            let base = point_at("2026-03-07 06:00:00");
 
             // 1.5d == 36h == 1d 12h as values (129,600 fixed seconds)
             let one_and_half_days = DurationValue::parse("1.5d").unwrap();
@@ -843,10 +873,10 @@ mod tests {
             // 0.5-day remainder adds 12 clock hours to Sunday 18:00 EDT.
             let shifted_fractional = base.apply(&one_and_half_days).unwrap();
             assert_eq!(
-                shifted_fractional.local_datetime().to_string(),
+                shifted_fractional.local_datetime_or_utc().to_string(),
                 "2026-03-08 18:00:00"
             );
-            assert_eq!(shifted_fractional, date_point("2026-03-08T22:00:00Z"));
+            assert_eq!(shifted_fractional, point_at("2026-03-08T22:00:00Z"));
 
             // The fractional spelling decomposes exactly like its written-order
             // equivalent "1d 12h".
@@ -859,14 +889,14 @@ mod tests {
             let shifted_exact = base.apply(&thirty_six_hours).unwrap();
             assert_ne!(shifted_fractional, shifted_exact);
             assert_eq!(
-                shifted_exact.local_datetime().to_string(),
+                shifted_exact.local_datetime_or_utc().to_string(),
                 "2026-03-08 19:00:00"
             );
         }
 
         #[test]
         fn date_value_calendar_arithmetic_handles_sub_day_units() {
-            let base = date_point("2026-07-29");
+            let base = point_at("2026-07-29");
 
             // Sub-day 1 hour shift is a no-op on date (stays 2026-07-29)
             let one_hour = DurationValue::parse("1h").unwrap();
@@ -876,16 +906,16 @@ mod tests {
             let twenty_four_hours = DurationValue::parse("24h").unwrap();
             assert_eq!(
                 base.apply(&twenty_four_hours).unwrap(),
-                date_point("2026-07-30")
+                point_at("2026-07-30")
             );
         }
 
         #[test]
         fn diff_splits_the_fixed_unit_frame_by_time_component_presence() {
             TzGuard::set("UTC");
-            let dt1 = date_point("2026-07-28T23:00:00Z");
-            let dt2 = date_point("2026-07-29T00:30:00Z");
-            let date_only = date_point("2026-07-29");
+            let dt1 = point_at("2026-07-28T23:00:00Z");
+            let dt2 = point_at("2026-07-29T00:30:00Z");
+            let date_only = point_at("2026-07-29");
 
             // When both date points carry a time component, fixed units return
             // exact f64:
@@ -899,8 +929,8 @@ mod tests {
             assert_eq!(diff_calendar, Difference::Whole(1));
 
             // Calendar units return whole counts:
-            let diff_months = date_point("2026-01-15")
-                .diff(date_point("2026-03-15"), DurationUnit::Month)
+            let diff_months = point_at("2026-01-15")
+                .diff(point_at("2026-03-15"), DurationUnit::Month)
                 .unwrap();
             assert_eq!(diff_months, Difference::Whole(2));
         }
@@ -913,24 +943,24 @@ mod tests {
             // Saturday March 7, 2026 at 12:00 EST: month and year shifts
             // preserve the clock time, re-resolving through the local zone
             // after the chrono arithmetic.
-            let base = date_point("2026-03-07 12:00:00");
+            let base = point_at("2026-03-07 12:00:00");
             let shifted_month = base.shift(1, DurationUnit::Month).unwrap();
             assert_eq!(
-                shifted_month.local_datetime().to_string(),
+                shifted_month.local_datetime_or_utc().to_string(),
                 "2026-04-07 12:00:00"
             );
             let shifted_year = base.shift(1, DurationUnit::Year).unwrap();
             assert_eq!(
-                shifted_year.local_datetime().to_string(),
+                shifted_year.local_datetime_or_utc().to_string(),
                 "2027-03-07 12:00:00"
             );
 
             // Month-end clamping also re-resolves locally: Jan 31 noon in
             // EST clamps to Feb 28 noon, still reading 12:00.
-            let january = date_point("2026-01-31 12:00:00");
+            let january = point_at("2026-01-31 12:00:00");
             let clamped = january.shift(1, DurationUnit::Month).unwrap();
             assert_eq!(
-                clamped.local_datetime().to_string(),
+                clamped.local_datetime_or_utc().to_string(),
                 "2026-02-28 12:00:00"
             );
         }
@@ -939,18 +969,18 @@ mod tests {
         fn apply_applies_a_fractional_calendar_part_to_a_calendar_date() {
             // 1.5d: the whole day shifts the calendar; the 12-hour
             // remainder lands on the resulting calendar day (midnight + 36h).
-            let base = date_point("2026-03-07");
+            let base = point_at("2026-03-07");
             let shifted =
                 base.apply(&DurationValue::parse("1.5d").unwrap()).unwrap();
-            assert_eq!(shifted, date_point("2026-03-08"));
+            assert_eq!(shifted, point_at("2026-03-08"));
 
             // 1.5mo: the whole month clamps Jan 31 to Feb 28, then the
             // 15-day remainder (half of the nominal 30-day month) applies
             // as exact calendar time.
-            let january = date_point("2026-01-31");
+            let january = point_at("2026-01-31");
             let clamped =
                 january.apply(&DurationValue::parse("1.5mo").unwrap()).unwrap();
-            assert_eq!(clamped, date_point("2026-03-15"));
+            assert_eq!(clamped, point_at("2026-03-15"));
         }
 
         #[rstest]
@@ -966,30 +996,76 @@ mod tests {
             #[case] unit: DurationUnit,
             #[case] expected: &str,
         ) {
-            let base = date_point("2026-07-29");
+            let base = point_at("2026-07-29");
             let shifted = base.shift(n, unit).unwrap();
-            assert_eq!(shifted, date_point(expected));
+            assert_eq!(shifted, point_at(expected));
         }
 
         #[test]
-        fn date_point_shift_clamps_date_and_keeps_sub_day_precision() {
+        fn month_shift_clamps_to_the_last_day_and_keeps_day_precision() {
             // Arrange
-            let jan = date_point("2026-01-31");
-            let july = date_point("2026-07-29");
+            let january_31 = point_at("2026-01-31");
 
             // Act
-            let feb = jan.shift(1, DurationUnit::Month).unwrap();
-            let same_day = july.shift(5, DurationUnit::Hour).unwrap();
+            let shifted = january_31.shift(1, DurationUnit::Month).unwrap();
+
+            // Assert
+            assert_eq!(shifted, point_at("2026-02-28"));
+            assert_eq!(shifted.canonical_pattern(), "%Y-%m-%d");
+        }
+
+        #[rstest]
+        #[case::five_hours(5, "2026-07-29")]
+        #[case::just_under_a_day(23, "2026-07-29")]
+        #[case::one_day(24, "2026-07-30")]
+        #[case::over_a_day(25, "2026-07-30")]
+        #[case::backwards(-1, "2026-07-28")]
+        fn hour_shift_moves_a_calendar_date_only_across_midnight(
+            #[case] hours: i64,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            let base = point_at("2026-07-29");
+
+            // Act
+            let shifted = base.shift(hours, DurationUnit::Hour).unwrap();
+
+            // Assert
+            assert_eq!(shifted, point_at(expected));
+        }
+
+        #[test]
+        fn month_shift_keeps_month_precision() {
+            // Arrange
+            let base = point_at("2026-07");
+
+            // Act
+            let shifted = base.shift(1, DurationUnit::Month).unwrap();
+
+            // Assert
+            assert_eq!(shifted.canonical_pattern(), "%Y-%m");
+            assert_eq!(
+                shifted.local_datetime_or_utc().format("%Y-%m").to_string(),
+                "2026-08"
+            );
+        }
+
+        #[test]
+        fn clock_shift_keeps_fractional_seconds() {
+            // Arrange
+            TzGuard::set("UTC");
+            let base = point_at("2026-07-29T14:30:00.123");
+
+            // Act
+            let shifted = base.shift(1, DurationUnit::Hour).unwrap();
 
             // Assert
             assert_eq!(
-                feb.local_datetime().date(),
-                NaiveDate::from_ymd_opt(2026, 2, 28).unwrap()
-            );
-            assert_eq!(feb.canonical_pattern(), "%Y-%m-%d");
-            assert_eq!(
-                same_day.local_datetime().date(),
-                NaiveDate::from_ymd_opt(2026, 7, 29).unwrap()
+                shifted
+                    .local_datetime_or_utc()
+                    .format(shifted.canonical_pattern())
+                    .to_string(),
+                "2026-07-29T15:30:00.123"
             );
         }
 
@@ -997,14 +1073,14 @@ mod tests {
         fn date_point_calendar_shift_preserves_noon_across_dst() {
             // Arrange
             TzGuard::set("America/New_York");
-            let date_point = date_point("2026-03-07T12:00:00");
+            let date_point = point_at("2026-03-07T12:00:00");
 
             // Act
             let shifted = date_point.shift(1, DurationUnit::Day).unwrap();
 
             // Assert
             assert_eq!(
-                shifted.local_datetime().to_string(),
+                shifted.local_datetime_or_utc().to_string(),
                 "2026-03-08 12:00:00"
             );
         }
@@ -1013,7 +1089,7 @@ mod tests {
         fn zero_day_shift_re_resolves_fold_to_earlier_occurrence() {
             // Arrange
             TzGuard::set("America/New_York");
-            let second_occurrence = date_point("2026-11-01T06:30:00Z");
+            let second_occurrence = point_at("2026-11-01T06:30:00Z");
 
             // Act: calendar shifts re-resolve through the earliest-occurrence
             // policy.
@@ -1023,7 +1099,7 @@ mod tests {
             // Assert
             assert_eq!(
                 shifted.instant(),
-                date_point("2026-11-01T05:30:00Z").instant()
+                point_at("2026-11-01T05:30:00Z").instant()
             );
         }
 
@@ -1031,7 +1107,7 @@ mod tests {
         fn zero_day_shift_in_utc_keeps_the_instant() {
             // Arrange
             TzGuard::set("UTC");
-            let date_point = date_point("2026-07-29T14:30:00Z");
+            let date_point = point_at("2026-07-29T14:30:00Z");
 
             // Act
             let shifted = date_point.shift(0, DurationUnit::Day).unwrap();
@@ -1063,7 +1139,7 @@ mod tests {
         #[test]
         fn date_apply_restarts_each_sub_day_component_at_midnight() {
             // Arrange
-            let date = date_point("2026-07-29");
+            let date = point_at("2026-07-29");
             let separate = DurationValue::parse("12h 12h").unwrap();
             let together = DurationValue::parse("24h").unwrap();
 
@@ -1073,7 +1149,7 @@ mod tests {
 
             // Assert
             assert_eq!(separate_date, date);
-            assert_eq!(together_date, date_point("2026-07-30"));
+            assert_eq!(together_date, point_at("2026-07-30"));
         }
     }
 
@@ -1084,56 +1160,56 @@ mod tests {
 
         #[test]
         fn week_boundary_returns_iso_monday_spanning_month_boundaries() {
-            let date_point = date_point("2026-02-01");
+            let date_point = point_at("2026-02-01");
             let sow = date_point.start_of(CalendarPeriod::Week).expect("sow");
             let eow = date_point.end_of(CalendarPeriod::Week).expect("eow");
             assert_eq!(
-                sow.local_datetime().date(),
+                sow.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-01-26").unwrap().naive_date()
             );
             assert_eq!(
-                eow.local_datetime().date(),
+                eow.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-02-01").unwrap().naive_date()
             );
         }
 
         #[test]
         fn year_boundary_returns_first_and_last_day_of_year() {
-            let date_point = date_point("2026-07-29");
+            let date_point = point_at("2026-07-29");
             let soy = date_point.start_of(CalendarPeriod::Year).expect("soy");
             let eoy = date_point.end_of(CalendarPeriod::Year).expect("eoy");
             assert_eq!(
-                soy.local_datetime().date(),
+                soy.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-01-01").unwrap().naive_date()
             );
             assert_eq!(
-                eoy.local_datetime().date(),
+                eoy.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-12-31").unwrap().naive_date()
             );
         }
 
         #[test]
         fn date_point_with_weekday_maps_to_target_weekday_in_iso_week() {
-            let date_point = date_point("2026-07-29");
+            let date_point = point_at("2026-07-29");
             let mon = date_point.with_weekday(Weekday::Mon).expect("mon");
             let sun = date_point.with_weekday(Weekday::Sun).expect("sun");
             assert_eq!(
-                mon.local_datetime().date(),
+                mon.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-07-27").unwrap().naive_date()
             );
             assert_eq!(
-                sun.local_datetime().date(),
+                sun.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-08-02").unwrap().naive_date()
             );
         }
 
         #[test]
         fn date_point_apply_shifts_by_compound_duration() {
-            let date_point = date_point("2026-07-29");
+            let date_point = point_at("2026-07-29");
             let dur = DurationValue::parse("1w 2d").unwrap();
             let shifted = date_point.apply(&dur).expect("apply succeeds");
             assert_eq!(
-                shifted.local_datetime().date(),
+                shifted.local_datetime_or_utc().date(),
                 DateValue::parse_iso("2026-08-07").unwrap().naive_date()
             );
             assert_eq!(shifted.canonical_pattern(), "%Y-%m-%d");

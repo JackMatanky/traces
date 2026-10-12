@@ -13,14 +13,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{error::DurationError, scan, unit::DurationUnit};
 
-/// At or above this magnitude, [`DurationSeconds`]'s [`Display`](fmt::Display)
-/// switches to scientific notation.
-const SCIENTIFIC_ABOVE: f64 = 1e15;
-
-/// Below this magnitude (excluding exact zero), [`DurationSeconds`]'s
-/// [`Display`](fmt::Display) switches to scientific notation.
-const SCIENTIFIC_BELOW: f64 = 1e-6;
-
 /// A validated duration expression with its total seconds and original source
 /// spelling.
 ///
@@ -51,42 +43,6 @@ pub struct DurationValue {
     spelling: Box<str>,
     seconds: DurationSeconds,
     components: Option<Components>,
-}
-
-/// The six fixed sub-year units used for greedy millisecond decomposition in
-/// [`DurationValue::from_nominal_seconds`].
-///
-/// Month and Year are intentionally omitted from magnitude-derived conversion:
-/// their lengths are calendar-dependent and cannot be soundly synthesized from
-/// a raw magnitude.
-const DECOMPOSITION_ORDER: [DurationUnit; 6] = [
-    DurationUnit::Week,
-    DurationUnit::Day,
-    DurationUnit::Hour,
-    DurationUnit::Minute,
-    DurationUnit::Second,
-    DurationUnit::Millisecond,
-];
-
-/// Units, largest first, used by [`DurationValue::humanize`].
-const HUMAN_ORDER: [DurationUnit; 7] = [
-    DurationUnit::Year,
-    DurationUnit::Month,
-    DurationUnit::Week,
-    DurationUnit::Day,
-    DurationUnit::Hour,
-    DurationUnit::Minute,
-    DurationUnit::Second,
-];
-
-/// Renders a magnitude too large for whole-unit counts in scientific notation.
-fn scientific_seconds_text(total_secs: f64, is_negative: bool) -> String {
-    let sign = if is_negative {
-        "-"
-    } else {
-        ""
-    };
-    format!("{sign}{total_secs:e} seconds")
 }
 
 impl DurationValue {
@@ -136,6 +92,131 @@ impl DurationValue {
     /// - The folded total is not finite.
     pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
         Self::scan(input, scan::ScanMode::Prefix).ok()
+    }
+
+    /// Synthesizes a canonical [`DurationValue`] from a [`DurationSeconds`]
+    /// value.
+    ///
+    /// Greedily decomposes `seconds.0.abs()` into Weeks, Days, Hours, Minutes,
+    /// Seconds, and Milliseconds (ratios from
+    /// [`DurationUnit::nominal_seconds`]); Month and Year are omitted
+    /// because their lengths are calendar-dependent. Zero yields `"0s"`; a
+    /// negative duration starts with `"-"`. When the decomposition cannot
+    /// represent a nonzero magnitude (a sub-millisecond remainder rounds to
+    /// zero, or `u64` overflows at the other extreme), falls back to
+    /// [`DurationSeconds`]'s [`Display`](fmt::Display) so the result never
+    /// lies as `"0s"`.
+    #[inline]
+    pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
+        Self {
+            spelling: Self::canonical_spelling(seconds),
+            seconds,
+            components: None,
+        }
+    }
+
+    /// Renders this duration in human-readable compound English (for example
+    /// `"3 days, 4 hours"`), decomposing its nominal seconds greedily from
+    /// years down to seconds with a rounded millisecond remainder.
+    ///
+    /// Magnitudes too large for whole-unit counts render in scientific
+    /// notation; zero renders as `"0 seconds"`.
+    #[must_use]
+    pub(crate) fn humanize(&self) -> String {
+        let total_secs = self.seconds.as_f64();
+        if total_secs == 0.0 {
+            return "0 seconds".to_owned();
+        }
+        let is_negative = total_secs < 0.0;
+        let mut rem = total_secs.abs();
+
+        let mut parts = Vec::new();
+        for unit in HUMAN_ORDER {
+            let unit_secs = unit.nominal_seconds();
+            if rem >= unit_secs {
+                let count = (rem / unit_secs).floor();
+                let Some(count_u64) = count.to_u64() else {
+                    return scientific_seconds_text(total_secs, is_negative);
+                };
+                rem = count.mul_add(-unit_secs, rem);
+                let (singular, plural) = unit.human_names();
+                if count_u64 == 1 {
+                    parts.push(format!("1 {singular}"));
+                } else {
+                    parts.push(format!("{count_u64} {plural}"));
+                }
+            }
+        }
+
+        if rem > 0.0 {
+            let ms_round = (rem * 1000.0).round();
+            if let Some(ms) = ms_round.to_u64()
+                && ms > 0
+            {
+                if ms == 1 {
+                    parts.push("1 millisecond".to_owned());
+                } else {
+                    parts.push(format!("{ms} milliseconds"));
+                }
+            } else if parts.is_empty() {
+                parts.push("< 1 millisecond".to_owned());
+            } else {
+                // Sub-millisecond residual after whole units are already
+                // present is omitted.
+            }
+        }
+
+        if parts.is_empty() {
+            return "0 seconds".to_owned();
+        }
+
+        let joined = parts.join(", ");
+        if is_negative {
+            format!("-{joined}")
+        } else {
+            joined
+        }
+    }
+
+    /// Returns the parsed duration components, if retained.
+    ///
+    /// Values parsed from text retain their written components and witness the
+    /// regime:
+    ///
+    /// - [`Some`] containing a calendar unit ([`DurationUnit::Day`],
+    ///   [`DurationUnit::Week`], [`DurationUnit::Month`],
+    ///   [`DurationUnit::Year`]): calendar application semantics.
+    /// - [`Some`] with only sub-day units, or [`None`] (synthesized from
+    ///   seconds): fixed-magnitude semantics.
+    #[inline]
+    #[must_use]
+    pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
+        self.components.as_deref()
+    }
+
+    /// Returns true if this duration contains any calendar-application units
+    /// in its parsed components.
+    #[cfg(test)]
+    #[inline]
+    #[must_use]
+    pub(crate) fn has_calendar_component(&self) -> bool {
+        self.components().is_some_and(|components| {
+            components.iter().any(|component| component.unit.is_calendar())
+        })
+    }
+
+    /// Returns the duration spelling.
+    #[inline]
+    #[must_use]
+    pub(crate) fn as_str(&self) -> &str {
+        &self.spelling
+    }
+
+    /// Returns the total duration as [`DurationSeconds`].
+    #[inline]
+    #[must_use]
+    pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
+        self.seconds
     }
 
     /// Scans a duration in either whole-input or prefix mode.
@@ -248,27 +329,6 @@ impl DurationValue {
         )
     }
 
-    /// Synthesizes a canonical [`DurationValue`] from a [`DurationSeconds`]
-    /// value.
-    ///
-    /// Greedily decomposes `seconds.0.abs()` into Weeks, Days, Hours, Minutes,
-    /// Seconds, and Milliseconds (ratios from
-    /// [`DurationUnit::nominal_seconds`]); Month and Year are omitted
-    /// because their lengths are calendar-dependent. Zero yields `"0s"`; a
-    /// negative duration starts with `"-"`. When the decomposition cannot
-    /// represent a nonzero magnitude (a sub-millisecond remainder rounds to
-    /// zero, or `u64` overflows at the other extreme), falls back to
-    /// [`DurationSeconds`]'s [`Display`](fmt::Display) so the result never
-    /// lies as `"0s"`.
-    #[inline]
-    pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
-        Self {
-            spelling: Self::canonical_spelling(seconds),
-            seconds,
-            components: None,
-        }
-    }
-
     /// Synthesizes the canonical spelling for a fixed-magnitude duration: the
     /// greedy sub-year decomposition of [`DECOMPOSITION_ORDER`], or
     /// [`DurationSeconds`]'s [`Display`](fmt::Display) dialect when the
@@ -323,110 +383,6 @@ impl DurationValue {
         } else {
             format!("{}s", DurationSeconds(total_secs)).into_boxed_str()
         }
-    }
-
-    /// Renders this duration in human-readable compound English (for example
-    /// `"3 days, 4 hours"`), decomposing its nominal seconds greedily from
-    /// years down to seconds with a rounded millisecond remainder.
-    ///
-    /// Magnitudes too large for whole-unit counts render in scientific
-    /// notation; zero renders as `"0 seconds"`.
-    #[must_use]
-    pub(crate) fn humanize(&self) -> String {
-        let total_secs = self.seconds.as_f64();
-        if total_secs == 0.0 {
-            return "0 seconds".to_owned();
-        }
-        let is_negative = total_secs < 0.0;
-        let mut rem = total_secs.abs();
-
-        let mut parts = Vec::new();
-        for unit in HUMAN_ORDER {
-            let unit_secs = unit.nominal_seconds();
-            if rem >= unit_secs {
-                let count = (rem / unit_secs).floor();
-                let Some(count_u64) = count.to_u64() else {
-                    return scientific_seconds_text(total_secs, is_negative);
-                };
-                rem = count.mul_add(-unit_secs, rem);
-                let (singular, plural) = unit.human_names();
-                if count_u64 == 1 {
-                    parts.push(format!("1 {singular}"));
-                } else {
-                    parts.push(format!("{count_u64} {plural}"));
-                }
-            }
-        }
-
-        if rem > 0.0 {
-            let ms_round = (rem * 1000.0).round();
-            if let Some(ms) = ms_round.to_u64()
-                && ms > 0
-            {
-                if ms == 1 {
-                    parts.push("1 millisecond".to_owned());
-                } else {
-                    parts.push(format!("{ms} milliseconds"));
-                }
-            } else if parts.is_empty() {
-                parts.push("< 1 millisecond".to_owned());
-            } else {
-                // Sub-millisecond residual after whole units are already
-                // present is omitted.
-            }
-        }
-
-        if parts.is_empty() {
-            return "0 seconds".to_owned();
-        }
-
-        let joined = parts.join(", ");
-        if is_negative {
-            format!("-{joined}")
-        } else {
-            joined
-        }
-    }
-
-    /// Returns the parsed duration components, if retained.
-    ///
-    /// Values parsed from text retain their written components and witness the
-    /// regime:
-    ///
-    /// - [`Some`] containing a calendar unit ([`DurationUnit::Day`],
-    ///   [`DurationUnit::Week`], [`DurationUnit::Month`],
-    ///   [`DurationUnit::Year`]): calendar application semantics.
-    /// - [`Some`] with only sub-day units, or [`None`] (synthesized from
-    ///   seconds): fixed-magnitude semantics.
-    #[inline]
-    #[must_use]
-    pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
-        self.components.as_deref()
-    }
-
-    /// Returns true if this duration contains any calendar-application units
-    /// in its parsed components.
-    #[cfg(test)]
-    #[inline]
-    #[must_use]
-    pub(crate) fn has_calendar_component(&self) -> bool {
-        self.components().is_some_and(|components| {
-            components.iter().any(|component| component.unit.is_calendar())
-        })
-    }
-
-    /// Returns the duration spelling.
-    #[inline]
-    #[must_use]
-    pub(crate) fn as_str(&self) -> &str {
-        &self.spelling
-    }
-
-    /// Returns the total duration as [`DurationSeconds`].
-    #[inline]
-    #[must_use]
-    pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
-        self.seconds
     }
 
     /// Combines `rhs` with `self`, negating `rhs`'s components (and seconds, in
@@ -697,6 +653,13 @@ type Components = Box<[DurationComponent]>;
 pub(crate) struct DurationSeconds(pub(crate) f64);
 
 impl DurationSeconds {
+    /// Returns the raw seconds value as `f64`.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn as_f64(self) -> f64 {
+        self.0
+    }
+
     /// Constructs from a raw `f64`, normalizing a signed zero to positive zero
     /// so the type's invariant (see the type docs) holds everywhere, not just
     /// at parse time.
@@ -707,13 +670,6 @@ impl DurationSeconds {
         } else {
             value
         })
-    }
-
-    /// Returns the raw seconds value as `f64`.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn as_f64(self) -> f64 {
-        self.0
     }
 }
 
@@ -848,6 +804,50 @@ impl Mul<DurationSeconds> for f64 {
         DurationSeconds::canonicalize_zero(self * rhs.0)
     }
 }
+
+/// The six fixed sub-year units used for greedy millisecond decomposition in
+/// [`DurationValue::from_nominal_seconds`].
+///
+/// Month and Year are intentionally omitted from magnitude-derived conversion:
+/// their lengths are calendar-dependent and cannot be soundly synthesized from
+/// a raw magnitude.
+const DECOMPOSITION_ORDER: [DurationUnit; 6] = [
+    DurationUnit::Week,
+    DurationUnit::Day,
+    DurationUnit::Hour,
+    DurationUnit::Minute,
+    DurationUnit::Second,
+    DurationUnit::Millisecond,
+];
+
+/// Units, largest first, used by [`DurationValue::humanize`].
+const HUMAN_ORDER: [DurationUnit; 7] = [
+    DurationUnit::Year,
+    DurationUnit::Month,
+    DurationUnit::Week,
+    DurationUnit::Day,
+    DurationUnit::Hour,
+    DurationUnit::Minute,
+    DurationUnit::Second,
+];
+
+/// Renders a magnitude too large for whole-unit counts in scientific notation.
+fn scientific_seconds_text(total_secs: f64, is_negative: bool) -> String {
+    let sign = if is_negative {
+        "-"
+    } else {
+        ""
+    };
+    format!("{sign}{total_secs:e} seconds")
+}
+
+/// At or above this magnitude, [`DurationSeconds`]'s [`Display`](fmt::Display)
+/// switches to scientific notation.
+const SCIENTIFIC_ABOVE: f64 = 1e15;
+
+/// Below this magnitude (excluding exact zero), [`DurationSeconds`]'s
+/// [`Display`](fmt::Display) switches to scientific notation.
+const SCIENTIFIC_BELOW: f64 = 1e-6;
 
 #[cfg(test)]
 mod tests {

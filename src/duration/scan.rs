@@ -2,73 +2,13 @@ use super::{
     error::DurationError, unit::DurationUnit, value::DurationComponent,
 };
 
+/// How far a scan may stop before the end of the input.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum ScanMode {
+    /// The whole input must be consumed.
     Whole,
+    /// Scanning stops at the first byte that cannot continue a component.
     Prefix,
-}
-
-/// Returns `true` if `bytes[pos]` can begin a numeric duration token.
-pub(super) fn can_start_component(bytes: &[u8], pos: usize) -> bool {
-    let Some(&b) = bytes.get(pos) else {
-        return false;
-    };
-    if b.is_ascii_digit() {
-        return true;
-    }
-    if b == b'.' {
-        return bytes
-            .get(pos.saturating_add(1))
-            .is_some_and(u8::is_ascii_digit);
-    }
-    if b == b'+' || b == b'-' {
-        return has_digits_after_sign(
-            bytes.get(pos.saturating_add(1)),
-            bytes.get(pos.saturating_add(2)),
-        );
-    }
-    false
-}
-
-/// Returns `true` if the bytes following a `+`/`-` sign begin a valid
-/// number: a digit, or `.` followed by one.
-pub(super) fn has_digits_after_sign(
-    next: Option<&u8>,
-    next_next: Option<&u8>,
-) -> bool {
-    match next {
-        Some(c) if c.is_ascii_digit() => true,
-        Some(b'.') => next_next.is_some_and(u8::is_ascii_digit),
-        _ => false,
-    }
-}
-
-/// Advances `pos` past whitespace and commas.
-pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
-    let len = bytes.len();
-    while *pos < len {
-        let Some(&b) = bytes.get(*pos) else {
-            break;
-        };
-        if !b.is_ascii_whitespace() && b != b',' {
-            break;
-        }
-        *pos = (*pos).saturating_add(1);
-    }
-}
-
-/// Advances `pos` past ASCII whitespace.
-pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
-    let len = bytes.len();
-    while *pos < len {
-        let Some(&b) = bytes.get(*pos) else {
-            break;
-        };
-        if !b.is_ascii_whitespace() {
-            break;
-        }
-        *pos = (*pos).saturating_add(1);
-    }
 }
 
 /// Scans one `<number><unit>` part starting at `pos`, returning the
@@ -213,5 +153,68 @@ pub(super) fn apply_leading_sign(
     };
     for component in components {
         component.magnitude *= sign;
+    }
+}
+
+/// Returns `true` if `bytes[pos]` can begin a numeric duration token.
+pub(super) fn can_start_component(bytes: &[u8], pos: usize) -> bool {
+    let Some(&b) = bytes.get(pos) else {
+        return false;
+    };
+    if b.is_ascii_digit() {
+        return true;
+    }
+    if b == b'.' {
+        return bytes
+            .get(pos.saturating_add(1))
+            .is_some_and(u8::is_ascii_digit);
+    }
+    if b == b'+' || b == b'-' {
+        return has_digits_after_sign(
+            bytes.get(pos.saturating_add(1)),
+            bytes.get(pos.saturating_add(2)),
+        );
+    }
+    false
+}
+
+/// Returns `true` if the bytes following a `+`/`-` sign begin a valid
+/// number: a digit, or `.` followed by one.
+pub(super) fn has_digits_after_sign(
+    next: Option<&u8>,
+    next_next: Option<&u8>,
+) -> bool {
+    match next {
+        Some(c) if c.is_ascii_digit() => true,
+        Some(b'.') => next_next.is_some_and(u8::is_ascii_digit),
+        _ => false,
+    }
+}
+
+/// Advances `pos` past whitespace and commas.
+pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
+    let len = bytes.len();
+    while *pos < len {
+        let Some(&b) = bytes.get(*pos) else {
+            break;
+        };
+        if !b.is_ascii_whitespace() && b != b',' {
+            break;
+        }
+        *pos = (*pos).saturating_add(1);
+    }
+}
+
+/// Advances `pos` past ASCII whitespace.
+pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
+    let len = bytes.len();
+    while *pos < len {
+        let Some(&b) = bytes.get(*pos) else {
+            break;
+        };
+        if !b.is_ascii_whitespace() {
+            break;
+        }
+        *pos = (*pos).saturating_add(1);
     }
 }

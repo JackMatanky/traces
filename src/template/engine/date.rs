@@ -380,7 +380,7 @@ fn resolve_anchor(
         date_point = apply_offset(date_point, &off_val)?;
     }
 
-    let local_datetime = date_point.local_datetime();
+    let local_datetime = date_point.local_datetime_or_utc();
     let pat = pattern_to_strftime(format, local_datetime)?;
     render_with_pattern(local_datetime.format(&pat), format)
 }
@@ -574,7 +574,7 @@ fn render_with_pattern(
 /// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
 ///   string.
 fn parse_local_datetime(s: &str) -> Result<NaiveDateTime, Error> {
-    parse_date_point(s).map(DatePoint::local_datetime)
+    parse_date_point(s).map(DatePoint::local_datetime_or_utc)
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -795,7 +795,7 @@ fn render_period_edge(
         PeriodEdge::End => date_point.end_of(calendar_period),
     }
     .map_err(render_date_error)?;
-    let local_datetime = shifted.local_datetime();
+    let local_datetime = shifted.local_datetime_or_utc();
     let pat = shifted.canonical_pattern();
     render_with_pattern(local_datetime.format(pat), pat)
 }
@@ -822,8 +822,8 @@ fn end_of_year(value: &str) -> TemplateEngineResult<String> {
 /// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
-/// Sub-day shifts on date-only values are calendar-only and do not change the
-/// date.
+/// A sub-day shift of a date-only value moves the date only when it crosses
+/// midnight (`25h` moves it one day; `5h` does not).
 ///
 /// `"years"`, `"months"`, `"weeks"`, and `"days"` preserve the local clock
 /// time across a DST transition; the remaining units shift the exact
@@ -855,8 +855,8 @@ fn date_add(
 /// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
-/// Sub-day shifts on date-only values are calendar-only and do not change the
-/// date.
+/// A sub-day shift of a date-only value moves the date only when it crosses
+/// midnight (`25h` moves it one day; `5h` does not).
 ///
 /// # Errors
 ///
@@ -886,9 +886,9 @@ fn date_sub(
 /// - Inputs with a time component ([`DatePoint::Instant`]) shift calendar units
 ///   on the local clock time (preserving clock-time hour across DST) and
 ///   sub-day units exactly on the instant.
-/// - Calendar inputs ([`DatePoint::Calendar`]) shift entirely on the calendar
-///   clock time. Sub-day shifts on date-only inputs leave the calendar day
-///   unchanged.
+/// - Calendar inputs ([`DatePoint::Calendar`]) shift on the local datetime at
+///   midnight. A sub-day shift moves the date only when it crosses midnight
+///   (`25h` moves it one day; `5h` does not).
 ///
 /// # Errors
 ///
@@ -901,7 +901,7 @@ fn shift_by_unit(
 ) -> TemplateEngineResult<String> {
     let shifted_date_point =
         parse_date_point(value)?.shift(n, unit).map_err(render_date_error)?;
-    let local_datetime = shifted_date_point.local_datetime();
+    let local_datetime = shifted_date_point.local_datetime_or_utc();
     let pat = shifted_date_point.canonical_pattern();
     render_with_pattern(local_datetime.format(pat), pat)
 }
@@ -1023,7 +1023,7 @@ fn weekday(
         let shifted = date_point
             .with_weekday(target_weekday)
             .map_err(render_date_error)?;
-        let local_datetime = shifted.local_datetime();
+        let local_datetime = shifted.local_datetime_or_utc();
         let pat = pattern_to_strftime(format, local_datetime)?;
         Ok(Value::from(render_with_pattern(
             local_datetime.format(&pat),

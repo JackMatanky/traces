@@ -219,6 +219,64 @@ impl ComparisonExpr {
     }
 }
 
+/// A value expression in a query filter.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ValueExpr {
+    /// Field path lookup on a query row.
+    Field(FieldPath),
+    /// A literal value.
+    Literal(NoteFieldValue),
+    /// A value-returning function call (e.g. `dur`, `date_add`, `date_diff`,
+    /// `date_component`).
+    Call {
+        function: QueryFunction,
+        args: Vec<Self>,
+    },
+    /// An arithmetic binary operation evaluated left-to-right.
+    Binary {
+        lhs: Box<Self>,
+        op: ArithOp,
+        rhs: Box<Self>,
+    },
+}
+
+impl ValueExpr {
+    /// Evaluates a value expression; an invalid row value cannot satisfy a
+    /// comparison.
+    fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
+        match self {
+            Self::Field(path) => Some(row.resolve_ref(path).to_owned_value()),
+            Self::Literal(value) => Some(value.clone()),
+            Self::Call {
+                function,
+                args,
+            } => {
+                let values = args
+                    .iter()
+                    .map(|arg| arg.evaluate(row))
+                    .collect::<Option<Vec<_>>>()?;
+                evaluate_registry_call(*function, &values)
+            }
+            Self::Binary {
+                lhs,
+                op,
+                rhs,
+            } => evaluate_binary(lhs.evaluate(row)?, *op, rhs.evaluate(row)?),
+        }
+    }
+}
+
+/// Binary arithmetic operator.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ArithOp {
+    /// `+`
+    Add,
+    /// `-`
+    Sub,
+    /// `*`
+    Mul,
+}
+
 /// A function callable from a filter expression, resolved at parse time.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum QueryFunction {
@@ -265,64 +323,6 @@ impl QueryFunction {
             .iter()
             .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
             .map(|&(_, function)| function)
-    }
-}
-
-/// A value expression in a query filter.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ValueExpr {
-    /// Field path lookup on a query row.
-    Field(FieldPath),
-    /// A literal value.
-    Literal(NoteFieldValue),
-    /// A value-returning function call (e.g. `dur`, `date_add`, `date_diff`,
-    /// `date_component`).
-    Call {
-        function: QueryFunction,
-        args: Vec<Self>,
-    },
-    /// An arithmetic binary operation evaluated left-to-right.
-    Binary {
-        lhs: Box<Self>,
-        op: ArithOp,
-        rhs: Box<Self>,
-    },
-}
-
-/// Binary arithmetic operator.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum ArithOp {
-    /// `+`
-    Add,
-    /// `-`
-    Sub,
-    /// `*`
-    Mul,
-}
-
-impl ValueExpr {
-    /// Evaluates a value expression; an invalid row value cannot satisfy a
-    /// comparison.
-    fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
-        match self {
-            Self::Field(path) => Some(row.resolve_ref(path).to_owned_value()),
-            Self::Literal(value) => Some(value.clone()),
-            Self::Call {
-                function,
-                args,
-            } => {
-                let values = args
-                    .iter()
-                    .map(|arg| arg.evaluate(row))
-                    .collect::<Option<Vec<_>>>()?;
-                evaluate_registry_call(*function, &values)
-            }
-            Self::Binary {
-                lhs,
-                op,
-                rhs,
-            } => evaluate_binary(lhs.evaluate(row)?, *op, rhs.evaluate(row)?),
-        }
     }
 }
 

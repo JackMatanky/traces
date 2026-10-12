@@ -1,55 +1,3 @@
-/// Human-readable list of accepted unit spellings for error messages.
-///
-/// Kept beside [`UNIT_SPELLINGS`] as a reminder to update both when a unit or
-/// spelling family is added to the registry: this lists one spelling per
-/// family, not every accepted alias.
-pub(crate) const UNIT_SPELLINGS_HINT: &str =
-    "\"years\"/\"y\", \"months\"/\"mo\", \"weeks\"/\"w\", \"days\"/\"d\", \
-     \"hours\"/\"h\", \"minutes\"/\"m\", \"seconds\"/\"s\", or \"ms\"";
-
-/// Case-insensitive unit string to [`DurationUnit`] mapping.
-///
-/// Contains all accepted abbreviations and full names. Keys are stored
-/// lowercase; lookup in [`DurationUnit::from_spelling`] lowercases the input
-/// before matching.
-static UNIT_SPELLINGS: phf::Map<&'static str, DurationUnit> = phf::phf_map! {
-    "ms" => DurationUnit::Millisecond,
-    "millisecond" => DurationUnit::Millisecond,
-    "milliseconds" => DurationUnit::Millisecond,
-    "s" => DurationUnit::Second,
-    "sec" => DurationUnit::Second,
-    "secs" => DurationUnit::Second,
-    "second" => DurationUnit::Second,
-    "seconds" => DurationUnit::Second,
-    "m" => DurationUnit::Minute,
-    "min" => DurationUnit::Minute,
-    "mins" => DurationUnit::Minute,
-    "minute" => DurationUnit::Minute,
-    "minutes" => DurationUnit::Minute,
-    "h" => DurationUnit::Hour,
-    "hr" => DurationUnit::Hour,
-    "hrs" => DurationUnit::Hour,
-    "hour" => DurationUnit::Hour,
-    "hours" => DurationUnit::Hour,
-    "d" => DurationUnit::Day,
-    "day" => DurationUnit::Day,
-    "days" => DurationUnit::Day,
-    "w" => DurationUnit::Week,
-    "wk" => DurationUnit::Week,
-    "wks" => DurationUnit::Week,
-    "week" => DurationUnit::Week,
-    "weeks" => DurationUnit::Week,
-    "mo" => DurationUnit::Month,
-    "mos" => DurationUnit::Month,
-    "month" => DurationUnit::Month,
-    "months" => DurationUnit::Month,
-    "y" => DurationUnit::Year,
-    "yr" => DurationUnit::Year,
-    "yrs" => DurationUnit::Year,
-    "year" => DurationUnit::Year,
-    "years" => DurationUnit::Year,
-};
-
 /// A recognized duration unit.
 ///
 /// Single source of truth for unit parsing and seconds conversion. Match on
@@ -177,6 +125,58 @@ impl DurationUnit {
         }
     }
 }
+
+/// Human-readable list of accepted unit spellings for error messages.
+///
+/// Kept beside [`UNIT_SPELLINGS`] as a reminder to update both when a unit or
+/// spelling family is added to the registry: this lists one spelling per
+/// family, not every accepted alias.
+pub(crate) const UNIT_SPELLINGS_HINT: &str =
+    "\"years\"/\"y\", \"months\"/\"mo\", \"weeks\"/\"w\", \"days\"/\"d\", \
+     \"hours\"/\"h\", \"minutes\"/\"m\", \"seconds\"/\"s\", or \"ms\"";
+
+/// Case-insensitive unit string to [`DurationUnit`] mapping.
+///
+/// Contains all accepted abbreviations and full names. Keys are stored
+/// lowercase; lookup in [`DurationUnit::from_spelling`] lowercases the input
+/// before matching.
+static UNIT_SPELLINGS: phf::Map<&'static str, DurationUnit> = phf::phf_map! {
+    "ms" => DurationUnit::Millisecond,
+    "millisecond" => DurationUnit::Millisecond,
+    "milliseconds" => DurationUnit::Millisecond,
+    "s" => DurationUnit::Second,
+    "sec" => DurationUnit::Second,
+    "secs" => DurationUnit::Second,
+    "second" => DurationUnit::Second,
+    "seconds" => DurationUnit::Second,
+    "m" => DurationUnit::Minute,
+    "min" => DurationUnit::Minute,
+    "mins" => DurationUnit::Minute,
+    "minute" => DurationUnit::Minute,
+    "minutes" => DurationUnit::Minute,
+    "h" => DurationUnit::Hour,
+    "hr" => DurationUnit::Hour,
+    "hrs" => DurationUnit::Hour,
+    "hour" => DurationUnit::Hour,
+    "hours" => DurationUnit::Hour,
+    "d" => DurationUnit::Day,
+    "day" => DurationUnit::Day,
+    "days" => DurationUnit::Day,
+    "w" => DurationUnit::Week,
+    "wk" => DurationUnit::Week,
+    "wks" => DurationUnit::Week,
+    "week" => DurationUnit::Week,
+    "weeks" => DurationUnit::Week,
+    "mo" => DurationUnit::Month,
+    "mos" => DurationUnit::Month,
+    "month" => DurationUnit::Month,
+    "months" => DurationUnit::Month,
+    "y" => DurationUnit::Year,
+    "yr" => DurationUnit::Year,
+    "yrs" => DurationUnit::Year,
+    "year" => DurationUnit::Year,
+    "years" => DurationUnit::Year,
+};
 
 #[cfg(test)]
 mod tests {

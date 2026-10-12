@@ -14,91 +14,6 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
-/// Calendar precision of a zone-free date point.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DatePrecision {
-    /// Year and month.
-    Month,
-    /// Full calendar date.
-    Day,
-}
-
-/// A parsed date or date-time at the precision it was written.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DatePoint {
-    /// Zone-free calendar date.
-    Calendar {
-        date: DateValue,
-        date_precision: DatePrecision,
-    },
-    /// UTC instant.
-    Instant(DateTimeValue),
-}
-
-impl DatePoint {
-    /// Whether this date point carries a time-of-day component.
-    #[must_use]
-    pub(crate) const fn has_time(self) -> bool {
-        matches!(self, Self::Instant(_))
-    }
-
-    /// Calendar date of this date point in the local zone.
-    #[must_use]
-    pub(crate) fn date(self) -> DateValue {
-        match self {
-            Self::Calendar {
-                date,
-                ..
-            } => date,
-            Self::Instant(dt) => dt.local_date(),
-        }
-    }
-
-    /// Calendar clock time, or local clock for an instant.
-    #[must_use]
-    pub(crate) fn local_datetime(self) -> NaiveDateTime {
-        match self {
-            Self::Calendar {
-                date,
-                ..
-            } => date.naive_date().and_time(NaiveTime::MIN),
-            Self::Instant(dt) => dt.local_datetime_or_utc(),
-        }
-    }
-
-    /// UTC instant represented by this date point.
-    #[must_use]
-    pub(crate) fn instant(self) -> DateTime<Utc> {
-        match self {
-            Self::Calendar {
-                date,
-                ..
-            } => DateTimeValue::from(date).utc(),
-            Self::Instant(dt) => dt.utc(),
-        }
-    }
-
-    /// Canonical strftime pattern preserving written precision.
-    #[must_use]
-    pub(crate) fn canonical_pattern(self) -> &'static str {
-        use chrono::Timelike as _;
-        match self {
-            Self::Calendar {
-                date_precision: DatePrecision::Month,
-                ..
-            } => "%Y-%m",
-            Self::Calendar {
-                date_precision: DatePrecision::Day,
-                ..
-            } => DATE_PATTERN,
-            Self::Instant(_) if self.local_datetime().nanosecond() == 0 => {
-                DATETIME_PATTERN
-            }
-            Self::Instant(_) => "%Y-%m-%dT%H:%M:%S%.f",
-        }
-    }
-}
-
 /// A calendar date without timezone or time-of-day ([`NaiveDate`]).
 ///
 /// Wraps a [`NaiveDate`] representing a calendar date (`YYYY-MM-DD` or
@@ -353,6 +268,97 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     {
         let s = Cow::<'de, str>::deserialize(deserializer)?;
         Self::parse_iso(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Calendar precision of a zone-free date point.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DatePrecision {
+    /// Year and month.
+    Month,
+    /// Full calendar date.
+    Day,
+}
+
+/// A parsed date or date-time at the precision it was written.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DatePoint {
+    /// Zone-free calendar date.
+    Calendar {
+        /// The calendar date; month precision stores the first of the month.
+        date: DateValue,
+        /// How much of `date` was written.
+        date_precision: DatePrecision,
+    },
+    /// UTC instant.
+    Instant(DateTimeValue),
+}
+
+impl DatePoint {
+    /// Whether this date point carries a time-of-day component.
+    #[must_use]
+    pub(crate) const fn has_time(self) -> bool {
+        matches!(self, Self::Instant(_))
+    }
+
+    /// Calendar date of this date point in the local zone.
+    #[must_use]
+    pub(crate) fn date(self) -> DateValue {
+        match self {
+            Self::Calendar {
+                date,
+                ..
+            } => date,
+            Self::Instant(dt) => dt.local_date(),
+        }
+    }
+
+    /// Local datetime reading of this date point: midnight for a calendar
+    /// date, the local clock time (UTC when the offset cannot apply) for an
+    /// instant.
+    #[must_use]
+    pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+        match self {
+            Self::Calendar {
+                date,
+                ..
+            } => date.naive_date().and_time(NaiveTime::MIN),
+            Self::Instant(dt) => dt.local_datetime_or_utc(),
+        }
+    }
+
+    /// UTC instant represented by this date point.
+    #[must_use]
+    pub(crate) fn instant(self) -> DateTime<Utc> {
+        match self {
+            Self::Calendar {
+                date,
+                ..
+            } => DateTimeValue::from(date).utc(),
+            Self::Instant(dt) => dt.utc(),
+        }
+    }
+
+    /// Canonical strftime pattern preserving written precision.
+    #[must_use]
+    pub(crate) fn canonical_pattern(self) -> &'static str {
+        use chrono::Timelike as _;
+        match self {
+            Self::Calendar {
+                date_precision: DatePrecision::Month,
+                ..
+            } => "%Y-%m",
+            Self::Calendar {
+                date_precision: DatePrecision::Day,
+                ..
+            } => DATE_PATTERN,
+            Self::Instant(_)
+                if self.local_datetime_or_utc().nanosecond() == 0 =>
+            {
+                DATETIME_PATTERN
+            }
+            Self::Instant(_) => "%Y-%m-%dT%H:%M:%S%.f",
+        }
     }
 }
 
@@ -650,44 +656,48 @@ mod tests {
         }
     }
 
-    mod date_point_api {
+    mod date_point {
         use pretty_assertions::assert_eq;
+        use rstest::rstest;
 
         use super::*;
 
         #[test]
-        fn has_time_only_for_instants() {
-            TzGuard::set("UTC");
-            assert!(!DatePoint::parse("2026-07").unwrap().has_time());
-            assert!(!DatePoint::parse("2026-07-29").unwrap().has_time());
-            assert!(
-                DatePoint::parse("2026-07-29T14:30:00Z").unwrap().has_time()
-            );
+        fn has_time_is_false_for_a_calendar_point() {
+            let point = DatePoint::Calendar {
+                date: DateValue(NaiveDate::MIN),
+                date_precision: DatePrecision::Day,
+            };
+
+            assert!(!point.has_time());
         }
 
         #[test]
-        fn canonical_pattern_preserves_date_precision_and_fractional_seconds() {
+        fn has_time_is_true_for_an_instant() {
+            assert!(DatePoint::Instant(fixed_datetime()).has_time());
+        }
+
+        #[rstest]
+        #[case::month("2026-07", "%Y-%m")]
+        #[case::day("2026-07-29", "%Y-%m-%d")]
+        #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
+        #[case::fractional_seconds(
+            "2026-07-29T14:30:00.123Z",
+            "%Y-%m-%dT%H:%M:%S%.f"
+        )]
+        fn canonical_pattern_preserves_precision_and_fractional_seconds(
+            #[case] text: &str,
+            #[case] expected: &str,
+        ) {
+            // Arrange
             TzGuard::set("UTC");
-            assert_eq!(
-                DatePoint::parse("2026-07").unwrap().canonical_pattern(),
-                "%Y-%m"
-            );
-            assert_eq!(
-                DatePoint::parse("2026-07-29").unwrap().canonical_pattern(),
-                "%Y-%m-%d"
-            );
-            assert_eq!(
-                DatePoint::parse("2026-07-29T14:30:00Z")
-                    .unwrap()
-                    .canonical_pattern(),
-                "%Y-%m-%dT%H:%M:%S"
-            );
-            assert_eq!(
-                DatePoint::parse("2026-07-29T14:30:00.123Z")
-                    .unwrap()
-                    .canonical_pattern(),
-                "%Y-%m-%dT%H:%M:%S%.f"
-            );
+            let point = DatePoint::parse(text).expect("valid date point");
+
+            // Act
+            let pattern = point.canonical_pattern();
+
+            // Assert
+            assert_eq!(pattern, expected);
         }
     }
 
@@ -884,7 +894,7 @@ mod tests {
                 .expect_err("unrecognized shape");
             assert_eq!(
                 err.to_string(),
-                "`2026/08/22` is not a recognized date/time: not enough input"
+                "`2026/08/22` is not a recognized date/time: invalid input"
             );
         }
 
