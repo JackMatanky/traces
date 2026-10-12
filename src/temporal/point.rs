@@ -1,6 +1,6 @@
 use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
-    Timelike as _, Utc, Weekday,
+    Timelike as _, Utc, Weekday, format::ParseErrorKind,
 };
 use num_traits::ToPrimitive as _;
 
@@ -9,6 +9,8 @@ use super::{
     DateValue, Difference, DurationComponent, DurationUnit, DurationValue,
     PeriodEdge,
     calendar::{shift_datetime, time_delta_from_seconds},
+    date::DateShape,
+    datetime::{DateTimeShape, ParsedDateTime},
 };
 
 /// Calendar precision of a zone-free date point.
@@ -377,6 +379,180 @@ impl DatePoint {
         .ok_or(DateError::OutOfRange)?;
         self.with_date(new_date)
     }
+
+    /// Parses a date or date-time shape, retaining date precision.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::UnknownShape`] if the trimmed input does not start with
+    ///   two or four ASCII digits followed by `-`.
+    /// - [`DateError::YearNotFourDigits`] if it starts that way but the year is
+    ///   not four ASCII digits.
+    /// - [`DateError::InvalidValue`] if no date or date-time shape matches, or
+    ///   a matched field is out of range.
+    /// - [`DateError::LocalZoneLookup`] if a naive date-time cannot be resolved
+    ///   in the local zone.
+    pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_like_date(trimmed.as_bytes()) {
+            return Err(DateError::UnknownShape);
+        }
+        if !starts_with_year(trimmed) {
+            return Err(DateError::YearNotFourDigits {
+                input: trimmed.into(),
+            });
+        }
+        let calendar_point = |(date, date_precision)| Self::Calendar {
+            date: DateValue::from(date),
+            date_precision,
+        };
+        // Date-only shapes cannot match the date-time cascade.
+        if trimmed.len() <= 10 {
+            return DateShape::parse_any(trimmed).map(calendar_point).map_err(
+                |reason| DateError::InvalidValue {
+                    input: trimmed.into(),
+                    reason,
+                },
+            );
+        }
+        match DateTimeShape::parse_any(trimmed) {
+            Ok(ParsedDateTime::Instant(instant)) => {
+                Ok(Self::Instant(DateTimeValue::from(instant)))
+            }
+            Ok(ParsedDateTime::Unzoned(local_datetime)) => {
+                Ok(Self::Instant(DateTimeValue::from_local(local_datetime)?))
+            }
+            Err(datetime_err) => match DateShape::parse_any(trimmed) {
+                Ok(date) => Ok(calendar_point(date)),
+                Err(date_err) => {
+                    let reason = if matches!(
+                        trimmed.as_bytes().get(10),
+                        Some(b'T' | b' ')
+                    ) {
+                        datetime_err
+                    } else {
+                        date_err
+                    };
+                    Err(DateError::InvalidValue {
+                        input: trimmed.into(),
+                        reason,
+                    })
+                }
+            },
+        }
+    }
+
+    /// Parses a 10-byte `YYYY-MM-DD` or 7-byte `YYYY-MM` date prefix of `s`.
+    ///
+    /// Returns the date point and the number of bytes consumed, or [`None`]
+    /// when `s` does not start with either shape.
+    #[must_use]
+    pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
+        let bytes = s.as_bytes();
+        if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
+            if let Some(prefix) = s.get(..10)
+                && let Ok(
+                    date_point @ Self::Calendar {
+                        date_precision: DatePrecision::Day,
+                        ..
+                    },
+                ) = Self::parse(prefix)
+            {
+                return Some((date_point, 10));
+            }
+            return None;
+        }
+        if let Some(prefix) = s.get(..7)
+            && let Ok(
+                date_point @ Self::Calendar {
+                    date_precision: DatePrecision::Month,
+                    ..
+                },
+            ) = Self::parse(prefix)
+        {
+            return Some((date_point, 7));
+        }
+        None
+    }
+
+    /// Parses a date or date-time with a chrono strftime pattern.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::InvalidValue`] if `text` matches `pattern` neither as an
+    ///   offset date-time, a naive date-time, nor a date.
+    /// - [`DateError::LocalZoneLookup`] if a naive date-time match cannot be
+    ///   resolved in the local zone.
+    pub(crate) fn parse_with_pattern(
+        text: &str,
+        pattern: &str,
+    ) -> Result<Self, DateError> {
+        let trimmed_text = text.trim();
+        let trimmed_pattern = pattern.trim();
+        if let Ok(dt) = DateTime::parse_from_str(trimmed_text, trimmed_pattern)
+        {
+            return Ok(Self::Instant(DateTimeValue::from(
+                dt.with_timezone(&Utc),
+            )));
+        }
+        if let Ok(local_datetime) =
+            NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
+        {
+            return Ok(Self::Instant(DateTimeValue::from_local(
+                local_datetime,
+            )?));
+        }
+        if trimmed_pattern == "%Y-%m"
+            && let Ok(
+                date_point @ Self::Calendar {
+                    date_precision: DatePrecision::Month,
+                    ..
+                },
+            ) = Self::parse(trimmed_text)
+        {
+            return Ok(date_point);
+        }
+        NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
+            .map(|date| Self::Calendar {
+                date: DateValue::from(date),
+                date_precision: DatePrecision::Day,
+            })
+            .map_err(|source| DateError::InvalidValue {
+                input: trimmed_text.into(),
+                reason: parse_reason(source),
+            })
+    }
+}
+
+/// Maps a chrono parse failure to a short static reason, so errors carry no
+/// allocation or foreign error type.
+pub(super) fn parse_reason(error: chrono::ParseError) -> &'static str {
+    match error.kind() {
+        ParseErrorKind::OutOfRange => "a field is out of range",
+        ParseErrorKind::Impossible => "the date does not exist",
+        ParseErrorKind::NotEnough => "not enough input",
+        ParseErrorKind::TooShort => "input is too short",
+        ParseErrorKind::TooLong => "unexpected trailing input",
+        ParseErrorKind::BadFormat => "bad format pattern",
+        _ => "invalid input",
+    }
+}
+
+/// Returns `true` if `bytes` begins with a date-like prefix: two or four ASCII
+/// digits followed by `-`.
+fn starts_like_date(bytes: &[u8]) -> bool {
+    bytes.len() >= 5
+        && [2, 4].into_iter().any(|digits| {
+            bytes
+                .get(..digits)
+                .is_some_and(|b| b.iter().all(u8::is_ascii_digit))
+                && bytes.get(digits) == Some(&b'-')
+        })
+}
+
+/// Returns `true` if `s`'s first four bytes are ASCII digits.
+pub(super) fn starts_with_year(s: &str) -> bool {
+    s.as_bytes().get(..4).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
 }
 
 #[cfg(test)]
@@ -1059,6 +1235,209 @@ mod tests {
                 DateValue::parse_iso("2026-08-07").unwrap().naive_date()
             );
             assert_eq!(shifted.canonical_pattern(), "%Y-%m-%d");
+        }
+    }
+
+    mod parsing {
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::too_short("202")]
+        #[case::empty("")]
+        #[case::non_digit_year("abcd-01-01")]
+        fn rejects_a_missing_four_digit_year(#[case] input: &str) {
+            assert!(!starts_with_year(input));
+        }
+
+        #[test]
+        fn accepts_a_five_digit_year_prefix_as_having_four_digits() {
+            // The `starts_with_year` guard only checks the first 4 bytes; a
+            // longer numeric prefix still passes this guard and is rejected
+            // later, by the format cascade, as InvalidValue rather than
+            // YearNotFourDigits.
+            assert!(starts_with_year("20265-01-01"));
+            assert!(matches!(
+                DateValue::parse_iso("20265-01-01"),
+                Err(DateError::InvalidValue { .. })
+            ));
+        }
+    }
+
+    mod date_point_parsing {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::day("2026-07-29", DatePrecision::Day)]
+        #[case::month("2026-07", DatePrecision::Month)]
+        #[case::unpadded_day("2026-1-1", DatePrecision::Day)]
+        fn parse_keeps_the_written_date_precision(
+            #[case] text: &str,
+            #[case] expected: DatePrecision,
+        ) {
+            // Act
+            let parsed = DatePoint::parse(text).expect("valid date");
+
+            // Assert
+            assert!(matches!(
+                parsed,
+                DatePoint::Calendar { date_precision, .. }
+                    if date_precision == expected
+            ));
+        }
+
+        #[rstest]
+        #[case::offset("2026-07-29T14:30:00Z")]
+        #[case::t_separated("2026-07-29T14:30:00")]
+        #[case::space_separated_fractional("2026-07-29 14:30:00.123")]
+        fn parse_returns_an_instant_for_date_times(#[case] text: &str) {
+            // Arrange
+            TzGuard::set("UTC");
+
+            // Act
+            let parsed = DatePoint::parse(text).expect("valid date-time");
+
+            // Assert
+            assert!(matches!(parsed, DatePoint::Instant(_)));
+        }
+
+        #[test]
+        fn parse_denotes_the_first_day_for_a_year_month() {
+            // Act
+            let year_month = DatePoint::parse("2026-07").expect("valid");
+
+            // Assert
+            assert_eq!(
+                year_month.date(),
+                DateValue::parse_iso("2026-07-01").expect("valid")
+            );
+        }
+
+        #[rstest]
+        #[case::word("hello")]
+        #[case::empty("")]
+        #[case::year_only("2026")]
+        #[case::slashes("2026/08/22")]
+        #[case::five_digit_year("20265-01-01")]
+        fn parse_rejects_text_without_a_date_shape(#[case] text: &str) {
+            assert_eq!(DatePoint::parse(text), Err(DateError::UnknownShape));
+        }
+
+        #[test]
+        fn parse_rejects_a_two_digit_year() {
+            assert!(matches!(
+                DatePoint::parse("26-08-22"),
+                Err(DateError::YearNotFourDigits { .. })
+            ));
+        }
+
+        #[rstest]
+        #[case::month_out_of_range(
+            "2026-13",
+            "`2026-13` is not a recognized date/time: a field is out of range"
+        )]
+        #[case::impossible_day(
+            "2026-02-30",
+            "`2026-02-30` is not a recognized date/time: a field is out of \
+             range"
+        )]
+        fn parse_reports_the_reason_the_date_was_rejected(
+            #[case] text: &str,
+            #[case] expected_message: &str,
+        ) {
+            // Act
+            let error = DatePoint::parse(text).expect_err("invalid date");
+
+            // Assert
+            assert_eq!(error.to_string(), expected_message);
+        }
+
+        #[rstest]
+        #[case::signed_month("2026-+7")]
+        #[case::trailing_garbage("2026-07-29Tinvalid")]
+        fn parse_rejects_malformed_values(#[case] text: &str) {
+            assert!(matches!(
+                DatePoint::parse(text),
+                Err(DateError::InvalidValue { .. })
+            ));
+        }
+
+        #[rstest]
+        #[case::day("2026-07-29T14:30:00", 10, DatePrecision::Day)]
+        #[case::month("2026-07 remainder", 7, DatePrecision::Month)]
+        fn parse_prefix_returns_the_date_and_its_length(
+            #[case] text: &str,
+            #[case] expected_length: usize,
+            #[case] expected_precision: DatePrecision,
+        ) {
+            // Act
+            let (parsed, length) =
+                DatePoint::parse_prefix(text).expect("date prefix");
+
+            // Assert
+            assert_eq!(length, expected_length);
+            assert!(matches!(
+                parsed,
+                DatePoint::Calendar { date_precision, .. }
+                    if date_precision == expected_precision
+            ));
+        }
+
+        #[rstest]
+        #[case::word("not a date")]
+        #[case::signed_month("2026-+7 later")]
+        fn parse_prefix_returns_none_without_a_date_prefix(#[case] text: &str) {
+            assert_eq!(DatePoint::parse_prefix(text), None);
+        }
+    }
+
+    mod parse_with_pattern {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::iso_date("2026-07-29", "%Y-%m-%d", "2026-07-29")]
+        #[case::custom_date("29/07/2026", "%d/%m/%Y", "2026-07-29")]
+        #[case::date_time(
+            "2026-07-29 14:30:00",
+            "%Y-%m-%d %H:%M:%S",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::year_month("2026-07", "%Y-%m", "2026-07")]
+        fn parses_text_matching_the_pattern(
+            #[case] text: &str,
+            #[case] pattern: &str,
+            #[case] expected_text: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+            let expected = DatePoint::parse(expected_text).expect("valid");
+
+            // Act
+            let parsed = DatePoint::parse_with_pattern(text, pattern);
+
+            // Assert
+            assert_eq!(parsed, Ok(expected));
+        }
+
+        #[rstest]
+        #[case::bad_pattern("2026-07-29", "%Q")]
+        #[case::not_a_date("not-a-date", "%Y-%m-%d")]
+        #[case::mismatched_pattern("2026-07-29", "%d/%m/%Y")]
+        fn rejects_text_not_matching_the_pattern(
+            #[case] text: &str,
+            #[case] pattern: &str,
+        ) {
+            assert!(matches!(
+                DatePoint::parse_with_pattern(text, pattern),
+                Err(DateError::InvalidValue { .. })
+            ));
         }
     }
 }

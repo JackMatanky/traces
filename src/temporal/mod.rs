@@ -18,8 +18,6 @@
 //!
 //! - [`DateValue`] - Parsed calendar date with no time-of-day component.
 //! - [`DateTimeValue`] - Parsed UTC date-time instant.
-//! - [`parse::DateShape`] - Format grammar for calendar date recognition.
-//! - [`parse::DateTimeShape`] - Format grammar for date-time recognition.
 //! - [`DatePoint`] - Calendar date or UTC instant with written precision.
 //! - [`Difference`] - Result of a calendar-owner difference measurement.
 //! - [`DateError`] - Error type for parsing, local-zone resolution, and
@@ -55,7 +53,6 @@ mod date;
 mod datetime;
 mod duration;
 mod error;
-mod parse;
 mod point;
 mod scan;
 mod unit;

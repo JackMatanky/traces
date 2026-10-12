@@ -1361,17 +1361,26 @@ src/temporal/calendar.rs: pub(super) fn time_delta_from_seconds(
 src/temporal/date.rs: pub struct DateValue(NaiveDate);
 src/temporal/date.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 src/temporal/date.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
+src/temporal/date.rs: pub(crate) enum DateShape {
+src/temporal/date.rs: pub(crate) fn parse_any(
+src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/date.rs: pub(super) fn advance(self, delta: TimeDelta) -> Result<Self, DateError> {
 src/temporal/date.rs: pub(super) fn whole_months_until(self, to: Self) -> i64 {
 src/temporal/date.rs: pub(super) fn whole_years_until(self, to: Self) -> i64 {
 src/temporal/datetime.rs: pub struct DateTimeValue(DateTime<Utc>);
+src/temporal/datetime.rs: pub(crate) const ALL: [Self; 5] = [
 src/temporal/datetime.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
+src/temporal/datetime.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
 src/temporal/datetime.rs: pub(crate) const fn utc(self) -> DateTime<Utc> {
+src/temporal/datetime.rs: pub(crate) enum DateTimeShape {
+src/temporal/datetime.rs: pub(crate) enum ParsedDateTime {
 src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
 src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/temporal/datetime.rs: pub(crate) fn local_date(self) -> DateValue {
 src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
 src/temporal/datetime.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
+src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub(crate) fn shift(
 src/temporal/datetime.rs: pub(super) fn from_local(
 src/temporal/duration.rs: pub struct DurationValue {
@@ -1401,18 +1410,6 @@ src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSecond
 src/temporal/mod.rs: pub(crate) use point::{DatePoint, DatePrecision};
 src/temporal/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
 src/temporal/mod.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
-src/temporal/parse.rs: pub(crate) const ALL: [Self; 5] = [
-src/temporal/parse.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
-src/temporal/parse.rs: pub(crate) enum DateShape {
-src/temporal/parse.rs: pub(crate) enum DateTimeShape {
-src/temporal/parse.rs: pub(crate) enum ParsedDateTime {
-src/temporal/parse.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
-src/temporal/parse.rs: pub(crate) fn parse_any(
-src/temporal/parse.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
-src/temporal/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/temporal/parse.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/temporal/parse.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
-src/temporal/parse.rs: pub(crate) fn parse_with_pattern(
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
 src/temporal/point.rs: pub(crate) enum DatePoint {
 src/temporal/point.rs: pub(crate) enum DatePrecision {
@@ -1424,9 +1421,14 @@ src/temporal/point.rs: pub(crate) fn diff(self, to: Self, unit: DurationUnit) ->
 src/temporal/point.rs: pub(crate) fn end_of(
 src/temporal/point.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/temporal/point.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+src/temporal/point.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
+src/temporal/point.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
+src/temporal/point.rs: pub(crate) fn parse_with_pattern(
 src/temporal/point.rs: pub(crate) fn shift(
 src/temporal/point.rs: pub(crate) fn start_of(
 src/temporal/point.rs: pub(crate) fn with_weekday(
+src/temporal/point.rs: pub(super) fn parse_reason(error: chrono::ParseError) -> &'static str {
+src/temporal/point.rs: pub(super) fn starts_with_year(s: &str) -> bool {
 src/temporal/scan.rs: pub(super) const fn is_at_end(&self) -> bool {
 src/temporal/scan.rs: pub(super) const fn new(input: &'a str) -> Self {
 src/temporal/scan.rs: pub(super) const fn position(&self) -> usize {

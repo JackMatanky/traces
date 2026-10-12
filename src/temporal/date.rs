@@ -3,8 +3,11 @@ use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{DateTimeValue, error::DateError};
-
+use super::{
+    DatePrecision, DateTimeValue,
+    error::DateError,
+    point::{parse_reason, starts_with_year},
+};
 /// [`DateValue`]'s canonical output format: `2026-07-29`.
 pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 
@@ -72,6 +75,92 @@ impl DateValue {
             .checked_add_signed(delta)
             .map(|local_datetime| Self::from(local_datetime.date()))
             .ok_or(DateError::OutOfRange)
+    }
+
+    /// Parses an ISO-8601 date string (`YYYY-MM-DD` or `YYYY-MM`) using the
+    /// recognition layer.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
+    ///   digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
+    pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_with_year(trimmed) {
+            return Err(DateError::YearNotFourDigits {
+                input: trimmed.into(),
+            });
+        }
+        DateShape::parse_any(trimmed).map(|(date, _)| Self::from(date)).map_err(
+            |reason| DateError::InvalidValue {
+                input: trimmed.into(),
+                reason,
+            },
+        )
+    }
+}
+
+/// Recognized date input format shapes, tried in order by
+/// [`DateShape::parse_any`] for [`DatePoint::parse`](super::DatePoint::parse)
+/// and [`DateValue::parse_iso`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DateShape {
+    /// Full ISO date: `2026-07-29`.
+    YearMonthDay,
+    /// Year-month reduced precision: `2026-07`. Day defaults to 1.
+    YearMonth,
+}
+
+impl DateShape {
+    /// Parses `s` as a full date, falling back to a year-month.
+    ///
+    /// # Errors
+    ///
+    /// Returns the static reason the best-fitting shape rejected `s`: the
+    /// year-month reason for 7-byte input (`YYYY-MM`), the full-date reason
+    /// otherwise.
+    pub(crate) fn parse_any(
+        s: &str,
+    ) -> Result<(NaiveDate, DatePrecision), &'static str> {
+        Self::YearMonthDay.parse_precision(s).or_else(|day_reason| {
+            Self::YearMonth.parse_precision(s).map_err(|month_reason| {
+                if s.len() == 7 {
+                    month_reason
+                } else {
+                    day_reason
+                }
+            })
+        })
+    }
+
+    fn parse_precision(
+        self,
+        s: &str,
+    ) -> Result<(NaiveDate, DatePrecision), &'static str> {
+        match self {
+            Self::YearMonthDay => NaiveDate::parse_from_str(s, DATE_PATTERN)
+                .map(|d| (d, DatePrecision::Day))
+                .map_err(parse_reason),
+            Self::YearMonth => {
+                Self::parse_year_month(s).map(|d| (d, DatePrecision::Month))
+            }
+        }
+    }
+
+    /// Parses `"YYYY-MM"`, defaulting the day to 1.
+    fn parse_year_month(s: &str) -> Result<NaiveDate, &'static str> {
+        let (year_str, month_str) =
+            s.split_once('-').ok_or("not enough input")?;
+        if year_str.len() != 4
+            || month_str.len() != 2
+            || !month_str.bytes().all(|b| b.is_ascii_digit())
+        {
+            return Err("not enough input");
+        }
+        let year: i32 = year_str.parse().map_err(|_| "invalid input")?;
+        let month: u32 = month_str.parse().map_err(|_| "invalid input")?;
+        NaiveDate::from_ymd_opt(year, month, 1).ok_or("a field is out of range")
     }
 }
 
@@ -184,6 +273,50 @@ mod tests {
             let reparsed = DateValue::parse_iso(&date.to_string())
                 .expect("formatted output re-parses");
             assert_eq!(reparsed, date);
+        }
+    }
+
+    mod parsing {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::full_date("2026-07-29", (2026, 7, 29))]
+        #[case::year_month("2026-08", (2026, 8, 1))]
+        #[case::missing_leading_zeros("2026-8-22", (2026, 8, 22))]
+        fn parses_date_shapes_to_the_expected_date(
+            #[case] input: &str,
+            #[case] (year, month, day): (i32, u32, u32),
+        ) {
+            // Act
+            let parsed = DateValue::parse_iso(input).expect("valid shape");
+
+            // Assert
+            let expected = NaiveDate::from_ymd_opt(year, month, day)
+                .expect("valid fixture date");
+            assert_eq!(parsed, DateValue::from(expected));
+        }
+
+        #[test]
+        fn date_value_rejects_a_short_year_with_year_not_four_digits() {
+            let result = DateValue::parse_iso("26-08-22");
+            assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
+        }
+
+        #[rstest]
+        #[case::invalid_month_number("2026-13")]
+        #[case::non_numeric_month("2026-ab")]
+        #[case::single_digit_month("2026-7")]
+        #[case::slashes("2026/08/22")]
+        fn date_value_rejects_malformed_input_as_invalid_value(
+            #[case] input: &str,
+        ) {
+            assert!(matches!(
+                DateValue::parse_iso(input),
+                Err(DateError::InvalidValue { .. })
+            ));
         }
     }
 

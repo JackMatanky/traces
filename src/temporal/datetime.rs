@@ -7,7 +7,10 @@ use chrono::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    DateValue, DurationUnit, calendar::shift_datetime, error::DateError,
+    DateValue, DurationUnit,
+    calendar::shift_datetime,
+    error::DateError,
+    point::{parse_reason, starts_with_year},
 };
 
 /// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
@@ -224,6 +227,43 @@ impl DateTimeValue {
             ))
         }
     }
+
+    /// Parses an RFC 3339 or ISO-8601 date-time string using
+    /// [`DateTimeShape::ALL`].
+    ///
+    /// Surrounding whitespace is ignored. The cascade matches shapes only: a
+    /// matched naive input then resolves through [`DateTimeValue::from_local`]
+    /// (an explicit-offset input already is the instant). Resolution runs once
+    /// after the cascade, because a resolution failure must not retry later
+    /// formats.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
+    ///   digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
+    /// - [`DateError::LocalZoneLookup`] if the local timezone lookup fails
+    ///   while resolving a naive input.
+    pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_with_year(trimmed) {
+            return Err(DateError::YearNotFourDigits {
+                input: trimmed.into(),
+            });
+        }
+        let shape = DateTimeShape::parse_any(trimmed).map_err(|reason| {
+            DateError::InvalidValue {
+                input: trimmed.into(),
+                reason,
+            }
+        })?;
+        match shape {
+            ParsedDateTime::Instant(instant) => Ok(Self::from(instant)),
+            ParsedDateTime::Unzoned(local_datetime) => {
+                Self::from_local(local_datetime)
+            }
+        }
+    }
 }
 
 /// Renders the local clock time without a UTC offset, so a date or time
@@ -320,6 +360,89 @@ impl<'de> Deserialize<'de> for DateTimeValue {
         let s = Cow::<'de, str>::deserialize(deserializer)?;
         Self::parse_iso(&s).map_err(serde::de::Error::custom)
     }
+}
+
+/// Recognized date-time input format shapes tried in order by
+/// [`DateTimeValue::parse_iso`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DateTimeShape {
+    /// RFC 3339 format with offset: `2026-07-29T14:30:00Z`.
+    Rfc3339,
+    /// `T`-separated seconds, optionally fractional: `2026-07-29T14:30:00.123`.
+    LocalTSeconds,
+    /// `T`-separated minute-only precision: `2026-07-29T14:30`.
+    LocalTMinutes,
+    /// Space-separated seconds, optionally fractional: `2026-07-29
+    /// 14:30:00.123`.
+    LocalSpaceSeconds,
+    /// Space-separated minute-only precision: `2026-07-29 14:30`.
+    LocalSpaceMinutes,
+}
+
+impl DateTimeShape {
+    /// Formats tried in order by [`DateTimeValue::parse_iso`] (most
+    /// specific/unambiguous first).
+    pub(crate) const ALL: [Self; 5] = [
+        Self::Rfc3339,
+        Self::LocalTSeconds,
+        Self::LocalTMinutes,
+        Self::LocalSpaceSeconds,
+        Self::LocalSpaceMinutes,
+    ];
+
+    /// Returns the strftime pattern for this format, or `None` for
+    /// [`Self::Rfc3339`] which uses dedicated RFC 3339 parsing.
+    #[must_use]
+    pub(crate) const fn pattern(self) -> Option<&'static str> {
+        match self {
+            Self::Rfc3339 => None,
+            Self::LocalTSeconds => Some("%Y-%m-%dT%H:%M:%S%.f"),
+            Self::LocalTMinutes => Some("%Y-%m-%dT%H:%M"),
+            Self::LocalSpaceSeconds => Some("%Y-%m-%d %H:%M:%S%.f"),
+            Self::LocalSpaceMinutes => Some("%Y-%m-%d %H:%M"),
+        }
+    }
+
+    /// Parses `s` as the first matching shape in [`Self::ALL`] order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the static reason chrono gave for the last shape tried when no
+    /// shape matches.
+    pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
+        let [first, rest @ ..] = Self::ALL;
+        let mut result = first.parse_shape(s);
+        for format in rest {
+            if result.is_ok() {
+                break;
+            }
+            result = format.parse_shape(s);
+        }
+        result.map_err(parse_reason)
+    }
+
+    /// Parses according to this format, returning a parsed datetime shape.
+    fn parse_shape(
+        self,
+        s: &str,
+    ) -> Result<ParsedDateTime, chrono::ParseError> {
+        match self.pattern() {
+            None => DateTime::parse_from_rfc3339(s)
+                .map(|dt| ParsedDateTime::Instant(dt.with_timezone(&Utc))),
+            Some(pat) => NaiveDateTime::parse_from_str(s, pat)
+                .map(ParsedDateTime::Unzoned),
+        }
+    }
+}
+
+/// The parsed shape of a date-time string before local-zone resolution.
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum ParsedDateTime {
+    /// Explicit RFC 3339 instant.
+    Instant(DateTime<Utc>),
+    /// Local naive datetime that must resolve through
+    /// [`DateTimeValue::from_local`].
+    Unzoned(NaiveDateTime),
 }
 
 #[cfg(test)]
@@ -442,6 +565,115 @@ mod tests {
                     .single()
                     .expect("unambiguous instant")
             );
+        }
+    }
+
+    mod parsing {
+        use chrono::NaiveDate;
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::utc_offset("2026-07-29T14:30:00Z", "2026-07-29T14:30:00")]
+        #[case::numeric_offset(
+            "2026-07-29T14:30:00+02:00",
+            "2026-07-29T12:30:00"
+        )]
+        #[case::fractional_seconds(
+            "2026-07-29T14:30:00.123",
+            "2026-07-29T14:30:00.123"
+        )]
+        #[case::t_separated_with_seconds(
+            "2026-07-29T14:30:00",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::t_separated_minute_only(
+            "2026-07-29T14:30",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::space_separated_fractional(
+            "2026-07-29 14:30:00.123",
+            "2026-07-29T14:30:00.123"
+        )]
+        #[case::space_separated_with_seconds(
+            "2026-07-29 14:30:00",
+            "2026-07-29T14:30:00"
+        )]
+        #[case::space_separated_minute_only(
+            "2026-07-29 14:30",
+            "2026-07-29T14:30:00"
+        )]
+        fn parses_every_datetime_shape_to_the_expected_instant(
+            #[case] input: &str,
+            #[case] expected_utc_rendering: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+
+            // Act
+            let parsed = DateTimeValue::parse_iso(input).expect("valid shape");
+
+            // Assert
+            assert_eq!(parsed.to_string(), expected_utc_rendering);
+        }
+
+        #[test]
+        fn datetime_value_rejects_a_short_year_with_year_not_four_digits() {
+            let result = DateTimeValue::parse_iso("26-08-22T14:30:00");
+            assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
+        }
+
+        #[test]
+        fn datetime_value_rejects_an_unrecognized_shape_as_invalid_value() {
+            let result = DateTimeValue::parse_iso("2026-07-29Tinvalid");
+            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
+        }
+
+        #[test]
+        fn date_time_shape_parses_whole_seconds_via_the_fractional_shape() {
+            // Arrange
+            let local_datetime = NaiveDate::from_ymd_opt(2026, 7, 29)
+                .and_then(|date| date.and_hms_opt(14, 30, 0))
+                .expect("valid fixture datetime");
+
+            // Act
+            let t_separated = DateTimeShape::parse_any("2026-07-29T14:30:00");
+            let space_separated =
+                DateTimeShape::parse_any("2026-07-29 14:30:00");
+
+            // Assert
+            assert!(matches!(
+                t_separated,
+                Ok(ParsedDateTime::Unzoned(parsed)) if parsed == local_datetime
+            ));
+            assert!(matches!(
+                space_separated,
+                Ok(ParsedDateTime::Unzoned(parsed)) if parsed == local_datetime
+            ));
+        }
+
+        #[rstest]
+        #[case::rfc3339(DateTimeShape::Rfc3339, None)]
+        #[case::t_seconds(
+            DateTimeShape::LocalTSeconds,
+            Some("%Y-%m-%dT%H:%M:%S%.f")
+        )]
+        #[case::t_minutes(DateTimeShape::LocalTMinutes, Some("%Y-%m-%dT%H:%M"))]
+        #[case::space_seconds(
+            DateTimeShape::LocalSpaceSeconds,
+            Some("%Y-%m-%d %H:%M:%S%.f")
+        )]
+        #[case::space_minutes(
+            DateTimeShape::LocalSpaceMinutes,
+            Some("%Y-%m-%d %H:%M")
+        )]
+        fn date_time_shape_maps_to_its_strftime_pattern(
+            #[case] shape: DateTimeShape,
+            #[case] expected: Option<&str>,
+        ) {
+            assert_eq!(shape.pattern(), expected);
         }
     }
 
