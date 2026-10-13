@@ -371,9 +371,8 @@ impl<'a> SortKey<'a> {
             NoteFieldValueRef::Bool(b) => Self::Bool(b),
             NoteFieldValueRef::Number(n) => Self::Number(normalize_zero(n)),
             NoteFieldValueRef::DateTime(value) => Self::DateTime(value),
-            NoteFieldValueRef::Date(value) => {
-                Self::DateTime(DateTimeValue::from(value))
-            }
+            NoteFieldValueRef::Date(value) => DateTimeValue::try_from(value)
+                .map_or(Self::Null, Self::DateTime),
             NoteFieldValueRef::Duration(dv) => {
                 Self::Duration(dv.nominal_seconds())
             }
@@ -394,9 +393,8 @@ impl<'a> SortKey<'a> {
     fn from_text(s: Cow<'a, str>) -> Self {
         match TextShape::classify(&s) {
             TextShape::DateTime(value) => Self::DateTime(value),
-            TextShape::Date(value) => {
-                Self::DateTime(DateTimeValue::from(value))
-            }
+            TextShape::Date(value) => DateTimeValue::try_from(value)
+                .map_or(Self::Null, Self::DateTime),
             TextShape::Duration(dv) => Self::Duration(dv.nominal_seconds()),
             TextShape::Plain => Self::Text(s),
         }
@@ -867,7 +865,10 @@ mod tests {
             ));
             assert_eq!(
                 key,
-                SortKey::DateTime(DateTimeValue::from(date("2026-07-29")))
+                SortKey::DateTime(
+                    DateTimeValue::try_from(date("2026-07-29"))
+                        .expect("test date has a representable local midnight"),
+                ),
             );
         }
 
@@ -887,7 +888,10 @@ mod tests {
             ));
             assert_eq!(
                 key,
-                SortKey::DateTime(DateTimeValue::from(date("2026-07-29")))
+                SortKey::DateTime(
+                    DateTimeValue::try_from(date("2026-07-29"))
+                        .expect("test date has a representable local midnight"),
+                ),
             );
         }
 

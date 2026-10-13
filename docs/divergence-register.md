@@ -1,17 +1,17 @@
 # Temporal Divergence Register
 
-## Redesign Behavior-Change Register (`R1 to R17`)
+## Redesign Behavior-Change Register (`R1 to R18`)
 
 This section is the **allow-list for Stage 2 oracle diffs**. Stage 1 of the
 temporal redesign is behavior-preserving: the migration oracle
 (`src/temporal_oracle.rs`) must show a **zero diff** after every Stage 1
 commit. Stage 2 (the engine swap) may change behavior only as listed below,
 and **every oracle diff line must carry a register tag**; any diff line
-outside `R1` to `R17` is a defect and triggers the Stage 2 drop condition.
+outside `R1` to `R18` is a defect and triggers the Stage 2 drop condition.
 
 Rows `R1` to `R15` come from
-`.design/2026-10-12-review-temporal/redesign-plan.md` (section 6); `R16` and
-`R17` from `implementation-plan.md` (section 7). Decisions `D1` to `D10` stand
+`.design/2026-10-12-review-temporal/redesign-plan.md` (section 6); `R16` to
+`R18` from `implementation-plan.md` (section 7). Decisions `D1` to `D10` stand
 at their defaults, so every row below is `accept` (or `keep`) unless noted.
 Case counts
 are measured from `tests/snapshots/temporal_oracle.snap`: 2,347 case lines,
@@ -213,6 +213,15 @@ per-row counts overlap.
   `src/temporal/duration.rs`.
 
 ---
+### `R18`: Leap Seconds Are Rejected
+
+- **Today**: Chrono accepts and round-trips RFC 3339 leap seconds such as
+  `23:59:60Z`.
+- **After**: Jiff timestamps reject leap seconds because they have no distinct
+  timestamp representation.
+- **Recommendation**: accept (approved for S2.3).
+- **Oracle cases**: 7 date-time parse rows tagged `R18`, one in each
+  explicit-zone group.
 
 ## Divergences from External Systems
 

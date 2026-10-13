@@ -488,11 +488,9 @@ fn normalize_name(name: &str) -> String {
 /// # Examples
 ///
 /// ```rust
-/// use chrono::NaiveDate;
 /// use traces_pkm::{DateValue, TaskDate, TaskDateSet, TaskDateType};
 ///
-/// let due =
-///     NaiveDate::from_ymd_opt(2025, 1, 15).map(DateValue::from).unwrap();
+/// let due = DateValue::from_ymd(2025, 1, 15).expect("valid date");
 /// let dates = TaskDateSet::from_iter([TaskDate::new(TaskDateType::Due, due)]);
 /// assert_eq!(dates.get(TaskDateType::Due), Some(due));
 /// assert!(!dates.is_empty());
@@ -534,11 +532,9 @@ impl TaskDateSet {
     /// # Examples
     ///
     /// ```rust
-    /// use chrono::NaiveDate;
     /// use traces_pkm::{DateValue, TaskDate, TaskDateSet, TaskDateType};
     ///
-    /// let due =
-    ///     NaiveDate::from_ymd_opt(2025, 1, 15).map(DateValue::from).unwrap();
+    /// let due = DateValue::from_ymd(2025, 1, 15).expect("valid date");
     /// let dates = TaskDateSet::from_iter([TaskDate::new(TaskDateType::Due, due)]);
     /// assert_eq!(dates.get(TaskDateType::Due), Some(due));
     /// assert_eq!(dates.get(TaskDateType::Start), None);
@@ -582,11 +578,10 @@ impl TaskDateSet {
     /// # Examples
     ///
     /// ```rust
-    /// use chrono::NaiveDate;
     /// use traces_pkm::{DateValue, TaskDate, TaskDateSet, TaskDateType};
     ///
-    /// let d1 = NaiveDate::from_ymd_opt(2025, 1, 1).map(DateValue::from).unwrap();
-    /// let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).map(DateValue::from).unwrap();
+    /// let d1 = DateValue::from_ymd(2025, 1, 1).expect("valid date");
+    /// let d2 = DateValue::from_ymd(2025, 1, 15).expect("valid date");
     /// let dates = TaskDateSet::from_iter([
     ///     TaskDate::new(TaskDateType::Due, d2),
     ///     TaskDate::new(TaskDateType::Created, d1),
@@ -687,11 +682,9 @@ impl Iterator for TaskDateSetIter {
 /// # Examples
 ///
 /// ```rust
-/// use chrono::NaiveDate;
 /// use traces_pkm::{DateValue, TaskDate, TaskDateType};
 ///
-/// let date_val =
-///     NaiveDate::from_ymd_opt(2025, 1, 15).map(DateValue::from).unwrap();
+/// let date_val = DateValue::from_ymd(2025, 1, 15).expect("valid date");
 /// let task_date = TaskDate::new(TaskDateType::Due, date_val);
 /// assert_eq!(task_date.kind(), TaskDateType::Due);
 /// assert_eq!(task_date.date(), date_val);
@@ -709,11 +702,8 @@ impl TaskDate {
     /// # Examples
     ///
     /// ```rust
-    /// use chrono::NaiveDate;
     /// use traces_pkm::{DateValue, TaskDate, TaskDateType};
-    ///
-    /// let date_val =
-    ///     NaiveDate::from_ymd_opt(2025, 1, 15).map(DateValue::from).unwrap();
+    /// let date_val = DateValue::from_ymd(2025, 1, 15).expect("valid date");
     /// let task_date = TaskDate::new(TaskDateType::Due, date_val);
     /// assert_eq!(task_date.kind(), TaskDateType::Due);
     /// ```
@@ -1600,7 +1590,6 @@ mod tests {
     }
 
     mod task_date_set {
-        use chrono::NaiveDate;
         use pretty_assertions::assert_eq;
 
         use super::*;
@@ -1619,9 +1608,8 @@ mod tests {
         #[test]
         fn insert_occupies_slot_and_is_not_empty() {
             let mut set = TaskDateSet::default();
-            let d = NaiveDate::from_ymd_opt(2025, 1, 15)
-                .map(DateValue::from)
-                .unwrap();
+            let d =
+                DateValue::from_ymd(2025, 1, 15).expect("valid fixture date");
             set.insert(TaskDate::new(TaskDateType::Due, d));
             assert_eq!(set.is_empty(), false);
             assert_eq!(set.get(TaskDateType::Due), Some(d));
@@ -1630,12 +1618,10 @@ mod tests {
         #[test]
         fn insert_ignores_duplicate_insertion_into_occupied_slot() {
             let mut set = TaskDateSet::default();
-            let d1 = NaiveDate::from_ymd_opt(2025, 1, 15)
-                .map(DateValue::from)
-                .unwrap();
-            let d2 = NaiveDate::from_ymd_opt(2025, 2, 20)
-                .map(DateValue::from)
-                .unwrap();
+            let d1 =
+                DateValue::from_ymd(2025, 1, 15).expect("valid fixture date");
+            let d2 =
+                DateValue::from_ymd(2025, 2, 20).expect("valid fixture date");
             set.insert(TaskDate::new(TaskDateType::Due, d1));
             set.insert(TaskDate::new(TaskDateType::Due, d2));
             assert_eq!(set.get(TaskDateType::Due), Some(d1));
@@ -1644,12 +1630,10 @@ mod tests {
         #[test]
         fn iter_yields_occupied_slots_in_declaration_order() {
             let mut set = TaskDateSet::default();
-            let d1 = NaiveDate::from_ymd_opt(2025, 1, 1)
-                .map(DateValue::from)
-                .unwrap();
-            let d2 = NaiveDate::from_ymd_opt(2025, 1, 6)
-                .map(DateValue::from)
-                .unwrap();
+            let d1 =
+                DateValue::from_ymd(2025, 1, 1).expect("valid fixture date");
+            let d2 =
+                DateValue::from_ymd(2025, 1, 6).expect("valid fixture date");
             set.insert(TaskDate::new(TaskDateType::Cancelled, d2));
             set.insert(TaskDate::new(TaskDateType::Created, d1));
             let items: Vec<TaskDate> = set.iter().collect();
@@ -1662,12 +1646,10 @@ mod tests {
         #[test]
         fn into_iter_yields_occupied_slots_in_declaration_order() {
             let mut set = TaskDateSet::default();
-            let d1 = NaiveDate::from_ymd_opt(2025, 1, 1)
-                .map(DateValue::from)
-                .unwrap();
-            let d2 = NaiveDate::from_ymd_opt(2025, 1, 6)
-                .map(DateValue::from)
-                .unwrap();
+            let d1 =
+                DateValue::from_ymd(2025, 1, 1).expect("valid fixture date");
+            let d2 =
+                DateValue::from_ymd(2025, 1, 6).expect("valid fixture date");
             set.insert(TaskDate::new(TaskDateType::Cancelled, d2));
             set.insert(TaskDate::new(TaskDateType::Created, d1));
             let mut count: usize = 0;
@@ -1691,9 +1673,8 @@ mod tests {
         #[test]
         fn borrowed_into_iter_yields_occupied_slots() {
             let mut set = TaskDateSet::default();
-            let d = NaiveDate::from_ymd_opt(2025, 1, 10)
-                .map(DateValue::from)
-                .unwrap();
+            let d =
+                DateValue::from_ymd(2025, 1, 10).expect("valid fixture date");
             set.insert(TaskDate::new(TaskDateType::Due, d));
             let collected: Vec<_> = (&set).into_iter().collect();
             assert_eq!(collected, vec![TaskDate::new(TaskDateType::Due, d)]);
@@ -1702,9 +1683,8 @@ mod tests {
         #[test]
         fn iter_size_hint_tracks_remaining_slots() {
             let mut set = TaskDateSet::default();
-            let d = NaiveDate::from_ymd_opt(2025, 1, 10)
-                .map(DateValue::from)
-                .unwrap();
+            let d =
+                DateValue::from_ymd(2025, 1, 10).expect("valid fixture date");
             set.insert(TaskDate::new(TaskDateType::Due, d));
             let mut iter = set.iter();
             assert_eq!(iter.size_hint(), (0, Some(6)));
@@ -1714,12 +1694,10 @@ mod tests {
 
         #[test]
         fn from_iterator_and_extend_collect_first_wins() {
-            let d1 = NaiveDate::from_ymd_opt(2025, 1, 1)
-                .map(DateValue::from)
-                .unwrap();
-            let d2 = NaiveDate::from_ymd_opt(2025, 1, 2)
-                .map(DateValue::from)
-                .unwrap();
+            let d1 =
+                DateValue::from_ymd(2025, 1, 1).expect("valid fixture date");
+            let d2 =
+                DateValue::from_ymd(2025, 1, 2).expect("valid fixture date");
             let set = TaskDateSet::from_iter([
                 TaskDate::new(TaskDateType::Due, d1),
                 TaskDate::new(TaskDateType::Due, d2),
@@ -1727,9 +1705,8 @@ mod tests {
             assert_eq!(set.get(TaskDateType::Due), Some(d1));
 
             let mut extended = set;
-            let d3 = NaiveDate::from_ymd_opt(2025, 1, 3)
-                .map(DateValue::from)
-                .unwrap();
+            let d3 =
+                DateValue::from_ymd(2025, 1, 3).expect("valid fixture date");
             extended.extend([
                 TaskDate::new(TaskDateType::Due, d3),
                 TaskDate::new(TaskDateType::Start, d3),
@@ -1749,9 +1726,8 @@ mod tests {
                 (TaskDateType::Done, 5),
                 (TaskDateType::Cancelled, 6),
             ] {
-                let day = NaiveDate::from_ymd_opt(2025, 1, day)
-                    .map(DateValue::from)
-                    .unwrap();
+                let day = DateValue::from_ymd(2025, 1, day)
+                    .expect("valid fixture date");
                 set.insert(TaskDate::new(kind, day));
             }
             let bytes = postcard::to_allocvec(&set).expect("encode dates");
@@ -1781,32 +1757,31 @@ mod tests {
                 .expect("decode pre-c1 dates wire bytes");
             assert_eq!(
                 decoded.get(TaskDateType::Created),
-                NaiveDate::from_ymd_opt(2025, 1, 1).map(DateValue::from)
+                DateValue::from_ymd(2025, 1, 1).ok()
             );
             assert_eq!(
                 decoded.get(TaskDateType::Scheduled),
-                NaiveDate::from_ymd_opt(2025, 1, 2).map(DateValue::from)
+                DateValue::from_ymd(2025, 1, 2).ok()
             );
             assert_eq!(
                 decoded.get(TaskDateType::Start),
-                NaiveDate::from_ymd_opt(2025, 1, 3).map(DateValue::from)
+                DateValue::from_ymd(2025, 1, 3).ok()
             );
             assert_eq!(
                 decoded.get(TaskDateType::Due),
-                NaiveDate::from_ymd_opt(2025, 1, 4).map(DateValue::from)
+                DateValue::from_ymd(2025, 1, 4).ok()
             );
             assert_eq!(
                 decoded.get(TaskDateType::Done),
-                NaiveDate::from_ymd_opt(2025, 1, 5).map(DateValue::from)
+                DateValue::from_ymd(2025, 1, 5).ok()
             );
             assert_eq!(
                 decoded.get(TaskDateType::Cancelled),
-                NaiveDate::from_ymd_opt(2025, 1, 6).map(DateValue::from)
+                DateValue::from_ymd(2025, 1, 6).ok()
             );
         }
     }
     mod task_date_type {
-        use chrono::NaiveDate;
         use pretty_assertions::assert_eq;
         use rstest::rstest;
 
@@ -1903,12 +1878,10 @@ mod tests {
 
         #[test]
         fn task_date_supports_hash_and_ordering() {
-            let d1 = NaiveDate::from_ymd_opt(2025, 1, 1)
-                .map(DateValue::from)
-                .unwrap();
-            let d2 = NaiveDate::from_ymd_opt(2025, 1, 2)
-                .map(DateValue::from)
-                .unwrap();
+            let d1 =
+                DateValue::from_ymd(2025, 1, 1).expect("valid fixture date");
+            let d2 =
+                DateValue::from_ymd(2025, 1, 2).expect("valid fixture date");
             let td1 = TaskDate::new(TaskDateType::Created, d1);
             let td2 = TaskDate::new(TaskDateType::Due, d2);
             let td1_dup = TaskDate::new(TaskDateType::Created, d1);

@@ -299,7 +299,6 @@ pub(super) struct TaskClassificationParams<'a> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
     use rstest::rstest;
 
     use super::{super::list::ListTracker, *};
@@ -1115,7 +1114,7 @@ mod tests {
         use super::*;
 
         fn date(year: i32, month: u32, day: u32) -> Option<DateValue> {
-            NaiveDate::from_ymd_opt(year, month, day).map(Into::into)
+            DateValue::from_ymd(year, month, day).ok()
         }
         #[rstest]
         #[case::emoji(

@@ -235,10 +235,10 @@ mod probe {
 
     pub(super) fn promote(input: &str) -> String {
         match input.parse::<DateValue>() {
-            Ok(date) => {
-                let date_time = DateTimeValue::from(date);
-                format!("{} local {date_time}", json(&date_time))
-            }
+            Ok(date) => DateTimeValue::try_from(date).map_or_else(
+                |error| format!("Err({})", date_error_class(&error)),
+                |date_time| format!("{} local {date_time}", json(&date_time)),
+            ),
             Err(error) => format!("Err({})", date_error_class(&error)),
         }
     }
@@ -324,8 +324,13 @@ mod probe {
     pub(super) fn diff(from: &str, to: &str, unit_spelling: &str) -> String {
         match (point_or(from), point_or(to)) {
             (Ok(from), Ok(to)) => match from.diff(to, unit(unit_spelling)) {
-                Difference::Whole(n) => format!("whole {n}"),
-                Difference::Fractional(f) => format!("fractional {f:.6}"),
+                Ok(Difference::Whole(n)) => format!("whole {n}"),
+                Ok(Difference::Fractional(f)) => {
+                    format!("fractional {f:.6}")
+                }
+                Err(error) => {
+                    format!("Err({})", calendar_error_class(&error))
+                }
             },
             _ => "Err(parse)".to_owned(),
         }
@@ -899,7 +904,9 @@ const PATTERNS: [(&str, &str); 17] = [
 fn zone_corpus(log: &mut Transcript, zone: &ZoneCase) {
     log.section(&format!("date-time parse in {}", zone.name));
     for input in DATE_TIMES {
-        let tag = if input.contains("2026-1-1") {
+        let tag = if input.contains("23:59:60") {
+            "R18"
+        } else if input.contains("2026-1-1") {
             "R6"
         } else if input.contains("9999") || input.starts_with("999-") {
             "R14"

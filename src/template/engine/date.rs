@@ -297,16 +297,18 @@ enum Anchor {
 
 impl Anchor {
     /// The date point a shorthand starts from when no reference is given.
-    fn base(self) -> DatePoint {
-        let now = DatePoint::from(DateTimeValue::from(Utc::now()));
+    fn base(self) -> Result<DatePoint, CalendarError> {
+        let now = DatePoint::from(DateTimeValue::from_timestamp(
+            jiff::Timestamp::now(),
+        ));
         match self {
-            Self::Now => now,
+            Self::Now => Ok(now),
             Self::Today
             | Self::Tomorrow
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => DatePoint::from(now.date()),
+            | Self::Weekday(_) => Ok(DatePoint::from(now.date()?)),
         }
     }
 
@@ -366,7 +368,7 @@ impl Anchor {
                 parse_date_point(ref_text)?
             }
         } else {
-            self.base()
+            self.base().map_err(render_calendar_error)?
         };
         date_point =
             self.transform(date_point).map_err(render_calendar_error)?;
@@ -466,8 +468,14 @@ impl Object for DateNamespace {
                     // Display is human-facing: the local clock time of the
                     // instant, via the crate's canonical conversion
                     // (`.naive_utc()` would show the UTC clock instead).
-                    let local =
-                        DateTimeValue::from(utc).local_datetime_or_utc();
+                    let local = DateTimeValue::try_from(utc)
+                        .map_err(|error| {
+                            Error::new(
+                                ErrorKind::InvalidOperation,
+                                error.to_string(),
+                            )
+                        })?
+                        .local_datetime_or_utc();
                     render_with_pattern(local.format(format), format)
                 },
             )),
@@ -1030,7 +1038,8 @@ fn date_diff(
     let from = parse_date_point(value)?;
     let to = parse_date_point(other)?;
 
-    Ok(match from.diff(to, unit) {
+    let diff = from.diff(to, unit).map_err(render_calendar_error)?;
+    Ok(match diff {
         Difference::Whole(n) => Value::from(n),
         Difference::Fractional(f) => Value::from(f),
     })

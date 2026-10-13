@@ -2868,14 +2868,17 @@ impl core::cmp::PartialEq for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::From<chrono::datetime::DateTime<chrono::offset::utc::Utc>> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> Self
-impl core::convert::From<std::time::SystemTime> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(std::time::SystemTime) -> Self
 impl core::convert::From<traces_pkm::DateTimeValue> for chrono::datetime::DateTime<chrono::offset::utc::Utc>
 pub fn chrono::datetime::DateTime<chrono::offset::utc::Utc>::from(traces_pkm::DateTimeValue) -> Self
-impl core::convert::From<traces_pkm::DateValue> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(traces_pkm::DateValue) -> Self
+impl core::convert::TryFrom<chrono::datetime::DateTime<chrono::offset::utc::Utc>> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<std::time::SystemTime> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(std::time::SystemTime) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<traces_pkm::DateValue> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(traces_pkm::DateValue) -> core::result::Result<Self, Self::Error>
 impl core::fmt::Debug for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DateTimeValue
@@ -2944,6 +2947,8 @@ impl<T> tracing::instrument::Instrument for traces_pkm::DateTimeValue
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateTimeValue
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateTimeValue where T: 'static
 #[repr(transparent)] pub struct traces_pkm::DateValue(_)
+impl traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from_ymd(i32, u32, u32) -> core::result::Result<Self, traces_pkm::DateError>
 impl core::clone::Clone for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DateValue
@@ -2953,14 +2958,19 @@ impl core::cmp::PartialEq for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::From<chrono::naive::date::NaiveDate> for traces_pkm::DateValue
-pub fn traces_pkm::DateValue::from(chrono::naive::date::NaiveDate) -> Self
-impl core::convert::From<std::time::SystemTime> for traces_pkm::DateValue
-pub fn traces_pkm::DateValue::from(std::time::SystemTime) -> Self
+impl core::convert::From<jiff::civil::date::Date> for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from(jiff::civil::date::Date) -> Self
 impl core::convert::From<traces_pkm::DateValue> for chrono::naive::date::NaiveDate
 pub fn chrono::naive::date::NaiveDate::from(traces_pkm::DateValue) -> Self
-impl core::convert::From<traces_pkm::DateValue> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(traces_pkm::DateValue) -> Self
+impl core::convert::TryFrom<chrono::naive::date::NaiveDate> for traces_pkm::DateValue
+pub type traces_pkm::DateValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateValue::try_from(chrono::naive::date::NaiveDate) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<std::time::SystemTime> for traces_pkm::DateValue
+pub type traces_pkm::DateValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateValue::try_from(std::time::SystemTime) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<traces_pkm::DateValue> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(traces_pkm::DateValue) -> core::result::Result<Self, Self::Error>
 impl core::fmt::Debug for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DateValue

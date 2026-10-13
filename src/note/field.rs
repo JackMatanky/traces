@@ -109,10 +109,9 @@ impl NoteFieldValue {
     pub fn as_date(&self) -> Option<DateValue> {
         match self {
             Self::Date(value) => Some(*value),
-            Self::DateTime(value) => Some(value.local_date()),
-            Self::String(s) => {
-                DatePoint::parse_prefix(s).map(|point| point.value().date())
-            }
+            Self::DateTime(value) => value.local_date().ok(),
+            Self::String(s) => DatePoint::parse_prefix(s)
+                .and_then(|point| point.value().date().ok()),
             _ => None,
         }
     }
@@ -293,12 +292,10 @@ impl NoteFieldValueRef<'_> {
             (Self::Duration(a), Self::Duration(b)) => a.cmp(b),
             (Self::Date(a), Self::Date(b)) => a.cmp(b),
             (Self::DateTime(a), Self::DateTime(b)) => a.cmp(b),
-            (Self::Date(a), Self::DateTime(b)) => {
-                DateTimeValue::from(*a).cmp(b)
-            }
-            (Self::DateTime(a), Self::Date(b)) => {
-                a.cmp(&DateTimeValue::from(*b))
-            }
+            (Self::Date(a), Self::DateTime(b)) => DateTimeValue::try_from(*a)
+                .map_or(Ordering::Less, |date_time| date_time.cmp(b)),
+            (Self::DateTime(a), Self::Date(b)) => DateTimeValue::try_from(*b)
+                .map_or(Ordering::Greater, |date_time| a.cmp(&date_time)),
             (Self::String(a), Self::String(b)) => a.cmp(b),
             (Self::Link(a), Self::Link(b)) => {
                 a.target().cmp(b.target()).then_with(|| a.text().cmp(b.text()))

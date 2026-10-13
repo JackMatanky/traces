@@ -9,6 +9,7 @@
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
 use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
+use jiff::civil;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
@@ -43,13 +44,58 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 /// ```
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DateValue(NaiveDate);
+pub struct DateValue(civil::Date);
 
 impl DateValue {
+    /// Constructs a calendar date from year, month, and day fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DateError::InvalidValue`] if the fields do not name a
+    /// representable Gregorian date.
+    #[inline]
+    pub fn from_ymd(
+        year: i32,
+        month: u32,
+        day: u32,
+    ) -> Result<Self, DateError> {
+        let invalid = || DateError::InvalidValue {
+            input: format!("{year}-{month}-{day}").into(),
+            reason: "a field is out of range",
+        };
+        let year = i16::try_from(year).map_err(|_| invalid())?;
+        let month = i8::try_from(month).map_err(|_| invalid())?;
+        let day = i8::try_from(day).map_err(|_| invalid())?;
+        civil::Date::new(year, month, day).map(Self).map_err(|_| invalid())
+    }
+
     /// Returns the wrapped calendar date.
     #[must_use]
-    pub(crate) const fn naive_date(self) -> NaiveDate {
-        self.0
+    #[expect(
+        clippy::expect_used,
+        reason = "Jiff's date range is strictly inside chrono's date range"
+    )]
+    pub(crate) fn naive_date(self) -> NaiveDate {
+        NaiveDate::from_ymd_opt(
+            i32::from(self.0.year()),
+            u32::try_from(self.0.month()).expect("Jiff month fits chrono"),
+            u32::try_from(self.0.day()).expect("Jiff day fits chrono"),
+        )
+        .expect("every Jiff civil date fits chrono")
+    }
+
+    pub(crate) fn try_from_naive_date(
+        date: NaiveDate,
+    ) -> Result<Self, CalendarError> {
+        let year = i16::try_from(date.year())
+            .map_err(|_| CalendarError::OutOfRange)?;
+        let month = i8::try_from(date.month())
+            .map_err(|_| CalendarError::OutOfRange)?;
+        let day =
+            i8::try_from(date.day()).map_err(|_| CalendarError::OutOfRange)?;
+        civil::Date::new(year, month, day)
+            .map(Self)
+            .map_err(|_| CalendarError::OutOfRange)
     }
 
     /// Returns the whole calendar months from `self` to `to`, signed by
@@ -60,7 +106,7 @@ impl DateValue {
     /// final month is not complete. Either ordering is accepted: `to` before
     /// `self` yields a negative count.
     pub(super) fn whole_months_until(self, to: Self) -> i64 {
-        let (from, to) = (self.naive_date(), to.naive_date());
+        let (from, to) = (self.0, to.0);
         let (earlier, later, sign) = if to >= from {
             (from, to, 1)
         } else {
@@ -106,7 +152,9 @@ impl DateValue {
         self.naive_date()
             .and_time(NaiveTime::MIN)
             .checked_add_signed(delta)
-            .map(|local_datetime| Self::from(local_datetime.date()))
+            .and_then(|local_datetime| {
+                Self::try_from(local_datetime.date()).ok()
+            })
             .ok_or(CalendarError::OutOfRange)
     }
 
@@ -129,7 +177,7 @@ impl DateValue {
                 input: trimmed.into(),
             });
         }
-        DateShape::parse_any(trimmed).map(|(date, _)| Self::from(date)).map_err(
+        DateShape::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
             |reason| DateError::InvalidValue {
                 input: trimmed.into(),
                 reason,
@@ -159,7 +207,7 @@ impl DateShape {
     /// otherwise.
     pub(crate) fn parse_any(
         s: &str,
-    ) -> Result<(NaiveDate, DatePrecision), &'static str> {
+    ) -> Result<(civil::Date, DatePrecision), &'static str> {
         Self::YearMonthDay.parse_precision(s).or_else(|day_reason| {
             Self::YearMonth.parse_precision(s).map_err(|month_reason| {
                 if s.len() == 7 {
@@ -174,11 +222,22 @@ impl DateShape {
     fn parse_precision(
         self,
         s: &str,
-    ) -> Result<(NaiveDate, DatePrecision), &'static str> {
+    ) -> Result<(civil::Date, DatePrecision), &'static str> {
         match self {
-            Self::YearMonthDay => NaiveDate::parse_from_str(s, DATE_PATTERN)
-                .map(|d| (d, DatePrecision::Day))
-                .map_err(parse_reason),
+            Self::YearMonthDay => {
+                let date = NaiveDate::parse_from_str(s, DATE_PATTERN)
+                    .map_err(parse_reason)?;
+                let date = civil::Date::new(
+                    i16::try_from(date.year())
+                        .map_err(|_| "year is outside the supported range")?,
+                    i8::try_from(date.month())
+                        .map_err(|_| "month is outside the supported range")?,
+                    i8::try_from(date.day())
+                        .map_err(|_| "day is outside the supported range")?,
+                )
+                .map_err(|_| "a field is out of range")?;
+                Ok((date, DatePrecision::Day))
+            }
             Self::YearMonth => {
                 Self::parse_year_month(s).map(|d| (d, DatePrecision::Month))
             }
@@ -186,7 +245,7 @@ impl DateShape {
     }
 
     /// Parses `"YYYY-MM"`, defaulting the day to 1.
-    fn parse_year_month(s: &str) -> Result<NaiveDate, &'static str> {
+    fn parse_year_month(s: &str) -> Result<civil::Date, &'static str> {
         let (year_str, month_str) =
             s.split_once('-').ok_or("not enough input")?;
         if year_str.len() != 4
@@ -195,9 +254,9 @@ impl DateShape {
         {
             return Err("not enough input");
         }
-        let year: i32 = year_str.parse().map_err(|_| "invalid input")?;
-        let month: u32 = month_str.parse().map_err(|_| "invalid input")?;
-        NaiveDate::from_ymd_opt(year, month, 1).ok_or("a field is out of range")
+        let year: i16 = year_str.parse().map_err(|_| "invalid input")?;
+        let month: i8 = month_str.parse().map_err(|_| "invalid input")?;
+        civil::Date::new(year, month, 1).map_err(|_| "a field is out of range")
     }
 }
 
@@ -205,7 +264,7 @@ impl DateShape {
 impl fmt::Display for DateValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.format(DATE_PATTERN))
+        write!(f, "{}", self.0)
     }
 }
 
@@ -215,10 +274,21 @@ impl From<DateValue> for NaiveDate {
         value.naive_date()
     }
 }
-impl From<NaiveDate> for DateValue {
+impl From<civil::Date> for DateValue {
     #[inline]
-    fn from(date: NaiveDate) -> Self {
+    fn from(date: civil::Date) -> Self {
         Self(date)
+    }
+}
+impl TryFrom<NaiveDate> for DateValue {
+    type Error = DateError;
+
+    #[inline]
+    fn try_from(date: NaiveDate) -> Result<Self, Self::Error> {
+        Self::try_from_naive_date(date).map_err(|_| DateError::InvalidValue {
+            input: date.to_string().into(),
+            reason: "date/time is outside the representable range",
+        })
     }
 }
 
@@ -228,10 +298,14 @@ impl From<NaiveDate> for DateValue {
 /// A file's date means the reader's local day, the same doctrine that reads
 /// unzoned date-time input on the local clock: a time in the final hours of
 /// December 31 locally can already be January 1 in UTC, or the reverse.
-impl From<SystemTime> for DateValue {
+impl TryFrom<SystemTime> for DateValue {
+    type Error = DateError;
+
     #[inline]
-    fn from(time: SystemTime) -> Self {
-        DateTimeValue::from(time).local_date()
+    fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
+        DateTimeValue::try_from(time)?
+            .local_date()
+            .map_err(|error| error.into_date_error("system time"))
     }
 }
 
@@ -836,7 +910,6 @@ mod tests {
 
     mod conversions {
         use pretty_assertions::assert_eq;
-        use rstest::rstest;
 
         use super::*;
 
@@ -849,7 +922,8 @@ mod tests {
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 
             // Act
-            let date = DateValue::from(system_time);
+            let date = DateValue::try_from(system_time)
+                .expect("epoch-adjacent time fits the date range");
 
             // Assert
             assert_eq!(
@@ -867,7 +941,8 @@ mod tests {
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 
             // Act
-            let date = DateValue::from(system_time);
+            let date = DateValue::try_from(system_time)
+                .expect("epoch-adjacent time fits the date range");
 
             // Assert
             assert_eq!(
@@ -878,54 +953,32 @@ mod tests {
         }
 
         #[test]
-        fn wraps_a_chrono_date_through_the_from_trait() {
+        fn converts_a_chrono_date_within_the_jiff_range() {
             // Arrange
             let chrono_date = NaiveDate::from_ymd_opt(2026, 7, 29)
                 .expect("valid fixture date");
 
             // Act
-            let date = DateValue::from(chrono_date);
+            let date = DateValue::try_from(chrono_date)
+                .expect("2026 is within the Jiff date range");
 
             // Assert
             assert_eq!(
                 date,
                 ymd(2026, 7, 29),
-                "the From impl wraps without loss"
+                "the fallible conversion preserves valid calendar fields"
             );
         }
 
         #[test]
-        fn unwraps_to_a_chrono_date_through_the_from_trait() {
+        fn rejects_chrono_dates_outside_the_jiff_range() {
             // Arrange
-            let date = ymd(2026, 7, 29);
-            let expected = NaiveDate::from_ymd_opt(2026, 7, 29)
-                .expect("valid fixture date");
-
-            // Act
-            let chrono_date = NaiveDate::from(date);
+            let minimum = DateValue::try_from(NaiveDate::MIN);
+            let maximum = DateValue::try_from(NaiveDate::MAX);
 
             // Assert
-            assert_eq!(
-                chrono_date, expected,
-                "the inverse From impl unwraps without loss"
-            );
-        }
-
-        #[rstest]
-        #[case::minimum(NaiveDate::MIN)]
-        #[case::maximum(NaiveDate::MAX)]
-        fn wraps_the_extremes_of_the_chrono_date_range(
-            #[case] extreme: NaiveDate,
-        ) {
-            // Arrange: `extreme` is the case literal, a year far outside the
-            // four-digit parse rule.
-            // Act
-            let round_tripped = NaiveDate::from(DateValue::from(extreme));
-            // Assert
-            assert_eq!(
-                round_tripped, extreme,
-                "construction never narrows the wrapped range"
-            );
+            assert!(minimum.is_err(), "chrono's minimum exceeds Jiff's range");
+            assert!(maximum.is_err(), "chrono's maximum exceeds Jiff's range");
         }
     }
 

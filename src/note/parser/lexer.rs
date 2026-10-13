@@ -253,7 +253,10 @@ fn task_date_callback(
         return Filter::Skip;
     }
     lex.bump(ws_end.saturating_add(consumed));
-    Filter::Emit(TaskDate::new(kind, parsed.value().date()))
+    match parsed.value().date() {
+        Ok(date) => Filter::Emit(TaskDate::new(kind, date)),
+        Err(_) => Filter::Skip,
+    }
 }
 
 /// Parses a Markdown tag following the leading `#` character.

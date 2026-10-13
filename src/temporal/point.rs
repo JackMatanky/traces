@@ -11,6 +11,8 @@ use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
     Timelike as _, Utc, Weekday, format::ParseErrorKind,
 };
+#[cfg(test)]
+use jiff::Timestamp;
 use num_traits::ToPrimitive as _;
 
 use super::{
@@ -72,13 +74,12 @@ impl DatePoint {
     }
 
     /// Calendar date of this date point in the local zone.
-    #[must_use]
-    pub(crate) fn date(self) -> DateValue {
+    pub(crate) fn date(self) -> Result<DateValue, CalendarError> {
         match self {
             Self::Calendar {
                 date,
                 ..
-            } => date,
+            } => Ok(date),
             Self::DateTime(dt) => dt.local_date(),
         }
     }
@@ -104,7 +105,10 @@ impl DatePoint {
             Self::Calendar {
                 date,
                 ..
-            } => DateTimeValue::from(date).utc(),
+            } => DateTimeValue::try_from(date).map_or_else(
+                |_| date.naive_date().and_time(NaiveTime::MIN).and_utc(),
+                DateTimeValue::utc,
+            ),
             Self::DateTime(dt) => dt.utc(),
         }
     }
@@ -148,7 +152,9 @@ impl DatePoint {
                 let local_datetime =
                     shift_datetime(self.local_datetime_or_utc(), n, unit)?;
                 Ok(Self::Calendar {
-                    date: DateValue::from(local_datetime.date()),
+                    date: DateValue::try_from_naive_date(
+                        local_datetime.date(),
+                    )?,
                     date_precision,
                 })
             }
@@ -256,32 +262,40 @@ impl DatePoint {
     /// Years and months are whole calendar counts of the local dates. Exact
     /// units are fractional when both points carry a time and whole, truncated
     /// toward zero, otherwise.
-    pub(crate) fn diff(self, to: Self, unit: TimeUnit) -> Difference {
+    pub(crate) fn diff(
+        self,
+        to: Self,
+        unit: TimeUnit,
+    ) -> Result<Difference, CalendarError> {
         let local_delta = || {
             to.local_datetime_or_utc()
                 .signed_duration_since(self.local_datetime_or_utc())
         };
         match unit {
-            TimeUnit::Year => {
-                Difference::Whole(self.date().whole_years_until(to.date()))
-            }
-            TimeUnit::Month => {
-                Difference::Whole(self.date().whole_months_until(to.date()))
-            }
+            TimeUnit::Year => Ok(Difference::Whole(
+                self.date()?.whole_years_until(to.date()?),
+            )),
+            TimeUnit::Month => Ok(Difference::Whole(
+                self.date()?.whole_months_until(to.date()?),
+            )),
             fixed if self.has_time() && to.has_time() => {
                 let seconds =
                     to.instant().signed_duration_since(self.instant());
-                Difference::Fractional(
+                Ok(Difference::Fractional(
                     seconds.as_seconds_f64() / fixed.nominal_seconds(),
-                )
+                ))
             }
-            TimeUnit::Week => Difference::Whole(local_delta().num_weeks()),
-            TimeUnit::Day => Difference::Whole(local_delta().num_days()),
-            TimeUnit::Hour => Difference::Whole(local_delta().num_hours()),
-            TimeUnit::Minute => Difference::Whole(local_delta().num_minutes()),
-            TimeUnit::Second => Difference::Whole(local_delta().num_seconds()),
+            TimeUnit::Week => Ok(Difference::Whole(local_delta().num_weeks())),
+            TimeUnit::Day => Ok(Difference::Whole(local_delta().num_days())),
+            TimeUnit::Hour => Ok(Difference::Whole(local_delta().num_hours())),
+            TimeUnit::Minute => {
+                Ok(Difference::Whole(local_delta().num_minutes()))
+            }
+            TimeUnit::Second => {
+                Ok(Difference::Whole(local_delta().num_seconds()))
+            }
             TimeUnit::Millisecond => {
-                Difference::Whole(local_delta().num_milliseconds())
+                Ok(Difference::Whole(local_delta().num_milliseconds()))
             }
         }
     }
@@ -317,11 +331,14 @@ impl DatePoint {
                 date: date.advance(delta)?,
                 date_precision,
             }),
-            Self::DateTime(dt) => Ok(Self::DateTime(DateTimeValue::from(
-                dt.utc()
-                    .checked_add_signed(delta)
-                    .ok_or(CalendarError::OutOfRange)?,
-            ))),
+            Self::DateTime(dt) => Ok(Self::DateTime(
+                DateTimeValue::try_from(
+                    dt.utc()
+                        .checked_add_signed(delta)
+                        .ok_or(CalendarError::OutOfRange)?,
+                )
+                .map_err(|_| CalendarError::OutOfRange)?,
+            )),
         }
     }
 
@@ -362,7 +379,7 @@ impl DatePoint {
                 date_precision,
                 ..
             } => Ok(Self::Calendar {
-                date: DateValue::from(date),
+                date: DateValue::try_from_naive_date(date)?,
                 date_precision,
             }),
             Self::DateTime(_) => {
@@ -449,7 +466,12 @@ impl DatePoint {
         }
         match DateTimeShape::parse_any(trimmed) {
             Ok(ParsedDateTime::Instant(instant)) => {
-                Ok(Self::DateTime(DateTimeValue::from(instant)))
+                Ok(Self::DateTime(DateTimeValue::try_from(instant).map_err(
+                    |_| DateError::InvalidValue {
+                        input: trimmed.into(),
+                        reason: "date/time is outside the representable range",
+                    },
+                )?))
             }
             Ok(ParsedDateTime::Unzoned(local_datetime)) => Ok(Self::DateTime(
                 DateTimeValue::from_local(local_datetime)
@@ -528,9 +550,14 @@ impl DatePoint {
         let trimmed_pattern = pattern.trim();
         if let Ok(dt) = DateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::DateTime(DateTimeValue::from(
-                dt.with_timezone(&Utc),
-            )));
+            return Ok(Self::DateTime(
+                DateTimeValue::try_from(dt.with_timezone(&Utc)).map_err(
+                    |_| DateError::InvalidValue {
+                        input: trimmed_text.into(),
+                        reason: "date/time is outside the representable range",
+                    },
+                )?,
+            ));
         }
         if let Ok(local_datetime) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
@@ -550,15 +577,17 @@ impl DatePoint {
         {
             return Ok(date_point);
         }
-        NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
-            .map(|date| Self::Calendar {
-                date: DateValue::from(date),
-                date_precision: DatePrecision::Day,
-            })
+        let date = NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
             .map_err(|source| DateError::InvalidValue {
                 input: trimmed_text.into(),
                 reason: parse_reason(source),
-            })
+            })?;
+        let date = DateValue::try_from_naive_date(date)
+            .map_err(|error| error.into_date_error(trimmed_text))?;
+        Ok(Self::Calendar {
+            date,
+            date_precision: DatePrecision::Day,
+        })
     }
 }
 
@@ -1334,18 +1363,20 @@ mod tests {
             // Arrange: points one unit inside each representable edge.
             ZoneGuard::set("UTC");
             let max_date = DatePoint::Calendar {
-                date: DateValue::from(NaiveDate::MAX),
+                date: DateValue::from_ymd(9999, 12, 31)
+                    .expect("maximum Jiff date is valid"),
                 date_precision: DatePrecision::Day,
             };
             let min_date = DatePoint::Calendar {
-                date: DateValue::from(NaiveDate::MIN),
+                date: DateValue::from_ymd(-9999, 1, 1)
+                    .expect("minimum Jiff date is valid"),
                 date_precision: DatePrecision::Day,
             };
-            let max_point = DatePoint::DateTime(DateTimeValue::from(
-                DateTime::<Utc>::MAX_UTC,
+            let max_point = DatePoint::DateTime(DateTimeValue::from_timestamp(
+                Timestamp::MAX,
             ));
-            let min_point = DatePoint::DateTime(DateTimeValue::from(
-                DateTime::<Utc>::MIN_UTC,
+            let min_point = DatePoint::DateTime(DateTimeValue::from_timestamp(
+                Timestamp::MIN,
             ));
 
             // Act
@@ -1744,11 +1775,11 @@ mod tests {
             // Arrange: the date-time range edges and a one-second duration.
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
-            let max_point = DatePoint::DateTime(DateTimeValue::from(
-                DateTime::<Utc>::MAX_UTC,
+            let max_point = DatePoint::DateTime(DateTimeValue::from_timestamp(
+                Timestamp::MAX,
             ));
-            let min_point = DatePoint::DateTime(DateTimeValue::from(
-                DateTime::<Utc>::MIN_UTC,
+            let min_point = DatePoint::DateTime(DateTimeValue::from_timestamp(
+                Timestamp::MIN,
             ));
 
             // Act
@@ -2243,7 +2274,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "{unit:?} between calendar points must count whole units"
             );
         }
@@ -2268,7 +2300,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "diff must be antisymmetric for {unit:?}"
             );
         }
@@ -2298,7 +2331,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "whole years must count across a large span"
             );
         }
@@ -2330,7 +2364,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "{unit:?} between date-time points must be fractional exact \
                  time"
             );
@@ -2353,7 +2388,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "{unit:?} must count whole calendar units of the local dates"
             );
         }
@@ -2383,7 +2419,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "a point diffed against itself must count zero"
             );
         }
@@ -2414,7 +2451,8 @@ mod tests {
 
             // Assert
             assert_eq!(
-                difference, expected,
+                difference,
+                Ok(expected),
                 "a mixed-frame hour diff must truncate toward zero"
             );
         }
@@ -2438,22 +2476,22 @@ mod tests {
             // Assert
             assert_eq!(
                 spring_day,
-                Difference::Fractional(0.958_333_333_333_333_4),
+                Ok(Difference::Fractional(0.958_333_333_333_333_4)),
                 "the spring day spans twenty-three elapsed hours"
             );
             assert_eq!(
                 spring_hour,
-                Difference::Fractional(23.0),
+                Ok(Difference::Fractional(23.0)),
                 "the spring day spans twenty-three elapsed hours"
             );
             assert_eq!(
                 fall_day,
-                Difference::Fractional(1.041_666_666_666_666_7),
+                Ok(Difference::Fractional(1.041_666_666_666_666_7)),
                 "the fall day spans twenty-five elapsed hours"
             );
             assert_eq!(
                 fall_hour,
-                Difference::Fractional(25.0),
+                Ok(Difference::Fractional(25.0)),
                 "the fall day spans twenty-five elapsed hours"
             );
         }
@@ -2472,12 +2510,12 @@ mod tests {
             // Assert
             assert_eq!(
                 days,
-                Difference::Whole(1),
+                Ok(Difference::Whole(1)),
                 "a date-only day diff must count the local calendar day"
             );
             assert_eq!(
                 hours,
-                Difference::Whole(24),
+                Ok(Difference::Whole(24)),
                 "a date-only hour diff must count nominal whole hours"
             );
         }
@@ -2491,9 +2529,12 @@ mod tests {
 
         #[test]
         fn reports_no_time_for_a_calendar_point() {
-            // Arrange: the minimum representable calendar date.
+            // Arrange: the minimum year in the Jiff date range.
             let point = DatePoint::Calendar {
-                date: DateValue::from(NaiveDate::MIN),
+                date: DateValue::from(
+                    jiff::civil::Date::new(-9999, 1, 1)
+                        .expect("minimum Jiff date is valid"),
+                ),
                 date_precision: DatePrecision::Day,
             };
 
@@ -2527,7 +2568,7 @@ mod tests {
             // Assert
             assert_eq!(
                 date,
-                ymd(2026, 7, 1),
+                Ok(ymd(2026, 7, 1)),
                 "a calendar point must return its stored date"
             );
         }
@@ -2544,7 +2585,7 @@ mod tests {
             // Assert
             assert_eq!(
                 date,
-                ymd(2026, 7, 29),
+                Ok(ymd(2026, 7, 29)),
                 "a date-time point must render its local calendar date"
             );
         }

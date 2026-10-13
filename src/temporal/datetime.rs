@@ -28,10 +28,11 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// A Date-Time stored as UTC that renders as the local clock.
 ///
-/// Accepts RFC 3339 input with an explicit offset and naive input in the five
-/// written shapes of `DateTimeShape`. Naive input resolves in the process's
-/// local zone (ambiguous fall-back times take the earlier occurrence;
-/// spring-forward gaps shift forward by the gap length) and stores as UTC.
+/// Accepts RFC 3339 input with an explicit offset except for leap seconds,
+/// which Jiff timestamps cannot represent. Naive input in the five written
+/// shapes of `DateTimeShape` resolves in the process's local zone (ambiguous
+/// fall-back times take the earlier occurrence; spring-forward gaps shift
+/// forward by the gap length) and stores as UTC.
 /// [`Display`](fmt::Display) renders the local clock time without a zone
 /// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
 /// Deserialization runs the same parser as [`FromStr`](std::str::FromStr), so
@@ -48,11 +49,12 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 ///
 /// ZoneGuard::set("UTC");
 ///
-/// let epoch = DateTimeValue::from(SystemTime::UNIX_EPOCH);
+/// let epoch = DateTimeValue::try_from(SystemTime::UNIX_EPOCH)?;
 /// assert_eq!(epoch.to_string(), "1970-01-01T00:00:00");
 ///
-/// let minute =
-///     DateTimeValue::from(SystemTime::UNIX_EPOCH - Duration::from_secs(60));
+/// let minute = DateTimeValue::try_from(
+///     SystemTime::UNIX_EPOCH - Duration::from_secs(60),
+/// )?;
 /// assert_eq!(minute.to_string(), "1969-12-31T23:59:00");
 ///
 /// let parsed: DateTimeValue = "2026-07-29T14:30:00Z".parse()?;
@@ -64,9 +66,14 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 /// ```
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DateTimeValue(DateTime<Utc>);
+pub struct DateTimeValue(Timestamp);
 
 impl DateTimeValue {
+    #[inline]
+    pub(crate) const fn from_timestamp(timestamp: Timestamp) -> Self {
+        Self(timestamp)
+    }
+
     /// Returns the local clock-time rendering of this date-time.
     ///
     /// Every human-facing rendering uses checked offset application and returns
@@ -84,12 +91,7 @@ impl DateTimeValue {
         self,
         zone: &TimeZone,
     ) -> Option<NaiveDateTime> {
-        let timestamp = Timestamp::new(
-            self.0.timestamp(),
-            i32::try_from(self.0.timestamp_subsec_nanos()).ok()?,
-        )
-        .ok()?;
-        let local = timestamp.to_zoned(zone.clone()).datetime();
+        let local = self.0.to_zoned(zone.clone()).datetime();
         let date = NaiveDate::from_ymd_opt(
             i32::from(local.year()),
             u32::try_from(local.month()).ok()?,
@@ -109,7 +111,7 @@ impl DateTimeValue {
     #[inline]
     #[must_use]
     pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
-        self.local_datetime().unwrap_or_else(|| self.0.naive_utc())
+        self.local_datetime().unwrap_or_else(|| self.utc().naive_utc())
     }
 
     /// Returns the local calendar date of this date-time, discarding
@@ -118,22 +120,29 @@ impl DateTimeValue {
     /// At the representable date-time edge where the local offset cannot be
     /// applied, the UTC date is used.
     #[inline]
-    #[must_use]
-    pub(crate) fn local_date(self) -> DateValue {
-        DateValue::from(self.local_datetime_or_utc().date())
+    pub(crate) fn local_date(self) -> Result<DateValue, CalendarError> {
+        DateValue::try_from_naive_date(self.local_datetime_or_utc().date())
     }
 
-    /// Returns `true` if this date-time is exactly local-zone midnight on
-    /// `date` (see the [`From<DateValue>`] promotion).
+    /// Returns true if this date-time is exactly local-zone midnight on date.
     #[must_use]
     pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
-        self.0 == Self::from(date).0
+        Self::try_from(date).is_ok_and(|midnight| self.0 == midnight.0)
     }
 
     /// Returns the wrapped [`DateTime<Utc>`].
     #[must_use]
-    pub(crate) const fn utc(self) -> DateTime<Utc> {
-        self.0
+    #[expect(
+        clippy::expect_used,
+        reason = "Jiff's timestamp range is strictly inside chrono's UTC range"
+    )]
+    pub(crate) fn utc(self) -> DateTime<Utc> {
+        DateTime::<Utc>::from_timestamp(
+            self.0.as_second(),
+            u32::try_from(self.0.subsec_nanosecond())
+                .expect("Jiff timestamps have nonnegative nanoseconds"),
+        )
+        .expect("Jiff timestamp range fits Chrono's UTC range")
     }
 
     /// Canonical strftime pattern for this date-time: whole seconds, plus
@@ -143,7 +152,7 @@ impl DateTimeValue {
     /// their nanosecond component and no zone lookup is needed.
     #[must_use]
     pub(crate) fn canonical_pattern(self) -> &'static str {
-        if self.0.nanosecond() == 0 {
+        if self.0.subsec_nanosecond() == 0 {
             DATETIME_PATTERN
         } else {
             "%Y-%m-%dT%H:%M:%S%.f"
@@ -188,13 +197,7 @@ impl DateTimeValue {
             .to_zoned(zone.clone())
             .map_err(|_| zone_lookup())?
             .timestamp();
-        let utc = DateTime::<Utc>::from_timestamp(
-            timestamp.as_second(),
-            u32::try_from(timestamp.subsec_nanosecond())
-                .map_err(|_| zone_lookup())?,
-        )
-        .ok_or_else(zone_lookup)?;
-        Ok(Self(utc))
+        Ok(Self(timestamp))
     }
 
     /// Shifts calendar units in the local datetime frame and clock units in
@@ -216,9 +219,10 @@ impl DateTimeValue {
                 self.local_datetime().ok_or(CalendarError::OutOfRange)?;
             Self::from_local(shift_datetime(local_datetime, n, unit)?)
         } else {
-            Ok(Self::from(
+            Self::try_from(
                 shift_datetime(self.utc().naive_utc(), n, unit)?.and_utc(),
-            ))
+            )
+            .map_err(|_| CalendarError::OutOfRange)
         }
     }
 
@@ -252,7 +256,11 @@ impl DateTimeValue {
             }
         })?;
         match shape {
-            ParsedDateTime::Instant(date_time) => Ok(Self::from(date_time)),
+            ParsedDateTime::Instant(date_time) => Self::try_from(date_time)
+                .map_err(|_| DateError::InvalidValue {
+                    input: trimmed.into(),
+                    reason: "date/time is outside the representable range",
+                }),
             ParsedDateTime::Unzoned(local_datetime) => {
                 Self::from_local(local_datetime)
                     .map_err(|error| error.into_date_error(trimmed))
@@ -279,17 +287,38 @@ impl fmt::Display for DateTimeValue {
     }
 }
 
-impl From<SystemTime> for DateTimeValue {
+impl TryFrom<SystemTime> for DateTimeValue {
+    type Error = DateError;
+
     #[inline]
-    fn from(time: SystemTime) -> Self {
-        Self(DateTime::<Utc>::from(time))
+    fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
+        Timestamp::try_from(time).map(Self).map_err(|_| {
+            DateError::InvalidValue {
+                input: "system time".into(),
+                reason: "date/time is outside the representable range",
+            }
+        })
     }
 }
 
-impl From<DateTime<Utc>> for DateTimeValue {
+impl TryFrom<DateTime<Utc>> for DateTimeValue {
+    type Error = DateError;
+
     #[inline]
-    fn from(dt: DateTime<Utc>) -> Self {
-        Self(dt)
+    fn try_from(dt: DateTime<Utc>) -> Result<Self, Self::Error> {
+        let nanoseconds =
+            i32::try_from(dt.timestamp_subsec_nanos()).map_err(|_| {
+                DateError::InvalidValue {
+                    input: dt.to_rfc3339().into(),
+                    reason: "date/time is outside the representable range",
+                }
+            })?;
+        Timestamp::new(dt.timestamp(), nanoseconds).map(Self).map_err(|_| {
+            DateError::InvalidValue {
+                input: dt.to_rfc3339().into(),
+                reason: "date/time is outside the representable range",
+            }
+        })
     }
 }
 
@@ -300,23 +329,26 @@ impl From<DateTimeValue> for DateTime<Utc> {
     }
 }
 
-/// Promotes a [`DateValue`] to a [`DateTimeValue`] at midnight in the local
-/// zone: a zone-free calendar date has no clock time until a reader's zone
-/// supplies one.
+/// Resolves a calendar date to local midnight.
 ///
-/// On zone-lookup failure, this promotion degrades to the neutral UTC frame
-/// (calendar date read as UTC, deterministic and shift-free) instead of
-/// surfacing [`DateError::LocalZoneLookup`]. Equality, sort-key, and ordering
-/// paths consume the infallible conversion and cannot propagate an error. A
-/// `TryFrom` would duplicate that fallback at each of them. All fallible entry
-/// points surface broken local-zone lookups as [`DateError::LocalZoneLookup`]
-/// instead.
-impl From<DateValue> for DateTimeValue {
+/// If local resolution fails, the date is retried at UTC midnight.
+///
+/// # Errors
+///
+/// Returns `DateError::InvalidValue` when the date's midnight is outside the
+/// supported timestamp range.
+impl TryFrom<DateValue> for DateTimeValue {
+    type Error = DateError;
+
     #[inline]
-    fn from(date: DateValue) -> Self {
+    fn try_from(date: DateValue) -> Result<Self, Self::Error> {
         let midnight = date.naive_date().and_time(NaiveTime::MIN);
         Self::from_local(midnight)
-            .unwrap_or_else(|_zone_failure| Self(midnight.and_utc()))
+            .or_else(|_| Self::from_local_in(midnight, &TimeZone::UTC))
+            .map_err(|_| DateError::InvalidValue {
+                input: midnight.to_string().into(),
+                reason: "date/time is outside the representable range",
+            })
     }
 }
 
@@ -337,8 +369,9 @@ impl Serialize for DateTimeValue {
     where
         S: Serializer,
     {
-        serializer
-            .serialize_str(&self.0.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+        serializer.serialize_str(
+            &self.utc().to_rfc3339_opts(SecondsFormat::AutoSi, true),
+        )
     }
 }
 
@@ -471,7 +504,8 @@ mod tests {
                 .expect("the epoch is an unambiguous UTC date-time");
 
             // Act
-            let value = DateTimeValue::from(epoch);
+            let value = DateTimeValue::try_from(epoch)
+                .expect("the Unix epoch is within Timestamp's range");
 
             // Assert
             assert_eq!(
@@ -492,7 +526,8 @@ mod tests {
                 .expect("the pre-epoch reading is unambiguous");
 
             // Act
-            let value = DateTimeValue::from(before_epoch);
+            let value = DateTimeValue::try_from(before_epoch)
+                .expect("the pre-epoch value is within Timestamp's range");
 
             // Assert
             assert_eq!(
@@ -503,20 +538,14 @@ mod tests {
         }
 
         #[rstest]
-        #[case::minimum(NaiveDateTime::MIN.and_utc())]
-        #[case::maximum(NaiveDateTime::MAX.and_utc())]
-        fn wraps_the_representable_range_edges(#[case] edge: DateTime<Utc>) {
-            // Arrange: `edge` is a bound of the representable range.
+        #[case::minimum(Timestamp::MIN)]
+        #[case::maximum(Timestamp::MAX)]
+        fn wraps_the_representable_range_edges(#[case] edge: Timestamp) {
+            // Arrange: the edge is a bound of the Jiff timestamp range.
+            let value = DateTimeValue(edge);
 
-            // Act
-            let value = DateTimeValue::from(edge);
-
-            // Assert
-            assert_eq!(
-                value.utc(),
-                edge,
-                "the range edges must round-trip through construction"
-            );
+            // Act and assert
+            assert_eq!(value.0, edge);
         }
 
         #[test]
@@ -788,6 +817,17 @@ mod tests {
             assert!(matches!(result, Err(DateError::InvalidValue { .. })));
         }
 
+        #[test]
+        fn rejects_rfc3339_leap_seconds() {
+            // Arrange
+            let input = "2026-07-29T23:59:60Z";
+
+            // Act
+            let result = DateTimeValue::parse_iso(input);
+
+            // Assert
+            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
+        }
         #[rstest]
         #[case::missing_time("2026-07-29", "input is too short")]
         #[case::trailing_offset_text(
@@ -965,9 +1005,10 @@ mod tests {
         fn renders_fractional_seconds_only_when_nonzero() {
             // Arrange: whole seconds plus 123 milliseconds.
             ZoneGuard::set("UTC");
-            let with_nanos = DateTimeValue(
+            let with_nanos = DateTimeValue::try_from(
                 fixed_datetime().utc() + TimeDelta::milliseconds(123),
-            );
+            )
+            .expect("the fixture and millisecond shift fit Timestamp's range");
             assert_eq!(
                 with_nanos.local_datetime().map(|local| local.nanosecond()),
                 Some(123_000_000),
@@ -1014,19 +1055,17 @@ mod tests {
         }
 
         #[test]
-        fn renders_the_utc_clock_when_the_local_offset_cannot_apply() {
-            // Arrange: at the range edge the local offset overflows.
+        fn renders_the_local_clock_at_the_jiff_timestamp_upper_edge() {
+            // Arrange: Jiff reserves offset headroom at the timestamp bound.
             ZoneGuard::set("Etc/GMT-2");
-            let edge = DateTimeValue::from(NaiveDateTime::MAX.and_utc());
+            let edge = DateTimeValue(Timestamp::MAX);
 
             // Act
             let rendered = edge.to_string();
 
             // Assert
-            assert_eq!(
-                rendered, "+262142-12-31T23:59:59.999999999",
-                "an unapplicable local offset must fall back to the UTC clock"
-            );
+            assert_eq!(rendered, "9999-12-31T00:00:00.999999999");
+            assert_ne!(rendered, edge.utc().naive_utc().to_string());
         }
 
         #[test]
@@ -1114,12 +1153,13 @@ mod tests {
         #[case::sub_second(123)]
         fn round_trips_through_json(#[case] milliseconds: i64) {
             // Arrange: the case adds whole seconds or 123 milliseconds.
-            let value = DateTimeValue(
+            let value = DateTimeValue::try_from(
                 fixed_datetime()
                     .utc()
                     .checked_add_signed(TimeDelta::milliseconds(milliseconds))
                     .expect("the fixture plus milliseconds is in range"),
-            );
+            )
+            .expect("the fixture plus milliseconds fits Timestamp's range");
             let json =
                 serde_json::to_string(&value).expect("the case serializes");
 
@@ -1220,7 +1260,8 @@ mod tests {
             let date = ymd(2026, 7, 29);
 
             // Act
-            let promoted = DateTimeValue::from(date);
+            let promoted = DateTimeValue::try_from(date)
+                .expect("test date has a representable local midnight");
             let expected = DateTimeValue::parse_iso("2026-07-28T22:00:00Z");
 
             // Assert
@@ -1238,7 +1279,8 @@ mod tests {
             let date = ymd(2026, 9, 6);
 
             // Act
-            let promoted = DateTimeValue::from(date);
+            let promoted = DateTimeValue::try_from(date)
+                .expect("test date has a representable local midnight");
             let expected = DateTimeValue::parse_iso("2026-09-06T04:00:00Z");
 
             // Assert
@@ -1255,22 +1297,23 @@ mod tests {
         }
 
         #[test]
-        fn falls_back_to_utc_midnight_when_the_local_zone_cannot_resolve() {
-            // Arrange: UTC+14 pushes local midnight of the earliest
-            // representable date below the representable range.
+        fn rejects_a_date_midnight_outside_the_timestamp_range() {
+            // Arrange
             ZoneGuard::set("Etc/GMT-14");
-            let date = ymd(-262_143, 1, 1);
+            let date = ymd(-9999, 1, 1);
 
             // Act
-            let promoted = DateTimeValue::from(date);
+            let error = DateTimeValue::try_from(date).expect_err(
+                "the minimum civil date is outside the timestamp range",
+            );
 
             // Assert
-            assert_eq!(
-                promoted.utc(),
-                NaiveDateTime::MIN.and_utc(),
-                "an unresolvable local midnight must degrade to the neutral \
-                 UTC frame"
-            );
+            assert!(matches!(
+                error,
+                DateError::InvalidValue { input, reason }
+                    if input.as_ref() == "-9999-01-01 00:00:00"
+                        && reason == "date/time is outside the representable range"
+            ));
         }
 
         #[test]
@@ -1281,7 +1324,8 @@ mod tests {
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 
             // Act
-            let converted = DateTimeValue::from(system_time);
+            let converted = DateTimeValue::try_from(system_time)
+                .expect("test system time is within the supported range");
             let expected = DateTimeValue::parse_iso("1970-01-01T00:16:40");
 
             // Assert
@@ -1298,7 +1342,8 @@ mod tests {
             let chrono_dt = fixed_datetime().utc();
 
             // Act
-            let converted = DateTimeValue::from(chrono_dt);
+            let converted = DateTimeValue::try_from(chrono_dt)
+                .expect("test date-time is within the supported range");
             let back: DateTime<Utc> = converted.into();
 
             // Assert
@@ -1421,7 +1466,8 @@ mod tests {
             let date = ymd(2026, 7, 29);
 
             // Act
-            let midnight = DateTimeValue::from(date);
+            let midnight = DateTimeValue::try_from(date)
+                .expect("test date has a representable local midnight");
             let time_of_day = fixed_datetime();
 
             // Assert
@@ -1452,7 +1498,7 @@ mod tests {
             // Assert
             assert_eq!(
                 extracted,
-                ymd(2026, 7, 29),
+                Ok(ymd(2026, 7, 29)),
                 "the UTC calendar date must be extracted"
             );
         }
@@ -1468,7 +1514,7 @@ mod tests {
             // Assert
             assert_eq!(
                 extracted,
-                ymd(2026, 7, 30),
+                Ok(ymd(2026, 7, 30)),
                 "the local calendar date must roll forward with the offset"
             );
         }

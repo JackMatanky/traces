@@ -350,69 +350,102 @@ impl ArithOp {
         left: NoteFieldValue,
         right: NoteFieldValue,
     ) -> Option<NoteFieldValue> {
-        if matches!(left, NoteFieldValue::Null)
-            || matches!(right, NoteFieldValue::Null)
-        {
-            return Some(NoteFieldValue::Null);
-        }
-        match (left, self, right) {
-            (
-                date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-                Self::Add,
-                NoteFieldValue::Duration(duration),
-            )
-            | (
-                NoteFieldValue::Duration(duration),
-                Self::Add,
-                date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-            ) => Some(NoteFieldValue::from(
-                date.as_date_point()?.apply(&duration).ok()?,
-            )),
-            (
-                date @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-                Self::Sub,
-                NoteFieldValue::Duration(duration),
-            ) => Some(NoteFieldValue::from(
-                date.as_date_point()?
-                    .apply(&duration.checked_neg().ok()?)
-                    .ok()?,
-            )),
-            (
-                date1 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-                Self::Sub,
-                date2 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-            ) => {
-                let diff = date2
-                    .as_date_point()?
-                    .diff(date1.as_date_point()?, TimeUnit::Second);
-                let seconds = diff.to_f64()?;
-                Some(NoteFieldValue::Duration(
-                    DurationValue::from_nominal_seconds(
-                        DurationSeconds::try_from(seconds).ok()?,
-                    )
-                    .ok()?,
-                ))
+        match left {
+            NoteFieldValue::Date(date) => {
+                self.evaluate_date(date.into(), right)
             }
-            (
-                NoteFieldValue::Duration(a),
-                Self::Add,
-                NoteFieldValue::Duration(b),
-            ) => Some(NoteFieldValue::Duration(a.checked_add(b).ok()?)),
-            (
-                NoteFieldValue::Duration(a),
-                Self::Sub,
-                NoteFieldValue::Duration(b),
-            ) => Some(NoteFieldValue::Duration(a.checked_sub(b).ok()?)),
-            (
-                NoteFieldValue::Duration(duration),
-                Self::Mul,
-                NoteFieldValue::Number(n),
-            )
-            | (
-                NoteFieldValue::Number(n),
-                Self::Mul,
-                NoteFieldValue::Duration(duration),
-            ) => Some(NoteFieldValue::Duration(duration.checked_mul(n).ok()?)),
+            NoteFieldValue::DateTime(datetime) => {
+                self.evaluate_date(datetime.into(), right)
+            }
+            NoteFieldValue::Duration(duration) => {
+                self.evaluate_duration(duration, right)
+            }
+            NoteFieldValue::Number(factor) => {
+                self.evaluate_number(factor, right)
+            }
+            _ => Some(NoteFieldValue::Null),
+        }
+    }
+
+    fn evaluate_date(
+        self,
+        date: DatePoint,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
+        match self {
+            Self::Add => match right {
+                NoteFieldValue::Duration(duration) => {
+                    Some(NoteFieldValue::from(date.apply(&duration).ok()?))
+                }
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Sub => match right {
+                NoteFieldValue::Duration(duration) => {
+                    let duration = duration.checked_neg().ok()?;
+                    Some(NoteFieldValue::from(date.apply(&duration).ok()?))
+                }
+                other @ (NoteFieldValue::Date(_)
+                | NoteFieldValue::DateTime(_)) => {
+                    let diff = other
+                        .as_date_point()?
+                        .diff(date, TimeUnit::Second)
+                        .ok()?;
+                    let seconds = diff.to_f64()?;
+                    Some(NoteFieldValue::Duration(
+                        DurationValue::from_nominal_seconds(
+                            DurationSeconds::try_from(seconds).ok()?,
+                        )
+                        .ok()?,
+                    ))
+                }
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Mul => Some(NoteFieldValue::Null),
+        }
+    }
+
+    fn evaluate_duration(
+        self,
+        duration: DurationValue,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
+        match self {
+            Self::Add => match right {
+                date @ (NoteFieldValue::Date(_)
+                | NoteFieldValue::DateTime(_)) => Some(NoteFieldValue::from(
+                    date.as_date_point()?.apply(&duration).ok()?,
+                )),
+                NoteFieldValue::Duration(other) => Some(
+                    NoteFieldValue::Duration(duration.checked_add(other).ok()?),
+                ),
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Sub => match right {
+                NoteFieldValue::Duration(other) => Some(
+                    NoteFieldValue::Duration(duration.checked_sub(other).ok()?),
+                ),
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Mul => match right {
+                NoteFieldValue::Number(factor) => {
+                    Some(NoteFieldValue::Duration(
+                        duration.checked_mul(factor).ok()?,
+                    ))
+                }
+                _ => Some(NoteFieldValue::Null),
+            },
+        }
+    }
+
+    fn evaluate_number(
+        self,
+        factor: f64,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
+        match (self, right) {
+            (Self::Mul, NoteFieldValue::Duration(duration)) => Some(
+                NoteFieldValue::Duration(duration.checked_mul(factor).ok()?),
+            ),
             _ => Some(NoteFieldValue::Null),
         }
     }
@@ -639,7 +672,8 @@ impl QueryFunction {
         {
             return Some(NoteFieldValue::Null);
         }
-        let diff = date1.as_date_point()?.diff(date2.as_date_point()?, unit);
+        let diff =
+            date1.as_date_point()?.diff(date2.as_date_point()?, unit).ok()?;
         Some(NoteFieldValue::Number(diff.to_f64()?))
     }
 
