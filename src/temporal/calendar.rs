@@ -15,7 +15,11 @@
 //! - [`DateComponent`]: a named calendar or clock component of a date point.
 //! - [`Difference`]: the measured difference between two date points.
 
-use chrono::{Days, Months, NaiveDateTime, TimeDelta, Weekday};
+use chrono::{
+    Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
+    Timelike as _, Weekday,
+};
+use jiff::{Span, civil};
 
 use super::error::CalendarError;
 use crate::temporal::{DurationSeconds, TimeUnit};
@@ -179,9 +183,8 @@ pub(super) fn time_delta_from_seconds(
 /// result.
 ///
 /// Calendar units shift calendar days; month and year shifts clamp to the last
-/// day of the target month (the documented `chrono` behavior). Exact units
-/// shift elapsed time, so the clock reading moves by the same amount regardless
-/// of the calendar.
+/// day of the target month. Exact units shift elapsed time, so the clock
+/// reading moves by the same amount regardless of the calendar.
 ///
 /// No zone is consulted: callers wanting DST-aware local-clock semantics route
 /// through [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
@@ -194,75 +197,54 @@ pub(super) fn shift_datetime(
     n: i64,
     unit: TimeUnit,
 ) -> Result<NaiveDateTime, CalendarError> {
-    match unit {
-        TimeUnit::Year => {
-            let months = n.checked_mul(12).ok_or(CalendarError::OutOfRange)?;
-            shift_datetime_months(local_datetime, months)
-        }
-        TimeUnit::Month => shift_datetime_months(local_datetime, n),
-        TimeUnit::Week => {
-            let days = n.checked_mul(7).ok_or(CalendarError::OutOfRange)?;
-            let days_u64 = days.unsigned_abs();
-            if days >= 0 {
-                local_datetime.checked_add_days(Days::new(days_u64))
-            } else {
-                local_datetime.checked_sub_days(Days::new(days_u64))
-            }
-            .ok_or(CalendarError::OutOfRange)
-        }
-        TimeUnit::Day => {
-            let days_u64 = n.unsigned_abs();
-            if n >= 0 {
-                local_datetime.checked_add_days(Days::new(days_u64))
-            } else {
-                local_datetime.checked_sub_days(Days::new(days_u64))
-            }
-            .ok_or(CalendarError::OutOfRange)
-        }
-        TimeUnit::Millisecond => {
-            let delta = chrono::Duration::try_milliseconds(n)
-                .ok_or(CalendarError::OutOfRange)?;
-            local_datetime
-                .checked_add_signed(delta)
-                .ok_or(CalendarError::OutOfRange)
-        }
-        TimeUnit::Second | TimeUnit::Minute | TimeUnit::Hour => {
-            let secs = unit
-                .whole_nominal_seconds()
-                .ok_or(CalendarError::OutOfRange)?
-                .checked_mul(n)
-                .ok_or(CalendarError::OutOfRange)?;
-            let delta = chrono::Duration::try_seconds(secs)
-                .ok_or(CalendarError::OutOfRange)?;
-            local_datetime
-                .checked_add_signed(delta)
-                .ok_or(CalendarError::OutOfRange)
-        }
+    let span = match unit {
+        TimeUnit::Year => Span::new().try_years(n),
+        TimeUnit::Month => Span::new().try_months(n),
+        TimeUnit::Week => Span::new().try_weeks(n),
+        TimeUnit::Day => Span::new().try_days(n),
+        TimeUnit::Hour => Span::new().try_hours(n),
+        TimeUnit::Minute => Span::new().try_minutes(n),
+        TimeUnit::Second => Span::new().try_seconds(n),
+        TimeUnit::Millisecond => Span::new().try_milliseconds(n),
     }
-}
-
-/// Shifts `local_datetime` by `months` calendar months (positive or negative)
-/// and returns the result.
-///
-/// The result clamps to the last day of the target month, per the documented
-/// `chrono` behavior.
-///
-/// # Errors
-///
-/// - [`CalendarError::OutOfRange`] if `months` does not fit a `u32` or the
-///   arithmetic overflows representable bounds.
-pub(super) fn shift_datetime_months(
-    local_datetime: NaiveDateTime,
-    months: i64,
-) -> Result<NaiveDateTime, CalendarError> {
-    let months_u32 = u32::try_from(months.unsigned_abs())
-        .map_err(|_| CalendarError::OutOfRange)?;
-    if months >= 0 {
-        local_datetime.checked_add_months(Months::new(months_u32))
-    } else {
-        local_datetime.checked_sub_months(Months::new(months_u32))
-    }
-    .ok_or(CalendarError::OutOfRange)
+    .map_err(|_| CalendarError::OutOfRange)?;
+    let date_time = civil::DateTime::new(
+        i16::try_from(local_datetime.year())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        i8::try_from(local_datetime.month())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        i8::try_from(local_datetime.day())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        i8::try_from(local_datetime.hour())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        i8::try_from(local_datetime.minute())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        i8::try_from(local_datetime.second())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        i32::try_from(local_datetime.nanosecond())
+            .map_err(|_| CalendarError::OutOfRange)?,
+    )
+    .map_err(|_| CalendarError::OutOfRange)?;
+    let shifted =
+        date_time.checked_add(span).map_err(|_| CalendarError::OutOfRange)?;
+    let date = NaiveDate::from_ymd_opt(
+        i32::from(shifted.year()),
+        u32::try_from(shifted.month())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        u32::try_from(shifted.day()).map_err(|_| CalendarError::OutOfRange)?,
+    )
+    .ok_or(CalendarError::OutOfRange)?;
+    let time = NaiveTime::from_hms_nano_opt(
+        u32::try_from(shifted.hour()).map_err(|_| CalendarError::OutOfRange)?,
+        u32::try_from(shifted.minute())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        u32::try_from(shifted.second())
+            .map_err(|_| CalendarError::OutOfRange)?,
+        u32::try_from(shifted.subsec_nanosecond())
+            .map_err(|_| CalendarError::OutOfRange)?,
+    )
+    .ok_or(CalendarError::OutOfRange)?;
+    Ok(NaiveDateTime::new(date, time))
 }
 
 #[cfg(test)]

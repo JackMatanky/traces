@@ -288,35 +288,6 @@ impl TimeUnit {
     pub(crate) const fn is_calendar(self) -> bool {
         self.spec().calendar
     }
-
-    /// Returns the whole fixed seconds per unit as `i64`, derived from
-    /// [`Self::nominal_seconds`].
-    ///
-    /// [`None`] only for [`Self::Millisecond`]; every other variant is listed
-    /// explicitly, so adding a unit forces it to declare whether its ratio is a
-    /// whole number of seconds.
-    #[must_use]
-    #[expect(
-        clippy::as_conversions,
-        reason = "derives whole seconds from the sole nominal_seconds ratio \
-                  definition"
-    )]
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "nominal_seconds for whole-second units always fit in i64"
-    )]
-    pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
-        match self {
-            Self::Millisecond => None,
-            Self::Second
-            | Self::Minute
-            | Self::Hour
-            | Self::Day
-            | Self::Week
-            | Self::Month
-            | Self::Year => Some(self.nominal_seconds() as i64),
-        }
-    }
 }
 
 /// Human-readable list of accepted unit spellings for error messages.
@@ -555,29 +526,6 @@ mod tests {
                 actual.to_bits(),
                 expected.to_bits(),
                 "nominal seconds of {unit:?} must be exactly {expected}"
-            );
-        }
-
-        #[rstest]
-        #[case::millisecond(TimeUnit::Millisecond, None)]
-        #[case::second(TimeUnit::Second, Some(1))]
-        #[case::minute(TimeUnit::Minute, Some(60))]
-        #[case::hour(TimeUnit::Hour, Some(3_600))]
-        #[case::day(TimeUnit::Day, Some(86_400))]
-        #[case::week(TimeUnit::Week, Some(604_800))]
-        #[case::month(TimeUnit::Month, Some(2_592_000))]
-        #[case::year(TimeUnit::Year, Some(31_536_000))]
-        fn returns_whole_nominal_seconds_for_each_unit(
-            #[case] unit: TimeUnit,
-            #[case] expected: Option<i64>,
-        ) {
-            // Arrange: `unit` and `expected` are the case literals.
-            // Act
-            let actual = unit.whole_nominal_seconds();
-            // Assert
-            assert_eq!(
-                actual, expected,
-                "whole nominal seconds of {unit:?} must be {expected:?}"
             );
         }
 
