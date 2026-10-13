@@ -1365,7 +1365,7 @@ src/temporal/date.rs: pub(crate) const fn naive_date(self) -> NaiveDate {
 src/temporal/date.rs: pub(crate) enum DateShape {
 src/temporal/date.rs: pub(crate) fn parse_any(
 src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/temporal/date.rs: pub(super) fn advance(self, delta: TimeDelta) -> Result<Self, DateError> {
+src/temporal/date.rs: pub(super) fn advance(
 src/temporal/date.rs: pub(super) fn whole_months_until(self, to: Self) -> i64 {
 src/temporal/date.rs: pub(super) fn whole_years_until(self, to: Self) -> i64 {
 src/temporal/datetime.rs: pub struct DateTimeValue(DateTime<Utc>);
@@ -1400,6 +1400,8 @@ src/temporal/duration.rs: pub(crate) struct DurationComponent {
 src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
+src/temporal/error.rs: pub(crate) enum CalendarError {
+src/temporal/error.rs: pub(crate) fn into_date_error(self, input: &str) -> DateError {
 src/temporal/fixtures.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
 src/temporal/fixtures.rs: pub(super) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
 src/temporal/mod.rs: pub use date::DateValue;
@@ -1410,6 +1412,7 @@ src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSeconds};
+src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use point::DatePoint;
 src/temporal/mod.rs: pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {

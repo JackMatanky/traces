@@ -12,7 +12,7 @@ use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    DateTimeValue,
+    CalendarError, DateTimeValue,
     error::DateError,
     point::{DatePrecision, parse_reason, starts_with_year},
 };
@@ -98,14 +98,17 @@ impl DateValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the result falls outside the
+    /// - [`CalendarError::OutOfRange`] if the result falls outside the
     ///   representable `chrono` date range.
-    pub(super) fn advance(self, delta: TimeDelta) -> Result<Self, DateError> {
+    pub(super) fn advance(
+        self,
+        delta: TimeDelta,
+    ) -> Result<Self, CalendarError> {
         self.naive_date()
             .and_time(NaiveTime::MIN)
             .checked_add_signed(delta)
             .map(|local_datetime| Self::from(local_datetime.date()))
-            .ok_or(DateError::OutOfRange)
+            .ok_or(CalendarError::OutOfRange)
     }
 
     /// Parses an ISO-8601 date string (`YYYY-MM-DD` or `YYYY-MM`) using the

@@ -14,9 +14,9 @@ use chrono::{
 use num_traits::ToPrimitive as _;
 
 use super::{
-    CalendarPeriod, DATE_PATTERN, DateComponent, DateError, DateTimeValue,
-    DateValue, Difference, DurationComponent, DurationValue, PeriodEdge,
-    TimeUnit,
+    CalendarError, CalendarPeriod, DATE_PATTERN, DateComponent, DateError,
+    DateTimeValue, DateValue, Difference, DurationComponent, DurationValue,
+    PeriodEdge, TimeUnit,
     calendar::{shift_datetime, time_delta_from_seconds},
     date::DateShape,
     datetime::{DateTimeShape, ParsedDateTime},
@@ -131,15 +131,15 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the shift exceeds the supported date
+    /// - [`CalendarError::OutOfRange`] if the shift exceeds the supported date
     ///   range.
-    /// - [`DateError::LocalZoneLookup`] if a date-time point's shifted local
-    ///   datetime cannot be resolved.
+    /// - [`CalendarError::Zone`] if a date-time point’s shifted local datetime
+    ///   cannot be resolved.
     pub(crate) fn shift(
         self,
         n: i64,
         unit: TimeUnit,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date_precision,
@@ -160,14 +160,14 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if a component is non-finite, a calendar
+    /// - [`CalendarError::OutOfRange`] if a component is non-finite, a calendar
     ///   magnitude does not fit `i64`, or any shift overflows.
-    /// - [`DateError::LocalZoneLookup`] if a date-time point's shifted local
-    ///   datetime cannot be resolved.
+    /// - [`CalendarError::Zone`] if a date-time point’s shifted local datetime
+    ///   cannot be resolved.
     pub(crate) fn apply(
         self,
         duration: &DurationValue,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         match duration.components() {
             Some(components) => {
                 components.iter().try_fold(self, |date_point, &component| {
@@ -176,7 +176,7 @@ impl DatePoint {
             }
             None => self.advance_exact(
                 TimeDelta::try_from(duration.nominal_seconds())
-                    .map_err(|_| DateError::OutOfRange)?,
+                    .map_err(|_| CalendarError::OutOfRange)?,
             ),
         }
     }
@@ -186,14 +186,14 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the boundary date is outside the
+    /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
     ///   supported date range.
-    /// - [`DateError::LocalZoneLookup`] if a date-time point's boundary
-    ///   datetime cannot be resolved.
+    /// - [`CalendarError::Zone`] if a date-time point’s boundary datetime
+    ///   cannot be resolved.
     pub(crate) fn start_of(
         self,
         calendar_period: CalendarPeriod,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         self.boundary(calendar_period, PeriodEdge::Start)
     }
 
@@ -202,14 +202,14 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the boundary date is outside the
+    /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
     ///   supported date range.
-    /// - [`DateError::LocalZoneLookup`] if a date-time point's boundary
-    ///   datetime cannot be resolved.
+    /// - [`CalendarError::Zone`] if a date-time point’s boundary datetime
+    ///   cannot be resolved.
     pub(crate) fn end_of(
         self,
         calendar_period: CalendarPeriod,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         self.boundary(calendar_period, PeriodEdge::End)
     }
 
@@ -217,17 +217,17 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the `target` day falls outside the
+    /// - [`CalendarError::OutOfRange`] if the `target` day falls outside the
     ///   supported date range.
-    /// - [`DateError::LocalZoneLookup`] if a date-time point's new local
-    ///   datetime cannot be resolved.
+    /// - [`CalendarError::Zone`] if a date-time point’s new local datetime
+    ///   cannot be resolved.
     pub(crate) fn with_weekday(
         self,
         target: Weekday,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         let iso = self.local_datetime_or_utc().date().iso_week();
         let date = NaiveDate::from_isoywd_opt(iso.year(), iso.week(), target)
-            .ok_or(DateError::OutOfRange)?;
+            .ok_or(CalendarError::OutOfRange)?;
         self.with_date(date)
     }
 
@@ -287,7 +287,7 @@ impl DatePoint {
     }
 
     /// Advances on the local clock, preserving written precision.
-    fn advance_local(self, delta: TimeDelta) -> Result<Self, DateError> {
+    fn advance_local(self, delta: TimeDelta) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date,
@@ -298,17 +298,17 @@ impl DatePoint {
             }),
             Self::DateTime(dt) => {
                 let local_datetime =
-                    dt.local_datetime().ok_or(DateError::OutOfRange)?;
+                    dt.local_datetime().ok_or(CalendarError::OutOfRange)?;
                 let shifted = local_datetime
                     .checked_add_signed(delta)
-                    .ok_or(DateError::OutOfRange)?;
+                    .ok_or(CalendarError::OutOfRange)?;
                 Ok(Self::DateTime(DateTimeValue::from_local(shifted)?))
             }
         }
     }
 
     /// Advances by exact elapsed time, preserving written precision.
-    fn advance_exact(self, delta: TimeDelta) -> Result<Self, DateError> {
+    fn advance_exact(self, delta: TimeDelta) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date,
@@ -320,7 +320,7 @@ impl DatePoint {
             Self::DateTime(dt) => Ok(Self::DateTime(DateTimeValue::from(
                 dt.utc()
                     .checked_add_signed(delta)
-                    .ok_or(DateError::OutOfRange)?,
+                    .ok_or(CalendarError::OutOfRange)?,
             ))),
         }
     }
@@ -329,14 +329,14 @@ impl DatePoint {
     fn apply_component(
         self,
         component: DurationComponent,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         let (magnitude, unit) = (component.magnitude(), component.unit());
         if !magnitude.is_finite() {
-            return Err(DateError::OutOfRange);
+            return Err(CalendarError::OutOfRange);
         }
         if unit.is_calendar() {
             let whole =
-                magnitude.trunc().to_i64().ok_or(DateError::OutOfRange)?;
+                magnitude.trunc().to_i64().ok_or(CalendarError::OutOfRange)?;
             let shifted = if whole != 0 {
                 self.shift(whole, unit)?
             } else {
@@ -356,7 +356,7 @@ impl DatePoint {
     }
 
     /// Replaces the local date, preserving written precision and time.
-    fn with_date(self, date: NaiveDate) -> Result<Self, DateError> {
+    fn with_date(self, date: NaiveDate) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date_precision,
@@ -378,7 +378,7 @@ impl DatePoint {
         self,
         calendar_period: CalendarPeriod,
         period_edge: PeriodEdge,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_or_utc().date();
         let new_date = match (calendar_period, period_edge) {
             (CalendarPeriod::Week, period_edge) => {
@@ -407,7 +407,7 @@ impl DatePoint {
                 NaiveDate::from_ymd_opt(date.year(), 12, 31)
             }
         }
-        .ok_or(DateError::OutOfRange)?;
+        .ok_or(CalendarError::OutOfRange)?;
         self.with_date(new_date)
     }
 
@@ -415,18 +415,19 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::UnknownShape`] if the trimmed input does not start with
-    ///   two or four ASCII digits followed by `-`.
+    /// - [`DateError::InvalidValue`] if the input does not begin with two or
+    ///   four ASCII digits followed by `-`, or if no accepted shape matches.
     /// - [`DateError::YearNotFourDigits`] if it starts that way but the year is
     ///   not four ASCII digits.
-    /// - [`DateError::InvalidValue`] if no date or date-time shape matches, or
-    ///   a matched field is out of range.
     /// - [`DateError::LocalZoneLookup`] if a naive date-time cannot be resolved
     ///   in the local zone.
     pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_like_date(trimmed.as_bytes()) {
-            return Err(DateError::UnknownShape);
+            return Err(DateError::InvalidValue {
+                input: trimmed.into(),
+                reason: "not a date or date-time shape",
+            });
         }
         if !starts_with_year(trimmed) {
             return Err(DateError::YearNotFourDigits {
@@ -450,9 +451,10 @@ impl DatePoint {
             Ok(ParsedDateTime::Instant(instant)) => {
                 Ok(Self::DateTime(DateTimeValue::from(instant)))
             }
-            Ok(ParsedDateTime::Unzoned(local_datetime)) => {
-                Ok(Self::DateTime(DateTimeValue::from_local(local_datetime)?))
-            }
+            Ok(ParsedDateTime::Unzoned(local_datetime)) => Ok(Self::DateTime(
+                DateTimeValue::from_local(local_datetime)
+                    .map_err(|error| error.into_date_error(trimmed))?,
+            )),
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok(date) => Ok(calendar_point(date)),
                 Err(date_err) => {
@@ -533,9 +535,10 @@ impl DatePoint {
         if let Ok(local_datetime) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::DateTime(DateTimeValue::from_local(
-                local_datetime,
-            )?));
+            return Ok(Self::DateTime(
+                DateTimeValue::from_local(local_datetime)
+                    .map_err(|error| error.into_date_error(trimmed_text))?,
+            ));
         }
         if trimmed_pattern == "%Y-%m"
             && let Ok(
@@ -715,11 +718,13 @@ mod tests {
             let parsed = DatePoint::parse(text);
 
             // Assert
-            assert_eq!(
+            assert!(matches!(
                 parsed,
-                Err(DateError::UnknownShape),
-                "{text:?} must be rejected as an unknown shape"
-            );
+                Err(DateError::InvalidValue {
+                    input,
+                    reason: "not a date or date-time shape",
+                }) if input.as_ref() == text.trim()
+            ));
         }
 
         #[test]
@@ -1227,7 +1232,7 @@ mod tests {
             // Arrange: Saturday 2026-03-07 12:00 EST; the gap begins Sunday.
             TzGuard::set("America/New_York");
             let base = point_at("2026-03-07 12:00:00");
-            let clock = |point: Result<DatePoint, DateError>| {
+            let clock = |point: Result<DatePoint, CalendarError>| {
                 point.map(|p| p.local_datetime_or_utc().to_string())
             };
 
@@ -1355,22 +1360,22 @@ mod tests {
             // Assert
             assert_eq!(
                 past_max_date,
-                Err(DateError::OutOfRange),
+                Err(CalendarError::OutOfRange),
                 "shifting past the maximum date must report out of range"
             );
             assert_eq!(
                 past_min_date,
-                Err(DateError::OutOfRange),
+                Err(CalendarError::OutOfRange),
                 "shifting before the minimum date must report out of range"
             );
             assert_eq!(
                 past_max_point,
-                Err(DateError::OutOfRange),
+                Err(CalendarError::OutOfRange),
                 "shifting past the maximum date-time must report out of range"
             );
             assert_eq!(
                 past_min_point,
-                Err(DateError::OutOfRange),
+                Err(CalendarError::OutOfRange),
                 "shifting before the minimum date-time must report out of \
                  range"
             );
@@ -1755,12 +1760,12 @@ mod tests {
             // Assert
             assert_eq!(
                 overflowed,
-                Err(DateError::OutOfRange),
+                Err(CalendarError::OutOfRange),
                 "applying past the maximum must report out of range"
             );
             assert_eq!(
                 underflowed,
-                Err(DateError::OutOfRange),
+                Err(CalendarError::OutOfRange),
                 "applying before the minimum must report out of range"
             );
         }

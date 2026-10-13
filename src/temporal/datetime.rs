@@ -15,7 +15,7 @@ use chrono::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    DateValue, TimeUnit,
+    CalendarError, DateValue, TimeUnit,
     calendar::shift_datetime,
     error::DateError,
     point::{parse_reason, starts_with_year},
@@ -146,7 +146,7 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::LocalZoneLookup`] if the lookup finds no offset for
+    /// - [`CalendarError::Zone`] if the lookup finds no offset for
     ///   `local_datetime` or a probe (a broken tz-data/OS environment rather
     ///   than a DST boundary), or if applying the resolved offset would leave
     ///   the range of `NaiveDateTime`.
@@ -156,8 +156,8 @@ impl DateTimeValue {
     /// [chrono#1701]: https://github.com/chronotope/chrono/issues/1701
     pub(super) fn from_local(
         local_datetime: NaiveDateTime,
-    ) -> Result<Self, DateError> {
-        let zone_lookup = || DateError::LocalZoneLookup {
+    ) -> Result<Self, CalendarError> {
+        let zone_lookup = || CalendarError::Zone {
             input: local_datetime.to_string().into(),
         };
         // The checked forms return `None` instead of panicking when the
@@ -204,14 +204,14 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::LocalZoneLookup`] if no nearby local time resolves within
-    ///   the 25-hour backward search (a broken tz-data/OS lookup rather than a
+    /// - [`CalendarError::Zone`] if no nearby local time resolves within the
+    ///   25-hour backward search (a broken tz-data/OS lookup rather than a
     ///   gap), or if stepping the probe back would leave the range of
     ///   `NaiveDateTime`.
     fn offset_across_gap(
         local_datetime: NaiveDateTime,
-        zone_lookup: &impl Fn() -> DateError,
-    ) -> Result<FixedOffset, DateError> {
+        zone_lookup: &impl Fn() -> CalendarError,
+    ) -> Result<FixedOffset, CalendarError> {
         let hour = TimeDelta::try_hours(1).ok_or_else(zone_lookup)?;
         let mut probe = local_datetime;
         for _ in 0..25 {
@@ -231,19 +231,19 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the shift overflows, or the local
+    /// - [`CalendarError::OutOfRange`] if the shift overflows, or the local
     ///   datetime of a calendar-unit shift is outside the range covered by
     ///   `NaiveDateTime`.
-    /// - [`DateError::LocalZoneLookup`] if the shifted local datetime cannot be
+    /// - [`CalendarError::Zone`] if the shifted local datetime cannot be
     ///   resolved to a stored date-time.
     pub(crate) fn shift(
         self,
         n: i64,
         unit: TimeUnit,
-    ) -> Result<Self, DateError> {
+    ) -> Result<Self, CalendarError> {
         if unit.is_calendar() {
             let local_datetime =
-                self.local_datetime().ok_or(DateError::OutOfRange)?;
+                self.local_datetime().ok_or(CalendarError::OutOfRange)?;
             Self::from_local(shift_datetime(local_datetime, n, unit)?)
         } else {
             Ok(Self::from(
@@ -285,6 +285,7 @@ impl DateTimeValue {
             ParsedDateTime::Instant(date_time) => Ok(Self::from(date_time)),
             ParsedDateTime::Unzoned(local_datetime) => {
                 Self::from_local(local_datetime)
+                    .map_err(|error| error.into_date_error(trimmed))
             }
         }
     }
@@ -721,7 +722,7 @@ mod tests {
             let result = DateTimeValue::from_local(NaiveDateTime::MIN);
 
             // Assert
-            assert!(matches!(result, Err(DateError::LocalZoneLookup { .. })));
+            assert!(matches!(result, Err(CalendarError::Zone { .. })));
         }
     }
 
@@ -1377,7 +1378,8 @@ mod tests {
             // Assert
             assert_eq!(
                 shifted,
-                DateTimeValue::parse_iso("2026-11-01T05:30:00Z"),
+                Ok(DateTimeValue::parse_iso("2026-11-01T05:30:00Z")
+                    .expect("explicit-offset fixture parses")),
                 "a zero-day calendar shift must re-resolve the fold to the \
                  earlier occurrence"
             );

@@ -278,8 +278,6 @@ pub traces_pkm::DateError::InvalidValue::input: alloc::boxed::Box<str>
 pub traces_pkm::DateError::InvalidValue::reason: &'static str
 pub traces_pkm::DateError::LocalZoneLookup
 pub traces_pkm::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
-pub traces_pkm::DateError::OutOfRange
-pub traces_pkm::DateError::UnknownShape
 pub traces_pkm::DateError::YearNotFourDigits
 pub traces_pkm::DateError::YearNotFourDigits::input: alloc::boxed::Box<str>
 impl core::clone::Clone for traces_pkm::DateError

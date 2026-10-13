@@ -45,8 +45,8 @@ use crate::{
     DATE_PATTERN, DateTimeValue, DurationSeconds, DurationValue, TimeUnit,
     UNIT_SPELLINGS_HINT,
     temporal::{
-        CalendarPeriod, DateComponent, DateError, DatePoint, Difference,
-        PeriodEdge, weekday_from_number,
+        CalendarError, CalendarPeriod, DateComponent, DateError, DatePoint,
+        Difference, PeriodEdge, weekday_from_number,
     },
 };
 const NAMESPACE_METHODS: &[&str] = &[
@@ -262,14 +262,16 @@ fn apply_offset(
     offset_val: &Value,
 ) -> TemplateEngineResult<DatePoint> {
     if let Some(n) = offset_val.as_i64() {
-        return date_point.shift(n, TimeUnit::Day).map_err(render_date_error);
+        return date_point
+            .shift(n, TimeUnit::Day)
+            .map_err(render_calendar_error);
     }
     if let Some(s) = offset_val.as_str() {
         let translated = iso_offset_to_text(s)?;
         let duration = DurationValue::parse(&translated).map_err(|source| {
             invalid_operation(format!("invalid duration offset {s:?}"), source)
         })?;
-        return date_point.apply(&duration).map_err(render_date_error);
+        return date_point.apply(&duration).map_err(render_calendar_error);
     }
     Err(Error::new(
         ErrorKind::InvalidOperation,
@@ -309,7 +311,10 @@ impl Anchor {
     }
 
     /// Moves `date_point` as this anchor requires.
-    fn transform(self, date_point: DatePoint) -> Result<DatePoint, DateError> {
+    fn transform(
+        self,
+        date_point: DatePoint,
+    ) -> Result<DatePoint, CalendarError> {
         match self {
             Self::Now | Self::Today => Ok(date_point),
             Self::Tomorrow => date_point.shift(1, TimeUnit::Day),
@@ -363,7 +368,8 @@ impl Anchor {
         } else {
             self.base()
         };
-        date_point = self.transform(date_point).map_err(render_date_error)?;
+        date_point =
+            self.transform(date_point).map_err(render_calendar_error)?;
 
         if let Some(off_val) = offset {
             date_point = apply_offset(date_point, &off_val)?;
@@ -778,7 +784,7 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_date_point`].
 /// - [`ErrorKind::InvalidOperation`] if the boundary is outside the supported
-///   range or its local time cannot be resolved; see [`render_date_error`].
+///   range or its local time cannot be resolved; see [`render_calendar_error`].
 fn render_period_edge(
     value: &str,
     calendar_period: CalendarPeriod,
@@ -789,7 +795,7 @@ fn render_period_edge(
         PeriodEdge::Start => date_point.start_of(calendar_period),
         PeriodEdge::End => date_point.end_of(calendar_period),
     }
-    .map_err(render_date_error)?;
+    .map_err(render_calendar_error)?;
     let local_datetime = shifted.local_datetime_or_utc();
     let pat = shifted.canonical_pattern();
     render_with_pattern(local_datetime.format(pat), pat)
@@ -872,14 +878,15 @@ fn date_sub(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or the shift
-///   overflows chrono's representable range (see [`render_date_error`]).
+///   overflows chrono's representable range (see [`render_calendar_error`]).
 fn shift_by_unit(
     value: &str,
     n: i64,
     unit: TimeUnit,
 ) -> TemplateEngineResult<String> {
-    let shifted_date_point =
-        parse_date_point(value)?.shift(n, unit).map_err(render_date_error)?;
+    let shifted_date_point = parse_date_point(value)?
+        .shift(n, unit)
+        .map_err(render_calendar_error)?;
     let local_datetime = shifted_date_point.local_datetime_or_utc();
     let pat = shifted_date_point.canonical_pattern();
     render_with_pattern(local_datetime.format(pat), pat)
@@ -977,7 +984,7 @@ fn weekday(
         let target_weekday = weekday_or_error(target_num)?;
         let shifted = date_point
             .with_weekday(target_weekday)
-            .map_err(render_date_error)?;
+            .map_err(render_calendar_error)?;
         let local_datetime = shifted.local_datetime_or_utc();
         let pat = pattern_to_strftime(format, local_datetime)?;
         Ok(Value::from(render_with_pattern(
@@ -1103,16 +1110,7 @@ fn date_out_of_range_error() -> Error {
     )
 }
 
-/// Translates a core [`DateError`] from the calendar owner into a render
-/// error.
-///
-/// An overflow keeps the shared range message; a local-zone lookup failure
-/// keeps its distinct diagnosis (a broken tz-data/OS environment, never a DST
-/// ambiguity, which the resolver resolves deterministically) with the source
-/// attached. Parse-shape failures can reach here through the `reference` /
-/// `reference_format` shorthand path, which feeds raw text to the parsers;
-/// they render their own message rather than the overflow diagnosis. The
-/// match stays exhaustive per `pat-exhaustive-enum`.
+/// Translates a core parse error into a render error.
 fn render_date_error(error: DateError) -> Error {
     match error {
         DateError::LocalZoneLookup {
@@ -1123,14 +1121,27 @@ fn render_date_error(error: DateError) -> Error {
                 input,
             },
         ),
-        DateError::OutOfRange => date_out_of_range_error(),
-        DateError::UnknownShape
-        | DateError::InvalidValue {
+        DateError::InvalidValue {
             ..
         }
         | DateError::YearNotFourDigits {
             ..
         } => invalid_operation(error.to_string(), error),
+    }
+}
+
+/// Translates a computed calendar failure into a render error.
+fn render_calendar_error(error: CalendarError) -> Error {
+    match error {
+        CalendarError::OutOfRange => date_out_of_range_error(),
+        CalendarError::Zone {
+            input,
+        } => invalid_operation(
+            format!("local timezone lookup failed for {input:?}"),
+            CalendarError::Zone {
+                input,
+            },
+        ),
     }
 }
 
@@ -2487,7 +2498,7 @@ mod tests {
 
         #[test]
         fn keeps_the_range_message_for_an_overflow() {
-            let error = render_date_error(DateError::OutOfRange);
+            let error = render_calendar_error(CalendarError::OutOfRange);
             assert!(
                 error
                     .to_string()

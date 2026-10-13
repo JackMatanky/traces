@@ -17,7 +17,7 @@
 
 use chrono::{Days, Months, NaiveDateTime, TimeDelta, Weekday};
 
-use super::error::DateError;
+use super::error::CalendarError;
 use crate::temporal::{DurationSeconds, TimeUnit};
 
 /// A calendar period that date-point boundaries select.
@@ -166,14 +166,14 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
 ///
 /// # Errors
 ///
-/// - [`DateError::OutOfRange`] if `part_secs` is not finite or its whole
+/// - [`CalendarError::OutOfRange`] if `part_secs` is not finite or its whole
 ///   seconds do not fit a [`TimeDelta`].
 pub(super) fn time_delta_from_seconds(
     part_secs: f64,
-) -> Result<TimeDelta, DateError> {
+) -> Result<TimeDelta, CalendarError> {
     let ds = DurationSeconds::try_from(part_secs)
-        .map_err(|_| DateError::OutOfRange)?;
-    TimeDelta::try_from(ds).map_err(|_| DateError::OutOfRange)
+        .map_err(|_| CalendarError::OutOfRange)?;
+    TimeDelta::try_from(ds).map_err(|_| CalendarError::OutOfRange)
 }
 
 /// Shifts a calendar datetime by `n` in the chosen `unit` and returns the
@@ -190,27 +190,27 @@ pub(super) fn time_delta_from_seconds(
 ///
 /// # Errors
 ///
-/// - [`DateError::OutOfRange`] if the shift overflows representable bounds.
+/// - [`CalendarError::OutOfRange`] if the shift overflows representable bounds.
 pub(super) fn shift_datetime(
     local_datetime: NaiveDateTime,
     n: i64,
     unit: TimeUnit,
-) -> Result<NaiveDateTime, DateError> {
+) -> Result<NaiveDateTime, CalendarError> {
     match unit {
         TimeUnit::Year => {
-            let months = n.checked_mul(12).ok_or(DateError::OutOfRange)?;
+            let months = n.checked_mul(12).ok_or(CalendarError::OutOfRange)?;
             shift_datetime_months(local_datetime, months)
         }
         TimeUnit::Month => shift_datetime_months(local_datetime, n),
         TimeUnit::Week => {
-            let days = n.checked_mul(7).ok_or(DateError::OutOfRange)?;
+            let days = n.checked_mul(7).ok_or(CalendarError::OutOfRange)?;
             let days_u64 = days.unsigned_abs();
             if days >= 0 {
                 local_datetime.checked_add_days(Days::new(days_u64))
             } else {
                 local_datetime.checked_sub_days(Days::new(days_u64))
             }
-            .ok_or(DateError::OutOfRange)
+            .ok_or(CalendarError::OutOfRange)
         }
         TimeUnit::Day => {
             let days_u64 = n.unsigned_abs();
@@ -219,26 +219,26 @@ pub(super) fn shift_datetime(
             } else {
                 local_datetime.checked_sub_days(Days::new(days_u64))
             }
-            .ok_or(DateError::OutOfRange)
+            .ok_or(CalendarError::OutOfRange)
         }
         TimeUnit::Millisecond => {
             let delta = chrono::Duration::try_milliseconds(n)
-                .ok_or(DateError::OutOfRange)?;
+                .ok_or(CalendarError::OutOfRange)?;
             local_datetime
                 .checked_add_signed(delta)
-                .ok_or(DateError::OutOfRange)
+                .ok_or(CalendarError::OutOfRange)
         }
         TimeUnit::Second | TimeUnit::Minute | TimeUnit::Hour => {
             let secs = unit
                 .whole_nominal_seconds()
-                .ok_or(DateError::OutOfRange)?
+                .ok_or(CalendarError::OutOfRange)?
                 .checked_mul(n)
-                .ok_or(DateError::OutOfRange)?;
+                .ok_or(CalendarError::OutOfRange)?;
             let delta = chrono::Duration::try_seconds(secs)
-                .ok_or(DateError::OutOfRange)?;
+                .ok_or(CalendarError::OutOfRange)?;
             local_datetime
                 .checked_add_signed(delta)
-                .ok_or(DateError::OutOfRange)
+                .ok_or(CalendarError::OutOfRange)
         }
     }
 }
@@ -251,20 +251,20 @@ pub(super) fn shift_datetime(
 ///
 /// # Errors
 ///
-/// - [`DateError::OutOfRange`] if `months` does not fit a `u32` or the
+/// - [`CalendarError::OutOfRange`] if `months` does not fit a `u32` or the
 ///   arithmetic overflows representable bounds.
 pub(super) fn shift_datetime_months(
     local_datetime: NaiveDateTime,
     months: i64,
-) -> Result<NaiveDateTime, DateError> {
+) -> Result<NaiveDateTime, CalendarError> {
     let months_u32 = u32::try_from(months.unsigned_abs())
-        .map_err(|_| DateError::OutOfRange)?;
+        .map_err(|_| CalendarError::OutOfRange)?;
     if months >= 0 {
         local_datetime.checked_add_months(Months::new(months_u32))
     } else {
         local_datetime.checked_sub_months(Months::new(months_u32))
     }
-    .ok_or(DateError::OutOfRange)
+    .ok_or(CalendarError::OutOfRange)
 }
 
 #[cfg(test)]

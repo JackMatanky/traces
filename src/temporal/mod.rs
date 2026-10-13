@@ -68,6 +68,7 @@ pub(crate) use datetime::DATETIME_PATTERN;
 pub use datetime::DateTimeValue;
 pub use duration::DurationValue;
 pub(crate) use duration::{DurationComponent, DurationSeconds};
+pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
 pub(crate) use point::DatePoint;
 pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};

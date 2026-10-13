@@ -1,16 +1,15 @@
-//! Public and internal error types for temporal parsing and arithmetic.
+//! Public parsing errors and internal temporal arithmetic errors.
 //!
-//! [`DateError`] reports date, date-time, and calendar-arithmetic failures;
-//! [`DurationError`] reports duration parsing, validation, and conversion
+//! [`DateError`] reports date and date-time parsing or local-zone resolution
+//! failures. [`CalendarError`] reports internal calendar-arithmetic failures,
+//! while [`DurationError`] reports duration parsing, validation, and conversion
 //! failures. The [`Display`](std::fmt::Display) text of each variant is the
 //! message shown by the CLI and is part of the crate's contract.
 
-/// Error type for date/date-time parsing, local-zone resolution, and calendar
-/// arithmetic failures.
+/// Error type for date/date-time parsing and local-zone resolution failures.
 ///
-/// Raised by the typed [`DateValue`] and [`DateTimeValue`] parsers and by the
-/// calendar owner's `shift`, `apply`, and `diff` operations; the template
-/// engine translates the arithmetic failures into render errors.
+/// Raised by the typed [`DateValue`] and [`DateTimeValue`] parsers. Calendar
+/// arithmetic failures use the crate-internal `CalendarError` instead.
 ///
 /// # Examples
 ///
@@ -33,10 +32,7 @@
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum DateError {
-    /// The input has no recognized date or date-time shape.
-    #[error("not a date or date-time shape")]
-    UnknownShape,
-    /// No accepted date/time shape matched `input` (e.g., `"2026/08/22"`).
+    /// No accepted date/time shape matched `input` (e.g., "2026/08/22").
     #[error("`{input}` is not a recognized date/time: {reason}")]
     InvalidValue {
         /// The raw input that failed to parse.
@@ -44,7 +40,7 @@ pub enum DateError {
         /// The reason the final shape check rejected the input.
         reason: &'static str,
     },
-    /// `input` does not begin with 4 ASCII digits (e.g., `"26-08-22"`).
+    /// `input` does not begin with 4 ASCII digits (e.g., "26-08-22").
     ///
     /// The year must be exactly 4 ASCII digits; a shorter prefix would
     /// otherwise be silently misread.
@@ -53,9 +49,7 @@ pub enum DateError {
         /// The raw input that failed to parse.
         input: Box<str>,
     },
-    /// The process's local timezone could not resolve a naive input, or the
-    /// resolved offset would push it outside the range representable by
-    /// `NaiveDateTime`.
+    /// The process's local timezone could not resolve a naive input.
     ///
     /// DST ambiguities and gaps never produce this error; they resolve
     /// deterministically.
@@ -64,10 +58,38 @@ pub enum DateError {
         /// The naive clock-time input that could not be resolved.
         input: Box<str>,
     },
-    /// A date/time arithmetic operation overflowed or exceeded the
-    /// representable range.
+}
+
+/// Error returned by internal calendar arithmetic.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum CalendarError {
+    /// Calendar arithmetic exceeded the representable range.
     #[error("date/time value is out of range")]
     OutOfRange,
+    /// Local-zone resolution failed for a computed local clock time.
+    #[error("local timezone lookup failed for {input}")]
+    Zone {
+        /// Local clock time that could not be resolved.
+        input: Box<str>,
+    },
+}
+
+impl CalendarError {
+    /// Maps a calendar failure to the parse error exposed by typed date
+    /// parsers.
+    pub(crate) fn into_date_error(self, input: &str) -> DateError {
+        match self {
+            Self::OutOfRange => DateError::InvalidValue {
+                input: input.into(),
+                reason: "date/time is outside the representable range",
+            },
+            Self::Zone {
+                input: zone_input,
+            } => DateError::LocalZoneLookup {
+                input: zone_input,
+            },
+        }
+    }
 }
 
 /// Error returned when a duration operation fails.
@@ -150,10 +172,6 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::unknown_shape(
-            DateError::UnknownShape,
-            "not a date or date-time shape"
-        )]
         #[case::invalid_value(
             DateError::InvalidValue {
                 input: "2026/08/22".into(),
@@ -169,10 +187,6 @@ mod tests {
             DateError::LocalZoneLookup { input: "2026-07-29 14:30".into() },
             "local timezone lookup failed for `2026-07-29 14:30`"
         )]
-        #[case::out_of_range(
-            DateError::OutOfRange,
-            "date/time value is out of range"
-        )]
         fn renders_exact_display_text_for_date_errors(
             #[case] error: DateError,
             #[case] expected: &str,
@@ -184,6 +198,21 @@ mod tests {
             assert_eq!(
                 rendered, expected,
                 "Display text of {error:?} is the CLI contract"
+            );
+        }
+
+        #[test]
+        fn formats_internal_calendar_errors() {
+            assert_eq!(
+                CalendarError::OutOfRange.to_string(),
+                "date/time value is out of range"
+            );
+            assert_eq!(
+                CalendarError::Zone {
+                    input: "2026-03-08 02:30:00".into(),
+                }
+                .to_string(),
+                "local timezone lookup failed for 2026-03-08 02:30:00"
             );
         }
 
@@ -254,6 +283,26 @@ mod tests {
     mod conversions {
         use super::*;
         use crate::temporal::{DurationSeconds, DurationValue};
+
+        #[test]
+        fn maps_calendar_failures_to_parse_errors() {
+            assert_eq!(
+                CalendarError::OutOfRange.into_date_error("9999-12-31"),
+                DateError::InvalidValue {
+                    input: "9999-12-31".into(),
+                    reason: "date/time is outside the representable range",
+                }
+            );
+            assert_eq!(
+                CalendarError::Zone {
+                    input: "2026-03-08 02:30:00".into(),
+                }
+                .into_date_error("2026-03-08 02:30:00"),
+                DateError::LocalZoneLookup {
+                    input: "2026-03-08 02:30:00".into(),
+                }
+            );
+        }
 
         #[test]
         fn rejects_non_finite_seconds_at_the_seconds_boundary() {

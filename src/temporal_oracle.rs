@@ -35,14 +35,13 @@ mod probe {
         DateError, DateTimeValue, DateValue, DurationError, DurationValue,
         TimeUnit,
         temporal::{
-            CalendarPeriod, DateComponent, DatePoint, Difference,
-            weekday_from_number,
+            CalendarError, CalendarPeriod, DateComponent, DatePoint,
+            Difference, weekday_from_number,
         },
     };
 
     fn date_error_class(error: &DateError) -> &'static str {
         match error {
-            DateError::UnknownShape => "UnknownShape",
             DateError::YearNotFourDigits {
                 ..
             } => "YearNotFourDigits",
@@ -52,7 +51,15 @@ mod probe {
             DateError::LocalZoneLookup {
                 ..
             } => "LocalZoneLookup",
-            DateError::OutOfRange => "OutOfRange",
+        }
+    }
+
+    fn calendar_error_class(error: &CalendarError) -> &'static str {
+        match error {
+            CalendarError::OutOfRange => "OutOfRange",
+            CalendarError::Zone {
+                ..
+            } => "LocalZoneLookup",
         }
     }
 
@@ -255,9 +262,9 @@ mod probe {
 
     pub(super) fn shift(input: &str, n: i64, unit_spelling: &str) -> String {
         render_result(point_or(input).and_then(|point| {
-            point
-                .shift(n, unit(unit_spelling))
-                .map_err(|error| format!("Err({})", date_error_class(&error)))
+            point.shift(n, unit(unit_spelling)).map_err(|error| {
+                format!("Err({})", calendar_error_class(&error))
+            })
         }))
     }
 
@@ -266,9 +273,9 @@ mod probe {
             return "Err(corpus)".to_owned();
         };
         render_result(point_or(input).and_then(|point| {
-            point
-                .apply(&duration)
-                .map_err(|error| format!("Err({})", date_error_class(&error)))
+            point.apply(&duration).map_err(|error| {
+                format!("Err({})", calendar_error_class(&error))
+            })
         }))
     }
 
@@ -284,7 +291,7 @@ mod probe {
                 "start" => point.start_of(period),
                 _ => point.end_of(period),
             }
-            .map_err(|error| format!("Err({})", date_error_class(&error)))
+            .map_err(|error| format!("Err({})", calendar_error_class(&error)))
         }))
     }
 
@@ -293,9 +300,9 @@ mod probe {
             return "None".to_owned();
         };
         render_result(point_or(input).and_then(|point| {
-            point
-                .with_weekday(target)
-                .map_err(|error| format!("Err({})", date_error_class(&error)))
+            point.with_weekday(target).map_err(|error| {
+                format!("Err({})", calendar_error_class(&error))
+            })
         }))
     }
 

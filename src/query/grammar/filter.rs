@@ -33,8 +33,8 @@ use crate::{
         value::QueryFieldValueRef,
     },
     temporal::{
-        CalendarPeriod, DateComponent, DateError, DatePoint, PERIOD_SHORTHANDS,
-        PeriodEdge,
+        CalendarError, CalendarPeriod, DateComponent, DatePoint,
+        PERIOD_SHORTHANDS, PeriodEdge,
     },
 };
 
@@ -672,13 +672,24 @@ impl QueryFunction {
 
     fn date_boundary(
         args: &[NoteFieldValue],
-        op: impl FnOnce(DatePoint) -> Result<DatePoint, DateError>,
+        op: impl FnOnce(DatePoint) -> Result<DatePoint, CalendarError>,
     ) -> Option<NoteFieldValue> {
         let date = args.first()?;
         if matches!(date, NoteFieldValue::Null) {
             return Some(NoteFieldValue::Null);
         }
-        Some(NoteFieldValue::from(op(date.as_date_point()?).ok()?))
+        let point = match op(date.as_date_point()?) {
+            Ok(point) => point,
+            Err(
+                CalendarError::OutOfRange
+                | CalendarError::Zone {
+                    ..
+                },
+            ) => {
+                return None;
+            }
+        };
+        Some(NoteFieldValue::from(point))
     }
 
     fn date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
