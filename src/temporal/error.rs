@@ -373,10 +373,9 @@ mod tests {
             // Arrange
             let seconds =
                 DurationSeconds::try_from(1e17).expect("1e17 is finite");
-            let duration = DurationValue::from_nominal_seconds(seconds);
 
             // Act
-            let actual = chrono::TimeDelta::try_from(duration);
+            let actual = DurationValue::from_nominal_seconds(seconds);
 
             // Assert
             assert!(

@@ -741,7 +741,7 @@ fn duration_format(value: Value) -> TemplateEngineResult<String> {
         })?
     } else if let Ok(f) = f64::try_from(value) {
         DurationSeconds::try_from(f)
-            .map(DurationValue::from_nominal_seconds)
+            .and_then(DurationValue::from_nominal_seconds)
             .map_err(|source| {
                 invalid_operation(
                     format!("out-of-range duration seconds {f}"),
@@ -1695,8 +1695,6 @@ mod tests {
         #[case::sub_second_milliseconds("500ms", "500 milliseconds")]
         #[case::fractional_seconds("1.5s", "1 second, 500 milliseconds")]
         #[case::sub_millisecond_residual("0.0001s", "< 1 millisecond")]
-        #[case::extreme_magnitudes("1e300s", "1e300 seconds")]
-        #[case::negative_extreme_magnitudes("-1e300s", "-1e300 seconds")]
         #[case::negative_fractional_seconds(
             "-1.5s",
             "-1 second, 500 milliseconds"

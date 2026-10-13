@@ -1384,16 +1384,20 @@ src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateE
 src/temporal/datetime.rs: pub(crate) fn shift(
 src/temporal/datetime.rs: pub(super) fn from_local(
 src/temporal/datetime.rs: pub(super) fn from_local_in(
+src/temporal/duration.rs: pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub fn checked_mul(self, factor: f64) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub fn checked_neg(self) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub fn checked_sub(self, rhs: Self) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub struct DurationValue {
 src/temporal/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
 src/temporal/duration.rs: pub(crate) const fn magnitude(self) -> f64 {
-src/temporal/duration.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
 src/temporal/duration.rs: pub(crate) const fn unit(self) -> TimeUnit {
 src/temporal/duration.rs: pub(crate) fn as_str(&self) -> &str {
 src/temporal/duration.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
-src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
+src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(
 src/temporal/duration.rs: pub(crate) fn has_calendar_component(&self) -> bool {
 src/temporal/duration.rs: pub(crate) fn humanize(&self) -> String {
+src/temporal/duration.rs: pub(crate) fn nominal_seconds(&self) -> DurationSeconds {
 src/temporal/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
 src/temporal/duration.rs: pub(crate) struct DurationComponent {

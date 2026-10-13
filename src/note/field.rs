@@ -576,6 +576,10 @@ impl From<FieldValueRef<'_>> for NoteFieldValue {
 mod tests {
     use super::*;
     use crate::field::FieldValueRef;
+    #[test]
+    fn note_field_value_stays_within_the_72_byte_budget() {
+        assert!(std::mem::size_of::<NoteFieldValue>() <= 72);
+    }
 
     mod field_value {
         use pretty_assertions::assert_eq;

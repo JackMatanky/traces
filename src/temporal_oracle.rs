@@ -14,12 +14,8 @@
 //! promoted to named unit tests.
 
 #![expect(
-    clippy::arithmetic_side_effects,
     clippy::too_many_lines,
-    reason = "the oracle is a temporary migration harness: the probe applies \
-              the
-              duration operators under test, and the corpus functions are flat
-              case lists"
+    reason = "the corpus functions keep related migration cases together"
 )]
 
 use std::fmt::Write as _;
@@ -156,25 +152,34 @@ mod probe {
             return "Err(corpus)".to_owned();
         };
         let result = match op {
-            "+" => left + right,
-            "-" => left - right,
+            "+" => left.checked_add(right),
+            "-" => left.checked_sub(right),
             _ => return "Err(corpus)".to_owned(),
         };
-        render_duration(&result)
+        match result {
+            Ok(duration) => render_duration(&duration),
+            Err(_) => "Err(corpus)".to_owned(),
+        }
     }
 
     pub(super) fn duration_scale(input: &str, factor: f64) -> String {
         let Ok(duration) = DurationValue::parse(input) else {
             return "Err(corpus)".to_owned();
         };
-        render_duration(&(duration * factor))
+        duration.checked_mul(factor).map_or_else(
+            |_| "Err(corpus)".to_owned(),
+            |duration| render_duration(&duration),
+        )
     }
 
     pub(super) fn duration_negate(input: &str) -> String {
         let Ok(duration) = DurationValue::parse(input) else {
             return "Err(corpus)".to_owned();
         };
-        render_duration(&-duration)
+        duration.checked_neg().map_or_else(
+            |_| "Err(corpus)".to_owned(),
+            |duration| render_duration(&duration),
+        )
     }
 
     pub(super) fn duration_order(left: &str, right: &str) -> String {

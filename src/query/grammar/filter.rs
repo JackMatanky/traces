@@ -345,11 +345,6 @@ impl ArithOp {
     /// Returns `Null` when either operand is `Null` or the operand types do
     /// not support the operator, and `None` when a date or duration result is
     /// not representable.
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "duration operators preserve overflow as non-finite; \
-                  consuming conversions reject it"
-    )]
     fn evaluate(
         self,
         left: NoteFieldValue,
@@ -378,7 +373,9 @@ impl ArithOp {
                 Self::Sub,
                 NoteFieldValue::Duration(duration),
             ) => Some(NoteFieldValue::from(
-                date.as_date_point()?.apply(&-duration).ok()?,
+                date.as_date_point()?
+                    .apply(&duration.checked_neg().ok()?)
+                    .ok()?,
             )),
             (
                 date1 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
@@ -392,19 +389,20 @@ impl ArithOp {
                 Some(NoteFieldValue::Duration(
                     DurationValue::from_nominal_seconds(
                         DurationSeconds::try_from(seconds).ok()?,
-                    ),
+                    )
+                    .ok()?,
                 ))
             }
             (
                 NoteFieldValue::Duration(a),
                 Self::Add,
                 NoteFieldValue::Duration(b),
-            ) => Some(NoteFieldValue::Duration(a + b)),
+            ) => Some(NoteFieldValue::Duration(a.checked_add(b).ok()?)),
             (
                 NoteFieldValue::Duration(a),
                 Self::Sub,
                 NoteFieldValue::Duration(b),
-            ) => Some(NoteFieldValue::Duration(a - b)),
+            ) => Some(NoteFieldValue::Duration(a.checked_sub(b).ok()?)),
             (
                 NoteFieldValue::Duration(duration),
                 Self::Mul,
@@ -414,7 +412,7 @@ impl ArithOp {
                 NoteFieldValue::Number(n),
                 Self::Mul,
                 NoteFieldValue::Duration(duration),
-            ) => Some(NoteFieldValue::Duration(duration * n)),
+            ) => Some(NoteFieldValue::Duration(duration.checked_mul(n).ok()?)),
             _ => Some(NoteFieldValue::Null),
         }
     }
@@ -927,11 +925,6 @@ impl FilterGrammar {
         })
     }
 
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "duration negation preserves non-finite results without \
-                  panicking"
-    )]
     fn parse_primary(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
@@ -979,7 +972,16 @@ impl FilterGrammar {
                 Ok(ValueExpr::Literal(NoteFieldValue::Number(-number)))
             }
             ValueExpr::Literal(NoteFieldValue::Duration(duration)) => {
-                Ok(ValueExpr::Literal(NoteFieldValue::Duration(-duration)))
+                Ok(ValueExpr::Literal(NoteFieldValue::Duration(
+                    duration.checked_neg().map_err(|_| {
+                        QuerySyntaxError::unexpected_end(
+                            QueryDialect::Filter,
+                            input,
+                            span.clone(),
+                            "a representable negative duration",
+                        )
+                    })?,
+                )))
             }
             _ => Err(QuerySyntaxError::unexpected_end(
                 QueryDialect::Filter,

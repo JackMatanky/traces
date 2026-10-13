@@ -1515,7 +1515,8 @@ mod tests {
             let synthesized = DurationValue::from_nominal_seconds(
                 crate::temporal::DurationSeconds::try_from(3600.0)
                     .expect("finite seconds"),
-            );
+            )
+            .expect("one hour fits within the Jiff span range");
 
             // Act
             let applied = base.apply(&synthesized);
@@ -1752,7 +1753,8 @@ mod tests {
 
             // Act
             let overflowed = max_point.apply(&one_second);
-            let underflowed = min_point.apply(&(-one_second));
+            let underflowed = min_point
+                .apply(&one_second.checked_neg().expect("one second fits"));
 
             // Assert
             assert_eq!(
