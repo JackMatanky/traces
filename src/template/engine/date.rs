@@ -32,9 +32,9 @@
 //! `date.today()`, `date.tomorrow()`, `date.yesterday()`, and
 //! `date.from_timestamp()` read or render the local clock for display.
 
-use std::{fmt::Write as _, sync::Arc};
+use std::sync::Arc;
 
-use chrono::{Datelike as _, NaiveDate, NaiveDateTime, Utc};
+use chrono::{Datelike as _, NaiveDate, NaiveDateTime, Timelike as _, Utc};
 use minijinja::{
     Environment, Error, ErrorKind,
     value::{Enumerator, Kwargs, Object, Value},
@@ -229,7 +229,7 @@ impl Anchor {
 
         let local_datetime = date_point.local_datetime_or_utc();
         let pat = pattern_to_strftime(format, local_datetime)?;
-        render_with_pattern(local_datetime.format(&pat), format)
+        format_strtime(local_datetime, &pat, format)
     }
 }
 
@@ -326,7 +326,7 @@ impl Object for DateNamespace {
                             )
                         })?
                         .local_datetime_or_utc();
-                    render_with_pattern(local.format(format), format)
+                    format_strtime(local, format, format)
                 },
             )),
             _ => None,
@@ -385,32 +385,40 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
         .ok_or_else(|| unknown_unit_error(unit_str))
 }
 
-/// Formats `formattable`, anything chrono's `.format(fmt)` produces
-/// (`DelayedFormat` from a `NaiveDate`, `NaiveDateTime`, or `DateTime<_>`).
-///
-/// Writes through [`std::fmt::Write`] rather than `.to_string()`: the latter's
-/// blanket impl `.expect()`s a successful `Display::fmt`, but `DelayedFormat`
-/// returns `Err` for an invalid strftime specifier such as `%Q`. Writing
-/// directly turns that into a normal [`minijinja::Error`] instead of a panic.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `pattern` is not a strftime specifier
-///   `formattable` can render, for example `%Q`.
-fn render_with_pattern(
-    formattable: impl std::fmt::Display,
-    pattern: &str,
+/// Formats a civil date-time with Jiff's strict strftime implementation.
+fn format_strtime(
+    datetime: NaiveDateTime,
+    strftime: &str,
+    source_pattern: &str,
 ) -> TemplateEngineResult<String> {
-    let mut rendered = String::new();
-    write!(rendered, "{formattable}").map_err(|_fmt_error| {
+    let range_error = || {
         Error::new(
             ErrorKind::InvalidOperation,
-            format!("invalid date format {pattern:?}"),
+            "date/time is outside the formatter's representable range",
+        )
+    };
+    let datetime = jiff::civil::DateTime::new(
+        i16::try_from(datetime.year()).map_err(|_| range_error())?,
+        i8::try_from(datetime.month()).map_err(|_| range_error())?,
+        i8::try_from(datetime.day()).map_err(|_| range_error())?,
+        i8::try_from(datetime.hour()).map_err(|_| range_error())?,
+        i8::try_from(datetime.minute()).map_err(|_| range_error())?,
+        i8::try_from(datetime.second()).map_err(|_| range_error())?,
+        i32::try_from(datetime.nanosecond()).map_err(|_| range_error())?,
+    )
+    .map_err(|source| {
+        invalid_operation(
+            "date/time is invalid for strftime formatting",
+            source,
         )
     })?;
-    Ok(rendered)
+    jiff::fmt::strtime::format(strftime, datetime).map_err(|source| {
+        invalid_operation(
+            format!("invalid date format {source_pattern:?}"),
+            source,
+        )
+    })
 }
-
 /// The shared date/time string parser for filters that work on the human clock
 /// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
 /// parse via [`parse_date_point`] directly.
@@ -428,10 +436,10 @@ fn parse_local_datetime(s: &str) -> Result<NaiveDateTime, Error> {
 /// moment-dialect tokens (`YYYY MM DD HH mm ss`, `Do`/`S`,
 /// `dddd`/`ddd`/`MMM`/`MMMM`, bracket literals like `[Daily]`).
 ///
-/// Documented strftime grammar is [`chrono::format::strftime`]. `%Z` prints
-/// only a UTC offset, `%S` may render `60` for a leap second, and week numbers
-/// use `%V`/`%G` (ISO), never `%U`/`%W`. Chrono advises against `%+`, which
-/// is never emitted.
+/// Jiff [`fmt::strtime`] formats the date-time as a civil value without a
+/// time zone, so directives that require an offset or zone name fail. Leap
+/// seconds are not representable. Week numbers use ISO `%V`/`%G`, never `%U`
+/// or `%W`.
 ///
 /// # Errors
 ///
@@ -442,7 +450,7 @@ fn parse_local_datetime(s: &str) -> Result<NaiveDateTime, Error> {
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
     let datetime = parse_local_datetime(value)?;
     let translated = pattern_to_strftime(pattern, datetime)?;
-    render_with_pattern(datetime.format(&translated), pattern)
+    format_strtime(datetime, &translated, pattern)
 }
 
 /// Translates `pattern` to a strftime pattern.
@@ -656,7 +664,7 @@ fn render_period_edge(
     .map_err(render_calendar_error)?;
     let local_datetime = shifted.local_datetime_or_utc();
     let pat = shifted.canonical_pattern();
-    render_with_pattern(local_datetime.format(pat), pat)
+    format_strtime(local_datetime, pat, pat)
 }
 
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
@@ -747,7 +755,7 @@ fn shift_by_unit(
         .map_err(render_calendar_error)?;
     let local_datetime = shifted_date_point.local_datetime_or_utc();
     let pat = shifted_date_point.canonical_pattern();
-    render_with_pattern(local_datetime.format(pat), pat)
+    format_strtime(local_datetime, pat, pat)
 }
 
 /// `{{ value | add_days(n) }}` is a convenience shortcut for
@@ -845,10 +853,7 @@ fn weekday(
             .map_err(render_calendar_error)?;
         let local_datetime = shifted.local_datetime_or_utc();
         let pat = pattern_to_strftime(format, local_datetime)?;
-        Ok(Value::from(render_with_pattern(
-            local_datetime.format(&pat),
-            format,
-        )?))
+        Ok(Value::from(format_strtime(local_datetime, &pat, format)?))
     } else {
         kwargs.assert_all_used()?;
         Ok(Value::from(date_point.component(DateComponent::Weekday)))
