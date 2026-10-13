@@ -183,11 +183,10 @@ pub(crate) struct DecomposedPart {
 ///
 /// `total_ms` is a magnitude in milliseconds and `units` must be ordered
 /// largest first, as [`UNITS`], [`CANONICAL_UNITS`], and [`HUMAN_UNITS`] are.
-/// Unit sizes are [`UnitSpec::nominal_milliseconds`],
-/// so the registry stays the sole ratio table. Units larger than the remaining
-/// magnitude contribute no row. Returns the rows and the sub-unit remainder in
-/// milliseconds; rendering or rounding that remainder is the caller's
-/// decision.
+/// Unit sizes are [`UnitSpec::nominal_milliseconds`], so the registry stays the
+/// sole ratio table. Units larger than the remaining magnitude contribute no
+/// row. Returns the rows and the sub-unit remainder in milliseconds; rendering
+/// or rounding that remainder is the caller's decision.
 #[must_use]
 #[expect(
     clippy::arithmetic_side_effects,
@@ -222,10 +221,10 @@ fn whole_milliseconds(unit: TimeUnit) -> u64 {
 impl TimeUnit {
     /// Looks up a unit by its case-insensitive spelling.
     ///
-    /// Scans the alias lists in [`UNITS`] with ASCII-case-insensitive
-    /// equality, so
-    /// every alias in the registry is accepted and nothing else is: an empty,
-    /// too long, or non-ASCII input matches no alias and returns [`None`].
+    /// Scans the alias lists in [`UNITS`] with ASCII-case-insensitive equality,
+    /// so every alias in the registry is accepted and nothing else is: an
+    /// empty, too long, or non-ASCII input matches no alias and returns
+    /// [`None`].
     #[must_use]
     pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
         UNITS
@@ -238,8 +237,8 @@ impl TimeUnit {
 
     /// Returns this unit's [`UnitSpec`] row.
     ///
-    /// Listed by variant, so adding a [`TimeUnit`] variant with no
-    /// [`UNITS`] row yet fails to compile here first.
+    /// Listed by variant, so adding a [`TimeUnit`] variant with no [`UNITS`]
+    /// row yet fails to compile here first.
     #[must_use]
     pub(crate) const fn spec(self) -> &'static UnitSpec {
         match self {
@@ -269,8 +268,8 @@ impl TimeUnit {
         self.spec().names
     }
 
-    /// Returns the fixed nominal seconds per unit, the sole unit-ratio table
-    /// in the crate.
+    /// Returns the fixed nominal seconds per unit, the sole unit-ratio table in
+    /// the crate.
     ///
     /// Calendar units ([`Self::Day`], [`Self::Week`], [`Self::Month`],
     /// [`Self::Year`]) get nominal fixed ratios for value identity, magnitude
@@ -294,8 +293,8 @@ impl TimeUnit {
     /// [`Self::nominal_seconds`].
     ///
     /// [`None`] only for [`Self::Millisecond`]; every other variant is listed
-    /// explicitly, so adding a unit forces it to declare whether its ratio is
-    /// a whole number of seconds.
+    /// explicitly, so adding a unit forces it to declare whether its ratio is a
+    /// whole number of seconds.
     #[must_use]
     #[expect(
         clippy::as_conversions,
@@ -798,10 +797,9 @@ mod tests {
 
         #[test]
         fn leaves_the_sub_unit_remainder_to_the_caller() {
-            // Arrange: 1.5 seconds is one second plus 500 milliseconds of
-            // remainder. Act
+            // Arrange: the magnitude is 1.5 seconds.
+            // Act
             let (parts, remainder_ms) = decompose(1_500, &HUMAN_UNITS);
-
             // Assert
             assert_eq!(
                 parts,

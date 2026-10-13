@@ -1,28 +1,27 @@
 //! A validated duration with a nominal identity and a calendar application
 //! regime.
 //!
-//! Owns [`DurationValue`], the nominal-seconds measure [`DurationSeconds`],
-//! and the written components ([`DurationComponent`]) that witness the
-//! regime. Every duration-shaped string in the crate is recognized here;
-//! callers hold a validated [`DurationValue`] or receive a
-//! [`DurationError`].
+//! Owns [`DurationValue`], the nominal-seconds measure [`DurationSeconds`], and
+//! the written components ([`DurationComponent`]) that witness the regime.
+//! Every duration-shaped string in the crate is recognized here; callers hold a
+//! validated [`DurationValue`] or receive a [`DurationError`].
 //!
 //! # Identity and application
 //!
-//! Nominal seconds are the identity of a Duration: one month counts as 30
-//! days and one year as 365 days, so equality, ordering, and hashing compare
-//! nominal seconds and never the spelling. The written components decide how
-//! a value applies: a calendar unit (day, week, month, year) applies on the
-//! local clock, while an exact unit (hour and smaller) applies as exact
-//! elapsed time. Values synthesized from a magnitude carry no components and
-//! always apply exactly.
+//! Nominal seconds are the identity of a Duration: one month counts as 30 days
+//! and one year as 365 days, so equality, ordering, and hashing compare nominal
+//! seconds and never the spelling. The written components decide how a value
+//! applies: a calendar unit (day, week, month, year) applies on the local
+//! clock, while an exact unit (hour and smaller) applies as exact elapsed time.
+//! Values synthesized from a magnitude carry no components and always apply
+//! exactly.
 //!
 //! # Grammar
 //!
 //! Written input is one or more `<number><unit>` components with an optional
-//! sign on the whole span, separated by whitespace or commas. Unit
-//! spellings are case-insensitive, and a component may carry a fraction or
-//! an exponent. Surrounding whitespace is insignificant.
+//! sign on the whole span, separated by whitespace or commas. Unit spellings
+//! are case-insensitive, and a component may carry a fraction or an exponent.
+//! Surrounding whitespace is insignificant.
 
 use std::{
     borrow::Cow,
@@ -48,10 +47,9 @@ use super::{
 /// Holds the written spelling, the nominal-seconds identity, and the written
 /// components that witness the regime. Parsing guarantees finite nominal
 /// seconds; scaling by a non-finite factor can produce non-finite seconds,
-/// which consuming conversions reject with
-/// [`DurationError::NonFiniteSeconds`]. Equality, ordering, and hashing
-/// compare nominal seconds, so two spellings of one elapsed time are one
-/// value.
+/// which consuming conversions reject with [`DurationError::NonFiniteSeconds`].
+/// Equality, ordering, and hashing compare nominal seconds, so two spellings of
+/// one elapsed time are one value.
 ///
 /// # Examples
 ///
@@ -124,14 +122,13 @@ impl DurationValue {
     /// value.
     ///
     /// Greedily decomposes `seconds.0.abs()` into Weeks, Days, Hours, Minutes,
-    /// Seconds, and Milliseconds (ratios from
-    /// [`TimeUnit::nominal_seconds`]); Month and Year are omitted because
-    /// their lengths are calendar-dependent. Zero yields `"0s"`; a negative
-    /// duration starts with `"-"`. When the decomposition cannot represent a
-    /// nonzero magnitude (a sub-millisecond remainder rounds to zero, or `u64`
-    /// overflows at the other extreme), it falls back to the
-    /// [`DurationSeconds`] [`Display`](fmt::Display) so the result never lies
-    /// as `"0s"`.
+    /// Seconds, and Milliseconds (ratios from [`TimeUnit::nominal_seconds`]);
+    /// Month and Year are omitted because their lengths are calendar-dependent.
+    /// Zero yields `"0s"`; a negative duration starts with `"-"`. When the
+    /// decomposition cannot represent a nonzero magnitude (a sub-millisecond
+    /// remainder rounds to zero, or `u64` overflows at the other extreme), it
+    /// falls back to the [`DurationSeconds`] [`Display`](fmt::Display) so the
+    /// result never lies as `"0s"`.
     ///
     /// This is the only constructor for the fixed regime: a value with no
     /// written components always comes from here.
@@ -144,12 +141,11 @@ impl DurationValue {
         }
     }
 
-    /// Assembles a calendar-regime [`DurationValue`] from written
-    /// components.
+    /// Assembles a calendar-regime [`DurationValue`] from written components.
     ///
-    /// `spelling` is the written text the components were parsed or
-    /// transformed from, retained verbatim; `seconds` is the folded nominal
-    /// identity the caller already computed.
+    /// `spelling` is the written text the components were parsed or transformed
+    /// from, retained verbatim; `seconds` is the folded nominal identity the
+    /// caller already computed.
     #[inline]
     fn from_components(
         spelling: Box<str>,
@@ -164,15 +160,15 @@ impl DurationValue {
     }
 
     /// Renders this duration in human-readable compound English (for example
-    /// `"3 days, 4 hours"`), decomposing its magnitude greedily from years
-    /// down to seconds over [`HUMAN_UNITS`].
+    /// `"3 days, 4 hours"`), decomposing its magnitude greedily from years down
+    /// to seconds over [`HUMAN_UNITS`].
     ///
     /// The magnitude is rounded to whole milliseconds first, so a fractional
     /// remainder renders as one tail millisecond count and a near-whole
     /// magnitude rolls up (`"2 seconds"` for 1.9999 seconds). A non-finite or
-    /// sub-half-millisecond magnitude renders as `"0 seconds"` and as
-    /// `"< 1 millisecond"` respectively; magnitudes too large for whole-unit
-    /// counts render in scientific notation.
+    /// sub-half-millisecond magnitude renders as `"0 seconds"` and as `"< 1
+    /// millisecond"` respectively; magnitudes too large for whole-unit counts
+    /// render in scientific notation.
     #[must_use]
     pub(crate) fn humanize(&self) -> String {
         let total_secs = self.seconds.as_f64();
@@ -182,8 +178,8 @@ impl DurationValue {
         if total_secs == 0.0 || total_secs.is_nan() {
             return "0 seconds".to_owned();
         }
-        // `{:e}` carries the sign of the original magnitude, so the
-        // scientific fallback keeps it too.
+        // `{:e}` carries the sign of the original magnitude, so the scientific
+        // fallback keeps it too.
         let Some(total_ms) = (total_secs.abs() * 1_000.0).round().to_u64()
         else {
             return format!("{total_secs:e} seconds");
@@ -394,8 +390,8 @@ impl DurationValue {
             if index > 0 {
                 spelling.push(' ');
             }
-            // Writing the `Display` implementation of `u64` into a `String`
-            // is infallible.
+            // Writing the `Display` implementation of `u64` into a `String` is
+            // infallible.
             let _ = write!(spelling, "{count}{}", unit.spelling());
         }
         spelling.into_boxed_str()
@@ -1066,7 +1062,7 @@ mod tests {
         #[case::explicit_exponent_sign("1e+2d", 8_640_000.0)]
         #[case::uppercase_exponent("1E3m", 60_000.0)]
         #[case::exponent_after_decimal(".5e2s", 50.0)]
-        fn parses_decimal_and_exponent_magnitudes(
+        fn parses_supported_numeric_magnitudes(
             #[case] input: &str,
             #[case] expected: f64,
         ) {
@@ -1276,7 +1272,7 @@ mod tests {
         }
 
         #[test]
-        fn pins_the_unknown_unit_divergence_between_parse_and_prefix() {
+        fn pins_unknown_unit_behavior_across_full_and_prefix_parses() {
             // Arrange
             let input = "1h 1x";
             // Act
@@ -1288,7 +1284,7 @@ mod tests {
         }
 
         #[test]
-        fn pins_the_leading_comma_divergence_between_parse_and_prefix() {
+        fn pins_leading_comma_behavior_across_full_and_prefix_parses() {
             // Arrange
             let input = ",1h";
             // Act
@@ -1305,7 +1301,7 @@ mod tests {
         }
 
         #[test]
-        fn pins_the_trailing_comma_divergence_between_parse_and_prefix() {
+        fn pins_trailing_comma_behavior_across_full_and_prefix_parses() {
             // Arrange
             let input = "1h,";
             // Act
@@ -1786,7 +1782,7 @@ mod tests {
         }
 
         #[test]
-        fn keeps_json_and_postcard_spellings_per_value() {
+        fn preserves_raw_spellings_across_serializers() {
             // Arrange
             let compound =
                 DurationValue::parse("1h 30m").expect("compound is valid");
@@ -1981,7 +1977,7 @@ mod tests {
         }
 
         #[test]
-        fn identifies_calendar_and_exact_regimes_from_components() {
+        fn reports_calendar_component_presence() {
             // Arrange
             let calendar = DurationValue::parse("1mo 2d")
                 .expect("calendar compound is valid");
@@ -2005,7 +2001,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn add_and_sub_combine_components_for_component_operands() {
+        fn adds_component_operands() {
             // Arrange
             let expected =
                 DurationValue::parse("1h 30m").expect("compound is valid");
@@ -2013,16 +2009,26 @@ mod tests {
             let minutes =
                 DurationValue::parse("30m").expect("minutes are valid");
             // Act
-            let sum = hour + minutes.clone();
-            let diff = expected.clone() - minutes;
-            // Assert: equality is by nominal seconds, and `Sub` keeps the
-            // negated rhs entry as the written witness.
+            let sum = hour + minutes;
+            // Assert
             assert_eq!(sum, expected);
+        }
+
+        #[test]
+        fn subtracts_component_operands_with_a_negative_witness() {
+            // Arrange
+            let expected =
+                DurationValue::parse("1h 30m").expect("compound is valid");
+            let minutes =
+                DurationValue::parse("30m").expect("minutes are valid");
+            // Act
+            let diff = expected - minutes;
+            // Assert
             assert_eq!(
                 diff.nominal_seconds(),
                 DurationSeconds::try_from(3_600.0).expect("finite seconds")
             );
-            let components = diff.components().expect("Some plus Some retains");
+            let components = diff.components().expect("both operands retain");
             assert_eq!(components.len(), 3);
             assert_eq!(
                 components.last().copied(),
@@ -2160,7 +2166,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn scales_each_component_and_folds_the_seconds() {
+        fn scales_components_into_nominal_total() {
             // Arrange
             let duration =
                 DurationValue::parse("1h 30m").expect("compound is valid");
@@ -2280,7 +2286,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn adds_and_subtracts_seconds() {
+        fn adds_seconds() {
             // Arrange
             let left =
                 DurationSeconds::try_from(300.0).expect("finite seconds");
@@ -2288,20 +2294,31 @@ mod tests {
                 DurationSeconds::try_from(100.0).expect("finite seconds");
             // Act
             let sum = left + right;
-            let diff = left - right;
             // Assert
             assert_eq!(
                 sum,
                 DurationSeconds::try_from(400.0).expect("finite seconds")
             );
+        }
+
+        #[test]
+        fn subtracts_seconds() {
+            // Arrange
+            let left =
+                DurationSeconds::try_from(300.0).expect("finite seconds");
+            let right =
+                DurationSeconds::try_from(100.0).expect("finite seconds");
+            // Act
+            let difference = left - right;
+            // Assert
             assert_eq!(
-                diff,
+                difference,
                 DurationSeconds::try_from(200.0).expect("finite seconds")
             );
         }
 
         #[test]
-        fn scales_seconds_from_either_operand_order() {
+        fn scales_seconds_with_either_operand_order() {
             // Arrange
             let seconds =
                 DurationSeconds::try_from(100.0).expect("finite seconds");

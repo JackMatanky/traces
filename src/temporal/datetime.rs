@@ -2,8 +2,8 @@
 //!
 //! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
 //! [`ParsedDateTime`]) that turn written RFC 3339 and naive clock times into
-//! it. Written input without an offset resolves in the process's local zone
-//! and stores as UTC; every human-facing rendering converts back to the local
+//! it. Written input without an offset resolves in the process's local zone and
+//! stores as UTC; every human-facing rendering converts back to the local
 //! clock. Callers hold the validated date-time or receive a [`DateError`].
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
@@ -32,9 +32,8 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 /// spring-forward gaps shift forward by the gap length) and stores as UTC.
 /// [`Display`](fmt::Display) renders the local clock time without a zone
 /// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
-/// Deserialization runs the same parser as
-/// [`FromStr`](std::str::FromStr), so inline and deserialized date-times
-/// follow one grammar.
+/// Deserialization runs the same parser as [`FromStr`](std::str::FromStr), so
+/// inline and deserialized date-times follow one grammar.
 ///
 /// # Examples
 ///
@@ -68,11 +67,8 @@ pub struct DateTimeValue(DateTime<Utc>);
 impl DateTimeValue {
     /// Returns the local clock-time rendering of this date-time.
     ///
-    /// Every human-facing rendering goes through this conversion: the offset
-    /// comes from [`Local::offset_from_utc_datetime`] and is applied with
-    /// [`NaiveDateTime::checked_add_offset`], which returns [`None`] instead of
-    /// panicking at the range edge of `NaiveDateTime` (`.naive_local()` would
-    /// panic there).
+    /// Every human-facing rendering uses checked offset application and returns
+    /// [`None`] when the result falls outside the supported date-time range.
     #[inline]
     #[must_use]
     pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
@@ -92,8 +88,8 @@ impl DateTimeValue {
     /// Returns the local calendar date of this date-time, discarding
     /// time-of-day.
     ///
-    /// When the local offset cannot be applied (a date-time at the extreme
-    /// edge of [`NaiveDateTime`]), the UTC date renders instead.
+    /// At the representable date-time edge where the local offset cannot be
+    /// applied, the UTC date is used.
     #[inline]
     #[must_use]
     pub(crate) fn local_date(self) -> DateValue {
@@ -134,25 +130,21 @@ impl DateTimeValue {
     /// and stored as UTC. Resolution never fails on a DST boundary:
     ///
     /// - Ambiguous fall-back times resolve to their earliest occurrence;
-    /// - Spring-forward gaps shift forward by the gap, matching the
-    ///   `'compatible'` disambiguation of Temporal and the
-    ///   [`Disambiguation::Compatible`] policy of jiff.
+    /// - Spring-forward gaps shift forward by the gap, matching the Compatible
+    ///   disambiguation policy.
     ///
-    /// Only a broken tz-data/OS lookup or an offset application outside
-    /// the range of `NaiveDateTime` errors. On the `WebAssembly` target, the
-    /// `Local` type reports every local time as unambiguous ([chrono#1701]),
-    /// so the
-    /// ambiguous arm is unreachable there.
+    /// Only a broken zone-data or operating-system lookup, or an offset outside
+    /// the supported date-time range, errors. On `WebAssembly`, `Local` reports
+    /// every local time as unambiguous ([chrono#1701]), so that platform does
+    /// not exercise the ambiguous arm.
     ///
     /// # Errors
     ///
     /// - [`CalendarError::Zone`] if the lookup finds no offset for
-    ///   `local_datetime` or a probe (a broken tz-data/OS environment rather
-    ///   than a DST boundary), or if applying the resolved offset would leave
-    ///   the range of `NaiveDateTime`.
+    ///   `local_datetime` or a probe (a broken zone-data or operating-system
+    ///   environment rather than a DST boundary), or if applying the resolved
+    ///   offset would leave the supported date-time range.
     ///
-    /// [`Disambiguation::Compatible`]:
-    ///     https://docs.rs/jiff/latest/jiff/tz/enum.Disambiguation.html
     /// [chrono#1701]: https://github.com/chronotope/chrono/issues/1701
     pub(super) fn from_local(
         local_datetime: NaiveDateTime,
@@ -205,9 +197,9 @@ impl DateTimeValue {
     /// # Errors
     ///
     /// - [`CalendarError::Zone`] if no nearby local time resolves within the
-    ///   25-hour backward search (a broken tz-data/OS lookup rather than a
-    ///   gap), or if stepping the probe back would leave the range of
-    ///   `NaiveDateTime`.
+    ///   25-hour backward search (a broken zone-data or operating-system
+    ///   lookup, not a DST boundary), or if stepping the probe back would leave
+    ///   the supported date-time range.
     fn offset_across_gap(
         local_datetime: NaiveDateTime,
         zone_lookup: &impl Fn() -> CalendarError,
@@ -231,9 +223,8 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if the shift overflows, or the local
-    ///   datetime of a calendar-unit shift is outside the range covered by
-    ///   `NaiveDateTime`.
+    /// - [`CalendarError::OutOfRange`] if the shift overflows or its local
+    ///   date-time lies outside the supported range.
     /// - [`CalendarError::Zone`] if the shifted local datetime cannot be
     ///   resolved to a stored date-time.
     pub(crate) fn shift(
@@ -266,8 +257,8 @@ impl DateTimeValue {
     /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
     ///   digits.
     /// - [`DateError::InvalidValue`] if no accepted shape matches.
-    /// - [`DateError::LocalZoneLookup`] if the local timezone lookup fails
-    ///   while resolving a naive input.
+    /// - [`DateError::LocalZoneLookup`] if local zone lookup fails while
+    ///   resolving a naive input.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_with_year(trimmed) {
@@ -337,10 +328,10 @@ impl From<DateTimeValue> for DateTime<Utc> {
 /// On zone-lookup failure, this promotion degrades to the neutral UTC frame
 /// (calendar date read as UTC, deterministic and shift-free) instead of
 /// surfacing [`DateError::LocalZoneLookup`]. Equality, sort-key, and ordering
-/// paths consume the infallible conversion and cannot propagate an error.
-/// A `TryFrom` would duplicate that fallback at each of them. All
-/// fallible entry points surface broken local-zone lookups as
-/// [`DateError::LocalZoneLookup`] instead.
+/// paths consume the infallible conversion and cannot propagate an error. A
+/// `TryFrom` would duplicate that fallback at each of them. All fallible entry
+/// points surface broken local-zone lookups as [`DateError::LocalZoneLookup`]
+/// instead.
 impl From<DateValue> for DateTimeValue {
     #[inline]
     fn from(date: DateValue) -> Self {
@@ -359,8 +350,8 @@ impl FromStr for DateTimeValue {
     }
 }
 
-/// Serializes as an explicit RFC 3339 `…Z` interop spelling, independent of
-/// the local-clock rendering [`Display`](fmt::Display) performs.
+/// Serializes as an explicit RFC 3339 `…Z` interop spelling, independent of the
+/// local-clock rendering [`Display`](fmt::Display) performs.
 impl Serialize for DateTimeValue {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -1185,7 +1176,7 @@ mod tests {
         }
 
         #[test]
-        fn deserializes_a_yaml_z_spelling_to_the_same_instant() {
+        fn deserializes_a_yaml_z_spelling_to_the_same_utc_date_time() {
             #[derive(serde::Deserialize)]
             struct YamlNote {
                 datetime: DateTimeValue,

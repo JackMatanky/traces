@@ -22,8 +22,8 @@ use crate::temporal::{DurationSeconds, TimeUnit};
 
 /// A calendar period that date-point boundaries select.
 ///
-/// Selecting a variant fixes the span a start-of or end-of boundary lands
-/// on: the ISO week, the calendar month, or the calendar year.
+/// Selecting a variant fixes the span a start-of or end-of boundary lands on:
+/// the ISO week, the calendar month, or the calendar year.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CalendarPeriod {
     /// The ISO week, Monday through Sunday.
@@ -36,8 +36,8 @@ pub(crate) enum CalendarPeriod {
 
 /// Which side of a calendar period a boundary selects.
 ///
-/// Selecting a variant fixes whether a boundary lands on the first or the
-/// last day of the period.
+/// Selecting a variant fixes whether a boundary lands on the first or the last
+/// day of the period.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PeriodEdge {
     /// First day of the period.
@@ -49,8 +49,8 @@ pub(crate) enum PeriodEdge {
 /// Every accepted period-boundary shorthand, in short and long spellings.
 ///
 /// The one name table for start-of/end-of-period selectors: query filters
-/// resolve function names from it and template filters register their
-/// names from it, so the two surfaces cannot drift. Names are matched
+/// resolve function names from it and template filters register their names
+/// from it, so the two surfaces cannot drift. Names are matched
 /// ASCII-case-insensitively and are unique.
 pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
     ("sow", CalendarPeriod::Week, PeriodEdge::Start),
@@ -67,8 +67,7 @@ pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
     ("end_of_year", CalendarPeriod::Year, PeriodEdge::End),
 ];
 
-/// A named calendar or clock component of a
-/// [`DatePoint`](super::DatePoint).
+/// A named calendar or clock component of a [`DatePoint`](super::DatePoint).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateComponent {
     /// Calendar year.
@@ -93,8 +92,8 @@ impl DateComponent {
     /// Resolves a component name to its [`DateComponent`].
     ///
     /// Matching is ASCII case-insensitive across the eight registered names
-    /// (`year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`,
-    /// `week`); any other string returns [`None`].
+    /// (`year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`, `week`);
+    /// any other string returns [`None`].
     #[must_use]
     pub(crate) fn from_name(name: &str) -> Option<Self> {
         const TABLE: [(&str, DateComponent); 8] = [
@@ -142,8 +141,8 @@ impl Difference {
 /// Maps an ISO weekday number to its [`Weekday`], returning [`None`] for
 /// anything outside `1..=7`.
 ///
-/// `0` is rejected because Sunday-based conventions disagree on it (Sunday
-/// is `0` in some and `1` in others).
+/// `0` is rejected because Sunday-based conventions disagree on it (Sunday is
+/// `0` in some and `1` in others).
 #[must_use]
 pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
     match n {
@@ -158,8 +157,8 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
     }
 }
 
-/// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from
-/// the fraction rounded to the nearest nanosecond.
+/// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from the
+/// fraction rounded to the nearest nanosecond.
 ///
 /// The split lets calendar arithmetic keep whole days while the remainder
 /// carries the sub-second part for `DatePoint::apply`.
@@ -179,14 +178,13 @@ pub(super) fn time_delta_from_seconds(
 /// Shifts a calendar datetime by `n` in the chosen `unit` and returns the
 /// result.
 ///
-/// Calendar units shift calendar days; month and year shifts clamp to the
-/// last day of the target month (the documented `chrono` behavior). Exact
-/// units shift elapsed time, so the clock reading moves by the same amount
-/// regardless of the calendar.
+/// Calendar units shift calendar days; month and year shifts clamp to the last
+/// day of the target month (the documented `chrono` behavior). Exact units
+/// shift elapsed time, so the clock reading moves by the same amount regardless
+/// of the calendar.
 ///
-/// No zone is consulted: callers wanting DST-aware local-clock semantics
-/// route through
-/// [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
+/// No zone is consulted: callers wanting DST-aware local-clock semantics route
+/// through [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
 ///
 /// # Errors
 ///
@@ -243,8 +241,8 @@ pub(super) fn shift_datetime(
     }
 }
 
-/// Shifts `local_datetime` by `months` calendar months (positive or
-/// negative) and returns the result.
+/// Shifts `local_datetime` by `months` calendar months (positive or negative)
+/// and returns the result.
 ///
 /// The result clamps to the last day of the target month, per the documented
 /// `chrono` behavior.
@@ -506,7 +504,7 @@ mod tests {
             CalendarPeriod::Year,
             ["end_of_year", "eoy", "soy", "start_of_year"]
         )]
-        fn spells_one_short_and_one_long_name_per_edge(
+        fn returns_both_shorthand_lengths_for_each_edge(
             #[case] period: CalendarPeriod,
             #[case] expected: [&str; 4],
         ) {

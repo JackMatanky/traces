@@ -1,11 +1,11 @@
 //! Date points and the precision-aware arithmetic over them.
 //!
-//! Owns [`DatePoint`], a Date written at a month or day [`DatePrecision`],
-//! or a Date-Time stored as UTC that renders as the local clock. Parsing
-//! retains the written precision; month precision denotes the first of the
-//! month. Arithmetic applies calendar units on the local clock and exact
-//! units as exact elapsed time. Callers hold the validated date point or
-//! receive a [`DateError`].
+//! Owns [`DatePoint`], a Date written at a month or day [`DatePrecision`], or a
+//! Date-Time stored as UTC that renders as the local clock. Parsing retains the
+//! written precision; month precision denotes the first of the month.
+//! Arithmetic applies calendar units on the local clock and exact units as
+//! exact elapsed time. Callers hold the validated date point or receive a
+//! [`DateError`].
 
 use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
@@ -34,9 +34,9 @@ pub(crate) enum DatePrecision {
 /// A Date written at a month or day precision, or a Date-Time.
 ///
 /// Calendar points are zone-free and carry the written [`DatePrecision`].
-/// Date-Time points store UTC and resolve naive input in the process's
-/// local zone (a repeated local time takes the earlier occurrence; a
-/// skipped local time shifts forward by the gap length).
+/// Date-Time points store UTC and resolve naive input in the process's local
+/// zone (a repeated local time takes the earlier occurrence; a skipped local
+/// time shifts forward by the gap length).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePoint {
     /// A zone-free Date at the written precision.
@@ -83,9 +83,9 @@ impl DatePoint {
         }
     }
 
-    /// Local datetime reading of this date point: midnight for a calendar
-    /// date, the local clock time (UTC when the offset cannot apply) for a
-    /// date-time point.
+    /// Local datetime reading of this date point: midnight for a calendar date,
+    /// the local clock time (UTC when the offset cannot apply) for a date-time
+    /// point.
     #[must_use]
     pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
         match self {
@@ -125,9 +125,9 @@ impl DatePoint {
         }
     }
 
-    /// Shifts by `n` whole units: calendar units move the local clock,
-    /// exact units move the exact time (calendar dates move only when the
-    /// shift crosses midnight).
+    /// Shifts by `n` whole units: calendar units move the local clock, exact
+    /// units move the exact time (calendar dates move only when the shift
+    /// crosses midnight).
     ///
     /// # Errors
     ///
@@ -253,9 +253,9 @@ impl DatePoint {
 
     /// Measures the difference to another date point in the requested unit.
     ///
-    /// Years and months are whole calendar counts of the local dates.
-    /// Exact units are fractional when both points carry a time and whole,
-    /// truncated toward zero, otherwise.
+    /// Years and months are whole calendar counts of the local dates. Exact
+    /// units are fractional when both points carry a time and whole, truncated
+    /// toward zero, otherwise.
     pub(crate) fn diff(self, to: Self, unit: TimeUnit) -> Difference {
         let local_delta = || {
             to.local_datetime_or_utc()
@@ -601,10 +601,10 @@ mod tests {
         test_support::TzGuard,
     };
 
-    // Zone doctrine: every test that resolves or renders in a named zone
-    // calls `TzGuard::set` exactly once, before any parse. The local zone
-    // cache reuses the previously set zone within one second, so a second
-    // `set` inside one test would read stale offsets.
+    // Zone doctrine: every test that resolves or renders in a named zone calls
+    // `TzGuard::set` exactly once, before any parse. The local zone cache
+    // reuses the previously set zone within one second, so a second `set`
+    // inside one test would read stale offsets.
 
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
@@ -711,8 +711,8 @@ mod tests {
         #[case::slashes("2026/08/22")]
         #[case::five_digit_year("20265-01-01")]
         fn rejects_text_without_a_date_shape(#[case] text: &str) {
-            // Arrange: `text` lacks the two-or-four-digit year and dash
-            // prefix that marks a date-like shape.
+            // Arrange: `text` lacks the two-or-four-digit year and dash prefix
+            // that marks a date-like shape.
 
             // Act
             let parsed = DatePoint::parse(text);
@@ -764,8 +764,8 @@ mod tests {
             #[case] text: &str,
             #[case] expected_reason: &str,
         ) {
-            // Arrange: `text` matches a recognized shape but carries an
-            // invalid field.
+            // Arrange: `text` matches a recognized shape but carries an invalid
+            // field.
 
             // Act
             let parsed = DatePoint::parse(text);
@@ -842,7 +842,7 @@ mod tests {
             ymd(2026, 7, 1),
             7
         )]
-        fn returns_the_written_precision_and_its_extent(
+        fn returns_written_precision_with_its_extent(
             #[case] text: &str,
             #[case] expected_precision: DatePrecision,
             #[case] expected_date: DateValue,
@@ -875,8 +875,8 @@ mod tests {
         #[case::non_digit_month("2026-0a-29")]
         #[case::month_out_of_range("1234-56-78 rest")]
         fn returns_none_without_a_complete_date_prefix(#[case] text: &str) {
-            // Arrange: `text` lacks a complete ten-byte day or seven-byte
-            // month prefix; a dash at position seven demands the full day.
+            // Arrange: `text` lacks a complete ten-byte day or seven-byte month
+            // prefix; a dash at position seven demands the full day.
 
             // Act
             let parsed = DatePoint::parse_prefix(text);
@@ -1186,8 +1186,7 @@ mod tests {
 
         #[test]
         fn shifts_by_a_whole_month_magnitude_in_one_step() {
-            // Arrange: one-step month arithmetic must not clamp
-            // incrementally.
+            // Arrange: one-step month arithmetic must not clamp incrementally.
             let base = point_at("2026-01-31");
 
             // Act
@@ -1439,8 +1438,8 @@ mod tests {
             #[case] text: &str,
             #[case] expected: DateValue,
         ) {
-            // Arrange: repeated units are accepted, and each sub-day
-            // component restarts from the current midnight.
+            // Arrange: repeated units are accepted, and each sub-day component
+            // restarts from the current midnight.
             let base = point_at("2026-07-29");
             let duration = DurationValue::parse(text).expect("valid duration");
 
@@ -1466,8 +1465,8 @@ mod tests {
             #[case] text: &str,
             #[case] expected: DateValue,
         ) {
-            // Arrange: written order clamps month ends at each step,
-            // unlike a single two-month shift.
+            // Arrange: written order clamps month ends at each step, unlike a
+            // single two-month shift.
             let base = point_at("2026-01-31");
             let duration = DurationValue::parse(text).expect("valid duration");
 
@@ -1689,7 +1688,7 @@ mod tests {
         }
 
         #[test]
-        fn applies_equal_valued_month_and_day_units_differently_on_dates() {
+        fn distinguishes_calendar_from_exact_application_for_equal_values() {
             // Arrange: \"1 month\" equals \"30 days\" as values.
             let base = point_at("2026-01-15");
             let one_month =
@@ -2102,7 +2101,7 @@ mod tests {
         #[case::year_end_of_2020("2020-12-31", 53, 4)]
         #[case::first_sunday_of_2021("2021-01-03", 53, 7)]
         #[case::first_day_of_2026("2026-01-01", 1, 4)]
-        fn returns_the_iso_week_and_weekday_at_year_edges(
+        fn returns_week_coordinates_at_year_edges(
             #[case] text: &str,
             #[case] expected_week: i64,
             #[case] expected_weekday: i64,
@@ -2422,8 +2421,8 @@ mod tests {
 
         #[test]
         fn measures_a_dst_day_by_elapsed_time_when_both_points_carry_a_time() {
-            // Arrange: New York springs forward on 2026-03-08 (a 23-hour
-            // day) and falls back on 2026-11-01 (a 25-hour day).
+            // Arrange: New York springs forward on 2026-03-08 (a 23-hour day)
+            // and falls back on 2026-11-01 (a 25-hour day).
             TzGuard::set("America/New_York");
             let spring_from = point_at("2026-03-07 12:00:00");
             let spring_to = point_at("2026-03-08 12:00:00");
@@ -2585,7 +2584,7 @@ mod tests {
             assert_eq!(
                 utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
                 "2026-07-29T18:30:05Z",
-                "the stored date-time must be the UTC instant"
+                "the stored date-time must be the UTC value"
             );
         }
 

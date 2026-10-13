@@ -1,52 +1,32 @@
-//! ISO-8601 and RFC-3339 date and date-time parsing, formatting, and
-//! arithmetic.
+//! Calendar dates, Date-Times, Durations, and the arithmetic that relates them.
 //!
-//! Recognition entry points are [`DatePoint::parse`],
-//! [`DatePoint::parse_prefix`], and [`DatePoint::parse_with_pattern`]. The
-//! strict typed parsers [`DateValue::parse_iso`] and
-//! [`DateTimeValue::parse_iso`] back their respective
-//! [`FromStr`](std::str::FromStr) implementations.
+//! This module owns recognition, parsing, formatting, and value semantics for
+//! date-shaped and duration-shaped input. Callers use validated values; parse
+//! failures are public errors, while arithmetic failures stay internal and map
+//! at the query and template boundaries.
 //!
 //! # Clock doctrine
 //!
-//! A naive datetime means what a human means: it is read in the process's local
-//! zone and stored as UTC (see [`DateTimeValue::from_local`]); a date-only
-//! value stays a zone-free calendar date. Instants render as the local clock
-//! time and travel as UTC for storage and comparison.
+//! Unzoned Date-Time input resolves in the process-local zone and is stored as
+//! UTC; explicit-offset input is normalized to UTC. A Date remains zone-free.
+//! Date-Time display uses the local clock, except at the representable range
+//! edge where the local offset cannot apply and the UTC clock is used instead.
+//! Repeated local times resolve to the earlier occurrence; skipped local times
+//! shift forward by the gap length.
+//!
+//! # Calendar regime
+//!
+//! Calendar units (day, week, month, and year) apply left-to-right on the local
+//! clock. Exact units (hour and smaller) apply as elapsed time. Equal Durations
+//! such as `1d` and `24h` can therefore move a Date-Time differently across
+//! calendar boundaries and daylight-saving transitions.
 //!
 //! # Key Types
 //!
-//! - [`DateValue`]: Parsed calendar date with no time-of-day component.
-//! - [`DateTimeValue`]: Parsed UTC date-time instant.
-//! - [`DatePoint`]: Calendar date or UTC instant with written precision.
-//! - [`Difference`]: Result of a calendar-owner difference measurement.
-//! - [`DateError`]: Error type for parsing, local-zone resolution, and calendar
-//!   arithmetic failures.
-//!
-//! # Calendar owner
-//!
-//! [`DateTimeValue::shift`] is the instant-frame shift primitive.
-//! [`DatePoint::shift`], [`DatePoint::apply`], [`DatePoint::diff`],
-//! [`DatePoint::start_of`], [`DatePoint::end_of`], and
-//! [`DatePoint::with_weekday`] own precision-aware calendar arithmetic.
-//!
-//! Duration parsing, validation, and arithmetic.
-//!
-//! Accepts human-readable duration strings like `"1h 30m"` or `"4 yrs, 6 wks"`
-//! and converts them to a total seconds value. Components are `<number><unit>`
-//! pairs, optionally separated by whitespace or commas.
-//!
-//! # Key Types
-//!
-//! - [`DurationValue`]: A parsed duration carrying its total seconds, its
-//!   original spelling, and its retained written components (which witness the
-//!   calendar-versus-fixed regime).
-//! - [`TimeUnit`]: Unit registry (parsing and seconds conversion). Single
-//!   source of truth; callers should not maintain their own registries.
-//! - [`DurationSeconds`]: An `f64` newtype that is finite on construction, with
-//!   [`Ord`], [`Add`](std::ops::Add), [`Sub`](std::ops::Sub), and
-//!   [`Mul`](std::ops::Mul).
-//! - [`DurationError`]: Error type for parse and conversion failures.
+//! - [`DateValue`]: A zone-free calendar date with written precision.
+//! - [`DateTimeValue`]: A UTC-stored Date-Time rendered as the local clock.
+//! - [`DurationValue`]: A validated duration with nominal identity and a
+//!   calendar or exact application regime.
 
 mod calendar;
 mod date;

@@ -23,12 +23,12 @@ pub(super) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
 ///
 /// # Panics
 ///
-/// Panics only if the constant fixture ceases to be a valid instant; the
+/// Panics only if the constant fixture ceases to be a valid date-time; the
 /// literal is unambiguous (UTC carries no fold or gap).
 pub(super) fn fixed_datetime() -> DateTimeValue {
     DateTimeValue::from(
         Utc.with_ymd_and_hms(2026, 7, 29, 14, 30, 5)
             .single()
-            .expect("2026-07-29 14:30:05 UTC is a valid, unambiguous instant"),
+            .expect("2026-07-29 14:30:05 UTC is a valid Date-Time"),
     )
 }

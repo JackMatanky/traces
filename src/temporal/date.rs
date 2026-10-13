@@ -22,8 +22,8 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 
 /// A zone-free calendar date with no time of day.
 ///
-/// Carries a validated `YYYY-MM-DD` day on the proleptic Gregorian calendar:
-/// no zone and no clock time. Every accepted input year is exactly four ASCII
+/// Carries a validated `YYYY-MM-DD` day on the proleptic Gregorian calendar: no
+/// zone and no clock time. Every accepted input year is exactly four ASCII
 /// digits, every value names a real day, and written `YYYY-MM` input defaults
 /// its day to 1. Deserialization runs the same parser as
 /// [`FromStr`](std::str::FromStr), so inline and deserialized dates follow one
@@ -46,7 +46,7 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 pub struct DateValue(NaiveDate);
 
 impl DateValue {
-    /// Returns the wrapped [`NaiveDate`].
+    /// Returns the wrapped calendar date.
     #[must_use]
     pub(crate) const fn naive_date(self) -> NaiveDate {
         self.0
@@ -55,10 +55,10 @@ impl DateValue {
     /// Returns the whole calendar months from `self` to `to`, signed by
     /// ordering.
     ///
-    /// Counts the total calendar months between the two dates and subtracts
-    /// one when the day-of-month of `to` is below that of `self`, because
-    /// that final month is not complete. Either ordering is accepted: `to`
-    /// before `self` yields a negative count.
+    /// Counts the total calendar months between the two dates and subtracts one
+    /// when the day-of-month of `to` is below that of `self`, because that
+    /// final month is not complete. Either ordering is accepted: `to` before
+    /// `self` yields a negative count.
     pub(super) fn whole_months_until(self, to: Self) -> i64 {
         let (from, to) = (self.naive_date(), to.naive_date());
         let (earlier, later, sign) = if to >= from {
@@ -84,9 +84,8 @@ impl DateValue {
     /// Returns the whole calendar years from `self` to `to`, signed by
     /// ordering.
     ///
-    /// A year counts only once the month and day of `to` reach those of
-    /// `self`, so this is [`DateValue::whole_months_until`] divided down to
-    /// years.
+    /// A year counts only once the month and day of `to` reach those of `self`,
+    /// so this is [`DateValue::whole_months_until`] divided down to years.
     pub(super) fn whole_years_until(self, to: Self) -> i64 {
         self.whole_months_until(to) / 12
     }
@@ -223,12 +222,12 @@ impl From<NaiveDate> for DateValue {
     }
 }
 
-/// Converts to the calendar day `time` falls on in the local zone, not the
-/// UTC calendar day.
+/// Converts to the calendar day `time` falls on in the local zone, not the UTC
+/// calendar day.
 ///
 /// A file's date means the reader's local day, the same doctrine that reads
-/// naive date-time input on the local clock: an instant in the last hours of
-/// December 31 locally is already January 1 in UTC, or the reverse.
+/// unzoned date-time input on the local clock: a time in the final hours of
+/// December 31 locally can already be January 1 in UTC, or the reverse.
 impl From<SystemTime> for DateValue {
     #[inline]
     fn from(time: SystemTime) -> Self {

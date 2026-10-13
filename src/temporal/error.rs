@@ -49,11 +49,11 @@ pub enum DateError {
         /// The raw input that failed to parse.
         input: Box<str>,
     },
-    /// The process's local timezone could not resolve a naive input.
+    /// The process's local zone could not resolve a naive input.
     ///
     /// DST ambiguities and gaps never produce this error; they resolve
     /// deterministically.
-    #[error("local timezone lookup failed for `{input}`")]
+    #[error("local zone lookup failed for `{input}`")]
     LocalZoneLookup {
         /// The naive clock-time input that could not be resolved.
         input: Box<str>,
@@ -67,7 +67,7 @@ pub(crate) enum CalendarError {
     #[error("date/time value is out of range")]
     OutOfRange,
     /// Local-zone resolution failed for a computed local clock time.
-    #[error("local timezone lookup failed for {input}")]
+    #[error("local zone lookup failed for {input}")]
     Zone {
         /// Local clock time that could not be resolved.
         input: Box<str>,
@@ -185,7 +185,7 @@ mod tests {
         )]
         #[case::local_zone_lookup(
             DateError::LocalZoneLookup { input: "2026-07-29 14:30".into() },
-            "local timezone lookup failed for `2026-07-29 14:30`"
+            "local zone lookup failed for `2026-07-29 14:30`"
         )]
         fn renders_exact_display_text_for_date_errors(
             #[case] error: DateError,
@@ -202,18 +202,27 @@ mod tests {
         }
 
         #[test]
-        fn formats_internal_calendar_errors() {
-            assert_eq!(
-                CalendarError::OutOfRange.to_string(),
-                "date/time value is out of range"
-            );
-            assert_eq!(
-                CalendarError::Zone {
-                    input: "2026-03-08 02:30:00".into(),
-                }
-                .to_string(),
-                "local timezone lookup failed for 2026-03-08 02:30:00"
-            );
+        fn renders_the_out_of_range_calendar_error() {
+            // Arrange
+            let error = CalendarError::OutOfRange;
+            let expected = "date/time value is out of range";
+            // Act
+            let rendered = error.to_string();
+            // Assert
+            assert_eq!(rendered, expected);
+        }
+
+        #[test]
+        fn renders_the_zone_calendar_error() {
+            // Arrange
+            let error = CalendarError::Zone {
+                input: "2026-03-08 02:30:00".into(),
+            };
+            let expected = "local zone lookup failed for 2026-03-08 02:30:00";
+            // Act
+            let rendered = error.to_string();
+            // Assert
+            assert_eq!(rendered, expected);
         }
 
         #[rstest]
@@ -285,23 +294,31 @@ mod tests {
         use crate::temporal::{DurationSeconds, DurationValue};
 
         #[test]
-        fn maps_calendar_failures_to_parse_errors() {
-            assert_eq!(
-                CalendarError::OutOfRange.into_date_error("9999-12-31"),
-                DateError::InvalidValue {
-                    input: "9999-12-31".into(),
-                    reason: "date/time is outside the representable range",
-                }
-            );
-            assert_eq!(
-                CalendarError::Zone {
-                    input: "2026-03-08 02:30:00".into(),
-                }
-                .into_date_error("2026-03-08 02:30:00"),
-                DateError::LocalZoneLookup {
-                    input: "2026-03-08 02:30:00".into(),
-                }
-            );
+        fn maps_out_of_range_calendar_failure_to_parse_error() {
+            // Arrange
+            let input = "9999-12-31";
+            // Act
+            let actual = CalendarError::OutOfRange.into_date_error(input);
+            // Assert
+            assert_eq!(actual, DateError::InvalidValue {
+                input: input.into(),
+                reason: "date/time is outside the representable range",
+            });
+        }
+
+        #[test]
+        fn maps_zone_calendar_failure_to_local_zone_lookup_error() {
+            // Arrange
+            let input = "2026-03-08 02:30:00";
+            let error = CalendarError::Zone {
+                input: input.into(),
+            };
+            // Act
+            let actual = error.into_date_error(input);
+            // Assert
+            assert_eq!(actual, DateError::LocalZoneLookup {
+                input: input.into(),
+            });
         }
 
         #[test]
