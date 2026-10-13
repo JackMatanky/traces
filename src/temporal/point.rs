@@ -2747,4 +2747,134 @@ mod tests {
             );
         }
     }
+
+    mod proptests {
+        use proptest::prelude::*;
+
+        use super::*;
+
+        proptest! {
+            #[test]
+            fn period_start_is_idempotent(
+                year in 2000_i32..2030,
+                month in 1_u32..=12,
+                day in 1_u32..=28,
+                period in prop_oneof![
+                    Just(CalendarPeriod::Week),
+                    Just(CalendarPeriod::Month),
+                    Just(CalendarPeriod::Year),
+                ],
+            ) {
+                let point = DatePoint::from(ymd(year, month, day));
+
+                // Act
+                let start = point
+                    .start_of(period)
+                    .expect("a valid in-range date has a period start");
+                let repeated = start
+                    .start_of(period)
+                    .expect("a period start remains in range");
+
+                // Assert
+                prop_assert_eq!(repeated, start);
+            }
+
+            #[test]
+            fn calendar_point_stays_between_period_edges(
+                year in 2000_i32..2030,
+                month in 1_u32..=12,
+                day in 1_u32..=28,
+                period in prop_oneof![
+                    Just(CalendarPeriod::Week),
+                    Just(CalendarPeriod::Month),
+                    Just(CalendarPeriod::Year),
+                ],
+            ) {
+                let point = DatePoint::from(ymd(year, month, day));
+
+                // Act
+                let start = point
+                    .start_of(period)
+                    .expect("a valid in-range date has a period start");
+                let end = point
+                    .end_of(period)
+                    .expect("a valid in-range date has a period end");
+
+                // Assert
+                let DatePoint::Calendar { date: start, .. } = start else {
+                    prop_assert!(false, "a calendar point keeps its kind");
+                    return Ok(());
+                };
+                let DatePoint::Calendar { date: end, .. } = end else {
+                    prop_assert!(false, "a calendar point keeps its kind");
+                    return Ok(());
+                };
+                let DatePoint::Calendar { date, .. } = point else {
+                    prop_assert!(false, "the generated point is a calendar date");
+                    return Ok(());
+                };
+                prop_assert!(start <= date);
+                prop_assert!(date <= end);
+            }
+
+            #[test]
+            fn date_only_diff_is_antisymmetric_for_each_unit(
+                year_a in 2000_i32..2030,
+                month_a in 1_u32..=12,
+                day_a in 1_u32..=28,
+                year_b in 2000_i32..2030,
+                month_b in 1_u32..=12,
+                day_b in 1_u32..=28,
+                unit in prop_oneof![
+                    Just(TimeUnit::Millisecond),
+                    Just(TimeUnit::Second),
+                    Just(TimeUnit::Minute),
+                    Just(TimeUnit::Hour),
+                    Just(TimeUnit::Day),
+                    Just(TimeUnit::Week),
+                    Just(TimeUnit::Month),
+                    Just(TimeUnit::Year),
+                ],
+            ) {
+                let a = DatePoint::from(ymd(year_a, month_a, day_a));
+                let b = DatePoint::from(ymd(year_b, month_b, day_b));
+
+                // Act
+                let forward = a.diff(b, unit);
+                let backward = b.diff(a, unit);
+
+                // Assert
+                let (Ok(Difference::Whole(forward)), Ok(Difference::Whole(backward))) =
+                    (forward, backward) else {
+                    prop_assert!(false, "date-only differences are whole");
+                    return Ok(());
+                };
+                prop_assert_eq!(
+                    forward,
+                    backward.checked_neg().expect("date diff fits i64"),
+                );
+            }
+
+            #[test]
+            fn day_shift_then_inverse_restores_calendar_date(
+                year in 2000_i32..2030,
+                month in 1_u32..=12,
+                day in 1_u32..=28,
+                delta in -365_i64..=365,
+            ) {
+                let point = DatePoint::from(ymd(year, month, day));
+
+                // Act
+                let shifted = point
+                    .shift(delta, TimeUnit::Day)
+                    .expect("bounded day shifts fit the date range");
+                let restored = shifted
+                    .shift(delta.checked_neg().expect("generated offset fits i64"), TimeUnit::Day)
+                    .expect("inverse bounded day shifts fit the date range");
+
+                // Assert
+                prop_assert_eq!(restored, point);
+            }
+        }
+    }
 }
