@@ -60,7 +60,7 @@ experimental = true
 [env]
 HK_MISE = "1"
 ADR_DIRECTORY = "docs/adr/"
-RUST_DOCS_MCP_CACHE_DIR = ".rust-docs/cache/"
+RUST_DOCS_MCP_CACHE_DIR = "{{config_root}}/.rust-docs/cache/"
 # Coverage filename-exclusion regex, consumed by `coverage:lcov`/`coverage:html`
 # as cargo-llvm-cov's --ignore-filename-regex. Ported from the deleted
 # tarpaulin.toml exclude-files. POSIX ERE only: no lookahead, no (?:...), no \d
