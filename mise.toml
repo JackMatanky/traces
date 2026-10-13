@@ -59,7 +59,7 @@ experimental = true
 
 [env]
 HK_MISE = "1"
-ADR_DIRECTORY = "docs/adr/"
+ADR_DIRECTORY = "{{config_root}}/docs/adr/"
 RUST_DOCS_MCP_CACHE_DIR = "{{config_root}}/.rust-docs/cache/"
 # Coverage filename-exclusion regex, consumed by `coverage:lcov`/`coverage:html`
 # as cargo-llvm-cov's --ignore-filename-regex. Ported from the deleted
