@@ -60,7 +60,8 @@ mod scan;
 mod unit;
 
 pub(crate) use calendar::{
-    CalendarPeriod, DateComponent, Difference, PeriodEdge, weekday_from_number,
+    CalendarPeriod, DateComponent, Difference, PERIOD_SHORTHANDS, PeriodEdge,
+    weekday_from_number,
 };
 pub(crate) use date::DATE_PATTERN;
 pub use date::DateValue;

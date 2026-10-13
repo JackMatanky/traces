@@ -32,7 +32,10 @@ use crate::{
         sort::TextShape,
         value::QueryFieldValueRef,
     },
-    temporal::{CalendarPeriod, DateComponent, DateError, DatePoint},
+    temporal::{
+        CalendarPeriod, DateComponent, DateError, DatePoint, PERIOD_SHORTHANDS,
+        PeriodEdge,
+    },
 };
 
 /// Parsed filter expression AST used by [`crate::query::QuerySet::filter`].
@@ -437,32 +440,37 @@ pub(crate) enum QueryFunction {
 }
 
 impl QueryFunction {
-    const NAMES: &'static [(&'static str, Self)] = &[
+    /// Functions whose names do not come from
+    /// [`PERIOD_SHORTHANDS`](crate::temporal::PERIOD_SHORTHANDS).
+    const FIXED_NAMES: &'static [(&'static str, Self)] = &[
         ("dur", Self::Dur),
         ("date_add", Self::DateAdd),
         ("date_diff", Self::DateDiff),
         ("date_component", Self::DateComponent),
         ("date", Self::Date),
-        ("sow", Self::StartOf(CalendarPeriod::Week)),
-        ("start_of_week", Self::StartOf(CalendarPeriod::Week)),
-        ("eow", Self::EndOf(CalendarPeriod::Week)),
-        ("end_of_week", Self::EndOf(CalendarPeriod::Week)),
-        ("som", Self::StartOf(CalendarPeriod::Month)),
-        ("start_of_month", Self::StartOf(CalendarPeriod::Month)),
-        ("eom", Self::EndOf(CalendarPeriod::Month)),
-        ("end_of_month", Self::EndOf(CalendarPeriod::Month)),
-        ("soy", Self::StartOf(CalendarPeriod::Year)),
-        ("start_of_year", Self::StartOf(CalendarPeriod::Year)),
-        ("eoy", Self::EndOf(CalendarPeriod::Year)),
-        ("end_of_year", Self::EndOf(CalendarPeriod::Year)),
     ];
 
     /// Resolves a function name, ASCII case-insensitively.
+    ///
+    /// Period-boundary names (`sow`, `start_of_week`) resolve through
+    /// [`PERIOD_SHORTHANDS`](crate::temporal::PERIOD_SHORTHANDS), so the
+    /// filter grammar and the template filters accept the same spellings.
     fn from_name(name: &str) -> Option<Self> {
-        Self::NAMES
+        Self::FIXED_NAMES
             .iter()
             .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
             .map(|&(_, function)| function)
+            .or_else(|| {
+                PERIOD_SHORTHANDS
+                    .iter()
+                    .find(|(candidate, _, _)| {
+                        name.eq_ignore_ascii_case(candidate)
+                    })
+                    .map(|&(_, period, edge)| match edge {
+                        PeriodEdge::Start => Self::StartOf(period),
+                        PeriodEdge::End => Self::EndOf(period),
+                    })
+            })
     }
 
     /// Checks the argument count and the statically known literal arguments.

@@ -95,18 +95,11 @@ impl DateNamespace {
         env.add_filter("sub_months", sub_months);
         env.add_filter("add_years", add_years);
         env.add_filter("sub_years", sub_years);
-        env.add_filter("start_of_week", start_of_week);
-        env.add_filter("sow", start_of_week);
-        env.add_filter("end_of_week", end_of_week);
-        env.add_filter("eow", end_of_week);
-        env.add_filter("start_of_month", start_of_month);
-        env.add_filter("som", start_of_month);
-        env.add_filter("end_of_month", end_of_month);
-        env.add_filter("eom", end_of_month);
-        env.add_filter("start_of_year", start_of_year);
-        env.add_filter("soy", start_of_year);
-        env.add_filter("end_of_year", end_of_year);
-        env.add_filter("eoy", end_of_year);
+        for &(name, period, edge) in crate::temporal::PERIOD_SHORTHANDS.iter() {
+            env.add_filter(name, move |value: &str| {
+                render_period_edge(value, period, edge)
+            });
+        }
         env.add_filter("weekday", weekday);
         env.add_filter("date_diff", date_diff);
         env.add_test("is_past", is_past);
@@ -777,6 +770,19 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 
 /// Returns the first or last day of the input's `calendar_period` at its
 /// original precision.
+///
+/// Backs every name in
+/// [`PERIOD_SHORTHANDS`](crate::temporal::PERIOD_SHORTHANDS): the
+/// `start_of_week`/`sow` filter returns the first day (Monday) of the ISO
+/// week, `end_of_week`/`eow` the last (Sunday), and the month and year
+/// spellings behave the same on their period.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
+///   string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside the supported
+///   range or its local time cannot be resolved; see [`render_date_error`].
 fn render_period_edge(
     value: &str,
     calendar_period: CalendarPeriod,
@@ -791,90 +797,6 @@ fn render_period_edge(
     let local_datetime = shifted.local_datetime_or_utc();
     let pat = shifted.canonical_pattern();
     render_with_pattern(local_datetime.format(pat), pat)
-}
-
-/// `{{ value | start_of_week }}` returns the first day (Monday) of the ISO week
-/// containing the input, at the input's original precision.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date_point`].
-/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
-///   representable range or its local time cannot be resolved; see
-///   [`render_date_error`].
-fn start_of_week(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Week, PeriodEdge::Start)
-}
-
-/// `{{ value | end_of_week }}` returns the last day (Sunday) of the ISO week
-/// containing the input, at the input's original precision.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date_point`].
-/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
-///   representable range or its local time cannot be resolved; see
-///   [`render_date_error`].
-fn end_of_week(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Week, PeriodEdge::End)
-}
-
-/// `{{ value | start_of_month }}` returns the first day of the month containing
-/// the input, at the input's original precision.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date_point`].
-/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
-///   representable range or its local time cannot be resolved; see
-///   [`render_date_error`].
-fn start_of_month(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::Start)
-}
-
-/// `{{ value | end_of_month }}` returns the last day of the month containing
-/// the input, at the input's original precision.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date_point`].
-/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
-///   representable range or its local time cannot be resolved; see
-///   [`render_date_error`].
-fn end_of_month(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Month, PeriodEdge::End)
-}
-
-/// `{{ value | start_of_year }}` returns the first day of the year containing
-/// the input, at the input's original precision.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date_point`].
-/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
-///   representable range or its local time cannot be resolved; see
-///   [`render_date_error`].
-fn start_of_year(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Year, PeriodEdge::Start)
-}
-
-/// `{{ value | end_of_year }}` returns the last day of the year containing the
-/// input, at the input's original precision.
-///
-/// # Errors
-///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date_point`].
-/// - [`ErrorKind::InvalidOperation`] if the boundary is outside chrono's
-///   representable range or its local time cannot be resolved; see
-///   [`render_date_error`].
-fn end_of_year(value: &str) -> TemplateEngineResult<String> {
-    render_period_edge(value, CalendarPeriod::Year, PeriodEdge::End)
 }
 
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
@@ -1191,9 +1113,10 @@ fn date_out_of_range_error() -> Error {
 /// An overflow keeps the shared range message; a local-zone lookup failure
 /// keeps its distinct diagnosis (a broken tz-data/OS environment, never a DST
 /// ambiguity, which the resolver resolves deterministically) with the source
-/// attached. Parse-shape failures cannot occur here: shift and diff receive
-/// already-parsed values, but the match stays exhaustive per
-/// `pat-exhaustive-enum`.
+/// attached. Parse-shape failures can reach here through the `reference` /
+/// `reference_format` shorthand path, which feeds raw text to the parsers;
+/// they render their own message rather than the overflow diagnosis. The
+/// match stays exhaustive per `pat-exhaustive-enum`.
 fn render_date_error(error: DateError) -> Error {
     match error {
         DateError::LocalZoneLookup {
@@ -1204,14 +1127,14 @@ fn render_date_error(error: DateError) -> Error {
                 input,
             },
         ),
-        DateError::OutOfRange
-        | DateError::UnknownShape
+        DateError::OutOfRange => date_out_of_range_error(),
+        DateError::UnknownShape
         | DateError::InvalidValue {
             ..
         }
         | DateError::YearNotFourDigits {
             ..
-        } => date_out_of_range_error(),
+        } => invalid_operation(error.to_string(), error),
     }
 }
 
@@ -2574,6 +2497,48 @@ mod tests {
                     .to_string()
                     .contains("date arithmetic overflowed the supported range"),
                 "unexpected detail: {error}"
+            );
+        }
+
+        #[test]
+        fn renders_parse_failures_with_their_own_message() {
+            let error = render_date_error(DateError::YearNotFourDigits {
+                input: "26-08-22".into(),
+            });
+            assert!(
+                error.to_string().contains("does not have a 4-digit year"),
+                "expected the parse diagnosis, got {error}"
+            );
+            assert!(
+                !error
+                    .to_string()
+                    .contains("date arithmetic overflowed the supported range"),
+                "a parse failure must not render as an overflow: {error}"
+            );
+        }
+
+        #[test]
+        fn renders_a_bad_reference_format_as_a_parse_error() {
+            // Arrange: a reference whose text cannot satisfy its
+            // `reference_format`, so `parse_with_pattern` fails before any
+            // arithmetic runs.
+            let rendered = env().render_str(
+                r"{{ date.today(reference='not-a-date', reference_format='%Y-%m-%d') }}",
+                minijinja::context! {},
+            );
+            // Act
+            let error = rendered.expect_err("a mismatched reference fails");
+            // Assert
+            let message = error.to_string();
+            assert!(
+                message.contains("does not have a 4-digit year")
+                    || message.contains("not a recognized date/time")
+                    || message.contains("not a date or date-time shape"),
+                "expected a parse diagnosis, got: {message}"
+            );
+            assert!(
+                !message.contains("date arithmetic overflowed"),
+                "a parse failure must not render as an overflow: {message}"
             );
         }
     }

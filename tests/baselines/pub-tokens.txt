@@ -1348,6 +1348,7 @@ src/template/writer.rs: pub(super) fn trusted(root: &Path, candidate: PathBuf) -
 src/template/writer.rs: pub(super) fn with_declared(
 src/template/writer.rs: pub(super) fn write(
 src/template/writer.rs: pub(super) struct TemplateWriteTarget<'a> {
+src/temporal/calendar.rs: pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
 src/temporal/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
 src/temporal/calendar.rs: pub(crate) enum CalendarPeriod {
 src/temporal/calendar.rs: pub(crate) enum DateComponent {

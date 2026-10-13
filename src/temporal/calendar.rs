@@ -46,6 +46,27 @@ pub(crate) enum PeriodEdge {
     End,
 }
 
+/// Every accepted period-boundary shorthand, in short and long spellings.
+///
+/// The one name table for start-of/end-of-period selectors: query filters
+/// resolve function names from it and template filters register their
+/// names from it, so the two surfaces cannot drift. Names are matched
+/// ASCII-case-insensitively and are unique.
+pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
+    ("sow", CalendarPeriod::Week, PeriodEdge::Start),
+    ("start_of_week", CalendarPeriod::Week, PeriodEdge::Start),
+    ("eow", CalendarPeriod::Week, PeriodEdge::End),
+    ("end_of_week", CalendarPeriod::Week, PeriodEdge::End),
+    ("som", CalendarPeriod::Month, PeriodEdge::Start),
+    ("start_of_month", CalendarPeriod::Month, PeriodEdge::Start),
+    ("eom", CalendarPeriod::Month, PeriodEdge::End),
+    ("end_of_month", CalendarPeriod::Month, PeriodEdge::End),
+    ("soy", CalendarPeriod::Year, PeriodEdge::Start),
+    ("start_of_year", CalendarPeriod::Year, PeriodEdge::Start),
+    ("eoy", CalendarPeriod::Year, PeriodEdge::End),
+    ("end_of_year", CalendarPeriod::Year, PeriodEdge::End),
+];
+
 /// A named calendar or clock component of a
 /// [`DatePoint`](super::DatePoint).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -432,6 +453,75 @@ mod tests {
                 Some(magnitude.to_bits()),
                 "{difference:?} should project its magnitude unchanged"
             );
+        }
+    }
+
+    mod shorthands {
+        use std::collections::HashSet;
+
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[test]
+        fn holds_exactly_the_twelve_names() {
+            // Arrange: the table is the arranged input.
+            // Act
+            // Assert
+            assert_eq!(
+                PERIOD_SHORTHANDS.len(),
+                12,
+                "three periods by two edges by short and long spelling"
+            );
+        }
+
+        #[test]
+        fn keeps_every_name_unique() {
+            // Arrange
+            let total = PERIOD_SHORTHANDS.len();
+
+            // Act
+            let unique: HashSet<&str> =
+                PERIOD_SHORTHANDS.iter().map(|&(name, _, _)| name).collect();
+
+            // Assert
+            assert_eq!(
+                unique.len(),
+                total,
+                "no shorthand name may resolve to two (period, edge) rows"
+            );
+        }
+
+        #[rstest]
+        #[case::week(
+            CalendarPeriod::Week,
+            ["end_of_week", "eow", "sow", "start_of_week"]
+        )]
+        #[case::month(
+            CalendarPeriod::Month,
+            ["end_of_month", "eom", "som", "start_of_month"]
+        )]
+        #[case::year(
+            CalendarPeriod::Year,
+            ["end_of_year", "eoy", "soy", "start_of_year"]
+        )]
+        fn spells_one_short_and_one_long_name_per_edge(
+            #[case] period: CalendarPeriod,
+            #[case] expected: [&str; 4],
+        ) {
+            // Arrange: the rows of one period are the arranged input.
+            // Act
+            let mut names: Vec<&str> = PERIOD_SHORTHANDS
+                .iter()
+                .filter(|&&(_, p, _)| p == period)
+                .map(|&(name, _, _)| name)
+                .collect();
+            names.sort_unstable();
+
+            // Assert: both edges are present, each once short and once long,
+            // so callers can pair every abbreviation with its full spelling.
+            assert_eq!(names, expected, "{period:?} shorthand spellings");
         }
     }
 }
