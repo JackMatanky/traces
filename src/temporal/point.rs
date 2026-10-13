@@ -47,14 +47,28 @@ pub(crate) enum DatePoint {
         date_precision: DatePrecision,
     },
     /// A Date-Time stored as UTC, rendered as the local clock.
-    Instant(DateTimeValue),
+    DateTime(DateTimeValue),
 }
 
+impl From<DateValue> for DatePoint {
+    fn from(date: DateValue) -> Self {
+        Self::Calendar {
+            date,
+            date_precision: DatePrecision::Day,
+        }
+    }
+}
+
+impl From<DateTimeValue> for DatePoint {
+    fn from(date_time: DateTimeValue) -> Self {
+        Self::DateTime(date_time)
+    }
+}
 impl DatePoint {
     /// Whether this date point carries a time-of-day component.
     #[must_use]
     pub(crate) const fn has_time(self) -> bool {
-        matches!(self, Self::Instant(_))
+        matches!(self, Self::DateTime(_))
     }
 
     /// Calendar date of this date point in the local zone.
@@ -65,7 +79,7 @@ impl DatePoint {
                 date,
                 ..
             } => date,
-            Self::Instant(dt) => dt.local_date(),
+            Self::DateTime(dt) => dt.local_date(),
         }
     }
 
@@ -79,7 +93,7 @@ impl DatePoint {
                 date,
                 ..
             } => date.naive_date().and_time(NaiveTime::MIN),
-            Self::Instant(dt) => dt.local_datetime_or_utc(),
+            Self::DateTime(dt) => dt.local_datetime_or_utc(),
         }
     }
 
@@ -91,7 +105,7 @@ impl DatePoint {
                 date,
                 ..
             } => DateTimeValue::from(date).utc(),
-            Self::Instant(dt) => dt.utc(),
+            Self::DateTime(dt) => dt.utc(),
         }
     }
 
@@ -107,17 +121,18 @@ impl DatePoint {
                 date_precision: DatePrecision::Day,
                 ..
             } => DATE_PATTERN,
-            Self::Instant(dt) => dt.canonical_pattern(),
+            Self::DateTime(dt) => dt.canonical_pattern(),
         }
     }
 
-    /// Shifts by `n` whole `unit`s: calendar units move the local clock,
+    /// Shifts by `n` whole units: calendar units move the local clock,
     /// exact units move the exact time (calendar dates move only when the
     /// shift crosses midnight).
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the shift overflows chrono's range.
+    /// - [`DateError::OutOfRange`] if the shift exceeds the supported date
+    ///   range.
     /// - [`DateError::LocalZoneLookup`] if a date-time point's shifted local
     ///   datetime cannot be resolved.
     pub(crate) fn shift(
@@ -137,7 +152,7 @@ impl DatePoint {
                     date_precision,
                 })
             }
-            Self::Instant(dt) => dt.shift(n, unit).map(Self::Instant),
+            Self::DateTime(dt) => dt.shift(n, unit).map(Self::DateTime),
         }
     }
 
@@ -171,8 +186,8 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the boundary date is outside chrono's
-    ///   date range.
+    /// - [`DateError::OutOfRange`] if the boundary date is outside the
+    ///   supported date range.
     /// - [`DateError::LocalZoneLookup`] if a date-time point's boundary
     ///   datetime cannot be resolved.
     pub(crate) fn start_of(
@@ -187,8 +202,8 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the boundary date is outside chrono's
-    ///   date range.
+    /// - [`DateError::OutOfRange`] if the boundary date is outside the
+    ///   supported date range.
     /// - [`DateError::LocalZoneLookup`] if a date-time point's boundary
     ///   datetime cannot be resolved.
     pub(crate) fn end_of(
@@ -202,8 +217,8 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::OutOfRange`] if the ISO week's `target` day is outside
-    ///   chrono's date range.
+    /// - [`DateError::OutOfRange`] if the `target` day falls outside the
+    ///   supported date range.
     /// - [`DateError::LocalZoneLookup`] if a date-time point's new local
     ///   datetime cannot be resolved.
     pub(crate) fn with_weekday(
@@ -281,13 +296,13 @@ impl DatePoint {
                 date: date.advance(delta)?,
                 date_precision,
             }),
-            Self::Instant(dt) => {
+            Self::DateTime(dt) => {
                 let local_datetime =
                     dt.local_datetime().ok_or(DateError::OutOfRange)?;
                 let shifted = local_datetime
                     .checked_add_signed(delta)
                     .ok_or(DateError::OutOfRange)?;
-                Ok(Self::Instant(DateTimeValue::from_local(shifted)?))
+                Ok(Self::DateTime(DateTimeValue::from_local(shifted)?))
             }
         }
     }
@@ -302,7 +317,7 @@ impl DatePoint {
                 date: date.advance(delta)?,
                 date_precision,
             }),
-            Self::Instant(dt) => Ok(Self::Instant(DateTimeValue::from(
+            Self::DateTime(dt) => Ok(Self::DateTime(DateTimeValue::from(
                 dt.utc()
                     .checked_add_signed(delta)
                     .ok_or(DateError::OutOfRange)?,
@@ -350,10 +365,10 @@ impl DatePoint {
                 date: DateValue::from(date),
                 date_precision,
             }),
-            Self::Instant(_) => {
+            Self::DateTime(_) => {
                 let local_datetime =
                     date.and_time(self.local_datetime_or_utc().time());
-                Ok(Self::Instant(DateTimeValue::from_local(local_datetime)?))
+                Ok(Self::DateTime(DateTimeValue::from_local(local_datetime)?))
             }
         }
     }
@@ -433,10 +448,10 @@ impl DatePoint {
         }
         match DateTimeShape::parse_any(trimmed) {
             Ok(ParsedDateTime::Instant(instant)) => {
-                Ok(Self::Instant(DateTimeValue::from(instant)))
+                Ok(Self::DateTime(DateTimeValue::from(instant)))
             }
             Ok(ParsedDateTime::Unzoned(local_datetime)) => {
-                Ok(Self::Instant(DateTimeValue::from_local(local_datetime)?))
+                Ok(Self::DateTime(DateTimeValue::from_local(local_datetime)?))
             }
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok(date) => Ok(calendar_point(date)),
@@ -463,7 +478,11 @@ impl DatePoint {
     /// Returns the date point and the number of bytes consumed, or [`None`]
     /// when `s` does not start with either shape.
     #[must_use]
-    pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
+    pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
+        crate::lexer::lex_prefix(s, Self::parse_prefix_raw)
+    }
+
+    fn parse_prefix_raw(s: &str) -> Option<(Self, usize)> {
         let bytes = s.as_bytes();
         if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
             if let Some(prefix) = s.get(..10)
@@ -507,14 +526,14 @@ impl DatePoint {
         let trimmed_pattern = pattern.trim();
         if let Ok(dt) = DateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::Instant(DateTimeValue::from(
+            return Ok(Self::DateTime(DateTimeValue::from(
                 dt.with_timezone(&Utc),
             )));
         }
         if let Ok(local_datetime) =
             NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
         {
-            return Ok(Self::Instant(DateTimeValue::from_local(
+            return Ok(Self::DateTime(DateTimeValue::from_local(
                 local_datetime,
             )?));
         }
@@ -566,7 +585,7 @@ fn starts_like_date(bytes: &[u8]) -> bool {
         })
 }
 
-/// Returns `true` if `s`'s first four bytes are ASCII digits.
+/// Returns `true` if the first four bytes of `s` are ASCII digits.
 pub(super) fn starts_with_year(s: &str) -> bool {
     s.as_bytes().get(..4).is_some_and(|b| b.iter().all(u8::is_ascii_digit))
 }
@@ -656,7 +675,7 @@ mod tests {
             // Assert
             assert_eq!(
                 parsed,
-                Ok(DatePoint::Instant(expected)),
+                Ok(DatePoint::DateTime(expected)),
                 "{text:?} must parse as a date-time point"
             );
         }
@@ -827,20 +846,18 @@ mod tests {
             // Arrange: `text` begins with a complete day or month prefix.
 
             // Act
-            let parsed = DatePoint::parse_prefix(text);
+            let parsed = DatePoint::parse_prefix(text).expect("date prefix");
 
             // Assert
             assert_eq!(
-                parsed,
-                Some((
-                    DatePoint::Calendar {
-                        date: expected_date,
-                        date_precision: expected_precision,
-                    },
-                    expected_extent,
-                )),
-                "{text:?} must yield its written precision and extent"
+                *parsed.value(),
+                DatePoint::Calendar {
+                    date: expected_date,
+                    date_precision: expected_precision,
+                },
+                "{text:?} must yield its written precision"
             );
+            assert_eq!(parsed.span_usize(), 0..expected_extent);
         }
 
         #[rstest]
@@ -954,7 +971,7 @@ mod tests {
             // Assert
             assert_eq!(
                 parsed,
-                Ok(DatePoint::Instant(expected)),
+                Ok(DatePoint::DateTime(expected)),
                 "{text:?} with {pattern:?} must parse as a date-time point"
             );
         }
@@ -1005,7 +1022,7 @@ mod tests {
             #[case] pattern: &str,
             #[case] expected_reason: &str,
         ) {
-            // Arrange: `text` conflicts with `pattern`'s field semantics.
+            // Arrange: `text` conflicts with the field semantics of `pattern`.
 
             // Act
             let parsed = DatePoint::parse_with_pattern(text, pattern);
@@ -1322,10 +1339,10 @@ mod tests {
                 date: DateValue::from(NaiveDate::MIN),
                 date_precision: DatePrecision::Day,
             };
-            let max_point = DatePoint::Instant(DateTimeValue::from(
+            let max_point = DatePoint::DateTime(DateTimeValue::from(
                 DateTime::<Utc>::MAX_UTC,
             ));
-            let min_point = DatePoint::Instant(DateTimeValue::from(
+            let min_point = DatePoint::DateTime(DateTimeValue::from(
                 DateTime::<Utc>::MIN_UTC,
             ));
 
@@ -1472,7 +1489,7 @@ mod tests {
         ) {
             // Arrange
             TzGuard::set("UTC");
-            let base = DatePoint::Instant(fixed_datetime());
+            let base = DatePoint::DateTime(fixed_datetime());
             let duration = DurationValue::parse(text).expect("valid duration");
             let expected = point_at(expected);
 
@@ -1492,7 +1509,7 @@ mod tests {
             // Arrange: a duration rebuilt from nominal seconds carries no
             // written components, so it advances the exact time.
             TzGuard::set("UTC");
-            let base = DatePoint::Instant(fixed_datetime());
+            let base = DatePoint::DateTime(fixed_datetime());
             let synthesized = DurationValue::from_nominal_seconds(
                 crate::temporal::DurationSeconds::try_from(3600.0)
                     .expect("finite seconds"),
@@ -1551,7 +1568,7 @@ mod tests {
         #[test]
         fn applies_a_calendar_week_differently_from_168_exact_hours_across_a_gap()
          {
-            // Arrange: 1w, 7d and 168h are equal as values.
+            // Arrange: one week, 7d and 168h are equal as values.
             TzGuard::set("America/New_York");
             let base = point_at("2026-03-07 12:00:00");
             let one_week = DurationValue::parse("1w").expect("valid duration");
@@ -1724,10 +1741,10 @@ mod tests {
             // Arrange: the date-time range edges and a one-second duration.
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
-            let max_point = DatePoint::Instant(DateTimeValue::from(
+            let max_point = DatePoint::DateTime(DateTimeValue::from(
                 DateTime::<Utc>::MAX_UTC,
             ));
-            let min_point = DatePoint::Instant(DateTimeValue::from(
+            let min_point = DatePoint::DateTime(DateTimeValue::from(
                 DateTime::<Utc>::MIN_UTC,
             ));
 
@@ -2486,7 +2503,7 @@ mod tests {
         #[test]
         fn reports_a_time_for_a_date_time_point() {
             // Arrange: the fixed reference date-time.
-            let point = DatePoint::Instant(fixed_datetime());
+            let point = DatePoint::DateTime(fixed_datetime());
 
             // Act
             let has_time = point.has_time();
@@ -2515,7 +2532,7 @@ mod tests {
         fn returns_the_local_calendar_date_for_a_date_time_point() {
             // Arrange
             TzGuard::set("UTC");
-            let point = DatePoint::Instant(fixed_datetime());
+            let point = DatePoint::DateTime(fixed_datetime());
 
             // Act
             let date = point.date();

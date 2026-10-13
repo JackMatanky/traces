@@ -35,8 +35,8 @@ mod probe {
         DateError, DateTimeValue, DateValue, DurationError, DurationValue,
         TimeUnit,
         temporal::{
-            CalendarPeriod, DateComponent, DatePoint, DatePrecision,
-            Difference, weekday_from_number,
+            CalendarPeriod, DateComponent, DatePoint, Difference,
+            weekday_from_number,
         },
     };
 
@@ -84,15 +84,16 @@ mod probe {
         match point {
             DatePoint::Calendar {
                 date,
-                date_precision,
+                ..
             } => {
-                let precision = match date_precision {
-                    DatePrecision::Month => "month",
-                    DatePrecision::Day => "day",
+                let precision = if point.canonical_pattern() == "%Y-%m" {
+                    "month"
+                } else {
+                    "day"
                 };
                 format!("date {date} ({precision})")
             }
-            DatePoint::Instant(date_time) => {
+            DatePoint::DateTime(date_time) => {
                 format!("datetime {} local {date_time}", json(&date_time))
             }
         }
@@ -133,13 +134,14 @@ mod probe {
 
     pub(super) fn duration_prefix(input: &str) -> String {
         match DurationValue::parse_prefix(input) {
-            Some((duration, end)) => {
-                format!("{} @{end}", render_duration(&duration))
-            }
+            Some(parsed) => format!(
+                "{} @{}",
+                render_duration(parsed.value()),
+                parsed.span_usize().end
+            ),
             None => "None".to_owned(),
         }
     }
-
     pub(super) fn duration_op(left: &str, op: &str, right: &str) -> String {
         let (Ok(left), Ok(right)) =
             (DurationValue::parse(left), DurationValue::parse(right))
@@ -235,7 +237,11 @@ mod probe {
 
     pub(super) fn point_prefix(input: &str) -> String {
         match DatePoint::parse_prefix(input) {
-            Some((point, end)) => format!("{} @{end}", render_point(point)),
+            Some(parsed) => format!(
+                "{} @{}",
+                render_point(*parsed.value()),
+                parsed.span_usize().end
+            ),
             None => "None".to_owned(),
         }
     }

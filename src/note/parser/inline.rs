@@ -184,9 +184,12 @@ impl<'a> InlineValueParser<'a> {
     /// [`NoteFieldValue::Duration`].
     fn parse_duration_at(&self, pos: usize) -> Option<ParsedAtom> {
         let tail = self.source.from(pos)?;
-        let (dv, consumed) = DurationValue::parse_prefix(tail)?;
-        let end = self.source.advance(pos, consumed);
-        Some(ParsedAtom::new(NoteFieldValue::Duration(dv), end))
+        let parsed = DurationValue::parse_prefix(tail)?;
+        let end = self.source.advance(pos, parsed.span_usize().end);
+        Some(ParsedAtom::new(
+            NoteFieldValue::Duration(parsed.value().clone()),
+            end,
+        ))
     }
 
     /// Parses a case-insensitive `true`/`false` keyword atom at `pos`.
@@ -218,38 +221,34 @@ impl<'a> InlineValueParser<'a> {
     /// Parses an ISO date atom (`YYYY-MM-DD` or `YYYY-MM`) at `pos`.
     fn parse_date_at(&self, pos: usize) -> Option<ParsedAtom> {
         let remainder = self.source.from(pos)?;
-        let (date_point, consumed) = DatePoint::parse_prefix(remainder)?;
-        let end = self.source.advance(pos, consumed);
+        let parsed = DatePoint::parse_prefix(remainder)?;
+        let end = self.source.advance(pos, parsed.span_usize().end);
         if !self.is_atom_boundary(end) {
             return None;
         }
-        Some(ParsedAtom::new(NoteFieldValue::Date(date_point.date()), end))
+        Some(ParsedAtom::new(NoteFieldValue::Date(parsed.value().date()), end))
     }
 
-    /// Parses a finite `f64` number atom at `pos`.
+    /// Parses a finite f64 number atom at pos.
     fn parse_number_at(&self, pos: usize) -> Option<ParsedAtom> {
-        let end = self.parse_number_end(pos)?;
-        let raw = self.source.get(pos..end)?;
-        let num = raw.parse::<f64>().ok()?;
-        (num.is_finite() && self.is_atom_boundary(end))
-            .then_some(ParsedAtom::new(NoteFieldValue::Number(num), end))
+        let tail = self.source.from(pos)?;
+        let parsed = crate::lexer::lex_prefix(tail, |tail| {
+            let end = tail
+                .char_indices()
+                .take_while(|(_, ch)| {
+                    ch.is_ascii_digit() || "+-.eE".contains(*ch)
+                })
+                .map(|(offset, ch)| offset.saturating_add(ch.len_utf8()))
+                .last()?;
+            Some((tail.get(..end)?.parse::<f64>().ok()?, end))
+        })?;
+        let end = self.source.advance(pos, parsed.span_usize().end);
+        (parsed.value().is_finite() && self.is_atom_boundary(end)).then_some(
+            ParsedAtom::new(NoteFieldValue::Number(*parsed.value()), end),
+        )
     }
 
-    /// Finds the end offset of a numeric token at `pos`: digits and the
-    /// characters `+-.eE`, without validating that they form a valid `f64`.
-    /// [`Self::parse_number_at`] checks that separately.
-    fn parse_number_end(&self, pos: usize) -> Option<usize> {
-        self.source
-            .from(pos)?
-            .char_indices()
-            .take_while(|(_, ch)| {
-                ch.is_ascii_digit() || matches!(ch, '+' | '-' | '.' | 'e' | 'E')
-            })
-            .map(|(offset, ch)| self.source.token_end(pos, offset, ch))
-            .last()
-    }
-
-    /// Parses a `#tag`-shaped atom (`#book`, `#projects/active`) at `pos`.
+    /// Parses a tag-shaped atom.
     ///
     /// Requires `#` followed by an alphabetic character. The match is returned
     /// as [`NoteFieldValue::String`] holding the tag text, including the

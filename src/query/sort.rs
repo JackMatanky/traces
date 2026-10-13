@@ -464,7 +464,7 @@ impl TextShape {
     pub(super) fn classify(s: &str) -> Self {
         let trimmed = s.trim();
         match DatePoint::parse(trimmed) {
-            Ok(DatePoint::Instant(dt)) => return Self::DateTime(dt),
+            Ok(DatePoint::DateTime(dt)) => return Self::DateTime(dt),
             Ok(DatePoint::Calendar {
                 date,
                 ..

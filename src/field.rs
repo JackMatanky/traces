@@ -828,7 +828,7 @@ impl<'a> FieldStringValue<'a> {
     ) -> FieldValueRef<'a> {
         if coercion == DateTimeCoercion::Classify {
             return match DatePoint::parse(&self.0) {
-                Ok(DatePoint::Instant(dt)) => FieldValueRef::DateTime(dt),
+                Ok(DatePoint::DateTime(dt)) => FieldValueRef::DateTime(dt),
                 Ok(DatePoint::Calendar {
                     date,
                     ..

@@ -45,11 +45,10 @@ use crate::{
     DATE_PATTERN, DateTimeValue, DurationSeconds, DurationValue, TimeUnit,
     UNIT_SPELLINGS_HINT,
     temporal::{
-        CalendarPeriod, DateComponent, DateError, DatePoint, DatePrecision,
-        Difference, PeriodEdge, weekday_from_number,
+        CalendarPeriod, DateComponent, DateError, DatePoint, Difference,
+        PeriodEdge, weekday_from_number,
     },
 };
-
 const NAMESPACE_METHODS: &[&str] = &[
     "now",
     "today",
@@ -297,7 +296,7 @@ enum Anchor {
 impl Anchor {
     /// The date point a shorthand starts from when no reference is given.
     fn base(self) -> DatePoint {
-        let now = DatePoint::Instant(DateTimeValue::from(Utc::now()));
+        let now = DatePoint::from(DateTimeValue::from(Utc::now()));
         match self {
             Self::Now => now,
             Self::Today
@@ -305,10 +304,7 @@ impl Anchor {
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => DatePoint::Calendar {
-                date: now.date(),
-                date_precision: DatePrecision::Day,
-            },
+            | Self::Weekday(_) => DatePoint::from(now.date()),
         }
     }
 
@@ -866,9 +862,9 @@ fn date_sub(
 
 /// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration
 /// semantics per `unit`.
-/// - Inputs with a time component ([`DatePoint::Instant`]) shift calendar units
-///   on the local clock time (preserving clock-time hour across DST) and
-///   sub-day units exactly on the instant.
+/// - Date-Time inputs ([`DatePoint::DateTime`]) shift calendar units on the
+///   local clock time (preserving clock-time hour across DST) and sub-day units
+///   exactly on the Date-Time.
 /// - Calendar inputs ([`DatePoint::Calendar`]) shift on the local datetime at
 ///   midnight. A sub-day shift moves the date only when it crosses midnight
 ///   (`25h` moves it one day; `5h` does not).

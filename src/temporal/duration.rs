@@ -39,7 +39,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
     error::DurationError,
-    scan,
     unit::{CANONICAL_UNITS, DecomposedPart, HUMAN_UNITS, TimeUnit, decompose},
 };
 
@@ -106,26 +105,19 @@ impl DurationValue {
         if trimmed.is_empty() {
             return Err(DurationError::Empty);
         }
-        Self::scan(trimmed, scan::ScanMode::Whole).map(|(val, _)| val)
+        Self::scan(trimmed, false).map(|(val, _)| val)
     }
 
-    /// Parses a duration prefix from `input`, returning the parsed
-    /// [`DurationValue`] and the number of consumed bytes.
+    /// Parses a duration prefix from `input`, returning its byte span.
     ///
     /// Recognizes the same `<number><unit>` grammar as [`Self::parse`],
     /// including the leading-sign rule: only the first part may carry an
     /// explicit `-`; a redundant `+` is accepted anywhere. In prefix mode,
-    /// commas are treated as atom delimiters rather than part separators,
-    /// preserving list precedence at inline note boundaries. Returns `None` if:
-    ///
-    /// - The input does not start with a valid duration segment, or no
-    ///   components could be parsed.
-    /// - A part after the first carries an explicit `-` or fails to parse; the
-    ///   loop bails on the first error rather than returning the prefix parsed
-    ///   so far.
-    /// - The folded nominal seconds are not finite.
-    pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
-        Self::scan(input, scan::ScanMode::Prefix).ok()
+    /// commas are atom delimiters rather than part separators. Returns `None`
+    /// when the input does not start with a valid component, a later component
+    /// is malformed, or the nominal seconds are not finite.
+    pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
+        crate::lexer::lex_prefix(input, |input| Self::scan(input, true).ok())
     }
 
     /// Synthesizes a canonical [`DurationValue`] from a [`DurationSeconds`]
@@ -274,82 +266,66 @@ impl DurationValue {
     }
 
     /// Scans a duration in either whole-input or prefix mode.
-    fn scan(
-        input: &str,
-        mode: scan::ScanMode,
-    ) -> Result<(Self, usize), DurationError> {
-        let mut scanner = scan::Scanner::new(input);
-        match mode {
-            scan::ScanMode::Whole => {
-                scanner.skip_separators();
-                if scanner.is_at_end() {
-                    return Err(DurationError::Empty);
-                }
+    fn scan(input: &str, prefix: bool) -> Result<(Self, usize), DurationError> {
+        let bytes = input.as_bytes();
+        let mut position = 0;
+        if prefix {
+            if !can_start_component(bytes, position) {
+                return Err(DurationError::Empty);
             }
-            scan::ScanMode::Prefix => {
-                if !scanner.can_start_component() {
-                    return Err(DurationError::Empty);
-                }
+        } else {
+            skip_separators(bytes, &mut position);
+            if position == bytes.len() {
+                return Err(DurationError::Empty);
             }
         }
 
         let mut is_negative = false;
         let mut last_end = 0;
-        let mut raw_components = Vec::new();
-
-        while !scanner.is_at_end() {
-            let (number, unit) = scanner.component()?;
-
+        let mut components = Vec::new();
+        while position < bytes.len() {
+            let (number, unit) = parse_component(input, &mut position)?;
             if number.is_sign_negative() {
-                if !raw_components.is_empty() {
+                if !components.is_empty() {
                     return Err(DurationError::MisplacedSign);
                 }
                 is_negative = true;
             }
-
-            raw_components.push(DurationComponent {
+            components.push(DurationComponent {
                 magnitude: number.abs(),
                 unit,
             });
-            last_end = scanner.position();
+            last_end = position;
 
-            match mode {
-                scan::ScanMode::Whole => {
-                    scanner.skip_separators();
-                    if scanner.is_at_end() {
-                        break;
-                    }
+            if prefix {
+                let mut next = position;
+                skip_whitespace(bytes, &mut next);
+                if !can_start_component(bytes, next) {
+                    break;
                 }
-                scan::ScanMode::Prefix => {
-                    if !scanner.skip_to_next_component() {
-                        break;
-                    }
-                }
+                position = next;
+            } else {
+                skip_separators(bytes, &mut position);
             }
-        }
-
-        if raw_components.is_empty() {
-            return Err(DurationError::Empty);
         }
 
         if is_negative {
-            for component in &mut raw_components {
+            for component in &mut components {
                 component.magnitude = -component.magnitude;
             }
         }
-
-        let total = Self::sum_nominal_seconds(&raw_components);
-        let seconds = DurationSeconds::try_from(total)?;
-        let spelling = match mode {
-            scan::ScanMode::Whole => input.trim().into(),
-            scan::ScanMode::Prefix => input[..last_end].trim().into(),
+        let seconds =
+            DurationSeconds::try_from(Self::sum_nominal_seconds(&components))?;
+        let spelling = if prefix {
+            input[..last_end].trim().into()
+        } else {
+            input.trim().into()
         };
-
         Ok((
             Self::from_components(
                 spelling,
                 seconds,
-                raw_components.into_boxed_slice(),
+                components.into_boxed_slice(),
             ),
             last_end,
         ))
@@ -489,6 +465,118 @@ impl FromStr for DurationValue {
     }
 }
 
+fn parse_component(
+    input: &str,
+    position: &mut usize,
+) -> Result<(f64, TimeUnit), DurationError> {
+    let number = parse_number(input, position)?;
+    skip_whitespace(input.as_bytes(), position);
+    let start = *position;
+    while input.as_bytes().get(*position).is_some_and(u8::is_ascii_alphabetic) {
+        *position = (*position).saturating_add(1);
+    }
+    if start == *position {
+        return Err(DurationError::MissingUnit);
+    }
+    let spelling =
+        input.get(start..*position).ok_or(DurationError::MissingUnit)?;
+    let unit =
+        TimeUnit::from_spelling(spelling).ok_or(DurationError::UnknownUnit)?;
+    Ok((number, unit))
+}
+
+fn parse_number(
+    input: &str,
+    position: &mut usize,
+) -> Result<f64, DurationError> {
+    let bytes = input.as_bytes();
+    let start = *position;
+    if matches!(bytes.get(*position), Some(b'+' | b'-')) {
+        let has_digits = bytes
+            .get((*position).saturating_add(1))
+            .is_some_and(u8::is_ascii_digit)
+            || (bytes.get((*position).saturating_add(1)) == Some(&b'.')
+                && bytes
+                    .get((*position).saturating_add(2))
+                    .is_some_and(u8::is_ascii_digit));
+        if !has_digits {
+            return Err(DurationError::MisplacedSign);
+        }
+        *position = (*position).saturating_add(1);
+    }
+    let mut has_decimal = false;
+    let mut has_digit = false;
+    while let Some(&byte) = bytes.get(*position) {
+        if byte.is_ascii_digit() {
+            has_digit = true;
+        } else if byte == b'.' && !has_decimal {
+            has_decimal = true;
+        } else {
+            break;
+        }
+        *position = (*position).saturating_add(1);
+    }
+    if has_digit && matches!(bytes.get(*position), Some(b'e' | b'E')) {
+        let mut end = (*position).saturating_add(1);
+        if matches!(bytes.get(end), Some(b'+' | b'-')) {
+            end = end.saturating_add(1);
+        }
+        if bytes.get(end).is_some_and(u8::is_ascii_digit) {
+            while bytes.get(end).is_some_and(u8::is_ascii_digit) {
+                end = end.saturating_add(1);
+            }
+            *position = end;
+        }
+    }
+    if start == *position {
+        return Err(DurationError::MissingNumber);
+    }
+    let text =
+        input.get(start..*position).ok_or(DurationError::MissingNumber)?;
+    let number: f64 =
+        text.parse().map_err(|source| DurationError::MalformedNumber {
+            source,
+        })?;
+    if number.is_finite() {
+        Ok(number)
+    } else {
+        Err(DurationError::NumberOverflow)
+    }
+}
+
+fn can_start_component(bytes: &[u8], position: usize) -> bool {
+    match bytes.get(position) {
+        Some(byte) if byte.is_ascii_digit() => true,
+        Some(b'.') => bytes
+            .get(position.saturating_add(1))
+            .is_some_and(u8::is_ascii_digit),
+        Some(b'+' | b'-') => {
+            bytes
+                .get(position.saturating_add(1))
+                .is_some_and(u8::is_ascii_digit)
+                || (bytes.get(position.saturating_add(1)) == Some(&b'.')
+                    && bytes
+                        .get(position.saturating_add(2))
+                        .is_some_and(u8::is_ascii_digit))
+        }
+        _ => false,
+    }
+}
+
+fn skip_whitespace(bytes: &[u8], position: &mut usize) {
+    while bytes.get(*position).is_some_and(u8::is_ascii_whitespace) {
+        *position = (*position).saturating_add(1);
+    }
+}
+
+fn skip_separators(bytes: &[u8], position: &mut usize) {
+    while bytes
+        .get(*position)
+        .is_some_and(|byte| byte.is_ascii_whitespace() || *byte == b',')
+    {
+        *position = (*position).saturating_add(1);
+    }
+}
 impl TryFrom<DurationValue> for TimeDelta {
     type Error = DurationError;
 
@@ -887,10 +975,11 @@ mod tests {
     /// prefix rows compare against one `Ok` triple.
     fn parse_prefix_parts(input: &str) -> Result<(String, usize, f64), String> {
         DurationValue::parse_prefix(input)
-            .map(|(duration, consumed)| {
+            .map(|parsed| {
+                let duration = parsed.value();
                 (
                     duration.to_string(),
-                    consumed,
+                    parsed.span_usize().end,
                     duration.nominal_seconds().as_f64(),
                 )
             })
@@ -1856,9 +1945,10 @@ mod tests {
         #[test]
         fn prefix_retains_the_same_components_as_a_full_parse() {
             // Arrange
-            let (prefixed, consumed) =
-                DurationValue::parse_prefix("-1h 30m trailing")
-                    .expect("valid prefix");
+            let parsed = DurationValue::parse_prefix("-1h 30m trailing")
+                .expect("valid prefix");
+            let prefixed = parsed.value();
+            let consumed = parsed.span_usize().end;
             let full = DurationValue::parse("-1h 30m").expect("valid compound");
             // Act
             let same_components = prefixed.components() == full.components();

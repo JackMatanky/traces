@@ -56,7 +56,6 @@ mod error;
 #[cfg(test)]
 mod fixtures;
 mod point;
-mod scan;
 mod unit;
 
 pub(crate) use calendar::{
@@ -70,5 +69,5 @@ pub use datetime::DateTimeValue;
 pub use duration::DurationValue;
 pub(crate) use duration::{DurationComponent, DurationSeconds};
 pub use error::{DateError, DurationError};
-pub(crate) use point::{DatePoint, DatePrecision};
+pub(crate) use point::DatePoint;
 pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};

@@ -20,9 +20,8 @@ use serde::{Deserialize, Serialize};
 
 use super::Link;
 use crate::{
-    DateTimeValue, DateValue, DurationValue, Tag,
-    field::FieldValueRef,
-    temporal::{DatePoint, DatePrecision},
+    DateTimeValue, DateValue, DurationValue, Tag, field::FieldValueRef,
+    temporal::DatePoint,
 };
 
 /// A metadata value parsed from YAML frontmatter or inline field text.
@@ -111,8 +110,9 @@ impl NoteFieldValue {
         match self {
             Self::Date(value) => Some(*value),
             Self::DateTime(value) => Some(value.local_date()),
-            Self::String(s) => DatePoint::parse_prefix(s)
-                .map(|(date_point, _)| date_point.date()),
+            Self::String(s) => {
+                DatePoint::parse_prefix(s).map(|point| point.value().date())
+            }
             _ => None,
         }
     }
@@ -123,13 +123,10 @@ impl NoteFieldValue {
     /// Strings are not parsed: query evaluation only treats typed date values
     /// as dates.
     #[must_use]
-    pub(crate) const fn as_date_point(&self) -> Option<DatePoint> {
+    pub(crate) fn as_date_point(&self) -> Option<DatePoint> {
         match self {
-            Self::Date(date) => Some(DatePoint::Calendar {
-                date: *date,
-                date_precision: DatePrecision::Day,
-            }),
-            Self::DateTime(datetime) => Some(DatePoint::Instant(*datetime)),
+            Self::Date(date) => Some(DatePoint::from(*date)),
+            Self::DateTime(datetime) => Some(DatePoint::from(*datetime)),
             _ => None,
         }
     }
@@ -172,7 +169,7 @@ impl From<DatePoint> for NoteFieldValue {
                 date,
                 ..
             } => Self::Date(date),
-            DatePoint::Instant(datetime) => Self::DateTime(datetime),
+            DatePoint::DateTime(datetime) => Self::DateTime(datetime),
         }
     }
 }

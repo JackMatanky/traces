@@ -521,6 +521,7 @@ src/lexer.rs: pub(crate) desc: &'static str,
 src/lexer.rs: pub(crate) enum LexError {
 src/lexer.rs: pub(crate) fn expect<U>(
 src/lexer.rs: pub(crate) fn expect_map<F, R>(
+src/lexer.rs: pub(crate) fn lex_prefix<T>(
 src/lexer.rs: pub(crate) fn lexical_unquote(raw: &str) -> String {
 src/lexer.rs: pub(crate) fn new(tokens: Vec<T>) -> Self {
 src/lexer.rs: pub(crate) fn next(&mut self) -> Option<T> {
@@ -597,7 +598,6 @@ src/note/cursor.rs: pub(super) fn advance(&self, pos: usize, bytes: usize) -> us
 src/note/cursor.rs: pub(super) fn advance_char(&self, pos: usize, ch: char) -> usize {
 src/note/cursor.rs: pub(super) fn from(&self, pos: usize) -> Option<&'a str> {
 src/note/cursor.rs: pub(super) fn get(&self, range: Range<usize>) -> Option<&'a str> {
-src/note/cursor.rs: pub(super) fn token_end(
 src/note/cursor.rs: pub(super) struct SourceText<'a>(&'a str);
 src/note/field.rs: pub enum NoteFieldValue {
 src/note/field.rs: pub enum NoteFieldValueRef<'a> {
@@ -605,10 +605,10 @@ src/note/field.rs: pub fn as_date(&self) -> Option<DateValue> {
 src/note/field.rs: pub fn as_ref(&self) -> NoteFieldValueRef<'_> {
 src/note/field.rs: pub fn as_str(&self) -> Option<&str> {
 src/note/field.rs: pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
-src/note/field.rs: pub(crate) const fn as_date_point(&self) -> Option<DatePoint> {
 src/note/field.rs: pub(crate) const fn rank(self) -> u8 {
 src/note/field.rs: pub(crate) enum NoteFieldType {
 src/note/field.rs: pub(crate) fn append_text(&self, out: &mut String) {
+src/note/field.rs: pub(crate) fn as_date_point(&self) -> Option<DatePoint> {
 src/note/field.rs: pub(crate) fn as_str(&self) -> Option<&str> {
 src/note/field.rs: pub(crate) fn is_containing(&self, target: &NoteFieldValue) -> bool {
 src/note/field.rs: pub(crate) fn is_equal_to_literal(&self, literal: &NoteFieldValue) -> bool {
@@ -1395,7 +1395,7 @@ src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSe
 src/temporal/duration.rs: pub(crate) fn has_calendar_component(&self) -> bool {
 src/temporal/duration.rs: pub(crate) fn humanize(&self) -> String {
 src/temporal/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
-src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
+src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
 src/temporal/duration.rs: pub(crate) struct DurationComponent {
 src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
 src/temporal/error.rs: pub enum DateError {
@@ -1410,7 +1410,7 @@ src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSeconds};
-src/temporal/mod.rs: pub(crate) use point::{DatePoint, DatePrecision};
+src/temporal/mod.rs: pub(crate) use point::DatePoint;
 src/temporal/mod.rs: pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
 src/temporal/point.rs: pub(crate) enum DatePoint {
@@ -1424,23 +1424,13 @@ src/temporal/point.rs: pub(crate) fn end_of(
 src/temporal/point.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/temporal/point.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
 src/temporal/point.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
-src/temporal/point.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(Self, usize)> {
+src/temporal/point.rs: pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
 src/temporal/point.rs: pub(crate) fn parse_with_pattern(
 src/temporal/point.rs: pub(crate) fn shift(
 src/temporal/point.rs: pub(crate) fn start_of(
 src/temporal/point.rs: pub(crate) fn with_weekday(
 src/temporal/point.rs: pub(super) fn parse_reason(error: chrono::ParseError) -> &'static str {
 src/temporal/point.rs: pub(super) fn starts_with_year(s: &str) -> bool {
-src/temporal/scan.rs: pub(super) const fn is_at_end(&self) -> bool {
-src/temporal/scan.rs: pub(super) const fn new(input: &'a str) -> Self {
-src/temporal/scan.rs: pub(super) const fn position(&self) -> usize {
-src/temporal/scan.rs: pub(super) enum ScanMode {
-src/temporal/scan.rs: pub(super) fn can_start_component(&self) -> bool {
-src/temporal/scan.rs: pub(super) fn component(
-src/temporal/scan.rs: pub(super) fn skip_separators(&mut self) {
-src/temporal/scan.rs: pub(super) fn skip_to_next_component(&mut self) -> bool {
-src/temporal/scan.rs: pub(super) fn skip_whitespace(&mut self) {
-src/temporal/scan.rs: pub(super) struct Scanner<'a> {
 src/temporal/unit.rs: pub aliases: &'static [&'static str],
 src/temporal/unit.rs: pub calendar: bool,
 src/temporal/unit.rs: pub count: u64,

@@ -55,21 +55,6 @@ impl<'a> SourceText<'a> {
     pub(super) fn advance_char(&self, pos: usize, ch: char) -> usize {
         self.advance(pos, ch.len_utf8())
     }
-
-    /// Calculates the byte offset just after a token-ending character.
-    ///
-    /// `pos` is the token start, `offset` is the character offset within that
-    /// token, and `ch` is the token's final character.
-    #[inline]
-    #[must_use]
-    pub(super) fn token_end(
-        &self,
-        pos: usize,
-        offset: usize,
-        ch: char,
-    ) -> usize {
-        self.advance(self.advance(pos, offset), ch.len_utf8())
-    }
 }
 
 impl AsRef<str> for SourceText<'_> {

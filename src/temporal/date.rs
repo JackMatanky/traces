@@ -12,9 +12,9 @@ use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    DatePrecision, DateTimeValue,
+    DateTimeValue,
     error::DateError,
-    point::{parse_reason, starts_with_year},
+    point::{DatePrecision, parse_reason, starts_with_year},
 };
 
 /// Canonical output format of [`DateValue`]: `2026-07-29`.
