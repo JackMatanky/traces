@@ -1094,4 +1094,29 @@ mod tests {
             );
         }
     }
+
+    mod proptests {
+        use proptest::prelude::*;
+
+        use super::*;
+
+        proptest! {
+            #[test]
+            fn iso_display_round_trips_supported_dates(
+                year in 0_i32..=9999,
+                month in 1_u32..=12,
+                day in 1_u32..=28,
+            ) {
+                let date = DateValue::from_ymd(year, month, day)
+                    .expect("generated four-digit date is valid");
+
+                // Act
+                let displayed = date.to_string();
+                let parsed = DateValue::parse_iso(&displayed);
+
+                // Assert
+                prop_assert_eq!(parsed, Ok(date));
+            }
+        }
+    }
 }

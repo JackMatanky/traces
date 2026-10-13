@@ -1558,4 +1558,33 @@ mod tests {
             );
         }
     }
+
+    mod proptests {
+        use proptest::prelude::*;
+
+        use super::*;
+
+        proptest! {
+            #[test]
+            fn local_iso_display_round_trips_at_second_precision(
+                seconds in 946_684_800_u64..=1_893_456_000_u64,
+            ) {
+                // Display and parsing use the process-local zone; pin it so the
+                // round trip is deterministic across developer machines.
+                ZoneGuard::set("UTC");
+                let system_time = SystemTime::UNIX_EPOCH
+                    .checked_add(std::time::Duration::from_secs(seconds))
+                    .expect("generated timestamp fits SystemTime");
+                let value = DateTimeValue::try_from(system_time)
+                    .expect("generated timestamp fits DateTimeValue");
+
+                // Act
+                let displayed = value.to_string();
+                let parsed = DateTimeValue::parse_iso(&displayed);
+
+                // Assert
+                prop_assert_eq!(parsed, Ok(value));
+            }
+        }
+    }
 }
