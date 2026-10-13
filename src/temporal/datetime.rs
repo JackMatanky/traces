@@ -12,7 +12,7 @@ use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime,
     SecondsFormat, Timelike as _, Utc,
 };
-use jiff::{Timestamp, civil, tz::TimeZone};
+use jiff::{Span, Timestamp, civil, tz::TimeZone};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
@@ -220,13 +220,25 @@ impl DateTimeValue {
         if unit.is_calendar() {
             let local_datetime =
                 self.local_datetime().ok_or(CalendarError::OutOfRange)?;
-            Self::from_local(shift_datetime(local_datetime, n, unit)?)
-        } else {
-            Self::try_from(
-                shift_datetime(self.utc().naive_utc(), n, unit)?.and_utc(),
-            )
-            .map_err(|_| CalendarError::OutOfRange)
+            return Self::from_local(shift_datetime(local_datetime, n, unit)?);
         }
+        let span = match unit {
+            TimeUnit::Millisecond => Span::new().try_milliseconds(n),
+            TimeUnit::Second => Span::new().try_seconds(n),
+            TimeUnit::Minute => Span::new().try_minutes(n),
+            TimeUnit::Hour => Span::new().try_hours(n),
+            TimeUnit::Day
+            | TimeUnit::Week
+            | TimeUnit::Month
+            | TimeUnit::Year => {
+                return Err(CalendarError::OutOfRange);
+            }
+        }
+        .map_err(|_| CalendarError::OutOfRange)?;
+        self.0
+            .checked_add(span)
+            .map(Self)
+            .map_err(|_| CalendarError::OutOfRange)
     }
 
     /// Parses an RFC 3339 or ISO-8601 date-time string using
