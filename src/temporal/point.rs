@@ -646,11 +646,6 @@ mod tests {
         #[rstest]
         #[case::day("2026-07-29", DatePrecision::Day, ymd(2026, 7, 29))]
         #[case::month("2026-07", DatePrecision::Month, ymd(2026, 7, 1))]
-        #[case::unpadded_month_and_day(
-            "2026-1-1",
-            DatePrecision::Day,
-            ymd(2026, 1, 1)
-        )]
         fn parses_a_date_shape_to_a_calendar_point(
             #[case] text: &str,
             #[case] expected_precision: DatePrecision,
@@ -670,6 +665,23 @@ mod tests {
                 }),
                 "{text:?} must parse as a calendar point at its written \
                  precision"
+            );
+        }
+        #[test]
+        fn rejects_unpadded_calendar_date() {
+            // Arrange
+            let input = "2026-1-1";
+
+            // Act
+            let result = DatePoint::parse(input);
+
+            // Assert
+            assert_eq!(
+                result,
+                Err(DateError::InvalidValue {
+                    input: input.into(),
+                    reason: "input is too short",
+                })
             );
         }
 

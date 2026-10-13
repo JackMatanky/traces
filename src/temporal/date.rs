@@ -24,11 +24,11 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 /// A zone-free calendar date with no time of day.
 ///
 /// Carries a validated `YYYY-MM-DD` day on the proleptic Gregorian calendar: no
-/// zone and no clock time. Every accepted input year is exactly four ASCII
-/// digits, every value names a real day, and written `YYYY-MM` input defaults
-/// its day to 1. Deserialization runs the same parser as
-/// [`FromStr`](std::str::FromStr), so inline and deserialized dates follow one
-/// grammar.
+/// zone and no clock time. Full dates require zero-padded month and day fields;
+/// `YYYY-MM` input defaults its day to 1. Every accepted input year is exactly
+/// four ASCII digits, and every value names a real day. Deserialization runs
+/// the same parser as [`FromStr`](std::str::FromStr), so inline and
+/// deserialized dates follow one grammar.
 ///
 /// # Examples
 ///
@@ -225,6 +225,9 @@ impl DateShape {
     ) -> Result<(civil::Date, DatePrecision), &'static str> {
         match self {
             Self::YearMonthDay => {
+                if s.len() < 10 && starts_with_year(s) {
+                    return Err("input is too short");
+                }
                 let date = NaiveDate::parse_from_str(s, DATE_PATTERN)
                     .map_err(parse_reason)?;
                 let date = civil::Date::new(
@@ -473,20 +476,20 @@ mod tests {
         }
 
         #[rstest]
-        #[case::unpadded_month_and_day("2026-1-1", (2026, 1, 1))]
-        #[case::unpadded_day("2026-07-2", (2026, 7, 2))]
-        fn accepts_unpadded_dates(
-            #[case] input: &str,
-            #[case] (year, month, day): (i32, u32, u32),
-        ) {
-            // Arrange: `input` and the expected fields are the case literals.
+        #[case::unpadded_month_and_day("2026-1-1")]
+        #[case::unpadded_day("2026-07-2")]
+        fn rejects_unpadded_dates(#[case] input: &str) {
+            // Arrange: strict date parsing requires zero-padded month and day.
             // Act
             let result = input.parse::<DateValue>();
             // Assert
             assert_eq!(
                 result,
-                Ok(ymd(year, month, day)),
-                "`{input}` is accepted while padding stays lenient"
+                Err(DateError::InvalidValue {
+                    input: input.into(),
+                    reason: "input is too short",
+                }),
+                "unpadded date {input} must be rejected"
             );
         }
 

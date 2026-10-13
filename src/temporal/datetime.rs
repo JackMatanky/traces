@@ -29,10 +29,12 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 /// A Date-Time stored as UTC that renders as the local clock.
 ///
 /// Accepts RFC 3339 input with an explicit offset except for leap seconds,
-/// which Jiff timestamps cannot represent. Naive input in the five written
-/// shapes of `DateTimeShape` resolves in the process's local zone (ambiguous
-/// fall-back times take the earlier occurrence; spring-forward gaps shift
-/// forward by the gap length) and stores as UTC.
+/// which Jiff timestamps cannot represent. ISO date portions require
+/// zero-padded month and day fields. Naive input in the five written shapes of
+/// `DateTimeShape` resolves in the process’s local zone (ambiguous fall-back
+/// times take the earlier occurrence; spring-forward gaps shift forward by the
+/// gap length) and stores as UTC. `DatePoint::parse_with_pattern` is a separate
+/// strftime parser and retains its pattern-driven padding rules.
 /// [`Display`](fmt::Display) renders the local clock time without a zone
 /// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
 /// Deserialization runs the same parser as [`FromStr`](std::str::FromStr), so
@@ -445,7 +447,9 @@ impl DateTimeShape {
             }
             result = format.parse_shape(s);
         }
-        result.map_err(parse_reason)
+        result.map_err(parse_reason).and_then(|parsed| {
+            strict_date_prefix(s).then_some(parsed).ok_or("input is too short")
+        })
     }
 
     /// Parses according to this format, returning a parsed datetime shape.
@@ -462,6 +466,22 @@ impl DateTimeShape {
     }
 }
 
+fn strict_date_prefix(s: &str) -> bool {
+    s.get(..10).is_some_and(|date| {
+        let bytes = date.as_bytes();
+        bytes.get(4) == Some(&b'-')
+            && bytes.get(7) == Some(&b'-')
+            && bytes
+                .get(..4)
+                .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
+            && bytes
+                .get(5..7)
+                .is_some_and(|month| month.iter().all(u8::is_ascii_digit))
+            && bytes
+                .get(8..)
+                .is_some_and(|day| day.iter().all(u8::is_ascii_digit))
+    })
+}
 /// The parsed shape of a date-time string before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParsedDateTime {
@@ -899,19 +919,20 @@ mod tests {
         }
 
         #[test]
-        fn accepts_unpadded_month_day_fields() {
-            // Arrange: UTC, so the rendering is the stored clock time.
-            ZoneGuard::set("UTC");
+        fn rejects_unpadded_month_day_fields() {
+            // Arrange: strict ISO parsing requires a padded date component.
+            let input = "2026-7-29T14:30:00";
 
             // Act
-            let result = DateTimeValue::parse_iso("2026-7-29T14:30:00");
+            let result = DateTimeValue::parse_iso(input);
 
             // Assert
             assert_eq!(
-                result.map(|parsed| parsed.to_string()),
-                Ok("2026-07-29T14:30:00".to_owned()),
-                "chrono admits one-digit %m/%d fields; the parser follows \
-                 that leniency"
+                result,
+                Err(DateError::InvalidValue {
+                    input: input.into(),
+                    reason: "input is too short",
+                })
             );
         }
 
