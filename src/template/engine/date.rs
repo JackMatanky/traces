@@ -1163,12 +1163,12 @@ fn unknown_unit_error(unit: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::TzGuard;
+    use crate::test_support::ZoneGuard;
 
     fn env() -> Environment<'static> {
         // Every date filter reads the local zone through the core parser, so
         // the render below must own `TZ` against concurrent tests.
-        TzGuard::keep();
+        ZoneGuard::keep();
         let mut env = Environment::new();
         DateNamespace.register(&mut env);
         env
@@ -1372,7 +1372,7 @@ mod tests {
 
         #[test]
         fn formats_the_unix_epoch_with_the_default_format() {
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
 
             let rendered = env()
                 .render_str(
@@ -1386,7 +1386,7 @@ mod tests {
 
         #[test]
         fn accepts_an_explicit_format_kwarg() {
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
 
             let rendered = env()
                 .render_str(
@@ -1400,7 +1400,7 @@ mod tests {
 
         #[test]
         fn formats_in_the_local_clock_time() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             // Midnight UTC reads as 02:00 local on the same calendar day.
             let rendered = env()
@@ -1480,7 +1480,7 @@ mod tests {
             #[case] format: &str,
             #[case] expected: &str,
         ) {
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
 
             let rendered = env()
                 .render_str(
@@ -1494,7 +1494,7 @@ mod tests {
 
         #[test]
         fn renders_an_explicit_offset_input_in_the_local_clock_time() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             // The everyday spelling is the reader's clock time: 14:30Z is 16:30
             // local, not the UTC 12:30 the old behavior printed.
@@ -1510,7 +1510,7 @@ mod tests {
 
         #[test]
         fn reformats_a_naive_input_to_its_own_clock_time() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             // A naive datetime means the reader's clock time, so displaying it
             // back yields the written time in any zone.
@@ -1627,7 +1627,7 @@ mod tests {
             #[case] format: &str,
             #[case] expected: &str,
         ) {
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
 
             let rendered = env()
                 .render_str(
@@ -1814,7 +1814,7 @@ mod tests {
             #[case] input: &str,
             #[case] expected: i64,
         ) {
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
 
             let rendered = env()
                 .render_str(
@@ -1828,7 +1828,7 @@ mod tests {
 
         #[test]
         fn interprets_a_naive_datetime_in_the_local_zone() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             let rendered = env()
                 .render_str(
@@ -1844,7 +1844,7 @@ mod tests {
 
         #[test]
         fn resolves_a_date_only_input_at_local_midnight() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             let rendered = env()
                 .render_str(
@@ -1859,7 +1859,7 @@ mod tests {
 
         #[test]
         fn resolves_a_spring_forward_gap_input_instead_of_failing() {
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
 
             // 02:30 does not exist on 2026-03-08; the adopted 'compatible'
             // policy shifts it forward by the gap to 03:30 EDT (07:30Z).
@@ -2051,7 +2051,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::test_support::TzGuard;
+        use crate::test_support::ZoneGuard;
 
         #[test]
         fn returns_an_integer_day_count_when_neither_input_has_time() {
@@ -2239,7 +2239,7 @@ mod tests {
         fn truncates_to_a_whole_hour_count_for_a_mixed_date_and_datetime_pair(
             #[case] other: &str,
         ) {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             // Regression: the mixed-precision branch previously subtracted
             // whichever naive representations the two parsers happened to
@@ -2333,7 +2333,7 @@ mod tests {
         #[test]
         fn a_day_unit_preserves_the_clock_time_across_a_dst_gap_while_hours_do_not()
          {
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
 
             let rendered = env()
                 .render_str(

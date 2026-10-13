@@ -24,7 +24,7 @@
 
 use std::fmt::Write as _;
 
-use crate::test_support::TzGuard;
+use crate::test_support::ZoneGuard;
 
 /// Renders operation results as stable transcript text.
 ///
@@ -1051,11 +1051,11 @@ fn zone_corpus(log: &mut Transcript, zone: &ZoneCase) {
 /// Builds the full transcript of the corpus.
 fn transcript() -> String {
     let mut log = Transcript::default();
-    TzGuard::set("UTC");
+    ZoneGuard::set("UTC");
     durations(&mut log);
     dates(&mut log);
     for zone in &ZONES {
-        TzGuard::set(zone.name);
+        ZoneGuard::set(zone.name);
         log.section(&format!("ZONE {}", zone.name));
         zone_corpus(&mut log, zone);
     }

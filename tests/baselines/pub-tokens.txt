@@ -547,14 +547,12 @@ src/lib.rs: pub fn create_trusted_project(
 src/lib.rs: pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
 src/lib.rs: pub fn fixture_service(root: &Path) -> ConfigService {
 src/lib.rs: pub fn indexer(&self) -> IndexerService {
-src/lib.rs: pub fn keep() {
 src/lib.rs: pub fn parse_note<P: AsRef<Path>>(path: P, src: &str) -> Note {
 src/lib.rs: pub fn parse_note_str(src: &str) -> Note {
 src/lib.rs: pub fn parse_tag(s: &str) -> Tag {
 src/lib.rs: pub fn resolve_safe_path<P: AsRef<Path>>(
 src/lib.rs: pub fn root(&self) -> &Path {
 src/lib.rs: pub fn service(&self) -> &ConfigService {
-src/lib.rs: pub fn set(zone: &str) {
 src/lib.rs: pub fn trust(&self) {
 src/lib.rs: pub fn trusted<P: Into<PathBuf>>(root: P) -> Self {
 src/lib.rs: pub fn untrust(&self) -> usize {
@@ -570,7 +568,7 @@ src/lib.rs: pub fn write_template<P: AsRef<Path>>(
 src/lib.rs: pub mod cli;
 src/lib.rs: pub mod testing {
 src/lib.rs: pub struct TestProject {
-src/lib.rs: pub struct TzGuard {
+src/lib.rs: pub use crate::temporal::ZoneGuard;
 src/lib.rs: pub use crate::{
 src/lib.rs: pub use dialog::{
 src/lib.rs: pub use file::FileMeta;
@@ -1379,11 +1377,13 @@ src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str 
 src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/temporal/datetime.rs: pub(crate) fn local_date(self) -> DateValue {
 src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
+src/temporal/datetime.rs: pub(crate) fn local_datetime_in(
 src/temporal/datetime.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
 src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
 src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub(crate) fn shift(
 src/temporal/datetime.rs: pub(super) fn from_local(
+src/temporal/datetime.rs: pub(super) fn from_local_in(
 src/temporal/duration.rs: pub struct DurationValue {
 src/temporal/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
 src/temporal/duration.rs: pub(crate) const fn magnitude(self) -> f64 {
@@ -1408,6 +1408,7 @@ src/temporal/mod.rs: pub use date::DateValue;
 src/temporal/mod.rs: pub use datetime::DateTimeValue;
 src/temporal/mod.rs: pub use duration::DurationValue;
 src/temporal/mod.rs: pub use error::{DateError, DurationError};
+src/temporal/mod.rs: pub use zone::ZoneGuard;
 src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;

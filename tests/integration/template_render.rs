@@ -9,8 +9,8 @@ use rstest::rstest;
 use traces_pkm::{
     PresetDialogProvider,
     testing::{
-        CommitPolicy, TemplatePathInput, TemplateService, TestProject, TzGuard,
-        WriteMode, WriteOutcome,
+        CommitPolicy, TemplatePathInput, TemplateService, TestProject,
+        WriteMode, WriteOutcome, ZoneGuard,
     },
 };
 
@@ -508,7 +508,7 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 
     // Query under UTC+14
     {
-        TzGuard::set("Pacific/Kiritimati");
+        ZoneGuard::set("Pacific/Kiritimati");
         let written = service
             .render_to_file(
                 &input,
@@ -527,7 +527,7 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 
     // Query under UTC-12
     {
-        TzGuard::set("Etc/GMT+12");
+        ZoneGuard::set("Etc/GMT+12");
         let written = service
             .render_to_file(
                 &input,
@@ -547,7 +547,7 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 /// injected TZ.
 #[test]
 fn template_seam_renders_local_clock_under_injected_tz() {
-    TzGuard::set("Etc/GMT-5"); // UTC+05:00
+    ZoneGuard::set("Etc/GMT-5"); // UTC+05:00
     let temp = tempfile::tempdir().expect("create temp dir");
     let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template("clock.md", r#"{{ date.now("%Y") }}"#);

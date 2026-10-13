@@ -920,7 +920,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::test_support::TzGuard;
+        use crate::test_support::ZoneGuard;
 
         fn date(s: &str) -> DateValue {
             DateValue::parse_iso(s).expect("valid date")
@@ -1038,7 +1038,7 @@ mod tests {
 
         #[test]
         fn a_bare_date_promotes_to_local_zone_midnight_for_ordering() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             let d = date("2026-07-29");
             // 23:00Z on the 28th falls between the date's local-zone

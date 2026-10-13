@@ -143,11 +143,13 @@ per-row counts overlap.
 
 - **Today**: `TzGuard` mutates the `TZ` environment variable under a global
   mutex using `unsafe`.
-- **After**: `ZoneGuard` installs a process-wide override with no `unsafe` and
-  no environment mutation; `TZ` is ignored under test.
+- **After**: `ZoneGuard` overrides the Jiff time zone for the current test
+  thread and serializes guard lifetimes. It does not mutate `TZ` or use
+  `unsafe`.
 - **Recommendation**: accept.
-- **Oracle cases**: none tagged — the guard is the oracle adapter itself
-  (`S2.1`), and the swap must leave the transcript at zero diff.
+- **Oracle cases**: the adapter uses `ZoneGuard` (`S2.1`). The snapshot now
+  records each declared zone explicitly; the previous `TZ`-based run left
+  cross-zone rows with stale offsets.
 
 ### `R13`: Explicit `LocalZoneLookup` Error Kept
 

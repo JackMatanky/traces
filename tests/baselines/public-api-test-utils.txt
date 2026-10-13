@@ -1908,49 +1908,6 @@ impl<T> either::into_either::IntoEither for traces_pkm::testing::TestProject
 impl<T> tracing::instrument::Instrument for traces_pkm::testing::TestProject
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::TestProject
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::TestProject where T: 'static
-pub struct traces_pkm::testing::TzGuard
-impl traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::keep()
-pub fn traces_pkm::testing::TzGuard::set(&str)
-impl core::fmt::Debug for traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::ops::drop::Drop for traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::drop(&mut self)
-impl core::marker::Freeze for traces_pkm::testing::TzGuard
-impl !core::marker::Send for traces_pkm::testing::TzGuard
-impl core::marker::Sync for traces_pkm::testing::TzGuard
-impl core::marker::Unpin for traces_pkm::testing::TzGuard
-impl core::marker::UnsafeUnpin for traces_pkm::testing::TzGuard
-impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::testing::TzGuard
-impl core::panic::unwind_safe::UnwindSafe for traces_pkm::testing::TzGuard
-impl<D> owo_colors::OwoColorize for traces_pkm::testing::TzGuard
-impl<T, U> core::convert::Into<U> for traces_pkm::testing::TzGuard where U: core::convert::From<T>
-pub fn traces_pkm::testing::TzGuard::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for traces_pkm::testing::TzGuard where U: core::convert::Into<T>
-pub type traces_pkm::testing::TzGuard::Error = never
-pub fn traces_pkm::testing::TzGuard::try_from(U) -> core::result::Result<T, never>
-impl<T, U> core::convert::TryInto<U> for traces_pkm::testing::TzGuard where U: core::convert::TryFrom<T>
-pub type traces_pkm::testing::TzGuard::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn traces_pkm::testing::TzGuard::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> core::any::Any for traces_pkm::testing::TzGuard where T: 'static + ?core::marker::Sized
-pub fn traces_pkm::testing::TzGuard::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for traces_pkm::testing::TzGuard where T: ?core::marker::Sized
-pub fn traces_pkm::testing::TzGuard::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for traces_pkm::testing::TzGuard where T: ?core::marker::Sized
-pub fn traces_pkm::testing::TzGuard::borrow_mut(&mut self) -> &mut T
-impl<T> core::convert::From<T> for traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::testing::TzGuard
-pub type traces_pkm::testing::TzGuard::Init = T
-pub const traces_pkm::testing::TzGuard::ALIGN: usize
-pub unsafe fn traces_pkm::testing::TzGuard::deref<'a>(usize) -> &'a T
-pub unsafe fn traces_pkm::testing::TzGuard::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn traces_pkm::testing::TzGuard::drop(usize)
-pub unsafe fn traces_pkm::testing::TzGuard::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for traces_pkm::testing::TzGuard
-impl<T> tracing::instrument::Instrument for traces_pkm::testing::TzGuard
-impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::TzGuard
-impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::TzGuard where T: 'static
 pub struct traces_pkm::testing::WorkspaceIndex
 impl traces_pkm::testing::WorkspaceIndex
 pub fn traces_pkm::testing::WorkspaceIndex::entries(&self) -> &[traces_pkm::testing::FileEntry]
@@ -2002,6 +1959,49 @@ impl<T> either::into_either::IntoEither for traces_pkm::testing::WorkspaceIndex
 impl<T> tracing::instrument::Instrument for traces_pkm::testing::WorkspaceIndex
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::WorkspaceIndex
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::WorkspaceIndex where T: 'static
+pub struct traces_pkm::testing::ZoneGuard
+impl traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::keep()
+pub fn traces_pkm::testing::ZoneGuard::set(&str)
+impl core::fmt::Debug for traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::ops::drop::Drop for traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::drop(&mut self)
+impl core::marker::Freeze for traces_pkm::testing::ZoneGuard
+impl !core::marker::Send for traces_pkm::testing::ZoneGuard
+impl core::marker::Sync for traces_pkm::testing::ZoneGuard
+impl core::marker::Unpin for traces_pkm::testing::ZoneGuard
+impl core::marker::UnsafeUnpin for traces_pkm::testing::ZoneGuard
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::testing::ZoneGuard
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::testing::ZoneGuard
+impl<D> owo_colors::OwoColorize for traces_pkm::testing::ZoneGuard
+impl<T, U> core::convert::Into<U> for traces_pkm::testing::ZoneGuard where U: core::convert::From<T>
+pub fn traces_pkm::testing::ZoneGuard::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::testing::ZoneGuard where U: core::convert::Into<T>
+pub type traces_pkm::testing::ZoneGuard::Error = never
+pub fn traces_pkm::testing::ZoneGuard::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::testing::ZoneGuard where U: core::convert::TryFrom<T>
+pub type traces_pkm::testing::ZoneGuard::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::testing::ZoneGuard::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for traces_pkm::testing::ZoneGuard where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::testing::ZoneGuard::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::testing::ZoneGuard where T: ?core::marker::Sized
+pub fn traces_pkm::testing::ZoneGuard::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::testing::ZoneGuard where T: ?core::marker::Sized
+pub fn traces_pkm::testing::ZoneGuard::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::testing::ZoneGuard
+pub type traces_pkm::testing::ZoneGuard::Init = T
+pub const traces_pkm::testing::ZoneGuard::ALIGN: usize
+pub unsafe fn traces_pkm::testing::ZoneGuard::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::testing::ZoneGuard::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::testing::ZoneGuard::drop(usize)
+pub unsafe fn traces_pkm::testing::ZoneGuard::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for traces_pkm::testing::ZoneGuard
+impl<T> tracing::instrument::Instrument for traces_pkm::testing::ZoneGuard
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::ZoneGuard
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::ZoneGuard where T: 'static
 pub const traces_pkm::testing::DEFAULT_SCHEMAS_DIR: &str
 pub const traces_pkm::testing::DEFAULT_SCHEMA_VALUES_DIR: &str
 pub const traces_pkm::testing::DEFAULT_TEMPLATES_DIR: &str

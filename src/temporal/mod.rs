@@ -37,7 +37,7 @@ mod error;
 mod fixtures;
 mod point;
 mod unit;
-
+mod zone;
 pub(crate) use calendar::{
     CalendarPeriod, DateComponent, Difference, PERIOD_SHORTHANDS, PeriodEdge,
     weekday_from_number,
@@ -52,3 +52,5 @@ pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
 pub(crate) use point::DatePoint;
 pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
+#[cfg(any(test, feature = "test-utils"))]
+pub use zone::ZoneGuard;

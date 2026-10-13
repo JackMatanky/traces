@@ -272,7 +272,7 @@ impl<'de> Deserialize<'de> for DateValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{temporal::fixtures::ymd, test_support::TzGuard};
+    use crate::{temporal::fixtures::ymd, test_support::ZoneGuard};
 
     mod constructor {
         use pretty_assertions::assert_eq;
@@ -844,7 +844,7 @@ mod tests {
         fn converts_a_system_time_to_the_local_calendar_day() {
             // Arrange: UTC-05:00 has no DST; 1000 seconds after the epoch is
             // 00:16:40Z on January 1, which is 19:16:40 on December 31 local.
-            TzGuard::set("Etc/GMT+5");
+            ZoneGuard::set("Etc/GMT+5");
             let system_time =
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 
@@ -862,7 +862,7 @@ mod tests {
         #[test]
         fn converts_a_system_time_to_the_date_under_the_utc_zone() {
             // Arrange: under UTC the local day and the UTC day agree.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let system_time =
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 

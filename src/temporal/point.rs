@@ -598,13 +598,11 @@ mod tests {
     use super::*;
     use crate::{
         temporal::fixtures::{fixed_datetime, ymd},
-        test_support::TzGuard,
+        test_support::ZoneGuard,
     };
 
-    // Zone doctrine: every test that resolves or renders in a named zone calls
-    // `TzGuard::set` exactly once, before any parse. The local zone cache
-    // reuses the previously set zone within one second, so a second `set`
-    // inside one test would read stale offsets.
+    // ZoneGuard pins a Jiff time zone to the test thread without changing the
+    // process TZ environment variable; repeated sets replace the override.
 
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
@@ -668,7 +666,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             // Arrange: naive shapes resolve in the local zone.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let expected =
                 DateTimeValue::parse_iso(expected).expect("valid date-time");
 
@@ -966,7 +964,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             // Arrange: naive patterns resolve in the local zone.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let expected =
                 DateTimeValue::parse_iso(expected).expect("valid date-time");
 
@@ -1229,7 +1227,7 @@ mod tests {
         #[test]
         fn keeps_the_local_clock_time_across_a_spring_forward_gap() {
             // Arrange: Saturday 2026-03-07 12:00 EST; the gap begins Sunday.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let base = point_at("2026-03-07 12:00:00");
             let clock = |point: Result<DatePoint, CalendarError>| {
                 point.map(|p| p.local_datetime_or_utc().to_string())
@@ -1273,7 +1271,7 @@ mod tests {
         #[test]
         fn keeps_the_local_clock_time_across_a_fall_back_fold() {
             // Arrange: Saturday 2026-10-31 12:00 EDT; the fold begins Sunday.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let base = point_at("2026-10-31 12:00:00");
 
             // Act
@@ -1291,7 +1289,7 @@ mod tests {
         #[test]
         fn shifts_exact_units_by_elapsed_time_across_dst_transitions() {
             // Arrange: the spring gap and fall fold of America/New_York.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let spring = point_at("2026-03-07 12:00:00");
             let fall = point_at("2026-10-31 12:00:00");
 
@@ -1334,7 +1332,7 @@ mod tests {
         #[test]
         fn reports_out_of_range_past_the_representable_edges() {
             // Arrange: points one unit inside each representable edge.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let max_date = DatePoint::Calendar {
                 date: DateValue::from(NaiveDate::MAX),
                 date_precision: DatePrecision::Day,
@@ -1492,7 +1490,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let base = DatePoint::DateTime(fixed_datetime());
             let duration = DurationValue::parse(text).expect("valid duration");
             let expected = point_at(expected);
@@ -1512,7 +1510,7 @@ mod tests {
         fn applies_synthesized_nominal_seconds_exactly() {
             // Arrange: a duration rebuilt from nominal seconds carries no
             // written components, so it advances the exact time.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let base = DatePoint::DateTime(fixed_datetime());
             let synthesized = DurationValue::from_nominal_seconds(
                 crate::temporal::DurationSeconds::try_from(3600.0)
@@ -1533,7 +1531,7 @@ mod tests {
         #[test]
         fn applies_equal_valued_units_differently_across_a_gap() {
             // Arrange: 1d equals 24h as values, but not across the spring gap.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let base = point_at("2026-03-07 12:00:00");
             let one_day = DurationValue::parse("1d").expect("valid duration");
             let twenty_four_hours =
@@ -1573,7 +1571,7 @@ mod tests {
         fn applies_a_calendar_week_differently_from_168_exact_hours_across_a_gap()
          {
             // Arrange: one week, 7d and 168h are equal as values.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let base = point_at("2026-03-07 12:00:00");
             let one_week = DurationValue::parse("1w").expect("valid duration");
             let seven_days =
@@ -1611,7 +1609,7 @@ mod tests {
         #[test]
         fn applies_the_fractional_part_of_a_calendar_unit_on_the_local_clock() {
             // Arrange: 1.5d equals 36h equals \"1d 12h\" as values.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let base = point_at("2026-03-07 06:00:00");
             let one_and_half_days =
                 DurationValue::parse("1.5d").expect("valid duration");
@@ -1655,7 +1653,7 @@ mod tests {
         #[test]
         fn applies_written_components_left_to_right_across_a_gap() {
             // Arrange: 02:30 sits one hour before the spring gap opens.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let base = point_at("2026-03-07 02:30:00");
             let day_then_hour =
                 DurationValue::parse("1d 1h").expect("valid duration");
@@ -1852,7 +1850,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
@@ -1959,7 +1957,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
@@ -2049,7 +2047,7 @@ mod tests {
         #[test]
         fn keeps_the_time_of_day_on_a_date_time_point() {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
@@ -2159,7 +2157,7 @@ mod tests {
             #[case] expected: i64,
         ) {
             // Arrange: naive input resolves in the local zone.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let base = point_at(text);
 
             // Act
@@ -2321,7 +2319,7 @@ mod tests {
             #[case] expected: Difference,
         ) {
             // Arrange: ninety minutes span the date boundary.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let from = point_at("2026-07-28T23:00:00Z");
             let to = point_at("2026-07-29T00:30:00Z");
 
@@ -2344,7 +2342,7 @@ mod tests {
             #[case] expected: Difference,
         ) {
             // Arrange: the two points sit in the same month and year.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let from = point_at("2026-07-28T23:00:00Z");
             let to = point_at("2026-07-29T00:30:00Z");
 
@@ -2375,7 +2373,7 @@ mod tests {
             #[case] expected: Difference,
         ) {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let point = point_at(text);
 
             // Act
@@ -2405,7 +2403,7 @@ mod tests {
             #[case] expected: Difference,
         ) {
             // Arrange: mixed frames count whole units of the local reading.
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let from = point_at(from);
             let to = point_at(to);
 
@@ -2423,7 +2421,7 @@ mod tests {
         fn measures_a_dst_day_by_elapsed_time_when_both_points_carry_a_time() {
             // Arrange: New York springs forward on 2026-03-08 (a 23-hour day)
             // and falls back on 2026-11-01 (a 25-hour day).
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let spring_from = point_at("2026-03-07 12:00:00");
             let spring_to = point_at("2026-03-08 12:00:00");
             let fall_from = point_at("2026-10-31 12:00:00");
@@ -2461,7 +2459,7 @@ mod tests {
         #[test]
         fn counts_whole_days_for_date_only_points_across_dst() {
             // Arrange: date-only points have no time component to fold.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let from = point_at("2026-03-07");
             let to = point_at("2026-03-08");
 
@@ -2535,7 +2533,7 @@ mod tests {
         #[test]
         fn returns_the_local_calendar_date_for_a_date_time_point() {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let point = DatePoint::DateTime(fixed_datetime());
 
             // Act
@@ -2568,7 +2566,7 @@ mod tests {
         #[test]
         fn renders_the_local_clock_reading_of_a_date_time_point() {
             // Arrange: the naive reference date-time resolved in New York.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let point = point_at("2026-07-29 14:30:05");
 
             // Act
@@ -2591,7 +2589,7 @@ mod tests {
         #[test]
         fn resolves_a_calendar_point_at_utc_midnight_in_utc() {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let point = point_at("2026-07-29");
 
             // Act
@@ -2608,7 +2606,7 @@ mod tests {
         #[test]
         fn resolves_a_calendar_point_at_local_midnight_in_the_process_zone() {
             // Arrange: New York sits four hours behind UTC in July.
-            TzGuard::set("America/New_York");
+            ZoneGuard::set("America/New_York");
             let point = point_at("2026-07-29");
 
             // Act
@@ -2635,7 +2633,7 @@ mod tests {
             #[case] expected: &str,
         ) {
             // Arrange
-            TzGuard::set("UTC");
+            ZoneGuard::set("UTC");
             let point = point_at(text);
 
             // Act
