@@ -21,7 +21,8 @@
 //! Written input is one or more `<number><unit>` components with an optional
 //! sign on the whole span, separated by whitespace or commas. Unit spellings
 //! are case-insensitive, and a component may carry a fraction or an exponent.
-//! Surrounding whitespace is insignificant.
+//! Surrounding whitespace is insignificant. ISO 8601 duration spans are also
+//! accepted and retain their written spelling.
 
 use std::{
     borrow::Cow,
@@ -78,31 +79,34 @@ pub struct DurationValue {
 }
 
 impl DurationValue {
-    /// Parses a duration string containing one or more `<number><unit>`
-    /// components.
+    /// Parses a human-readable or ISO 8601 duration string.
     ///
-    /// Accepts integers, decimals (`".5h"`), and exponential floats (`"1e3s"`),
-    /// optional leading `+` or `-` on the first part, redundant `+` on
-    /// subsequent components, and whitespace or comma separators between
-    /// components.
+    /// Human-readable input accepts integers, decimals (".5h"), and
+    /// exponential floats ("1e3s"), an optional leading sign on the first
+    /// component, and whitespace or comma separators. ISO 8601 input is parsed
+    /// directly into a Jiff span.
     ///
     /// # Errors
     ///
-    /// - [`DurationError::Empty`] if `input` is empty or whitespace.
-    /// - [`DurationError::MissingNumber`] if a segment has a unit without a
-    ///   number.
-    /// - [`DurationError::MissingUnit`] if a number appears without a unit.
-    /// - [`DurationError::UnknownUnit`] if a unit is unrecognized.
-    /// - [`DurationError::MisplacedSign`] if a non-leading part carries a
-    ///   negative sign.
-    /// - [`DurationError::MalformedNumber`] if float syntax is invalid.
-    /// - [`DurationError::NumberOverflow`] if a literal overflows to infinity.
-    /// - [`DurationError::NonFiniteSeconds`] if the folded nominal seconds are
-    ///   non-finite.
+    /// Returns the corresponding parse, finiteness, or range error.
     pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
         let trimmed = input.trim();
         if trimmed.is_empty() {
             return Err(DurationError::Empty);
+        }
+        let unsigned = trimmed
+            .strip_prefix('-')
+            .or_else(|| trimmed.strip_prefix('+'))
+            .unwrap_or(trimmed);
+        if (unsigned.starts_with('P') || unsigned.starts_with('p'))
+            && let Ok(span) = trimmed.parse::<Span>()
+        {
+            DurationSeconds::try_from(span_nominal_seconds(span))?;
+            return Ok(Self {
+                spelling: trimmed.into(),
+                span: Box::new(span),
+                components: None,
+            });
         }
         Self::scan(trimmed, false).map(|(val, _)| val)
     }
@@ -1266,6 +1270,13 @@ mod tests {
         #[case::years_and_weeks("4 yrs, 6 wks", 129_772_800.0)]
         #[case::fractional_scalars("0.5h 15m", 2_700.0)]
         #[case::massive_day_literal("7304484d", 631_107_417_600.0)]
+        #[case::iso_date_and_time("P1DT2H", 93_600.0)]
+        #[case::iso_time_minutes("PT90M", 5_400.0)]
+        #[case::iso_negative_time("-PT1H", -3_600.0)]
+        #[case::iso_positive_month("P1M", 2_592_000.0)]
+        #[case::iso_negative_month_before_p("-P1M", -2_592_000.0)]
+        #[case::iso_negative_date_time("-P1DT2H", -93_600.0)]
+        #[case::iso_time_only_minutes("PT30M", 1_800.0)]
         fn accepts_multi_component_input(
             #[case] input: &str,
             #[case] expected: f64,
@@ -1373,7 +1384,6 @@ mod tests {
         #[case::positive_sign("+h")]
         #[case::negative_sign("-h")]
         #[case::lone_positive_sign("+")]
-        #[case::iso_with_leading_minus("-PT1H")]
         fn rejects_a_sign_without_a_magnitude(#[case] input: &str) {
             // Arrange: `input` is the case literal.
             // Act
@@ -1408,8 +1418,6 @@ mod tests {
         #[rstest]
         #[case::bare_unit("h")]
         #[case::unit_without_number(", h")]
-        #[case::bare_iso_unit("PT90M")]
-        #[case::iso_designator("P1DT2H")]
         #[case::exponent_without_number("e3s")]
         #[case::text_without_number("hello")]
         fn rejects_a_component_without_a_number(#[case] input: &str) {
