@@ -18,6 +18,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::{
     CalendarError, DateValue, TimeUnit,
     calendar::shift_datetime,
+    date::has_padded_date_prefix,
     error::DateError,
     point::{parse_reason, starts_with_year},
     zone::local_zone,
@@ -448,7 +449,9 @@ impl DateTimeShape {
             result = format.parse_shape(s);
         }
         result.map_err(parse_reason).and_then(|parsed| {
-            strict_date_prefix(s).then_some(parsed).ok_or("input is too short")
+            has_padded_date_prefix(s)
+                .then_some(parsed)
+                .ok_or("input is too short")
         })
     }
 
@@ -466,22 +469,6 @@ impl DateTimeShape {
     }
 }
 
-fn strict_date_prefix(s: &str) -> bool {
-    s.get(..10).is_some_and(|date| {
-        let bytes = date.as_bytes();
-        bytes.get(4) == Some(&b'-')
-            && bytes.get(7) == Some(&b'-')
-            && bytes
-                .get(..4)
-                .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
-            && bytes
-                .get(5..7)
-                .is_some_and(|month| month.iter().all(u8::is_ascii_digit))
-            && bytes
-                .get(8..)
-                .is_some_and(|day| day.iter().all(u8::is_ascii_digit))
-    })
-}
 /// The parsed shape of a date-time string before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParsedDateTime {

@@ -15,7 +15,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::{
     CalendarError, DateTimeValue,
     error::DateError,
-    point::{DatePrecision, parse_reason, starts_with_year},
+    point::{DatePrecision, starts_with_year},
 };
 
 /// Canonical output format of [`DateValue`]: `2026-07-29`.
@@ -197,6 +197,23 @@ pub(crate) enum DateShape {
     YearMonth,
 }
 
+/// Returns whether the first ten bytes are a zero-padded `YYYY-MM-DD` date.
+pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
+    s.get(..10).is_some_and(|date| {
+        let bytes = date.as_bytes();
+        bytes.get(4) == Some(&b'-')
+            && bytes.get(7) == Some(&b'-')
+            && bytes
+                .get(..4)
+                .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
+            && bytes
+                .get(5..7)
+                .is_some_and(|month| month.iter().all(u8::is_ascii_digit))
+            && bytes
+                .get(8..)
+                .is_some_and(|day| day.iter().all(u8::is_ascii_digit))
+    })
+}
 impl DateShape {
     /// Parses `s` as a full date, falling back to a year-month.
     ///
@@ -225,26 +242,34 @@ impl DateShape {
     ) -> Result<(civil::Date, DatePrecision), &'static str> {
         match self {
             Self::YearMonthDay => {
-                if s.len() < 10 && starts_with_year(s) {
-                    return Err("input is too short");
-                }
-                let date = NaiveDate::parse_from_str(s, DATE_PATTERN)
-                    .map_err(parse_reason)?;
-                let date = civil::Date::new(
-                    i16::try_from(date.year())
-                        .map_err(|_| "year is outside the supported range")?,
-                    i8::try_from(date.month())
-                        .map_err(|_| "month is outside the supported range")?,
-                    i8::try_from(date.day())
-                        .map_err(|_| "day is outside the supported range")?,
-                )
-                .map_err(|_| "a field is out of range")?;
+                let date = Self::parse_year_month_day(s)?;
                 Ok((date, DatePrecision::Day))
             }
             Self::YearMonth => {
                 Self::parse_year_month(s).map(|d| (d, DatePrecision::Month))
             }
         }
+    }
+
+    fn parse_year_month_day(s: &str) -> Result<civil::Date, &'static str> {
+        if s.len() < 10 && starts_with_year(s) {
+            return Err("input is too short");
+        }
+        if s.len() > 10 && has_padded_date_prefix(s) {
+            return Err("unexpected trailing input");
+        }
+        if s.len() != 10 || !has_padded_date_prefix(s) {
+            return Err("invalid input");
+        }
+        let year = s.get(..4).ok_or("invalid input")?;
+        let month = s.get(5..7).ok_or("invalid input")?;
+        let day = s.get(8..10).ok_or("invalid input")?;
+        civil::Date::new(
+            year.parse().map_err(|_| "invalid input")?,
+            month.parse().map_err(|_| "invalid input")?,
+            day.parse().map_err(|_| "invalid input")?,
+        )
+        .map_err(|_| "a field is out of range")
     }
 
     /// Parses `"YYYY-MM"`, defaulting the day to 1.
