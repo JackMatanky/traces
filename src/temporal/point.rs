@@ -279,11 +279,13 @@ impl DatePoint {
                 self.date()?.whole_months_until(to.date()?),
             )),
             fixed if self.has_time() && to.has_time() => {
-                let seconds =
-                    to.instant().signed_duration_since(self.instant());
-                Ok(Difference::Fractional(
-                    seconds.as_seconds_f64() / fixed.nominal_seconds(),
-                ))
+                let seconds = match (self, to) {
+                    (Self::DateTime(from), Self::DateTime(to)) => {
+                        to.duration_since(from).as_secs_f64()
+                    }
+                    _ => return Err(CalendarError::OutOfRange),
+                };
+                Ok(Difference::Fractional(seconds / fixed.nominal_seconds()))
             }
             TimeUnit::Week => Ok(Difference::Whole(local_delta().num_weeks())),
             TimeUnit::Day => Ok(Difference::Whole(local_delta().num_days())),

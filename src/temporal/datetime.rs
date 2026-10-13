@@ -12,7 +12,7 @@ use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime,
     SecondsFormat, Timelike as _, Utc,
 };
-use jiff::{Span, Timestamp, civil, tz::TimeZone};
+use jiff::{SignedDuration, Span, Timestamp, civil, tz::TimeZone};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
@@ -77,8 +77,14 @@ impl DateTimeValue {
         Self(timestamp)
     }
 
+    /// Returns the exact elapsed time from `earlier` to this value.
+    #[inline]
+    #[must_use]
+    pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
+        self.0.duration_since(earlier.0)
+    }
+
     /// Returns the local clock-time rendering of this date-time.
-    ///
     /// Every human-facing rendering uses checked offset application and returns
     /// [`None`] when the result falls outside the supported date-time range.
     #[inline]

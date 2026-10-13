@@ -1376,6 +1376,7 @@ src/temporal/datetime.rs: pub(crate) const fn pattern(self) -> Option<&'static s
 src/temporal/datetime.rs: pub(crate) enum DateTimeShape {
 src/temporal/datetime.rs: pub(crate) enum ParsedDateTime {
 src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/temporal/datetime.rs: pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
 src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, CalendarError> {
 src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
