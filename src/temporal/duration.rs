@@ -240,6 +240,13 @@ impl DurationValue {
         self.components.as_deref()
     }
 
+    /// Returns the Jiff span represented by this duration.
+    #[inline]
+    #[must_use]
+    pub(crate) fn span(&self) -> Span {
+        *self.span
+    }
+
     /// Returns `true` if the written components include a calendar unit.
     #[cfg(test)]
     #[inline]

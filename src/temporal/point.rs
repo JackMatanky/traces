@@ -11,6 +11,7 @@ use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
     Timelike as _, Utc, Weekday, format::ParseErrorKind,
 };
+use jiff::Span;
 #[cfg(test)]
 use jiff::Timestamp;
 use num_traits::ToPrimitive as _;
@@ -180,10 +181,7 @@ impl DatePoint {
                     date_point.apply_component(component)
                 })
             }
-            None => self.advance_exact(
-                TimeDelta::try_from(duration.nominal_seconds())
-                    .map_err(|_| CalendarError::OutOfRange)?,
-            ),
+            None => self.advance_span(duration.span()),
         }
     }
 
@@ -319,6 +317,22 @@ impl DatePoint {
                     .checked_add_signed(delta)
                     .ok_or(CalendarError::OutOfRange)?;
                 Ok(Self::DateTime(DateTimeValue::from_local(shifted)?))
+            }
+        }
+    }
+
+    /// Advances by an exact Jiff span, preserving the point's date/time kind.
+    fn advance_span(self, span: Span) -> Result<Self, CalendarError> {
+        match self {
+            Self::Calendar {
+                date,
+                date_precision,
+            } => Ok(Self::Calendar {
+                date: date.advance_span(span)?,
+                date_precision,
+            }),
+            Self::DateTime(datetime) => {
+                Ok(Self::DateTime(datetime.checked_add_span(span)?))
             }
         }
     }
@@ -1498,6 +1512,36 @@ mod tests {
                 }),
                 "{text:?} must move the date only when a component crosses \
                  midnight"
+            );
+        }
+        #[rstest]
+        #[case::under_a_day(82_800.0, ymd(2026, 7, 29))]
+        #[case::one_day(86_400.0, ymd(2026, 7, 30))]
+        #[case::negative_day(-86_400.0, ymd(2026, 7, 28))]
+        fn applies_synthesized_exact_spans_to_calendar_dates(
+            #[case] seconds: f64,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at("2026-07-29");
+            let duration = DurationValue::from_nominal_seconds(
+                crate::temporal::DurationSeconds::try_from(seconds)
+                    .expect("finite seconds"),
+            )
+            .expect("duration fits within the Jiff span range");
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{seconds} exact seconds must advance from midnight and keep \
+                 `Date` precision"
             );
         }
 

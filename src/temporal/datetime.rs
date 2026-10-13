@@ -241,6 +241,19 @@ impl DateTimeValue {
             }
         }
         .map_err(|_| CalendarError::OutOfRange)?;
+        self.checked_add_span(span)
+    }
+
+    /// Adds an exact Jiff span to this timestamp.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the resulting timestamp exceeds the
+    ///   representable range.
+    pub(crate) fn checked_add_span(
+        self,
+        span: Span,
+    ) -> Result<Self, CalendarError> {
         self.0
             .checked_add(span)
             .map(Self)

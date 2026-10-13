@@ -1366,6 +1366,7 @@ src/temporal/date.rs: pub(crate) fn parse_any(
 src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/date.rs: pub(crate) fn try_from_naive_date(
 src/temporal/date.rs: pub(super) fn advance(
+src/temporal/date.rs: pub(super) fn advance_span(
 src/temporal/date.rs: pub(super) fn whole_months_until(self, to: Self) -> i64 {
 src/temporal/date.rs: pub(super) fn whole_years_until(self, to: Self) -> i64 {
 src/temporal/datetime.rs: pub struct DateTimeValue(Timestamp);
@@ -1376,6 +1377,7 @@ src/temporal/datetime.rs: pub(crate) const fn pattern(self) -> Option<&'static s
 src/temporal/datetime.rs: pub(crate) enum DateTimeShape {
 src/temporal/datetime.rs: pub(crate) enum ParsedDateTime {
 src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/temporal/datetime.rs: pub(crate) fn checked_add_span(
 src/temporal/datetime.rs: pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
 src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
 src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, CalendarError> {
@@ -1404,6 +1406,7 @@ src/temporal/duration.rs: pub(crate) fn humanize(&self) -> String {
 src/temporal/duration.rs: pub(crate) fn nominal_seconds(&self) -> DurationSeconds {
 src/temporal/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
+src/temporal/duration.rs: pub(crate) fn span(&self) -> Span {
 src/temporal/duration.rs: pub(crate) struct DurationComponent {
 src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
 src/temporal/error.rs: pub enum DateError {

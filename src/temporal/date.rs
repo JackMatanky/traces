@@ -9,7 +9,7 @@
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
 use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
-use jiff::civil;
+use jiff::{Span, civil};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
@@ -156,6 +156,23 @@ impl DateValue {
                 Self::try_from(local_datetime.date()).ok()
             })
             .ok_or(CalendarError::OutOfRange)
+    }
+
+    /// Adds a Jiff span, discarding the time of day as date-only arithmetic
+    /// does.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the resulting date exceeds Jiff's
+    ///   representable range.
+    pub(super) fn advance_span(
+        self,
+        span: Span,
+    ) -> Result<Self, CalendarError> {
+        self.0
+            .checked_add(span)
+            .map(Self)
+            .map_err(|_| CalendarError::OutOfRange)
     }
 
     /// Parses an ISO-8601 date string (`YYYY-MM-DD` or `YYYY-MM`) using the
