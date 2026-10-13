@@ -10,10 +10,10 @@
 
 use std::sync::Arc;
 
-use chrono::NaiveDate;
 use pretty_assertions::assert_eq;
 use traces_pkm::{
-    SourceLine, TaskDateType, TaskListItem, TaskPriority, TaskStatusType,
+    DateValue, SourceLine, TaskDateType, TaskListItem, TaskPriority,
+    TaskStatusType,
     testing::{
         FileEntry, QueryBuilder, QueryService, QuerySet, SourceSelector,
         TestProject,
@@ -75,11 +75,8 @@ fn reloads_flat_list_items_with_metadata_and_hierarchy() {
     let root = records.first().expect("root task record");
     assert_eq!(root.raw_text(), "Root task 📅 2025-06-01 🔺");
     assert_eq!(
-        root.kind()
-            .as_task()
-            .and_then(|t| t.dates().get(TaskDateType::Due))
-            .map(Into::into),
-        NaiveDate::from_ymd_opt(2025, 6, 1)
+        root.kind().as_task().and_then(|t| t.dates().get(TaskDateType::Due)),
+        Some(DateValue::from_ymd(2025, 6, 1).expect("fixture date"))
     );
     assert_eq!(
         root.kind().as_task().and_then(TaskListItem::priority),
@@ -208,8 +205,8 @@ owner: alice
     let root_task = loaded_items.first().expect("root task");
     let root_t = root_task.kind().as_task().expect("root task kind");
     assert_eq!(
-        root_t.dates().get(TaskDateType::Due).map(Into::into),
-        NaiveDate::from_ymd_opt(2026, 6, 1)
+        root_t.dates().get(TaskDateType::Due),
+        Some(DateValue::from_ymd(2026, 6, 1).expect("fixture date"))
     );
     assert_eq!(root_t.priority(), Some(TaskPriority::Highest));
     assert_eq!(root_t.is_fully_complete(), false);
@@ -218,8 +215,8 @@ owner: alice
     let completed_t =
         completed_subtask.kind().as_task().expect("completed task kind");
     assert_eq!(
-        completed_t.dates().get(TaskDateType::Due).map(Into::into),
-        NaiveDate::from_ymd_opt(2026, 6, 15)
+        completed_t.dates().get(TaskDateType::Due),
+        Some(DateValue::from_ymd(2026, 6, 15).expect("fixture date"))
     );
     assert_eq!(completed_t.is_fully_complete(), true);
 

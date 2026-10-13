@@ -2960,11 +2960,6 @@ impl core::cmp::PartialOrd for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
 impl core::convert::From<jiff::civil::date::Date> for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::from(jiff::civil::date::Date) -> Self
-impl core::convert::From<traces_pkm::DateValue> for chrono::naive::date::NaiveDate
-pub fn chrono::naive::date::NaiveDate::from(traces_pkm::DateValue) -> Self
-impl core::convert::TryFrom<chrono::naive::date::NaiveDate> for traces_pkm::DateValue
-pub type traces_pkm::DateValue::Error = traces_pkm::DateError
-pub fn traces_pkm::DateValue::try_from(chrono::naive::date::NaiveDate) -> core::result::Result<Self, Self::Error>
 impl core::convert::TryFrom<std::time::SystemTime> for traces_pkm::DateValue
 pub type traces_pkm::DateValue::Error = traces_pkm::DateError
 pub fn traces_pkm::DateValue::try_from(std::time::SystemTime) -> core::result::Result<Self, Self::Error>

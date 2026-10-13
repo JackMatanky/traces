@@ -153,7 +153,7 @@ impl DateValue {
             .and_time(NaiveTime::MIN)
             .checked_add_signed(delta)
             .and_then(|local_datetime| {
-                Self::try_from(local_datetime.date()).ok()
+                Self::try_from_naive_date(local_datetime.date()).ok()
             })
             .ok_or(CalendarError::OutOfRange)
     }
@@ -313,27 +313,10 @@ impl fmt::Display for DateValue {
     }
 }
 
-impl From<DateValue> for NaiveDate {
-    #[inline]
-    fn from(value: DateValue) -> Self {
-        value.naive_date()
-    }
-}
 impl From<civil::Date> for DateValue {
     #[inline]
     fn from(date: civil::Date) -> Self {
         Self(date)
-    }
-}
-impl TryFrom<NaiveDate> for DateValue {
-    type Error = DateError;
-
-    #[inline]
-    fn try_from(date: NaiveDate) -> Result<Self, Self::Error> {
-        Self::try_from_naive_date(date).map_err(|_| DateError::InvalidValue {
-            input: date.to_string().into(),
-            reason: "date/time is outside the representable range",
-        })
     }
 }
 
@@ -995,35 +978,6 @@ mod tests {
                 ymd(1970, 1, 1),
                 "the epoch's UTC day converts unchanged under UTC"
             );
-        }
-
-        #[test]
-        fn converts_a_chrono_date_within_the_jiff_range() {
-            // Arrange
-            let chrono_date = NaiveDate::from_ymd_opt(2026, 7, 29)
-                .expect("valid fixture date");
-
-            // Act
-            let date = DateValue::try_from(chrono_date)
-                .expect("2026 is within the Jiff date range");
-
-            // Assert
-            assert_eq!(
-                date,
-                ymd(2026, 7, 29),
-                "the fallible conversion preserves valid calendar fields"
-            );
-        }
-
-        #[test]
-        fn rejects_chrono_dates_outside_the_jiff_range() {
-            // Arrange
-            let minimum = DateValue::try_from(NaiveDate::MIN);
-            let maximum = DateValue::try_from(NaiveDate::MAX);
-
-            // Assert
-            assert!(minimum.is_err(), "chrono's minimum exceeds Jiff's range");
-            assert!(maximum.is_err(), "chrono's maximum exceeds Jiff's range");
         }
     }
 
