@@ -140,12 +140,34 @@ impl DurationValue {
     /// overflows at the other extreme), it falls back to the
     /// [`DurationSeconds`] [`Display`](fmt::Display) so the result never lies
     /// as `"0s"`.
+    ///
+    /// This is the only constructor for the fixed regime: a value with no
+    /// written components always comes from here.
     #[inline]
     pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
         Self {
             spelling: Self::canonical_spelling(seconds),
             seconds,
             components: None,
+        }
+    }
+
+    /// Assembles a calendar-regime [`DurationValue`] from written
+    /// components.
+    ///
+    /// `spelling` is the written text the components were parsed or
+    /// transformed from, retained verbatim; `seconds` is the folded nominal
+    /// identity the caller already computed.
+    #[inline]
+    fn from_components(
+        spelling: Box<str>,
+        seconds: DurationSeconds,
+        components: Box<[DurationComponent]>,
+    ) -> Self {
+        Self {
+            spelling,
+            seconds,
+            components: Some(components),
         }
     }
 
@@ -324,11 +346,11 @@ impl DurationValue {
         };
 
         Ok((
-            Self {
+            Self::from_components(
                 spelling,
                 seconds,
-                components: Some(raw_components.into_boxed_slice()),
-            },
+                raw_components.into_boxed_slice(),
+            ),
             last_end,
         ))
     }
@@ -437,11 +459,11 @@ impl DurationValue {
             }
             let fold_total = Self::sum_nominal_seconds(&combined);
             let seconds = DurationSeconds::canonicalize_zero(fold_total);
-            Self {
-                spelling: Self::canonical_spelling(seconds),
+            Self::from_components(
+                Self::canonical_spelling(seconds),
                 seconds,
-                components: Some(combined.into_boxed_slice()),
-            }
+                combined.into_boxed_slice(),
+            )
         } else {
             #[expect(
                 clippy::arithmetic_side_effects,
@@ -453,11 +475,7 @@ impl DurationValue {
             } else {
                 self.seconds + rhs.seconds
             };
-            Self {
-                spelling: Self::canonical_spelling(seconds),
-                seconds,
-                components: None,
-            }
+            Self::from_nominal_seconds(seconds)
         }
     }
 }
@@ -576,11 +594,11 @@ impl Mul<f64> for DurationValue {
                 .collect();
             let fold_total = Self::sum_nominal_seconds(&scaled);
             let seconds = DurationSeconds::canonicalize_zero(fold_total);
-            Self {
-                spelling: Self::canonical_spelling(seconds),
+            Self::from_components(
+                Self::canonical_spelling(seconds),
                 seconds,
-                components: Some(scaled.into_boxed_slice()),
-            }
+                scaled.into_boxed_slice(),
+            )
         } else {
             #[expect(
                 clippy::arithmetic_side_effects,
@@ -588,11 +606,7 @@ impl Mul<f64> for DurationValue {
                           without panicking"
             )]
             let seconds = self.seconds * rhs;
-            Self {
-                spelling: Self::canonical_spelling(seconds),
-                seconds,
-                components: None,
-            }
+            Self::from_nominal_seconds(seconds)
         }
     }
 }
@@ -1376,6 +1390,23 @@ mod tests {
             // Assert
             assert_eq!(duration.as_str(), "1e300s");
             assert_ne!(duration.as_str(), "0s");
+        }
+
+        #[test]
+        fn agrees_with_the_synthesized_path_on_identity() {
+            // Arrange: one magnitude built by parsing written components and
+            // one by synthesis, the constructor pair behind every value.
+            let written =
+                DurationValue::parse("1h 30m").expect("compound is valid");
+            let synthesized = synthesized(5_400.0);
+            // Act
+            // Assert: both paths carry the same nominal identity, so they
+            // compare equal and render identically; only the regime witness
+            // differs.
+            assert_eq!(written, synthesized);
+            assert_eq!(written.humanize(), synthesized.humanize());
+            assert!(written.components().is_some());
+            assert!(synthesized.components().is_none());
         }
     }
 

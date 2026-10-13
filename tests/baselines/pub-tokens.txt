@@ -1445,13 +1445,13 @@ src/temporal/unit.rs: pub aliases: &'static [&'static str],
 src/temporal/unit.rs: pub calendar: bool,
 src/temporal/unit.rs: pub count: u64,
 src/temporal/unit.rs: pub names: (&'static str, &'static str),
+src/temporal/unit.rs: pub nominal_milliseconds: u64,
 src/temporal/unit.rs: pub nominal_seconds: f64,
 src/temporal/unit.rs: pub spelling: &'static str,
 src/temporal/unit.rs: pub unit: TimeUnit,
 src/temporal/unit.rs: pub unit: TimeUnit,
 src/temporal/unit.rs: pub(crate) const CANONICAL_UNITS: [TimeUnit; 6] = [
 src/temporal/unit.rs: pub(crate) const HUMAN_UNITS: [TimeUnit; 7] = [
-src/temporal/unit.rs: pub(crate) const UNITS: [UnitSpec; 8] = [
 src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
 src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
 src/temporal/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
@@ -1462,6 +1462,7 @@ src/temporal/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<
 src/temporal/unit.rs: pub(crate) enum TimeUnit {
 src/temporal/unit.rs: pub(crate) fn decompose(
 src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
+src/temporal/unit.rs: pub(crate) static UNITS: [UnitSpec; 8] = [
 src/temporal/unit.rs: pub(crate) struct DecomposedPart {
 src/temporal/unit.rs: pub(crate) struct UnitSpec {
 src/temporal_oracle.rs: pub(super) fn apply(input: &str, duration: &str) -> String {

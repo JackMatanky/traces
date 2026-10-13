@@ -56,6 +56,8 @@ pub(crate) struct UnitSpec {
     /// whole-count date-shifting behavior belongs to the calendar owner
     /// modules.
     pub nominal_seconds: f64,
+    /// Exact nominal milliseconds used by integer decomposition.
+    pub nominal_milliseconds: u64,
     /// Whether the unit takes effect on the local clock (`true`) or as exact
     /// elapsed time (`false`).
     pub calendar: bool,
@@ -66,13 +68,14 @@ pub(crate) struct UnitSpec {
 /// [`decompose`] and the unit sets below depend on this order. A new unit adds
 /// a row here and a variant to [`TimeUnit`]; the `invariants` tests fail to
 /// compile or assert until both agree.
-pub(crate) const UNITS: [UnitSpec; 8] = [
+pub(crate) static UNITS: [UnitSpec; 8] = [
     UnitSpec {
         unit: TimeUnit::Year,
         spelling: "y",
         aliases: &["y", "yr", "yrs", "year", "years"],
         names: ("year", "years"),
         nominal_seconds: 31_536_000.0,
+        nominal_milliseconds: 31_536_000_000,
         calendar: true,
     },
     UnitSpec {
@@ -81,6 +84,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["mo", "mos", "month", "months"],
         names: ("month", "months"),
         nominal_seconds: 2_592_000.0,
+        nominal_milliseconds: 2_592_000_000,
         calendar: true,
     },
     UnitSpec {
@@ -89,6 +93,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["w", "wk", "wks", "week", "weeks"],
         names: ("week", "weeks"),
         nominal_seconds: 604_800.0,
+        nominal_milliseconds: 604_800_000,
         calendar: true,
     },
     UnitSpec {
@@ -97,6 +102,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["d", "day", "days"],
         names: ("day", "days"),
         nominal_seconds: 86_400.0,
+        nominal_milliseconds: 86_400_000,
         calendar: true,
     },
     UnitSpec {
@@ -105,6 +111,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["h", "hr", "hrs", "hour", "hours"],
         names: ("hour", "hours"),
         nominal_seconds: 3_600.0,
+        nominal_milliseconds: 3_600_000,
         calendar: false,
     },
     UnitSpec {
@@ -113,6 +120,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["m", "min", "mins", "minute", "minutes"],
         names: ("minute", "minutes"),
         nominal_seconds: 60.0,
+        nominal_milliseconds: 60_000,
         calendar: false,
     },
     UnitSpec {
@@ -121,6 +129,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["s", "sec", "secs", "second", "seconds"],
         names: ("second", "seconds"),
         nominal_seconds: 1.0,
+        nominal_milliseconds: 1_000,
         calendar: false,
     },
     UnitSpec {
@@ -129,6 +138,7 @@ pub(crate) const UNITS: [UnitSpec; 8] = [
         aliases: &["ms", "millisecond", "milliseconds"],
         names: ("millisecond", "milliseconds"),
         nominal_seconds: 0.001,
+        nominal_milliseconds: 1,
         calendar: false,
     },
 ];
@@ -173,12 +183,17 @@ pub(crate) struct DecomposedPart {
 ///
 /// `total_ms` is a magnitude in milliseconds and `units` must be ordered
 /// largest first, as [`UNITS`], [`CANONICAL_UNITS`], and [`HUMAN_UNITS`] are.
-/// Unit sizes are [`UnitSpec::nominal_seconds`] scaled to whole milliseconds,
+/// Unit sizes are [`UnitSpec::nominal_milliseconds`],
 /// so the registry stays the sole ratio table. Units larger than the remaining
 /// magnitude contribute no row. Returns the rows and the sub-unit remainder in
 /// milliseconds; rendering or rounding that remainder is the caller's
 /// decision.
 #[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "registered unit sizes are nonzero and decomposition maintains a \
+              u64 remainder"
+)]
 pub(crate) fn decompose(
     total_ms: u64,
     units: &[TimeUnit],
@@ -199,21 +214,9 @@ pub(crate) fn decompose(
     (parts, rem)
 }
 
-/// Returns [`UnitSpec::nominal_seconds`] for `unit`, scaled to whole
-/// milliseconds.
-///
-/// The registry's ratios are all exact whole milliseconds; the `expect`
-/// records that invariant rather than silently decomposing with a zero.
+/// Returns the exact nominal millisecond count for [unit].
 fn whole_milliseconds(unit: TimeUnit) -> u64 {
-    let spec = UNITS
-        .iter()
-        .find(|row| row.unit == unit)
-        .expect("every TimeUnit variant has a UNITS row");
-    use num_traits::ToPrimitive as _;
-    (spec.nominal_seconds * 1_000.0)
-        .round()
-        .to_u64()
-        .expect("UNITS nominal ratios are exact whole milliseconds")
+    unit.spec().nominal_milliseconds
 }
 
 impl TimeUnit {
@@ -666,13 +669,13 @@ mod tests {
             // Arrange: adjacent registry pairs are the arranged input.
             // Act
             // Assert
-            for pair in UNITS.windows(2) {
+            for (larger, smaller) in UNITS.iter().zip(UNITS.iter().skip(1)) {
                 assert!(
-                    pair[0].nominal_seconds > pair[1].nominal_seconds,
+                    larger.nominal_seconds > smaller.nominal_seconds,
                     "{:?} must precede the smaller {:?}; decomposition \
                      depends on descending order",
-                    pair[0].unit,
-                    pair[1].unit
+                    larger.unit,
+                    smaller.unit
                 );
             }
         }

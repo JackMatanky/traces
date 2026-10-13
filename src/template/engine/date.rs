@@ -95,7 +95,7 @@ impl DateNamespace {
         env.add_filter("sub_months", sub_months);
         env.add_filter("add_years", add_years);
         env.add_filter("sub_years", sub_years);
-        for &(name, period, edge) in crate::temporal::PERIOD_SHORTHANDS.iter() {
+        for &(name, period, edge) in &crate::temporal::PERIOD_SHORTHANDS {
             env.add_filter(name, move |value: &str| {
                 render_period_edge(value, period, edge)
             });

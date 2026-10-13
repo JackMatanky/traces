@@ -618,11 +618,11 @@ mod tests {
             // Arrange: comma separation is handled by `skip_separators`, so
             // the whitespace-only lookahead must not jump across it.
             let mut scanner = Scanner::new("1,30m");
-            let scanned = scanner.number().expect("the one scans");
+            let magnitude = scanner.number().expect("the one scans");
             // Act
             let moved = scanner.skip_to_next_component();
             // Assert
-            assert_eq!(scanned.to_bits(), 1.0_f64.to_bits());
+            assert_eq!(magnitude.to_bits(), 1.0_f64.to_bits());
             assert!(!moved);
             assert_eq!(scanner.position(), 1);
         }
@@ -631,11 +631,11 @@ mod tests {
         fn stays_put_before_a_multibyte_character() {
             // Arrange
             let mut scanner = Scanner::new("1é");
-            let scanned = scanner.number().expect("the one scans");
+            let magnitude = scanner.number().expect("the one scans");
             // Act
             let moved = scanner.skip_to_next_component();
             // Assert
-            assert_eq!(scanned.to_bits(), 1.0_f64.to_bits());
+            assert_eq!(magnitude.to_bits(), 1.0_f64.to_bits());
             assert!(!moved);
             assert_eq!(scanner.position(), 1);
         }
@@ -676,11 +676,11 @@ mod tests {
         fn reports_a_cursor_before_the_end_of_input() {
             // Arrange
             let mut scanner = Scanner::new("1h");
-            let scanned = scanner.number().expect("the one scans");
+            let magnitude = scanner.number().expect("the one scans");
             // Act
             let at_end = scanner.is_at_end();
             // Assert
-            assert_eq!(scanned.to_bits(), 1.0_f64.to_bits());
+            assert_eq!(magnitude.to_bits(), 1.0_f64.to_bits());
             assert!(!at_end);
             assert_eq!(scanner.position(), 1);
         }
