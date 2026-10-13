@@ -1,3 +1,11 @@
+//! A UTC-stored Date-Time that renders as the local clock.
+//!
+//! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
+//! [`ParsedDateTime`]) that turn written RFC 3339 and naive clock times into
+//! it. Written input without an offset resolves in the process's local zone
+//! and stores as UTC; every human-facing rendering converts back to the local
+//! clock. Callers hold the validated date-time or receive a [`DateError`].
+
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
 use chrono::{
@@ -13,45 +21,58 @@ use super::{
     point::{parse_reason, starts_with_year},
 };
 
-/// [`DateTimeValue`]'s canonical output format: `2026-07-29T14:30:00`.
+/// Canonical output format of [`DateTimeValue`]: `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
-/// Parsed UTC date-time instant.
+/// A Date-Time stored as UTC that renders as the local clock.
 ///
-/// Wraps [`DateTime<Utc>`] as a newtype, enforcing ISO-8601/RFC-3339
-/// recognition through its crate-internal `parse_iso` parser. All values are
-/// UTC-normalized; offset-bearing input is converted to UTC at parse time,
-/// while naive input resolves in the process's local zone.
+/// Accepts RFC 3339 input with an explicit offset and naive input in the five
+/// written shapes of `DateTimeShape`. Naive input resolves in the process's
+/// local zone (ambiguous fall-back times take the earlier occurrence;
+/// spring-forward gaps shift forward by the gap length) and stores as UTC.
+/// [`Display`](fmt::Display) renders the local clock time without a zone
+/// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
+/// Deserialization runs the same parser as
+/// [`FromStr`](std::str::FromStr), so inline and deserialized date-times
+/// follow one grammar.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::DateTimeValue;
+/// # #[cfg(feature = "test-utils")]
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// use std::time::{Duration, SystemTime};
 ///
-/// let utc: DateTimeValue =
-///     "2026-07-29T14:30:00Z".parse().expect("valid RFC 3339");
-/// let offset: DateTimeValue =
-///     "2026-07-29T14:30:00+00:00".parse().expect("equivalent offset");
-/// assert_eq!(utc, offset);
+/// use traces_pkm::{DateTimeValue, testing::TzGuard};
 ///
-/// // Outside a DST fold hour, the local clock time this value renders
-/// // re-parses to the same instant.
-/// let round_trip: DateTimeValue =
-///     utc.to_string().parse().expect("rendered spelling re-parses");
-/// assert_eq!(utc, round_trip);
+/// TzGuard::set("UTC");
+///
+/// let epoch = DateTimeValue::from(SystemTime::UNIX_EPOCH);
+/// assert_eq!(epoch.to_string(), "1970-01-01T00:00:00");
+///
+/// let minute =
+///     DateTimeValue::from(SystemTime::UNIX_EPOCH - Duration::from_secs(60));
+/// assert_eq!(minute.to_string(), "1969-12-31T23:59:00");
+///
+/// let parsed: DateTimeValue = "2026-07-29T14:30:00Z".parse()?;
+/// assert_eq!(parsed.to_string(), "2026-07-29T14:30:00");
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "test-utils"))]
+/// # fn main() {}
 /// ```
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DateTimeValue(DateTime<Utc>);
 
 impl DateTimeValue {
-    /// Returns the local clock-time rendering of this instant.
+    /// Returns the local clock-time rendering of this date-time.
     ///
     /// Every human-facing rendering goes through this conversion: the offset
     /// comes from [`Local::offset_from_utc_datetime`] and is applied with
     /// [`NaiveDateTime::checked_add_offset`], which returns [`None`] instead of
-    /// panicking at `NaiveDateTime`'s range edge (`.naive_local()` would panic
-    /// there).
+    /// panicking at the range edge of `NaiveDateTime` (`.naive_local()` would
+    /// panic there).
     #[inline]
     #[must_use]
     pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
@@ -68,10 +89,11 @@ impl DateTimeValue {
         self.local_datetime().unwrap_or_else(|| self.0.naive_utc())
     }
 
-    /// Returns the local calendar date of this instant, discarding time-of-day.
+    /// Returns the local calendar date of this date-time, discarding
+    /// time-of-day.
     ///
-    /// When the local offset cannot be applied (an instant at the extreme edge
-    /// of [`NaiveDateTime`]'s range), the UTC date renders instead.
+    /// When the local offset cannot be applied (a date-time at the extreme
+    /// edge of [`NaiveDateTime`]), the UTC date renders instead.
     #[inline]
     #[must_use]
     pub(crate) fn local_date(self) -> DateValue {
@@ -91,7 +113,7 @@ impl DateTimeValue {
         self.0
     }
 
-    /// Canonical strftime pattern for this instant: whole seconds, plus
+    /// Canonical strftime pattern for this date-time: whole seconds, plus
     /// fractional seconds only when the nanosecond component is nonzero.
     ///
     /// Local offsets are whole seconds, so the UTC and local readings share
@@ -105,20 +127,21 @@ impl DateTimeValue {
         }
     }
 
-    /// Resolves a naive local datetime to an instant under the crate's DST
-    /// doctrine.
+    /// Resolves a naive local clock time to a stored date-time under the
+    /// crate's DST doctrine.
     ///
     /// A clock time written without a zone is read in the process's local zone
     /// and stored as UTC. Resolution never fails on a DST boundary:
     ///
     /// - Ambiguous fall-back times resolve to their earliest occurrence;
-    /// - Spring-forward gaps shift forward by the gap, matching Temporal's
-    ///   `'compatible'` disambiguation and jiff's
-    ///   [`Disambiguation::Compatible`].
+    /// - Spring-forward gaps shift forward by the gap, matching the
+    ///   `'compatible'` disambiguation of Temporal and the
+    ///   [`Disambiguation::Compatible`] policy of jiff.
     ///
     /// Only a broken tz-data/OS lookup or an offset application outside
-    /// `NaiveDateTime`'s range errors. On the `WebAssembly` target, chrono's
-    /// `Local` reports every local time as unambiguous ([chrono#1701]), so the
+    /// the range of `NaiveDateTime` errors. On the `WebAssembly` target, the
+    /// `Local` type reports every local time as unambiguous ([chrono#1701]),
+    /// so the
     /// ambiguous arm is unreachable there.
     ///
     /// # Errors
@@ -126,7 +149,7 @@ impl DateTimeValue {
     /// - [`DateError::LocalZoneLookup`] if the lookup finds no offset for
     ///   `local_datetime` or a probe (a broken tz-data/OS environment rather
     ///   than a DST boundary), or if applying the resolved offset would leave
-    ///   `NaiveDateTime`'s range.
+    ///   the range of `NaiveDateTime`.
     ///
     /// [`Disambiguation::Compatible`]:
     ///     https://docs.rs/jiff/latest/jiff/tz/enum.Disambiguation.html
@@ -137,29 +160,29 @@ impl DateTimeValue {
         let zone_lookup = || DateError::LocalZoneLookup {
             input: local_datetime.to_string().into(),
         };
-        // The checked forms return `None` instead of panicking when the instant
-        // leaves `NaiveDateTime`'s range (impossible for the parsers'
-        // 4-digit-year inputs).
+        // The checked forms return `None` instead of panicking when the
+        // resolved value leaves the range of `NaiveDateTime` (impossible for
+        // parsers' 4-digit-year inputs).
         match Local.offset_from_local_datetime(&local_datetime) {
             MappedLocalTime::Single(offset) => {
-                let instant = local_datetime
+                let naive_utc = local_datetime
                     .checked_sub_offset(offset)
                     .ok_or_else(zone_lookup)?;
-                Ok(Self(instant.and_utc()))
+                Ok(Self(naive_utc.and_utc()))
             }
             MappedLocalTime::Ambiguous(a, b) => {
                 // `chrono` orders an ambiguous pair by offset (tzfile data) or
-                // transition side (POSIX rules); the earliest occurrence has
-                // the larger offset, since instant = local_datetime - offset.
+                // transition side (POSIX rules); the earlier occurrence has
+                // the larger offset (local minus offset).
                 let earliest = if a.local_minus_utc() >= b.local_minus_utc() {
                     a
                 } else {
                     b
                 };
-                let instant = local_datetime
+                let naive_utc = local_datetime
                     .checked_sub_offset(earliest)
                     .ok_or_else(zone_lookup)?;
-                Ok(Self(instant.and_utc()))
+                Ok(Self(naive_utc.and_utc()))
             }
             MappedLocalTime::None => {
                 // A gap resolves `None` across the whole skipped span, so no
@@ -167,10 +190,10 @@ impl DateTimeValue {
                 // the gap time forward by exactly the gap.
                 let offset =
                     Self::offset_across_gap(local_datetime, &zone_lookup)?;
-                let instant = local_datetime
+                let naive_utc = local_datetime
                     .checked_sub_offset(offset)
                     .ok_or_else(zone_lookup)?;
-                Ok(Self(instant.and_utc()))
+                Ok(Self(naive_utc.and_utc()))
             }
         }
     }
@@ -183,8 +206,8 @@ impl DateTimeValue {
     ///
     /// - [`DateError::LocalZoneLookup`] if no nearby local time resolves within
     ///   the 25-hour backward search (a broken tz-data/OS lookup rather than a
-    ///   gap), or if stepping the probe back would leave `NaiveDateTime`'s
-    ///   range.
+    ///   gap), or if stepping the probe back would leave the range of
+    ///   `NaiveDateTime`.
     fn offset_across_gap(
         local_datetime: NaiveDateTime,
         zone_lookup: &impl Fn() -> DateError,
@@ -209,9 +232,10 @@ impl DateTimeValue {
     /// # Errors
     ///
     /// - [`DateError::OutOfRange`] if the shift overflows, or the local
-    ///   datetime of a calendar-unit shift is outside chrono's range.
+    ///   datetime of a calendar-unit shift is outside the range covered by
+    ///   `NaiveDateTime`.
     /// - [`DateError::LocalZoneLookup`] if the shifted local datetime cannot be
-    ///   resolved to an instant.
+    ///   resolved to a stored date-time.
     pub(crate) fn shift(
         self,
         n: i64,
@@ -233,9 +257,9 @@ impl DateTimeValue {
     ///
     /// Surrounding whitespace is ignored. The cascade matches shapes only: a
     /// matched naive input then resolves through [`DateTimeValue::from_local`]
-    /// (an explicit-offset input already is the instant). Resolution runs once
-    /// after the cascade, because a resolution failure must not retry later
-    /// formats.
+    /// (an explicit-offset input already carries an offset and stores
+    /// directly). Resolution runs once after the cascade, because a resolution
+    /// failure must not retry later formats.
     ///
     /// # Errors
     ///
@@ -258,7 +282,7 @@ impl DateTimeValue {
             }
         })?;
         match shape {
-            ParsedDateTime::Instant(instant) => Ok(Self::from(instant)),
+            ParsedDateTime::Instant(date_time) => Ok(Self::from(date_time)),
             ParsedDateTime::Unzoned(local_datetime) => {
                 Self::from_local(local_datetime)
             }
@@ -306,14 +330,14 @@ impl From<DateTimeValue> for DateTime<Utc> {
 }
 
 /// Promotes a [`DateValue`] to a [`DateTimeValue`] at midnight in the local
-/// zone: a zone-free calendar date has no instant until a reader's zone
+/// zone: a zone-free calendar date has no clock time until a reader's zone
 /// supplies one.
 ///
 /// On zone-lookup failure, this promotion degrades to the neutral UTC frame
 /// (calendar date read as UTC, deterministic and shift-free) instead of
-/// surfacing [`DateError::LocalZoneLookup`], because the infallible conversion
-/// is consumed by equality, sort-key, and ordering paths that cannot propagate
-/// an error, while `TryFrom` would duplicate that fallback at each of them. All
+/// surfacing [`DateError::LocalZoneLookup`]. Equality, sort-key, and ordering
+/// paths consume the infallible conversion and cannot propagate an error.
+/// A `TryFrom` would duplicate that fallback at each of them. All
 /// fallible entry points surface broken local-zone lookups as
 /// [`DateError::LocalZoneLookup`] instead.
 impl From<DateValue> for DateTimeValue {
@@ -334,9 +358,8 @@ impl FromStr for DateTimeValue {
     }
 }
 
-/// Serializes as an explicit RFC 3339 `…Z` interop spelling via
-/// [`DateTime::to_rfc3339_opts`], independent of [`Display`](fmt::Display)'s
-/// local-naive rendering.
+/// Serializes as an explicit RFC 3339 `…Z` interop spelling, independent of
+/// the local-clock rendering [`Display`](fmt::Display) performs.
 impl Serialize for DateTimeValue {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -362,7 +385,7 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     }
 }
 
-/// Recognized date-time input format shapes tried in order by
+/// Recognized date-time input format shapes, tried in order by
 /// [`DateTimeValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateTimeShape {
@@ -438,7 +461,8 @@ impl DateTimeShape {
 /// The parsed shape of a date-time string before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParsedDateTime {
-    /// Explicit RFC 3339 instant.
+    /// An explicit RFC 3339 date-time with its offset applied; stores as UTC
+    /// directly.
     Instant(DateTime<Utc>),
     /// Local naive datetime that must resolve through
     /// [`DateTimeValue::from_local`].
@@ -449,97 +473,248 @@ pub(crate) enum ParsedDateTime {
 mod tests {
     use super::*;
     use crate::{
-        temporal::{DatePoint, fixtures::fixed_datetime},
+        temporal::fixtures::{fixed_datetime, ymd},
         test_support::TzGuard,
     };
 
-    fn point_at(text: &str) -> DatePoint {
-        DatePoint::parse(text).expect("valid date point")
+    // Zone doctrine: every test that resolves or renders in a named zone
+    // calls `TzGuard::set` exactly once, before any parse. The local zone
+    // cache reuses the previously set zone within one second, so a second
+    // `set` inside one test would read stale offsets.
+
+    mod constructor {
+        use std::time::Duration;
+
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[test]
+        fn constructs_the_unix_epoch_from_system_time() {
+            // Arrange: the epoch and the UTC date-time it must equal.
+            let epoch = SystemTime::UNIX_EPOCH;
+            let expected = Utc
+                .with_ymd_and_hms(1970, 1, 1, 0, 0, 0)
+                .single()
+                .expect("the epoch is an unambiguous UTC date-time");
+
+            // Act
+            let value = DateTimeValue::from(epoch);
+
+            // Assert
+            assert_eq!(
+                value.utc(),
+                expected,
+                "the epoch must construct as 1970-01-01T00:00:00Z"
+            );
+        }
+
+        #[test]
+        fn constructs_a_pre_epoch_date_time_from_system_time() {
+            // Arrange: one thousand seconds before the epoch.
+            let before_epoch =
+                SystemTime::UNIX_EPOCH - Duration::from_secs(1_000);
+            let expected = Utc
+                .with_ymd_and_hms(1969, 12, 31, 23, 43, 20)
+                .single()
+                .expect("the pre-epoch reading is unambiguous");
+
+            // Act
+            let value = DateTimeValue::from(before_epoch);
+
+            // Assert
+            assert_eq!(
+                value.utc(),
+                expected,
+                "negative timeline positions must construct before the epoch"
+            );
+        }
+
+        #[rstest]
+        #[case::minimum(NaiveDateTime::MIN.and_utc())]
+        #[case::maximum(NaiveDateTime::MAX.and_utc())]
+        fn wraps_the_representable_range_edges(#[case] edge: DateTime<Utc>) {
+            // Arrange: `edge` is a bound of the representable range.
+
+            // Act
+            let value = DateTimeValue::from(edge);
+
+            // Assert
+            assert_eq!(
+                value.utc(),
+                edge,
+                "the range edges must round-trip through construction"
+            );
+        }
+
+        #[test]
+        fn returns_none_one_second_past_each_representable_edge() {
+            // Arrange: the bounds one second outside the representable range.
+            let min_seconds = NaiveDateTime::MIN.and_utc().timestamp();
+            let max_seconds = NaiveDateTime::MAX.and_utc().timestamp();
+            let below = min_seconds
+                .checked_sub(1)
+                .expect("the minimum second is not i64::MIN");
+            let above = max_seconds
+                .checked_add(1)
+                .expect("the maximum second is not i64::MAX");
+
+            // Act
+            let lower = DateTime::<Utc>::from_timestamp(below, 0);
+            let upper = DateTime::<Utc>::from_timestamp(above, 0);
+
+            // Assert
+            assert!(
+                lower.is_none(),
+                "one second past the minimum must not construct, got {lower:?}"
+            );
+            assert!(
+                upper.is_none(),
+                "one second past the maximum must not construct, got {upper:?}"
+            );
+        }
     }
 
-    /// Local-zone doctrine: a naive datetime means the reader's local clock
-    /// time, resolved to UTC through the DST resolver; a date-only value stays
-    /// zone-free until a zone is needed. Every test here injects `TZ` via
-    /// [`TzGuard`] so the asserted zone is deterministic.
-    mod local_zone {
+    mod disambiguation {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[test]
-        fn parses_a_naive_datetime_in_the_local_zone_and_stores_utc() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
-
-            let parsed = DateTimeValue::parse_iso("2026-07-29 14:30:00")
-                .expect("naive datetime parses");
-
-            assert_eq!(
-                parsed,
-                DateTimeValue::parse_iso("2026-07-29T12:30:00Z")
-                    .expect("equivalent explicit-offset instant parses")
-            );
-        }
-
-        #[test]
-        fn resolves_an_ambiguous_fall_back_time_to_the_earliest_occurrence() {
+        fn resolves_an_ambiguous_fall_back_time_to_the_earlier_occurrence() {
+            // Arrange: 01:30 happens twice on this fall-back day.
             TzGuard::set("America/New_York");
 
-            let parsed = DateTimeValue::parse_iso("2026-11-01 01:30:00")
-                .expect("ambiguous clock time still parses");
+            // Act
+            let parsed = DateTimeValue::parse_iso("2026-11-01 01:30:00");
+            let earlier = DateTimeValue::parse_iso("2026-11-01T05:30:00Z");
 
-            // 01:30 happens twice (EDT, then EST); the earliest occurrence is
-            // the EDT reading, 05:30Z.
+            // Assert
             assert_eq!(
-                parsed,
-                DateTimeValue::parse_iso("2026-11-01T05:30:00Z")
-                    .expect("equivalent explicit-offset instant parses")
+                parsed, earlier,
+                "an ambiguous clock time must take the earlier (EDT) \
+                 occurrence"
             );
         }
 
         #[test]
         fn shifts_a_spring_forward_gap_forward_by_the_gap() {
+            // Arrange: 02:30 does not exist on this spring-forward day.
             TzGuard::set("America/New_York");
 
-            let parsed = DateTimeValue::parse_iso("2026-03-08 02:30:00")
-                .expect("gap clock time still parses, never fails");
+            // Act
+            let parsed = DateTimeValue::parse_iso("2026-03-08 02:30:00");
+            let shifted = DateTimeValue::parse_iso("2026-03-08T07:30:00Z");
 
-            // 02:30 does not exist; interpreting it with the pre-transition
-            // offset shifts it forward by the one-hour gap to 03:30 EDT.
+            // Assert
             assert_eq!(
-                parsed,
-                DateTimeValue::parse_iso("2026-03-08T07:30:00Z")
-                    .expect("equivalent explicit-offset instant parses")
+                parsed, shifted,
+                "a gap clock time must shift forward by the one-hour gap"
+            );
+            assert_eq!(
+                parsed.map(|value| value.to_string()),
+                Ok("2026-03-08T03:30:00".to_owned()),
+                "the shifted gap must land on the post-transition clock"
             );
         }
 
         #[test]
         fn resolves_local_times_adjacent_to_a_gap_without_error() {
+            // Arrange: one second before the gap, and at the gap's end.
             TzGuard::set("America/New_York");
 
-            let before = DateTimeValue::parse_iso("2026-03-08 01:59:59")
-                .expect("clock time one second before the gap parses");
-            let after = DateTimeValue::parse_iso("2026-03-08 03:00:00")
-                .expect("clock time at the gap's end parses");
+            // Act
+            let before = DateTimeValue::parse_iso("2026-03-08 01:59:59");
+            let after = DateTimeValue::parse_iso("2026-03-08 03:00:00");
+            let before_expected =
+                DateTimeValue::parse_iso("2026-03-08T06:59:59Z");
+            let after_expected =
+                DateTimeValue::parse_iso("2026-03-08T07:00:00Z");
 
-            // A real gap resolves `None` only inside the gap; the adjacent
-            // local times must resolve normally, not be swept into a silent
-            // shift or an error.
+            // Assert
             assert_eq!(
-                before,
-                DateTimeValue::parse_iso("2026-03-08T06:59:59Z")
-                    .expect("equivalent explicit-offset instant parses")
+                before, before_expected,
+                "the last second before the gap must resolve normally"
             );
             assert_eq!(
-                after,
-                DateTimeValue::parse_iso("2026-03-08T07:00:00Z")
-                    .expect("equivalent explicit-offset instant parses")
+                after, after_expected,
+                "the first second after the gap must resolve normally"
             );
         }
 
         #[test]
-        fn reports_local_zone_lookup_when_extreme_local_datetime_cannot_resolve()
+        fn resolves_the_london_fold_to_the_earlier_occurrence() {
+            // Arrange: one zone per test; London falls back on 2026-10-25.
+            TzGuard::set("Europe/London");
+            let earlier = DateTimeValue::parse_iso("2026-10-25T01:30:00+01:00")
+                .expect("an explicit offset must parse");
+            let later = DateTimeValue::parse_iso("2026-10-25T01:30:00+00:00")
+                .expect("an explicit offset must parse");
+
+            // Act
+            let resolved = DateTimeValue::parse_iso("2026-10-25T01:30:00");
+
+            // Assert
+            assert_eq!(
+                resolved,
+                Ok(earlier),
+                "the London fold must take the first (BST) occurrence"
+            );
+            assert_ne!(
+                resolved,
+                Ok(later),
+                "the later (GMT) occurrence must not be selected"
+            );
+        }
+
+        #[test]
+        fn resolves_the_lord_howe_half_hour_fold_to_the_earlier_occurrence() {
+            // Arrange: Lord Howe shifts by 30 minutes, folding 2026-04-05.
+            TzGuard::set("Australia/Lord_Howe");
+            let earlier = DateTimeValue::parse_iso("2026-04-05T01:45:00+11:00")
+                .expect("an explicit offset must parse");
+            let later = DateTimeValue::parse_iso("2026-04-05T01:45:00+10:30")
+                .expect("an explicit offset must parse");
+
+            // Act
+            let resolved = DateTimeValue::parse_iso("2026-04-05T01:45:00");
+
+            // Assert
+            assert_eq!(
+                resolved,
+                Ok(earlier),
+                "the half-hour fold must take the first (DST) occurrence"
+            );
+            assert_ne!(
+                resolved,
+                Ok(later),
+                "the later standard-time occurrence must not be selected"
+            );
+        }
+
+        #[test]
+        fn shifts_the_lord_howe_half_hour_gap_forward_by_the_gap() {
+            // Arrange: the 2026-10-04 gap skips 02:00 to 02:30.
+            TzGuard::set("Australia/Lord_Howe");
+            let shifted = DateTimeValue::parse_iso("2026-10-04T02:45:00+11:00")
+                .expect("an explicit offset must parse");
+
+            // Act
+            let resolved = DateTimeValue::parse_iso("2026-10-04T02:15:00");
+
+            // Assert
+            assert_eq!(
+                resolved,
+                Ok(shifted),
+                "an in-gap time must shift forward by the 30-minute gap"
+            );
+        }
+
+        #[test]
+        fn reports_local_zone_lookup_when_the_extreme_local_datetime_cannot_resolve()
          {
-            // Arrange
+            // Arrange: UTC+14 pushes the range edge out of range.
             TzGuard::set("Etc/GMT-14");
 
             // Act
@@ -548,27 +723,9 @@ mod tests {
             // Assert
             assert!(matches!(result, Err(DateError::LocalZoneLookup { .. })));
         }
-
-        #[test]
-        fn promotes_a_date_value_to_local_zone_midnight() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
-
-            let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-
-            let promoted = DateTimeValue::from(date);
-
-            // Calendar midnight in UTC+2 is 22:00Z on the previous day, so this
-            // pins the promotion to the local zone rather than UTC.
-            assert_eq!(
-                promoted.utc(),
-                Utc.with_ymd_and_hms(2026, 7, 28, 22, 0, 0)
-                    .single()
-                    .expect("unambiguous instant")
-            );
-        }
     }
 
-    mod parsing {
+    mod parse {
         use chrono::NaiveDate;
         use pretty_assertions::assert_eq;
         use rstest::rstest;
@@ -605,38 +762,154 @@ mod tests {
             "2026-07-29 14:30",
             "2026-07-29T14:30:00"
         )]
-        fn parses_every_datetime_shape_to_the_expected_instant(
+        fn parses_each_accepted_shape_to_the_expected_utc_rendering(
             #[case] input: &str,
-            #[case] expected_utc_rendering: &str,
+            #[case] expected_rendering: &str,
         ) {
-            // Arrange
+            // Arrange: the case literals are the input and its UTC rendering.
             TzGuard::set("UTC");
 
             // Act
-            let parsed = DateTimeValue::parse_iso(input).expect("valid shape");
+            let result = DateTimeValue::parse_iso(input);
 
             // Assert
-            assert_eq!(parsed.to_string(), expected_utc_rendering);
+            assert_eq!(
+                result.map(|parsed| parsed.to_string()),
+                Ok(expected_rendering.to_owned()),
+                "`{input}` must parse and render as `{expected_rendering}`"
+            );
         }
 
         #[test]
-        fn datetime_value_rejects_a_short_year_with_year_not_four_digits() {
+        fn parses_a_naive_date_time_in_the_local_zone() {
+            // Arrange: UTC+2, no DST.
+            TzGuard::set("Etc/GMT-2");
+
+            // Act
+            let result = DateTimeValue::parse_iso("2026-07-29 14:30:00");
+            let expected = DateTimeValue::parse_iso("2026-07-29T12:30:00Z");
+
+            // Assert
+            assert_eq!(
+                result, expected,
+                "a naive clock time must resolve in the local zone and store \
+                 as UTC"
+            );
+        }
+
+        #[test]
+        fn rejects_a_short_year_with_year_not_four_digits() {
+            // Arrange: the two-digit year is the whole input's prefix.
+            // Act
             let result = DateTimeValue::parse_iso("26-08-22T14:30:00");
+
+            // Assert
             assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
         }
 
         #[test]
-        fn datetime_value_rejects_an_unrecognized_shape_as_invalid_value() {
+        fn rejects_an_unrecognized_shape_as_invalid_value() {
+            // Arrange: a valid year prefix with an unrecognized body.
+            // Act
             let result = DateTimeValue::parse_iso("2026-07-29Tinvalid");
+
+            // Assert
             assert!(matches!(result, Err(DateError::InvalidValue { .. })));
         }
 
+        #[rstest]
+        #[case::missing_time("2026-07-29", "input is too short")]
+        #[case::trailing_offset_text(
+            "2026-07-29T14:30:00+02:00x",
+            "invalid input"
+        )]
+        #[case::midnight_as_hour_24("2026-07-29T24:00:00", "invalid input")]
+        #[case::trailing_text("2026-07-29T14:30:00junk", "invalid input")]
+        #[case::over_padded_hour("2026-07-29T014:30:00", "invalid input")]
+        fn rejects_malformed_inputs_with_the_expected_reason(
+            #[case] input: &str,
+            #[case] reason: &str,
+        ) {
+            // Arrange: `input` and the expected reason are the case literals.
+            // Act
+            let result = DateTimeValue::parse_iso(input);
+
+            // Assert
+            assert!(
+                matches!(
+                    result,
+                    Err(DateError::InvalidValue {
+                        reason: actual,
+                        ..
+                    }) if actual == reason
+                ),
+                "`{input}` must be rejected with `{reason}`, got {result:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::leading(" 2026-07-29T14:30:00Z")]
+        #[case::trailing("2026-07-29T14:30:00Z ")]
+        fn trims_surrounding_whitespace(#[case] input: &str) {
+            // Arrange: `input` is the case literal with one stray space.
+            TzGuard::set("UTC");
+
+            // Act
+            let result = DateTimeValue::parse_iso(input);
+
+            // Assert
+            assert_eq!(
+                result.map(|parsed| parsed.to_string()),
+                Ok("2026-07-29T14:30:00".to_owned()),
+                "surrounding whitespace must be ignored"
+            );
+        }
+
         #[test]
-        fn date_time_shape_parses_whole_seconds_via_the_fractional_shape() {
-            // Arrange
+        fn accepts_whitespace_runs_at_the_date_time_separator() {
+            // Arrange: UTC, so the rendering is the stored clock time.
+            TzGuard::set("UTC");
+
+            // Act
+            let double_space = DateTimeValue::parse_iso("2026-07-29  14:30:00");
+            let tab = DateTimeValue::parse_iso("2026-07-29\t14:30:00");
+
+            // Assert
+            assert_eq!(
+                double_space.map(|parsed| parsed.to_string()),
+                Ok("2026-07-29T14:30:00".to_owned()),
+                "a run of spaces between date and time must still parse"
+            );
+            assert_eq!(
+                tab.map(|parsed| parsed.to_string()),
+                Ok("2026-07-29T14:30:00".to_owned()),
+                "a tab between date and time must still parse"
+            );
+        }
+
+        #[test]
+        fn accepts_unpadded_month_day_fields() {
+            // Arrange: UTC, so the rendering is the stored clock time.
+            TzGuard::set("UTC");
+
+            // Act
+            let result = DateTimeValue::parse_iso("2026-7-29T14:30:00");
+
+            // Assert
+            assert_eq!(
+                result.map(|parsed| parsed.to_string()),
+                Ok("2026-07-29T14:30:00".to_owned()),
+                "chrono admits one-digit %m/%d fields; the parser follows \
+                 that leniency"
+            );
+        }
+
+        #[test]
+        fn parses_whole_seconds_through_the_fractional_shape() {
+            // Arrange: the same wall-clock time in both separators.
             let local_datetime = NaiveDate::from_ymd_opt(2026, 7, 29)
                 .and_then(|date| date.and_hms_opt(14, 30, 0))
-                .expect("valid fixture datetime");
+                .expect("valid fixture date-time");
 
             // Act
             let t_separated = DateTimeShape::parse_any("2026-07-29T14:30:00");
@@ -669,11 +942,16 @@ mod tests {
             DateTimeShape::LocalSpaceMinutes,
             Some("%Y-%m-%d %H:%M")
         )]
-        fn date_time_shape_maps_to_its_strftime_pattern(
+        fn maps_each_shape_to_its_strftime_pattern(
             #[case] shape: DateTimeShape,
             #[case] expected: Option<&str>,
         ) {
-            assert_eq!(shape.pattern(), expected);
+            // Arrange: `shape` is the case value.
+            // Act
+            let pattern = shape.pattern();
+
+            // Assert
+            assert_eq!(pattern, expected, "one strftime pattern per shape");
         }
     }
 
@@ -683,89 +961,221 @@ mod tests {
         use super::*;
 
         #[test]
-        fn fold_hour_display_re_parses_to_the_earlier_instant() {
-            // Arrange
-            TzGuard::set("America/New_York");
-            let later =
-                DateTimeValue::parse_iso("2026-11-01T06:30:00Z").unwrap();
+        fn renders_the_local_clock_time_without_the_offset() {
+            // Arrange: UTC+2, no DST.
+            TzGuard::set("Etc/GMT-2");
 
             // Act
-            let local_datetime = later.to_string();
-            let reparsed = DateTimeValue::parse_iso(&local_datetime).unwrap();
+            let rendered = fixed_datetime().to_string();
 
             // Assert
-            assert_eq!(local_datetime, "2026-11-01T01:30:00");
             assert_eq!(
-                reparsed,
-                DateTimeValue::parse_iso("2026-11-01T05:30:00Z").unwrap()
+                rendered, "2026-07-29T16:30:05",
+                "the human-facing spelling is the local clock time"
             );
-            assert_ne!(reparsed, later);
         }
 
         #[test]
-        fn renders_to_display_without_the_offset() {
+        fn renders_the_zero_padded_canonical_form() {
+            // Arrange: UTC, so the rendering is the stored clock time.
             TzGuard::set("UTC");
 
-            assert_eq!(fixed_datetime().to_string(), "2026-07-29T14:30:05");
+            // Act
+            let rendered = fixed_datetime().to_string();
+
+            // Assert
+            assert_eq!(
+                rendered, "2026-07-29T14:30:05",
+                "the canonical form is zero-padded ISO without an offset"
+            );
         }
 
         #[test]
-        fn round_trips_fractional_seconds_in_display() {
+        fn renders_fractional_seconds_only_when_nonzero() {
+            // Arrange: whole seconds plus 123 milliseconds.
             TzGuard::set("UTC");
-
             let with_nanos = DateTimeValue(
-                fixed_datetime().utc() + chrono::TimeDelta::milliseconds(123),
+                fixed_datetime().utc() + TimeDelta::milliseconds(123),
             );
-            assert_eq!(with_nanos.to_string(), "2026-07-29T14:30:05.123");
+
+            // Act
+            let rendered = with_nanos.to_string();
+
+            // Assert
+            assert_eq!(
+                rendered, "2026-07-29T14:30:05.123",
+                "fractional seconds must appear only for a nonzero nanosecond \
+                 component"
+            );
         }
 
         #[test]
-        fn extracts_the_calendar_date_discarding_time_of_day() {
-            TzGuard::set("UTC");
+        fn renders_the_fold_hour_that_re_parses_to_the_earlier_occurrence() {
+            // Arrange: the second occurrence of the folded 01:30 clock time.
+            TzGuard::set("America/New_York");
+            let later = DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
+                .expect("explicit-offset fixture parses");
 
-            let extracted = fixed_datetime().local_date();
-            let expected =
-                DateValue::parse_iso("2026-07-29").expect("valid date");
-            assert_eq!(extracted, expected);
+            // Act
+            let rendered = later.to_string();
+            let reparsed = DateTimeValue::parse_iso(&rendered);
+            let earlier = DateTimeValue::parse_iso("2026-11-01T05:30:00Z");
+
+            // Assert
+            assert_eq!(
+                rendered, "2026-11-01T01:30:00",
+                "a fold-hour date-time renders its local clock time"
+            );
+            assert_eq!(
+                reparsed, earlier,
+                "a fold-hour rendering must re-parse to the earlier occurrence"
+            );
+            assert_ne!(
+                reparsed,
+                Ok(later),
+                "re-parsing the fold-hour rendering must not return the later \
+                 occurrence"
+            );
         }
 
         #[test]
-        fn extracts_the_local_calendar_date_of_the_instant() {
-            TzGuard::set("Etc/GMT-12"); // UTC+12: 14:30Z is already July 30
+        fn renders_the_utc_clock_when_the_local_offset_cannot_apply() {
+            // Arrange: at the range edge the local offset overflows.
+            TzGuard::set("Etc/GMT-2");
+            let edge = DateTimeValue::from(NaiveDateTime::MAX.and_utc());
 
-            let extracted = fixed_datetime().local_date();
-            let expected =
-                DateValue::parse_iso("2026-07-30").expect("valid date");
-            assert_eq!(extracted, expected);
+            // Act
+            let rendered = edge.to_string();
+
+            // Assert
+            assert_eq!(
+                rendered, "+262142-12-31T23:59:59.999999999",
+                "an unapplicable local offset must fall back to the UTC clock"
+            );
         }
 
         #[test]
-        fn round_trips_a_datetime_value_through_display_and_parse_iso() {
+        fn round_trips_display_output_back_through_parse_iso() {
+            // Arrange: the current zone (kept) hosts this rendering.
             TzGuard::keep();
-
             let value = fixed_datetime();
-            let reparsed = DateTimeValue::parse_iso(&value.to_string())
-                .expect("formatted output re-parses");
-            assert_eq!(reparsed, value);
+
+            // Act
+            let reparsed = DateTimeValue::parse_iso(&value.to_string());
+
+            // Assert
+            assert_eq!(
+                Ok(value),
+                reparsed,
+                "display output must re-parse to the same date-time"
+            );
         }
     }
 
-    mod comparison {
+    mod serialization {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
         use super::*;
 
         #[test]
-        fn requires_exact_midnight_in_is_midnight_of() {
-            TzGuard::keep();
+        fn serializes_as_the_utc_z_string() {
+            // Arrange: the fixed reference date-time.
+            // Act
+            let json = serde_json::to_string(&fixed_datetime());
 
-            let midnight = DateTimeValue::from(
-                DateValue::parse_iso("2026-07-29").expect("valid date"),
+            // Assert
+            assert_eq!(
+                json.ok().as_deref(),
+                Some("\"2026-07-29T14:30:05Z\""),
+                "serialization must carry an explicit RFC 3339 UTC spelling"
             );
-            assert!(midnight.is_midnight_of(
-                DateValue::parse_iso("2026-07-29").expect("valid date")
-            ));
-            assert!(!fixed_datetime().is_midnight_of(
-                DateValue::parse_iso("2026-07-29").expect("valid date")
-            ));
+        }
+
+        #[test]
+        fn serializes_sub_second_precision_with_autosi() {
+            // Arrange: a three-fraction-digit date-time.
+            let value = DateTimeValue::parse_iso("2026-07-29T14:30:00.123Z")
+                .expect("explicit-offset fixture parses");
+
+            // Act
+            let json = serde_json::to_string(&value);
+
+            // Assert
+            assert_eq!(
+                json.ok().as_deref(),
+                Some("\"2026-07-29T14:30:00.123Z\""),
+                "AutoSi precision must keep the three written fraction digits"
+            );
+        }
+
+        #[rstest]
+        #[case::whole_seconds(0)]
+        #[case::sub_second(123)]
+        fn round_trips_through_json(#[case] milliseconds: i64) {
+            // Arrange: the case adds whole seconds or 123 milliseconds.
+            let value = DateTimeValue(
+                fixed_datetime()
+                    .utc()
+                    .checked_add_signed(TimeDelta::milliseconds(milliseconds))
+                    .expect("the fixture plus milliseconds is in range"),
+            );
+            let json =
+                serde_json::to_string(&value).expect("the case serializes");
+
+            // Act
+            let restored: Result<DateTimeValue, _> =
+                serde_json::from_str(&json);
+
+            // Assert
+            assert_eq!(
+                restored.ok(),
+                Some(value),
+                "JSON round trips must be lossless"
+            );
+        }
+    }
+
+    mod deserialization {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn deserializes_an_rfc3339_utc_string() {
+            // Arrange: the serialized spelling of the fixed reference
+            // date-time.
+            let json = "\"2026-07-29T14:30:05Z\"";
+
+            // Act
+            let result = serde_json::from_str::<DateTimeValue>(json);
+
+            // Assert
+            assert_eq!(
+                result.ok(),
+                Some(fixed_datetime()),
+                "an RFC 3339 UTC string must deserialize to the same date-time"
+            );
+        }
+
+        #[test]
+        fn rejects_an_invalid_string_with_the_parse_error() {
+            // Arrange: an input the parser rejects before any zone lookup.
+            let json = "\"not-a-date\"";
+
+            // Act
+            let result = serde_json::from_str::<DateTimeValue>(json);
+
+            // Assert
+            assert!(
+                matches!(
+                    result,
+                    Err(error) if error
+                        .to_string()
+                        .contains("`not-a-date` does not have a 4-digit year")
+                ),
+                "deserialization must surface the parser's own error"
+            );
         }
     }
 
@@ -775,26 +1185,166 @@ mod tests {
         use super::*;
 
         #[test]
-        fn converts_from_system_time() {
-            TzGuard::set("UTC");
+        fn promotes_a_date_to_local_zone_midnight() {
+            // Arrange: UTC+2, no DST.
+            TzGuard::set("Etc/GMT-2");
+            let date = ymd(2026, 7, 29);
 
-            let system_time = std::time::SystemTime::UNIX_EPOCH
-                + std::time::Duration::from_secs(1_000);
-            let converted = DateTimeValue::from(system_time);
+            // Act
+            let promoted = DateTimeValue::from(date);
+            let expected = DateTimeValue::parse_iso("2026-07-28T22:00:00Z");
+
+            // Assert
             assert_eq!(
-                converted,
-                DateTimeValue::parse_iso("1970-01-01T00:16:40")
-                    .expect("valid datetime")
+                expected,
+                Ok(promoted),
+                "local midnight in UTC+2 is 22:00Z on the previous day"
+            );
+        }
+
+        #[test]
+        fn advances_a_promoted_midnight_across_a_zone_gap() {
+            // Arrange: local midnight falls inside this spring-forward gap.
+            TzGuard::set("America/Santiago");
+            let date = ymd(2026, 9, 6);
+
+            // Act
+            let promoted = DateTimeValue::from(date);
+            let expected = DateTimeValue::parse_iso("2026-09-06T04:00:00Z");
+
+            // Assert
+            assert_eq!(
+                expected,
+                Ok(promoted),
+                "midnight inside a DST gap must advance by the gap length"
+            );
+            assert_eq!(
+                promoted.to_string(),
+                "2026-09-06T01:00:00",
+                "the advanced midnight must render as the post-gap clock time"
+            );
+        }
+
+        #[test]
+        fn falls_back_to_utc_midnight_when_the_local_zone_cannot_resolve() {
+            // Arrange: UTC+14 pushes local midnight of the earliest
+            // representable date below the representable range.
+            TzGuard::set("Etc/GMT-14");
+            let date = ymd(-262_143, 1, 1);
+
+            // Act
+            let promoted = DateTimeValue::from(date);
+
+            // Assert
+            assert_eq!(
+                promoted.utc(),
+                NaiveDateTime::MIN.and_utc(),
+                "an unresolvable local midnight must degrade to the neutral \
+                 UTC frame"
+            );
+        }
+
+        #[test]
+        fn converts_a_system_time() {
+            // Arrange: one thousand seconds past the epoch, UTC.
+            TzGuard::set("UTC");
+            let system_time =
+                SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
+
+            // Act
+            let converted = DateTimeValue::from(system_time);
+            let expected = DateTimeValue::parse_iso("1970-01-01T00:16:40");
+
+            // Assert
+            assert_eq!(
+                expected,
+                Ok(converted),
+                "a SystemTime position must convert to the same date-time"
             );
         }
 
         #[test]
         fn round_trips_through_chrono_date_time_utc() {
+            // Arrange: the fixed reference date-time in the UTC frame.
             let chrono_dt = fixed_datetime().utc();
+
+            // Act
             let converted = DateTimeValue::from(chrono_dt);
-            assert_eq!(converted, fixed_datetime());
             let back: DateTime<Utc> = converted.into();
-            assert_eq!(back, chrono_dt);
+
+            // Assert
+            assert_eq!(
+                converted,
+                fixed_datetime(),
+                "a wrapped UTC date-time must equal the original"
+            );
+            assert_eq!(
+                back, chrono_dt,
+                "unwrapping must return the original UTC date-time"
+            );
+        }
+    }
+
+    mod shift {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn keeps_fractional_seconds_through_a_clock_unit_shift() {
+            // Arrange: a date-time with 123 milliseconds.
+            TzGuard::set("UTC");
+            let base = DateTimeValue::parse_iso("2026-07-29T14:30:00.123Z")
+                .expect("explicit-offset fixture parses");
+
+            // Act
+            let shifted = base.shift(1, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                shifted.map(|value| value.to_string()),
+                Ok("2026-07-29T15:30:00.123".to_owned()),
+                "a clock-unit shift must keep the fractional seconds"
+            );
+        }
+
+        #[test]
+        fn re_resolves_a_fold_hour_to_the_earlier_occurrence_on_a_zero_day_shift()
+         {
+            // Arrange: the second occurrence of the folded 01:30 clock time.
+            TzGuard::set("America/New_York");
+            let second_occurrence =
+                DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
+                    .expect("explicit-offset fixture parses");
+
+            // Act: calendar shifts re-resolve the local clock time.
+            let shifted = second_occurrence.shift(0, DurationUnit::Day);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                DateTimeValue::parse_iso("2026-11-01T05:30:00Z"),
+                "a zero-day calendar shift must re-resolve the fold to the \
+                 earlier occurrence"
+            );
+        }
+
+        #[test]
+        fn keeps_the_date_time_under_a_zero_day_shift_in_utc() {
+            // Arrange: UTC carries no fold or gap.
+            TzGuard::set("UTC");
+            let base = DateTimeValue::parse_iso("2026-07-29T14:30:00Z")
+                .expect("explicit-offset fixture parses");
+
+            // Act
+            let shifted = base.shift(0, DurationUnit::Day);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                Ok(base),
+                "a zero-day shift in UTC must keep the date-time"
+            );
         }
     }
 
@@ -804,120 +1354,93 @@ mod tests {
         use super::*;
 
         #[test]
-        fn compares_datetimes_chronologically() {
-            TzGuard::keep();
-
-            let earlier = DateTimeValue::parse_iso("2026-01-01T00:00:00")
-                .expect("valid datetime");
+        fn orders_date_times_chronologically() {
+            // Arrange: two explicit-offset date-times, half a year apart.
+            let earlier = DateTimeValue::parse_iso("2026-01-01T00:00:00Z")
+                .expect("explicit-offset fixture parses");
             let later = fixed_datetime();
-            assert!(earlier < later);
-            assert!(later > earlier);
-            assert_eq!(earlier.cmp(&earlier), std::cmp::Ordering::Equal);
+
+            // Act
+            let ordering = earlier.cmp(&later);
+
+            // Assert
+            assert_eq!(
+                ordering,
+                std::cmp::Ordering::Less,
+                "the earlier date-time must order first"
+            );
+            assert!(
+                later > earlier,
+                "the later date-time must compare greater"
+            );
+            assert_eq!(
+                earlier.cmp(&earlier),
+                std::cmp::Ordering::Equal,
+                "equal date-times must compare equal"
+            );
         }
     }
 
-    mod display_and_traits {
+    mod equality {
+        use super::*;
+
+        #[test]
+        fn requires_exact_local_midnight_for_is_midnight_of() {
+            // Arrange: the current zone (kept) hosts the promotion.
+            TzGuard::keep();
+            let date = ymd(2026, 7, 29);
+
+            // Act
+            let midnight = DateTimeValue::from(date);
+            let time_of_day = fixed_datetime();
+
+            // Assert
+            assert!(
+                midnight.is_midnight_of(date),
+                "the promoted midnight must count as midnight of its date"
+            );
+            assert!(
+                !time_of_day.is_midnight_of(date),
+                "a date-time with a time of day must not count as midnight"
+            );
+        }
+    }
+
+    mod accessors {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[test]
-        fn displays_a_datetime_value_as_its_canonical_string() {
+        fn extracts_the_calendar_date_discarding_time_of_day() {
+            // Arrange: UTC, so the stored calendar date is the local one.
             TzGuard::set("UTC");
-
-            assert_eq!(fixed_datetime().to_string(), "2026-07-29T14:30:05");
-        }
-
-        #[test]
-        fn displays_the_local_clock_time_of_the_instant() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
-
-            // The everyday human spelling is the local clock time, so a
-            // 14:30:05Z instant reads as 16:30:05 local.
-            assert_eq!(fixed_datetime().to_string(), "2026-07-29T16:30:05");
-        }
-
-        #[test]
-        fn round_trips_a_datetime_value_through_json() {
-            let json =
-                serde_json::to_string(&fixed_datetime()).expect("serializable");
-            let restored: DateTimeValue =
-                serde_json::from_str(&json).expect("deserializable");
-            assert_eq!(restored, fixed_datetime());
-        }
-
-        #[test]
-        fn serializes_datetime_value_with_the_explicit_rfc3339_z_suffix() {
-            let json =
-                serde_json::to_string(&fixed_datetime()).expect("serializable");
-            assert_eq!(json, "\"2026-07-29T14:30:05Z\"");
-        }
-
-        #[test]
-        fn round_trips_sub_second_datetime_through_json_with_autosi() {
-            let dt = DateTimeValue::parse_iso("2026-07-29T14:30:00.123Z")
-                .expect("valid instant");
-            let json = serde_json::to_string(&dt).expect("serializable");
-            assert_eq!(json, "\"2026-07-29T14:30:00.123Z\"");
-            let restored: DateTimeValue =
-                serde_json::from_str(&json).expect("deserializable");
-            assert_eq!(restored, dt);
-        }
-    }
-
-    mod calendar_owner {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn clock_shift_keeps_fractional_seconds() {
-            // Arrange
-            TzGuard::set("UTC");
-            let base = point_at("2026-07-29T14:30:00.123");
 
             // Act
-            let shifted = base.shift(1, DurationUnit::Hour).unwrap();
+            let extracted = fixed_datetime().local_date();
 
             // Assert
             assert_eq!(
-                shifted
-                    .local_datetime_or_utc()
-                    .format(shifted.canonical_pattern())
-                    .to_string(),
-                "2026-07-29T15:30:00.123"
+                extracted,
+                ymd(2026, 7, 29),
+                "the UTC calendar date must be extracted"
             );
         }
 
         #[test]
-        fn zero_day_shift_re_resolves_fold_to_earlier_occurrence() {
-            // Arrange
-            TzGuard::set("America/New_York");
-            let second_occurrence = point_at("2026-11-01T06:30:00Z");
+        fn extracts_the_local_calendar_date_of_a_date_time() {
+            // Arrange: UTC+12 rolls 14:30Z into the next local day.
+            TzGuard::set("Etc/GMT-12");
 
-            // Act: calendar shifts re-resolve through the earliest-occurrence
-            // policy.
-            let shifted =
-                second_occurrence.shift(0, DurationUnit::Day).unwrap();
+            // Act
+            let extracted = fixed_datetime().local_date();
 
             // Assert
             assert_eq!(
-                shifted.instant(),
-                point_at("2026-11-01T05:30:00Z").instant()
+                extracted,
+                ymd(2026, 7, 30),
+                "the local calendar date must roll forward with the offset"
             );
-        }
-
-        #[test]
-        fn zero_day_shift_in_utc_keeps_the_instant() {
-            // Arrange
-            TzGuard::set("UTC");
-            let date_point = point_at("2026-07-29T14:30:00Z");
-
-            // Act
-            let shifted = date_point.shift(0, DurationUnit::Day).unwrap();
-
-            // Assert
-            assert_eq!(shifted.instant(), date_point.instant());
         }
     }
 }
