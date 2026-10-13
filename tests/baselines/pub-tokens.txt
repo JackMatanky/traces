@@ -1387,7 +1387,7 @@ src/temporal/duration.rs: pub struct DurationValue {
 src/temporal/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
 src/temporal/duration.rs: pub(crate) const fn magnitude(self) -> f64 {
 src/temporal/duration.rs: pub(crate) const fn nominal_seconds(&self) -> DurationSeconds {
-src/temporal/duration.rs: pub(crate) const fn unit(self) -> DurationUnit {
+src/temporal/duration.rs: pub(crate) const fn unit(self) -> TimeUnit {
 src/temporal/duration.rs: pub(crate) fn as_str(&self) -> &str {
 src/temporal/duration.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
 src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(seconds: DurationSeconds) -> Self {
@@ -1410,7 +1410,7 @@ src/temporal/mod.rs: pub(crate) use date::DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSeconds};
 src/temporal/mod.rs: pub(crate) use point::{DatePoint, DatePrecision};
-src/temporal/mod.rs: pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
+src/temporal/mod.rs: pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
 src/temporal/point.rs: pub(crate) enum DatePoint {
 src/temporal/point.rs: pub(crate) enum DatePrecision {
@@ -1418,7 +1418,7 @@ src/temporal/point.rs: pub(crate) fn apply(
 src/temporal/point.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
 src/temporal/point.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
 src/temporal/point.rs: pub(crate) fn date(self) -> DateValue {
-src/temporal/point.rs: pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
+src/temporal/point.rs: pub(crate) fn diff(self, to: Self, unit: TimeUnit) -> Difference {
 src/temporal/point.rs: pub(crate) fn end_of(
 src/temporal/point.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
 src/temporal/point.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
@@ -1440,14 +1440,29 @@ src/temporal/scan.rs: pub(super) fn skip_separators(&mut self) {
 src/temporal/scan.rs: pub(super) fn skip_to_next_component(&mut self) -> bool {
 src/temporal/scan.rs: pub(super) fn skip_whitespace(&mut self) {
 src/temporal/scan.rs: pub(super) struct Scanner<'a> {
+src/temporal/unit.rs: pub aliases: &'static [&'static str],
+src/temporal/unit.rs: pub calendar: bool,
+src/temporal/unit.rs: pub count: u64,
+src/temporal/unit.rs: pub names: (&'static str, &'static str),
+src/temporal/unit.rs: pub nominal_seconds: f64,
+src/temporal/unit.rs: pub spelling: &'static str,
+src/temporal/unit.rs: pub unit: TimeUnit,
+src/temporal/unit.rs: pub unit: TimeUnit,
+src/temporal/unit.rs: pub(crate) const CANONICAL_UNITS: [TimeUnit; 6] = [
+src/temporal/unit.rs: pub(crate) const HUMAN_UNITS: [TimeUnit; 7] = [
+src/temporal/unit.rs: pub(crate) const UNITS: [UnitSpec; 8] = [
 src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
 src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
 src/temporal/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
 src/temporal/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
+src/temporal/unit.rs: pub(crate) const fn spec(self) -> &'static UnitSpec {
 src/temporal/unit.rs: pub(crate) const fn spelling(self) -> &'static str {
 src/temporal/unit.rs: pub(crate) const fn whole_nominal_seconds(self) -> Option<i64> {
-src/temporal/unit.rs: pub(crate) enum DurationUnit {
+src/temporal/unit.rs: pub(crate) enum TimeUnit {
+src/temporal/unit.rs: pub(crate) fn decompose(
 src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
+src/temporal/unit.rs: pub(crate) struct DecomposedPart {
+src/temporal/unit.rs: pub(crate) struct UnitSpec {
 src/temporal_oracle.rs: pub(super) fn apply(input: &str, duration: &str) -> String {
 src/temporal_oracle.rs: pub(super) fn boundary(input: &str, period: &str, edge: &str) -> String {
 src/temporal_oracle.rs: pub(super) fn component(input: &str, name: &str) -> String {

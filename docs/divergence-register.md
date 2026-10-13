@@ -1,18 +1,19 @@
 # Temporal Divergence Register
 
-## Redesign Behavior-Change Register (`R1 to R16`)
+## Redesign Behavior-Change Register (`R1 to R17`)
 
 This section is the **allow-list for Stage 2 oracle diffs**. Stage 1 of the
 temporal redesign is behavior-preserving: the migration oracle
 (`src/temporal_oracle.rs`) must show a **zero diff** after every Stage 1
 commit. Stage 2 (the engine swap) may change behavior only as listed below,
 and **every oracle diff line must carry a register tag**; any diff line
-outside `R1` to `R16` is a defect and triggers the Stage 2 drop condition.
+outside `R1` to `R17` is a defect and triggers the Stage 2 drop condition.
 
 Rows `R1` to `R15` come from
-`.design/2026-10-12-review-temporal/redesign-plan.md` (section 6); `R16` from
-`implementation-plan.md` (section 7). Decisions `D1` to `D10` stand at their
-defaults, so every row below is `accept` (or `keep`) unless noted. Case counts
+`.design/2026-10-12-review-temporal/redesign-plan.md` (section 6); `R16` and
+`R17` from `implementation-plan.md` (section 7). Decisions `D1` to `D10` stand
+at their defaults, so every row below is `accept` (or `keep`) unless noted.
+Case counts
 are measured from `tests/snapshots/temporal_oracle.snap`: 2,347 case lines,
 713 of which carry a register tag. A line may carry more than one tag, so
 per-row counts overlap.
@@ -190,6 +191,24 @@ per-row counts overlap.
 - **Oracle cases**: 20 lines tagged `R4,R16` — the ten duration add/subtract
   pairs (`23h 1h`, `1d 1h`, `1h 30m 30m`, `1mo 1d`, `2d 1d`, `1d 2d`, `1h
   1h`, `1w 1d`, `90m 1h 30m`, `1y 1mo`), each with `+` and `-`.
+
+### `R17`: Humanize Rounds the Whole Magnitude Before Decomposition
+
+- **Today** (from commit `S1.4`): `humanize` rounds the total magnitude to whole
+  milliseconds before decomposing, so a fraction in `[0.9995, 1)` of the last
+  human unit rolls into it: `1.9999s` renders `"2 seconds"` and `59.9999s`
+  renders `"1 minute"`.
+- **Before commit `S1.4`**: The whole units were floored and only the tail rounded, so
+  the same magnitudes rendered `"1 second, 1000 milliseconds"` and
+  `"59 seconds, 1000 milliseconds"`.
+- **Scope**: display only; value identity and canonical spelling are
+  unchanged. Every magnitude with a sub-second fraction below `0.9995`
+  renders exactly as before.
+- **Recommendation**: accept.
+- **Oracle cases**: none — no corpus row has a fraction in the roll-up range,
+  which is why the `S1.4` oracle diff stayed zero. Pinned by
+  `rolls_a_near_whole_magnitude_into_the_next_unit` in
+  `src/temporal/duration.rs`.
 
 ---
 

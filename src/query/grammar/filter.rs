@@ -23,8 +23,9 @@ use super::{
     },
 };
 use crate::{
-    DurationSeconds, DurationUnit, DurationValue, LexError, NoteFieldValue,
-    NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec, lexical_unquote,
+    DurationSeconds, DurationValue, LexError, NoteFieldValue,
+    NoteFieldValueRef, Spanned, SpannedTokenStream, TimeUnit, TokenSpec,
+    lexical_unquote,
     query::{
         QueryRow,
         error::{QueryBuilderError, QueryDialect, QuerySyntaxError},
@@ -310,7 +311,7 @@ impl ValueExpr {
         matches!(
             self,
             Self::Literal(NoteFieldValue::String(unit))
-                if DurationUnit::from_spelling(unit).is_none()
+                if TimeUnit::from_spelling(unit).is_none()
         )
     }
 
@@ -383,7 +384,7 @@ impl ArithOp {
             ) => {
                 let diff = date2
                     .as_date_point()?
-                    .diff(date1.as_date_point()?, DurationUnit::Second);
+                    .diff(date1.as_date_point()?, TimeUnit::Second);
                 let seconds = diff.to_f64()?;
                 Some(NoteFieldValue::Duration(
                     DurationValue::from_nominal_seconds(
@@ -610,7 +611,7 @@ impl QueryFunction {
                 if matches!(date, NoteFieldValue::Null) {
                     return Some(NoteFieldValue::Null);
                 }
-                let unit = DurationUnit::from_spelling(unit)?;
+                let unit = TimeUnit::from_spelling(unit)?;
                 let n = (n.fract() == 0.0).then(|| n.to_i64()).flatten()?;
                 let shifted = date.as_date_point()?.shift(n, unit).ok()?;
                 Some(NoteFieldValue::from(shifted))
@@ -621,9 +622,9 @@ impl QueryFunction {
 
     fn date_diff(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
         let (date1, date2, unit) = match args {
-            [date1, date2] => (date1, date2, DurationUnit::Day),
+            [date1, date2] => (date1, date2, TimeUnit::Day),
             [date1, date2, NoteFieldValue::String(unit)] => {
-                (date1, date2, DurationUnit::from_spelling(unit)?)
+                (date1, date2, TimeUnit::from_spelling(unit)?)
             }
             _ => return None,
         };

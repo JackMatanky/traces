@@ -170,7 +170,7 @@ pub use task::{
 #[expect(unused_imports, reason = "crate re-export")]
 pub(crate) use template::TemplateService;
 pub(crate) use temporal::{
-    DATE_PATTERN, DATETIME_PATTERN, DurationSeconds, DurationUnit,
+    DATE_PATTERN, DATETIME_PATTERN, DurationSeconds, TimeUnit,
     UNIT_SPELLINGS_HINT,
 };
 pub use temporal::{

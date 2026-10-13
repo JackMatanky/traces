@@ -32,8 +32,8 @@ use crate::test_support::TzGuard;
 /// not name any engine type.
 mod probe {
     use crate::{
-        DateError, DateTimeValue, DateValue, DurationError, DurationUnit,
-        DurationValue,
+        DateError, DateTimeValue, DateValue, DurationError, DurationValue,
+        TimeUnit,
         temporal::{
             CalendarPeriod, DateComponent, DatePoint, DatePrecision,
             Difference, weekday_from_number,
@@ -76,8 +76,8 @@ mod probe {
         serde_json::to_string(value).expect("temporal values serialize")
     }
 
-    fn unit(spelling: &str) -> DurationUnit {
-        DurationUnit::from_spelling(spelling).expect("corpus uses real units")
+    fn unit(spelling: &str) -> TimeUnit {
+        TimeUnit::from_spelling(spelling).expect("corpus uses real units")
     }
 
     fn render_point(point: DatePoint) -> String {

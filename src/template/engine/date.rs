@@ -42,7 +42,7 @@ use minijinja::{
 
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
-    DATE_PATTERN, DateTimeValue, DurationSeconds, DurationUnit, DurationValue,
+    DATE_PATTERN, DateTimeValue, DurationSeconds, DurationValue, TimeUnit,
     UNIT_SPELLINGS_HINT,
     temporal::{
         CalendarPeriod, DateComponent, DateError, DatePoint, DatePrecision,
@@ -270,9 +270,7 @@ fn apply_offset(
     offset_val: &Value,
 ) -> TemplateEngineResult<DatePoint> {
     if let Some(n) = offset_val.as_i64() {
-        return date_point
-            .shift(n, DurationUnit::Day)
-            .map_err(render_date_error);
+        return date_point.shift(n, TimeUnit::Day).map_err(render_date_error);
     }
     if let Some(s) = offset_val.as_str() {
         let translated = iso_offset_to_text(s)?;
@@ -325,8 +323,8 @@ impl Anchor {
     fn transform(self, date_point: DatePoint) -> Result<DatePoint, DateError> {
         match self {
             Self::Now | Self::Today => Ok(date_point),
-            Self::Tomorrow => date_point.shift(1, DurationUnit::Day),
-            Self::Yesterday => date_point.shift(-1, DurationUnit::Day),
+            Self::Tomorrow => date_point.shift(1, TimeUnit::Day),
+            Self::Yesterday => date_point.shift(-1, TimeUnit::Day),
             Self::StartOf(calendar_period) => {
                 date_point.start_of(calendar_period)
             }
@@ -524,13 +522,13 @@ fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `unit` is not one of
-///   [`DurationUnit::from_spelling`]'s accepted unit names or abbreviations.
+///   [`TimeUnit::from_spelling`]'s accepted unit names or abbreviations.
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `unit`.
-fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<DurationUnit> {
+fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
     let unit_str = kwargs.get::<Option<&str>>("unit")?.unwrap_or("days");
     kwargs.assert_all_used()?;
-    DurationUnit::from_spelling(unit_str)
+    TimeUnit::from_spelling(unit_str)
         .ok_or_else(|| unknown_unit_error(unit_str))
 }
 
@@ -882,7 +880,7 @@ fn end_of_year(value: &str) -> TemplateEngineResult<String> {
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
 /// date/time string.
 ///
-/// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
+/// `unit` defaults to `"days"` and accepts any [`TimeUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
 /// A sub-day shift of a date-only value moves the date only when it crosses
@@ -915,7 +913,7 @@ fn date_add(
 /// `{{ value | date_sub(n, unit="days") }}` subtracts `n` `unit`s from a piped
 /// date/time string.
 ///
-/// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
+/// `unit` defaults to `"days"` and accepts any [`TimeUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
 /// A sub-day shift of a date-only value moves the date only when it crosses
@@ -960,7 +958,7 @@ fn date_sub(
 fn shift_by_unit(
     value: &str,
     n: i64,
-    unit: DurationUnit,
+    unit: TimeUnit,
 ) -> TemplateEngineResult<String> {
     let shifted_date_point =
         parse_date_point(value)?.shift(n, unit).map_err(render_date_error)?;
@@ -978,7 +976,7 @@ fn shift_by_unit(
 ///   overflows chrono's representable range.
 fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
-    shift_by_unit(value, n_i64, DurationUnit::Day)
+    shift_by_unit(value, n_i64, TimeUnit::Day)
 }
 
 /// `{{ value | sub_days(n) }}` is a convenience shortcut for
@@ -991,7 +989,7 @@ fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     let n_i64 = n_i64.checked_neg().ok_or_else(date_out_of_range_error)?;
-    shift_by_unit(value, n_i64, DurationUnit::Day)
+    shift_by_unit(value, n_i64, TimeUnit::Day)
 }
 
 /// `{{ value | add_months(n) }}` is a convenience shortcut for
@@ -1002,7 +1000,7 @@ fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
 ///   overflows chrono's representable range.
 fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
-    shift_by_unit(value, i64::from(n), DurationUnit::Month)
+    shift_by_unit(value, i64::from(n), TimeUnit::Month)
 }
 
 /// `{{ value | sub_months(n) }}` is a convenience shortcut for
@@ -1015,7 +1013,7 @@ fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
-    shift_by_unit(value, n_i64, DurationUnit::Month)
+    shift_by_unit(value, n_i64, TimeUnit::Month)
 }
 
 /// `{{ value | add_years(n) }}` is a convenience shortcut for
@@ -1026,7 +1024,7 @@ fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
 ///   overflows chrono's representable range.
 fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
-    shift_by_unit(value, i64::from(n), DurationUnit::Year)
+    shift_by_unit(value, i64::from(n), TimeUnit::Year)
 }
 
 /// `{{ value | sub_years(n) }}` is a convenience shortcut for
@@ -1039,7 +1037,7 @@ fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
-    shift_by_unit(value, n_i64, DurationUnit::Year)
+    shift_by_unit(value, n_i64, TimeUnit::Year)
 }
 
 /// `{{ value | weekday }}` returns the ISO weekday number: `1` for Monday
@@ -1090,7 +1088,7 @@ fn weekday(
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` or `other` is not a parseable
 ///   date/time string (see [`parse_date_point`]) or `unit` is not one of
-///   [`DurationUnit::from_spelling`]'s accepted names (see [`unit_kwarg`]).
+///   [`TimeUnit::from_spelling`]'s accepted names (see [`unit_kwarg`]).
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `unit`.
 #[expect(
@@ -1218,7 +1216,7 @@ fn render_date_error(error: DateError) -> Error {
 }
 
 /// Builds the error for a `unit="..."` kwarg naming anything outside
-/// [`DurationUnit::from_spelling`]'s accepted unit names.
+/// [`TimeUnit::from_spelling`]'s accepted unit names.
 ///
 /// The expected-spellings hint comes from [`UNIT_SPELLINGS_HINT`], kept beside
 /// the unit registry so the message cannot drift from what [`unit_kwarg`]

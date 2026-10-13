@@ -15,7 +15,7 @@ use chrono::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    DateValue, DurationUnit,
+    DateValue, TimeUnit,
     calendar::shift_datetime,
     error::DateError,
     point::{parse_reason, starts_with_year},
@@ -239,7 +239,7 @@ impl DateTimeValue {
     pub(crate) fn shift(
         self,
         n: i64,
-        unit: DurationUnit,
+        unit: TimeUnit,
     ) -> Result<Self, DateError> {
         if unit.is_calendar() {
             let local_datetime =
@@ -1352,7 +1352,7 @@ mod tests {
                 .expect("explicit-offset fixture parses");
 
             // Act
-            let shifted = base.shift(1, DurationUnit::Hour);
+            let shifted = base.shift(1, TimeUnit::Hour);
 
             // Assert
             assert_eq!(
@@ -1372,7 +1372,7 @@ mod tests {
                     .expect("explicit-offset fixture parses");
 
             // Act: calendar shifts re-resolve the local clock time.
-            let shifted = second_occurrence.shift(0, DurationUnit::Day);
+            let shifted = second_occurrence.shift(0, TimeUnit::Day);
 
             // Assert
             assert_eq!(
@@ -1391,7 +1391,7 @@ mod tests {
                 .expect("explicit-offset fixture parses");
 
             // Act
-            let shifted = base.shift(0, DurationUnit::Day);
+            let shifted = base.shift(0, TimeUnit::Day);
 
             // Assert
             assert_eq!(

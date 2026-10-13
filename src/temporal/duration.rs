@@ -37,7 +37,11 @@ use chrono::TimeDelta;
 use num_traits::ToPrimitive as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{error::DurationError, scan, unit::DurationUnit};
+use super::{
+    error::DurationError,
+    scan,
+    unit::{CANONICAL_UNITS, DecomposedPart, HUMAN_UNITS, TimeUnit, decompose},
+};
 
 /// A validated duration with a nominal identity and a calendar application
 /// regime.
@@ -129,7 +133,7 @@ impl DurationValue {
     ///
     /// Greedily decomposes `seconds.0.abs()` into Weeks, Days, Hours, Minutes,
     /// Seconds, and Milliseconds (ratios from
-    /// [`DurationUnit::nominal_seconds`]); Month and Year are omitted because
+    /// [`TimeUnit::nominal_seconds`]); Month and Year are omitted because
     /// their lengths are calendar-dependent. Zero yields `"0s"`; a negative
     /// duration starts with `"-"`. When the decomposition cannot represent a
     /// nonzero magnitude (a sub-millisecond remainder rounds to zero, or `u64`
@@ -146,67 +150,65 @@ impl DurationValue {
     }
 
     /// Renders this duration in human-readable compound English (for example
-    /// `"3 days, 4 hours"`), decomposing its nominal seconds greedily from
-    /// years down to seconds with a rounded millisecond remainder.
+    /// `"3 days, 4 hours"`), decomposing its magnitude greedily from years
+    /// down to seconds over [`HUMAN_UNITS`].
     ///
-    /// Magnitudes too large for whole-unit counts render in scientific
-    /// notation; zero renders as `"0 seconds"`.
+    /// The magnitude is rounded to whole milliseconds first, so a fractional
+    /// remainder renders as one tail millisecond count and a near-whole
+    /// magnitude rolls up (`"2 seconds"` for 1.9999 seconds). A non-finite or
+    /// sub-half-millisecond magnitude renders as `"0 seconds"` and as
+    /// `"< 1 millisecond"` respectively; magnitudes too large for whole-unit
+    /// counts render in scientific notation.
     #[must_use]
     pub(crate) fn humanize(&self) -> String {
         let total_secs = self.seconds.as_f64();
-        if total_secs == 0.0 {
+        // A non-finite magnitude satisfies no comparison, so the pre-catalog
+        // loop fell through to the empty-parts `"0 seconds"`; the guard keeps
+        // that pinned shape instead of a `"NaN seconds"` spelling.
+        if total_secs == 0.0 || total_secs.is_nan() {
             return "0 seconds".to_owned();
         }
+        // `{:e}` carries the sign of the original magnitude, so the
+        // scientific fallback keeps it too.
+        let Some(total_ms) = (total_secs.abs() * 1_000.0).round().to_u64()
+        else {
+            return format!("{total_secs:e} seconds");
+        };
         let is_negative = total_secs < 0.0;
-        let mut rem = total_secs.abs();
 
-        let mut parts = Vec::new();
-        for unit in HUMAN_ORDER {
-            let unit_secs = unit.nominal_seconds();
-            if rem >= unit_secs {
-                let count = (rem / unit_secs).floor();
-                let Some(count_u64) = count.to_u64() else {
-                    // `{:e}` already carries the sign of a negative magnitude.
-                    return format!("{total_secs:e} seconds");
-                };
-                rem = count.mul_add(-unit_secs, rem);
-                let (singular, plural) = unit.human_names();
-                if count_u64 == 1 {
-                    parts.push(format!("1 {singular}"));
-                } else {
-                    parts.push(format!("{count_u64} {plural}"));
-                }
-            }
-        }
-
-        if rem > 0.0 {
-            let ms_round = (rem * 1000.0).round();
-            if let Some(ms) = ms_round.to_u64()
-                && ms > 0
-            {
-                if ms == 1 {
-                    parts.push("1 millisecond".to_owned());
-                } else {
-                    parts.push(format!("{ms} milliseconds"));
-                }
-            } else if parts.is_empty() {
-                parts.push("< 1 millisecond".to_owned());
+        let (parts, remainder_ms) = decompose(total_ms, &HUMAN_UNITS);
+        let mut text = String::new();
+        for part in parts {
+            let (singular, plural) = part.unit.human_names();
+            let name = if part.count == 1 {
+                singular
             } else {
-                // Sub-millisecond residual after whole units are already
-                // present is omitted.
+                plural
+            };
+            if !text.is_empty() {
+                text.push_str(", ");
             }
+            let _ = write!(text, "{} {name}", part.count);
+        }
+        if remainder_ms > 0 {
+            let name = if remainder_ms == 1 {
+                "millisecond"
+            } else {
+                "milliseconds"
+            };
+            if !text.is_empty() {
+                text.push_str(", ");
+            }
+            let _ = write!(text, "{remainder_ms} {name}");
         }
 
-        if parts.is_empty() {
-            return "0 seconds".to_owned();
+        if text.is_empty() {
+            return "< 1 millisecond".to_owned();
         }
-
-        let joined = parts.join(", ");
         if is_negative {
-            format!("-{joined}")
-        } else {
-            joined
+            text.insert(0, '-');
         }
+        text
     }
 
     /// Returns the written components that witness the regime, if any are
@@ -214,9 +216,9 @@ impl DurationValue {
     ///
     /// Values parsed from text keep their written components:
     ///
-    /// - [`Some`] containing a calendar unit ([`DurationUnit::Day`],
-    ///   [`DurationUnit::Week`], [`DurationUnit::Month`],
-    ///   [`DurationUnit::Year`]): the value applies on the local clock.
+    /// - [`Some`] containing a calendar unit ([`TimeUnit::Day`],
+    ///   [`TimeUnit::Week`], [`TimeUnit::Month`], [`TimeUnit::Year`]): the
+    ///   value applies on the local clock.
     /// - [`Some`] with only exact units, or [`None`] (synthesized from a
     ///   magnitude): the value applies as exact elapsed time.
     #[inline]
@@ -352,18 +354,13 @@ impl DurationValue {
     }
 
     /// Synthesizes the canonical spelling for a fixed-magnitude duration: the
-    /// greedy sub-year decomposition of [`DECOMPOSITION_ORDER`], or the
+    /// greedy sub-year decomposition of [`CANONICAL_UNITS`], or the
     /// [`DurationSeconds`] [`Display`](fmt::Display) dialect when the
     /// decomposition can't represent the magnitude (see
     /// [`Self::from_nominal_seconds`]).
     ///
     /// Accumulates into one `String`: decomposition emits at most six integer
     /// counts, so no per-part intermediate strings are needed.
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "unit_ms is non-zero (>= 1) and total_ms >= unit_ms, so \
-                  division and modulo never panic"
-    )]
     fn canonical_spelling(seconds: DurationSeconds) -> Box<str> {
         let total_secs = seconds.0;
         if total_secs == 0.0 {
@@ -371,41 +368,39 @@ impl DurationValue {
         }
 
         let is_negative = total_secs < 0.0;
-        let rem = total_secs.abs();
-        let mut total_ms = (rem * 1_000.0).round().to_u64().unwrap_or(0);
+        let total_ms =
+            (total_secs.abs() * 1_000.0).round().to_u64().unwrap_or(0);
+        let (parts, _) = decompose(total_ms, &CANONICAL_UNITS);
+        if parts.is_empty() {
+            // The decomposition can't represent the magnitude: a sub-half
+            // millisecond remainder rounds `total_ms` to zero, and a huge
+            // magnitude overflows the `u64` conversion (read back as 0). Fall
+            // back to the honest `DurationSeconds` dialect instead of lying
+            // with `"0s"`.
+            return format!("{}s", DurationSeconds(total_secs))
+                .into_boxed_str();
+        }
+
         let mut spelling = String::new();
         if is_negative {
             spelling.push('-');
         }
-        let mut decomposed = false;
-        for unit in DECOMPOSITION_ORDER {
-            let unit_ms = (unit.nominal_seconds() * 1_000.0)
-                .round()
-                .to_u64()
-                .unwrap_or(0);
-            if total_ms >= unit_ms {
-                let count = total_ms / unit_ms;
-                total_ms %= unit_ms;
-                if decomposed {
-                    spelling.push(' ');
-                }
-                // Writing the `Display` implementation of `u64` into a
-                // `String` is infallible.
-                let _ = write!(spelling, "{count}{}", unit.spelling());
-                decomposed = true;
+        for (
+            index,
+            DecomposedPart {
+                unit,
+                count,
+            },
+        ) in parts.into_iter().enumerate()
+        {
+            if index > 0 {
+                spelling.push(' ');
             }
+            // Writing the `Display` implementation of `u64` into a `String`
+            // is infallible.
+            let _ = write!(spelling, "{count}{}", unit.spelling());
         }
-
-        // The decomposition can't represent every magnitude: a sub-millisecond
-        // remainder rounds to zero, and a huge magnitude overflows `u64` in the
-        // milliseconds conversion above (read back as 0). Either way nothing
-        // was written for a nonzero `total_secs`; fall back to the honest
-        // `DurationSeconds` dialect instead of lying with `"0s"`.
-        if decomposed {
-            spelling.into_boxed_str()
-        } else {
-            format!("{}s", DurationSeconds(total_secs)).into_boxed_str()
-        }
+        spelling.into_boxed_str()
     }
 
     /// Combines `rhs` with `self`, negating the components of `rhs` (and
@@ -658,7 +653,7 @@ pub(crate) struct DurationComponent {
     /// Signed magnitude, with the leading sign applied.
     magnitude: f64,
     /// Unit associated with this magnitude.
-    unit: DurationUnit,
+    unit: TimeUnit,
 }
 
 impl DurationComponent {
@@ -672,7 +667,7 @@ impl DurationComponent {
     /// Returns the unit of the magnitude.
     #[inline]
     #[must_use]
-    pub(crate) const fn unit(self) -> DurationUnit {
+    pub(crate) const fn unit(self) -> TimeUnit {
         self.unit
     }
 }
@@ -841,32 +836,6 @@ impl Mul<DurationSeconds> for f64 {
         DurationSeconds::canonicalize_zero(self * rhs.0)
     }
 }
-
-/// The six fixed sub-year units used for greedy millisecond decomposition in
-/// [`DurationValue::from_nominal_seconds`].
-///
-/// Month and Year are intentionally omitted from magnitude-derived conversion:
-/// their lengths are calendar-dependent and cannot be soundly synthesized from
-/// a raw magnitude.
-const DECOMPOSITION_ORDER: [DurationUnit; 6] = [
-    DurationUnit::Week,
-    DurationUnit::Day,
-    DurationUnit::Hour,
-    DurationUnit::Minute,
-    DurationUnit::Second,
-    DurationUnit::Millisecond,
-];
-
-/// Units, largest first, used by [`DurationValue::humanize`].
-const HUMAN_ORDER: [DurationUnit; 7] = [
-    DurationUnit::Year,
-    DurationUnit::Month,
-    DurationUnit::Week,
-    DurationUnit::Day,
-    DurationUnit::Hour,
-    DurationUnit::Minute,
-    DurationUnit::Second,
-];
 
 /// At or above this magnitude, the [`DurationSeconds`]
 /// [`Display`](fmt::Display) switches to scientific notation.
@@ -1641,6 +1610,42 @@ mod tests {
             // Assert
             assert_eq!(duration.humanize(), expected);
         }
+
+        #[test]
+        fn renders_a_non_finite_magnitude_as_zero_seconds() {
+            // Arrange: a raw non-finite `DurationSeconds` bypasses the
+            // finite-only `try_from` that scaling already rejects.
+            let duration =
+                DurationValue::from_nominal_seconds(DurationSeconds(f64::NAN));
+            // Act
+            let humanized = duration.humanize();
+            // Assert
+            assert_eq!(humanized, "0 seconds");
+        }
+
+        #[rstest]
+        #[case::second_roll_up(1.999_9, "2 seconds")]
+        #[case::minute_boundary(59.999_9, "1 minute")]
+        fn rolls_a_near_whole_magnitude_into_the_next_unit(
+            #[case] raw_secs: f64,
+            #[case] expected: &str,
+        ) {
+            // Arrange: the magnitude rounds to a whole unit boundary before
+            // decomposition, so no `"…, 1000 milliseconds"` tail exists.
+            // Act
+            let duration = synthesized(raw_secs);
+            // Assert
+            assert_eq!(duration.humanize(), expected);
+        }
+
+        #[test]
+        fn renders_a_one_millisecond_tail_in_the_singular() {
+            // Arrange: 1 millisecond is below every human unit; the tail count
+            // is 1. Act
+            let humanized = synthesized(0.001).humanize();
+            // Assert
+            assert_eq!(humanized, "1 millisecond");
+        }
     }
 
     mod serialization {
@@ -1805,14 +1810,14 @@ mod tests {
                 first,
                 Some(DurationComponent {
                     magnitude: -1.0,
-                    unit: DurationUnit::Hour,
+                    unit: TimeUnit::Hour,
                 })
             );
             assert_eq!(
                 second,
                 Some(DurationComponent {
                     magnitude: -30.0,
-                    unit: DurationUnit::Minute,
+                    unit: TimeUnit::Minute,
                 })
             );
         }
@@ -1902,7 +1907,7 @@ mod tests {
                 components.last().copied(),
                 Some(DurationComponent {
                     magnitude: -30.0,
-                    unit: DurationUnit::Minute,
+                    unit: TimeUnit::Minute,
                 })
             );
         }
@@ -1969,14 +1974,14 @@ mod tests {
                 components.and_then(|entries| entries.first().copied()),
                 Some(DurationComponent {
                     magnitude: 1.0,
-                    unit: DurationUnit::Day,
+                    unit: TimeUnit::Day,
                 })
             );
             assert_eq!(
                 components.and_then(|entries| entries.get(1).copied()),
                 Some(DurationComponent {
                     magnitude: 1.0,
-                    unit: DurationUnit::Hour,
+                    unit: TimeUnit::Hour,
                 })
             );
         }
@@ -2047,14 +2052,14 @@ mod tests {
                 components.and_then(|entries| entries.first().copied()),
                 Some(DurationComponent {
                     magnitude: 2.5,
-                    unit: DurationUnit::Hour,
+                    unit: TimeUnit::Hour,
                 })
             );
             assert_eq!(
                 components.and_then(|entries| entries.get(1).copied()),
                 Some(DurationComponent {
                     magnitude: 75.0,
-                    unit: DurationUnit::Minute,
+                    unit: TimeUnit::Minute,
                 })
             );
             assert_eq!(
@@ -2076,7 +2081,7 @@ mod tests {
                 components.and_then(|entries| entries.first().copied()),
                 Some(DurationComponent {
                     magnitude: 0.5,
-                    unit: DurationUnit::Hour,
+                    unit: TimeUnit::Hour,
                 })
             );
             assert_eq!(scaled.as_str(), "30m");

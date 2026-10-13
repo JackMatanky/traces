@@ -5,7 +5,7 @@
 //! prefix lookahead. [`ScanMode`] names how far a scan may stop before the
 //! end of the input.
 
-use super::{error::DurationError, unit::DurationUnit};
+use super::{error::DurationError, unit::TimeUnit};
 
 /// A byte cursor over duration text.
 ///
@@ -92,7 +92,7 @@ impl<'a> Scanner<'a> {
     /// - [`DurationError::UnknownUnit`] if the unit is not recognized.
     pub(super) fn component(
         &mut self,
-    ) -> Result<(f64, DurationUnit), DurationError> {
+    ) -> Result<(f64, TimeUnit), DurationError> {
         let number = self.number()?;
         self.skip_whitespace();
         let unit = self.unit()?;
@@ -172,7 +172,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Scans a run of ASCII letters as a unit spelling.
-    fn unit(&mut self) -> Result<DurationUnit, DurationError> {
+    fn unit(&mut self) -> Result<TimeUnit, DurationError> {
         let start = self.pos;
         while self.byte_at(0).is_some_and(|byte| byte.is_ascii_alphabetic()) {
             self.bump();
@@ -180,11 +180,8 @@ impl<'a> Scanner<'a> {
         self.resolve_unit(start)
     }
 
-    /// Converts the scanned unit span `start..cursor` into a [`DurationUnit`].
-    fn resolve_unit(
-        &self,
-        start: usize,
-    ) -> Result<DurationUnit, DurationError> {
+    /// Converts the scanned unit span `start..cursor` into a [`TimeUnit`].
+    fn resolve_unit(&self, start: usize) -> Result<TimeUnit, DurationError> {
         if start == self.pos {
             return Err(DurationError::MissingUnit);
         }
@@ -193,7 +190,7 @@ impl<'a> Scanner<'a> {
         };
         let spelling = core::str::from_utf8(unit_slice)
             .map_err(|_| DurationError::UnknownUnit)?;
-        DurationUnit::from_spelling(spelling).ok_or(DurationError::UnknownUnit)
+        TimeUnit::from_spelling(spelling).ok_or(DurationError::UnknownUnit)
     }
 
     /// Returns `true` if the bytes after the sign at the cursor begin a valid
@@ -374,19 +371,19 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::hour("h", DurationUnit::Hour)]
-        #[case::uppercase_hour("H", DurationUnit::Hour)]
-        #[case::minutes("m", DurationUnit::Minute)]
-        #[case::months("mo", DurationUnit::Month)]
-        #[case::milliseconds("ms", DurationUnit::Millisecond)]
-        #[case::long_minutes("mins", DurationUnit::Minute)]
-        #[case::long_hours("hours", DurationUnit::Hour)]
-        #[case::long_years("yrs", DurationUnit::Year)]
-        #[case::long_weeks("wks", DurationUnit::Week)]
-        #[case::long_seconds("secs", DurationUnit::Second)]
+        #[case::hour("h", TimeUnit::Hour)]
+        #[case::uppercase_hour("H", TimeUnit::Hour)]
+        #[case::minutes("m", TimeUnit::Minute)]
+        #[case::months("mo", TimeUnit::Month)]
+        #[case::milliseconds("ms", TimeUnit::Millisecond)]
+        #[case::long_minutes("mins", TimeUnit::Minute)]
+        #[case::long_hours("hours", TimeUnit::Hour)]
+        #[case::long_years("yrs", TimeUnit::Year)]
+        #[case::long_weeks("wks", TimeUnit::Week)]
+        #[case::long_seconds("secs", TimeUnit::Second)]
         fn scans_a_unit_spelling(
             #[case] input: &str,
-            #[case] expected: DurationUnit,
+            #[case] expected: TimeUnit,
         ) {
             // Arrange: `input` is the case literal.
             // Act
@@ -423,17 +420,17 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::hour("1h", 1.0, DurationUnit::Hour)]
-        #[case::minutes("30m", 30.0, DurationUnit::Minute)]
-        #[case::spaced_unit("1 h", 1.0, DurationUnit::Hour)]
-        #[case::decimal("1.5h", 1.5, DurationUnit::Hour)]
-        #[case::exponent("1e3s", 1_000.0, DurationUnit::Second)]
-        #[case::uppercase_unit("12H", 12.0, DurationUnit::Hour)]
-        #[case::negative("-15m", -15.0, DurationUnit::Minute)]
+        #[case::hour("1h", 1.0, TimeUnit::Hour)]
+        #[case::minutes("30m", 30.0, TimeUnit::Minute)]
+        #[case::spaced_unit("1 h", 1.0, TimeUnit::Hour)]
+        #[case::decimal("1.5h", 1.5, TimeUnit::Hour)]
+        #[case::exponent("1e3s", 1_000.0, TimeUnit::Second)]
+        #[case::uppercase_unit("12H", 12.0, TimeUnit::Hour)]
+        #[case::negative("-15m", -15.0, TimeUnit::Minute)]
         fn scans_a_number_and_unit_pair(
             #[case] input: &str,
             #[case] expected_magnitude: f64,
-            #[case] expected_unit: DurationUnit,
+            #[case] expected_unit: TimeUnit,
         ) {
             // Arrange: `input` is the case literal.
             // Act
@@ -587,7 +584,7 @@ mod tests {
             // Act
             let moved = scanner.skip_to_next_component();
             // Assert
-            assert_eq!((magnitude, unit), (1.0, DurationUnit::Hour));
+            assert_eq!((magnitude, unit), (1.0, TimeUnit::Hour));
             assert!(moved);
             assert_eq!(scanner.position(), 3);
         }

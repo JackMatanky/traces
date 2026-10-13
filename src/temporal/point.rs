@@ -15,8 +15,8 @@ use num_traits::ToPrimitive as _;
 
 use super::{
     CalendarPeriod, DATE_PATTERN, DateComponent, DateError, DateTimeValue,
-    DateValue, Difference, DurationComponent, DurationUnit, DurationValue,
-    PeriodEdge,
+    DateValue, Difference, DurationComponent, DurationValue, PeriodEdge,
+    TimeUnit,
     calendar::{shift_datetime, time_delta_from_seconds},
     date::DateShape,
     datetime::{DateTimeShape, ParsedDateTime},
@@ -123,7 +123,7 @@ impl DatePoint {
     pub(crate) fn shift(
         self,
         n: i64,
-        unit: DurationUnit,
+        unit: TimeUnit,
     ) -> Result<Self, DateError> {
         match self {
             Self::Calendar {
@@ -241,16 +241,16 @@ impl DatePoint {
     /// Years and months are whole calendar counts of the local dates.
     /// Exact units are fractional when both points carry a time and whole,
     /// truncated toward zero, otherwise.
-    pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
+    pub(crate) fn diff(self, to: Self, unit: TimeUnit) -> Difference {
         let local_delta = || {
             to.local_datetime_or_utc()
                 .signed_duration_since(self.local_datetime_or_utc())
         };
         match unit {
-            DurationUnit::Year => {
+            TimeUnit::Year => {
                 Difference::Whole(self.date().whole_years_until(to.date()))
             }
-            DurationUnit::Month => {
+            TimeUnit::Month => {
                 Difference::Whole(self.date().whole_months_until(to.date()))
             }
             fixed if self.has_time() && to.has_time() => {
@@ -260,16 +260,12 @@ impl DatePoint {
                     seconds.as_seconds_f64() / fixed.nominal_seconds(),
                 )
             }
-            DurationUnit::Week => Difference::Whole(local_delta().num_weeks()),
-            DurationUnit::Day => Difference::Whole(local_delta().num_days()),
-            DurationUnit::Hour => Difference::Whole(local_delta().num_hours()),
-            DurationUnit::Minute => {
-                Difference::Whole(local_delta().num_minutes())
-            }
-            DurationUnit::Second => {
-                Difference::Whole(local_delta().num_seconds())
-            }
-            DurationUnit::Millisecond => {
+            TimeUnit::Week => Difference::Whole(local_delta().num_weeks()),
+            TimeUnit::Day => Difference::Whole(local_delta().num_days()),
+            TimeUnit::Hour => Difference::Whole(local_delta().num_hours()),
+            TimeUnit::Minute => Difference::Whole(local_delta().num_minutes()),
+            TimeUnit::Second => Difference::Whole(local_delta().num_seconds()),
+            TimeUnit::Millisecond => {
                 Difference::Whole(local_delta().num_milliseconds())
             }
         }
@@ -1089,13 +1085,13 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::day_forward(1, DurationUnit::Day, ymd(2026, 7, 30))]
-        #[case::day_backward(-1, DurationUnit::Day, ymd(2026, 7, 28))]
-        #[case::week_backward(-1, DurationUnit::Week, ymd(2026, 7, 22))]
-        #[case::year_backward(-1, DurationUnit::Year, ymd(2025, 7, 29))]
+        #[case::day_forward(1, TimeUnit::Day, ymd(2026, 7, 30))]
+        #[case::day_backward(-1, TimeUnit::Day, ymd(2026, 7, 28))]
+        #[case::week_backward(-1, TimeUnit::Week, ymd(2026, 7, 22))]
+        #[case::year_backward(-1, TimeUnit::Year, ymd(2025, 7, 29))]
         fn shifts_a_calendar_date_by_whole_units(
             #[case] n: i64,
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected: DateValue,
         ) {
             // Arrange
@@ -1130,7 +1126,7 @@ mod tests {
             let expected = point_at(expected);
 
             // Act
-            let shifted = base.shift(hours, DurationUnit::Hour);
+            let shifted = base.shift(hours, TimeUnit::Hour);
 
             // Assert
             assert_eq!(
@@ -1152,7 +1148,7 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let shifted = base.shift(1, DurationUnit::Month);
+            let shifted = base.shift(1, TimeUnit::Month);
 
             // Assert
             assert_eq!(
@@ -1173,7 +1169,7 @@ mod tests {
             let base = point_at("2026-01-31");
 
             // Act
-            let shifted = base.shift(2, DurationUnit::Month);
+            let shifted = base.shift(2, TimeUnit::Month);
 
             // Assert
             assert_eq!(
@@ -1185,11 +1181,11 @@ mod tests {
         }
 
         #[rstest]
-        #[case::month(1, DurationUnit::Month, ymd(2026, 8, 1))]
-        #[case::day(1, DurationUnit::Day, ymd(2026, 7, 2))]
+        #[case::month(1, TimeUnit::Month, ymd(2026, 8, 1))]
+        #[case::day(1, TimeUnit::Day, ymd(2026, 7, 2))]
         fn preserves_month_precision_through_a_shift(
             #[case] n: i64,
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected_date: DateValue,
         ) {
             // Arrange
@@ -1219,11 +1215,11 @@ mod tests {
             };
 
             // Act
-            let day = clock(base.shift(1, DurationUnit::Day));
-            let week = clock(base.shift(1, DurationUnit::Week));
-            let month = clock(base.shift(1, DurationUnit::Month));
-            let year = clock(base.shift(1, DurationUnit::Year));
-            let back = clock(base.shift(-1, DurationUnit::Day));
+            let day = clock(base.shift(1, TimeUnit::Day));
+            let week = clock(base.shift(1, TimeUnit::Week));
+            let month = clock(base.shift(1, TimeUnit::Month));
+            let year = clock(base.shift(1, TimeUnit::Year));
+            let back = clock(base.shift(-1, TimeUnit::Day));
 
             // Assert
             assert_eq!(
@@ -1260,7 +1256,7 @@ mod tests {
             let base = point_at("2026-10-31 12:00:00");
 
             // Act
-            let day = base.shift(1, DurationUnit::Day);
+            let day = base.shift(1, TimeUnit::Day);
 
             // Assert
             assert_eq!(
@@ -1279,11 +1275,11 @@ mod tests {
             let fall = point_at("2026-10-31 12:00:00");
 
             // Act
-            let spring_hours = spring.shift(168, DurationUnit::Hour);
-            let spring_week = spring.shift(1, DurationUnit::Week);
-            let spring_days = spring.shift(7, DurationUnit::Day);
-            let fall_day = fall.shift(1, DurationUnit::Day);
-            let fall_hours = fall.shift(24, DurationUnit::Hour);
+            let spring_hours = spring.shift(168, TimeUnit::Hour);
+            let spring_week = spring.shift(1, TimeUnit::Week);
+            let spring_days = spring.shift(7, TimeUnit::Day);
+            let fall_day = fall.shift(1, TimeUnit::Day);
+            let fall_hours = fall.shift(24, TimeUnit::Hour);
 
             // Assert
             assert_eq!(
@@ -1334,10 +1330,10 @@ mod tests {
             ));
 
             // Act
-            let past_max_date = max_date.shift(1, DurationUnit::Day);
-            let past_min_date = min_date.shift(-1, DurationUnit::Day);
-            let past_max_point = max_point.shift(1, DurationUnit::Hour);
-            let past_min_point = min_point.shift(-1, DurationUnit::Hour);
+            let past_max_date = max_date.shift(1, TimeUnit::Day);
+            let past_min_date = min_date.shift(-1, TimeUnit::Day);
+            let past_max_point = max_point.shift(1, TimeUnit::Hour);
+            let past_min_point = min_point.shift(-1, TimeUnit::Hour);
 
             // Assert
             assert_eq!(
@@ -2166,55 +2162,55 @@ mod tests {
         #[case::year(
             "2020-06-15",
             "2026-07-15",
-            DurationUnit::Year,
+            TimeUnit::Year,
             Difference::Whole(6)
         )]
         #[case::month_across_month_ends(
             "2026-01-15",
             "2026-03-15",
-            DurationUnit::Month,
+            TimeUnit::Month,
             Difference::Whole(2)
         )]
         #[case::week(
             "2026-07-29",
             "2026-08-06",
-            DurationUnit::Week,
+            TimeUnit::Week,
             Difference::Whole(1)
         )]
         #[case::day(
             "2026-07-29",
             "2026-08-06",
-            DurationUnit::Day,
+            TimeUnit::Day,
             Difference::Whole(8)
         )]
         #[case::hour(
             "2026-07-29",
             "2026-08-06",
-            DurationUnit::Hour,
+            TimeUnit::Hour,
             Difference::Whole(192)
         )]
         #[case::minute(
             "2026-07-29",
             "2026-08-06",
-            DurationUnit::Minute,
+            TimeUnit::Minute,
             Difference::Whole(11520)
         )]
         #[case::second(
             "2026-07-29",
             "2026-08-06",
-            DurationUnit::Second,
+            TimeUnit::Second,
             Difference::Whole(691_200)
         )]
         #[case::millisecond(
             "2026-07-29",
             "2026-08-06",
-            DurationUnit::Millisecond,
+            TimeUnit::Millisecond,
             Difference::Whole(691_200_000)
         )]
         fn returns_whole_counts_between_calendar_points(
             #[case] from: &str,
             #[case] to: &str,
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected: Difference,
         ) {
             // Arrange
@@ -2232,14 +2228,14 @@ mod tests {
         }
 
         #[rstest]
-        #[case::month("2026-01-15", "2026-03-15", DurationUnit::Month, Difference::Whole(-2))]
-        #[case::year("2020-06-15", "2026-07-15", DurationUnit::Year, Difference::Whole(-6))]
-        #[case::day("2026-07-29", "2026-08-06", DurationUnit::Day, Difference::Whole(-8))]
-        #[case::hour("2026-07-29", "2026-08-06", DurationUnit::Hour, Difference::Whole(-192))]
+        #[case::month("2026-01-15", "2026-03-15", TimeUnit::Month, Difference::Whole(-2))]
+        #[case::year("2020-06-15", "2026-07-15", TimeUnit::Year, Difference::Whole(-6))]
+        #[case::day("2026-07-29", "2026-08-06", TimeUnit::Day, Difference::Whole(-8))]
+        #[case::hour("2026-07-29", "2026-08-06", TimeUnit::Hour, Difference::Whole(-192))]
         fn returns_the_negated_difference_in_the_reverse_direction(
             #[case] from: &str,
             #[case] to: &str,
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected: Difference,
         ) {
             // Arrange
@@ -2277,7 +2273,7 @@ mod tests {
             let to = point_at(to);
 
             // Act
-            let difference = from.diff(to, DurationUnit::Year);
+            let difference = from.diff(to, TimeUnit::Year);
 
             // Assert
             assert_eq!(
@@ -2287,20 +2283,20 @@ mod tests {
         }
 
         #[rstest]
-        #[case::hour(DurationUnit::Hour, Difference::Fractional(1.5))]
-        #[case::minute(DurationUnit::Minute, Difference::Fractional(90.0))]
-        #[case::second(DurationUnit::Second, Difference::Fractional(5400.0))]
+        #[case::hour(TimeUnit::Hour, Difference::Fractional(1.5))]
+        #[case::minute(TimeUnit::Minute, Difference::Fractional(90.0))]
+        #[case::second(TimeUnit::Second, Difference::Fractional(5400.0))]
         #[case::millisecond(
-            DurationUnit::Millisecond,
+            TimeUnit::Millisecond,
             Difference::Fractional(5_400_000.0)
         )]
-        #[case::day(DurationUnit::Day, Difference::Fractional(0.0625))]
+        #[case::day(TimeUnit::Day, Difference::Fractional(0.0625))]
         #[case::week(
-            DurationUnit::Week,
+            TimeUnit::Week,
             Difference::Fractional(0.008_928_571_428_571_428)
         )]
         fn returns_fractional_counts_between_date_time_points(
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected: Difference,
         ) {
             // Arrange: ninety minutes span the date boundary.
@@ -2320,10 +2316,10 @@ mod tests {
         }
 
         #[rstest]
-        #[case::month(DurationUnit::Month, Difference::Whole(0))]
-        #[case::year(DurationUnit::Year, Difference::Whole(0))]
+        #[case::month(TimeUnit::Month, Difference::Whole(0))]
+        #[case::year(TimeUnit::Year, Difference::Whole(0))]
         fn returns_whole_calendar_counts_between_date_time_points(
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected: Difference,
         ) {
             // Arrange: the two points sit in the same month and year.
@@ -2344,17 +2340,17 @@ mod tests {
         #[rstest]
         #[case::calendar_point(
             "2026-07-29",
-            DurationUnit::Day,
+            TimeUnit::Day,
             Difference::Whole(0)
         )]
         #[case::date_time_point(
             "2026-07-29 14:30:05",
-            DurationUnit::Hour,
+            TimeUnit::Hour,
             Difference::Fractional(0.0)
         )]
         fn returns_zero_for_a_point_diffed_against_itself(
             #[case] text: &str,
-            #[case] unit: DurationUnit,
+            #[case] unit: TimeUnit,
             #[case] expected: Difference,
         ) {
             // Arrange
@@ -2393,7 +2389,7 @@ mod tests {
             let to = point_at(to);
 
             // Act
-            let difference = from.diff(to, DurationUnit::Hour);
+            let difference = from.diff(to, TimeUnit::Hour);
 
             // Assert
             assert_eq!(
@@ -2413,10 +2409,10 @@ mod tests {
             let fall_to = point_at("2026-11-01 12:00:00");
 
             // Act
-            let spring_day = spring_from.diff(spring_to, DurationUnit::Day);
-            let spring_hour = spring_from.diff(spring_to, DurationUnit::Hour);
-            let fall_day = fall_from.diff(fall_to, DurationUnit::Day);
-            let fall_hour = fall_from.diff(fall_to, DurationUnit::Hour);
+            let spring_day = spring_from.diff(spring_to, TimeUnit::Day);
+            let spring_hour = spring_from.diff(spring_to, TimeUnit::Hour);
+            let fall_day = fall_from.diff(fall_to, TimeUnit::Day);
+            let fall_hour = fall_from.diff(fall_to, TimeUnit::Hour);
 
             // Assert
             assert_eq!(
@@ -2449,8 +2445,8 @@ mod tests {
             let to = point_at("2026-03-08");
 
             // Act
-            let days = from.diff(to, DurationUnit::Day);
-            let hours = from.diff(to, DurationUnit::Hour);
+            let days = from.diff(to, TimeUnit::Day);
+            let hours = from.diff(to, TimeUnit::Hour);
 
             // Assert
             assert_eq!(

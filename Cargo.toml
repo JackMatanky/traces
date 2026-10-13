@@ -131,7 +131,7 @@ miette = { version = "7.6.0", features = ["derive", "fancy"] }
 minijinja = { version = "2.24.0", default-features = false, features = ["adjacent_loop_items", "builtins", "debug", "macros", "multi_template", "serde"] }
 noyalib = { version = "0.0.53", default-features = false, features = ["fast-float", "fast-int", "std"] }
 num-traits = "0.2.19"
-phf = { version = "0.14.0", features = ["macros"] }
+
 postcard = { version = "1.1.3", default-features = false, features = ["use-std"] }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 rayon = "1.12.0"

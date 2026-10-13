@@ -41,7 +41,7 @@
 //! - [`DurationValue`]: A parsed duration carrying its total seconds, its
 //!   original spelling, and its retained written components (which witness the
 //!   calendar-versus-fixed regime).
-//! - [`DurationUnit`]: Unit registry (parsing and seconds conversion). Single
+//! - [`TimeUnit`]: Unit registry (parsing and seconds conversion). Single
 //!   source of truth; callers should not maintain their own registries.
 //! - [`DurationSeconds`]: An `f64` newtype that is finite on construction, with
 //!   [`Ord`], [`Add`](std::ops::Add), [`Sub`](std::ops::Sub), and
@@ -70,4 +70,4 @@ pub use duration::DurationValue;
 pub(crate) use duration::{DurationComponent, DurationSeconds};
 pub use error::{DateError, DurationError};
 pub(crate) use point::{DatePoint, DatePrecision};
-pub(crate) use unit::{DurationUnit, UNIT_SPELLINGS_HINT};
+pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};

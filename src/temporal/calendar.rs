@@ -18,7 +18,7 @@
 use chrono::{Days, Months, NaiveDateTime, TimeDelta, Weekday};
 
 use super::error::DateError;
-use crate::temporal::{DurationSeconds, DurationUnit};
+use crate::temporal::{DurationSeconds, TimeUnit};
 
 /// A calendar period that date-point boundaries select.
 ///
@@ -173,15 +173,15 @@ pub(super) fn time_delta_from_seconds(
 pub(super) fn shift_datetime(
     local_datetime: NaiveDateTime,
     n: i64,
-    unit: DurationUnit,
+    unit: TimeUnit,
 ) -> Result<NaiveDateTime, DateError> {
     match unit {
-        DurationUnit::Year => {
+        TimeUnit::Year => {
             let months = n.checked_mul(12).ok_or(DateError::OutOfRange)?;
             shift_datetime_months(local_datetime, months)
         }
-        DurationUnit::Month => shift_datetime_months(local_datetime, n),
-        DurationUnit::Week => {
+        TimeUnit::Month => shift_datetime_months(local_datetime, n),
+        TimeUnit::Week => {
             let days = n.checked_mul(7).ok_or(DateError::OutOfRange)?;
             let days_u64 = days.unsigned_abs();
             if days >= 0 {
@@ -191,7 +191,7 @@ pub(super) fn shift_datetime(
             }
             .ok_or(DateError::OutOfRange)
         }
-        DurationUnit::Day => {
+        TimeUnit::Day => {
             let days_u64 = n.unsigned_abs();
             if n >= 0 {
                 local_datetime.checked_add_days(Days::new(days_u64))
@@ -200,14 +200,14 @@ pub(super) fn shift_datetime(
             }
             .ok_or(DateError::OutOfRange)
         }
-        DurationUnit::Millisecond => {
+        TimeUnit::Millisecond => {
             let delta = chrono::Duration::try_milliseconds(n)
                 .ok_or(DateError::OutOfRange)?;
             local_datetime
                 .checked_add_signed(delta)
                 .ok_or(DateError::OutOfRange)
         }
-        DurationUnit::Second | DurationUnit::Minute | DurationUnit::Hour => {
+        TimeUnit::Second | TimeUnit::Minute | TimeUnit::Hour => {
             let secs = unit
                 .whole_nominal_seconds()
                 .ok_or(DateError::OutOfRange)?
