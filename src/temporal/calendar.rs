@@ -437,15 +437,14 @@ mod tests {
         fn projects_non_finite_fractional_differences_unchanged(
             #[case] magnitude: f64,
         ) {
-            // Arrange: `magnitude` is the case literal; only the fractional
-            // variant can carry a non-finite magnitude.
+            // Arrange: non-finite fractional magnitudes are valid Difference
+            // values.
             let difference = Difference::Fractional(magnitude);
 
             // Act
             let actual = difference.to_f64();
 
-            // Assert: bits compare equal for non-finite values, where `==`
-            // would report every NaN as unequal.
+            // Assert: bit comparison treats NaN consistently.
             assert_eq!(
                 actual.map(f64::to_bits),
                 Some(magnitude.to_bits()),
@@ -491,6 +490,63 @@ mod tests {
             );
         }
 
+        #[rstest]
+        #[case::sow("sow", CalendarPeriod::Week, PeriodEdge::Start)]
+        #[case::start_of_week(
+            "start_of_week",
+            CalendarPeriod::Week,
+            PeriodEdge::Start
+        )]
+        #[case::eow("eow", CalendarPeriod::Week, PeriodEdge::End)]
+        #[case::end_of_week(
+            "end_of_week",
+            CalendarPeriod::Week,
+            PeriodEdge::End
+        )]
+        #[case::som("som", CalendarPeriod::Month, PeriodEdge::Start)]
+        #[case::start_of_month(
+            "start_of_month",
+            CalendarPeriod::Month,
+            PeriodEdge::Start
+        )]
+        #[case::eom("eom", CalendarPeriod::Month, PeriodEdge::End)]
+        #[case::end_of_month(
+            "end_of_month",
+            CalendarPeriod::Month,
+            PeriodEdge::End
+        )]
+        #[case::soy("soy", CalendarPeriod::Year, PeriodEdge::Start)]
+        #[case::start_of_year(
+            "start_of_year",
+            CalendarPeriod::Year,
+            PeriodEdge::Start
+        )]
+        #[case::eoy("eoy", CalendarPeriod::Year, PeriodEdge::End)]
+        #[case::end_of_year(
+            "end_of_year",
+            CalendarPeriod::Year,
+            PeriodEdge::End
+        )]
+        fn maps_each_shorthand_to_its_period_edge(
+            #[case] name: &str,
+            #[case] expected_period: CalendarPeriod,
+            #[case] expected_edge: PeriodEdge,
+        ) {
+            // Arrange: the expected row is declared in the case.
+            // Act
+            let actual = PERIOD_SHORTHANDS
+                .iter()
+                .find(|&&(candidate, _, _)| {
+                    candidate.eq_ignore_ascii_case(name)
+                })
+                .map(|&(_, period, edge)| (period, edge));
+            // Assert
+            assert_eq!(
+                actual,
+                Some((expected_period, expected_edge)),
+                "{name} must map to {expected_period:?}/{expected_edge:?}"
+            );
+        }
         #[rstest]
         #[case::week(
             CalendarPeriod::Week,
