@@ -1103,6 +1103,79 @@ mod tests {
                 .expect("generated spelling parses");
             prop_assert_eq!(original, reparsed);
         }
+
+        #[test]
+        fn nominal_constructor_preserves_integer_milliseconds(
+            milliseconds in -1_000_000_000_i32..=1_000_000_000_i32,
+        ) {
+            let expected = f64::from(milliseconds) / 1_000.0;
+            let duration = synthesized(expected);
+
+            prop_assert_eq!(
+                duration.nominal_seconds().as_f64().to_bits(),
+                expected.to_bits(),
+            );
+        }
+
+        #[test]
+        fn negating_twice_preserves_nominal_identity(
+            seconds in -1_000_000_i32..=1_000_000_i32,
+        ) {
+            let duration = synthesized(f64::from(seconds));
+            let original = duration.nominal_seconds();
+            let negated = duration
+                .checked_neg()
+                .expect("bounded duration negates");
+            let restored = negated
+                .checked_neg()
+                .expect("bounded negated duration restores");
+
+            prop_assert!(restored.nominal_seconds() == original);
+        }
+
+        #[test]
+        fn add_then_subtract_preserves_nominal_identity(
+            left in -1_000_000_i32..=1_000_000_i32,
+            right in -1_000_000_i32..=1_000_000_i32,
+        ) {
+            let left = synthesized(f64::from(left));
+            let right = synthesized(f64::from(right));
+            let left_identity = left.nominal_seconds();
+            let right_identity = right.nominal_seconds();
+            let right_again = synthesized(right_identity.as_f64());
+            let restored = left
+                .checked_add(right)
+                .and_then(|sum| sum.checked_sub(right_again))
+                .expect("bounded duration arithmetic succeeds");
+
+            prop_assert!(restored.nominal_seconds() == left_identity);
+        }
+
+        #[test]
+        fn equality_ordering_and_hash_share_nominal_identity(
+            seconds in -1_000_000_i32..=1_000_000_i32,
+        ) {
+            let nominal = synthesized(f64::from(seconds));
+            let written = DurationValue::parse(&format!("{seconds}s"))
+                .expect("integer-second spelling parses");
+
+            prop_assert!(nominal == written);
+            prop_assert_eq!(nominal.cmp(&written), std::cmp::Ordering::Equal);
+            prop_assert_eq!(hash_val(&nominal), hash_val(&written));
+        }
+
+        #[test]
+        fn scaling_by_one_preserves_identity(
+            seconds in -1_000_000_i32..=1_000_000_i32,
+        ) {
+            let duration = synthesized(f64::from(seconds));
+            let original = duration.nominal_seconds();
+            let scaled = duration
+                .checked_mul(1.0)
+                .expect("bounded duration scales by one");
+
+            prop_assert!(scaled.nominal_seconds() == original);
+        }
     }
 
     /// Parses a valid duration and projects its nominal seconds, erasing
