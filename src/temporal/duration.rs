@@ -1099,8 +1099,9 @@ mod tests {
             seconds in -1_000_000_000_i32..=1_000_000_000_i32,
         ) {
             let original = synthesized(f64::from(seconds));
-            let reparsed = DurationValue::parse(original.as_str())
-                .expect("generated spelling parses");
+            let displayed = original.to_string();
+            let reparsed = DurationValue::parse(&displayed)
+                .expect("displayed spelling parses");
             prop_assert_eq!(original, reparsed);
         }
 
