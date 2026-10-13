@@ -77,7 +77,7 @@ impl DateTimeValue {
         self.local_datetime_in(&local_zone())
     }
 
-    /// Converts the stored instant to local civil time using the supplied zone.
+    /// Converts the UTC value to local civil time using the supplied zone.
     #[inline]
     #[must_use]
     pub(crate) fn local_datetime_in(
