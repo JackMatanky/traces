@@ -33,7 +33,7 @@ cargo-deny = "latest"
 "cargo:cargo-llvm-cov" = "latest"
 "cargo:cargo-crap" = "latest"
 "cargo:https://github.com/quality-gates/messrust" = { version = "tag:v0.1.15" }
-"cargo:mutarust" = "0.1.10"
+"cargo:mutarust" = "latest"
 "cargo:cargo-shear" = "latest"
 
 # -- Benchmarking --
@@ -60,10 +60,11 @@ experimental = true
 [env]
 HK_MISE = "1"
 ADR_DIRECTORY = "docs/adr/"
+RUST_DOCS_MCP_CACHE_DIR = ".rust-docs/cache/"
 # Coverage filename-exclusion regex, consumed by `coverage:lcov`/`coverage:html`
 # as cargo-llvm-cov's --ignore-filename-regex. Ported from the deleted
-# tarpaulin.toml exclude-files. POSIX ERE only: no lookahead, no (?:...), no \d \w \s —
-# an invalid regex silently disables ALL exclusions (defaults included).
+# tarpaulin.toml exclude-files. POSIX ERE only: no lookahead, no (?:...), no \d
+# \w \s — an invalid regex silently disables ALL exclusions (defaults included).
 COVERAGE_IGNORE_REGEX = 'src/main\.rs$|src/cli($|/)|src/(.*/)?error\.rs$'
 
 [task_config]
