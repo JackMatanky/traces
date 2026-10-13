@@ -878,6 +878,63 @@ mod tests {
         }
     }
 
+    mod hostile_yaml_note {
+        use pretty_assertions::{assert_eq, assert_ne};
+        use serde::Deserialize;
+
+        use super::*;
+
+        #[test]
+        fn renders_extreme_durations_in_scientific_notation() {
+            #[derive(Deserialize)]
+            struct ExtremeNote {
+                duration: DurationValue,
+            }
+
+            // Arrange
+            let extreme_digits = "9".repeat(50);
+            let yaml = format!("duration: \"{extreme_digits}y\"\n");
+
+            // Act
+            let note = noyalib::from_str::<ExtremeNote>(&yaml)
+                .expect("extreme duration deserializes without panicking");
+            let synthesized = DurationValue::from_nominal_seconds(
+                note.duration.nominal_seconds(),
+            );
+            let rendered = synthesized.to_string();
+
+            // Assert
+            assert_ne!(rendered, "0s", "never a silent zero");
+            assert!(rendered.contains('e'), "renders in scientific notation");
+        }
+
+        #[test]
+        fn treats_a_negative_zero_duration_as_zero() {
+            #[derive(Deserialize)]
+            struct ZeroNote {
+                duration: DurationValue,
+            }
+
+            // Arrange
+            let yaml = "duration: \"-0m\"\n";
+
+            // Act
+            let note = noyalib::from_str::<ZeroNote>(yaml)
+                .expect("negative-zero duration deserializes");
+
+            // Assert
+            assert_eq!(
+                note.duration,
+                DurationValue::parse("0m").expect("valid duration"),
+                "\"-0m\" must equal zero, not hide a negative"
+            );
+            assert!(
+                note.duration >= DurationValue::parse("0m").unwrap(),
+                "\"-0m\" must order as zero"
+            );
+        }
+    }
+
     mod value {
         use super::*;
 

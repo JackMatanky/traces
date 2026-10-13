@@ -1093,6 +1093,31 @@ mod tests {
         }
 
         #[test]
+        fn keeps_its_postcard_spelling() {
+            // Arrange
+            let value = fixed_datetime();
+
+            // Act
+            let bytes = postcard::to_allocvec(&value);
+
+            // Assert
+            assert_eq!(
+                bytes.as_deref(),
+                Ok(b"\x142026-07-29T14:30:05Z".as_slice()),
+                "postcard encodes the length-prefixed UTC Z string"
+            );
+            assert_eq!(
+                bytes
+                    .and_then(|bytes| {
+                        postcard::from_bytes::<DateTimeValue>(&bytes)
+                    })
+                    .map_err(|error| error.to_string()),
+                Ok(value),
+                "postcard encode then decode must return the same date-time"
+            );
+        }
+
+        #[test]
         fn serializes_sub_second_precision_with_autosi() {
             // Arrange: a three-fraction-digit date-time.
             let value = DateTimeValue::parse_iso("2026-07-29T14:30:00.123Z")
@@ -1155,6 +1180,35 @@ mod tests {
                 result.ok(),
                 Some(fixed_datetime()),
                 "an RFC 3339 UTC string must deserialize to the same date-time"
+            );
+        }
+
+        #[test]
+        fn deserializes_a_yaml_z_spelling_to_the_same_instant() {
+            #[derive(serde::Deserialize)]
+            struct YamlNote {
+                datetime: DateTimeValue,
+            }
+
+            // Arrange: YAML strings share the serde string path; the "Z"
+            // spelling must not mean the local zone.
+            let yaml = "datetime: \"2026-07-29T14:30:00Z\"\n";
+
+            // Act
+            let note = noyalib::from_str::<YamlNote>(yaml)
+                .expect("YAML note deserializes");
+
+            // Assert
+            assert_eq!(
+                note.datetime,
+                DateTimeValue::parse_iso("2026-07-29T14:30:00+00:00")
+                    .expect("valid datetime"),
+                "\"Z\" must parse as UTC, not the local zone"
+            );
+            assert_eq!(
+                serde_json::to_string(&note.datetime).expect("serializable"),
+                "\"2026-07-29T14:30:00Z\"",
+                "re-serialization must keep the Z spelling"
             );
         }
 

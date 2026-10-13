@@ -1,3 +1,12 @@
+//! Date points and the precision-aware arithmetic over them.
+//!
+//! Owns [`DatePoint`], a Date written at a month or day [`DatePrecision`],
+//! or a Date-Time stored as UTC that renders as the local clock. Parsing
+//! retains the written precision; month precision denotes the first of the
+//! month. Arithmetic applies calendar units on the local clock and exact
+//! units as exact elapsed time. Callers hold the validated date point or
+//! receive a [`DateError`].
+
 use chrono::{
     DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
     Timelike as _, Utc, Weekday, format::ParseErrorKind,
@@ -22,17 +31,22 @@ pub(crate) enum DatePrecision {
     Day,
 }
 
-/// A parsed date or date-time at the precision it was written.
+/// A Date written at a month or day precision, or a Date-Time.
+///
+/// Calendar points are zone-free and carry the written [`DatePrecision`].
+/// Date-Time points store UTC and resolve naive input in the process's
+/// local zone (a repeated local time takes the earlier occurrence; a
+/// skipped local time shifts forward by the gap length).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePoint {
-    /// Zone-free calendar date.
+    /// A zone-free Date at the written precision.
     Calendar {
         /// The calendar date; month precision stores the first of the month.
         date: DateValue,
         /// How much of `date` was written.
         date_precision: DatePrecision,
     },
-    /// UTC instant.
+    /// A Date-Time stored as UTC, rendered as the local clock.
     Instant(DateTimeValue),
 }
 
@@ -55,8 +69,9 @@ impl DatePoint {
         }
     }
 
-    /// Local datetime reading of this date point: midnight for a calendar date,
-    /// the local clock time (UTC when the offset cannot apply) for an instant.
+    /// Local datetime reading of this date point: midnight for a calendar
+    /// date, the local clock time (UTC when the offset cannot apply) for a
+    /// date-time point.
     #[must_use]
     pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
         match self {
@@ -68,7 +83,7 @@ impl DatePoint {
         }
     }
 
-    /// UTC instant represented by this date point.
+    /// UTC date-time represented by this date point.
     #[must_use]
     pub(crate) fn instant(self) -> DateTime<Utc> {
         match self {
@@ -96,15 +111,15 @@ impl DatePoint {
         }
     }
 
-    /// Shifts by `n` whole `unit`s: calendar units move the date or local
-    /// datetime, clock units move the exact instant (calendar dates move only
-    /// when the shift crosses midnight).
+    /// Shifts by `n` whole `unit`s: calendar units move the local clock,
+    /// exact units move the exact time (calendar dates move only when the
+    /// shift crosses midnight).
     ///
     /// # Errors
     ///
     /// - [`DateError::OutOfRange`] if the shift overflows chrono's range.
-    /// - [`DateError::LocalZoneLookup`] if an instant's shifted local datetime
-    ///   cannot be resolved.
+    /// - [`DateError::LocalZoneLookup`] if a date-time point's shifted local
+    ///   datetime cannot be resolved.
     pub(crate) fn shift(
         self,
         n: i64,
@@ -132,8 +147,8 @@ impl DatePoint {
     ///
     /// - [`DateError::OutOfRange`] if a component is non-finite, a calendar
     ///   magnitude does not fit `i64`, or any shift overflows.
-    /// - [`DateError::LocalZoneLookup`] if an instant's shifted local datetime
-    ///   cannot be resolved.
+    /// - [`DateError::LocalZoneLookup`] if a date-time point's shifted local
+    ///   datetime cannot be resolved.
     pub(crate) fn apply(
         self,
         duration: &DurationValue,
@@ -158,8 +173,8 @@ impl DatePoint {
     ///
     /// - [`DateError::OutOfRange`] if the boundary date is outside chrono's
     ///   date range.
-    /// - [`DateError::LocalZoneLookup`] if an instant's boundary datetime
-    ///   cannot be resolved.
+    /// - [`DateError::LocalZoneLookup`] if a date-time point's boundary
+    ///   datetime cannot be resolved.
     pub(crate) fn start_of(
         self,
         calendar_period: CalendarPeriod,
@@ -174,8 +189,8 @@ impl DatePoint {
     ///
     /// - [`DateError::OutOfRange`] if the boundary date is outside chrono's
     ///   date range.
-    /// - [`DateError::LocalZoneLookup`] if an instant's boundary datetime
-    ///   cannot be resolved.
+    /// - [`DateError::LocalZoneLookup`] if a date-time point's boundary
+    ///   datetime cannot be resolved.
     pub(crate) fn end_of(
         self,
         calendar_period: CalendarPeriod,
@@ -189,8 +204,8 @@ impl DatePoint {
     ///
     /// - [`DateError::OutOfRange`] if the ISO week's `target` day is outside
     ///   chrono's date range.
-    /// - [`DateError::LocalZoneLookup`] if an instant's new local datetime
-    ///   cannot be resolved.
+    /// - [`DateError::LocalZoneLookup`] if a date-time point's new local
+    ///   datetime cannot be resolved.
     pub(crate) fn with_weekday(
         self,
         target: Weekday,
@@ -224,8 +239,8 @@ impl DatePoint {
     /// Measures the difference to another date point in the requested unit.
     ///
     /// Years and months are whole calendar counts of the local dates.
-    /// Fixed-length units are fractional when both points carry a time and
-    /// whole, truncated toward zero, otherwise.
+    /// Exact units are fractional when both points carry a time and whole,
+    /// truncated toward zero, otherwise.
     pub(crate) fn diff(self, to: Self, unit: DurationUnit) -> Difference {
         let local_delta = || {
             to.local_datetime_or_utc()
@@ -260,6 +275,7 @@ impl DatePoint {
         }
     }
 
+    /// Advances on the local clock, preserving written precision.
     fn advance_local(self, delta: TimeDelta) -> Result<Self, DateError> {
         match self {
             Self::Calendar {
@@ -280,6 +296,7 @@ impl DatePoint {
         }
     }
 
+    /// Advances by exact elapsed time, preserving written precision.
     fn advance_exact(self, delta: TimeDelta) -> Result<Self, DateError> {
         match self {
             Self::Calendar {
@@ -297,6 +314,7 @@ impl DatePoint {
         }
     }
 
+    /// Applies one duration component in its own frame.
     fn apply_component(
         self,
         component: DurationComponent,
@@ -326,6 +344,7 @@ impl DatePoint {
         }
     }
 
+    /// Replaces the local date, preserving written precision and time.
     fn with_date(self, date: NaiveDate) -> Result<Self, DateError> {
         match self {
             Self::Calendar {
@@ -343,6 +362,7 @@ impl DatePoint {
         }
     }
 
+    /// Resolves a period edge to its local date, preserving precision.
     fn boundary(
         self,
         calendar_period: CalendarPeriod,
@@ -557,832 +577,294 @@ pub(super) fn starts_with_year(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use serde::Deserialize;
-
     use super::*;
-    use crate::{temporal::fixtures::fixed_datetime, test_support::TzGuard};
+    use crate::{
+        temporal::fixtures::{fixed_datetime, ymd},
+        test_support::TzGuard,
+    };
+
+    // Zone doctrine: every test that resolves or renders in a named zone
+    // calls `TzGuard::set` exactly once, before any parse. The local zone
+    // cache reuses the previously set zone within one second, so a second
+    // `set` inside one test would read stale offsets.
 
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
     }
 
-    mod date_point {
-        use chrono::NaiveDate;
+    mod parse {
         use pretty_assertions::assert_eq;
         use rstest::rstest;
 
         use super::*;
 
-        #[test]
-        fn has_time_is_false_for_a_calendar_point() {
-            let point = DatePoint::Calendar {
-                date: DateValue::from(NaiveDate::MIN),
-                date_precision: DatePrecision::Day,
-            };
-
-            assert!(!point.has_time());
-        }
-
-        #[test]
-        fn has_time_is_true_for_an_instant() {
-            assert!(DatePoint::Instant(fixed_datetime()).has_time());
-        }
-
         #[rstest]
-        #[case::month("2026-07", "%Y-%m")]
-        #[case::day("2026-07-29", "%Y-%m-%d")]
-        #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
-        #[case::fractional_seconds(
-            "2026-07-29T14:30:00.123Z",
-            "%Y-%m-%dT%H:%M:%S%.f"
+        #[case::day("2026-07-29", DatePrecision::Day, ymd(2026, 7, 29))]
+        #[case::month("2026-07", DatePrecision::Month, ymd(2026, 7, 1))]
+        #[case::unpadded_month_and_day(
+            "2026-1-1",
+            DatePrecision::Day,
+            ymd(2026, 1, 1)
         )]
-        fn canonical_pattern_preserves_precision_and_fractional_seconds(
+        fn parses_a_date_shape_to_a_calendar_point(
             #[case] text: &str,
-            #[case] expected: &str,
+            #[case] expected_precision: DatePrecision,
+            #[case] expected_date: DateValue,
         ) {
-            // Arrange
-            TzGuard::set("UTC");
-            let point = DatePoint::parse(text).expect("valid date point");
+            // Arrange: `text` is a zone-free date shape.
 
             // Act
-            let pattern = point.canonical_pattern();
-
-            // Assert
-            assert_eq!(pattern, expected);
-        }
-    }
-
-    mod golden_serde {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn date_and_datetime_keep_their_json_and_postcard_spellings() {
-            // Arrange
-            TzGuard::set("UTC");
-            let date = DateValue::parse_iso("2026-07-29").unwrap();
-            let datetime =
-                DateTimeValue::parse_iso("2026-07-29T14:30:05Z").unwrap();
-
-            // Act
-            let date_bytes = postcard::to_allocvec(&date).unwrap();
-            let datetime_bytes = postcard::to_allocvec(&datetime).unwrap();
-
-            // Assert
-            assert_eq!(serde_json::to_string(&date).unwrap(), "\"2026-07-29\"");
-            assert_eq!(
-                serde_json::to_string(&datetime).unwrap(),
-                "\"2026-07-29T14:30:05Z\""
-            );
-            assert_eq!(date_bytes, b"\x0a2026-07-29");
-            assert_eq!(datetime_bytes, b"\x142026-07-29T14:30:05Z");
-            assert_eq!(
-                postcard::from_bytes::<DateValue>(&date_bytes).unwrap(),
-                date
-            );
-            assert_eq!(
-                postcard::from_bytes::<DateTimeValue>(&datetime_bytes).unwrap(),
-                datetime
-            );
-        }
-    }
-
-    mod hostile_yaml_note {
-        use pretty_assertions::{assert_eq, assert_ne};
-
-        use super::*;
-
-        #[derive(Deserialize)]
-        struct HostileNote {
-            duration_extreme: DurationValue,
-            duration_zero: DurationValue,
-            datetime: DateTimeValue,
-        }
-
-        #[test]
-        fn parses_round_trips_and_displays_without_panic_or_lying() {
-            let extreme_digits = "9".repeat(50);
-            let yaml = format!(
-                "duration_extreme: {extreme_digits}y\nduration_zero: \
-                 \"-0m\"\ndatetime: \"2026-07-29T14:30:00Z\"\n"
-            );
-
-            let note = noyalib::from_str::<HostileNote>(&yaml)
-                .expect("hostile note deserializes without panicking");
-
-            // A value rebuilt from its parsed seconds (no original
-            // spelling to echo) renders in scientific notation, never a
-            // silent "0s".
-            let synthesized = DurationValue::from_nominal_seconds(
-                note.duration_extreme.nominal_seconds(),
-            );
-            let rendered_extreme = synthesized.to_string();
-            assert_ne!(rendered_extreme, "0s");
-            assert!(rendered_extreme.contains('e'));
-
-            // "-0m": equals and orders as zero, not a hidden negative.
-            assert_eq!(
-                note.duration_zero,
-                DurationValue::parse("0m").expect("valid duration")
-            );
-            assert!(note.duration_zero >= DurationValue::parse("0m").unwrap());
-
-            // "…Z" datetime: parses to the same instant as the explicit-offset
-            // spelling (naive would mean the local zone) and re-serializes
-            // with the same spelling.
-            assert_eq!(
-                note.datetime,
-                DateTimeValue::parse_iso("2026-07-29T14:30:00+00:00")
-                    .expect("valid datetime")
-            );
-            assert_eq!(
-                serde_json::to_string(&note.datetime).expect("serializable"),
-                "\"2026-07-29T14:30:00Z\""
-            );
-        }
-    }
-
-    mod calendar_owner {
-        use pretty_assertions::{assert_eq, assert_ne};
-        use rstest::rstest;
-
-        use super::*;
-
-        #[test]
-        fn apply_advances_the_instant_by_the_duration() {
-            let base = DatePoint::Instant(fixed_datetime());
-            let one_hour = DurationValue::parse("1h").expect("valid duration");
-            let forward = base.apply(&one_hour).expect("no overflow");
-            assert_eq!(
-                forward,
-                DatePoint::Instant(DateTimeValue::from(
-                    base.instant() + TimeDelta::hours(1)
-                ))
-            );
-        }
-
-        #[test]
-        fn apply_rewinds_the_instant_by_negated_duration() {
-            let base = DatePoint::Instant(fixed_datetime());
-            let one_hour = DurationValue::parse("1h").expect("valid duration");
-            let back = base.apply(&(-one_hour)).expect("no overflow");
-            assert_eq!(
-                back,
-                DatePoint::Instant(DateTimeValue::from(
-                    base.instant() - TimeDelta::hours(1)
-                ))
-            );
-        }
-
-        #[test]
-        fn overflows_near_the_representable_range_in_apply() {
-            let near_max = DatePoint::Instant(DateTimeValue::from(
-                DateTime::<Utc>::MAX_UTC,
-            ));
-            let one_second =
-                DurationValue::parse("1s").expect("valid duration");
-            assert_eq!(near_max.apply(&one_second).ok(), None);
-        }
-
-        #[test]
-        fn underflows_near_the_representable_range_in_apply() {
-            let near_min = DatePoint::Instant(DateTimeValue::from(
-                DateTime::<Utc>::MIN_UTC,
-            ));
-            let one_second =
-                DurationValue::parse("1s").expect("valid duration");
-            assert_eq!(near_min.apply(&(-one_second)).ok(), None);
-        }
-
-        #[test]
-        fn shift_preserves_the_local_clock_time_for_calendar_units_across_dst()
-        {
-            TzGuard::set("America/New_York");
-
-            // Saturday March 7, 2026 at 12:00 EST (UTC 17:00:00)
-            let base = point_at("2026-03-07 12:00:00");
-
-            // A one-day `shift` keeps 12:00 on the clock time across the gap.
-            let shifted_day = base.shift(1, DurationUnit::Day).unwrap();
-            assert_eq!(
-                shifted_day.local_datetime_or_utc().to_string(),
-                "2026-03-08 12:00:00"
-            );
-
-            // Week and 7 days share the calendar path, so both keep 12:00.
-            let shifted_week = base.shift(1, DurationUnit::Week).unwrap();
-            let shifted_7d = base.shift(7, DurationUnit::Day).unwrap();
-            assert_eq!(shifted_week, shifted_7d);
-            assert_eq!(
-                shifted_week.local_datetime_or_utc().to_string(),
-                "2026-03-14 12:00:00"
-            );
-
-            // 168 hours shifts the instant and lands 13:00 across the gap.
-            let shifted_168h = base.shift(168, DurationUnit::Hour).unwrap();
-            assert_ne!(shifted_week, shifted_168h);
-            assert_eq!(
-                shifted_168h.local_datetime_or_utc().to_string(),
-                "2026-03-14 13:00:00"
-            );
-
-            // `shift` and `apply` agree for the same calendar unit.
-            let applied_week =
-                base.apply(&DurationValue::parse("1w").unwrap()).unwrap();
-            assert_eq!(shifted_week, applied_week);
-        }
-
-        #[test]
-        fn equal_duration_values_shift_dates_differently() {
-            // "1 month" == "30 days" as duration values (fixed ratios)
-            let one_month = DurationValue::parse("1 month").unwrap();
-            let thirty_days = DurationValue::parse("30 days").unwrap();
-            assert_eq!(one_month, thirty_days);
-
-            // Yet they shift a date differently:
-            // 2026-01-15 + 1 month = 2026-02-15 (28 days later)
-            // 2026-01-15 + 30 days = 2026-02-14 (30 days later)
-            let base = point_at("2026-01-15");
-            let shifted_month = base.apply(&one_month).unwrap();
-            let shifted_days = base.apply(&thirty_days).unwrap();
-
-            assert_eq!(shifted_month, point_at("2026-02-15"));
-            assert_eq!(shifted_days, point_at("2026-02-14"));
-            assert_ne!(shifted_month, shifted_days);
-        }
-
-        #[test]
-        fn month_clamping_matches_chrono_documented_behavior() {
-            // Chrono's `checked_add_months` clamps to the target month's last
-            // day; the calendar owner delegates to it, so the clamp is pinned
-            // here.
-            let jan_31_non_leap = point_at("2023-01-31");
-            let feb_clamped =
-                jan_31_non_leap.shift(1, DurationUnit::Month).unwrap();
-            assert_eq!(feb_clamped, point_at("2023-02-28"));
-
-            let jan_31_leap = point_at("2024-01-31");
-            let feb_leap_clamped =
-                jan_31_leap.shift(1, DurationUnit::Month).unwrap();
-            assert_eq!(feb_leap_clamped, point_at("2024-02-29"));
-        }
-
-        #[test]
-        fn day_is_calendar_application_unit_differing_from_24h_across_dst() {
-            TzGuard::set("America/New_York");
-
-            // 1d == 24h as duration values
-            let one_day = DurationValue::parse("1d").unwrap();
-            let twenty_four_hours = DurationValue::parse("24h").unwrap();
-            assert_eq!(one_day, twenty_four_hours);
-
-            // Saturday March 7, 2026 at 12:00:00 EST (UTC 17:00:00)
-            let base = point_at("2026-03-07 12:00:00");
-
-            // 1d shifts local clock time to Sunday March 8, 2026 at 12:00:00
-            // EDT (UTC 16:00:00)
-            let shifted_day = base.apply(&one_day).unwrap();
-            assert_eq!(
-                shifted_day.local_datetime_or_utc().to_string(),
-                "2026-03-08 12:00:00"
-            );
-            assert_eq!(shifted_day, point_at("2026-03-08T16:00:00Z"));
-
-            // 24h shifts stored UTC instant by 24 hours -> Sunday March 8 at
-            // 13:00:00 EDT (UTC 17:00:00)
-            let shifted_hours = base.apply(&twenty_four_hours).unwrap();
-            assert_eq!(
-                shifted_hours.local_datetime_or_utc().to_string(),
-                "2026-03-08 13:00:00"
-            );
-            assert_eq!(shifted_hours, point_at("2026-03-08T17:00:00Z"));
-
-            // Equal values, different shifts across DST
-            assert_ne!(shifted_day, shifted_hours);
-        }
-
-        #[test]
-        fn week_shifts_as_seven_calendar_days_matching_7d_and_differing_from_168h()
-         {
-            TzGuard::set("America/New_York");
-
-            let one_week = DurationValue::parse("1w").unwrap();
-            let seven_days = DurationValue::parse("7d").unwrap();
-            let hours_168 = DurationValue::parse("168h").unwrap();
-
-            assert_eq!(one_week, seven_days);
-            assert_eq!(one_week, hours_168);
-
-            // Saturday March 7, 2026 at 12:00:00 EST
-            let base = point_at("2026-03-07 12:00:00");
-
-            let shifted_week = base.apply(&one_week).unwrap();
-            let shifted_7d = base.apply(&seven_days).unwrap();
-            let shifted_168h = base.apply(&hours_168).unwrap();
-
-            // The `1w` and `7d` forms shift identically.
-            assert_eq!(shifted_week, shifted_7d);
-            assert_eq!(
-                shifted_week.local_datetime_or_utc().to_string(),
-                "2026-03-14 12:00:00"
-            );
-
-            // The `1w` and `168h` forms differ across the DST transition.
-            assert_ne!(shifted_week, shifted_168h);
-            assert_eq!(
-                shifted_168h.local_datetime_or_utc().to_string(),
-                "2026-03-14 13:00:00"
-            );
-        }
-
-        #[test]
-        fn apply_processes_parts_left_to_right_across_dst_transition() {
-            TzGuard::set("America/New_York");
-
-            // Saturday March 7, 2026 at 02:30:00 EST (UTC 07:30:00)
-            let base = point_at("2026-03-07 02:30:00");
-
-            let d_1d_1h = DurationValue::parse("1d 1h").unwrap();
-            let d_1h_1d = DurationValue::parse("1h 1d").unwrap();
-
-            // Values are equal in duration seconds
-            assert_eq!(d_1d_1h, d_1h_1d);
-
-            // Left-to-right application:
-            // "1d 1h": 1d lands in the spring-forward gap (Sunday 02:30 shifts
-            // to 03:30 EDT = 07:30 UTC), then 1h advances the instant to
-            // 08:30 UTC (04:30 EDT).
-            let res_1d_1h = base.apply(&d_1d_1h).unwrap();
-            assert_eq!(res_1d_1h, point_at("2026-03-08T08:30:00Z"));
-            assert_eq!(
-                res_1d_1h.local_datetime_or_utc().to_string(),
-                "2026-03-08 04:30:00"
-            );
-
-            // "1h 1d": 1h advances the Saturday instant to 03:30 EST
-            // (08:30 UTC), then 1d shifts the clock time to Sunday 03:30 EDT
-            // (07:30 UTC).
-            let res_1h_1d = base.apply(&d_1h_1d).unwrap();
-            assert_eq!(res_1h_1d, point_at("2026-03-08T07:30:00Z"));
-            assert_eq!(
-                res_1h_1d.local_datetime_or_utc().to_string(),
-                "2026-03-08 03:30:00"
-            );
-
-            // Different written order yields different result
-            assert_ne!(res_1d_1h, res_1h_1d);
-        }
-
-        #[test]
-        fn fractional_calendar_part_keeps_the_local_clock_time_across_dst() {
-            TzGuard::set("America/New_York");
-
-            // Saturday March 7, 2026 at 06:00 EST (UTC 11:00:00)
-            let base = point_at("2026-03-07 06:00:00");
-
-            // 1.5d == 36h == 1d 12h as values (129,600 fixed seconds)
-            let one_and_half_days = DurationValue::parse("1.5d").unwrap();
-            let thirty_six_hours = DurationValue::parse("36h").unwrap();
-            let written_order = DurationValue::parse("1d 12h").unwrap();
-            assert_eq!(one_and_half_days, thirty_six_hours);
-            assert_eq!(one_and_half_days, written_order);
-
-            // The fractional day is a calendar-unit remainder, so it keeps
-            // the local clock time: 1d lands Sunday 06:00 EDT, then the
-            // 0.5-day remainder adds 12 clock hours to Sunday 18:00 EDT.
-            let shifted_fractional = base.apply(&one_and_half_days).unwrap();
-            assert_eq!(
-                shifted_fractional.local_datetime_or_utc().to_string(),
-                "2026-03-08 18:00:00"
-            );
-            assert_eq!(shifted_fractional, point_at("2026-03-08T22:00:00Z"));
-
-            // The fractional spelling decomposes exactly like its written-order
-            // equivalent "1d 12h".
-            assert_eq!(shifted_fractional, base.apply(&written_order).unwrap());
-
-            // 36h shifts the stored instant exactly and lands an hour later
-            // on the clock time across the 2026-03-08 gap: equal duration
-            // values need not shift a date-time identically across a DST
-            // boundary.
-            let shifted_exact = base.apply(&thirty_six_hours).unwrap();
-            assert_ne!(shifted_fractional, shifted_exact);
-            assert_eq!(
-                shifted_exact.local_datetime_or_utc().to_string(),
-                "2026-03-08 19:00:00"
-            );
-        }
-
-        #[test]
-        fn diff_splits_the_fixed_unit_frame_by_time_component_presence() {
-            TzGuard::set("UTC");
-            let dt1 = point_at("2026-07-28T23:00:00Z");
-            let dt2 = point_at("2026-07-29T00:30:00Z");
-            let date_only = point_at("2026-07-29");
-
-            // When both date points carry a time component, fixed units return
-            // exact f64:
-            let diff_hours = dt1.diff(dt2, DurationUnit::Hour);
-            assert_eq!(diff_hours, Difference::Fractional(1.5));
-
-            // When either date point is date-only, fixed units return whole
-            // i64:
-            let diff_calendar = dt1.diff(date_only, DurationUnit::Hour);
-            assert_eq!(diff_calendar, Difference::Whole(1));
-
-            // Calendar units return whole counts:
-            let diff_months = point_at("2026-01-15")
-                .diff(point_at("2026-03-15"), DurationUnit::Month);
-            assert_eq!(diff_months, Difference::Whole(2));
-        }
-
-        #[test]
-        fn shift_preserves_the_local_clock_time_for_months_and_years_across_dst()
-         {
-            TzGuard::set("America/New_York");
-
-            // Saturday March 7, 2026 at 12:00 EST: month and year shifts
-            // preserve the clock time, re-resolving through the local zone
-            // after the chrono arithmetic.
-            let base = point_at("2026-03-07 12:00:00");
-            let shifted_month = base.shift(1, DurationUnit::Month).unwrap();
-            assert_eq!(
-                shifted_month.local_datetime_or_utc().to_string(),
-                "2026-04-07 12:00:00"
-            );
-            let shifted_year = base.shift(1, DurationUnit::Year).unwrap();
-            assert_eq!(
-                shifted_year.local_datetime_or_utc().to_string(),
-                "2027-03-07 12:00:00"
-            );
-
-            // Month-end clamping also re-resolves locally: Jan 31 noon in
-            // EST clamps to Feb 28 noon, still reading 12:00.
-            let january = point_at("2026-01-31 12:00:00");
-            let clamped = january.shift(1, DurationUnit::Month).unwrap();
-            assert_eq!(
-                clamped.local_datetime_or_utc().to_string(),
-                "2026-02-28 12:00:00"
-            );
-        }
-
-        #[test]
-        fn apply_applies_a_fractional_calendar_part_to_a_calendar_date() {
-            // 1.5d: the whole day shifts the calendar; the 12-hour
-            // remainder lands on the resulting calendar day (midnight + 36h).
-            let base = point_at("2026-03-07");
-            let shifted =
-                base.apply(&DurationValue::parse("1.5d").unwrap()).unwrap();
-            assert_eq!(shifted, point_at("2026-03-08"));
-
-            // 1.5mo: the whole month clamps Jan 31 to Feb 28, then the
-            // 15-day remainder (half of the nominal 30-day month) applies
-            // as exact calendar time.
-            let january = point_at("2026-01-31");
-            let clamped =
-                january.apply(&DurationValue::parse("1.5mo").unwrap()).unwrap();
-            assert_eq!(clamped, point_at("2026-03-15"));
-        }
-
-        #[rstest]
-        #[case::negative_week(-1, DurationUnit::Week, "2026-07-22")]
-        #[case::negative_year(-1, DurationUnit::Year, "2025-07-29")]
-        #[case::sub_day_unit_leaves_the_calendar_date_intact(
-            500,
-            DurationUnit::Millisecond,
-            "2026-07-29"
-        )]
-        fn shift_calendar_date_by_signed_units(
-            #[case] n: i64,
-            #[case] unit: DurationUnit,
-            #[case] expected: &str,
-        ) {
-            let base = point_at("2026-07-29");
-            let shifted = base.shift(n, unit).unwrap();
-            assert_eq!(shifted, point_at(expected));
-        }
-
-        #[test]
-        fn month_shift_clamps_to_the_last_day_and_keeps_day_precision() {
-            // Arrange
-            let january_31 = point_at("2026-01-31");
-
-            // Act
-            let shifted = january_31.shift(1, DurationUnit::Month).unwrap();
-
-            // Assert
-            assert_eq!(shifted, point_at("2026-02-28"));
-            assert_eq!(shifted.canonical_pattern(), "%Y-%m-%d");
-        }
-
-        #[rstest]
-        #[case::five_hours(5, "2026-07-29")]
-        #[case::just_under_a_day(23, "2026-07-29")]
-        #[case::one_day(24, "2026-07-30")]
-        #[case::over_a_day(25, "2026-07-30")]
-        #[case::backwards(-1, "2026-07-28")]
-        fn hour_shift_moves_a_calendar_date_only_across_midnight(
-            #[case] hours: i64,
-            #[case] expected: &str,
-        ) {
-            // Arrange
-            let base = point_at("2026-07-29");
-
-            // Act
-            let shifted = base.shift(hours, DurationUnit::Hour).unwrap();
-
-            // Assert
-            assert_eq!(shifted, point_at(expected));
-        }
-
-        #[test]
-        fn month_shift_keeps_month_precision() {
-            // Arrange
-            let base = point_at("2026-07");
-
-            // Act
-            let shifted = base.shift(1, DurationUnit::Month).unwrap();
-
-            // Assert
-            assert_eq!(shifted.canonical_pattern(), "%Y-%m");
-            assert_eq!(
-                shifted.local_datetime_or_utc().format("%Y-%m").to_string(),
-                "2026-08"
-            );
-        }
-
-        #[test]
-        fn date_point_calendar_shift_preserves_noon_across_dst() {
-            // Arrange
-            TzGuard::set("America/New_York");
-            let date_point = point_at("2026-03-07T12:00:00");
-
-            // Act
-            let shifted = date_point.shift(1, DurationUnit::Day).unwrap();
+            let parsed = DatePoint::parse(text);
 
             // Assert
             assert_eq!(
-                shifted.local_datetime_or_utc().to_string(),
-                "2026-03-08 12:00:00"
-            );
-        }
-
-        #[test]
-        fn shift_reports_out_of_range_at_date_and_instant_limits() {
-            // Arrange
-            TzGuard::set("UTC");
-            let instant = DatePoint::Instant(DateTimeValue::from(
-                DateTime::<Utc>::MAX_UTC,
-            ));
-            let date = DatePoint::Calendar {
-                date: DateValue::from(NaiveDate::MAX),
-                date_precision: DatePrecision::Day,
-            };
-
-            // Act
-            let instant_result = instant.shift(1, DurationUnit::Day);
-            let date_result = date.shift(1, DurationUnit::Day);
-
-            // Assert
-            assert_eq!(instant_result, Err(DateError::OutOfRange));
-            assert_eq!(date_result, Err(DateError::OutOfRange));
-        }
-
-        #[test]
-        fn date_apply_restarts_each_sub_day_component_at_midnight() {
-            // Arrange
-            let date = point_at("2026-07-29");
-            let separate = DurationValue::parse("12h 12h").unwrap();
-            let together = DurationValue::parse("24h").unwrap();
-
-            // Act
-            let separate_date = date.apply(&separate).unwrap();
-            let together_date = date.apply(&together).unwrap();
-
-            // Assert
-            assert_eq!(separate_date, date);
-            assert_eq!(together_date, point_at("2026-07-30"));
-        }
-    }
-
-    mod date_point_boundaries {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn week_boundary_returns_iso_monday_spanning_month_boundaries() {
-            let date_point = point_at("2026-02-01");
-            let sow = date_point.start_of(CalendarPeriod::Week).expect("sow");
-            let eow = date_point.end_of(CalendarPeriod::Week).expect("eow");
-            assert_eq!(
-                sow.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-01-26").unwrap().naive_date()
-            );
-            assert_eq!(
-                eow.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-02-01").unwrap().naive_date()
-            );
-        }
-
-        #[test]
-        fn year_boundary_returns_first_and_last_day_of_year() {
-            let date_point = point_at("2026-07-29");
-            let soy = date_point.start_of(CalendarPeriod::Year).expect("soy");
-            let eoy = date_point.end_of(CalendarPeriod::Year).expect("eoy");
-            assert_eq!(
-                soy.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-01-01").unwrap().naive_date()
-            );
-            assert_eq!(
-                eoy.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-12-31").unwrap().naive_date()
-            );
-        }
-
-        #[test]
-        fn date_point_with_weekday_maps_to_target_weekday_in_iso_week() {
-            let date_point = point_at("2026-07-29");
-            let mon = date_point.with_weekday(Weekday::Mon).expect("mon");
-            let sun = date_point.with_weekday(Weekday::Sun).expect("sun");
-            assert_eq!(
-                mon.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-07-27").unwrap().naive_date()
-            );
-            assert_eq!(
-                sun.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-08-02").unwrap().naive_date()
-            );
-        }
-
-        #[test]
-        fn date_point_apply_shifts_by_compound_duration() {
-            let date_point = point_at("2026-07-29");
-            let dur = DurationValue::parse("1w 2d").unwrap();
-            let shifted = date_point.apply(&dur).expect("apply succeeds");
-            assert_eq!(
-                shifted.local_datetime_or_utc().date(),
-                DateValue::parse_iso("2026-08-07").unwrap().naive_date()
-            );
-            assert_eq!(shifted.canonical_pattern(), "%Y-%m-%d");
-        }
-    }
-
-    mod parsing {
-        use rstest::rstest;
-
-        use super::*;
-
-        #[rstest]
-        #[case::too_short("202")]
-        #[case::empty("")]
-        #[case::non_digit_year("abcd-01-01")]
-        fn rejects_a_missing_four_digit_year(#[case] input: &str) {
-            assert!(!starts_with_year(input));
-        }
-
-        #[test]
-        fn accepts_a_five_digit_year_prefix_as_having_four_digits() {
-            // The `starts_with_year` guard only checks the first 4 bytes; a
-            // longer numeric prefix still passes this guard and is rejected
-            // later, by the format cascade, as InvalidValue rather than
-            // YearNotFourDigits.
-            assert!(starts_with_year("20265-01-01"));
-            assert!(matches!(
-                DateValue::parse_iso("20265-01-01"),
-                Err(DateError::InvalidValue { .. })
-            ));
-        }
-    }
-
-    mod date_point_parsing {
-        use pretty_assertions::assert_eq;
-        use rstest::rstest;
-
-        use super::*;
-
-        #[rstest]
-        #[case::day("2026-07-29", DatePrecision::Day)]
-        #[case::month("2026-07", DatePrecision::Month)]
-        #[case::unpadded_day("2026-1-1", DatePrecision::Day)]
-        fn parse_keeps_the_written_date_precision(
-            #[case] text: &str,
-            #[case] expected: DatePrecision,
-        ) {
-            // Act
-            let parsed = DatePoint::parse(text).expect("valid date");
-
-            // Assert
-            assert!(matches!(
                 parsed,
-                DatePoint::Calendar { date_precision, .. }
-                    if date_precision == expected
-            ));
+                Ok(DatePoint::Calendar {
+                    date: expected_date,
+                    date_precision: expected_precision,
+                }),
+                "{text:?} must parse as a calendar point at its written \
+                 precision"
+            );
         }
 
         #[rstest]
-        #[case::offset("2026-07-29T14:30:00Z")]
-        #[case::t_separated("2026-07-29T14:30:00")]
-        #[case::space_separated_fractional("2026-07-29 14:30:00.123")]
-        fn parse_returns_an_instant_for_date_times(#[case] text: &str) {
-            // Arrange
+        #[case::t_with_seconds("2026-07-29T14:30:00", "2026-07-29T14:30:00Z")]
+        #[case::t_with_minutes("2026-07-29T14:30", "2026-07-29T14:30:00Z")]
+        #[case::space_with_seconds(
+            "2026-07-29 14:30:00",
+            "2026-07-29T14:30:00Z"
+        )]
+        #[case::space_with_minutes("2026-07-29 14:30", "2026-07-29T14:30:00Z")]
+        #[case::space_with_fraction(
+            "2026-07-29 14:30:00.123",
+            "2026-07-29T14:30:00.123Z"
+        )]
+        #[case::rfc_3339_z("2026-07-29T14:30:00Z", "2026-07-29T14:30:00Z")]
+        #[case::rfc_3339_offset(
+            "2026-07-29T14:30:00+02:00",
+            "2026-07-29T12:30:00Z"
+        )]
+        fn parses_a_date_time_shape_to_a_date_time_point(
+            #[case] text: &str,
+            #[case] expected: &str,
+        ) {
+            // Arrange: naive shapes resolve in the local zone.
             TzGuard::set("UTC");
+            let expected =
+                DateTimeValue::parse_iso(expected).expect("valid date-time");
 
             // Act
-            let parsed = DatePoint::parse(text).expect("valid date-time");
-
-            // Assert
-            assert!(matches!(parsed, DatePoint::Instant(_)));
-        }
-
-        #[test]
-        fn parse_denotes_the_first_day_for_a_year_month() {
-            // Act
-            let year_month = DatePoint::parse("2026-07").expect("valid");
+            let parsed = DatePoint::parse(text);
 
             // Assert
             assert_eq!(
-                year_month.date(),
-                DateValue::parse_iso("2026-07-01").expect("valid")
+                parsed,
+                Ok(DatePoint::Instant(expected)),
+                "{text:?} must parse as a date-time point"
+            );
+        }
+
+        #[test]
+        fn trims_surrounding_whitespace() {
+            // Arrange: whitespace around a day-precision date.
+            let text = "  2026-07-29  ";
+
+            // Act
+            let parsed = DatePoint::parse(text);
+
+            // Assert
+            assert_eq!(
+                parsed,
+                Ok(DatePoint::Calendar {
+                    date: ymd(2026, 7, 29),
+                    date_precision: DatePrecision::Day,
+                }),
+                "surrounding whitespace must not defeat shape recognition"
             );
         }
 
         #[rstest]
         #[case::word("hello")]
         #[case::empty("")]
+        #[case::blank("  ")]
         #[case::year_only("2026")]
+        #[case::non_digit_year("abcd-01-01")]
         #[case::slashes("2026/08/22")]
         #[case::five_digit_year("20265-01-01")]
-        fn parse_rejects_text_without_a_date_shape(#[case] text: &str) {
-            assert_eq!(DatePoint::parse(text), Err(DateError::UnknownShape));
+        fn rejects_text_without_a_date_shape(#[case] text: &str) {
+            // Arrange: `text` lacks the two-or-four-digit year and dash
+            // prefix that marks a date-like shape.
+
+            // Act
+            let parsed = DatePoint::parse(text);
+
+            // Assert
+            assert_eq!(
+                parsed,
+                Err(DateError::UnknownShape),
+                "{text:?} must be rejected as an unknown shape"
+            );
         }
 
         #[test]
-        fn parse_rejects_a_two_digit_year() {
-            assert!(matches!(
-                DatePoint::parse("26-08-22"),
-                Err(DateError::YearNotFourDigits { .. })
-            ));
+        fn rejects_a_two_digit_year() {
+            // Arrange: a two-digit year passes the shape guard but fails the
+            // four-digit year rule.
+            let text = "26-08-22";
+
+            // Act
+            let parsed = DatePoint::parse(text);
+
+            // Assert
+            assert!(
+                matches!(parsed, Err(DateError::YearNotFourDigits { .. })),
+                "expected YearNotFourDigits, got {parsed:?}"
+            );
         }
 
         #[rstest]
-        #[case::month_out_of_range(
-            "2026-13",
-            "`2026-13` is not a recognized date/time: a field is out of range"
-        )]
-        #[case::impossible_day(
+        #[case::month_out_of_range("2026-13", "a field is out of range")]
+        #[case::impossible_february_day(
             "2026-02-30",
-            "`2026-02-30` is not a recognized date/time: a field is out of \
-             range"
+            "a field is out of range"
         )]
-        fn parse_reports_the_reason_the_date_was_rejected(
+        #[case::impossible_april_day("2026-04-31", "a field is out of range")]
+        #[case::signed_month("2026-+7", "not enough input")]
+        #[case::trailing_text_after_a_date_time(
+            "2026-07-29T14:30:00 junk",
+            "invalid input"
+        )]
+        #[case::trailing_word_after_the_separator(
+            "2026-07-29Tinvalid",
+            "invalid input"
+        )]
+        #[case::hour_twenty_four("2026-07-29T24:00:00", "invalid input")]
+        fn rejects_an_invalid_field_with_the_mapped_reason(
             #[case] text: &str,
-            #[case] expected_message: &str,
+            #[case] expected_reason: &str,
         ) {
+            // Arrange: `text` matches a recognized shape but carries an
+            // invalid field.
+
             // Act
-            let error = DatePoint::parse(text).expect_err("invalid date");
+            let parsed = DatePoint::parse(text);
 
             // Assert
-            assert_eq!(error.to_string(), expected_message);
+            assert!(
+                matches!(
+                    parsed,
+                    Err(DateError::InvalidValue { reason, .. })
+                        if reason == expected_reason
+                ),
+                "expected reason {expected_reason:?}, got {parsed:?}"
+            );
         }
 
-        #[rstest]
-        #[case::signed_month("2026-+7")]
-        #[case::trailing_garbage("2026-07-29Tinvalid")]
-        fn parse_rejects_malformed_values(#[case] text: &str) {
-            assert!(matches!(
-                DatePoint::parse(text),
-                Err(DateError::InvalidValue { .. })
-            ));
+        #[test]
+        fn renders_the_parse_failure_in_the_error_message() {
+            // Arrange: the rendered message is the CLI-facing contract.
+            let text = "2026-13";
+
+            // Act
+            let error = DatePoint::parse(text).expect_err("an invalid date");
+
+            // Assert
+            assert_eq!(
+                error.to_string(),
+                "`2026-13` is not a recognized date/time: a field is out of \
+                 range"
+            );
         }
+    }
+
+    mod parse_prefix {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
 
         #[rstest]
-        #[case::day("2026-07-29T14:30:00", 10, DatePrecision::Day)]
-        #[case::month("2026-07 remainder", 7, DatePrecision::Month)]
-        fn parse_prefix_returns_the_date_and_its_length(
+        #[case::full_day(
+            "2026-07-29",
+            DatePrecision::Day,
+            ymd(2026, 7, 29),
+            10
+        )]
+        #[case::day_before_a_date_time(
+            "2026-07-29T14:30:00",
+            DatePrecision::Day,
+            ymd(2026, 7, 29),
+            10
+        )]
+        #[case::day_before_trailing_text(
+            "2026-07-29 rest",
+            DatePrecision::Day,
+            ymd(2026, 7, 29),
+            10
+        )]
+        #[case::day_before_a_bare_separator(
+            "2026-07-29T",
+            DatePrecision::Day,
+            ymd(2026, 7, 29),
+            10
+        )]
+        #[case::full_month("2026-07", DatePrecision::Month, ymd(2026, 7, 1), 7)]
+        #[case::month_before_trailing_text(
+            "2026-07 remainder",
+            DatePrecision::Month,
+            ymd(2026, 7, 1),
+            7
+        )]
+        #[case::month_before_a_digit(
+            "2026-0729",
+            DatePrecision::Month,
+            ymd(2026, 7, 1),
+            7
+        )]
+        fn returns_the_written_precision_and_its_extent(
             #[case] text: &str,
-            #[case] expected_length: usize,
             #[case] expected_precision: DatePrecision,
+            #[case] expected_date: DateValue,
+            #[case] expected_extent: usize,
         ) {
+            // Arrange: `text` begins with a complete day or month prefix.
+
             // Act
-            let (parsed, length) =
-                DatePoint::parse_prefix(text).expect("date prefix");
+            let parsed = DatePoint::parse_prefix(text);
 
             // Assert
-            assert_eq!(length, expected_length);
-            assert!(matches!(
+            assert_eq!(
                 parsed,
-                DatePoint::Calendar { date_precision, .. }
-                    if date_precision == expected_precision
-            ));
+                Some((
+                    DatePoint::Calendar {
+                        date: expected_date,
+                        date_precision: expected_precision,
+                    },
+                    expected_extent,
+                )),
+                "{text:?} must yield its written precision and extent"
+            );
         }
 
         #[rstest]
+        #[case::day_truncated_at_the_separator("2026-07-2")]
+        #[case::day_truncated_mid_field("2026-07-3")]
         #[case::word("not a date")]
-        #[case::signed_month("2026-+7 later")]
-        fn parse_prefix_returns_none_without_a_date_prefix(#[case] text: &str) {
-            assert_eq!(DatePoint::parse_prefix(text), None);
+        #[case::two_digit_year("26-07 rest")]
+        #[case::five_digit_year("20265-01-01")]
+        #[case::invalid_month_and_day("2026-13-99 x")]
+        #[case::non_digit_month("2026-0a-29")]
+        #[case::month_out_of_range("1234-56-78 rest")]
+        fn returns_none_without_a_complete_date_prefix(#[case] text: &str) {
+            // Arrange: `text` lacks a complete ten-byte day or seven-byte
+            // month prefix; a dash at position seven demands the full day.
+
+            // Act
+            let parsed = DatePoint::parse_prefix(text);
+
+            // Assert
+            assert_eq!(parsed, None, "{text:?} must not yield a date prefix");
         }
     }
 
@@ -1393,42 +875,1760 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::iso_date("2026-07-29", "%Y-%m-%d", "2026-07-29")]
-        #[case::custom_date("29/07/2026", "%d/%m/%Y", "2026-07-29")]
-        #[case::date_time(
-            "2026-07-29 14:30:00",
-            "%Y-%m-%d %H:%M:%S",
-            "2026-07-29T14:30:00"
+        #[case::iso_date("2026-07-29", "%Y-%m-%d", ymd(2026, 7, 29))]
+        #[case::unpadded_fields("2026-1-1", "%Y-%m-%d", ymd(2026, 1, 1))]
+        #[case::swapped_order("29/07/2026", "%d/%m/%Y", ymd(2026, 7, 29))]
+        #[case::month_name("July 29, 2026", "%B %d, %Y", ymd(2026, 7, 29))]
+        #[case::abbreviated_month_name(
+            "Jul 29, 2026",
+            "%b %d, %Y",
+            ymd(2026, 7, 29)
         )]
-        #[case::year_month("2026-07", "%Y-%m", "2026-07")]
-        fn parses_text_matching_the_pattern(
+        #[case::weekday_name(
+            "Wednesday, July 29, 2026",
+            "%A, %B %d, %Y",
+            ymd(2026, 7, 29)
+        )]
+        #[case::iso_week_date("2026-W01-4", "%G-W%V-%u", ymd(2026, 1, 1))]
+        #[case::iso_week_date_at_a_year_edge(
+            "2020-W53-4",
+            "%G-W%V-%u",
+            ymd(2020, 12, 31)
+        )]
+        fn parses_a_date_pattern_to_a_calendar_point(
             #[case] text: &str,
             #[case] pattern: &str,
-            #[case] expected_text: &str,
+            #[case] expected: DateValue,
         ) {
-            // Arrange
-            TzGuard::set("UTC");
-            let expected = DatePoint::parse(expected_text).expect("valid");
+            // Arrange: `pattern` matches a zone-free date.
 
             // Act
             let parsed = DatePoint::parse_with_pattern(text, pattern);
 
             // Assert
-            assert_eq!(parsed, Ok(expected));
+            assert_eq!(
+                parsed,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{text:?} with {pattern:?} must parse as a calendar point"
+            );
         }
 
         #[rstest]
-        #[case::bad_pattern("2026-07-29", "%Q")]
-        #[case::not_a_date("not-a-date", "%Y-%m-%d")]
-        #[case::mismatched_pattern("2026-07-29", "%d/%m/%Y")]
-        fn rejects_text_not_matching_the_pattern(
+        #[case::seconds(
+            "2026-07-29 14:30:00",
+            "%Y-%m-%d %H:%M:%S",
+            "2026-07-29T14:30:00Z"
+        )]
+        #[case::minutes(
+            "2026-07-29T14:30",
+            "%Y-%m-%dT%H:%M",
+            "2026-07-29T14:30:00Z"
+        )]
+        #[case::hour_12_clock(
+            "2026-07-29 02:30:00 PM",
+            "%Y-%m-%d %I:%M:%S %p",
+            "2026-07-29T14:30:00Z"
+        )]
+        #[case::fractional_digits(
+            "2026-07-29 14:30:00.123",
+            "%Y-%m-%d %H:%M:%S.%3f",
+            "2026-07-29T14:30:00.123Z"
+        )]
+        #[case::fractional_digits_fixed(
+            "2026-07-29 14:30:00.123",
+            "%Y-%m-%d %H:%M:%S%.3f",
+            "2026-07-29T14:30:00.123Z"
+        )]
+        fn parses_a_date_time_pattern_to_a_date_time_point(
+            #[case] text: &str,
+            #[case] pattern: &str,
+            #[case] expected: &str,
+        ) {
+            // Arrange: naive patterns resolve in the local zone.
+            TzGuard::set("UTC");
+            let expected =
+                DateTimeValue::parse_iso(expected).expect("valid date-time");
+
+            // Act
+            let parsed = DatePoint::parse_with_pattern(text, pattern);
+
+            // Assert
+            assert_eq!(
+                parsed,
+                Ok(DatePoint::Instant(expected)),
+                "{text:?} with {pattern:?} must parse as a date-time point"
+            );
+        }
+
+        #[test]
+        fn preserves_month_precision_for_the_year_month_pattern() {
+            // Arrange: the `%Y-%m` pattern keeps the written month precision.
+            let text = "2026-07";
+            let pattern = "%Y-%m";
+
+            // Act
+            let parsed = DatePoint::parse_with_pattern(text, pattern);
+
+            // Assert
+            assert_eq!(
+                parsed,
+                Ok(DatePoint::Calendar {
+                    date: ymd(2026, 7, 1),
+                    date_precision: DatePrecision::Month,
+                }),
+                "the year-month pattern must preserve month precision"
+            );
+        }
+
+        #[rstest]
+        #[case::inconsistent_weekday(
+            "Thursday, July 29, 2026",
+            "%A, %B %d, %Y",
+            "the date does not exist"
+        )]
+        #[case::inconsistent_abbreviated_weekday(
+            "Thu, July 29, 2026",
+            "%a, %B %d, %Y",
+            "the date does not exist"
+        )]
+        #[case::zero_padded_weekday(
+            "2026-W01-04",
+            "%G-W%V-%u",
+            "a field is out of range"
+        )]
+        #[case::unsupported_padding_flag(
+            "2026-07",
+            "%Y-%-m",
+            "not enough input"
+        )]
+        fn rejects_a_pattern_mismatch_with_the_field_reason(
+            #[case] text: &str,
+            #[case] pattern: &str,
+            #[case] expected_reason: &str,
+        ) {
+            // Arrange: `text` conflicts with `pattern`'s field semantics.
+
+            // Act
+            let parsed = DatePoint::parse_with_pattern(text, pattern);
+
+            // Assert
+            assert!(
+                matches!(
+                    parsed,
+                    Err(DateError::InvalidValue { reason, .. })
+                        if reason == expected_reason
+                ),
+                "expected reason {expected_reason:?}, got {parsed:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::capital_e("2026-07-29", "%E")]
+        #[case::capital_o("2026-07-29", "%O")]
+        #[case::bare_dot("2026-07-29", "%.")]
+        #[case::bare_underscore("2026-07-29", "%_")]
+        #[case::fractional_q(
+            "2026-07-29 14:30:00.123456789",
+            "%Y-%m-%d %H:%M:%S%Q"
+        )]
+        fn rejects_an_unknown_specifier_without_panicking(
             #[case] text: &str,
             #[case] pattern: &str,
         ) {
-            assert!(matches!(
-                DatePoint::parse_with_pattern(text, pattern),
-                Err(DateError::InvalidValue { .. })
+            // Arrange: `pattern` carries a specifier the engine cannot parse.
+
+            // Act
+            let parsed = DatePoint::parse_with_pattern(text, pattern);
+
+            // Assert
+            assert!(
+                matches!(
+                    parsed,
+                    Err(DateError::InvalidValue {
+                        reason: "bad format pattern",
+                        ..
+                    })
+                ),
+                "an unknown specifier must fail as a bad format pattern, got \
+                 {parsed:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::not_a_date("not-a-date", "%Y-%m-%d", "invalid input")]
+        #[case::swapped_pattern("2026-07-29", "%d/%m/%Y", "invalid input")]
+        fn rejects_text_that_cannot_match_the_pattern(
+            #[case] text: &str,
+            #[case] pattern: &str,
+            #[case] expected_reason: &str,
+        ) {
+            // Arrange: `text` matches `pattern` in no parser of the cascade.
+
+            // Act
+            let parsed = DatePoint::parse_with_pattern(text, pattern);
+
+            // Assert
+            assert!(
+                matches!(
+                    parsed,
+                    Err(DateError::InvalidValue { reason, .. })
+                        if reason == expected_reason
+                ),
+                "expected reason {expected_reason:?}, got {parsed:?}"
+            );
+        }
+    }
+
+    mod shift {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::day_forward(1, DurationUnit::Day, ymd(2026, 7, 30))]
+        #[case::day_backward(-1, DurationUnit::Day, ymd(2026, 7, 28))]
+        #[case::week_backward(-1, DurationUnit::Week, ymd(2026, 7, 22))]
+        #[case::year_backward(-1, DurationUnit::Year, ymd(2025, 7, 29))]
+        fn shifts_a_calendar_date_by_whole_units(
+            #[case] n: i64,
+            #[case] unit: DurationUnit,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at("2026-07-29");
+
+            // Act
+            let shifted = base.shift(n, unit);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{n} {unit:?} must shift the calendar date"
+            );
+        }
+
+        #[rstest]
+        #[case::five_hours(5, "2026-07-29")]
+        #[case::just_under_a_day(23, "2026-07-29")]
+        #[case::one_day(24, "2026-07-30")]
+        #[case::over_a_day(25, "2026-07-30")]
+        #[case::a_day_and_a_half(36, "2026-07-30")]
+        fn moves_a_calendar_date_only_when_the_shift_crosses_midnight(
+            #[case] hours: i64,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            let base = point_at("2026-07-29");
+            let expected = point_at(expected);
+
+            // Act
+            let shifted = base.shift(hours, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                Ok(expected),
+                "{hours} exact hours must move the calendar date only when \
+                 the shift crosses midnight"
+            );
+        }
+
+        #[rstest]
+        #[case::non_leap_year("2023-01-31", ymd(2023, 2, 28))]
+        #[case::leap_year("2024-01-31", ymd(2024, 2, 29))]
+        fn clamps_a_month_shift_to_the_last_day_of_february(
+            #[case] text: &str,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let shifted = base.shift(1, DurationUnit::Month);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "a month shift must clamp to the target month's last day and \
+                 keep day precision"
+            );
+        }
+
+        #[test]
+        fn shifts_by_a_whole_month_magnitude_in_one_step() {
+            // Arrange: one-step month arithmetic must not clamp
+            // incrementally.
+            let base = point_at("2026-01-31");
+
+            // Act
+            let shifted = base.shift(2, DurationUnit::Month);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                Ok(point_at("2026-03-31")),
+                "a magnitude of two months must not clamp at the intermediate \
+                 month end"
+            );
+        }
+
+        #[rstest]
+        #[case::month(1, DurationUnit::Month, ymd(2026, 8, 1))]
+        #[case::day(1, DurationUnit::Day, ymd(2026, 7, 2))]
+        fn preserves_month_precision_through_a_shift(
+            #[case] n: i64,
+            #[case] unit: DurationUnit,
+            #[case] expected_date: DateValue,
+        ) {
+            // Arrange
+            let base = point_at("2026-07");
+
+            // Act
+            let shifted = base.shift(n, unit);
+
+            // Assert
+            assert_eq!(
+                shifted,
+                Ok(DatePoint::Calendar {
+                    date: expected_date,
+                    date_precision: DatePrecision::Month,
+                }),
+                "{n} {unit:?} must move the date and keep month precision"
+            );
+        }
+
+        #[test]
+        fn keeps_the_local_clock_time_across_a_spring_forward_gap() {
+            // Arrange: Saturday 2026-03-07 12:00 EST; the gap begins Sunday.
+            TzGuard::set("America/New_York");
+            let base = point_at("2026-03-07 12:00:00");
+            let clock = |point: Result<DatePoint, DateError>| {
+                point.map(|p| p.local_datetime_or_utc().to_string())
+            };
+
+            // Act
+            let day = clock(base.shift(1, DurationUnit::Day));
+            let week = clock(base.shift(1, DurationUnit::Week));
+            let month = clock(base.shift(1, DurationUnit::Month));
+            let year = clock(base.shift(1, DurationUnit::Year));
+            let back = clock(base.shift(-1, DurationUnit::Day));
+
+            // Assert
+            assert_eq!(
+                day,
+                Ok("2026-03-08 12:00:00".to_owned()),
+                "a one-day shift must keep the local clock time across the gap"
+            );
+            assert_eq!(
+                week,
+                Ok("2026-03-14 12:00:00".to_owned()),
+                "a one-week shift must keep the local clock time"
+            );
+            assert_eq!(
+                month,
+                Ok("2026-04-07 12:00:00".to_owned()),
+                "a one-month shift must keep the local clock time"
+            );
+            assert_eq!(
+                year,
+                Ok("2027-03-07 12:00:00".to_owned()),
+                "a one-year shift must keep the local clock time"
+            );
+            assert_eq!(
+                back,
+                Ok("2026-03-06 12:00:00".to_owned()),
+                "a backward day shift must keep the local clock time"
+            );
+        }
+
+        #[test]
+        fn keeps_the_local_clock_time_across_a_fall_back_fold() {
+            // Arrange: Saturday 2026-10-31 12:00 EDT; the fold begins Sunday.
+            TzGuard::set("America/New_York");
+            let base = point_at("2026-10-31 12:00:00");
+
+            // Act
+            let day = base.shift(1, DurationUnit::Day);
+
+            // Assert
+            assert_eq!(
+                day.map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-11-01 12:00:00".to_owned()),
+                "a one-day shift must keep the local clock time across the \
+                 fold"
+            );
+        }
+
+        #[test]
+        fn shifts_exact_units_by_elapsed_time_across_dst_transitions() {
+            // Arrange: the spring gap and fall fold of America/New_York.
+            TzGuard::set("America/New_York");
+            let spring = point_at("2026-03-07 12:00:00");
+            let fall = point_at("2026-10-31 12:00:00");
+
+            // Act
+            let spring_hours = spring.shift(168, DurationUnit::Hour);
+            let spring_week = spring.shift(1, DurationUnit::Week);
+            let spring_days = spring.shift(7, DurationUnit::Day);
+            let fall_day = fall.shift(1, DurationUnit::Day);
+            let fall_hours = fall.shift(24, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                spring_hours
+                    .as_ref()
+                    .map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-03-14 13:00:00".to_owned()),
+                "168 exact hours must cross the gap as elapsed time"
+            );
+            assert_eq!(
+                spring_week, spring_days,
+                "a calendar week must equal seven calendar days"
+            );
+            assert_ne!(
+                spring_week, spring_hours,
+                "a calendar week must differ from 168 exact hours across the \
+                 gap"
+            );
+            assert_eq!(
+                fall_day.map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-11-01 12:00:00".to_owned()),
+                "a calendar day must keep the local clock time across the fold"
+            );
+            assert_eq!(
+                fall_hours.map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-11-01 11:00:00".to_owned()),
+                "24 exact hours must cross the fold as elapsed time"
+            );
+        }
+
+        #[test]
+        fn reports_out_of_range_past_the_representable_edges() {
+            // Arrange: points one unit inside each representable edge.
+            TzGuard::set("UTC");
+            let max_date = DatePoint::Calendar {
+                date: DateValue::from(NaiveDate::MAX),
+                date_precision: DatePrecision::Day,
+            };
+            let min_date = DatePoint::Calendar {
+                date: DateValue::from(NaiveDate::MIN),
+                date_precision: DatePrecision::Day,
+            };
+            let max_point = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MAX_UTC,
             ));
+            let min_point = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MIN_UTC,
+            ));
+
+            // Act
+            let past_max_date = max_date.shift(1, DurationUnit::Day);
+            let past_min_date = min_date.shift(-1, DurationUnit::Day);
+            let past_max_point = max_point.shift(1, DurationUnit::Hour);
+            let past_min_point = min_point.shift(-1, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                past_max_date,
+                Err(DateError::OutOfRange),
+                "shifting past the maximum date must report out of range"
+            );
+            assert_eq!(
+                past_min_date,
+                Err(DateError::OutOfRange),
+                "shifting before the minimum date must report out of range"
+            );
+            assert_eq!(
+                past_max_point,
+                Err(DateError::OutOfRange),
+                "shifting past the maximum date-time must report out of range"
+            );
+            assert_eq!(
+                past_min_point,
+                Err(DateError::OutOfRange),
+                "shifting before the minimum date-time must report out of \
+                 range"
+            );
+        }
+    }
+
+    mod apply {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[test]
+        fn applies_compound_components_in_written_order() {
+            // Arrange
+            let base = point_at("2026-07-29");
+            let duration =
+                DurationValue::parse("1w 2d").expect("valid duration");
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(point_at("2026-08-07")),
+                "\"1w 2d\" must apply in written order and keep day precision"
+            );
+        }
+
+        #[rstest]
+        #[case::negative_day("-1d", ymd(2026, 7, 28))]
+        #[case::fractional_day("1.5d", ymd(2026, 7, 30))]
+        fn applies_signed_day_durations_to_a_calendar_date(
+            #[case] text: &str,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at("2026-07-29");
+            let duration = DurationValue::parse(text).expect("valid duration");
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{text:?} must apply to the calendar date"
+            );
+        }
+
+        #[rstest]
+        #[case::repeated_exact_unit("12h 12h", ymd(2026, 7, 29))]
+        #[case::single_exact_unit("24h", ymd(2026, 7, 30))]
+        #[case::over_a_day("36h", ymd(2026, 7, 30))]
+        fn applies_each_exact_component_from_local_midnight(
+            #[case] text: &str,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange: repeated units are accepted, and each sub-day
+            // component restarts from the current midnight.
+            let base = point_at("2026-07-29");
+            let duration = DurationValue::parse(text).expect("valid duration");
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{text:?} must move the date only when a component crosses \
+                 midnight"
+            );
+        }
+
+        #[rstest]
+        #[case::sequential("1mo 1mo", ymd(2026, 3, 28))]
+        #[case::one_step("2mo", ymd(2026, 3, 31))]
+        fn applies_month_components_sequentially(
+            #[case] text: &str,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange: written order clamps month ends at each step,
+            // unlike a single two-month shift.
+            let base = point_at("2026-01-31");
+            let duration = DurationValue::parse(text).expect("valid duration");
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{text:?} must apply month components in written order"
+            );
+        }
+
+        #[rstest]
+        #[case::forward("1h", "2026-07-29T15:30:05Z")]
+        #[case::backward("-1h", "2026-07-29T13:30:05Z")]
+        fn applies_signed_durations_to_a_date_time_point(
+            #[case] text: &str,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+            let base = DatePoint::Instant(fixed_datetime());
+            let duration = DurationValue::parse(text).expect("valid duration");
+            let expected = point_at(expected);
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(expected),
+                "{text:?} must apply to the stored date-time"
+            );
+        }
+
+        #[test]
+        fn applies_synthesized_nominal_seconds_exactly() {
+            // Arrange: a duration rebuilt from nominal seconds carries no
+            // written components, so it advances the exact time.
+            TzGuard::set("UTC");
+            let base = DatePoint::Instant(fixed_datetime());
+            let synthesized = DurationValue::from_nominal_seconds(
+                crate::temporal::DurationSeconds::try_from(3600.0)
+                    .expect("finite seconds"),
+            );
+
+            // Act
+            let applied = base.apply(&synthesized);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(point_at("2026-07-29T15:30:05Z")),
+                "synthesized nominal seconds must advance the exact time"
+            );
+        }
+
+        #[test]
+        fn applies_equal_valued_units_differently_across_a_gap() {
+            // Arrange: 1d equals 24h as values, but not across the spring gap.
+            TzGuard::set("America/New_York");
+            let base = point_at("2026-03-07 12:00:00");
+            let one_day = DurationValue::parse("1d").expect("valid duration");
+            let twenty_four_hours =
+                DurationValue::parse("24h").expect("valid duration");
+            assert_eq!(
+                one_day, twenty_four_hours,
+                "\"1d\" and \"24h\" must be equal as values"
+            );
+
+            // Act
+            let by_calendar = base.apply(&one_day);
+            let by_exact = base.apply(&twenty_four_hours);
+
+            // Assert
+            assert_eq!(
+                by_calendar
+                    .as_ref()
+                    .map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-03-08 12:00:00".to_owned()),
+                "the calendar day must keep the local clock time across the \
+                 gap"
+            );
+            assert_eq!(
+                by_exact
+                    .as_ref()
+                    .map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-03-08 13:00:00".to_owned()),
+                "24 exact hours must cross the gap as elapsed time"
+            );
+            assert_ne!(
+                by_calendar, by_exact,
+                "equal values must apply differently across the gap"
+            );
+        }
+
+        #[test]
+        fn applies_a_calendar_week_differently_from_168_exact_hours_across_a_gap()
+         {
+            // Arrange: 1w, 7d and 168h are equal as values.
+            TzGuard::set("America/New_York");
+            let base = point_at("2026-03-07 12:00:00");
+            let one_week = DurationValue::parse("1w").expect("valid duration");
+            let seven_days =
+                DurationValue::parse("7d").expect("valid duration");
+            let hours_168 =
+                DurationValue::parse("168h").expect("valid duration");
+            assert_eq!(one_week, seven_days, "\"1w\" and \"7d\" must be equal");
+            assert_eq!(
+                one_week, hours_168,
+                "\"1w\" and \"168h\" must be equal as values"
+            );
+
+            // Act
+            let by_week = base.apply(&one_week);
+            let by_days = base.apply(&seven_days);
+            let by_hours = base.apply(&hours_168);
+
+            // Assert
+            assert_eq!(
+                by_week.as_ref().map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-03-14 12:00:00".to_owned()),
+                "a calendar week must keep the local clock time"
+            );
+            assert_eq!(
+                by_week, by_days,
+                "\"1w\" and \"7d\" must apply identically"
+            );
+            assert_ne!(
+                by_week, by_hours,
+                "a calendar week must differ from 168 exact hours across the \
+                 gap"
+            );
+        }
+
+        #[test]
+        fn applies_the_fractional_part_of_a_calendar_unit_on_the_local_clock() {
+            // Arrange: 1.5d equals 36h equals \"1d 12h\" as values.
+            TzGuard::set("America/New_York");
+            let base = point_at("2026-03-07 06:00:00");
+            let one_and_half_days =
+                DurationValue::parse("1.5d").expect("valid duration");
+            let thirty_six_hours =
+                DurationValue::parse("36h").expect("valid duration");
+            let written_order =
+                DurationValue::parse("1d 12h").expect("valid duration");
+            assert_eq!(
+                one_and_half_days, thirty_six_hours,
+                "\"1.5d\" and \"36h\" must be equal as values"
+            );
+            assert_eq!(
+                one_and_half_days, written_order,
+                "\"1.5d\" and \"1d 12h\" must be equal as values"
+            );
+
+            // Act
+            let by_fraction = base.apply(&one_and_half_days);
+            let by_written = base.apply(&written_order);
+            let by_exact = base.apply(&thirty_six_hours);
+
+            // Assert
+            assert_eq!(
+                by_fraction
+                    .as_ref()
+                    .map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-03-08 18:00:00".to_owned()),
+                "the fractional day must keep the local clock time"
+            );
+            assert_eq!(
+                by_fraction, by_written,
+                "\"1.5d\" must decompose like its written-order equivalent"
+            );
+            assert_ne!(
+                by_fraction, by_exact,
+                "the fractional calendar part must differ from 36 exact hours \
+                 across the gap"
+            );
+        }
+
+        #[test]
+        fn applies_written_components_left_to_right_across_a_gap() {
+            // Arrange: 02:30 sits one hour before the spring gap opens.
+            TzGuard::set("America/New_York");
+            let base = point_at("2026-03-07 02:30:00");
+            let day_then_hour =
+                DurationValue::parse("1d 1h").expect("valid duration");
+            let hour_then_day =
+                DurationValue::parse("1h 1d").expect("valid duration");
+            assert_eq!(
+                day_then_hour, hour_then_day,
+                "the written orders must be equal as values"
+            );
+
+            // Act
+            let first = base.apply(&day_then_hour);
+            let second = base.apply(&hour_then_day);
+
+            // Assert
+            assert_eq!(
+                first,
+                Ok(point_at("2026-03-08T08:30:00Z")),
+                "\"1d 1h\" must apply the day first, then the hour"
+            );
+            assert_eq!(
+                second,
+                Ok(point_at("2026-03-08T07:30:00Z")),
+                "\"1h 1d\" must apply the hour first, then the day"
+            );
+            assert_ne!(
+                first, second,
+                "written order must change the result across a gap"
+            );
+        }
+
+        #[test]
+        fn applies_equal_valued_month_and_day_units_differently_on_dates() {
+            // Arrange: \"1 month\" equals \"30 days\" as values.
+            let base = point_at("2026-01-15");
+            let one_month =
+                DurationValue::parse("1 month").expect("valid duration");
+            let thirty_days =
+                DurationValue::parse("30 days").expect("valid duration");
+            assert_eq!(
+                one_month, thirty_days,
+                "\"1 month\" and \"30 days\" must be equal as values"
+            );
+
+            // Act
+            let by_month = base.apply(&one_month);
+            let by_days = base.apply(&thirty_days);
+
+            // Assert
+            assert_eq!(
+                by_month,
+                Ok(point_at("2026-02-15")),
+                "a calendar month must land on the same day of the next month"
+            );
+            assert_eq!(
+                by_days,
+                Ok(point_at("2026-02-14")),
+                "thirty exact days must land thirty days later"
+            );
+            assert_ne!(
+                by_month, by_days,
+                "equal values must shift a date differently"
+            );
+        }
+
+        #[test]
+        fn applies_a_fractional_month_to_a_calendar_date() {
+            // Arrange: the whole month clamps first, then the half-month
+            // remainder (fifteen nominal days) applies as local time.
+            let base = point_at("2026-01-31");
+            let duration =
+                DurationValue::parse("1.5mo").expect("valid duration");
+
+            // Act
+            let applied = base.apply(&duration);
+
+            // Assert
+            assert_eq!(
+                applied,
+                Ok(point_at("2026-03-15")),
+                "1.5mo must clamp the month, then add the local remainder"
+            );
+        }
+
+        #[test]
+        fn reports_out_of_range_past_the_representable_edges() {
+            // Arrange: the date-time range edges and a one-second duration.
+            let one_second =
+                DurationValue::parse("1s").expect("valid duration");
+            let max_point = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MAX_UTC,
+            ));
+            let min_point = DatePoint::Instant(DateTimeValue::from(
+                DateTime::<Utc>::MIN_UTC,
+            ));
+
+            // Act
+            let overflowed = max_point.apply(&one_second);
+            let underflowed = min_point.apply(&(-one_second));
+
+            // Assert
+            assert_eq!(
+                overflowed,
+                Err(DateError::OutOfRange),
+                "applying past the maximum must report out of range"
+            );
+            assert_eq!(
+                underflowed,
+                Err(DateError::OutOfRange),
+                "applying before the minimum must report out of range"
+            );
+        }
+    }
+
+    mod start_of {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::week("2026-02-01", CalendarPeriod::Week, ymd(2026, 1, 26))]
+        #[case::month("2026-02-01", CalendarPeriod::Month, ymd(2026, 2, 1))]
+        #[case::year("2026-02-01", CalendarPeriod::Year, ymd(2026, 1, 1))]
+        #[case::week_across_a_year_edge(
+            "2025-12-31",
+            CalendarPeriod::Week,
+            ymd(2025, 12, 29)
+        )]
+        #[case::week_from_a_year_start(
+            "2026-01-01",
+            CalendarPeriod::Week,
+            ymd(2025, 12, 29)
+        )]
+        #[case::week_on_a_leap_day(
+            "2024-02-29",
+            CalendarPeriod::Week,
+            ymd(2024, 2, 26)
+        )]
+        fn returns_the_first_day_of_the_period(
+            #[case] text: &str,
+            #[case] period: CalendarPeriod,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let start = base.start_of(period);
+
+            // Assert
+            assert_eq!(
+                start,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{period:?} start must be the first day of the period"
+            );
+        }
+
+        #[rstest]
+        #[case::week("2026-07", CalendarPeriod::Week, ymd(2026, 6, 29))]
+        #[case::month("2026-07", CalendarPeriod::Month, ymd(2026, 7, 1))]
+        #[case::year("2026-07", CalendarPeriod::Year, ymd(2026, 1, 1))]
+        fn preserves_month_precision(
+            #[case] text: &str,
+            #[case] period: CalendarPeriod,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let start = base.start_of(period);
+
+            // Assert
+            assert_eq!(
+                start,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Month,
+                }),
+                "{period:?} start must keep the written month precision"
+            );
+        }
+
+        #[rstest]
+        #[case::week(CalendarPeriod::Week, "2026-07-27 14:30:05")]
+        #[case::month(CalendarPeriod::Month, "2026-07-01 14:30:05")]
+        #[case::year(CalendarPeriod::Year, "2026-01-01 14:30:05")]
+        fn keeps_the_time_of_day_on_a_date_time_point(
+            #[case] period: CalendarPeriod,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+            let base = point_at("2026-07-29 14:30:05");
+
+            // Act
+            let start = base.start_of(period);
+
+            // Assert
+            assert_eq!(
+                start.map(|p| p.local_datetime_or_utc().to_string()),
+                Ok(expected.to_owned()),
+                "{period:?} start must keep the local time of day"
+            );
+        }
+    }
+
+    mod end_of {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::week("2026-02-01", CalendarPeriod::Week, ymd(2026, 2, 1))]
+        #[case::month("2026-02-01", CalendarPeriod::Month, ymd(2026, 2, 28))]
+        #[case::year("2026-02-01", CalendarPeriod::Year, ymd(2026, 12, 31))]
+        #[case::week_across_a_year_edge(
+            "2025-12-31",
+            CalendarPeriod::Week,
+            ymd(2026, 1, 4)
+        )]
+        #[case::week_from_a_year_start(
+            "2026-01-01",
+            CalendarPeriod::Week,
+            ymd(2026, 1, 4)
+        )]
+        #[case::week_on_a_leap_day(
+            "2024-02-29",
+            CalendarPeriod::Week,
+            ymd(2024, 3, 3)
+        )]
+        #[case::month_on_a_leap_day(
+            "2024-02-29",
+            CalendarPeriod::Month,
+            ymd(2024, 2, 29)
+        )]
+        #[case::year_on_a_leap_day(
+            "2024-02-29",
+            CalendarPeriod::Year,
+            ymd(2024, 12, 31)
+        )]
+        fn returns_the_last_day_of_the_period(
+            #[case] text: &str,
+            #[case] period: CalendarPeriod,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let end = base.end_of(period);
+
+            // Assert
+            assert_eq!(
+                end,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{period:?} end must be the last day of the period"
+            );
+        }
+
+        #[rstest]
+        #[case::week("2026-07", CalendarPeriod::Week, ymd(2026, 7, 5))]
+        #[case::month("2026-07", CalendarPeriod::Month, ymd(2026, 7, 31))]
+        #[case::year("2026-07", CalendarPeriod::Year, ymd(2026, 12, 31))]
+        fn preserves_month_precision(
+            #[case] text: &str,
+            #[case] period: CalendarPeriod,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let end = base.end_of(period);
+
+            // Assert
+            assert_eq!(
+                end,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Month,
+                }),
+                "{period:?} end must keep the written month precision"
+            );
+        }
+
+        #[rstest]
+        #[case::week(CalendarPeriod::Week, "2026-08-02 14:30:05")]
+        #[case::month(CalendarPeriod::Month, "2026-07-31 14:30:05")]
+        #[case::year(CalendarPeriod::Year, "2026-12-31 14:30:05")]
+        fn keeps_the_time_of_day_on_a_date_time_point(
+            #[case] period: CalendarPeriod,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+            let base = point_at("2026-07-29 14:30:05");
+
+            // Act
+            let end = base.end_of(period);
+
+            // Assert
+            assert_eq!(
+                end.map(|p| p.local_datetime_or_utc().to_string()),
+                Ok(expected.to_owned()),
+                "{period:?} end must keep the local time of day"
+            );
+        }
+    }
+
+    mod with_weekday {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::monday(Weekday::Mon, ymd(2026, 7, 27))]
+        #[case::tuesday(Weekday::Tue, ymd(2026, 7, 28))]
+        #[case::wednesday(Weekday::Wed, ymd(2026, 7, 29))]
+        #[case::thursday(Weekday::Thu, ymd(2026, 7, 30))]
+        #[case::friday(Weekday::Fri, ymd(2026, 7, 31))]
+        #[case::saturday(Weekday::Sat, ymd(2026, 8, 1))]
+        #[case::sunday(Weekday::Sun, ymd(2026, 8, 2))]
+        fn selects_the_named_weekday_of_the_iso_week(
+            #[case] target: Weekday,
+            #[case] expected: DateValue,
+        ) {
+            // Arrange: 2026-07-29 is a Wednesday.
+            let base = point_at("2026-07-29");
+
+            // Act
+            let selected = base.with_weekday(target);
+
+            // Assert
+            assert_eq!(
+                selected,
+                Ok(DatePoint::Calendar {
+                    date: expected,
+                    date_precision: DatePrecision::Day,
+                }),
+                "{target:?} must select the weekday of the ISO week"
+            );
+        }
+
+        #[test]
+        fn selects_backwards_across_a_week_edge() {
+            // Arrange: Sunday 2026-08-02 belongs to the week that began on
+            // Monday 2026-07-27, in the previous month.
+            let base = point_at("2026-08-02");
+
+            // Act
+            let monday = base.with_weekday(Weekday::Mon);
+
+            // Assert
+            assert_eq!(
+                monday,
+                Ok(point_at("2026-07-27")),
+                "selecting Monday from a Sunday must move back across the \
+                 week edge"
+            );
+        }
+
+        #[test]
+        fn preserves_month_precision() {
+            // Arrange
+            let base = point_at("2026-07");
+
+            // Act
+            let friday = base.with_weekday(Weekday::Fri);
+
+            // Assert
+            assert_eq!(
+                friday,
+                Ok(DatePoint::Calendar {
+                    date: ymd(2026, 7, 3),
+                    date_precision: DatePrecision::Month,
+                }),
+                "the written month precision must survive the selection"
+            );
+        }
+
+        #[test]
+        fn keeps_the_time_of_day_on_a_date_time_point() {
+            // Arrange
+            TzGuard::set("UTC");
+            let base = point_at("2026-07-29 14:30:05");
+
+            // Act
+            let sunday = base.with_weekday(Weekday::Sun);
+
+            // Assert
+            assert_eq!(
+                sunday.map(|p| p.local_datetime_or_utc().to_string()),
+                Ok("2026-08-02 14:30:05".to_owned()),
+                "the local time of day must survive the selection"
+            );
+        }
+    }
+
+    mod component {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::year("2026-07-29", DateComponent::Year, 2026)]
+        #[case::month("2026-07-29", DateComponent::Month, 7)]
+        #[case::day("2026-07-29", DateComponent::Day, 29)]
+        #[case::hour("2026-07-29", DateComponent::Hour, 0)]
+        #[case::minute("2026-07-29", DateComponent::Minute, 0)]
+        #[case::second("2026-07-29", DateComponent::Second, 0)]
+        #[case::weekday("2026-07-29", DateComponent::Weekday, 3)]
+        #[case::week("2026-07-29", DateComponent::Week, 31)]
+        fn returns_each_component_of_a_calendar_day(
+            #[case] text: &str,
+            #[case] component: DateComponent,
+            #[case] expected: i64,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let value = base.component(component);
+
+            // Assert
+            assert_eq!(
+                value, expected,
+                "{component:?} of {text:?} must read from the local midnight"
+            );
+        }
+
+        #[rstest]
+        #[case::year_end_of_2020("2020-12-31", 53, 4)]
+        #[case::first_sunday_of_2021("2021-01-03", 53, 7)]
+        #[case::first_day_of_2026("2026-01-01", 1, 4)]
+        fn returns_the_iso_week_and_weekday_at_year_edges(
+            #[case] text: &str,
+            #[case] expected_week: i64,
+            #[case] expected_weekday: i64,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let week = base.component(DateComponent::Week);
+            let weekday = base.component(DateComponent::Weekday);
+
+            // Assert
+            assert_eq!(
+                week, expected_week,
+                "the ISO week of {text:?} must span the year edge"
+            );
+            assert_eq!(
+                weekday, expected_weekday,
+                "weekdays are ISO numbered, Monday = 1 through Sunday = 7"
+            );
+        }
+
+        #[rstest]
+        #[case::day("2026-07", DateComponent::Day, 1)]
+        #[case::week("2026-07", DateComponent::Week, 27)]
+        #[case::weekday("2026-07", DateComponent::Weekday, 3)]
+        fn reads_a_month_precision_point_as_the_first_of_its_month(
+            #[case] text: &str,
+            #[case] component: DateComponent,
+            #[case] expected: i64,
+        ) {
+            // Arrange
+            let base = point_at(text);
+
+            // Act
+            let value = base.component(component);
+
+            // Assert
+            assert_eq!(
+                value, expected,
+                "{component:?} of a month-precision point reads from the \
+                 first of the month"
+            );
+        }
+
+        #[rstest]
+        #[case::hour("2026-07-29 14:30:05", DateComponent::Hour, 14)]
+        #[case::minute("2026-07-29 14:30:05", DateComponent::Minute, 30)]
+        #[case::second("2026-07-29 14:30:05", DateComponent::Second, 5)]
+        #[case::week("2026-07-29 14:30:05", DateComponent::Week, 31)]
+        #[case::weekday("2026-07-29 14:30:05", DateComponent::Weekday, 3)]
+        fn returns_the_local_clock_components_of_a_date_time_point(
+            #[case] text: &str,
+            #[case] component: DateComponent,
+            #[case] expected: i64,
+        ) {
+            // Arrange: naive input resolves in the local zone.
+            TzGuard::set("UTC");
+            let base = point_at(text);
+
+            // Act
+            let value = base.component(component);
+
+            // Assert
+            assert_eq!(
+                value, expected,
+                "{component:?} must read from the local clock rendering"
+            );
+        }
+    }
+
+    mod diff {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::year(
+            "2020-06-15",
+            "2026-07-15",
+            DurationUnit::Year,
+            Difference::Whole(6)
+        )]
+        #[case::month_across_month_ends(
+            "2026-01-15",
+            "2026-03-15",
+            DurationUnit::Month,
+            Difference::Whole(2)
+        )]
+        #[case::week(
+            "2026-07-29",
+            "2026-08-06",
+            DurationUnit::Week,
+            Difference::Whole(1)
+        )]
+        #[case::day(
+            "2026-07-29",
+            "2026-08-06",
+            DurationUnit::Day,
+            Difference::Whole(8)
+        )]
+        #[case::hour(
+            "2026-07-29",
+            "2026-08-06",
+            DurationUnit::Hour,
+            Difference::Whole(192)
+        )]
+        #[case::minute(
+            "2026-07-29",
+            "2026-08-06",
+            DurationUnit::Minute,
+            Difference::Whole(11520)
+        )]
+        #[case::second(
+            "2026-07-29",
+            "2026-08-06",
+            DurationUnit::Second,
+            Difference::Whole(691_200)
+        )]
+        #[case::millisecond(
+            "2026-07-29",
+            "2026-08-06",
+            DurationUnit::Millisecond,
+            Difference::Whole(691_200_000)
+        )]
+        fn returns_whole_counts_between_calendar_points(
+            #[case] from: &str,
+            #[case] to: &str,
+            #[case] unit: DurationUnit,
+            #[case] expected: Difference,
+        ) {
+            // Arrange
+            let from = point_at(from);
+            let to = point_at(to);
+
+            // Act
+            let difference = from.diff(to, unit);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "{unit:?} between calendar points must count whole units"
+            );
+        }
+
+        #[rstest]
+        #[case::month("2026-01-15", "2026-03-15", DurationUnit::Month, Difference::Whole(-2))]
+        #[case::year("2020-06-15", "2026-07-15", DurationUnit::Year, Difference::Whole(-6))]
+        #[case::day("2026-07-29", "2026-08-06", DurationUnit::Day, Difference::Whole(-8))]
+        #[case::hour("2026-07-29", "2026-08-06", DurationUnit::Hour, Difference::Whole(-192))]
+        fn returns_the_negated_difference_in_the_reverse_direction(
+            #[case] from: &str,
+            #[case] to: &str,
+            #[case] unit: DurationUnit,
+            #[case] expected: Difference,
+        ) {
+            // Arrange
+            let from = point_at(from);
+            let to = point_at(to);
+
+            // Act
+            let difference = to.diff(from, unit);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "diff must be antisymmetric for {unit:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::to_the_last_representable_day(
+            "2026-01-01",
+            "9999-12-31",
+            Difference::Whole(7973)
+        )]
+        #[case::since_the_epoch(
+            "1970-01-01",
+            "2026-07-29",
+            Difference::Whole(56)
+        )]
+        fn counts_whole_years_across_large_spans(
+            #[case] from: &str,
+            #[case] to: &str,
+            #[case] expected: Difference,
+        ) {
+            // Arrange
+            let from = point_at(from);
+            let to = point_at(to);
+
+            // Act
+            let difference = from.diff(to, DurationUnit::Year);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "whole years must count across a large span"
+            );
+        }
+
+        #[rstest]
+        #[case::hour(DurationUnit::Hour, Difference::Fractional(1.5))]
+        #[case::minute(DurationUnit::Minute, Difference::Fractional(90.0))]
+        #[case::second(DurationUnit::Second, Difference::Fractional(5400.0))]
+        #[case::millisecond(
+            DurationUnit::Millisecond,
+            Difference::Fractional(5_400_000.0)
+        )]
+        #[case::day(DurationUnit::Day, Difference::Fractional(0.0625))]
+        #[case::week(
+            DurationUnit::Week,
+            Difference::Fractional(0.008_928_571_428_571_428)
+        )]
+        fn returns_fractional_counts_between_date_time_points(
+            #[case] unit: DurationUnit,
+            #[case] expected: Difference,
+        ) {
+            // Arrange: ninety minutes span the date boundary.
+            TzGuard::set("UTC");
+            let from = point_at("2026-07-28T23:00:00Z");
+            let to = point_at("2026-07-29T00:30:00Z");
+
+            // Act
+            let difference = from.diff(to, unit);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "{unit:?} between date-time points must be fractional exact \
+                 time"
+            );
+        }
+
+        #[rstest]
+        #[case::month(DurationUnit::Month, Difference::Whole(0))]
+        #[case::year(DurationUnit::Year, Difference::Whole(0))]
+        fn returns_whole_calendar_counts_between_date_time_points(
+            #[case] unit: DurationUnit,
+            #[case] expected: Difference,
+        ) {
+            // Arrange: the two points sit in the same month and year.
+            TzGuard::set("UTC");
+            let from = point_at("2026-07-28T23:00:00Z");
+            let to = point_at("2026-07-29T00:30:00Z");
+
+            // Act
+            let difference = from.diff(to, unit);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "{unit:?} must count whole calendar units of the local dates"
+            );
+        }
+
+        #[rstest]
+        #[case::calendar_point(
+            "2026-07-29",
+            DurationUnit::Day,
+            Difference::Whole(0)
+        )]
+        #[case::date_time_point(
+            "2026-07-29 14:30:05",
+            DurationUnit::Hour,
+            Difference::Fractional(0.0)
+        )]
+        fn returns_zero_for_a_point_diffed_against_itself(
+            #[case] text: &str,
+            #[case] unit: DurationUnit,
+            #[case] expected: Difference,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+            let point = point_at(text);
+
+            // Act
+            let difference = point.diff(point, unit);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "a point diffed against itself must count zero"
+            );
+        }
+
+        #[rstest]
+        #[case::date_time_to_date(
+            "2026-07-28T23:00:00Z",
+            "2026-07-29",
+            Difference::Whole(1)
+        )]
+        #[case::date_to_date_time(
+            "2026-07-29",
+            "2026-07-29T00:30:00",
+            Difference::Whole(0)
+        )]
+        fn truncates_toward_zero_when_either_point_lacks_a_time(
+            #[case] from: &str,
+            #[case] to: &str,
+            #[case] expected: Difference,
+        ) {
+            // Arrange: mixed frames count whole units of the local reading.
+            TzGuard::set("UTC");
+            let from = point_at(from);
+            let to = point_at(to);
+
+            // Act
+            let difference = from.diff(to, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                difference, expected,
+                "a mixed-frame hour diff must truncate toward zero"
+            );
+        }
+
+        #[test]
+        fn measures_a_dst_day_by_elapsed_time_when_both_points_carry_a_time() {
+            // Arrange: New York springs forward on 2026-03-08 (a 23-hour
+            // day) and falls back on 2026-11-01 (a 25-hour day).
+            TzGuard::set("America/New_York");
+            let spring_from = point_at("2026-03-07 12:00:00");
+            let spring_to = point_at("2026-03-08 12:00:00");
+            let fall_from = point_at("2026-10-31 12:00:00");
+            let fall_to = point_at("2026-11-01 12:00:00");
+
+            // Act
+            let spring_day = spring_from.diff(spring_to, DurationUnit::Day);
+            let spring_hour = spring_from.diff(spring_to, DurationUnit::Hour);
+            let fall_day = fall_from.diff(fall_to, DurationUnit::Day);
+            let fall_hour = fall_from.diff(fall_to, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                spring_day,
+                Difference::Fractional(0.958_333_333_333_333_4),
+                "the spring day spans twenty-three elapsed hours"
+            );
+            assert_eq!(
+                spring_hour,
+                Difference::Fractional(23.0),
+                "the spring day spans twenty-three elapsed hours"
+            );
+            assert_eq!(
+                fall_day,
+                Difference::Fractional(1.041_666_666_666_666_7),
+                "the fall day spans twenty-five elapsed hours"
+            );
+            assert_eq!(
+                fall_hour,
+                Difference::Fractional(25.0),
+                "the fall day spans twenty-five elapsed hours"
+            );
+        }
+
+        #[test]
+        fn counts_whole_days_for_date_only_points_across_dst() {
+            // Arrange: date-only points have no time component to fold.
+            TzGuard::set("America/New_York");
+            let from = point_at("2026-03-07");
+            let to = point_at("2026-03-08");
+
+            // Act
+            let days = from.diff(to, DurationUnit::Day);
+            let hours = from.diff(to, DurationUnit::Hour);
+
+            // Assert
+            assert_eq!(
+                days,
+                Difference::Whole(1),
+                "a date-only day diff must count the local calendar day"
+            );
+            assert_eq!(
+                hours,
+                Difference::Whole(24),
+                "a date-only hour diff must count nominal whole hours"
+            );
+        }
+    }
+
+    mod accessors {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[test]
+        fn reports_no_time_for_a_calendar_point() {
+            // Arrange: the minimum representable calendar date.
+            let point = DatePoint::Calendar {
+                date: DateValue::from(NaiveDate::MIN),
+                date_precision: DatePrecision::Day,
+            };
+
+            // Act
+            let has_time = point.has_time();
+
+            // Assert
+            assert!(!has_time, "a calendar point must report no time-of-day");
+        }
+
+        #[test]
+        fn reports_a_time_for_a_date_time_point() {
+            // Arrange: the fixed reference date-time.
+            let point = DatePoint::Instant(fixed_datetime());
+
+            // Act
+            let has_time = point.has_time();
+
+            // Assert
+            assert!(has_time, "a date-time point must report a time-of-day");
+        }
+
+        #[test]
+        fn returns_the_stored_date_for_a_calendar_point() {
+            // Arrange: month precision stores the first of the month.
+            let point = point_at("2026-07");
+
+            // Act
+            let date = point.date();
+
+            // Assert
+            assert_eq!(
+                date,
+                ymd(2026, 7, 1),
+                "a calendar point must return its stored date"
+            );
+        }
+
+        #[test]
+        fn returns_the_local_calendar_date_for_a_date_time_point() {
+            // Arrange
+            TzGuard::set("UTC");
+            let point = DatePoint::Instant(fixed_datetime());
+
+            // Act
+            let date = point.date();
+
+            // Assert
+            assert_eq!(
+                date,
+                ymd(2026, 7, 29),
+                "a date-time point must render its local calendar date"
+            );
+        }
+
+        #[test]
+        fn renders_a_calendar_point_as_local_midnight() {
+            // Arrange
+            let point = point_at("2026-07-29");
+
+            // Act
+            let local = point.local_datetime_or_utc();
+
+            // Assert
+            assert_eq!(
+                local.to_string(),
+                "2026-07-29 00:00:00",
+                "a calendar point must render as local midnight"
+            );
+        }
+
+        #[test]
+        fn renders_the_local_clock_reading_of_a_date_time_point() {
+            // Arrange: the naive reference date-time resolved in New York.
+            TzGuard::set("America/New_York");
+            let point = point_at("2026-07-29 14:30:05");
+
+            // Act
+            let local = point.local_datetime_or_utc();
+            let utc = point.instant();
+
+            // Assert
+            assert_eq!(
+                local.to_string(),
+                "2026-07-29 14:30:05",
+                "the local clock must keep the written wall time"
+            );
+            assert_eq!(
+                utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                "2026-07-29T18:30:05Z",
+                "the stored date-time must be the UTC instant"
+            );
+        }
+
+        #[test]
+        fn resolves_a_calendar_point_at_utc_midnight_in_utc() {
+            // Arrange
+            TzGuard::set("UTC");
+            let point = point_at("2026-07-29");
+
+            // Act
+            let utc = point.instant();
+
+            // Assert
+            assert_eq!(
+                utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                "2026-07-29T00:00:00Z",
+                "in UTC a calendar point must resolve at UTC midnight"
+            );
+        }
+
+        #[test]
+        fn resolves_a_calendar_point_at_local_midnight_in_the_process_zone() {
+            // Arrange: New York sits four hours behind UTC in July.
+            TzGuard::set("America/New_York");
+            let point = point_at("2026-07-29");
+
+            // Act
+            let utc = point.instant();
+
+            // Assert
+            assert_eq!(
+                utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                "2026-07-29T04:00:00Z",
+                "a calendar point must resolve at local midnight"
+            );
+        }
+
+        #[rstest]
+        #[case::month("2026-07", "%Y-%m")]
+        #[case::day("2026-07-29", "%Y-%m-%d")]
+        #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
+        #[case::fractional_seconds(
+            "2026-07-29T14:30:00.123Z",
+            "%Y-%m-%dT%H:%M:%S%.f"
+        )]
+        fn preserves_written_precision_in_the_canonical_pattern(
+            #[case] text: &str,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            TzGuard::set("UTC");
+            let point = point_at(text);
+
+            // Act
+            let pattern = point.canonical_pattern();
+
+            // Assert
+            assert_eq!(
+                pattern, expected,
+                "{text:?} must render its written precision"
+            );
         }
     }
 }

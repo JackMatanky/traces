@@ -667,6 +667,29 @@ mod tests {
         }
 
         #[test]
+        fn keeps_its_postcard_spelling() {
+            // Arrange
+            let date = ymd(2026, 7, 29);
+
+            // Act
+            let bytes = postcard::to_allocvec(&date);
+
+            // Assert
+            assert_eq!(
+                bytes.as_deref(),
+                Ok(b"\x0a2026-07-29".as_slice()),
+                "postcard encodes the length-prefixed ISO string"
+            );
+            assert_eq!(
+                bytes
+                    .and_then(|bytes| postcard::from_bytes::<DateValue>(&bytes))
+                    .map_err(|error| error.to_string()),
+                Ok(date),
+                "postcard encode then decode must return the same date"
+            );
+        }
+
+        #[test]
         fn round_trips_through_json_serde() {
             // Arrange
             let date = ymd(2026, 7, 29);
