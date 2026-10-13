@@ -20,8 +20,11 @@ i64
 mise
 newtype
 newtypes
+noyalib
+proleptic
 representable
 rhs
+serde
 strftime
 timsort
 tz

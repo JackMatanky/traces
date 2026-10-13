@@ -1400,6 +1400,7 @@ src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
 src/temporal/fixtures.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
+src/temporal/fixtures.rs: pub(super) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
 src/temporal/mod.rs: pub use date::DateValue;
 src/temporal/mod.rs: pub use datetime::DateTimeValue;
 src/temporal/mod.rs: pub use duration::DurationValue;

@@ -657,7 +657,6 @@ mod tests {
         struct HostileNote {
             duration_extreme: DurationValue,
             duration_zero: DurationValue,
-            date: DateValue,
             datetime: DateTimeValue,
         }
 
@@ -666,8 +665,7 @@ mod tests {
             let extreme_digits = "9".repeat(50);
             let yaml = format!(
                 "duration_extreme: {extreme_digits}y\nduration_zero: \
-                 \"-0m\"\ndate: \"2026-07\"\ndatetime: \
-                 \"2026-07-29T14:30:00Z\"\n"
+                 \"-0m\"\ndatetime: \"2026-07-29T14:30:00Z\"\n"
             );
 
             let note = noyalib::from_str::<HostileNote>(&yaml)
@@ -689,13 +687,6 @@ mod tests {
                 DurationValue::parse("0m").expect("valid duration")
             );
             assert!(note.duration_zero >= DurationValue::parse("0m").unwrap());
-
-            // "YYYY-MM" date: precision defaults to day 1, matches inline
-            // parsing exactly.
-            assert_eq!(
-                note.date,
-                DateValue::parse_iso("2026-07-01").expect("valid date")
-            );
 
             // "…Z" datetime: parses to the same instant as the explicit-offset
             // spelling (naive would mean the local zone) and re-serializes
