@@ -32,7 +32,7 @@ cargo-deny = "latest"
 "github:nextest-rs/nextest" = "latest"
 "cargo:cargo-llvm-cov" = "latest"
 "cargo:cargo-crap" = "latest"
-"cargo:https://github.com/quality-gates/messrust" = { version = "tag:v0.1.15" }
+"cargo:https://github.com/quality-gates/messrust" = { version = "branch:main" }
 "cargo:mutarust" = "latest"
 "cargo:cargo-shear" = "latest"
 
