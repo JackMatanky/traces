@@ -1,4 +1,5 @@
-//! Resolves the local time zone and owns the scoped test override.
+//! Resolves the local time zone and owns the serialized process-wide test
+//! override.
 
 use jiff::tz::TimeZone;
 
@@ -20,12 +21,19 @@ where
     })
 }
 
-/// Returns the system time zone, falling back to UTC if system discovery fails.
+/// Returns the process-local time zone, falling back to UTC if system discovery
+/// fails.
 #[inline]
 #[must_use]
 pub(crate) fn local_zone() -> TimeZone {
     #[cfg(any(test, feature = "test-utils"))]
-    if let Some(zone) = ZONE_OVERRIDE.with(|slot| slot.borrow().clone()) {
+    let override_zone = ZONE_OVERRIDE
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+
+    #[cfg(any(test, feature = "test-utils"))]
+    if let Some(zone) = override_zone {
         return zone;
     }
 
@@ -34,20 +42,39 @@ pub(crate) fn local_zone() -> TimeZone {
 
 #[cfg(any(test, feature = "test-utils"))]
 thread_local! {
-    static ZONE_OVERRIDE: std::cell::RefCell<Option<TimeZone>> =
-        const { std::cell::RefCell::new(None) };
     static ZONE_GUARD: std::cell::RefCell<Option<ZoneGuard>> =
         const { std::cell::RefCell::new(None) };
 }
 
 #[cfg(any(test, feature = "test-utils"))]
+static ZONE_OVERRIDE: std::sync::RwLock<Option<TimeZone>> =
+    std::sync::RwLock::new(None);
+
+#[cfg(any(test, feature = "test-utils"))]
 static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// Serializes one test's local-zone override and restores it when its thread
-/// exits.
+/// Serializes test access to the process-wide local-zone override and restores
+/// the previous override when its owning test thread exits. Reads are
+/// synchronized separately, so they do not wait on the guard lifecycle lock.
 ///
-/// Repeated calls to [`Self::set`] replace the current thread's override while
-/// keeping the original zone and lock until the test thread exits.
+/// Repeated calls to [`Self::set`] replace the active override while retaining
+/// the original zone and serialization lock.
+///
+/// # Examples
+///
+/// ```
+/// use traces_pkm::{DateTimeValue, testing::ZoneGuard};
+///
+/// let value = DateTimeValue::from_unix_seconds(0)?;
+/// let utc = value.to_string();
+/// let worker = std::thread::spawn(move || {
+///     ZoneGuard::set("Etc/GMT-2");
+///     assert_eq!(value.to_string(), "1970-01-01T02:00:00");
+/// });
+/// worker.join().expect("zone test thread exits");
+/// assert_eq!(value.to_string(), utc);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug)]
 #[must_use]
@@ -69,10 +96,11 @@ impl ZoneGuard {
         });
     }
 
-    /// Sets the local zone for the current test thread.
+    /// Sets the process-wide local zone for the current test thread.
     ///
-    /// Repeated calls replace the override; the original value is restored when
-    /// the test thread exits.
+    /// Readers on other threads observe the override. Repeated calls replace
+    /// it; the original value is restored when the owning test thread
+    /// exits.
     ///
     /// # Panics
     ///
@@ -88,8 +116,10 @@ impl ZoneGuard {
         ZONE_GUARD.with(|slot| {
             let mut slot = slot.borrow_mut();
             if slot.is_some() {
-                ZONE_OVERRIDE
-                    .with(|current| *current.borrow_mut() = Some(zone));
+                *ZONE_OVERRIDE
+                    .write()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                    Some(zone);
             } else {
                 *slot = Some(Self::install(Some(zone)));
             }
@@ -99,13 +129,13 @@ impl ZoneGuard {
     fn install(zone: Option<TimeZone>) -> Self {
         let lock =
             ZONE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let previous = ZONE_OVERRIDE.with(|slot| {
-            let mut current = slot.borrow_mut();
-            match zone {
-                Some(zone) => (*current).replace(zone),
-                None => current.clone(),
-            }
-        });
+        let mut previous = ZONE_OVERRIDE
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let previous = match zone {
+            Some(zone) => previous.replace(zone),
+            None => previous.clone(),
+        };
         Self {
             previous,
             _lock: lock,
@@ -118,7 +148,9 @@ impl Drop for ZoneGuard {
     #[inline]
     fn drop(&mut self) {
         let previous = self.previous.take();
-        let _ = ZONE_OVERRIDE.try_with(|slot| *slot.borrow_mut() = previous);
+        *ZONE_OVERRIDE
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = previous;
     }
 }
 
@@ -289,7 +321,11 @@ mod tests {
             });
             started_rx.recv().expect("second thread starts");
 
-            // Assert
+            assert_eq!(
+                local_zone(),
+                TimeZone::UTC,
+                "other threads observe the active override"
+            );
             assert!(
                 acquired_rx.recv_timeout(Duration::from_millis(20)).is_err()
             );
