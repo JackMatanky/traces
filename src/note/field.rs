@@ -916,7 +916,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::test_support::ZoneGuard;
+        use crate::temporal::test_support::ZoneGuard;
 
         fn date(s: &str) -> DateValue {
             DateValue::parse_iso(s).expect("valid date")

@@ -1,16 +1,21 @@
-//! Defines the closed set of time units the crate accepts, with one row of
-//! facts per unit.
+//! Defines the closed sets of temporal units the crate accepts: duration
+//! [`TimeUnit`] and date-point [`DateUnit`].
 //!
-//! [`TEMPORAL_UNITS`] is the only place a unit's accepted spellings, nominal
-//! length, frame, and human names are stated; callers read those facts from
-//! [`TimeUnit`] instead of keeping private copies. Calendar units
+//! [`TEMPORAL_UNITS`] is the only place a duration unit's accepted spellings,
+//! nominal length, frame, and human names are stated; callers read those facts
+//! from [`TimeUnit`] instead of keeping private copies. Calendar units
 //! ([`TimeUnit::Day`], [`TimeUnit::Week`], [`TimeUnit::Month`],
 //! [`TimeUnit::Year`]) take effect on the local clock; exact units
 //! ([`TimeUnit::Hour`] and smaller) are exact elapsed time.
 //!
+//! [`DateUnit`] identifies calendar or clock components of a date reading and
+//! provides projection from local datetime values.
+//!
 //! [`decompose`] turns a magnitude into whole-unit counts over a caller-chosen
-//! unit set, and is the one decomposition routine behind both the canonical
-//! spelling and [`DurationValue::humanize`](super::DurationValue::humanize).
+//! unit set, and is the one decomposition routine behind both canonical
+//! spelling and human duration rendering.
+
+use jiff::civil;
 
 /// Identifies a recognized duration unit.
 ///
@@ -67,9 +72,9 @@ pub(crate) struct UnitSpec {
 
 /// Lists the time-unit registry in largest-first order.
 ///
-/// [`decompose`] and the unit sets below depend on this order. A new unit adds
-/// a row here and a variant to [`TimeUnit`]; the `invariants` tests fail to
-/// compile or assert until both agree.
+/// [`decompose`] requires caller-chosen largest-first order. A new duration
+/// unit adds a row here and a variant to [`TimeUnit`]; the `invariants` tests
+/// fail to compile or assert until both agree.
 pub(crate) static TEMPORAL_UNITS: [UnitSpec; 8] = [
     UnitSpec {
         unit: TimeUnit::Year,
@@ -145,34 +150,6 @@ pub(crate) static TEMPORAL_UNITS: [UnitSpec; 8] = [
     },
 ];
 
-/// Lists the units used for canonical spelling, from largest to smallest.
-///
-/// Month and Year are omitted because their nominal ratios are identities, not
-/// applications: a synthesized magnitude never claims calendar meaning.
-pub(crate) const CANONICAL_UNITS: [TimeUnit; 6] = [
-    TimeUnit::Week,
-    TimeUnit::Day,
-    TimeUnit::Hour,
-    TimeUnit::Minute,
-    TimeUnit::Second,
-    TimeUnit::Millisecond,
-];
-
-/// Lists the units that [`DurationValue::humanize`] decomposes over, largest
-/// first.
-///
-/// Millisecond is omitted: the sub-second remainder is rounded and rendered as
-/// one tail count instead of a decomposed row.
-pub(crate) const HUMAN_UNITS: [TimeUnit; 7] = [
-    TimeUnit::Year,
-    TimeUnit::Month,
-    TimeUnit::Week,
-    TimeUnit::Day,
-    TimeUnit::Hour,
-    TimeUnit::Minute,
-    TimeUnit::Second,
-];
-
 /// Stores one whole-unit row of a magnitude decomposition.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DecomposedPart {
@@ -185,12 +162,11 @@ pub(crate) struct DecomposedPart {
 /// Greedily decomposes a non-negative magnitude into whole-unit counts.
 ///
 /// `total_ms` is a magnitude in milliseconds and `units` must be ordered
-/// largest first, as [`TEMPORAL_UNITS`], [`CANONICAL_UNITS`], and
-/// [`HUMAN_UNITS`] are. Unit sizes are [`UnitSpec::nominal_milliseconds`], so
-/// the registry stays the sole ratio table. Units larger than the remaining
-/// magnitude contribute no row. Returns the rows and the sub-unit remainder in
-/// milliseconds; rendering or rounding that remainder is the caller's decision.
-#[must_use]
+/// largest first, as [`TEMPORAL_UNITS`] and duration composition sets are.
+/// Unit sizes are [`UnitSpec::nominal_milliseconds`], so the registry stays the
+/// sole ratio table. Units larger than the remaining magnitude contribute no
+/// row. Returns the rows and the sub-unit remainder in milliseconds; rendering
+/// or rounding that remainder is the caller's decision.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "registered unit sizes are nonzero and decomposition maintains a \
@@ -288,6 +264,78 @@ impl TimeUnit {
     #[must_use]
     pub(crate) const fn is_calendar(self) -> bool {
         self.spec().calendar
+    }
+}
+
+/// Identifies a named calendar or clock component of a date point.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DateUnit {
+    /// Identifies the calendar year.
+    Year,
+    /// Identifies the calendar month, 1 through 12.
+    Month,
+    /// Identifies the day of the month, 1 through 31.
+    Day,
+    /// Identifies the hour of the day, 0 through 23.
+    Hour,
+    /// Identifies the minute of the hour, 0 through 59.
+    Minute,
+    /// Identifies the second of the minute, 0 through 59.
+    Second,
+    /// Identifies the ISO weekday number, Monday = 1 through Sunday = 7.
+    Weekday,
+    /// Identifies the ISO week number of the year.
+    Week,
+}
+
+impl DateUnit {
+    /// Resolves a component name to its [`DateUnit`].
+    ///
+    /// Matching is ASCII case-insensitive across the eight registered names
+    /// (`year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`, `week`);
+    /// any other string returns [`None`].
+    #[must_use]
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        const TABLE: [(&str, DateUnit); 8] = [
+            ("year", DateUnit::Year),
+            ("month", DateUnit::Month),
+            ("day", DateUnit::Day),
+            ("hour", DateUnit::Hour),
+            ("minute", DateUnit::Minute),
+            ("second", DateUnit::Second),
+            ("weekday", DateUnit::Weekday),
+            ("week", DateUnit::Week),
+        ];
+        TABLE
+            .iter()
+            .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
+            .map(|&(_, component)| component)
+    }
+
+    /// Projects the requested component value from a local civil datetime.
+    ///
+    /// Weekdays are ISO numbered, Monday = 1 through Sunday = 7. Weeks are ISO
+    /// week numbers.
+    #[must_use]
+    pub(crate) fn of(self, local_datetime: civil::DateTime) -> i64 {
+        match self {
+            Self::Year => i64::from(local_datetime.year()),
+            Self::Month => i64::from(local_datetime.month()),
+            Self::Day => i64::from(local_datetime.day()),
+            Self::Hour => i64::from(local_datetime.hour()),
+            Self::Minute => i64::from(local_datetime.minute()),
+            Self::Second => i64::from(local_datetime.second()),
+            Self::Weekday => i64::from(match local_datetime.weekday() {
+                civil::Weekday::Monday => 1,
+                civil::Weekday::Tuesday => 2,
+                civil::Weekday::Wednesday => 3,
+                civil::Weekday::Thursday => 4,
+                civil::Weekday::Friday => 5,
+                civil::Weekday::Saturday => 6,
+                civil::Weekday::Sunday => 7,
+            }),
+            Self::Week => i64::from(local_datetime.iso_week_date().week()),
+        }
     }
 }
 
@@ -439,6 +487,69 @@ mod tests {
             let actual = TimeUnit::from_spelling(input);
             // Assert
             assert_eq!(actual, None, "`{input}` must not resolve to a unit");
+        }
+
+        #[rstest]
+        #[case::year("year", DateUnit::Year)]
+        #[case::month("month", DateUnit::Month)]
+        #[case::day("day", DateUnit::Day)]
+        #[case::hour("hour", DateUnit::Hour)]
+        #[case::minute("minute", DateUnit::Minute)]
+        #[case::second("second", DateUnit::Second)]
+        #[case::weekday("weekday", DateUnit::Weekday)]
+        #[case::week("week", DateUnit::Week)]
+        fn resolves_each_registered_date_unit_name(
+            #[case] name: &str,
+            #[case] expected: DateUnit,
+        ) {
+            // Arrange: `name` and `expected` are the case literals.
+            // Act
+            let actual = DateUnit::from_name(name);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{name}` should resolve to {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::upper_case("YEAR", DateUnit::Year)]
+        #[case::title_case("Second", DateUnit::Second)]
+        #[case::mixed_case("WeEk", DateUnit::Week)]
+        #[case::upper_weekday("WEEKDAY", DateUnit::Weekday)]
+        fn resolves_date_unit_names_ascii_case_insensitively(
+            #[case] name: &str,
+            #[case] expected: DateUnit,
+        ) {
+            // Arrange: `name` and `expected` are the case literals.
+            // Act
+            let actual = DateUnit::from_name(name);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "`{name}` should resolve case-insensitively to {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::empty("")]
+        #[case::plural("years")]
+        #[case::abbreviated("yr")]
+        #[case::leading_space(" day")]
+        #[case::trailing_space("day ")]
+        #[case::compound("year-month")]
+        #[case::unrecognized("quarter")]
+        fn rejects_date_unit_names_outside_the_registry(#[case] name: &str) {
+            // Arrange: `name` is the case literal.
+            // Act
+            let actual = DateUnit::from_name(name);
+            // Assert
+            assert_eq!(
+                actual, None,
+                "`{name}` must not resolve to a date unit"
+            );
         }
     }
 
@@ -689,13 +800,18 @@ mod tests {
 
         #[test]
         fn decomposes_whole_units_greedily_over_both_sets() {
+            use crate::temporal::duration::{
+                COMPOUND_FORMAT_ORDER, NOMINAL_COMPOSITION_ORDER,
+            };
+
             // Arrange: one magnitude that fills a unit from each set.
             // `90_000_000 ms` is 1 day 1 hour; `31_596_000_000 ms` is
             // 1 year 16 hours 40 minutes.
             // Act
             let (canonical, canonical_rem) =
-                decompose(90_000_000, &CANONICAL_UNITS);
-            let (human, human_rem) = decompose(31_596_000_000, &HUMAN_UNITS);
+                decompose(90_000_000, &NOMINAL_COMPOSITION_ORDER);
+            let (human, human_rem) =
+                decompose(31_596_000_000, &COMPOUND_FORMAT_ORDER);
 
             // Assert
             assert_eq!(
@@ -737,10 +853,12 @@ mod tests {
 
         #[test]
         fn leaves_the_sub_unit_remainder_to_the_caller() {
+            use crate::temporal::duration::COMPOUND_FORMAT_ORDER;
+
             // Arrange: the magnitude is 1.5 seconds.
             // Act
-            let (parts, remainder_ms) = decompose(1_500, &HUMAN_UNITS);
-            // Assert
+            let (parts, remainder_ms) =
+                decompose(1_500, &COMPOUND_FORMAT_ORDER);
             assert_eq!(
                 parts,
                 vec![DecomposedPart {
@@ -754,12 +872,16 @@ mod tests {
 
         #[test]
         fn decomposes_a_sub_second_magnitude_only_where_ms_is_a_row() {
+            use crate::temporal::duration::{
+                COMPOUND_FORMAT_ORDER, NOMINAL_COMPOSITION_ORDER,
+            };
+
             // Arrange: 999 milliseconds is below every human unit but is a
             // canonical row on its own.
             // Act
-            let (canonical, canonical_rem) = decompose(999, &CANONICAL_UNITS);
-            let (human, human_rem) = decompose(999, &HUMAN_UNITS);
-
+            let (canonical, canonical_rem) =
+                decompose(999, &NOMINAL_COMPOSITION_ORDER);
+            let (human, human_rem) = decompose(999, &COMPOUND_FORMAT_ORDER);
             // Assert
             assert_eq!(canonical, vec![DecomposedPart {
                 unit: TimeUnit::Millisecond,
@@ -768,6 +890,41 @@ mod tests {
             assert_eq!(canonical_rem, 0);
             assert!(human.is_empty(), "human units start at seconds");
             assert_eq!(human_rem, 999);
+        }
+    }
+
+    mod projection {
+        use jiff::civil::date;
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::year(DateUnit::Year, 2026)]
+        #[case::month(DateUnit::Month, 7)]
+        #[case::day(DateUnit::Day, 29)]
+        #[case::hour(DateUnit::Hour, 14)]
+        #[case::minute(DateUnit::Minute, 30)]
+        #[case::second(DateUnit::Second, 45)]
+        #[case::weekday(DateUnit::Weekday, 3)]
+        #[case::week(DateUnit::Week, 31)]
+        fn projects_each_component_from_datetime(
+            #[case] unit: DateUnit,
+            #[case] expected: i64,
+        ) {
+            // Arrange: 2026-07-29 is a Wednesday (ISO weekday 3), in ISO week
+            // 31.
+            let dt = date(2026, 7, 29).at(14, 30, 45, 0);
+
+            // Act
+            let actual = unit.of(dt);
+
+            // Assert
+            assert_eq!(
+                actual, expected,
+                "{unit:?} of {dt} must project as {expected}"
+            );
         }
     }
 }

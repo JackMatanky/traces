@@ -33,8 +33,8 @@ use crate::{
         value::QueryFieldValueRef,
     },
     temporal::{
-        CALENDAR_PERIOD_EDGES, CalendarError, CalendarPeriod, DateComponent,
-        DatePoint, PeriodEdge,
+        CALENDAR_PERIOD_EDGES, CalendarError, CalendarPeriod, DatePoint,
+        DateUnit, PeriodEdge,
     },
 };
 
@@ -584,7 +584,7 @@ impl QueryFunction {
                 } else if matches!(
                     args.get(1),
                     Some(ValueExpr::Literal(NoteFieldValue::String(name)))
-                        if DateComponent::from_name(name).is_none()
+                        if DateUnit::from_name(name).is_none()
                 ) {
                     Some(
                         "valid component: year, month, day, hour, minute, \
@@ -760,7 +760,7 @@ impl QueryFunction {
         if matches!(date, NoteFieldValue::Null) {
             return Some(NoteFieldValue::Null);
         }
-        let component = DateComponent::from_name(component)?;
+        let component = DateUnit::from_name(component)?;
         let zone = crate::temporal::local_zone().ok()?;
         Some(NoteFieldValue::Number(
             date.as_date_point()?.component(component, &zone).to_f64()?,
@@ -1340,7 +1340,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::test_support::ZoneGuard;
+        use crate::temporal::test_support::ZoneGuard;
 
         #[rstest]
         #[case::greater_than("rating > 5", &["high"])]

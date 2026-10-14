@@ -408,7 +408,7 @@ impl<'de> Deserialize<'de> for DateValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{temporal::fixtures::ymd, test_support::ZoneGuard};
+    use crate::temporal::test_support::{ZoneGuard, fixtures::ymd};
 
     mod constructor {
         use pretty_assertions::assert_eq;

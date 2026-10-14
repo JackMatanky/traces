@@ -199,9 +199,10 @@ pub mod testing {
             CommitPolicy, RenderFailureKind, TemplatePathInput,
             TemplateService, WriteMode, WriteOutcome,
         },
+        temporal::test_support::ZoneGuard,
         test_support::{
             DEFAULT_SCHEMA_VALUES_DIR, DEFAULT_SCHEMAS_DIR,
-            DEFAULT_TEMPLATES_DIR, TestProject, ZoneGuard, build_test_index,
+            DEFAULT_TEMPLATES_DIR, TestProject, build_test_index,
             create_trusted_project, fixture_service, parse_note,
             parse_note_str, parse_tag, resolve_safe_path, write_note,
             write_schema, write_template,
@@ -224,8 +225,9 @@ pub mod testing {
 /// - [`parse_note`], [`parse_note_str`], and [`build_test_index`] construct
 ///   in-memory notes and indexes with zero disk I/O.
 /// - [`parse_tag`] parses tag string slices for fixture data.
-/// - [`ZoneGuard`] (test-only) pins the local zone using a thread-local
-///   override, without mutating process environment variables.
+///
+/// Time-zone fixtures are owned by `temporal::test_support`, not this generic
+/// project-fixture module.
 #[cfg(any(test, feature = "test-utils"))]
 mod test_support {
     #![expect(
@@ -239,7 +241,6 @@ mod test_support {
         sync::Arc,
     };
 
-    pub use crate::temporal::ZoneGuard;
     use crate::{
         Config, ConfigService, IndexerService, MarkdownParserInput, Note, Tag,
         config::{LocalConfigFile, TrustRequest},

@@ -1,21 +1,17 @@
 //! Defines vocabulary shared by date-point arithmetic and its callers: calendar
-//! periods, period edges, components, and differences.
+//! periods and period edges.
 //!
 //! This module owns the names that date-point arithmetic and its query and
 //! template callers share. It holds no arithmetic of its own: the calendar
 //! owner modules apply [`CalendarPeriod`] and [`PeriodEdge`] at date-point
-//! boundaries, resolve [`DateComponent`] names, and project [`DateDiff`]
-//! measurements, while the free functions here supply the zone-free datetime
-//! shifting and sub-second splitting those owners share.
+//! boundaries, while the free functions here supply the zone-free datetime
+//! shifting those owners share.
 //!
 //! # Key Types
 //!
 //! - [`CalendarPeriod`]: Represents a calendar period selected by date-point
 //!   boundaries.
 //! - [`PeriodEdge`]: Selects the side of a calendar period used by a boundary.
-//! - [`DateComponent`]: Identifies a calendar or clock component of a date
-//!   point.
-//! - [`DateDiff`]: Stores a measured difference between two date points.
 
 use jiff::{Span, civil};
 
@@ -69,78 +65,6 @@ pub(crate) const CALENDAR_PERIOD_EDGES: [(&str, CalendarPeriod, PeriodEdge);
     ("eoy", CalendarPeriod::Year, PeriodEdge::End),
     ("end_of_year", CalendarPeriod::Year, PeriodEdge::End),
 ];
-
-/// Identifies a named calendar or clock component of a
-/// [`DatePoint`](super::DatePoint).
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateComponent {
-    /// Identifies the calendar year.
-    Year,
-    /// Identifies the calendar month, 1 through 12.
-    Month,
-    /// Identifies the day of the month, 1 through 31.
-    Day,
-    /// Identifies the hour of the day, 0 through 23.
-    Hour,
-    /// Identifies the minute of the hour, 0 through 59.
-    Minute,
-    /// Identifies the second of the minute, 0 through 59.
-    Second,
-    /// Identifies the ISO weekday number, Monday = 1 through Sunday = 7.
-    Weekday,
-    /// Identifies the ISO week number of the year.
-    Week,
-}
-
-impl DateComponent {
-    /// Resolves a component name to its [`DateComponent`].
-    ///
-    /// Matching is ASCII case-insensitive across the eight registered names
-    /// (`year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`, `week`);
-    /// any other string returns [`None`].
-    #[must_use]
-    pub(crate) fn from_name(name: &str) -> Option<Self> {
-        const TABLE: [(&str, DateComponent); 8] = [
-            ("year", DateComponent::Year),
-            ("month", DateComponent::Month),
-            ("day", DateComponent::Day),
-            ("hour", DateComponent::Hour),
-            ("minute", DateComponent::Minute),
-            ("second", DateComponent::Second),
-            ("weekday", DateComponent::Weekday),
-            ("week", DateComponent::Week),
-        ];
-        TABLE
-            .iter()
-            .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
-            .map(|&(_, component)| component)
-    }
-}
-
-/// Stores the result of measuring the difference between two date points.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum DateDiff {
-    /// Stores a whole-unit difference.
-    Whole(i64),
-    /// Stores a fractional-unit difference.
-    Fractional(f64),
-}
-
-impl DateDiff {
-    /// Projects the measured difference as an `f64`.
-    ///
-    /// Whole magnitudes convert through the standard integer-to-floating
-    /// conversion; finite fractional magnitudes pass through unchanged.
-    #[inline]
-    #[must_use]
-    pub(crate) fn to_f64(self) -> Option<f64> {
-        match self {
-            Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
-            Self::Fractional(n) if n.is_finite() => Some(n),
-            Self::Fractional(_) => None,
-        }
-    }
-}
 
 /// Maps an ISO weekday number to its [`civil::Weekday`].
 ///
@@ -231,69 +155,6 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::year("year", DateComponent::Year)]
-        #[case::month("month", DateComponent::Month)]
-        #[case::day("day", DateComponent::Day)]
-        #[case::hour("hour", DateComponent::Hour)]
-        #[case::minute("minute", DateComponent::Minute)]
-        #[case::second("second", DateComponent::Second)]
-        #[case::weekday("weekday", DateComponent::Weekday)]
-        #[case::week("week", DateComponent::Week)]
-        fn resolves_each_registered_component_name(
-            #[case] name: &str,
-            #[case] expected: DateComponent,
-        ) {
-            // Arrange: `name` and `expected` are the case literals.
-            // Act
-            let actual = DateComponent::from_name(name);
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "`{name}` should resolve to {expected:?}"
-            );
-        }
-
-        #[rstest]
-        #[case::upper_case("YEAR", DateComponent::Year)]
-        #[case::title_case("Second", DateComponent::Second)]
-        #[case::mixed_case("WeEk", DateComponent::Week)]
-        #[case::upper_weekday("WEEKDAY", DateComponent::Weekday)]
-        fn resolves_names_ascii_case_insensitively(
-            #[case] name: &str,
-            #[case] expected: DateComponent,
-        ) {
-            // Arrange: `name` and `expected` are the case literals.
-            // Act
-            let actual = DateComponent::from_name(name);
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "`{name}` should resolve case-insensitively to {expected:?}"
-            );
-        }
-
-        #[rstest]
-        #[case::empty("")]
-        #[case::plural("years")]
-        #[case::abbreviated("yr")]
-        #[case::leading_space(" day")]
-        #[case::trailing_space("day ")]
-        #[case::compound("year-month")]
-        #[case::unrecognized("quarter")]
-        fn rejects_names_outside_the_registry(#[case] name: &str) {
-            // Arrange: `name` is the case literal.
-            // Act
-            let actual = DateComponent::from_name(name);
-            // Assert
-            assert_eq!(
-                actual, None,
-                "`{name}` must not resolve to a component"
-            );
-        }
-
-        #[rstest]
         #[case::monday(1, civil::Weekday::Monday)]
         #[case::tuesday(2, civil::Weekday::Tuesday)]
         #[case::wednesday(3, civil::Weekday::Wednesday)]
@@ -329,75 +190,6 @@ mod tests {
             assert_eq!(
                 actual, None,
                 "weekday number {number} must not map to a weekday"
-            );
-        }
-    }
-
-    mod conversions {
-        use pretty_assertions::assert_eq;
-        use rstest::rstest;
-
-        use super::*;
-
-        #[rstest]
-        #[case::positive(DateDiff::Whole(42), 42.0)]
-        #[case::negative(DateDiff::Whole(-7), -7.0)]
-        #[case::zero(DateDiff::Whole(0), 0.0)]
-        #[case::i64_max(DateDiff::Whole(i64::MAX), 9_223_372_036_854_775_808.0)]
-        #[case::i64_min(
-            DateDiff::Whole(i64::MIN),
-            -9_223_372_036_854_775_808.0
-        )]
-        fn projects_whole_differences_as_f64(
-            #[case] difference: DateDiff,
-            #[case] expected: f64,
-        ) {
-            // Arrange: `difference` and `expected` are the case literals.
-            // Act
-            let actual = difference.to_f64();
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "{difference:?} should project as {expected}"
-            );
-        }
-
-        #[rstest]
-        #[case::two_and_a_half(DateDiff::Fractional(2.5), 2.5)]
-        #[case::negative_fraction(DateDiff::Fractional(-0.25), -0.25)]
-        #[case::zero(DateDiff::Fractional(0.0), 0.0)]
-        fn projects_fractional_differences_as_f64(
-            #[case] difference: DateDiff,
-            #[case] expected: f64,
-        ) {
-            // Arrange: `difference` and `expected` are the case literals.
-            // Act
-            let actual = difference.to_f64();
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "{difference:?} should project as {expected}"
-            );
-        }
-
-        #[rstest]
-        #[case::not_a_number(f64::NAN)]
-        #[case::positive_infinity(f64::INFINITY)]
-        #[case::negative_infinity(f64::NEG_INFINITY)]
-        fn rejects_non_finite_fractional_differences(#[case] magnitude: f64) {
-            // Arrange: non-finite fractional values cannot be represented as
-            // `f64` output.
-            let difference = DateDiff::Fractional(magnitude);
-
-            // Act
-            let actual = difference.to_f64();
-
-            // Assert
-            assert_eq!(
-                actual, None,
-                "non-finite {magnitude:?} is not projectable"
             );
         }
     }

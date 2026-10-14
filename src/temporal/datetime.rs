@@ -1,7 +1,7 @@
 //! Defines UTC-stored Date-Times that render as the local clock.
 //!
 //! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
-//! [`ParsedDateTimeKind`]) that turn written RFC 3339 and naive clock times
+//! [`DateTimeInput`]) that turn written RFC 3339 and naive clock times
 //! into it. Written input without an offset resolves in the process's local
 //! zone and stores as UTC; every human-facing rendering converts back to the
 //! local clock. Callers hold the validated date-time or receive a
@@ -304,15 +304,7 @@ impl DateTimeValue {
                 reason,
             }
         })?;
-        match shape {
-            ParsedDateTimeKind::Instant(timestamp) => {
-                Ok(Self::from_timestamp(timestamp))
-            }
-            ParsedDateTimeKind::Unzoned(local_datetime) => {
-                Self::from_local(local_datetime)
-                    .map_err(|error| error.into_date_error(trimmed))
-            }
-        }
+        shape.resolve(trimmed)
     }
 }
 
@@ -458,9 +450,7 @@ impl DateTimeShape {
     /// # Errors
     ///
     /// Returns a static reason if no accepted date-time shape matches `s`.
-    pub(crate) fn parse_any(
-        s: &str,
-    ) -> Result<ParsedDateTimeKind, &'static str> {
+    pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
         let normalized_input = normalized.as_ref();
         if normalized_input.len() <= 10 {
@@ -506,17 +496,17 @@ impl DateTimeShape {
     /// # Errors
     ///
     /// - A static reason if the input does not match this format.
-    fn parse_shape(self, s: &str) -> Result<ParsedDateTimeKind, &'static str> {
+    fn parse_shape(self, s: &str) -> Result<DateTimeInput, &'static str> {
         match self.pattern() {
             None if !numeric_rfc3339_offset_is_valid(s) => {
                 Err("input does not match RFC 3339")
             }
             None => s
                 .parse::<Timestamp>()
-                .map(ParsedDateTimeKind::Instant)
+                .map(DateTimeInput::Absolute)
                 .map_err(|_| "input does not match RFC 3339"),
             Some(pattern) => civil::DateTime::strptime(pattern, s)
-                .map(ParsedDateTimeKind::Unzoned)
+                .map(DateTimeInput::LocalClock)
                 .map_err(|_| "invalid input"),
         }
     }
@@ -564,22 +554,51 @@ fn numeric_rfc3339_offset_is_valid(input: &str) -> bool {
 }
 
 /// Stores the parsed date-time shape before local-zone resolution.
-#[derive(Copy, Clone, Debug)]
-pub(crate) enum ParsedDateTimeKind {
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DateTimeInput {
     /// Stores an explicit RFC 3339 date-time with its offset applied.
-    Instant(Timestamp),
+    Absolute(Timestamp),
     /// Stores a naive local civil date-time that must resolve through
     /// [`DateTimeValue::from_local`].
-    Unzoned(civil::DateTime),
+    LocalClock(civil::DateTime),
+}
+
+impl DateTimeInput {
+    /// Resolves parsed date-time input into a UTC-stored [`DateTimeValue`].
+    ///
+    /// For [`Self::Absolute`], the timestamp is stored directly.
+    /// For [`Self::LocalClock`], resolution runs through
+    /// [`DateTimeValue::from_local`] in the process-local time zone.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if the system time zone cannot resolve
+    ///   a local-clock input.
+    /// - [`DateError::InvalidValue`] if the local-clock input cannot be
+    ///   represented as a timestamp in the selected zone.
+    pub(crate) fn resolve(
+        self,
+        input: &str,
+    ) -> Result<DateTimeValue, DateError> {
+        match self {
+            Self::Absolute(timestamp) => {
+                Ok(DateTimeValue::from_timestamp(timestamp))
+            }
+            Self::LocalClock(local_datetime) => {
+                DateTimeValue::from_local(local_datetime)
+                    .map_err(|error| error.into_date_error(input))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use crate::{
-        temporal::fixtures::{fixed_datetime, ymd},
-        test_support::ZoneGuard,
+    use crate::temporal::test_support::{
+        ZoneGuard,
+        fixtures::{fixed_datetime, ymd},
     };
 
     // ZoneGuard pins a Jiff time zone to the test thread without changing the
@@ -702,7 +721,9 @@ mod tests {
         #[test]
         fn resolves_an_ambiguous_fall_back_time_to_the_earlier_occurrence() {
             // Arrange: 01:30 happens twice on this fall-back day.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
 
             // Act
             let parsed = DateTimeValue::parse_iso("2026-11-01 01:30:00");
@@ -719,7 +740,9 @@ mod tests {
         #[test]
         fn shifts_a_spring_forward_gap_forward_by_the_gap() {
             // Arrange: 02:30 does not exist on this spring-forward day.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
 
             // Act
             let parsed = DateTimeValue::parse_iso("2026-03-08 02:30:00");
@@ -740,7 +763,9 @@ mod tests {
         #[test]
         fn resolves_local_times_adjacent_to_a_gap_without_error() {
             // Arrange: one second before the gap, and at the gap's end.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
 
             // Act
             let before = DateTimeValue::parse_iso("2026-03-08 01:59:59");
@@ -764,7 +789,9 @@ mod tests {
         #[test]
         fn resolves_the_london_fold_to_the_earlier_occurrence() {
             // Arrange: one zone per test; London falls back on 2026-10-25.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::london_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::london_zone(),
+            );
             let earlier = DateTimeValue::parse_iso("2026-10-25T01:30:00+01:00")
                 .expect("an explicit offset must parse");
             let later = DateTimeValue::parse_iso("2026-10-25T01:30:00+00:00")
@@ -789,7 +816,9 @@ mod tests {
         #[test]
         fn resolves_the_lord_howe_half_hour_fold_to_the_earlier_occurrence() {
             // Arrange: Lord Howe shifts by 30 minutes, folding 2026-04-05.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::lord_howe_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::lord_howe_zone(),
+            );
             let earlier = DateTimeValue::parse_iso("2026-04-05T01:45:00+11:00")
                 .expect("an explicit offset must parse");
             let later = DateTimeValue::parse_iso("2026-04-05T01:45:00+10:30")
@@ -814,7 +843,9 @@ mod tests {
         #[test]
         fn shifts_the_lord_howe_half_hour_gap_forward_by_the_gap() {
             // Arrange: the 2026-10-04 gap skips 02:00 to 02:30.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::lord_howe_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::lord_howe_zone(),
+            );
             let shifted = DateTimeValue::parse_iso("2026-10-04T02:45:00+11:00")
                 .expect("an explicit offset must parse");
 
@@ -860,7 +891,7 @@ mod tests {
         fn shifts_a_midnight_gap_forward_by_the_gap() {
             // Arrange: the fixture advances from 23:59 to 01:00 on this date.
             ZoneGuard::set_timezone(
-                crate::temporal::fixtures::midnight_gap_zone(),
+                crate::temporal::test_support::fixtures::midnight_gap_zone(),
             );
             let shifted = DateTimeValue::parse_iso("2026-03-08T00:30:00Z")
                 .expect("explicit shifted instant is valid");
@@ -1115,11 +1146,11 @@ mod tests {
             // Assert
             assert!(matches!(
                 t_separated,
-                Ok(ParsedDateTimeKind::Unzoned(parsed)) if parsed == local_datetime
+                Ok(DateTimeInput::LocalClock(parsed)) if parsed == local_datetime
             ));
             assert!(matches!(
                 space_separated,
-                Ok(ParsedDateTimeKind::Unzoned(parsed)) if parsed == local_datetime
+                Ok(DateTimeInput::LocalClock(parsed)) if parsed == local_datetime
             ));
         }
 
@@ -1233,7 +1264,9 @@ mod tests {
         #[test]
         fn renders_the_fold_hour_that_re_parses_to_the_earlier_occurrence() {
             // Arrange: the second occurrence of the folded 01:30 clock time.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
             let later = DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
                 .expect("explicit-offset fixture parses");
 
@@ -1510,7 +1543,7 @@ mod tests {
             // Arrange: local midnight falls inside the fixture's spring-forward
             // gap.
             ZoneGuard::set_timezone(
-                crate::temporal::fixtures::midnight_gap_zone(),
+                crate::temporal::test_support::fixtures::midnight_gap_zone(),
             );
             let date = ymd(2026, 3, 8);
             let expected = DateTimeValue::parse_iso("2026-03-08T00:00:00Z")
@@ -1602,7 +1635,9 @@ mod tests {
         fn re_resolves_a_fold_hour_to_the_earlier_occurrence_on_a_zero_day_shift()
          {
             // Arrange: the second occurrence of the folded 01:30 clock time.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
             let second_occurrence =
                 DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
                     .expect("explicit-offset fixture parses");

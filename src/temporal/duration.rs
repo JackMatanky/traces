@@ -35,8 +35,34 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
     error::DurationError,
-    unit::{CANONICAL_UNITS, HUMAN_UNITS, TimeUnit, decompose},
+    unit::{TimeUnit, decompose},
 };
+
+/// Largest-first order for synthesizing a nominal duration from seconds.
+///
+/// Month and Year are omitted: nominal ratios describe identity, not calendar
+/// application, so a synthesized magnitude never claims those components.
+pub(crate) const NOMINAL_COMPOSITION_ORDER: [TimeUnit; 6] = [
+    TimeUnit::Week,
+    TimeUnit::Day,
+    TimeUnit::Hour,
+    TimeUnit::Minute,
+    TimeUnit::Second,
+    TimeUnit::Millisecond,
+];
+
+/// Largest-first order for rendering a compound English magnitude.
+///
+/// Milliseconds are rounded and rendered from the remaining magnitude.
+pub(crate) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
+    TimeUnit::Year,
+    TimeUnit::Month,
+    TimeUnit::Week,
+    TimeUnit::Day,
+    TimeUnit::Hour,
+    TimeUnit::Minute,
+    TimeUnit::Second,
+];
 
 /// Nanoseconds per microsecond: a sub-second conversion factor with no
 /// registry row; all registered unit ratios come from `TEMPORAL_UNITS`.
@@ -171,7 +197,7 @@ impl DurationValue {
             return Err(DurationError::SecondsOutOfRange);
         }
         let total_ms = total_ms as u64;
-        let (parts, _) = decompose(total_ms, &CANONICAL_UNITS);
+        let (parts, _) = decompose(total_ms, &NOMINAL_COMPOSITION_ORDER);
         let mut span = Span::new();
         for part in parts {
             let count = i64::try_from(part.count)
@@ -393,9 +419,9 @@ impl DurationValue {
         Some((dv, last_end))
     }
 
-    /// Renders this duration in human-readable compound English.
+    /// Renders this duration as a comma-separated English magnitude.
     #[must_use]
-    pub(crate) fn humanize(&self) -> String {
+    pub(crate) fn to_compound_string(self) -> String {
         use std::fmt::Write as _;
 
         let total_secs = self.nominal_seconds();
@@ -411,7 +437,7 @@ impl DurationValue {
         }
         let is_negative = total_secs < 0.0;
 
-        let (parts, remainder_ms) = decompose(total_ms, &HUMAN_UNITS);
+        let (parts, remainder_ms) = decompose(total_ms, &COMPOUND_FORMAT_ORDER);
         let mut text = String::new();
         for part in parts {
             let (singular, plural) = part.unit.human_names();
@@ -1617,7 +1643,7 @@ mod tests {
         }
     }
 
-    mod humanize {
+    mod compound_format {
         use pretty_assertions::assert_eq;
 
         use super::*;
@@ -1648,7 +1674,7 @@ mod tests {
             } else {
                 synthesized(raw_secs)
             };
-            assert_eq!(duration.humanize(), expected);
+            assert_eq!(duration.to_compound_string(), expected);
         }
     }
 

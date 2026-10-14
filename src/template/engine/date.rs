@@ -44,8 +44,8 @@ use crate::{
     DEFAULT_DATE_PATTERN, DateTimeValue, DurationValue, TimeUnit,
     UNIT_SPELLINGS_HINT,
     temporal::{
-        CalendarError, CalendarPeriod, DateComponent, DateDiff, DateError,
-        DatePoint, PeriodEdge, weekday_from_number,
+        CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
+        DateUnit, PeriodEdge, weekday_from_number,
     },
 };
 const NAMESPACE_METHODS: &[&str] = &[
@@ -621,7 +621,7 @@ fn duration_format(value: Value) -> TemplateEngineResult<String> {
             "durationformat expects a duration string or number",
         ));
     };
-    Ok(dv.humanize())
+    Ok(dv.to_compound_string())
 }
 /// `{{ value | timestamp }}` converts a piped date/time string to Unix seconds.
 ///
@@ -873,7 +873,7 @@ fn weekday(
         Ok(Value::from(format_strtime(&zoned, &pat, format)?))
     } else {
         kwargs.assert_all_used()?;
-        Ok(Value::from(date_point.component(DateComponent::Weekday, &zone)))
+        Ok(Value::from(date_point.component(DateUnit::Weekday, &zone)))
     }
 }
 
@@ -1053,7 +1053,7 @@ fn unknown_unit_error(unit: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::ZoneGuard;
+    use crate::temporal::test_support::ZoneGuard;
 
     fn env() -> Environment<'static> {
         // Every date filter reads the local zone through the core parser, so
@@ -1723,7 +1723,9 @@ mod tests {
 
         #[test]
         fn resolves_a_spring_forward_gap_input_instead_of_failing() {
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
 
             // 02:30 does not exist on 2026-03-08; the adopted 'compatible'
             // policy shifts it forward by the gap to 03:30 EDT (07:30Z).
@@ -1915,7 +1917,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::test_support::ZoneGuard;
+        use crate::temporal::test_support::ZoneGuard;
 
         #[test]
         fn returns_an_integer_day_count_when_neither_input_has_time() {
@@ -2196,7 +2198,9 @@ mod tests {
         #[test]
         fn a_day_unit_preserves_the_clock_time_across_a_dst_gap_while_hours_do_not()
          {
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
+            ZoneGuard::set_timezone(
+                crate::temporal::test_support::fixtures::new_york_zone(),
+            );
 
             let rendered = env()
                 .render_str(

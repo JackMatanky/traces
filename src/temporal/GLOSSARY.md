@@ -47,8 +47,26 @@ The process-local zone used to resolve unzoned Date-Time input, render stored
 Date-Time values, and apply calendar units. System zone lookup errors propagate
 as `DateError::LocalZoneLookup`.
 
-#### Unit
+#### Time unit
 
-One of the eight accepted time units. Each unit defines its accepted spellings,
-nominal length, application regime, and human-readable names in the shared
-registry.
+`TimeUnit` is one of the eight accepted duration quantities. Its shared
+registry defines spellings, nominal length, calendar-versus-elapsed application,
+and English names. A week here is a seven-day calendar amount.
+
+#### Date unit
+
+`DateUnit` selects a field from a date point's local civil reading: year,
+month, day, hour, minute, second, ISO weekday number, or ISO week number. It
+does not represent an amount that can be added to a date.
+
+#### Date-time input
+
+`DateTimeInput` is a temporary recognition result. An explicit offset has
+already been applied to produce an absolute timestamp; a local clock reading
+still needs zone resolution before it becomes `DateTimeValue`.
+
+#### Date difference
+
+`DateDiff` distinguishes whole calendar measurements from fractional
+clock/elapsed measurements; query consumers convert it to a number and
+template consumers retain integer-versus-float output.
