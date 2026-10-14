@@ -21,11 +21,13 @@ where
     })
 }
 
-/// Returns the process-local time zone, falling back to UTC if system discovery
-/// fails.
+/// Returns the process-local time zone.
+///
+/// # Errors
+///
+/// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
 #[inline]
-#[must_use]
-pub(crate) fn local_zone() -> TimeZone {
+pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
     #[cfg(any(test, feature = "test-utils"))]
     let override_zone = ZONE_OVERRIDE
         .read()
@@ -34,10 +36,10 @@ pub(crate) fn local_zone() -> TimeZone {
 
     #[cfg(any(test, feature = "test-utils"))]
     if let Some(zone) = override_zone {
-        return zone;
+        return Ok(zone);
     }
 
-    resolve(TimeZone::try_system).unwrap_or(TimeZone::UTC)
+    resolve(TimeZone::try_system)
 }
 
 #[cfg(any(test, feature = "test-utils"))]
@@ -58,7 +60,8 @@ static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// synchronized separately, so they do not wait on the guard lifecycle lock.
 ///
 /// Repeated calls to [`Self::set`] replace the active override while retaining
-/// the original zone and serialization lock.
+/// the original zone and serialization lock. Use [`Self::with`] for nested
+/// scoped changes; each scope restores its immediate parent even during unwind.
 ///
 /// # Examples
 ///
@@ -67,11 +70,9 @@ static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 ///
 /// let value = DateTimeValue::from_unix_seconds(0)?;
 /// let utc = value.to_string();
-/// let worker = std::thread::spawn(move || {
-///     ZoneGuard::set("Etc/GMT-2");
+/// ZoneGuard::with("Etc/GMT-2", || {
 ///     assert_eq!(value.to_string(), "1970-01-01T02:00:00");
 /// });
-/// worker.join().expect("zone test thread exits");
 /// assert_eq!(value.to_string(), utc);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -96,11 +97,10 @@ impl ZoneGuard {
         });
     }
 
-    /// Sets the process-wide local zone for the current test thread.
+    /// Runs `action` with a process-wide local-zone override.
     ///
-    /// Readers on other threads observe the override. Repeated calls replace
-    /// it; the original value is restored when the owning test thread
-    /// exits.
+    /// Nested calls restore the immediately enclosing zone. The override is
+    /// restored during normal return and panic unwinding.
     ///
     /// # Panics
     ///
@@ -110,9 +110,55 @@ impl ZoneGuard {
         clippy::panic,
         reason = "unknown test zones indicate a fixture error"
     )]
+    pub fn with<R, F: FnOnce() -> R>(zone: &str, action: F) -> R {
+        let zone = TimeZone::get(zone)
+            .unwrap_or_else(|_| panic!("unknown time zone: {zone}"));
+        let has_owner = ZONE_GUARD.with(|slot| slot.borrow().is_some());
+        if has_owner {
+            let previous = ZONE_OVERRIDE
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .replace(zone);
+            let restore = ScopedZoneRestore {
+                previous,
+            };
+            let result = action();
+            drop(restore);
+            result
+        } else {
+            ZONE_GUARD.with(|slot| {
+                *slot.borrow_mut() = Some(Self::install(Some(zone)));
+            });
+            let _restore = ThreadZoneRestore;
+            action()
+        }
+    }
+
+    /// Sets the process-wide local zone for the current test thread.
+    ///
+    /// Readers on other threads observe the override. Repeated calls replace
+    /// it; the original value is restored when the owning test thread exits.
+    /// Use the scoped with method for nested overrides.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the zone name is unrecognized.
+    #[inline]
+    #[expect(
+        clippy::panic,
+        reason = "unknown test zones indicate a fixture error"
+    )]
     pub fn set(zone: &str) {
         let zone = TimeZone::get(zone)
             .unwrap_or_else(|_| panic!("unknown time zone: {zone}"));
+        Self::set_timezone(zone);
+    }
+
+    /// Sets the process-wide local zone to a previously resolved zone.
+    ///
+    /// Repeated calls replace the active override; the original value is
+    /// restored when the owning test thread exits.
+    pub(crate) fn set_timezone(zone: TimeZone) {
         ZONE_GUARD.with(|slot| {
             let mut slot = slot.borrow_mut();
             if slot.is_some() {
@@ -153,12 +199,53 @@ impl Drop for ZoneGuard {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = previous;
     }
 }
+#[cfg(any(test, feature = "test-utils"))]
+struct ScopedZoneRestore {
+    previous: Option<TimeZone>,
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+impl Drop for ScopedZoneRestore {
+    fn drop(&mut self) {
+        *ZONE_OVERRIDE
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            self.previous.take();
+    }
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+struct ThreadZoneRestore;
+
+#[cfg(any(test, feature = "test-utils"))]
+impl Drop for ThreadZoneRestore {
+    fn drop(&mut self) {
+        let guard = ZONE_GUARD.with(|slot| slot.borrow_mut().take());
+        drop(guard);
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use std::{sync::mpsc, time::Duration};
 
     use super::*;
+
+    #[test]
+    fn fixture_zones_are_resolved_without_system_zone_lookup() {
+        let zones = [
+            crate::temporal::fixtures::fixed_offset_zone(19_800),
+            crate::temporal::fixtures::new_york_zone(),
+            crate::temporal::fixtures::london_zone(),
+            crate::temporal::fixtures::lord_howe_zone(),
+            crate::temporal::fixtures::midnight_gap_zone(),
+        ];
+
+        for zone in zones {
+            ZoneGuard::set_timezone(zone.clone());
+            assert_eq!(local_zone(), Ok(zone));
+        }
+    }
 
     mod lookup {
         use super::*;
@@ -173,17 +260,20 @@ mod tests {
             ZoneGuard::set("Etc/GMT-2");
 
             // Assert
-            assert_eq!(local_zone(), expected);
+            assert_eq!(
+                local_zone().expect("system time zone available"),
+                expected
+            );
         }
 
         #[test]
         fn returns_the_system_zone_without_a_guard() {
             // Arrange
-            let expected =
-                resolve(TimeZone::try_system).unwrap_or(TimeZone::UTC);
+            let expected = resolve(TimeZone::try_system)
+                .expect("system time zone available");
 
             // Act
-            let actual = local_zone();
+            let actual = local_zone().expect("system time zone available");
 
             // Assert
             assert_eq!(actual, expected);
@@ -213,31 +303,88 @@ mod tests {
         #[test]
         fn keeps_the_current_zone_unchanged() {
             // Arrange
-            let expected = local_zone();
+            let expected = local_zone().expect("system time zone available");
 
             // Act
             ZoneGuard::keep();
             ZoneGuard::keep();
 
             // Assert
-            assert_eq!(local_zone(), expected);
+            assert_eq!(
+                local_zone().expect("system time zone available"),
+                expected
+            );
         }
 
         #[test]
         fn restores_the_previous_zone_when_dropped() {
             // Arrange
-            let previous = local_zone();
+            let previous = local_zone().expect("system time zone available");
             let guard = ZoneGuard::install(Some(
                 TimeZone::get("Etc/GMT-2").expect("valid fixture zone"),
             ));
 
             // Act
-            let installed = local_zone();
+            let installed = local_zone().expect("system time zone available");
             drop(guard);
 
             // Assert
             assert_ne!(installed, previous);
-            assert_eq!(local_zone(), previous);
+            assert_eq!(
+                local_zone().expect("system time zone available"),
+                previous
+            );
+        }
+
+        #[test]
+        fn nested_scopes_restore_the_parent_zone_and_outer_zone() {
+            let original = local_zone().expect("system time zone available");
+
+            ZoneGuard::with("Etc/GMT-2", || {
+                let outer =
+                    TimeZone::get("Etc/GMT-2").expect("valid fixture zone");
+                assert_eq!(
+                    local_zone().expect("outer zone is available"),
+                    outer
+                );
+                ZoneGuard::with("UTC", || {
+                    assert_eq!(
+                        local_zone().expect("inner zone is available"),
+                        TimeZone::UTC
+                    );
+                });
+                assert_eq!(
+                    local_zone().expect("outer zone is restored"),
+                    outer
+                );
+            });
+
+            assert_eq!(
+                local_zone().expect("original zone is restored"),
+                original
+            );
+        }
+
+        #[test]
+        #[expect(
+            clippy::disallowed_methods,
+            clippy::panic,
+            reason = "test deliberately unwinds to prove scoped restoration"
+        )]
+        fn scoped_zone_is_restored_during_unwind() {
+            let original = local_zone().expect("system time zone available");
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    ZoneGuard::with("Etc/GMT-2", || {
+                        panic!("exercise unwind restoration")
+                    });
+                }));
+
+            assert!(result.is_err());
+            assert_eq!(
+                local_zone().expect("original zone is restored"),
+                original
+            );
         }
 
         struct ZoneRestoreObserver {
@@ -247,14 +394,17 @@ mod tests {
 
         impl Drop for ZoneRestoreObserver {
             fn drop(&mut self) {
-                let _ = self.sender.send((self.previous.clone(), local_zone()));
+                let _ = self.sender.send((
+                    self.previous.clone(),
+                    local_zone().expect("system time zone available"),
+                ));
             }
         }
 
         #[test]
         fn restores_the_previous_zone_during_unwinding() {
             // Arrange
-            let previous = local_zone();
+            let previous = local_zone().expect("system time zone available");
             let replacement = if previous == TimeZone::UTC {
                 TimeZone::get("Etc/GMT-2").expect("valid fixture zone")
             } else {
@@ -270,7 +420,11 @@ mod tests {
 
                 // The mismatched assertion deliberately unwinds with the guard
                 // live.
-                assert_eq!(local_zone(), previous, "force guard unwinding");
+                assert_eq!(
+                    local_zone().expect("system time zone available"),
+                    previous,
+                    "force guard unwinding"
+                );
             });
 
             // Act
@@ -295,7 +449,10 @@ mod tests {
             ZoneGuard::set("UTC");
 
             // Assert
-            assert_eq!(local_zone(), TimeZone::UTC);
+            assert_eq!(
+                local_zone().expect("guarded zone is available"),
+                TimeZone::UTC
+            );
         }
 
         #[test]
@@ -322,7 +479,7 @@ mod tests {
             started_rx.recv().expect("second thread starts");
 
             assert_eq!(
-                local_zone(),
+                local_zone().expect("active override is available"),
                 TimeZone::UTC,
                 "other threads observe the active override"
             );

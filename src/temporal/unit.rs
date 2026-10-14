@@ -52,10 +52,8 @@ pub(crate) struct UnitSpec {
     pub names: (&'static str, &'static str),
     /// Fixed nominal seconds per unit, the sole unit-ratio table in the crate.
     ///
-    /// Calendar units get nominal fixed ratios here for value identity,
-    /// magnitude ordering, and fractional-remainder application; their
-    /// Stores fixed nominal seconds per unit, the sole unit-ratio table.
-    /// modules.
+    /// Stores the nominal seconds per unit; calendar ratios are used only for
+    /// value identity and ordering, because actual calendar lengths vary.
     pub nominal_seconds: f64,
     /// Stores the exact nominal milliseconds used by integer decomposition.
     pub nominal_milliseconds: u64,

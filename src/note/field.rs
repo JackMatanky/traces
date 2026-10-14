@@ -109,10 +109,9 @@ impl NoteFieldValue {
     pub fn as_date(&self) -> Option<DateValue> {
         match self {
             Self::Date(value) => Some(*value),
-            Self::DateTime(value) => Some(value.local_date()),
-            Self::String(s) => {
-                DatePoint::parse_prefix(s).map(|point| point.value().date())
-            }
+            Self::DateTime(value) => value.local_date().ok(),
+            Self::String(s) => DatePoint::parse_prefix(s)
+                .and_then(|point| point.value().date().ok()),
             _ => None,
         }
     }

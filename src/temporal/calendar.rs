@@ -160,17 +160,6 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
     }
 }
 
-/// Builds a Jiff [`Span`] from nominal seconds, rounding the fractional part to
-/// the nearest nanosecond.
-///
-/// # Errors
-///
-/// - [`CalendarError::OutOfRange`] if the value cannot be represented.
-pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
-    super::duration::span_from_nominal_seconds(part_secs)
-        .map_err(|_| CalendarError::OutOfRange)
-}
-
 /// Shifts a calendar datetime by `n` in the chosen `unit` and returns the
 /// result.
 ///

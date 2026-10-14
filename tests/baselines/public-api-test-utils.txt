@@ -1963,6 +1963,7 @@ pub struct traces_pkm::testing::ZoneGuard
 impl traces_pkm::testing::ZoneGuard
 pub fn traces_pkm::testing::ZoneGuard::keep()
 pub fn traces_pkm::testing::ZoneGuard::set(&str)
+pub fn traces_pkm::testing::ZoneGuard::with<R, F: core::ops::function::FnOnce() -> R>(&str, F) -> R
 impl core::fmt::Debug for traces_pkm::testing::ZoneGuard
 pub fn traces_pkm::testing::ZoneGuard::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::ops::drop::Drop for traces_pkm::testing::ZoneGuard

@@ -22,10 +22,10 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 
 /// Represents a zone-free calendar date with no time of day.
 ///
-/// Carries a validated `YYYY-MM-DD` day on the proleptic Gregorian calendar: no
-/// zone and no clock time. Full dates require zero-padded month and day fields;
-/// `YYYY-MM` input defaults its day to 1. Every accepted input year is exactly
-/// four ASCII digits, and every value names a real day. Deserialization runs
+/// Carries a validated proleptic Gregorian date: no zone and no clock time.
+/// Full dates require zero-padded month and day fields; `YYYY-MM` input
+/// defaults its day to 1. Years use exactly four ASCII digits, with a leading
+/// minus sign for negative years in `-YYYY-MM-DD` form. Deserialization runs
 /// the same parser as [`FromStr`](std::str::FromStr), so inline and
 /// deserialized dates follow one grammar.
 ///
@@ -51,8 +51,8 @@ impl DateValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if the year is outside `0..=9999` or the
-    ///   fields do not name a representable Gregorian date.
+    /// - [`DateError::InvalidValue`] if the year is outside `-9999..=9999` or
+    ///   the fields do not name a representable Gregorian date.
     #[inline]
     pub fn from_ymd(
         year: i32,
@@ -63,7 +63,7 @@ impl DateValue {
             input: format!("{year}-{month}-{day}").into(),
             reason: "a field is out of range",
         };
-        if !(0..=9999).contains(&year) {
+        if !(-9999..=9999).contains(&year) {
             return Err(invalid());
         }
         let year = i16::try_from(year).map_err(|_| invalid())?;
@@ -140,18 +140,17 @@ impl DateValue {
             .map_err(|_| CalendarError::OutOfRange)
     }
 
-    /// Parses an ISO-8601 date string (`YYYY-MM-DD` or `YYYY-MM`) using the
-    /// recognition layer.
+    /// Parses an ISO-8601 date string (`YYYY-MM-DD`, `YYYY-MM`, or a signed
+    /// four-digit year in the same forms) using the recognition layer.
     ///
-    /// Trims surrounding whitespace first, then requires four leading ASCII
-    /// digits before trying each accepted shape in order.
+    /// Trims surrounding whitespace first, then requires a four-digit year,
+    /// optionally prefixed by a minus sign, before trying accepted shapes.
     ///
     /// # Errors
     ///
     /// - [`DateError::YearNotFourDigits`] if the trimmed `s` does not begin
-    ///   with 4 ASCII digits.
-    /// - [`DateError::InvalidValue`] if no accepted shape matches, carrying `s`
-    ///   and the static reason the best-fitting shape rejected it.
+    ///   with four ASCII digits or a minus sign followed by four ASCII digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_with_year(trimmed) {
@@ -179,20 +178,31 @@ pub(crate) enum DateShape {
     YearMonth,
 }
 
-/// Returns whether the first ten bytes are a zero-padded `YYYY-MM-DD` date.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "year length is 4 or 5 bytes"
+)]
 pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
-    s.get(..10).is_some_and(|date| {
+    let year_len = if s.starts_with('-') {
+        5
+    } else {
+        4
+    };
+    let year_start = usize::from(s.starts_with('-'));
+    let month_start = year_len + 1;
+    let day_start = month_start + 3;
+    s.get(..year_len + 6).is_some_and(|date| {
         let bytes = date.as_bytes();
-        bytes.get(4) == Some(&b'-')
-            && bytes.get(7) == Some(&b'-')
+        bytes.get(year_len) == Some(&b'-')
+            && bytes.get(month_start + 2) == Some(&b'-')
             && bytes
-                .get(..4)
+                .get(year_start..year_len)
                 .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
             && bytes
-                .get(5..7)
+                .get(month_start..month_start + 2)
                 .is_some_and(|month| month.iter().all(u8::is_ascii_digit))
             && bytes
-                .get(8..)
+                .get(day_start..day_start + 2)
                 .is_some_and(|day| day.iter().all(u8::is_ascii_digit))
     })
 }
@@ -232,19 +242,29 @@ impl DateShape {
         }
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "year length is 4 or 5 bytes"
+    )]
     fn parse_year_month_day(s: &str) -> Result<civil::Date, &'static str> {
-        if s.len() < 10 && starts_with_year(s) {
+        let year_len = if s.starts_with('-') {
+            5
+        } else {
+            4
+        };
+        let date_len = year_len + 6;
+        if s.len() < date_len && starts_with_year(s) {
             return Err("input is too short");
         }
-        if s.len() > 10 && has_padded_date_prefix(s) {
+        if s.len() > date_len && has_padded_date_prefix(s) {
             return Err("unexpected trailing input");
         }
-        if s.len() != 10 || !has_padded_date_prefix(s) {
+        if s.len() != date_len || !has_padded_date_prefix(s) {
             return Err("invalid input");
         }
-        let year = s.get(..4).ok_or("invalid input")?;
-        let month = s.get(5..7).ok_or("invalid input")?;
-        let day = s.get(8..10).ok_or("invalid input")?;
+        let year = s.get(..year_len).ok_or("invalid input")?;
+        let month = s.get(year_len + 1..year_len + 3).ok_or("invalid input")?;
+        let day = s.get(year_len + 4..year_len + 6).ok_or("invalid input")?;
         civil::Date::new(
             year.parse().map_err(|_| "invalid input")?,
             month.parse().map_err(|_| "invalid input")?,
@@ -253,27 +273,57 @@ impl DateShape {
         .map_err(|_| "a field is out of range")
     }
 
-    /// Parses `"YYYY-MM"`, defaulting the day to 1.
+    /// Parses `YYYY-MM` or `-YYYY-MM`, defaulting the day to 1.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "year length is 4 or 5 bytes"
+    )]
     fn parse_year_month(s: &str) -> Result<civil::Date, &'static str> {
-        let (year_str, month_str) =
-            s.split_once('-').ok_or("not enough input")?;
-        if year_str.len() != 4
-            || month_str.len() != 2
-            || !month_str.bytes().all(|b| b.is_ascii_digit())
-        {
+        let year_len = if s.starts_with('-') {
+            5
+        } else {
+            4
+        };
+        let expected_len = year_len + 3;
+        if s.len() != expected_len {
             return Err("not enough input");
         }
-        let year: i16 = year_str.parse().map_err(|_| "invalid input")?;
+        let year = s.get(..year_len).ok_or("not enough input")?;
+        if s.as_bytes().get(year_len) != Some(&b'-') {
+            return Err("not enough input");
+        }
+        let month_str = s.get(year_len + 1..).ok_or("not enough input")?;
+        if !month_str.bytes().all(|b| b.is_ascii_digit()) {
+            return Err("not enough input");
+        }
+        let year: i16 = year.parse().map_err(|_| "invalid input")?;
         let month: i8 = month_str.parse().map_err(|_| "invalid input")?;
         civil::Date::new(year, month, 1).map_err(|_| "a field is out of range")
     }
 }
 
-/// Renders as the canonical zero-padded `YYYY-MM-DD` string.
+/// Renders as a four-digit year with a leading minus sign for negative years.
 impl fmt::Display for DateValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        let date = self.0;
+        if date.year() < 0 {
+            write!(
+                f,
+                "-{:04}-{:02}-{:02}",
+                date.year().unsigned_abs(),
+                date.month(),
+                date.day()
+            )
+        } else {
+            write!(
+                f,
+                "{:04}-{:02}-{:02}",
+                date.year(),
+                date.month(),
+                date.day()
+            )
+        }
     }
 }
 
@@ -301,7 +351,7 @@ impl TryFrom<SystemTime> for DateValue {
     ///   timestamp range.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
-        Ok(DateTimeValue::try_from(time)?.local_date())
+        DateTimeValue::try_from(time)?.local_date()
     }
 }
 
@@ -352,15 +402,17 @@ mod tests {
 
         #[test]
         fn constructs_dates_from_valid_boundary_fields() {
-            // Arrange: the leap day and the two supported year endpoints.
+            // Arrange: the leap day and the supported year endpoints.
             // Act
             let dates = [
+                DateValue::from_ymd(-9999, 1, 1),
                 DateValue::from_ymd(2024, 2, 29),
                 DateValue::from_ymd(0, 1, 1),
                 DateValue::from_ymd(9999, 12, 31),
             ];
             // Assert
             assert_eq!(dates, [
+                Ok(ymd(-9999, 1, 1)),
                 Ok(ymd(2024, 2, 29)),
                 Ok(ymd(0, 1, 1)),
                 Ok(ymd(9999, 12, 31))
@@ -373,14 +425,14 @@ mod tests {
         #[case::month_thirteen(2026, 13, 1)]
         #[case::day_zero(2026, 1, 0)]
         #[case::day_thirty_two(2026, 1, 32)]
-        #[case::negative_year(-1, 1, 1)]
-        #[case::year_five_digits(10000, 1, 1)]
-        fn rejects_invalid_or_non_four_digit_fields(
+        #[case::year_below_range(-10000, 1, 1)]
+        #[case::year_above_range(10000, 1, 1)]
+        fn rejects_invalid_or_out_of_range_fields(
             #[case] year: i32,
             #[case] month: u32,
             #[case] day: u32,
         ) {
-            // Arrange: the fields are invalid or outside the public grammar.
+            // Arrange: the fields are invalid or outside the supported range.
             // Act
             let result = DateValue::from_ymd(year, month, day);
             // Assert
@@ -452,35 +504,35 @@ mod tests {
         }
 
         #[rstest]
+        #[case::minimum_signed_year("-9999-01-01", (-9999, 1, 1))]
         #[case::year_zero("0000-01-01", (0, 1, 1))]
-        #[case::year_9999("9999-12-31", (9999, 12, 31))]
-        fn accepts_the_extreme_four_digit_years(
+        #[case::maximum_year("9999-12-31", (9999, 12, 31))]
+        fn accepts_year_boundaries(
             #[case] input: &str,
             #[case] (year, month, day): (i32, u32, u32),
         ) {
-            // Arrange: `input` and the expected fields are the case literals.
+            // Arrange: the input and expected date are paired boundary values.
+            // Act
+            let result = input.parse::<DateValue>();
+            // Assert
+            assert_eq!(result, Ok(ymd(year, month, day)));
+            let date = result.expect("boundary date parses");
+            assert_eq!(date.to_string(), input);
+            assert_eq!(input.parse::<DateValue>(), Ok(date));
+        }
+
+        #[test]
+        fn rejects_a_negative_year_without_four_digits() {
+            // Arrange
+            let input = "-001-01-01";
             // Act
             let result = input.parse::<DateValue>();
             // Assert
             assert_eq!(
                 result,
-                Ok(ymd(year, month, day)),
-                "the four-digit rule admits `{input}`"
-            );
-        }
-
-        #[test]
-        fn rejects_negative_years_before_the_four_digit_rule() {
-            // Arrange: `-001` begins with a sign, not four ASCII digits.
-            // Act
-            let result = "-001-01-01".parse::<DateValue>();
-            // Assert
-            assert_eq!(
-                result,
                 Err(DateError::YearNotFourDigits {
-                    input: "-001-01-01".into(),
-                }),
-                "years below `0000` fall outside the four-digit rule"
+                    input: input.into()
+                })
             );
         }
     }

@@ -113,14 +113,23 @@ fn apply_offset(
 ) -> TemplateEngineResult<DatePoint> {
     if let Some(n) = offset_val.as_i64() {
         return date_point
-            .shift(n, TimeUnit::Day)
+            .shift(
+                n,
+                TimeUnit::Day,
+                &crate::temporal::local_zone().map_err(render_date_error)?,
+            )
             .map_err(render_calendar_error);
     }
     if let Some(s) = offset_val.as_str() {
         let duration = DurationValue::parse(s).map_err(|source| {
             invalid_operation(format!("invalid duration offset {s:?}"), source)
         })?;
-        return date_point.apply(&duration).map_err(render_calendar_error);
+        return date_point
+            .apply(
+                &duration,
+                &crate::temporal::local_zone().map_err(render_date_error)?,
+            )
+            .map_err(render_calendar_error);
     }
     Err(Error::new(
         ErrorKind::InvalidOperation,
@@ -146,35 +155,50 @@ enum Anchor {
 
 impl Anchor {
     /// The date point a shorthand starts from when no reference is given.
-    fn base(self) -> DatePoint {
+    fn base(self) -> Result<DatePoint, CalendarError> {
         let now = DatePoint::from(DateTimeValue::from_timestamp(
             jiff::Timestamp::now(),
         ));
         match self {
-            Self::Now => now,
+            Self::Now => Ok(now),
             Self::Today
             | Self::Tomorrow
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => DatePoint::from(now.date()),
+            | Self::Weekday(_) => Ok(DatePoint::from(now.date()?)),
         }
     }
 
-    /// Moves `date_point` as this anchor requires.
+    /// Moves the date point as this anchor requires.
     fn transform(
         self,
         date_point: DatePoint,
-    ) -> Result<DatePoint, CalendarError> {
+    ) -> TemplateEngineResult<DatePoint> {
         match self {
             Self::Now | Self::Today => Ok(date_point),
-            Self::Tomorrow => date_point.shift(1, TimeUnit::Day),
-            Self::Yesterday => date_point.shift(-1, TimeUnit::Day),
-            Self::StartOf(calendar_period) => {
-                date_point.start_of(calendar_period)
+            anchor => {
+                let zone =
+                    crate::temporal::local_zone().map_err(render_date_error)?;
+                match anchor {
+                    Self::Now | Self::Today => Ok(date_point),
+                    Self::Tomorrow => date_point
+                        .shift(1, TimeUnit::Day, &zone)
+                        .map_err(render_calendar_error),
+                    Self::Yesterday => date_point
+                        .shift(-1, TimeUnit::Day, &zone)
+                        .map_err(render_calendar_error),
+                    Self::StartOf(calendar_period) => date_point
+                        .start_of(calendar_period, &zone)
+                        .map_err(render_calendar_error),
+                    Self::EndOf(calendar_period) => date_point
+                        .end_of(calendar_period, &zone)
+                        .map_err(render_calendar_error),
+                    Self::Weekday(target) => date_point
+                        .with_weekday(target, &zone)
+                        .map_err(render_calendar_error),
+                }
             }
-            Self::EndOf(calendar_period) => date_point.end_of(calendar_period),
-            Self::Weekday(target) => date_point.with_weekday(target),
         }
     }
 
@@ -217,18 +241,21 @@ impl Anchor {
                 parse_date_point(ref_text)?
             }
         } else {
-            self.base()
+            self.base().map_err(render_calendar_error)?
         };
-        date_point =
-            self.transform(date_point).map_err(render_calendar_error)?;
+        date_point = self.transform(date_point)?;
 
         if let Some(off_val) = offset {
             date_point = apply_offset(date_point, &off_val)?;
         }
 
-        let local_datetime = date_point.local_datetime_or_utc();
+        let zone = crate::temporal::local_zone().map_err(render_date_error)?;
+        let local_datetime = date_point.local_datetime_in(&zone);
         let pat = pattern_to_strftime(format, local_datetime)?;
-        format_strtime(local_datetime, &pat, format)
+        let zoned = date_point
+            .zoned_datetime_in(&zone)
+            .map_err(render_calendar_error)?;
+        format_strtime(&zoned, &pat, format)
     }
 }
 
@@ -314,9 +341,12 @@ impl Object for DateNamespace {
                                 format!("timestamp {unix_ts} is out of range"),
                             )
                         })?;
-                    let local = DateTimeValue::from_timestamp(timestamp)
-                        .local_datetime();
-                    format_strtime(local, format, format)
+                    let zone = crate::temporal::local_zone()
+                        .map_err(render_date_error)?;
+                    let zoned = DateTimeValue::from_timestamp(timestamp)
+                        .utc()
+                        .to_zoned(zone);
+                    format_strtime(&zoned, format, format)
                 },
             )),
             _ => None,
@@ -375,9 +405,9 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
         .ok_or_else(|| unknown_unit_error(unit_str))
 }
 
-/// Formats a civil date-time with Jiff's strict strftime implementation.
+/// Formats a zoned date-time with Jiff's strict strftime implementation.
 fn format_strtime(
-    datetime: jiff::civil::DateTime,
+    datetime: &jiff::Zoned,
     strftime: &str,
     source_pattern: &str,
 ) -> TemplateEngineResult<String> {
@@ -397,7 +427,9 @@ fn format_strtime(
 ///
 /// Returns an invalid-operation error when `s` is not parseable.
 fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
-    parse_date_point(s).map(DatePoint::local_datetime_or_utc)
+    let point = parse_date_point(s)?;
+    let zone = crate::temporal::local_zone().map_err(render_date_error)?;
+    Ok(point.local_datetime_in(&zone))
 }
 
 /// `{{ value | date_format(format_string) }}` formats a piped date/time string
@@ -405,21 +437,24 @@ fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
 /// moment-dialect tokens (`YYYY MM DD HH mm ss`, `Do`/`S`,
 /// `dddd`/`ddd`/`MMM`/`MMMM`, bracket literals like `[Daily]`).
 ///
-/// Jiff [`fmt::strtime`] formats the date-time as a civil value without a
-/// time zone, so directives that require an offset or zone name fail. Leap
-/// seconds are not representable. Week numbers use ISO `%V`/`%G`, never `%U`
-/// or `%W`.
+/// Jiff [`fmt::strtime`] formats a zoned date-time, so `%Z` reflects the
+/// resolved local zone even on either side of a DST fold. Leap seconds are
+/// not representable. Week numbers use ISO `%V`/`%G`, never `%U` or `%W`.
 ///
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_local_datetime`].
+///   string or the local zone cannot be resolved; see [`parse_date_point`].
 /// - [`ErrorKind::InvalidOperation`] if `pattern` is an invalid strftime
 ///   pattern or contains an unsupported moment token.
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
-    let datetime = parse_local_datetime(value)?;
+    let point = parse_date_point(value)?;
+    let zone = crate::temporal::local_zone().map_err(render_date_error)?;
+    let datetime = point.local_datetime_in(&zone);
     let translated = pattern_to_strftime(pattern, datetime)?;
-    format_strtime(datetime, &translated, pattern)
+    let zoned =
+        point.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
+    format_strtime(&zoned, &translated, pattern)
 }
 
 /// Translates `pattern` to a strftime pattern.
@@ -627,14 +662,18 @@ fn render_period_edge(
     period_edge: PeriodEdge,
 ) -> TemplateEngineResult<String> {
     let date_point = parse_date_point(value)?;
+    let zone = crate::temporal::local_zone().map_err(render_date_error)?;
     let shifted = match period_edge {
-        PeriodEdge::Start => date_point.start_of(calendar_period),
-        PeriodEdge::End => date_point.end_of(calendar_period),
+        PeriodEdge::Start => date_point.start_of(calendar_period, &zone),
+        PeriodEdge::End => date_point.end_of(calendar_period, &zone),
     }
     .map_err(render_calendar_error)?;
-    let local_datetime = shifted.local_datetime_or_utc();
     let pat = shifted.canonical_pattern();
-    format_strtime(local_datetime, pat, pat)
+    format_strtime(
+        &shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?,
+        pat,
+        pat,
+    )
 }
 
 /// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
@@ -720,12 +759,18 @@ fn shift_by_unit(
     n: i64,
     unit: TimeUnit,
 ) -> TemplateEngineResult<String> {
+    let zone = crate::temporal::local_zone().map_err(render_date_error)?;
     let shifted_date_point = parse_date_point(value)?
-        .shift(n, unit)
+        .shift(n, unit, &zone)
         .map_err(render_calendar_error)?;
-    let local_datetime = shifted_date_point.local_datetime_or_utc();
     let pat = shifted_date_point.canonical_pattern();
-    format_strtime(local_datetime, pat, pat)
+    format_strtime(
+        &shifted_date_point
+            .zoned_datetime_in(&zone)
+            .map_err(render_calendar_error)?,
+        pat,
+        pat,
+    )
 }
 
 /// `{{ value | add_days(n) }}` is a convenience shortcut for
@@ -815,18 +860,21 @@ fn weekday(
     kwargs: Kwargs,
 ) -> TemplateEngineResult<Value> {
     let date_point = parse_date_point(value)?;
+    let zone = crate::temporal::local_zone().map_err(render_date_error)?;
     if let Some(target_num) = n {
         let format = format_kwarg(&kwargs)?;
         let target_weekday = weekday_or_error(target_num)?;
         let shifted = date_point
-            .with_weekday(target_weekday)
+            .with_weekday(target_weekday, &zone)
             .map_err(render_calendar_error)?;
-        let local_datetime = shifted.local_datetime_or_utc();
+        let local_datetime = shifted.local_datetime_in(&zone);
         let pat = pattern_to_strftime(format, local_datetime)?;
-        Ok(Value::from(format_strtime(local_datetime, &pat, format)?))
+        let zoned =
+            shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
+        Ok(Value::from(format_strtime(&zoned, &pat, format)?))
     } else {
         kwargs.assert_all_used()?;
-        Ok(Value::from(date_point.component(DateComponent::Weekday)))
+        Ok(Value::from(date_point.component(DateComponent::Weekday, &zone)))
     }
 }
 
@@ -863,7 +911,13 @@ fn date_diff(
     let from = parse_date_point(value)?;
     let to = parse_date_point(other)?;
 
-    let diff = from.diff(to, unit).map_err(render_calendar_error)?;
+    let diff = from
+        .diff(
+            to,
+            unit,
+            &crate::temporal::local_zone().map_err(render_date_error)?,
+        )
+        .map_err(render_calendar_error)?;
     Ok(match diff {
         DateDiff::Whole(n) => Value::from(n),
         DateDiff::Fractional(f) => Value::from(f),
@@ -1091,13 +1145,13 @@ mod tests {
             );
         }
 
-        /// Regression: invalid format specifiers such as %Q must surface as a
+        /// Regression: invalid format specifiers such as %J must surface as a
         /// normal render error rather than panic during formatting.
         #[test]
         fn now_returns_an_error_instead_of_panicking_on_an_invalid_format() {
             let error = env()
                 .render_str(
-                    r#"{{ date.now(format="%Q") }}"#,
+                    r#"{{ date.now(format="%J") }}"#,
                     minijinja::context!(),
                 )
                 .expect_err("invalid format specifier fails cleanly");
@@ -1196,7 +1250,7 @@ mod tests {
         ) {
             let error = env()
                 .render_str(
-                    &format!(r#"{{{{ date.{function}(format="%Q") }}}}"#),
+                    &format!(r#"{{{{ date.{function}(format="%J") }}}}"#),
                     minijinja::context!(),
                 )
                 .expect_err("invalid format specifier fails cleanly");
@@ -1333,6 +1387,28 @@ mod tests {
         }
 
         #[test]
+        fn formats_fall_back_fold_abbreviations_from_the_resolved_zone() {
+            ZoneGuard::set("America/New_York");
+
+            let env = env();
+            let daylight = env
+                .render_str(
+                    r#"{{ value | date_format("%Y-%m-%d %H:%M %Z") }}"#,
+                    minijinja::context! { value => "2026-11-01T05:30:00Z" },
+                )
+                .expect("daylight occurrence renders");
+            let standard = env
+                .render_str(
+                    r#"{{ value | date_format("%Y-%m-%d %H:%M %Z") }}"#,
+                    minijinja::context! { value => "2026-11-01T06:30:00Z" },
+                )
+                .expect("standard occurrence renders");
+
+            assert_eq!(daylight, "2026-11-01 01:30 EDT");
+            assert_eq!(standard, "2026-11-01 01:30 EST");
+        }
+
+        #[test]
         fn renders_an_explicit_offset_input_in_the_local_clock_time() {
             ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
@@ -1431,7 +1507,7 @@ mod tests {
         fn rejects_an_invalid_format_specifier_instead_of_panicking() {
             let error = env()
                 .render_str(
-                    r#"{{ "2026-07-23" | date_format("%Q") }}"#,
+                    r#"{{ "2026-07-23" | date_format("%J") }}"#,
                     minijinja::context!(),
                 )
                 .expect_err("invalid format specifier fails cleanly");
@@ -1648,7 +1724,7 @@ mod tests {
 
         #[test]
         fn resolves_a_spring_forward_gap_input_instead_of_failing() {
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
 
             // 02:30 does not exist on 2026-03-08; the adopted 'compatible'
             // policy shifts it forward by the gap to 03:30 EDT (07:30Z).
@@ -2121,7 +2197,7 @@ mod tests {
         #[test]
         fn a_day_unit_preserves_the_clock_time_across_a_dst_gap_while_hours_do_not()
          {
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
 
             let rendered = env()
                 .render_str(

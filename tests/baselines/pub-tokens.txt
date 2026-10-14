@@ -1357,7 +1357,6 @@ src/temporal/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/temporal/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/temporal/calendar.rs: pub(super) fn shift_date(
 src/temporal/calendar.rs: pub(super) fn shift_datetime(
-src/temporal/calendar.rs: pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
 src/temporal/date.rs: pub fn from_ymd(
 src/temporal/date.rs: pub struct DateValue(civil::Date);
 src/temporal/date.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
@@ -1383,10 +1382,10 @@ src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str 
 src/temporal/datetime.rs: pub(crate) fn checked_add_span(
 src/temporal/datetime.rs: pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
 src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
-src/temporal/datetime.rs: pub(crate) fn local_date(self) -> DateValue {
-src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> civil::DateTime {
+src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, DateError> {
+src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Result<civil::DateTime, DateError> {
 src/temporal/datetime.rs: pub(crate) fn local_datetime_in(self, zone: &TimeZone) -> civil::DateTime {
-src/temporal/datetime.rs: pub(crate) fn local_datetime_or_utc(self) -> civil::DateTime {
+src/temporal/datetime.rs: pub(crate) fn local_datetime_or_utc(
 src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
 src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub(crate) fn shift(
@@ -1398,8 +1397,6 @@ src/temporal/duration.rs: pub fn checked_neg(self) -> Result<Self, DurationError
 src/temporal/duration.rs: pub fn checked_sub(self, rhs: Self) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub struct DurationValue {
 src/temporal/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
-src/temporal/duration.rs: pub(crate) const fn magnitude(self) -> f64 {
-src/temporal/duration.rs: pub(crate) const fn unit(self) -> TimeUnit {
 src/temporal/duration.rs: pub(crate) fn as_str(&self) -> &str {
 src/temporal/duration.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
 src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(
@@ -1416,37 +1413,46 @@ src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
 src/temporal/error.rs: pub(crate) enum CalendarError {
 src/temporal/error.rs: pub(crate) fn into_date_error(self, input: &str) -> DateError {
-src/temporal/fixtures.rs: pub(super) fn fixed_datetime() -> DateTimeValue {
-src/temporal/fixtures.rs: pub(super) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
+src/temporal/fixtures.rs: pub(crate) fn fixed_datetime() -> DateTimeValue {
+src/temporal/fixtures.rs: pub(crate) fn fixed_offset_zone(seconds: i32) -> TimeZone {
+src/temporal/fixtures.rs: pub(crate) fn london_zone() -> TimeZone {
+src/temporal/fixtures.rs: pub(crate) fn lord_howe_zone() -> TimeZone {
+src/temporal/fixtures.rs: pub(crate) fn midnight_gap_zone() -> TimeZone {
+src/temporal/fixtures.rs: pub(crate) fn new_york_zone() -> TimeZone {
+src/temporal/fixtures.rs: pub(crate) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
 src/temporal/mod.rs: pub use date::DateValue;
 src/temporal/mod.rs: pub use datetime::DateTimeValue;
 src/temporal/mod.rs: pub use duration::DurationValue;
 src/temporal/mod.rs: pub use error::{DateError, DurationError};
 src/temporal/mod.rs: pub use zone::ZoneGuard;
+src/temporal/mod.rs: pub(crate) mod fixtures;
 src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;
-src/temporal/mod.rs: pub(crate) use duration::{DurationComponent, DurationSeconds};
+src/temporal/mod.rs: pub(crate) use duration::DurationSeconds;
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use point::DatePoint;
 src/temporal/mod.rs: pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
+src/temporal/mod.rs: pub(crate) use zone::local_zone;
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
 src/temporal/point.rs: pub(crate) enum DatePoint {
 src/temporal/point.rs: pub(crate) enum DatePrecision {
 src/temporal/point.rs: pub(crate) fn apply(
 src/temporal/point.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
-src/temporal/point.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
-src/temporal/point.rs: pub(crate) fn date(self) -> DateValue {
+src/temporal/point.rs: pub(crate) fn component(
+src/temporal/point.rs: pub(crate) fn date(self) -> Result<DateValue, CalendarError> {
+src/temporal/point.rs: pub(crate) fn date_in(self, zone: &TimeZone) -> DateValue {
 src/temporal/point.rs: pub(crate) fn diff(
 src/temporal/point.rs: pub(crate) fn end_of(
 src/temporal/point.rs: pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
-src/temporal/point.rs: pub(crate) fn local_datetime_or_utc(self) -> jiff::civil::DateTime {
+src/temporal/point.rs: pub(crate) fn local_datetime_in(
 src/temporal/point.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
 src/temporal/point.rs: pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
 src/temporal/point.rs: pub(crate) fn parse_with_pattern(
 src/temporal/point.rs: pub(crate) fn shift(
 src/temporal/point.rs: pub(crate) fn start_of(
 src/temporal/point.rs: pub(crate) fn with_weekday(
+src/temporal/point.rs: pub(crate) fn zoned_datetime_in(
 src/temporal/point.rs: pub(super) fn starts_with_year(s: &str) -> bool {
 src/temporal/unit.rs: pub aliases: &'static [&'static str],
 src/temporal/unit.rs: pub calendar: bool,
@@ -1473,6 +1479,8 @@ src/temporal/unit.rs: pub(crate) struct DecomposedPart {
 src/temporal/unit.rs: pub(crate) struct UnitSpec {
 src/temporal/zone.rs: pub fn keep() {
 src/temporal/zone.rs: pub fn set(zone: &str) {
+src/temporal/zone.rs: pub fn with<R, F: FnOnce() -> R>(zone: &str, action: F) -> R {
 src/temporal/zone.rs: pub struct ZoneGuard {
-src/temporal/zone.rs: pub(crate) fn local_zone() -> TimeZone {
+src/temporal/zone.rs: pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
+src/temporal/zone.rs: pub(crate) fn set_timezone(zone: TimeZone) {
 src/yaml.rs: pub(crate) fn parse(text: &str) -> Result<noyalib::Value, noyalib::Error> {

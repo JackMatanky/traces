@@ -263,6 +263,7 @@ impl DurationValue {
     ///   value applies on the local clock.
     /// - [`Some`] with only exact units, or [`None`] (synthesized from a
     ///   magnitude): the value applies as exact elapsed time.
+    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
@@ -789,22 +790,6 @@ pub(crate) struct DurationComponent {
     magnitude: f64,
     /// Stores the unit associated with this magnitude.
     unit: TimeUnit,
-}
-
-impl DurationComponent {
-    /// Returns the signed magnitude.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn magnitude(self) -> f64 {
-        self.magnitude
-    }
-
-    /// Returns the unit of the magnitude.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn unit(self) -> TimeUnit {
-        self.unit
-    }
 }
 
 #[expect(

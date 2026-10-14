@@ -8,35 +8,33 @@
 //!
 //! # Clock doctrine
 //!
-//! Unzoned Date-Time input resolves in the process-local zone and is stored as
+//! Naive Date-Time input resolves in the process-local zone and is stored as
 //! UTC; explicit-offset input is normalized to UTC. A Date remains zone-free.
-//! Date-Time display uses the local clock, except at the representable range
-//! edge where the local offset cannot apply and the UTC clock is used instead.
-//! Repeated local times resolve to the earlier occurrence; skipped local times
-//! shift forward by the gap length.
+//! Date-Time display uses the local clock. Repeated local times resolve to the
+//! earlier occurrence; skipped local times shift forward by the gap length.
 //!
-//! # Calendar regime
+//! # Calendar arithmetic
 //!
-//! Calendar units (day, week, month, and year) apply left-to-right on the local
-//! clock. Exact units (hour and smaller) apply as elapsed time. Equal Durations
-//! such as `1d` and `24h` can therefore move a Date-Time differently across
-//! calendar boundaries and daylight-saving transitions.
+//! A duration is applied in one Jiff calendar operation, independent of the
+//! order in which its units were written. Calendar units use the local clock;
+//! exact units measure elapsed time. Calendar-day differences count local
+//! calendar boundaries, while hour and smaller differences measure elapsed
+//! time.
 //!
-//! # Key Types
+//! # Key types
 //!
-//! - [`DateValue`]: Represents a zone-free calendar date with written
-//!   precision.
-//! - [`DateTimeValue`]: Stores a UTC Date-Time and renders it as the local
-//!   clock.
-//! - [`DurationValue`]: Represents a validated duration with nominal identity
-//!   and a calendar or exact application regime.
+//! - [`DateValue`]: A zone-free calendar date.
+//! - [`DateTimeValue`]: Stores a UTC timestamp and renders it as local civil
+//!   time.
+//! - [`DurationValue`]: A validated duration with nominal identity and
+//!   calendar-aware application.
 mod calendar;
 mod date;
 mod datetime;
 mod duration;
 mod error;
 #[cfg(test)]
-mod fixtures;
+pub(crate) mod fixtures;
 mod point;
 mod unit;
 mod zone;
@@ -48,11 +46,12 @@ pub(crate) use date::DATE_PATTERN;
 pub use date::DateValue;
 pub(crate) use datetime::DATETIME_PATTERN;
 pub use datetime::DateTimeValue;
+pub(crate) use duration::DurationSeconds;
 pub use duration::DurationValue;
-pub(crate) use duration::{DurationComponent, DurationSeconds};
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
 pub(crate) use point::DatePoint;
 pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
 #[cfg(any(test, feature = "test-utils"))]
 pub use zone::ZoneGuard;
+pub(crate) use zone::local_zone;

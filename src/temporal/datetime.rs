@@ -111,10 +111,13 @@ impl DateTimeValue {
     }
 
     /// Returns the local clock-time rendering of this date-time.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
     #[inline]
-    #[must_use]
-    pub(crate) fn local_datetime(self) -> civil::DateTime {
-        self.local_datetime_in(&local_zone())
+    pub(crate) fn local_datetime(self) -> Result<civil::DateTime, DateError> {
+        Ok(self.local_datetime_in(&local_zone()?))
     }
 
     /// Converts the UTC value to local civil time using the supplied zone.
@@ -125,17 +128,26 @@ impl DateTimeValue {
     }
 
     /// Returns the local clock time of this date-time.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
     #[inline]
-    #[must_use]
-    pub(crate) fn local_datetime_or_utc(self) -> civil::DateTime {
+    pub(crate) fn local_datetime_or_utc(
+        self,
+    ) -> Result<civil::DateTime, DateError> {
         self.local_datetime()
     }
 
     /// Returns the local calendar date of this date-time, discarding
     /// time-of-day.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
     #[inline]
-    pub(crate) fn local_date(self) -> DateValue {
-        self.local_datetime_or_utc().date().into()
+    pub(crate) fn local_date(self) -> Result<DateValue, DateError> {
+        Ok(self.local_datetime_or_utc()?.date().into())
     }
 
     /// Returns true if this date-time is exactly local-zone midnight on date.
@@ -177,32 +189,32 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::Zone`] if Jiff cannot resolve the local time within
-    ///   the supported Date-Time range.
+    /// - [`CalendarError::Zone`] if process-local time-zone discovery fails.
+    /// - [`CalendarError::OutOfRange`] if the resolved local time falls outside
+    ///   Jiff's supported timestamp range.
     pub(super) fn from_local(
         local_datetime: civil::DateTime,
     ) -> Result<Self, CalendarError> {
-        Self::from_local_in(local_datetime, &local_zone())
+        let zone = local_zone().map_err(|error| CalendarError::Zone {
+            input: error.to_string().into(),
+        })?;
+        Self::from_local_in(local_datetime, &zone)
     }
 
     /// Resolves a naive local clock time in the explicitly supplied zone.
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::Zone`] if Jiff cannot resolve the local time within
-    ///   the supported Date-Time range.
+    /// - [`CalendarError::OutOfRange`] if the supplied zone shifts the local
+    ///   time outside Jiff's supported timestamp range.
     pub(super) fn from_local_in(
         local_datetime: civil::DateTime,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
-        let zone_lookup = || CalendarError::Zone {
-            input: local_datetime.to_string().into(),
-        };
-        let timestamp = local_datetime
+        local_datetime
             .to_zoned(zone.clone())
-            .map_err(|_| zone_lookup())?
-            .timestamp();
-        Ok(Self(timestamp))
+            .map(|zoned| Self(zoned.timestamp()))
+            .map_err(|_| CalendarError::OutOfRange)
     }
 
     /// Shifts calendar units in the local datetime frame and clock units in
@@ -212,16 +224,18 @@ impl DateTimeValue {
     ///
     /// - [`CalendarError::OutOfRange`] if the shift overflows or its local
     ///   date-time lies outside the supported range.
-    /// - [`CalendarError::Zone`] if the shifted local datetime cannot be
-    ///   resolved to a stored date-time.
     pub(crate) fn shift(
         self,
         n: i64,
         unit: TimeUnit,
+        zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         if unit.is_calendar() {
-            let local_datetime = self.local_datetime();
-            return Self::from_local(shift_datetime(local_datetime, n, unit)?);
+            let local_datetime = self.local_datetime_in(zone);
+            return Self::from_local_in(
+                shift_datetime(local_datetime, n, unit)?,
+                zone,
+            );
         }
         let span = match unit {
             TimeUnit::Millisecond => Span::new().try_milliseconds(n),
@@ -236,10 +250,10 @@ impl DateTimeValue {
             }
         }
         .map_err(|_| CalendarError::OutOfRange)?;
-        self.checked_add_span(span)
+        self.checked_add_span(span, zone)
     }
 
-    /// Adds an exact Jiff span to this Date-Time.
+    /// Adds a Jiff span to this Date-Time in the supplied time zone.
     ///
     /// # Errors
     ///
@@ -248,10 +262,12 @@ impl DateTimeValue {
     pub(crate) fn checked_add_span(
         self,
         span: Span,
+        zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         self.0
+            .to_zoned(zone.clone())
             .checked_add(span)
-            .map(Self)
+            .map(|zoned| Self(zoned.timestamp()))
             .map_err(|_| CalendarError::OutOfRange)
     }
 
@@ -304,11 +320,10 @@ impl DateTimeValue {
 impl fmt::Display for DateTimeValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rendered = jiff::fmt::strtime::format(
-            self.canonical_pattern(),
-            self.local_datetime_or_utc(),
-        )
-        .map_err(|_| fmt::Error)?;
+        let local = self.local_datetime().map_err(|_| fmt::Error)?;
+        let rendered =
+            jiff::fmt::strtime::format(self.canonical_pattern(), local)
+                .map_err(|_| fmt::Error)?;
         f.write_str(&rendered)
     }
 }
@@ -320,8 +335,8 @@ impl TryFrom<SystemTime> for DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if `time` lies outside Jiff’s
-    ///   representable timestamp range.
+    /// - [`DateError::InvalidValue`] if time lies outside Jiff's representable
+    ///   timestamp range.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
         Timestamp::try_from(time).map(Self).map_err(|_| {
@@ -336,22 +351,19 @@ impl TryFrom<SystemTime> for DateTimeValue {
 impl TryFrom<DateValue> for DateTimeValue {
     type Error = DateError;
 
-    /// Converts a calendar date to local midnight, falling back to UTC if the
-    /// local zone cannot represent that time.
+    /// Converts a calendar date to local midnight.
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if neither zone can represent the date’s
-    ///   midnight as a Date-Time.
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
+    /// - [`DateError::InvalidValue`] if midnight is outside the supported
+    ///   range.
     #[inline]
     fn try_from(date: DateValue) -> Result<Self, Self::Error> {
         let midnight = date.civil_date().at(0, 0, 0, 0);
-        Self::from_local(midnight)
-            .or_else(|_| Self::from_local_in(midnight, &TimeZone::UTC))
-            .map_err(|_| DateError::InvalidValue {
-                input: midnight.to_string().into(),
-                reason: "date/time is outside the representable range",
-            })
+        let zone = local_zone()?;
+        Self::from_local_in(midnight, &zone)
+            .map_err(|error| error.into_date_error(&midnight.to_string()))
     }
 }
 
@@ -682,7 +694,7 @@ mod tests {
         #[test]
         fn resolves_an_ambiguous_fall_back_time_to_the_earlier_occurrence() {
             // Arrange: 01:30 happens twice on this fall-back day.
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
 
             // Act
             let parsed = DateTimeValue::parse_iso("2026-11-01 01:30:00");
@@ -699,7 +711,7 @@ mod tests {
         #[test]
         fn shifts_a_spring_forward_gap_forward_by_the_gap() {
             // Arrange: 02:30 does not exist on this spring-forward day.
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
 
             // Act
             let parsed = DateTimeValue::parse_iso("2026-03-08 02:30:00");
@@ -720,7 +732,7 @@ mod tests {
         #[test]
         fn resolves_local_times_adjacent_to_a_gap_without_error() {
             // Arrange: one second before the gap, and at the gap's end.
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
 
             // Act
             let before = DateTimeValue::parse_iso("2026-03-08 01:59:59");
@@ -744,7 +756,7 @@ mod tests {
         #[test]
         fn resolves_the_london_fold_to_the_earlier_occurrence() {
             // Arrange: one zone per test; London falls back on 2026-10-25.
-            ZoneGuard::set("Europe/London");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::london_zone());
             let earlier = DateTimeValue::parse_iso("2026-10-25T01:30:00+01:00")
                 .expect("an explicit offset must parse");
             let later = DateTimeValue::parse_iso("2026-10-25T01:30:00+00:00")
@@ -769,7 +781,7 @@ mod tests {
         #[test]
         fn resolves_the_lord_howe_half_hour_fold_to_the_earlier_occurrence() {
             // Arrange: Lord Howe shifts by 30 minutes, folding 2026-04-05.
-            ZoneGuard::set("Australia/Lord_Howe");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::lord_howe_zone());
             let earlier = DateTimeValue::parse_iso("2026-04-05T01:45:00+11:00")
                 .expect("an explicit offset must parse");
             let later = DateTimeValue::parse_iso("2026-04-05T01:45:00+10:30")
@@ -794,7 +806,7 @@ mod tests {
         #[test]
         fn shifts_the_lord_howe_half_hour_gap_forward_by_the_gap() {
             // Arrange: the 2026-10-04 gap skips 02:00 to 02:30.
-            ZoneGuard::set("Australia/Lord_Howe");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::lord_howe_zone());
             let shifted = DateTimeValue::parse_iso("2026-10-04T02:45:00+11:00")
                 .expect("an explicit offset must parse");
 
@@ -810,8 +822,8 @@ mod tests {
         }
 
         #[test]
-        fn reports_local_zone_lookup_when_the_extreme_local_datetime_cannot_resolve()
-         {
+        fn reports_out_of_range_when_the_extreme_local_datetime_cannot_resolve()
+        {
             // Arrange: UTC+14 pushes the range edge out of range.
             ZoneGuard::set("Etc/GMT-14");
 
@@ -819,7 +831,7 @@ mod tests {
             let result = DateTimeValue::from_local(civil::DateTime::MIN);
 
             // Assert
-            assert!(matches!(result, Err(CalendarError::Zone { .. })));
+            assert_eq!(result, Err(CalendarError::OutOfRange));
         }
         #[test]
         fn resolves_the_sydney_southern_dst_fold_to_the_earlier_occurrence() {
@@ -837,13 +849,15 @@ mod tests {
         }
 
         #[test]
-        fn shifts_santiago_midnight_gap_forward_by_the_gap() {
-            // Arrange: Chile advances from 23:59 to 01:00 on this date.
-            ZoneGuard::set("America/Santiago");
-            let shifted = DateTimeValue::parse_iso("2019-09-08T04:30:00Z")
+        fn shifts_a_midnight_gap_forward_by_the_gap() {
+            // Arrange: the fixture advances from 23:59 to 01:00 on this date.
+            ZoneGuard::set_timezone(
+                crate::temporal::fixtures::midnight_gap_zone(),
+            );
+            let shifted = DateTimeValue::parse_iso("2026-03-08T00:30:00Z")
                 .expect("explicit shifted instant is valid");
             // Act
-            let resolved = DateTimeValue::parse_iso("2019-09-08T00:30:00");
+            let resolved = DateTimeValue::parse_iso("2026-03-08T00:30:00");
             // Assert
             assert_eq!(resolved, Ok(shifted));
         }
@@ -1190,7 +1204,10 @@ mod tests {
                     .expect("the fixture and millisecond shift fit"),
             );
             assert_eq!(
-                with_nanos.local_datetime().subsec_nanosecond(),
+                with_nanos
+                    .local_datetime()
+                    .expect("system zone available")
+                    .subsec_nanosecond(),
                 123_000_000
             );
 
@@ -1208,7 +1225,7 @@ mod tests {
         #[test]
         fn renders_the_fold_hour_that_re_parses_to_the_earlier_occurrence() {
             // Arrange: the second occurrence of the folded 01:30 clock time.
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
             let later = DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
                 .expect("explicit-offset fixture parses");
 
@@ -1482,10 +1499,13 @@ mod tests {
 
         #[test]
         fn advances_a_promoted_midnight_across_a_zone_gap() {
-            // Arrange: local midnight falls inside this spring-forward gap.
-            ZoneGuard::set("America/Santiago");
-            let date = ymd(2026, 9, 6);
-            let expected = DateTimeValue::parse_iso("2026-09-06T04:00:00Z")
+            // Arrange: local midnight falls inside the fixture's spring-forward
+            // gap.
+            ZoneGuard::set_timezone(
+                crate::temporal::fixtures::midnight_gap_zone(),
+            );
+            let date = ymd(2026, 3, 8);
+            let expected = DateTimeValue::parse_iso("2026-03-08T00:00:00Z")
                 .expect("valid expected date-time");
 
             // Act
@@ -1497,7 +1517,7 @@ mod tests {
                     promoted,
                     Ok(value)
                         if value == expected
-                            && value.to_string() == "2026-09-06T01:00:00"
+                            && value.to_string() == "2026-03-08T01:00:00"
                 ),
                 "midnight inside a DST gap advances by the gap length"
             );
@@ -1556,7 +1576,11 @@ mod tests {
                 .expect("explicit-offset fixture parses");
 
             // Act
-            let shifted = base.shift(1, TimeUnit::Hour);
+            let shifted = base.shift(
+                1,
+                TimeUnit::Hour,
+                &local_zone().expect("system time zone available"),
+            );
 
             // Assert
             assert_eq!(
@@ -1570,14 +1594,18 @@ mod tests {
         fn re_resolves_a_fold_hour_to_the_earlier_occurrence_on_a_zero_day_shift()
          {
             // Arrange: the second occurrence of the folded 01:30 clock time.
-            ZoneGuard::set("America/New_York");
+            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
             let second_occurrence =
                 DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
                     .expect("explicit-offset fixture parses");
 
             // Act
             // Calendar shifts re-resolve the local clock time.
-            let shifted = second_occurrence.shift(0, TimeUnit::Day);
+            let shifted = second_occurrence.shift(
+                0,
+                TimeUnit::Day,
+                &local_zone().expect("system time zone available"),
+            );
 
             // Assert
             assert_eq!(
@@ -1597,7 +1625,11 @@ mod tests {
                 .expect("explicit-offset fixture parses");
 
             // Act
-            let shifted = base.shift(0, TimeUnit::Day);
+            let shifted = base.shift(
+                0,
+                TimeUnit::Day,
+                &local_zone().expect("system time zone available"),
+            );
 
             // Assert
             assert_eq!(
@@ -1680,7 +1712,8 @@ mod tests {
             ZoneGuard::set("UTC");
 
             // Act
-            let extracted = fixed_datetime().local_date();
+            let extracted =
+                fixed_datetime().local_date().expect("system zone available");
 
             // Assert
             assert_eq!(
@@ -1696,7 +1729,8 @@ mod tests {
             ZoneGuard::set("Etc/GMT-12");
 
             // Act
-            let extracted = fixed_datetime().local_date();
+            let extracted =
+                fixed_datetime().local_date().expect("system zone available");
 
             // Assert
             assert_eq!(

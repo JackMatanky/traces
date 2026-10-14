@@ -376,20 +376,36 @@ impl ArithOp {
         match self {
             Self::Add => match right {
                 NoteFieldValue::Duration(duration) => {
-                    Some(NoteFieldValue::from(date.apply(&duration).ok()?))
+                    Some(NoteFieldValue::from(
+                        date.apply(
+                            &duration,
+                            &crate::temporal::local_zone().ok()?,
+                        )
+                        .ok()?,
+                    ))
                 }
                 _ => Some(NoteFieldValue::Null),
             },
             Self::Sub => match right {
                 NoteFieldValue::Duration(duration) => {
                     let duration = duration.checked_neg().ok()?;
-                    Some(NoteFieldValue::from(date.apply(&duration).ok()?))
+                    Some(NoteFieldValue::from(
+                        date.apply(
+                            &duration,
+                            &crate::temporal::local_zone().ok()?,
+                        )
+                        .ok()?,
+                    ))
                 }
                 other @ (NoteFieldValue::Date(_)
                 | NoteFieldValue::DateTime(_)) => {
                     let diff = other
                         .as_date_point()?
-                        .diff(date, TimeUnit::Second)
+                        .diff(
+                            date,
+                            TimeUnit::Second,
+                            &crate::temporal::local_zone().ok()?,
+                        )
                         .ok()?;
                     let seconds = diff.to_f64()?;
                     Some(NoteFieldValue::Duration(
@@ -414,7 +430,9 @@ impl ArithOp {
             Self::Add => match right {
                 date @ (NoteFieldValue::Date(_)
                 | NoteFieldValue::DateTime(_)) => Some(NoteFieldValue::from(
-                    date.as_date_point()?.apply(&duration).ok()?,
+                    date.as_date_point()?
+                        .apply(&duration, &crate::temporal::local_zone().ok()?)
+                        .ok()?,
                 )),
                 NoteFieldValue::Duration(other) => Some(
                     NoteFieldValue::Duration(duration.checked_add(other).ok()?),
@@ -622,13 +640,15 @@ impl QueryFunction {
             Self::DateDiff => Self::date_diff(args),
             Self::DateComponent => Self::date_component(args),
             Self::StartOf(calendar_period) => {
+                let zone = crate::temporal::local_zone().ok()?;
                 Self::date_boundary(args, |date_point| {
-                    date_point.start_of(calendar_period)
+                    date_point.start_of(calendar_period, &zone)
                 })
             }
             Self::EndOf(calendar_period) => {
+                let zone = crate::temporal::local_zone().ok()?;
                 Self::date_boundary(args, |date_point| {
-                    date_point.end_of(calendar_period)
+                    date_point.end_of(calendar_period, &zone)
                 })
             }
             Self::Date => Self::date(args),
@@ -653,7 +673,10 @@ impl QueryFunction {
                 }
                 let unit = TimeUnit::from_spelling(unit)?;
                 let n = (n.fract() == 0.0).then(|| n.to_i64()).flatten()?;
-                let shifted = date.as_date_point()?.shift(n, unit).ok()?;
+                let shifted = date
+                    .as_date_point()?
+                    .shift(n, unit, &crate::temporal::local_zone().ok()?)
+                    .ok()?;
                 Some(NoteFieldValue::from(shifted))
             }
             _ => None,
@@ -673,8 +696,14 @@ impl QueryFunction {
         {
             return Some(NoteFieldValue::Null);
         }
-        let diff =
-            date1.as_date_point()?.diff(date2.as_date_point()?, unit).ok()?;
+        let diff = date1
+            .as_date_point()?
+            .diff(
+                date2.as_date_point()?,
+                unit,
+                &crate::temporal::local_zone().ok()?,
+            )
+            .ok()?;
         Some(NoteFieldValue::Number(diff.to_f64()?))
     }
 
@@ -734,8 +763,9 @@ impl QueryFunction {
             return Some(NoteFieldValue::Null);
         }
         let component = DateComponent::from_name(component)?;
+        let zone = crate::temporal::local_zone().ok()?;
         Some(NoteFieldValue::Number(
-            date.as_date_point()?.component(component).to_f64()?,
+            date.as_date_point()?.component(component, &zone).to_f64()?,
         ))
     }
 }

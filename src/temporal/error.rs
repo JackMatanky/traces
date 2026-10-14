@@ -41,10 +41,10 @@ pub enum DateError {
         /// The reason the final shape check rejected the input.
         reason: &'static str,
     },
-    /// `input` does not begin with 4 ASCII digits (e.g., "26-08-22").
+    /// `input` does not begin with a four-digit year (e.g., `26-08-22`).
     ///
-    /// The year must be exactly 4 ASCII digits; a shorter prefix would
-    /// otherwise be silently misread.
+    /// Years use four ASCII digits, optionally prefixed by `-` for negative
+    /// years. Shorter or non-ASCII year forms are rejected rather than guessed.
     #[error("`{input}` does not have a 4-digit year")]
     YearNotFourDigits {
         /// The raw input that failed to parse.
