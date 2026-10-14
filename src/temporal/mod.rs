@@ -34,6 +34,7 @@ mod date;
 mod datetime;
 mod duration;
 mod error;
+mod lexer;
 mod point;
 mod unit;
 mod zone;

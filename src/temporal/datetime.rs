@@ -12,9 +12,8 @@ use jiff::{SignedDuration, Span, Timestamp, civil, tz::TimeZone};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    CalendarError, DateValue, TimeUnit, calendar::shift_datetime,
-    date::has_padded_date_prefix, error::DateError, point::starts_with_year,
-    zone::local_zone,
+    CalendarError, DateValue, TimeUnit, date::has_padded_date_prefix,
+    error::DateError, lexer::starts_with_year, zone::local_zone,
 };
 
 /// Defines the canonical display format for [`DateTimeValue`]:
@@ -245,27 +244,16 @@ impl DateTimeValue {
         unit: TimeUnit,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
+        let span = unit.to_span(n)?;
         if unit.is_calendar() {
             let local_datetime = self.local_datetime_in(zone);
-            return Self::from_local_in(
-                shift_datetime(local_datetime, n, unit)?,
-                zone,
-            );
+            let shifted = local_datetime
+                .checked_add(span)
+                .map_err(|_| CalendarError::OutOfRange)?;
+            Self::from_local_in(shifted, zone)
+        } else {
+            self.checked_add_span(span, zone)
         }
-        let span = match unit {
-            TimeUnit::Millisecond => Span::new().try_milliseconds(n),
-            TimeUnit::Second => Span::new().try_seconds(n),
-            TimeUnit::Minute => Span::new().try_minutes(n),
-            TimeUnit::Hour => Span::new().try_hours(n),
-            TimeUnit::Day
-            | TimeUnit::Week
-            | TimeUnit::Month
-            | TimeUnit::Year => {
-                return Err(CalendarError::OutOfRange);
-            }
-        }
-        .map_err(|_| CalendarError::OutOfRange)?;
-        self.checked_add_span(span, zone)
     }
 
     /// Adds a Jiff span to this Date-Time in the supplied time zone.

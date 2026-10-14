@@ -13,10 +13,9 @@
 //!   boundaries.
 //! - [`PeriodEdge`]: Selects the side of a calendar period used by a boundary.
 
-use jiff::{Span, civil};
+use jiff::civil;
 
 use super::error::CalendarError;
-use crate::temporal::TimeUnit;
 
 /// Represents a calendar period that date-point boundaries select.
 ///
@@ -30,6 +29,66 @@ pub(crate) enum CalendarPeriod {
     Month,
     /// Identifies the calendar year.
     Year,
+}
+
+impl CalendarPeriod {
+    /// Computes the boundary date of this calendar period for a given date.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the target date cannot be
+    ///   represented.
+    pub(crate) fn snap_date(
+        self,
+        edge: PeriodEdge,
+        date: civil::Date,
+    ) -> Result<civil::Date, CalendarError> {
+        match self {
+            Self::Week => {
+                let iso = date.iso_week_date();
+                let target = match edge {
+                    PeriodEdge::Start => civil::Weekday::Monday,
+                    PeriodEdge::End => civil::Weekday::Sunday,
+                };
+                civil::ISOWeekDate::new(iso.year(), iso.week(), target)
+                    .map(civil::Date::from)
+            }
+            Self::Month => {
+                civil::Date::new(date.year(), date.month(), match edge {
+                    PeriodEdge::Start => 1,
+                    PeriodEdge::End => date.days_in_month(),
+                })
+            }
+            Self::Year => civil::Date::new(
+                date.year(),
+                match edge {
+                    PeriodEdge::Start => 1,
+                    PeriodEdge::End => 12,
+                },
+                match edge {
+                    PeriodEdge::Start => 1,
+                    PeriodEdge::End => 31,
+                },
+            ),
+        }
+        .map_err(|_| CalendarError::OutOfRange)
+    }
+
+    /// Aligns a date to a target weekday within its ISO week.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the target date cannot be
+    ///   represented.
+    pub(crate) fn snap_weekday(
+        date: civil::Date,
+        target: civil::Weekday,
+    ) -> Result<civil::Date, CalendarError> {
+        let iso = date.iso_week_date();
+        civil::ISOWeekDate::new(iso.year(), iso.week(), target)
+            .map(civil::Date::from)
+            .map_err(|_| CalendarError::OutOfRange)
+    }
 }
 
 /// Selects which side of a calendar period a boundary uses.
@@ -83,65 +142,6 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
         7 => Some(civil::Weekday::Sunday),
         _ => None,
     }
-}
-
-/// Shifts a calendar date by `n` in the chosen `unit` and returns the result.
-///
-/// Calendar units shift calendar days; month and year shifts clamp to the last
-/// day of the target month. Exact units shift elapsed time, so the date moves
-/// only when the shift crosses midnight.
-///
-/// No zone is consulted: callers wanting DST-aware local-clock semantics route
-/// through [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
-///
-/// # Errors
-///
-/// - [`CalendarError::OutOfRange`] if the shift overflows representable bounds.
-pub(super) fn shift_date(
-    date: civil::Date,
-    n: i64,
-    unit: TimeUnit,
-) -> Result<civil::Date, CalendarError> {
-    date.checked_add(shift_span(n, unit)?)
-        .map_err(|_| CalendarError::OutOfRange)
-}
-
-/// Shifts a civil datetime by `n` in the chosen `unit` and returns the result.
-///
-/// Calendar units shift calendar days; month and year shifts clamp to the last
-/// day of the target month. Exact units shift elapsed clock time without
-/// consulting time zones.
-///
-/// # Errors
-///
-/// - [`CalendarError::OutOfRange`] if the shift overflows representable bounds.
-pub(super) fn shift_datetime(
-    local_datetime: civil::DateTime,
-    n: i64,
-    unit: TimeUnit,
-) -> Result<civil::DateTime, CalendarError> {
-    local_datetime
-        .checked_add(shift_span(n, unit)?)
-        .map_err(|_| CalendarError::OutOfRange)
-}
-
-/// Constructs a [`Span`] of `n` units of the given [`TimeUnit`].
-///
-/// # Errors
-///
-/// - [`CalendarError::OutOfRange`] if `n` cannot be represented as a [`Span`].
-fn shift_span(n: i64, unit: TimeUnit) -> Result<Span, CalendarError> {
-    match unit {
-        TimeUnit::Year => Span::new().try_years(n),
-        TimeUnit::Month => Span::new().try_months(n),
-        TimeUnit::Week => Span::new().try_weeks(n),
-        TimeUnit::Day => Span::new().try_days(n),
-        TimeUnit::Hour => Span::new().try_hours(n),
-        TimeUnit::Minute => Span::new().try_minutes(n),
-        TimeUnit::Second => Span::new().try_seconds(n),
-        TimeUnit::Millisecond => Span::new().try_milliseconds(n),
-    }
-    .map_err(|_| CalendarError::OutOfRange)
 }
 
 #[cfg(test)]
@@ -320,6 +320,75 @@ mod tests {
                 actual, None,
                 "weekday number {number} must not map to a weekday"
             );
+        }
+    }
+
+    mod boundaries {
+        use jiff::civil::date;
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::start_of_week(
+            CalendarPeriod::Week,
+            PeriodEdge::Start,
+            date(2026, 7, 29), // Wednesday
+            date(2026, 7, 27)  // Monday
+        )]
+        #[case::end_of_week(
+            CalendarPeriod::Week,
+            PeriodEdge::End,
+            date(2026, 7, 29), // Wednesday
+            date(2026, 8, 2)   // Sunday
+        )]
+        #[case::start_of_month(
+            CalendarPeriod::Month,
+            PeriodEdge::Start,
+            date(2026, 7, 29),
+            date(2026, 7, 1)
+        )]
+        #[case::end_of_month(
+            CalendarPeriod::Month,
+            PeriodEdge::End,
+            date(2026, 7, 29),
+            date(2026, 7, 31)
+        )]
+        #[case::start_of_year(
+            CalendarPeriod::Year,
+            PeriodEdge::Start,
+            date(2026, 7, 29),
+            date(2026, 1, 1)
+        )]
+        #[case::end_of_year(
+            CalendarPeriod::Year,
+            PeriodEdge::End,
+            date(2026, 7, 29),
+            date(2026, 12, 31)
+        )]
+        fn snaps_dates_to_calendar_period_boundaries(
+            #[case] period: CalendarPeriod,
+            #[case] edge: PeriodEdge,
+            #[case] input: civil::Date,
+            #[case] expected: civil::Date,
+        ) {
+            // Arrange
+            // Act
+            let actual = period.snap_date(edge, input);
+            // Assert
+            assert_eq!(actual, Ok(expected));
+        }
+
+        #[test]
+        fn aligns_to_target_weekday_within_iso_week() {
+            // Arrange: 2026-07-29 is a Wednesday.
+            let wednesday = date(2026, 7, 29);
+            // Act
+            let friday =
+                CalendarPeriod::snap_weekday(wednesday, civil::Weekday::Friday);
+            // Assert
+            assert_eq!(friday, Ok(date(2026, 7, 31)));
         }
     }
 }

@@ -12,9 +12,8 @@ use jiff::{Span, civil};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    CalendarError, DateTimeValue,
-    error::DateError,
-    point::{DatePrecision, starts_with_year},
+    CalendarError, DateTimeValue, error::DateError, lexer::starts_with_year,
+    point::DatePrecision,
 };
 
 /// Defines the canonical display format for [`DateValue`]: `2026-07-29`.
@@ -110,43 +109,6 @@ impl DateValue {
     #[must_use]
     pub(crate) const fn civil_date(self) -> civil::Date {
         self.0
-    }
-
-    /// Returns the whole calendar years from `self` to `to`, signed by
-    /// ordering.
-    ///
-    /// A year counts only once the month and day of `to` reach those of `self`,
-    /// so this is [`DateValue::whole_months_until`] divided down to years.
-    pub(super) fn whole_years_until(self, to: Self) -> i64 {
-        self.whole_months_until(to) / 12
-    }
-
-    /// Returns the whole calendar months from `self` to `to`, signed by
-    /// ordering.
-    ///
-    /// Counts the total calendar months between the two dates and subtracts one
-    /// when the day-of-month of `to` is below that of `self`, because that
-    /// final month is not complete. Either ordering is accepted: `to` before
-    /// `self` yields a negative count.
-    pub(super) fn whole_months_until(self, to: Self) -> i64 {
-        let (from, to) = (self.0, to.0);
-        let (earlier, later, sign) = if to >= from {
-            (from, to, 1)
-        } else {
-            (to, from, -1)
-        };
-        #[expect(
-            clippy::arithmetic_side_effects,
-            reason = "Jiff civil dates have bounded year/month/day fields, so \
-                      the year subtraction, month conversion, day comparison, \
-                      and sign multiplication cannot overflow i64"
-        )]
-        let months = sign
-            * (i64::from(later.year() - earlier.year()) * 12
-                + i64::from(later.month())
-                - i64::from(earlier.month())
-                - i64::from(later.day() < earlier.day()));
-        months
     }
 
     /// Adds a Jiff span, discarding the time of day as date-only arithmetic

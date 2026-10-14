@@ -75,6 +75,207 @@ const PRINTER: SpanPrinter = SpanPrinter::new()
     .designator(Designator::Compact)
     .direction(Direction::Sign);
 
+/// Internal representation of the ten Jiff [`Span`] unit fields.
+///
+/// Encapsulates fieldwise arithmetic and checked conversions between raw
+/// integer components and a validated [`Span`].
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+struct DurationFields {
+    years: i64,
+    months: i64,
+    weeks: i64,
+    days: i64,
+    hours: i64,
+    minutes: i64,
+    seconds: i64,
+    milliseconds: i64,
+    microseconds: i64,
+    nanoseconds: i64,
+}
+
+impl DurationFields {
+    #[inline]
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_lossless,
+        reason = "infallible widening from i32 to i64"
+    )]
+    fn from_span(span: Span) -> Self {
+        Self {
+            years: span.get_years() as i64,
+            months: span.get_months() as i64,
+            weeks: span.get_weeks() as i64,
+            days: span.get_days() as i64,
+            hours: span.get_hours() as i64,
+            minutes: span.get_minutes(),
+            seconds: span.get_seconds(),
+            milliseconds: span.get_milliseconds(),
+            microseconds: span.get_microseconds(),
+            nanoseconds: span.get_nanoseconds(),
+        }
+    }
+
+    #[inline]
+    fn to_span(self) -> Result<Span, DurationError> {
+        let years_i32 = i32::try_from(self.years)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        let months_i32 = i32::try_from(self.months)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        let weeks_i32 = i32::try_from(self.weeks)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        let days_i32 = i32::try_from(self.days)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        let millis_i32 = i32::try_from(self.milliseconds)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        let micros_i32 = i32::try_from(self.microseconds)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        let nanos_i32 = i32::try_from(self.nanoseconds)
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+
+        Span::new()
+            .try_years(years_i32)
+            .and_then(|s| s.try_months(months_i32))
+            .and_then(|s| s.try_weeks(weeks_i32))
+            .and_then(|s| s.try_days(days_i32))
+            .and_then(|s| s.try_hours(self.hours))
+            .and_then(|s| s.try_minutes(self.minutes))
+            .and_then(|s| s.try_seconds(self.seconds))
+            .and_then(|s| s.try_milliseconds(millis_i32))
+            .and_then(|s| s.try_microseconds(micros_i32))
+            .and_then(|s| s.try_nanoseconds(nanos_i32))
+            .map_err(|_| DurationError::SecondsOutOfRange)
+    }
+
+    #[inline]
+    fn checked_add(self, other: Self) -> Result<Self, DurationError> {
+        Ok(Self {
+            years: self
+                .years
+                .checked_add(other.years)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            months: self
+                .months
+                .checked_add(other.months)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            weeks: self
+                .weeks
+                .checked_add(other.weeks)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            days: self
+                .days
+                .checked_add(other.days)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            hours: self
+                .hours
+                .checked_add(other.hours)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            minutes: self
+                .minutes
+                .checked_add(other.minutes)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            seconds: self
+                .seconds
+                .checked_add(other.seconds)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            milliseconds: self
+                .milliseconds
+                .checked_add(other.milliseconds)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            microseconds: self
+                .microseconds
+                .checked_add(other.microseconds)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            nanoseconds: self
+                .nanoseconds
+                .checked_add(other.nanoseconds)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+        })
+    }
+
+    #[inline]
+    fn checked_mul(self, factor: i64) -> Result<Self, DurationError> {
+        Ok(Self {
+            years: self
+                .years
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            months: self
+                .months
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            weeks: self
+                .weeks
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            days: self
+                .days
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            hours: self
+                .hours
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            minutes: self
+                .minutes
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            seconds: self
+                .seconds
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            milliseconds: self
+                .milliseconds
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            microseconds: self
+                .microseconds
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+            nanoseconds: self
+                .nanoseconds
+                .checked_mul(factor)
+                .ok_or(DurationError::SecondsOutOfRange)?,
+        })
+    }
+
+    #[inline]
+    fn has_mixed_signs(self) -> bool {
+        let fields = [
+            self.years,
+            self.months,
+            self.weeks,
+            self.days,
+            self.hours,
+            self.minutes,
+            self.seconds,
+            self.milliseconds,
+            self.microseconds,
+            self.nanoseconds,
+        ];
+        fields.iter().any(|&v| v > 0) && fields.iter().any(|&v| v < 0)
+    }
+
+    #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bounded Span unit values safely convert and sum into i128 \
+                  nanoseconds"
+    )]
+    fn nominal_nanoseconds(self) -> i128 {
+        i128::from(self.years) * TimeUnit::Year.nominal_nanoseconds()
+            + i128::from(self.months) * TimeUnit::Month.nominal_nanoseconds()
+            + i128::from(self.weeks) * TimeUnit::Week.nominal_nanoseconds()
+            + i128::from(self.days) * TimeUnit::Day.nominal_nanoseconds()
+            + i128::from(self.hours) * TimeUnit::Hour.nominal_nanoseconds()
+            + i128::from(self.minutes) * TimeUnit::Minute.nominal_nanoseconds()
+            + i128::from(self.seconds) * TimeUnit::Second.nominal_nanoseconds()
+            + i128::from(self.milliseconds)
+                * TimeUnit::Millisecond.nominal_nanoseconds()
+            + i128::from(self.microseconds) * NANOS_PER_MICRO
+            + i128::from(self.nanoseconds)
+    }
+}
+
 /// Represents a validated duration with a nominal identity and a calendar
 /// application regime.
 ///
@@ -139,14 +340,14 @@ impl DurationValue {
         let (parts, _) = decompose(total_ms, &NOMINAL_COMPOSITION_ORDER);
         let mut span = Span::new();
         for part in parts {
-            let count = i64::try_from(part.count)
+            let count = i64::try_from(part.count())
                 .map_err(|_| DurationError::SecondsOutOfRange)?;
             let count = if is_negative {
                 count.checked_neg().ok_or(DurationError::SecondsOutOfRange)?
             } else {
                 count
             };
-            span = match part.unit {
+            span = match part.unit() {
                 TimeUnit::Week => span
                     .try_weeks(
                         i32::try_from(count)
@@ -247,89 +448,15 @@ impl DurationValue {
     /// - [`DurationError::SecondsOutOfRange`] if the sum exceeds Jiff's
     ///   representable span range.
     #[inline]
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_lossless,
-        reason = "infallible widening from i32 to i64 and checked addition"
-    )]
     pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
-        let span1 = self.0;
-        let span2 = rhs.0;
-        let years = (span1.get_years() as i64)
-            .checked_add(span2.get_years() as i64)
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let months = (span1.get_months() as i64)
-            .checked_add(span2.get_months() as i64)
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let weeks = (span1.get_weeks() as i64)
-            .checked_add(span2.get_weeks() as i64)
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let days = (span1.get_days() as i64)
-            .checked_add(span2.get_days() as i64)
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let hours = (span1.get_hours() as i64)
-            .checked_add(span2.get_hours() as i64)
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let minutes = span1
-            .get_minutes()
-            .checked_add(span2.get_minutes())
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let seconds = span1
-            .get_seconds()
-            .checked_add(span2.get_seconds())
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let millis = span1
-            .get_milliseconds()
-            .checked_add(span2.get_milliseconds())
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let micros = span1
-            .get_microseconds()
-            .checked_add(span2.get_microseconds())
-            .ok_or(DurationError::SecondsOutOfRange)?;
-        let nanos = span1
-            .get_nanoseconds()
-            .checked_add(span2.get_nanoseconds())
-            .ok_or(DurationError::SecondsOutOfRange)?;
-
-        let fields = [
-            years, months, weeks, days, hours, minutes, seconds, millis,
-            micros, nanos,
-        ];
-        let has_pos = fields.iter().any(|&v| v > 0);
-        let has_neg = fields.iter().any(|&v| v < 0);
-
-        if has_pos && has_neg {
+        let f1 = DurationFields::from_span(self.0);
+        let f2 = DurationFields::from_span(rhs.0);
+        let sum = f1.checked_add(f2)?;
+        if sum.has_mixed_signs() {
             let total_secs = self.nominal_seconds() + rhs.nominal_seconds();
             Self::from_nominal_seconds(total_secs)
         } else {
-            let years_i32 = i32::try_from(years)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let months_i32 = i32::try_from(months)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let weeks_i32 = i32::try_from(weeks)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let days_i32 = i32::try_from(days)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let millis_i32 = i32::try_from(millis)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let micros_i32 = i32::try_from(micros)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let nanos_i32 = i32::try_from(nanos)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-
-            Span::new()
-                .try_years(years_i32)
-                .and_then(|s| s.try_months(months_i32))
-                .and_then(|s| s.try_weeks(weeks_i32))
-                .and_then(|s| s.try_days(days_i32))
-                .and_then(|s| s.try_hours(hours))
-                .and_then(|s| s.try_minutes(minutes))
-                .and_then(|s| s.try_seconds(seconds))
-                .and_then(|s| s.try_milliseconds(millis_i32))
-                .and_then(|s| s.try_microseconds(micros_i32))
-                .and_then(|s| s.try_nanoseconds(nanos_i32))
-                .map(Self)
-                .map_err(|_| DurationError::SecondsOutOfRange)
+            sum.to_span().map(Self)
         }
     }
 
@@ -352,12 +479,6 @@ impl DurationValue {
     /// - [`DurationError::SecondsOutOfRange`] if the scaled duration exceeds
     ///   Jiff's representable span range.
     #[inline]
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_lossless,
-        clippy::cast_possible_truncation,
-        reason = "bounded integer scaling and float decomposition"
-    )]
     pub fn checked_mul(self, factor: f64) -> Result<Self, DurationError> {
         if !factor.is_finite() {
             return Err(DurationError::NonFiniteSeconds);
@@ -365,73 +486,16 @@ impl DurationValue {
         if factor == 0.0 {
             return Ok(Self(Span::new()));
         }
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "integral factor is checked before truncation"
+        )]
         if factor.fract() == 0.0 {
             let f = factor as i64;
-            let span = self.0;
-            let years = (span.get_years() as i64)
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let months = (span.get_months() as i64)
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let weeks = (span.get_weeks() as i64)
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let days = (span.get_days() as i64)
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let hours = (span.get_hours() as i64)
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let minutes = span
-                .get_minutes()
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let seconds = span
-                .get_seconds()
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let millis = span
-                .get_milliseconds()
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let micros = span
-                .get_microseconds()
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-            let nanos = span
-                .get_nanoseconds()
-                .checked_mul(f)
-                .ok_or(DurationError::SecondsOutOfRange)?;
-
-            let years_i32 = i32::try_from(years)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let months_i32 = i32::try_from(months)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let weeks_i32 = i32::try_from(weeks)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let days_i32 = i32::try_from(days)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let millis_i32 = i32::try_from(millis)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let micros_i32 = i32::try_from(micros)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let nanos_i32 = i32::try_from(nanos)
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-
-            Span::new()
-                .try_years(years_i32)
-                .and_then(|s| s.try_months(months_i32))
-                .and_then(|s| s.try_weeks(weeks_i32))
-                .and_then(|s| s.try_days(days_i32))
-                .and_then(|s| s.try_hours(hours))
-                .and_then(|s| s.try_minutes(minutes))
-                .and_then(|s| s.try_seconds(seconds))
-                .and_then(|s| s.try_milliseconds(millis_i32))
-                .and_then(|s| s.try_microseconds(micros_i32))
-                .and_then(|s| s.try_nanoseconds(nanos_i32))
-                .map(Self)
-                .map_err(|_| DurationError::SecondsOutOfRange)
+            let fields = DurationFields::from_span(self.0);
+            let scaled = fields.checked_mul(f)?;
+            scaled.to_span().map(Self)
         } else {
             let total = self.nominal_seconds() * factor;
             Self::from_nominal_seconds(total)
@@ -470,8 +534,8 @@ impl DurationValue {
         let (parts, remainder_ms) = decompose(total_ms, &COMPOUND_FORMAT_ORDER);
         let mut text = String::new();
         for part in parts {
-            let (singular, plural) = part.unit.human_names();
-            let name = if part.count == 1 {
+            let (singular, plural) = part.unit().human_names();
+            let name = if part.count() == 1 {
                 singular
             } else {
                 plural
@@ -479,7 +543,7 @@ impl DurationValue {
             if !text.is_empty() {
                 text.push_str(", ");
             }
-            let _ = write!(text, "{} {name}", part.count);
+            let _ = write!(text, "{} {name}", part.count());
         }
         if remainder_ms > 0 {
             let name = if remainder_ms == 1 {
@@ -505,29 +569,8 @@ impl DurationValue {
     /// Returns the exact nominal duration in integer nanoseconds.
     #[inline]
     #[must_use]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "bounded Span unit values safely convert and sum into i128 \
-                  nanoseconds"
-    )]
     pub(crate) fn nominal_nanoseconds(&self) -> i128 {
-        let span = self.0;
-        i128::from(span.get_years()) * TimeUnit::Year.nominal_nanoseconds()
-            + i128::from(span.get_months())
-                * TimeUnit::Month.nominal_nanoseconds()
-            + i128::from(span.get_weeks())
-                * TimeUnit::Week.nominal_nanoseconds()
-            + i128::from(span.get_days()) * TimeUnit::Day.nominal_nanoseconds()
-            + i128::from(span.get_hours())
-                * TimeUnit::Hour.nominal_nanoseconds()
-            + i128::from(span.get_minutes())
-                * TimeUnit::Minute.nominal_nanoseconds()
-            + i128::from(span.get_seconds())
-                * TimeUnit::Second.nominal_nanoseconds()
-            + i128::from(span.get_milliseconds())
-                * TimeUnit::Millisecond.nominal_nanoseconds()
-            + i128::from(span.get_microseconds()) * NANOS_PER_MICRO
-            + i128::from(span.get_nanoseconds())
+        DurationFields::from_span(self.0).nominal_nanoseconds()
     }
 
     /// Returns the nominal duration in seconds as an `f64` value.

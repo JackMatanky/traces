@@ -8,13 +8,17 @@
 //! Callers hold the validated date point or receive a [`DateError`].
 
 use jiff::{Span, Timestamp, civil, tz::TimeZone};
+use logos::Logos;
 
 use super::{
     CalendarError, CalendarPeriod, DEFAULT_DATE_PATTERN, DateError,
     DateTimeValue, DateUnit, DateValue, DurationValue, PeriodEdge, TimeUnit,
-    calendar::{shift_date, shift_datetime},
     date::DateShape,
     datetime::{DateTimeInput, DateTimeShape},
+    lexer::{
+        TemporalShapeToken, scan_date_prefix, starts_like_date,
+        starts_with_year,
+    },
     zone::local_zone,
 };
 
@@ -71,38 +75,60 @@ impl DatePoint {
                 input: trimmed.into(),
             });
         }
-        let calendar_point = |(date, date_precision)| Self::Calendar {
-            date: DateValue::from(date),
-            date_precision,
-        };
-        // Date-only shapes cannot match the date-time cascade.
         if trimmed.len() <= 10 {
-            return DateShape::parse_any(trimmed).map(calendar_point).map_err(
-                |reason| DateError::InvalidValue {
+            return DateShape::parse_any(trimmed)
+                .map(|(date, date_precision)| Self::Calendar {
+                    date: DateValue::from_civil_date(date),
+                    date_precision,
+                })
+                .map_err(|reason| DateError::InvalidValue {
                     input: trimmed.into(),
                     reason,
-                },
-            );
+                });
         }
-        match DateTimeShape::parse_any(trimmed) {
-            Ok(input) => Ok(Self::DateTime(input.resolve(trimmed)?)),
-            Err(datetime_err) => match DateShape::parse_any(trimmed) {
-                Ok(date) => Ok(calendar_point(date)),
-                Err(date_err) => {
-                    let reason = if matches!(
-                        trimmed.as_bytes().get(10),
-                        Some(b'T' | b' ')
-                    ) {
-                        datetime_err
-                    } else {
-                        date_err
-                    };
-                    Err(DateError::InvalidValue {
-                        input: trimmed.into(),
-                        reason,
-                    })
-                }
-            },
+
+        let mut lexer = TemporalShapeToken::lexer(trimmed);
+        if let Some(Ok(_token)) = lexer.next()
+            && lexer.span().start == 0
+        {
+            if lexer.span().end == trimmed.len() {
+                let input =
+                    DateTimeShape::parse_any(trimmed).map_err(|reason| {
+                        DateError::InvalidValue {
+                            input: trimmed.into(),
+                            reason,
+                        }
+                    })?;
+                return Ok(Self::DateTime(input.resolve(trimmed)?));
+            }
+            let trailing = &trimmed[lexer.span().end..];
+            if trailing.starts_with('T') || trailing.starts_with(' ') {
+                return Err(DateError::InvalidValue {
+                    input: trimmed.into(),
+                    reason: "invalid input",
+                });
+            }
+        }
+
+        match DateShape::parse_any(trimmed) {
+            Ok((date, date_precision)) => Ok(Self::Calendar {
+                date: DateValue::from_civil_date(date),
+                date_precision,
+            }),
+            Err(date_err) => {
+                let reason = if matches!(
+                    trimmed.as_bytes().get(10),
+                    Some(b'T' | b' ')
+                ) {
+                    DateTimeShape::parse_any(trimmed).err().unwrap_or(date_err)
+                } else {
+                    date_err
+                };
+                Err(DateError::InvalidValue {
+                    input: trimmed.into(),
+                    reason,
+                })
+            }
         }
     }
 
@@ -112,7 +138,7 @@ impl DatePoint {
     /// when `s` does not start with either shape.
     #[must_use]
     pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
-        crate::lexer::lex_prefix(s, Self::parse_prefix_raw)
+        crate::lexer::lex_prefix(s, scan_date_prefix)
     }
 
     /// Parses a date or date-time with a Jiff strtime pattern.
@@ -286,26 +312,31 @@ impl DatePoint {
         unit: TimeUnit,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
+        let span = unit.to_span(n)?;
         match self {
             Self::Calendar {
                 date,
                 date_precision,
-            } if unit.is_calendar() => Ok(Self::Calendar {
-                date: DateValue::from_civil_date(shift_date(
-                    date.civil_date(),
-                    n,
-                    unit,
-                )?),
-                date_precision,
-            }),
+            } if unit.is_calendar() => {
+                let shifted = date
+                    .civil_date()
+                    .checked_add(span)
+                    .map_err(|_| CalendarError::OutOfRange)?;
+                Ok(Self::Calendar {
+                    date: DateValue::from_civil_date(shifted),
+                    date_precision,
+                })
+            }
             Self::Calendar {
                 date_precision,
                 ..
             } => {
                 let local_datetime = self.local_datetime_in(zone);
-                let local_datetime = shift_datetime(local_datetime, n, unit)?;
+                let shifted = local_datetime
+                    .checked_add(span)
+                    .map_err(|_| CalendarError::OutOfRange)?;
                 Ok(Self::Calendar {
-                    date: DateValue::from_civil_date(local_datetime.date()),
+                    date: DateValue::from_civil_date(shifted.date()),
                     date_precision,
                 })
             }
@@ -339,7 +370,9 @@ impl DatePoint {
         calendar_period: CalendarPeriod,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
-        self.boundary(calendar_period, PeriodEdge::Start, zone)
+        let date = self.local_datetime_in(zone).date();
+        let target = calendar_period.snap_date(PeriodEdge::Start, date)?;
+        self.with_date(target, zone)
     }
 
     /// Returns the last day of the period, preserving written precision and
@@ -354,7 +387,9 @@ impl DatePoint {
         calendar_period: CalendarPeriod,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
-        self.boundary(calendar_period, PeriodEdge::End, zone)
+        let date = self.local_datetime_in(zone).date();
+        let target = calendar_period.snap_date(PeriodEdge::End, date)?;
+        self.with_date(target, zone)
     }
 
     /// Selects a weekday of this date point's ISO week in zone.
@@ -367,12 +402,8 @@ impl DatePoint {
         target: civil::Weekday,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
-        let local_date = self.local_datetime_in(zone).date();
-        let iso = local_date.iso_week_date();
-        let target_date =
-            civil::ISOWeekDate::new(iso.year(), iso.week(), target)
-                .map(civil::Date::from)
-                .map_err(|_| CalendarError::OutOfRange)?;
+        let date = self.local_datetime_in(zone).date();
+        let target_date = CalendarPeriod::snap_weekday(date, target)?;
         self.with_date(target_date, zone)
     }
 
@@ -400,59 +431,43 @@ impl DatePoint {
         unit: TimeUnit,
         zone: &TimeZone,
     ) -> Result<DateDiff, CalendarError> {
-        let local_delta = || {
-            to.local_datetime_in(zone)
-                .duration_since(self.local_datetime_in(zone))
-        };
-        let calendar_days = || {
-            self.date_in(zone)
-                .civil_date()
-                .until(to.date_in(zone).civil_date())
-                .map(|span| i64::from(span.get_days()))
-                .map_err(|_| CalendarError::OutOfRange)
-        };
         match unit {
-            TimeUnit::Year => Ok(DateDiff::Whole(
-                self.date_in(zone).whole_years_until(to.date_in(zone)),
-            )),
-            TimeUnit::Month => Ok(DateDiff::Whole(
-                self.date_in(zone).whole_months_until(to.date_in(zone)),
-            )),
-            calendar @ (TimeUnit::Week | TimeUnit::Day)
+            TimeUnit::Week | TimeUnit::Day
                 if self.has_time() && to.has_time() =>
             {
-                // The civil clock counts a DST-short or DST-long day as one
-                // calendar day, while preserving a fractional clock remainder.
-                Ok(DateDiff::Fractional(
-                    local_delta().as_secs_f64() / calendar.nominal_seconds(),
-                ))
+                let from_dt = self.local_datetime_in(zone);
+                let to_dt = to.local_datetime_in(zone);
+                Ok(DifferenceEngine::civil_clock_diff(from_dt, to_dt, unit))
             }
-            TimeUnit::Week => Ok(DateDiff::Whole(calendar_days()? / 7)),
-            TimeUnit::Day => Ok(DateDiff::Whole(calendar_days()?)),
-            fixed @ (TimeUnit::Hour
+            TimeUnit::Year
+            | TimeUnit::Month
+            | TimeUnit::Week
+            | TimeUnit::Day => {
+                let from_date = self.date_in(zone).civil_date();
+                let to_date = to.date_in(zone).civil_date();
+                DifferenceEngine::calendar_diff(from_date, to_date, unit)
+            }
+            TimeUnit::Hour
             | TimeUnit::Minute
             | TimeUnit::Second
-            | TimeUnit::Millisecond)
+            | TimeUnit::Millisecond
                 if self.has_time() && to.has_time() =>
             {
-                let seconds = match (self, to) {
+                match (self, to) {
                     (Self::DateTime(from_dt), Self::DateTime(to_dt)) => {
-                        to_dt.duration_since(from_dt).as_secs_f64()
+                        Ok(DifferenceEngine::elapsed_diff(from_dt, to_dt, unit))
                     }
-                    _ => return Err(CalendarError::OutOfRange),
-                };
-                Ok(DateDiff::Fractional(seconds / fixed.nominal_seconds()))
+                    _ => Err(CalendarError::OutOfRange),
+                }
             }
-            TimeUnit::Hour => {
-                Ok(DateDiff::Whole(local_delta().as_secs() / 3_600))
+            TimeUnit::Hour
+            | TimeUnit::Minute
+            | TimeUnit::Second
+            | TimeUnit::Millisecond => {
+                let from_dt = self.local_datetime_in(zone);
+                let to_dt = to.local_datetime_in(zone);
+                DifferenceEngine::whole_unit_diff(from_dt, to_dt, unit)
             }
-            TimeUnit::Minute => {
-                Ok(DateDiff::Whole(local_delta().as_secs() / 60))
-            }
-            TimeUnit::Second => Ok(DateDiff::Whole(local_delta().as_secs())),
-            TimeUnit::Millisecond => i64::try_from(local_delta().as_millis())
-                .map(DateDiff::Whole)
-                .map_err(|_| CalendarError::OutOfRange),
         }
     }
 
@@ -460,36 +475,6 @@ impl DatePoint {
     #[must_use]
     pub(crate) const fn has_time(self) -> bool {
         matches!(self, Self::DateTime(_))
-    }
-
-    /// Parses a raw date prefix from `s`, returning the [`DatePoint`] and byte
-    /// length.
-    fn parse_prefix_raw(s: &str) -> Option<(Self, usize)> {
-        let bytes = s.as_bytes();
-        if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
-            if let Some(prefix) = s.get(..10)
-                && let Ok(
-                    date_point @ Self::Calendar {
-                        date_precision: DatePrecision::Day,
-                        ..
-                    },
-                ) = Self::parse(prefix)
-            {
-                return Some((date_point, 10));
-            }
-            return None;
-        }
-        if let Some(prefix) = s.get(..7)
-            && let Ok(
-                date_point @ Self::Calendar {
-                    date_precision: DatePrecision::Month,
-                    ..
-                },
-            ) = Self::parse(prefix)
-        {
-            return Some((date_point, 7));
-        }
-        None
     }
 
     /// Applies one Jiff span, preserving the point's date/time kind.
@@ -542,57 +527,6 @@ impl DatePoint {
         }
     }
 
-    /// Resolves a period edge to its local date, preserving precision.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
-    ///   supported range.
-    fn boundary(
-        self,
-        calendar_period: CalendarPeriod,
-        period_edge: PeriodEdge,
-        zone: &TimeZone,
-    ) -> Result<Self, CalendarError> {
-        let date = self.local_datetime_in(zone).date();
-        let new_date = match calendar_period {
-            CalendarPeriod::Week => {
-                let iso = date.iso_week_date();
-                let target = if period_edge == PeriodEdge::Start {
-                    civil::Weekday::Monday
-                } else {
-                    civil::Weekday::Sunday
-                };
-                civil::ISOWeekDate::new(iso.year(), iso.week(), target)
-                    .map(civil::Date::from)
-            }
-            CalendarPeriod::Month => civil::Date::new(
-                date.year(),
-                date.month(),
-                if period_edge == PeriodEdge::Start {
-                    1
-                } else {
-                    date.days_in_month()
-                },
-            ),
-            CalendarPeriod::Year => civil::Date::new(
-                date.year(),
-                if period_edge == PeriodEdge::Start {
-                    1
-                } else {
-                    12
-                },
-                if period_edge == PeriodEdge::Start {
-                    1
-                } else {
-                    31
-                },
-            ),
-        }
-        .map_err(|_| CalendarError::OutOfRange)?;
-        self.with_date(new_date, zone)
-    }
-
     #[cfg(test)]
     fn local_datetime_or_utc(self) -> jiff::civil::DateTime {
         self.local_datetime_in(
@@ -641,17 +575,102 @@ impl DateDiff {
     }
 }
 
-/// Returns `true` if `s` begins with four ASCII year digits, optionally
-/// preceded by a minus sign for a signed four-digit year.
-pub(super) fn starts_with_year(s: &str) -> bool {
-    let year = if s.starts_with('-') {
-        s.get(1..5)
-    } else {
-        s.get(..4)
-    };
-    year.is_some_and(|bytes| {
-        bytes.len() == 4 && bytes.bytes().all(|byte| byte.is_ascii_digit())
-    })
+/// Calculates differences between date points across the three temporal
+/// regimes: calendar discrete, civil-clock fractional, and physical elapsed.
+struct DifferenceEngine;
+
+impl DifferenceEngine {
+    /// Computes discrete whole calendar differences (years, months, weeks,
+    /// days).
+    fn calendar_diff(
+        from: civil::Date,
+        to: civil::Date,
+        unit: TimeUnit,
+    ) -> Result<DateDiff, CalendarError> {
+        match unit {
+            TimeUnit::Year => {
+                Ok(DateDiff::Whole(Self::whole_years_between(from, to)))
+            }
+            TimeUnit::Month => {
+                Ok(DateDiff::Whole(Self::whole_months_between(from, to)))
+            }
+            TimeUnit::Week => {
+                let days = from
+                    .until(to)
+                    .map(|span| i64::from(span.get_days()))
+                    .map_err(|_| CalendarError::OutOfRange)?;
+                Ok(DateDiff::Whole(days / 7))
+            }
+            TimeUnit::Day => {
+                let days = from
+                    .until(to)
+                    .map(|span| i64::from(span.get_days()))
+                    .map_err(|_| CalendarError::OutOfRange)?;
+                Ok(DateDiff::Whole(days))
+            }
+            _ => Err(CalendarError::OutOfRange),
+        }
+    }
+
+    /// Computes civil-clock wall time difference across DST transitions.
+    fn civil_clock_diff(
+        from: civil::DateTime,
+        to: civil::DateTime,
+        unit: TimeUnit,
+    ) -> DateDiff {
+        let delta = to.duration_since(from);
+        DateDiff::Fractional(delta.as_secs_f64() / unit.nominal_seconds())
+    }
+
+    /// Computes physical elapsed duration between two date-times.
+    fn elapsed_diff(
+        from: DateTimeValue,
+        to: DateTimeValue,
+        unit: TimeUnit,
+    ) -> DateDiff {
+        let delta = to.duration_since(from);
+        DateDiff::Fractional(delta.as_secs_f64() / unit.nominal_seconds())
+    }
+
+    /// Computes whole-unit differences using civil delta seconds.
+    fn whole_unit_diff(
+        from: civil::DateTime,
+        to: civil::DateTime,
+        unit: TimeUnit,
+    ) -> Result<DateDiff, CalendarError> {
+        let delta = to.duration_since(from);
+        match unit {
+            TimeUnit::Hour => Ok(DateDiff::Whole(delta.as_secs() / 3_600)),
+            TimeUnit::Minute => Ok(DateDiff::Whole(delta.as_secs() / 60)),
+            TimeUnit::Second => Ok(DateDiff::Whole(delta.as_secs())),
+            TimeUnit::Millisecond => i64::try_from(delta.as_millis())
+                .map(DateDiff::Whole)
+                .map_err(|_| CalendarError::OutOfRange),
+            _ => Err(CalendarError::OutOfRange),
+        }
+    }
+
+    fn whole_years_between(from: civil::Date, to: civil::Date) -> i64 {
+        Self::whole_months_between(from, to) / 12
+    }
+
+    fn whole_months_between(from: civil::Date, to: civil::Date) -> i64 {
+        let (earlier, later, sign) = if to >= from {
+            (from, to, 1)
+        } else {
+            (to, from, -1)
+        };
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "bounded year/month/day fields cannot overflow i64"
+        )]
+        let months = sign
+            * (i64::from(later.year() - earlier.year()) * 12
+                + i64::from(later.month())
+                - i64::from(earlier.month())
+                - i64::from(later.day() < earlier.day()));
+        months
+    }
 }
 
 /// Returns whether a strtime `pattern` includes any time-of-day directives.
@@ -713,18 +732,6 @@ fn pattern_has_time_fields(pattern: &str) -> Option<bool> {
         }
     }
     Some(has_time_fields)
-}
-
-/// Returns `true` if `bytes` begins with a date-like prefix: two or four ASCII
-/// digits followed by `-`.
-fn starts_like_date(bytes: &[u8]) -> bool {
-    bytes.len() >= 5
-        && [2, 4].into_iter().any(|digits| {
-            bytes
-                .get(..digits)
-                .is_some_and(|b| b.iter().all(u8::is_ascii_digit))
-                && bytes.get(digits) == Some(&b'-')
-        })
 }
 
 /// Resolves the process-local time zone for calendar operations.

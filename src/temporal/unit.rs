@@ -15,7 +15,9 @@
 //! unit set, and is the one decomposition routine behind both canonical
 //! spelling and human duration rendering.
 
-use jiff::civil;
+use jiff::{Span, civil};
+
+use super::error::CalendarError;
 
 /// Identifies a recognized duration unit.
 ///
@@ -110,6 +112,38 @@ impl TimeUnit {
     #[must_use]
     pub(crate) const fn is_calendar(self) -> bool {
         self.spec().calendar
+    }
+
+    /// Constructs a single-unit [`Span`] of `n` units.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if `n` cannot be represented as a
+    ///   [`Span`].
+    pub(crate) fn to_span(self, n: i64) -> Result<Span, CalendarError> {
+        let span = match self {
+            Self::Year => Span::new().try_years(n),
+            Self::Month => Span::new().try_months(n),
+            Self::Week => {
+                let count =
+                    i32::try_from(n).map_err(|_| CalendarError::OutOfRange)?;
+                Span::new().try_weeks(count)
+            }
+            Self::Day => {
+                let count =
+                    i32::try_from(n).map_err(|_| CalendarError::OutOfRange)?;
+                Span::new().try_days(count)
+            }
+            Self::Hour => Span::new().try_hours(n),
+            Self::Minute => Span::new().try_minutes(n),
+            Self::Second => Span::new().try_seconds(n),
+            Self::Millisecond => {
+                let count =
+                    i32::try_from(n).map_err(|_| CalendarError::OutOfRange)?;
+                Span::new().try_milliseconds(count)
+            }
+        };
+        span.map_err(|_| CalendarError::OutOfRange)
     }
 }
 
@@ -224,9 +258,23 @@ pub(crate) static TEMPORAL_UNITS: [UnitSpec; 8] = [
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DecomposedPart {
     /// Identifies the unit being counted.
-    pub unit: TimeUnit,
+    unit: TimeUnit,
     /// Stores the whole-unit count; it is always at least 1.
-    pub count: u64,
+    count: u64,
+}
+
+impl DecomposedPart {
+    /// Returns the unit counted by this part.
+    #[must_use]
+    pub(crate) const fn unit(&self) -> TimeUnit {
+        self.unit
+    }
+
+    /// Returns the positive whole-unit count.
+    #[must_use]
+    pub(crate) const fn count(&self) -> u64 {
+        self.count
+    }
 }
 
 /// Greedily decomposes a non-negative magnitude into whole-unit counts.

@@ -1350,8 +1350,8 @@ src/temporal/calendar.rs: pub(crate) const CALENDAR_PERIOD_EDGES: [(&str, Calend
 src/temporal/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
 src/temporal/calendar.rs: pub(crate) enum CalendarPeriod {
 src/temporal/calendar.rs: pub(crate) enum PeriodEdge {
-src/temporal/calendar.rs: pub(super) fn shift_date(
-src/temporal/calendar.rs: pub(super) fn shift_datetime(
+src/temporal/calendar.rs: pub(crate) fn snap_date(
+src/temporal/calendar.rs: pub(crate) fn snap_weekday(
 src/temporal/date.rs: pub fn from_ymd(
 src/temporal/date.rs: pub struct DateValue(civil::Date);
 src/temporal/date.rs: pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
@@ -1362,8 +1362,6 @@ src/temporal/date.rs: pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
 src/temporal/date.rs: pub(crate) fn parse_any(
 src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/date.rs: pub(super) fn advance_span(
-src/temporal/date.rs: pub(super) fn whole_months_until(self, to: Self) -> i64 {
-src/temporal/date.rs: pub(super) fn whole_years_until(self, to: Self) -> i64 {
 src/temporal/datetime.rs: pub fn from_unix_seconds(seconds: i64) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub struct DateTimeValue(Timestamp);
 src/temporal/datetime.rs: pub(crate) const ALL: [Self; 5] = [
@@ -1460,28 +1458,28 @@ src/temporal/point.rs: pub(crate) fn start_of(
 src/temporal/point.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/temporal/point.rs: pub(crate) fn with_weekday(
 src/temporal/point.rs: pub(crate) fn zoned_datetime_in(
-src/temporal/point.rs: pub(super) fn starts_with_year(s: &str) -> bool {
 src/temporal/unit.rs: pub aliases: &'static [&'static str],
 src/temporal/unit.rs: pub calendar: bool,
-src/temporal/unit.rs: pub count: u64,
 src/temporal/unit.rs: pub names: (&'static str, &'static str),
 src/temporal/unit.rs: pub nominal_milliseconds: u64,
 src/temporal/unit.rs: pub nominal_nanoseconds: i128,
 src/temporal/unit.rs: pub nominal_seconds: f64,
 src/temporal/unit.rs: pub unit: TimeUnit,
-src/temporal/unit.rs: pub unit: TimeUnit,
 src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
+src/temporal/unit.rs: pub(crate) const fn count(&self) -> u64 {
 src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
 src/temporal/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
 src/temporal/unit.rs: pub(crate) const fn nominal_nanoseconds(self) -> i128 {
 src/temporal/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
 src/temporal/unit.rs: pub(crate) const fn spec(self) -> &'static UnitSpec {
+src/temporal/unit.rs: pub(crate) const fn unit(&self) -> TimeUnit {
 src/temporal/unit.rs: pub(crate) enum DateUnit {
 src/temporal/unit.rs: pub(crate) enum TimeUnit {
 src/temporal/unit.rs: pub(crate) fn decompose(
 src/temporal/unit.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
 src/temporal/unit.rs: pub(crate) fn of(self, local_datetime: civil::DateTime) -> i64 {
+src/temporal/unit.rs: pub(crate) fn to_span(self, n: i64) -> Result<Span, CalendarError> {
 src/temporal/unit.rs: pub(crate) static TEMPORAL_UNITS: [UnitSpec; 8] = [
 src/temporal/unit.rs: pub(crate) struct DecomposedPart {
 src/temporal/unit.rs: pub(crate) struct UnitSpec {
