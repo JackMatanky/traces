@@ -48,9 +48,8 @@ pub(crate) enum PeriodEdge {
 
 /// Every accepted period-boundary shorthand, in short and long spellings.
 ///
-/// The one name table for start-of/end-of-period selectors: query filters
-/// resolve function names from it and template filters register their names
-/// from it, so the two surfaces cannot drift. Names are matched
+/// Shared by query-filter name resolution and template-filter registration,
+/// preventing the two surfaces from drifting. Names are matched
 /// ASCII-case-insensitively and are unique.
 pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
     ("sow", CalendarPeriod::Week, PeriodEdge::Start),
@@ -181,12 +180,27 @@ pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
 /// # Errors
 ///
 /// - [`CalendarError::OutOfRange`] if the shift overflows representable bounds.
+pub(super) fn shift_date(
+    date: civil::Date,
+    n: i64,
+    unit: TimeUnit,
+) -> Result<civil::Date, CalendarError> {
+    date.checked_add(shift_span(n, unit)?)
+        .map_err(|_| CalendarError::OutOfRange)
+}
+
 pub(super) fn shift_datetime(
     local_datetime: civil::DateTime,
     n: i64,
     unit: TimeUnit,
 ) -> Result<civil::DateTime, CalendarError> {
-    let span = match unit {
+    local_datetime
+        .checked_add(shift_span(n, unit)?)
+        .map_err(|_| CalendarError::OutOfRange)
+}
+
+fn shift_span(n: i64, unit: TimeUnit) -> Result<Span, CalendarError> {
+    match unit {
         TimeUnit::Year => Span::new().try_years(n),
         TimeUnit::Month => Span::new().try_months(n),
         TimeUnit::Week => Span::new().try_weeks(n),
@@ -196,8 +210,7 @@ pub(super) fn shift_datetime(
         TimeUnit::Second => Span::new().try_seconds(n),
         TimeUnit::Millisecond => Span::new().try_milliseconds(n),
     }
-    .map_err(|_| CalendarError::OutOfRange)?;
-    local_datetime.checked_add(span).map_err(|_| CalendarError::OutOfRange)
+    .map_err(|_| CalendarError::OutOfRange)
 }
 
 #[cfg(test)]

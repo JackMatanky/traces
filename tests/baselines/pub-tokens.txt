@@ -1355,6 +1355,7 @@ src/temporal/calendar.rs: pub(crate) enum Difference {
 src/temporal/calendar.rs: pub(crate) enum PeriodEdge {
 src/temporal/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/temporal/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
+src/temporal/calendar.rs: pub(super) fn shift_date(
 src/temporal/calendar.rs: pub(super) fn shift_datetime(
 src/temporal/calendar.rs: pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
 src/temporal/date.rs: pub fn from_ymd(

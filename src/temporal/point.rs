@@ -14,7 +14,7 @@ use super::{
     CalendarError, CalendarPeriod, DATE_PATTERN, DateComponent, DateError,
     DateTimeValue, DateValue, Difference, DurationComponent, DurationValue,
     PeriodEdge, TimeUnit,
-    calendar::{shift_datetime, span_from_seconds},
+    calendar::{shift_date, shift_datetime, span_from_seconds},
     date::DateShape,
     datetime::{DateTimeShape, ParsedDateTime},
 };
@@ -137,6 +137,17 @@ impl DatePoint {
         unit: TimeUnit,
     ) -> Result<Self, CalendarError> {
         match self {
+            Self::Calendar {
+                date,
+                date_precision,
+            } if unit.is_calendar() => Ok(Self::Calendar {
+                date: DateValue::from_civil_date(shift_date(
+                    date.civil_date(),
+                    n,
+                    unit,
+                )?),
+                date_precision,
+            }),
             Self::Calendar {
                 date_precision,
                 ..

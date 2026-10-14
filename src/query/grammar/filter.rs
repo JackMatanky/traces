@@ -6,7 +6,8 @@
 //! - Dotted and bare field path lookups resolved via [`FieldPath`].
 //! - Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) with type
 //!   coercion.
-//! - Function calls such as `contains(field, target)` with tag prefix matching.
+//! - Function calls (for example, contains(field, target)) support tag-prefix
+//!   matching.
 //! - Value expressions: date ± duration, date − date (duration result),
 //!   duration ± duration and duration × number, plus `dur`, `date_add`,
 //!   `date_diff`, and `date_component` calls. Arithmetic groups left-to-right
@@ -232,7 +233,7 @@ impl ComparisonExpr {
     /// (`Null`, `Bool`, `Number`) are already typed. Reuses
     /// [`TextShape::classify`] (the same heuristic `SortKey::from_text`
     /// uses), so filter literals and sort-key text classify identically, not
-    /// via a second hand-rolled copy.
+    /// via a duplicate implementation.
     pub(super) fn classify_literal(literal: NoteFieldValue) -> NoteFieldValue {
         let NoteFieldValue::String(text) = &literal else {
             return literal;
@@ -953,6 +954,12 @@ impl FilterGrammar {
                 QuerySyntaxError::from_lex(QueryDialect::Filter, input, err)
             })?;
         function.validate_args(&args, input, span)?;
+        if function == QueryFunction::Dur
+            && let [ValueExpr::Literal(value)] = args.as_slice()
+            && let Some(value) = function.evaluate(std::slice::from_ref(value))
+        {
+            return Ok(ValueExpr::Literal(value));
+        }
         Ok(ValueExpr::Call {
             function,
             args,
@@ -1190,7 +1197,7 @@ enum FilterToken {
     Ident(String),
 }
 
-/// Unescapes a quoted string literal into a [`NoteFieldValue::String`].
+/// Decodes a quoted string literal into a string field value.
 #[expect(
     clippy::needless_pass_by_ref_mut,
     reason = "logos Callback trait requires &mut Lexer"
@@ -1368,13 +1375,14 @@ mod tests {
             ]);
 
             // In canonical rank: Number < Text.
-            // rating > 5 matches num_high (7 > 5) and text ("gold" > 5 by
-            // rank).
+            // Rating > 5 matches the numeric row (7 > 5) and the text row
+            // ("gold" > 5 by rank).
             let filtered =
                 rows.clone().filter("rating > 5").expect("valid filter");
             assert_eq!(names(&filtered), ["num_high", "text"]);
 
-            // sort rating asc orders: num_low (3), num_high (7), text ("gold").
+            // Sorting rating ascending yields the numeric rows (3, 7), then
+            // text ("gold").
             let sorted = rows.sort("rating", false).expect("valid sort");
             assert_eq!(names(&sorted), ["num_low", "num_high", "text"]);
         }
@@ -1522,10 +1530,9 @@ mod tests {
 
         #[test]
         fn evaluates_a_date_only_literal_at_local_midnight() {
-            // A naive literal means the reader's zone: the boundaries here
-            // are local midnight in the pinned UTC+2 zone (2025-12-31T22:00Z
-            // through 2026-01-01T22:00Z), which still separates the two
-            // fixture instants.
+            // A naive literal uses the reader's zone. In the pinned UTC+2 zone,
+            // local midnight falls at December 31 at 22:00 UTC through January
+            // 1 at 22:00 UTC, which still separates the fixture instants.
             ZoneGuard::set("Etc/GMT-2");
 
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -1571,8 +1578,9 @@ mod tests {
 
         #[test]
         fn matches_calendar_days_via_mdate() {
-            // `mdate` is the mtime's local calendar date, so the expectation
-            // only holds in the pinned zone.
+            // This field is a local calendar date derived from file
+            // modification time, so the expectation only holds in
+            // the pinned zone.
             ZoneGuard::set("UTC");
 
             let temp = tempfile::tempdir().expect("create temp dir");
