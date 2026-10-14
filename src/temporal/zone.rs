@@ -74,7 +74,7 @@ impl ZoneGuard {
     ///
     /// Panics if `zone` is not a recognized time-zone name.
     #[inline]
-    #[allow(
+    #[expect(
         clippy::panic,
         reason = "unknown test zones indicate a fixture error"
     )]
@@ -179,6 +179,19 @@ mod tests {
         use super::*;
 
         #[test]
+        fn keeps_the_current_zone_unchanged_and_is_idempotent() {
+            // Arrange
+            let expected = local_zone();
+
+            // Act
+            ZoneGuard::keep();
+            ZoneGuard::keep();
+
+            // Assert
+            assert_eq!(local_zone(), expected);
+        }
+
+        #[test]
         fn restores_the_previous_zone_when_dropped() {
             // Arrange
             let previous = local_zone();
@@ -196,7 +209,7 @@ mod tests {
         }
 
         #[test]
-        #[allow(
+        #[expect(
             clippy::panic,
             clippy::disallowed_methods,
             reason = "exercise guard restoration during unwinding"
