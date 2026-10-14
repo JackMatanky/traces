@@ -1,4 +1,4 @@
-//! Date points and the precision-aware arithmetic over them.
+//! Defines date points and their precision-aware arithmetic.
 //!
 //! Owns [`DatePoint`], a Date written at a month or day [`DatePrecision`], or a
 //! Date-Time stored as UTC that renders as the local clock. Parsing retains the
@@ -19,7 +19,7 @@ use super::{
     datetime::{DateTimeShape, ParsedDateTime},
 };
 
-/// Calendar precision of a zone-free date point.
+/// Tracks whether a zone-free date point uses month or full-date precision.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePrecision {
     /// Year and month.
@@ -28,22 +28,23 @@ pub(crate) enum DatePrecision {
     Day,
 }
 
-/// A Date written at a month or day precision, or a Date-Time.
+/// Represents a date at its written precision or a Date-Time.
 ///
 /// Calendar points are zone-free and carry the written [`DatePrecision`].
-/// Date-Time points store UTC and resolve naive input in the process's local
+/// Date-Time points store UTC and resolve naive input in the process-local
 /// zone (a repeated local time takes the earlier occurrence; a skipped local
 /// time shifts forward by the gap length).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePoint {
-    /// A zone-free Date at the written precision.
+    /// Stores a zone-free Date at its written precision.
     Calendar {
-        /// The calendar date; month precision stores the first of the month.
+        /// Stores the calendar date; month precision stores the first of the
+        /// month.
         date: DateValue,
-        /// How much of `date` was written.
+        /// Records how much of `date` the input specified.
         date_precision: DatePrecision,
     },
-    /// A Date-Time stored as UTC, rendered as the local clock.
+    /// Stores a UTC Date-Time and renders it as the local clock.
     DateTime(DateTimeValue),
 }
 

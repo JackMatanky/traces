@@ -1,4 +1,4 @@
-//! A validated duration with a nominal identity and a calendar application
+//! Defines validated durations with nominal identity and a calendar application
 //! regime.
 //!
 //! Owns [`DurationValue`], the nominal-seconds measure [`DurationSeconds`], and
@@ -42,15 +42,14 @@ use super::{
     unit::{CANONICAL_UNITS, DecomposedPart, HUMAN_UNITS, TimeUnit, decompose},
 };
 
-/// A validated duration with a nominal identity and a calendar application
-/// regime.
+/// Represents a validated duration with a nominal identity and a calendar
+/// application regime.
 ///
 /// Stores a Jiff [`Span`] alongside its written spelling and components.
 /// Nominal seconds define equality, ordering, and hashing; written components
 /// preserve calendar application semantics. Checked arithmetic rejects values
 /// outside Jiff's representable span range.
-/// Equality, ordering, and hashing compare nominal seconds, so two spellings of
-/// one elapsed time are one value.
+/// Callers can inspect the preserved spelling without reconstructing it.
 ///
 /// # Examples
 ///
@@ -87,7 +86,21 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// Returns the corresponding parse, finiteness, or range error.
+    /// - [`DurationError::Empty`] if the input contains no component.
+    /// - [`DurationError::MissingNumber`] if a unit has no preceding number.
+    /// - [`DurationError::MisplacedSign`] if a sign appears in an invalid
+    ///   position.
+    /// - [`DurationError::MalformedNumber`] if a component has invalid float
+    ///   syntax.
+    /// - [`DurationError::MissingUnit`] if a number has no following unit.
+    /// - [`DurationError::UnknownUnit`] if a component names an unrecognized
+    ///   unit.
+    /// - [`DurationError::NumberOverflow`] if a component magnitude parses as
+    ///   infinity.
+    /// - [`DurationError::NonFiniteSeconds`] if the combined magnitude is
+    ///   non-finite.
+    /// - [`DurationError::SecondsOutOfRange`] if Jiff cannot represent the
+    ///   span.
     pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
         let trimmed = input.trim();
         if trimmed.is_empty() {
@@ -136,6 +149,12 @@ impl DurationValue {
     ///
     /// This is the only constructor for the fixed regime: a value with no
     /// written components always comes from here.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::NonFiniteSeconds`] if `seconds` is not finite.
+    /// - [`DurationError::SecondsOutOfRange`] if Jiff cannot represent the
+    ///   span.
     #[inline]
     pub(crate) fn from_nominal_seconds(
         seconds: DurationSeconds,
@@ -152,6 +171,13 @@ impl DurationValue {
     ///
     /// `spelling` is the written text the components were parsed or transformed
     /// from, retained verbatim.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::NonFiniteSeconds`] if component folding is
+    ///   non-finite.
+    /// - [`DurationError::SecondsOutOfRange`] if Jiff cannot represent the
+    ///   span.
     #[inline]
     fn from_components(
         spelling: Box<str>,
@@ -281,12 +307,13 @@ impl DurationValue {
     ///
     /// # Arguments
     ///
-    /// * rhs - The duration to add.
+    /// - `rhs`: The duration to add.
     ///
     /// # Errors
     ///
-    /// Returns an error for a non-finite result or when the result exceeds
-    /// Jiff's span range.
+    /// - [`DurationError::NonFiniteSeconds`] if the result is non-finite.
+    /// - [`DurationError::SecondsOutOfRange`] if the result exceeds Jiff’s span
+    ///   range.
     #[inline]
     pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
         let total =
@@ -316,11 +343,13 @@ impl DurationValue {
     ///
     /// # Arguments
     ///
-    /// * rhs - The duration to subtract.
+    /// - `rhs`: The duration to subtract.
     ///
     /// # Errors
     ///
-    /// Returns an error for a non-finite result or an out-of-range span.
+    /// - [`DurationError::NonFiniteSeconds`] if the result is non-finite.
+    /// - [`DurationError::SecondsOutOfRange`] if the result exceeds Jiff’s span
+    ///   range.
     #[inline]
     pub fn checked_sub(self, rhs: Self) -> Result<Self, DurationError> {
         let total =
@@ -356,12 +385,14 @@ impl DurationValue {
     ///
     /// # Arguments
     ///
-    /// * factor - The finite scale factor.
+    /// - `factor`: The finite scale factor.
     ///
     /// # Errors
     ///
-    /// Returns an error for a non-finite factor or result, or an out-of-range
-    /// span.
+    /// - [`DurationError::NonFiniteSeconds`] if `factor` or the scaled result
+    ///   is non-finite.
+    /// - [`DurationError::SecondsOutOfRange`] if the scaled span exceeds Jiff’s
+    ///   range.
     #[inline]
     pub fn checked_mul(self, factor: f64) -> Result<Self, DurationError> {
         if !factor.is_finite() {
@@ -402,13 +433,32 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// Returns an error when the negated span cannot be represented.
+    /// - [`DurationError::SecondsOutOfRange`] if the negated span exceeds
+    ///   Jiff’s range.
     #[inline]
     pub fn checked_neg(self) -> Result<Self, DurationError> {
         self.checked_mul(-1.0)
     }
 
     /// Scans a duration in either whole-input or prefix mode.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::Empty`] if the input contains no component.
+    /// - [`DurationError::MissingNumber`] if a unit has no preceding number.
+    /// - [`DurationError::MisplacedSign`] if a sign appears in an invalid
+    ///   position.
+    /// - [`DurationError::MalformedNumber`] if a component has invalid float
+    ///   syntax.
+    /// - [`DurationError::MissingUnit`] if a number has no following unit.
+    /// - [`DurationError::UnknownUnit`] if a component names an unrecognized
+    ///   unit.
+    /// - [`DurationError::NumberOverflow`] if a component magnitude parses as
+    ///   infinity.
+    /// - [`DurationError::NonFiniteSeconds`] if the combined magnitude is
+    ///   non-finite.
+    /// - [`DurationError::SecondsOutOfRange`] if the resulting span exceeds
+    ///   Jiff’s range.
     fn scan(input: &str, prefix: bool) -> Result<(Self, usize), DurationError> {
         let bytes = input.as_bytes();
         let mut position = 0;
@@ -732,12 +782,12 @@ impl<'de> Deserialize<'de> for DurationValue {
     }
 }
 
-/// One written duration magnitude and its unit.
+/// Stores one written duration magnitude and its time unit.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct DurationComponent {
-    /// Signed magnitude, with the leading sign applied.
+    /// Stores the signed magnitude, with the leading sign applied.
     magnitude: f64,
-    /// Unit associated with this magnitude.
+    /// Stores the unit associated with this magnitude.
     unit: TimeUnit,
 }
 
@@ -901,7 +951,7 @@ fn span_from_components(
         .and_then(|span| span.try_nanoseconds(nanos))
         .map_err(|_| DurationError::SecondsOutOfRange)
 }
-/// A duration measured in seconds.
+/// Represents a duration in nominal seconds.
 ///
 /// Wraps `f64` with NaN-safe ordering and arithmetic; operators do not
 /// re-validate finiteness, so overflow can yield a non-finite result. Parsing
@@ -937,7 +987,11 @@ impl DurationSeconds {
 impl TryFrom<f64> for DurationSeconds {
     type Error = DurationError;
 
-    /// Normalizes a signed zero to positive zero (see the type docs).
+    /// Normalizes a signed zero to positive zero.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::NonFiniteSeconds`] if `secs` is `NaN` or infinite.
     #[inline]
     fn try_from(secs: f64) -> Result<Self, Self::Error> {
         secs.is_finite()

@@ -4,7 +4,11 @@ use jiff::tz::TimeZone;
 
 use super::DateError;
 
-/// Resolves a time-zone source into a user-facing lookup error.
+/// Maps a failed local-zone lookup to [`DateError::LocalZoneLookup`].
+///
+/// # Errors
+///
+/// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
 fn resolve<E>(
     source: impl FnOnce() -> Result<TimeZone, E>,
 ) -> Result<TimeZone, DateError>

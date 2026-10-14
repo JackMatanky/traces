@@ -1,4 +1,4 @@
-//! A zone-free calendar date.
+//! Defines zone-free calendar dates.
 //!
 //! Owns [`DateValue`] and the ISO recognition shape ([`DateShape`]) that turns
 //! written `YYYY-MM-DD` and `YYYY-MM` input into it. Every accepted input year
@@ -17,10 +17,10 @@ use super::{
     point::{DatePrecision, starts_with_year},
 };
 
-/// Canonical output format of [`DateValue`]: `2026-07-29`.
+/// Defines the canonical display format for [`DateValue`]: `2026-07-29`.
 pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 
-/// A zone-free calendar date with no time of day.
+/// Represents a zone-free calendar date with no time of day.
 ///
 /// Carries a validated `YYYY-MM-DD` day on the proleptic Gregorian calendar: no
 /// zone and no clock time. Full dates require zero-padded month and day fields;
@@ -51,8 +51,8 @@ impl DateValue {
     ///
     /// # Errors
     ///
-    /// Returns [`DateError::InvalidValue`] if the year is outside `0..=9999` or
-    /// the fields do not name a representable Gregorian date.
+    /// - [`DateError::InvalidValue`] if the year is outside `0..=9999` or the
+    ///   fields do not name a representable Gregorian date.
     #[inline]
     pub fn from_ymd(
         year: i32,
@@ -168,7 +168,7 @@ impl DateValue {
     }
 }
 
-/// Recognized date input format shapes, tried in order by
+/// Defines the recognized date input shapes, tried in order by
 /// [`DateShape::parse_any`] for [`DatePoint::parse`](super::DatePoint::parse)
 /// and [`DateValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -201,9 +201,8 @@ impl DateShape {
     ///
     /// # Errors
     ///
-    /// Returns the static reason the best-fitting shape rejected `s`: the
-    /// year-month reason for 7-byte input (`YYYY-MM`), the full-date reason
-    /// otherwise.
+    /// - A static reason from the best-fitting shape: the year-month reason for
+    ///   7-byte input (`YYYY-MM`), or the full-date reason otherwise.
     pub(crate) fn parse_any(
         s: &str,
     ) -> Result<(civil::Date, DatePrecision), &'static str> {
@@ -298,8 +297,8 @@ impl TryFrom<SystemTime> for DateValue {
     ///
     /// # Errors
     ///
-    /// Returns [`DateError::InvalidValue`] if `time` is outside the
-    /// representable timestamp range.
+    /// - [`DateError::InvalidValue`] if `time` is outside the representable
+    ///   timestamp range.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
         Ok(DateTimeValue::try_from(time)?.local_date())

@@ -1,4 +1,4 @@
-//! Shared builders for the temporal test suites.
+//! Defines shared builders for the temporal test suites.
 //!
 //! Contains only value builders; assertions live in the owning test modules.
 

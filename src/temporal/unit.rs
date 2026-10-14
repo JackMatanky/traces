@@ -1,5 +1,5 @@
-//! The closed set of time units the crate accepts, with one row of facts per
-//! unit.
+//! Defines the closed set of time units the crate accepts, with one row of
+//! facts per unit.
 //!
 //! [`UNITS`] is the only place a unit's accepted spellings, nominal length,
 //! frame, and human names are stated; callers read those facts from
@@ -12,7 +12,7 @@
 //! unit set, and is the one decomposition routine behind both the canonical
 //! spelling and [`DurationValue::humanize`](super::DurationValue::humanize).
 
-/// A recognized duration unit.
+/// Identifies a recognized duration unit.
 ///
 /// Selecting a variant fixes the unit's accepted spellings, canonical short
 /// spelling, nominal length in seconds, frame (calendar or exact), and human
@@ -38,32 +38,33 @@ pub(crate) enum TimeUnit {
     Year,
 }
 
-/// Every fact the crate states about one time unit.
+/// Stores the registry facts for one time unit.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct UnitSpec {
-    /// The unit this row describes.
+    /// Identifies the unit described by this row.
     pub unit: TimeUnit,
-    /// Canonical short spelling used in synthesized duration text.
+    /// Stores the canonical short spelling used in synthesized duration text.
     pub spelling: &'static str,
-    /// Every accepted input spelling, lowercase, [`Self::spelling`] included.
+    /// Lists every accepted lowercase input spelling, [`Self::spelling`]
+    /// included.
     pub aliases: &'static [&'static str],
-    /// Singular and plural English names for human-readable output.
+    /// Stores singular and plural English names for human-readable output.
     pub names: (&'static str, &'static str),
     /// Fixed nominal seconds per unit, the sole unit-ratio table in the crate.
     ///
     /// Calendar units get nominal fixed ratios here for value identity,
     /// magnitude ordering, and fractional-remainder application; their
-    /// whole-count date-shifting behavior belongs to the calendar owner
+    /// Stores fixed nominal seconds per unit, the sole unit-ratio table.
     /// modules.
     pub nominal_seconds: f64,
-    /// Exact nominal milliseconds used by integer decomposition.
+    /// Stores the exact nominal milliseconds used by integer decomposition.
     pub nominal_milliseconds: u64,
-    /// Whether the unit takes effect on the local clock (`true`) or as exact
-    /// elapsed time (`false`).
+    /// Reports whether the unit takes effect on the local clock (`true`) or as
+    /// exact elapsed time (`false`).
     pub calendar: bool,
 }
 
-/// The unit registry, ordered largest unit first.
+/// Lists the time-unit registry in largest-first order.
 ///
 /// [`decompose`] and the unit sets below depend on this order. A new unit adds
 /// a row here and a variant to [`TimeUnit`]; the `invariants` tests fail to
@@ -143,7 +144,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
 ];
 
-/// Units the canonical spelling decomposes over: sub-year, largest first.
+/// Lists the units used for canonical spelling, from largest to smallest.
 ///
 /// Month and Year are omitted because their nominal ratios are identities, not
 /// applications: a synthesized magnitude never claims calendar meaning.
@@ -156,7 +157,8 @@ pub(crate) const CANONICAL_UNITS: [TimeUnit; 6] = [
     TimeUnit::Millisecond,
 ];
 
-/// Units [`DurationValue::humanize`] decomposes over, largest first.
+/// Lists the units that [`DurationValue::humanize`] decomposes over, largest
+/// first.
 ///
 /// Millisecond is omitted: the sub-second remainder is rounded and rendered as
 /// one tail count instead of a decomposed row.
@@ -170,12 +172,12 @@ pub(crate) const HUMAN_UNITS: [TimeUnit; 7] = [
     TimeUnit::Second,
 ];
 
-/// One whole-unit row of a magnitude decomposition.
+/// Stores one whole-unit row of a magnitude decomposition.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DecomposedPart {
-    /// The unit being counted.
+    /// Identifies the unit being counted.
     pub unit: TimeUnit,
-    /// Whole units in the magnitude; always at least 1.
+    /// Stores the whole-unit count; it is always at least 1.
     pub count: u64,
 }
 
@@ -213,7 +215,7 @@ pub(crate) fn decompose(
     (parts, rem)
 }
 
-/// Returns the exact nominal millisecond count for [unit].
+/// Returns the exact nominal millisecond count for [`TimeUnit`].
 fn whole_milliseconds(unit: TimeUnit) -> u64 {
     unit.spec().nominal_milliseconds
 }
@@ -290,10 +292,10 @@ impl TimeUnit {
     }
 }
 
-/// Human-readable list of accepted unit spellings for error messages.
+/// Provides a human-readable hint of accepted unit spellings.
 ///
 /// Lists one spelling per [`UNITS`] row, not every accepted alias; the
-/// `invariants` tests pin that every row's compact spelling appears here.
+/// `invariants` tests pin that every row’s compact spelling appears here.
 pub(crate) const UNIT_SPELLINGS_HINT: &str =
     "\"years\"/\"y\", \"months\"/\"mo\", \"weeks\"/\"w\", \"days\"/\"d\", \
      \"hours\"/\"h\", \"minutes\"/\"m\", \"seconds\"/\"s\", or \"ms\"";

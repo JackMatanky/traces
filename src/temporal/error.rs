@@ -1,15 +1,15 @@
-//! Public parsing errors and internal temporal arithmetic errors.
+//! Defines public parsing errors and internal temporal arithmetic errors.
 //!
 //! [`DateError`] reports date and date-time parsing or local-zone resolution
-//! failures. [`CalendarError`] reports internal calendar-arithmetic failures,
-//! while [`DurationError`] reports duration parsing, validation, and conversion
+//! failures. Internal calendar arithmetic uses a separate error type.
+//! [`DurationError`] reports duration parsing, validation, and conversion
 //! failures. The [`Display`](std::fmt::Display) text of each variant is the
 //! message shown by the CLI and is part of the crate's contract.
 
-/// Error type for date/date-time parsing and local-zone resolution failures.
+/// Reports date/date-time parsing and local-zone resolution failures.
 ///
-/// Raised by the typed [`DateValue`] and [`DateTimeValue`] parsers. Calendar
-/// arithmetic failures use the crate-internal `CalendarError` instead.
+/// Typed [`DateValue`] and [`DateTimeValue`] parsers return this error.
+/// Calendar arithmetic failures use a separate internal error type.
 ///
 /// # Examples
 ///
@@ -32,7 +32,8 @@
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum DateError {
-    /// No accepted date/time shape matched `input` (e.g., "2026/08/22").
+    /// Reports that no accepted date/time shape matched `input` (e.g.,
+    /// "2026/08/22").
     #[error("`{input}` is not a recognized date/time: {reason}")]
     InvalidValue {
         /// The raw input that failed to parse.
@@ -49,7 +50,7 @@ pub enum DateError {
         /// The raw input that failed to parse.
         input: Box<str>,
     },
-    /// The process's local zone could not resolve a naive input.
+    /// Reports that the process-local zone could not resolve a naive input.
     ///
     /// DST ambiguities and gaps never produce this error; they resolve
     /// deterministically.
@@ -60,13 +61,14 @@ pub enum DateError {
     },
 }
 
-/// Error returned by internal calendar arithmetic.
+/// Reports failures in internal calendar arithmetic.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum CalendarError {
-    /// Calendar arithmetic exceeded the representable range.
+    /// Reports that calendar arithmetic exceeds the representable range.
     #[error("date/time value is out of range")]
     OutOfRange,
-    /// Local-zone resolution failed for a computed local clock time.
+    /// Reports that local-zone resolution failed for a computed local clock
+    /// time.
     #[error("local zone lookup failed for {input}")]
     Zone {
         /// Local clock time that could not be resolved.
@@ -92,12 +94,12 @@ impl CalendarError {
     }
 }
 
-/// Error returned when a duration operation fails.
+/// Reports failures in duration parsing, validation, and conversion.
 ///
-/// Three failure domains:
+/// Covers three failure domains:
 ///
-/// - Parsing human-readable duration text;
-/// - Validating raw seconds;
+/// - Parsing human-readable duration text.
+/// - Validating raw seconds.
 /// - Converting nominal seconds to a Jiff span.
 ///
 /// Parse failures carry no copy of the input: the caller already holds it.

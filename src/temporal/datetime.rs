@@ -1,4 +1,4 @@
-//! A UTC-stored Date-Time that renders as the local clock.
+//! Defines UTC-stored Date-Times that render as the local clock.
 //!
 //! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
 //! [`ParsedDateTime`]) that turn written RFC 3339 and naive clock times into
@@ -17,17 +17,19 @@ use super::{
     zone::local_zone,
 };
 
-/// Canonical output format of [`DateTimeValue`]: `2026-07-29T14:30:00`.
+/// Defines the canonical display format for [`DateTimeValue`]:
+/// `2026-07-29T14:30:00`.
 pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
-/// A Date-Time stored as UTC that renders as the local clock.
+/// Stores a Date-Time in UTC and renders it as the local clock.
 ///
 /// Accepts RFC 3339 input with an explicit offset, except leap seconds,
 /// which Jiff cannot represent. ISO date portions require zero-padded month
 /// and day fields. Naive input in the five accepted shapes resolves in the
-/// process’s local zone. Folds take the earlier occurrence; gaps shift forward
+/// process-local zone. Folds take the earlier occurrence; gaps shift forward
 /// by their length. Pattern-based parsing uses a separate strftime grammar and
 /// retains its pattern-driven padding rules.
+///
 /// [`Display`](fmt::Display) renders the local clock time without a zone
 /// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
 /// Deserialization runs the same parser as [`FromStr`](std::str::FromStr), so
@@ -72,8 +74,8 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// Returns [`DateError::InvalidValue`] if `seconds` lies outside Jiff's
-    /// representable timestamp range.
+    /// - [`DateError::InvalidValue`] if `seconds` lies outside Jiff’s
+    ///   representable timestamp range.
     ///
     /// # Examples
     ///
@@ -175,8 +177,8 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// Returns [`CalendarError::Zone`] when the civil time or resolved UTC
-    /// Date-Time is outside the supported range.
+    /// - [`CalendarError::Zone`] if Jiff cannot resolve the local time within
+    ///   the supported Date-Time range.
     pub(super) fn from_local(
         local_datetime: civil::DateTime,
     ) -> Result<Self, CalendarError> {
@@ -184,6 +186,11 @@ impl DateTimeValue {
     }
 
     /// Resolves a naive local clock time in the explicitly supplied zone.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::Zone`] if Jiff cannot resolve the local time within
+    ///   the supported Date-Time range.
     pub(super) fn from_local_in(
         local_datetime: civil::DateTime,
         zone: &TimeZone,
@@ -309,6 +316,12 @@ impl fmt::Display for DateTimeValue {
 impl TryFrom<SystemTime> for DateTimeValue {
     type Error = DateError;
 
+    /// Converts a system time to a UTC-stored Date-Time.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::InvalidValue`] if `time` lies outside Jiff’s
+    ///   representable timestamp range.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
         Timestamp::try_from(time).map(Self).map_err(|_| {
@@ -323,6 +336,13 @@ impl TryFrom<SystemTime> for DateTimeValue {
 impl TryFrom<DateValue> for DateTimeValue {
     type Error = DateError;
 
+    /// Converts a calendar date to local midnight, falling back to UTC if the
+    /// local zone cannot represent that time.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::InvalidValue`] if neither zone can represent the date’s
+    ///   midnight as a Date-Time.
     #[inline]
     fn try_from(date: DateValue) -> Result<Self, Self::Error> {
         let midnight = date.civil_date().at(0, 0, 0, 0);
@@ -376,7 +396,7 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     }
 }
 
-/// Recognized date-time input format shapes, tried in order by
+/// Defines recognized date-time input shapes, tried in order by
 /// [`DateTimeValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateTimeShape {
@@ -421,7 +441,7 @@ impl DateTimeShape {
     ///
     /// # Errors
     ///
-    /// Returns a static reason when no accepted shape matches.
+    /// - A static reason if no accepted date-time shape matches `s`.
     pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
         let normalized_input = normalized.as_ref();
@@ -463,7 +483,11 @@ impl DateTimeShape {
         Cow::Owned(format!("{prefix}.{leading}{suffix}"))
     }
 
-    /// Parses according to this format, returning a parsed datetime shape.
+    /// Parses this format into a parsed date-time shape.
+    ///
+    /// # Errors
+    ///
+    /// - A static reason if the input does not match this format.
     fn parse_shape(self, s: &str) -> Result<ParsedDateTime, &'static str> {
         match self.pattern() {
             None if !numeric_rfc3339_offset_is_valid(s) => {
@@ -519,12 +543,12 @@ fn numeric_rfc3339_offset_is_valid(input: &str) -> bool {
     };
     hours <= 23 && minutes <= 59
 }
-/// The parsed shape of a date-time string before local-zone resolution.
+/// Stores the parsed date-time shape before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParsedDateTime {
-    /// An explicit RFC 3339 date-time with its offset applied.
+    /// Stores an explicit RFC 3339 date-time with its offset applied.
     Instant(Timestamp),
-    /// Local civil datetime that must resolve through
+    /// Stores a naive local civil date-time that must resolve through
     /// [`DateTimeValue::from_local`].
     Unzoned(civil::DateTime),
 }

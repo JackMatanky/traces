@@ -1,4 +1,4 @@
-//! Vocabulary shared by date-point arithmetic and its callers: calendar
+//! Defines vocabulary shared by date-point arithmetic and its callers: calendar
 //! periods, period edges, components, and differences.
 //!
 //! This module owns the names that date-point arithmetic and its query and
@@ -10,17 +10,19 @@
 //!
 //! # Key Types
 //!
-//! - [`CalendarPeriod`]: a calendar period that date-point boundaries select.
-//! - [`PeriodEdge`]: which side of a calendar period a boundary selects.
-//! - [`DateComponent`]: a named calendar or clock component of a date point.
-//! - [`Difference`]: the measured difference between two date points.
+//! - [`CalendarPeriod`]: Represents a calendar period selected by date-point
+//!   boundaries.
+//! - [`PeriodEdge`]: Selects the side of a calendar period used by a boundary.
+//! - [`DateComponent`]: Identifies a calendar or clock component of a date
+//!   point.
+//! - [`Difference`]: Stores a measured difference between two date points.
 
 use jiff::{Span, civil};
 
 use super::error::CalendarError;
 use crate::temporal::TimeUnit;
 
-/// A calendar period that date-point boundaries select.
+/// Represents a calendar period that date-point boundaries select.
 ///
 /// Selecting a variant fixes the span a start-of or end-of boundary lands on:
 /// the ISO week, the calendar month, or the calendar year.
@@ -34,9 +36,9 @@ pub(crate) enum CalendarPeriod {
     Year,
 }
 
-/// Which side of a calendar period a boundary selects.
+/// Selects which side of a calendar period a boundary uses.
 ///
-/// Selecting a variant fixes whether a boundary lands on the first or the last
+/// Selecting a variant fixes whether the boundary lands on the first or last
 /// day of the period.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PeriodEdge {
@@ -46,7 +48,8 @@ pub(crate) enum PeriodEdge {
     End,
 }
 
-/// Every accepted period-boundary shorthand, in short and long spellings.
+/// Lists every accepted period-boundary shorthand in its short and long
+/// spellings.
 ///
 /// Shared by query-filter name resolution and template-filter registration,
 /// preventing the two surfaces from drifting. Names are matched
@@ -66,7 +69,8 @@ pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
     ("end_of_year", CalendarPeriod::Year, PeriodEdge::End),
 ];
 
-/// A named calendar or clock component of a [`DatePoint`](super::DatePoint).
+/// Identifies a named calendar or clock component of a
+/// [`DatePoint`](super::DatePoint).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateComponent {
     /// Calendar year.
@@ -112,7 +116,7 @@ impl DateComponent {
     }
 }
 
-/// Result of measuring the difference between two date points.
+/// Stores the result of measuring the difference between two date points.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Difference {
     /// Whole units elapsed.
@@ -161,7 +165,7 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
 ///
 /// # Errors
 ///
-/// Returns [`CalendarError::OutOfRange`] when the value cannot be represented.
+/// - [`CalendarError::OutOfRange`] if the value cannot be represented.
 pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
     super::duration::span_from_nominal_seconds(part_secs)
         .map_err(|_| CalendarError::OutOfRange)

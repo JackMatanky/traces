@@ -1,4 +1,5 @@
-//! Calendar dates, Date-Times, Durations, and the arithmetic that relates them.
+//! Provides calendar dates, Date-Times, Durations, and the arithmetic that
+//! relates them.
 //!
 //! This module owns recognition, parsing, formatting, and value semantics for
 //! date-shaped and duration-shaped input. Callers use validated values; parse
@@ -23,11 +24,12 @@
 //!
 //! # Key Types
 //!
-//! - [`DateValue`]: A zone-free calendar date with written precision.
-//! - [`DateTimeValue`]: A UTC-stored Date-Time rendered as the local clock.
-//! - [`DurationValue`]: A validated duration with nominal identity and a
-//!   calendar or exact application regime.
-
+//! - [`DateValue`]: Represents a zone-free calendar date with written
+//!   precision.
+//! - [`DateTimeValue`]: Stores a UTC Date-Time and renders it as the local
+//!   clock.
+//! - [`DurationValue`]: Represents a validated duration with nominal identity
+//!   and a calendar or exact application regime.
 mod calendar;
 mod date;
 mod datetime;
