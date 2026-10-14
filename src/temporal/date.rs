@@ -36,6 +36,7 @@ pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
 ///
 /// let date: DateValue = "2026-07-29".parse()?;
 /// assert_eq!(date.to_string(), "2026-07-29");
+/// assert_eq!(DateValue::from_ymd(2024, 2, 29)?.to_string(), "2024-02-29");
 ///
 /// let error = "26-08-22".parse::<DateValue>();
 /// assert!(matches!(error, Err(DateError::YearNotFourDigits { .. })));
@@ -50,8 +51,8 @@ impl DateValue {
     ///
     /// # Errors
     ///
-    /// Returns [`DateError::InvalidValue`] if the fields do not name a
-    /// representable Gregorian date.
+    /// Returns [`DateError::InvalidValue`] if the year is outside `0..=9999` or
+    /// the fields do not name a representable Gregorian date.
     #[inline]
     pub fn from_ymd(
         year: i32,
@@ -62,6 +63,9 @@ impl DateValue {
             input: format!("{year}-{month}-{day}").into(),
             reason: "a field is out of range",
         };
+        if !(0..=9999).contains(&year) {
+            return Err(invalid());
+        }
         let year = i16::try_from(year).map_err(|_| invalid())?;
         let month = i8::try_from(month).map_err(|_| invalid())?;
         let day = i8::try_from(day).map_err(|_| invalid())?;
@@ -290,6 +294,12 @@ impl From<civil::Date> for DateValue {
 impl TryFrom<SystemTime> for DateValue {
     type Error = DateError;
 
+    /// Converts `time` to its date in the current local time zone.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DateError::InvalidValue`] if `time` is outside the
+    /// representable timestamp range.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
         Ok(DateTimeValue::try_from(time)?.local_date())
@@ -341,6 +351,42 @@ mod tests {
 
         use super::*;
 
+        #[test]
+        fn constructs_dates_from_valid_boundary_fields() {
+            // Arrange: the leap day and the two supported year endpoints.
+            // Act
+            let dates = [
+                DateValue::from_ymd(2024, 2, 29),
+                DateValue::from_ymd(0, 1, 1),
+                DateValue::from_ymd(9999, 12, 31),
+            ];
+            // Assert
+            assert_eq!(dates, [
+                Ok(ymd(2024, 2, 29)),
+                Ok(ymd(0, 1, 1)),
+                Ok(ymd(9999, 12, 31))
+            ]);
+        }
+
+        #[rstest]
+        #[case::common_year_leap_day(2026, 2, 29)]
+        #[case::month_zero(2026, 0, 1)]
+        #[case::month_thirteen(2026, 13, 1)]
+        #[case::day_zero(2026, 1, 0)]
+        #[case::day_thirty_two(2026, 1, 32)]
+        #[case::negative_year(-1, 1, 1)]
+        #[case::year_five_digits(10000, 1, 1)]
+        fn rejects_invalid_or_non_four_digit_fields(
+            #[case] year: i32,
+            #[case] month: u32,
+            #[case] day: u32,
+        ) {
+            // Arrange: the fields are invalid or outside the public grammar.
+            // Act
+            let result = DateValue::from_ymd(year, month, day);
+            // Assert
+            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
+        }
         #[test]
         fn accepts_leap_day() {
             // Arrange: 2024 is a leap year.

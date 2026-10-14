@@ -41,3 +41,10 @@ kwargs
 Jiff
 strtime
 ZoneGuard
+DST
+POSIX
+Unzoned
+unzoned
+jiff
+strptime
+tzdb

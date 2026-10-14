@@ -120,11 +120,7 @@ impl Drop for ZoneGuard {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        panic::{AssertUnwindSafe, catch_unwind},
-        sync::mpsc,
-        time::Duration,
-    };
+    use std::{sync::mpsc, time::Duration};
 
     use super::*;
 
@@ -179,7 +175,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn keeps_the_current_zone_unchanged_and_is_idempotent() {
+        fn keeps_the_current_zone_unchanged() {
             // Arrange
             let expected = local_zone();
 
@@ -208,27 +204,50 @@ mod tests {
             assert_eq!(local_zone(), previous);
         }
 
+        struct ZoneRestoreObserver {
+            previous: TimeZone,
+            sender: mpsc::Sender<(TimeZone, TimeZone)>,
+        }
+
+        impl Drop for ZoneRestoreObserver {
+            fn drop(&mut self) {
+                let _ = self.sender.send((self.previous.clone(), local_zone()));
+            }
+        }
+
         #[test]
-        #[expect(
-            clippy::panic,
-            clippy::disallowed_methods,
-            reason = "exercise guard restoration during unwinding"
-        )]
         fn restores_the_previous_zone_during_unwinding() {
             // Arrange
             let previous = local_zone();
+            let replacement = if previous == TimeZone::UTC {
+                TimeZone::get("Etc/GMT-2").expect("valid fixture zone")
+            } else {
+                TimeZone::UTC
+            };
+            let (sender, restored_zone) = mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let _observer = ZoneRestoreObserver {
+                    previous: previous.clone(),
+                    sender,
+                };
+                let _guard = ZoneGuard::install(Some(replacement));
+
+                // The mismatched assertion deliberately unwinds with the guard
+                // live.
+                assert_eq!(local_zone(), previous, "force guard unwinding");
+            });
 
             // Act
-            let result = catch_unwind(AssertUnwindSafe(|| {
-                let _guard = ZoneGuard::install(Some(
-                    TimeZone::get("Etc/GMT-2").expect("valid fixture zone"),
-                ));
-                panic!("test unwind");
-            }));
+            let result = worker.join();
+            let restored = restored_zone.recv();
 
             // Assert
-            assert!(result.is_err());
-            assert_eq!(local_zone(), previous);
+            assert!(result.is_err(), "the worker must unwind while guarded");
+            assert!(
+                matches!(&restored, Ok((before, after)) if before == after),
+                "the thread-local zone must be restored before the thread \
+                 exits: {restored:?}"
+            );
         }
 
         #[test]
@@ -288,7 +307,8 @@ mod tests {
             // Act
             ZoneGuard::set("invalid/zone");
 
-            // Assert: the should_panic attribute checks the error message.
+            // Assert
+            // `#[should_panic]` checks the error message.
         }
     }
 }

@@ -1441,8 +1441,7 @@ mod tests {
                 date_precision: DatePrecision::Day,
             };
             let min_date = DatePoint::Calendar {
-                date: DateValue::from_ymd(-9999, 1, 1)
-                    .expect("minimum Jiff date is valid"),
+                date: DateValue::from_civil_date(jiff::civil::Date::MIN),
                 date_precision: DatePrecision::Day,
             };
             let max_point = DatePoint::DateTime(DateTimeValue::from_timestamp(
@@ -2630,6 +2629,42 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
+
+        #[test]
+        fn converts_a_date_to_a_day_precision_calendar_point() {
+            // Arrange: a calendar date that must not acquire a time component.
+            let date = ymd(2026, 7, 29);
+
+            // Act
+            let point = DatePoint::from(date);
+
+            // Assert
+            assert_eq!(
+                point,
+                DatePoint::Calendar {
+                    date,
+                    date_precision: DatePrecision::Day,
+                },
+                "converting a Date must preserve the date and use day \
+                 precision"
+            );
+        }
+
+        #[test]
+        fn converts_a_date_time_to_a_date_time_point() {
+            // Arrange: the fixed reference Date-Time.
+            let date_time = fixed_datetime();
+
+            // Act
+            let point = DatePoint::from(date_time);
+
+            // Assert
+            assert_eq!(
+                point,
+                DatePoint::DateTime(date_time),
+                "converting a Date-Time must preserve its value"
+            );
+        }
 
         #[test]
         fn reports_no_time_for_a_calendar_point() {

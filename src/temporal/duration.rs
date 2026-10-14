@@ -1489,6 +1489,27 @@ mod tests {
             // Assert
             assert_eq!(result, Err(expected.to_owned()));
         }
+        #[test]
+        fn rejects_the_first_day_count_beyond_jiff_span_range() {
+            // Arrange: 7304484 days is accepted; the next day exceeds
+            // Jiff's span.
+
+            // Act
+            let result = DurationValue::parse("7304485d");
+            // Assert
+            assert!(matches!(result, Err(DurationError::SecondsOutOfRange)));
+        }
+
+        #[rstest]
+        #[case::fractional_day("P1.5D")]
+        #[case::negative_month_component("P-1M")]
+        fn rejects_malformed_iso_spans(#[case] input: &str) {
+            // Arrange: `input` is not valid ISO 8601 duration syntax.
+            // Act
+            let result = DurationValue::parse(input);
+            // Assert
+            assert!(result.is_err(), "malformed ISO span {input:?} must fail");
+        }
     }
 
     mod parse_prefix {
@@ -1605,6 +1626,15 @@ mod tests {
             // Assert
             assert_eq!(reparsed, Ok(raw_secs));
         }
+        #[test]
+        fn rejects_nominal_seconds_outside_the_span_range() {
+            // Arrange: this magnitude exceeds Jiff's representable span range.
+            let seconds = DurationSeconds(1e20);
+            // Act
+            let result = DurationValue::from_nominal_seconds(seconds);
+            // Assert
+            assert!(matches!(result, Err(DurationError::SecondsOutOfRange)));
+        }
     }
 
     mod decomposition {
@@ -1646,9 +1676,9 @@ mod tests {
                 DurationValue::parse("1h 30m").expect("compound is valid");
             let synthesized = synthesized(5_400.0);
             // Act
-            // Assert: both paths carry the same nominal identity, so they
-            // compare equal and render identically; only the regime witness
-            // differs.
+            // Assert
+            // Both paths carry the same nominal identity but different regime
+            // witnesses.
             assert_eq!(written, synthesized);
             assert_eq!(written.humanize(), synthesized.humanize());
             assert!(written.components().is_some());
@@ -1708,6 +1738,16 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+        #[test]
+        fn orders_a_nominal_month_equal_to_thirty_days() {
+            // Arrange
+            let month = DurationValue::parse("1mo").expect("month is valid");
+            let days = DurationValue::parse("30d").expect("days are valid");
+            // Act
+            let ordering = month.cmp(&days);
+            // Assert
+            assert_eq!(ordering, Ordering::Equal);
+        }
 
         #[rstest]
         #[case::sub_hour("30m", "1h")]
@@ -1823,6 +1863,29 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+        #[test]
+        fn formats_duration_values_canonically() {
+            // Arrange: each spelling crosses a required display category.
+            let cases = [
+                ("0s", "0s"),
+                ("-2h", "-2h"),
+                ("250ms", "250ms"),
+                ("5y 2mo 3w 4d 5h 6m 7s", "5y 2mo 3w 4d 5h 6m 7s"),
+                ("1y 2mo", "1y 2mo"),
+                ("1mo 2d 3h", "1mo 2d 3h"),
+            ];
+            // Act
+            for (input, expected) in cases {
+                let rendered =
+                    DurationValue::parse(input).map(|value| value.to_string());
+                // Assert
+                assert!(
+                    matches!(rendered, Ok(ref actual) if actual == expected),
+                    "display of {input:?} should be {expected:?}, got \
+                     {rendered:?}"
+                );
+            }
+        }
 
         #[test]
         fn displays_the_written_spelling() {
@@ -1959,6 +2022,20 @@ mod tests {
         use serde::Deserialize;
 
         use super::*;
+        #[test]
+        fn rejects_non_string_json_scalars() {
+            // Arrange: duration deserialization accepts strings only.
+            let inputs = ["42", "true", "[]"];
+            // Act
+            for input in inputs {
+                let result = serde_json::from_str::<DurationValue>(input);
+                // Assert
+                assert!(
+                    result.is_err(),
+                    "non-string scalar {input} must be rejected"
+                );
+            }
+        }
 
         #[test]
         fn deserializes_from_a_string() {
@@ -2125,6 +2202,46 @@ mod tests {
 
     mod arithmetic {
         use super::*;
+        #[test]
+        fn subtracts_equal_durations_to_zero() {
+            // Arrange
+            let hour = DurationValue::parse("1h").expect("hour is valid");
+            // Act
+            let result = hour.clone().checked_sub(hour);
+            // Assert
+            assert!(matches!(result, Ok(value) if value.as_str() == "0s"));
+        }
+
+        #[test]
+        fn scales_a_written_duration_by_a_negative_factor() {
+            // Arrange
+            let hour = DurationValue::parse("1h").expect("hour is valid");
+            // Act
+            let result = hour.checked_mul(-2.0);
+            // Assert
+            assert!(
+                matches!(result, Ok(value) if value.nominal_seconds() == DurationSeconds(-7_200.0))
+            );
+        }
+
+        #[test]
+        fn adds_mixed_origin_operands_by_exact_time() {
+            // Arrange
+            let parsed = DurationValue::parse("1d").expect("day is valid");
+            let synthesized =
+                DurationValue::from_nominal_seconds(DurationSeconds(3_600.0))
+                    .expect("hour is within the span range");
+            // Act
+            let sum = parsed.clone().checked_add(synthesized.clone());
+            let difference = parsed.checked_sub(synthesized);
+            // Assert
+            assert!(
+                matches!(sum, Ok(value) if value.nominal_seconds() == DurationSeconds(90_000.0) && value.components().is_none())
+            );
+            assert!(
+                matches!(difference, Ok(value) if value.nominal_seconds() == DurationSeconds(82_800.0) && value.components().is_none())
+            );
+        }
 
         #[test]
         fn checked_subtraction_preserves_written_units() {

@@ -1115,6 +1115,8 @@ impl<T> tracing::instrument::Instrument for traces_pkm::TaskStatusType
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskStatusType
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskStatusType where T: 'static
 #[repr(transparent)] pub struct traces_pkm::DateTimeValue(_)
+impl traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from_unix_seconds(i64) -> core::result::Result<Self, traces_pkm::DateError>
 impl core::clone::Clone for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DateTimeValue

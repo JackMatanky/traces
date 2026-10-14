@@ -46,6 +46,8 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 ///
 /// let epoch = DateTimeValue::try_from(SystemTime::UNIX_EPOCH)?;
 /// assert_eq!(epoch.to_string(), "1970-01-01T00:00:00");
+/// let from_seconds = DateTimeValue::from_unix_seconds(0)?;
+/// assert_eq!(from_seconds, epoch);
 ///
 /// let minute = DateTimeValue::try_from(
 ///     SystemTime::UNIX_EPOCH - Duration::from_secs(60),
@@ -64,6 +66,36 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 pub struct DateTimeValue(Timestamp);
 
 impl DateTimeValue {
+    /// Constructs a UTC date-time from whole seconds since the UTC epoch.
+    ///
+    /// The input is a number of seconds from `1970-01-01T00:00:00Z`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DateError::InvalidValue`] if `seconds` lies outside Jiff's
+    /// representable timestamp range.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use traces_pkm::DateTimeValue;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let epoch = DateTimeValue::from_unix_seconds(0)?;
+    /// assert_eq!(epoch, "1970-01-01T00:00:00Z".parse()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn from_unix_seconds(seconds: i64) -> Result<Self, DateError> {
+        Timestamp::from_second(seconds).map(Self).map_err(|_| {
+            DateError::InvalidValue {
+                input: seconds.to_string().into(),
+                reason: "date/time is outside the representable range",
+            }
+        })
+    }
+
     #[inline]
     pub(crate) const fn from_timestamp(timestamp: Timestamp) -> Self {
         Self(timestamp)
@@ -434,6 +466,9 @@ impl DateTimeShape {
     /// Parses according to this format, returning a parsed datetime shape.
     fn parse_shape(self, s: &str) -> Result<ParsedDateTime, &'static str> {
         match self.pattern() {
+            None if !numeric_rfc3339_offset_is_valid(s) => {
+                Err("input does not match RFC 3339")
+            }
             None => s
                 .parse::<Timestamp>()
                 .map(ParsedDateTime::Instant)
@@ -445,6 +480,45 @@ impl DateTimeShape {
     }
 }
 
+fn numeric_rfc3339_offset_is_valid(input: &str) -> bool {
+    let Some(tail) = input.get(10..) else {
+        return true;
+    };
+    let Some(start) = tail.rfind(['+', '-']) else {
+        return true;
+    };
+    let Some(offset) = tail.as_bytes().get(start..) else {
+        return false;
+    };
+    let Ok(offset) = <&[u8; 6]>::try_from(offset) else {
+        return false;
+    };
+    let [sign, hour_tens, hour_ones, colon, minute_tens, minute_ones] = *offset;
+    if !matches!(sign, b'+' | b'-')
+        || colon != b':'
+        || !hour_tens.is_ascii_digit()
+        || !hour_ones.is_ascii_digit()
+        || !minute_tens.is_ascii_digit()
+        || !minute_ones.is_ascii_digit()
+    {
+        return false;
+    }
+    let Some(hours) = offset
+        .get(1..3)
+        .and_then(|digits| std::str::from_utf8(digits).ok())
+        .and_then(|digits| digits.parse::<u16>().ok())
+    else {
+        return false;
+    };
+    let Some(minutes) = offset
+        .get(4..6)
+        .and_then(|digits| std::str::from_utf8(digits).ok())
+        .and_then(|digits| digits.parse::<u16>().ok())
+    else {
+        return false;
+    };
+    hours <= 23 && minutes <= 59
+}
 /// The parsed shape of a date-time string before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParsedDateTime {
@@ -474,6 +548,37 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
+        #[test]
+        fn constructs_unix_seconds_at_both_supported_edges() {
+            // Arrange: both endpoints, the epoch, and one second before it.
+            let before_epoch = -1;
+            let seconds = [
+                Timestamp::MIN.as_second(),
+                0,
+                before_epoch,
+                Timestamp::MAX.as_second(),
+            ];
+            // Act
+            let results = seconds.map(DateTimeValue::from_unix_seconds);
+            // Assert
+            assert!(results.into_iter().zip(seconds).all(|(result, expected)| {
+                matches!(result, Ok(value) if value.utc().as_second() == expected)
+            }));
+        }
+
+        #[test]
+        fn rejects_unix_seconds_one_past_each_supported_edge() {
+            // Arrange: each value is immediately beyond Jiff's timestamp range.
+            let below_minimum = Timestamp::MIN.as_second() - 1;
+            let above_maximum = Timestamp::MAX.as_second() + 1;
+            let seconds = [below_minimum, above_maximum];
+            // Act
+            let results = seconds.map(DateTimeValue::from_unix_seconds);
+            // Assert
+            assert!(results.into_iter().all(|result| {
+                matches!(result, Err(DateError::InvalidValue { .. }))
+            }));
+        }
 
         #[test]
         fn constructs_the_unix_epoch_from_system_time() {
@@ -692,6 +797,43 @@ mod tests {
             // Assert
             assert!(matches!(result, Err(CalendarError::Zone { .. })));
         }
+        #[test]
+        fn resolves_the_sydney_southern_dst_fold_to_the_earlier_occurrence() {
+            // Arrange: Sydney's 2026 fall-back repeats 02:30.
+            ZoneGuard::set("Australia/Sydney");
+            let earlier = DateTimeValue::parse_iso("2026-04-04T15:30:00Z")
+                .expect("explicit earlier instant is valid");
+            let later = DateTimeValue::parse_iso("2026-04-04T16:30:00Z")
+                .expect("explicit later instant is valid");
+            // Act
+            let resolved = DateTimeValue::parse_iso("2026-04-05T02:30:00");
+            // Assert
+            assert_eq!(resolved, Ok(earlier));
+            assert_ne!(resolved, Ok(later));
+        }
+
+        #[test]
+        fn shifts_santiago_midnight_gap_forward_by_the_gap() {
+            // Arrange: Chile advances from 23:59 to 01:00 on this date.
+            ZoneGuard::set("America/Santiago");
+            let shifted = DateTimeValue::parse_iso("2019-09-08T04:30:00Z")
+                .expect("explicit shifted instant is valid");
+            // Act
+            let resolved = DateTimeValue::parse_iso("2019-09-08T00:30:00");
+            // Assert
+            assert_eq!(resolved, Ok(shifted));
+        }
+
+        #[test]
+        fn resolves_unambiguous_input_in_a_no_dst_zone() {
+            // Arrange
+            ZoneGuard::set("Etc/UTC");
+            let expected = DateTimeValue::parse_iso("2026-07-29T14:30:00Z");
+            // Act
+            let resolved = DateTimeValue::parse_iso("2026-07-29T14:30:00");
+            // Assert
+            assert_eq!(resolved, expected);
+        }
     }
 
     mod parse {
@@ -887,6 +1029,31 @@ mod tests {
                 })
             );
         }
+        #[rstest]
+        #[case::unpadded_day("2026-07-9T14:30:00")]
+        #[case::offset_hour_out_of_range("2026-07-29T14:30:00+25:00")]
+        #[case::offset_minute_out_of_range("2026-07-29T14:30:00+02:60")]
+        fn rejects_malformed_date_time_inputs(#[case] input: &str) {
+            // Arrange: `input` violates the strict date-time grammar.
+            // Act
+            let result = DateTimeValue::parse_iso(input);
+            // Assert
+            assert!(
+                matches!(result, Err(DateError::InvalidValue { .. })),
+                "invalid date-time {input:?} must be rejected"
+            );
+        }
+
+        #[rstest]
+        #[case::empty("")]
+        #[case::whitespace("   ")]
+        fn rejects_empty_input_before_shape_matching(#[case] input: &str) {
+            // Arrange: empty input has no four-digit year prefix.
+            // Act
+            let result = DateTimeValue::parse_iso(input);
+            // Assert
+            assert!(matches!(result, Err(DateError::YearNotFourDigits { .. })));
+        }
 
         #[test]
         fn parses_whole_seconds_through_the_fractional_shape() {
@@ -942,6 +1109,17 @@ mod tests {
         use pretty_assertions::{assert_eq, assert_ne};
 
         use super::*;
+        #[test]
+        fn renders_microseconds_with_six_fractional_digits() {
+            // Arrange: UTC makes the local rendering identical to the input.
+            ZoneGuard::set("UTC");
+            let value = DateTimeValue::parse_iso("2026-07-29T14:30:00.123456Z")
+                .expect("microsecond timestamp is valid");
+            // Act
+            let rendered = value.to_string();
+            // Assert
+            assert_eq!(rendered, "2026-07-29T14:30:00.123456");
+        }
 
         #[test]
         fn renders_the_local_clock_time_without_the_offset() {
@@ -1169,6 +1347,20 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+        #[test]
+        fn rejects_non_string_json_scalars() {
+            // Arrange: date-time deserialization accepts strings only.
+            let inputs = ["42", "true", "[]"];
+            // Act
+            for input in inputs {
+                let result = serde_json::from_str::<DateTimeValue>(input);
+                // Assert
+                assert!(
+                    result.is_err(),
+                    "non-string scalar {input} must be rejected"
+                );
+            }
+        }
 
         #[test]
         fn deserializes_an_rfc3339_utc_string() {
@@ -1291,7 +1483,7 @@ mod tests {
         fn rejects_a_date_midnight_outside_the_timestamp_range() {
             // Arrange
             ZoneGuard::set("Etc/GMT-14");
-            let date = ymd(-9999, 1, 1);
+            let date = DateValue::from_civil_date(civil::Date::MIN);
 
             // Act
             let error = DateTimeValue::try_from(date).expect_err(
@@ -1359,7 +1551,8 @@ mod tests {
                 DateTimeValue::parse_iso("2026-11-01T06:30:00Z")
                     .expect("explicit-offset fixture parses");
 
-            // Act: calendar shifts re-resolve the local clock time.
+            // Act
+            // Calendar shifts re-resolve the local clock time.
             let shifted = second_occurrence.shift(0, TimeUnit::Day);
 
             // Assert

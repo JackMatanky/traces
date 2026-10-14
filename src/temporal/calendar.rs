@@ -156,8 +156,8 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
     }
 }
 
-/// Builds a Jiff [`Span`] from nominal seconds, rounding the fractional part
-/// to the nearest nanosecond.
+/// Builds a Jiff [`Span`] from nominal seconds, rounding the fractional part to
+/// the nearest nanosecond.
 ///
 /// # Errors
 ///
@@ -392,7 +392,8 @@ mod tests {
             // Act
             let actual = difference.to_f64();
 
-            // Assert: bit comparison treats NaN consistently.
+            // Assert
+            // Bit comparison treats NaN consistently.
             assert_eq!(
                 actual.map(f64::to_bits),
                 Some(magnitude.to_bits()),
@@ -521,8 +522,9 @@ mod tests {
                 .collect();
             names.sort_unstable();
 
-            // Assert: both edges are present, each once short and once long,
-            // so callers can pair every abbreviation with its full spelling.
+            // Assert
+            // Both edges are present once short and once long, pairing each
+            // abbreviation with its full spelling.
             assert_eq!(names, expected, "{period:?} shorthand spellings");
         }
     }

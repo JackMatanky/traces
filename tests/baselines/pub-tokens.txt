@@ -1370,6 +1370,7 @@ src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError
 src/temporal/date.rs: pub(super) fn advance_span(
 src/temporal/date.rs: pub(super) fn whole_months_until(self, to: Self) -> i64 {
 src/temporal/date.rs: pub(super) fn whole_years_until(self, to: Self) -> i64 {
+src/temporal/datetime.rs: pub fn from_unix_seconds(seconds: i64) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub struct DateTimeValue(Timestamp);
 src/temporal/datetime.rs: pub(crate) const ALL: [Self; 5] = [
 src/temporal/datetime.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
