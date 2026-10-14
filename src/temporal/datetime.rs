@@ -23,11 +23,11 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Stores a Date-Time in UTC and renders it as the local clock.
 ///
-/// Accepts RFC 3339 input with an explicit offset, except leap seconds,
-/// which Jiff cannot represent. ISO date portions require zero-padded month
-/// and day fields. Naive input in the five accepted shapes resolves in the
-/// process-local zone. Folds take the earlier occurrence; gaps shift forward
-/// by their length. Pattern-based parsing uses a separate strftime grammar and
+/// Accepts RFC 3339 input with an explicit offset, except leap seconds, which
+/// Jiff cannot represent. ISO date portions require zero-padded month and day
+/// fields. Naive input in the five accepted shapes resolves in the
+/// process-local zone. Folds take the earlier occurrence; gaps shift forward by
+/// their length. Pattern-based parsing uses a separate strftime grammar and
 /// retains its pattern-driven padding rules.
 ///
 /// [`Display`](fmt::Display) renders the local clock time without a zone

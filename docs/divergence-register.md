@@ -213,6 +213,7 @@ per-row counts overlap.
   `src/temporal/duration.rs`.
 
 ---
+
 ### `R18`: Leap Seconds Are Rejected
 
 - **Today**: Chrono accepts and round-trips RFC 3339 leap seconds such as
@@ -222,6 +223,45 @@ per-row counts overlap.
 - **Recommendation**: accept (approved for S2.3).
 - **Oracle cases**: 7 date-time parse rows tagged `R18`, one in each
   explicit-zone group.
+
+## Stage 2 Completion Refinements (2026-10-14)
+
+Recorded at the S2.2/S2.6 completion commits (`c43f0cfd`, `7ac2c6cc`). These
+refine the rows above rather than adding new behavior classes; each is pinned
+by owner-module tests.
+
+### Refinement 1: Resolved-Zone Range Overflow Is `OutOfRange`
+
+- **Relation**: refines `R13` and `R11`.
+- **Change**: `LocalZoneLookup` now means exactly one thing: the
+  process-local zone discovery failed. When the zone is already resolved
+  (explicit `&TimeZone` callers) and shifting the local time leaves Jiff's
+  representable timestamp range, the failure is `CalendarError::OutOfRange`,
+  not a zone error. Pinned by
+  `reports_out_of_range_when_the_extreme_local_datetime_cannot_resolve` in
+  `src/temporal/datetime.rs`.
+
+### Refinement 2: Strict Filter Equality Between Strings and Durations
+
+- **Relation**: consequence of `R4` (durations no longer expose borrowed
+  source text).
+- **Change**: `NoteFieldValue::as_str` returns `None` for duration fields, so
+  query filter equality (`==`) no longer matches a string field against a
+  duration literal (or vice versa) via the source spelling; both sides are
+  now strictly typed. String rendering of durations goes through canonical
+  `Display`. Pinned by `pins_string_duration_filter_equality_directionality`
+  in `src/note/field.rs`.
+
+### Refinement 3: `DurationSeconds` Removed; `DurationValue` Is `Copy`
+
+- **Relation**: completes `R5`; extends the `R11`/`R4` API surface changes.
+- **Change**: the `f64`-seconds newtype is deleted; sort keys hold
+  `DurationValue` directly and all nominal synthesis goes through
+  `DurationValue::from_nominal_seconds(f64)`. The public type gains `Copy`
+  and checked operator impls (`Add`/`Sub`/`Mul`/`Neg`); public-API baselines
+  and `pub-tokens.txt` were regenerated at `7ac2c6cc`. Sub-millisecond
+  decimals remain valid inputs (`0.0001s` = 100 µs) while Jiff's `us`/`ns`
+  unit spellings stay excluded, matching the `R3` row.
 
 ## Divergences from External Systems
 

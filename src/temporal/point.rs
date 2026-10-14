@@ -752,7 +752,6 @@ mod tests {
 
     // ZoneGuard pins a Jiff time zone to the test thread without changing the
     // process TZ environment variable; repeated sets replace the override.
-
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
     }
