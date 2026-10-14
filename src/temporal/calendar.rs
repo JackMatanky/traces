@@ -28,11 +28,11 @@ use crate::temporal::TimeUnit;
 /// the ISO week, the calendar month, or the calendar year.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CalendarPeriod {
-    /// The ISO week, Monday through Sunday.
+    /// Identifies the ISO week, Monday through Sunday.
     Week,
-    /// The calendar month.
+    /// Identifies the calendar month.
     Month,
-    /// The calendar year.
+    /// Identifies the calendar year.
     Year,
 }
 
@@ -42,9 +42,9 @@ pub(crate) enum CalendarPeriod {
 /// day of the period.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PeriodEdge {
-    /// First day of the period.
+    /// Selects the first day of the period.
     Start,
-    /// Last day of the period.
+    /// Selects the last day of the period.
     End,
 }
 
@@ -73,21 +73,21 @@ pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
 /// [`DatePoint`](super::DatePoint).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateComponent {
-    /// Calendar year.
+    /// Identifies the calendar year.
     Year,
-    /// Calendar month, 1 through 12.
+    /// Identifies the calendar month, 1 through 12.
     Month,
-    /// Day of the month, 1 through 31.
+    /// Identifies the day of the month, 1 through 31.
     Day,
-    /// Hour of the day, 0 through 23.
+    /// Identifies the hour of the day, 0 through 23.
     Hour,
-    /// Minute of the hour, 0 through 59.
+    /// Identifies the minute of the hour, 0 through 59.
     Minute,
-    /// Second of the minute, 0 through 59.
+    /// Identifies the second of the minute, 0 through 59.
     Second,
-    /// ISO weekday number, Monday = 1 through Sunday = 7.
+    /// Identifies the ISO weekday number, Monday = 1 through Sunday = 7.
     Weekday,
-    /// ISO week number of the year.
+    /// Identifies the ISO week number of the year.
     Week,
 }
 
@@ -119,9 +119,9 @@ impl DateComponent {
 /// Stores the result of measuring the difference between two date points.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum DateDiff {
-    /// Whole units elapsed.
+    /// Stores a whole-unit difference.
     Whole(i64),
-    /// Fractional units elapsed.
+    /// Stores a fractional-unit difference.
     Fractional(f64),
 }
 
@@ -141,11 +141,11 @@ impl DateDiff {
     }
 }
 
-/// Maps an ISO weekday number to its [`civil::Weekday`], returning [`None`] for
-/// anything outside `1..=7`.
+/// Maps an ISO weekday number to its [`civil::Weekday`].
 ///
-/// `0` is rejected because Sunday-based conventions disagree on it (Sunday is
-/// `0` in some and `1` in others).
+/// Returns [`None`] for anything outside `1..=7`. `0` is rejected because
+/// Sunday-based conventions disagree on it (Sunday is `0` in some and `1` in
+/// others).
 #[must_use]
 pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
     match n {
@@ -160,12 +160,12 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
     }
 }
 
-/// Shifts a calendar datetime by `n` in the chosen `unit` and returns the
+/// Shifts a calendar date by `n` in the chosen `unit` and returns the
 /// result.
 ///
 /// Calendar units shift calendar days; month and year shifts clamp to the last
-/// day of the target month. Exact units shift elapsed time, so the clock
-/// reading moves by the same amount regardless of the calendar.
+/// day of the target month. Exact units shift elapsed time, so the date moves
+/// only when the shift crosses midnight.
 ///
 /// No zone is consulted: callers wanting DST-aware local-clock semantics route
 /// through [`DateTimeValue::shift`](super::DateTimeValue::shift) instead.
@@ -182,6 +182,16 @@ pub(super) fn shift_date(
         .map_err(|_| CalendarError::OutOfRange)
 }
 
+/// Shifts a civil datetime by `n` in the chosen `unit` and returns the
+/// result.
+///
+/// Calendar units shift calendar days; month and year shifts clamp to the last
+/// day of the target month. Exact units shift elapsed clock time without
+/// consulting time zones.
+///
+/// # Errors
+///
+/// - [`CalendarError::OutOfRange`] if the shift overflows representable bounds.
 pub(super) fn shift_datetime(
     local_datetime: civil::DateTime,
     n: i64,
@@ -192,6 +202,11 @@ pub(super) fn shift_datetime(
         .map_err(|_| CalendarError::OutOfRange)
 }
 
+/// Constructs a [`Span`] of `n` units of the given [`TimeUnit`].
+///
+/// # Errors
+///
+/// - [`CalendarError::OutOfRange`] if `n` cannot be represented as a [`Span`].
 fn shift_span(n: i64, unit: TimeUnit) -> Result<Span, CalendarError> {
     match unit {
         TimeUnit::Year => Span::new().try_years(n),

@@ -3031,7 +3031,7 @@ impl<T> serde_core::de::DeserializeOwned for traces_pkm::DateValue where T: for<
 impl<T> tracing::instrument::Instrument for traces_pkm::DateValue
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateValue
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateValue where T: 'static
-pub struct traces_pkm::DurationValue
+pub struct traces_pkm::DurationValue(_)
 impl traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::checked_add(self, Self) -> core::result::Result<Self, traces_pkm::DurationError>
 pub fn traces_pkm::DurationValue::checked_mul(self, f64) -> core::result::Result<Self, traces_pkm::DurationError>
@@ -3052,6 +3052,22 @@ impl core::fmt::Display for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::hash<H: core::hash::Hasher>(&self, &mut H)
+impl core::marker::Copy for traces_pkm::DurationValue
+impl core::ops::arith::Add for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::add(self, Self) -> Self::Output
+impl core::ops::arith::Mul<f64> for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::mul(self, f64) -> Self::Output
+impl core::ops::arith::Mul<i64> for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::mul(self, i64) -> Self::Output
+impl core::ops::arith::Neg for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::neg(self) -> Self
+impl core::ops::arith::Sub for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::sub(self, Self) -> Self::Output
 impl core::str::traits::FromStr for traces_pkm::DurationValue
 pub type traces_pkm::DurationValue::Err = traces_pkm::DurationError
 pub fn traces_pkm::DurationValue::from_str(&str) -> core::result::Result<Self, Self::Err>

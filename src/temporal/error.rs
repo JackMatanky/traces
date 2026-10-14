@@ -36,18 +36,19 @@ pub enum DateError {
     /// "2026/08/22").
     #[error("`{input}` is not a recognized date/time: {reason}")]
     InvalidValue {
-        /// The raw input that failed to parse.
+        /// Stores the raw input that failed to parse.
         input: Box<str>,
-        /// The reason the final shape check rejected the input.
+        /// Stores the reason the final shape check rejected the input.
         reason: &'static str,
     },
-    /// `input` does not begin with a four-digit year (e.g., `26-08-22`).
+    /// Reports that `input` does not begin with a four-digit year (e.g.,
+    /// `26-08-22`).
     ///
     /// Years use four ASCII digits, optionally prefixed by `-` for negative
     /// years. Shorter or non-ASCII year forms are rejected rather than guessed.
     #[error("`{input}` does not have a 4-digit year")]
     YearNotFourDigits {
-        /// The raw input that failed to parse.
+        /// Stores the raw input that failed to parse.
         input: Box<str>,
     },
     /// Reports that the process-local zone could not resolve a naive input.
@@ -56,7 +57,7 @@ pub enum DateError {
     /// deterministically.
     #[error("local zone lookup failed for `{input}`")]
     LocalZoneLookup {
-        /// The naive clock-time input that could not be resolved.
+        /// Stores the naive clock-time input that could not be resolved.
         input: Box<str>,
     },
 }
@@ -71,7 +72,7 @@ pub(crate) enum CalendarError {
     /// time.
     #[error("local zone lookup failed for {input}")]
     Zone {
-        /// Local clock time that could not be resolved.
+        /// Stores the local clock time that could not be resolved.
         input: Box<str>,
     },
 }
@@ -119,46 +120,49 @@ impl CalendarError {
 #[derive(Clone, Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum DurationError {
-    /// Input is empty or contains only separators.
+    /// Reports that the input is empty or contains only separators.
     #[error("duration is empty")]
     Empty,
 
-    /// A unit appears without a preceding number (e.g., `"h"` or `"hours"`).
+    /// Reports that a unit appears without a preceding number (e.g., `"h"` or
+    /// `"hours"`).
     #[error("no number before unit")]
     MissingNumber,
 
-    /// The number portion has a malformed sign (e.g., `"+h"`), or a part after
-    /// the first carries an explicit `-` (e.g., `"1h -30m"`).
+    /// Reports that the number portion has a malformed sign (e.g., `"+h"`), or
+    /// a part after the first carries an explicit `-` (e.g., `"1h -30m"`).
     #[error("misplaced sign in duration")]
     MisplacedSign,
 
-    /// The number portion is not valid float syntax (e.g., a bare `"."`).
+    /// Reports that the number portion is not valid float syntax (e.g., a bare
+    /// `"."`).
     #[error("invalid number syntax: {source}")]
     MalformedNumber {
-        /// The underlying float-parse failure.
+        /// Stores the underlying float-parse failure.
         #[source]
         source: std::num::ParseFloatError,
     },
 
-    /// A number appears without a trailing unit (e.g., `"1"` or `"42"`).
+    /// Reports that a number appears without a trailing unit (e.g., `"1"` or
+    /// `"42"`).
     #[error("no unit after number")]
     MissingUnit,
 
-    /// The unit string is not recognized (e.g., `"1x"`).
+    /// Reports that the unit string is not recognized (e.g., `"1x"`).
     #[error("unknown unit")]
     UnknownUnit,
 
-    /// A single part's number overflows to infinity (e.g., a 400-digit
-    /// literal).
+    /// Reports that a single part's number overflows to infinity (e.g., a
+    /// 400-digit literal).
     #[error("number overflows to infinity")]
     NumberOverflow,
 
-    /// A raw seconds value is `NaN` or infinite.
+    /// Reports that a raw seconds value is `NaN` or infinite.
     #[error("duration seconds must be finite")]
     NonFiniteSeconds,
 
-    /// A finite seconds value does not fit the range representable by
-    /// Jiff Span.
+    /// Reports that a finite seconds value does not fit the range representable
+    /// by a Jiff [`Span`](jiff::Span).
     #[error("duration seconds are outside the representable range")]
     SecondsOutOfRange,
 }
@@ -293,7 +297,7 @@ mod tests {
 
     mod conversions {
         use super::*;
-        use crate::temporal::{DurationSeconds, DurationValue};
+        use crate::temporal::DurationValue;
 
         #[test]
         fn maps_out_of_range_calendar_failure_to_parse_error() {
@@ -324,28 +328,9 @@ mod tests {
         }
 
         #[test]
-        fn rejects_non_finite_seconds_at_validation() {
-            // Arrange
-            let raw = f64::NAN;
-
-            // Act
-            let actual = DurationSeconds::try_from(raw);
-
-            // Assert
-            assert!(
-                matches!(actual, Err(DurationError::NonFiniteSeconds)),
-                "expected NonFiniteSeconds, got {actual:?}"
-            );
-        }
-
-        #[test]
         fn rejects_durations_outside_the_jiff_span_range() {
-            // Arrange
-            let seconds =
-                DurationSeconds::try_from(1e17).expect("1e17 is finite");
-
             // Act
-            let actual = DurationValue::from_nominal_seconds(seconds);
+            let actual = DurationValue::from_nominal_seconds(1e17);
 
             // Assert
             assert!(

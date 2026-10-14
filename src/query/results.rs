@@ -1302,17 +1302,18 @@ rating: note
 
             let grouped = rows.group_by("spent").expect("valid group_by");
 
-            let spellings: Vec<String> = grouped
+            let rendered: Vec<String> = grouped
                 .iter()
                 .map(|row| {
+                    let mut text = String::new();
                     row.field("spent")
                         .expect("valid path")
-                        .as_str()
-                        .expect("duration field has text")
-                        .to_owned()
+                        .as_ref()
+                        .append_text(&mut text);
+                    text
                 })
                 .collect();
-            assert_eq!(spellings, ["10m", "1h 30m", "90m"]);
+            assert_eq!(rendered, ["10m", "1h 30m", "90m"]);
         }
 
         #[test]

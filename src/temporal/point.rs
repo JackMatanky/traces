@@ -18,6 +18,11 @@ use super::{
     zone::local_zone,
 };
 
+/// Resolves the process-local time zone for calendar operations.
+///
+/// # Errors
+///
+/// - [`CalendarError::Zone`] if system time-zone discovery fails.
 fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
     local_zone().map_err(|error| CalendarError::Zone {
         input: error.to_string().into(),
@@ -26,9 +31,9 @@ fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
 /// Tracks whether a zone-free date point uses month or full-date precision.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePrecision {
-    /// Year and month.
+    /// Specifies year and month precision.
     Month,
-    /// Full calendar date.
+    /// Specifies full calendar date precision.
     Day,
 }
 
@@ -67,13 +72,13 @@ impl From<DateTimeValue> for DatePoint {
     }
 }
 impl DatePoint {
-    /// Whether this date point carries a time-of-day component.
+    /// Returns `true` if this date point carries a time-of-day component.
     #[must_use]
     pub(crate) const fn has_time(self) -> bool {
         matches!(self, Self::DateTime(_))
     }
 
-    /// Calendar date of this date point in the supplied zone.
+    /// Returns the calendar date of this date point in the supplied zone.
     pub(crate) fn date_in(self, zone: &TimeZone) -> DateValue {
         match self {
             Self::Calendar {
@@ -84,7 +89,7 @@ impl DatePoint {
         }
     }
 
-    /// Calendar date in the process-local zone.
+    /// Returns the calendar date of this date point in the process-local zone.
     ///
     /// # Errors
     ///
@@ -144,6 +149,11 @@ impl DatePoint {
     }
 
     /// Returns the UTC-stored Date-Time equivalent of this date point.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if converting a calendar date to a UTC
+    ///   instant exceeds the supported range.
     pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
         match self {
             Self::Calendar {
@@ -156,7 +166,7 @@ impl DatePoint {
         }
     }
 
-    /// Canonical strftime pattern preserving written precision.
+    /// Returns the canonical strftime pattern preserving written precision.
     #[must_use]
     pub(crate) fn canonical_pattern(self) -> &'static str {
         match self {
@@ -180,8 +190,6 @@ impl DatePoint {
     ///
     /// - [`CalendarError::OutOfRange`] if the shift exceeds the supported date
     ///   range.
-    /// - [`CalendarError::Zone`] if a date-time point’s shifted local datetime
-    ///   cannot be resolved.
     pub(crate) fn shift(
         self,
         n: i64,
@@ -221,7 +229,6 @@ impl DatePoint {
     ///
     /// - [`CalendarError::OutOfRange`] if the span exceeds the supported
     ///   date-time range.
-    /// - [`CalendarError::Zone`] if resolving a local date-time fails.
     pub(crate) fn apply(
         self,
         duration: &DurationValue,
@@ -237,7 +244,6 @@ impl DatePoint {
     ///
     /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
     ///   supported range.
-    /// - [`CalendarError::Zone`] if resolving the local date-time fails.
     pub(crate) fn start_of(
         self,
         calendar_period: CalendarPeriod,
@@ -253,7 +259,6 @@ impl DatePoint {
     ///
     /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
     ///   supported range.
-    /// - [`CalendarError::Zone`] if resolving a local date-time fails.
     pub(crate) fn end_of(
         self,
         calendar_period: CalendarPeriod,
@@ -267,7 +272,6 @@ impl DatePoint {
     /// # Errors
     ///
     /// - [`CalendarError::OutOfRange`] if the target date is not representable.
-    /// - [`CalendarError::Zone`] if resolving the local clock time fails.
     pub(crate) fn with_weekday(
         self,
         target: civil::Weekday,
@@ -409,6 +413,11 @@ impl DatePoint {
     }
 
     /// Replaces the local date, preserving written precision and time.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the resulting date-time exceeds the
+    ///   supported range.
     fn with_date(
         self,
         date: civil::Date,
@@ -434,6 +443,11 @@ impl DatePoint {
     }
 
     /// Resolves a period edge to its local date, preserving precision.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
+    ///   supported range.
     fn boundary(
         self,
         calendar_period: CalendarPeriod,
@@ -552,6 +566,8 @@ impl DatePoint {
         crate::lexer::lex_prefix(s, Self::parse_prefix_raw)
     }
 
+    /// Parses a raw date prefix from `s`, returning the [`DatePoint`] and byte
+    /// length.
     fn parse_prefix_raw(s: &str) -> Option<(Self, usize)> {
         let bytes = s.as_bytes();
         if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
@@ -640,6 +656,9 @@ impl DatePoint {
         })
     }
 }
+/// Returns whether a strtime `pattern` includes any time-of-day directives.
+///
+/// Returns [`None`] if the pattern contains an unsupported `%Q` directive.
 fn pattern_has_time_fields(pattern: &str) -> Option<bool> {
     let mut characters = pattern.chars().peekable();
     let mut has_time_fields = false;
@@ -710,8 +729,8 @@ fn starts_like_date(bytes: &[u8]) -> bool {
         })
 }
 
-/// Returns whether `s` begins with four ASCII year digits, optionally preceded
-/// by a minus sign for a signed four-digit year.
+/// Returns `true` if `s` begins with four ASCII year digits, optionally
+/// preceded by a minus sign for a signed four-digit year.
 pub(super) fn starts_with_year(s: &str) -> bool {
     let year = if s.starts_with('-') {
         s.get(1..5)
@@ -1624,7 +1643,6 @@ mod tests {
 
         #[rstest]
         #[case::negative_day("-1d", ymd(2026, 7, 28))]
-        #[case::fractional_day("1.5d", ymd(2026, 7, 30))]
         fn applies_signed_day_durations_to_a_calendar_date(
             #[case] text: &str,
             #[case] expected: DateValue,
@@ -1687,11 +1705,8 @@ mod tests {
         ) {
             // Arrange
             let base = point_at("2026-07-29");
-            let duration = DurationValue::from_nominal_seconds(
-                crate::temporal::DurationSeconds::try_from(seconds)
-                    .expect("finite seconds"),
-            )
-            .expect("duration fits within the Jiff span range");
+            let duration = DurationValue::from_nominal_seconds(seconds)
+                .expect("duration fits within the Jiff span range");
 
             // Act
             let applied = base.apply(
@@ -1772,11 +1787,8 @@ mod tests {
             // written components, so it advances the exact time.
             ZoneGuard::set("UTC");
             let base = DatePoint::DateTime(fixed_datetime());
-            let synthesized = DurationValue::from_nominal_seconds(
-                crate::temporal::DurationSeconds::try_from(3600.0)
-                    .expect("finite seconds"),
-            )
-            .expect("one hour fits within the Jiff span range");
+            let synthesized = DurationValue::from_nominal_seconds(3600.0)
+                .expect("one hour fits within the Jiff span range");
 
             // Act
             let applied = base.apply(
@@ -1887,29 +1899,16 @@ mod tests {
 
         #[test]
         fn applies_the_fractional_part_of_a_calendar_unit_on_the_local_clock() {
-            // Arrange: 1.5d equals 36h equals \"1d 12h\" as values.
+            // Arrange: a calendar day plus an exact 12-hour remainder spans
+            // the spring gap; 36 exact hours does not.
             ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
             let base = point_at("2026-03-07 06:00:00");
-            let one_and_half_days =
-                DurationValue::parse("1.5d").expect("valid duration");
-            let thirty_six_hours =
-                DurationValue::parse("36h").expect("valid duration");
             let written_order =
                 DurationValue::parse("1d 12h").expect("valid duration");
-            assert_eq!(
-                one_and_half_days, thirty_six_hours,
-                "\"1.5d\" and \"36h\" must be equal as values"
-            );
-            assert_eq!(
-                one_and_half_days, written_order,
-                "\"1.5d\" and \"1d 12h\" must be equal as values"
-            );
+            let thirty_six_hours =
+                DurationValue::parse("36h").expect("valid duration");
 
             // Act
-            let by_fraction = base.apply(
-                &one_and_half_days,
-                &local_zone().expect("system time zone available"),
-            );
             let by_written = base.apply(
                 &written_order,
                 &local_zone().expect("system time zone available"),
@@ -1921,49 +1920,17 @@ mod tests {
 
             // Assert
             assert_eq!(
-                by_fraction
+                by_written
                     .as_ref()
                     .map(|p| p.local_datetime_or_utc().to_string()),
                 Ok("2026-03-08T18:00:00".to_owned()),
-                "the fractional day must keep the local clock time"
-            );
-            assert_eq!(
-                by_fraction, by_written,
-                "\"1.5d\" must decompose like its written-order equivalent"
+                "the calendar day must keep the local clock time"
             );
             assert_ne!(
-                by_fraction, by_exact,
-                "the fractional calendar part must differ from 36 exact hours \
-                 across the gap"
+                by_written, by_exact,
+                "the calendar day must differ from 36 exact hours across the \
+                 gap"
             );
-        }
-
-        #[test]
-        fn applies_a_duration_independently_of_written_unit_order_across_a_gap()
-        {
-            // Arrange: 02:30 sits one hour before the spring gap opens.
-            ZoneGuard::set_timezone(crate::temporal::fixtures::new_york_zone());
-            let base = point_at("2026-03-07 02:30:00");
-            let day_then_hour =
-                DurationValue::parse("1d 1h").expect("valid duration");
-            let hour_then_day =
-                DurationValue::parse("1h 1d").expect("valid duration");
-            assert_eq!(day_then_hour, hour_then_day);
-
-            // Act
-            let first = base.apply(
-                &day_then_hour,
-                &local_zone().expect("system time zone available"),
-            );
-            let second = base.apply(
-                &hour_then_day,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            let expected = Ok(point_at("2026-03-08T08:30:00Z"));
-            assert_eq!(first, expected);
-            assert_eq!(second, expected);
         }
 
         #[test]
@@ -2003,28 +1970,6 @@ mod tests {
             assert_ne!(
                 by_month, by_days,
                 "equal values must shift a date differently"
-            );
-        }
-
-        #[test]
-        fn applies_a_fractional_month_to_a_calendar_date() {
-            // Arrange: the whole month clamps first, then the half-month
-            // remainder (fifteen nominal days) applies as local time.
-            let base = point_at("2026-01-31");
-            let duration =
-                DurationValue::parse("1.5mo").expect("valid duration");
-
-            // Act
-            let applied = base.apply(
-                &duration,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                applied,
-                Ok(point_at("2026-03-15")),
-                "1.5mo must clamp the month, then add the local remainder"
             );
         }
 

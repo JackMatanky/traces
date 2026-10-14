@@ -65,16 +65,23 @@ static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust
+/// # #[cfg(feature = "test-utils")]
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # use pretty_assertions::assert_eq;
 /// use traces_pkm::{DateTimeValue, testing::ZoneGuard};
 ///
+/// ZoneGuard::set("UTC");
 /// let value = DateTimeValue::from_unix_seconds(0)?;
 /// let utc = value.to_string();
 /// ZoneGuard::with("Etc/GMT-2", || {
 ///     assert_eq!(value.to_string(), "1970-01-01T02:00:00");
 /// });
 /// assert_eq!(value.to_string(), utc);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "test-utils"))]
+/// # fn main() {}
 /// ```
 #[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug)]
@@ -138,11 +145,11 @@ impl ZoneGuard {
     ///
     /// Readers on other threads observe the override. Repeated calls replace
     /// it; the original value is restored when the owning test thread exits.
-    /// Use the scoped with method for nested overrides.
+    /// Use [`Self::with`] for nested overrides.
     ///
     /// # Panics
     ///
-    /// Panics if the zone name is unrecognized.
+    /// Panics if `zone` is not a recognized time-zone name.
     #[inline]
     #[expect(
         clippy::panic,
@@ -172,6 +179,7 @@ impl ZoneGuard {
         });
     }
 
+    /// Installs a new override zone and acquires the serialization lock.
     fn install(zone: Option<TimeZone>) -> Self {
         let lock =
             ZONE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -199,6 +207,7 @@ impl Drop for ZoneGuard {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = previous;
     }
 }
+/// Restores the previous zone override when dropped.
 #[cfg(any(test, feature = "test-utils"))]
 struct ScopedZoneRestore {
     previous: Option<TimeZone>,
@@ -214,6 +223,7 @@ impl Drop for ScopedZoneRestore {
     }
 }
 
+/// Cleans up thread-local zone state on test thread exit.
 #[cfg(any(test, feature = "test-utils"))]
 struct ThreadZoneRestore;
 

@@ -41,8 +41,7 @@ use minijinja::{
 
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
-    DATE_PATTERN, DateTimeValue, DurationSeconds, DurationValue, TimeUnit,
-    UNIT_SPELLINGS_HINT,
+    DATE_PATTERN, DateTimeValue, DurationValue, TimeUnit, UNIT_SPELLINGS_HINT,
     temporal::{
         CalendarError, CalendarPeriod, DateComponent, DateDiff, DateError,
         DatePoint, PeriodEdge, weekday_from_number,
@@ -608,14 +607,12 @@ fn duration_format(value: Value) -> TemplateEngineResult<String> {
             invalid_operation(format!("invalid duration {s:?}"), source)
         })?
     } else if let Ok(f) = f64::try_from(value) {
-        DurationSeconds::try_from(f)
-            .and_then(DurationValue::from_nominal_seconds)
-            .map_err(|source| {
-                invalid_operation(
-                    format!("out-of-range duration seconds {f}"),
-                    source,
-                )
-            })?
+        DurationValue::from_nominal_seconds(f).map_err(|source| {
+            invalid_operation(
+                format!("out-of-range duration seconds {f}"),
+                source,
+            )
+        })?
     } else {
         return Err(Error::new(
             ErrorKind::InvalidOperation,

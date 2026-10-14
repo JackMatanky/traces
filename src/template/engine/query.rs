@@ -600,7 +600,7 @@ fn field_value(value: NoteFieldValue) -> Value {
         NoteFieldValue::Bool(b) => Value::from(b),
         NoteFieldValue::Number(n) => Value::from(n),
         NoteFieldValue::String(s) => Value::from(s),
-        NoteFieldValue::Duration(dv) => Value::from(dv.as_str()),
+        NoteFieldValue::Duration(dv) => Value::from(dv.to_string()),
         NoteFieldValue::Date(value) => Value::from(value.to_string()),
         NoteFieldValue::DateTime(value) => Value::from(value.to_string()),
         NoteFieldValue::Link(link) => Value::from(link.target().to_owned()),

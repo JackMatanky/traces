@@ -24,9 +24,8 @@ use super::{
     },
 };
 use crate::{
-    DurationSeconds, DurationValue, LexError, NoteFieldValue,
-    NoteFieldValueRef, Spanned, SpannedTokenStream, TimeUnit, TokenSpec,
-    lexical_unquote,
+    DurationValue, LexError, NoteFieldValue, NoteFieldValueRef, Spanned,
+    SpannedTokenStream, TimeUnit, TokenSpec, lexical_unquote,
     query::{
         QueryRow,
         error::{QueryBuilderError, QueryDialect, QuerySyntaxError},
@@ -289,7 +288,10 @@ impl ValueExpr {
                 lhs,
                 op,
                 rhs,
-            } => op.evaluate(lhs.evaluate(row)?, rhs.evaluate(row)?),
+            } => {
+                let left = lhs.evaluate(row)?;
+                op.evaluate(&left, rhs.evaluate(row)?)
+            }
         }
     }
 
@@ -348,21 +350,21 @@ impl ArithOp {
     /// not representable.
     fn evaluate(
         self,
-        left: NoteFieldValue,
+        left: &NoteFieldValue,
         right: NoteFieldValue,
     ) -> Option<NoteFieldValue> {
         match left {
             NoteFieldValue::Date(date) => {
-                self.evaluate_date(date.into(), right)
+                self.evaluate_date((*date).into(), right)
             }
             NoteFieldValue::DateTime(datetime) => {
-                self.evaluate_date(datetime.into(), right)
+                self.evaluate_date((*datetime).into(), right)
             }
             NoteFieldValue::Duration(duration) => {
-                self.evaluate_duration(duration, right)
+                self.evaluate_duration(*duration, right)
             }
             NoteFieldValue::Number(factor) => {
-                self.evaluate_number(factor, right)
+                self.evaluate_number(*factor, right)
             }
             _ => Some(NoteFieldValue::Null),
         }
@@ -409,10 +411,7 @@ impl ArithOp {
                         .ok()?;
                     let seconds = diff.to_f64()?;
                     Some(NoteFieldValue::Duration(
-                        DurationValue::from_nominal_seconds(
-                            DurationSeconds::try_from(seconds).ok()?,
-                        )
-                        .ok()?,
+                        DurationValue::from_nominal_seconds(seconds).ok()?,
                     ))
                 }
                 _ => Some(NoteFieldValue::Null),
@@ -628,7 +627,7 @@ impl QueryFunction {
         match self {
             Self::Dur => match args {
                 [NoteFieldValue::Duration(duration)] => {
-                    Some(NoteFieldValue::Duration(duration.clone()))
+                    Some(NoteFieldValue::Duration(*duration))
                 }
                 [NoteFieldValue::String(text)] => Some(
                     NoteFieldValue::Duration(DurationValue::parse(text).ok()?),
@@ -657,13 +656,11 @@ impl QueryFunction {
 
     fn date_add(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
         match args {
-            [date, NoteFieldValue::Duration(duration)] => ArithOp::Add
-                .evaluate(
-                    date.clone(),
-                    NoteFieldValue::Duration(duration.clone()),
-                ),
+            [date, NoteFieldValue::Duration(duration)] => {
+                ArithOp::Add.evaluate(date, NoteFieldValue::Duration(*duration))
+            }
             [date, NoteFieldValue::String(text)] => ArithOp::Add.evaluate(
-                date.clone(),
+                date,
                 NoteFieldValue::Duration(DurationValue::parse(text).ok()?),
             ),
             [date, NoteFieldValue::Number(n), NoteFieldValue::String(unit)] => {

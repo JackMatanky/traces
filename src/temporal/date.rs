@@ -172,12 +172,13 @@ impl DateValue {
 /// and [`DateValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DateShape {
-    /// Full ISO date: `2026-07-29`.
+    /// Matches a full ISO date: `2026-07-29`.
     YearMonthDay,
-    /// Year-month reduced precision: `2026-07`. Day defaults to 1.
+    /// Matches year-month reduced precision: `2026-07` (day defaults to 1).
     YearMonth,
 }
 
+/// Returns `true` if `s` starts with a four-digit zero-padded date prefix.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "year length is 4 or 5 bytes"
@@ -211,8 +212,8 @@ impl DateShape {
     ///
     /// # Errors
     ///
-    /// - A static reason from the best-fitting shape: the year-month reason for
-    ///   7-byte input (`YYYY-MM`), or the full-date reason otherwise.
+    /// Returns a static reason from the best-fitting shape: the year-month
+    /// reason for 7-byte input (`YYYY-MM`), or the full-date reason otherwise.
     pub(crate) fn parse_any(
         s: &str,
     ) -> Result<(civil::Date, DatePrecision), &'static str> {
@@ -227,6 +228,11 @@ impl DateShape {
         })
     }
 
+    /// Parses `s` according to this shape, returning the date and precision.
+    ///
+    /// # Errors
+    ///
+    /// Returns a static reason if `s` does not match this shape.
     fn parse_precision(
         self,
         s: &str,
@@ -242,6 +248,11 @@ impl DateShape {
         }
     }
 
+    /// Parses `YYYY-MM-DD` or `-YYYY-MM-DD`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a static reason if `s` is not a valid full date string.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "year length is 4 or 5 bytes"
@@ -274,6 +285,10 @@ impl DateShape {
     }
 
     /// Parses `YYYY-MM` or `-YYYY-MM`, defaulting the day to 1.
+    ///
+    /// # Errors
+    ///
+    /// Returns a static reason if `s` is not a valid year-month string.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "year length is 4 or 5 bytes"
@@ -349,6 +364,7 @@ impl TryFrom<SystemTime> for DateValue {
     ///
     /// - [`DateError::InvalidValue`] if `time` is outside the representable
     ///   timestamp range.
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
         DateTimeValue::try_from(time)?.local_date()

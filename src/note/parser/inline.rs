@@ -186,10 +186,7 @@ impl<'a> InlineValueParser<'a> {
         let tail = self.source.from(pos)?;
         let parsed = DurationValue::parse_prefix(tail)?;
         let end = self.source.advance(pos, parsed.span_usize().end);
-        Some(ParsedAtom::new(
-            NoteFieldValue::Duration(parsed.value().clone()),
-            end,
-        ))
+        Some(ParsedAtom::new(NoteFieldValue::Duration(*parsed.value()), end))
     }
 
     /// Parses a case-insensitive `true`/`false` keyword atom at `pos`.
@@ -418,13 +415,11 @@ mod tests {
             let vp = InlineValueParser::new("1h 30m");
             let result = vp.parse_duration_at(0);
 
-            assert!(
-                matches!(
-                    &result,
-                    Some(ParsedAtom { value: NoteFieldValue::Duration(dv), .. })
-                        if dv.as_str() == "1h 30m"
-                ),
-                "1h 30m must parse as duration"
+            let expected =
+                DurationValue::parse("1h 30m").expect("valid duration");
+            assert_eq!(
+                result.map(|atom| atom.value),
+                Some(NoteFieldValue::Duration(expected))
             );
         }
 
@@ -433,13 +428,11 @@ mod tests {
             let vp = InlineValueParser::new("1h30m");
             let result = vp.parse_duration_at(0);
 
-            assert!(
-                matches!(
-                    &result,
-                    Some(ParsedAtom { value: NoteFieldValue::Duration(dv), .. })
-                        if dv.as_str() == "1h30m"
-                ),
-                "1h30m must parse as duration"
+            let expected =
+                DurationValue::parse("1h30m").expect("valid duration");
+            assert_eq!(
+                result.map(|atom| atom.value),
+                Some(NoteFieldValue::Duration(expected))
             );
         }
     }

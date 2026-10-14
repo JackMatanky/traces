@@ -43,17 +43,17 @@ pub(crate) enum TimeUnit {
 pub(crate) struct UnitSpec {
     /// Identifies the unit described by this row.
     pub unit: TimeUnit,
-    /// Stores the canonical short spelling used in synthesized duration text.
-    pub spelling: &'static str,
-    /// Lists every accepted lowercase input spelling, [`Self::spelling`]
-    /// included.
+    /// Lists every accepted lowercase input spelling.
     pub aliases: &'static [&'static str],
     /// Stores singular and plural English names for human-readable output.
     pub names: (&'static str, &'static str),
-    /// Fixed nominal seconds per unit, the sole unit-ratio table in the crate.
+    /// Stores the fixed nominal seconds per unit.
     ///
-    /// Stores the nominal seconds per unit; calendar ratios are used only for
-    /// value identity and ordering, because actual calendar lengths vary.
+    /// Calendar units ([`TimeUnit::Day`], [`TimeUnit::Week`],
+    /// [`TimeUnit::Month`], [`TimeUnit::Year`]) use nominal fixed ratios for
+    /// value identity, magnitude ordering, and fractional-remainder
+    /// application; their whole-count date-shifting behavior belongs to the
+    /// calendar owner modules because actual calendar lengths vary.
     pub nominal_seconds: f64,
     /// Stores the exact nominal milliseconds used by integer decomposition.
     pub nominal_milliseconds: u64,
@@ -70,7 +70,6 @@ pub(crate) struct UnitSpec {
 pub(crate) static UNITS: [UnitSpec; 8] = [
     UnitSpec {
         unit: TimeUnit::Year,
-        spelling: "y",
         aliases: &["y", "yr", "yrs", "year", "years"],
         names: ("year", "years"),
         nominal_seconds: 31_536_000.0,
@@ -79,7 +78,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Month,
-        spelling: "mo",
         aliases: &["mo", "mos", "month", "months"],
         names: ("month", "months"),
         nominal_seconds: 2_592_000.0,
@@ -88,7 +86,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Week,
-        spelling: "w",
         aliases: &["w", "wk", "wks", "week", "weeks"],
         names: ("week", "weeks"),
         nominal_seconds: 604_800.0,
@@ -97,7 +94,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Day,
-        spelling: "d",
         aliases: &["d", "day", "days"],
         names: ("day", "days"),
         nominal_seconds: 86_400.0,
@@ -106,7 +102,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Hour,
-        spelling: "h",
         aliases: &["h", "hr", "hrs", "hour", "hours"],
         names: ("hour", "hours"),
         nominal_seconds: 3_600.0,
@@ -115,7 +110,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Minute,
-        spelling: "m",
         aliases: &["m", "min", "mins", "minute", "minutes"],
         names: ("minute", "minutes"),
         nominal_seconds: 60.0,
@@ -124,7 +118,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Second,
-        spelling: "s",
         aliases: &["s", "sec", "secs", "second", "seconds"],
         names: ("second", "seconds"),
         nominal_seconds: 1.0,
@@ -133,7 +126,6 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
     },
     UnitSpec {
         unit: TimeUnit::Millisecond,
-        spelling: "ms",
         aliases: &["ms", "millisecond", "milliseconds"],
         names: ("millisecond", "milliseconds"),
         nominal_seconds: 0.001,
@@ -253,13 +245,6 @@ impl TimeUnit {
         }
     }
 
-    /// Returns the canonical short spelling used in synthesized duration text.
-    #[must_use]
-    #[inline]
-    pub(crate) const fn spelling(self) -> &'static str {
-        self.spec().spelling
-    }
-
     /// Returns the singular and plural English names for human-readable
     /// durations.
     #[must_use]
@@ -268,8 +253,7 @@ impl TimeUnit {
         self.spec().names
     }
 
-    /// Returns the fixed nominal seconds per unit, the sole unit-ratio table in
-    /// the crate.
+    /// Returns the fixed nominal seconds per unit.
     ///
     /// Calendar units ([`Self::Day`], [`Self::Week`], [`Self::Month`],
     /// [`Self::Year`]) get nominal fixed ratios for value identity, magnitude
@@ -448,34 +432,6 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::millisecond(TimeUnit::Millisecond, "ms")]
-        #[case::second(TimeUnit::Second, "s")]
-        #[case::minute(TimeUnit::Minute, "m")]
-        #[case::hour(TimeUnit::Hour, "h")]
-        #[case::day(TimeUnit::Day, "d")]
-        #[case::week(TimeUnit::Week, "w")]
-        #[case::month(TimeUnit::Month, "mo")]
-        #[case::year(TimeUnit::Year, "y")]
-        fn returns_canonical_spelling_for_each_unit(
-            #[case] unit: TimeUnit,
-            #[case] expected: &str,
-        ) {
-            // Arrange: `unit` and `expected` are the case literals.
-            // Act
-            let actual = unit.spelling();
-            // Assert
-            assert_eq!(
-                actual, expected,
-                "canonical spelling of {unit:?} must stay `{expected}`"
-            );
-            assert_eq!(
-                TimeUnit::from_spelling(actual),
-                Some(unit),
-                "canonical spelling `{actual}` must parse back to {unit:?}"
-            );
-        }
-
-        #[rstest]
         #[case::millisecond(
             TimeUnit::Millisecond,
             "millisecond",
@@ -652,11 +608,13 @@ mod tests {
             // Act
             // Assert
             for row in &UNITS {
-                let spelling = row.unit.spelling();
+                // The first alias of every row is its compact spelling.
+                let compact =
+                    row.aliases.first().expect("unit row has aliases");
                 assert!(
-                    hint_tokens.contains(spelling),
+                    hint_tokens.contains(compact),
                     "UNIT_SPELLINGS_HINT must list the compact spelling \
-                     `{spelling}` of {:?}",
+                     `{compact}` of {:?}",
                     row.unit
                 );
             }

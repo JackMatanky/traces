@@ -11,9 +11,10 @@ arithmetic. `src/temporal/` is the single owner of these values and their rules.
 #### Date
 
 A zone-free calendar date. Every date-shaped string, including serde
-deserialization, uses the temporal parser. Parsing requires a four-digit year
-and retains month or day precision; `YYYY-MM` denotes the first day of the month.
-The internal representation is Jiff's zone-free civil date type.
+deserialization, uses the temporal parser. Parsing requires a four-digit year;
+`YYYY-MM` normalizes to the first day of the month. `DateValue` represents
+a whole calendar date using Jiff's zone-free civil date type; written precision
+(month or day) is preserved separately by `DatePoint`.
 
 #### Date-Time
 
@@ -43,7 +44,8 @@ boundaries and daylight-saving transitions.
 #### Zone
 
 The process-local zone used to resolve unzoned Date-Time input, render stored
-Date-Time values, and apply calendar units.
+Date-Time values, and apply calendar units. System zone lookup errors propagate
+as `DateError::LocalZoneLookup`.
 
 #### Unit
 

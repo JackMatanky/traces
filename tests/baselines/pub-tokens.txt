@@ -1395,20 +1395,22 @@ src/temporal/duration.rs: pub fn checked_add(self, rhs: Self) -> Result<Self, Du
 src/temporal/duration.rs: pub fn checked_mul(self, factor: f64) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub fn checked_neg(self) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub fn checked_sub(self, rhs: Self) -> Result<Self, DurationError> {
-src/temporal/duration.rs: pub struct DurationValue {
-src/temporal/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
-src/temporal/duration.rs: pub(crate) fn as_str(&self) -> &str {
-src/temporal/duration.rs: pub(crate) fn components(&self) -> Option<&[DurationComponent]> {
+src/temporal/duration.rs: pub struct DurationValue(Span);
+src/temporal/duration.rs: pub(crate) const fn from_span(span: Span) -> Self {
+src/temporal/duration.rs: pub(crate) const fn span(self) -> Span {
+src/temporal/duration.rs: pub(crate) fn components(&self) -> Vec<DurationComponent> {
 src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(
 src/temporal/duration.rs: pub(crate) fn has_calendar_component(&self) -> bool {
 src/temporal/duration.rs: pub(crate) fn humanize(&self) -> String {
-src/temporal/duration.rs: pub(crate) fn nominal_seconds(&self) -> DurationSeconds {
+src/temporal/duration.rs: pub(crate) fn magnitude(&self) -> f64 {
+src/temporal/duration.rs: pub(crate) fn nominal_nanoseconds(&self) -> i128 {
+src/temporal/duration.rs: pub(crate) fn nominal_seconds(&self) -> f64 {
 src/temporal/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
 src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
-src/temporal/duration.rs: pub(crate) fn span(&self) -> Span {
+src/temporal/duration.rs: pub(crate) fn unit(&self) -> TimeUnit {
+src/temporal/duration.rs: pub(crate) magnitude: f64,
 src/temporal/duration.rs: pub(crate) struct DurationComponent {
-src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
-src/temporal/duration.rs: pub(super) fn span_from_nominal_seconds(
+src/temporal/duration.rs: pub(crate) unit: TimeUnit,
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
 src/temporal/error.rs: pub(crate) enum CalendarError {
@@ -1429,7 +1431,6 @@ src/temporal/mod.rs: pub(crate) mod fixtures;
 src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DATETIME_PATTERN;
-src/temporal/mod.rs: pub(crate) use duration::DurationSeconds;
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use point::DatePoint;
 src/temporal/mod.rs: pub(crate) use unit::{TimeUnit, UNIT_SPELLINGS_HINT};
@@ -1460,7 +1461,6 @@ src/temporal/unit.rs: pub count: u64,
 src/temporal/unit.rs: pub names: (&'static str, &'static str),
 src/temporal/unit.rs: pub nominal_milliseconds: u64,
 src/temporal/unit.rs: pub nominal_seconds: f64,
-src/temporal/unit.rs: pub spelling: &'static str,
 src/temporal/unit.rs: pub unit: TimeUnit,
 src/temporal/unit.rs: pub unit: TimeUnit,
 src/temporal/unit.rs: pub(crate) const CANONICAL_UNITS: [TimeUnit; 6] = [
@@ -1470,7 +1470,6 @@ src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'
 src/temporal/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
 src/temporal/unit.rs: pub(crate) const fn nominal_seconds(self) -> f64 {
 src/temporal/unit.rs: pub(crate) const fn spec(self) -> &'static UnitSpec {
-src/temporal/unit.rs: pub(crate) const fn spelling(self) -> &'static str {
 src/temporal/unit.rs: pub(crate) enum TimeUnit {
 src/temporal/unit.rs: pub(crate) fn decompose(
 src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {

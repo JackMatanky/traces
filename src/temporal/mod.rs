@@ -1,4 +1,4 @@
-//! Provides calendar dates, Date-Times, Durations, and the arithmetic that
+//! Provides calendar dates, date-times, durations, and the arithmetic that
 //! relates them.
 //!
 //! This module owns recognition, parsing, formatting, and value semantics for
@@ -23,7 +23,8 @@
 //!
 //! # Key types
 //!
-//! - [`DateValue`]: A zone-free calendar date.
+//! - [`DateValue`]: A zone-free calendar date on the proleptic Gregorian
+//!   calendar with whole-day precision.
 //! - [`DateTimeValue`]: Stores a UTC timestamp and renders it as local civil
 //!   time.
 //! - [`DurationValue`]: A validated duration with nominal identity and
@@ -46,7 +47,6 @@ pub(crate) use date::DATE_PATTERN;
 pub use date::DateValue;
 pub(crate) use datetime::DATETIME_PATTERN;
 pub use datetime::DateTimeValue;
-pub(crate) use duration::DurationSeconds;
 pub use duration::DurationValue;
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};

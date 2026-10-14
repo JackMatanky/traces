@@ -51,9 +51,8 @@ pub enum NoteFieldValue {
     Date(DateValue),
     /// ISO `YYYY-MM-DDThh:mm:ss` date-time.
     DateTime(DateTimeValue),
-    /// Duration literal in source spelling, such as `4h15m` or `4 yrs, 6 wks`.
-    /// Equality and ordering compare by total parsed seconds, not source
-    /// spelling.
+    /// Validated duration; renders in canonical spelling. Equality and ordering
+    /// compare exact nominal nanoseconds, not the original input text.
     Duration(DurationValue),
     /// A link parsed from wikilink or Markdown link syntax.
     Link(Link),
@@ -64,8 +63,8 @@ pub enum NoteFieldValue {
 }
 
 impl NoteFieldValue {
-    /// Returns the inner text for [`NoteFieldValue::String`] and
-    /// [`NoteFieldValue::Duration`] variants, or `None` for any other kind.
+    /// Borrows the inner text of a [`NoteFieldValue::String`], or returns
+    /// `None` for any other kind. Durations are formatted on demand instead.
     ///
     /// # Examples
     ///
@@ -83,7 +82,6 @@ impl NoteFieldValue {
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(s),
-            Self::Duration(dv) => Some(dv.as_str()),
             _ => None,
         }
     }
@@ -326,7 +324,9 @@ impl NoteFieldValueRef<'_> {
                 let _ = write!(out, "{value}");
             }
             Self::String(value) => out.push_str(value),
-            Self::Duration(value) => out.push_str(value.as_str()),
+            Self::Duration(value) => {
+                let _ = write!(out, "{value}");
+            }
             Self::Date(value) => {
                 let _ = write!(out, "{value}");
             }
@@ -355,12 +355,10 @@ impl NoteFieldValueRef<'_> {
         }
     }
 
-    /// Returns the borrowed string for [`Self::String`] or the duration's
-    /// source spelling for [`Self::Duration`], or `None` for any other kind.
+    /// Borrows a string field; formatted durations have no borrowed spelling.
     pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(value) => Some(value),
-            Self::Duration(value) => Some(value.as_str()),
             _ => None,
         }
     }
@@ -375,7 +373,7 @@ impl NoteFieldValueRef<'_> {
             Self::String(value) => NoteFieldValue::String(value.to_owned()),
             Self::Date(value) => NoteFieldValue::Date(value),
             Self::DateTime(value) => NoteFieldValue::DateTime(value),
-            Self::Duration(value) => NoteFieldValue::Duration((*value).clone()),
+            Self::Duration(value) => NoteFieldValue::Duration(*value),
             Self::Link(value) => NoteFieldValue::Link((*value).clone()),
             Self::List(values) => NoteFieldValue::List(values.into()),
             Self::Object(value) => NoteFieldValue::Object((*value).clone()),
@@ -795,11 +793,11 @@ mod tests {
         }
 
         #[test]
-        fn as_str_returns_inner_str_for_duration_variant() {
+        fn returns_none_for_a_duration_field() {
             let dur_val = NoteFieldValue::Duration(
                 DurationValue::parse("4h").expect("valid duration"),
             );
-            assert_eq!(dur_val.as_str(), Some("4h"));
+            assert_eq!(dur_val.as_str(), None);
         }
 
         #[test]
@@ -905,12 +903,9 @@ mod tests {
             let str_field = NoteFieldValue::String("1h".to_owned());
             let dur_field = NoteFieldValue::Duration(dur_val);
 
-            // string_field == dur("1h") is true because String arm matches any
-            // as_str
-            assert!(str_field.as_ref().is_equal_to_literal(&dur_field));
-
-            // duration_field == "1h" is false because Duration arm requires
-            // Duration literal
+            // Strict typing: a string never equals a duration literal and a
+            // duration never equals a string literal, regardless of text.
+            assert!(!str_field.as_ref().is_equal_to_literal(&dur_field));
             assert!(!dur_field.as_ref().is_equal_to_literal(&str_field));
         }
     }

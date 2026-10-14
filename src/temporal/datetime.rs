@@ -98,6 +98,7 @@ impl DateTimeValue {
         })
     }
 
+    /// Wraps a Jiff [`Timestamp`].
     #[inline]
     pub(crate) const fn from_timestamp(timestamp: Timestamp) -> Self {
         Self(timestamp)
@@ -150,7 +151,8 @@ impl DateTimeValue {
         Ok(self.local_datetime_or_utc()?.date().into())
     }
 
-    /// Returns true if this date-time is exactly local-zone midnight on date.
+    /// Returns `true` if this date-time is exactly local-zone midnight on
+    /// `date`.
     #[must_use]
     pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
         Self::try_from(date).is_ok_and(|midnight| self.0 == midnight.0)
@@ -163,8 +165,9 @@ impl DateTimeValue {
         self.0
     }
 
-    /// Canonical strftime pattern for this date-time: whole seconds, plus
-    /// fractional seconds only when the nanosecond component is nonzero.
+    /// Returns the canonical strftime pattern for this date-time: whole
+    /// seconds, plus fractional seconds only when the nanosecond component is
+    /// nonzero.
     ///
     /// Local offsets are whole seconds, so the UTC and local readings share
     /// their nanosecond component and no zone lookup is needed.
@@ -335,8 +338,8 @@ impl TryFrom<SystemTime> for DateTimeValue {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if time lies outside Jiff's representable
-    ///   timestamp range.
+    /// - [`DateError::InvalidValue`] if `time` lies outside Jiff's
+    ///   representable timestamp range.
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
         Timestamp::try_from(time).map(Self).map_err(|_| {
@@ -453,7 +456,7 @@ impl DateTimeShape {
     ///
     /// # Errors
     ///
-    /// - A static reason if no accepted date-time shape matches `s`.
+    /// Returns a static reason if no accepted date-time shape matches `s`.
     pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
         let normalized_input = normalized.as_ref();
@@ -516,6 +519,7 @@ impl DateTimeShape {
     }
 }
 
+/// Returns `true` if the RFC 3339 numeric offset in `input` is valid.
 fn numeric_rfc3339_offset_is_valid(input: &str) -> bool {
     let Some(tail) = input.get(10..) else {
         return true;
