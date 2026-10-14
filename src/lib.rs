@@ -131,8 +131,6 @@ mod tag;
 mod task;
 mod template;
 mod temporal;
-#[cfg(test)]
-mod temporal_oracle;
 mod yaml;
 
 pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};

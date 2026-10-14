@@ -483,13 +483,11 @@ mod tests {
             let expected: Timestamp =
                 "1970-01-01T00:00:00Z".parse().expect("valid epoch timestamp");
             // Act
-            let value = DateTimeValue::try_from(epoch)
-                .expect("the Unix epoch is within Timestamp's range");
+            let result = DateTimeValue::try_from(epoch);
 
             // Assert
-            assert_eq!(
-                value.utc(),
-                expected,
+            assert!(
+                matches!(result, Ok(value) if value.utc() == expected),
                 "the epoch must construct as 1970-01-01T00:00:00Z"
             );
         }
@@ -503,13 +501,11 @@ mod tests {
                 .parse()
                 .expect("valid pre-epoch timestamp");
             // Act
-            let value = DateTimeValue::try_from(before_epoch)
-                .expect("the pre-epoch value is within Timestamp's range");
+            let result = DateTimeValue::try_from(before_epoch);
 
             // Assert
-            assert_eq!(
-                value.utc(),
-                expected,
+            assert!(
+                matches!(result, Ok(value) if value.utc() == expected),
                 "negative timeline positions must construct before the epoch"
             );
         }
@@ -521,8 +517,11 @@ mod tests {
             // Arrange: the edge is a bound of the Jiff timestamp range.
             let value = DateTimeValue(edge);
 
-            // Act and assert
-            assert_eq!(value.0, edge);
+            // Act
+            let actual = value.0;
+
+            // Assert
+            assert_eq!(actual, edge);
         }
 
         #[test]
@@ -711,6 +710,10 @@ mod tests {
         #[case::fractional_seconds(
             "2026-07-29T14:30:00.123",
             "2026-07-29T14:30:00.123"
+        )]
+        #[case::overprecision_truncates_to_nanoseconds(
+            "2026-07-29T14:30:00.1234567891Z",
+            "2026-07-29T14:30:00.123456789"
         )]
         #[case::t_separated_with_seconds(
             "2026-07-29T14:30:00",
@@ -1195,22 +1198,27 @@ mod tests {
             // Arrange: YAML strings share the serde string path; the "Z"
             // spelling must not mean the local zone.
             let yaml = "datetime: \"2026-07-29T14:30:00Z\"\n";
+            let expected =
+                DateTimeValue::parse_iso("2026-07-29T14:30:00+00:00")
+                    .expect("valid datetime");
 
             // Act
-            let note = noyalib::from_str::<YamlNote>(yaml)
-                .expect("YAML note deserializes");
+            let result = noyalib::from_str::<YamlNote>(yaml).map(|note| {
+                let YamlNote {
+                    datetime,
+                } = note;
+                let serialized = serde_json::to_string(&datetime);
+                (datetime, serialized)
+            });
 
             // Assert
-            assert_eq!(
-                note.datetime,
-                DateTimeValue::parse_iso("2026-07-29T14:30:00+00:00")
-                    .expect("valid datetime"),
-                "\"Z\" must parse as UTC, not the local zone"
-            );
-            assert_eq!(
-                serde_json::to_string(&note.datetime).expect("serializable"),
-                "\"2026-07-29T14:30:00Z\"",
-                "re-serialization must keep the Z spelling"
+            assert!(
+                matches!(
+                    result,
+                    Ok((datetime, Ok(serialized)))
+                        if datetime == expected && serialized == "\"2026-07-29T14:30:00Z\""
+                ),
+                "YAML Z values remain UTC when deserialized and serialized"
             );
         }
 
@@ -1236,7 +1244,6 @@ mod tests {
     }
 
     mod conversions {
-        use pretty_assertions::assert_eq;
 
         use super::*;
 
@@ -1245,16 +1252,15 @@ mod tests {
             // Arrange: UTC+2, no DST.
             ZoneGuard::set("Etc/GMT-2");
             let date = ymd(2026, 7, 29);
+            let expected = DateTimeValue::parse_iso("2026-07-28T22:00:00Z")
+                .expect("valid expected date-time");
 
             // Act
-            let promoted = DateTimeValue::try_from(date)
-                .expect("test date has a representable local midnight");
-            let expected = DateTimeValue::parse_iso("2026-07-28T22:00:00Z");
+            let promoted = DateTimeValue::try_from(date);
 
             // Assert
-            assert_eq!(
-                expected,
-                Ok(promoted),
+            assert!(
+                matches!(promoted, Ok(value) if value == expected),
                 "local midnight in UTC+2 is 22:00Z on the previous day"
             );
         }
@@ -1264,22 +1270,21 @@ mod tests {
             // Arrange: local midnight falls inside this spring-forward gap.
             ZoneGuard::set("America/Santiago");
             let date = ymd(2026, 9, 6);
+            let expected = DateTimeValue::parse_iso("2026-09-06T04:00:00Z")
+                .expect("valid expected date-time");
 
             // Act
-            let promoted = DateTimeValue::try_from(date)
-                .expect("test date has a representable local midnight");
-            let expected = DateTimeValue::parse_iso("2026-09-06T04:00:00Z");
+            let promoted = DateTimeValue::try_from(date);
 
             // Assert
-            assert_eq!(
-                expected,
-                Ok(promoted),
-                "midnight inside a DST gap must advance by the gap length"
-            );
-            assert_eq!(
-                promoted.to_string(),
-                "2026-09-06T01:00:00",
-                "the advanced midnight must render as the post-gap clock time"
+            assert!(
+                matches!(
+                    promoted,
+                    Ok(value)
+                        if value == expected
+                            && value.to_string() == "2026-09-06T01:00:00"
+                ),
+                "midnight inside a DST gap advances by the gap length"
             );
         }
 
@@ -1309,16 +1314,15 @@ mod tests {
             ZoneGuard::set("UTC");
             let system_time =
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
+            let expected = DateTimeValue::parse_iso("1970-01-01T00:16:40")
+                .expect("valid expected date-time");
 
             // Act
-            let converted = DateTimeValue::try_from(system_time)
-                .expect("test system time is within the supported range");
-            let expected = DateTimeValue::parse_iso("1970-01-01T00:16:40");
+            let converted = DateTimeValue::try_from(system_time);
 
             // Assert
-            assert_eq!(
-                expected,
-                Ok(converted),
+            assert!(
+                matches!(converted, Ok(value) if value == expected),
                 "a SystemTime position must convert to the same date-time"
             );
         }
@@ -1429,19 +1433,21 @@ mod tests {
             // Arrange: the current zone (kept) hosts the promotion.
             ZoneGuard::keep();
             let date = ymd(2026, 7, 29);
-
-            // Act
             let midnight = DateTimeValue::try_from(date)
                 .expect("test date has a representable local midnight");
             let time_of_day = fixed_datetime();
 
+            // Act
+            let is_midnight = midnight.is_midnight_of(date);
+            let has_time = time_of_day.is_midnight_of(date);
+
             // Assert
             assert!(
-                midnight.is_midnight_of(date),
+                is_midnight,
                 "the promoted midnight must count as midnight of its date"
             );
             assert!(
-                !time_of_day.is_midnight_of(date),
+                !has_time,
                 "a date-time with a time of day must not count as midnight"
             );
         }
@@ -1495,6 +1501,7 @@ mod tests {
             fn local_iso_display_round_trips_at_second_precision(
                 seconds in 946_684_800_u64..=1_893_456_000_u64,
             ) {
+                // Arrange
                 // Display and parsing use the process-local zone; pin it so the
                 // round trip is deterministic across developer machines.
                 ZoneGuard::set("UTC");

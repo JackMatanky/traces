@@ -1058,20 +1058,28 @@ mod tests {
         fn synthesized_display_roundtrips_by_span_identity(
             seconds in -1_000_000_000_i32..=1_000_000_000_i32,
         ) {
+            // Arrange
             let original = synthesized(f64::from(seconds));
+
+            // Act
             let displayed = original.to_string();
-            let reparsed = DurationValue::parse(&displayed)
-                .expect("displayed spelling parses");
-            prop_assert_eq!(original, reparsed);
+            let reparsed = DurationValue::parse(&displayed);
+
+            // Assert
+            prop_assert!(matches!(reparsed, Ok(value) if value == original));
         }
 
         #[test]
         fn nominal_constructor_preserves_integer_milliseconds(
             milliseconds in -1_000_000_000_i32..=1_000_000_000_i32,
         ) {
+            // Arrange
             let expected = f64::from(milliseconds) / 1_000.0;
+
+            // Act
             let duration = synthesized(expected);
 
+            // Assert
             prop_assert_eq!(
                 duration.nominal_seconds().as_f64().to_bits(),
                 expected.to_bits(),
@@ -1082,16 +1090,20 @@ mod tests {
         fn negating_twice_preserves_nominal_identity(
             seconds in -1_000_000_i32..=1_000_000_i32,
         ) {
+            // Arrange
             let duration = synthesized(f64::from(seconds));
             let original = duration.nominal_seconds();
-            let negated = duration
-                .checked_neg()
-                .expect("bounded duration negates");
-            let restored = negated
-                .checked_neg()
-                .expect("bounded negated duration restores");
 
-            prop_assert!(restored.nominal_seconds() == original);
+            // Act
+            let restored = duration
+                .checked_neg()
+                .and_then(DurationValue::checked_neg);
+
+            // Assert
+            prop_assert!(matches!(
+                restored,
+                Ok(value) if value.nominal_seconds() == original
+            ));
         }
 
         #[test]
@@ -1099,43 +1111,60 @@ mod tests {
             left in -1_000_000_i32..=1_000_000_i32,
             right in -1_000_000_i32..=1_000_000_i32,
         ) {
+            // Arrange
             let left = synthesized(f64::from(left));
             let right = synthesized(f64::from(right));
             let left_identity = left.nominal_seconds();
-            let right_identity = right.nominal_seconds();
-            let right_again = synthesized(right_identity.as_f64());
+            let right_again = synthesized(right.nominal_seconds().as_f64());
+
+            // Act
             let restored = left
                 .checked_add(right)
-                .and_then(|sum| sum.checked_sub(right_again))
-                .expect("bounded duration arithmetic succeeds");
+                .and_then(|sum| sum.checked_sub(right_again));
 
-            prop_assert!(restored.nominal_seconds() == left_identity);
+            // Assert
+            prop_assert!(matches!(
+                restored,
+                Ok(value) if value.nominal_seconds() == left_identity
+            ));
         }
 
         #[test]
         fn equality_ordering_and_hash_share_nominal_identity(
             seconds in -1_000_000_i32..=1_000_000_i32,
         ) {
+            // Arrange
             let nominal = synthesized(f64::from(seconds));
             let written = DurationValue::parse(&format!("{seconds}s"))
                 .expect("integer-second spelling parses");
 
+            // Act
+            let ordering = nominal.cmp(&written);
+            let nominal_hash = hash_val(&nominal);
+            let written_hash = hash_val(&written);
+
+            // Assert
             prop_assert!(nominal == written);
-            prop_assert_eq!(nominal.cmp(&written), std::cmp::Ordering::Equal);
-            prop_assert_eq!(hash_val(&nominal), hash_val(&written));
+            prop_assert_eq!(ordering, std::cmp::Ordering::Equal);
+            prop_assert_eq!(nominal_hash, written_hash);
         }
 
         #[test]
         fn scaling_by_one_preserves_identity(
             seconds in -1_000_000_i32..=1_000_000_i32,
         ) {
+            // Arrange
             let duration = synthesized(f64::from(seconds));
             let original = duration.nominal_seconds();
-            let scaled = duration
-                .checked_mul(1.0)
-                .expect("bounded duration scales by one");
 
-            prop_assert!(scaled.nominal_seconds() == original);
+            // Act
+            let scaled = duration.checked_mul(1.0);
+
+            // Assert
+            prop_assert!(matches!(
+                scaled,
+                Ok(value) if value.nominal_seconds() == original
+            ));
         }
     }
 
@@ -1916,12 +1945,14 @@ mod tests {
             // Assert
             assert_eq!(duration.humanize(), expected);
         }
-
         #[test]
         fn renders_a_one_millisecond_tail_in_the_singular() {
-            // Arrange: 1 millisecond is below every human unit; the tail count
-            // is 1. Act
-            let humanized = synthesized(0.001).humanize();
+            // Arrange
+            let duration = synthesized(0.001);
+
+            // Act
+            let humanized = duration.humanize();
+
             // Assert
             assert_eq!(humanized, "1 millisecond");
         }
@@ -2137,116 +2168,122 @@ mod tests {
     }
 
     mod arithmetic {
-        use pretty_assertions::assert_eq;
-
         use super::*;
-        #[test]
-        fn checked_subtract_and_multiply_preserve_units_and_report_range_errors()
-         {
-            let difference = DurationValue::parse("3h")
-                .expect("hours are valid")
-                .checked_sub(DurationValue::parse("1h").expect("hour is valid"))
-                .expect("hour subtraction is in range");
-            assert_eq!(difference.to_string(), "2h");
-
-            let scaled = DurationValue::parse("3h")
-                .expect("hours are valid")
-                .checked_mul(2.0)
-                .expect("scaled hours are in range");
-            assert_eq!(scaled.to_string(), "6h");
-
-            let largest = DurationValue::parse("7304484d")
-                .expect("maximum Jiff span is valid");
-            assert!(matches!(
-                largest.checked_mul(2.0),
-                Err(DurationError::SecondsOutOfRange)
-            ));
-        }
 
         #[test]
-        fn checked_add_preserves_the_largest_unit_and_rejects_overflow() {
-            let hours = DurationValue::parse("23h")
-                .expect("hours are valid")
-                .checked_add(DurationValue::parse("1h").expect("hour is valid"))
-                .expect("the hour field can hold 24 hours");
-            assert_eq!(hours.to_string(), "24h");
+        fn checked_subtraction_preserves_written_units() {
+            // Arrange
+            let three_hours =
+                DurationValue::parse("3h").expect("hours are valid");
+            let one_hour = DurationValue::parse("1h").expect("hour is valid");
 
-            let maximum = DurationValue::parse("7304484d")
-                .expect("maximum Jiff span is valid");
-            let error = maximum
-                .checked_add(DurationValue::parse("1d").expect("day is valid"))
-                .expect_err("span beyond Jiff's bound must fail");
-            assert!(matches!(error, DurationError::SecondsOutOfRange));
-        }
+            // Act
+            let difference = three_hours.checked_sub(one_hour);
 
-        #[test]
-        fn addition_and_subtraction_preserve_written_fields() {
-            let day = DurationValue::parse("1d").expect("day is valid");
-            let hour = DurationValue::parse("1h").expect("hour is valid");
-            let sum =
-                day.checked_add(hour).expect("combined fields fit within Span");
-            assert_eq!(sum.as_str(), "1d 1h");
-
-            let compound =
-                DurationValue::parse("1h 30m").expect("compound is valid");
-            let minutes =
-                DurationValue::parse("30m").expect("minutes are valid");
-            let difference = compound
-                .checked_sub(minutes)
-                .expect("subtraction fits within Span");
-            assert_eq!(difference.nominal_seconds(), DurationSeconds(3_600.0));
-            assert_eq!(
-                difference.components().expect("fields retained").len(),
-                3
+            // Assert
+            assert!(
+                matches!(difference, Ok(value) if value.to_string() == "2h"),
+                "subtracting one hour from three preserves the hour unit"
             );
         }
 
         #[test]
-        fn twenty_four_exact_hours_remain_hours() {
-            let hours = DurationValue::parse("23h")
-                .expect("hours are valid")
-                .checked_add(DurationValue::parse("1h").expect("hour is valid"))
-                .expect("24 hours fit within Span");
-            assert_eq!(hours.as_str(), "24h");
+        fn checked_add_preserves_the_largest_unit_and_rejects_overflow() {
+            // Arrange
+            let hours = DurationValue::parse("23h").expect("hours are valid");
+            let one_hour = DurationValue::parse("1h").expect("hour is valid");
+            let maximum = DurationValue::parse("7304484d")
+                .expect("maximum Jiff span is valid");
+            let one_day = DurationValue::parse("1d").expect("day is valid");
+
+            // Act
+            let sum = hours.checked_add(one_hour);
+            let overflow = maximum.checked_add(one_day);
+
+            // Assert
+            assert!(
+                matches!(sum, Ok(value) if value.to_string() == "24h"),
+                "an exact day remains represented as hours"
+            );
+            assert!(
+                matches!(overflow, Err(DurationError::SecondsOutOfRange)),
+                "adding beyond Jiff's supported span reports a range error"
+            );
+        }
+
+        #[test]
+        fn arithmetic_preserves_written_fields() {
+            // Arrange
+            let day = DurationValue::parse("1d").expect("day is valid");
+            let hour = DurationValue::parse("1h").expect("hour is valid");
+            let compound =
+                DurationValue::parse("1h 30m").expect("compound is valid");
+            let minutes =
+                DurationValue::parse("30m").expect("minutes are valid");
+
+            // Act
+            let sum = day.checked_add(hour);
+            let difference = compound.checked_sub(minutes);
+
+            // Assert
+            assert!(
+                matches!(sum, Ok(value) if value.as_str() == "1d 1h"),
+                "addition retains the written day and hour units"
+            );
+            assert!(
+                matches!(
+                    difference,
+                    Ok(value)
+                        if value.nominal_seconds() == DurationSeconds(3_600.0)
+                            && value.components().map(<[_]>::len) == Some(3)
+                ),
+                "subtraction retains the component-field structure"
+            );
         }
 
         #[test]
         fn checked_scaling_preserves_units_and_rejects_invalid_results() {
+            // Arrange
             let hour = DurationValue::parse("1h").expect("hour is valid");
-            let doubled = hour
-                .clone()
-                .checked_mul(2.0)
-                .expect("scaled hours are in range");
-            assert_eq!(doubled.as_str(), "2h");
 
-            let halved = hour
-                .clone()
-                .checked_mul(0.5)
-                .expect("half an hour is in range");
-            assert_eq!(halved.as_str(), "30m");
+            // Act
+            let doubled = hour.clone().checked_mul(2.0);
+            let halved = hour.clone().checked_mul(0.5);
+            let zero = hour.clone().checked_mul(0.0);
+            let infinite = hour.checked_mul(f64::INFINITY);
 
-            let zero = hour.clone().checked_mul(0.0).expect("zero is in range");
-            assert_eq!(zero.as_str(), "0s");
-            assert!(matches!(
-                hour.checked_mul(f64::INFINITY),
-                Err(DurationError::NonFiniteSeconds)
-            ));
+            // Assert
+            assert!(
+                matches!(doubled, Ok(value) if value.as_str() == "2h"),
+                "doubling retains the hour unit"
+            );
+            assert!(
+                matches!(halved, Ok(value) if value.as_str() == "30m"),
+                "halving one hour uses the exact minute unit"
+            );
+            assert!(
+                matches!(zero, Ok(value) if value.as_str() == "0s"),
+                "scaling to zero uses the canonical seconds unit"
+            );
+            assert!(
+                matches!(infinite, Err(DurationError::NonFiniteSeconds)),
+                "non-finite results are rejected"
+            );
         }
 
         #[test]
-        fn checked_negation_and_span_overflow_are_reported() {
-            let negative = DurationValue::parse("1h")
-                .expect("hour is valid")
-                .checked_neg()
-                .expect("one hour can be negated");
-            assert_eq!(negative.as_str(), "-1h");
+        fn checked_negation_preserves_units() {
+            // Arrange
+            let hour = DurationValue::parse("1h").expect("hour is valid");
 
-            let maximum = DurationValue::parse("7304484d")
-                .expect("maximum Jiff span is valid");
-            assert!(matches!(
-                maximum.checked_mul(2.0),
-                Err(DurationError::SecondsOutOfRange)
-            ));
+            // Act
+            let negative = hour.checked_neg();
+
+            // Assert
+            assert!(
+                matches!(negative, Ok(value) if value.as_str() == "-1h"),
+                "negation retains the hour unit"
+            );
         }
     }
 

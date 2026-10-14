@@ -133,25 +133,39 @@ mod tests {
 
         #[test]
         fn returns_the_guarded_zone() {
+            // Arrange
             let expected =
                 TimeZone::get("Etc/GMT-2").expect("valid fixture zone");
+
+            // Act
             ZoneGuard::set("Etc/GMT-2");
 
+            // Assert
             assert_eq!(local_zone(), expected);
         }
 
         #[test]
         fn returns_the_system_zone_without_a_guard() {
+            // Arrange
             let expected =
                 resolve(TimeZone::try_system).unwrap_or(TimeZone::UTC);
 
-            assert_eq!(local_zone(), expected);
+            // Act
+            let actual = local_zone();
+
+            // Assert
+            assert_eq!(actual, expected);
         }
 
         #[test]
         fn maps_a_failing_resolver_to_the_lookup_error() {
-            let result = resolve(|| Err("system zone unavailable"));
+            // Arrange
+            let unavailable = || Err("system zone unavailable");
 
+            // Act
+            let result = resolve(unavailable);
+
+            // Assert
             assert_eq!(
                 result,
                 Err(DateError::LocalZoneLookup {
@@ -166,13 +180,18 @@ mod tests {
 
         #[test]
         fn restores_the_previous_zone_when_dropped() {
+            // Arrange
             let previous = local_zone();
             let guard = ZoneGuard::install(Some(
                 TimeZone::get("Etc/GMT-2").expect("valid fixture zone"),
             ));
-            assert_ne!(local_zone(), previous);
+
+            // Act
+            let installed = local_zone();
             drop(guard);
 
+            // Assert
+            assert_ne!(installed, previous);
             assert_eq!(local_zone(), previous);
         }
 
@@ -183,7 +202,10 @@ mod tests {
             reason = "exercise guard restoration during unwinding"
         )]
         fn restores_the_previous_zone_during_unwinding() {
+            // Arrange
             let previous = local_zone();
+
+            // Act
             let result = catch_unwind(AssertUnwindSafe(|| {
                 let _guard = ZoneGuard::install(Some(
                     TimeZone::get("Etc/GMT-2").expect("valid fixture zone"),
@@ -191,20 +213,26 @@ mod tests {
                 panic!("test unwind");
             }));
 
+            // Assert
             assert!(result.is_err());
             assert_eq!(local_zone(), previous);
         }
 
         #[test]
-        fn repeated_sets_replace_the_override_and_keep_the_original_guard() {
+        fn repeated_sets_replace_the_active_override() {
+            // Arrange: the first set call installs the thread-local guard.
+
+            // Act
             ZoneGuard::set("Etc/GMT-2");
             ZoneGuard::set("UTC");
 
+            // Assert
             assert_eq!(local_zone(), TimeZone::UTC);
         }
 
         #[test]
         fn serializes_concurrent_guards() {
+            // Arrange
             let (held_tx, held_rx) = mpsc::channel();
             let (release_tx, release_rx) = mpsc::channel();
             let first = std::thread::spawn(move || {
@@ -216,12 +244,16 @@ mod tests {
 
             let (started_tx, started_rx) = mpsc::channel();
             let (acquired_tx, acquired_rx) = mpsc::channel();
+
+            // Act
             let second = std::thread::spawn(move || {
                 started_tx.send(()).expect("receiver remains open");
                 ZoneGuard::set("Etc/GMT-2");
                 acquired_tx.send(()).expect("receiver remains open");
             });
             started_rx.recv().expect("second thread starts");
+
+            // Assert
             assert!(
                 acquired_rx.recv_timeout(Duration::from_millis(20)).is_err()
             );
@@ -237,7 +269,13 @@ mod tests {
         #[test]
         #[should_panic(expected = "unknown time zone: invalid/zone")]
         fn rejects_an_unknown_zone_name() {
+            // Arrange: the name is absent from the installed time-zone
+            // database.
+
+            // Act
             ZoneGuard::set("invalid/zone");
+
+            // Assert: the should_panic attribute checks the error message.
         }
     }
 }

@@ -896,7 +896,6 @@ mod tests {
     }
 
     mod conversions {
-        use pretty_assertions::assert_eq;
 
         use super::*;
 
@@ -909,13 +908,11 @@ mod tests {
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 
             // Act
-            let date = DateValue::try_from(system_time)
-                .expect("epoch-adjacent time fits the date range");
+            let result = DateValue::try_from(system_time);
 
             // Assert
-            assert_eq!(
-                date,
-                ymd(1969, 12, 31),
+            assert!(
+                matches!(result, Ok(date) if date == ymd(1969, 12, 31)),
                 "a file's date is the reader's local day, not the UTC day"
             );
         }
@@ -928,13 +925,11 @@ mod tests {
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
 
             // Act
-            let date = DateValue::try_from(system_time)
-                .expect("epoch-adjacent time fits the date range");
+            let result = DateValue::try_from(system_time);
 
             // Assert
-            assert_eq!(
-                date,
-                ymd(1970, 1, 1),
+            assert!(
+                matches!(result, Ok(date) if date == ymd(1970, 1, 1)),
                 "the epoch's UTC day converts unchanged under UTC"
             );
         }
@@ -1020,6 +1015,7 @@ mod tests {
                 month in 1_u32..=12,
                 day in 1_u32..=28,
             ) {
+                // Arrange
                 let date = DateValue::from_ymd(year, month, day)
                     .expect("generated four-digit date is valid");
 

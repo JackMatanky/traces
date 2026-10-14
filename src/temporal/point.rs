@@ -944,21 +944,24 @@ mod tests {
             #[case] expected_date: DateValue,
             #[case] expected_extent: usize,
         ) {
-            // Arrange: `text` begins with a complete day or month prefix.
+            // Arrange: the input begins with a complete day or month prefix.
 
             // Act
-            let parsed = DatePoint::parse_prefix(text).expect("date prefix");
+            let parsed = DatePoint::parse_prefix(text);
 
             // Assert
-            assert_eq!(
-                *parsed.value(),
-                DatePoint::Calendar {
-                    date: expected_date,
-                    date_precision: expected_precision,
-                },
-                "{text:?} must yield its written precision"
+            assert!(
+                matches!(
+                    parsed,
+                    Some(parsed)
+                        if *parsed.value() == DatePoint::Calendar {
+                            date: expected_date,
+                            date_precision: expected_precision,
+                        }
+                            && parsed.span_usize() == (0..expected_extent)
+                ),
+                "{text:?} must yield its written precision and exact extent"
             );
-            assert_eq!(parsed.span_usize(), 0..expected_extent);
         }
 
         #[rstest]
@@ -971,8 +974,8 @@ mod tests {
         #[case::non_digit_month("2026-0a-29")]
         #[case::month_out_of_range("1234-56-78 rest")]
         fn returns_none_without_a_complete_date_prefix(#[case] text: &str) {
-            // Arrange: `text` lacks a complete ten-byte day or seven-byte month
-            // prefix; a dash at position seven demands the full day.
+            // Arrange: the input lacks a complete ten-byte day or seven-byte
+            // month prefix.
 
             // Act
             let parsed = DatePoint::parse_prefix(text);
@@ -1864,6 +1867,8 @@ mod tests {
             // Arrange: the date-time range edges and a one-second duration.
             let one_second =
                 DurationValue::parse("1s").expect("valid duration");
+            let negative_one_second =
+                DurationValue::parse("-1s").expect("valid duration");
             let max_point = DatePoint::DateTime(DateTimeValue::from_timestamp(
                 Timestamp::MAX,
             ));
@@ -1873,8 +1878,7 @@ mod tests {
 
             // Act
             let overflowed = max_point.apply(&one_second);
-            let underflowed = min_point
-                .apply(&one_second.checked_neg().expect("one second fits"));
+            let underflowed = min_point.apply(&negative_one_second);
 
             // Assert
             assert_eq!(
@@ -2798,8 +2802,8 @@ mod tests {
                     Just(CalendarPeriod::Year),
                 ],
             ) {
+                // Arrange
                 let point = DatePoint::from(ymd(year, month, day));
-
                 // Act
                 let start = point
                     .start_of(period)
@@ -2823,8 +2827,8 @@ mod tests {
                     Just(CalendarPeriod::Year),
                 ],
             ) {
+                // Arrange
                 let point = DatePoint::from(ymd(year, month, day));
-
                 // Act
                 let start = point
                     .start_of(period)
@@ -2869,6 +2873,7 @@ mod tests {
                     Just(TimeUnit::Year),
                 ],
             ) {
+                // Arrange
                 let a = DatePoint::from(ymd(year_a, month_a, day_a));
                 let b = DatePoint::from(ymd(year_b, month_b, day_b));
 
@@ -2895,8 +2900,8 @@ mod tests {
                 day in 1_u32..=28,
                 delta in -365_i64..=365,
             ) {
+                // Arrange
                 let point = DatePoint::from(ymd(year, month, day));
-
                 // Act
                 let shifted = point
                     .shift(delta, TimeUnit::Day)

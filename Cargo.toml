@@ -152,7 +152,6 @@ walkdir = "2.5.0"
 # --------------------- Dev Dependencies ---------------------- #
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports"] }
-insta = { version = "1.48.0", default-features = false }
 pretty_assertions = "1.4.1"
 proptest = "1.12.0"
 rstest = { version = "0.27.0", default-features = false }

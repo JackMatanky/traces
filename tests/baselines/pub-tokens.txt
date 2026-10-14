@@ -1473,26 +1473,4 @@ src/temporal/zone.rs: pub fn keep() {
 src/temporal/zone.rs: pub fn set(zone: &str) {
 src/temporal/zone.rs: pub struct ZoneGuard {
 src/temporal/zone.rs: pub(crate) fn local_zone() -> TimeZone {
-src/temporal_oracle.rs: pub(super) fn apply(input: &str, duration: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn boundary(input: &str, period: &str, edge: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn component(input: &str, name: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn date_time_from_json(text: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn date_time_value(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn date_value(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn date_value_from_json(text: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn diff(from: &str, to: &str, unit_spelling: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_from_json(text: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_json(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_negate(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_op(left: &str, op: &str, right: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_order(left: &str, right: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_prefix(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn duration_scale(input: &str, factor: f64) -> String {
-src/temporal_oracle.rs: pub(super) fn point(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn point_prefix(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn point_with_pattern(text: &str, pattern: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn promote(input: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn shift(input: &str, n: i64, unit_spelling: &str) -> String {
-src/temporal_oracle.rs: pub(super) fn weekday(input: &str, iso_number: i64) -> String {
 src/yaml.rs: pub(crate) fn parse(text: &str) -> Result<noyalib::Value, noyalib::Error> {
