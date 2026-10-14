@@ -98,7 +98,7 @@ impl CalendarError {
 ///
 /// - Parsing human-readable duration text;
 /// - Validating raw seconds;
-/// - Converting a duration or seconds value to a `TimeDelta`.
+/// - Converting nominal seconds to a Jiff span.
 ///
 /// Parse failures carry no copy of the input: the caller already holds it.
 ///
@@ -156,7 +156,7 @@ pub enum DurationError {
     NonFiniteSeconds,
 
     /// A finite seconds value does not fit the range representable by
-    /// `TimeDelta`.
+    /// Jiff Span.
     #[error("duration seconds are outside the representable range")]
     SecondsOutOfRange,
 }
@@ -322,7 +322,7 @@ mod tests {
         }
 
         #[test]
-        fn rejects_non_finite_seconds_at_the_seconds_boundary() {
+        fn rejects_non_finite_seconds_at_validation() {
             // Arrange
             let raw = f64::NAN;
 
@@ -337,39 +337,7 @@ mod tests {
         }
 
         #[test]
-        fn accepts_in_range_seconds_at_the_time_delta_boundary() {
-            // Arrange
-            let seconds =
-                DurationSeconds::try_from(90.0).expect("90.0 is finite");
-
-            // Act
-            let actual = chrono::TimeDelta::try_from(seconds);
-
-            // Assert
-            assert!(
-                actual.is_ok(),
-                "90 seconds must fit TimeDelta, got {actual:?}"
-            );
-        }
-
-        #[test]
-        fn rejects_out_of_range_seconds_at_the_time_delta_boundary() {
-            // Arrange
-            let seconds =
-                DurationSeconds::try_from(1e30).expect("1e30 is finite");
-
-            // Act
-            let actual = chrono::TimeDelta::try_from(seconds);
-
-            // Assert
-            assert!(
-                matches!(actual, Err(DurationError::SecondsOutOfRange)),
-                "expected SecondsOutOfRange, got {actual:?}"
-            );
-        }
-
-        #[test]
-        fn rejects_out_of_range_durations_at_the_time_delta_boundary() {
+        fn rejects_durations_outside_the_jiff_span_range() {
             // Arrange
             let seconds =
                 DurationSeconds::try_from(1e17).expect("1e17 is finite");

@@ -1124,11 +1124,6 @@ impl core::cmp::PartialEq for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::From<traces_pkm::DateTimeValue> for chrono::datetime::DateTime<chrono::offset::utc::Utc>
-pub fn chrono::datetime::DateTime<chrono::offset::utc::Utc>::from(traces_pkm::DateTimeValue) -> Self
-impl core::convert::TryFrom<chrono::datetime::DateTime<chrono::offset::utc::Utc>> for traces_pkm::DateTimeValue
-pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
-pub fn traces_pkm::DateTimeValue::try_from(chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> core::result::Result<Self, Self::Error>
 impl core::convert::TryFrom<std::time::SystemTime> for traces_pkm::DateTimeValue
 pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
 pub fn traces_pkm::DateTimeValue::try_from(std::time::SystemTime) -> core::result::Result<Self, Self::Error>
@@ -1304,9 +1299,6 @@ impl core::cmp::PartialEq for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::TryFrom<traces_pkm::DurationValue> for chrono::time_delta::TimeDelta
-pub type chrono::time_delta::TimeDelta::Error = traces_pkm::DurationError
-pub fn chrono::time_delta::TimeDelta::try_from(traces_pkm::DurationValue) -> core::result::Result<Self, Self::Error>
 impl core::fmt::Debug for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DurationValue

@@ -226,10 +226,7 @@ impl<'a> InlineValueParser<'a> {
         if !self.is_atom_boundary(end) {
             return None;
         }
-        Some(ParsedAtom::new(
-            NoteFieldValue::Date(parsed.value().date().ok()?),
-            end,
-        ))
+        Some(ParsedAtom::new(NoteFieldValue::Date(parsed.value().date()), end))
     }
 
     /// Parses a finite f64 number atom at pos.

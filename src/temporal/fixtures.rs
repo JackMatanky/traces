@@ -2,8 +2,6 @@
 //!
 //! Contains only value builders; assertions live in the owning test modules.
 
-use chrono::{TimeZone as _, Utc};
-
 use super::{DateTimeValue, DateValue};
 
 /// Builds a [`DateValue`] from calendar fields.
@@ -24,10 +22,6 @@ pub(super) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
 /// Panics only if the constant fixture ceases to be a valid date-time; the
 /// literal is unambiguous (UTC carries no fold or gap).
 pub(super) fn fixed_datetime() -> DateTimeValue {
-    DateTimeValue::try_from(
-        Utc.with_ymd_and_hms(2026, 7, 29, 14, 30, 5)
-            .single()
-            .expect("2026-07-29 14:30:05 UTC is a valid Date-Time"),
-    )
-    .expect("fixture timestamp is in Jiff's range")
+    DateTimeValue::parse_iso("2026-07-29T14:30:05Z")
+        .expect("fixture timestamp is valid and in Jiff's range")
 }

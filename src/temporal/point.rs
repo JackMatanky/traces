@@ -7,20 +7,14 @@
 //! exact elapsed time. Callers hold the validated date point or receive a
 //! [`DateError`].
 
-use chrono::{
-    DateTime, Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
-    Timelike as _, Utc, Weekday, format::ParseErrorKind,
-};
-use jiff::Span;
-#[cfg(test)]
-use jiff::Timestamp;
+use jiff::{Span, Timestamp, civil};
 use num_traits::ToPrimitive as _;
 
 use super::{
     CalendarError, CalendarPeriod, DATE_PATTERN, DateComponent, DateError,
     DateTimeValue, DateValue, Difference, DurationComponent, DurationValue,
     PeriodEdge, TimeUnit,
-    calendar::{shift_datetime, time_delta_from_seconds},
+    calendar::{shift_datetime, span_from_seconds},
     date::DateShape,
     datetime::{DateTimeShape, ParsedDateTime},
 };
@@ -75,42 +69,39 @@ impl DatePoint {
     }
 
     /// Calendar date of this date point in the local zone.
-    pub(crate) fn date(self) -> Result<DateValue, CalendarError> {
+    pub(crate) fn date(self) -> DateValue {
         match self {
             Self::Calendar {
                 date,
                 ..
-            } => Ok(date),
+            } => date,
             Self::DateTime(dt) => dt.local_date(),
         }
     }
 
     /// Local datetime reading of this date point: midnight for a calendar date,
-    /// the local clock time (UTC when the offset cannot apply) for a date-time
-    /// point.
+    /// the local clock time for a date-time point.
     #[must_use]
-    pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+    pub(crate) fn local_datetime_or_utc(self) -> jiff::civil::DateTime {
         match self {
             Self::Calendar {
                 date,
                 ..
-            } => date.naive_date().and_time(NaiveTime::MIN),
+            } => date.civil_date().at(0, 0, 0, 0),
             Self::DateTime(dt) => dt.local_datetime_or_utc(),
         }
     }
 
-    /// UTC date-time represented by this date point.
-    #[must_use]
-    pub(crate) fn instant(self) -> DateTime<Utc> {
+    /// UTC instant represented by this date point.
+    pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
         match self {
             Self::Calendar {
                 date,
                 ..
-            } => DateTimeValue::try_from(date).map_or_else(
-                |_| date.naive_date().and_time(NaiveTime::MIN).and_utc(),
-                DateTimeValue::utc,
-            ),
-            Self::DateTime(dt) => dt.utc(),
+            } => DateTimeValue::try_from(date)
+                .map(DateTimeValue::utc)
+                .map_err(|_| CalendarError::OutOfRange),
+            Self::DateTime(datetime) => Ok(datetime.utc()),
         }
     }
 
@@ -153,9 +144,7 @@ impl DatePoint {
                 let local_datetime =
                     shift_datetime(self.local_datetime_or_utc(), n, unit)?;
                 Ok(Self::Calendar {
-                    date: DateValue::try_from_naive_date(
-                        local_datetime.date(),
-                    )?,
+                    date: DateValue::from_civil_date(local_datetime.date()),
                     date_precision,
                 })
             }
@@ -218,25 +207,20 @@ impl DatePoint {
     }
 
     /// Selects a weekday of this date point's ISO week.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the `target` day falls outside the
-    ///   supported date range.
-    /// - [`CalendarError::Zone`] if a date-time point’s new local datetime
-    ///   cannot be resolved.
     pub(crate) fn with_weekday(
         self,
-        target: Weekday,
+        target: civil::Weekday,
     ) -> Result<Self, CalendarError> {
-        let iso = self.local_datetime_or_utc().date().iso_week();
-        let date = NaiveDate::from_isoywd_opt(iso.year(), iso.week(), target)
-            .ok_or(CalendarError::OutOfRange)?;
-        self.with_date(date)
+        let local_date = self.local_datetime_or_utc().date();
+        let iso = local_date.iso_week_date();
+        let target_date =
+            civil::ISOWeekDate::new(iso.year(), iso.week(), target)
+                .map(civil::Date::from)
+                .map_err(|_| CalendarError::OutOfRange)?;
+        self.with_date(target_date)
     }
 
     /// Returns one calendar or clock component of the local datetime reading.
-    ///
     /// Weekdays are ISO numbered, Monday = 1 through Sunday = 7.
     #[must_use]
     pub(crate) fn component(self, component: DateComponent) -> i64 {
@@ -249,17 +233,24 @@ impl DatePoint {
             DateComponent::Minute => i64::from(local_datetime.minute()),
             DateComponent::Second => i64::from(local_datetime.second()),
             DateComponent::Weekday => {
-                i64::from(local_datetime.weekday().number_from_monday())
+                i64::from(match local_datetime.weekday() {
+                    civil::Weekday::Monday => 1,
+                    civil::Weekday::Tuesday => 2,
+                    civil::Weekday::Wednesday => 3,
+                    civil::Weekday::Thursday => 4,
+                    civil::Weekday::Friday => 5,
+                    civil::Weekday::Saturday => 6,
+                    civil::Weekday::Sunday => 7,
+                })
             }
-            DateComponent::Week => i64::from(local_datetime.iso_week().week()),
+            DateComponent::Week => {
+                i64::from(local_datetime.iso_week_date().week())
+            }
         }
     }
 
     /// Measures the difference to another date point in the requested unit.
-    ///
-    /// Years and months are whole calendar counts of the local dates. Exact
-    /// units are fractional when both points carry a time and whole, truncated
-    /// toward zero, otherwise.
+    /// Whole units truncate toward zero when either value is a calendar point.
     pub(crate) fn diff(
         self,
         to: Self,
@@ -267,15 +258,15 @@ impl DatePoint {
     ) -> Result<Difference, CalendarError> {
         let local_delta = || {
             to.local_datetime_or_utc()
-                .signed_duration_since(self.local_datetime_or_utc())
+                .duration_since(self.local_datetime_or_utc())
         };
         match unit {
-            TimeUnit::Year => Ok(Difference::Whole(
-                self.date()?.whole_years_until(to.date()?),
-            )),
-            TimeUnit::Month => Ok(Difference::Whole(
-                self.date()?.whole_months_until(to.date()?),
-            )),
+            TimeUnit::Year => {
+                Ok(Difference::Whole(self.date().whole_years_until(to.date())))
+            }
+            TimeUnit::Month => {
+                Ok(Difference::Whole(self.date().whole_months_until(to.date())))
+            }
             fixed if self.has_time() && to.has_time() => {
                 let seconds = match (self, to) {
                     (Self::DateTime(from), Self::DateTime(to)) => {
@@ -285,37 +276,40 @@ impl DatePoint {
                 };
                 Ok(Difference::Fractional(seconds / fixed.nominal_seconds()))
             }
-            TimeUnit::Week => Ok(Difference::Whole(local_delta().num_weeks())),
-            TimeUnit::Day => Ok(Difference::Whole(local_delta().num_days())),
-            TimeUnit::Hour => Ok(Difference::Whole(local_delta().num_hours())),
+            TimeUnit::Week => {
+                Ok(Difference::Whole(local_delta().as_secs() / 604_800))
+            }
+            TimeUnit::Day => {
+                Ok(Difference::Whole(local_delta().as_secs() / 86_400))
+            }
+            TimeUnit::Hour => {
+                Ok(Difference::Whole(local_delta().as_secs() / 3_600))
+            }
             TimeUnit::Minute => {
-                Ok(Difference::Whole(local_delta().num_minutes()))
+                Ok(Difference::Whole(local_delta().as_secs() / 60))
             }
-            TimeUnit::Second => {
-                Ok(Difference::Whole(local_delta().num_seconds()))
-            }
-            TimeUnit::Millisecond => {
-                Ok(Difference::Whole(local_delta().num_milliseconds()))
-            }
+            TimeUnit::Second => Ok(Difference::Whole(local_delta().as_secs())),
+            TimeUnit::Millisecond => i64::try_from(local_delta().as_millis())
+                .map(Difference::Whole)
+                .map_err(|_| CalendarError::OutOfRange),
         }
     }
 
     /// Advances on the local clock, preserving written precision.
-    fn advance_local(self, delta: TimeDelta) -> Result<Self, CalendarError> {
+    fn advance_local(self, span: Span) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date,
                 date_precision,
             } => Ok(Self::Calendar {
-                date: date.advance(delta)?,
+                date: date.advance_span(span)?,
                 date_precision,
             }),
-            Self::DateTime(dt) => {
-                let local_datetime =
-                    dt.local_datetime().ok_or(CalendarError::OutOfRange)?;
-                let shifted = local_datetime
-                    .checked_add_signed(delta)
-                    .ok_or(CalendarError::OutOfRange)?;
+            Self::DateTime(datetime) => {
+                let shifted = datetime
+                    .local_datetime()
+                    .checked_add(span)
+                    .map_err(|_| CalendarError::OutOfRange)?;
                 Ok(Self::DateTime(DateTimeValue::from_local(shifted)?))
             }
         }
@@ -338,23 +332,21 @@ impl DatePoint {
     }
 
     /// Advances by exact elapsed time, preserving written precision.
-    fn advance_exact(self, delta: TimeDelta) -> Result<Self, CalendarError> {
+    fn advance_exact(self, span: Span) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date,
                 date_precision,
             } => Ok(Self::Calendar {
-                date: date.advance(delta)?,
+                date: date.advance_span(span)?,
                 date_precision,
             }),
-            Self::DateTime(dt) => Ok(Self::DateTime(
-                DateTimeValue::try_from(
-                    dt.utc()
-                        .checked_add_signed(delta)
-                        .ok_or(CalendarError::OutOfRange)?,
-                )
-                .map_err(|_| CalendarError::OutOfRange)?,
-            )),
+            Self::DateTime(datetime) => datetime
+                .utc()
+                .checked_add(span)
+                .map(DateTimeValue::from_timestamp)
+                .map(Self::DateTime)
+                .map_err(|_| CalendarError::OutOfRange),
         }
     }
 
@@ -379,28 +371,28 @@ impl DatePoint {
             if remainder == 0.0 {
                 Ok(shifted)
             } else {
-                shifted.advance_local(time_delta_from_seconds(remainder)?)
+                shifted.advance_local(span_from_seconds(remainder)?)
             }
         } else {
-            self.advance_exact(time_delta_from_seconds(
+            self.advance_exact(span_from_seconds(
                 magnitude * unit.nominal_seconds(),
             )?)
         }
     }
 
     /// Replaces the local date, preserving written precision and time.
-    fn with_date(self, date: NaiveDate) -> Result<Self, CalendarError> {
+    fn with_date(self, date: civil::Date) -> Result<Self, CalendarError> {
         match self {
             Self::Calendar {
                 date_precision,
                 ..
             } => Ok(Self::Calendar {
-                date: DateValue::try_from_naive_date(date)?,
+                date: DateValue::from_civil_date(date),
                 date_precision,
             }),
             Self::DateTime(_) => {
-                let local_datetime =
-                    date.and_time(self.local_datetime_or_utc().time());
+                let local = self.local_datetime_or_utc();
+                let local_datetime = date.to_datetime(local.time());
                 Ok(Self::DateTime(DateTimeValue::from_local(local_datetime)?))
             }
         }
@@ -413,34 +405,41 @@ impl DatePoint {
         period_edge: PeriodEdge,
     ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_or_utc().date();
-        let new_date = match (calendar_period, period_edge) {
-            (CalendarPeriod::Week, period_edge) => {
-                let iso = date.iso_week();
-                NaiveDate::from_isoywd_opt(
-                    iso.year(),
-                    iso.week(),
-                    if period_edge == PeriodEdge::Start {
-                        Weekday::Mon
-                    } else {
-                        Weekday::Sun
-                    },
-                )
+        let new_date = match calendar_period {
+            CalendarPeriod::Week => {
+                let iso = date.iso_week_date();
+                let target = if period_edge == PeriodEdge::Start {
+                    civil::Weekday::Monday
+                } else {
+                    civil::Weekday::Sunday
+                };
+                civil::ISOWeekDate::new(iso.year(), iso.week(), target)
+                    .map(civil::Date::from)
             }
-            (CalendarPeriod::Month, period_edge) => {
-                date.with_day(if period_edge == PeriodEdge::Start {
+            CalendarPeriod::Month => civil::Date::new(
+                date.year(),
+                date.month(),
+                if period_edge == PeriodEdge::Start {
                     1
                 } else {
-                    u32::from(date.num_days_in_month())
-                })
-            }
-            (CalendarPeriod::Year, PeriodEdge::Start) => {
-                NaiveDate::from_ymd_opt(date.year(), 1, 1)
-            }
-            (CalendarPeriod::Year, PeriodEdge::End) => {
-                NaiveDate::from_ymd_opt(date.year(), 12, 31)
-            }
+                    date.days_in_month()
+                },
+            ),
+            CalendarPeriod::Year => civil::Date::new(
+                date.year(),
+                if period_edge == PeriodEdge::Start {
+                    1
+                } else {
+                    12
+                },
+                if period_edge == PeriodEdge::Start {
+                    1
+                } else {
+                    31
+                },
+            ),
         }
-        .ok_or(CalendarError::OutOfRange)?;
+        .map_err(|_| CalendarError::OutOfRange)?;
         self.with_date(new_date)
     }
 
@@ -482,12 +481,7 @@ impl DatePoint {
         }
         match DateTimeShape::parse_any(trimmed) {
             Ok(ParsedDateTime::Instant(instant)) => {
-                Ok(Self::DateTime(DateTimeValue::try_from(instant).map_err(
-                    |_| DateError::InvalidValue {
-                        input: trimmed.into(),
-                        reason: "date/time is outside the representable range",
-                    },
-                )?))
+                Ok(Self::DateTime(DateTimeValue::from_timestamp(instant)))
             }
             Ok(ParsedDateTime::Unzoned(local_datetime)) => Ok(Self::DateTime(
                 DateTimeValue::from_local(local_datetime)
@@ -550,7 +544,7 @@ impl DatePoint {
         None
     }
 
-    /// Parses a date or date-time with a chrono strftime pattern.
+    /// Parses a date or date-time with a Jiff strtime pattern.
     ///
     /// # Errors
     ///
@@ -564,19 +558,21 @@ impl DatePoint {
     ) -> Result<Self, DateError> {
         let trimmed_text = text.trim();
         let trimmed_pattern = pattern.trim();
-        if let Ok(dt) = DateTime::parse_from_str(trimmed_text, trimmed_pattern)
+        let has_time_fields = pattern_has_time_fields(trimmed_pattern)
+            .ok_or_else(|| DateError::InvalidValue {
+                input: trimmed_text.into(),
+                reason: "bad format pattern",
+            })?;
+        if let Ok(timestamp) =
+            Timestamp::strptime(trimmed_pattern, trimmed_text)
         {
-            return Ok(Self::DateTime(
-                DateTimeValue::try_from(dt.with_timezone(&Utc)).map_err(
-                    |_| DateError::InvalidValue {
-                        input: trimmed_text.into(),
-                        reason: "date/time is outside the representable range",
-                    },
-                )?,
-            ));
+            return Ok(Self::DateTime(DateTimeValue::from_timestamp(
+                timestamp,
+            )));
         }
-        if let Ok(local_datetime) =
-            NaiveDateTime::parse_from_str(trimmed_text, trimmed_pattern)
+        if has_time_fields
+            && let Ok(local_datetime) =
+                civil::DateTime::strptime(trimmed_pattern, trimmed_text)
         {
             return Ok(Self::DateTime(
                 DateTimeValue::from_local(local_datetime)
@@ -593,32 +589,77 @@ impl DatePoint {
         {
             return Ok(date_point);
         }
-        let date = NaiveDate::parse_from_str(trimmed_text, trimmed_pattern)
+        let date = civil::Date::strptime(trimmed_pattern, trimmed_text)
             .map_err(|source| DateError::InvalidValue {
                 input: trimmed_text.into(),
-                reason: parse_reason(source),
+                reason: if source.is_range() {
+                    "a field is out of range"
+                } else {
+                    "invalid input"
+                },
             })?;
-        let date = DateValue::try_from_naive_date(date)
-            .map_err(|error| error.into_date_error(trimmed_text))?;
         Ok(Self::Calendar {
-            date,
+            date: DateValue::from_civil_date(date),
             date_precision: DatePrecision::Day,
         })
     }
 }
-
-/// Maps a chrono parse failure to a short static reason, so errors carry no
-/// allocation or foreign error type.
-pub(super) fn parse_reason(error: chrono::ParseError) -> &'static str {
-    match error.kind() {
-        ParseErrorKind::OutOfRange => "a field is out of range",
-        ParseErrorKind::Impossible => "the date does not exist",
-        ParseErrorKind::NotEnough => "not enough input",
-        ParseErrorKind::TooShort => "input is too short",
-        ParseErrorKind::TooLong => "unexpected trailing input",
-        ParseErrorKind::BadFormat => "bad format pattern",
-        _ => "invalid input",
+fn pattern_has_time_fields(pattern: &str) -> Option<bool> {
+    let mut characters = pattern.chars().peekable();
+    let mut has_time_fields = false;
+    while let Some(character) = characters.next() {
+        if character != '%' {
+            continue;
+        }
+        let Some(mut directive) = characters.next() else {
+            break;
+        };
+        if directive == '%' {
+            continue;
+        }
+        while matches!(directive, '-' | '_' | '0' | '^' | '#' | ':' | 'E' | 'O')
+            || directive.is_ascii_digit()
+        {
+            let Some(next) = characters.next() else {
+                return Some(has_time_fields);
+            };
+            directive = next;
+        }
+        if directive == '.' {
+            while characters.peek().is_some_and(char::is_ascii_digit) {
+                let _ = characters.next();
+            }
+            let Some(next) = characters.next() else {
+                break;
+            };
+            directive = next;
+        }
+        if directive == 'Q' {
+            return None;
+        }
+        if matches!(
+            directive,
+            'H' | 'I'
+                | 'k'
+                | 'l'
+                | 'M'
+                | 'S'
+                | 'f'
+                | 'T'
+                | 'R'
+                | 'r'
+                | 'X'
+                | 'c'
+                | 'p'
+                | 's'
+                | 'Z'
+                | 'z'
+                | '+'
+        ) {
+            has_time_fields = true;
+        }
     }
+    Some(has_time_fields)
 }
 
 /// Returns `true` if `bytes` begins with a date-like prefix: two or four ASCII
@@ -1060,23 +1101,19 @@ mod tests {
         #[case::inconsistent_weekday(
             "Thursday, July 29, 2026",
             "%A, %B %d, %Y",
-            "the date does not exist"
+            "invalid input"
         )]
         #[case::inconsistent_abbreviated_weekday(
             "Thu, July 29, 2026",
             "%a, %B %d, %Y",
-            "the date does not exist"
+            "invalid input"
         )]
         #[case::zero_padded_weekday(
             "2026-W01-04",
             "%G-W%V-%u",
             "a field is out of range"
         )]
-        #[case::unsupported_padding_flag(
-            "2026-07",
-            "%Y-%-m",
-            "not enough input"
-        )]
+        #[case::unsupported_padding_flag("2026-07", "%Y-%-m", "invalid input")]
         fn rejects_a_pattern_mismatch_with_the_field_reason(
             #[case] text: &str,
             #[case] pattern: &str,
@@ -1118,14 +1155,8 @@ mod tests {
 
             // Assert
             assert!(
-                matches!(
-                    parsed,
-                    Err(DateError::InvalidValue {
-                        reason: "bad format pattern",
-                        ..
-                    })
-                ),
-                "an unknown specifier must fail as a bad format pattern, got \
+                matches!(parsed, Err(DateError::InvalidValue { .. })),
+                "an invalid specifier must fail without panicking, got \
                  {parsed:?}"
             );
         }
@@ -1300,27 +1331,27 @@ mod tests {
             // Assert
             assert_eq!(
                 day,
-                Ok("2026-03-08 12:00:00".to_owned()),
+                Ok("2026-03-08T12:00:00".to_owned()),
                 "a one-day shift must keep the local clock time across the gap"
             );
             assert_eq!(
                 week,
-                Ok("2026-03-14 12:00:00".to_owned()),
+                Ok("2026-03-14T12:00:00".to_owned()),
                 "a one-week shift must keep the local clock time"
             );
             assert_eq!(
                 month,
-                Ok("2026-04-07 12:00:00".to_owned()),
+                Ok("2026-04-07T12:00:00".to_owned()),
                 "a one-month shift must keep the local clock time"
             );
             assert_eq!(
                 year,
-                Ok("2027-03-07 12:00:00".to_owned()),
+                Ok("2027-03-07T12:00:00".to_owned()),
                 "a one-year shift must keep the local clock time"
             );
             assert_eq!(
                 back,
-                Ok("2026-03-06 12:00:00".to_owned()),
+                Ok("2026-03-06T12:00:00".to_owned()),
                 "a backward day shift must keep the local clock time"
             );
         }
@@ -1337,7 +1368,7 @@ mod tests {
             // Assert
             assert_eq!(
                 day.map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-11-01 12:00:00".to_owned()),
+                Ok("2026-11-01T12:00:00".to_owned()),
                 "a one-day shift must keep the local clock time across the \
                  fold"
             );
@@ -1362,7 +1393,7 @@ mod tests {
                 spring_hours
                     .as_ref()
                     .map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-03-14 13:00:00".to_owned()),
+                Ok("2026-03-14T13:00:00".to_owned()),
                 "168 exact hours must cross the gap as elapsed time"
             );
             assert_eq!(
@@ -1376,12 +1407,12 @@ mod tests {
             );
             assert_eq!(
                 fall_day.map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-11-01 12:00:00".to_owned()),
+                Ok("2026-11-01T12:00:00".to_owned()),
                 "a calendar day must keep the local clock time across the fold"
             );
             assert_eq!(
                 fall_hours.map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-11-01 11:00:00".to_owned()),
+                Ok("2026-11-01T11:00:00".to_owned()),
                 "24 exact hours must cross the fold as elapsed time"
             );
         }
@@ -1640,7 +1671,7 @@ mod tests {
                 by_calendar
                     .as_ref()
                     .map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-03-08 12:00:00".to_owned()),
+                Ok("2026-03-08T12:00:00".to_owned()),
                 "the calendar day must keep the local clock time across the \
                  gap"
             );
@@ -1648,7 +1679,7 @@ mod tests {
                 by_exact
                     .as_ref()
                     .map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-03-08 13:00:00".to_owned()),
+                Ok("2026-03-08T13:00:00".to_owned()),
                 "24 exact hours must cross the gap as elapsed time"
             );
             assert_ne!(
@@ -1682,7 +1713,7 @@ mod tests {
             // Assert
             assert_eq!(
                 by_week.as_ref().map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-03-14 12:00:00".to_owned()),
+                Ok("2026-03-14T12:00:00".to_owned()),
                 "a calendar week must keep the local clock time"
             );
             assert_eq!(
@@ -1726,7 +1757,7 @@ mod tests {
                 by_fraction
                     .as_ref()
                     .map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-03-08 18:00:00".to_owned()),
+                Ok("2026-03-08T18:00:00".to_owned()),
                 "the fractional day must keep the local clock time"
             );
             assert_eq!(
@@ -1933,9 +1964,9 @@ mod tests {
         }
 
         #[rstest]
-        #[case::week(CalendarPeriod::Week, "2026-07-27 14:30:05")]
-        #[case::month(CalendarPeriod::Month, "2026-07-01 14:30:05")]
-        #[case::year(CalendarPeriod::Year, "2026-01-01 14:30:05")]
+        #[case::week(CalendarPeriod::Week, "2026-07-27T14:30:05")]
+        #[case::month(CalendarPeriod::Month, "2026-07-01T14:30:05")]
+        #[case::year(CalendarPeriod::Year, "2026-01-01T14:30:05")]
         fn keeps_the_time_of_day_on_a_date_time_point(
             #[case] period: CalendarPeriod,
             #[case] expected: &str,
@@ -2040,9 +2071,9 @@ mod tests {
         }
 
         #[rstest]
-        #[case::week(CalendarPeriod::Week, "2026-08-02 14:30:05")]
-        #[case::month(CalendarPeriod::Month, "2026-07-31 14:30:05")]
-        #[case::year(CalendarPeriod::Year, "2026-12-31 14:30:05")]
+        #[case::week(CalendarPeriod::Week, "2026-08-02T14:30:05")]
+        #[case::month(CalendarPeriod::Month, "2026-07-31T14:30:05")]
+        #[case::year(CalendarPeriod::Year, "2026-12-31T14:30:05")]
         fn keeps_the_time_of_day_on_a_date_time_point(
             #[case] period: CalendarPeriod,
             #[case] expected: &str,
@@ -2070,15 +2101,15 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::monday(Weekday::Mon, ymd(2026, 7, 27))]
-        #[case::tuesday(Weekday::Tue, ymd(2026, 7, 28))]
-        #[case::wednesday(Weekday::Wed, ymd(2026, 7, 29))]
-        #[case::thursday(Weekday::Thu, ymd(2026, 7, 30))]
-        #[case::friday(Weekday::Fri, ymd(2026, 7, 31))]
-        #[case::saturday(Weekday::Sat, ymd(2026, 8, 1))]
-        #[case::sunday(Weekday::Sun, ymd(2026, 8, 2))]
+        #[case::monday(civil::Weekday::Monday, ymd(2026, 7, 27))]
+        #[case::tuesday(civil::Weekday::Tuesday, ymd(2026, 7, 28))]
+        #[case::wednesday(civil::Weekday::Wednesday, ymd(2026, 7, 29))]
+        #[case::thursday(civil::Weekday::Thursday, ymd(2026, 7, 30))]
+        #[case::friday(civil::Weekday::Friday, ymd(2026, 7, 31))]
+        #[case::saturday(civil::Weekday::Saturday, ymd(2026, 8, 1))]
+        #[case::sunday(civil::Weekday::Sunday, ymd(2026, 8, 2))]
         fn selects_the_named_weekday_of_the_iso_week(
-            #[case] target: Weekday,
+            #[case] target: civil::Weekday,
             #[case] expected: DateValue,
         ) {
             // Arrange: 2026-07-29 is a Wednesday.
@@ -2105,7 +2136,7 @@ mod tests {
             let base = point_at("2026-08-02");
 
             // Act
-            let monday = base.with_weekday(Weekday::Mon);
+            let monday = base.with_weekday(civil::Weekday::Monday);
 
             // Assert
             assert_eq!(
@@ -2122,7 +2153,7 @@ mod tests {
             let base = point_at("2026-07");
 
             // Act
-            let friday = base.with_weekday(Weekday::Fri);
+            let friday = base.with_weekday(civil::Weekday::Friday);
 
             // Assert
             assert_eq!(
@@ -2142,12 +2173,12 @@ mod tests {
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
-            let sunday = base.with_weekday(Weekday::Sun);
+            let sunday = base.with_weekday(civil::Weekday::Sunday);
 
             // Assert
             assert_eq!(
                 sunday.map(|p| p.local_datetime_or_utc().to_string()),
-                Ok("2026-08-02 14:30:05".to_owned()),
+                Ok("2026-08-02T14:30:05".to_owned()),
                 "the local time of day must survive the selection"
             );
         }
@@ -2626,7 +2657,7 @@ mod tests {
             // Assert
             assert_eq!(
                 date,
-                Ok(ymd(2026, 7, 1)),
+                ymd(2026, 7, 1),
                 "a calendar point must return its stored date"
             );
         }
@@ -2643,7 +2674,7 @@ mod tests {
             // Assert
             assert_eq!(
                 date,
-                Ok(ymd(2026, 7, 29)),
+                ymd(2026, 7, 29),
                 "a date-time point must render its local calendar date"
             );
         }
@@ -2659,7 +2690,7 @@ mod tests {
             // Assert
             assert_eq!(
                 local.to_string(),
-                "2026-07-29 00:00:00",
+                "2026-07-29T00:00:00",
                 "a calendar point must render as local midnight"
             );
         }
@@ -2672,16 +2703,16 @@ mod tests {
 
             // Act
             let local = point.local_datetime_or_utc();
-            let utc = point.instant();
+            let utc = point.instant().expect("the point is representable");
 
             // Assert
             assert_eq!(
                 local.to_string(),
-                "2026-07-29 14:30:05",
+                "2026-07-29T14:30:05",
                 "the local clock must keep the written wall time"
             );
             assert_eq!(
-                utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                utc.to_string(),
                 "2026-07-29T18:30:05Z",
                 "the stored date-time must be the UTC value"
             );
@@ -2694,11 +2725,12 @@ mod tests {
             let point = point_at("2026-07-29");
 
             // Act
-            let utc = point.instant();
+            let utc =
+                point.instant().expect("the date midnight is representable");
 
             // Assert
             assert_eq!(
-                utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                utc.to_string(),
                 "2026-07-29T00:00:00Z",
                 "in UTC a calendar point must resolve at UTC midnight"
             );
@@ -2711,11 +2743,12 @@ mod tests {
             let point = point_at("2026-07-29");
 
             // Act
-            let utc = point.instant();
+            let utc =
+                point.instant().expect("the date midnight is representable");
 
             // Assert
             assert_eq!(
-                utc.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                utc.to_string(),
                 "2026-07-29T04:00:00Z",
                 "a calendar point must resolve at local midnight"
             );
@@ -2727,7 +2760,7 @@ mod tests {
         #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
         #[case::fractional_seconds(
             "2026-07-29T14:30:00.123Z",
-            "%Y-%m-%dT%H:%M:%S%.f"
+            "%Y-%m-%dT%H:%M:%S%.3f"
         )]
         fn preserves_written_precision_in_the_canonical_pattern(
             #[case] text: &str,

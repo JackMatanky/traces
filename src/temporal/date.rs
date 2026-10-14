@@ -8,7 +8,6 @@
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
-use chrono::{Datelike as _, NaiveDate, NaiveTime, TimeDelta};
 use jiff::{Span, civil};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -69,33 +68,18 @@ impl DateValue {
         civil::Date::new(year, month, day).map(Self).map_err(|_| invalid())
     }
 
-    /// Returns the wrapped calendar date.
+    /// Wraps a valid Jiff civil date.
+    #[inline]
     #[must_use]
-    #[expect(
-        clippy::expect_used,
-        reason = "Jiff's date range is strictly inside chrono's date range"
-    )]
-    pub(crate) fn naive_date(self) -> NaiveDate {
-        NaiveDate::from_ymd_opt(
-            i32::from(self.0.year()),
-            u32::try_from(self.0.month()).expect("Jiff month fits chrono"),
-            u32::try_from(self.0.day()).expect("Jiff day fits chrono"),
-        )
-        .expect("every Jiff civil date fits chrono")
+    pub(crate) const fn from_civil_date(date: civil::Date) -> Self {
+        Self(date)
     }
 
-    pub(crate) fn try_from_naive_date(
-        date: NaiveDate,
-    ) -> Result<Self, CalendarError> {
-        let year = i16::try_from(date.year())
-            .map_err(|_| CalendarError::OutOfRange)?;
-        let month = i8::try_from(date.month())
-            .map_err(|_| CalendarError::OutOfRange)?;
-        let day =
-            i8::try_from(date.day()).map_err(|_| CalendarError::OutOfRange)?;
-        civil::Date::new(year, month, day)
-            .map(Self)
-            .map_err(|_| CalendarError::OutOfRange)
+    /// Returns the wrapped Jiff civil date.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn civil_date(self) -> civil::Date {
+        self.0
     }
 
     /// Returns the whole calendar months from `self` to `to`, signed by
@@ -114,10 +98,9 @@ impl DateValue {
         };
         #[expect(
             clippy::arithmetic_side_effects,
-            reason = "year/month/day are all bounded by NaiveDate's \
-                      representable range (~±262,000 years), so the year \
-                      subtraction, ×12 month conversion, day comparison, and \
-                      sign multiply can't overflow i64"
+            reason = "Jiff civil dates have bounded year/month/day fields, so \
+                      the year subtraction, month conversion, day comparison, \
+                      and sign multiplication cannot overflow i64"
         )]
         let months = sign
             * (i64::from(later.year() - earlier.year()) * 12
@@ -134,28 +117,6 @@ impl DateValue {
     /// so this is [`DateValue::whole_months_until`] divided down to years.
     pub(super) fn whole_years_until(self, to: Self) -> i64 {
         self.whole_months_until(to) / 12
-    }
-
-    /// Returns the date advanced by `delta`, keeping the date part.
-    ///
-    /// Reads `delta` from midnight of `self` and drops the resulting time of
-    /// day, so sub-day deltas leave the date unchanged.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the result falls outside the
-    ///   representable `chrono` date range.
-    pub(super) fn advance(
-        self,
-        delta: TimeDelta,
-    ) -> Result<Self, CalendarError> {
-        self.naive_date()
-            .and_time(NaiveTime::MIN)
-            .checked_add_signed(delta)
-            .and_then(|local_datetime| {
-                Self::try_from_naive_date(local_datetime.date()).ok()
-            })
-            .ok_or(CalendarError::OutOfRange)
     }
 
     /// Adds a Jiff span, discarding the time of day as date-only arithmetic
@@ -331,9 +292,7 @@ impl TryFrom<SystemTime> for DateValue {
 
     #[inline]
     fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
-        DateTimeValue::try_from(time)?
-            .local_date()
-            .map_err(|error| error.into_date_error("system time"))
+        Ok(DateTimeValue::try_from(time)?.local_date())
     }
 }
 

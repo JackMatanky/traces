@@ -13,7 +13,7 @@ arithmetic. `src/temporal/` is the single owner of these values and their rules.
 A zone-free calendar date. Every date-shaped string, including serde
 deserialization, uses the temporal parser. Parsing requires a four-digit year
 and retains month or day precision; `YYYY-MM` denotes the first day of the month.
-*Avoid*: `NaiveDate`, calendar value
+The internal representation is Jiff's zone-free civil date type.
 
 #### Date-Time
 

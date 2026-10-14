@@ -15,14 +15,10 @@
 //! - [`DateComponent`]: a named calendar or clock component of a date point.
 //! - [`Difference`]: the measured difference between two date points.
 
-use chrono::{
-    Datelike as _, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
-    Timelike as _, Weekday,
-};
 use jiff::{Span, civil};
 
 use super::error::CalendarError;
-use crate::temporal::{DurationSeconds, TimeUnit};
+use crate::temporal::TimeUnit;
 
 /// A calendar period that date-point boundaries select.
 ///
@@ -142,41 +138,34 @@ impl Difference {
     }
 }
 
-/// Maps an ISO weekday number to its [`Weekday`], returning [`None`] for
+/// Maps an ISO weekday number to its [`civil::Weekday`], returning [`None`] for
 /// anything outside `1..=7`.
 ///
 /// `0` is rejected because Sunday-based conventions disagree on it (Sunday is
 /// `0` in some and `1` in others).
 #[must_use]
-pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
+pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
     match n {
-        1 => Some(Weekday::Mon),
-        2 => Some(Weekday::Tue),
-        3 => Some(Weekday::Wed),
-        4 => Some(Weekday::Thu),
-        5 => Some(Weekday::Fri),
-        6 => Some(Weekday::Sat),
-        7 => Some(Weekday::Sun),
+        1 => Some(civil::Weekday::Monday),
+        2 => Some(civil::Weekday::Tuesday),
+        3 => Some(civil::Weekday::Wednesday),
+        4 => Some(civil::Weekday::Thursday),
+        5 => Some(civil::Weekday::Friday),
+        6 => Some(civil::Weekday::Saturday),
+        7 => Some(civil::Weekday::Sunday),
         _ => None,
     }
 }
 
-/// Builds a [`TimeDelta`] from `part_secs`, splitting whole seconds from the
-/// fraction rounded to the nearest nanosecond.
-///
-/// The split lets calendar arithmetic keep whole days while the remainder
-/// carries the sub-second part for `DatePoint::apply`.
+/// Builds a Jiff [`Span`] from nominal seconds, rounding the fractional part
+/// to the nearest nanosecond.
 ///
 /// # Errors
 ///
-/// - [`CalendarError::OutOfRange`] if `part_secs` is not finite or its whole
-///   seconds do not fit a [`TimeDelta`].
-pub(super) fn time_delta_from_seconds(
-    part_secs: f64,
-) -> Result<TimeDelta, CalendarError> {
-    let ds = DurationSeconds::try_from(part_secs)
-        .map_err(|_| CalendarError::OutOfRange)?;
-    TimeDelta::try_from(ds).map_err(|_| CalendarError::OutOfRange)
+/// Returns [`CalendarError::OutOfRange`] when the value cannot be represented.
+pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
+    super::duration::span_from_nominal_seconds(part_secs)
+        .map_err(|_| CalendarError::OutOfRange)
 }
 
 /// Shifts a calendar datetime by `n` in the chosen `unit` and returns the
@@ -193,10 +182,10 @@ pub(super) fn time_delta_from_seconds(
 ///
 /// - [`CalendarError::OutOfRange`] if the shift overflows representable bounds.
 pub(super) fn shift_datetime(
-    local_datetime: NaiveDateTime,
+    local_datetime: civil::DateTime,
     n: i64,
     unit: TimeUnit,
-) -> Result<NaiveDateTime, CalendarError> {
+) -> Result<civil::DateTime, CalendarError> {
     let span = match unit {
         TimeUnit::Year => Span::new().try_years(n),
         TimeUnit::Month => Span::new().try_months(n),
@@ -208,43 +197,7 @@ pub(super) fn shift_datetime(
         TimeUnit::Millisecond => Span::new().try_milliseconds(n),
     }
     .map_err(|_| CalendarError::OutOfRange)?;
-    let date_time = civil::DateTime::new(
-        i16::try_from(local_datetime.year())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        i8::try_from(local_datetime.month())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        i8::try_from(local_datetime.day())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        i8::try_from(local_datetime.hour())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        i8::try_from(local_datetime.minute())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        i8::try_from(local_datetime.second())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        i32::try_from(local_datetime.nanosecond())
-            .map_err(|_| CalendarError::OutOfRange)?,
-    )
-    .map_err(|_| CalendarError::OutOfRange)?;
-    let shifted =
-        date_time.checked_add(span).map_err(|_| CalendarError::OutOfRange)?;
-    let date = NaiveDate::from_ymd_opt(
-        i32::from(shifted.year()),
-        u32::try_from(shifted.month())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        u32::try_from(shifted.day()).map_err(|_| CalendarError::OutOfRange)?,
-    )
-    .ok_or(CalendarError::OutOfRange)?;
-    let time = NaiveTime::from_hms_nano_opt(
-        u32::try_from(shifted.hour()).map_err(|_| CalendarError::OutOfRange)?,
-        u32::try_from(shifted.minute())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        u32::try_from(shifted.second())
-            .map_err(|_| CalendarError::OutOfRange)?,
-        u32::try_from(shifted.subsec_nanosecond())
-            .map_err(|_| CalendarError::OutOfRange)?,
-    )
-    .ok_or(CalendarError::OutOfRange)?;
-    Ok(NaiveDateTime::new(date, time))
+    local_datetime.checked_add(span).map_err(|_| CalendarError::OutOfRange)
 }
 
 #[cfg(test)]
@@ -321,16 +274,16 @@ mod tests {
         }
 
         #[rstest]
-        #[case::monday(1, Weekday::Mon)]
-        #[case::tuesday(2, Weekday::Tue)]
-        #[case::wednesday(3, Weekday::Wed)]
-        #[case::thursday(4, Weekday::Thu)]
-        #[case::friday(5, Weekday::Fri)]
-        #[case::saturday(6, Weekday::Sat)]
-        #[case::sunday(7, Weekday::Sun)]
+        #[case::monday(1, civil::Weekday::Monday)]
+        #[case::tuesday(2, civil::Weekday::Tuesday)]
+        #[case::wednesday(3, civil::Weekday::Wednesday)]
+        #[case::thursday(4, civil::Weekday::Thursday)]
+        #[case::friday(5, civil::Weekday::Friday)]
+        #[case::saturday(6, civil::Weekday::Saturday)]
+        #[case::sunday(7, civil::Weekday::Sunday)]
         fn maps_iso_weekday_numbers_to_weekdays(
             #[case] number: i64,
-            #[case] expected: Weekday,
+            #[case] expected: civil::Weekday,
         ) {
             // Arrange: `number` and `expected` are the case literals.
             // Act

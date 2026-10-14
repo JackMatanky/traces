@@ -501,13 +501,14 @@ src/index/store.rs: pub(super) fn wrap_redb_error(
 src/index/store.rs: pub(super) struct IndexDimensions {
 src/index/store.rs: pub(super) struct PersistRequest<'a> {
 src/index/store.rs: pub(super) type StoreSnapshot =
+src/index/tables.rs: pub(super) const CACHE_FORMAT: TableDefinition<
 src/index/tables.rs: pub(super) const FILES: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const LINKS: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const NOTES: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const PATHS_BY_TAG: MultimapTableDefinition<
-src/index/tables.rs: pub(super) const TABLES: [TableSpec; 7] = [
+src/index/tables.rs: pub(super) const TABLES: [TableSpec; 8] = [
 src/index/tables.rs: pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
 src/index/tables.rs: pub(super) fn delete(
 src/index/tables.rs: pub(super) fn probe(
@@ -1347,7 +1348,7 @@ src/template/writer.rs: pub(super) fn with_declared(
 src/template/writer.rs: pub(super) fn write(
 src/template/writer.rs: pub(super) struct TemplateWriteTarget<'a> {
 src/temporal/calendar.rs: pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
-src/temporal/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<Weekday> {
+src/temporal/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
 src/temporal/calendar.rs: pub(crate) enum CalendarPeriod {
 src/temporal/calendar.rs: pub(crate) enum DateComponent {
 src/temporal/calendar.rs: pub(crate) enum Difference {
@@ -1355,17 +1356,16 @@ src/temporal/calendar.rs: pub(crate) enum PeriodEdge {
 src/temporal/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/temporal/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/temporal/calendar.rs: pub(super) fn shift_datetime(
-src/temporal/calendar.rs: pub(super) fn time_delta_from_seconds(
+src/temporal/calendar.rs: pub(super) fn span_from_seconds(part_secs: f64) -> Result<Span, CalendarError> {
 src/temporal/date.rs: pub fn from_ymd(
 src/temporal/date.rs: pub struct DateValue(civil::Date);
 src/temporal/date.rs: pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
+src/temporal/date.rs: pub(crate) const fn civil_date(self) -> civil::Date {
+src/temporal/date.rs: pub(crate) const fn from_civil_date(date: civil::Date) -> Self {
 src/temporal/date.rs: pub(crate) enum DateShape {
 src/temporal/date.rs: pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
-src/temporal/date.rs: pub(crate) fn naive_date(self) -> NaiveDate {
 src/temporal/date.rs: pub(crate) fn parse_any(
 src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/temporal/date.rs: pub(crate) fn try_from_naive_date(
-src/temporal/date.rs: pub(super) fn advance(
 src/temporal/date.rs: pub(super) fn advance_span(
 src/temporal/date.rs: pub(super) fn whole_months_until(self, to: Self) -> i64 {
 src/temporal/date.rs: pub(super) fn whole_years_until(self, to: Self) -> i64 {
@@ -1374,20 +1374,20 @@ src/temporal/datetime.rs: pub(crate) const ALL: [Self; 5] = [
 src/temporal/datetime.rs: pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 src/temporal/datetime.rs: pub(crate) const fn from_timestamp(timestamp: Timestamp) -> Self {
 src/temporal/datetime.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
+src/temporal/datetime.rs: pub(crate) const fn utc(self) -> Timestamp {
 src/temporal/datetime.rs: pub(crate) enum DateTimeShape {
 src/temporal/datetime.rs: pub(crate) enum ParsedDateTime {
 src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
 src/temporal/datetime.rs: pub(crate) fn checked_add_span(
 src/temporal/datetime.rs: pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
 src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
-src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, CalendarError> {
-src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Option<NaiveDateTime> {
-src/temporal/datetime.rs: pub(crate) fn local_datetime_in(
-src/temporal/datetime.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+src/temporal/datetime.rs: pub(crate) fn local_date(self) -> DateValue {
+src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> civil::DateTime {
+src/temporal/datetime.rs: pub(crate) fn local_datetime_in(self, zone: &TimeZone) -> civil::DateTime {
+src/temporal/datetime.rs: pub(crate) fn local_datetime_or_utc(self) -> civil::DateTime {
 src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
 src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub(crate) fn shift(
-src/temporal/datetime.rs: pub(crate) fn utc(self) -> DateTime<Utc> {
 src/temporal/datetime.rs: pub(super) fn from_local(
 src/temporal/datetime.rs: pub(super) fn from_local_in(
 src/temporal/duration.rs: pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
@@ -1409,6 +1409,7 @@ src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<crat
 src/temporal/duration.rs: pub(crate) fn span(&self) -> Span {
 src/temporal/duration.rs: pub(crate) struct DurationComponent {
 src/temporal/duration.rs: pub(crate) struct DurationSeconds(f64);
+src/temporal/duration.rs: pub(super) fn span_from_nominal_seconds(
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
 src/temporal/error.rs: pub(crate) enum CalendarError {
@@ -1433,18 +1434,17 @@ src/temporal/point.rs: pub(crate) enum DatePrecision {
 src/temporal/point.rs: pub(crate) fn apply(
 src/temporal/point.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
 src/temporal/point.rs: pub(crate) fn component(self, component: DateComponent) -> i64 {
-src/temporal/point.rs: pub(crate) fn date(self) -> Result<DateValue, CalendarError> {
+src/temporal/point.rs: pub(crate) fn date(self) -> DateValue {
 src/temporal/point.rs: pub(crate) fn diff(
 src/temporal/point.rs: pub(crate) fn end_of(
-src/temporal/point.rs: pub(crate) fn instant(self) -> DateTime<Utc> {
-src/temporal/point.rs: pub(crate) fn local_datetime_or_utc(self) -> NaiveDateTime {
+src/temporal/point.rs: pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
+src/temporal/point.rs: pub(crate) fn local_datetime_or_utc(self) -> jiff::civil::DateTime {
 src/temporal/point.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
 src/temporal/point.rs: pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
 src/temporal/point.rs: pub(crate) fn parse_with_pattern(
 src/temporal/point.rs: pub(crate) fn shift(
 src/temporal/point.rs: pub(crate) fn start_of(
 src/temporal/point.rs: pub(crate) fn with_weekday(
-src/temporal/point.rs: pub(super) fn parse_reason(error: chrono::ParseError) -> &'static str {
 src/temporal/point.rs: pub(super) fn starts_with_year(s: &str) -> bool {
 src/temporal/unit.rs: pub aliases: &'static [&'static str],
 src/temporal/unit.rs: pub calendar: bool,

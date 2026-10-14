@@ -90,7 +90,7 @@ impl FileMeta {
         if let Some(name) = BaseNameRef::from_path(path)
             && let Some(date_point) = DatePoint::parse_prefix(name.as_str())
         {
-            return date_point.value().date().ok();
+            return Some(date_point.value().date());
         }
         created_at.and_then(|time| DateValue::try_from(time).ok())
     }

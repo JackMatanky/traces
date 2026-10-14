@@ -34,7 +34,6 @@
 
 use std::sync::Arc;
 
-use chrono::{Datelike as _, NaiveDate, NaiveDateTime, Timelike as _, Utc};
 use minijinja::{
     Environment, Error, ErrorKind,
     value::{Enumerator, Kwargs, Object, Value},
@@ -142,23 +141,23 @@ enum Anchor {
     Yesterday,
     StartOf(CalendarPeriod),
     EndOf(CalendarPeriod),
-    Weekday(chrono::Weekday),
+    Weekday(jiff::civil::Weekday),
 }
 
 impl Anchor {
     /// The date point a shorthand starts from when no reference is given.
-    fn base(self) -> Result<DatePoint, CalendarError> {
+    fn base(self) -> DatePoint {
         let now = DatePoint::from(DateTimeValue::from_timestamp(
             jiff::Timestamp::now(),
         ));
         match self {
-            Self::Now => Ok(now),
+            Self::Now => now,
             Self::Today
             | Self::Tomorrow
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => Ok(DatePoint::from(now.date()?)),
+            | Self::Weekday(_) => DatePoint::from(now.date()),
         }
     }
 
@@ -218,7 +217,7 @@ impl Anchor {
                 parse_date_point(ref_text)?
             }
         } else {
-            self.base().map_err(render_calendar_error)?
+            self.base()
         };
         date_point =
             self.transform(date_point).map_err(render_calendar_error)?;
@@ -249,7 +248,7 @@ fn shorthand(anchor: Anchor) -> Value {
 }
 
 /// Maps an ISO weekday number (`1` Monday through `7` Sunday) to a weekday.
-fn weekday_or_error(n: i64) -> TemplateEngineResult<chrono::Weekday> {
+fn weekday_or_error(n: i64) -> TemplateEngineResult<jiff::civil::Weekday> {
     weekday_from_number(n).ok_or_else(|| {
         Error::new(
             ErrorKind::InvalidOperation,
@@ -308,24 +307,15 @@ impl Object for DateNamespace {
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
                     let format = format_kwarg(&kwargs)?;
-                    let utc = chrono::DateTime::from_timestamp(unix_ts, 0)
-                        .ok_or_else(|| {
+                    let timestamp =
+                        jiff::Timestamp::new(unix_ts, 0).map_err(|_| {
                             Error::new(
                                 ErrorKind::InvalidOperation,
                                 format!("timestamp {unix_ts} is out of range"),
                             )
                         })?;
-                    // Display is human-facing: the local clock time of the
-                    // instant, via the crate's canonical conversion
-                    // (`.naive_utc()` would show the UTC clock instead).
-                    let local = DateTimeValue::try_from(utc)
-                        .map_err(|error| {
-                            Error::new(
-                                ErrorKind::InvalidOperation,
-                                error.to_string(),
-                            )
-                        })?
-                        .local_datetime_or_utc();
+                    let local = DateTimeValue::from_timestamp(timestamp)
+                        .local_datetime();
                     format_strtime(local, format, format)
                 },
             )),
@@ -387,31 +377,10 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
 
 /// Formats a civil date-time with Jiff's strict strftime implementation.
 fn format_strtime(
-    datetime: NaiveDateTime,
+    datetime: jiff::civil::DateTime,
     strftime: &str,
     source_pattern: &str,
 ) -> TemplateEngineResult<String> {
-    let range_error = || {
-        Error::new(
-            ErrorKind::InvalidOperation,
-            "date/time is outside the formatter's representable range",
-        )
-    };
-    let datetime = jiff::civil::DateTime::new(
-        i16::try_from(datetime.year()).map_err(|_| range_error())?,
-        i8::try_from(datetime.month()).map_err(|_| range_error())?,
-        i8::try_from(datetime.day()).map_err(|_| range_error())?,
-        i8::try_from(datetime.hour()).map_err(|_| range_error())?,
-        i8::try_from(datetime.minute()).map_err(|_| range_error())?,
-        i8::try_from(datetime.second()).map_err(|_| range_error())?,
-        i32::try_from(datetime.nanosecond()).map_err(|_| range_error())?,
-    )
-    .map_err(|source| {
-        invalid_operation(
-            "date/time is invalid for strftime formatting",
-            source,
-        )
-    })?;
     jiff::fmt::strtime::format(strftime, datetime).map_err(|source| {
         invalid_operation(
             format!("invalid date format {source_pattern:?}"),
@@ -419,15 +388,15 @@ fn format_strtime(
         )
     })
 }
+
 /// The shared date/time string parser for filters that work on the human clock
 /// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
 /// parse via [`parse_date_point`] directly.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
-///   string.
-fn parse_local_datetime(s: &str) -> Result<NaiveDateTime, Error> {
+/// Returns an invalid-operation error when `s` is not parseable.
+fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
     parse_date_point(s).map(DatePoint::local_datetime_or_utc)
 }
 
@@ -461,7 +430,7 @@ fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
 /// ordinals, and `dddd`/`ddd`/`MMM`/`MMMM`.
 fn pattern_to_strftime(
     pattern: &str,
-    datetime: NaiveDateTime,
+    datetime: jiff::civil::DateTime,
 ) -> TemplateEngineResult<String> {
     if pattern.contains('%') {
         return Ok(pattern.to_owned());
@@ -495,7 +464,7 @@ const MOMENT_TOKENS: &[(&str, &str)] = &[
 
 /// Returns the English ordinal suffix (`"st"`, `"nd"`, `"rd"`, `"th"`) for
 /// `day`.
-fn ordinal_suffix(day: u32) -> &'static str {
+fn ordinal_suffix(day: i8) -> &'static str {
     match day {
         11..=13 => "th",
         _ => match day % 10 {
@@ -510,11 +479,9 @@ fn ordinal_suffix(day: u32) -> &'static str {
 /// Translates a moment-dialect pattern into a strftime format string.
 fn moment_to_strftime(
     pattern: &str,
-    datetime: NaiveDateTime,
+    datetime: jiff::civil::DateTime,
 ) -> TemplateEngineResult<String> {
     use std::fmt::Write as _;
-
-    use chrono::Datelike as _;
 
     let mut result = String::with_capacity(pattern.len().saturating_mul(2));
     let bytes = pattern.as_bytes();
@@ -633,7 +600,10 @@ fn duration_format(value: Value) -> TemplateEngineResult<String> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_date_point`].
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
-    Ok(parse_date_point(value)?.instant().timestamp())
+    parse_date_point(value)?
+        .instant()
+        .map(jiff::Timestamp::as_second)
+        .map_err(render_calendar_error)
 }
 
 /// Returns the first or last day of the input's `calendar_period` at its
@@ -684,8 +654,8 @@ fn render_period_edge(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string, `unit` is not an accepted unit name, or the shift overflows
-///   chrono's representable range.
+///   string, `unit` is not an accepted unit name, or the shift overflows Jiff
+///   representable range.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -713,7 +683,7 @@ fn date_add(
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string, `unit` is not an accepted unit name, `n` is [`i64::MIN`], or the
-///   shift overflows chrono's representable range.
+///   Jiff representable range.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -744,7 +714,7 @@ fn date_sub(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or the shift
-///   overflows chrono's representable range (see [`render_calendar_error`]).
+///   exceeds the Jiff representable range (see the calendar error mapping).
 fn shift_by_unit(
     value: &str,
     n: i64,
@@ -764,7 +734,7 @@ fn shift_by_unit(
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+///   exceeds the Jiff representable range.
 fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     shift_by_unit(value, n_i64, TimeUnit::Day)
@@ -776,7 +746,7 @@ fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+///   exceeds the Jiff representable range.
 fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     let n_i64 = n_i64.checked_neg().ok_or_else(date_out_of_range_error)?;
@@ -789,7 +759,7 @@ fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+///   exceeds the Jiff representable range.
 fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, i64::from(n), TimeUnit::Month)
 }
@@ -800,7 +770,7 @@ fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+///   exceeds the Jiff representable range.
 fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
@@ -813,7 +783,7 @@ fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+///   exceeds the Jiff representable range.
 fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, i64::from(n), TimeUnit::Year)
 }
@@ -824,7 +794,7 @@ fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+///   exceeds the Jiff representable range.
 fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
@@ -911,7 +881,9 @@ fn date_diff(
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_date_point`].
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
-    Ok(parse_date_point(value)?.instant() < Utc::now())
+    let instant =
+        parse_date_point(value)?.instant().map_err(render_calendar_error)?;
+    Ok(instant < jiff::Timestamp::now())
 }
 
 /// `{% if value is is_future %}` mirrors [`is_past`] for future instants.
@@ -921,7 +893,9 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
 /// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
 ///   string; see [`parse_date_point`].
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
-    Ok(parse_date_point(value)?.instant() > Utc::now())
+    let instant =
+        parse_date_point(value)?.instant().map_err(render_calendar_error)?;
+    Ok(instant > jiff::Timestamp::now())
 }
 
 /// `{% if value is is_leap_year %}` accepts either an integer year (`2024 is
@@ -933,20 +907,21 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
 /// - [`ErrorKind::InvalidOperation`] (via [`leap_year_input_error`]) if `value`
 ///   is neither an integer year representable as [`i32`] nor a parseable
 ///   date/time string; see [`parse_local_datetime`].
-/// - [`ErrorKind::InvalidOperation`] if the year is outside [`NaiveDate`]'s
-///   representable range.
+/// - `InvalidOperation` if the year is outside the Jiff-supported civil-date
+///   range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
     let year = if let Some(year) = value.as_i64() {
-        i32::try_from(year)
-            .map_err(|_out_of_range| leap_year_input_error(value))?
+        i16::try_from(year).map_err(|_| leap_year_input_error(value))?
     } else if let Some(s) = value.as_str() {
         parse_local_datetime(s)?.year()
     } else {
         return Err(leap_year_input_error(value));
     };
-    NaiveDate::from_ymd_opt(year, 1, 1)
-        .map(|date| date.leap_year())
-        .ok_or_else(|| leap_year_input_error(value))
+    if jiff::civil::Date::new(year, 1, 1).is_err() {
+        return Err(leap_year_input_error(value));
+    }
+    let year = i32::from(year);
+    Ok(year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))
 }
 
 /// Builds the `is_leap_year` error for an argument that's neither a
@@ -961,12 +936,10 @@ fn leap_year_input_error(value: &Value) -> Error {
     )
 }
 
-/// Builds the error for date arithmetic that overflows chrono's representable
-/// date range.
+/// Builds the error for calendar arithmetic that exceeds the supported Jiff
+/// date or time range.
 ///
-/// This is reached only at the extremes, such as multi-millennia offsets, but
-/// every `checked_*` chrono call this module makes can return `None`, and this
-/// module never `.unwrap()`s one.
+/// Checked operations return this instead of producing an invalid value.
 fn date_out_of_range_error() -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
@@ -1118,10 +1091,8 @@ mod tests {
             );
         }
 
-        /// Regression: Chrono's `DelayedFormat::fmt` returns `Err` for an
-        /// invalid specifier like `%Q`, and `String::to_string()`'s blanket
-        /// impl panics on that `Err`. Writing through `fmt::Write` directly
-        /// instead must surface it as a normal render error.
+        /// Regression: invalid format specifiers such as %Q must surface as a
+        /// normal render error rather than panic during formatting.
         #[test]
         fn now_returns_an_error_instead_of_panicking_on_an_invalid_format() {
             let error = env()
@@ -1175,24 +1146,29 @@ mod tests {
                 )
                 .expect("render succeeds");
             let mut parts = rendered.split('/');
-            let yesterday: NaiveDate = parts
+            let yesterday: jiff::civil::Date = parts
                 .next()
                 .expect("yesterday segment")
                 .parse()
                 .expect("valid ISO date");
-            let today: NaiveDate = parts
+            let today: jiff::civil::Date = parts
                 .next()
                 .expect("today segment")
                 .parse()
                 .expect("valid ISO date");
-            let tomorrow: NaiveDate = parts
+            let tomorrow: jiff::civil::Date = parts
                 .next()
                 .expect("tomorrow segment")
                 .parse()
                 .expect("valid ISO date");
-
-            assert_eq!(tomorrow, today.succ_opt().unwrap());
-            assert_eq!(yesterday, today.pred_opt().unwrap());
+            assert_eq!(
+                today.tomorrow().expect("date has a tomorrow"),
+                tomorrow
+            );
+            assert_eq!(
+                today.yesterday().expect("date has a yesterday"),
+                yesterday
+            );
         }
 
         #[rstest]
@@ -1534,10 +1510,10 @@ mod tests {
         #[test]
         fn format_bindings_never_emit_percent_plus() {
             let sample_pattern = "YYYY-MM-DD HH:mm:ss [Daily]";
-            let dt = chrono::NaiveDate::from_ymd_opt(2026, 7, 29)
-                .unwrap()
-                .and_hms_opt(14, 30, 0)
-                .unwrap();
+            let dt = jiff::civil::Date::new(2026, 7, 29)
+                .expect("valid date")
+                .at(14, 30, 0, 0);
+
             let translated = pattern_to_strftime(sample_pattern, dt).unwrap();
             assert!(!translated.contains("%+"));
         }
@@ -2126,8 +2102,7 @@ mod tests {
         }
 
         /// Regression: `1e16` seconds fits `i64` (so the `checked_mul` guard
-        /// passes) but overflows chrono's `TimeDelta` millisecond range, where
-        /// `chrono::Duration::seconds` panics instead of returning `None`.
+        /// passes) but exceeds the Jiff civil-date range, returning an error.
         #[test]
         fn date_add_returns_an_error_for_an_out_of_range_second_magnitude() {
             let error = env()
@@ -2203,8 +2178,8 @@ mod tests {
 
         #[test]
         fn current_timestamp_is_neither_past_nor_future() {
-            let now = Utc::now();
-            let formatted = now.format("%Y-%m-%dT%H:%M:%S").to_string();
+            let now = jiff::Timestamp::now();
+            let formatted = now.strftime("%Y-%m-%dT%H:%M:%S").to_string();
 
             let past = is_past(&formatted).expect("parse succeeds");
             let future = is_future(&formatted).expect("parse succeeds");

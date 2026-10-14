@@ -33,7 +33,6 @@ use std::{
     str::FromStr,
 };
 
-use chrono::TimeDelta;
 use jiff::Span;
 use num_traits::ToPrimitive as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -662,18 +661,6 @@ fn skip_separators(bytes: &[u8], position: &mut usize) {
         *position = (*position).saturating_add(1);
     }
 }
-impl TryFrom<DurationValue> for TimeDelta {
-    type Error = DurationError;
-
-    /// Converts to a [`TimeDelta`] via the nominal seconds of the duration,
-    /// returning [`DurationError::NonFiniteSeconds`] when the seconds value is
-    /// non-finite and [`DurationError::SecondsOutOfRange`] when it lies outside
-    /// the range [`TimeDelta`] can represent.
-    #[inline]
-    fn try_from(duration: DurationValue) -> Result<Self, Self::Error> {
-        Self::try_from(duration.nominal_seconds())
-    }
-}
 
 /// Renders the value's raw spelling: the original text for parsed values, the
 /// canonical sub-year decomposition for synthesized or computed ones.
@@ -777,7 +764,9 @@ impl DurationComponent {
     reason = "splits finite nominal seconds into bounded Span second and \
               nanosecond fields"
 )]
-fn span_from_nominal_seconds(total: f64) -> Result<Span, DurationError> {
+pub(super) fn span_from_nominal_seconds(
+    total: f64,
+) -> Result<Span, DurationError> {
     if !total.is_finite() {
         return Err(DurationError::NonFiniteSeconds);
     }
@@ -954,39 +943,6 @@ impl TryFrom<f64> for DurationSeconds {
         secs.is_finite()
             .then(|| Self::canonicalize_zero(secs))
             .ok_or(DurationError::NonFiniteSeconds)
-    }
-}
-
-impl TryFrom<DurationSeconds> for TimeDelta {
-    type Error = DurationError;
-
-    /// Converts to a [`TimeDelta`], returning
-    /// [`DurationError::NonFiniteSeconds`] for `NaN`/infinity and
-    /// [`DurationError::SecondsOutOfRange`] for a finite value outside the
-    /// range [`TimeDelta`] can represent.
-    #[inline]
-    fn try_from(seconds: DurationSeconds) -> Result<Self, Self::Error> {
-        let total = seconds.0;
-        if !total.is_finite() {
-            return Err(DurationError::NonFiniteSeconds);
-        }
-        let whole = total.trunc();
-        let frac = total.fract();
-        let (mut secs, nanos) = if frac < 0.0 {
-            (whole - 1.0, (frac + 1.0) * 1_000_000_000.0)
-        } else {
-            (whole, frac * 1_000_000_000.0)
-        };
-        let mut nanos_rounded =
-            nanos.round().to_i64().ok_or(DurationError::SecondsOutOfRange)?;
-        if nanos_rounded >= 1_000_000_000 {
-            secs += 1.0;
-            nanos_rounded = nanos_rounded.saturating_sub(1_000_000_000);
-        }
-        let secs_i64 = secs.to_i64().ok_or(DurationError::SecondsOutOfRange)?;
-        let nanos_u32 = u32::try_from(nanos_rounded)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-        Self::new(secs_i64, nanos_u32).ok_or(DurationError::SecondsOutOfRange)
     }
 }
 
@@ -2420,63 +2376,6 @@ mod tests {
                 seconds,
                 DurationSeconds::try_from(3_600.0).expect("finite seconds")
             );
-        }
-    }
-
-    mod time_delta {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[rstest]
-        #[case::whole_hour("1h", TimeDelta::hours(1))]
-        #[case::subsecond("500ms", TimeDelta::milliseconds(500))]
-        fn converts_duration_values_in_range(
-            #[case] input: &str,
-            #[case] expected: TimeDelta,
-        ) {
-            // Arrange: `input` is the case literal.
-            let duration =
-                DurationValue::parse(input).expect("case input is valid");
-            // Act
-            let converted = TimeDelta::try_from(duration)
-                .map_err(|error| error.to_string());
-            // Assert
-            assert_eq!(converted, Ok(expected));
-        }
-
-        #[rstest]
-        #[case::zero(0.0, TimeDelta::zero())]
-        #[case::negative_whole(-10.0, TimeDelta::seconds(-10))]
-        #[case::negative_fractional(-90.5, TimeDelta::milliseconds(-90_500))]
-        #[case::sub_nanosecond(0.000_000_001, TimeDelta::nanoseconds(1))]
-        fn converts_duration_seconds_in_range(
-            #[case] raw_secs: f64,
-            #[case] expected: TimeDelta,
-        ) {
-            // Arrange: `raw_secs` is the case literal.
-            let seconds =
-                DurationSeconds::try_from(raw_secs).expect("finite seconds");
-            // Act
-            let converted =
-                TimeDelta::try_from(seconds).map_err(|error| error.to_string());
-            // Assert
-            assert_eq!(converted, Ok(expected));
-        }
-
-        #[rstest]
-        #[case::extreme_positive(1e300)]
-        #[case::extreme_negative(-1e300)]
-        fn rejects_seconds_outside_the_representable_range(
-            #[case] raw_secs: f64,
-        ) {
-            // Arrange: `raw_secs` is the case literal.
-            let seconds =
-                DurationSeconds::try_from(raw_secs).expect("finite seconds");
-            // Act
-            let result = TimeDelta::try_from(seconds);
-            // Assert
-            assert!(matches!(result, Err(DurationError::SecondsOutOfRange)));
         }
     }
 }
