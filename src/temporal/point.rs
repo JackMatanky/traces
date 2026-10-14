@@ -92,7 +92,7 @@ impl DatePoint {
         }
     }
 
-    /// UTC instant represented by this date point.
+    /// Returns the UTC-stored Date-Time equivalent of this date point.
     pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
         match self {
             Self::Calendar {

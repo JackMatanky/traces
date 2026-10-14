@@ -38,3 +38,6 @@ S1
 parseable
 kwarg
 kwargs
+Jiff
+strtime
+ZoneGuard

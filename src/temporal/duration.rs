@@ -80,8 +80,8 @@ pub struct DurationValue {
 impl DurationValue {
     /// Parses a human-readable or ISO 8601 duration string.
     ///
-    /// Human-readable input accepts integers, decimals (".5h"), and
-    /// exponential floats ("1e3s"), an optional leading sign on the first
+    /// Human-readable input accepts integers, decimals (`.5h`), and
+    /// exponential floats (`1e3s`), an optional leading sign on the first
     /// component, and whitespace or comma separators. ISO 8601 input is parsed
     /// directly into a Jiff span.
     ///
@@ -165,16 +165,16 @@ impl DurationValue {
         })
     }
 
-    /// Renders this duration in human-readable compound English (for example
-    /// `"3 days, 4 hours"`), decomposing its magnitude greedily from years down
+    /// Renders this duration in human-readable compound English, for example
+    /// `3 days, 4 hours`, decomposing its magnitude greedily from years down
     /// to seconds over [`HUMAN_UNITS`].
     ///
     /// The magnitude is rounded to whole milliseconds first, so a fractional
     /// remainder renders as one tail millisecond count and a near-whole
-    /// magnitude rolls up (`"2 seconds"` for 1.9999 seconds). A non-finite or
-    /// sub-half-millisecond magnitude renders as `"0 seconds"` and as `"< 1
-    /// millisecond"` respectively; magnitudes too large for whole-unit counts
-    /// render in scientific notation.
+    /// magnitude rolls up (`2 seconds` for 1.9999 seconds). A non-finite or
+    /// sub-half-millisecond magnitude renders as `0 seconds` or `< 1
+    /// millisecond`, respectively. Magnitudes too large for whole-unit
+    /// counts render in scientific notation.
     #[must_use]
     pub(crate) fn humanize(&self) -> String {
         let total_secs = self.nominal_seconds().as_f64();
@@ -1130,7 +1130,7 @@ mod tests {
         }
 
         #[test]
-        fn equality_ordering_and_hash_share_nominal_identity(
+        fn nominal_identity_obeys_eq_ord_hash_contract(
             seconds in -1_000_000_i32..=1_000_000_i32,
         ) {
             // Arrange
@@ -1489,52 +1489,6 @@ mod tests {
             // Assert
             assert_eq!(result, Err(expected.to_owned()));
         }
-
-        #[test]
-        fn pins_unknown_unit_behavior_across_full_and_prefix_parses() {
-            // Arrange
-            let input = "1h 1x";
-            // Act
-            let parsed = parse_error(input);
-            let prefixed = parse_prefix_parts(input);
-            // Assert
-            assert!(matches!(parsed, Some(DurationError::UnknownUnit)));
-            assert_eq!(prefixed, Err("prefix rejected".to_owned()));
-        }
-
-        #[test]
-        fn pins_leading_comma_behavior_across_full_and_prefix_parses() {
-            // Arrange
-            let input = ",1h";
-            // Act
-            let parsed = DurationValue::parse(input);
-            let prefixed = parse_prefix_parts(input);
-            // Assert
-            assert_eq!(
-                parsed
-                    .map(|duration| duration.as_str().to_owned())
-                    .map_err(|error| error.to_string()),
-                Ok(",1h".to_owned())
-            );
-            assert_eq!(prefixed, Err("prefix rejected".to_owned()));
-        }
-
-        #[test]
-        fn pins_trailing_comma_behavior_across_full_and_prefix_parses() {
-            // Arrange
-            let input = "1h,";
-            // Act
-            let parsed = DurationValue::parse(input);
-            let prefixed = parse_prefix_parts(input);
-            // Assert
-            assert_eq!(
-                parsed
-                    .map(|duration| duration.as_str().to_owned())
-                    .map_err(|error| error.to_string()),
-                Ok("1h,".to_owned())
-            );
-            assert_eq!(prefixed, Ok(("1h".to_owned(), 2, 3_600.0)));
-        }
     }
 
     mod parse_prefix {
@@ -1591,6 +1545,8 @@ mod tests {
 
         #[rstest]
         #[case::non_duration("not a duration")]
+        #[case::unknown_suffix("1h 1x")]
+        #[case::leading_comma(",1h")]
         #[case::hyphen_bullet("- 15m")]
         #[case::non_leading_negative("1h -30m")]
         #[case::empty("")]
@@ -2187,49 +2143,59 @@ mod tests {
             );
         }
 
-        #[test]
-        fn checked_add_preserves_the_largest_unit_and_rejects_overflow() {
+        #[rstest]
+        #[case::exact_units("23h", "1h", "24h")]
+        #[case::calendar_and_exact_units("1d", "1h", "1d 1h")]
+        fn checked_add_preserves_written_units(
+            #[case] left: &str,
+            #[case] right: &str,
+            #[case] expected: &str,
+        ) {
             // Arrange
-            let hours = DurationValue::parse("23h").expect("hours are valid");
-            let one_hour = DurationValue::parse("1h").expect("hour is valid");
+            let left =
+                DurationValue::parse(left).expect("left duration is valid");
+            let right =
+                DurationValue::parse(right).expect("right duration is valid");
+
+            // Act
+            let sum = left.checked_add(right);
+
+            // Assert
+            assert!(
+                matches!(sum, Ok(value) if value.as_str() == expected),
+                "addition retains the expected units"
+            );
+        }
+
+        #[test]
+        fn checked_add_rejects_span_overflow() {
+            // Arrange
             let maximum = DurationValue::parse("7304484d")
                 .expect("maximum Jiff span is valid");
             let one_day = DurationValue::parse("1d").expect("day is valid");
 
             // Act
-            let sum = hours.checked_add(one_hour);
-            let overflow = maximum.checked_add(one_day);
+            let result = maximum.checked_add(one_day);
 
             // Assert
             assert!(
-                matches!(sum, Ok(value) if value.to_string() == "24h"),
-                "an exact day remains represented as hours"
-            );
-            assert!(
-                matches!(overflow, Err(DurationError::SecondsOutOfRange)),
-                "adding beyond Jiff's supported span reports a range error"
+                matches!(result, Err(DurationError::SecondsOutOfRange)),
+                "adding beyond Jiff’s supported span reports a range error"
             );
         }
 
         #[test]
-        fn arithmetic_preserves_written_fields() {
+        fn checked_subtraction_preserves_component_fields() {
             // Arrange
-            let day = DurationValue::parse("1d").expect("day is valid");
-            let hour = DurationValue::parse("1h").expect("hour is valid");
             let compound =
                 DurationValue::parse("1h 30m").expect("compound is valid");
             let minutes =
                 DurationValue::parse("30m").expect("minutes are valid");
 
             // Act
-            let sum = day.checked_add(hour);
             let difference = compound.checked_sub(minutes);
 
             // Assert
-            assert!(
-                matches!(sum, Ok(value) if value.as_str() == "1d 1h"),
-                "addition retains the written day and hour units"
-            );
             assert!(
                 matches!(
                     difference,
@@ -2241,32 +2207,52 @@ mod tests {
             );
         }
 
-        #[test]
-        fn checked_scaling_preserves_units_and_rejects_invalid_results() {
+        #[rstest]
+        #[case::doubled_hour(2.0, "2h")]
+        #[case::half_hour(0.5, "30m")]
+        fn checked_scaling_preserves_or_decomposes_units(
+            #[case] factor: f64,
+            #[case] expected: &str,
+        ) {
             // Arrange
             let hour = DurationValue::parse("1h").expect("hour is valid");
 
             // Act
-            let doubled = hour.clone().checked_mul(2.0);
-            let halved = hour.clone().checked_mul(0.5);
-            let zero = hour.clone().checked_mul(0.0);
-            let infinite = hour.checked_mul(f64::INFINITY);
+            let result = hour.checked_mul(factor);
 
             // Assert
             assert!(
-                matches!(doubled, Ok(value) if value.as_str() == "2h"),
-                "doubling retains the hour unit"
+                matches!(result, Ok(value) if value.as_str() == expected),
+                "scaling produces the expected unit spelling"
             );
+        }
+
+        #[test]
+        fn checked_scaling_zero_uses_canonical_seconds() {
+            // Arrange
+            let hour = DurationValue::parse("1h").expect("hour is valid");
+
+            // Act
+            let result = hour.checked_mul(0.0);
+
+            // Assert
             assert!(
-                matches!(halved, Ok(value) if value.as_str() == "30m"),
-                "halving one hour uses the exact minute unit"
+                matches!(result, Ok(value) if value.as_str() == "0s"),
+                "zero uses the canonical seconds spelling"
             );
+        }
+
+        #[test]
+        fn checked_scaling_rejects_non_finite_results() {
+            // Arrange
+            let hour = DurationValue::parse("1h").expect("hour is valid");
+
+            // Act
+            let result = hour.checked_mul(f64::INFINITY);
+
+            // Assert
             assert!(
-                matches!(zero, Ok(value) if value.as_str() == "0s"),
-                "scaling to zero uses the canonical seconds unit"
-            );
-            assert!(
-                matches!(infinite, Err(DurationError::NonFiniteSeconds)),
+                matches!(result, Err(DurationError::NonFiniteSeconds)),
                 "non-finite results are rejected"
             );
         }

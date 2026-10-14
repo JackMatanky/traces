@@ -22,13 +22,12 @@ pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// A Date-Time stored as UTC that renders as the local clock.
 ///
-/// Accepts RFC 3339 input with an explicit offset except for leap seconds,
-/// which Jiff timestamps cannot represent. ISO date portions require
-/// zero-padded month and day fields. Naive input in the five written shapes of
-/// `DateTimeShape` resolves in the process’s local zone (ambiguous fall-back
-/// times take the earlier occurrence; spring-forward gaps shift forward by the
-/// gap length) and stores as UTC. `DatePoint::parse_with_pattern` is a separate
-/// strftime parser and retains its pattern-driven padding rules.
+/// Accepts RFC 3339 input with an explicit offset, except leap seconds,
+/// which Jiff cannot represent. ISO date portions require zero-padded month
+/// and day fields. Naive input in the five accepted shapes resolves in the
+/// process’s local zone. Folds take the earlier occurrence; gaps shift forward
+/// by their length. Pattern-based parsing uses a separate strftime grammar and
+/// retains its pattern-driven padding rules.
 /// [`Display`](fmt::Display) renders the local clock time without a zone
 /// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
 /// Deserialization runs the same parser as [`FromStr`](std::str::FromStr), so
@@ -111,7 +110,7 @@ impl DateTimeValue {
         Self::try_from(date).is_ok_and(|midnight| self.0 == midnight.0)
     }
 
-    /// Returns the wrapped UTC timestamp.
+    /// Returns the wrapped UTC Date-Time.
     #[inline]
     #[must_use]
     pub(crate) const fn utc(self) -> Timestamp {
@@ -144,8 +143,8 @@ impl DateTimeValue {
     ///
     /// # Errors
     ///
-    /// Returns [`CalendarError::Zone`] when the civil time or resolved instant
-    /// is outside the supported range.
+    /// Returns [`CalendarError::Zone`] when the civil time or resolved UTC
+    /// Date-Time is outside the supported range.
     pub(super) fn from_local(
         local_datetime: civil::DateTime,
     ) -> Result<Self, CalendarError> {
@@ -201,11 +200,11 @@ impl DateTimeValue {
         self.checked_add_span(span)
     }
 
-    /// Adds an exact Jiff span to this timestamp.
+    /// Adds an exact Jiff span to this Date-Time.
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if the resulting timestamp exceeds the
+    /// - [`CalendarError::OutOfRange`] if the resulting Date-Time exceeds the
     ///   representable range.
     pub(crate) fn checked_add_span(
         self,
@@ -1501,9 +1500,7 @@ mod tests {
             fn local_iso_display_round_trips_at_second_precision(
                 seconds in 946_684_800_u64..=1_893_456_000_u64,
             ) {
-                // Arrange
-                // Display and parsing use the process-local zone; pin it so the
-                // round trip is deterministic across developer machines.
+                // Arrange: pin the process-local zone for a deterministic round trip.
                 ZoneGuard::set("UTC");
                 let system_time = SystemTime::UNIX_EPOCH
                     .checked_add(std::time::Duration::from_secs(seconds))
