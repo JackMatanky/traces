@@ -129,14 +129,14 @@ impl DateDiff {
     /// Projects the measured difference as an `f64`.
     ///
     /// Whole magnitudes convert through the standard integer-to-floating
-    /// conversion; fractional magnitudes pass through unchanged, non-finite
-    /// values included.
+    /// conversion; finite fractional magnitudes pass through unchanged.
     #[inline]
     #[must_use]
     pub(crate) fn to_f64(self) -> Option<f64> {
         match self {
             Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
-            Self::Fractional(n) => Some(n),
+            Self::Fractional(n) if n.is_finite() => Some(n),
+            Self::Fractional(_) => None,
         }
     }
 }
@@ -383,22 +383,18 @@ mod tests {
         #[case::not_a_number(f64::NAN)]
         #[case::positive_infinity(f64::INFINITY)]
         #[case::negative_infinity(f64::NEG_INFINITY)]
-        fn projects_non_finite_fractional_differences_unchanged(
-            #[case] magnitude: f64,
-        ) {
-            // Arrange: non-finite fractional magnitudes are valid `DateDiff`
-            // values.
+        fn rejects_non_finite_fractional_differences(#[case] magnitude: f64) {
+            // Arrange: non-finite fractional values cannot be represented as
+            // `f64` output.
             let difference = DateDiff::Fractional(magnitude);
 
             // Act
             let actual = difference.to_f64();
 
             // Assert
-            // Bit comparison treats NaN consistently.
             assert_eq!(
-                actual.map(f64::to_bits),
-                Some(magnitude.to_bits()),
-                "{difference:?} should project its magnitude unchanged"
+                actual, None,
+                "non-finite {magnitude:?} is not projectable"
             );
         }
     }
