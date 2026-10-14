@@ -11,8 +11,8 @@ use jiff::{Span, Timestamp, civil};
 use num_traits::ToPrimitive as _;
 
 use super::{
-    CalendarError, CalendarPeriod, DATE_PATTERN, DateComponent, DateError,
-    DateTimeValue, DateValue, Difference, DurationComponent, DurationValue,
+    CalendarError, CalendarPeriod, DATE_PATTERN, DateComponent, DateDiff,
+    DateError, DateTimeValue, DateValue, DurationComponent, DurationValue,
     PeriodEdge, TimeUnit,
     calendar::{shift_date, shift_datetime, span_from_seconds},
     date::DateShape,
@@ -267,17 +267,17 @@ impl DatePoint {
         self,
         to: Self,
         unit: TimeUnit,
-    ) -> Result<Difference, CalendarError> {
+    ) -> Result<DateDiff, CalendarError> {
         let local_delta = || {
             to.local_datetime_or_utc()
                 .duration_since(self.local_datetime_or_utc())
         };
         match unit {
             TimeUnit::Year => {
-                Ok(Difference::Whole(self.date().whole_years_until(to.date())))
+                Ok(DateDiff::Whole(self.date().whole_years_until(to.date())))
             }
             TimeUnit::Month => {
-                Ok(Difference::Whole(self.date().whole_months_until(to.date())))
+                Ok(DateDiff::Whole(self.date().whole_months_until(to.date())))
             }
             fixed if self.has_time() && to.has_time() => {
                 let seconds = match (self, to) {
@@ -286,23 +286,23 @@ impl DatePoint {
                     }
                     _ => return Err(CalendarError::OutOfRange),
                 };
-                Ok(Difference::Fractional(seconds / fixed.nominal_seconds()))
+                Ok(DateDiff::Fractional(seconds / fixed.nominal_seconds()))
             }
             TimeUnit::Week => {
-                Ok(Difference::Whole(local_delta().as_secs() / 604_800))
+                Ok(DateDiff::Whole(local_delta().as_secs() / 604_800))
             }
             TimeUnit::Day => {
-                Ok(Difference::Whole(local_delta().as_secs() / 86_400))
+                Ok(DateDiff::Whole(local_delta().as_secs() / 86_400))
             }
             TimeUnit::Hour => {
-                Ok(Difference::Whole(local_delta().as_secs() / 3_600))
+                Ok(DateDiff::Whole(local_delta().as_secs() / 3_600))
             }
             TimeUnit::Minute => {
-                Ok(Difference::Whole(local_delta().as_secs() / 60))
+                Ok(DateDiff::Whole(local_delta().as_secs() / 60))
             }
-            TimeUnit::Second => Ok(Difference::Whole(local_delta().as_secs())),
+            TimeUnit::Second => Ok(DateDiff::Whole(local_delta().as_secs())),
             TimeUnit::Millisecond => i64::try_from(local_delta().as_millis())
-                .map(Difference::Whole)
+                .map(DateDiff::Whole)
                 .map_err(|_| CalendarError::OutOfRange),
         }
     }
@@ -2319,55 +2319,55 @@ mod tests {
             "2020-06-15",
             "2026-07-15",
             TimeUnit::Year,
-            Difference::Whole(6)
+            DateDiff::Whole(6)
         )]
         #[case::month_across_month_ends(
             "2026-01-15",
             "2026-03-15",
             TimeUnit::Month,
-            Difference::Whole(2)
+            DateDiff::Whole(2)
         )]
         #[case::week(
             "2026-07-29",
             "2026-08-06",
             TimeUnit::Week,
-            Difference::Whole(1)
+            DateDiff::Whole(1)
         )]
         #[case::day(
             "2026-07-29",
             "2026-08-06",
             TimeUnit::Day,
-            Difference::Whole(8)
+            DateDiff::Whole(8)
         )]
         #[case::hour(
             "2026-07-29",
             "2026-08-06",
             TimeUnit::Hour,
-            Difference::Whole(192)
+            DateDiff::Whole(192)
         )]
         #[case::minute(
             "2026-07-29",
             "2026-08-06",
             TimeUnit::Minute,
-            Difference::Whole(11520)
+            DateDiff::Whole(11520)
         )]
         #[case::second(
             "2026-07-29",
             "2026-08-06",
             TimeUnit::Second,
-            Difference::Whole(691_200)
+            DateDiff::Whole(691_200)
         )]
         #[case::millisecond(
             "2026-07-29",
             "2026-08-06",
             TimeUnit::Millisecond,
-            Difference::Whole(691_200_000)
+            DateDiff::Whole(691_200_000)
         )]
         fn returns_whole_counts_between_calendar_points(
             #[case] from: &str,
             #[case] to: &str,
             #[case] unit: TimeUnit,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange
             let from = point_at(from);
@@ -2385,15 +2385,15 @@ mod tests {
         }
 
         #[rstest]
-        #[case::month("2026-01-15", "2026-03-15", TimeUnit::Month, Difference::Whole(-2))]
-        #[case::year("2020-06-15", "2026-07-15", TimeUnit::Year, Difference::Whole(-6))]
-        #[case::day("2026-07-29", "2026-08-06", TimeUnit::Day, Difference::Whole(-8))]
-        #[case::hour("2026-07-29", "2026-08-06", TimeUnit::Hour, Difference::Whole(-192))]
+        #[case::month("2026-01-15", "2026-03-15", TimeUnit::Month, DateDiff::Whole(-2))]
+        #[case::year("2020-06-15", "2026-07-15", TimeUnit::Year, DateDiff::Whole(-6))]
+        #[case::day("2026-07-29", "2026-08-06", TimeUnit::Day, DateDiff::Whole(-8))]
+        #[case::hour("2026-07-29", "2026-08-06", TimeUnit::Hour, DateDiff::Whole(-192))]
         fn returns_the_negated_difference_in_the_reverse_direction(
             #[case] from: &str,
             #[case] to: &str,
             #[case] unit: TimeUnit,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange
             let from = point_at(from);
@@ -2414,17 +2414,17 @@ mod tests {
         #[case::to_the_last_representable_day(
             "2026-01-01",
             "9999-12-31",
-            Difference::Whole(7973)
+            DateDiff::Whole(7973)
         )]
         #[case::since_the_epoch(
             "1970-01-01",
             "2026-07-29",
-            Difference::Whole(56)
+            DateDiff::Whole(56)
         )]
         fn counts_whole_years_across_large_spans(
             #[case] from: &str,
             #[case] to: &str,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange
             let from = point_at(from);
@@ -2442,21 +2442,21 @@ mod tests {
         }
 
         #[rstest]
-        #[case::hour(TimeUnit::Hour, Difference::Fractional(1.5))]
-        #[case::minute(TimeUnit::Minute, Difference::Fractional(90.0))]
-        #[case::second(TimeUnit::Second, Difference::Fractional(5400.0))]
+        #[case::hour(TimeUnit::Hour, DateDiff::Fractional(1.5))]
+        #[case::minute(TimeUnit::Minute, DateDiff::Fractional(90.0))]
+        #[case::second(TimeUnit::Second, DateDiff::Fractional(5400.0))]
         #[case::millisecond(
             TimeUnit::Millisecond,
-            Difference::Fractional(5_400_000.0)
+            DateDiff::Fractional(5_400_000.0)
         )]
-        #[case::day(TimeUnit::Day, Difference::Fractional(0.0625))]
+        #[case::day(TimeUnit::Day, DateDiff::Fractional(0.0625))]
         #[case::week(
             TimeUnit::Week,
-            Difference::Fractional(0.008_928_571_428_571_428)
+            DateDiff::Fractional(0.008_928_571_428_571_428)
         )]
         fn returns_fractional_counts_between_date_time_points(
             #[case] unit: TimeUnit,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange: ninety minutes span the date boundary.
             ZoneGuard::set("UTC");
@@ -2476,11 +2476,11 @@ mod tests {
         }
 
         #[rstest]
-        #[case::month(TimeUnit::Month, Difference::Whole(0))]
-        #[case::year(TimeUnit::Year, Difference::Whole(0))]
+        #[case::month(TimeUnit::Month, DateDiff::Whole(0))]
+        #[case::year(TimeUnit::Year, DateDiff::Whole(0))]
         fn returns_whole_calendar_counts_between_date_time_points(
             #[case] unit: TimeUnit,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange: the two points sit in the same month and year.
             ZoneGuard::set("UTC");
@@ -2499,20 +2499,16 @@ mod tests {
         }
 
         #[rstest]
-        #[case::calendar_point(
-            "2026-07-29",
-            TimeUnit::Day,
-            Difference::Whole(0)
-        )]
+        #[case::calendar_point("2026-07-29", TimeUnit::Day, DateDiff::Whole(0))]
         #[case::date_time_point(
             "2026-07-29 14:30:05",
             TimeUnit::Hour,
-            Difference::Fractional(0.0)
+            DateDiff::Fractional(0.0)
         )]
         fn returns_zero_for_a_point_diffed_against_itself(
             #[case] text: &str,
             #[case] unit: TimeUnit,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange
             ZoneGuard::set("UTC");
@@ -2533,17 +2529,17 @@ mod tests {
         #[case::date_time_to_date(
             "2026-07-28T23:00:00Z",
             "2026-07-29",
-            Difference::Whole(1)
+            DateDiff::Whole(1)
         )]
         #[case::date_to_date_time(
             "2026-07-29",
             "2026-07-29T00:30:00",
-            Difference::Whole(0)
+            DateDiff::Whole(0)
         )]
         fn truncates_toward_zero_when_either_point_lacks_a_time(
             #[case] from: &str,
             #[case] to: &str,
-            #[case] expected: Difference,
+            #[case] expected: DateDiff,
         ) {
             // Arrange: mixed frames count whole units of the local reading.
             ZoneGuard::set("UTC");
@@ -2580,22 +2576,22 @@ mod tests {
             // Assert
             assert_eq!(
                 spring_day,
-                Ok(Difference::Fractional(0.958_333_333_333_333_4)),
+                Ok(DateDiff::Fractional(0.958_333_333_333_333_4)),
                 "the spring day spans twenty-three elapsed hours"
             );
             assert_eq!(
                 spring_hour,
-                Ok(Difference::Fractional(23.0)),
+                Ok(DateDiff::Fractional(23.0)),
                 "the spring day spans twenty-three elapsed hours"
             );
             assert_eq!(
                 fall_day,
-                Ok(Difference::Fractional(1.041_666_666_666_666_7)),
+                Ok(DateDiff::Fractional(1.041_666_666_666_666_7)),
                 "the fall day spans twenty-five elapsed hours"
             );
             assert_eq!(
                 fall_hour,
-                Ok(Difference::Fractional(25.0)),
+                Ok(DateDiff::Fractional(25.0)),
                 "the fall day spans twenty-five elapsed hours"
             );
         }
@@ -2614,12 +2610,12 @@ mod tests {
             // Assert
             assert_eq!(
                 days,
-                Ok(Difference::Whole(1)),
+                Ok(DateDiff::Whole(1)),
                 "a date-only day diff must count the local calendar day"
             );
             assert_eq!(
                 hours,
-                Ok(Difference::Whole(24)),
+                Ok(DateDiff::Whole(24)),
                 "a date-only hour diff must count nominal whole hours"
             );
         }
@@ -2929,7 +2925,7 @@ mod tests {
                 let backward = b.diff(a, unit);
 
                 // Assert
-                let (Ok(Difference::Whole(forward)), Ok(Difference::Whole(backward))) =
+                let (Ok(DateDiff::Whole(forward)), Ok(DateDiff::Whole(backward))) =
                     (forward, backward) else {
                     prop_assert!(false, "date-only differences are whole");
                     return Ok(());

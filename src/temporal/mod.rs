@@ -41,7 +41,7 @@ mod point;
 mod unit;
 mod zone;
 pub(crate) use calendar::{
-    CalendarPeriod, DateComponent, Difference, PERIOD_SHORTHANDS, PeriodEdge,
+    CalendarPeriod, DateComponent, DateDiff, PERIOD_SHORTHANDS, PeriodEdge,
     weekday_from_number,
 };
 pub(crate) use date::DATE_PATTERN;

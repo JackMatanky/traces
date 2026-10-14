@@ -4,7 +4,7 @@
 //! This module owns the names that date-point arithmetic and its query and
 //! template callers share. It holds no arithmetic of its own: the calendar
 //! owner modules apply [`CalendarPeriod`] and [`PeriodEdge`] at date-point
-//! boundaries, resolve [`DateComponent`] names, and project [`Difference`]
+//! boundaries, resolve [`DateComponent`] names, and project [`DateDiff`]
 //! measurements, while the free functions here supply the zone-free datetime
 //! shifting and sub-second splitting those owners share.
 //!
@@ -15,7 +15,7 @@
 //! - [`PeriodEdge`]: Selects the side of a calendar period used by a boundary.
 //! - [`DateComponent`]: Identifies a calendar or clock component of a date
 //!   point.
-//! - [`Difference`]: Stores a measured difference between two date points.
+//! - [`DateDiff`]: Stores a measured difference between two date points.
 
 use jiff::{Span, civil};
 
@@ -118,14 +118,14 @@ impl DateComponent {
 
 /// Stores the result of measuring the difference between two date points.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum Difference {
+pub(crate) enum DateDiff {
     /// Whole units elapsed.
     Whole(i64),
     /// Fractional units elapsed.
     Fractional(f64),
 }
 
-impl Difference {
+impl DateDiff {
     /// Projects the measured difference as an `f64`.
     ///
     /// Whole magnitudes convert through the standard integer-to-floating
@@ -337,19 +337,16 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::positive(Difference::Whole(42), 42.0)]
-        #[case::negative(Difference::Whole(-7), -7.0)]
-        #[case::zero(Difference::Whole(0), 0.0)]
-        #[case::i64_max(
-            Difference::Whole(i64::MAX),
-            9_223_372_036_854_775_808.0
-        )]
+        #[case::positive(DateDiff::Whole(42), 42.0)]
+        #[case::negative(DateDiff::Whole(-7), -7.0)]
+        #[case::zero(DateDiff::Whole(0), 0.0)]
+        #[case::i64_max(DateDiff::Whole(i64::MAX), 9_223_372_036_854_775_808.0)]
         #[case::i64_min(
-            Difference::Whole(i64::MIN),
+            DateDiff::Whole(i64::MIN),
             -9_223_372_036_854_775_808.0
         )]
         fn projects_whole_differences_as_f64(
-            #[case] difference: Difference,
+            #[case] difference: DateDiff,
             #[case] expected: f64,
         ) {
             // Arrange: `difference` and `expected` are the case literals.
@@ -364,11 +361,11 @@ mod tests {
         }
 
         #[rstest]
-        #[case::two_and_a_half(Difference::Fractional(2.5), 2.5)]
-        #[case::negative_fraction(Difference::Fractional(-0.25), -0.25)]
-        #[case::zero(Difference::Fractional(0.0), 0.0)]
+        #[case::two_and_a_half(DateDiff::Fractional(2.5), 2.5)]
+        #[case::negative_fraction(DateDiff::Fractional(-0.25), -0.25)]
+        #[case::zero(DateDiff::Fractional(0.0), 0.0)]
         fn projects_fractional_differences_as_f64(
-            #[case] difference: Difference,
+            #[case] difference: DateDiff,
             #[case] expected: f64,
         ) {
             // Arrange: `difference` and `expected` are the case literals.
@@ -389,9 +386,9 @@ mod tests {
         fn projects_non_finite_fractional_differences_unchanged(
             #[case] magnitude: f64,
         ) {
-            // Arrange: non-finite fractional magnitudes are valid Difference
+            // Arrange: non-finite fractional magnitudes are valid `DateDiff`
             // values.
-            let difference = Difference::Fractional(magnitude);
+            let difference = DateDiff::Fractional(magnitude);
 
             // Act
             let actual = difference.to_f64();

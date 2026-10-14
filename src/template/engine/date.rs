@@ -44,8 +44,8 @@ use crate::{
     DATE_PATTERN, DateTimeValue, DurationSeconds, DurationValue, TimeUnit,
     UNIT_SPELLINGS_HINT,
     temporal::{
-        CalendarError, CalendarPeriod, DateComponent, DateError, DatePoint,
-        Difference, PeriodEdge, weekday_from_number,
+        CalendarError, CalendarPeriod, DateComponent, DateDiff, DateError,
+        DatePoint, PeriodEdge, weekday_from_number,
     },
 };
 const NAMESPACE_METHODS: &[&str] = &[
@@ -865,8 +865,8 @@ fn date_diff(
 
     let diff = from.diff(to, unit).map_err(render_calendar_error)?;
     Ok(match diff {
-        Difference::Whole(n) => Value::from(n),
-        Difference::Fractional(f) => Value::from(f),
+        DateDiff::Whole(n) => Value::from(n),
+        DateDiff::Fractional(f) => Value::from(f),
     })
 }
 

@@ -1351,7 +1351,7 @@ src/temporal/calendar.rs: pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPe
 src/temporal/calendar.rs: pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
 src/temporal/calendar.rs: pub(crate) enum CalendarPeriod {
 src/temporal/calendar.rs: pub(crate) enum DateComponent {
-src/temporal/calendar.rs: pub(crate) enum Difference {
+src/temporal/calendar.rs: pub(crate) enum DateDiff {
 src/temporal/calendar.rs: pub(crate) enum PeriodEdge {
 src/temporal/calendar.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/temporal/calendar.rs: pub(crate) fn to_f64(self) -> Option<f64> {
