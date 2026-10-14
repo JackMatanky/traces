@@ -41,7 +41,8 @@ use minijinja::{
 
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
-    DATE_PATTERN, DateTimeValue, DurationValue, TimeUnit, UNIT_SPELLINGS_HINT,
+    DEFAULT_DATE_PATTERN, DateTimeValue, DurationValue, TimeUnit,
+    UNIT_SPELLINGS_HINT,
     temporal::{
         CalendarError, CalendarPeriod, DateComponent, DateDiff, DateError,
         DatePoint, PeriodEdge, weekday_from_number,
@@ -92,7 +93,7 @@ impl DateNamespace {
         env.add_filter("sub_months", sub_months);
         env.add_filter("add_years", add_years);
         env.add_filter("sub_years", sub_years);
-        for &(name, period, edge) in &crate::temporal::PERIOD_SHORTHANDS {
+        for &(name, period, edge) in &crate::temporal::CALENDAR_PERIOD_EDGES {
             env.add_filter(name, move |value: &str| {
                 render_period_edge(value, period, edge)
             });
@@ -225,7 +226,7 @@ impl Anchor {
     ) -> TemplateEngineResult<String> {
         let format = format
             .or(kwargs.get::<Option<&str>>("format")?)
-            .unwrap_or(DATE_PATTERN);
+            .unwrap_or(DEFAULT_DATE_PATTERN);
         let offset = offset.or(kwargs.get::<Option<Value>>("offset")?);
         let reference = reference.or(kwargs.get::<Option<&str>>("reference")?);
         let reference_format = reference_format
@@ -367,7 +368,7 @@ fn parse_date_point(s: &str) -> TemplateEngineResult<DatePoint> {
 }
 
 /// Extracts the shared `format="..."` kwarg every `date.*` namespace method
-/// takes, defaulting to [`DATE_PATTERN`], and rejects any other kwarg
+/// takes, defaulting to [`DEFAULT_DATE_PATTERN`], and rejects any other kwarg
 /// via [`Kwargs::assert_all_used`].
 ///
 /// This is the one place all five
@@ -381,7 +382,8 @@ fn parse_date_point(s: &str) -> TemplateEngineResult<DatePoint> {
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
 ///   `format`.
 fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
-    let format = kwargs.get::<Option<&str>>("format")?.unwrap_or(DATE_PATTERN);
+    let format =
+        kwargs.get::<Option<&str>>("format")?.unwrap_or(DEFAULT_DATE_PATTERN);
     kwargs.assert_all_used()?;
     Ok(format)
 }
@@ -642,7 +644,7 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 /// original precision.
 ///
 /// Backs every name in
-/// [`PERIOD_SHORTHANDS`](crate::temporal::PERIOD_SHORTHANDS): the
+/// [`CALENDAR_PERIOD_EDGES`](crate::temporal::CALENDAR_PERIOD_EDGES): the
 /// `start_of_week`/`sow` filter returns the first day (Monday) of the ISO
 /// week, `end_of_week`/`eow` the last (Sunday), and the month and year
 /// spellings behave the same on their period.

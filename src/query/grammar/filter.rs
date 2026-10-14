@@ -33,8 +33,8 @@ use crate::{
         value::QueryFieldValueRef,
     },
     temporal::{
-        CalendarError, CalendarPeriod, DateComponent, DatePoint,
-        PERIOD_SHORTHANDS, PeriodEdge,
+        CALENDAR_PERIOD_EDGES, CalendarError, CalendarPeriod, DateComponent,
+        DatePoint, PeriodEdge,
     },
 };
 
@@ -490,7 +490,7 @@ pub(crate) enum QueryFunction {
 
 impl QueryFunction {
     /// Functions whose names do not come from
-    /// [`PERIOD_SHORTHANDS`](crate::temporal::PERIOD_SHORTHANDS).
+    /// [`CALENDAR_PERIOD_EDGES`](crate::temporal::CALENDAR_PERIOD_EDGES).
     const FIXED_NAMES: &'static [(&'static str, Self)] = &[
         ("dur", Self::Dur),
         ("date_add", Self::DateAdd),
@@ -502,15 +502,16 @@ impl QueryFunction {
     /// Resolves a function name, ASCII case-insensitively.
     ///
     /// Period-boundary names (`sow`, `start_of_week`) resolve through
-    /// [`PERIOD_SHORTHANDS`](crate::temporal::PERIOD_SHORTHANDS), so the
-    /// filter grammar and the template filters accept the same spellings.
+    /// [`CALENDAR_PERIOD_EDGES`](crate::temporal::CALENDAR_PERIOD_EDGES), so
+    /// the filter grammar and the template filters accept the same
+    /// spellings.
     fn from_name(name: &str) -> Option<Self> {
         Self::FIXED_NAMES
             .iter()
             .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
             .map(|&(_, function)| function)
             .or_else(|| {
-                PERIOD_SHORTHANDS
+                CALENDAR_PERIOD_EDGES
                     .iter()
                     .find(|(candidate, _, _)| {
                         name.eq_ignore_ascii_case(candidate)

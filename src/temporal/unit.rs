@@ -1,8 +1,8 @@
 //! Defines the closed set of time units the crate accepts, with one row of
 //! facts per unit.
 //!
-//! [`UNITS`] is the only place a unit's accepted spellings, nominal length,
-//! frame, and human names are stated; callers read those facts from
+//! [`TEMPORAL_UNITS`] is the only place a unit's accepted spellings, nominal
+//! length, frame, and human names are stated; callers read those facts from
 //! [`TimeUnit`] instead of keeping private copies. Calendar units
 //! ([`TimeUnit::Day`], [`TimeUnit::Week`], [`TimeUnit::Month`],
 //! [`TimeUnit::Year`]) take effect on the local clock; exact units
@@ -57,6 +57,9 @@ pub(crate) struct UnitSpec {
     pub nominal_seconds: f64,
     /// Stores the exact nominal milliseconds used by integer decomposition.
     pub nominal_milliseconds: u64,
+    /// Stores the exact nominal nanoseconds per unit; the authoritative
+    /// integer ratio for nominal-value identity and hashing.
+    pub nominal_nanoseconds: i128,
     /// Reports whether the unit takes effect on the local clock (`true`) or as
     /// exact elapsed time (`false`).
     pub calendar: bool,
@@ -67,13 +70,14 @@ pub(crate) struct UnitSpec {
 /// [`decompose`] and the unit sets below depend on this order. A new unit adds
 /// a row here and a variant to [`TimeUnit`]; the `invariants` tests fail to
 /// compile or assert until both agree.
-pub(crate) static UNITS: [UnitSpec; 8] = [
+pub(crate) static TEMPORAL_UNITS: [UnitSpec; 8] = [
     UnitSpec {
         unit: TimeUnit::Year,
         aliases: &["y", "yr", "yrs", "year", "years"],
         names: ("year", "years"),
         nominal_seconds: 31_536_000.0,
         nominal_milliseconds: 31_536_000_000,
+        nominal_nanoseconds: 365 * 86_400 * 1_000_000_000,
         calendar: true,
     },
     UnitSpec {
@@ -82,6 +86,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("month", "months"),
         nominal_seconds: 2_592_000.0,
         nominal_milliseconds: 2_592_000_000,
+        nominal_nanoseconds: 30 * 86_400 * 1_000_000_000,
         calendar: true,
     },
     UnitSpec {
@@ -90,6 +95,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("week", "weeks"),
         nominal_seconds: 604_800.0,
         nominal_milliseconds: 604_800_000,
+        nominal_nanoseconds: 7 * 86_400 * 1_000_000_000,
         calendar: true,
     },
     UnitSpec {
@@ -98,6 +104,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("day", "days"),
         nominal_seconds: 86_400.0,
         nominal_milliseconds: 86_400_000,
+        nominal_nanoseconds: 86_400 * 1_000_000_000,
         calendar: true,
     },
     UnitSpec {
@@ -106,6 +113,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("hour", "hours"),
         nominal_seconds: 3_600.0,
         nominal_milliseconds: 3_600_000,
+        nominal_nanoseconds: 3_600 * 1_000_000_000,
         calendar: false,
     },
     UnitSpec {
@@ -114,6 +122,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("minute", "minutes"),
         nominal_seconds: 60.0,
         nominal_milliseconds: 60_000,
+        nominal_nanoseconds: 60 * 1_000_000_000,
         calendar: false,
     },
     UnitSpec {
@@ -122,6 +131,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("second", "seconds"),
         nominal_seconds: 1.0,
         nominal_milliseconds: 1_000,
+        nominal_nanoseconds: 1_000_000_000,
         calendar: false,
     },
     UnitSpec {
@@ -130,6 +140,7 @@ pub(crate) static UNITS: [UnitSpec; 8] = [
         names: ("millisecond", "milliseconds"),
         nominal_seconds: 0.001,
         nominal_milliseconds: 1,
+        nominal_nanoseconds: 1_000_000,
         calendar: false,
     },
 ];
@@ -174,11 +185,11 @@ pub(crate) struct DecomposedPart {
 /// Greedily decomposes a non-negative magnitude into whole-unit counts.
 ///
 /// `total_ms` is a magnitude in milliseconds and `units` must be ordered
-/// largest first, as [`UNITS`], [`CANONICAL_UNITS`], and [`HUMAN_UNITS`] are.
-/// Unit sizes are [`UnitSpec::nominal_milliseconds`], so the registry stays the
-/// sole ratio table. Units larger than the remaining magnitude contribute no
-/// row. Returns the rows and the sub-unit remainder in milliseconds; rendering
-/// or rounding that remainder is the caller's decision.
+/// largest first, as [`TEMPORAL_UNITS`], [`CANONICAL_UNITS`], and
+/// [`HUMAN_UNITS`] are. Unit sizes are [`UnitSpec::nominal_milliseconds`], so
+/// the registry stays the sole ratio table. Units larger than the remaining
+/// magnitude contribute no row. Returns the rows and the sub-unit remainder in
+/// milliseconds; rendering or rounding that remainder is the caller's decision.
 #[must_use]
 #[expect(
     clippy::arithmetic_side_effects,
@@ -213,13 +224,13 @@ fn whole_milliseconds(unit: TimeUnit) -> u64 {
 impl TimeUnit {
     /// Looks up a unit by its case-insensitive spelling.
     ///
-    /// Scans the alias lists in [`UNITS`] with ASCII-case-insensitive equality,
-    /// so every alias in the registry is accepted and nothing else is: an
-    /// empty, too long, or non-ASCII input matches no alias and returns
-    /// [`None`].
+    /// Scans the alias lists in [`TEMPORAL_UNITS`] with ASCII-case-insensitive
+    /// equality, so every alias in the registry is accepted and nothing
+    /// else is: an empty, too long, or non-ASCII input matches no alias and
+    /// returns [`None`].
     #[must_use]
     pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
-        UNITS
+        TEMPORAL_UNITS
             .iter()
             .find(|row| {
                 row.aliases.iter().any(|alias| alias.eq_ignore_ascii_case(unit))
@@ -229,20 +240,26 @@ impl TimeUnit {
 
     /// Returns this unit's [`UnitSpec`] row.
     ///
-    /// Listed by variant, so adding a [`TimeUnit`] variant with no [`UNITS`]
-    /// row yet fails to compile here first.
+    /// Listed by variant, so adding a [`TimeUnit`] variant with no
+    /// [`TEMPORAL_UNITS`] row yet fails to compile here first.
     #[must_use]
     pub(crate) const fn spec(self) -> &'static UnitSpec {
         match self {
-            Self::Year => &UNITS[0],
-            Self::Month => &UNITS[1],
-            Self::Week => &UNITS[2],
-            Self::Day => &UNITS[3],
-            Self::Hour => &UNITS[4],
-            Self::Minute => &UNITS[5],
-            Self::Second => &UNITS[6],
-            Self::Millisecond => &UNITS[7],
+            Self::Year => &TEMPORAL_UNITS[0],
+            Self::Month => &TEMPORAL_UNITS[1],
+            Self::Week => &TEMPORAL_UNITS[2],
+            Self::Day => &TEMPORAL_UNITS[3],
+            Self::Hour => &TEMPORAL_UNITS[4],
+            Self::Minute => &TEMPORAL_UNITS[5],
+            Self::Second => &TEMPORAL_UNITS[6],
+            Self::Millisecond => &TEMPORAL_UNITS[7],
         }
+    }
+
+    /// Returns the exact nominal nanoseconds per unit from the registry.
+    #[must_use]
+    pub(crate) const fn nominal_nanoseconds(self) -> i128 {
+        self.spec().nominal_nanoseconds
     }
 
     /// Returns the singular and plural English names for human-readable
@@ -276,7 +293,7 @@ impl TimeUnit {
 
 /// Provides a human-readable hint of accepted unit spellings.
 ///
-/// Lists one spelling per [`UNITS`] row, not every accepted alias; the
+/// Lists one spelling per [`TEMPORAL_UNITS`] row, not every accepted alias; the
 /// `invariants` tests pin that every row’s compact spelling appears here.
 pub(crate) const UNIT_SPELLINGS_HINT: &str =
     "\"years\"/\"y\", \"months\"/\"mo\", \"weeks\"/\"w\", \"days\"/\"d\", \
@@ -537,7 +554,7 @@ mod tests {
 
             // Act
             // Assert
-            for row in &UNITS {
+            for row in &TEMPORAL_UNITS {
                 assert_eq!(
                     frame(row.unit),
                     row.unit.is_calendar(),
@@ -551,10 +568,11 @@ mod tests {
         #[test]
         fn keeps_every_registry_spelling_unique() {
             // Arrange
-            let total: usize = UNITS.iter().map(|row| row.aliases.len()).sum();
+            let total: usize =
+                TEMPORAL_UNITS.iter().map(|row| row.aliases.len()).sum();
 
             // Act
-            let unique: HashSet<&str> = UNITS
+            let unique: HashSet<&str> = TEMPORAL_UNITS
                 .iter()
                 .flat_map(|row| row.aliases.iter().copied())
                 .collect();
@@ -572,7 +590,9 @@ mod tests {
             // Arrange: adjacent registry pairs are the arranged input.
             // Act
             // Assert
-            for (larger, smaller) in UNITS.iter().zip(UNITS.iter().skip(1)) {
+            for (larger, smaller) in
+                TEMPORAL_UNITS.iter().zip(TEMPORAL_UNITS.iter().skip(1))
+            {
                 assert!(
                     larger.nominal_seconds > smaller.nominal_seconds,
                     "{:?} must precede the smaller {:?}; decomposition \
@@ -584,11 +604,25 @@ mod tests {
         }
 
         #[test]
+        fn keeps_nominal_ratios_consistent_across_scales() {
+            // Assert: the nanosecond ratio is authoritative; the millisecond
+            // column must derive from it exactly.
+            for row in &TEMPORAL_UNITS {
+                assert_eq!(
+                    i128::from(row.nominal_milliseconds),
+                    row.nominal_nanoseconds / 1_000_000,
+                    "{:?} millisecond ratio must match its nanosecond ratio",
+                    row.unit
+                );
+            }
+        }
+
+        #[test]
         fn resolves_every_registered_spelling() {
             // Arrange: the registry itself is the arranged input.
             // Act
             // Assert
-            for row in &UNITS {
+            for row in &TEMPORAL_UNITS {
                 for alias in row.aliases {
                     assert_eq!(
                         TimeUnit::from_spelling(alias),
@@ -607,7 +641,7 @@ mod tests {
 
             // Act
             // Assert
-            for row in &UNITS {
+            for row in &TEMPORAL_UNITS {
                 // The first alias of every row is its compact spelling.
                 let compact =
                     row.aliases.first().expect("unit row has aliases");
@@ -638,7 +672,7 @@ mod tests {
             }
 
             // Assert
-            for row in &UNITS {
+            for row in &TEMPORAL_UNITS {
                 assert!(
                     hint_variants.contains(&row.unit),
                     "UNIT_SPELLINGS_HINT must cover {:?}",

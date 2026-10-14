@@ -1,10 +1,11 @@
 //! Defines UTC-stored Date-Times that render as the local clock.
 //!
 //! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
-//! [`ParsedDateTime`]) that turn written RFC 3339 and naive clock times into
-//! it. Written input without an offset resolves in the process's local zone and
-//! stores as UTC; every human-facing rendering converts back to the local
-//! clock. Callers hold the validated date-time or receive a [`DateError`].
+//! [`ParsedDateTimeKind`]) that turn written RFC 3339 and naive clock times
+//! into it. Written input without an offset resolves in the process's local
+//! zone and stores as UTC; every human-facing rendering converts back to the
+//! local clock. Callers hold the validated date-time or receive a
+//! [`DateError`].
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
@@ -19,7 +20,7 @@ use super::{
 
 /// Defines the canonical display format for [`DateTimeValue`]:
 /// `2026-07-29T14:30:00`.
-pub(crate) const DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
+pub(crate) const DEFAULT_DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Stores a Date-Time in UTC and renders it as the local clock.
 ///
@@ -175,7 +176,7 @@ impl DateTimeValue {
     pub(crate) fn canonical_pattern(self) -> &'static str {
         let nanoseconds = self.0.subsec_nanosecond();
         if nanoseconds == 0 {
-            DATETIME_PATTERN
+            DEFAULT_DATETIME_PATTERN
         } else if nanoseconds % 1_000_000 == 0 {
             "%Y-%m-%dT%H:%M:%S%.3f"
         } else if nanoseconds % 1_000 == 0 {
@@ -304,10 +305,10 @@ impl DateTimeValue {
             }
         })?;
         match shape {
-            ParsedDateTime::Instant(timestamp) => {
+            ParsedDateTimeKind::Instant(timestamp) => {
                 Ok(Self::from_timestamp(timestamp))
             }
-            ParsedDateTime::Unzoned(local_datetime) => {
+            ParsedDateTimeKind::Unzoned(local_datetime) => {
                 Self::from_local(local_datetime)
                     .map_err(|error| error.into_date_error(trimmed))
             }
@@ -457,7 +458,9 @@ impl DateTimeShape {
     /// # Errors
     ///
     /// Returns a static reason if no accepted date-time shape matches `s`.
-    pub(crate) fn parse_any(s: &str) -> Result<ParsedDateTime, &'static str> {
+    pub(crate) fn parse_any(
+        s: &str,
+    ) -> Result<ParsedDateTimeKind, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
         let normalized_input = normalized.as_ref();
         if normalized_input.len() <= 10 {
@@ -503,17 +506,17 @@ impl DateTimeShape {
     /// # Errors
     ///
     /// - A static reason if the input does not match this format.
-    fn parse_shape(self, s: &str) -> Result<ParsedDateTime, &'static str> {
+    fn parse_shape(self, s: &str) -> Result<ParsedDateTimeKind, &'static str> {
         match self.pattern() {
             None if !numeric_rfc3339_offset_is_valid(s) => {
                 Err("input does not match RFC 3339")
             }
             None => s
                 .parse::<Timestamp>()
-                .map(ParsedDateTime::Instant)
+                .map(ParsedDateTimeKind::Instant)
                 .map_err(|_| "input does not match RFC 3339"),
             Some(pattern) => civil::DateTime::strptime(pattern, s)
-                .map(ParsedDateTime::Unzoned)
+                .map(ParsedDateTimeKind::Unzoned)
                 .map_err(|_| "invalid input"),
         }
     }
@@ -559,9 +562,10 @@ fn numeric_rfc3339_offset_is_valid(input: &str) -> bool {
     };
     hours <= 23 && minutes <= 59
 }
+
 /// Stores the parsed date-time shape before local-zone resolution.
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum ParsedDateTime {
+pub(crate) enum ParsedDateTimeKind {
     /// Stores an explicit RFC 3339 date-time with its offset applied.
     Instant(Timestamp),
     /// Stores a naive local civil date-time that must resolve through
@@ -1111,11 +1115,11 @@ mod tests {
             // Assert
             assert!(matches!(
                 t_separated,
-                Ok(ParsedDateTime::Unzoned(parsed)) if parsed == local_datetime
+                Ok(ParsedDateTimeKind::Unzoned(parsed)) if parsed == local_datetime
             ));
             assert!(matches!(
                 space_separated,
-                Ok(ParsedDateTime::Unzoned(parsed)) if parsed == local_datetime
+                Ok(ParsedDateTimeKind::Unzoned(parsed)) if parsed == local_datetime
             ));
         }
 

@@ -10,11 +10,12 @@
 use jiff::{Span, Timestamp, civil, tz::TimeZone};
 
 use super::{
-    CalendarError, CalendarPeriod, DATE_PATTERN, DateComponent, DateDiff,
-    DateError, DateTimeValue, DateValue, DurationValue, PeriodEdge, TimeUnit,
+    CalendarError, CalendarPeriod, DEFAULT_DATE_PATTERN, DateComponent,
+    DateDiff, DateError, DateTimeValue, DateValue, DurationValue, PeriodEdge,
+    TimeUnit,
     calendar::{shift_date, shift_datetime},
     date::DateShape,
-    datetime::{DateTimeShape, ParsedDateTime},
+    datetime::{DateTimeShape, ParsedDateTimeKind},
     zone::local_zone,
 };
 
@@ -177,7 +178,7 @@ impl DatePoint {
             Self::Calendar {
                 date_precision: DatePrecision::Day,
                 ..
-            } => DATE_PATTERN,
+            } => DEFAULT_DATE_PATTERN,
             Self::DateTime(dt) => dt.canonical_pattern(),
         }
     }
@@ -530,13 +531,15 @@ impl DatePoint {
             );
         }
         match DateTimeShape::parse_any(trimmed) {
-            Ok(ParsedDateTime::Instant(instant)) => {
+            Ok(ParsedDateTimeKind::Instant(instant)) => {
                 Ok(Self::DateTime(DateTimeValue::from_timestamp(instant)))
             }
-            Ok(ParsedDateTime::Unzoned(local_datetime)) => Ok(Self::DateTime(
-                DateTimeValue::from_local(local_datetime)
-                    .map_err(|error| error.into_date_error(trimmed))?,
-            )),
+            Ok(ParsedDateTimeKind::Unzoned(local_datetime)) => {
+                Ok(Self::DateTime(
+                    DateTimeValue::from_local(local_datetime)
+                        .map_err(|error| error.into_date_error(trimmed))?,
+                ))
+            }
             Err(datetime_err) => match DateShape::parse_any(trimmed) {
                 Ok(date) => Ok(calendar_point(date)),
                 Err(date_err) => {

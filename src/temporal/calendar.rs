@@ -54,7 +54,8 @@ pub(crate) enum PeriodEdge {
 /// Shared by query-filter name resolution and template-filter registration,
 /// preventing the two surfaces from drifting. Names are matched
 /// ASCII-case-insensitively and are unique.
-pub(crate) const PERIOD_SHORTHANDS: [(&str, CalendarPeriod, PeriodEdge); 12] = [
+pub(crate) const CALENDAR_PERIOD_EDGES: [(&str, CalendarPeriod, PeriodEdge);
+    12] = [
     ("sow", CalendarPeriod::Week, PeriodEdge::Start),
     ("start_of_week", CalendarPeriod::Week, PeriodEdge::Start),
     ("eow", CalendarPeriod::Week, PeriodEdge::End),
@@ -160,8 +161,7 @@ pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
     }
 }
 
-/// Shifts a calendar date by `n` in the chosen `unit` and returns the
-/// result.
+/// Shifts a calendar date by `n` in the chosen `unit` and returns the result.
 ///
 /// Calendar units shift calendar days; month and year shifts clamp to the last
 /// day of the target month. Exact units shift elapsed time, so the date moves
@@ -182,8 +182,7 @@ pub(super) fn shift_date(
         .map_err(|_| CalendarError::OutOfRange)
 }
 
-/// Shifts a civil datetime by `n` in the chosen `unit` and returns the
-/// result.
+/// Shifts a civil datetime by `n` in the chosen `unit` and returns the result.
 ///
 /// Calendar units shift calendar days; month and year shifts clamp to the last
 /// day of the target month. Exact units shift elapsed clock time without
@@ -417,7 +416,7 @@ mod tests {
             // Act
             // Assert
             assert_eq!(
-                PERIOD_SHORTHANDS.len(),
+                CALENDAR_PERIOD_EDGES.len(),
                 12,
                 "three periods by two edges by short and long spelling"
             );
@@ -426,11 +425,13 @@ mod tests {
         #[test]
         fn keeps_every_name_unique() {
             // Arrange
-            let total = PERIOD_SHORTHANDS.len();
+            let total = CALENDAR_PERIOD_EDGES.len();
 
             // Act
-            let unique: HashSet<&str> =
-                PERIOD_SHORTHANDS.iter().map(|&(name, _, _)| name).collect();
+            let unique: HashSet<&str> = CALENDAR_PERIOD_EDGES
+                .iter()
+                .map(|&(name, _, _)| name)
+                .collect();
 
             // Assert
             assert_eq!(
@@ -484,7 +485,7 @@ mod tests {
         ) {
             // Arrange: the expected row is declared in the case.
             // Act
-            let actual = PERIOD_SHORTHANDS
+            let actual = CALENDAR_PERIOD_EDGES
                 .iter()
                 .find(|&&(candidate, _, _)| {
                     candidate.eq_ignore_ascii_case(name)
@@ -516,7 +517,7 @@ mod tests {
         ) {
             // Arrange: the rows of one period are the arranged input.
             // Act
-            let mut names: Vec<&str> = PERIOD_SHORTHANDS
+            let mut names: Vec<&str> = CALENDAR_PERIOD_EDGES
                 .iter()
                 .filter(|&&(_, p, _)| p == period)
                 .map(|&(name, _, _)| name)

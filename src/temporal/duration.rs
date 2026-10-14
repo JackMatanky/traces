@@ -38,14 +38,8 @@ use super::{
     unit::{CANONICAL_UNITS, HUMAN_UNITS, TimeUnit, decompose},
 };
 
-const NANOS_PER_YEAR: i128 = 365 * 86_400 * 1_000_000_000;
-const NANOS_PER_MONTH: i128 = 30 * 86_400 * 1_000_000_000;
-const NANOS_PER_WEEK: i128 = 7 * 86_400 * 1_000_000_000;
-const NANOS_PER_DAY: i128 = 86_400 * 1_000_000_000;
-const NANOS_PER_HOUR: i128 = 3_600 * 1_000_000_000;
-const NANOS_PER_MINUTE: i128 = 60 * 1_000_000_000;
-const NANOS_PER_SECOND: i128 = 1_000_000_000;
-const NANOS_PER_MILLI: i128 = 1_000_000;
+/// Nanoseconds per microsecond: a sub-second conversion factor with no
+/// registry row; all registered unit ratios come from `TEMPORAL_UNITS`.
 const NANOS_PER_MICRO: i128 = 1_000;
 
 const MAX_NOMINAL_SECONDS: f64 = 631_107_417_600.0;
@@ -109,14 +103,20 @@ impl DurationValue {
     )]
     pub(crate) fn nominal_nanoseconds(&self) -> i128 {
         let span = self.0;
-        i128::from(span.get_years()) * NANOS_PER_YEAR
-            + i128::from(span.get_months()) * NANOS_PER_MONTH
-            + i128::from(span.get_weeks()) * NANOS_PER_WEEK
-            + i128::from(span.get_days()) * NANOS_PER_DAY
-            + i128::from(span.get_hours()) * NANOS_PER_HOUR
-            + i128::from(span.get_minutes()) * NANOS_PER_MINUTE
-            + i128::from(span.get_seconds()) * NANOS_PER_SECOND
-            + i128::from(span.get_milliseconds()) * NANOS_PER_MILLI
+        i128::from(span.get_years()) * TimeUnit::Year.nominal_nanoseconds()
+            + i128::from(span.get_months())
+                * TimeUnit::Month.nominal_nanoseconds()
+            + i128::from(span.get_weeks())
+                * TimeUnit::Week.nominal_nanoseconds()
+            + i128::from(span.get_days()) * TimeUnit::Day.nominal_nanoseconds()
+            + i128::from(span.get_hours())
+                * TimeUnit::Hour.nominal_nanoseconds()
+            + i128::from(span.get_minutes())
+                * TimeUnit::Minute.nominal_nanoseconds()
+            + i128::from(span.get_seconds())
+                * TimeUnit::Second.nominal_nanoseconds()
+            + i128::from(span.get_milliseconds())
+                * TimeUnit::Millisecond.nominal_nanoseconds()
             + i128::from(span.get_microseconds()) * NANOS_PER_MICRO
             + i128::from(span.get_nanoseconds())
     }

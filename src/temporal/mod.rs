@@ -40,12 +40,12 @@ mod point;
 mod unit;
 mod zone;
 pub(crate) use calendar::{
-    CalendarPeriod, DateComponent, DateDiff, PERIOD_SHORTHANDS, PeriodEdge,
+    CALENDAR_PERIOD_EDGES, CalendarPeriod, DateComponent, DateDiff, PeriodEdge,
     weekday_from_number,
 };
-pub(crate) use date::DATE_PATTERN;
+pub(crate) use date::DEFAULT_DATE_PATTERN;
 pub use date::DateValue;
-pub(crate) use datetime::DATETIME_PATTERN;
+pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
 pub use datetime::DateTimeValue;
 pub use duration::DurationValue;
 pub(crate) use error::CalendarError;

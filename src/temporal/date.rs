@@ -3,8 +3,8 @@
 //! Owns [`DateValue`] and the ISO recognition shape ([`DateShape`]) that turns
 //! written `YYYY-MM-DD` and `YYYY-MM` input into it. Every accepted input year
 //! is exactly four ASCII digits, and a parsed value always names a real day on
-//! the proleptic Gregorian calendar. Callers hold the validated date or
-//! receive a [`DateError`].
+//! the proleptic Gregorian calendar. Callers hold the validated date or receive
+//! a [`DateError`].
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
@@ -18,7 +18,7 @@ use super::{
 };
 
 /// Defines the canonical display format for [`DateValue`]: `2026-07-29`.
-pub(crate) const DATE_PATTERN: &str = "%Y-%m-%d";
+pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
 
 /// Represents a zone-free calendar date with no time of day.
 ///
