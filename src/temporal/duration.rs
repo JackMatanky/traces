@@ -104,67 +104,6 @@ const PRINTER: SpanPrinter = SpanPrinter::new()
 pub struct DurationValue(Span);
 
 impl DurationValue {
-    /// Returns the underlying Jiff [`Span`].
-    #[inline]
-    #[must_use]
-    pub(crate) const fn span(self) -> Span {
-        self.0
-    }
-
-    /// Wraps an existing Jiff [`Span`].
-    #[cfg(test)]
-    #[inline]
-    #[must_use]
-    pub(crate) const fn from_span(span: Span) -> Self {
-        Self(span)
-    }
-
-    /// Returns the exact nominal duration in integer nanoseconds.
-    #[inline]
-    #[must_use]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "bounded Span unit values safely convert and sum into i128 \
-                  nanoseconds"
-    )]
-    pub(crate) fn nominal_nanoseconds(&self) -> i128 {
-        let span = self.0;
-        i128::from(span.get_years()) * TimeUnit::Year.nominal_nanoseconds()
-            + i128::from(span.get_months())
-                * TimeUnit::Month.nominal_nanoseconds()
-            + i128::from(span.get_weeks())
-                * TimeUnit::Week.nominal_nanoseconds()
-            + i128::from(span.get_days()) * TimeUnit::Day.nominal_nanoseconds()
-            + i128::from(span.get_hours())
-                * TimeUnit::Hour.nominal_nanoseconds()
-            + i128::from(span.get_minutes())
-                * TimeUnit::Minute.nominal_nanoseconds()
-            + i128::from(span.get_seconds())
-                * TimeUnit::Second.nominal_nanoseconds()
-            + i128::from(span.get_milliseconds())
-                * TimeUnit::Millisecond.nominal_nanoseconds()
-            + i128::from(span.get_microseconds()) * NANOS_PER_MICRO
-            + i128::from(span.get_nanoseconds())
-    }
-
-    /// Returns the nominal duration in seconds as an `f64` value.
-    #[inline]
-    #[must_use]
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_precision_loss,
-        reason = "lossless float conversion of nanoseconds within \
-                  representable range"
-    )]
-    pub(crate) fn nominal_seconds(&self) -> f64 {
-        let nanos = self.nominal_nanoseconds();
-        if nanos == 0 {
-            0.0
-        } else {
-            (nanos as f64) / 1_000_000_000.0
-        }
-    }
-
     /// Synthesizes a canonical [`DurationValue`] from a nominal seconds value.
     ///
     /// # Errors
@@ -299,177 +238,6 @@ impl DurationValue {
     /// Parses a duration prefix from `input`, returning its spanned extent.
     pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
         crate::lexer::lex_prefix(input, Self::scan_prefix)
-    }
-
-    #[expect(
-        clippy::indexing_slicing,
-        clippy::arithmetic_side_effects,
-        reason = "bounded cursor movement and lookaheads"
-    )]
-    fn scan_prefix(input: &str) -> Option<(Self, usize)> {
-        let bytes = input.as_bytes();
-        let mut pos = 0;
-        if bytes.is_empty() {
-            return None;
-        }
-
-        let first = *bytes.first()?;
-        if first == b'+' || first == b'-' {
-            pos = 1;
-            let next = *bytes.get(pos)?;
-            if !next.is_ascii_digit() && next != b'.' {
-                return None;
-            }
-        }
-
-        let mut has_digit = false;
-        let mut has_dot = false;
-        while let Some(&b) = bytes.get(pos) {
-            if b.is_ascii_digit() {
-                has_digit = true;
-                pos += 1;
-            } else if b == b'.' && !has_dot {
-                has_dot = true;
-                pos += 1;
-            } else {
-                break;
-            }
-        }
-        if !has_digit {
-            return None;
-        }
-
-        while bytes.get(pos).is_some_and(u8::is_ascii_whitespace) {
-            pos += 1;
-        }
-
-        let unit_start = pos;
-        while bytes.get(pos).is_some_and(u8::is_ascii_alphabetic) {
-            pos += 1;
-        }
-        if unit_start == pos {
-            return None;
-        }
-        let mut last_end = pos;
-
-        loop {
-            let mut next_pos = last_end;
-            let mut has_ws = false;
-            while bytes.get(next_pos).is_some_and(u8::is_ascii_whitespace) {
-                has_ws = true;
-                next_pos += 1;
-            }
-
-            if next_pos >= bytes.len() {
-                break;
-            }
-
-            let next_byte = bytes[next_pos];
-            if next_byte == b'+' || next_byte == b'-' {
-                return None;
-            }
-
-            let starts_num = next_byte.is_ascii_digit()
-                || (next_byte == b'.'
-                    && bytes.get(next_pos + 1).is_some_and(u8::is_ascii_digit));
-
-            if !starts_num {
-                break;
-            }
-
-            if !has_ws && !bytes[last_end - 1].is_ascii_alphabetic() {
-                break;
-            }
-
-            let mut cur = next_pos;
-            let mut num_digit = false;
-            let mut num_dot = false;
-            while let Some(&b) = bytes.get(cur) {
-                if b.is_ascii_digit() {
-                    num_digit = true;
-                    cur += 1;
-                } else if b == b'.' && !num_dot {
-                    num_dot = true;
-                    cur += 1;
-                } else {
-                    break;
-                }
-            }
-            if !num_digit {
-                break;
-            }
-
-            while bytes.get(cur).is_some_and(u8::is_ascii_whitespace) {
-                cur += 1;
-            }
-
-            let comp_unit_start = cur;
-            while bytes.get(cur).is_some_and(u8::is_ascii_alphabetic) {
-                cur += 1;
-            }
-            if comp_unit_start == cur {
-                break;
-            }
-
-            last_end = cur;
-        }
-
-        let candidate = input.get(..last_end)?;
-        let dv = Self::parse(candidate).ok()?;
-        Some((dv, last_end))
-    }
-
-    /// Renders this duration as a comma-separated English magnitude.
-    #[must_use]
-    pub(crate) fn to_compound_string(self) -> String {
-        use std::fmt::Write as _;
-
-        let total_secs = self.nominal_seconds();
-        if total_secs == 0.0 || total_secs.is_nan() {
-            return "0 seconds".to_owned();
-        }
-        let Some(total_ms) = (total_secs.abs() * 1_000.0).round().to_u64()
-        else {
-            return format!("{total_secs:e} seconds");
-        };
-        if total_ms == 0 {
-            return "< 1 millisecond".to_owned();
-        }
-        let is_negative = total_secs < 0.0;
-
-        let (parts, remainder_ms) = decompose(total_ms, &COMPOUND_FORMAT_ORDER);
-        let mut text = String::new();
-        for part in parts {
-            let (singular, plural) = part.unit.human_names();
-            let name = if part.count == 1 {
-                singular
-            } else {
-                plural
-            };
-            if !text.is_empty() {
-                text.push_str(", ");
-            }
-            let _ = write!(text, "{} {name}", part.count);
-        }
-        if remainder_ms > 0 {
-            let name = if remainder_ms == 1 {
-                "millisecond"
-            } else {
-                "milliseconds"
-            };
-            if !text.is_empty() {
-                text.push_str(", ");
-            }
-            let _ = write!(text, "{remainder_ms} {name}");
-        }
-
-        if text.is_empty() {
-            return "< 1 millisecond".to_owned();
-        }
-        if is_negative {
-            text.insert(0, '-');
-        }
-        text
     }
 
     /// Adds two durations using field-by-field arithmetic.
@@ -681,6 +449,238 @@ impl DurationValue {
         Ok(Self(self.0.negate()))
     }
 
+    /// Renders this duration as a comma-separated English magnitude.
+    #[must_use]
+    pub(crate) fn to_compound_string(self) -> String {
+        use std::fmt::Write as _;
+
+        let total_secs = self.nominal_seconds();
+        if total_secs == 0.0 || total_secs.is_nan() {
+            return "0 seconds".to_owned();
+        }
+        let Some(total_ms) = (total_secs.abs() * 1_000.0).round().to_u64()
+        else {
+            return format!("{total_secs:e} seconds");
+        };
+        if total_ms == 0 {
+            return "< 1 millisecond".to_owned();
+        }
+        let is_negative = total_secs < 0.0;
+
+        let (parts, remainder_ms) = decompose(total_ms, &COMPOUND_FORMAT_ORDER);
+        let mut text = String::new();
+        for part in parts {
+            let (singular, plural) = part.unit.human_names();
+            let name = if part.count == 1 {
+                singular
+            } else {
+                plural
+            };
+            if !text.is_empty() {
+                text.push_str(", ");
+            }
+            let _ = write!(text, "{} {name}", part.count);
+        }
+        if remainder_ms > 0 {
+            let name = if remainder_ms == 1 {
+                "millisecond"
+            } else {
+                "milliseconds"
+            };
+            if !text.is_empty() {
+                text.push_str(", ");
+            }
+            let _ = write!(text, "{remainder_ms} {name}");
+        }
+
+        if text.is_empty() {
+            return "< 1 millisecond".to_owned();
+        }
+        if is_negative {
+            text.insert(0, '-');
+        }
+        text
+    }
+
+    /// Returns the exact nominal duration in integer nanoseconds.
+    #[inline]
+    #[must_use]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bounded Span unit values safely convert and sum into i128 \
+                  nanoseconds"
+    )]
+    pub(crate) fn nominal_nanoseconds(&self) -> i128 {
+        let span = self.0;
+        i128::from(span.get_years()) * TimeUnit::Year.nominal_nanoseconds()
+            + i128::from(span.get_months())
+                * TimeUnit::Month.nominal_nanoseconds()
+            + i128::from(span.get_weeks())
+                * TimeUnit::Week.nominal_nanoseconds()
+            + i128::from(span.get_days()) * TimeUnit::Day.nominal_nanoseconds()
+            + i128::from(span.get_hours())
+                * TimeUnit::Hour.nominal_nanoseconds()
+            + i128::from(span.get_minutes())
+                * TimeUnit::Minute.nominal_nanoseconds()
+            + i128::from(span.get_seconds())
+                * TimeUnit::Second.nominal_nanoseconds()
+            + i128::from(span.get_milliseconds())
+                * TimeUnit::Millisecond.nominal_nanoseconds()
+            + i128::from(span.get_microseconds()) * NANOS_PER_MICRO
+            + i128::from(span.get_nanoseconds())
+    }
+
+    /// Returns the nominal duration in seconds as an `f64` value.
+    #[inline]
+    #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_precision_loss,
+        reason = "lossless float conversion of nanoseconds within \
+                  representable range"
+    )]
+    pub(crate) fn nominal_seconds(&self) -> f64 {
+        let nanos = self.nominal_nanoseconds();
+        if nanos == 0 {
+            0.0
+        } else {
+            (nanos as f64) / 1_000_000_000.0
+        }
+    }
+
+    /// Returns the underlying Jiff [`Span`].
+    #[inline]
+    #[must_use]
+    pub(crate) const fn span(self) -> Span {
+        self.0
+    }
+
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects,
+        reason = "bounded cursor movement and lookaheads"
+    )]
+    fn scan_prefix(input: &str) -> Option<(Self, usize)> {
+        let bytes = input.as_bytes();
+        let mut pos = 0;
+        if bytes.is_empty() {
+            return None;
+        }
+
+        let first = *bytes.first()?;
+        if first == b'+' || first == b'-' {
+            pos = 1;
+            let next = *bytes.get(pos)?;
+            if !next.is_ascii_digit() && next != b'.' {
+                return None;
+            }
+        }
+
+        let mut has_digit = false;
+        let mut has_dot = false;
+        while let Some(&b) = bytes.get(pos) {
+            if b.is_ascii_digit() {
+                has_digit = true;
+                pos += 1;
+            } else if b == b'.' && !has_dot {
+                has_dot = true;
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+        if !has_digit {
+            return None;
+        }
+
+        while bytes.get(pos).is_some_and(u8::is_ascii_whitespace) {
+            pos += 1;
+        }
+
+        let unit_start = pos;
+        while bytes.get(pos).is_some_and(u8::is_ascii_alphabetic) {
+            pos += 1;
+        }
+        if unit_start == pos {
+            return None;
+        }
+        let mut last_end = pos;
+
+        loop {
+            let mut next_pos = last_end;
+            let mut has_ws = false;
+            while bytes.get(next_pos).is_some_and(u8::is_ascii_whitespace) {
+                has_ws = true;
+                next_pos += 1;
+            }
+
+            if next_pos >= bytes.len() {
+                break;
+            }
+
+            let next_byte = bytes[next_pos];
+            if next_byte == b'+' || next_byte == b'-' {
+                return None;
+            }
+
+            let starts_num = next_byte.is_ascii_digit()
+                || (next_byte == b'.'
+                    && bytes.get(next_pos + 1).is_some_and(u8::is_ascii_digit));
+
+            if !starts_num {
+                break;
+            }
+
+            if !has_ws && !bytes[last_end - 1].is_ascii_alphabetic() {
+                break;
+            }
+
+            let mut cur = next_pos;
+            let mut num_digit = false;
+            let mut num_dot = false;
+            while let Some(&b) = bytes.get(cur) {
+                if b.is_ascii_digit() {
+                    num_digit = true;
+                    cur += 1;
+                } else if b == b'.' && !num_dot {
+                    num_dot = true;
+                    cur += 1;
+                } else {
+                    break;
+                }
+            }
+            if !num_digit {
+                break;
+            }
+
+            while bytes.get(cur).is_some_and(u8::is_ascii_whitespace) {
+                cur += 1;
+            }
+
+            let comp_unit_start = cur;
+            while bytes.get(cur).is_some_and(u8::is_ascii_alphabetic) {
+                cur += 1;
+            }
+            if comp_unit_start == cur {
+                break;
+            }
+
+            last_end = cur;
+        }
+
+        let candidate = input.get(..last_end)?;
+        let dv = Self::parse(candidate).ok()?;
+        Some((dv, last_end))
+    }
+
+    /// Wraps an existing Jiff [`Span`].
+    #[cfg(test)]
+    #[inline]
+    #[must_use]
+    pub(crate) const fn from_span(span: Span) -> Self {
+        Self(span)
+    }
+
     /// Returns the written components that witness the regime.
     #[cfg(test)]
     #[inline]
@@ -753,6 +753,125 @@ impl DurationValue {
             || self.0.get_months() != 0
             || self.0.get_weeks() != 0
             || self.0.get_days() != 0
+    }
+}
+
+impl fmt::Display for DurationValue {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        PRINTER
+            .print_span(&self.0, jiff::fmt::StdFmtWrite(f))
+            .map_err(|_| fmt::Error)
+    }
+}
+
+impl FromStr for DurationValue {
+    type Err = DurationError;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s)
+    }
+}
+
+impl PartialEq for DurationValue {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.nominal_nanoseconds() == other.nominal_nanoseconds()
+    }
+}
+
+impl Eq for DurationValue {}
+
+impl PartialOrd for DurationValue {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DurationValue {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.nominal_nanoseconds().cmp(&other.nominal_nanoseconds())
+    }
+}
+
+impl Hash for DurationValue {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.nominal_nanoseconds().hash(state);
+    }
+}
+
+impl Add for DurationValue {
+    type Output = Result<Self, DurationError>;
+
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        self.checked_add(rhs)
+    }
+}
+
+impl Sub for DurationValue {
+    type Output = Result<Self, DurationError>;
+
+    #[inline]
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.checked_sub(rhs)
+    }
+}
+
+impl Mul<f64> for DurationValue {
+    type Output = Result<Self, DurationError>;
+
+    #[inline]
+    fn mul(self, rhs: f64) -> Self::Output {
+        self.checked_mul(rhs)
+    }
+}
+
+impl Mul<i64> for DurationValue {
+    type Output = Result<Self, DurationError>;
+
+    #[inline]
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_precision_loss,
+        reason = "scale factor converted to float for checked multiplication"
+    )]
+    fn mul(self, rhs: i64) -> Self::Output {
+        self.checked_mul(rhs as f64)
+    }
+}
+
+impl Neg for DurationValue {
+    type Output = Self;
+
+    #[inline]
+    fn neg(self) -> Self {
+        Self(self.0.negate())
+    }
+}
+
+impl Serialize for DurationValue {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for DurationValue {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = Cow::<'de, str>::deserialize(deserializer)?;
+        Self::parse(&s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -934,125 +1053,6 @@ fn classify_jiff_error(input: &str, err: jiff::Error) -> DurationError {
     }
     DurationError::UnknownUnit
 }
-
-impl fmt::Display for DurationValue {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        PRINTER
-            .print_span(&self.0, jiff::fmt::StdFmtWrite(f))
-            .map_err(|_| fmt::Error)
-    }
-}
-
-impl FromStr for DurationValue {
-    type Err = DurationError;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s)
-    }
-}
-
-impl PartialEq for DurationValue {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.nominal_nanoseconds() == other.nominal_nanoseconds()
-    }
-}
-
-impl Eq for DurationValue {}
-
-impl PartialOrd for DurationValue {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for DurationValue {
-    #[inline]
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.nominal_nanoseconds().cmp(&other.nominal_nanoseconds())
-    }
-}
-
-impl Hash for DurationValue {
-    #[inline]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.nominal_nanoseconds().hash(state);
-    }
-}
-
-impl Serialize for DurationValue {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_str(self)
-    }
-}
-
-impl<'de> Deserialize<'de> for DurationValue {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = Cow::<'de, str>::deserialize(deserializer)?;
-        Self::parse(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-impl Add for DurationValue {
-    type Output = Result<Self, DurationError>;
-
-    #[inline]
-    fn add(self, rhs: Self) -> Self::Output {
-        self.checked_add(rhs)
-    }
-}
-
-impl Sub for DurationValue {
-    type Output = Result<Self, DurationError>;
-
-    #[inline]
-    fn sub(self, rhs: Self) -> Self::Output {
-        self.checked_sub(rhs)
-    }
-}
-
-impl Mul<f64> for DurationValue {
-    type Output = Result<Self, DurationError>;
-
-    #[inline]
-    fn mul(self, rhs: f64) -> Self::Output {
-        self.checked_mul(rhs)
-    }
-}
-
-impl Mul<i64> for DurationValue {
-    type Output = Result<Self, DurationError>;
-
-    #[inline]
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_precision_loss,
-        reason = "scale factor converted to float for checked multiplication"
-    )]
-    fn mul(self, rhs: i64) -> Self::Output {
-        self.checked_mul(rhs as f64)
-    }
-}
-impl Neg for DurationValue {
-    type Output = Self;
-
-    #[inline]
-    fn neg(self) -> Self {
-        Self(self.0.negate())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -1372,150 +1372,6 @@ mod tests {
         }
     }
 
-    mod formatting {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-        #[rstest]
-        #[case::zero(0.0, "0s")]
-        #[case::negative(-5_400.0, "-1h 30m")]
-        #[case::sub_second(0.5, "500ms")]
-        #[case::compound_calendar(2.0f64.mul_add(2_592_000.0, 31_536_000.0), "1y 2mo")]
-        #[case::mixed(
-            31_536_000.0 + 2_592_000.0 + 86_400.0 + 3_600.0 + 60.0 + 1.0,
-            "1y 1mo 1d 1h 1m 1s"
-        )]
-        fn formats_durations_canonically(
-            #[case] raw_secs: f64,
-            #[case] expected: &str,
-        ) {
-            #[expect(
-                clippy::float_cmp,
-                reason = "case literals compare exactly against themselves"
-            )]
-            let duration = if raw_secs
-                == 2.0f64.mul_add(2_592_000.0, 31_536_000.0)
-            {
-                DurationValue::parse("1y 2mo").unwrap()
-            } else if raw_secs
-                == 31_536_000.0 + 2_592_000.0 + 86_400.0 + 3_600.0 + 60.0 + 1.0
-            {
-                DurationValue::parse("1y 1mo 1d 1h 1m 1s").unwrap()
-            } else {
-                synthesized(raw_secs)
-            };
-            assert_eq!(duration.to_string(), expected);
-        }
-    }
-
-    mod serialization {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-        #[rstest]
-        #[case::simple("1h 30m")]
-        #[case::negative("-1h 30m")]
-        #[case::zero("0s")]
-        fn serializes_to_canonical_string(#[case] input: &str) {
-            let duration = DurationValue::parse(input).expect("valid duration");
-            let json = serde_json::to_string(&duration).expect("serializes");
-            assert_eq!(json, format!("\"{input}\""));
-        }
-    }
-
-    mod deserialization {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-        #[test]
-        fn accepts_valid_string() {
-            let json = "\"1h 30m\"";
-            let duration: DurationValue =
-                serde_json::from_str(json).expect("deserializes");
-            assert_eq!(duration, DurationValue::parse("1h 30m").unwrap());
-        }
-
-        #[test]
-        fn rejects_non_string_scalar() {
-            let json = "42";
-            let result: Result<DurationValue, _> = serde_json::from_str(json);
-            assert!(result.is_err());
-        }
-
-        #[test]
-        fn rejects_invalid_string() {
-            let json = "\"invalid\"";
-            let result: Result<DurationValue, _> = serde_json::from_str(json);
-            assert!(result.is_err());
-        }
-    }
-
-    mod equality {
-        use pretty_assertions::{assert_eq, assert_ne};
-
-        use super::*;
-        #[test]
-        fn compares_by_nominal_nanoseconds() {
-            let a = DurationValue::parse("1h 30m").unwrap();
-            let b = DurationValue::parse("90m").unwrap();
-            assert_eq!(a, b);
-
-            let day = DurationValue::parse("1d").unwrap();
-            let hours = DurationValue::parse("24h").unwrap();
-            assert_eq!(day, hours);
-
-            let month = DurationValue::parse("1mo").unwrap();
-            let days30 = DurationValue::parse("30d").unwrap();
-            assert_eq!(month, days30);
-
-            let zero_pos = DurationValue::parse("0s").unwrap();
-            let zero_neg = DurationValue::parse("-0s").unwrap();
-            assert_eq!(zero_pos, zero_neg);
-
-            assert_ne!(a, day);
-        }
-    }
-
-    mod ordering {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-        #[test]
-        fn orders_consistently_with_equality() {
-            let neg = DurationValue::parse("-1h").unwrap();
-            let zero = DurationValue::parse("0s").unwrap();
-            let pos = DurationValue::parse("1h").unwrap();
-
-            assert!(neg < zero);
-            assert!(zero < pos);
-            assert!(neg < pos);
-
-            let month = DurationValue::parse("1mo").unwrap();
-            let days30 = DurationValue::parse("30d").unwrap();
-            assert_eq!(month.cmp(&days30), Ordering::Equal);
-        }
-    }
-
-    mod hashing {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-        #[test]
-        fn equal_durations_hash_identically() {
-            let a = DurationValue::parse("1h 30m").unwrap();
-            let b = DurationValue::parse("90m").unwrap();
-            assert_eq!(hash_val(&a), hash_val(&b));
-
-            let day = DurationValue::parse("1d").unwrap();
-            let hours = DurationValue::parse("24h").unwrap();
-            assert_eq!(hash_val(&day), hash_val(&hours));
-
-            let month = DurationValue::parse("1mo").unwrap();
-            let days30 = DurationValue::parse("30d").unwrap();
-            assert_eq!(hash_val(&month), hash_val(&days30));
-        }
-    }
-
     mod arithmetic {
         use pretty_assertions::assert_eq;
 
@@ -1606,6 +1462,150 @@ mod tests {
                 dur.checked_mul(f64::NAN),
                 Err(DurationError::NonFiniteSeconds)
             ));
+        }
+    }
+
+    mod equality {
+        use pretty_assertions::{assert_eq, assert_ne};
+
+        use super::*;
+        #[test]
+        fn compares_by_nominal_nanoseconds() {
+            let a = DurationValue::parse("1h 30m").unwrap();
+            let b = DurationValue::parse("90m").unwrap();
+            assert_eq!(a, b);
+
+            let day = DurationValue::parse("1d").unwrap();
+            let hours = DurationValue::parse("24h").unwrap();
+            assert_eq!(day, hours);
+
+            let month = DurationValue::parse("1mo").unwrap();
+            let days30 = DurationValue::parse("30d").unwrap();
+            assert_eq!(month, days30);
+
+            let zero_pos = DurationValue::parse("0s").unwrap();
+            let zero_neg = DurationValue::parse("-0s").unwrap();
+            assert_eq!(zero_pos, zero_neg);
+
+            assert_ne!(a, day);
+        }
+    }
+
+    mod ordering {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        #[test]
+        fn orders_consistently_with_equality() {
+            let neg = DurationValue::parse("-1h").unwrap();
+            let zero = DurationValue::parse("0s").unwrap();
+            let pos = DurationValue::parse("1h").unwrap();
+
+            assert!(neg < zero);
+            assert!(zero < pos);
+            assert!(neg < pos);
+
+            let month = DurationValue::parse("1mo").unwrap();
+            let days30 = DurationValue::parse("30d").unwrap();
+            assert_eq!(month.cmp(&days30), Ordering::Equal);
+        }
+    }
+
+    mod hashing {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        #[test]
+        fn equal_durations_hash_identically() {
+            let a = DurationValue::parse("1h 30m").unwrap();
+            let b = DurationValue::parse("90m").unwrap();
+            assert_eq!(hash_val(&a), hash_val(&b));
+
+            let day = DurationValue::parse("1d").unwrap();
+            let hours = DurationValue::parse("24h").unwrap();
+            assert_eq!(hash_val(&day), hash_val(&hours));
+
+            let month = DurationValue::parse("1mo").unwrap();
+            let days30 = DurationValue::parse("30d").unwrap();
+            assert_eq!(hash_val(&month), hash_val(&days30));
+        }
+    }
+
+    mod formatting {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        #[rstest]
+        #[case::zero(0.0, "0s")]
+        #[case::negative(-5_400.0, "-1h 30m")]
+        #[case::sub_second(0.5, "500ms")]
+        #[case::compound_calendar(2.0f64.mul_add(2_592_000.0, 31_536_000.0), "1y 2mo")]
+        #[case::mixed(
+            31_536_000.0 + 2_592_000.0 + 86_400.0 + 3_600.0 + 60.0 + 1.0,
+            "1y 1mo 1d 1h 1m 1s"
+        )]
+        fn formats_durations_canonically(
+            #[case] raw_secs: f64,
+            #[case] expected: &str,
+        ) {
+            #[expect(
+                clippy::float_cmp,
+                reason = "case literals compare exactly against themselves"
+            )]
+            let duration = if raw_secs
+                == 2.0f64.mul_add(2_592_000.0, 31_536_000.0)
+            {
+                DurationValue::parse("1y 2mo").unwrap()
+            } else if raw_secs
+                == 31_536_000.0 + 2_592_000.0 + 86_400.0 + 3_600.0 + 60.0 + 1.0
+            {
+                DurationValue::parse("1y 1mo 1d 1h 1m 1s").unwrap()
+            } else {
+                synthesized(raw_secs)
+            };
+            assert_eq!(duration.to_string(), expected);
+        }
+    }
+
+    mod serialization {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        #[rstest]
+        #[case::simple("1h 30m")]
+        #[case::negative("-1h 30m")]
+        #[case::zero("0s")]
+        fn serializes_to_canonical_string(#[case] input: &str) {
+            let duration = DurationValue::parse(input).expect("valid duration");
+            let json = serde_json::to_string(&duration).expect("serializes");
+            assert_eq!(json, format!("\"{input}\""));
+        }
+    }
+
+    mod deserialization {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        #[test]
+        fn accepts_valid_string() {
+            let json = "\"1h 30m\"";
+            let duration: DurationValue =
+                serde_json::from_str(json).expect("deserializes");
+            assert_eq!(duration, DurationValue::parse("1h 30m").unwrap());
+        }
+
+        #[test]
+        fn rejects_non_string_scalar() {
+            let json = "42";
+            let result: Result<DurationValue, _> = serde_json::from_str(json);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn rejects_invalid_string() {
+            let json = "\"invalid\"";
+            let result: Result<DurationValue, _> = serde_json::from_str(json);
+            assert!(result.is_err());
         }
     }
 

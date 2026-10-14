@@ -1,11 +1,10 @@
 //! Defines UTC-stored Date-Times that render as the local clock.
 //!
 //! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
-//! [`DateTimeInput`]) that turn written RFC 3339 and naive clock times
-//! into it. Written input without an offset resolves in the process's local
-//! zone and stores as UTC; every human-facing rendering converts back to the
-//! local clock. Callers hold the validated date-time or receive a
-//! [`DateError`].
+//! [`DateTimeInput`]) that turn written RFC 3339 and naive clock times into it.
+//! Written input without an offset resolves in the process's local zone and
+//! stores as UTC; every human-facing rendering converts back to the local
+//! clock. Callers hold the validated date-time or receive a [`DateError`].
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
@@ -105,11 +104,78 @@ impl DateTimeValue {
         Self(timestamp)
     }
 
-    /// Returns the exact elapsed time from `earlier` to this value.
+    /// Resolves a naive local clock time under Jiff's compatible DST policy.
+    ///
+    /// Ambiguous fall-back times choose their earlier occurrence;
+    /// spring-forward gaps shift forward by the gap length.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::Zone`] if process-local time-zone discovery fails.
+    /// - [`CalendarError::OutOfRange`] if the resolved local time falls outside
+    ///   Jiff's supported timestamp range.
+    pub(super) fn from_local(
+        local_datetime: civil::DateTime,
+    ) -> Result<Self, CalendarError> {
+        let zone = local_zone().map_err(|error| CalendarError::Zone {
+            input: error.to_string().into(),
+        })?;
+        Self::from_local_in(local_datetime, &zone)
+    }
+
+    /// Resolves a naive local clock time in the explicitly supplied zone.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the supplied zone shifts the local
+    ///   time outside Jiff's supported timestamp range.
+    pub(super) fn from_local_in(
+        local_datetime: civil::DateTime,
+        zone: &TimeZone,
+    ) -> Result<Self, CalendarError> {
+        local_datetime
+            .to_zoned(zone.clone())
+            .map(|zoned| Self(zoned.timestamp()))
+            .map_err(|_| CalendarError::OutOfRange)
+    }
+
+    /// Parses an RFC 3339 or ISO-8601 date-time string using
+    /// [`DateTimeShape::ALL`].
+    ///
+    /// Surrounding whitespace is ignored. The cascade matches shapes only: a
+    /// matched naive input then resolves through [`DateTimeValue::from_local`]
+    /// (an explicit-offset input already carries an offset and stores
+    /// directly). Resolution runs once after the cascade, because a resolution
+    /// failure must not retry later formats.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
+    ///   digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
+    /// - [`DateError::LocalZoneLookup`] if local zone lookup fails while
+    ///   resolving a naive input.
+    pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_with_year(trimmed) {
+            return Err(DateError::YearNotFourDigits {
+                input: trimmed.into(),
+            });
+        }
+        let shape = DateTimeShape::parse_any(trimmed).map_err(|reason| {
+            DateError::InvalidValue {
+                input: trimmed.into(),
+                reason,
+            }
+        })?;
+        shape.resolve(trimmed)
+    }
+
+    /// Returns the wrapped UTC Date-Time.
     #[inline]
     #[must_use]
-    pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
-        self.0.duration_since(earlier.0)
+    pub(crate) const fn utc(self) -> Timestamp {
+        self.0
     }
 
     /// Returns the local clock-time rendering of this date-time.
@@ -159,66 +225,11 @@ impl DateTimeValue {
         Self::try_from(date).is_ok_and(|midnight| self.0 == midnight.0)
     }
 
-    /// Returns the wrapped UTC Date-Time.
+    /// Returns the exact elapsed time from `earlier` to this value.
     #[inline]
     #[must_use]
-    pub(crate) const fn utc(self) -> Timestamp {
-        self.0
-    }
-
-    /// Returns the canonical strftime pattern for this date-time: whole
-    /// seconds, plus fractional seconds only when the nanosecond component is
-    /// nonzero.
-    ///
-    /// Local offsets are whole seconds, so the UTC and local readings share
-    /// their nanosecond component and no zone lookup is needed.
-    #[must_use]
-    pub(crate) fn canonical_pattern(self) -> &'static str {
-        let nanoseconds = self.0.subsec_nanosecond();
-        if nanoseconds == 0 {
-            DEFAULT_DATETIME_PATTERN
-        } else if nanoseconds % 1_000_000 == 0 {
-            "%Y-%m-%dT%H:%M:%S%.3f"
-        } else if nanoseconds % 1_000 == 0 {
-            "%Y-%m-%dT%H:%M:%S%.6f"
-        } else {
-            "%Y-%m-%dT%H:%M:%S%.9f"
-        }
-    }
-
-    /// Resolves a naive local clock time under Jiff's compatible DST policy.
-    ///
-    /// Ambiguous fall-back times choose their earlier occurrence;
-    /// spring-forward gaps shift forward by the gap length.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::Zone`] if process-local time-zone discovery fails.
-    /// - [`CalendarError::OutOfRange`] if the resolved local time falls outside
-    ///   Jiff's supported timestamp range.
-    pub(super) fn from_local(
-        local_datetime: civil::DateTime,
-    ) -> Result<Self, CalendarError> {
-        let zone = local_zone().map_err(|error| CalendarError::Zone {
-            input: error.to_string().into(),
-        })?;
-        Self::from_local_in(local_datetime, &zone)
-    }
-
-    /// Resolves a naive local clock time in the explicitly supplied zone.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the supplied zone shifts the local
-    ///   time outside Jiff's supported timestamp range.
-    pub(super) fn from_local_in(
-        local_datetime: civil::DateTime,
-        zone: &TimeZone,
-    ) -> Result<Self, CalendarError> {
-        local_datetime
-            .to_zoned(zone.clone())
-            .map(|zoned| Self(zoned.timestamp()))
-            .map_err(|_| CalendarError::OutOfRange)
+    pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
+        self.0.duration_since(earlier.0)
     }
 
     /// Shifts calendar units in the local datetime frame and clock units in
@@ -275,36 +286,24 @@ impl DateTimeValue {
             .map_err(|_| CalendarError::OutOfRange)
     }
 
-    /// Parses an RFC 3339 or ISO-8601 date-time string using
-    /// [`DateTimeShape::ALL`].
+    /// Returns the canonical strftime pattern for this date-time: whole
+    /// seconds, plus fractional seconds only when the nanosecond component is
+    /// nonzero.
     ///
-    /// Surrounding whitespace is ignored. The cascade matches shapes only: a
-    /// matched naive input then resolves through [`DateTimeValue::from_local`]
-    /// (an explicit-offset input already carries an offset and stores
-    /// directly). Resolution runs once after the cascade, because a resolution
-    /// failure must not retry later formats.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
-    ///   digits.
-    /// - [`DateError::InvalidValue`] if no accepted shape matches.
-    /// - [`DateError::LocalZoneLookup`] if local zone lookup fails while
-    ///   resolving a naive input.
-    pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-        let trimmed = s.trim();
-        if !starts_with_year(trimmed) {
-            return Err(DateError::YearNotFourDigits {
-                input: trimmed.into(),
-            });
+    /// Local offsets are whole seconds, so the UTC and local readings share
+    /// their nanosecond component and no zone lookup is needed.
+    #[must_use]
+    pub(crate) fn canonical_pattern(self) -> &'static str {
+        let nanoseconds = self.0.subsec_nanosecond();
+        if nanoseconds == 0 {
+            DEFAULT_DATETIME_PATTERN
+        } else if nanoseconds % 1_000_000 == 0 {
+            "%Y-%m-%dT%H:%M:%S%.3f"
+        } else if nanoseconds % 1_000 == 0 {
+            "%Y-%m-%dT%H:%M:%S%.6f"
+        } else {
+            "%Y-%m-%dT%H:%M:%S%.9f"
         }
-        let shape = DateTimeShape::parse_any(trimmed).map_err(|reason| {
-            DateError::InvalidValue {
-                input: trimmed.into(),
-                reason,
-            }
-        })?;
-        shape.resolve(trimmed)
     }
 }
 
@@ -432,19 +431,6 @@ impl DateTimeShape {
         Self::LocalSpaceMinutes,
     ];
 
-    /// Returns the strftime pattern for this format, or `None` for
-    /// [`Self::Rfc3339`] which uses dedicated RFC 3339 parsing.
-    #[must_use]
-    pub(crate) const fn pattern(self) -> Option<&'static str> {
-        match self {
-            Self::Rfc3339 => None,
-            Self::LocalTSeconds => Some("%Y-%m-%dT%H:%M:%S%.f"),
-            Self::LocalTMinutes => Some("%Y-%m-%dT%H:%M"),
-            Self::LocalSpaceSeconds => Some("%Y-%m-%d %H:%M:%S%.f"),
-            Self::LocalSpaceMinutes => Some("%Y-%m-%d %H:%M"),
-        }
-    }
-
     /// Parses `s` as the first matching shape in [`Self::ALL`] order.
     ///
     /// # Errors
@@ -510,6 +496,58 @@ impl DateTimeShape {
                 .map_err(|_| "invalid input"),
         }
     }
+
+    /// Returns the strftime pattern for this format, or `None` for
+    /// [`Self::Rfc3339`] which uses dedicated RFC 3339 parsing.
+    #[must_use]
+    pub(crate) const fn pattern(self) -> Option<&'static str> {
+        match self {
+            Self::Rfc3339 => None,
+            Self::LocalTSeconds => Some("%Y-%m-%dT%H:%M:%S%.f"),
+            Self::LocalTMinutes => Some("%Y-%m-%dT%H:%M"),
+            Self::LocalSpaceSeconds => Some("%Y-%m-%d %H:%M:%S%.f"),
+            Self::LocalSpaceMinutes => Some("%Y-%m-%d %H:%M"),
+        }
+    }
+}
+
+/// Stores the parsed date-time shape before local-zone resolution.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DateTimeInput {
+    /// Stores an explicit RFC 3339 date-time with its offset applied.
+    Absolute(Timestamp),
+    /// Stores a naive local civil date-time that must resolve through
+    /// [`DateTimeValue::from_local`].
+    LocalClock(civil::DateTime),
+}
+
+impl DateTimeInput {
+    /// Resolves parsed date-time input into a UTC-stored [`DateTimeValue`].
+    ///
+    /// For [`Self::Absolute`], the timestamp is stored directly.
+    /// For [`Self::LocalClock`], resolution runs through
+    /// [`DateTimeValue::from_local`] in the process-local time zone.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::LocalZoneLookup`] if the system time zone cannot resolve
+    ///   a local-clock input.
+    /// - [`DateError::InvalidValue`] if the local-clock input cannot be
+    ///   represented as a timestamp in the selected zone.
+    pub(crate) fn resolve(
+        self,
+        input: &str,
+    ) -> Result<DateTimeValue, DateError> {
+        match self {
+            Self::Absolute(timestamp) => {
+                Ok(DateTimeValue::from_timestamp(timestamp))
+            }
+            Self::LocalClock(local_datetime) => {
+                DateTimeValue::from_local(local_datetime)
+                    .map_err(|error| error.into_date_error(input))
+            }
+        }
+    }
 }
 
 /// Returns `true` if the RFC 3339 numeric offset in `input` is valid.
@@ -551,45 +589,6 @@ fn numeric_rfc3339_offset_is_valid(input: &str) -> bool {
         return false;
     };
     hours <= 23 && minutes <= 59
-}
-
-/// Stores the parsed date-time shape before local-zone resolution.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateTimeInput {
-    /// Stores an explicit RFC 3339 date-time with its offset applied.
-    Absolute(Timestamp),
-    /// Stores a naive local civil date-time that must resolve through
-    /// [`DateTimeValue::from_local`].
-    LocalClock(civil::DateTime),
-}
-
-impl DateTimeInput {
-    /// Resolves parsed date-time input into a UTC-stored [`DateTimeValue`].
-    ///
-    /// For [`Self::Absolute`], the timestamp is stored directly.
-    /// For [`Self::LocalClock`], resolution runs through
-    /// [`DateTimeValue::from_local`] in the process-local time zone.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::LocalZoneLookup`] if the system time zone cannot resolve
-    ///   a local-clock input.
-    /// - [`DateError::InvalidValue`] if the local-clock input cannot be
-    ///   represented as a timestamp in the selected zone.
-    pub(crate) fn resolve(
-        self,
-        input: &str,
-    ) -> Result<DateTimeValue, DateError> {
-        match self {
-            Self::Absolute(timestamp) => {
-                Ok(DateTimeValue::from_timestamp(timestamp))
-            }
-            Self::LocalClock(local_datetime) => {
-                DateTimeValue::from_local(local_datetime)
-                    .map_err(|error| error.into_date_error(input))
-            }
-        }
-    }
 }
 
 #[cfg(test)]

@@ -34,37 +34,37 @@ mod date;
 mod datetime;
 mod duration;
 mod error;
+mod point;
+mod unit;
+mod zone;
+
+pub(crate) use calendar::{
+    CALENDAR_PERIOD_EDGES, CalendarPeriod, PeriodEdge, weekday_from_number,
+};
+pub(crate) use date::DEFAULT_DATE_PATTERN;
+pub use date::DateValue;
+pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
+pub use datetime::DateTimeValue;
+pub use duration::DurationValue;
+pub(crate) use error::CalendarError;
+pub use error::{DateError, DurationError};
+pub(crate) use point::{DateDiff, DatePoint};
+pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
+pub(crate) use zone::local_zone;
+
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) mod test_support {
     use jiff::tz::TimeZone;
 
-    thread_local! {
-        static ZONE_GUARD: std::cell::RefCell<Option<ZoneGuard>> =
-            const { std::cell::RefCell::new(None) };
-    }
-
-    static ZONE_OVERRIDE: std::sync::RwLock<Option<TimeZone>> =
-        std::sync::RwLock::new(None);
-
-    static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-    #[inline]
-    pub(super) fn current_override() -> Option<TimeZone> {
-        ZONE_OVERRIDE
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-    }
-
     /// Serializes test access to the process-wide local-zone override and
-    /// restores the previous override when its owning test thread exits.
-    /// Reads are synchronized separately, so they do not wait on the guard
-    /// lifecycle lock.
+    /// restores the previous override when its owning test thread exits. Reads
+    /// are synchronized separately, so they do not wait on the guard lifecycle
+    /// lock.
     ///
     /// Repeated calls to [`Self::set`] replace the active override while
-    /// retaining the original zone and serialization lock. Use
-    /// [`Self::with`] for nested scoped changes; each scope restores its
-    /// immediate parent even during unwind.
+    /// retaining the original zone and serialization lock. Use [`Self::with`]
+    /// for nested scoped changes; each scope restores its immediate parent even
+    /// during unwind.
     ///
     /// # Examples
     ///
@@ -94,15 +94,24 @@ pub(crate) mod test_support {
     }
 
     impl ZoneGuard {
-        /// Holds the zone lock without changing the current zone.
+        /// Sets the process-wide local zone for the current test thread.
+        ///
+        /// Readers on other threads observe the override. Repeated calls
+        /// replace it; the original value is restored when the owning test
+        /// thread exits. Use [`Self::with`] for nested overrides.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `zone` is not a recognized time-zone name.
         #[inline]
-        pub fn keep() {
-            ZONE_GUARD.with(|slot| {
-                let mut slot = slot.borrow_mut();
-                if slot.is_none() {
-                    *slot = Some(Self::install(None));
-                }
-            });
+        #[expect(
+            clippy::panic,
+            reason = "unknown test zones indicate a fixture error"
+        )]
+        pub fn set(zone: &str) {
+            let zone = TimeZone::get(zone)
+                .unwrap_or_else(|_| panic!("unknown time zone: {zone}"));
+            Self::set_timezone(zone);
         }
 
         /// Runs `action` with a process-wide local-zone override.
@@ -142,24 +151,15 @@ pub(crate) mod test_support {
             }
         }
 
-        /// Sets the process-wide local zone for the current test thread.
-        ///
-        /// Readers on other threads observe the override. Repeated calls
-        /// replace it; the original value is restored when the owning
-        /// test thread exits. Use [`Self::with`] for nested overrides.
-        ///
-        /// # Panics
-        ///
-        /// Panics if `zone` is not a recognized time-zone name.
+        /// Holds the zone lock without changing the current zone.
         #[inline]
-        #[expect(
-            clippy::panic,
-            reason = "unknown test zones indicate a fixture error"
-        )]
-        pub fn set(zone: &str) {
-            let zone = TimeZone::get(zone)
-                .unwrap_or_else(|_| panic!("unknown time zone: {zone}"));
-            Self::set_timezone(zone);
+        pub fn keep() {
+            ZONE_GUARD.with(|slot| {
+                let mut slot = slot.borrow_mut();
+                if slot.is_none() {
+                    *slot = Some(Self::install(None));
+                }
+            });
         }
 
         /// Sets the process-wide local zone to a previously resolved zone.
@@ -209,6 +209,14 @@ pub(crate) mod test_support {
         }
     }
 
+    #[inline]
+    pub(super) fn current_override() -> Option<TimeZone> {
+        ZONE_OVERRIDE
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     /// Restores the previous zone override when dropped.
     struct ScopedZoneRestore {
         previous: Option<TimeZone>,
@@ -232,6 +240,16 @@ pub(crate) mod test_support {
             drop(guard);
         }
     }
+
+    thread_local! {
+        static ZONE_GUARD: std::cell::RefCell<Option<ZoneGuard>> =
+            const { std::cell::RefCell::new(None) };
+    }
+
+    static ZONE_OVERRIDE: std::sync::RwLock<Option<TimeZone>> =
+        std::sync::RwLock::new(None);
+
+    static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[cfg(test)]
     pub(crate) mod fixtures {
@@ -312,6 +330,20 @@ pub(crate) mod test_support {
 
         use super::*;
         use crate::temporal::local_zone;
+
+        struct ZoneRestoreObserver {
+            previous: TimeZone,
+            sender: mpsc::Sender<(TimeZone, TimeZone)>,
+        }
+
+        impl Drop for ZoneRestoreObserver {
+            fn drop(&mut self) {
+                let _ = self.sender.send((
+                    self.previous.clone(),
+                    local_zone().expect("system time zone available"),
+                ));
+            }
+        }
 
         #[test]
         fn keeps_the_current_zone_unchanged() {
@@ -398,20 +430,6 @@ pub(crate) mod test_support {
                 local_zone().expect("original zone is restored"),
                 original
             );
-        }
-
-        struct ZoneRestoreObserver {
-            previous: TimeZone,
-            sender: mpsc::Sender<(TimeZone, TimeZone)>,
-        }
-
-        impl Drop for ZoneRestoreObserver {
-            fn drop(&mut self) {
-                let _ = self.sender.send((
-                    self.previous.clone(),
-                    local_zone().expect("system time zone available"),
-                ));
-            }
         }
 
         #[test]
@@ -522,19 +540,3 @@ pub(crate) mod test_support {
         }
     }
 }
-mod point;
-mod unit;
-mod zone;
-pub(crate) use calendar::{
-    CALENDAR_PERIOD_EDGES, CalendarPeriod, PeriodEdge, weekday_from_number,
-};
-pub(crate) use date::DEFAULT_DATE_PATTERN;
-pub use date::DateValue;
-pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
-pub use datetime::DateTimeValue;
-pub use duration::DurationValue;
-pub(crate) use error::CalendarError;
-pub use error::{DateError, DurationError};
-pub(crate) use point::{DateDiff, DatePoint};
-pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
-pub(crate) use zone::local_zone;

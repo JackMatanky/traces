@@ -17,16 +17,7 @@ use super::{
     datetime::{DateTimeInput, DateTimeShape},
     zone::local_zone,
 };
-/// Resolves the process-local time zone for calendar operations.
-///
-/// # Errors
-///
-/// - [`CalendarError::Zone`] if system time-zone discovery fails.
-fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
-    local_zone().map_err(|error| CalendarError::Zone {
-        input: error.to_string().into(),
-    })
-}
+
 /// Tracks whether a zone-free date point uses month or full-date precision.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePrecision {
@@ -55,126 +46,133 @@ pub(crate) enum DatePoint {
     /// Stores a UTC Date-Time and renders it as the local clock.
     DateTime(DateTimeValue),
 }
-/// Stores the result of measuring the difference between two date points.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum DateDiff {
-    /// Stores a whole-unit difference.
-    Whole(i64),
-    /// Stores a fractional-unit difference.
-    Fractional(f64),
-}
-
-impl DateDiff {
-    /// Projects the measured difference as an `f64`.
-    ///
-    /// Whole magnitudes convert through the standard integer-to-floating
-    /// conversion; finite fractional magnitudes pass through unchanged.
-    #[inline]
-    #[must_use]
-    pub(crate) fn to_f64(self) -> Option<f64> {
-        match self {
-            Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
-            Self::Fractional(n) if n.is_finite() => Some(n),
-            Self::Fractional(_) => None,
-        }
-    }
-}
 
 impl DatePoint {
-    /// Measures the difference to another date point in the requested unit.
-    ///
-    /// Calendar days and weeks count local civil-clock time: a 23- or 25-hour
-    /// DST day is one day, with sub-day clock remainders retained when both
-    /// points have a time. Date-only differences return whole units, truncated
-    /// toward zero. Hours and smaller measure elapsed time for two date-times.
-    /// Reversing the operands negates the result.
+    /// Parses a date or date-time shape, retaining date precision.
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if converting a point or computing its
-    ///   calendar difference exceeds the representable range.
-    pub(crate) fn diff(
-        self,
-        to: Self,
-        unit: TimeUnit,
-        zone: &TimeZone,
-    ) -> Result<DateDiff, CalendarError> {
-        let local_delta = || {
-            to.local_datetime_in(zone)
-                .duration_since(self.local_datetime_in(zone))
+    /// - [`DateError::InvalidValue`] if the input does not begin with two or
+    ///   four ASCII digits followed by `-`, or if no accepted shape matches.
+    /// - [`DateError::YearNotFourDigits`] if it starts that way but the year is
+    ///   not four ASCII digits.
+    /// - [`DateError::LocalZoneLookup`] if a naive date-time cannot be resolved
+    ///   in the local zone.
+    pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_like_date(trimmed.as_bytes()) {
+            return Err(DateError::InvalidValue {
+                input: trimmed.into(),
+                reason: "not a date or date-time shape",
+            });
+        }
+        if !starts_with_year(trimmed) {
+            return Err(DateError::YearNotFourDigits {
+                input: trimmed.into(),
+            });
+        }
+        let calendar_point = |(date, date_precision)| Self::Calendar {
+            date: DateValue::from(date),
+            date_precision,
         };
-        let calendar_days = || {
-            self.date_in(zone)
-                .civil_date()
-                .until(to.date_in(zone).civil_date())
-                .map(|span| i64::from(span.get_days()))
-                .map_err(|_| CalendarError::OutOfRange)
-        };
-        match unit {
-            TimeUnit::Year => Ok(DateDiff::Whole(
-                self.date_in(zone).whole_years_until(to.date_in(zone)),
-            )),
-            TimeUnit::Month => Ok(DateDiff::Whole(
-                self.date_in(zone).whole_months_until(to.date_in(zone)),
-            )),
-            calendar @ (TimeUnit::Week | TimeUnit::Day)
-                if self.has_time() && to.has_time() =>
-            {
-                // The civil clock counts a DST-short or DST-long day as one
-                // calendar day, while preserving a fractional clock remainder.
-                Ok(DateDiff::Fractional(
-                    local_delta().as_secs_f64() / calendar.nominal_seconds(),
-                ))
-            }
-            TimeUnit::Week => Ok(DateDiff::Whole(calendar_days()? / 7)),
-            TimeUnit::Day => Ok(DateDiff::Whole(calendar_days()?)),
-            fixed @ (TimeUnit::Hour
-            | TimeUnit::Minute
-            | TimeUnit::Second
-            | TimeUnit::Millisecond)
-                if self.has_time() && to.has_time() =>
-            {
-                let seconds = match (self, to) {
-                    (Self::DateTime(from_dt), Self::DateTime(to_dt)) => {
-                        to_dt.duration_since(from_dt).as_secs_f64()
-                    }
-                    _ => return Err(CalendarError::OutOfRange),
-                };
-                Ok(DateDiff::Fractional(seconds / fixed.nominal_seconds()))
-            }
-            TimeUnit::Hour => {
-                Ok(DateDiff::Whole(local_delta().as_secs() / 3_600))
-            }
-            TimeUnit::Minute => {
-                Ok(DateDiff::Whole(local_delta().as_secs() / 60))
-            }
-            TimeUnit::Second => Ok(DateDiff::Whole(local_delta().as_secs())),
-            TimeUnit::Millisecond => i64::try_from(local_delta().as_millis())
-                .map(DateDiff::Whole)
-                .map_err(|_| CalendarError::OutOfRange),
+        // Date-only shapes cannot match the date-time cascade.
+        if trimmed.len() <= 10 {
+            return DateShape::parse_any(trimmed).map(calendar_point).map_err(
+                |reason| DateError::InvalidValue {
+                    input: trimmed.into(),
+                    reason,
+                },
+            );
+        }
+        match DateTimeShape::parse_any(trimmed) {
+            Ok(input) => Ok(Self::DateTime(input.resolve(trimmed)?)),
+            Err(datetime_err) => match DateShape::parse_any(trimmed) {
+                Ok(date) => Ok(calendar_point(date)),
+                Err(date_err) => {
+                    let reason = if matches!(
+                        trimmed.as_bytes().get(10),
+                        Some(b'T' | b' ')
+                    ) {
+                        datetime_err
+                    } else {
+                        date_err
+                    };
+                    Err(DateError::InvalidValue {
+                        input: trimmed.into(),
+                        reason,
+                    })
+                }
+            },
         }
     }
-}
 
-impl From<DateValue> for DatePoint {
-    fn from(date: DateValue) -> Self {
-        Self::Calendar {
-            date,
-            date_precision: DatePrecision::Day,
-        }
-    }
-}
-
-impl From<DateTimeValue> for DatePoint {
-    fn from(date_time: DateTimeValue) -> Self {
-        Self::DateTime(date_time)
-    }
-}
-impl DatePoint {
-    /// Returns `true` if this date point carries a time-of-day component.
+    /// Parses a 10-byte `YYYY-MM-DD` or 7-byte `YYYY-MM` date prefix of `s`.
+    ///
+    /// Returns the date point and the number of bytes consumed, or [`None`]
+    /// when `s` does not start with either shape.
     #[must_use]
-    pub(crate) const fn has_time(self) -> bool {
-        matches!(self, Self::DateTime(_))
+    pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
+        crate::lexer::lex_prefix(s, Self::parse_prefix_raw)
+    }
+
+    /// Parses a date or date-time with a Jiff strtime pattern.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::InvalidValue`] if `text` matches `pattern` neither as an
+    ///   offset date-time, a naive date-time, nor a date.
+    /// - [`DateError::LocalZoneLookup`] if a naive date-time match cannot be
+    ///   resolved in the local zone.
+    pub(crate) fn parse_with_pattern(
+        text: &str,
+        pattern: &str,
+    ) -> Result<Self, DateError> {
+        let trimmed_text = text.trim();
+        let trimmed_pattern = pattern.trim();
+        let has_time_fields = pattern_has_time_fields(trimmed_pattern)
+            .ok_or_else(|| DateError::InvalidValue {
+                input: trimmed_text.into(),
+                reason: "bad format pattern",
+            })?;
+        if let Ok(timestamp) =
+            Timestamp::strptime(trimmed_pattern, trimmed_text)
+        {
+            return Ok(Self::DateTime(
+                DateTimeInput::Absolute(timestamp).resolve(trimmed_text)?,
+            ));
+        }
+        if has_time_fields
+            && let Ok(local_datetime) =
+                civil::DateTime::strptime(trimmed_pattern, trimmed_text)
+        {
+            return Ok(Self::DateTime(
+                DateTimeInput::LocalClock(local_datetime)
+                    .resolve(trimmed_text)?,
+            ));
+        }
+        if trimmed_pattern == "%Y-%m"
+            && let Ok(
+                date_point @ Self::Calendar {
+                    date_precision: DatePrecision::Month,
+                    ..
+                },
+            ) = Self::parse(trimmed_text)
+        {
+            return Ok(date_point);
+        }
+        let date = civil::Date::strptime(trimmed_pattern, trimmed_text)
+            .map_err(|source| DateError::InvalidValue {
+                input: trimmed_text.into(),
+                reason: if source.is_range() {
+                    "a field is out of range"
+                } else {
+                    "invalid input"
+                },
+            })?;
+        Ok(Self::Calendar {
+            date: DateValue::from_civil_date(date),
+            date_precision: DatePrecision::Day,
+        })
     }
 
     /// Returns the calendar date of this date point in the supplied zone.
@@ -238,13 +236,6 @@ impl DatePoint {
                 Ok(datetime.utc().to_zoned(zone.clone()))
             }
         }
-    }
-
-    #[cfg(test)]
-    fn local_datetime_or_utc(self) -> jiff::civil::DateTime {
-        self.local_datetime_in(
-            &local_zone().expect("system time zone available for tests"),
-        )
     }
 
     /// Returns the UTC-stored Date-Time equivalent of this date point.
@@ -391,6 +382,116 @@ impl DatePoint {
         unit.of(self.local_datetime_in(zone))
     }
 
+    /// Measures the difference to another date point in the requested unit.
+    ///
+    /// Calendar days and weeks count local civil-clock time: a 23- or 25-hour
+    /// DST day is one day, with sub-day clock remainders retained when both
+    /// points have a time. Date-only differences return whole units, truncated
+    /// toward zero. Hours and smaller measure elapsed time for two date-times.
+    /// Reversing the operands negates the result.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if converting a point or computing its
+    ///   calendar difference exceeds the representable range.
+    pub(crate) fn diff(
+        self,
+        to: Self,
+        unit: TimeUnit,
+        zone: &TimeZone,
+    ) -> Result<DateDiff, CalendarError> {
+        let local_delta = || {
+            to.local_datetime_in(zone)
+                .duration_since(self.local_datetime_in(zone))
+        };
+        let calendar_days = || {
+            self.date_in(zone)
+                .civil_date()
+                .until(to.date_in(zone).civil_date())
+                .map(|span| i64::from(span.get_days()))
+                .map_err(|_| CalendarError::OutOfRange)
+        };
+        match unit {
+            TimeUnit::Year => Ok(DateDiff::Whole(
+                self.date_in(zone).whole_years_until(to.date_in(zone)),
+            )),
+            TimeUnit::Month => Ok(DateDiff::Whole(
+                self.date_in(zone).whole_months_until(to.date_in(zone)),
+            )),
+            calendar @ (TimeUnit::Week | TimeUnit::Day)
+                if self.has_time() && to.has_time() =>
+            {
+                // The civil clock counts a DST-short or DST-long day as one
+                // calendar day, while preserving a fractional clock remainder.
+                Ok(DateDiff::Fractional(
+                    local_delta().as_secs_f64() / calendar.nominal_seconds(),
+                ))
+            }
+            TimeUnit::Week => Ok(DateDiff::Whole(calendar_days()? / 7)),
+            TimeUnit::Day => Ok(DateDiff::Whole(calendar_days()?)),
+            fixed @ (TimeUnit::Hour
+            | TimeUnit::Minute
+            | TimeUnit::Second
+            | TimeUnit::Millisecond)
+                if self.has_time() && to.has_time() =>
+            {
+                let seconds = match (self, to) {
+                    (Self::DateTime(from_dt), Self::DateTime(to_dt)) => {
+                        to_dt.duration_since(from_dt).as_secs_f64()
+                    }
+                    _ => return Err(CalendarError::OutOfRange),
+                };
+                Ok(DateDiff::Fractional(seconds / fixed.nominal_seconds()))
+            }
+            TimeUnit::Hour => {
+                Ok(DateDiff::Whole(local_delta().as_secs() / 3_600))
+            }
+            TimeUnit::Minute => {
+                Ok(DateDiff::Whole(local_delta().as_secs() / 60))
+            }
+            TimeUnit::Second => Ok(DateDiff::Whole(local_delta().as_secs())),
+            TimeUnit::Millisecond => i64::try_from(local_delta().as_millis())
+                .map(DateDiff::Whole)
+                .map_err(|_| CalendarError::OutOfRange),
+        }
+    }
+
+    /// Returns `true` if this date point carries a time-of-day component.
+    #[must_use]
+    pub(crate) const fn has_time(self) -> bool {
+        matches!(self, Self::DateTime(_))
+    }
+
+    /// Parses a raw date prefix from `s`, returning the [`DatePoint`] and byte
+    /// length.
+    fn parse_prefix_raw(s: &str) -> Option<(Self, usize)> {
+        let bytes = s.as_bytes();
+        if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
+            if let Some(prefix) = s.get(..10)
+                && let Ok(
+                    date_point @ Self::Calendar {
+                        date_precision: DatePrecision::Day,
+                        ..
+                    },
+                ) = Self::parse(prefix)
+            {
+                return Some((date_point, 10));
+            }
+            return None;
+        }
+        if let Some(prefix) = s.get(..7)
+            && let Ok(
+                date_point @ Self::Calendar {
+                    date_precision: DatePrecision::Month,
+                    ..
+                },
+            ) = Self::parse(prefix)
+        {
+            return Some((date_point, 7));
+        }
+        None
+    }
+
     /// Applies one Jiff span, preserving the point's date/time kind.
     fn advance_span(
         self,
@@ -492,163 +593,67 @@ impl DatePoint {
         self.with_date(new_date, zone)
     }
 
-    /// Parses a date or date-time shape, retaining date precision.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::InvalidValue`] if the input does not begin with two or
-    ///   four ASCII digits followed by `-`, or if no accepted shape matches.
-    /// - [`DateError::YearNotFourDigits`] if it starts that way but the year is
-    ///   not four ASCII digits.
-    /// - [`DateError::LocalZoneLookup`] if a naive date-time cannot be resolved
-    ///   in the local zone.
-    pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
-        let trimmed = s.trim();
-        if !starts_like_date(trimmed.as_bytes()) {
-            return Err(DateError::InvalidValue {
-                input: trimmed.into(),
-                reason: "not a date or date-time shape",
-            });
-        }
-        if !starts_with_year(trimmed) {
-            return Err(DateError::YearNotFourDigits {
-                input: trimmed.into(),
-            });
-        }
-        let calendar_point = |(date, date_precision)| Self::Calendar {
-            date: DateValue::from(date),
-            date_precision,
-        };
-        // Date-only shapes cannot match the date-time cascade.
-        if trimmed.len() <= 10 {
-            return DateShape::parse_any(trimmed).map(calendar_point).map_err(
-                |reason| DateError::InvalidValue {
-                    input: trimmed.into(),
-                    reason,
-                },
-            );
-        }
-        match DateTimeShape::parse_any(trimmed) {
-            Ok(input) => Ok(Self::DateTime(input.resolve(trimmed)?)),
-            Err(datetime_err) => match DateShape::parse_any(trimmed) {
-                Ok(date) => Ok(calendar_point(date)),
-                Err(date_err) => {
-                    let reason = if matches!(
-                        trimmed.as_bytes().get(10),
-                        Some(b'T' | b' ')
-                    ) {
-                        datetime_err
-                    } else {
-                        date_err
-                    };
-                    Err(DateError::InvalidValue {
-                        input: trimmed.into(),
-                        reason,
-                    })
-                }
-            },
-        }
-    }
-
-    /// Parses a 10-byte `YYYY-MM-DD` or 7-byte `YYYY-MM` date prefix of `s`.
-    ///
-    /// Returns the date point and the number of bytes consumed, or [`None`]
-    /// when `s` does not start with either shape.
-    #[must_use]
-    pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
-        crate::lexer::lex_prefix(s, Self::parse_prefix_raw)
-    }
-
-    /// Parses a raw date prefix from `s`, returning the [`DatePoint`] and byte
-    /// length.
-    fn parse_prefix_raw(s: &str) -> Option<(Self, usize)> {
-        let bytes = s.as_bytes();
-        if bytes.len() >= 8 && bytes.get(7) == Some(&b'-') {
-            if let Some(prefix) = s.get(..10)
-                && let Ok(
-                    date_point @ Self::Calendar {
-                        date_precision: DatePrecision::Day,
-                        ..
-                    },
-                ) = Self::parse(prefix)
-            {
-                return Some((date_point, 10));
-            }
-            return None;
-        }
-        if let Some(prefix) = s.get(..7)
-            && let Ok(
-                date_point @ Self::Calendar {
-                    date_precision: DatePrecision::Month,
-                    ..
-                },
-            ) = Self::parse(prefix)
-        {
-            return Some((date_point, 7));
-        }
-        None
-    }
-
-    /// Parses a date or date-time with a Jiff strtime pattern.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::InvalidValue`] if `text` matches `pattern` neither as an
-    ///   offset date-time, a naive date-time, nor a date.
-    /// - [`DateError::LocalZoneLookup`] if a naive date-time match cannot be
-    ///   resolved in the local zone.
-    pub(crate) fn parse_with_pattern(
-        text: &str,
-        pattern: &str,
-    ) -> Result<Self, DateError> {
-        let trimmed_text = text.trim();
-        let trimmed_pattern = pattern.trim();
-        let has_time_fields = pattern_has_time_fields(trimmed_pattern)
-            .ok_or_else(|| DateError::InvalidValue {
-                input: trimmed_text.into(),
-                reason: "bad format pattern",
-            })?;
-        if let Ok(timestamp) =
-            Timestamp::strptime(trimmed_pattern, trimmed_text)
-        {
-            return Ok(Self::DateTime(
-                DateTimeInput::Absolute(timestamp).resolve(trimmed_text)?,
-            ));
-        }
-        if has_time_fields
-            && let Ok(local_datetime) =
-                civil::DateTime::strptime(trimmed_pattern, trimmed_text)
-        {
-            return Ok(Self::DateTime(
-                DateTimeInput::LocalClock(local_datetime)
-                    .resolve(trimmed_text)?,
-            ));
-        }
-        if trimmed_pattern == "%Y-%m"
-            && let Ok(
-                date_point @ Self::Calendar {
-                    date_precision: DatePrecision::Month,
-                    ..
-                },
-            ) = Self::parse(trimmed_text)
-        {
-            return Ok(date_point);
-        }
-        let date = civil::Date::strptime(trimmed_pattern, trimmed_text)
-            .map_err(|source| DateError::InvalidValue {
-                input: trimmed_text.into(),
-                reason: if source.is_range() {
-                    "a field is out of range"
-                } else {
-                    "invalid input"
-                },
-            })?;
-        Ok(Self::Calendar {
-            date: DateValue::from_civil_date(date),
-            date_precision: DatePrecision::Day,
-        })
+    #[cfg(test)]
+    fn local_datetime_or_utc(self) -> jiff::civil::DateTime {
+        self.local_datetime_in(
+            &local_zone().expect("system time zone available for tests"),
+        )
     }
 }
+
+impl From<DateValue> for DatePoint {
+    fn from(date: DateValue) -> Self {
+        Self::Calendar {
+            date,
+            date_precision: DatePrecision::Day,
+        }
+    }
+}
+
+impl From<DateTimeValue> for DatePoint {
+    fn from(date_time: DateTimeValue) -> Self {
+        Self::DateTime(date_time)
+    }
+}
+
+/// Stores the result of measuring the difference between two date points.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum DateDiff {
+    /// Stores a whole-unit difference.
+    Whole(i64),
+    /// Stores a fractional-unit difference.
+    Fractional(f64),
+}
+
+impl DateDiff {
+    /// Projects the measured difference as an `f64`.
+    ///
+    /// Whole magnitudes convert through the standard integer-to-floating
+    /// conversion; finite fractional magnitudes pass through unchanged.
+    #[inline]
+    #[must_use]
+    pub(crate) fn to_f64(self) -> Option<f64> {
+        match self {
+            Self::Whole(n) => num_traits::ToPrimitive::to_f64(&n),
+            Self::Fractional(n) if n.is_finite() => Some(n),
+            Self::Fractional(_) => None,
+        }
+    }
+}
+
+/// Returns `true` if `s` begins with four ASCII year digits, optionally
+/// preceded by a minus sign for a signed four-digit year.
+pub(super) fn starts_with_year(s: &str) -> bool {
+    let year = if s.starts_with('-') {
+        s.get(1..5)
+    } else {
+        s.get(..4)
+    };
+    year.is_some_and(|bytes| {
+        bytes.len() == 4 && bytes.bytes().all(|byte| byte.is_ascii_digit())
+    })
+}
+
 /// Returns whether a strtime `pattern` includes any time-of-day directives.
 ///
 /// Returns [`None`] if the pattern contains an unsupported `%Q` directive.
@@ -722,16 +727,14 @@ fn starts_like_date(bytes: &[u8]) -> bool {
         })
 }
 
-/// Returns `true` if `s` begins with four ASCII year digits, optionally
-/// preceded by a minus sign for a signed four-digit year.
-pub(super) fn starts_with_year(s: &str) -> bool {
-    let year = if s.starts_with('-') {
-        s.get(1..5)
-    } else {
-        s.get(..4)
-    };
-    year.is_some_and(|bytes| {
-        bytes.len() == 4 && bytes.bytes().all(|byte| byte.is_ascii_digit())
+/// Resolves the process-local time zone for calendar operations.
+///
+/// # Errors
+///
+/// - [`CalendarError::Zone`] if system time-zone discovery fails.
+fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
+    local_zone().map_err(|error| CalendarError::Zone {
+        input: error.to_string().into(),
     })
 }
 
@@ -1240,6 +1243,217 @@ mod tests {
                         if reason == expected_reason
                 ),
                 "expected reason {expected_reason:?}, got {parsed:?}"
+            );
+        }
+    }
+
+    mod accessors {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[test]
+        fn converts_a_date_to_a_day_precision_calendar_point() {
+            // Arrange: a calendar date that must not acquire a time component.
+            let date = ymd(2026, 7, 29);
+
+            // Act
+            let point = DatePoint::from(date);
+
+            // Assert
+            assert_eq!(
+                point,
+                DatePoint::Calendar {
+                    date,
+                    date_precision: DatePrecision::Day,
+                },
+                "converting a Date must preserve the date and use day \
+                 precision"
+            );
+        }
+
+        #[test]
+        fn converts_a_date_time_to_a_date_time_point() {
+            // Arrange: the fixed reference Date-Time.
+            let date_time = fixed_datetime();
+
+            // Act
+            let point = DatePoint::from(date_time);
+
+            // Assert
+            assert_eq!(
+                point,
+                DatePoint::DateTime(date_time),
+                "converting a Date-Time must preserve its value"
+            );
+        }
+
+        #[test]
+        fn reports_no_time_for_a_calendar_point() {
+            // Arrange: the minimum year in the Jiff date range.
+            let point = DatePoint::Calendar {
+                date: DateValue::from(
+                    jiff::civil::Date::new(-9999, 1, 1)
+                        .expect("minimum Jiff date is valid"),
+                ),
+                date_precision: DatePrecision::Day,
+            };
+
+            // Act
+            let has_time = point.has_time();
+
+            // Assert
+            assert!(!has_time, "a calendar point must report no time-of-day");
+        }
+
+        #[test]
+        fn reports_a_time_for_a_date_time_point() {
+            // Arrange: the fixed reference date-time.
+            let point = DatePoint::DateTime(fixed_datetime());
+
+            // Act
+            let has_time = point.has_time();
+
+            // Assert
+            assert!(has_time, "a date-time point must report a time-of-day");
+        }
+
+        #[test]
+        fn returns_the_stored_date_for_a_calendar_point() {
+            // Arrange: month precision stores the first of the month.
+            let point = point_at("2026-07");
+
+            // Act
+            let date = point.date().expect("calendar date exists");
+
+            // Assert
+            assert_eq!(
+                date,
+                ymd(2026, 7, 1),
+                "a calendar point must return its stored date"
+            );
+        }
+
+        #[test]
+        fn returns_the_local_calendar_date_for_a_date_time_point() {
+            // Arrange
+            ZoneGuard::set("UTC");
+            let point = DatePoint::DateTime(fixed_datetime());
+
+            // Act
+            let date = point.date().expect("system zone available");
+
+            // Assert
+            assert_eq!(
+                date,
+                ymd(2026, 7, 29),
+                "a date-time point must render its local calendar date"
+            );
+        }
+
+        #[test]
+        fn renders_a_calendar_point_as_local_midnight() {
+            // Arrange
+            let point = point_at("2026-07-29");
+
+            // Act
+            let local = point.local_datetime_in(
+                &local_zone().expect("system time zone available"),
+            );
+
+            // Assert
+            assert_eq!(
+                local.to_string(),
+                "2026-07-29T00:00:00",
+                "a calendar point must render as local midnight"
+            );
+        }
+
+        #[test]
+        fn renders_the_local_clock_reading_of_a_date_time_point() {
+            // Arrange: the naive reference date-time resolved in New York.
+            ZoneGuard::set_timezone(new_york_zone());
+            let point = point_at("2026-07-29 14:30:05");
+
+            // Act
+            let local = point.local_datetime_in(
+                &local_zone().expect("system time zone available"),
+            );
+            let utc = point.instant().expect("the point is representable");
+
+            // Assert
+            assert_eq!(
+                local.to_string(),
+                "2026-07-29T14:30:05",
+                "the local clock must keep the written wall time"
+            );
+            assert_eq!(
+                utc.to_string(),
+                "2026-07-29T18:30:05Z",
+                "the stored date-time must be the UTC value"
+            );
+        }
+
+        #[test]
+        fn resolves_a_calendar_point_at_utc_midnight_in_utc() {
+            // Arrange
+            ZoneGuard::set("UTC");
+            let point = point_at("2026-07-29");
+
+            // Act
+            let utc =
+                point.instant().expect("the date midnight is representable");
+
+            // Assert
+            assert_eq!(
+                utc.to_string(),
+                "2026-07-29T00:00:00Z",
+                "in UTC a calendar point must resolve at UTC midnight"
+            );
+        }
+
+        #[test]
+        fn resolves_a_calendar_point_at_local_midnight_in_the_process_zone() {
+            // Arrange: New York sits four hours behind UTC in July.
+            ZoneGuard::set_timezone(new_york_zone());
+            let point = point_at("2026-07-29");
+
+            // Act
+            let utc =
+                point.instant().expect("the date midnight is representable");
+
+            // Assert
+            assert_eq!(
+                utc.to_string(),
+                "2026-07-29T04:00:00Z",
+                "a calendar point must resolve at local midnight"
+            );
+        }
+
+        #[rstest]
+        #[case::month("2026-07", "%Y-%m")]
+        #[case::day("2026-07-29", "%Y-%m-%d")]
+        #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
+        #[case::fractional_seconds(
+            "2026-07-29T14:30:00.123Z",
+            "%Y-%m-%dT%H:%M:%S%.3f"
+        )]
+        fn preserves_written_precision_in_the_canonical_pattern(
+            #[case] text: &str,
+            #[case] expected: &str,
+        ) {
+            // Arrange
+            ZoneGuard::set("UTC");
+            let point = point_at(text);
+
+            // Act
+            let pattern = point.canonical_pattern();
+
+            // Assert
+            assert_eq!(
+                pattern, expected,
+                "{text:?} must render its written precision"
             );
         }
     }
@@ -2451,214 +2665,439 @@ mod tests {
         }
     }
 
-    mod accessors {
-        use pretty_assertions::assert_eq;
+    mod date_diff {
         use rstest::rstest;
 
         use super::*;
 
-        #[test]
-        fn converts_a_date_to_a_day_precision_calendar_point() {
-            // Arrange: a calendar date that must not acquire a time component.
-            let date = ymd(2026, 7, 29);
+        mod diff {
+            use super::*;
 
-            // Act
-            let point = DatePoint::from(date);
+            #[rstest]
+            #[case::year(
+                "2020-06-15",
+                "2026-07-15",
+                TimeUnit::Year,
+                DateDiff::Whole(6)
+            )]
+            #[case::month_across_month_ends(
+                "2026-01-15",
+                "2026-03-15",
+                TimeUnit::Month,
+                DateDiff::Whole(2)
+            )]
+            #[case::week(
+                "2026-07-29",
+                "2026-08-06",
+                TimeUnit::Week,
+                DateDiff::Whole(1)
+            )]
+            #[case::day(
+                "2026-07-29",
+                "2026-08-06",
+                TimeUnit::Day,
+                DateDiff::Whole(8)
+            )]
+            #[case::hour(
+                "2026-07-29",
+                "2026-08-06",
+                TimeUnit::Hour,
+                DateDiff::Whole(192)
+            )]
+            #[case::minute(
+                "2026-07-29",
+                "2026-08-06",
+                TimeUnit::Minute,
+                DateDiff::Whole(11520)
+            )]
+            #[case::second(
+                "2026-07-29",
+                "2026-08-06",
+                TimeUnit::Second,
+                DateDiff::Whole(691_200)
+            )]
+            #[case::millisecond(
+                "2026-07-29",
+                "2026-08-06",
+                TimeUnit::Millisecond,
+                DateDiff::Whole(691_200_000)
+            )]
+            fn returns_whole_counts_between_calendar_points(
+                #[case] from: &str,
+                #[case] to: &str,
+                #[case] unit: TimeUnit,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange
+                let from = point_at(from);
+                let to = point_at(to);
 
-            // Assert
-            assert_eq!(
-                point,
-                DatePoint::Calendar {
-                    date,
-                    date_precision: DatePrecision::Day,
-                },
-                "converting a Date must preserve the date and use day \
-                 precision"
-            );
+                // Act
+                let difference = from.diff(
+                    to,
+                    unit,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    difference,
+                    Ok(expected),
+                    "{unit:?} between calendar points must count whole units"
+                );
+            }
+
+            #[rstest]
+            #[case::month("2026-01-15", "2026-03-15", TimeUnit::Month, DateDiff::Whole(-2))]
+            #[case::year("2020-06-15", "2026-07-15", TimeUnit::Year, DateDiff::Whole(-6))]
+            #[case::day("2026-07-29", "2026-08-06", TimeUnit::Day, DateDiff::Whole(-8))]
+            #[case::hour("2026-07-29", "2026-08-06", TimeUnit::Hour, DateDiff::Whole(-192))]
+            fn returns_the_negated_difference_in_the_reverse_direction(
+                #[case] from: &str,
+                #[case] to: &str,
+                #[case] unit: TimeUnit,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange
+                let from = point_at(from);
+                let to = point_at(to);
+
+                // Act
+                let difference = to.diff(
+                    from,
+                    unit,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    difference,
+                    Ok(expected),
+                    "diff must be antisymmetric for {unit:?}"
+                );
+            }
+
+            #[rstest]
+            #[case::to_the_last_representable_day(
+                "2026-01-01",
+                "9999-12-31",
+                DateDiff::Whole(7973)
+            )]
+            #[case::since_the_epoch(
+                "1970-01-01",
+                "2026-07-29",
+                DateDiff::Whole(56)
+            )]
+            fn counts_whole_years_across_large_spans(
+                #[case] from: &str,
+                #[case] to: &str,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange
+                let from = point_at(from);
+                let to = point_at(to);
+
+                // Act
+                let difference = from.diff(
+                    to,
+                    TimeUnit::Year,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    difference,
+                    Ok(expected),
+                    "whole years must count across a large span"
+                );
+            }
+
+            #[rstest]
+            #[case::hour(TimeUnit::Hour, DateDiff::Fractional(1.5))]
+            #[case::minute(TimeUnit::Minute, DateDiff::Fractional(90.0))]
+            #[case::second(TimeUnit::Second, DateDiff::Fractional(5400.0))]
+            #[case::millisecond(
+                TimeUnit::Millisecond,
+                DateDiff::Fractional(5_400_000.0)
+            )]
+            #[case::calendar_day(TimeUnit::Day, DateDiff::Fractional(0.0625))]
+            #[case::calendar_week(
+                TimeUnit::Week,
+                DateDiff::Fractional(0.008_928_571_428_571_428)
+            )]
+            fn returns_exact_fractions_and_calendar_counts_between_date_time_points(
+                #[case] unit: TimeUnit,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange: ninety minutes span one local date boundary.
+                ZoneGuard::set("UTC");
+                let from = point_at("2026-07-28T23:00:00Z");
+                let to = point_at("2026-07-29T00:30:00Z");
+
+                // Act
+                let difference = from.diff(
+                    to,
+                    unit,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(difference, Ok(expected));
+            }
+
+            #[rstest]
+            #[case::month(TimeUnit::Month, DateDiff::Whole(0))]
+            #[case::year(TimeUnit::Year, DateDiff::Whole(0))]
+            fn returns_whole_calendar_counts_between_date_time_points(
+                #[case] unit: TimeUnit,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange: the two points sit in the same month and year.
+                ZoneGuard::set("UTC");
+                let from = point_at("2026-07-28T23:00:00Z");
+                let to = point_at("2026-07-29T00:30:00Z");
+
+                // Act
+                let difference = from.diff(
+                    to,
+                    unit,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    difference,
+                    Ok(expected),
+                    "{unit:?} must count whole calendar units of the local \
+                     dates"
+                );
+            }
+
+            #[rstest]
+            #[case::calendar_point(
+                "2026-07-29",
+                TimeUnit::Day,
+                DateDiff::Whole(0)
+            )]
+            #[case::date_time_point(
+                "2026-07-29 14:30:05",
+                TimeUnit::Hour,
+                DateDiff::Fractional(0.0)
+            )]
+            fn returns_zero_for_a_point_diffed_against_itself(
+                #[case] text: &str,
+                #[case] unit: TimeUnit,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange
+                ZoneGuard::set("UTC");
+                let point = point_at(text);
+
+                // Act
+                let difference = point.diff(
+                    point,
+                    unit,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    difference,
+                    Ok(expected),
+                    "a point diffed against itself must count zero"
+                );
+            }
+
+            #[rstest]
+            #[case::date_time_to_date(
+                "2026-07-28T23:00:00Z",
+                "2026-07-29",
+                DateDiff::Whole(1)
+            )]
+            #[case::date_to_date_time(
+                "2026-07-29",
+                "2026-07-29T00:30:00",
+                DateDiff::Whole(0)
+            )]
+            fn truncates_toward_zero_when_either_point_lacks_a_time(
+                #[case] from: &str,
+                #[case] to: &str,
+                #[case] expected: DateDiff,
+            ) {
+                // Arrange: mixed frames count whole units of the local reading.
+                ZoneGuard::set("UTC");
+                let from = point_at(from);
+                let to = point_at(to);
+
+                // Act
+                let difference = from.diff(
+                    to,
+                    TimeUnit::Hour,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    difference,
+                    Ok(expected),
+                    "a mixed-frame hour diff must truncate toward zero"
+                );
+            }
+
+            #[test]
+            fn counts_local_calendar_days_across_dst_independently_of_elapsed_hours()
+             {
+                // Arrange: New York springs forward on 2026-03-08 (a 23-hour
+                // day) and falls back on 2026-11-01 (a 25-hour
+                // day).
+                ZoneGuard::set_timezone(new_york_zone());
+                let spring_from = point_at("2026-03-07 12:00:00");
+                let spring_to = point_at("2026-03-08 12:00:00");
+                let fall_from = point_at("2026-10-31 12:00:00");
+                let fall_to = point_at("2026-11-01 12:00:00");
+
+                let spring_day = spring_from.diff(
+                    spring_to,
+                    TimeUnit::Day,
+                    &local_zone().expect("system time zone available"),
+                );
+                let spring_reverse = spring_to.diff(
+                    spring_from,
+                    TimeUnit::Day,
+                    &local_zone().expect("system time zone available"),
+                );
+                let spring_hour = spring_from.diff(
+                    spring_to,
+                    TimeUnit::Hour,
+                    &local_zone().expect("system time zone available"),
+                );
+                let fall_day = fall_from.diff(
+                    fall_to,
+                    TimeUnit::Day,
+                    &local_zone().expect("system time zone available"),
+                );
+                let fall_reverse = fall_to.diff(
+                    fall_from,
+                    TimeUnit::Day,
+                    &local_zone().expect("system time zone available"),
+                );
+                let fall_hour = fall_from.diff(
+                    fall_to,
+                    TimeUnit::Hour,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(spring_day, Ok(DateDiff::Fractional(1.0)));
+                assert_eq!(spring_reverse, Ok(DateDiff::Fractional(-1.0)));
+                assert_eq!(spring_hour, Ok(DateDiff::Fractional(23.0)));
+                assert_eq!(fall_day, Ok(DateDiff::Fractional(1.0)));
+                assert_eq!(fall_reverse, Ok(DateDiff::Fractional(-1.0)));
+                assert_eq!(fall_hour, Ok(DateDiff::Fractional(25.0)));
+            }
+
+            #[test]
+            fn counts_whole_days_for_date_only_points_across_dst() {
+                // Arrange: date-only points have no time component to fold.
+                ZoneGuard::set_timezone(new_york_zone());
+                let from = point_at("2026-03-07");
+                let to = point_at("2026-03-08");
+
+                // Act
+                let days = from.diff(
+                    to,
+                    TimeUnit::Day,
+                    &local_zone().expect("system time zone available"),
+                );
+                let hours = from.diff(
+                    to,
+                    TimeUnit::Hour,
+                    &local_zone().expect("system time zone available"),
+                );
+
+                // Assert
+                assert_eq!(
+                    days,
+                    Ok(DateDiff::Whole(1)),
+                    "a date-only day diff must count the local calendar day"
+                );
+                assert_eq!(
+                    hours,
+                    Ok(DateDiff::Whole(24)),
+                    "a date-only hour diff must count nominal whole hours"
+                );
+            }
         }
 
-        #[test]
-        fn converts_a_date_time_to_a_date_time_point() {
-            // Arrange: the fixed reference Date-Time.
-            let date_time = fixed_datetime();
+        mod to_f64 {
+            use super::*;
 
-            // Act
-            let point = DatePoint::from(date_time);
-
-            // Assert
-            assert_eq!(
-                point,
-                DatePoint::DateTime(date_time),
-                "converting a Date-Time must preserve its value"
-            );
-        }
-
-        #[test]
-        fn reports_no_time_for_a_calendar_point() {
-            // Arrange: the minimum year in the Jiff date range.
-            let point = DatePoint::Calendar {
-                date: DateValue::from(
-                    jiff::civil::Date::new(-9999, 1, 1)
-                        .expect("minimum Jiff date is valid"),
-                ),
-                date_precision: DatePrecision::Day,
-            };
-
-            // Act
-            let has_time = point.has_time();
-
-            // Assert
-            assert!(!has_time, "a calendar point must report no time-of-day");
-        }
-
-        #[test]
-        fn reports_a_time_for_a_date_time_point() {
-            // Arrange: the fixed reference date-time.
-            let point = DatePoint::DateTime(fixed_datetime());
-
-            // Act
-            let has_time = point.has_time();
-
-            // Assert
-            assert!(has_time, "a date-time point must report a time-of-day");
-        }
-
-        #[test]
-        fn returns_the_stored_date_for_a_calendar_point() {
-            // Arrange: month precision stores the first of the month.
-            let point = point_at("2026-07");
-
-            // Act
-            let date = point.date().expect("calendar date exists");
-
-            // Assert
-            assert_eq!(
-                date,
-                ymd(2026, 7, 1),
-                "a calendar point must return its stored date"
-            );
-        }
-
-        #[test]
-        fn returns_the_local_calendar_date_for_a_date_time_point() {
-            // Arrange
-            ZoneGuard::set("UTC");
-            let point = DatePoint::DateTime(fixed_datetime());
-
-            // Act
-            let date = point.date().expect("system zone available");
-
-            // Assert
-            assert_eq!(
-                date,
-                ymd(2026, 7, 29),
-                "a date-time point must render its local calendar date"
-            );
-        }
-
-        #[test]
-        fn renders_a_calendar_point_as_local_midnight() {
-            // Arrange
-            let point = point_at("2026-07-29");
-
-            // Act
-            let local = point.local_datetime_in(
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                local.to_string(),
-                "2026-07-29T00:00:00",
-                "a calendar point must render as local midnight"
-            );
-        }
-
-        #[test]
-        fn renders_the_local_clock_reading_of_a_date_time_point() {
-            // Arrange: the naive reference date-time resolved in New York.
-            ZoneGuard::set_timezone(new_york_zone());
-            let point = point_at("2026-07-29 14:30:05");
-
-            // Act
-            let local = point.local_datetime_in(
-                &local_zone().expect("system time zone available"),
-            );
-            let utc = point.instant().expect("the point is representable");
-
-            // Assert
-            assert_eq!(
-                local.to_string(),
-                "2026-07-29T14:30:05",
-                "the local clock must keep the written wall time"
-            );
-            assert_eq!(
-                utc.to_string(),
-                "2026-07-29T18:30:05Z",
-                "the stored date-time must be the UTC value"
-            );
-        }
-
-        #[test]
-        fn resolves_a_calendar_point_at_utc_midnight_in_utc() {
-            // Arrange
-            ZoneGuard::set("UTC");
-            let point = point_at("2026-07-29");
-
-            // Act
-            let utc =
-                point.instant().expect("the date midnight is representable");
-
-            // Assert
-            assert_eq!(
-                utc.to_string(),
-                "2026-07-29T00:00:00Z",
-                "in UTC a calendar point must resolve at UTC midnight"
-            );
-        }
-
-        #[test]
-        fn resolves_a_calendar_point_at_local_midnight_in_the_process_zone() {
-            // Arrange: New York sits four hours behind UTC in July.
-            ZoneGuard::set_timezone(new_york_zone());
-            let point = point_at("2026-07-29");
-
-            // Act
-            let utc =
-                point.instant().expect("the date midnight is representable");
-
-            // Assert
-            assert_eq!(
-                utc.to_string(),
-                "2026-07-29T04:00:00Z",
-                "a calendar point must resolve at local midnight"
-            );
-        }
-
-        #[rstest]
-        #[case::month("2026-07", "%Y-%m")]
-        #[case::day("2026-07-29", "%Y-%m-%d")]
-        #[case::whole_seconds("2026-07-29T14:30:00Z", "%Y-%m-%dT%H:%M:%S")]
-        #[case::fractional_seconds(
-            "2026-07-29T14:30:00.123Z",
-            "%Y-%m-%dT%H:%M:%S%.3f"
+            #[rstest]
+            #[case::positive(DateDiff::Whole(42), 42.0)]
+            #[case::negative(DateDiff::Whole(-7), -7.0)]
+            #[case::zero(DateDiff::Whole(0), 0.0)]
+            #[case::i64_max(
+                DateDiff::Whole(i64::MAX),
+                9_223_372_036_854_775_808.0
+            )]
+            #[case::i64_min(
+            DateDiff::Whole(i64::MIN),
+            -9_223_372_036_854_775_808.0
         )]
-        fn preserves_written_precision_in_the_canonical_pattern(
-            #[case] text: &str,
-            #[case] expected: &str,
-        ) {
-            // Arrange
-            ZoneGuard::set("UTC");
-            let point = point_at(text);
+            fn projects_whole_differences_as_f64(
+                #[case] difference: DateDiff,
+                #[case] expected: f64,
+            ) {
+                // Arrange: `difference` and `expected` are the case literals.
+                // Act
+                let actual = difference.to_f64();
+                // Assert
+                assert_eq!(
+                    actual,
+                    Some(expected),
+                    "{difference:?} should project as {expected}"
+                );
+            }
 
-            // Act
-            let pattern = point.canonical_pattern();
+            #[rstest]
+            #[case::two_and_a_half(DateDiff::Fractional(2.5), 2.5)]
+            #[case::negative_fraction(DateDiff::Fractional(-0.25), -0.25)]
+            #[case::zero(DateDiff::Fractional(0.0), 0.0)]
+            fn projects_fractional_differences_as_f64(
+                #[case] difference: DateDiff,
+                #[case] expected: f64,
+            ) {
+                // Arrange: `difference` and `expected` are the case literals.
+                // Act
+                let actual = difference.to_f64();
+                // Assert
+                assert_eq!(
+                    actual,
+                    Some(expected),
+                    "{difference:?} should project as {expected}"
+                );
+            }
 
-            // Assert
-            assert_eq!(
-                pattern, expected,
-                "{text:?} must render its written precision"
-            );
+            #[rstest]
+            #[case::not_a_number(f64::NAN)]
+            #[case::positive_infinity(f64::INFINITY)]
+            #[case::negative_infinity(f64::NEG_INFINITY)]
+            fn rejects_non_finite_fractional_differences(
+                #[case] magnitude: f64,
+            ) {
+                // Arrange: non-finite fractional values cannot be represented
+                // as `f64` output.
+                let difference = DateDiff::Fractional(magnitude);
+
+                // Act
+                let actual = difference.to_f64();
+
+                // Assert
+                assert_eq!(
+                    actual, None,
+                    "non-finite {magnitude:?} is not projectable"
+                );
+            }
         }
     }
 
@@ -2790,439 +3229,6 @@ mod tests {
                 // Assert
                 prop_assert_eq!(restored, point);
             }
-        }
-    }
-}
-#[cfg(test)]
-mod date_diff_tests {
-    use rstest::rstest;
-
-    use super::*;
-    use crate::temporal::{
-        local_zone,
-        test_support::{ZoneGuard, fixtures::new_york_zone},
-    };
-
-    fn point_at(text: &str) -> DatePoint {
-        DatePoint::parse(text).expect("valid date point")
-    }
-
-    mod conversions {
-        use super::*;
-
-        #[rstest]
-        #[case::positive(DateDiff::Whole(42), 42.0)]
-        #[case::negative(DateDiff::Whole(-7), -7.0)]
-        #[case::zero(DateDiff::Whole(0), 0.0)]
-        #[case::i64_max(DateDiff::Whole(i64::MAX), 9_223_372_036_854_775_808.0)]
-        #[case::i64_min(
-            DateDiff::Whole(i64::MIN),
-            -9_223_372_036_854_775_808.0
-        )]
-        fn projects_whole_differences_as_f64(
-            #[case] difference: DateDiff,
-            #[case] expected: f64,
-        ) {
-            // Arrange: `difference` and `expected` are the case literals.
-            // Act
-            let actual = difference.to_f64();
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "{difference:?} should project as {expected}"
-            );
-        }
-
-        #[rstest]
-        #[case::two_and_a_half(DateDiff::Fractional(2.5), 2.5)]
-        #[case::negative_fraction(DateDiff::Fractional(-0.25), -0.25)]
-        #[case::zero(DateDiff::Fractional(0.0), 0.0)]
-        fn projects_fractional_differences_as_f64(
-            #[case] difference: DateDiff,
-            #[case] expected: f64,
-        ) {
-            // Arrange: `difference` and `expected` are the case literals.
-            // Act
-            let actual = difference.to_f64();
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "{difference:?} should project as {expected}"
-            );
-        }
-
-        #[rstest]
-        #[case::not_a_number(f64::NAN)]
-        #[case::positive_infinity(f64::INFINITY)]
-        #[case::negative_infinity(f64::NEG_INFINITY)]
-        fn rejects_non_finite_fractional_differences(#[case] magnitude: f64) {
-            // Arrange: non-finite fractional values cannot be represented as
-            // `f64` output.
-            let difference = DateDiff::Fractional(magnitude);
-
-            // Act
-            let actual = difference.to_f64();
-
-            // Assert
-            assert_eq!(
-                actual, None,
-                "non-finite {magnitude:?} is not projectable"
-            );
-        }
-    }
-
-    mod diff {
-        use super::*;
-
-        #[rstest]
-        #[case::year(
-            "2020-06-15",
-            "2026-07-15",
-            TimeUnit::Year,
-            DateDiff::Whole(6)
-        )]
-        #[case::month_across_month_ends(
-            "2026-01-15",
-            "2026-03-15",
-            TimeUnit::Month,
-            DateDiff::Whole(2)
-        )]
-        #[case::week(
-            "2026-07-29",
-            "2026-08-06",
-            TimeUnit::Week,
-            DateDiff::Whole(1)
-        )]
-        #[case::day(
-            "2026-07-29",
-            "2026-08-06",
-            TimeUnit::Day,
-            DateDiff::Whole(8)
-        )]
-        #[case::hour(
-            "2026-07-29",
-            "2026-08-06",
-            TimeUnit::Hour,
-            DateDiff::Whole(192)
-        )]
-        #[case::minute(
-            "2026-07-29",
-            "2026-08-06",
-            TimeUnit::Minute,
-            DateDiff::Whole(11520)
-        )]
-        #[case::second(
-            "2026-07-29",
-            "2026-08-06",
-            TimeUnit::Second,
-            DateDiff::Whole(691_200)
-        )]
-        #[case::millisecond(
-            "2026-07-29",
-            "2026-08-06",
-            TimeUnit::Millisecond,
-            DateDiff::Whole(691_200_000)
-        )]
-        fn returns_whole_counts_between_calendar_points(
-            #[case] from: &str,
-            #[case] to: &str,
-            #[case] unit: TimeUnit,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange
-            let from = point_at(from);
-            let to = point_at(to);
-
-            // Act
-            let difference = from.diff(
-                to,
-                unit,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                difference,
-                Ok(expected),
-                "{unit:?} between calendar points must count whole units"
-            );
-        }
-
-        #[rstest]
-        #[case::month("2026-01-15", "2026-03-15", TimeUnit::Month, DateDiff::Whole(-2))]
-        #[case::year("2020-06-15", "2026-07-15", TimeUnit::Year, DateDiff::Whole(-6))]
-        #[case::day("2026-07-29", "2026-08-06", TimeUnit::Day, DateDiff::Whole(-8))]
-        #[case::hour("2026-07-29", "2026-08-06", TimeUnit::Hour, DateDiff::Whole(-192))]
-        fn returns_the_negated_difference_in_the_reverse_direction(
-            #[case] from: &str,
-            #[case] to: &str,
-            #[case] unit: TimeUnit,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange
-            let from = point_at(from);
-            let to = point_at(to);
-
-            // Act
-            let difference = to.diff(
-                from,
-                unit,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                difference,
-                Ok(expected),
-                "diff must be antisymmetric for {unit:?}"
-            );
-        }
-
-        #[rstest]
-        #[case::to_the_last_representable_day(
-            "2026-01-01",
-            "9999-12-31",
-            DateDiff::Whole(7973)
-        )]
-        #[case::since_the_epoch(
-            "1970-01-01",
-            "2026-07-29",
-            DateDiff::Whole(56)
-        )]
-        fn counts_whole_years_across_large_spans(
-            #[case] from: &str,
-            #[case] to: &str,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange
-            let from = point_at(from);
-            let to = point_at(to);
-
-            // Act
-            let difference = from.diff(
-                to,
-                TimeUnit::Year,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                difference,
-                Ok(expected),
-                "whole years must count across a large span"
-            );
-        }
-
-        #[rstest]
-        #[case::hour(TimeUnit::Hour, DateDiff::Fractional(1.5))]
-        #[case::minute(TimeUnit::Minute, DateDiff::Fractional(90.0))]
-        #[case::second(TimeUnit::Second, DateDiff::Fractional(5400.0))]
-        #[case::millisecond(
-            TimeUnit::Millisecond,
-            DateDiff::Fractional(5_400_000.0)
-        )]
-        #[case::calendar_day(TimeUnit::Day, DateDiff::Fractional(0.0625))]
-        #[case::calendar_week(
-            TimeUnit::Week,
-            DateDiff::Fractional(0.008_928_571_428_571_428)
-        )]
-        fn returns_exact_fractions_and_calendar_counts_between_date_time_points(
-            #[case] unit: TimeUnit,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange: ninety minutes span one local date boundary.
-            ZoneGuard::set("UTC");
-            let from = point_at("2026-07-28T23:00:00Z");
-            let to = point_at("2026-07-29T00:30:00Z");
-
-            // Act
-            let difference = from.diff(
-                to,
-                unit,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(difference, Ok(expected));
-        }
-
-        #[rstest]
-        #[case::month(TimeUnit::Month, DateDiff::Whole(0))]
-        #[case::year(TimeUnit::Year, DateDiff::Whole(0))]
-        fn returns_whole_calendar_counts_between_date_time_points(
-            #[case] unit: TimeUnit,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange: the two points sit in the same month and year.
-            ZoneGuard::set("UTC");
-            let from = point_at("2026-07-28T23:00:00Z");
-            let to = point_at("2026-07-29T00:30:00Z");
-
-            // Act
-            let difference = from.diff(
-                to,
-                unit,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                difference,
-                Ok(expected),
-                "{unit:?} must count whole calendar units of the local dates"
-            );
-        }
-
-        #[rstest]
-        #[case::calendar_point("2026-07-29", TimeUnit::Day, DateDiff::Whole(0))]
-        #[case::date_time_point(
-            "2026-07-29 14:30:05",
-            TimeUnit::Hour,
-            DateDiff::Fractional(0.0)
-        )]
-        fn returns_zero_for_a_point_diffed_against_itself(
-            #[case] text: &str,
-            #[case] unit: TimeUnit,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange
-            ZoneGuard::set("UTC");
-            let point = point_at(text);
-
-            // Act
-            let difference = point.diff(
-                point,
-                unit,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                difference,
-                Ok(expected),
-                "a point diffed against itself must count zero"
-            );
-        }
-
-        #[rstest]
-        #[case::date_time_to_date(
-            "2026-07-28T23:00:00Z",
-            "2026-07-29",
-            DateDiff::Whole(1)
-        )]
-        #[case::date_to_date_time(
-            "2026-07-29",
-            "2026-07-29T00:30:00",
-            DateDiff::Whole(0)
-        )]
-        fn truncates_toward_zero_when_either_point_lacks_a_time(
-            #[case] from: &str,
-            #[case] to: &str,
-            #[case] expected: DateDiff,
-        ) {
-            // Arrange: mixed frames count whole units of the local reading.
-            ZoneGuard::set("UTC");
-            let from = point_at(from);
-            let to = point_at(to);
-
-            // Act
-            let difference = from.diff(
-                to,
-                TimeUnit::Hour,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                difference,
-                Ok(expected),
-                "a mixed-frame hour diff must truncate toward zero"
-            );
-        }
-
-        #[test]
-        fn counts_local_calendar_days_across_dst_independently_of_elapsed_hours()
-         {
-            // Arrange: New York springs forward on 2026-03-08 (a 23-hour day)
-            // and falls back on 2026-11-01 (a 25-hour day).
-            ZoneGuard::set_timezone(new_york_zone());
-            let spring_from = point_at("2026-03-07 12:00:00");
-            let spring_to = point_at("2026-03-08 12:00:00");
-            let fall_from = point_at("2026-10-31 12:00:00");
-            let fall_to = point_at("2026-11-01 12:00:00");
-
-            let spring_day = spring_from.diff(
-                spring_to,
-                TimeUnit::Day,
-                &local_zone().expect("system time zone available"),
-            );
-            let spring_reverse = spring_to.diff(
-                spring_from,
-                TimeUnit::Day,
-                &local_zone().expect("system time zone available"),
-            );
-            let spring_hour = spring_from.diff(
-                spring_to,
-                TimeUnit::Hour,
-                &local_zone().expect("system time zone available"),
-            );
-            let fall_day = fall_from.diff(
-                fall_to,
-                TimeUnit::Day,
-                &local_zone().expect("system time zone available"),
-            );
-            let fall_reverse = fall_to.diff(
-                fall_from,
-                TimeUnit::Day,
-                &local_zone().expect("system time zone available"),
-            );
-            let fall_hour = fall_from.diff(
-                fall_to,
-                TimeUnit::Hour,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(spring_day, Ok(DateDiff::Fractional(1.0)));
-            assert_eq!(spring_reverse, Ok(DateDiff::Fractional(-1.0)));
-            assert_eq!(spring_hour, Ok(DateDiff::Fractional(23.0)));
-            assert_eq!(fall_day, Ok(DateDiff::Fractional(1.0)));
-            assert_eq!(fall_reverse, Ok(DateDiff::Fractional(-1.0)));
-            assert_eq!(fall_hour, Ok(DateDiff::Fractional(25.0)));
-        }
-
-        #[test]
-        fn counts_whole_days_for_date_only_points_across_dst() {
-            // Arrange: date-only points have no time component to fold.
-            ZoneGuard::set_timezone(new_york_zone());
-            let from = point_at("2026-03-07");
-            let to = point_at("2026-03-08");
-
-            // Act
-            let days = from.diff(
-                to,
-                TimeUnit::Day,
-                &local_zone().expect("system time zone available"),
-            );
-            let hours = from.diff(
-                to,
-                TimeUnit::Hour,
-                &local_zone().expect("system time zone available"),
-            );
-
-            // Assert
-            assert_eq!(
-                days,
-                Ok(DateDiff::Whole(1)),
-                "a date-only day diff must count the local calendar day"
-            );
-            assert_eq!(
-                hours,
-                Ok(DateDiff::Whole(24)),
-                "a date-only hour diff must count nominal whole hours"
-            );
         }
     }
 }

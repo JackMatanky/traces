@@ -43,6 +43,76 @@ pub(crate) enum TimeUnit {
     Year,
 }
 
+impl TimeUnit {
+    /// Looks up a unit by its case-insensitive spelling.
+    ///
+    /// Scans the alias lists in [`TEMPORAL_UNITS`] with ASCII-case-insensitive
+    /// equality, so every alias in the registry is accepted and nothing else
+    /// is: an empty, too long, or non-ASCII input matches no alias and returns
+    /// [`None`].
+    #[must_use]
+    pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
+        TEMPORAL_UNITS
+            .iter()
+            .find(|row| {
+                row.aliases.iter().any(|alias| alias.eq_ignore_ascii_case(unit))
+            })
+            .map(|row| row.unit)
+    }
+
+    /// Returns this unit's [`UnitSpec`] row.
+    ///
+    /// Listed by variant, so adding a [`TimeUnit`] variant with no
+    /// [`TEMPORAL_UNITS`] row yet fails to compile here first.
+    #[must_use]
+    pub(crate) const fn spec(self) -> &'static UnitSpec {
+        match self {
+            Self::Year => &TEMPORAL_UNITS[0],
+            Self::Month => &TEMPORAL_UNITS[1],
+            Self::Week => &TEMPORAL_UNITS[2],
+            Self::Day => &TEMPORAL_UNITS[3],
+            Self::Hour => &TEMPORAL_UNITS[4],
+            Self::Minute => &TEMPORAL_UNITS[5],
+            Self::Second => &TEMPORAL_UNITS[6],
+            Self::Millisecond => &TEMPORAL_UNITS[7],
+        }
+    }
+
+    /// Returns the exact nominal nanoseconds per unit from the registry.
+    #[must_use]
+    pub(crate) const fn nominal_nanoseconds(self) -> i128 {
+        self.spec().nominal_nanoseconds
+    }
+
+    /// Returns the fixed nominal seconds per unit.
+    ///
+    /// Calendar units ([`Self::Day`], [`Self::Week`], [`Self::Month`],
+    /// [`Self::Year`]) get nominal fixed ratios for value identity, magnitude
+    /// ordering, and fractional-remainder application; their whole-count
+    /// date-shifting behavior belongs to the calendar owner modules.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn nominal_seconds(self) -> f64 {
+        self.spec().nominal_seconds
+    }
+
+    /// Returns the singular and plural English names for human-readable
+    /// durations.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
+        self.spec().names
+    }
+
+    /// Returns `true` if this unit is a calendar unit ([`Self::Day`],
+    /// [`Self::Week`], [`Self::Month`], or [`Self::Year`]).
+    #[inline]
+    #[must_use]
+    pub(crate) const fn is_calendar(self) -> bool {
+        self.spec().calendar
+    }
+}
+
 /// Stores the registry facts for one time unit.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct UnitSpec {
@@ -195,76 +265,6 @@ pub(crate) fn decompose(
 /// Returns the exact nominal millisecond count for [`TimeUnit`].
 fn whole_milliseconds(unit: TimeUnit) -> u64 {
     unit.spec().nominal_milliseconds
-}
-
-impl TimeUnit {
-    /// Looks up a unit by its case-insensitive spelling.
-    ///
-    /// Scans the alias lists in [`TEMPORAL_UNITS`] with ASCII-case-insensitive
-    /// equality, so every alias in the registry is accepted and nothing
-    /// else is: an empty, too long, or non-ASCII input matches no alias and
-    /// returns [`None`].
-    #[must_use]
-    pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
-        TEMPORAL_UNITS
-            .iter()
-            .find(|row| {
-                row.aliases.iter().any(|alias| alias.eq_ignore_ascii_case(unit))
-            })
-            .map(|row| row.unit)
-    }
-
-    /// Returns this unit's [`UnitSpec`] row.
-    ///
-    /// Listed by variant, so adding a [`TimeUnit`] variant with no
-    /// [`TEMPORAL_UNITS`] row yet fails to compile here first.
-    #[must_use]
-    pub(crate) const fn spec(self) -> &'static UnitSpec {
-        match self {
-            Self::Year => &TEMPORAL_UNITS[0],
-            Self::Month => &TEMPORAL_UNITS[1],
-            Self::Week => &TEMPORAL_UNITS[2],
-            Self::Day => &TEMPORAL_UNITS[3],
-            Self::Hour => &TEMPORAL_UNITS[4],
-            Self::Minute => &TEMPORAL_UNITS[5],
-            Self::Second => &TEMPORAL_UNITS[6],
-            Self::Millisecond => &TEMPORAL_UNITS[7],
-        }
-    }
-
-    /// Returns the exact nominal nanoseconds per unit from the registry.
-    #[must_use]
-    pub(crate) const fn nominal_nanoseconds(self) -> i128 {
-        self.spec().nominal_nanoseconds
-    }
-
-    /// Returns the singular and plural English names for human-readable
-    /// durations.
-    #[must_use]
-    #[inline]
-    pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
-        self.spec().names
-    }
-
-    /// Returns the fixed nominal seconds per unit.
-    ///
-    /// Calendar units ([`Self::Day`], [`Self::Week`], [`Self::Month`],
-    /// [`Self::Year`]) get nominal fixed ratios for value identity, magnitude
-    /// ordering, and fractional-remainder application; their whole-count
-    /// date-shifting behavior belongs to the calendar owner modules.
-    #[must_use]
-    #[inline]
-    pub(crate) const fn nominal_seconds(self) -> f64 {
-        self.spec().nominal_seconds
-    }
-
-    /// Returns `true` if this unit is a calendar unit ([`Self::Day`],
-    /// [`Self::Week`], [`Self::Month`], or [`Self::Year`]).
-    #[inline]
-    #[must_use]
-    pub(crate) const fn is_calendar(self) -> bool {
-        self.spec().calendar
-    }
 }
 
 /// Identifies a named calendar or clock component of a date point.

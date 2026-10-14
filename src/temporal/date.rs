@@ -72,6 +72,32 @@ impl DateValue {
         civil::Date::new(year, month, day).map(Self).map_err(|_| invalid())
     }
 
+    /// Parses an ISO-8601 date string (`YYYY-MM-DD`, `YYYY-MM`, or a signed
+    /// four-digit year in the same forms) using the recognition layer.
+    ///
+    /// Trims surrounding whitespace first, then requires a four-digit year,
+    /// optionally prefixed by a minus sign, before trying accepted shapes.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::YearNotFourDigits`] if the trimmed `s` does not begin
+    ///   with four ASCII digits or a minus sign followed by four ASCII digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
+    pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+        let trimmed = s.trim();
+        if !starts_with_year(trimmed) {
+            return Err(DateError::YearNotFourDigits {
+                input: trimmed.into(),
+            });
+        }
+        DateShape::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
+            |reason| DateError::InvalidValue {
+                input: trimmed.into(),
+                reason,
+            },
+        )
+    }
+
     /// Wraps a valid Jiff civil date.
     #[inline]
     #[must_use]
@@ -84,6 +110,15 @@ impl DateValue {
     #[must_use]
     pub(crate) const fn civil_date(self) -> civil::Date {
         self.0
+    }
+
+    /// Returns the whole calendar years from `self` to `to`, signed by
+    /// ordering.
+    ///
+    /// A year counts only once the month and day of `to` reach those of `self`,
+    /// so this is [`DateValue::whole_months_until`] divided down to years.
+    pub(super) fn whole_years_until(self, to: Self) -> i64 {
+        self.whole_months_until(to) / 12
     }
 
     /// Returns the whole calendar months from `self` to `to`, signed by
@@ -114,15 +149,6 @@ impl DateValue {
         months
     }
 
-    /// Returns the whole calendar years from `self` to `to`, signed by
-    /// ordering.
-    ///
-    /// A year counts only once the month and day of `to` reach those of `self`,
-    /// so this is [`DateValue::whole_months_until`] divided down to years.
-    pub(super) fn whole_years_until(self, to: Self) -> i64 {
-        self.whole_months_until(to) / 12
-    }
-
     /// Adds a Jiff span, discarding the time of day as date-only arithmetic
     /// does.
     ///
@@ -139,31 +165,93 @@ impl DateValue {
             .map(Self)
             .map_err(|_| CalendarError::OutOfRange)
     }
+}
 
-    /// Parses an ISO-8601 date string (`YYYY-MM-DD`, `YYYY-MM`, or a signed
-    /// four-digit year in the same forms) using the recognition layer.
-    ///
-    /// Trims surrounding whitespace first, then requires a four-digit year,
-    /// optionally prefixed by a minus sign, before trying accepted shapes.
+/// Renders as a four-digit year with a leading minus sign for negative years.
+impl fmt::Display for DateValue {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let date = self.0;
+        if date.year() < 0 {
+            write!(
+                f,
+                "-{:04}-{:02}-{:02}",
+                date.year().unsigned_abs(),
+                date.month(),
+                date.day()
+            )
+        } else {
+            write!(
+                f,
+                "{:04}-{:02}-{:02}",
+                date.year(),
+                date.month(),
+                date.day()
+            )
+        }
+    }
+}
+
+impl From<civil::Date> for DateValue {
+    #[inline]
+    fn from(date: civil::Date) -> Self {
+        Self(date)
+    }
+}
+
+impl FromStr for DateValue {
+    type Err = DateError;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_iso(s)
+    }
+}
+
+/// Converts to the calendar day `time` falls on in the local zone, not the UTC
+/// calendar day.
+///
+/// A file's date means the reader's local day, the same doctrine that reads
+/// unzoned date-time input on the local clock: a time in the final hours of
+/// December 31 locally can already be January 1 in UTC, or the reverse.
+impl TryFrom<SystemTime> for DateValue {
+    type Error = DateError;
+
+    /// Converts `time` to its date in the current local time zone.
     ///
     /// # Errors
     ///
-    /// - [`DateError::YearNotFourDigits`] if the trimmed `s` does not begin
-    ///   with four ASCII digits or a minus sign followed by four ASCII digits.
-    /// - [`DateError::InvalidValue`] if no accepted shape matches.
-    pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-        let trimmed = s.trim();
-        if !starts_with_year(trimmed) {
-            return Err(DateError::YearNotFourDigits {
-                input: trimmed.into(),
-            });
-        }
-        DateShape::parse_any(trimmed).map(|(date, _)| Self(date)).map_err(
-            |reason| DateError::InvalidValue {
-                input: trimmed.into(),
-                reason,
-            },
-        )
+    /// - [`DateError::InvalidValue`] if `time` is outside the representable
+    ///   timestamp range.
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
+    #[inline]
+    fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
+        DateTimeValue::try_from(time)?.local_date()
+    }
+}
+
+/// Serializes as the canonical `YYYY-MM-DD` display string.
+impl Serialize for DateValue {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+/// Deserializes through the same parser as [`FromStr`](std::str::FromStr), so
+/// the four-digit-year rule and `YYYY-MM` acceptance apply identically to
+/// inline and deserialized dates.
+impl<'de> Deserialize<'de> for DateValue {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = Cow::<'de, str>::deserialize(deserializer)?;
+        Self::parse_iso(&s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -178,35 +266,6 @@ pub(crate) enum DateShape {
     YearMonth,
 }
 
-/// Returns `true` if `s` starts with a four-digit zero-padded date prefix.
-#[expect(
-    clippy::arithmetic_side_effects,
-    reason = "year length is 4 or 5 bytes"
-)]
-pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
-    let year_len = if s.starts_with('-') {
-        5
-    } else {
-        4
-    };
-    let year_start = usize::from(s.starts_with('-'));
-    let month_start = year_len + 1;
-    let day_start = month_start + 3;
-    s.get(..year_len + 6).is_some_and(|date| {
-        let bytes = date.as_bytes();
-        bytes.get(year_len) == Some(&b'-')
-            && bytes.get(month_start + 2) == Some(&b'-')
-            && bytes
-                .get(year_start..year_len)
-                .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
-            && bytes
-                .get(month_start..month_start + 2)
-                .is_some_and(|month| month.iter().all(u8::is_ascii_digit))
-            && bytes
-                .get(day_start..day_start + 2)
-                .is_some_and(|day| day.iter().all(u8::is_ascii_digit))
-    })
-}
 impl DateShape {
     /// Parses `s` as a full date, falling back to a year-month.
     ///
@@ -317,92 +376,34 @@ impl DateShape {
     }
 }
 
-/// Renders as a four-digit year with a leading minus sign for negative years.
-impl fmt::Display for DateValue {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let date = self.0;
-        if date.year() < 0 {
-            write!(
-                f,
-                "-{:04}-{:02}-{:02}",
-                date.year().unsigned_abs(),
-                date.month(),
-                date.day()
-            )
-        } else {
-            write!(
-                f,
-                "{:04}-{:02}-{:02}",
-                date.year(),
-                date.month(),
-                date.day()
-            )
-        }
-    }
-}
-
-impl From<civil::Date> for DateValue {
-    #[inline]
-    fn from(date: civil::Date) -> Self {
-        Self(date)
-    }
-}
-
-/// Converts to the calendar day `time` falls on in the local zone, not the UTC
-/// calendar day.
-///
-/// A file's date means the reader's local day, the same doctrine that reads
-/// unzoned date-time input on the local clock: a time in the final hours of
-/// December 31 locally can already be January 1 in UTC, or the reverse.
-impl TryFrom<SystemTime> for DateValue {
-    type Error = DateError;
-
-    /// Converts `time` to its date in the current local time zone.
-    ///
-    /// # Errors
-    ///
-    /// - [`DateError::InvalidValue`] if `time` is outside the representable
-    ///   timestamp range.
-    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
-    #[inline]
-    fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
-        DateTimeValue::try_from(time)?.local_date()
-    }
-}
-
-impl FromStr for DateValue {
-    type Err = DateError;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse_iso(s)
-    }
-}
-
-/// Serializes as the canonical `YYYY-MM-DD` display string.
-impl Serialize for DateValue {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-/// Deserializes through the same parser as [`FromStr`](std::str::FromStr), so
-/// the four-digit-year rule and `YYYY-MM` acceptance apply identically to
-/// inline and deserialized dates.
-impl<'de> Deserialize<'de> for DateValue {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = Cow::<'de, str>::deserialize(deserializer)?;
-        Self::parse_iso(&s).map_err(serde::de::Error::custom)
-    }
+/// Returns `true` if `s` starts with a four-digit zero-padded date prefix.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "year length is 4 or 5 bytes"
+)]
+pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
+    let year_len = if s.starts_with('-') {
+        5
+    } else {
+        4
+    };
+    let year_start = usize::from(s.starts_with('-'));
+    let month_start = year_len + 1;
+    let day_start = month_start + 3;
+    s.get(..year_len + 6).is_some_and(|date| {
+        let bytes = date.as_bytes();
+        bytes.get(year_len) == Some(&b'-')
+            && bytes.get(month_start + 2) == Some(&b'-')
+            && bytes
+                .get(year_start..year_len)
+                .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
+            && bytes
+                .get(month_start..month_start + 2)
+                .is_some_and(|month| month.iter().all(u8::is_ascii_digit))
+            && bytes
+                .get(day_start..day_start + 2)
+                .is_some_and(|day| day.iter().all(u8::is_ascii_digit))
+    })
 }
 
 #[cfg(test)]

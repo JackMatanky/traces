@@ -4,6 +4,21 @@ use jiff::tz::TimeZone;
 
 use super::DateError;
 
+/// Returns the process-local time zone.
+///
+/// # Errors
+///
+/// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
+#[inline]
+pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
+    #[cfg(any(test, feature = "test-utils"))]
+    if let Some(zone) = super::test_support::current_override() {
+        return Ok(zone);
+    }
+
+    resolve(TimeZone::try_system)
+}
+
 /// Maps a failed local-zone lookup to [`DateError::LocalZoneLookup`].
 ///
 /// # Errors
@@ -20,20 +35,6 @@ where
     })
 }
 
-/// Returns the process-local time zone.
-///
-/// # Errors
-///
-/// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
-#[inline]
-pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
-    #[cfg(any(test, feature = "test-utils"))]
-    if let Some(zone) = super::test_support::current_override() {
-        return Ok(zone);
-    }
-
-    resolve(TimeZone::try_system)
-}
 #[cfg(test)]
 mod tests {
 

@@ -62,39 +62,6 @@ pub enum DateError {
     },
 }
 
-/// Reports failures in internal calendar arithmetic.
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
-pub(crate) enum CalendarError {
-    /// Reports that calendar arithmetic exceeds the representable range.
-    #[error("date/time value is out of range")]
-    OutOfRange,
-    /// Reports that local-zone resolution failed for a computed local clock
-    /// time.
-    #[error("local zone lookup failed for {input}")]
-    Zone {
-        /// Stores the local clock time that could not be resolved.
-        input: Box<str>,
-    },
-}
-
-impl CalendarError {
-    /// Maps a calendar failure to the parse error exposed by typed date
-    /// parsers.
-    pub(crate) fn into_date_error(self, input: &str) -> DateError {
-        match self {
-            Self::OutOfRange => DateError::InvalidValue {
-                input: input.into(),
-                reason: "date/time is outside the representable range",
-            },
-            Self::Zone {
-                input: zone_input,
-            } => DateError::LocalZoneLookup {
-                input: zone_input,
-            },
-        }
-    }
-}
-
 /// Reports failures in duration parsing, validation, and conversion.
 ///
 /// Covers three failure domains:
@@ -167,6 +134,39 @@ pub enum DurationError {
     SecondsOutOfRange,
 }
 
+/// Reports failures in internal calendar arithmetic.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum CalendarError {
+    /// Reports that calendar arithmetic exceeds the representable range.
+    #[error("date/time value is out of range")]
+    OutOfRange,
+    /// Reports that local-zone resolution failed for a computed local clock
+    /// time.
+    #[error("local zone lookup failed for {input}")]
+    Zone {
+        /// Stores the local clock time that could not be resolved.
+        input: Box<str>,
+    },
+}
+
+impl CalendarError {
+    /// Maps a calendar failure to the parse error exposed by typed date
+    /// parsers.
+    pub(crate) fn into_date_error(self, input: &str) -> DateError {
+        match self {
+            Self::OutOfRange => DateError::InvalidValue {
+                input: input.into(),
+                reason: "date/time is outside the representable range",
+            },
+            Self::Zone {
+                input: zone_input,
+            } => DateError::LocalZoneLookup {
+                input: zone_input,
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,30 +205,6 @@ mod tests {
                 rendered, expected,
                 "Display text of {error:?} is the CLI contract"
             );
-        }
-
-        #[test]
-        fn renders_the_out_of_range_calendar_error() {
-            // Arrange
-            let error = CalendarError::OutOfRange;
-            let expected = "date/time value is out of range";
-            // Act
-            let rendered = error.to_string();
-            // Assert
-            assert_eq!(rendered, expected);
-        }
-
-        #[test]
-        fn renders_the_zone_calendar_error() {
-            // Arrange
-            let error = CalendarError::Zone {
-                input: "2026-03-08 02:30:00".into(),
-            };
-            let expected = "local zone lookup failed for 2026-03-08 02:30:00";
-            // Act
-            let rendered = error.to_string();
-            // Assert
-            assert_eq!(rendered, expected);
         }
 
         #[rstest]
@@ -292,6 +268,30 @@ mod tests {
                 "MalformedNumber must prefix the source error with its own \
                  message"
             );
+        }
+
+        #[test]
+        fn renders_the_out_of_range_calendar_error() {
+            // Arrange
+            let error = CalendarError::OutOfRange;
+            let expected = "date/time value is out of range";
+            // Act
+            let rendered = error.to_string();
+            // Assert
+            assert_eq!(rendered, expected);
+        }
+
+        #[test]
+        fn renders_the_zone_calendar_error() {
+            // Arrange
+            let error = CalendarError::Zone {
+                input: "2026-03-08 02:30:00".into(),
+            };
+            let expected = "local zone lookup failed for 2026-03-08 02:30:00";
+            // Act
+            let rendered = error.to_string();
+            // Assert
+            assert_eq!(rendered, expected);
         }
     }
 

@@ -148,53 +148,7 @@ fn shift_span(n: i64, unit: TimeUnit) -> Result<Span, CalendarError> {
 mod tests {
     use super::*;
 
-    mod lookup {
-        use pretty_assertions::assert_eq;
-        use rstest::rstest;
-
-        use super::*;
-
-        #[rstest]
-        #[case::monday(1, civil::Weekday::Monday)]
-        #[case::tuesday(2, civil::Weekday::Tuesday)]
-        #[case::wednesday(3, civil::Weekday::Wednesday)]
-        #[case::thursday(4, civil::Weekday::Thursday)]
-        #[case::friday(5, civil::Weekday::Friday)]
-        #[case::saturday(6, civil::Weekday::Saturday)]
-        #[case::sunday(7, civil::Weekday::Sunday)]
-        fn maps_iso_weekday_numbers_to_weekdays(
-            #[case] number: i64,
-            #[case] expected: civil::Weekday,
-        ) {
-            // Arrange: `number` and `expected` are the case literals.
-            // Act
-            let actual = weekday_from_number(number);
-            // Assert
-            assert_eq!(
-                actual,
-                Some(expected),
-                "ISO weekday number {number} should map to {expected:?}"
-            );
-        }
-
-        #[rstest]
-        #[case::zero(0)]
-        #[case::negative_one(-1)]
-        #[case::eight(8)]
-        #[case::i64_min(i64::MIN)]
-        fn rejects_weekday_numbers_outside_the_iso_range(#[case] number: i64) {
-            // Arrange: `number` is the case literal.
-            // Act
-            let actual = weekday_from_number(number);
-            // Assert
-            assert_eq!(
-                actual, None,
-                "weekday number {number} must not map to a weekday"
-            );
-        }
-    }
-
-    mod shorthands {
+    mod period_edges {
         use std::collections::HashSet;
 
         use pretty_assertions::assert_eq;
@@ -320,6 +274,52 @@ mod tests {
             // Both edges are present once short and once long, pairing each
             // abbreviation with its full spelling.
             assert_eq!(names, expected, "{period:?} shorthand spellings");
+        }
+    }
+
+    mod lookup {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::monday(1, civil::Weekday::Monday)]
+        #[case::tuesday(2, civil::Weekday::Tuesday)]
+        #[case::wednesday(3, civil::Weekday::Wednesday)]
+        #[case::thursday(4, civil::Weekday::Thursday)]
+        #[case::friday(5, civil::Weekday::Friday)]
+        #[case::saturday(6, civil::Weekday::Saturday)]
+        #[case::sunday(7, civil::Weekday::Sunday)]
+        fn maps_iso_weekday_numbers_to_weekdays(
+            #[case] number: i64,
+            #[case] expected: civil::Weekday,
+        ) {
+            // Arrange: `number` and `expected` are the case literals.
+            // Act
+            let actual = weekday_from_number(number);
+            // Assert
+            assert_eq!(
+                actual,
+                Some(expected),
+                "ISO weekday number {number} should map to {expected:?}"
+            );
+        }
+
+        #[rstest]
+        #[case::zero(0)]
+        #[case::negative_one(-1)]
+        #[case::eight(8)]
+        #[case::i64_min(i64::MIN)]
+        fn rejects_weekday_numbers_outside_the_iso_range(#[case] number: i64) {
+            // Arrange: `number` is the case literal.
+            // Act
+            let actual = weekday_from_number(number);
+            // Assert
+            assert_eq!(
+                actual, None,
+                "weekday number {number} must not map to a weekday"
+            );
         }
     }
 }
