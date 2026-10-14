@@ -1,6 +1,4 @@
-//! Field-construction error types:
-//! [`SchemaFieldBuilder`](super::SchemaFieldBuilder) and
-//! [`SchemaFieldParser`](super::parser::SchemaFieldParser)'s own failure modes.
+//! Defines field-construction error types for schema fields.
 //!
 //! [`SchemaFieldParserError`] is the single per-key validation vocabulary
 //! every field type's parser pushes through: `number`'s
@@ -21,7 +19,7 @@ use thiserror::Error;
 use super::{FieldAddress, SchemaFieldTypeTag};
 use crate::{path::PathError, schema::error::SchemaWarning};
 
-/// Why [`super::SchemaFieldBuilder::build`] failed.
+/// Describes why [`super::SchemaFieldBuilder::build`] failed.
 ///
 /// Always hard failures:
 /// - [`Self::RefOutOfBounds`]
@@ -33,8 +31,8 @@ use crate::{path::PathError, schema::error::SchemaWarning};
 /// - [`Self::Parser`]
 #[derive(Debug, Error)]
 pub(crate) enum SchemaFieldBuilderError {
-    /// A `$ref` names a Schema that is neither the Global Schema nor a
-    /// transitive `extends` ancestor of the referencing Schema.
+    /// Indicates a `$ref` names a Schema that is neither the Global Schema nor
+    /// a transitive `extends` ancestor of the referencing Schema.
     #[error(
         "$ref {reference} in field {own} is out of bounds: not the Global \
          Schema or a transitive `extends` ancestor"
@@ -43,14 +41,15 @@ pub(crate) enum SchemaFieldBuilderError {
         own: Box<FieldAddress>,
         reference: Box<FieldAddress>,
     },
-    /// A `$ref` names an in-bounds Schema that lacks the referenced field.
+    /// Indicates a `$ref` names an in-bounds Schema that lacks the referenced
+    /// field.
     #[error("$ref {reference} in field {own} does not resolve")]
     RefFieldNotFound {
         own: Box<FieldAddress>,
         reference: Box<FieldAddress>,
     },
-    /// One or more per-key validation failures from parsing a field type's
-    /// `options`. Never empty: only constructed from a non-empty
+    /// Indicates one or more per-key validation failures from parsing a field
+    /// type's `options`. Never empty: only constructed from a non-empty
     /// [`SchemaFieldParser::finish`](super::parser::SchemaFieldParser::finish)
     /// result.
     #[error(
@@ -61,7 +60,8 @@ pub(crate) enum SchemaFieldBuilderError {
     Parser(Vec<SchemaFieldParserError>),
 }
 
-/// One per-key validation failure from parsing a field type's `options`.
+/// Represents one per-key validation failure from parsing a field type's
+/// `options`.
 ///
 /// Every field type pushes through this one vocabulary: `select`'s
 /// [`Self::SelectValue`] wraps [`SchemaSelectFieldValueError`] the same way
@@ -74,14 +74,14 @@ pub(crate) enum SchemaFieldBuilderError {
 /// - [`SchemaWarning`] (degraded) for bare `$ref` overrides.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaFieldParserError {
-    /// An attribute key was not claimed by any typed extractor.
+    /// Indicates an attribute key was not claimed by any typed extractor.
     #[error("field {address} of type {kind} has no attribute {key:?}")]
     UnknownKey {
         address: FieldAddress,
         kind: SchemaFieldTypeTag,
         key: String,
     },
-    /// An attribute key was claimed, but its value is wrongly shaped.
+    /// Indicates an attribute key was claimed, but its value is wrongly shaped.
     #[error(
         "field {address} of type {kind}'s {key:?} attribute must be \
          {expected}, got {value}"
@@ -93,7 +93,8 @@ pub(crate) enum SchemaFieldParserError {
         value: String,
         expected: &'static str,
     },
-    /// A numeric attribute was present but cannot form a valid field invariant.
+    /// Indicates a numeric attribute was present but cannot form a valid field
+    /// invariant.
     #[error(
         "field {address} of type number's {key:?} attribute must be \
          {expected}, got {value}"
@@ -104,7 +105,7 @@ pub(crate) enum SchemaFieldParserError {
         value: String,
         expected: &'static str,
     },
-    /// A number field declared `min > max`.
+    /// Indicates a number field declared `min > max`.
     #[error(
         "field {address} of type number's \"min\" attribute must be <= \
          \"max\", got min {min} and max {max}"
@@ -114,7 +115,7 @@ pub(crate) enum SchemaFieldParserError {
         min: String,
         max: String,
     },
-    /// `select`/`multi` values configuration is invalid.
+    /// Indicates `select`/`multi` values configuration is invalid.
     #[error("field {address} {source}")]
     SelectValue {
         address: FieldAddress,
@@ -123,7 +124,7 @@ pub(crate) enum SchemaFieldParserError {
     },
 }
 
-/// A validation failure inside a `select`/`multi` values definition.
+/// Represents a validation failure inside a `select`/`multi` values definition.
 ///
 /// Reuses [`SchemaSelectFieldEntryError::ShapeMismatch`] for every "this must
 /// be {expected}, got {value}" failure (a file's `path`, a selector name, a
@@ -132,10 +133,10 @@ pub(crate) enum SchemaFieldParserError {
 /// checked varies.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaSelectFieldValueError {
-    /// A file subtable omitted its required `path` attribute.
+    /// Indicates a file subtable omitted its required `path` attribute.
     #[error("values file subtable is missing required attribute \"path\"")]
     MissingPath,
-    /// An entry has a shape or selector problem, whether declared inline in
+    /// Indicates an entry has a shape or selector problem.
     /// the field's own `values` list or loaded from an external file;
     /// `path` names which (`None` for inline).
     #[error(
@@ -150,7 +151,7 @@ pub(crate) enum SchemaSelectFieldValueError {
         #[source]
         source: SchemaSelectFieldEntryError,
     },
-    /// The referenced values file itself could not be confined, read,
+    /// Indicates the referenced values file itself could not be confined, read,
     /// parsed, or has the wrong top-level shape.
     #[error("values file {path:?} is invalid: {source}")]
     ValuesFile {
@@ -160,19 +161,19 @@ pub(crate) enum SchemaSelectFieldValueError {
     },
 }
 
-/// One entry's shape or selector failure.
+/// Represents one entry's shape or selector failure.
 /// [`SchemaSelectFieldValueError::Entry`] carries whether the entry was inline
 /// or loaded from a file: this type doesn't need to know.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaSelectFieldEntryError {
-    /// A selector's or entry key's value has the wrong shape.
+    /// Indicates a selector's or entry key's value has the wrong shape.
     #[error("{context} must be {expected}, got {value}")]
     ShapeMismatch {
         context: String,
         value: String,
         expected: &'static str,
     },
-    /// A selector key was specified on bare string entries.
+    /// Indicates a selector key was specified on bare string entries.
     #[error(
         "configures selector {selector:?} but entries contain bare string \
          values"
@@ -180,7 +181,7 @@ pub(crate) enum SchemaSelectFieldEntryError {
     SelectorOnBareEntries {
         selector: &'static str,
     },
-    /// An entry object was missing a key named by a selector.
+    /// Indicates an entry object was missing a key named by a selector.
     #[error(
         "configures selector {selector:?} = {key:?}, but an entry is missing \
          this key"
@@ -189,7 +190,8 @@ pub(crate) enum SchemaSelectFieldEntryError {
         selector: &'static str,
         key: String,
     },
-    /// An entry includes a passthrough key reserved by rendered select output.
+    /// Indicates an entry includes a passthrough key reserved by rendered
+    /// select output.
     #[error(
         "entry key {key:?} is reserved for rendered select output; choose \
          another source key or selector"
@@ -199,8 +201,8 @@ pub(crate) enum SchemaSelectFieldEntryError {
     },
 }
 
-/// Why the file backing a `select`/`multi` values subtable could not be
-/// loaded.
+/// Describes why the file backing a `select`/`multi` values subtable could not
+/// be loaded.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaSelectFieldFileError {
     /// The values file path escaped the schema directory or contained unsafe

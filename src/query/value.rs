@@ -1,4 +1,4 @@
-//! Zero-copy borrowed field representations and value conversions for query
+//! Represents zero-copy borrowed field values and conversions for query
 //! evaluation.
 //!
 //! This module provides [`QueryFieldValueRef`], an ephemeral enum that borrows
@@ -14,7 +14,7 @@ use crate::{
     note::{NoteFieldValue, NoteFieldValueRef},
 };
 
-/// Borrowed field value resolved from a [`super::QueryRow`].
+/// Represents a borrowed field value resolved from a [`super::QueryRow`].
 pub(super) enum QueryFieldValueRef<'a> {
     /// Borrowed metadata field from note-domain storage.
     Note(NoteFieldValueRef<'a>),

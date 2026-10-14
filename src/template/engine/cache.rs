@@ -1,4 +1,4 @@
-//! Cache render-scoped resources in `State`'s temp storage.
+//! Caches render-scoped resources in [`minijinja::State`]'s temp storage.
 //!
 //! [`cached`] backs `query.rs`'s
 //! [`WorkspaceIndex`](crate::index::WorkspaceIndex) cache: it stashes a load
@@ -56,8 +56,8 @@ where
 ///
 /// # Errors
 ///
-/// Any error `load` returns. Nothing is cached on failure, so the next call
-/// retries the load.
+/// Returns any error returned by `load`. Nothing is cached on failure, so the
+/// next call retries the load.
 pub(super) fn cached<T, E>(
     state: &State,
     key: &'static str,

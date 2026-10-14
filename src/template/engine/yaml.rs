@@ -1,4 +1,4 @@
-//! Register YAML serialization and deserialization filters for templates.
+//! Registers YAML serialization and deserialization filters for templates.
 //!
 //! [`YamlOps`] adds two stateless filters:
 //!
@@ -35,8 +35,9 @@ impl YamlOps {
 ///
 /// # Errors
 ///
-/// Returns [`minijinja::ErrorKind::InvalidOperation`] if the value cannot be
-/// serialized into YAML.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// the value cannot be serialized into YAML.
 pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
     let mut yaml = noyalib::to_string(value).map_err(|err| {
         invalid_operation("to_yaml: failed to serialize value to YAML", err)
@@ -56,8 +57,9 @@ pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns [`minijinja::ErrorKind::InvalidOperation`] if the input cannot be
-/// parsed as valid YAML.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// the input cannot be parsed as valid YAML.
 pub(super) fn from_yaml(text: &str) -> TemplateEngineResult<Value> {
     if text.trim().is_empty() {
         return Ok(Value::from(()));

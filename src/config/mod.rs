@@ -1,4 +1,4 @@
-//! Loads Config Files into a resolved [`Config`].
+//! Loads configuration files into a resolved [`Config`].
 //!
 //! The discovery, read, trust and value stages separate failure types. Loading
 //! follows this order:

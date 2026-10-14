@@ -1,14 +1,14 @@
-//! Define errors for template resolution, rendering, and writing.
+//! Defines errors for template resolution, rendering, and writing.
 //!
 //! [`TemplateError`] is the primary error returned by [`TemplateService`]. It
 //! records the failing pipeline stage and preserves source errors. CLI code
 //! adds diagnostic codes and help text outside this module.
 //!
-//! Public API:
+//! # Key Types
 //!
-//! - [`TemplateError`] - Resolve, read, render, output-path, write, and prompt
+//! - [`TemplateError`]: Resolve, read, render, output-path, write, and prompt
 //!   failures.
-//! - [`RenderFailureKind`] - Coarse render-error category for diagnostics.
+//! - [`RenderFailureKind`]: Coarse render-error category for diagnostics.
 //!
 //! [`TemplateService`]: super::service::TemplateService
 
@@ -138,9 +138,9 @@ pub enum TemplateError {
     SchemaLoad(#[from] crate::schema::SchemaError),
 }
 
-/// Classifies a `TemplateError::Render` failure for diagnostics.
+/// Classifies a [`TemplateError::Render`] failure for diagnostics.
 ///
-/// Provides just enough detail for `crate::cli::error` to choose a stable
+/// Provides just enough detail for [`crate::cli::error`] to choose a stable
 /// diagnostic code and help text. Classification inspects
 /// [`minijinja::Error::kind`] and the retained source chain instead of parsing
 /// display text, so new custom functions don't need to update string-matching
@@ -166,10 +166,10 @@ pub enum RenderFailureKind {
 }
 
 impl RenderFailureKind {
-    /// Classifies a minijinja render error.
+    /// Classifies a [`minijinja::Error`] into a coarse [`RenderFailureKind`].
     ///
-    /// Inspects [`minijinja::Error::kind`] and the source chain. It does not
-    /// parse display text.
+    /// Inspects [`minijinja::Error::kind`] and the source chain to identify
+    /// the failure category without parsing display text.
     ///
     /// # Examples
     ///

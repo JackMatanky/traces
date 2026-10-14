@@ -1,4 +1,4 @@
-//! Validated Markdown tag type.
+//! Defines a validated Markdown tag type.
 //!
 //! Tags are `#`-prefixed identifiers: a Unicode alphabetic first character
 //! followed by any mix of Unicode alphanumeric characters, `_`, `/`, or `-`.
@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// A validated Markdown tag; the stored string starts with `#`.
+/// Represents a validated Markdown tag whose stored string starts with `#`.
 ///
 /// Constructed via [`Tag::parse`], which validates the format once; nesting
 /// checks ([`Self::is_contained_in`]) and segments ([`Self::segments`]) are
@@ -82,7 +82,15 @@ impl Tag {
     ///
     /// # Errors
     ///
-    /// Same conditions as [`Self::parse_lenient_into`].
+    /// - [`MissingHash`] if the trimmed input is empty or a lone `#`.
+    /// - [`InvalidFirstCharacter`] if the character after the (implicit or
+    ///   explicit) `#` isn't alphabetic.
+    /// - [`InvalidBodyCharacter`] if a later character isn't alphanumeric, `_`,
+    ///   `/`, or `-`.
+    ///
+    /// [`MissingHash`]: TagError::MissingHash
+    /// [`InvalidFirstCharacter`]: TagError::InvalidFirstCharacter
+    /// [`InvalidBodyCharacter`]: TagError::InvalidBodyCharacter
     #[inline]
     pub(crate) fn parse_lenient(input: &str) -> Result<Self, TagError> {
         let mut buf = String::new();
@@ -229,7 +237,7 @@ impl Tag {
     }
 }
 
-/// Errors returned by [`Tag::parse`].
+/// Represents errors returned by [`Tag::parse`].
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum TagError {
     /// The input has no leading `#`, or nothing follows it.

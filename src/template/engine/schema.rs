@@ -1,4 +1,4 @@
-//! Register the `schema` namespace for templates, and wire
+//! Registers the `schema` namespace for templates, and wires
 //! [`crate::schema::Schema`] into minijinja directly.
 //!
 //! [`SchemaOps`] is the `schema` namespace object registered as a minijinja
@@ -106,7 +106,7 @@ impl SchemaOps {
         }
     }
 
-    /// Registers this object as the `schema` global.
+    /// Registers this object as the `schema` global in `env`.
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         env.add_global("schema", Value::from_object(self));
@@ -155,9 +155,9 @@ impl Object for SchemaOps {
 ///
 /// # Errors
 ///
-/// [`ErrorKind::InvalidOperation`] if no `Schema` value produced this render
-/// ever went through `schema.get`; cannot happen for a `Schema` bound the
-/// documented way, since that is the only route to one.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// no `Schema` value produced this render ever went through `schema.get`.
 fn cached_service(state: &State) -> TemplateEngineResult<Arc<SchemaService>> {
     super::cache::get_temp(state, SCHEMA_SERVICE_CACHE_KEY).ok_or_else(|| {
         Error::new(
@@ -273,8 +273,7 @@ fn select_entry_value(entry: &SchemaSelectFieldEntry) -> Value {
 ///
 /// # Errors
 ///
-/// Returns a [`regex::Error`] if a folder/extension glob fails to compile (see
-/// `compile_glob`: not expected in practice).
+/// Returns a [`regex::Error`] if a folder or extension glob fails to compile.
 fn file_field_source(
     filter: &SchemaFileFieldRef<'_>,
 ) -> Result<SourceSelector, regex::Error> {

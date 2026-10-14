@@ -1,4 +1,4 @@
-//! Schema loading, resolution, and query facade.
+//! Provides schema loading, resolution, and hierarchy query facade.
 //!
 //! [`SchemaService`] loads `.traces/schemas/*.toml` files, linearizes the
 //! `extends` DAG, and resolves it once at construction, exposing read-side
@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{BaseNameRef, DirTree, DirTreeError};
 
-/// An error encountered while loading or resolving schemas.
+/// Represents an error encountered while loading or resolving schemas.
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct SchemaServiceError(#[from] pub(crate) SchemaError);
@@ -31,14 +31,14 @@ impl SchemaServiceError {
     }
 }
 
-/// Schema loading, resolution, and hierarchy/class query facade.
+/// Provides schema loading, resolution, and hierarchy/class queries.
 #[derive(Debug)]
 pub struct SchemaService {
     schemas: IndexMap<SchemaName, Arc<Schema>>,
 }
 
 impl SchemaService {
-    /// Load every Schema TOML file under `directory` and resolve their
+    /// Loads every Schema TOML file under `directory` and resolves their
     /// effective fields, building a single read-only [`SchemaService`].
     ///
     /// A missing directory resolves to an empty registry. Recoverable warnings
@@ -63,7 +63,7 @@ impl SchemaService {
         Ok(Self::load_verbose(directory)?.service)
     }
 
-    /// Load every Schema TOML file under `directory`, returning recoverable
+    /// Loads every Schema TOML file under `directory`, returning recoverable
     /// construction diagnostics alongside the resolved service.
     ///
     /// The `extends` DAG is linearized and each Schema's fields are merged from
@@ -73,8 +73,13 @@ impl SchemaService {
     ///
     /// # Errors
     ///
-    /// Returns an error if the registry directory cannot be read, a schema file
-    /// fails to parse, or the `extends` DAG contains a cycle.
+    /// - [`ReadDirectory`] if the registry directory exists but cannot be read.
+    /// - [`File`] if a schema file fails to parse or cannot be read.
+    /// - [`Cycle`] if the `extends` DAG contains a cycle.
+    ///
+    /// [`ReadDirectory`]: SchemaError::ReadDirectory
+    /// [`File`]: SchemaError::File
+    /// [`Cycle`]: SchemaError::Cycle
     pub(crate) fn load_verbose(
         directory: &Path,
     ) -> SchemaResult<SchemaConstruction> {
@@ -84,7 +89,7 @@ impl SchemaService {
         Ok(resolved.into())
     }
 
-    /// Return a reference to the named Schema, or `None` if no Schema by that
+    /// Returns a reference to the named Schema, or `None` if no Schema by that
     /// name resolved.
     #[inline]
     #[must_use]
@@ -92,7 +97,7 @@ impl SchemaService {
         self.schemas.get(name)
     }
 
-    /// Return every Schema that directly extends `name`, sorted by name.
+    /// Returns every Schema that directly extends `name`, sorted by name.
     ///
     /// Excludes `name` itself and every transitive descendant. Empty, not an
     /// error, if `name` has no Schema or nothing extends it.
@@ -112,7 +117,8 @@ impl SchemaService {
         children
     }
 
-    /// Borrowed names of every Schema that directly extends `name`.
+    /// Returns an iterator over the borrowed names of every Schema that
+    /// directly extends `name`.
     ///
     /// Empty iterator, not an error, if `name` has no Schema or nothing extends
     /// it.
@@ -126,7 +132,7 @@ impl SchemaService {
             .flat_map(|schema| schema.children().iter().map(SchemaName::as_str))
     }
 
-    /// Return every Schema that directly or transitively extends `name`,
+    /// Returns every Schema that directly or transitively extends `name`,
     /// sorted by name.
     ///
     /// Excludes `name` itself. Empty, not an error, if `name` has no Schema or
@@ -147,7 +153,7 @@ impl SchemaService {
         descendants
     }
 
-    /// Return the set of Schema names matching `classes`, including transitive
+    /// Returns the set of Schema names matching `classes`, including transitive
     /// descendants.
     ///
     /// A class with no corresponding Schema still matches itself. Warns once

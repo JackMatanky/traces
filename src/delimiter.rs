@@ -1,4 +1,4 @@
-//! Balanced delimiter tracking and string-level delimiter scanning.
+//! Provides balanced delimiter tracking and string-level delimiter scanning.
 //!
 //! Provides zero-allocation stack validation for paired delimiters
 //! ([`DelimiterType`], [`DelimiterStack`]) and quote states ([`QuoteType`]),
@@ -7,8 +7,7 @@
 
 const MAX_DELIMITER_DEPTH: usize = 16;
 
-/// A stack-allocated delimiter validator supporting nested pairs and quote
-/// states.
+/// Validates stack-allocated delimiter pairs and quote states.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct DelimiterStack {
     entries: [DelimiterType; MAX_DELIMITER_DEPTH],
@@ -102,7 +101,7 @@ impl DelimiterStack {
     ///
     /// # Errors
     ///
-    /// - `Err(())` if `ch` mismatched the expected closing delimiter.
+    /// Returns `Err(())` if `ch` does not match the expected closing delimiter.
     #[inline]
     fn handle_char_close(&mut self, ch: char) -> Result<bool, ()> {
         let Some(current) = self.current_kind() else {
@@ -166,7 +165,7 @@ impl DelimiterType {
         }
     }
 
-    /// Number of bytes in the closing delimiter.
+    /// Returns the number of bytes in the closing delimiter.
     #[inline]
     #[must_use]
     pub(crate) const fn close_len(self) -> usize {
@@ -309,7 +308,7 @@ impl DelimiterType {
     }
 }
 
-/// String quote kinds recognized by lexical scanners.
+/// Represents string quote kinds recognized by lexical scanners.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 enum QuoteType {

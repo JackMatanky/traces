@@ -1,4 +1,4 @@
-//! `file` field type definition, borrowed filter, and parsing.
+//! Defines the `file` field type, its borrowed filter, and parsing.
 //!
 //! A `file` field links to notes matched by folder, extension, and class
 //! filters. Parsing validates the three attributes (`folders`, `ext`, `class`)
@@ -16,7 +16,7 @@ use indexmap::IndexMap;
 use super::{SchemaFieldType, parser::SchemaFieldParser};
 use crate::FieldValue;
 
-/// Resolved `file` field options.
+/// Represents resolved `file` field options.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct SchemaFileField {
     folders: Vec<String>,
@@ -25,7 +25,7 @@ pub(crate) struct SchemaFileField {
 }
 
 impl SchemaFileField {
-    /// Return the matched folder paths.
+    /// Returns the matched folder paths.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -33,7 +33,7 @@ impl SchemaFileField {
         &self.folders
     }
 
-    /// Return the matched file extension, if set.
+    /// Returns the matched file extension, if set.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -41,7 +41,7 @@ impl SchemaFileField {
         self.ext.as_deref()
     }
 
-    /// Return the matched class tags.
+    /// Returns the matched class tags.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -49,7 +49,7 @@ impl SchemaFileField {
         &self.class
     }
 
-    /// Borrow this definition as a [`SchemaFileFieldRef`].
+    /// Borrows this definition as a [`SchemaFileFieldRef`].
     #[inline]
     #[must_use]
     pub(super) fn as_ref(&self) -> SchemaFileFieldRef<'_> {
@@ -74,7 +74,7 @@ impl SchemaFileField {
         }
     }
 
-    /// Parse `options` against `file`'s `folders`/`ext`/`class` attributes,
+    /// Parses `options` against `file`'s `folders`/`ext`/`class` attributes,
     /// merging with `base` when present.
     ///
     /// # Arguments
@@ -108,14 +108,17 @@ impl SchemaFileField {
     }
 }
 
-/// A borrowed view of a resolved `file` field's filter parts.
+/// Represents a borrowed view of a resolved `file` field's filter parts.
 ///
 /// Returned by
 /// [`SchemaFieldDef::file_filter`](super::SchemaFieldDef::file_filter).
 #[derive(Copy, Clone)]
 pub(crate) struct SchemaFileFieldRef<'a> {
+    /// Borrowed folder paths.
     pub(crate) folders: &'a [String],
+    /// Borrowed file extension, if set.
     pub(crate) ext: Option<&'a str>,
+    /// Borrowed class tags.
     pub(crate) class: &'a [String],
 }
 

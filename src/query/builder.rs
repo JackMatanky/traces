@@ -1,4 +1,4 @@
-//! Declarative query builder for source selection, row granularity, and
+//! Builds declarative queries for source selection, row granularity, and
 //! transformations.
 //!
 //! This module provides [`QueryBuilder`], the primary user-facing builder for
@@ -28,7 +28,8 @@ pub(crate) enum QueryMode {
     Tasks,
 }
 
-/// Declarative query specification for index queries.
+/// Specifies an index query with source selection, row granularity, and
+/// transformations.
 ///
 /// Plans stay inert until [`QueryService::run`](super::QueryService::run)
 /// evaluates them against a borrowed

@@ -1,5 +1,5 @@
-//! Source-position primitives and byte-to-line conversion shared across
-//! text-parsing domains.
+//! Provides source-position primitives and byte-to-line conversion shared
+//! across text-parsing domains.
 //!
 //! # Key Types
 //!
@@ -24,7 +24,8 @@ use std::{cmp::Ordering, fmt, num::NonZeroU32, ops::Range};
 
 use serde::{Deserialize, Serialize};
 
-/// Precomputed line-start byte positions providing O(log n) line lookups.
+/// Stores precomputed line-start byte positions providing O(log n) line
+/// lookups.
 ///
 /// Precomputes line-start byte positions once per document; each conversion is
 /// an O(log n) binary search over them via [`slice::partition_point`].
@@ -60,7 +61,8 @@ impl LineIndex {
     }
 }
 
-/// An immutable, half-open `[start..end)` UTF-8 byte span in source text.
+/// Stores an immutable, half-open `[start..end)` UTF-8 byte span in source
+/// text.
 #[derive(
     Copy,
     Clone,
@@ -238,7 +240,9 @@ impl From<BytePos> for usize {
 ///
 /// # Errors
 ///
-/// - [`PositionError::BytePosOverflow`] if `pos` exceeds `u32::MAX`.
+/// - [`BytePosOverflow`] if `pos` exceeds `u32::MAX`.
+///
+/// [`BytePosOverflow`]: PositionError::BytePosOverflow
 impl TryFrom<usize> for BytePos {
     type Error = PositionError;
 
@@ -248,7 +252,7 @@ impl TryFrom<usize> for BytePos {
     }
 }
 
-/// A 1-indexed source line number.
+/// Stores a 1-indexed source line number.
 ///
 /// Distinct from `BytePos` so a byte position can never be passed where a line
 /// number is expected, or vice versa.
@@ -309,7 +313,9 @@ impl From<SourceLine> for u32 {
 ///
 /// # Errors
 ///
-/// - [`PositionError::ZeroSourceLine`] if `line` is zero.
+/// - [`ZeroSourceLine`] if `line` is zero.
+///
+/// [`ZeroSourceLine`]: PositionError::ZeroSourceLine
 impl TryFrom<u32> for SourceLine {
     type Error = PositionError;
 
@@ -348,7 +354,7 @@ impl<'de> Deserialize<'de> for SourceLine {
     }
 }
 
-/// A value paired with its [`ByteSpan`] in source text.
+/// Pairs a value with its [`ByteSpan`] in source text.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub(crate) struct Spanned<T> {
     value: T,
@@ -462,7 +468,7 @@ impl<T: Ord> Ord for Spanned<T> {
     }
 }
 
-/// Errors arising from invalid source positions or line numbers.
+/// Represents errors arising from invalid source positions or line numbers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum PositionError {
     /// A byte position exceeds the `u32` range.

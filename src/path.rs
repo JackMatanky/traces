@@ -1,12 +1,13 @@
-//! Validate relative paths, confine them to a root, and serialize them with
+//! Validates relative paths, confines them to a root, and serializes them with
 //! platform-native encodings.
 //!
-//! Main types:
-//! - [`HasPath`] - Path-addressable row trait for sorted storage views
-//! - [`RelativePath`] - Relative path accepted by lexical checks only
-//! - [`SafeRelativePath`] - Path accepted by lexical and filesystem checks
-//! - [`PathError`] - Path validation failure
-//! - [`codec`] - Serde support for `PathBuf` fields in serialized formats
+//! # Key Types
+//!
+//! - [`HasPath`]: path-addressable row trait for sorted storage views.
+//! - [`RelativePath`]: relative path accepted by lexical checks only.
+//! - [`SafeRelativePath`]: path accepted by lexical and filesystem checks.
+//! - [`PathError`]: path validation failure.
+//! - [`codec`]: Serde support for [`PathBuf`] fields in serialized formats.
 //!
 //! Confinement happens in two phases:
 //! - Lexical validation rejects absolute paths, parent-directory components,
@@ -47,7 +48,7 @@ pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
     }
 }
 
-/// A row addressable by its project-relative path.
+/// Trait for a row addressable by its project-relative path.
 ///
 /// Implemented by stored index rows so sorted containers can order and search
 /// by path without knowing the concrete row type.
@@ -71,10 +72,12 @@ impl RelativePath {
     ///
     /// # Errors
     ///
-    /// - [`PathError::Absolute`] if `candidate` is absolute
-    /// - [`PathError::UnsafeComponent`] if `candidate` contains `..`, a
-    ///   component that is not a plain name or `.`, or has no plain-name
-    ///   component at all
+    /// - [`Absolute`] if `candidate` is absolute.
+    /// - [`UnsafeComponent`] if `candidate` contains `..`, a component that is
+    ///   not a plain name or `.`, or has no plain-name component at all.
+    ///
+    /// [`Absolute`]: PathError::Absolute
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
     pub(crate) fn parse(candidate: &Path) -> Result<Self, PathError> {
         Self::try_from(candidate)
     }
@@ -84,9 +87,12 @@ impl RelativePath {
     ///
     /// # Errors
     ///
-    /// - [`PathError::OutsideRoot`] if `path` is not under `root`
-    /// - [`PathError::UnsafeComponent`] if the derived remainder contains an
-    ///   unsafe component or has no named component
+    /// - [`OutsideRoot`] if `path` is not under `root`.
+    /// - [`UnsafeComponent`] if the derived remainder contains an unsafe
+    ///   component or has no named component.
+    ///
+    /// [`OutsideRoot`]: PathError::OutsideRoot
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
     pub(crate) fn derive(root: &Path, path: &Path) -> Result<Self, PathError> {
         let relative =
             path.strip_prefix(root).map_err(|_| PathError::OutsideRoot)?;
@@ -156,12 +162,17 @@ impl SafeRelativePath {
     ///
     /// # Errors
     ///
-    /// - [`PathError::Absolute`] if `candidate` is absolute
-    /// - [`PathError::UnsafeComponent`] if `candidate` contains an unsafe
-    ///   component or has no named component
-    /// - [`PathError::OutsideRoot`] if `candidate` resolves outside `root`
-    /// - [`PathError::StrictPath`] if `strict-path` cannot validate `root` as a
-    ///   boundary or resolve the candidate's existing path components
+    /// - [`Absolute`] if `candidate` is absolute.
+    /// - [`UnsafeComponent`] if `candidate` contains an unsafe component or has
+    ///   no named component.
+    /// - [`OutsideRoot`] if `candidate` resolves outside `root`.
+    /// - [`StrictPath`] if `strict-path` cannot validate `root` as a boundary
+    ///   or resolve the candidate's existing path components.
+    ///
+    /// [`Absolute`]: PathError::Absolute
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
+    /// [`OutsideRoot`]: PathError::OutsideRoot
+    /// [`StrictPath`]: PathError::StrictPath
     pub(crate) fn parse(
         root: &Path,
         candidate: &Path,
@@ -201,7 +212,7 @@ impl AsRef<Path> for SafeRelativePath {
     }
 }
 
-/// A borrowed reference to a directory path.
+/// Borrows a reference to a directory path.
 ///
 /// Wraps `Path` to distinguish directory paths from file paths at the type
 /// level. The containing folder of `notes/todo.md` is `notes`; the containing
@@ -226,8 +237,8 @@ impl<'a> FolderRef<'a> {
         self.0
     }
 
-    /// Tree distance: hops up to the nearest shared ancestor plus down to the
-    /// other folder. The same folder has distance `0`.
+    /// Calculates tree distance: hops up to the nearest shared ancestor plus
+    /// down to the other folder. The same folder has distance `0`.
     pub(crate) fn distance_to(self, other: FolderRef<'_>) -> usize {
         let mut a_iter = self.0.components();
         let mut b_iter = other.0.components();
@@ -334,7 +345,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - The serializer rejects the byte payload.
+    /// Returns an error if the serializer rejects the byte payload.
     #[cfg(unix)]
     #[inline]
     pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
@@ -349,7 +360,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - The deserializer rejects the byte payload.
+    /// Returns an error if the deserializer rejects the byte payload.
     #[cfg(unix)]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -365,7 +376,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - The serializer rejects the wide-character payload.
+    /// Returns an error if the serializer rejects the wide-character payload.
     #[cfg(windows)]
     #[inline]
     pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
@@ -383,7 +394,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - The deserializer rejects the wide-character payload.
+    /// Returns an error if the deserializer rejects the wide-character payload.
     #[cfg(windows)]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -399,7 +410,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - The serializer rejects the string payload.
+    /// Returns an error if the serializer rejects the string payload.
     #[cfg(not(any(unix, windows)))]
     #[inline]
     pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
@@ -413,7 +424,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - The deserializer rejects the string payload.
+    /// Returns an error if the deserializer rejects the string payload.
     #[cfg(not(any(unix, windows)))]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>

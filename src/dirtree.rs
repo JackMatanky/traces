@@ -1,5 +1,5 @@
-//! Directory-tree traversal: flat listings and recursive walks with classified,
-//! path-contextualized errors.
+//! Provides directory-tree traversal with flat listings and recursive walks
+//! with classified, path-contextualized errors.
 //!
 //! The core entry points are [`DirTree::children`] (flat, one level) and
 //! [`DirTree::descendants`] (recursive, whole tree). Both yield [`DirNode`]
@@ -11,11 +11,11 @@
 //!
 //! Errors are classified into three variants based on where they occur:
 //!
-//! - [`DirTreeError::MissingRoot`] - the walk root does not exist. Callers
+//! - [`DirTreeError::MissingRoot`]: the walk root does not exist. Callers
 //!   decide their policy: degrade to empty or propagate.
-//! - [`DirTreeError::RootInaccessible`] - the root exists but could not be
+//! - [`DirTreeError::RootInaccessible`]: the root exists but could not be
 //!   opened.
-//! - [`DirTreeError::NodeInaccessible`] - a node beneath the root failed
+//! - [`DirTreeError::NodeInaccessible`]: a node beneath the root failed
 //!   (unreadable directory, metadata failure, mid-readdir glitch).
 //!
 //! Only [`DirTreeError::MissingRoot`] and [`DirTreeError::RootInaccessible`]
@@ -57,8 +57,8 @@ fn classify(fallback: &Path, source: walkdir::Error) -> DirTreeError {
     }
 }
 
-/// One node of a directory tree: a file, directory, or symlink yielded by
-/// [`DirTree::children`] or [`DirTree::descendants`].
+/// Represents a node of a directory tree: a file, directory, or symlink yielded
+/// by [`DirTree::children`] or [`DirTree::descendants`].
 ///
 /// Wraps walkdir's entry so callers never touch walkdir types. Accessors
 /// delegate to the underlying [`walkdir::DirEntry`] and report failures through
@@ -67,7 +67,7 @@ fn classify(fallback: &Path, source: walkdir::Error) -> DirTreeError {
 #[derive(Clone, Debug)]
 pub(crate) struct DirNode(DirEntry);
 
-/// Borrowed view of a directory node for zero-clone comparisons.
+/// Represents a borrowed view of a directory node for zero-clone comparisons.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 
@@ -128,7 +128,7 @@ impl DirNode {
     ///
     /// # Errors
     ///
-    /// Returns an I/O error if metadata cannot be read.
+    /// Returns an [`std::io::Error`] if metadata cannot be read.
     pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
         self.0.metadata().map_err(io::Error::from)
     }
@@ -154,7 +154,7 @@ impl Iterator for InnerIter {
         }
     }
 }
-/// Iterator over a directory tree with classified, path-contextualized errors.
+/// Iterates over a directory tree with classified, path-contextualized errors.
 ///
 /// Created by [`DirTree::children`] (flat, one level) or
 /// [`DirTree::descendants`] (recursive, whole tree). Configure with
@@ -298,7 +298,7 @@ impl Iterator for DirTree {
     }
 }
 
-/// A failure raised while traversing a directory tree.
+/// Represents a failure raised while traversing a directory tree.
 ///
 /// Callers match to state their missing-root policy and convert remaining
 /// errors via [`into_parts`](Self::into_parts).
@@ -338,6 +338,7 @@ pub(crate) enum DirTreeError {
 impl DirTreeError {
     /// Splits the error into its resolved path and I/O source.
     ///
+    /// Returns the resolved [`PathBuf`] and underlying [`std::io::Error`].
     /// Every variant carries the same `{path, source}` shape, allowing callers
     /// to decompose any error variant into its constituent path and underlying
     /// [`std::io::Error`] via tuple destructuring:

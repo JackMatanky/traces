@@ -187,6 +187,8 @@ impl Template {
     ///   templates are available.
     /// - [`CliError::TemplatePicker`] if the picker is unavailable, fails, or
     ///   is cancelled.
+    /// - [`CliError::TemplateInstantiate`] if parsing the template input path
+    ///   fails.
     fn resolve_name(
         &self,
         config: &Config,
@@ -229,6 +231,8 @@ impl Template {
     /// - [`CliError::NoTemplates`] if no templates are available in `config`.
     /// - [`CliError::TemplatePicker`] if interactive prompt fails, is
     ///   non-interactive, or is cancelled.
+    /// - [`CliError::TemplateInstantiate`] if parsing the chosen template path
+    ///   fails.
     fn pick_template(
         config: &Config,
         provider: &dyn DialogProvider,

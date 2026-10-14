@@ -1,4 +1,4 @@
-//! Schema name newtypes: owned ([`SchemaName`]) and borrowed
+//! Defines schema name newtypes: owned ([`SchemaName`]) and borrowed
 //! ([`SchemaNameRef`]).
 //!
 //! Ordering matches `str`'s, which `SchemaGraph`'s determinism depends on.
@@ -10,19 +10,19 @@ use serde::Deserialize;
 use super::{GLOBAL_SCHEMA_NAME, error::SchemaNameError};
 use crate::BaseNameRef;
 
-/// A Schema name from its source file stem.
+/// Represents an owned Schema name from its source file stem.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize)]
 pub(crate) struct SchemaName(String);
 
 impl SchemaName {
-    /// Return this name as a string slice.
+    /// Returns this name as a string slice.
     #[inline]
     #[must_use]
     pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
 
-    /// Borrow this name as a [`SchemaNameRef`].
+    /// Borrows this name as a [`SchemaNameRef`].
     #[inline]
     #[must_use]
     pub(crate) fn as_ref(&self) -> SchemaNameRef<'_> {
@@ -69,7 +69,9 @@ impl TryFrom<&str> for SchemaName {
     ///
     /// # Errors
     ///
-    /// - [`SchemaNameError::Empty`] if `name` is empty
+    /// - [`Empty`] if `name` is empty.
+    ///
+    /// [`Empty`]: SchemaNameError::Empty
     fn try_from(name: &str) -> Result<Self, Self::Error> {
         if name.is_empty() {
             return Err(SchemaNameError::Empty);
@@ -113,12 +115,12 @@ impl fmt::Display for SchemaName {
     }
 }
 
-/// Borrow a Schema name from parsed TOML data or a `$ref` string.
+/// Borrows a Schema name from parsed TOML data or a `$ref` string.
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct SchemaNameRef<'a>(&'a str);
 
 impl<'a> SchemaNameRef<'a> {
-    /// Return this name as a string slice.
+    /// Returns this name as a string slice.
     #[inline]
     #[must_use]
     pub(crate) const fn as_str(self) -> &'a str {

@@ -1,5 +1,5 @@
-//! Task status, priority, and lifecycle-date domain model shared by note
-//! parsing, display, and querying.
+//! Defines the task status, priority, and lifecycle-date domain model shared by
+//! note parsing, display, and querying.
 //!
 //! # Key Types
 //!
@@ -31,7 +31,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{DateValue, delimiter::DelimiterType};
 
-/// A named, typed task status keyed by its marker [`TaskStatusSymbol`].
+/// Represents a named, typed task status keyed by its marker
+/// [`TaskStatusSymbol`].
 ///
 /// Encapsulates the marker character, display name, and workflow classification
 /// type for task items.
@@ -99,7 +100,8 @@ impl Default for TaskStatus {
     }
 }
 
-/// A [`TaskStatus`] lookup table, built once during configuration resolution.
+/// Provides a [`TaskStatus`] lookup table, built once during configuration
+/// resolution.
 ///
 /// Provides lookup by marker symbol, display name, and workflow type. Default
 /// statuses are always present; configuration can add new statuses or override
@@ -211,8 +213,10 @@ impl TaskStatusMap {
     ///
     /// # Errors
     ///
-    /// - [`TaskError::ProhibitedStatusSymbol`] if the status symbol is one of
-    ///   `(`, `)`, `[`, `]`, `{`, or `}`.
+    /// - [`ProhibitedStatusSymbol`] if the status symbol is one of `(`, `)`,
+    ///   `[`, `]`, `{`, or `}`.
+    ///
+    /// [`ProhibitedStatusSymbol`]: TaskError::ProhibitedStatusSymbol
     #[inline]
     pub(crate) fn insert(
         &mut self,
@@ -279,7 +283,7 @@ impl Default for TaskStatusMap {
     }
 }
 
-/// The workflow classification of a [`TaskStatus`].
+/// Represents the workflow classification of a [`TaskStatus`].
 ///
 /// Maps statuses to standard lifecycle states used in task views and completion
 /// rollups.
@@ -370,6 +374,7 @@ impl TaskStatusType {
 /// assert_eq!(sym.as_char(), 'x');
 /// assert_eq!(sym, 'x');
 /// ```
+/// Represents the marker character inside a task item's `[<char>]` checkbox.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
 pub struct TaskStatusSymbol(char);
 
@@ -471,8 +476,8 @@ fn normalize_name(name: &str) -> String {
     out
 }
 
-/// Set of up to six task lifecycle dates, at most one per [`TaskDateType`]
-/// slot.
+/// Stores a set of up to six task lifecycle dates, at most one per
+/// [`TaskDateType`] slot.
 ///
 /// Holds one optional calendar date per lifecycle kind:
 ///
@@ -644,7 +649,7 @@ impl Extend<TaskDate> for TaskDateSet {
     }
 }
 
-/// An iterator over the occupied lifecycle dates in a [`TaskDateSet`].
+/// Iterates over the occupied lifecycle dates in a [`TaskDateSet`].
 ///
 /// Yields [`TaskDate`] elements in declaration order:
 /// 1. [`TaskDateType::Created`]
@@ -682,7 +687,7 @@ impl Iterator for TaskDateSetIter {
     }
 }
 
-/// A single task lifecycle date occurrence paired with its slot.
+/// Represents a single task lifecycle date occurrence paired with its slot.
 ///
 /// # Examples
 ///
@@ -741,7 +746,7 @@ impl TaskDate {
     }
 }
 
-/// Lifecycle slot of a task date.
+/// Represents the lifecycle slot of a task date.
 ///
 /// Represents the six recognized task lifecycle calendar dates supported by
 /// Obsidian Tasks syntax and Dataview inline fields.
@@ -924,8 +929,9 @@ impl std::str::FromStr for TaskDateType {
     ///
     /// # Errors
     ///
-    /// - [`TaskError::InvalidDateType`] if `s` is not a recognized date slot
-    ///   name.
+    /// - [`InvalidDateType`] if `s` is not a recognized date slot name.
+    ///
+    /// [`InvalidDateType`]: TaskError::InvalidDateType
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let trimmed = s.trim();
@@ -940,7 +946,7 @@ impl std::str::FromStr for TaskDateType {
     }
 }
 
-/// Task priority level.
+/// Represents the priority level of a task.
 ///
 /// Supports six priority levels ordered from lowest to highest:
 /// [`Self::Lowest`] < [`Self::Low`] < [`Self::Normal`] < [`Self::Medium`] <
@@ -1114,8 +1120,10 @@ impl std::fmt::Display for TaskPriority {
 ///
 /// # Errors
 ///
-/// - [`TaskError::InvalidPriority`] if `s` does not match a recognized priority
-///   name or emoji.
+/// - [`InvalidPriority`] if `s` does not match a recognized priority name or
+///   emoji.
+///
+/// [`InvalidPriority`]: TaskError::InvalidPriority
 impl std::str::FromStr for TaskPriority {
     type Err = TaskError;
 
@@ -1137,7 +1145,7 @@ impl std::str::FromStr for TaskPriority {
     }
 }
 
-/// Error type for task domain parsing failures.
+/// Represents errors arising from task domain parsing failures.
 #[derive(Debug, Clone, Eq, PartialEq, thiserror::Error)]
 pub enum TaskError {
     /// Task status symbol is reserved as a delimiter.

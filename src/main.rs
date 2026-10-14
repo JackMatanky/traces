@@ -1,4 +1,4 @@
-//! Run the `traces` CLI.
+//! Runs the `traces` CLI.
 //!
 //! Argument parsing and command dispatch live in [`traces_pkm::cli::run`].
 //! This file only maps the top-level outcome to a process exit code.
@@ -11,7 +11,7 @@ fn main() -> ExitCode {
     exit_code(traces_pkm::cli::run())
 }
 
-/// Maps the CLI result to a process exit code.
+/// Maps the CLI result to a process [`ExitCode`].
 ///
 /// Successful completion and Escape exit with `0`. Ctrl-C exits with `130`
 /// (POSIX SIGINT convention). Any other error is printed to stderr and

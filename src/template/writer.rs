@@ -1,4 +1,4 @@
-//! Resolve output paths and write rendered template content.
+//! Resolves output paths and writes rendered template content.
 //!
 //! [`TemplateWriteTarget::write`] resolves a render's output path and writes
 //! `content` under a [`CommitPolicy`]. [`WriteMode`] is defined here and
@@ -30,7 +30,7 @@ use crate::{DialogError, DialogProvider, path::SafeRelativePath};
 
 /// Controls whether rendered output is returned or written.
 ///
-/// Produced once from CLI flags via `from_flags`. Rendering still runs
+/// Produced once from CLI flags via [`Self::from_flags`]. Rendering still runs
 /// in both modes, including `ui.*` template helpers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum WriteMode {
@@ -93,9 +93,12 @@ impl CommitPolicy {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::OutputFileAlreadyExists`] if [`fs::File::create_new`]
-    ///   returns [`io::ErrorKind::AlreadyExists`] under [`Self::CreateNew`].
-    /// - [`TemplateError::Write`] for any other I/O failure.
+    /// - [`OutputFileAlreadyExists`] if [`fs::File::create_new`] returns
+    ///   [`io::ErrorKind::AlreadyExists`] under [`Self::CreateNew`].
+    /// - [`Write`] for any other I/O failure.
+    ///
+    /// [`OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
+    /// [`Write`]: TemplateError::Write
     fn create_file(self, path: &Path) -> Result<fs::File, TemplateError> {
         let file = match self {
             Self::Overwrite => fs::File::create(path),
@@ -178,6 +181,22 @@ impl<'a> TemplateWriteTarget<'a> {
     ///
     /// Keeps raw file writes private to this module: callers can only write via
     /// a path produced by [`Self::resolve`].
+    ///
+    /// # Errors
+    ///
+    /// - [`OutputPathEscapesRoot`] if the target path resolves outside `root`.
+    /// - [`OutputPathUnverifiable`] if output path confinement cannot be
+    ///   verified.
+    /// - [`Prompt`] if an interactive collision prompt fails or is cancelled.
+    /// - [`OutputFileAlreadyExists`] if the output file exists under
+    ///   [`CommitPolicy::CreateNew`].
+    /// - [`Write`] if creating parent directories or writing content fails.
+    ///
+    /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
+    /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
+    /// [`Prompt`]: TemplateError::Prompt
+    /// [`OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
+    /// [`Write`]: TemplateError::Write
     pub(super) fn write(
         &self,
         content: &str,
@@ -195,10 +214,12 @@ impl<'a> TemplateWriteTarget<'a> {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::OutputPathEscapesRoot`] if `requested` or `declared`
-    ///   names a path outside `root`.
-    /// - [`TemplateError::OutputPathUnverifiable`] if confinement cannot be
-    ///   verified.
+    /// - [`OutputPathEscapesRoot`] if `requested` or `declared` names a path
+    ///   outside `root`.
+    /// - [`OutputPathUnverifiable`] if confinement cannot be verified.
+    ///
+    /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
+    /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
     pub(super) fn target_path(
         &self,
         default: impl FnOnce() -> PathBuf,
@@ -220,12 +241,13 @@ impl<'a> TemplateWriteTarget<'a> {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::OutputPathEscapesRoot`] if `requested` or `declared`
-    ///   escapes `root`.
-    /// - [`TemplateError::OutputPathUnverifiable`] if confinement cannot be
-    ///   verified.
-    /// - [`TemplateError::Prompt`] if the collision prompt is cancelled or
-    ///   fails.
+    /// - [`OutputPathEscapesRoot`] if `requested` or `declared` escapes `root`.
+    /// - [`OutputPathUnverifiable`] if confinement cannot be verified.
+    /// - [`Prompt`] if the collision prompt is cancelled or fails.
+    ///
+    /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
+    /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
+    /// [`Prompt`]: TemplateError::Prompt
     pub(super) fn resolve(
         &self,
         policy: CommitPolicy,
@@ -272,10 +294,12 @@ impl<'a> TemplateWriteTarget<'a> {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::OutputPathEscapesRoot`] if `candidate` is unsafe or
-    ///   resolves outside `root`.
-    /// - [`TemplateError::OutputPathUnverifiable`] if confinement cannot be
-    ///   verified.
+    /// - [`OutputPathEscapesRoot`] if `candidate` is unsafe or resolves outside
+    ///   `root`.
+    /// - [`OutputPathUnverifiable`] if confinement cannot be verified.
+    ///
+    /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
+    /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
     fn confine(
         root: &Path,
         candidate: &Path,
@@ -317,10 +341,12 @@ impl<'a> TemplateWriteTarget<'a> {
 ///
 /// # Errors
 ///
-/// - [`TemplateError::Write`] if parent directory creation or content writing
-///   fails.
-/// - [`TemplateError::OutputFileAlreadyExists`] if [`CommitPolicy::CreateNew`]
-///   rejects an existing file through [`CommitPolicy::create_file`].
+/// - [`Write`] if parent directory creation or content writing fails.
+/// - [`OutputFileAlreadyExists`] if [`CommitPolicy::CreateNew`] rejects an
+///   existing file through [`CommitPolicy::create_file`].
+///
+/// [`Write`]: TemplateError::Write
+/// [`OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
 fn commit(
     path: &Path,
     content: &str,

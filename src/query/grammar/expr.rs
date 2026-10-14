@@ -1,4 +1,4 @@
-//! Recursive descent boolean algebra parser shared by source and filter
+//! Parses recursive descent boolean algebra shared by source and filter
 //! languages.
 //!
 //! This module provides a generic, precedence-climbing boolean expression
@@ -14,7 +14,7 @@ use crate::{
     query::error::{QueryBuilderError, QuerySyntaxError},
 };
 
-/// Binary logical operators and their accepted spellings.
+/// Represents binary logical operators and their accepted spellings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum LogicalOp {
     /// `AND` / `and` / `&&`.
@@ -37,7 +37,7 @@ impl TryFrom<&str> for LogicalOp {
     }
 }
 
-/// Logical control tokens consumed by the shared expression parser.
+/// Represents logical control tokens consumed by the shared expression parser.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum LogicalControl {
     Operator(LogicalOp),
@@ -46,9 +46,10 @@ pub(super) enum LogicalControl {
     RightParen,
 }
 
-/// Boolean expression tree over domain-local atoms.
+/// Represents a boolean expression tree over domain-local atoms.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum BooleanExpr<A> {
+    /// Matches the inner domain-local atom.
     Atom(A),
     /// Every child must match.
     And(Vec<Self>),
@@ -58,7 +59,7 @@ pub(crate) enum BooleanExpr<A> {
     Not(Box<Self>),
 }
 
-/// Domain-specific atom hooks for the shared logical grammar.
+/// Provides domain-specific atom hooks for the shared logical grammar.
 ///
 /// Implementations supply token classification, atom parsing, and syntax-error
 /// construction while the shared parser owns precedence and grouping.

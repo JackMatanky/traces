@@ -1,4 +1,4 @@
-//! `number` field type definition and parsing.
+//! Defines the `number` field type and its attribute parsing.
 //!
 //! Parses the optional `min`, `max`, and `step` attributes for `number` fields.
 
@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use super::{SchemaFieldType, parser::SchemaFieldParser};
 use crate::FieldValue;
 
-/// Resolved `number` field options.
+/// Represents resolved `number` field options.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SchemaNumberField {
     min: Option<f64>,
@@ -16,7 +16,7 @@ pub(crate) struct SchemaNumberField {
 }
 
 impl SchemaNumberField {
-    /// Return the inclusive minimum bound, if set.
+    /// Returns the inclusive minimum bound, if set.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -24,7 +24,7 @@ impl SchemaNumberField {
         self.min
     }
 
-    /// Return the inclusive maximum bound, if set.
+    /// Returns the inclusive maximum bound, if set.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -32,7 +32,7 @@ impl SchemaNumberField {
         self.max
     }
 
-    /// Return the increment step, if set.
+    /// Returns the increment step, if set.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -54,7 +54,7 @@ impl SchemaNumberField {
         }
     }
 
-    /// Parse `options` against `number`'s `min`/`max`/`step` attributes,
+    /// Parses `options` against `number`'s `min`/`max`/`step` attributes,
     /// merging with `base` when present.
     ///
     /// # Arguments

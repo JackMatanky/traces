@@ -1,4 +1,4 @@
-//! Sorted-by-path view over stored index rows.
+//! Provides a path-sorted slice wrapper over stored index rows.
 //!
 //! Every producer that loads rows from disk or the store returns rows sorted
 //! by [`HasPath::path`]. Keeping that ordering in the type lets binary
@@ -9,7 +9,7 @@ use std::path::Path;
 
 use crate::path::HasPath;
 
-/// Rows sorted ascending by [`HasPath::path`].
+/// Enforces that rows are sorted in ascending order by [`HasPath::path`].
 ///
 /// Construct through [`SortedByPath::sorted`] (sorts) or
 /// [`SortedByPath::assumed_sorted`] (debug-asserts); lookup methods rely on
@@ -74,7 +74,8 @@ impl<T: HasPath> SortedByPath<T> {
         self.0.get_mut(index)
     }
 
-    /// Binary-searches for `path`; see [`slice::binary_search_by`].
+    /// Binary-searches for `path`, returning `Ok(index)` if found or
+    /// `Err(insertion_point)` otherwise; see [`slice::binary_search_by`].
     #[inline]
     pub(crate) fn binary_search_by_path(
         &self,

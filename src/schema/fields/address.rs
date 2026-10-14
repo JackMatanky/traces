@@ -1,4 +1,4 @@
-//! `#<schema>/<field>` address parsing and representation.
+//! Parses and represents `#<schema>/<field>` addresses.
 
 use std::{borrow::Cow, fmt, str::FromStr};
 
@@ -8,7 +8,8 @@ use thiserror::Error;
 use super::super::{SchemaName, SchemaNameRef};
 use crate::{FieldName, FieldNameError, FieldNameRef};
 
-/// An owned `#<schema>/<field>` coordinate parsed from a `$ref` string.
+/// Represents an owned `#<schema>/<field>` coordinate parsed from a `$ref`
+/// string.
 ///
 /// Constructed via [`TryFrom<&str>`](TryFrom) or [`FromStr`].
 #[derive(Clone, Eq, PartialEq)]
@@ -18,21 +19,21 @@ pub(crate) struct FieldAddress {
 }
 
 impl FieldAddress {
-    /// Return the addressed Schema's name.
+    /// Returns the addressed Schema's name.
     #[inline]
     #[must_use]
     pub(crate) const fn schema(&self) -> &SchemaName {
         &self.schema
     }
 
-    /// Return the addressed field's name.
+    /// Returns the addressed field's name.
     #[inline]
     #[must_use]
     pub(crate) const fn field(&self) -> &FieldName {
         &self.field
     }
 
-    /// Borrow this address as a [`FieldAddressRef`].
+    /// Borrows this address as a [`FieldAddressRef`].
     ///
     /// Test-only: production code builds [`FieldAddressRef`] directly.
     #[cfg(test)]
@@ -46,7 +47,7 @@ impl FieldAddress {
 impl TryFrom<&str> for FieldAddress {
     type Error = FieldAddressError;
 
-    /// Parse a string into an owned field address.
+    /// Parses a string into an owned field address.
     ///
     /// # Errors
     ///
@@ -121,7 +122,7 @@ impl<'de> Deserialize<'de> for FieldAddress {
     }
 }
 
-/// A borrowed `#<schema>/<field>` coordinate.
+/// Represents a borrowed `#<schema>/<field>` coordinate.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FieldAddressRef<'a> {
     schema: SchemaNameRef<'a>,
@@ -129,7 +130,7 @@ pub(crate) struct FieldAddressRef<'a> {
 }
 
 impl<'a> FieldAddressRef<'a> {
-    /// Build a borrowed field address from its schema and field parts.
+    /// Builds a borrowed field address from its schema and field parts.
     #[inline]
     #[must_use]
     pub(crate) const fn new(
@@ -142,14 +143,14 @@ impl<'a> FieldAddressRef<'a> {
         }
     }
 
-    /// Return the addressed Schema's name.
+    /// Returns the addressed Schema's name.
     #[inline]
     #[must_use]
     pub(crate) const fn schema(self) -> SchemaNameRef<'a> {
         self.schema
     }
 
-    /// Return the addressed field's name.
+    /// Returns the addressed field's name.
     #[inline]
     #[must_use]
     pub(crate) const fn field(self) -> FieldNameRef<'a> {
@@ -157,16 +158,16 @@ impl<'a> FieldAddressRef<'a> {
     }
 }
 
-/// Why a [`FieldAddress`] failed to parse.
+/// Describes why a [`FieldAddress`] failed to parse.
 #[derive(Debug, Error)]
 pub(crate) enum FieldAddressError {
-    /// The input was not shaped `#<schema>/<field>` with both segments
-    /// non-empty.
+    /// Indicates the input was not shaped `#<schema>/<field>` with both
+    /// segments non-empty.
     #[error("malformed $ref {reference:?}: expected `#<schema>/<field>`")]
     Malformed {
         reference: String,
     },
-    /// The field segment failed [`FieldName`] validation.
+    /// Indicates the field segment failed [`FieldName`] validation.
     #[error(transparent)]
     FieldName(#[from] FieldNameError),
 }

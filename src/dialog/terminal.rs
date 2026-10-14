@@ -32,7 +32,7 @@ use super::{DialogError, DialogProvider, DialogResult};
 pub struct TerminalDialogProvider;
 
 impl TerminalDialogProvider {
-    /// Create a [`TerminalDialogProvider`] with default prompt behavior.
+    /// Creates a [`TerminalDialogProvider`] with default prompt behavior.
     #[inline]
     #[must_use]
     pub const fn new() -> Self {

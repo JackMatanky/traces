@@ -1,4 +1,4 @@
-//! Build validated field definitions from raw declarations.
+//! Builds validated field definitions from raw declarations.
 //!
 //! Constructs a [`SchemaFieldDef`] from its raw declaration by resolving `$ref`
 //! targets, merging inherited options, and validating against the resolved
@@ -35,7 +35,7 @@ struct ResolvedBase<'a> {
     degrade_on_error: bool,
 }
 
-/// Construction-time dependencies shared by field type parsers.
+/// Manages construction-time dependencies shared by field type parsers.
 ///
 /// Keeps generic schema builders coupled to one field-build context instead of
 /// every type-specific parser dependency.
@@ -44,7 +44,7 @@ pub(crate) struct SchemaFieldBuildContext {
 }
 
 impl SchemaFieldBuildContext {
-    /// Create a field-build context rooted at the schema directory.
+    /// Creates a field-build context rooted at the schema directory.
     #[must_use]
     pub(crate) fn new(schema_dir: &Path) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl SchemaFieldBuildContext {
         }
     }
 
-    /// Create a test context with no filesystem root.
+    /// Creates a test context with no filesystem root.
     #[cfg(test)]
     #[must_use]
     pub(crate) fn for_test() -> Self {
@@ -66,7 +66,7 @@ impl SchemaFieldBuildContext {
     }
 }
 
-/// Build one [`SchemaFieldDef`] from its raw declaration, resolving `$ref`
+/// Builds one [`SchemaFieldDef`] from its raw declaration, resolving `$ref`
 /// targets against already-resolved Schemas.
 ///
 /// `$ref` targets are bounded to the Global Schema or the referencing Schema's
@@ -78,7 +78,7 @@ pub(crate) struct SchemaFieldBuilder<'a> {
 }
 
 impl<'a> SchemaFieldBuilder<'a> {
-    /// Create a builder scoped to the given ancestors and resolved schemas.
+    /// Creates a builder scoped to the given ancestors and resolved schemas.
     pub(crate) const fn new(
         ancestors: &'a IndexSet<SchemaName>,
         resolved: &'a IndexMap<SchemaName, Schema>,
@@ -91,8 +91,8 @@ impl<'a> SchemaFieldBuilder<'a> {
         }
     }
 
-    /// Build `address`'s effective [`SchemaFieldDef`] from `raw`, alongside any
-    /// warnings a bare `$ref` override's degraded validation raised.
+    /// Builds `address`'s effective [`SchemaFieldDef`] from `raw`, alongside
+    /// any warnings a bare `$ref` override's degraded validation raised.
     ///
     /// - `Direct(kind)` or `Ref` with a `type` override: builds fresh from
     ///   `raw.options` against the resolved kind.

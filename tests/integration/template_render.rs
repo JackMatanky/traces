@@ -269,9 +269,11 @@ fn tasks_pipeline_rejects_obsolete_task_field_syntax_with_diagnostic() {
 }
 
 /// Proves `lists.from(...).task_list()` rejects page-level (non-task) rows
-/// with `QueryError::TaskListRequiresTaskRows`, confirming the `lists`
+/// with [`QueryError::TaskListRequiresTaskRows`], confirming the `lists`
 /// namespace's generic rows cannot silently pass through a formatter that
 /// requires task fields.
+///
+/// [`QueryError::TaskListRequiresTaskRows`]: traces_pkm::QueryError::TaskListRequiresTaskRows
 #[test]
 fn lists_pipeline_rejects_task_list_formatter_on_non_task_rows() {
     use std::error::Error as StdError;

@@ -1,10 +1,10 @@
-//! Query source selection, record filtering, field resolution, and
-//! transformations.
+//! Evaluates declarative queries over indexed Markdown notes and flat list
+//! items.
 //!
-//! The query subsystem evaluates declarative queries over indexed Markdown
-//! notes and flat list items stored in a [`WorkspaceIndex`]. It provides a
-//! query planning and execution engine supporting filtering, sorting, limiting,
-//! grouping, flattening, and formatting into Markdown tables and lists.
+//! The query subsystem evaluates queries over notes and list items stored in a
+//! [`WorkspaceIndex`]. It provides a query planning and execution engine
+//! supporting filtering, sorting, limiting, grouping, flattening, and
+//! formatting into Markdown tables and lists.
 //!
 //! # Architecture and Pipeline
 //!

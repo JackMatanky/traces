@@ -1,10 +1,11 @@
-//! Markdown heading data retained by a [`Note`](super::Note).
+//! Defines the heading model retained by a [`Note`](super::Note).
 
 use serde::{Deserialize, Serialize};
 
 use crate::SourceLine;
 
-/// A Markdown heading with display text and its 1-indexed source line.
+/// Represents a Markdown heading with display text and its 1-indexed source
+/// line.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Heading {
     level: u8,

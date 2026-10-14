@@ -1,4 +1,4 @@
-//! Register path tests and filters for templates.
+//! Registers path tests and filters for templates.
 //!
 //! [`PathOps`] adds three minijinja [`Environment::add_test`] tests:
 //!
@@ -104,12 +104,10 @@ impl PathOps {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] via [`super::error::confine_error`] if a
-///   relative `path` traverses outside `root`, through `..` or a symlink
-///   escape.
-/// - [`ErrorKind::InvalidOperation`] via [`super::error::invalid_operation`] if
-///   reading the resolved target's metadata fails for any reason other than
-///   "not found", such as permission denied or a broken symlink loop.
+/// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`] if
+/// a relative `path` traverses outside `root` (through `..` or a symlink
+/// escape) or if reading the resolved target's metadata fails for any reason
+/// other than "not found".
 ///
 /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn inspect(
@@ -152,10 +150,13 @@ impl InspectTarget {
     ///
     /// # Errors
     ///
-    /// - [`PathError::Absolute`], [`PathError::UnsafeComponent`], or
-    ///   [`PathError::OutsideRoot`] if a relative `path` resolves outside
-    ///   `root`.
-    /// - [`PathError::StrictPath`] if containment cannot be confirmed.
+    /// - [`OutsideRoot`] or [`UnsafeComponent`] if a relative `path` resolves
+    ///   outside `root`.
+    /// - [`StrictPath`] if containment cannot be confirmed.
+    ///
+    /// [`OutsideRoot`]: PathError::OutsideRoot
+    /// [`UnsafeComponent`]: PathError::UnsafeComponent
+    /// [`StrictPath`]: PathError::StrictPath
     fn resolve(root: &Path, path: &str) -> Result<Self, PathError> {
         let candidate = Path::new(path);
         if candidate.is_absolute() {

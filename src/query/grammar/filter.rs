@@ -1,5 +1,4 @@
-//! Record filter expression language and abstract syntax tree for `--where`
-//! queries.
+//! Parses and evaluates record filter expressions for `--where` queries.
 //!
 //! This module parses and evaluates row-level filter expressions. Expressions
 //! support:
@@ -35,7 +34,8 @@ use crate::{
     },
 };
 
-/// Parsed filter expression AST used by [`crate::query::QuerySet::filter`].
+/// Represents a parsed filter expression AST used by
+/// [`crate::query::QuerySet::filter`].
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FilterExpr(BooleanExpr<FilterAtom>);
 
@@ -107,10 +107,13 @@ impl FilterExpr {
     }
 }
 
-/// Atomic predicate: either a comparison or a recognized function call.
+/// Represents an atomic predicate: either a comparison or a recognized function
+/// call.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum FilterAtom {
+    /// Wraps a comparison expression between two value expressions.
     Comparison(ComparisonExpr),
+    /// Wraps a filter function with type-specific matching semantics.
     Function(FilterFunction),
 }
 
@@ -123,7 +126,7 @@ impl FilterAtom {
     }
 }
 
-/// Filter function with type-specific matching semantics.
+/// Represents a filter function with type-specific matching semantics.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum FilterFunction {
     /// `contains(field, target)` predicate.
@@ -163,7 +166,7 @@ impl FilterFunction {
     }
 }
 
-/// Comparison expression between two value expressions.
+/// Represents a comparison expression between two value expressions.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ComparisonExpr {
     lhs: ValueExpr,
@@ -218,7 +221,7 @@ impl ComparisonExpr {
     }
 }
 
-/// A value expression in a query filter.
+/// Represents a value expression in a query filter.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ValueExpr {
     /// Field path lookup on a query row.
@@ -239,14 +242,14 @@ pub(crate) enum ValueExpr {
     },
 }
 
-/// Binary arithmetic operator.
+/// Represents a binary arithmetic operator.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ArithOp {
-    /// `+`
+    /// Addition operator (`+`).
     Add,
-    /// `-`
+    /// Subtraction operator (`-`).
     Sub,
-    /// `*`
+    /// Multiplication operator (`*`).
     Mul,
 }
 

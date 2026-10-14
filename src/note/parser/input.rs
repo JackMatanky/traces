@@ -1,4 +1,4 @@
-//! Borrowed input parameters for Markdown note parsing.
+//! Defines borrowed input parameters for Markdown note parsing.
 //!
 //! [`MarkdownParserInput`] encapsulates a note's project-relative path and raw
 //! Markdown source text alongside resolved [`TaskConfig`] and
@@ -16,7 +16,8 @@ static DEFAULT_TASK_CONFIG: std::sync::LazyLock<TaskConfig> =
 static DEFAULT_FRONTMATTER_CONFIG: std::sync::LazyLock<FrontmatterConfig> =
     std::sync::LazyLock::new(FrontmatterConfig::default);
 
-/// Borrowed input container for [`super::parse_markdown`].
+/// Encapsulates borrowed input data and configuration for
+/// [`super::parse_markdown`].
 ///
 /// Pairs the source text, path, and configuration settings so parsing can run
 /// without allocating or cloning configuration tables.
@@ -28,6 +29,7 @@ pub struct MarkdownParserInput<'a> {
     src: &'a str,
     /// Resolved task status and tag filter configuration.
     tasks: &'a TaskConfig,
+    /// Resolved frontmatter field name configuration.
     frontmatter: &'a FrontmatterConfig,
 }
 

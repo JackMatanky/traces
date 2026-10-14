@@ -42,8 +42,8 @@ fn tag_filter_config_drives_task_selection_from_disk() {
 /// selection in a spawned process.
 ///
 /// Executes vs asserts:
-/// - Executes: `traces trust`, `traces index`, then `list --from` class queries
-///   — the child indexes and matches under the configured field.
+/// - Executes: `traces trust`, `traces index`, then `list --from` class
+///   queries; the child indexes and matches under the configured field.
 /// - Asserts: the `kind: Novel` value matches `@Novel` (and the default
 ///   `class`-field value would not exist here).
 ///

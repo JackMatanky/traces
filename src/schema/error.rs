@@ -1,4 +1,5 @@
-//! Schema loading, resolution, and field-construction error types.
+//! Defines error and warning types for Schema loading, resolution, and field
+//! construction.
 //!
 //! [`SchemaError`] is a hard failure that stops resolution. [`SchemaWarning`]
 //! is a recoverable defect that resolution degrades past.
@@ -10,7 +11,7 @@ use thiserror::Error;
 use super::{SchemaName, fields::SchemaFieldBuilderError};
 use crate::FieldName;
 
-/// Why a [`SchemaName`] could not be constructed.
+/// Indicates why a [`SchemaName`] could not be constructed.
 #[derive(Debug, Eq, PartialEq, Error)]
 pub(crate) enum SchemaNameError {
     /// Rejects an empty name.
@@ -18,10 +19,10 @@ pub(crate) enum SchemaNameError {
     Empty,
 }
 
-/// Convenience alias for schema operations that may fail.
+/// Convenience result alias carrying [`SchemaError`].
 pub(crate) type SchemaResult<T> = std::result::Result<T, SchemaError>;
 
-/// A hard failure that stops Schema loading or resolution.
+/// Represents a hard failure that stops Schema loading or resolution.
 ///
 /// Defects that resolution can recover from are emitted as [`SchemaWarning`]
 /// instead.
@@ -36,27 +37,27 @@ pub(crate) type SchemaResult<T> = std::result::Result<T, SchemaError>;
 /// [`TemplateError::SchemaLoad`]: crate::template::TemplateError::SchemaLoad
 #[derive(Debug, Error)]
 pub(crate) enum SchemaError {
-    /// The registry directory exists but could not be read.
+    /// Indicates the registry directory exists but could not be read.
     #[error("failed to read Schema registry directory {directory}: {source}")]
     ReadDirectory {
         directory: PathBuf,
         #[source]
         source: std::io::Error,
     },
-    /// A Schema TOML file could not be read or parsed.
+    /// Indicates a Schema TOML file could not be read or parsed.
     #[error("failed to load Schema file {path}: {source}")]
     File {
         path: PathBuf,
         #[source]
         source: SchemaFileError,
     },
-    /// The `extends` DAG contains a cycle.
+    /// Indicates the `extends` DAG contains a cycle.
     #[error("cycle detected among Schemas: {}", .schemas.join(", "))]
     Cycle {
         schemas: Vec<SchemaName>,
     },
-    /// Two effective fields share a [`FieldKey`](crate::FieldKey) canonical
-    /// form.
+    /// Indicates two effective fields share a [`FieldKey`](crate::FieldKey)
+    /// canonical form.
     #[error(
         "Schema {schema:?} has ambiguous fields {first:?} and {second:?}: \
          both canonicalize to the same metadata key"
@@ -66,13 +67,14 @@ pub(crate) enum SchemaError {
         first: FieldName,
         second: Box<FieldName>,
     },
-    /// A field failed to build: unrecognized attribute, wrongly-shaped value,
-    /// or `$ref` resolution failure.
+    /// Indicates a field failed to build due to an unrecognized attribute,
+    /// malformed value, or `$ref` resolution failure.
     #[error(transparent)]
     FieldBuilder(Box<SchemaFieldBuilderError>),
 }
 
-/// Why a Schema TOML file could not be loaded, once its path is known.
+/// Describes why a Schema TOML file could not be loaded, once its path is
+/// known.
 ///
 /// Deliberately not shared with `select`'s file loader
 /// (`SchemaSelectFieldFileError`, in `fields::error`, a private submodule this
@@ -81,8 +83,10 @@ pub(crate) enum SchemaError {
 /// both follow the same "read, then parse" pattern.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaFileError {
+    /// Indicates an I/O failure.
     #[error("{0}")]
     Io(#[from] std::io::Error),
+    /// Indicates a TOML parsing failure.
     #[error("{0}")]
     Parse(#[from] Box<toml::de::Error>),
 }
@@ -93,13 +97,13 @@ impl From<SchemaFieldBuilderError> for SchemaError {
     }
 }
 
-/// A recoverable Schema resolution defect.
+/// Represents a recoverable Schema resolution defect.
 ///
 /// Resolution skips the offending key or parent and continues. Every warning is
 /// surfaced to the caller as diagnostic context.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SchemaWarning {
-    /// An `extends` target has no corresponding Schema file.
+    /// Indicates an `extends` target has no corresponding Schema file.
     ///
     /// Resolution skips the missing parent. The Schema's own fields still
     /// resolve, and other valid parents still contribute their fields.
@@ -107,28 +111,29 @@ pub(crate) enum SchemaWarning {
         schema: SchemaName,
         target: SchemaName,
     },
-    /// The same `extends` target is declared more than once.
+    /// Indicates the same `extends` target is declared more than once.
     ///
     /// Duplicates are ignored; only the first occurrence contributes fields.
     DuplicateExtendsTarget {
         schema: SchemaName,
         target: SchemaName,
     },
-    /// A declared `extends` parent exists but failed to build its own fields.
-    /// This Schema resolves without that parent's contribution; other valid
-    /// parents still contribute.
+    /// Indicates a declared `extends` parent exists but failed to build its own
+    /// fields. This Schema resolves without that parent's contribution;
+    /// other valid parents still contribute.
     ParentFailedToResolve {
         schema: SchemaName,
         parent: SchemaName,
     },
-    /// `required = true` on the Global Schema, which is always ignored.
+    /// Indicates `required = true` was declared on the Global Schema, which is
+    /// always ignored.
     ///
     /// Global Schema fields can never be required; a referencing Schema may
     /// mark the field required locally instead.
     StrayGlobalRequired {
         field: String,
     },
-    /// A bare `$ref` override declared an invalid attribute (unknown key,
+    /// Indicates a bare `$ref` override declared an invalid attribute.
     /// wrongly-shaped value, or invalid `number`/`select` configuration). The
     /// key (or whole `values` override) is dropped and the base field's value
     /// is used as-is.

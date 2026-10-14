@@ -1,12 +1,12 @@
-//! The resolved [`Schema`] domain type and its lookups.
+//! Defines the resolved [`Schema`] domain type and its lookups.
 
 use indexmap::{IndexMap, IndexSet};
 
 use super::{SchemaName, fields::SchemaFieldDef};
 use crate::{FieldName, strsim::closest_match};
 
-/// A resolved Schema with its effective field definitions and position in the
-/// `extends` DAG.
+/// Represents a resolved Schema with its effective field definitions and
+/// position in the `extends` DAG.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Schema {
     name: SchemaName,
@@ -20,7 +20,7 @@ pub struct Schema {
 }
 
 impl Schema {
-    /// Build a resolved Schema from its merged fields and ancestors.
+    /// Builds a resolved Schema from its merged fields and ancestors.
     ///
     /// Hierarchy links ([`children`], [`descendants`]) are empty until
     /// [`set_hierarchy`] is called after full DAG resolution.
@@ -48,7 +48,7 @@ impl Schema {
         }
     }
 
-    /// Set this Schema's direct and transitive extenders.
+    /// Sets this Schema's direct and transitive extenders.
     pub(super) fn set_hierarchy(
         &mut self,
         children: IndexSet<SchemaName>,
@@ -58,21 +58,21 @@ impl Schema {
         self.descendants = descendants;
     }
 
-    /// Return the Schema name from the source file stem.
+    /// Returns the Schema name from the source file stem.
     #[inline]
     #[must_use]
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
-    /// Return this Schema's effective Field Definitions, keyed by name.
+    /// Returns this Schema's effective Field Definitions, keyed by name.
     #[inline]
     #[must_use]
     pub(crate) const fn fields(&self) -> &IndexMap<FieldName, SchemaFieldDef> {
         &self.fields
     }
 
-    /// Return the named Field Definition, or `None` if it does not resolve for
+    /// Returns the named Field Definition, or `None` if it does not resolve for
     /// this Schema.
     #[inline]
     #[must_use]
@@ -80,28 +80,28 @@ impl Schema {
         self.fields.get(name)
     }
 
-    /// Return this Schema's transitive `extends` ancestors.
+    /// Returns this Schema's transitive `extends` ancestors.
     #[inline]
     #[must_use]
     pub(super) const fn ancestors(&self) -> &IndexSet<SchemaName> {
         &self.ancestors
     }
 
-    /// Return the Schemas that directly `extends` this one.
+    /// Returns the Schemas that directly `extends` this one.
     #[inline]
     #[must_use]
     pub(super) const fn children(&self) -> &IndexSet<SchemaName> {
         &self.children
     }
 
-    /// Return every Schema that transitively `extends` this one.
+    /// Returns every Schema that transitively `extends` this one.
     #[inline]
     #[must_use]
     pub(super) const fn descendants(&self) -> &IndexSet<SchemaName> {
         &self.descendants
     }
 
-    /// Test whether this Schema is a `class` name.
+    /// Tests whether this Schema is a `class` name.
     ///
     /// # Examples
     ///
@@ -117,7 +117,7 @@ impl Schema {
         self.name.as_str() == class || self.ancestors.contains(class)
     }
 
-    /// Suggest the field name that best matches `field`, for a template
+    /// Suggests the field name that best matches `field`, for a template
     /// adapter's "did you mean" hint on an unknown-field error.
     ///
     /// Prefers a canonical ([`FieldKey`]) match over edit distance. Returns

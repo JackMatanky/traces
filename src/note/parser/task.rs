@@ -1,4 +1,5 @@
-//! Task text processing, date and priority extraction, and text normalization.
+//! Processes task text, extracts dates and priorities, and normalizes display
+//! text.
 //!
 //! [`TaskScan`] tokenizes list item text in a single pass to extract task
 //! lifecycle dates, priority levels, and cleaned display text without repeated
@@ -13,7 +14,7 @@ use crate::{
     note::{ListItemType, NoteFieldValue, TaskListItem},
 };
 
-/// Single-pass tokenization view of list item text.
+/// Provides a single-pass tokenization view of list item text.
 ///
 /// Encapsulates raw display text paired with its parsed token stream, ensuring
 /// date, priority, and clean text extraction remain synchronized with the
@@ -280,7 +281,7 @@ impl SubTaskCompletion {
     }
 }
 
-/// Classification inputs for one list item.
+/// Encapsulates classification inputs for one list item.
 #[derive(Copy, Clone)]
 pub(super) struct TaskClassificationParams<'a> {
     /// Item-leading marker symbol, or `None` for plain bullets.

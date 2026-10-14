@@ -1,4 +1,4 @@
-//! Query transformation plan optimization and execution pipeline.
+//! Optimizes and executes query transformation plans.
 //!
 //! This module provides [`ExecutionPlan`], an ordered sequence of
 //! transformation steps applied to query rows. Operations such as filtering,
@@ -25,7 +25,7 @@ use super::{
 };
 use crate::note::NoteFieldValue;
 
-/// Ordered, optimizable transformation pipeline over query rows.
+/// Manages an ordered, optimizable transformation pipeline over query rows.
 ///
 /// Optimizations are algebraic and idempotent: running them again on an
 /// optimized plan leaves the plan unchanged.
@@ -40,10 +40,12 @@ impl ExecutionPlan {
         self.fuse_filters().fuse_sorts().fuse_sort_limit().apply(rows)
     }
 
+    /// Returns whether this plan contains no transformation steps.
     pub(super) fn is_empty(&self) -> bool {
         self.ops.is_empty()
     }
 
+    /// Appends a transformation step to the plan.
     pub(super) fn push(&mut self, op: QueryTransform) {
         self.ops.push(op);
     }
@@ -131,7 +133,7 @@ impl ExecutionPlan {
     }
 }
 
-/// Single operation in an [`ExecutionPlan`].
+/// Represents a single transformation operation in an [`ExecutionPlan`].
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum QueryTransform {
     Filter(FilterExpr),
@@ -184,6 +186,7 @@ impl QueryTransform {
         })
     }
 
+    /// Builds a sort transform from an existing [`SortOrder`].
     pub(super) fn order(by: SortOrder) -> Self {
         Self::Sort {
             order: by,
@@ -194,9 +197,8 @@ impl QueryTransform {
     ///
     /// # Errors
     ///
-    /// - [`LimitOutOfRange`] if `n` is negative or exceeds `usize::MAX`.
-    ///
-    /// [`LimitOutOfRange`]: QueryBuilderError::LimitOutOfRange
+    /// - [`QueryBuilderError::LimitOutOfRange`] if `n` is negative or exceeds
+    ///   [`usize::MAX`].
     pub(super) fn limit(n: i64) -> Result<Self, QueryBuilderError> {
         let n = usize::try_from(n).map_err(|_source| {
             QueryBuilderError::LimitOutOfRange {
@@ -228,6 +230,7 @@ impl QueryTransform {
         Ok(Self::Flatten(FieldPath::parse(path)?))
     }
 
+    /// Applies this transform to `rows`, returning the transformed rows.
     pub(super) fn apply(&self, rows: Vec<QueryRow>) -> Vec<QueryRow> {
         match self {
             Self::Filter(expr) => {

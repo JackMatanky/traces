@@ -1,4 +1,5 @@
-//! Markdown list items and task-list structures.
+//! Defines the data structures and hierarchy operations for Markdown list items
+//! and task lists.
 //!
 //! This module defines the flat list-item data model. Items are stored in
 //! strict document order inside a [`Note`](crate::Note); hierarchy is
@@ -25,11 +26,11 @@ use serde::{Deserialize, Serialize};
 use super::field::NoteFieldValue;
 use crate::{FieldKey, SourceLine, Tag, TaskDateSet, TaskPriority, TaskStatus};
 
-/// Compact inline field map for a list item.
+/// Type alias for compact inline field maps attached to list items.
 pub(crate) type ListFieldMap = IndexMap<FieldKey, Box<[NoteFieldValue]>>;
 
-/// A Markdown list item with a classified [`ListItemType`], inline fields,
-/// tags, and source line positioning information.
+/// Represents a Markdown list item with a classified [`ListItemType`], inline
+/// fields, tags, and source line positioning information.
 //
 // NOTE: `Eq` is deliberately not derived. `ListFieldMap` contains
 // `NoteFieldValue`, whose `Number` variant holds `f64`, so `Eq` is
@@ -218,7 +219,7 @@ impl ListItem {
     }
 }
 
-/// Classification of a Markdown list item.
+/// Classifies a Markdown list item as a plain bullet, checkbox, or task.
 ///
 /// List items are classified during parsing based on leading marker syntax and
 /// configured task tag filters:
@@ -323,7 +324,7 @@ impl ListItemType {
     }
 }
 
-/// Task-specific data carried by a [`ListItemType::Task`] item.
+/// Stores task-specific data carried by a [`ListItemType::Task`] item.
 ///
 /// Encapsulates extracted task lifecycle dates ([`TaskDateSet`]), an optional
 /// priority ([`TaskPriority`]), the resolved [`TaskStatus`], and a precomputed
@@ -471,8 +472,8 @@ impl TaskListItem {
     }
 }
 
-/// Text representation of a list item holding both raw source-like text and
-/// cleaned display text.
+/// Represents the dual-form text of a list item holding both raw source text
+/// and cleaned display text.
 ///
 /// - `raw`: Source text minus the leading `[<char>] ` marker prefix only. All
 ///   other inline syntax (tags, date syntax, priority emojis, inline fields) is

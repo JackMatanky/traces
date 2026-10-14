@@ -1,4 +1,5 @@
-//! File rows persisted by the index.
+//! Defines the file entries and in-memory index structures persisted by the
+//! index.
 //!
 //! [`super::service::IndexerService`] is the only producer; construction flows
 //! through its `build`, `load`, or `refresh` methods.
@@ -8,7 +9,8 @@ use std::path::{Path, PathBuf};
 use super::{inlinks::InlinkMap, sort::SortedByPath};
 use crate::{FileMeta, Note};
 
-/// Persisted file entries with parsed note metadata and derived inbound links.
+/// Represents an in-memory snapshot of persisted file entries, parsed note
+/// metadata, and inbound links.
 ///
 /// Every regular file under the project root contributes one [`FileEntry`].
 /// Markdown files include a parsed [`Note`]; all entries may carry inlinks.
@@ -100,7 +102,7 @@ impl WorkspaceIndex {
         Self::new(entries.into_boxed_slice())
     }
 
-    /// Returns [`FileEntry`]s, sorted by path.
+    /// Returns the slice of [`FileEntry`] items, sorted by path.
     #[inline]
     #[must_use]
     pub fn entries(&self) -> &[FileEntry] {
@@ -111,7 +113,7 @@ impl WorkspaceIndex {
     ///
     /// # Panics
     ///
-    /// Panics if `position` is not a valid row index for this index. Row
+    /// Panics if `position` is out of bounds for the entries slice. Row
     /// indices are only constructed from a valid range over entries.
     #[expect(
         clippy::expect_used,
@@ -126,7 +128,7 @@ impl WorkspaceIndex {
     }
 }
 
-/// Parsed note metadata and inbound links for one indexed file.
+/// Stores parsed note metadata and inbound links for one indexed file.
 ///
 /// Notes stay boxed to keep [`FileEntry`]'s stack footprint small (~96 bytes).
 /// Inlinks also apply to non-Markdown attachments such as images and PDFs.
@@ -160,7 +162,7 @@ impl FileEntry {
         self.note.as_deref()
     }
 
-    /// Returns canonically sorted inbound link paths.
+    /// Returns the canonically sorted inbound link paths.
     #[inline]
     #[must_use]
     pub fn inlinks(&self) -> &[PathBuf] {
@@ -178,7 +180,8 @@ impl crate::path::HasPath for FileEntry {
     }
 }
 
-/// Position of a [`FileEntry`] within [`WorkspaceIndex::entries`].
+/// Represents the position of a [`FileEntry`] within
+/// [`WorkspaceIndex::entries`].
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct RowIndex(usize);
 

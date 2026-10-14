@@ -5,10 +5,12 @@
 //!
 //! # Key Types
 //!
-//! [`LocalConfigFile`] and [`GlobalConfigFile`] distinguish Config File
-//! sources. [`Discovered`], [`Trusted`], and [`Parsed`] mark lifecycle states;
-//! [`Trusted`] retains the content checked against a Companion Hash.
-
+//! - [`LocalConfigFile`]: identifies a project-local Config File.
+//! - [`GlobalConfigFile`]: identifies a user-global Config File.
+//! - [`Discovered`]: marks a discovered Config File before verification.
+//! - [`Trusted`]: holds local Config File content that passed Trust
+//!   Verification.
+//! - [`Parsed`]: holds parsed raw configuration from a Config File.
 use std::{
     marker::PhantomData,
     path::{Path, PathBuf},

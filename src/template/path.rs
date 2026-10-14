@@ -1,13 +1,13 @@
-//! Validate and label path values in the template pipeline.
+//! Validates and labels path values in the template pipeline.
 //!
-//! Public API:
+//! # Key Types
 //!
-//! - [`TemplatePathInput`] - Relative template identifier accepted at CLI and
+//! - [`TemplatePathInput`]: Relative template identifier accepted at CLI and
 //!   include boundaries.
-//! - [`TemplatePath`] - Resolved template path produced after loader lookup.
-//! - [`DeclaredOutputPath`] - Raw `file.write_to()` value captured during
+//! - [`TemplatePath`]: Resolved template path produced after loader lookup.
+//! - [`DeclaredOutputPath`]: Raw `file.write_to()` value captured during
 //!   rendering.
-//! - [`TemplatePathError`] - Validation and lookup failures for template
+//! - [`TemplatePathError`]: Validation and lookup failures for template
 //!   identifiers.
 //!
 //! [`TemplatePath`] is created by [`TemplateLoader`] immediately after finding
@@ -47,11 +47,13 @@ impl TemplatePathInput {
     ///
     /// # Errors
     ///
-    /// - `TemplatePathError::Absolute` if `path` is absolute.
-    /// - `TemplatePathError::UnsafeComponent` for `..`, any component that is
-    ///   not a plain name or `.`, or a path with no [`Component::Normal`].
+    /// - [`Absolute`] if `path` is absolute.
+    /// - [`UnsafeComponent`] if `path` contains `..`, any component that is not
+    ///   a plain name or `.`, or no [`Component::Normal`].
     ///
-    /// # Examples
+    /// [`Absolute`]: TemplatePathError::Absolute
+    /// [`UnsafeComponent`]: TemplatePathError::UnsafeComponent
+    /// [`Component::Normal`]: std::path::Component::Normal
     ///
     /// ```rust
     /// # #[cfg(feature = "test-utils")]
@@ -156,7 +158,7 @@ impl TemplatePath {
     ///
     /// # Errors
     ///
-    /// - [`io::Error`] if the resolved template file cannot be read.
+    /// Returns an [`io::Error`] if the resolved template file cannot be read.
     pub(super) fn read(&self) -> io::Result<String> {
         fs::read_to_string(self.absolute())
     }

@@ -1,4 +1,4 @@
-//! Markdown formatting and rendering for query result collections.
+//! Formats and renders query result collections into Markdown.
 //!
 //! This module converts transformed [`QueryRow`] items into user-facing
 //! Markdown formats, including GitHub-flavored Markdown tables, bulleted lists,
@@ -14,28 +14,29 @@ use super::{QueryError, QueryResult, grammar::FieldPath, results::QueryRow};
 /// Controls file-path rendering in task list output.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) enum TaskPathStyle {
-    /// Omit paths for template rendering.
+    /// Omits paths for template rendering.
     #[default]
     None,
-    /// Append paths in parentheses for `traces task`.
+    /// Appends paths in parentheses for `traces task` and 1-indexed source
+    /// line coordinates for `traces task -l`.
     Suffix,
     /// Append file path and 1-indexed source line coordinates for
     /// `traces task -l`.
     Coordinates,
 }
 
-/// Markdown display formats supported by query results.
+/// Represents Markdown display formats supported by query results.
 pub(super) enum QueryDisplayFormat {
-    /// Markdown table with display headers and field-path columns.
+    /// Renders a Markdown table with display headers and field-path columns.
     Table {
         headers: Vec<String>,
         columns: Vec<String>,
     },
-    /// Markdown bullet list rendered from one field path.
+    /// Renders a Markdown bullet list from one field path.
     List {
         field: String,
     },
-    /// Markdown task list rendered from task rows, optionally suffixed with
+    /// Renders a Markdown task list from task rows, optionally suffixed with
     /// each row's file path.
     TaskList {
         path_style: TaskPathStyle,
@@ -75,11 +76,11 @@ impl QueryDisplayFormat {
     ///
     /// # Errors
     ///
-    /// - [`FieldPath`]: a column or list field path is malformed.
-    /// - [`TableColumnCountMismatch`]: `Self::Table` headers and columns differ
-    ///   in length.
-    /// - [`TaskListRequiresTaskRows`]: `Self::TaskList` renders page-level
-    ///   rows.
+    /// - [`FieldPath`] if a column or list field path is malformed.
+    /// - [`TableColumnCountMismatch`] if table headers and columns differ in
+    ///   length.
+    /// - [`TaskListRequiresTaskRows`] if task-list formatting runs on
+    ///   page-level rows.
     ///
     /// [`FieldPath`]: QueryError::FieldPath
     /// [`TableColumnCountMismatch`]: QueryError::TableColumnCountMismatch

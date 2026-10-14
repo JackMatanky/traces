@@ -1,4 +1,4 @@
-//! Register date and time helpers for templates.
+//! Registers date and time helpers for templates.
 //!
 //! [`DateOps`] provides the `date` namespace object registered as a minijinja
 //! global by [`super::TemplateEngine`]. It also registers the flat `date_*`
@@ -71,7 +71,7 @@ const METHODS: &[&str] = &[
     "eoy",
     "weekday",
 ];
-/// Backs the `date` namespace object. Stateless; see the module docs.
+/// Backs the `date` namespace object.
 #[derive(Debug)]
 pub(super) struct DateOps;
 
@@ -131,16 +131,19 @@ fn today_point() -> DatePoint {
     )
 }
 
-/// Translates an ISO-8601 duration offset (e.g., `"P1M"`, `"-P1M"`, `"P-1M"`,
-/// `"P1DT2H"`) to standard `<number><unit>` duration text accepted by
-/// [`DurationValue`]. Returns borrowed input when `input` is not an ISO
-/// duration.
+/// Translates an ISO-8601 duration offset to standard `<number><unit>` duration
+/// text.
+///
+/// Accepts offsets such as `"P1M"`, `"-P1M"`, `"P-1M"`, and `"P1DT2H"`,
+/// returning format accepted by [`DurationValue`]. Returns borrowed input when
+/// `input` is not an ISO duration.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `input` has an ISO duration prefix (`P`
-///   or `p`) but contains malformed components, invalid units, or unconsumed
-///   trailing text.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `input` has an ISO duration prefix (`P` or `p`) but contains malformed
+/// components, invalid units, or unconsumed trailing text.
 fn translate_iso_offset(input: &str) -> TemplateEngineResult<Cow<'_, str>> {
     let trimmed = input.trim();
     let (lead_neg, after_lead_sign) = match trimmed.strip_prefix('-') {
@@ -607,6 +610,12 @@ impl Object for DateOps {
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
 /// the full parse-failure chain.
+///
+/// # Errors
+///
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `s` cannot be parsed as a recognized date or datetime.
 fn parse_recognized(s: &str) -> TemplateEngineResult<RecognizedDate> {
     match DateValue::classify(s) {
         Some(Ok(rec)) => Ok(rec),
@@ -637,20 +646,18 @@ fn parse_recognized(s: &str) -> TemplateEngineResult<RecognizedDate> {
         }
     }
 }
-/// Extracts the shared `format="..."` kwarg every `date.*` namespace method
-/// takes, defaulting to [`DEFAULT_DATE_FORMAT`], and rejects any other kwarg
-/// via [`Kwargs::assert_all_used`].
+/// Extracts the shared `format="..."` kwarg used by `date.*` namespace methods.
 ///
-/// This is the one place all five
-/// `now`/`today`/`tomorrow`/`yesterday`/`from_timestamp` closures decide how
-/// their optional `format=` argument is read.
+/// Defaults to [`DEFAULT_DATE_FORMAT`] and rejects any other kwarg via
+/// [`Kwargs::assert_all_used`].
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `format` is present but is not a
-///   string.
-/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
-///   `format`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `format` is present but is not a string, or
+/// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments) if
+/// `kwargs` carries any key besides `format`.
 fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
     let format =
         kwargs.get::<Option<&str>>("format")?.unwrap_or(DEFAULT_DATE_FORMAT);
@@ -658,35 +665,36 @@ fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
     Ok(format)
 }
 
-/// Extracts the shared `unit="..."` kwarg [`date_add`], [`date_sub`], and
-/// [`date_diff`] all take, defaulting to `"days"`, and rejects any other kwarg
-/// via [`Kwargs::assert_all_used`], mirroring [`format_kwarg`] for the `date.*`
-/// namespace methods' `format=` kwarg.
+/// Extracts the shared `unit="..."` kwarg used by [`date_add`], [`date_sub`],
+/// and [`date_diff`].
+///
+/// Defaults to `"days"` and rejects any other kwarg via
+/// [`Kwargs::assert_all_used`].
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `unit` is not one of
-///   [`DurationUnit::parse`]'s accepted unit names or abbreviations.
-/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
-///   `unit`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `unit` is not one of [`DurationUnit::parse`]'s accepted unit names or
+/// abbreviations, or
+/// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments)
+/// if `kwargs` carries any key besides `unit`.
 fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<DurationUnit> {
     let unit_str = kwargs.get::<Option<&str>>("unit")?.unwrap_or("days");
     kwargs.assert_all_used()?;
     DurationUnit::parse(unit_str).ok_or_else(|| unknown_unit_error(unit_str))
 }
 
-/// Formats `formattable`, anything chrono's `.format(fmt)` produces
-/// (`DelayedFormat` from a `NaiveDate`, `NaiveDateTime`, or `DateTime<_>`).
+/// Formats `formattable` with the given `format` string.
 ///
-/// Writes through [`std::fmt::Write`] rather than `.to_string()`: the latter's
-/// blanket impl `.expect()`s a successful `Display::fmt`, but `DelayedFormat`
-/// returns `Err` for an invalid strftime specifier such as `%Q`. Writing
-/// directly turns that into a normal [`minijinja::Error`] instead of a panic.
+/// Writes through [`std::fmt::Write`] rather than `.to_string()` so invalid
+/// strftime specifiers return a normal error instead of panicking.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `format` is not a strftime specifier
-///   `formattable` can render, for example `%Q`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `format` is not a strftime specifier `formattable` can render.
 fn format_with(
     formattable: impl std::fmt::Display,
     format: &str,
@@ -701,20 +709,22 @@ fn format_with(
     Ok(rendered)
 }
 
-/// The shared date/time string parser for filters that work on the human wall
-/// clock (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
-/// parse via [`parse_recognized`] directly.
+/// Parses a date or datetime string for wall-clock date filters.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `s` is not a parseable date/time
-///   string.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `s` is not a parseable date or datetime string.
 fn parse_date(s: &str) -> Result<NaiveDateTime, Error> {
     parse_recognized(s).map(|rec| rec.wall_or_utc())
 }
 
-/// `{{ value | date_format(format_string) }}` formats a piped date/time string
-/// according to either a strftime pattern (containing `%`) or common
+/// Formats a piped date/time string according to a strftime pattern or
+/// moment-dialect tokens.
+///
+/// Syntax: `{{ value | date_format(format_string) }}`.
+/// Formats according to either a strftime pattern (containing `%`) or common
 /// moment-dialect tokens (`YYYY MM DD HH mm ss`, `Do`/`S`,
 /// `dddd`/`ddd`/`MMM`/`MMMM`, bracket literals like `[Daily]`).
 ///
@@ -725,10 +735,10 @@ fn parse_date(s: &str) -> Result<NaiveDateTime, Error> {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_date`].
-/// - [`ErrorKind::InvalidOperation`] if `format` is an invalid strftime pattern
-///   or contains an unsupported moment token.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string, or if `format` is an invalid
+/// strftime pattern or contains an unsupported moment token.
 fn date_format(value: &str, format: &str) -> TemplateEngineResult<String> {
     let datetime = parse_date(value)?;
     let pattern = translate_pattern(format, datetime)?;
@@ -890,8 +900,15 @@ fn translate_moment_dialect(
     Ok(result)
 }
 
-/// `{{ value | durationformat }}` renders a duration in human-readable compound
-/// format (e.g. `"3 days, 4 hours"`).
+/// Renders a duration value or string in human-readable compound format.
+///
+/// Syntax: `{{ value | durationformat }}` (e.g. `"3 days, 4 hours"`).
+///
+/// # Errors
+///
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` cannot be parsed or converted into a [`DurationValue`].
 fn durationformat(value: Value) -> TemplateEngineResult<String> {
     let dv = if let Some(s) = value.as_str() {
         DurationValue::parse(s).map_err(|source| {
@@ -975,22 +992,30 @@ fn format_human_duration(dv: &DurationValue) -> String {
     }
 }
 
-/// `{{ value | timestamp }}` converts a piped date/time string to Unix seconds.
+/// Converts a piped date/time string to Unix seconds.
 ///
+/// Syntax: `{{ value | timestamp }}`.
 /// A naive input means the reader's local zone, so it compares correctly
 /// against file timestamps; an explicit-offset input converts directly; a
 /// date-only input resolves at local-zone midnight.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string; see [`parse_recognized`].
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
     Ok(parse_recognized(value)?.instant().timestamp())
 }
 
 /// Returns the first or last day of the input's month at its original
 /// precision.
+///
+/// # Errors
+///
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string or the month calculation fails.
 fn month_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
     let recognized = parse_recognized(value)?;
     let shifted = recognized.point().month_boundary(end).map_err(date_error)?;
@@ -999,6 +1024,12 @@ fn month_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
 }
 
 /// Returns the first or last day of the input's week at its original precision.
+///
+/// # Errors
+///
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string or the week calculation fails.
 fn week_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
     let recognized = parse_recognized(value)?;
     let shifted = recognized.point().week_boundary(end).map_err(date_error)?;
@@ -1007,6 +1038,12 @@ fn week_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
 }
 
 /// Returns the first or last day of the input's year at its original precision.
+///
+/// # Errors
+///
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string or the year calculation fails.
 fn year_boundary(value: &str, end: bool) -> TemplateEngineResult<String> {
     let recognized = parse_recognized(value)?;
     let shifted = recognized.point().year_boundary(end).map_err(date_error)?;
@@ -1030,9 +1067,9 @@ fn end_of_year(value: &str) -> TemplateEngineResult<String> {
     year_boundary(value, true)
 }
 
-/// `{{ value | date_add(n, unit="days") }}` adds `n` `unit`s to a piped
-/// date/time string.
+/// Adds `n` units to a piped date/time string.
 ///
+/// Syntax: `{{ value | date_add(n, unit="days") }}`.
 /// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
@@ -1045,9 +1082,10 @@ fn end_of_year(value: &str) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string, `unit` is not an accepted unit name, or the shift overflows
-///   chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string, `unit` is not an accepted unit
+/// name, or the shift overflows chrono's representable range.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -1062,9 +1100,9 @@ fn date_add(
     date_shift_unit(value, n, unit)
 }
 
-/// `{{ value | date_sub(n, unit="days") }}` subtracts `n` `unit`s from a piped
-/// date/time string.
+/// Subtracts `n` units from a piped date/time string.
 ///
+/// Syntax: `{{ value | date_sub(n, unit="days") }}`.
 /// `unit` defaults to `"days"` and accepts any [`DurationUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
@@ -1072,9 +1110,11 @@ fn date_add(
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string, `unit` is not an accepted unit name, `n` is [`i64::MIN`], or the
-///   shift overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string, `unit` is not an accepted unit
+/// name, `n` is [`i64::MIN`], or the shift overflows chrono's representable
+/// range.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -1093,8 +1133,8 @@ fn date_sub(
     )
 }
 
-/// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration
-/// semantics per `unit`.
+/// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration semantics
+/// per `unit`.
 ///
 /// - Inputs with a time component ([`Precision::DateTime`]) shift calendar
 ///   units on the local wall clock (preserving wall-clock hour across DST) and
@@ -1105,8 +1145,10 @@ fn date_sub(
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or the shift
-///   overflows chrono's representable range (see [`date_error`]).
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or the shift overflows chrono's representable range
+/// (see [`date_error`]).
 fn date_shift_unit(
     value: &str,
     n: i64,
@@ -1119,106 +1161,138 @@ fn date_shift_unit(
     format_with(shifted_point.wall.format(pat), pat)
 }
 
-/// `{{ value | add_days(n) }}` is a convenience shortcut for
-/// `{{ value | date_add(n, unit="days") }}`.
+/// Adds `n` days to a piped date/time string.
+///
+/// Convenience shortcut for `{{ value | date_add(n, unit="days") }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or arithmetic overflows chrono's representable
+/// range.
 fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     date_shift_unit(value, n_i64, DurationUnit::Day)
 }
 
-/// `{{ value | sub_days(n) }}` is a convenience shortcut for
-/// `{{ value | date_sub(n, unit="days") }}`.
+/// Subtracts `n` days from a piped date/time string.
+///
+/// Convenience shortcut for `{{ value | date_sub(n, unit="days") }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or arithmetic overflows chrono's representable
+/// range.
 fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     let n_i64 = n_i64.checked_neg().ok_or_else(date_out_of_range_error)?;
     date_shift_unit(value, n_i64, DurationUnit::Day)
 }
 
-/// `{{ value | add_months(n) }}` is a convenience shortcut for
-/// `{{ value | date_add(n, unit="months") }}`.
+/// Adds `n` months to a piped date/time string.
+///
+/// Convenience shortcut for `{{ value | date_add(n, unit="months") }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or arithmetic overflows chrono's representable
+/// range.
 fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     date_shift_unit(value, i64::from(n), DurationUnit::Month)
 }
 
-/// `{{ value | sub_months(n) }}` is a convenience shortcut for
-/// `{{ value | date_sub(n, unit="months") }}`.
+/// Subtracts `n` months from a piped date/time string.
+///
+/// Convenience shortcut for `{{ value | date_sub(n, unit="months") }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or arithmetic overflows chrono's representable
+/// range.
 fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
     date_shift_unit(value, n_i64, DurationUnit::Month)
 }
 
-/// `{{ value | add_years(n) }}` is a convenience shortcut for
-/// `{{ value | date_add(n, unit="years") }}`.
+/// Adds `n` years to a piped date/time string.
+///
+/// Convenience shortcut for `{{ value | date_add(n, unit="years") }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or arithmetic overflows chrono's representable
+/// range.
 fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     date_shift_unit(value, i64::from(n), DurationUnit::Year)
 }
 
-/// `{{ value | sub_years(n) }}` is a convenience shortcut for
-/// `{{ value | date_sub(n, unit="years") }}`.
+/// Subtracts `n` years from a piped date/time string.
+///
+/// Convenience shortcut for `{{ value | date_sub(n, unit="years") }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not parseable or arithmetic
-///   overflows chrono's representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not parseable or arithmetic overflows chrono's representable
+/// range.
 fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
     date_shift_unit(value, n_i64, DurationUnit::Year)
 }
 
-/// `{{ value | start_of_month }}` returns the first day of the input month.
+/// Returns the first day of the input month.
+///
+/// Syntax: `{{ value | start_of_month }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
-/// - [`ErrorKind::InvalidOperation`] if the first day of the month is outside
-///   chrono's representable range; see [`date_out_of_range_error`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string or the month boundary
+/// calculation fails.
 fn start_of_month(value: &str) -> TemplateEngineResult<String> {
     month_boundary(value, false)
 }
 
-/// `{{ value | end_of_month }}` returns the last day of the input month.
+/// Returns the last day of the input month.
+///
+/// Syntax: `{{ value | end_of_month }}`.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
-/// - [`ErrorKind::InvalidOperation`] if the last day of the month is outside
-///   chrono's representable range; see [`date_out_of_range_error`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string or the month boundary
+/// calculation fails.
 fn end_of_month(value: &str) -> TemplateEngineResult<String> {
     month_boundary(value, true)
 }
 
-/// `{{ value | weekday }}` returns `0` for Monday through `6` for Sunday.
-/// When `n` is supplied, returns the formatted date of that weekday in
+/// Returns the weekday index (Monday=0) or the formatted date of a given
+/// weekday in the week.
+///
+/// Syntax: `{{ value | weekday }}` returns `0` for Monday through `6` for
+/// Sunday. When `n` is supplied, returns the formatted date of that weekday in
 /// `value`'s week.
+///
+/// # Errors
+///
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string, `n` is out of range 0..=6, or
+/// `format` is invalid.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja Function trait extracts trailing Kwargs argument by \
@@ -1247,8 +1321,10 @@ fn weekday(
     }
 }
 
-/// `{{ value | date_diff(other, unit="days") }}` returns the signed difference
-/// from the piped value to `other`, positive when `other` is later.
+/// Returns the signed difference from the piped value to `other`.
+///
+/// Syntax: `{{ value | date_diff(other, unit="days") }}`. Returns positive
+/// when `other` is later.
 ///
 /// The `unit` kwarg defaults to `"days"` and accepts `"years"`, `"months"`,
 /// `"weeks"`, `"hours"`, `"minutes"`, `"seconds"`, or `"ms"`.
@@ -1261,13 +1337,12 @@ fn weekday(
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` or `other` is not a parseable
-///   date/time string (see [`parse_recognized`]) or `unit` is not one of
-///   [`DurationUnit::parse`]'s accepted names (see [`unit_kwarg`]).
-/// - [`ErrorKind::InvalidOperation`] if the difference overflows chrono's
-///   representable range (see [`date_error`]).
-/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries any key besides
-///   `unit`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` or `other` is not a parseable date/time string, if `unit` is not an
+/// accepted name, or if the difference overflows chrono's representable range.
+/// Returns [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments)
+/// if `kwargs` carries any key besides `unit`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -1290,40 +1365,48 @@ fn date_diff(
     }
 }
 
-/// `{% if value is is_past %}` returns `true` when the piped date/time string
-/// is before now.
+/// Evaluates whether the piped date/time string is before now.
 ///
+/// Syntax: `{% if value is is_past %}`.
 /// A naive input is interpreted in the reader's local zone, so it compares
 /// correctly against file timestamps.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string; see [`parse_recognized`].
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
     Ok(parse_recognized(value)?.instant() < Utc::now())
 }
 
-/// `{% if value is is_future %}` mirrors [`is_past`] for future instants.
+/// Evaluates whether the piped date/time string is after now.
+///
+/// Syntax: `{% if value is is_future %}`. Mirrors [`is_past`] for future
+/// instants.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is not a parseable date/time
-///   string; see [`parse_recognized`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is not a parseable date/time string; see [`parse_recognized`].
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
     Ok(parse_recognized(value)?.instant() > Utc::now())
 }
 
-/// `{% if value is is_leap_year %}` accepts either an integer year (`2024 is
-/// is_leap_year`) or a date/time string checked through [`parse_date`].
+/// Evaluates whether the given year or date/time string falls in a leap year.
+///
+/// Syntax: `{% if value is is_leap_year %}`. Accepts either an integer year
+/// (`2024 is is_leap_year`) or a date/time string checked through
+/// [`parse_date`].
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] (via [`leap_year_input_error`]) if `value`
-///   is neither an integer year representable as [`i32`] nor a parseable
-///   date/time string; see [`parse_date`].
-/// - [`ErrorKind::InvalidOperation`] if the year is outside [`NaiveDate`]'s
-///   representable range.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `value` is neither an integer year representable as [`i32`] nor a parseable
+/// date/time string, or if the year is outside [`NaiveDate`]'s representable
+/// range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
     let year = if let Some(year) = value.as_i64() {
         i32::try_from(year)

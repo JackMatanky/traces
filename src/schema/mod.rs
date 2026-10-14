@@ -1,4 +1,4 @@
-//! Schema resolution, field merging, and hierarchy queries for
+//! Resolves schemas, merges fields, and executes hierarchy queries for
 //! frontmatter-driven file classification.
 //!
 //! Reads `.traces/schemas/*.toml` files, linearizes the `extends` DAG via

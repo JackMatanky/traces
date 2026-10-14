@@ -1,10 +1,11 @@
-//! Resolve configuration and persistent-state directories.
+//! Resolves configuration and persistent-state directories.
 //!
-//! Main exports:
-//! - [`StateDirRoot`] - Store-root path newtype under the state directory
-//! - [`CONFIG_HOME`] - Parent directory for global configuration
-//! - [`TRACKED_CONFIGS`] - Store for paths loaded by config discovery
-//! - [`TRUSTED_CONFIGS`] - Store for paths marked trusted by workspace config
+//! # Key Items
+//!
+//! - [`StateDirRoot`]: store-root path newtype under the state directory.
+//! - [`CONFIG_HOME`]: parent directory for global configuration.
+//! - [`TRACKED_CONFIGS`]: store for paths loaded by config discovery.
+//! - [`TRUSTED_CONFIGS`]: store for paths marked trusted by workspace config.
 //!
 //! State stores live under `$TRACES_STATE_DIR` when that variable is set and
 //! non-empty. Otherwise, they live under the platform state directory with the
@@ -19,7 +20,7 @@ use std::{
 
 const APP_NAME: &str = "traces";
 
-/// Wraps a store directory rooted under the application state directory.
+/// Wraps a store directory path rooted under the application state directory.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct StateDirRoot(PathBuf);
 
@@ -53,7 +54,7 @@ impl AsRef<Path> for StateDirRoot {
     }
 }
 
-/// User home directory on Unix.
+/// Resolves the user home directory on Unix.
 ///
 /// - Override: `$HOME`
 /// - Default: `/`
@@ -61,7 +62,7 @@ impl AsRef<Path> for StateDirRoot {
 static HOME: LazyLock<PathBuf> =
     LazyLock::new(|| var_path("HOME").unwrap_or_else(|| PathBuf::from("/")));
 
-/// User home directory on Windows.
+/// Resolves the user home directory on Windows.
 ///
 /// - Override: `%USERPROFILE%` (then `%HOMEDRIVE%``%HOMEPATH%`)
 #[cfg(all(not(test), windows))]

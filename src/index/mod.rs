@@ -1,5 +1,5 @@
-//! Persistent file indexing, metadata caching, and incremental refresh for a
-//! project root.
+//! Provides persistent file indexing, metadata caching, and incremental refresh
+//! for a project root.
 //!
 //! [`IndexerService`] scans the filesystem, parses Markdown notes, derives
 //! inbound links, and stores the resulting [`WorkspaceIndex`] through the
@@ -41,7 +41,8 @@ pub(crate) use store::IndexStore;
 /// Project-relative index database path.
 const INDEX_FILE: &str = ".traces/index.redb";
 
-/// Materializes a stale pass from the store or its retained in-memory update.
+/// Materializes a stale pass from the store or its retained in-memory update
+/// into a [`WorkspaceIndex`].
 ///
 /// # Errors
 ///

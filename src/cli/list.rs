@@ -75,8 +75,9 @@ impl List {
     /// # Errors
     ///
     /// - [`CliError::Index`] if refreshing the [`WorkspaceIndex`] fails.
-    /// - [`CliError::Query`] if `--where` is an unparsable filter expression or
-    ///   `--sort` names a malformed field path.
+    /// - [`CliError::Query`] if `--where` is an unparsable filter expression,
+    ///   the source selector cannot be parsed, or `--sort` names a malformed
+    ///   field path.
     ///
     /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
     fn render(&self, config: &Config) -> Result<(String, usize), CliError> {

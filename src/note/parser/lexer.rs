@@ -1,4 +1,4 @@
-//! Single-pass [`ItemToken`] tokenizer for list item text.
+//! Tokenizes list item text into [`ItemToken`] elements in a single pass.
 //!
 //! One logos pass yields inline fields, task date shorthands, priority emojis,
 //! and tags, together with the callbacks and look-behind helpers they share.
@@ -68,7 +68,8 @@ where
     prefix.chars().next_back()
 }
 
-/// Switch controlling whether task field emoji shorthands are recognized.
+/// Controls whether task field emoji shorthands are recognized during
+/// tokenization.
 ///
 /// Used as [`ItemToken`]'s logos `extras` value so [`scan_fields`] chooses its
 /// lexer behavior without passing a bare `bool`.
@@ -90,7 +91,7 @@ impl TaskFieldEmojis {
     }
 }
 
-/// Syntactic form of a scanned inline field token.
+/// Identifies the syntactic form of a scanned inline field token.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum FieldForm {
     /// `Key:: Value` occupying the start of a line.
@@ -99,7 +100,8 @@ pub(super) enum FieldForm {
     Wrapped,
 }
 
-/// Scanned inline field token payload.
+/// Represents a scanned inline field token with its key, value, and syntactic
+/// form.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct FieldToken {
     /// Canonical field key.
@@ -110,7 +112,7 @@ pub(super) struct FieldToken {
     pub(super) form: FieldForm,
 }
 
-/// Token stream for item components in free-form Markdown text.
+/// Represents tokenized components extracted from free-form Markdown text.
 #[derive(Debug, PartialEq, Logos)]
 #[logos(extras = TaskFieldEmojis, skip(r"[\s\S]", priority = 0))]
 pub(super) enum ItemToken {

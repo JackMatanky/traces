@@ -1,4 +1,5 @@
-//! Metadata field values parsed from YAML frontmatter and inline field text.
+//! Defines metadata field values parsed from YAML frontmatter and inline field
+//! text.
 //!
 //! This module provides [`NoteFieldValue`] and [`NoteFieldValueRef`], the owned
 //! and borrowed representations of strongly typed metadata values extracted
@@ -23,7 +24,8 @@ use crate::{
     DateTimeValue, DateValue, DurationValue, Tag, field::FieldValueRef,
 };
 
-/// A metadata value parsed from YAML frontmatter or inline field text.
+/// Represents a metadata value parsed from YAML frontmatter or inline field
+/// text.
 ///
 /// Supports nulls, booleans, numbers, strings, ISO dates, duration literals,
 /// wikilinks, ordered lists, and nested objects.
@@ -144,8 +146,8 @@ impl NoteFieldValue {
     }
 }
 
-/// Borrowed mirror of [`NoteFieldValue`], resolved without allocation from a
-/// note's parsed metadata.
+/// Represents a borrowed mirror of [`NoteFieldValue`], resolved without
+/// allocation from a note's parsed metadata.
 #[derive(Copy, Clone, Debug)]
 pub enum NoteFieldValueRef<'a> {
     /// Empty or missing value.
@@ -170,10 +172,12 @@ pub enum NoteFieldValueRef<'a> {
     Object(&'a IndexMap<String, NoteFieldValue>),
 }
 
-/// Discriminant-only companion to the canonical rank order. The single place
-/// the rank numbers are written down; [`NoteFieldValueRef::rank`] and
-/// `SortKey::rank` (`src/query/sort.rs`) both delegate to
-/// [`NoteFieldType::rank`], so they cannot drift from each other.
+/// Identifies the discriminant type for field values to establish canonical
+/// rank order.
+///
+/// The single place the rank numbers are written down;
+/// [`NoteFieldValueRef::rank`] and `SortKey::rank` (`src/query/sort.rs`) both
+/// delegate to [`NoteFieldType::rank`], so they cannot drift from each other.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum NoteFieldType {
     /// No value, or a missing field.
@@ -239,11 +243,11 @@ impl NoteFieldValueRef<'_> {
         self.kind().rank()
     }
 
-    /// Canonical total order across all field kinds: `Null < Bool < Number <
-    /// Duration < Temporal (Date/DateTime) < Text < Link < List < Object`.
-    /// Kinds compare by rank except where a pair has an explicit arm below
-    /// (same-kind comparisons, and the Date/DateTime cross-kind case, which
-    /// share one rank).
+    /// Compares two field values according to the canonical total order:
+    /// `Null < Bool < Number < Duration < Temporal (Date/DateTime) < Text <
+    /// Link < List < Object`. Kinds compare by rank except where a pair has
+    /// an explicit arm below (same-kind comparisons, and the Date/DateTime
+    /// cross-kind case, which share one rank).
     ///
     /// A bare [`Date`](Self::Date) promotes to a [`DateTime`](Self::DateTime)
     /// at local-zone midnight for the cross-kind comparison (see

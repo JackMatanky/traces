@@ -9,6 +9,16 @@
 //! - [`TerminalDialogProvider`] delegates to [`inquire`] for real terminal
 //!   interaction and returns fallback values in non-TTY contexts.
 //!
+//! # Key Types
+//!
+//! - [`DialogProvider`]: object-safe trait for prompting and collecting
+//!   responses.
+//! - [`PresetDialogProvider`]: deterministic replay provider for tests and
+//!   automation.
+//! - [`TerminalDialogProvider`]: interactive terminal provider backed by
+//!   [`inquire`].
+//! - [`DialogError`]: error type for dialog prompt failures.
+//!
 //! # Selection by Position
 //!
 //! [`DialogProvider::select`] and [`DialogProvider::multi_select`] return
@@ -33,7 +43,7 @@ pub use terminal::TerminalDialogProvider;
 /// `select` and `multi_select` return indices into the `items` slice. See the
 /// module-level documentation for the rationale.
 pub trait DialogProvider: Send + Sync {
-    /// Whether this provider can perform interactive prompting.
+    /// Reports whether this provider can perform interactive prompting.
     ///
     /// Returns `false` in non-TTY environments or when no preset answers
     /// remain.
@@ -43,7 +53,7 @@ pub trait DialogProvider: Send + Sync {
         true
     }
 
-    /// Display a yes/no confirmation prompt.
+    /// Displays a yes/no confirmation prompt.
     ///
     /// When the user provides no input, `default` is returned if present;
     /// otherwise `false` is returned.
@@ -69,7 +79,7 @@ pub trait DialogProvider: Send + Sync {
     fn confirm(&self, label: &str, default: Option<bool>)
     -> DialogResult<bool>;
 
-    /// Display a multi-selection prompt and return the chosen indices.
+    /// Displays a multi-selection prompt and returns the chosen indices.
     ///
     /// An empty `items` slice yields an empty [`Vec`] (not an error).
     ///
@@ -98,7 +108,7 @@ pub trait DialogProvider: Send + Sync {
         items: &[String],
     ) -> DialogResult<Vec<usize>>;
 
-    /// Display a single-selection prompt and return the chosen index.
+    /// Displays a single-selection prompt and returns the chosen index.
     ///
     /// Index-based selection lets the caller recover the chosen entry from a
     /// parallel list, supporting non-string item types and disambiguating
@@ -129,7 +139,7 @@ pub trait DialogProvider: Send + Sync {
     /// ```
     fn select(&self, label: &str, items: &[String]) -> DialogResult<usize>;
 
-    /// Display a freeform text prompt and return the user's input.
+    /// Displays a freeform text prompt and returns the user's input.
     ///
     /// When the user submits an empty string, `default` is returned if present;
     /// otherwise an empty string is returned.

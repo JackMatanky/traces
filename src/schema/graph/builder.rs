@@ -1,4 +1,4 @@
-//! Topological-sort builder that produces a [`SchemaGraph`].
+//! Builds topological-sort order and produces a [`SchemaGraph`].
 
 use std::collections::VecDeque;
 

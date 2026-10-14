@@ -60,8 +60,9 @@ pub enum CliError {
         #[source]
         source: io::Error,
     },
-    /// Configuration loading from `cwd` failed. Shared by every command that
-    /// needs the current configuration.
+    /// Configuration loading from `cwd` failed.
+    ///
+    /// Shared by every command that needs the current configuration.
     #[error("failed to load configuration from {cwd}")]
     ConfigLoad {
         /// The directory configuration loading started from.

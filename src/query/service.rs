@@ -1,5 +1,4 @@
-//! Query execution service over in-memory indexes and persisted key-value
-//! storage.
+//! Executes queries over in-memory indexes and persisted key-value storage.
 //!
 //! This module provides [`QueryService`], the central coordination engine that
 //! executes queries against either an in-memory [`WorkspaceIndex`] or directly
@@ -27,7 +26,7 @@ use crate::{
     index::{IndexResult, IndexStore, RowIndex, SortedByPath, WorkspaceIndex},
 };
 
-/// Evaluates source expressions against a borrowed [`WorkspaceIndex`].
+/// Coordinates query execution against in-memory indexes and persisted storage.
 ///
 /// Supports page/list/task modes, optional File Class expansion, and pending
 /// plan transformations.
@@ -61,7 +60,8 @@ pub struct QueryService {
 }
 
 impl QueryService {
-    /// Creates a service with case- and key-normalized `class_field` matching.
+    /// Creates a query service with case- and key-normalized `class_field`
+    /// matching.
     #[inline]
     #[must_use]
     pub fn new<S: Into<String>>(class_field: S) -> Self {
@@ -76,7 +76,7 @@ impl QueryService {
         }
     }
 
-    /// Attaches class hierarchy expansion.
+    /// Attaches a class hierarchy expander to the service.
     #[inline]
     #[must_use]
     pub(crate) fn with_class_expander(
@@ -98,7 +98,8 @@ impl QueryService {
         }
     }
 
-    /// Applies File Class expansion and plan transformations to `builder`.
+    /// Executes `builder` against `index`, applying File Class expansion and
+    /// plan transformations.
     #[inline]
     pub fn run(
         &self,
@@ -119,8 +120,11 @@ impl QueryService {
     ///
     /// # Errors
     ///
-    /// - [`crate::index::IndexError`] if source resolution or any batch read
-    ///   from `store` fails.
+    /// - [`Store`] if database access or row deserialization fails.
+    /// - [`Path`] if a resolved path fails lexical confinement.
+    ///
+    /// [`Store`]: crate::index::IndexError::Store
+    /// [`Path`]: crate::index::IndexError::Path
     #[inline]
     pub(crate) fn run_from_store(
         &self,
@@ -171,8 +175,17 @@ impl QueryService {
     ///
     /// # Errors
     ///
-    /// - `IndexError` if syncing the persisted index fails.
-    /// - `IndexError` if persisted-store query execution fails.
+    /// - [`Store`] if database access or row serialization fails.
+    /// - [`Scan`] if directory traversal fails during index refresh.
+    /// - [`Path`] if path validation fails.
+    /// - [`NoteParse`] if reading or parsing a note fails.
+    /// - [`Inspect`] if inspecting file metadata fails.
+    ///
+    /// [`Store`]: crate::index::IndexError::Store
+    /// [`Scan`]: crate::index::IndexError::Scan
+    /// [`Path`]: crate::index::IndexError::Path
+    /// [`NoteParse`]: crate::index::IndexError::NoteParse
+    /// [`Inspect`]: crate::index::IndexError::Inspect
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn sync_and_run(

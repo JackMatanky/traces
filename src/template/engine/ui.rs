@@ -1,4 +1,4 @@
-//! Register interactive `ui.*` helpers for templates.
+//! Registers interactive `ui.*` helpers for templates.
 //!
 //! [`UiOps`] is the `ui` namespace object registered as a minijinja global by
 //! [`super::TemplateEngine`]. It exposes four methods:
@@ -56,7 +56,7 @@ impl UiOps {
         }
     }
 
-    /// Registers this object as the `ui` global.
+    /// Registers this object as the `ui` global in `env`.
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         env.add_global("ui", Value::from_object(self));
@@ -165,11 +165,9 @@ impl SelectOptions {
     ///
     /// # Errors
     ///
-    /// - [`minijinja::Error`] if `items.try_iter()` cannot iterate `items`.
-    /// - [`minijinja::Error`] if [`get_path`] fails while reading an
-    ///   `attribute=` path.
-    /// - [`minijinja::Error`] if `kwargs` contains an unknown key or a kwarg
-    ///   has the wrong type.
+    /// Returns a [`minijinja::Error`] if `items.try_iter()` cannot iterate
+    /// `items`, if [`get_path`] fails while reading an `attribute=` path, or
+    /// if `kwargs` contains an unknown key or invalid argument type.
     fn extract(items: &Value, kwargs: &Kwargs) -> TemplateEngineResult<Self> {
         let attribute = kwargs.get::<Option<&str>>("attribute")?;
         let default = kwargs.get::<Option<Value>>("default")?;
@@ -207,7 +205,12 @@ impl SelectOptions {
         })
     }
 
-    /// - [`ErrorKind::InvalidOperation`] if `index` is out of bounds.
+    /// Recovers the selected [`Value`] by its index.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`]
+    /// if `index` is out of bounds.
     fn recover(&self, index: usize) -> TemplateEngineResult<Value> {
         self.values.get(index).cloned().ok_or_else(|| {
             Error::new(
@@ -244,8 +247,8 @@ fn dialog_error(source: DialogError) -> Error {
 ///
 /// # Errors
 ///
-/// - [`minijinja::Error`] if [`Value::get_attr`] or
-///   [`Value::get_item_by_index`] fails for a defined intermediate value.
+/// Returns a [`minijinja::Error`] if [`Value::get_attr`] or
+/// [`Value::get_item_by_index`] fails for a defined intermediate value.
 fn get_path(item: &Value, path: &str) -> TemplateEngineResult<Value> {
     let mut current = item.clone();
     for part in path.split('.') {

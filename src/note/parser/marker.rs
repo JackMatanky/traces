@@ -1,4 +1,4 @@
-//! Task list marker scanner and accumulator.
+//! Scans and accumulates item-leading task list markers.
 //!
 //! Identifies and parses `[<symbol>]` task markers at the start of list items,
 //! following `CommonMark` and Obsidian whitespace rules.
@@ -10,7 +10,8 @@ use crate::DelimiterType;
 /// one trailing whitespace byte.
 const MAX_MARKER_BYTES: usize = 8;
 
-/// Action required by caller after advancing marker accumulation.
+/// Specifies the action required by callers after advancing marker
+/// accumulation.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum MarkerAction<'a> {
     /// No text to append or flush (marker accumulation is incomplete).
@@ -37,7 +38,7 @@ const CLOSE_BRACKET: char = match DelimiterType::Bracket.close_char() {
     None => ']',
 };
 
-/// A recognized item-leading task marker.
+/// Represents a recognized item-leading task marker.
 ///
 /// `symbol` is the character inside `[<symbol>]`; `remainder` is the scanned
 /// text with the marker and its single trailing ASCII whitespace character
@@ -173,14 +174,15 @@ fn char_boundary_le(text: &str, max: usize) -> usize {
     boundary
 }
 
-/// Classification of a decided item-leading marker.
+/// Represents the classification of a decided item-leading marker.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum ItemMarker {
     Plain,
     Marked(char),
 }
 
-/// Fixed-size stack accumulator for leading task marker recognition.
+/// Implements a fixed-size stack accumulator for leading task marker
+/// recognition.
 ///
 /// Buffers up to 8 leading bytes of an item until marker classification is
 /// resolved. Marker syntax is withheld from item display buffers.

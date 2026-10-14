@@ -1,4 +1,4 @@
-//! Coordinate template resolution, rendering, and file output.
+//! Coordinates template resolution, rendering, and file output.
 //!
 //! [`TemplateService`] manages the top-to-bottom pipeline for a [`Config`]:
 //!
@@ -51,10 +51,10 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - `TemplateError::SchemaLoad` if constructing the underlying
-    ///   `TemplateEngine` fails to load the Schema registry: the registry
-    ///   directory could not be read or listed, a Schema file failed to parse,
-    ///   or the `extends` DAG contains a cycle.
+    /// - [`SchemaLoad`] if constructing the underlying [`TemplateEngine`] fails
+    ///   to load the Schema registry.
+    ///
+    /// [`SchemaLoad`]: TemplateError::SchemaLoad
     #[inline]
     pub fn new(
         config: &'a Config,
@@ -100,20 +100,28 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - `Resolve` if resolving the template name fails.
-    /// - `Read` if reading the resolved template source fails.
-    /// - `Render` if minijinja evaluation fails.
-    /// - `OutputPathEscapesRoot` if the output path attempts to escape the
+    /// - [`Resolve`] if resolving the template name fails.
+    /// - [`Read`] if reading the resolved template source fails.
+    /// - [`Render`] if minijinja evaluation fails.
+    /// - [`OutputPathEscapesRoot`] if the output path attempts to escape the
     ///   root.
-    /// - `OutputPathUnverifiable` if `strict-path` cannot validate the root
+    /// - [`OutputPathUnverifiable`] if `strict-path` cannot validate the root
     ///   boundary or resolve existing candidate components.
-    /// - `Prompt` if an interactive UI prompt inside the template fails or is
+    /// - [`Prompt`] if an interactive UI prompt inside the template fails or is
     ///   cancelled.
-    /// - `OutputFileAlreadyExists` if the output file already exists under
-    ///   [`CommitPolicy::CreateNew`] and the target exists.
-    /// - `Write` if creating parent directories, creating the output file, or
+    /// - [`OutputFileAlreadyExists`] if the output file already exists under
+    ///   [`CommitPolicy::CreateNew`].
+    /// - [`Write`] if creating parent directories, creating the output file, or
     ///   writing rendered content fails.
     ///
+    /// [`Resolve`]: TemplateError::Resolve
+    /// [`Read`]: TemplateError::Read
+    /// [`Render`]: TemplateError::Render
+    /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
+    /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
+    /// [`Prompt`]: TemplateError::Prompt
+    /// [`OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
+    /// [`Write`]: TemplateError::Write
     /// [`CommitPolicy::CreateNew`]: super::writer::CommitPolicy::CreateNew
     #[inline]
     pub fn render_to_file(

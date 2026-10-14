@@ -1,6 +1,10 @@
+//! Provides environment variable parsing and directory filters for workspace
+//! discovery.
+
 use std::{collections::HashSet, ffi::OsStr, path::PathBuf, sync::LazyLock};
 
-/// Colon-separated absolute paths where upward discovery stops.
+/// Holds absolute ceiling paths parsed from `TRACES_CEILING_DIRS` where upward
+/// discovery stops.
 pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
     std::env::var_os("TRACES_CEILING_DIRS")
         .map(|val| {
@@ -11,7 +15,8 @@ pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
         .unwrap_or_default()
 });
 
-/// Colon- or comma-separated directory names to prune during directory scans.
+/// Holds directory names parsed from `TRACES_IGNORED_DIRS` to prune during
+/// directory scans.
 pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =
     LazyLock::new(|| {
         let mut set = HashSet::from([

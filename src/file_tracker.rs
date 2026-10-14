@@ -1,9 +1,10 @@
-//! Store canonical file paths by path hash.
+//! Stores canonical file paths by path hash.
 //!
-//! Main types:
-//! - [`FilePathTracker`] - Hash-keyed tracker for canonical file paths
-//! - [`FilePathTrackerError`] - I/O failure from tracker operations
-//! - [`CleanMode`] - Cleanup policy for stale entries
+//! # Key Types
+//!
+//! - [`FilePathTracker`]: hash-keyed tracker for canonical file paths.
+//! - [`FilePathTrackerError`]: I/O failure from tracker operations.
+//! - [`CleanMode`]: cleanup policy for stale entries.
 //!
 //! Entries are named with [`Blake3PathHash`]. Unix entries are symlinks whose
 //! targets are the recorded paths. Windows entries are plain files whose
@@ -55,10 +56,12 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::Canonicalize`] if `target` cannot be
-    ///   canonicalized
-    /// - [`FilePathTrackerError::StoreIo`] if the store root cannot be created
-    ///   or the entry cannot be written
+    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    /// - [`StoreIo`] if the store root cannot be created or the entry cannot be
+    ///   written.
+    ///
+    /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
     #[inline]
     pub(crate) fn record(
         &self,
@@ -99,10 +102,11 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::Canonicalize`] if `target` cannot be
-    ///   canonicalized
-    /// - [`FilePathTrackerError::StoreIo`] if the entry's existence cannot be
-    ///   checked
+    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    /// - [`StoreIo`] if the entry's existence cannot be checked.
+    ///
+    /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
     #[inline]
     pub(crate) fn contains(
         &self,
@@ -129,8 +133,10 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::StoreIo`] if the store root exists but cannot
-    ///   be read or a child entry cannot be inspected
+    /// - [`StoreIo`] if the store root exists but cannot be read or a child
+    ///   entry cannot be inspected.
+    ///
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
     #[inline]
     pub(crate) fn list_all(
         &self,
@@ -164,10 +170,12 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::StoreIo`] if the store root cannot be read, a
-    ///   child entry cannot be inspected, or a stale entry cannot be removed
-    /// - [`FilePathTrackerError::CompanionRemove`] if a companion file cannot
-    ///   be removed
+    /// - [`StoreIo`] if the store root cannot be read, a child entry cannot be
+    ///   inspected, or a stale entry cannot be removed.
+    /// - [`CompanionRemove`] if a companion file cannot be removed.
+    ///
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
+    /// [`CompanionRemove`]: FilePathTrackerError::CompanionRemove
     #[inline]
     pub(crate) fn clean(
         &self,
@@ -204,11 +212,13 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::Canonicalize`] if `target` cannot be
-    ///   canonicalized
-    /// - [`FilePathTrackerError::StoreIo`] if the store root cannot be created
-    /// - [`FilePathTrackerError::CompanionWrite`] if the companion cannot be
-    ///   written
+    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    /// - [`StoreIo`] if the store root cannot be created.
+    /// - [`CompanionWrite`] if the companion cannot be written.
+    ///
+    /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
+    /// [`CompanionWrite`]: FilePathTrackerError::CompanionWrite
     #[inline]
     pub(crate) fn write_companion(
         &self,
@@ -242,10 +252,11 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::Canonicalize`] if `target` cannot be
-    ///   canonicalized
-    /// - [`FilePathTrackerError::CompanionRead`] if the companion exists but
-    ///   cannot be read
+    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    /// - [`CompanionRead`] if the companion exists but cannot be read.
+    ///
+    /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
+    /// [`CompanionRead`]: FilePathTrackerError::CompanionRead
     #[inline]
     pub(crate) fn read_companion(
         &self,
@@ -274,12 +285,13 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError::Canonicalize`] if `target` cannot be
-    ///   canonicalized
-    /// - [`FilePathTrackerError::StoreIo`] if the root entry exists but cannot
-    ///   be removed
-    /// - [`FilePathTrackerError::CompanionRemove`] if a companion file cannot
-    ///   be removed
+    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    /// - [`StoreIo`] if the root entry exists but cannot be removed.
+    /// - [`CompanionRemove`] if a companion file cannot be removed.
+    ///
+    /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
+    /// [`CompanionRemove`]: FilePathTrackerError::CompanionRemove
     #[inline]
     pub(crate) fn remove_with_companions(
         &self,
@@ -322,8 +334,10 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`FilePathTrackerError`] if the store root cannot be read or a stale
-    ///   entry cannot be removed.
+    /// - [`StoreIo`] if the store root cannot be read or a stale entry cannot
+    ///   be removed.
+    ///
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
     fn clean_reporting(
         &self,
         companion_suffixes: &[&str],
@@ -400,6 +414,13 @@ impl StoreEntry {
         root.join(self.hash.as_str())
     }
 
+    /// Builds a store entry from `target`'s canonical path.
+    ///
+    /// # Errors
+    ///
+    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    ///
+    /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     #[inline]
     #[expect(
         clippy::disallowed_methods,

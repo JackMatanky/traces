@@ -1,4 +1,4 @@
-//! Template loading searches local and global template directories.
+//! Searches local and global template directories for templates.
 //!
 //! [`TemplateLoader::find`] is the single resolution path for validated
 //! top-level `-i <path>` and minijinja `{% include %}`/`{% extends %}` inputs.
@@ -78,10 +78,19 @@ impl TemplateLoader {
     ///
     /// # Errors
     ///
-    /// - [`TemplatePathError::AmbiguousTemplate`] if `name`'s stem matches more
-    ///   than one file within a single template directory.
-    /// - [`TemplatePathError::TemplateNotFound`] if no template directory has a
-    ///   match.
+    /// - [`AmbiguousTemplate`] if `name`'s stem matches more than one file
+    ///   within a single template directory.
+    /// - [`DirectoryRead`] if reading a template directory fails during stem
+    ///   lookup.
+    /// - [`TemplateNotFound`] if no template directory has a match.
+    /// - [`UnsafeComponent`] or [`Absolute`] if a matched file name fails
+    ///   relative path validation.
+    ///
+    /// [`AmbiguousTemplate`]: TemplatePathError::AmbiguousTemplate
+    /// [`DirectoryRead`]: TemplatePathError::DirectoryRead
+    /// [`TemplateNotFound`]: TemplatePathError::TemplateNotFound
+    /// [`UnsafeComponent`]: TemplatePathError::UnsafeComponent
+    /// [`Absolute`]: TemplatePathError::Absolute
     pub(super) fn find(
         &self,
         name: &TemplatePathInput,
@@ -138,8 +147,16 @@ impl TemplateLoader {
     ///
     /// # Errors
     ///
-    /// - [`TemplatePathError::AmbiguousTemplate`] if more than one file in the
-    ///   search directory shares the stem.
+    /// - [`AmbiguousTemplate`] if more than one file in the search directory
+    ///   shares the stem.
+    /// - [`DirectoryRead`] if reading the search directory fails.
+    /// - [`UnsafeComponent`] or [`Absolute`] if a matched file name fails
+    ///   relative path validation.
+    ///
+    /// [`AmbiguousTemplate`]: TemplatePathError::AmbiguousTemplate
+    /// [`DirectoryRead`]: TemplatePathError::DirectoryRead
+    /// [`UnsafeComponent`]: TemplatePathError::UnsafeComponent
+    /// [`Absolute`]: TemplatePathError::Absolute
     fn find_name_in(
         dir: &Path,
         name: &TemplatePathInput,
@@ -204,9 +221,8 @@ impl TemplateLoader {
     ///
     /// # Errors
     ///
-    /// - [`minijinja::Error`] if resolving `name` fails for anything except
-    ///   absence.
-    /// - [`minijinja::Error`] if the resolved file cannot be read.
+    /// Returns a [`minijinja::Error`] if resolving `name` fails for anything
+    /// except absence, or if the resolved file cannot be read.
     ///
     /// [`TemplateEngine::new`]: super::engine::TemplateEngine::new
     pub(super) fn load(&self, name: &str) -> Result<Option<String>, Error> {

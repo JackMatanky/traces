@@ -1,4 +1,4 @@
-//! Recursive-descent parser for inline-field value text.
+//! Parses inline field value text into typed field value records.
 //!
 //! Converts raw inline field value strings (Dataview syntax) into strongly
 //! typed [`NoteFieldValue`] records, supporting comma-separated lists, quoted
@@ -10,8 +10,8 @@ use crate::{
     note::{Link, NoteFieldValue, cursor::SourceText},
 };
 
-/// An atom parsed at some position: its value and the exclusive byte offset
-/// immediately following it.
+/// Represents an atom parsed at a specific position, pairing its value with its
+/// ending byte offset.
 #[derive(Clone, Debug, PartialEq)]
 struct ParsedAtom {
     value: NoteFieldValue,
@@ -43,7 +43,7 @@ pub(super) fn parse_inline_value(raw: &str) -> NoteFieldValue {
     InlineValueParser::new(trimmed).parse()
 }
 
-/// Recursive-descent parser for inline field value text.
+/// Implements a recursive-descent parser for inline field value text.
 ///
 /// Evaluates trimmed text against typed atom grammars, returning single scalar
 /// values, comma-separated lists, or falling back to raw string values.

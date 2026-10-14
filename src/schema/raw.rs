@@ -1,4 +1,4 @@
-//! On-disk Schema TOML shapes and serde deserialization.
+//! Defines on-disk Schema TOML shapes and serde deserialization.
 //!
 //! These types match `.traces/schemas/<name>.toml` and deny unknown fields.
 //! `$ref` strings and `type`/`$ref` source are parsed into validated shapes
@@ -20,7 +20,8 @@ const ALLOWED_OPTION_KEYS: &[&str] = &[
     "min", "max", "step", "format",
 ];
 
-/// One `.traces/schemas/<name>.toml` file, parsed but not yet resolved.
+/// Represents one `.traces/schemas/<name>.toml` file, parsed but not yet
+/// resolved.
 ///
 /// The filename stem (not any field on this type) is the Schema name.
 /// Unknown keys at any level are rejected by `#[serde(deny_unknown_fields)]`.
@@ -38,7 +39,7 @@ pub(crate) struct RawSchema {
     pub(crate) fields: IndexMap<FieldName, RawSchemaFieldDef>,
 }
 
-/// A field definition parsed from TOML, before `$ref` resolution.
+/// Represents a field definition parsed from TOML, before `$ref` resolution.
 ///
 /// Exactly one of [`RawSchemaFieldSource::Direct`] or
 /// [`RawSchemaFieldSource::Ref`] is set, determined by the presence of
@@ -60,7 +61,7 @@ pub(crate) struct RawSchemaFieldDef {
 }
 
 impl RawSchemaFieldDef {
-    /// Build a `Direct` field definition with no options.
+    /// Builds a `Direct` field definition with no options.
     ///
     /// Test-only: production code deserializes from TOML.
     #[cfg(test)]
@@ -75,7 +76,7 @@ impl RawSchemaFieldDef {
         }
     }
 
-    /// Build a `$ref`-only field definition with no options.
+    /// Builds a `$ref`-only field definition with no options.
     #[cfg(test)]
     #[inline]
     #[must_use]
@@ -93,14 +94,15 @@ impl RawSchemaFieldDef {
 }
 
 impl<'de> Deserialize<'de> for RawSchemaFieldDef {
-    /// Deserialize the `[fields.<name>]` TOML table, converting its
+    /// Deserializes the `[fields.<name>]` TOML table, converting its
     /// `type`/`$ref` keys into a validated [`RawSchemaFieldSource`] and every
     /// other present key into [`RawSchemaFieldDef::options`].
     ///
     /// # Errors
     ///
-    /// - [`RawFieldDefError::MissingSource`] if neither `type` nor `$ref` is
-    ///   present.
+    /// - [`MissingSource`] if neither `type` nor `$ref` is present.
+    ///
+    /// [`MissingSource`]: RawFieldDefError::MissingSource
     /// - Serde deserialization error if `$ref` is not shaped
     ///   `#<schema>/<field>` or if any unknown key is present (per
     ///   `#[serde(deny_unknown_fields)]` on the wire shape).
@@ -182,21 +184,21 @@ impl<'de> serde::de::Visitor<'de> for RawSchemaFieldDefVisitor {
     }
 }
 
-/// How a raw field was declared: `type` alone, or `$ref` with optional
-/// `type` override.
+/// Specifies how a raw field was declared: `type` alone, or `$ref` with
+/// optional `type` override.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RawSchemaFieldSource {
-    /// Use a `type` key with no `$ref`.
+    /// Declares a field using a `type` key with no `$ref`.
     Direct(RawSchemaFieldType),
-    /// Use a `$ref` address to a base definition, with an optional local `type`
-    /// override.
+    /// Declares a field using a `$ref` address to a base definition, with an
+    /// optional local `type` override.
     Ref {
         address: FieldAddress,
         override_type: Option<RawSchemaFieldType>,
     },
 }
 
-/// The `type` key of a raw field definition.
+/// Represents the `type` key of a raw field definition.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum RawSchemaFieldType {
@@ -227,15 +229,15 @@ impl std::fmt::Display for RawSchemaFieldType {
     }
 }
 
-/// The raw DTO matching the root shape of a values file.
+/// Represents the raw DTO matching the root shape of a values file.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchemaSelectFieldValues {
     pub(crate) entries: Option<Vec<RawSchemaSelectFieldEntry>>,
 }
 
-/// A raw entry DTO in a values file, constrained to bare strings or structured
-/// objects.
+/// Represents a raw entry DTO in a values file, constrained to bare strings or
+/// structured objects.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum RawSchemaSelectFieldEntry {
@@ -252,7 +254,7 @@ impl From<RawSchemaSelectFieldEntry> for FieldValue {
     }
 }
 
-/// Why a [`RawSchemaFieldDef`] failed to deserialize.
+/// Describes why a [`RawSchemaFieldDef`] failed to deserialize.
 #[derive(Debug, Error)]
 pub(crate) enum RawFieldDefError {
     /// Neither `type` nor `$ref` was present.

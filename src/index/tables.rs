@@ -1,4 +1,5 @@
-//! Redb table definitions and rebuild delete policies for the index store.
+//! Defines redb table schemas and rebuild deletion policies for the index
+//! store.
 //!
 //! [`IndexStore`] owns connections and row payloads; this module owns the
 //! static schema: seven [`TableSpec`] entries pairing each table's definition
@@ -12,21 +13,21 @@ use redb::{
 
 use super::{error::StoreResult, store::IndexStore};
 
-/// File metadata table.
+/// Defines the file metadata table.
 ///
 /// Key: project-relative path as UTF-8 bytes
 /// Value: serialized [`crate::FileMeta`]
 pub(super) const FILES: TableDefinition<'static, &'static [u8], &'static [u8]> =
     TableDefinition::new("files");
 
-/// Parsed note metadata table.
+/// Defines the parsed note metadata table.
 ///
 /// Key: project-relative path as UTF-8 bytes
 /// Value: serialized [`crate::Note`]
 pub(super) const NOTES: TableDefinition<'static, &'static [u8], &'static [u8]> =
     TableDefinition::new("notes");
 
-/// Inbound link multimap table.
+/// Defines the inbound link multimap table.
 ///
 /// Key: target note path as UTF-8 bytes
 /// Value: one source note path per entry
@@ -36,21 +37,21 @@ pub(super) const LINKS: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("links");
 
-/// Path lookup by tag multimap table.
+/// Defines the path lookup by tag multimap table.
 pub(super) const PATHS_BY_TAG: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("paths_by_tag");
 
-/// Path lookup by file class multimap table.
+/// Defines the path lookup by file class multimap table.
 pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("paths_by_file_class");
 
-/// Reverse tag index: path -> current normalized tags.
+/// Defines the reverse tag index mapping paths to current normalized tags.
 ///
 /// Lets incremental upserts and deletes touch O(path tag count) entries instead
 /// of scanning [`PATHS_BY_TAG`].
@@ -60,20 +61,21 @@ pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("tags_by_path");
 
-/// Reverse file-class index: path -> current normalized classes.
+/// Defines the reverse file-class index mapping paths to current normalized
+/// classes.
 pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("classes_by_path");
 
-/// One of the seven schema tables: to-one row or to-many multimap.
+/// Represents a schema table: to-one row or to-many multimap.
 enum TableDef {
     ToOne(TableDefinition<'static, &'static [u8], &'static [u8]>),
     ToMany(MultimapTableDefinition<'static, &'static [u8], &'static [u8]>),
 }
 
-/// How a table's rows are treated during a rebuild wipe.
+/// Specifies how a table's rows are treated during a rebuild wipe.
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum DeletePolicy {
     /// A delete error fails the rebuild.
@@ -82,13 +84,13 @@ enum DeletePolicy {
     BestEffort,
 }
 
-/// One schema fact: a table definition plus its rebuild delete policy.
+/// Pairs a table definition with its rebuild deletion policy.
 pub(super) struct TableSpec {
     def: TableDef,
     policy: DeletePolicy,
 }
 
-/// Every table in the schema, in declaration order.
+/// Lists every table in the schema in declaration order.
 pub(super) const TABLES: [TableSpec; 7] = [
     TableSpec {
         def: TableDef::ToOne(FILES),
@@ -132,6 +134,11 @@ impl TableDef {
 
 impl TableSpec {
     /// Probes this table's definition against `txn` without reading rows.
+    ///
+    /// # Errors
+    ///
+    /// - [`redb::TableError`] if the table definition cannot be opened or does
+    ///   not match.
     pub(super) fn probe(
         &self,
         txn: &ReadTransaction,
@@ -143,6 +150,13 @@ impl TableSpec {
     ///
     /// `Required` propagates every storage error; `BestEffort` tolerates only a
     /// missing table (the fresh-database case) and propagates the rest.
+    ///
+    /// # Errors
+    ///
+    /// - [`StoreError::Redb`] if deleting the table fails in redb and policy
+    ///   does not permit ignoring it.
+    ///
+    /// [`StoreError::Redb`]: super::error::StoreError::Redb
     pub(super) fn delete(
         &self,
         store: &IndexStore,

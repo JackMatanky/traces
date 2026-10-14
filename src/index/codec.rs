@@ -1,4 +1,4 @@
-//! Index store row codec: bytes-of-a-row framing for redb payloads.
+//! Implements row encoding and decoding for redb payloads in the index store.
 //!
 //! Rows use postcard with [`StoreError`] context, and [`path_from_bytes`] has
 //! a lossy fallback for non-Unicode paths read from byte-oriented stores. The
@@ -21,7 +21,7 @@ use super::error::{StoreError, StoreResult};
 ///
 /// # Errors
 ///
-/// - [`StoreError::Serialize`] when postcard serialization fails
+/// - [`StoreError::Serialize`] if postcard serialization fails.
 ///
 /// [`StoreError::Serialize`]: StoreError::Serialize
 pub(super) fn encode_row<'a, T: Serialize>(
@@ -43,7 +43,7 @@ pub(super) fn encode_row<'a, T: Serialize>(
 ///
 /// # Errors
 ///
-/// - [`StoreError::Deserialize`] when postcard deserialization fails
+/// - [`StoreError::Deserialize`] if postcard deserialization fails.
 pub(super) fn decode_row<T: DeserializeOwned>(
     path: &Path,
     bytes: &[u8],
@@ -54,7 +54,8 @@ pub(super) fn decode_row<T: DeserializeOwned>(
     })
 }
 
-/// Borrowed redb key carrying a project-relative path's native bytes.
+/// Wraps a borrowed project-relative path to expose its native bytes as a redb
+/// key.
 ///
 /// Keys are written with [`Path::as_encoded_bytes`] and read back through the
 /// lossy [`path_from_bytes`] fallback; serde row payloads go through

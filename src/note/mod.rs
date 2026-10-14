@@ -1,4 +1,4 @@
-//! Parse Obsidian-style Markdown notes into structured records.
+//! Parses Obsidian-style Markdown notes into structured records.
 //!
 //! [`parse_markdown`] walks a `pulldown-cmark` event stream once, building a
 //! [`Note`] that holds YAML frontmatter, headings, lists, outgoing links,

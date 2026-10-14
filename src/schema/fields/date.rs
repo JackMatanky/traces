@@ -1,4 +1,4 @@
-//! `date` field type definition and parsing.
+//! Defines the `date` field type and its attribute parsing.
 //!
 //! Parses the optional `format` attribute for `date` fields.
 
@@ -7,14 +7,14 @@ use indexmap::IndexMap;
 use super::{SchemaFieldType, parser::SchemaFieldParser};
 use crate::FieldValue;
 
-/// Resolved `date` field options.
+/// Represents resolved `date` field options.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct SchemaDateField {
     format: Option<String>,
 }
 
 impl SchemaDateField {
-    /// Return the display/parse format, if set.
+    /// Returns the display/parse format, if set.
     #[inline]
     #[must_use]
     #[cfg(test)]
@@ -30,8 +30,8 @@ impl SchemaDateField {
         }
     }
 
-    /// Parse `options` against `date`'s `format` attribute, merging with `base`
-    /// when present.
+    /// Parses `options` against `date`'s `format` attribute, merging with
+    /// `base` when present.
     ///
     /// # Arguments
     ///

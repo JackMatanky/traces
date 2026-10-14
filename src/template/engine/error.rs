@@ -1,4 +1,4 @@
-//! Map helper failures into minijinja errors.
+//! Maps helper failures into minijinja errors.
 //!
 //! Engine helpers return [`minijinja::Error`] so template diagnostics keep
 //! name, line, and column context. This module centralizes common conversions
@@ -11,8 +11,8 @@ use crate::path::PathError;
 /// Convenience alias for template engine helper return types.
 pub(super) type TemplateEngineResult<T> = std::result::Result<T, Error>;
 
-/// Builds the error for a template `path` argument rejected by root
-/// confinement.
+/// Builds a [`minijinja::Error`] for a template `path` argument rejected by
+/// root confinement.
 ///
 /// [`PathError::Absolute`], [`PathError::UnsafeComponent`], and
 /// [`PathError::OutsideRoot`] share the "escapes the project root" message

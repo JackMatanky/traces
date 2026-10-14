@@ -1,4 +1,4 @@
-//! Positional result rows and lazy, memoized query result sets.
+//! Provides positional result rows and lazy, memoized query result sets.
 //!
 //! This module implements the runtime data representations produced by query
 //! execution:
@@ -36,7 +36,7 @@ enum RowType {
     },
 }
 
-/// Query-visible view of one indexed [`FileEntry`].
+/// Provides a query-visible view of one indexed [`FileEntry`].
 ///
 /// Carries row type and flattened field overrides used to resolve `file.*`,
 /// `list.*`, frontmatter, inline fields, `tags`, and inlinks.
@@ -129,14 +129,14 @@ impl QueryRow {
             .map(|task| task.status().symbol())
     }
 
-    /// Returns 0-indexed list item depth, or 0 for non-list rows.
+    /// Returns the 0-indexed list item depth, or 0 for non-list rows.
     #[inline]
     #[must_use]
     pub fn depth(&self) -> u8 {
         self.list_item().map_or(0, ListItem::depth)
     }
 
-    /// Returns 1-indexed source line number, or `None` for non-list rows.
+    /// Returns the 1-indexed source line number, or `None` for non-list rows.
     #[inline]
     #[must_use]
     pub fn line(&self) -> Option<SourceLine> {
@@ -439,7 +439,7 @@ impl std::fmt::Debug for QueryRow {
     }
 }
 
-/// Lazily transformed, memoized collection of [`QueryRow`] rows.
+/// Wraps a lazily transformed, memoized collection of [`QueryRow`] rows.
 ///
 /// Transform methods append to a pending plan in `O(1)` time. Reads
 /// ([`Self::len`], [`Self::get`], [`Self::iter`], and terminal renderers)
@@ -483,7 +483,7 @@ impl QuerySet {
         self.rows().len()
     }
 
-    /// Returns whether this query set contains no rows.
+    /// Returns `true` if this query set contains no rows.
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -561,9 +561,9 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `path` cannot be parsed as a valid field path.
+    /// - [`FieldPath`] if `path` cannot be parsed as a valid field path.
     ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// [`FieldPath`]: super::QueryError::FieldPath
     #[inline]
     pub(crate) fn sort_field(
         self,
@@ -588,7 +588,7 @@ impl QuerySet {
     /// # Errors
     ///
     /// - [`Builder`] if `n` is negative or exceeds platform pointer-width
-    ///   limits (`usize::MAX`).
+    ///   limits ([`usize::MAX`]).
     ///
     /// [`Builder`]: super::QueryError::Builder
     #[inline]

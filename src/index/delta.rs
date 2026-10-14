@@ -1,13 +1,15 @@
-//! Incremental-refresh deltas for path-sorted file and inlink state.
+//! Computes incremental-refresh deltas for path-sorted file metadata and
+//! inbound link state.
 
 use std::path::PathBuf;
 
 use super::{inlinks::InlinkMap, sort::SortedByPath};
 use crate::FileMeta;
 
-/// Computed difference between disk files and persisted index metadata.
+/// Represents the difference between scanned filesystem entries and persisted
+/// index metadata.
 ///
-/// Both result slices remain ascending by path: [`Self::compute` performs a
+/// Both result slices remain ascending by path: [`Self::compute`] performs a
 /// single merge over its path-sorted inputs, so upserted and deleted rows
 /// inherit that order.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -83,7 +85,8 @@ impl FileDelta {
     }
 }
 
-/// Computed difference in inbound link edges.
+/// Represents the computed difference in inbound link edges between index
+/// snapshots.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct InlinkDelta {
     upserted: Box<[(PathBuf, PathBuf)]>,

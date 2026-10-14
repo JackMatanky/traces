@@ -1,4 +1,4 @@
-//! DAG bookkeeping for the `extends` relationship, linearized via Kahn's
+//! Tracks DAG relationships for the `extends` hierarchy, linearized via Kahn's
 //! topological sort.
 //!
 //! [`SchemaGraph`] owns graph mechanics so [`super::builder::SchemaBuilder`]
@@ -41,7 +41,7 @@ use indexmap::IndexSet;
 
 use super::{SchemaName, SchemaNameRef};
 
-/// A validated, acyclic `extends` DAG in topological order.
+/// Represents a validated, acyclic `extends` DAG in topological order.
 ///
 /// Only constructible via [`SchemaGraphBuilder::build`], so querying hierarchy
 /// is impossible before cycle-checking.
@@ -64,8 +64,8 @@ impl<'a> SchemaGraph<'a> {
         self.topo_order.iter().copied()
     }
 
-    /// Borrows `name`'s raw `extends` parent list. Returns an empty slice if
-    /// `name` is unknown or is the excluded Global Schema.
+    /// Borrows `name`'s raw `extends` parent list, returning an empty slice if
+    /// unknown or if `name` is the excluded Global Schema.
     #[must_use]
     pub(super) fn parents_of(&self, name: SchemaNameRef<'_>) -> &[SchemaName] {
         self.adjacency.parents_of(name)

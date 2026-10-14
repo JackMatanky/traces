@@ -1,5 +1,5 @@
-//! Domain-specific query languages for source selection, record filtering, and
-//! field access.
+//! Defines domain-specific query languages for source selection, record
+//! filtering, and field access.
 //!
 //! This module encapsulates the lexing, grammar parsing, and abstract syntax
 //! trees for user-supplied query strings:

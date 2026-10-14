@@ -1,4 +1,4 @@
-//! Query field path parsing, validation, and typed accessor representation.
+//! Parses, validates, and represents typed query field paths.
 //!
 //! Field paths appear in filter expressions, sort specifications, and
 //! table/list output configurations. This module parses string paths into a
@@ -24,7 +24,7 @@ use crate::{
     FieldKey, TaskDateType, query::error::FieldPathError, strsim::closest_match,
 };
 
-/// A resolved query field path.
+/// Represents a resolved query field path.
 ///
 /// Parsed once per [`crate::query::QuerySet`] transformation, then applied to
 /// each [`crate::query::QueryRow`] to extract a [`NoteFieldValue`].
@@ -35,11 +35,13 @@ use crate::{
 /// [`NoteFieldValue`]: crate::NoteFieldValue
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FieldPath {
+    /// Accesses a `file.<field>` metadata property.
     File(FileField),
     /// Resolves to [`crate::NoteFieldValue::Null`] on page-level records.
     List(ListField),
-    /// Frontmatter or inline field key.
+    /// Accesses a frontmatter or inline metadata field by its canonical key.
     Metadata(String),
+    /// Accesses document tags on page rows, or list-item tags on list rows.
     Tags,
     /// Project-relative paths of Notes linking to this Note.
     ///
@@ -146,15 +148,20 @@ impl FieldPath {
     }
 }
 
-/// A `file.<field>` accessor backed by [`FileMeta`](crate::FileMeta) metadata.
+/// Represents a `file.<field>` accessor backed by [`FileMeta`](crate::FileMeta)
+/// metadata.
 ///
 /// Accepted accessor names, including aliases such as `ctime` for `created_at`,
 /// are listed in [`ACCESSOR_NAMES`](Self::ACCESSOR_NAMES).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FileField {
+    /// Accesses the file's project-relative path.
     Path,
+    /// Accesses the file's base name without directory components or extension.
     Name,
+    /// Accesses the project-relative folder containing the file.
     Folder,
+    /// Accesses file size in bytes.
     Size,
     /// Accesses [`crate::FileMeta::created_at`] (falling back to
     /// [`crate::FileMeta::modified_at`]) as a bare date.
@@ -212,19 +219,25 @@ impl FileField {
     }
 }
 
-/// A task-specific list field.
+/// Represents a task-specific list field.
 ///
 /// These fields resolve to [`crate::NoteFieldValue::Null`] on plain bullets and
 /// non-task checkboxes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum TaskField {
+    /// Accesses the task status name string.
     Status,
+    /// Accesses the task status category string.
     StatusType,
+    /// Accesses the task status character symbol.
     StatusSymbol,
+    /// Accesses task completion boolean.
     Completed,
+    /// Accesses task priority string.
     Priority,
     /// A task lifecycle date slot, resolved through [`crate::TaskDateSet`].
     Date(TaskDateType),
+    /// Accesses whether all descendants of this task are complete.
     FullyComplete,
 }
 
@@ -260,18 +273,28 @@ impl TaskField {
     }
 }
 
-/// A universal or task-specific `list.<field>` accessor.
+/// Represents a universal or task-specific `list.<field>` accessor.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ListField {
+    /// Accesses clean list item text without bullets or markers.
     Text,
+    /// Accesses verbatim list item source text.
     RawText,
+    /// Accesses 1-indexed source line number.
     Line,
+    /// Accesses parent list item 1-indexed source line number, if any.
     Parent,
+    /// Accesses 0-indexed list indentation depth.
     Depth,
+    /// Accesses list item tags.
     Tags,
+    /// Accesses whether the list item is a task.
     IsTask,
+    /// Accesses list item kind string (`plain`, `checkbox`, or `task`).
     Kind,
+    /// Accesses whether the list item belongs to an ordered list.
     IsOrdered,
+    /// Accesses an embedded task-specific property.
     Task(TaskField),
 }
 

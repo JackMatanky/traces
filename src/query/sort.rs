@@ -1,4 +1,4 @@
-//! Sort-key generation, total-order comparison, and sorting execution for query
+//! Generates sort keys, evaluates total order comparisons, and sorts query
 //! rows.
 //!
 //! This module implements ordering semantics across diverse metadata types,
@@ -23,7 +23,8 @@ use crate::{
     NoteFieldValueRef, note::normalize_zero,
 };
 
-/// Composite ordering clause made of one or more [`SortTerm`] values.
+/// Represents a composite ordering clause made of one or more [`SortTerm`]
+/// values.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SortOrder {
     terms: Box<[SortTerm]>,
@@ -225,7 +226,7 @@ impl SortOrder {
     }
 }
 
-/// Field path plus direction inside a composite [`SortOrder`].
+/// Represents a field path plus direction inside a composite [`SortOrder`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct SortTerm {
     path: FieldPath,
@@ -264,9 +265,10 @@ impl SortTerm {
 /// Defaults to [`Self::Descending`] to match unprefixed CLI and template terms.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) enum SortDirection {
-    /// Smallest value first.
+    /// Sorts smallest value first.
     Ascending,
-    /// Largest value first (default, matching unprefixed CLI/template terms).
+    /// Sorts largest value first (default, matching unprefixed CLI/template
+    /// terms).
     #[default]
     Descending,
 }
@@ -296,16 +298,16 @@ impl SortDirection {
     )
 )]
 pub(crate) enum NullPlacement {
-    /// Null sorts first ascending, last descending (the Dataview default).
+    /// Sorts null first ascending, last descending (the Dataview default).
     #[default]
     Auto,
-    /// Null always sorts before every non-null value.
+    /// Always sorts null before every non-null value.
     First,
-    /// Null always sorts after every non-null value.
+    /// Always sorts null after every non-null value.
     Last,
 }
 
-/// Row-major buffer of precomputed sort keys.
+/// Stores a row-major buffer of precomputed sort keys.
 pub(super) struct SortKeys<'a> {
     flat: Vec<SortKey<'a>>,
     stride: NonZeroUsize,
@@ -324,7 +326,7 @@ impl<'a> SortKeys<'a> {
     }
 }
 
-/// Normalized scalar used for row-order comparisons.
+/// Represents a normalized scalar used for row-order comparisons.
 ///
 /// Reduced projection of [`NoteFieldValueRef`]'s rank order for cheap,
 /// precomputed sort comparisons: `List` and `Object` collapse to `Null`, `Link`
@@ -439,8 +441,8 @@ impl<'a> SortKey<'a> {
     }
 }
 
-/// Result of inspecting free text for a date, date-time, or duration shape.
-/// Shared by [`SortKey::from_text`] and
+/// Represents the result of inspecting free text for a date, date-time, or
+/// duration shape. Shared by [`SortKey::from_text`] and
 /// `filter::ComparisonExpr::classify_literal` so both call one classifier, not
 /// two copies of the same date/duration heuristic.
 pub(super) enum TextShape {

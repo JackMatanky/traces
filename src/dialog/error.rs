@@ -77,13 +77,12 @@ impl From<std::io::Error> for DialogError {
     }
 }
 
-/// Maps each `inquire` outcome to its matching [`DialogError`] variant rather
-/// than folding everything into [`BackendFailure`]: cancellation, interruption,
-/// missing TTY, I/O, and configuration errors each need a distinct
-/// caller-visible outcome, and only truly unrecognized backend failures fall
-/// through to [`BackendFailure`].
+/// Maps each `inquire` outcome to its matching [`DialogError`] variant.
 ///
-/// [`BackendFailure`]: DialogError::BackendFailure
+/// Distinguishes cancellation, interruption, missing TTY, I/O, and
+/// configuration errors into distinct caller-visible outcomes; only truly
+/// unrecognized backend failures fall through to
+/// [`DialogError::BackendFailure`].
 impl From<inquire::InquireError> for DialogError {
     #[inline]
     fn from(err: inquire::InquireError) -> Self {

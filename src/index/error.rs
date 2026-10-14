@@ -1,4 +1,5 @@
-//! Errors from index scanning, persistence, and loading.
+//! Defines error types and result aliases for index scanning, persistence, and
+//! loading.
 
 use std::{io, path::PathBuf};
 
@@ -7,8 +8,10 @@ use thiserror::Error;
 use crate::{DirTreeError, path::PathError};
 
 pub type IndexResult<T> = std::result::Result<T, IndexError>;
+pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
 
-/// Failures returned by [`super::WorkspaceIndex`] operations.
+/// Represents failures returned by [`super::IndexerService`] and workspace
+/// index operations.
 #[derive(Debug, Error)]
 #[expect(
     private_interfaces,
@@ -16,23 +19,23 @@ pub type IndexResult<T> = std::result::Result<T, IndexError>;
               IndexError is pub"
 )]
 pub enum IndexError {
-    /// Database access or row serialization/deserialization failed.
+    /// Indicates that database access or row serialization failed.
     #[error(transparent)]
     Store(#[from] StoreError),
-    /// Directory traversal failed during scan.
+    /// Indicates that directory traversal failed during a filesystem scan.
     #[error(transparent)]
     Scan(#[from] DirTreeError),
-    /// A path rejected by lexical confinement validation.
+    /// Indicates that lexical confinement validation rejected a path.
     #[error(transparent)]
     Path(#[from] PathError),
-    /// A Markdown note could not be read or decoded as UTF-8.
+    /// Indicates that a Markdown note could not be read or decoded as UTF-8.
     #[error("failed to parse note {path}")]
     NoteParse {
         path: PathBuf,
         #[source]
         source: io::Error,
     },
-    /// File metadata could not be inspected during scan.
+    /// Indicates that file metadata could not be inspected during a scan.
     #[error("failed to inspect {path}")]
     Inspect {
         path: PathBuf,
@@ -41,33 +44,32 @@ pub enum IndexError {
     },
 }
 
-pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
-
-/// Low-level index persistence failure.
+/// Represents low-level index persistence failures.
 #[derive(Debug, Error)]
 pub(crate) enum StoreError {
-    /// Filesystem access failed.
+    /// Indicates that filesystem access failed.
     #[error("failed to access {path}")]
     Io {
         path: PathBuf,
         #[source]
         source: io::Error,
     },
-    /// Opening, reading, or writing the redb-backed database failed.
+    /// Indicates that opening, reading, or writing the redb-backed database
+    /// failed.
     #[error("failed to access the database at {path}")]
     Redb {
         path: PathBuf,
         #[source]
         source: Box<redb::Error>,
     },
-    /// Row serialization failed.
+    /// Indicates that row serialization failed.
     #[error("failed to serialize the row for {path}")]
     Serialize {
         path: PathBuf,
         #[source]
         source: postcard::Error,
     },
-    /// Stored row deserialization failed.
+    /// Indicates that stored row deserialization failed.
     #[error("failed to deserialize the row for {path}")]
     Deserialize {
         path: PathBuf,

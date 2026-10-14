@@ -4,7 +4,7 @@
 //! the default `-i` template dispatch), and translates domain errors into
 //! [`CliError`] diagnostics.
 //!
-//! Key types:
+//! # Key Types
 //!
 //! - [`CommandOutcome`]: top-level result of a successful command.
 //! - [`UserAbort`]: deliberate user cancellation or interruption.
@@ -117,7 +117,7 @@ impl Cli {
     ///
     /// - [`CliError::NoCommand`] if neither a subcommand nor `-i`/`--input` was
     ///   provided.
-    /// - [`CliError`] if command execution fails.
+    /// - Any [`CliError`] returned by command execution.
     fn run(
         self,
         service: &ConfigService,
@@ -218,8 +218,8 @@ impl Commands {
 ///
 /// - [`CliError::NoCommand`] when neither a subcommand nor `-i`/`--input` is
 ///   provided.
-/// - [`CliError`] for any command-level failure (config load, indexing, query,
-///   template rendering, trust store, etc.).
+/// - Any [`CliError`] for command execution failures (such as configuration
+///   loading, indexing, query evaluation, or template instantiation).
 #[inline]
 pub fn run() -> Result<CommandOutcome, CliError> {
     let provider: Arc<dyn DialogProvider> =
@@ -307,7 +307,7 @@ impl SortArgs {
     ///
     /// # Errors
     ///
-    /// Returns [`CliError::Query`] if any sort field path is malformed.
+    /// - [`CliError::Query`] if any sort field path is malformed.
     fn resolve(&self, root: &Path) -> Result<Option<SortOrder>, CliError> {
         if self.keys.is_empty() {
             return Ok(None);

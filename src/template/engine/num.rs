@@ -1,4 +1,4 @@
-//! Register numeric filters for templates.
+//! Registers numeric filters for templates.
 //!
 //! [`NumOps`] adds four stateless filters:
 //!
@@ -46,7 +46,8 @@ impl NumOps {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `value` is negative.
+/// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`] if
+/// `value` is negative.
 fn sqrt(value: f64) -> TemplateEngineResult<f64> {
     if value < 0.0 {
         return Err(Error::new(

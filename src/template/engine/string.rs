@@ -1,4 +1,4 @@
-//! Register string filters for templates.
+//! Registers string filters for templates.
 //!
 //! [`StrOps`] adds thirteen stateless filters:
 //!
@@ -79,10 +79,10 @@ fn trim_suffix(value: &str, suffix: &str) -> String {
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-///   not a string.
-/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
-///   `ellipsis`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
+/// not a string, or [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has
+/// any key besides `ellipsis`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Kwargs::assert_all_used consumes self by value; &Kwargs \
@@ -122,10 +122,10 @@ fn truncate(
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-///   not a string.
-/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
-///   `ellipsis`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
+/// not a string, or [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has
+/// any key besides `ellipsis`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Kwargs::assert_all_used consumes self by value; &Kwargs \
@@ -169,10 +169,10 @@ fn truncate_words(
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-///   not a string.
-/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
-///   `ellipsis`.
+/// Returns a [`minijinja::Error`] with kind
+/// [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
+/// not a string, or [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has
+/// any key besides `ellipsis`.
 fn ellipsis_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
     let ellipsis = kwargs.get::<Option<&str>>("ellipsis")?.unwrap_or("...");
     kwargs.assert_all_used()?;
@@ -188,8 +188,9 @@ fn ellipsis_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
-///   regex; see [`regex_compile_error`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
+/// regex; see [`regex_compile_error`].
 fn regex_replace(
     value: &str,
     pattern: &str,
@@ -206,8 +207,9 @@ fn regex_replace(
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
-///   regex; see [`regex_compile_error`].
+/// Returns a [`minijinja::Error`] with kind
+/// [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
+/// regex; see [`regex_compile_error`].
 fn regex_match(value: &str, pattern: &str) -> TemplateEngineResult<bool> {
     let re = Regex::new(pattern)
         .map_err(|source| regex_compile_error(pattern, source))?;

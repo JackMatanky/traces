@@ -1,4 +1,5 @@
-//! Nearest-candidate resolution for one wikilink basename's file candidates.
+//! Resolves nearest-candidate files for wikilink basenames based on folder
+//! distance.
 //!
 //! [`BaseNameIndex`] selects a [`ResolutionType`] once in
 //! [`BaseNameIndex::build`] — a linear scan below [`TRIE_THRESHOLD`]
@@ -13,19 +14,21 @@ use rustc_hash::FxHashMap;
 
 use crate::path::FolderRef;
 
-/// Per-basename candidate index dispatching to flat scan or a folder trie.
+/// Dispatches per-basename candidate lookups to either a flat scan or a folder
+/// trie.
 ///
 /// Opaque over its [`ResolutionType`]: callers see one query surface and
 /// never the representation.
 pub(super) struct BaseNameIndex<'a>(ResolutionType<'a>);
 
-/// Candidate-count strategy selected once at [`BaseNameIndex::build`].
+/// Represents the candidate-count strategy selected once at
+/// [`BaseNameIndex::build`].
 enum ResolutionType<'a> {
     Flat(Vec<&'a Path>),
     Trie(Box<CandidateTrie<'a>>),
 }
 
-/// Candidate count at which [`BaseNameIndex::build`] switches to
+/// Defines the candidate count at which [`BaseNameIndex::build`] switches to
 /// [`CandidateTrie`].
 pub(super) const TRIE_THRESHOLD: usize = 64;
 
@@ -92,7 +95,7 @@ impl<'a> BaseNameIndex<'a> {
     }
 }
 
-/// Folder-component trie for one Wikilink basename's candidates.
+/// Implements a folder-component trie for one wikilink basename's candidates.
 ///
 /// Answers nearest-candidate queries in `O(depth(from))` by precomputing each
 /// folder's nearest same-basename candidate inside its subtree. The trie's
@@ -338,7 +341,8 @@ impl<'a> CandidateTrie<'a> {
     }
 }
 
-/// Folder trie node with local candidates and precomputed subtree aggregates.
+/// Stores local candidates and precomputed subtree aggregates for a folder trie
+/// node.
 struct TrieNode<'a> {
     depth: usize,
     /// Candidates whose containing folder is this node.
@@ -356,7 +360,7 @@ struct TrieNode<'a> {
     excluding: Vec<(NodeId, SubtreeAggregate<'a>)>,
 }
 
-/// Subtree aggregate with optional per-extension buckets.
+/// Tracks subtree aggregates with optional per-extension buckets.
 ///
 /// `by_ext` is a `Vec`, not a `HashMap`: same-basename candidates rarely span
 /// enough extensions for hashing and per-node allocation to win.
@@ -402,8 +406,8 @@ impl<'a> SubtreeAggregate<'a> {
     }
 }
 
-/// Minimum candidate depth, tie count, and sample path for one folder
-/// aggregate.
+/// Stores the minimum candidate depth, tie count, and sample path for one
+/// folder aggregate.
 ///
 /// [`Self::EMPTY`] is the merge identity and represents no candidate.
 #[derive(Copy, Clone, Debug)]

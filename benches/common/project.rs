@@ -80,6 +80,11 @@ pub(crate) fn create_project(
 /// Use this for query, sort, and filter benchmarks. Fixture setup is excluded
 /// from measurements: call this once before the benchmark loop and clone the
 /// returned `Arc` inside iterations.
+///
+/// # Panics
+///
+/// Panics if a generated note path or source cannot be parsed into the test
+/// index.
 pub(crate) fn build_index(
     note_count: usize,
     shape: ProjectShape,
@@ -115,7 +120,11 @@ pub(crate) fn build_index_arc(
 ///
 /// `note_source` receives `(note_index, note_count)` and must return full
 /// Markdown content. Notes are written as `note-{i}.md` in memory only.
-/// Handles errors by panicking internally.
+///
+/// # Panics
+///
+/// Panics if a generated note path or source cannot be parsed into the test
+/// index.
 pub(crate) fn build_index_arc_from_note_source(
     note_count: usize,
     note_source: impl Fn(usize, usize) -> String,

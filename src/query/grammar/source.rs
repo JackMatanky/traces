@@ -1,5 +1,4 @@
-//! Source expression language parser and document selector for `--from`
-//! queries.
+//! Parses source expressions and selects documents for `--from` queries.
 //!
 //! This module evaluates document-level source expressions against candidate
 //! notes in a [`WorkspaceIndex`](crate::index::WorkspaceIndex). It supports:
@@ -29,7 +28,8 @@ use crate::{
     },
 };
 
-/// Source selector for all notes or a parsed expression.
+/// Selects source documents for a query, matching all notes or a parsed
+/// expression.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SourceSelector {
     /// Every note satisfies this source.
@@ -45,7 +45,7 @@ impl SourceSelector {
     ///
     /// # Errors
     ///
-    /// - `QueryError::Syntax` if nonblank `input` is not a valid source
+    /// - [`QueryError::Syntax`] if nonblank `input` is not a valid source
     ///   expression.
     #[inline]
     pub fn parse(input: &str) -> QueryResult<Self> {
@@ -96,7 +96,7 @@ impl SourceSelector {
     }
 }
 
-/// Parsed source expression with boolean atom leaves.
+/// Represents a parsed source expression with boolean atom leaves.
 ///
 /// Operator precedence is `NOT` > `AND` > `OR`; parentheses override.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -176,7 +176,7 @@ impl SourceExpr {
     }
 }
 
-/// Atomic predicate in a source expression.
+/// Represents an atomic predicate in a source expression.
 ///
 /// # Matching rules
 ///
@@ -188,8 +188,11 @@ impl SourceExpr {
 ///   the resolved [`ClassExpansionMode`] set
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SourceAtom {
+    /// Matches a `#tag` pattern.
     Tag(String),
+    /// Matches a path pattern.
     Path(GlobPattern),
+    /// Matches a File Class hierarchy.
     Class {
         /// Raw query class names.
         names: Vec<String>,
@@ -242,7 +245,7 @@ where
     values.into_iter().flatten().filter_map(NoteFieldValue::as_str)
 }
 
-/// Compiled glob used by path source atoms.
+/// Represents a compiled glob used by path source atoms.
 ///
 /// `*` matches characters except `/`; `**` also crosses `/`; every other
 /// character matches literally. Native path separators are normalized to `/`

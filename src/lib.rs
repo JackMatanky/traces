@@ -1,36 +1,35 @@
-//! Process Obsidian-style Markdown notes with frontmatter, inline fields,
+//! Processes Obsidian-style Markdown notes with frontmatter, inline fields,
 //! wikilinks, and task lists.
 //!
 //! # Modules
 //!
-//! - [`cli`] - Command-line interface definitions, argument parsing, and
-//!   command execution flow.
-//! - `config` - Project configuration loading, discovery, TOML parsing, and
+//! - [`cli`]: command-line interface definitions, argument parsing, and command
+//!   execution flow.
+//! - `config`: project configuration loading, discovery, TOML parsing, and
 //!   trust verification.
-//! - `dialog` - Object-safe dialog prompts for interactive and preset input.
-//! - `dirs` - XDG and platform-specific directory resolution for configuration
+//! - `dialog`: object-safe dialog prompts for interactive and preset input.
+//! - `dirs`: XDG and platform-specific directory resolution for configuration
 //!   and persistent state.
-//! - `dirtree` - Directory-tree traversal with classified walk errors.
-//! - `field` - Validated field-name and field-key primitives shared across note
+//! - `dirtree`: directory-tree traversal with classified walk errors.
+//! - `field`: validated field-name and field-key primitives shared across note
 //!   metadata and schemas.
-//! - `file` - File metadata and file-name newtypes shared by the index,
+//! - `file`: file metadata and file-name newtypes shared by the index,
 //!   template, and schema layers.
-//! - `file_class_expander` - Implements schema-aware File Class expansion for
+//! - `file_class_expander`: implements schema-aware File Class expansion for
 //!   the query domain, without either depending on the other.
-//! - `file_tracker` - Hash-keyed file and path tracker using BLAKE3-named
+//! - `file_tracker`: hash-keyed file and path tracker using BLAKE3-named
 //!   entries.
-//! - `hash` - BLAKE3 hashing for file contents and canonicalized paths.
-//! - `index` - Persistent file index, note parsing, and link graph
-//!   construction.
-//! - `query` - Read-side source selection, record projection, transformations,
+//! - `hash`: BLAKE3 hashing for file contents and canonicalized paths.
+//! - `index`: persistent file index, note parsing, and link graph construction.
+//! - `query`: read-side source selection, record projection, transformations,
 //!   and output rendering.
-//! - `note` - Markdown note parsing, YAML frontmatter extraction, and task
+//! - `note`: Markdown note parsing, YAML frontmatter extraction, and task
 //!   processing.
-//! - `path` - Root-relative path validation and confinement.
-//! - `schema` - Schema registry and field resolution: parses
+//! - `path`: root-relative path validation and confinement.
+//! - `schema`: schema registry and field resolution: parses
 //!   `.traces/schemas/*.toml` and linearizes the `extends` DAG into effective
 //!   field definitions.
-//! - `template` - Template loading, path expansion, custom engine bindings, and
+//! - `template`: template loading, path expansion, custom engine bindings, and
 //!   note rendering.
 //! # Key Types
 //!
@@ -207,22 +206,22 @@ pub mod testing {
     };
 }
 
-/// Build isolated fixtures for the crate's own `#[cfg(test)]` suites and,
+/// Builds isolated fixtures for the crate's own `#[cfg(test)]` suites and,
 /// under the `test-utils` feature, for external `tests/`/`benches/`
 /// consumers.
 ///
-/// - [`TestProject`] encapsulates an isolated workspace fixture managing paths,
-///   configuration, trust records, schemas, templates, and on-disk index
+/// - [`TestProject`]: encapsulates an isolated workspace fixture managing
+///   paths, configuration, trust records, schemas, templates, and on-disk index
 ///   persistence.
-/// - [`fixture_service`] returns a [`ConfigService`] backed by temporary
+/// - [`fixture_service`]: returns a [`ConfigService`] backed by temporary
 ///   directories.
-/// - [`create_trusted_project`] writes a minimal config and trusts it.
-/// - [`write_note`], [`write_template`], and [`write_schema`] write fixture
+/// - [`create_trusted_project`]: writes a minimal config and trusts it.
+/// - [`write_note`], [`write_template`], and [`write_schema`]: write fixture
 ///   files.
-/// - [`parse_note`], [`parse_note_str`], and [`build_test_index`] construct
+/// - [`parse_note`], [`parse_note_str`], and [`build_test_index`]: construct
 ///   in-memory notes and indexes with zero disk I/O.
-/// - [`parse_tag`] parses tag string slices for fixture data.
-/// - [`TzGuard`] (test-only) pins the process's `TZ` for deterministic
+/// - [`parse_tag`]: parses tag string slices for fixture data.
+/// - [`TzGuard`] (test-only): pins the process's `TZ` for deterministic
 ///   local-zone assertions.
 #[cfg(any(test, feature = "test-utils"))]
 mod test_support {
@@ -289,8 +288,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if `root` cannot be created. Fixture-only code: a panic
-        ///   here means the fixture setup itself is broken.
+        /// Panics if `root` cannot be created. Fixture-only code: a panic
+        /// here means the fixture setup itself is broken.
         #[inline]
         #[must_use]
         pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
@@ -307,7 +306,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the config file cannot be written. Fixture-only code.
+        /// Panics if the config file cannot be written. Fixture-only code.
         #[inline]
         #[must_use]
         pub fn untrusted<P: Into<PathBuf>>(root: P) -> Self {
@@ -332,7 +331,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the fixture setup fails; see [`create_trusted_project`].
+        /// Panics if the fixture setup fails; see [`create_trusted_project`].
         #[inline]
         #[must_use]
         pub fn trusted<P: Into<PathBuf>>(root: P) -> Self {
@@ -391,9 +390,9 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if `.traces/config.toml` is missing or invalid.
-        ///   Fixture-only code: a panic here means the test's fixture data is
-        ///   wrong.
+        /// Panics if `.traces/config.toml` is missing or invalid.
+        /// Fixture-only code: a panic here means the test's fixture data is
+        /// wrong.
         #[inline]
         pub fn trust(&self) {
             let config = LocalConfigFile::at(&self.root);
@@ -407,7 +406,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the trust entry cannot be removed. Fixture-only code.
+        /// Panics if the trust entry cannot be removed. Fixture-only code.
         #[inline]
         #[must_use]
         pub fn untrust(&self) -> usize {
@@ -420,8 +419,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the path escapes `root` or the file cannot be written.
-        ///   Fixture-only code: a panic here means the fixture setup is broken.
+        /// Panics if the path escapes `root` or the file cannot be written.
+        /// Fixture-only code: a panic here means the fixture setup is broken.
         #[inline]
         pub fn write_file<P: AsRef<Path>>(
             &self,
@@ -441,8 +440,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if `rel_path` escapes `root` or the note cannot be written.
-        ///   Fixture-only code: a panic here means the fixture setup is broken.
+        /// Panics if `rel_path` escapes `root` or the note cannot be written.
+        /// Fixture-only code: a panic here means the fixture setup is broken.
         #[inline]
         pub fn write_note<P: AsRef<Path>>(
             &self,
@@ -456,8 +455,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the path escapes `root` or the template cannot be
-        ///   written. Fixture-only code.
+        /// Panics if the path escapes `root` or the template cannot be
+        /// written. Fixture-only code.
         #[inline]
         pub fn write_template<P: AsRef<Path>>(
             &self,
@@ -474,8 +473,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the path escapes `root` or the schema cannot be written.
-        ///   Fixture-only code.
+        /// Panics if the path escapes `root` or the schema cannot be written.
+        /// Fixture-only code.
         #[inline]
         pub fn write_schema<P: AsRef<Path>>(
             &self,
@@ -493,8 +492,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the path escapes `root` or the file cannot be written.
-        ///   Fixture-only code.
+        /// Panics if the path escapes `root` or the file cannot be written.
+        /// Fixture-only code.
         #[inline]
         pub fn write_schema_value<P: AsRef<Path>>(
             &self,
@@ -518,7 +517,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the index build fails. Fixture-only code.
+        /// Panics if the index build fails. Fixture-only code.
         #[inline]
         #[must_use]
         pub fn build_index(&self) -> WorkspaceIndex {
@@ -529,7 +528,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// - Panics if the build or persist fails. Fixture-only code.
+        /// Panics if the build or persist fails. Fixture-only code.
         #[inline]
         #[must_use]
         pub fn build_and_persist(&self) -> (IndexerService, WorkspaceIndex) {
@@ -590,8 +589,8 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// - Panics if `s` is not a valid tag. Fixture-only code: a panic here
-    ///   means the test's fixture data is wrong.
+    /// Panics if `s` is not a valid tag. Fixture-only code: a panic here
+    /// means the test's fixture data is wrong.
     ///
     /// # Examples
     ///
@@ -613,7 +612,7 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// - Panics if `rel_path` is absolute or contains a `..` component.
+    /// Panics if `rel_path` is absolute or contains a `..` component.
     #[inline]
     #[must_use]
     pub fn resolve_safe_path<P: AsRef<Path>>(
@@ -647,9 +646,9 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// - Panics if `root` cannot be created, the config file cannot be written,
-    ///   or trust cannot be recorded. Fixture-only code: a panic here means the
-    ///   fixture setup itself is broken.
+    /// Panics if `root` cannot be created, the config file cannot be written,
+    /// or trust cannot be recorded. Fixture-only code: a panic here means the
+    /// fixture setup itself is broken.
     #[inline]
     #[must_use]
     pub fn create_trusted_project(
@@ -674,8 +673,8 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// - Panics if the path escapes `root` or the note cannot be written.
-    ///   Fixture-only code: a panic here means the fixture setup is broken.
+    /// Panics if the path escapes `root` or the note cannot be written.
+    /// Fixture-only code: a panic here means the fixture setup is broken.
     #[inline]
     pub fn write_note<P: AsRef<Path>>(
         root: &Path,
@@ -695,8 +694,8 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// - Panics if the path escapes `root` or the template cannot be written.
-    ///   Fixture-only code: a panic here means the fixture setup is broken.
+    /// Panics if the path escapes `root` or the template cannot be written.
+    /// Fixture-only code: a panic here means the fixture setup is broken.
     #[inline]
     pub fn write_template<P: AsRef<Path>>(
         root: &Path,
@@ -719,8 +718,8 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// - Panics if the path escapes `root` or the schema cannot be written.
-    ///   Fixture-only code: a panic here means the fixture setup is broken.
+    /// Panics if the path escapes `root` or the schema cannot be written.
+    /// Fixture-only code: a panic here means the fixture setup is broken.
     #[inline]
     pub fn write_schema<P: AsRef<Path>>(
         root: &Path,

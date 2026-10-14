@@ -1,7 +1,7 @@
-//! Register `file.*` helpers for templates.
+//! Registers `file.*` helpers for templates.
 //!
-//! [`FileOps`] is the `file` namespace object registered as a minijinja global
-//! by [`super::TemplateEngine`]. It exposes two methods:
+//! [`FileOps`] is the `file` namespace object registered as a [`minijinja`]
+//! global by [`super::TemplateEngine`]. It exposes two methods:
 //!
 //! - `file.write_to("path")`: declares the output path for the current render.
 //! - `file.include("path")`: reads another file under [`Config::root`] and
@@ -59,7 +59,7 @@ impl FileOps {
         }
     }
 
-    /// Registers this object as the `file` global.
+    /// Registers this object as the `file` global in `env`.
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         env.add_global("file", Value::from_object(self));

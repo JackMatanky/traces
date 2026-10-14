@@ -1,4 +1,5 @@
-//! Derived inbound link graph computed from indexed outlinks.
+//! Computes and manages the derived inbound link graph from indexed note
+//! outlinks.
 //!
 //! [`InlinkMap`] stores deduplicated source paths keyed by each indexed target.
 //! [`super::IndexerService::build`] and [`super::IndexerService::refresh`]
@@ -46,7 +47,7 @@ use crate::{
     note::{LinkTarget, Note},
 };
 
-/// Target-keyed inbound link graph.
+/// Stores a target-keyed inbound link graph mapping targets to source paths.
 ///
 /// Each target path maps to its deduplicated, canonically sorted inbound source
 /// paths. Construction through [`InlinkMap::new`] enforces:
@@ -314,7 +315,7 @@ pub(super) fn resolve_edges_for(
     edges
 }
 
-/// Path and basename index used during link resolution.
+/// Indexes paths and basenames used during link resolution.
 pub(super) struct LinkResolver<'a> {
     files: &'a [FileMeta],
     basename_index: FxHashMap<BaseNameRef<'a>, BaseNameIndex<'a>>,
@@ -417,7 +418,8 @@ impl<'a> LinkResolver<'a> {
     }
 }
 
-/// A resolved link target: the path of the file an outlink points to.
+/// Represents a resolved link target: the path of the file an outlink points
+/// to.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Target<'a>(&'a Path);
 
@@ -427,7 +429,8 @@ impl Target<'_> {
     }
 }
 
-/// A [`Note`] that links to a [`Target`]: the path recorded as an inbound edge.
+/// Represents a [`Note`] that links to a [`Target`]: the path recorded as an
+/// inbound edge.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Source<'a>(&'a Path);
 

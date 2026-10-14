@@ -38,7 +38,13 @@ impl Trust {
     ///
     /// # Errors
     ///
-    /// - [`CliError`] if the dispatched trust action fails.
+    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    ///   current directory fails.
+    /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+    /// - [`CliError::TrustList`] if reading the trust store fails.
+    /// - [`CliError::TrustClean`] if cleaning the trust store fails.
+    /// - [`CliError::TrustShow`] if reading trust status fails.
+    /// - [`CliError::Trust`] if updating the trust store fails.
     #[inline]
     pub(super) fn run(self, service: &ConfigService) -> CliResult {
         match self.action {
@@ -90,6 +96,8 @@ impl Trust {
     ///
     /// # Errors
     ///
+    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    ///   current directory fails.
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::TrustShow`] if reading trust status fails.
     #[expect(
@@ -119,6 +127,8 @@ impl Trust {
     ///
     /// # Errors
     ///
+    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    ///   current directory fails.
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::Trust`] if updating the trust store fails.
     fn trust(&self, service: &ConfigService) -> CliResult {
@@ -139,7 +149,7 @@ impl Trust {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading
+    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
     ///   current directory fails.
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - Any [`CliError`] returned by `visit`.

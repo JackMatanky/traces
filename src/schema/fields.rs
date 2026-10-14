@@ -1,4 +1,5 @@
-//! Resolved field definitions, type-specific options, and `$ref` building.
+//! Defines resolved field definitions, type-specific options, and `$ref`
+//! building.
 //!
 //! Each raw field's `type` and `options` bag are validated and merged into a
 //! [`SchemaFieldType`] by the per-type `parse` functions in submodules.
@@ -43,7 +44,8 @@ pub(crate) use file::{SchemaFileField, SchemaFileFieldRef};
 pub(crate) use number::SchemaNumberField;
 pub(crate) use select::{SchemaSelectField, SchemaSelectFieldEntry};
 
-/// A resolved field definition after inheritance and `$ref` application.
+/// Represents a resolved field definition after inheritance and `$ref`
+/// application.
 ///
 /// Carries the effective type, whether the field is required, and whether it
 /// accepts multiple values.
@@ -76,7 +78,7 @@ impl SchemaFieldDef {
         Self::new(kind, required, multi)
     }
 
-    /// Return this field's type.
+    /// Returns this field's type.
     ///
     /// Use [`select_values`] and [`file_filter`] for type-specific accessors.
     ///
@@ -88,7 +90,7 @@ impl SchemaFieldDef {
         &self.kind
     }
 
-    /// Return the static selectable entries for a `select` or `multi` field.
+    /// Returns the static selectable entries for a `select` or `multi` field.
     ///
     /// Returns `None` for every other field type.
     #[inline]
@@ -104,7 +106,7 @@ impl SchemaFieldDef {
         }
     }
 
-    /// Return the borrowed file filter for a `file` field.
+    /// Returns the borrowed file filter for a `file` field.
     ///
     /// Returns `None` for every other field type.
     #[inline]
@@ -120,14 +122,14 @@ impl SchemaFieldDef {
         }
     }
 
-    /// Return `true` if this field must be set.
+    /// Returns `true` if this field must be set.
     #[inline]
     #[must_use]
     pub(crate) const fn is_required(&self) -> bool {
         self.required
     }
 
-    /// Return `true` if this field accepts multiple values.
+    /// Returns `true` if this field accepts multiple values.
     #[inline]
     #[must_use]
     pub(crate) const fn is_multi(&self) -> bool {
@@ -135,7 +137,7 @@ impl SchemaFieldDef {
     }
 }
 
-/// A field's effective type and its type-specific options.
+/// Represents a field's effective type and its type-specific options.
 ///
 /// Each variant wraps the resolved options for that kind:
 /// - [`Select`][SchemaFieldType::Select]: [`SchemaSelectField`]
@@ -223,9 +225,8 @@ impl SchemaFieldType {
     }
 }
 
-/// Which of the six field kinds a [`SchemaFieldType`] or
-/// [`RawSchemaFieldType`] is, without either's
-/// payload.
+/// Identifies which of the six field kinds a [`SchemaFieldType`] or
+/// [`RawSchemaFieldType`] is, without either's payload.
 ///
 /// Constructible from a [`RawSchemaFieldType`] (via
 /// [`From`]) or projected from an already-resolved [`SchemaFieldType`] (via

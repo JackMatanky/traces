@@ -28,8 +28,8 @@ impl Tracked {
     ///
     /// # Errors
     ///
-    /// - [`CliError`] if the dispatched action fails.
-    #[inline]
+    /// - [`CliError::TrackedList`] if reading the tracked-config store fails.
+    /// - [`CliError::TrackedClean`] if cleaning the tracked-config store fails.
     pub(super) fn run(self, tracked: &TrackerStore) -> CliResult {
         match self.action {
             TrackedAction::List => Self::list(tracked),

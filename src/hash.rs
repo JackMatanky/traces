@@ -1,9 +1,10 @@
-//! Hash file contents, framed fields, and path bytes with BLAKE3.
+//! Hashes file contents, framed fields, and path bytes with BLAKE3.
 //!
-//! Main types:
-//! - [`Blake3Digest`] - BLAKE3 digest of file contents or framed fields
-//! - [`Blake3PathHash`] - BLAKE3 hex digest of path bytes
-//! - [`HashError`] - File-read failure while hashing contents
+//! # Key Types
+//!
+//! - [`Blake3Digest`]: BLAKE3 digest of file contents or framed fields.
+//! - [`Blake3PathHash`]: BLAKE3 hex digest of path bytes.
+//! - [`HashError`]: file-read failure while hashing contents.
 
 use std::{
     fmt::{self, Display, Formatter},
@@ -31,7 +32,7 @@ impl Blake3Digest {
     ///
     /// # Errors
     ///
-    /// - `HashError` if `path` cannot be read
+    /// Returns a [`HashError`] if `path` cannot be read.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn from_path(path: &Path) -> Result<Self, HashError> {

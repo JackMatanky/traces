@@ -1,4 +1,4 @@
-//! Build and run the minijinja environment used by [`TemplateService`].
+//! Builds and runs the minijinja environment used by [`TemplateService`].
 //!
 //! [`TemplateEngine`] owns one [`Environment`] configured with the loader and
 //! helper surface used by templates. Rendering returns [`RenderOutput`], which
@@ -97,10 +97,11 @@ impl TemplateEngine {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::SchemaLoad`] if the Schema registry cannot be loaded:
-    ///   the registry directory could not be read or listed, a Schema file
-    ///   failed to parse, or the `extends` DAG contains a cycle.
+    /// - [`SchemaLoad`] if the Schema registry cannot be loaded: the registry
+    ///   directory could not be read or listed, a Schema file failed to parse,
+    ///   or the `extends` DAG contains a cycle.
     ///
+    /// [`SchemaLoad`]: TemplateError::SchemaLoad
     /// [`uuid`]: fn@uuid
     /// [`DialogProvider`]: crate::DialogProvider
     /// [`TemplateLoader`]: super::loader::TemplateLoader
@@ -177,10 +178,9 @@ impl TemplateEngine {
     ///
     /// # Errors
     ///
-    /// Returns a `minijinja::Error` if:
-    /// - `source` fails to parse or render.
-    /// - A referenced `{% include %}` or `{% extends %}` template target fails
-    ///   to load or render.
+    /// Returns a [`minijinja::Error`] if `source` fails to parse or render, or
+    /// if a referenced `{% include %}` or `{% extends %}` template target fails
+    /// to load or render.
     #[inline]
     pub(super) fn render(
         &self,
@@ -213,8 +213,9 @@ pub(super) struct RenderOutput {
     pub(super) write_to: Option<DeclaredOutputPath>,
 }
 
-/// Generates a random UUID v4 string formatted per RFC 4122
-/// (`xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`).
+/// Generates a random UUID v4 string formatted per RFC 4122.
+///
+/// Output format: `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.
 ///
 /// Registered in minijinja as the standalone `uuid()` function, unlike
 /// namespace-qualified helpers such as `file.*`, `ui.*`, or `date.*`.

@@ -1,4 +1,5 @@
-//! Parsed Markdown note record.
+//! Defines the parsed Markdown note model representing page-level content and
+//! metadata.
 
 use std::path::{Path, PathBuf};
 
@@ -14,7 +15,7 @@ use super::{
 };
 use crate::{FieldKey, FieldKeyRef, Tag};
 
-/// A parsed Markdown note.
+/// Represents a parsed Markdown note record.
 ///
 /// Stores page-level frontmatter, headings and list items in document order,
 /// outgoing links, inline fields, and tags. [`Self::tasks`] filters stored list

@@ -1,4 +1,4 @@
-//! `select` field type definition, entry type, and parsing.
+//! Defines the `select` field type, its entries, and attribute parsing.
 //!
 //! Parses the `values` attribute for `select` fields into
 //! [`SchemaSelectFieldEntry`]s.
@@ -24,14 +24,14 @@ use crate::{FieldValue, path::SafeRelativePath};
 type CachedSelectValues = Arc<Vec<FieldValue>>;
 type ValuesFileCacheMap = IndexMap<PathBuf, CachedSelectValues>;
 
-/// Resolved `select` field options.
+/// Represents resolved `select` field options.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SchemaSelectField {
     values: Vec<SchemaSelectFieldEntry>,
 }
 
 impl SchemaSelectField {
-    /// Return the selectable entries.
+    /// Returns the selectable entries.
     #[inline]
     #[must_use]
     pub(crate) fn values(&self) -> &[SchemaSelectFieldEntry] {
@@ -46,7 +46,7 @@ impl SchemaSelectField {
         }
     }
 
-    /// Parse `options` against `select`'s `values` attribute, merging with
+    /// Parses `options` against `select`'s `values` attribute, merging with
     /// `base` when present.
     ///
     /// # Arguments
@@ -126,6 +126,9 @@ impl SchemaSelectField {
     }
 }
 
+/// Represents a selectable entry rendered as a plain string or structured
+/// object.
+///
 /// Rendered as a plain string when `label` equals `value` and `extra` is
 /// empty, otherwise as `{value, label, ...extra}`.
 #[derive(Clone, Debug, PartialEq)]
@@ -136,7 +139,7 @@ pub(crate) struct SchemaSelectFieldEntry {
 }
 
 impl SchemaSelectFieldEntry {
-    /// Build a new entry with explicit value, label, and extra passthrough
+    /// Builds a new entry with explicit value, label, and extra passthrough
     /// keys.
     pub(crate) const fn new(
         value: FieldValue,
@@ -150,7 +153,8 @@ impl SchemaSelectFieldEntry {
         }
     }
 
-    /// Build a literal entry where `label` equals `value` and `extra` is empty.
+    /// Builds a literal entry where `label` equals `value` and `extra` is
+    /// empty.
     pub(crate) fn literal(value: String) -> Self {
         Self {
             value: FieldValue::String(value.clone()),
@@ -159,21 +163,21 @@ impl SchemaSelectFieldEntry {
         }
     }
 
-    /// Return this entry's value.
+    /// Returns this entry's value.
     #[inline]
     #[must_use]
     pub(crate) const fn value(&self) -> &FieldValue {
         &self.value
     }
 
-    /// Return this entry's display label.
+    /// Returns this entry's display label.
     #[inline]
     #[must_use]
     pub(crate) const fn label(&self) -> &FieldValue {
         &self.label
     }
 
-    /// Return this entry's passthrough keys beyond `value`/`label`.
+    /// Returns this entry's passthrough keys beyond `value`/`label`.
     #[inline]
     #[must_use]
     pub(crate) const fn extra(&self) -> &IndexMap<String, FieldValue> {
@@ -195,7 +199,8 @@ impl SchemaSelectFieldEntry {
     }
 }
 
-/// Confined memoizing cache for external `select`/`multi` field values files.
+/// Confines and memoizes cache for external `select`/`multi` field values
+/// files.
 ///
 /// Transient to `SchemaService::new` construction: successful loads are cached
 /// by distinct confined path during schema building, then dropped. Failed loads
@@ -232,8 +237,19 @@ impl SelectValuesFileCache {
     ///
     /// # Errors
     ///
-    /// Returns [`SchemaSelectFieldFileError`] if confinement fails, I/O fails,
-    /// parsing fails, or `entries` is missing.
+    /// - [`Confinement`] if path confinement fails.
+    /// - [`Io`] if an I/O error occurs reading the file.
+    /// - [`ParseToml`] if TOML parsing fails.
+    /// - [`ParseJson`] if JSON parsing fails.
+    /// - [`BadExtension`] if the file extension is unsupported.
+    /// - [`MissingEntries`] if the values file is missing the `entries` list.
+    ///
+    /// [`Confinement`]: SchemaSelectFieldFileError::Confinement
+    /// [`Io`]: SchemaSelectFieldFileError::Io
+    /// [`ParseToml`]: SchemaSelectFieldFileError::ParseToml
+    /// [`ParseJson`]: SchemaSelectFieldFileError::ParseJson
+    /// [`BadExtension`]: SchemaSelectFieldFileError::BadExtension
+    /// [`MissingEntries`]: SchemaSelectFieldFileError::MissingEntries
     pub(crate) fn load(
         &self,
         relative_path: &str,

@@ -1,4 +1,4 @@
-//! Cycle detection over the unvisited subgraph after topological sort.
+//! Detects cycles over the unvisited subgraph after topological sort.
 
 use indexmap::IndexSet;
 

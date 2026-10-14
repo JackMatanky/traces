@@ -52,7 +52,7 @@ pub struct PresetDialogProvider {
 }
 
 impl PresetDialogProvider {
-    /// Create a [`PresetDialogProvider`] with no queued responses.
+    /// Creates a [`PresetDialogProvider`] with no queued responses.
     ///
     /// Dialog calls fall through to their `default` parameter, or to the
     /// provider's hard-coded fallback when no default is available.
@@ -62,7 +62,7 @@ impl PresetDialogProvider {
         Self::default()
     }
 
-    /// Queue a response for the next [`DialogProvider::text`] call.
+    /// Queues a response for the next [`DialogProvider::text`] call.
     ///
     /// Text responses are consumed first-in-first-out. When the queue is empty,
     /// `text` falls back to the `default` parameter.
@@ -84,7 +84,7 @@ impl PresetDialogProvider {
         self
     }
 
-    /// Queue a response for the next [`DialogProvider::confirm`] call.
+    /// Queues a response for the next [`DialogProvider::confirm`] call.
     ///
     /// # Examples
     ///
@@ -103,7 +103,7 @@ impl PresetDialogProvider {
         self
     }
 
-    /// Queue a chosen index for the next [`DialogProvider::select`] call.
+    /// Queues a chosen index for the next [`DialogProvider::select`] call.
     ///
     /// The queued index is validated only when [`DialogProvider::select`]
     /// consumes it. An index at or beyond the prompted items' length returns
@@ -133,7 +133,8 @@ impl PresetDialogProvider {
         self
     }
 
-    /// Queue chosen indices for the next [`DialogProvider::multi_select`] call.
+    /// Queues chosen indices for the next [`DialogProvider::multi_select`]
+    /// call.
     ///
     /// # Examples
     ///

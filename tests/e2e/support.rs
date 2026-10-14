@@ -184,7 +184,7 @@ impl Sandbox {
     /// and project root.
     ///
     /// Leaves project files uninitialized. Call [`Self::write_config`] or
-    /// [`Self::trusted`] before running commands that require a
+    /// [`Self::trusted_via_cli`] before running commands that require a
     /// discoverable or trusted project.
     pub(crate) fn new() -> Self {
         Self {
@@ -208,6 +208,7 @@ impl Sandbox {
         }
     }
 
+    /// Returns the sandbox project root directory.
     pub(crate) fn root(&self) -> &Path {
         self.project.path()
     }

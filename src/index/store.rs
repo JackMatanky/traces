@@ -1,7 +1,7 @@
-//! Redb persistence for [`FileMeta`], [`Note`], and derived inlinks.
+//! Provides redb persistence for [`FileMeta`], [`Note`], and derived inlinks.
 //!
 //! [`IndexStore`] owns the database connection and drives the schema in
-//! `super::tables`; callers use [`super::IndexerService`] rather than direct
+//! [`super::tables`]; callers use [`super::IndexerService`] rather than direct
 //! table access.
 
 use std::{
@@ -38,7 +38,8 @@ use crate::{FileMeta, Note, Tag, file::FileFormat};
 pub(super) type StoreSnapshot =
     (SortedByPath<FileMeta>, SortedByPath<Note>, InlinkMap);
 
-/// Store-owned persistence request for full rebuilds and incremental refreshes.
+/// Represents a store-owned persistence request for full rebuilds and
+/// incremental refreshes.
 pub(super) struct PersistRequest<'a> {
     dimensions: IndexDimensions,
     rows: PersistRows<'a>,
@@ -87,7 +88,7 @@ struct IncrementalRows<'a> {
     edges: &'a InlinkDelta,
 }
 
-/// Rows affected by a persistence request.
+/// Represents the rows affected by a persistence request.
 pub(super) enum PersistRows<'a> {
     /// Full cache rebuild from assembled entries.
     Rebuild {
@@ -127,7 +128,7 @@ type TableRange<'a> = redb::Range<'a, &'static [u8], &'static [u8]>;
 type BytesMultimapTable<'txn> =
     redb::MultimapTable<'txn, &'static [u8], &'static [u8]>;
 
-/// Redb-backed handle to one project root's index database.
+/// Manages a redb-backed database handle for one project root's index.
 #[derive(Debug)]
 pub(crate) struct IndexStore {
     db: redb::Database,
@@ -1535,7 +1536,7 @@ impl WriteTarget {
     }
 }
 
-/// Store-owned dimensions written for tag and file-class indexes.
+/// Manages store-owned dimensions written for tag and file-class indexes.
 pub(super) struct IndexDimensions {
     dimensions: [IndexDimension; 2],
 }

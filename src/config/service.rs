@@ -162,7 +162,7 @@ impl ConfigService {
     ///
     /// # Errors
     ///
-    /// - `ConfigTrustError::Tracker` if removing the root or Companion Hash
+    /// - [`ConfigTrustError::Tracker`] if removing the root or Companion Hash
     ///   fails.
     #[inline]
     pub fn untrust(

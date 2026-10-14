@@ -1,4 +1,4 @@
-//! Nested list and list-item tracking.
+//! Manages nested list and list-item tracking during Markdown parsing.
 //!
 //! [`ListTracker`] maintains explicit list and list-item stacks so nested
 //! Markdown structures never recurse through the call stack. [`ItemFrame`]
@@ -16,7 +16,7 @@ use crate::{
     note::{ListItem, ListItemType, ListText, NoteFieldValue},
 };
 
-/// Nested list and list-item state for one Markdown event stream.
+/// Tracks nested list and list-item state across a Markdown event stream.
 ///
 /// Completed top-level lists live in `lists`; still-open lists and items live
 /// on explicit stacks.
@@ -202,8 +202,7 @@ impl ListTracker {
     }
 }
 
-/// Dual buffer pair maintaining display text and metadata scan text for an
-/// item.
+/// Maintains display text and metadata scan text buffers for an item.
 ///
 /// The display buffer receives all item text, while the scan buffer excludes
 /// code spans and blocks to prevent false positive field and tag matches.
@@ -299,7 +298,7 @@ impl ItemBuffers {
     }
 }
 
-/// An active list item frame on the parser stack.
+/// Represents an active list item frame on the parser stack.
 struct ItemFrame {
     buffers: ItemBuffers,
     /// Inline fields lexed from this item's own text.
@@ -453,7 +452,8 @@ impl ItemFrame {
     }
 }
 
-/// A list item separated from its frame, ready for hierarchy attachment.
+/// Encapsulates a list item separated from its frame, ready for hierarchy
+/// attachment.
 struct FinalizedItem {
     /// The classified item with its position, text, fields, and tags.
     item: ListItem,
@@ -467,7 +467,7 @@ struct FinalizedItem {
     descendants: Vec<ListItem>,
 }
 
-/// An active list frame on the parser stack.
+/// Represents an active list frame on the parser stack.
 struct ListFrame {
     is_ordered: bool,
 }

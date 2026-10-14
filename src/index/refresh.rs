@@ -1,4 +1,5 @@
-//! Incremental index refresh planning and typed update application.
+//! Plans incremental index refreshes and applies typed updates to the index
+//! store.
 //!
 //! [`RefreshState`] models the refresh lifecycle: fresh scans can
 //! materialize directly from the store, while stale scans must pass
@@ -20,7 +21,7 @@ use super::{
 };
 use crate::{FileMeta, Note};
 
-/// Changed-row counts from an incremental refresh.
+/// Records changed-row counts resulting from an incremental refresh.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[expect(
     clippy::struct_field_names,
@@ -49,21 +50,21 @@ impl RefreshReport {
         }
     }
 
-    /// Files inserted or updated.
+    /// Returns the number of files inserted or updated.
     #[inline]
     #[must_use]
     pub const fn upserted_count(self) -> usize {
         self.upserted_count
     }
 
-    /// Files deleted from the index.
+    /// Returns the number of files deleted from the index.
     #[inline]
     #[must_use]
     pub const fn deleted_count(self) -> usize {
         self.deleted_count
     }
 
-    /// Inbound link edges updated.
+    /// Returns the number of inbound link edges updated.
     #[inline]
     #[must_use]
     pub const fn links_modified_count(self) -> usize {
@@ -71,7 +72,8 @@ impl RefreshReport {
     }
 }
 
-/// Refresh state produced by one scan, before optional persistence.
+/// Represents the refresh state produced by one scan before optional
+/// persistence.
 pub(super) enum RefreshState {
     /// No file metadata changed; the opened store remains current.
     Fresh {
@@ -82,7 +84,7 @@ pub(super) enum RefreshState {
     Stale(Box<PendingApply>),
 }
 
-/// Reconciled refresh data waiting for a store write.
+/// Holds reconciled refresh data waiting for a store write.
 pub(super) struct PendingApply {
     store: IndexStore,
     update: IndexUpdate,
@@ -139,7 +141,7 @@ impl PendingApply {
     }
 }
 
-/// Successfully persisted refresh state.
+/// Represents a successfully persisted refresh state.
 pub(super) struct Persisted {
     pass: PendingApply,
 }
@@ -163,7 +165,8 @@ impl Persisted {
     }
 }
 
-/// Failed persistence plus the pass needed for fail-open materialization.
+/// Encapsulates failed persistence along with the pass needed for fail-open
+/// materialization.
 ///
 /// The pass is boxed to keep this error type small: it is returned through
 /// [`PendingApply::apply`]'s `Result`, and refresh call sites handle it inline.
@@ -197,13 +200,14 @@ impl PersistFailed {
     }
 }
 
-/// Which notes are authoritative for the reconciled inlink map.
+/// Tracks which notes are authoritative for the reconciled inlink map.
 pub(super) struct InlinkReconciliation {
     links: InlinkMap,
     notes: NoteScope,
 }
 
-/// Notes needed to persist and materialize the refresh state.
+/// Designates the note scope needed to persist and materialize the refresh
+/// state.
 pub(super) enum NoteScope {
     /// Only modified notes were parsed; unchanged notes still live in the
     /// store.
@@ -252,7 +256,7 @@ impl NoteScope {
     }
 }
 
-/// Scanned-and-diffed state of one index root, before note parsing.
+/// Holds the scanned and diffed state of one index root before note parsing.
 pub(super) struct RefreshPlan {
     store: IndexStore,
     current_files: SortedByPath<FileMeta>,
@@ -407,8 +411,7 @@ impl RefreshPlan {
     }
 }
 
-/// Computed facts from one reconciliation, not yet applied. Pure data: no
-/// store handle, constructible and assertable without a database.
+/// Represents the computed facts from one reconciliation before persistence.
 pub(super) struct IndexUpdate {
     current_files: SortedByPath<FileMeta>,
     delta: FileDelta,

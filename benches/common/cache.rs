@@ -22,6 +22,11 @@ pub(crate) fn index_db_path(root: &Path) -> PathBuf {
 ///
 /// The interface is intentionally best-effort: unsupported platforms succeed
 /// without doing work so the same benchmark code still builds and runs.
+///
+/// # Errors
+///
+/// - [`std::io::Error`] if opening `path` fails or the platform page eviction
+///   call fails.
 pub(crate) fn drop_page_cache(path: &Path) -> std::io::Result<()> {
     platform::drop_page_cache(path)
 }

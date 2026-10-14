@@ -1,4 +1,4 @@
-//! YAML frontmatter parsing and key-value metadata storage.
+//! Parses YAML frontmatter and provides key-value metadata storage.
 //!
 //! [`RawFrontmatter`] preserves unparsed source YAML. [`Frontmatter`] stores
 //! parsed YAML key-value pairs mapping [`FieldKey`] to [`NoteFieldValue`]
@@ -11,7 +11,7 @@ use tracing::warn;
 use super::field::NoteFieldValue;
 use crate::{FieldKey, FieldKeyRef, Tag, field::FieldValueRef, yaml};
 
-/// Raw YAML frontmatter text from a Markdown note.
+/// Holds raw YAML frontmatter text from a Markdown note.
 ///
 /// Preserves the unparsed YAML between frontmatter delimiters (`---`).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -87,7 +87,7 @@ enum FrontmatterParseError {
     NotMapping,
 }
 
-/// Structured frontmatter fields parsed from `RawFrontmatter`.
+/// Stores structured frontmatter fields parsed from [`RawFrontmatter`].
 ///
 /// Converts raw YAML into an [`IndexMap`] of field key-value pairs. Malformed
 /// or non-mapping YAML produces an empty frontmatter after logging the parse

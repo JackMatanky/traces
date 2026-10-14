@@ -725,9 +725,9 @@ impl TryFrom<RawTaskConfig> for TaskConfig {
     ///
     /// # Errors
     ///
-    /// - `ConfigValueError::Task` if a status symbol is `(`, `)`, `[`, `]`,
+    /// - [`ConfigValueError::Task`] if a status symbol is `(`, `)`, `[`, `]`,
     ///   `{`, or `}`.
-    /// - `ConfigValueError::InvalidTagFilter` if a tag filter cannot form a
+    /// - [`ConfigValueError::InvalidTagFilter`] if a tag filter cannot form a
     ///   valid [`Tag`].
     #[inline]
     fn try_from(raw: RawTaskConfig) -> Result<Self, Self::Error> {

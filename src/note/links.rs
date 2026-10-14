@@ -1,4 +1,5 @@
-//! Outgoing links from Markdown and Obsidian wikilink syntax.
+//! Defines representations and parsers for outgoing Markdown and Obsidian
+//! wikilinks.
 //!
 //! [`Link`] pairs a raw target string with its [`LinkType`] (Markdown or
 //! wikilink syntax); [`LinkTarget`] splits that raw target into its path and
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::cursor::SourceText;
 use crate::DelimiterType;
 
-/// The syntax used by an extracted [`Link`].
+/// Identifies the syntax used by an extracted [`Link`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum LinkType {
     /// Standard Markdown `[text](target)` link.
@@ -18,7 +19,7 @@ pub enum LinkType {
     Wikilink,
 }
 
-/// An outgoing Markdown link or Obsidian wikilink.
+/// Represents an outgoing Markdown link or Obsidian wikilink.
 ///
 /// Holds the raw target string, optional display text (or alias for wikilinks;
 /// `None` falls back to the target), link syntax kind, and an embedded flag
@@ -193,7 +194,8 @@ impl Link {
     }
 }
 
-/// The parts a [`Link`]'s raw target text splits into at its first `#`.
+/// Represents the segmented parts of a [`Link`]'s raw target split at its first
+/// `#`.
 ///
 /// Obsidian and Markdown links can point to three mutually exclusive shapes:
 ///

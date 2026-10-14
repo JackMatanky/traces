@@ -24,13 +24,10 @@ impl Index {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if the current directory cannot be
-    ///   read.
-    /// - [`CliError::ConfigLoad`] if loading configuration fails, including an
-    ///   untrusted project root.
-    /// - [`CliError::Index`] if scanning the project root or persisting the
+    /// - [`Index`] if scanning the project root or persisting the
     ///   [`WorkspaceIndex`] fails.
     ///
+    /// [`Index`]: CliError::Index
     /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
     #[expect(
         clippy::unused_self,

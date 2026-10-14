@@ -30,7 +30,7 @@ impl Untrust {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading
+    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
     ///   current directory fails.
     /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
     /// - [`CliError::Untrust`] if updating the trust store fails.

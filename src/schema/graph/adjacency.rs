@@ -1,4 +1,4 @@
-//! CSR (compressed sparse row) adjacency for the `extends` DAG.
+//! Stores CSR (compressed sparse row) adjacency for the `extends` DAG.
 //!
 //! [`SchemaAdjacency`] owns the dense index mapping and parent→child edge
 //! storage that [`SchemaGraph`] and [`SchemaGraphBuilder`] query during
@@ -13,14 +13,14 @@ use super::super::{
     RawSchema, SchemaName, SchemaNameRef, error::SchemaWarning,
 };
 
-/// A validated parent→child edge between two dense indices.
+/// Represents a validated parent→child edge between two dense indices.
 struct SchemaGraphEdge {
     source: DenseIndex,
     target: DenseIndex,
 }
 
-/// `extends` adjacency between Schemas, stored as a CSR graph over dense
-/// [`DenseIndex`]es.
+/// Stores `extends` adjacency between Schemas as a CSR graph over dense
+/// [`DenseIndex`] values.
 ///
 /// The Global Schema (`excluded`) is never assigned a node. It participates via
 /// `$ref`, never `extends`, so it must never compete for topological position
@@ -57,9 +57,9 @@ impl<'a> SchemaAdjacency<'a> {
     ///
     /// - [`DuplicateExtendsTarget`] if the same `extends` target appears more
     ///   than once; checked before target-existence, so a repeated unresolvable
-    ///   target warns `Missing` on first occurrence and `Duplicate` thereafter
+    ///   target warns `Missing` on first occurrence and `Duplicate` thereafter.
     /// - [`MissingExtendsTarget`] if an `extends` target has no corresponding
-    ///   Schema file (other than `excluded`)
+    ///   Schema file (other than `excluded`).
     ///
     /// [`MissingExtendsTarget`]: SchemaWarning::MissingExtendsTarget
     /// [`DuplicateExtendsTarget`]: SchemaWarning::DuplicateExtendsTarget
@@ -310,8 +310,8 @@ impl<'a> SchemaAdjacency<'a> {
     }
 }
 
-/// Dense per-schema array index, assigned once at construction in raw-map
-/// insertion order.
+/// Represents a dense per-schema array index, assigned once at construction in
+/// raw-map insertion order.
 ///
 /// Array indexing replaces string-hashed lookups on every graph operation. Caps
 /// a schema set at `u32::MAX` entries, which is not a real constraint for a

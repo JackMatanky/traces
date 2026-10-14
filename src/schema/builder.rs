@@ -1,5 +1,5 @@
-//! Schema resolution: linearize the `extends` DAG, merge inherited fields, and
-//! compute hierarchy sets.
+//! Resolves schemas: linearizes the `extends` DAG, merges inherited fields, and
+//! computes hierarchy sets.
 //!
 //! [`SchemaBuilder`] is the single-method entry point. Internally it:
 //!
@@ -29,14 +29,14 @@ use super::{
 };
 use crate::{FieldKey, FieldName};
 
-/// A Schema that failed to resolve, with its [`SchemaError`].
+/// Represents a Schema that failed to resolve, with its [`SchemaError`].
 #[derive(Debug)]
 pub(crate) struct SchemaFailure {
     pub(crate) schema: SchemaName,
     pub(crate) error: SchemaError,
 }
 
-/// Output of a successful resolution pass.
+/// Represents the output of a successful resolution pass.
 ///
 /// Contains every Schema that resolved without error, alongside warnings for
 /// recoverable defects and failures for hard errors.
@@ -51,7 +51,7 @@ pub(super) struct ResolvedSchemas {
     pub(super) failures: Vec<SchemaFailure>,
 }
 
-/// Entry point for resolving a set of raw schemas into [`Schema`] values.
+/// Resolves a set of raw schemas into [`Schema`] values.
 ///
 /// Build with [`new`](Self::new), then call [`build`](Self::build) to produce
 /// [`ResolvedSchemas`].
@@ -77,7 +77,8 @@ type InheritedFields = (
 );
 
 impl<'a> SchemaBuilder<'a> {
-    /// Create a builder from a borrowed raw-schema map and field-build context.
+    /// Creates a builder from a borrowed raw-schema map and field-build
+    /// context.
     pub(super) fn new(
         raw: &'a IndexMap<SchemaName, RawSchema>,
         field_context: &'a SchemaFieldBuildContext,
@@ -100,20 +101,20 @@ impl<'a> SchemaBuilder<'a> {
     ///
     /// # Errors
     ///
-    /// - [`Cycle`] if the `extends` DAG contains a cycle
+    /// - [`Cycle`] if the `extends` DAG contains a cycle.
     ///
     /// # Warnings
     ///
     /// - [`MissingExtendsTarget`] if an `extends` target has no corresponding
-    ///   Schema file
+    ///   Schema file.
     /// - [`DuplicateExtendsTarget`] if the same `extends` target appears more
-    ///   than once
-    /// - [`ParentFailedToResolve`] if a declared parent failed to resolve
+    ///   than once.
+    /// - [`ParentFailedToResolve`] if a declared parent failed to resolve.
     /// - [`StrayGlobalRequired`] if the Global Schema declares `required =
-    ///   true`
+    ///   true`.
     /// - [`DegradedOverride`] if a bare `$ref` override declares an invalid
     ///   attribute or value; the key (or whole `values` override) is dropped
-    ///   and the base field's value is used as-is
+    ///   and the base field's value is used as-is.
     ///
     /// [`Cycle`]: SchemaError::Cycle
     /// [`MissingExtendsTarget`]: SchemaWarning::MissingExtendsTarget
@@ -200,9 +201,9 @@ impl<'a> SchemaBuilder<'a> {
     /// # Errors
     ///
     /// - [`FieldBuilder`] if a `$ref` in `raw.fields` fails to resolve or
-    ///   validate
+    ///   validate.
     /// - [`AmbiguousFieldName`] if two effective fields canonicalize to the
-    ///   same [`FieldKey`]
+    ///   same [`FieldKey`].
     ///
     /// [`FieldBuilder`]: SchemaError::FieldBuilder
     /// [`AmbiguousFieldName`]: SchemaError::AmbiguousFieldName

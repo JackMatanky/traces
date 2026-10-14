@@ -1,4 +1,4 @@
-//! Register the `query`, `lists`, and `tasks` namespaces for templates.
+//! Registers the `query`, `lists`, and `tasks` namespaces for templates.
 //!
 //! All three namespaces are backed by [`QueryOps`], registered by
 //! [`super::TemplateEngine::new`]:
@@ -179,7 +179,7 @@ impl QueryOps {
         env.add_global(name, Value::from_object(self));
     }
 
-    /// Registers `table`, `list`, `task_list`, and `count` as pipeline filters:
+    /// Registers `table`, `list`, `task_list`, and `count` as pipeline filters.
     /// `rows | table(["Name"], ["file.name"])`, mirroring the call-method form
     /// `rows.table(["Name"], ["file.name"])` documented on
     /// [`Object::call_method`] for [`QuerySet`]. Registered once, not per
@@ -200,8 +200,9 @@ impl QueryOps {
     ///
     /// # Errors
     ///
-    /// - [`ErrorKind::InvalidOperation`] if refreshing the index fails, as
-    ///   documented on [`Self::cached_index`].
+    /// Returns a [`minijinja::Error`] with kind
+    /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation)
+    /// if refreshing the index fails.
     fn run(
         &self,
         state: &State,
@@ -218,13 +219,10 @@ impl QueryOps {
     ///
     /// # Errors
     ///
-    /// - [`ErrorKind::InvalidOperation`] if refreshing the index fails,
-    ///   including filesystem errors while scanning the configured root,
-    ///   database access errors, and postcard decoding errors on stored rows.
-    ///   The original error is preserved as [`source`], matching
-    ///   [`super::ui`]'s `dialog_error`.
-    ///
-    /// [`source`]: std::error::Error::source
+    /// Returns a [`minijinja::Error`] with kind
+    /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation)
+    /// if refreshing the index fails. The original error is preserved as
+    /// [`source`]. [`source`]: `std::error::Error::source`
     fn cached_index(
         &self,
         state: &State,
@@ -279,10 +277,10 @@ fn query_error(source: QueryError) -> Error {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `expr` is neither a `SourceSelector`
-///   nor a string.
-/// - Propagates [`QueryError::Syntax`] (via [`query_error`]) if `expr` is a
-///   string that fails to parse as a source expression.
+/// Returns a [`minijinja::Error`] with kind
+/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+/// `expr` is neither a [`SourceSelector`] nor a string, or if `expr` fails to
+/// parse as a valid source expression.
 fn resolve_from_arg(
     expr: Option<&Value>,
 ) -> TemplateEngineResult<SourceSelector> {
@@ -349,17 +347,17 @@ impl Object for QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`ErrorKind::UnknownMethod`] for any other method name.
-    /// - [`ErrorKind::TooManyArguments`]/[`ErrorKind::MissingArgument`] if a
-    ///   method's arguments don't match its expected shape.
-    /// - [`ErrorKind::InvalidOperation`] via `query_error` if a field path or
-    ///   filter expression is unparsable, `.limit(...)` is negative, or
-    ///   `.task_list()` runs on records with no `list.*` fields.
+    /// Returns a [`minijinja::Error`] with kind
+    /// [`ErrorKind::UnknownMethod`](minijinja::ErrorKind::UnknownMethod) for
+    /// any unrecognized method name, [`ErrorKind::TooManyArguments`] or
+    /// [`ErrorKind::MissingArgument`] if a method's arguments don't match its
+    /// expected shape, or [`ErrorKind::InvalidOperation`] if a field path or
+    /// filter expression is unparsable, `.limit(...)` is negative, or
+    /// `.task_list()` runs on records with no `list.*` fields.
     ///
     /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
     /// [`ErrorKind::MissingArgument`]: minijinja::ErrorKind::MissingArgument
     /// [`ErrorKind::TooManyArguments`]: minijinja::ErrorKind::TooManyArguments
-    /// [`ErrorKind::UnknownMethod`]: minijinja::ErrorKind::UnknownMethod
     #[inline]
     fn call_method(
         self: &Arc<Self>,
@@ -431,7 +429,8 @@ impl Object for QuerySet {
     }
 }
 
-/// `rows | table(...)` filter body. See [`QuerySet::table`].
+/// Renders a markdown table for the `rows | table(...)` filter. See
+/// [`QuerySet::table`].
 ///
 /// Takes owned `Vec<String>` for `headers`/`columns` rather than borrowed
 /// `Vec<&str>`. Two reasons stack here:
@@ -459,23 +458,25 @@ fn table_filter(
     rows.table(&headers_slice, &columns_slice).map_err(query_error)
 }
 
-/// `rows | list(path)` filter body. See [`QuerySet::list`].
+/// Renders a markdown list for the `rows | list(path)` filter. See
+/// [`QuerySet::list`].
 fn list_filter(rows: &QuerySet, path: &str) -> TemplateEngineResult<String> {
     rows.list(path).map_err(query_error)
 }
 
-/// `rows | task_list` filter body. See [`QuerySet::task_list`].
+/// Renders a markdown task list for the `rows | task_list` filter. See
+/// [`QuerySet::task_list`].
 fn task_list_filter(rows: &QuerySet) -> TemplateEngineResult<String> {
     rows.task_list(TaskPathStyle::default()).map_err(query_error)
 }
 
-/// `rows | count` filter body: the number of records in `rows`.
+/// Returns the number of records in `rows` for the `rows | count` filter.
 fn count_filter(rows: &QuerySet) -> usize {
     rows.len()
 }
 
-/// `field | with_children` filter body: widens a `file` field's `Class` atom
-/// (if any) to direct-children depth.
+/// Widens a `file` field's `Class` atom to direct-children depth for the
+/// `field | with_children` filter.
 fn with_children_filter(source: &SourceSelector) -> Value {
     Value::from_object(set_class_depth(
         source.clone(),
@@ -483,8 +484,8 @@ fn with_children_filter(source: &SourceSelector) -> Value {
     ))
 }
 
-/// `field | with_descendants` filter body: widens a `file` field's `Class` atom
-/// (if any) to transitive-descendants depth.
+/// Widens a `file` field's `Class` atom to transitive-descendants depth for the
+/// `field | with_descendants` filter.
 fn with_descendants_filter(source: &SourceSelector) -> Value {
     Value::from_object(set_class_depth(
         source.clone(),

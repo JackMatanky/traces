@@ -1,4 +1,4 @@
-//! Markdown event parser for [`Note`] records.
+//! Parses Markdown event streams into structured [`Note`] records.
 //!
 //! [`parse_markdown`] walks a `pulldown-cmark` event stream in a single pass,
 //! assembling a [`Note`] from frontmatter, headings, lists, outlinks, inline

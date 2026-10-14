@@ -1,4 +1,5 @@
-//! Shared lexer primitives for tokenizing text into typed token streams.
+//! Provides shared lexer primitives for tokenizing text into typed token
+//! streams.
 //!
 //! Provides token streaming with one-token lookahead ([`LexTokenStream`]),
 //! spanned token wrappers ([`Spanned`]), token expectations ([`TokenSpec`]),
@@ -12,12 +13,14 @@ use thiserror::Error;
 
 use crate::Spanned;
 
-/// An owning one-token-lookahead cursor over a materialized token stream.
+/// Stores an owning one-token-lookahead cursor over a materialized token
+/// stream.
 pub(crate) struct LexTokenStream<T> {
     tokens: Peekable<vec::IntoIter<T>>,
 }
 
-/// A [`LexTokenStream`] whose tokens carry their [`Spanned`] byte ranges.
+/// Type alias for a [`LexTokenStream`] whose tokens carry their [`Spanned`]
+/// byte ranges.
 pub(crate) type SpannedTokenStream<T> = LexTokenStream<Spanned<T>>;
 
 impl<T> LexTokenStream<T> {
@@ -48,8 +51,10 @@ impl<T> LexTokenStream<Spanned<T>> {
     ///
     /// # Errors
     ///
-    /// - [`LexError::UnexpectedToken`] when the logos lexer encounters an
-    ///   unrecognized token or when `post` returns an error.
+    /// - [`UnexpectedToken`] when the logos lexer encounters an unrecognized
+    ///   token or when `post` returns an error.
+    ///
+    /// [`UnexpectedToken`]: LexError::UnexpectedToken
     pub(crate) fn tokenize_with<'a>(
         input: &'a str,
         mut post: impl FnMut(Spanned<T>) -> Result<Spanned<T>, LexError>,
@@ -76,8 +81,10 @@ impl<T> LexTokenStream<Spanned<T>> {
     ///
     /// # Errors
     ///
-    /// - [`LexError::UnexpectedToken`] when the logos lexer encounters an
-    ///   unrecognized token.
+    /// - [`UnexpectedToken`] when the logos lexer encounters an unrecognized
+    ///   token.
+    ///
+    /// [`UnexpectedToken`]: LexError::UnexpectedToken
     pub(crate) fn tokenize<'a>(input: &'a str) -> Result<Self, LexError>
     where
         T: Logos<'a, Source = str>,
@@ -107,9 +114,11 @@ impl<T> LexTokenStream<Spanned<T>> {
     ///
     /// # Errors
     ///
-    /// - [`LexError::UnexpectedToken`] if the next token does not match
-    ///   `expected.value`.
-    /// - [`LexError::UnexpectedEndOfInput`] if the stream is empty.
+    /// - [`UnexpectedToken`] if the next token does not match `expected.value`.
+    /// - [`UnexpectedEndOfInput`] if the stream is empty.
+    ///
+    /// [`UnexpectedToken`]: LexError::UnexpectedToken
+    /// [`UnexpectedEndOfInput`]: LexError::UnexpectedEndOfInput
     pub(crate) fn expect<U>(
         &mut self,
         input: &str,
@@ -139,8 +148,11 @@ impl<T> LexTokenStream<Spanned<T>> {
     ///
     /// # Errors
     ///
-    /// - [`LexError::UnexpectedToken`] if `f` returns `None`.
-    /// - [`LexError::UnexpectedEndOfInput`] if the stream is empty.
+    /// - [`UnexpectedToken`] if `f` returns `None`.
+    /// - [`UnexpectedEndOfInput`] if the stream is empty.
+    ///
+    /// [`UnexpectedToken`]: LexError::UnexpectedToken
+    /// [`UnexpectedEndOfInput`]: LexError::UnexpectedEndOfInput
     pub(crate) fn expect_map<F, R>(
         &mut self,
         input: &str,
@@ -172,8 +184,7 @@ impl<T> LexTokenStream<Spanned<T>> {
     }
 }
 
-/// An expected token specification pairing an expected token value with its
-/// diagnostic description.
+/// Pairs an expected token value with its diagnostic description.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct TokenSpec<'a, T: ?Sized> {
     pub(crate) value: &'a T,
@@ -243,7 +254,8 @@ fn lexical_backslash_unescape(input: &str) -> String {
     output
 }
 
-/// Diagnostic errors emitted during lexical tokenization and parsing.
+/// Represents diagnostic errors emitted during lexical tokenization and
+/// parsing.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub(crate) enum LexError {
     /// An unexpected token was encountered where another token was expected.

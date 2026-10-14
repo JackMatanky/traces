@@ -1,11 +1,12 @@
-//! Shared YAML parsing for frontmatter and template filters.
+//! Provides shared YAML parsing for frontmatter and template filters.
 
 use std::sync::LazyLock;
 
 use noyalib::ParserConfig;
 
-/// YAML 1.2 parser configuration using noyalib's `serde_yaml_compat` preset:
-/// leading-zero integers (`01234`) resolve as strings, YAML 1.1 binary
+/// Configures YAML 1.2 parsing using noyalib's `serde_yaml_compat` preset.
+///
+/// Leading-zero integers (`01234`) resolve as strings, YAML 1.1 binary
 /// literals resolve as integers, an overflowing float literal stays a string,
 /// an integer past `u64::MAX` errors instead of degrading to `f64`, a
 /// non-scalar mapping key errors, and `<<` merge keys stay ordinary entries.

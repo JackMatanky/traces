@@ -28,6 +28,7 @@ pub struct ConfigFixture {
 }
 
 impl ConfigFixture {
+    /// Creates an empty configuration fixture with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -141,6 +142,11 @@ impl ConfigFixture {
 
     /// Writes this configuration to `<root>/.traces/config.toml`, creating
     /// parent directories as needed. Returns the path to the written file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`std::io::Error`] if creating parent directories or writing
+    /// the configuration file fails.
     pub fn write_to(&self, root: &Path) -> std::io::Result<PathBuf> {
         let config_path = root.join(CONFIG_FILE_REL);
         if let Some(parent) = config_path.parent() {

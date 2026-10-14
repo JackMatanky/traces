@@ -1,16 +1,16 @@
-//! Exact and forgiving field identifiers, and field values parsed from TOML,
-//! JSON, or YAML.
+//! Defines exact and forgiving field identifiers, and field values parsed from
+//! TOML, JSON, or YAML.
 //!
-//! # Main Types
+//! # Key Types
 //!
-//! - [`FieldName`] - exact schema field identifier preserving case
-//! - [`FieldNameRef`] - borrowed counterpart to [`FieldName`]
-//! - [`FieldKey`] - forgiving note field identity with a canonical form
-//! - [`FieldKeyRef`] - zero-allocation, O(1) forgiving [`FieldKey`] lookup
-//! - [`FieldValue`] - owned, format-agnostic field value
-//! - [`FieldValueRef`] - zero-copy borrowed field value
-//! - [`FieldNameError`] - field-name parse failure
-//! - [`FieldKeyError`] - field-key parse failure
+//! - [`FieldName`]: exact schema field identifier preserving case.
+//! - [`FieldNameRef`]: borrowed counterpart to [`FieldName`].
+//! - [`FieldKey`]: forgiving note field identity with a canonical form.
+//! - [`FieldKeyRef`]: zero-allocation, O(1) forgiving [`FieldKey`] lookup.
+//! - [`FieldValue`]: owned, format-agnostic field value.
+//! - [`FieldValueRef`]: zero-copy borrowed field value.
+//! - [`FieldNameError`]: field-name parse failure.
+//! - [`FieldKeyError`]: field-key parse failure.
 //!
 //! [`FieldName`] preserves exact identity: `status` and `Status` are distinct.
 //! [`FieldKey`] preserves the original text for display and stores a canonical
@@ -63,8 +63,8 @@ impl FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only
-    /// - [`ContainsSlash`] if `raw` contains `/`
+    /// - [`Empty`] if `raw` is empty or whitespace-only.
+    /// - [`ContainsSlash`] if `raw` contains `/`.
     ///
     /// [`Empty`]: FieldNameError::Empty
     /// [`ContainsSlash`]: FieldNameError::ContainsSlash
@@ -88,8 +88,8 @@ impl TryFrom<String> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only
-    /// - [`ContainsSlash`] if `raw` contains `/`
+    /// - [`Empty`] if `raw` is empty or whitespace-only.
+    /// - [`ContainsSlash`] if `raw` contains `/`.
     ///
     /// [`Empty`]: FieldNameError::Empty
     /// [`ContainsSlash`]: FieldNameError::ContainsSlash
@@ -106,8 +106,8 @@ impl TryFrom<&str> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only
-    /// - [`ContainsSlash`] if `raw` contains `/`
+    /// - [`Empty`] if `raw` is empty or whitespace-only.
+    /// - [`ContainsSlash`] if `raw` contains `/`.
     ///
     /// [`Empty`]: FieldNameError::Empty
     /// [`ContainsSlash`]: FieldNameError::ContainsSlash
@@ -132,9 +132,9 @@ impl TryFrom<serde_json::Value> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`NotScalar`] for `Null`, `Array`, and `Object` values
-    /// - [`Empty`] if the coerced string is empty or whitespace-only
-    /// - [`ContainsSlash`] if the coerced string contains `/`
+    /// - [`NotScalar`] for `Null`, `Array`, and `Object` values.
+    /// - [`Empty`] if the coerced string is empty or whitespace-only.
+    /// - [`ContainsSlash`] if the coerced string contains `/`.
     ///
     /// [`NotScalar`]: FieldNameError::NotScalar
     /// [`Empty`]: FieldNameError::Empty
@@ -221,8 +221,8 @@ impl<'a> TryFrom<&'a str> for FieldNameRef<'a> {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only
-    /// - [`ContainsSlash`] if `raw` contains `/`
+    /// - [`Empty`] if `raw` is empty or whitespace-only.
+    /// - [`ContainsSlash`] if `raw` contains `/`.
     ///
     /// [`Empty`]: FieldNameError::Empty
     /// [`ContainsSlash`]: FieldNameError::ContainsSlash
@@ -273,9 +273,12 @@ impl FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation
-    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
-    ///   searchable character
+    /// - [`Name`] if `raw` fails [`FieldName`] validation.
+    /// - [`EmptyCanonical`] if canonicalization strips every searchable
+    ///   character.
+    ///
+    /// [`Name`]: FieldKeyError::Name
+    /// [`EmptyCanonical`]: FieldKeyError::EmptyCanonical
     pub(crate) fn try_new(
         raw: impl Into<String>,
     ) -> Result<Self, FieldKeyError> {
@@ -468,9 +471,9 @@ impl TryFrom<&str> for FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`Name`] if `raw` fails [`FieldName`] validation
+    /// - [`Name`] if `raw` fails [`FieldName`] validation.
     /// - [`EmptyCanonical`] if canonicalization strips every searchable
-    ///   character
+    ///   character.
     ///
     /// [`Name`]: FieldKeyError::Name
     /// [`EmptyCanonical`]: FieldKeyError::EmptyCanonical
@@ -494,10 +497,10 @@ impl TryFrom<serde_json::Value> for FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`NotScalar`] for `Null`, `Array`, and `Object` values
-    /// - [`Name`] if the coerced string fails [`FieldName`] validation
+    /// - [`NotScalar`] for `Null`, `Array`, and `Object` values.
+    /// - [`Name`] if the coerced string fails [`FieldName`] validation.
     /// - [`EmptyCanonical`] if canonicalization strips every searchable
-    ///   character
+    ///   character.
     ///
     /// [`NotScalar`]: FieldNameError::NotScalar
     /// [`Name`]: FieldKeyError::Name
@@ -972,6 +975,10 @@ impl<'a> FieldValueRef<'a> {
     /// When `coercion` is [`DateTimeCoercion::Classify`], ISO date strings are
     /// classified as [`FieldValueRef::Date`] rather than
     /// [`FieldValueRef::String`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if deserialization fails.
     pub(crate) fn deserialize_with<'de, D>(
         deserializer: D,
         coercion: DateTimeCoercion,

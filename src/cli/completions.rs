@@ -37,10 +37,12 @@ impl Completions {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if `--list-templates` requires reading
-    ///   the current directory and it cannot be read.
-    /// - [`CliError::ConfigLoad`] if loading configuration for
-    ///   `--list-templates` fails.
+    /// - [`CurrentDirectory`] if `--list-templates` requires reading the
+    ///   current directory and it cannot be read.
+    /// - [`ConfigLoad`] if loading configuration for `--list-templates` fails.
+    ///
+    /// [`CurrentDirectory`]: CliError::CurrentDirectory
+    /// [`ConfigLoad`]: CliError::ConfigLoad
     #[inline]
     pub(super) fn run(self, service: &ConfigService) -> CliResult {
         self.shell.map_or_else(
@@ -88,8 +90,11 @@ impl Completions {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if reading the current directory fails.
-    /// - [`CliError::ConfigLoad`] if configuration discovery or loading fails.
+    /// - [`CurrentDirectory`] if reading the current directory fails.
+    /// - [`ConfigLoad`] if configuration discovery or loading fails.
+    ///
+    /// [`CurrentDirectory`]: CliError::CurrentDirectory
+    /// [`ConfigLoad`]: CliError::ConfigLoad
     fn template_names(
         service: &ConfigService,
     ) -> Result<Vec<String>, CliError> {

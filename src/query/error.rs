@@ -1,4 +1,5 @@
-//! Error types for query specification, syntax parsing, and result evaluation.
+//! Defines error types for query specification, syntax parsing, and result
+//! evaluation.
 //!
 //! This module defines the error domain for the query subsystem, providing
 //! typed diagnostics with source spans, friendly suggestions, and formatted
@@ -25,29 +26,31 @@ use crate::LexError;
 /// Result alias carrying `QueryError`.
 pub type QueryResult<T> = std::result::Result<T, QueryError>;
 
-/// Top-level query parsing and transformation error.
+/// Represents any failure during query construction, syntax analysis, field
+/// path resolution, or formatting.
 ///
 /// Delegates [`miette::Diagnostic`] to the inner [`QuerySyntaxError`] for
 /// syntax failures.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum QueryError {
-    /// Builder-construction failure.
+    /// Indicates a builder-construction failure.
     #[error(transparent)]
     Builder(#[from] QueryBuilderError),
-    /// Source or filter expression syntax failure.
+    /// Indicates a source or filter expression syntax failure.
     #[error(transparent)]
     Syntax(#[from] QuerySyntaxError),
-    /// Field-path parse or accessor failure.
+    /// Indicates a field-path parse or accessor failure.
     #[error(transparent)]
     FieldPath(#[from] FieldPathError),
-    /// [`super::QuerySet::task_list`] received page-level records instead of
-    /// task rows.
+    /// Indicates that [`super::QuerySet::task_list`] received page-level
+    /// records instead of task rows.
     #[error(
         "task_list requires task-level records from the `tasks` namespace; \
          got page-level records with no task fields"
     )]
     TaskListRequiresTaskRows,
-    /// [`super::QuerySet::table`] received mismatched header and column counts.
+    /// Indicates that [`super::QuerySet::table`] received mismatched header and
+    /// column counts.
     #[error(
         "table headers ({headers}) and columns ({columns}) must have the same \
          length"
@@ -80,18 +83,20 @@ impl Diagnostic for QueryError {
     }
 }
 
-/// Error while building a [`super::QueryBuilder`].
+/// Describes failures that occur while building a
+/// [`QueryBuilder`](super::QueryBuilder).
 ///
 /// Separates request-construction failures from execution/rendering failures.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum QueryBuilderError {
-    /// Source or filter expression syntax failure.
+    /// Indicates a source or filter expression syntax failure.
     #[error(transparent)]
     Syntax(#[from] QuerySyntaxError),
-    /// Field-path parse or accessor failure.
+    /// Indicates a field-path parse or accessor failure.
     #[error(transparent)]
     FieldPath(#[from] FieldPathError),
-    /// Query limit is negative or exceeds platform [`usize`] bounds.
+    /// Indicates a query limit is negative or exceeds platform [`usize`]
+    /// bounds.
     #[error("invalid limit {limit}; expected a non-negative row count")]
     LimitOutOfRange {
         /// The rejected limit count.
@@ -99,7 +104,7 @@ pub enum QueryBuilderError {
     },
 }
 
-/// Syntax error in a source or filter expression.
+/// Represents a syntax error in a source or filter expression.
 ///
 /// Provides [`miette::Diagnostic`] spans and repair hints from the underlying
 /// `LexError`.
@@ -158,7 +163,8 @@ impl QuerySyntaxError {
     }
 }
 
-/// Malformed field path with an optional closest-accessor suggestion.
+/// Represents a malformed field path with an optional closest-accessor
+/// suggestion.
 ///
 /// Formats the accepted accessor prefixes and "did you mean" hint for display.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
@@ -189,12 +195,12 @@ impl FieldPathError {
     }
 }
 
-/// Query language that rejected an expression.
+/// Identifies the query language dialect that rejected an expression.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum QueryDialect {
-    /// The `--from` source-selection language.
+    /// Selects the `--from` source-selection language.
     Source,
-    /// The `--where` record-filtering language.
+    /// Selects the `--where` record-filtering language.
     Filter,
 }
 

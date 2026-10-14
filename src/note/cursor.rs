@@ -1,11 +1,11 @@
-//! UTF-8 byte-offset helpers for the parser and wikilink parser.
+//! Provides UTF-8 byte-offset helpers for parsing note text and wikilinks.
 //!
 //! [`SourceText`] wraps a borrowed string and exposes validated byte-offset
 //! arithmetic used by the lexer and [`Link`](super::Link) parser.
 
 use std::ops::Range;
 
-/// Borrowed parser input addressed by validated byte offsets.
+/// Wraps borrowed parser input addressed by validated byte offsets.
 pub(super) struct SourceText<'a>(&'a str);
 
 impl<'a> SourceText<'a> {

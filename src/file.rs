@@ -9,13 +9,13 @@
 //!
 //! File-name newtypes decompose a path's final component for index lookup:
 //!
-//! - [`FileName`] owns the full final component including extension
+//! - [`FileName`]: owns the full final component including extension
 //!   (`todo.md`). Constructed from a [`Path`] via [`TryFrom`]; returns
 //!   [`FileNameError::Missing`] when the path has no final component.
-//! - [`BaseName`] owns the stem with the extension stripped (`todo`), derived
+//! - [`BaseName`]: owns the stem with the extension stripped (`todo`), derived
 //!   from [`FileName`] via [`From`]. Used as the index key for stem-based link
 //!   resolution.
-//! - [`BaseNameRef`] borrows the stem without allocation, enabling zero-copy
+//! - [`BaseNameRef`]: borrows the stem without allocation, enabling zero-copy
 //!   comparison and hash lookups directly from a [`Path`].
 //!
 //! Dotfiles follow [`Path::file_stem`]: `.gitignore` has no extension, so both
@@ -35,7 +35,8 @@ use crate::{
     path::{FolderRef, RelativePath},
 };
 
-/// Metadata captured for one regular file under a project root.
+/// Stores filesystem metadata captured for one regular file under a project
+/// root.
 ///
 /// Stored paths are project-root-relative so the index can move with the
 /// project directory.
@@ -59,7 +60,8 @@ impl FileMeta {
     ///
     /// # Errors
     ///
-    /// - [`std::io::Error`] if the file's modification time cannot be read.
+    /// Returns an [`std::io::Error`] if the file's modification time cannot be
+    /// read.
     pub(crate) fn from_metadata(
         relative: RelativePath,
         metadata: &fs::Metadata,
@@ -228,7 +230,7 @@ impl crate::path::HasPath for FileMeta {
     }
 }
 
-/// Final path component of a file, including any extension.
+/// Stores the final path component of a file, including any extension.
 ///
 /// Wraps the text returned by [`Path::file_name`]. For `todo.md`, stores
 /// `todo.md`. For `.gitignore`, stores `.gitignore`.
@@ -254,8 +256,10 @@ impl TryFrom<&Path> for FileName {
     ///
     /// # Errors
     ///
-    /// - [`FileNameError::Missing`] if `path` has no final component, such as
-    ///   `/`, `..`, or an empty path.
+    /// - [`Missing`] if `path` has no final component, such as `/`, `..`, or an
+    ///   empty path.
+    ///
+    /// [`Missing`]: FileNameError::Missing
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         path.file_name()
             .map(|name| Self(name.to_string_lossy().into_owned()))
@@ -263,7 +267,7 @@ impl TryFrom<&Path> for FileName {
     }
 }
 
-/// Owned file name with any extension stripped.
+/// Stores an owned file name with any extension stripped.
 ///
 /// Uses [`Path::file_stem`] on [`FileName`]'s stored text. For `todo.md`,
 /// stores `todo`. Dotfiles such as `.gitignore` keep their full text as the
@@ -291,7 +295,7 @@ impl From<&FileName> for BaseName {
     }
 }
 
-/// Borrowed file name with any extension stripped.
+/// Borrows a file name with any extension stripped.
 ///
 /// Use this instead of [`BaseName`] when a comparison or hash lookup can borrow
 /// directly from a [`Path`]. Dotfile behavior matches [`Path::file_stem`].
@@ -329,7 +333,7 @@ impl std::borrow::Borrow<str> for BaseNameRef<'_> {
     }
 }
 
-/// Coarse file classification used by the two-tier index.
+/// Classifies files for the two-tier index.
 ///
 /// Markdown notes get parsed [`crate::Note`] metadata in addition to their
 /// [`FileMeta`]. Other files only keep general file metadata.
@@ -342,7 +346,8 @@ pub enum FileFormat {
 }
 
 impl FileFormat {
-    /// Classifies `.md` and `.markdown` file paths as [`Self::Note`].
+    /// Classifies a path by extension, returning [`Self::Note`] for `.md` and
+    /// `.markdown` files.
     pub(crate) fn from_path(path: &Path) -> Self {
         match path.extension().and_then(|ext| ext.to_str()) {
             Some(ext)

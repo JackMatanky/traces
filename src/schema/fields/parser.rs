@@ -16,7 +16,7 @@ use super::{
 };
 use crate::FieldValue;
 
-/// Key extractor and error collector for schema field option tables.
+/// Extracts keys and collects validation errors for schema field option tables.
 ///
 /// `SchemaFieldParser` coordinates field validation by recording which keys
 /// were explicitly requested via typed extractor methods

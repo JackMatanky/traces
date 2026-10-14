@@ -1,4 +1,4 @@
-//! String similarity matching using Levenshtein edit distance.
+//! Provides string similarity matching using Levenshtein edit distance.
 
 use strsim::levenshtein;
 
