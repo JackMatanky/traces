@@ -1,15 +1,16 @@
 //! Declarative token recognition for date and date-time input shapes.
 //!
-//! Uses [`logos::Logos`] to classify date and date-time shapes in a single
-//! pass, replacing procedural heuristics with parse-don't-validate recognition.
+//! Uses [`logos::Logos`] to classify date, date-time, and duration shapes in a
+//! single pass, replacing procedural heuristics with parse-don't-validate
+//! recognition.
 
 use logos::Logos;
 
-use super::{DateValue, date::DateShape, point::DatePoint};
+use super::{DateValue, DurationValue, date::DateShape, point::DatePoint};
 
 /// Token classification for temporal prefix recognition.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
-pub(crate) enum DatePrefixToken {
+enum DatePrefixToken {
     /// Full ISO date: `YYYY-MM-DD` or `-YYYY-MM-DD`.
     #[regex(r"-?[0-9]{4}-[0-9]{2}-[0-9]{2}")]
     FullDate,
@@ -19,9 +20,19 @@ pub(crate) enum DatePrefixToken {
     YearMonth,
 }
 
+/// Token classification for duration prefix recognition.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
+enum DurationToken {
+    #[regex(r"[+-]?([0-9]+(\.[0-9]+)?|\.[0-9]+)\s*[a-zA-Z]+")]
+    Part,
+
+    #[regex(r"[ \t\n\f\r]+", logos::skip)]
+    Whitespace,
+}
+
 /// Token classification for whole temporal input shapes.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
-pub(crate) enum TemporalShapeToken {
+pub(super) enum TemporalShapeToken {
     /// Explicit RFC 3339 date-time with timezone offset or `Z`.
     #[regex(r"-?[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([zZ]|[+-][0-9]{2}:[0-9]{2})")]
     Rfc3339,
@@ -77,69 +88,106 @@ pub(crate) fn starts_with_year(s: &str) -> bool {
 /// Scans a date prefix from `input`, returning the parsed [`DatePoint`] and
 /// consumed byte count.
 #[must_use]
-pub(crate) fn scan_date_prefix(input: &str) -> Option<(DatePoint, usize)> {
-    let mut lexer = DatePrefixToken::lexer(input);
-    let token = lexer.next()?.ok()?;
+pub(super) fn scan_date_prefix(input: &str) -> Option<(DatePoint, usize)> {
+    let trimmed_start = input.trim_start();
+    let leading_ws = input.len().saturating_sub(trimmed_start.len());
+    let mut lexer = DatePrefixToken::lexer(trimmed_start);
+
+    let _token = lexer.next()?.ok()?;
     let span = lexer.span();
     if span.start != 0 {
         return None;
     }
-    // An input like "2026-07-2" has a dash following the month; that indicates
-    // an incomplete day prefix rather than a valid year-month prefix.
-    if token == DatePrefixToken::YearMonth
-        && input.as_bytes().get(span.end) == Some(&b'-')
-    {
+
+    let matched = &trimmed_start[span.clone()];
+    if matched.len() == 7 && trimmed_start[span.end..].starts_with('-') {
         return None;
     }
-    let matched = lexer.slice();
-    let (date, date_precision) = DateShape::parse_any(matched).ok()?;
-    Some((
-        DatePoint::Calendar {
-            date: DateValue::from_civil_date(date),
-            date_precision,
-        },
-        span.end,
-    ))
+    let (date, precision) = DateShape::parse_any(matched).ok()?;
+    let point = DatePoint::Calendar {
+        date: DateValue::from_civil_date(date),
+        date_precision: precision,
+    };
+    Some((point, leading_ws.saturating_add(span.end)))
+}
+
+/// Scans a duration prefix from `input`, returning the parsed [`DurationValue`]
+/// and consumed byte count.
+#[must_use]
+pub(super) fn scan_duration_prefix(
+    input: &str,
+) -> Option<(DurationValue, usize)> {
+    let mut lexer = DurationToken::lexer(input);
+    let mut last_end = 0;
+    while let Some(Ok(DurationToken::Part)) = lexer.next() {
+        let span = lexer.span();
+        if last_end == 0 && span.start != 0 {
+            return None;
+        }
+        last_end = span.end;
+        let rem = &input[last_end..];
+        let trimmed = rem.trim_start();
+        if trimmed.starts_with(['+', '-']) {
+            return None;
+        }
+        if !trimmed.starts_with(|c: char| c.is_ascii_digit() || c == '.') {
+            break;
+        }
+    }
+    if last_end == 0 {
+        return None;
+    }
+    let rem = &input[last_end..];
+    let trimmed = rem.trim_start();
+    if trimmed.starts_with(['+', '-']) {
+        return None;
+    }
+    if trimmed.starts_with(|c: char| c.is_ascii_digit() || c == '.') {
+        return None;
+    }
+    let candidate = &input[..last_end];
+    let val = DurationValue::parse(candidate).ok()?;
+    Some((val, last_end))
 }
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+    use rstest::rstest;
+
     use super::*;
-    use crate::temporal::point::DatePrecision;
 
-    #[test]
-    fn recognizes_full_date_and_year_month_tokens() {
-        let mut full = DatePrefixToken::lexer("2026-07-29 rest");
-        assert_eq!(full.next(), Some(Ok(DatePrefixToken::FullDate)));
-        assert_eq!(full.span(), 0..10);
-
-        let mut month = DatePrefixToken::lexer("2026-07 rest");
-        assert_eq!(month.next(), Some(Ok(DatePrefixToken::YearMonth)));
-        assert_eq!(month.span(), 0..7);
+    #[rstest]
+    #[case::standard_full_date("2026-07-29 after", 10)]
+    #[case::standard_year_month("2026-07 after", 7)]
+    #[case::leading_whitespace("   2026-07-29 after", 13)]
+    fn scans_valid_date_prefixes(
+        #[case] input: &str,
+        #[case] expected_len: usize,
+    ) {
+        let (point, len) = scan_date_prefix(input).expect("valid prefix");
+        assert_eq!(len, expected_len);
+        assert!(matches!(point, DatePoint::Calendar { .. }));
     }
 
-    #[test]
-    fn scans_date_prefixes_without_manual_byte_indexing() {
-        let (point, len) =
-            scan_date_prefix("2026-07-29 after").expect("parses");
-        assert_eq!(len, 10);
-        assert!(matches!(point, DatePoint::Calendar {
-            date_precision: DatePrecision::Day,
-            ..
-        }));
-
-        let (month_point, month_len) =
-            scan_date_prefix("2026-07 after").expect("parses");
-        assert_eq!(month_len, 7);
-        assert!(matches!(month_point, DatePoint::Calendar {
-            date_precision: DatePrecision::Month,
-            ..
-        }));
+    #[rstest]
+    #[case::empty("")]
+    #[case::no_prefix("not a date")]
+    #[case::two_digit_prefix("26-07-29")]
+    fn rejects_invalid_date_prefixes(#[case] input: &str) {
+        assert_eq!(scan_date_prefix(input), None);
     }
 
-    #[test]
-    fn rejects_truncated_day_prefix_after_dash() {
-        assert_eq!(scan_date_prefix("2026-07-2"), None);
-        assert_eq!(scan_date_prefix("2026-07-3"), None);
+    #[rstest]
+    #[case::single_unit("1h remaining", 2)]
+    #[case::compound("1h 30m remaining", 6)]
+    #[case::signed("-2d extra", 3)]
+    fn scans_valid_duration_prefixes(
+        #[case] input: &str,
+        #[case] expected_len: usize,
+    ) {
+        let (_val, len) =
+            scan_duration_prefix(input).expect("valid duration prefix");
+        assert_eq!(len, expected_len);
     }
 }

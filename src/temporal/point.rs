@@ -10,6 +10,7 @@
 use jiff::{Span, Timestamp, civil, tz::TimeZone};
 use logos::Logos;
 
+pub(super) use super::date::DatePrecision;
 use super::{
     CalendarError, CalendarPeriod, DEFAULT_DATE_PATTERN, DateError,
     DateTimeValue, DateUnit, DateValue, DurationValue, PeriodEdge, TimeUnit,
@@ -22,21 +23,12 @@ use super::{
     zone::local_zone,
 };
 
-/// Tracks whether a zone-free date point uses month or full-date precision.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DatePrecision {
-    /// Specifies year and month precision.
-    Month,
-    /// Specifies full calendar date precision.
-    Day,
-}
-
 /// Represents a date at its written precision or a Date-Time.
 ///
 /// Calendar points are zone-free and carry the written [`DatePrecision`].
-/// Date-Time points store UTC and resolve naive input in the process-local
-/// zone (a repeated local time takes the earlier occurrence; a skipped local
-/// time shifts forward by the gap length).
+/// Date-Time points store UTC and resolve naive input in the process-local zone
+/// (a repeated local time takes the earlier occurrence; a skipped local time
+/// shifts forward by the gap length).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePoint {
     /// Stores a zone-free Date at its written precision.
@@ -371,7 +363,7 @@ impl DatePoint {
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_in(zone).date();
-        let target = calendar_period.snap_date(PeriodEdge::Start, date)?;
+        let target = calendar_period.snap_date(PeriodEdge::Start, date);
         self.with_date(target, zone)
     }
 
@@ -388,7 +380,7 @@ impl DatePoint {
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_in(zone).date();
-        let target = calendar_period.snap_date(PeriodEdge::End, date)?;
+        let target = calendar_period.snap_date(PeriodEdge::End, date);
         self.with_date(target, zone)
     }
 
@@ -403,7 +395,7 @@ impl DatePoint {
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_in(zone).date();
-        let target_date = CalendarPeriod::snap_weekday(date, target)?;
+        let target_date = CalendarPeriod::snap_weekday(date, target);
         self.with_date(target_date, zone)
     }
 
@@ -447,10 +439,7 @@ impl DatePoint {
                 let to_date = to.date_in(zone).civil_date();
                 DifferenceEngine::calendar_diff(from_date, to_date, unit)
             }
-            TimeUnit::Hour
-            | TimeUnit::Minute
-            | TimeUnit::Second
-            | TimeUnit::Millisecond
+            TimeUnit::Hour | TimeUnit::Minute | TimeUnit::Second
                 if self.has_time() && to.has_time() =>
             {
                 match (self, to) {
@@ -460,10 +449,7 @@ impl DatePoint {
                     _ => Err(CalendarError::OutOfRange),
                 }
             }
-            TimeUnit::Hour
-            | TimeUnit::Minute
-            | TimeUnit::Second
-            | TimeUnit::Millisecond => {
+            TimeUnit::Hour | TimeUnit::Minute | TimeUnit::Second => {
                 let from_dt = self.local_datetime_in(zone);
                 let to_dt = to.local_datetime_in(zone);
                 DifferenceEngine::whole_unit_diff(from_dt, to_dt, unit)
@@ -587,29 +573,33 @@ impl DifferenceEngine {
         to: civil::Date,
         unit: TimeUnit,
     ) -> Result<DateDiff, CalendarError> {
-        match unit {
-            TimeUnit::Year => {
-                Ok(DateDiff::Whole(Self::whole_years_between(from, to)))
-            }
-            TimeUnit::Month => {
-                Ok(DateDiff::Whole(Self::whole_months_between(from, to)))
-            }
+        let diff = match unit {
+            TimeUnit::Year => i64::from(
+                from.until((jiff::Unit::Year, to))
+                    .map_err(|_| CalendarError::OutOfRange)?
+                    .get_years(),
+            ),
+            TimeUnit::Month => i64::from(
+                from.until((jiff::Unit::Month, to))
+                    .map_err(|_| CalendarError::OutOfRange)?
+                    .get_months(),
+            ),
             TimeUnit::Week => {
-                let days = from
-                    .until(to)
-                    .map(|span| i64::from(span.get_days()))
-                    .map_err(|_| CalendarError::OutOfRange)?;
-                Ok(DateDiff::Whole(days / 7))
+                let days = i64::from(
+                    from.until((jiff::Unit::Day, to))
+                        .map_err(|_| CalendarError::OutOfRange)?
+                        .get_days(),
+                );
+                days / 7
             }
-            TimeUnit::Day => {
-                let days = from
-                    .until(to)
-                    .map(|span| i64::from(span.get_days()))
-                    .map_err(|_| CalendarError::OutOfRange)?;
-                Ok(DateDiff::Whole(days))
-            }
-            _ => Err(CalendarError::OutOfRange),
-        }
+            TimeUnit::Day => i64::from(
+                from.until((jiff::Unit::Day, to))
+                    .map_err(|_| CalendarError::OutOfRange)?
+                    .get_days(),
+            ),
+            _ => return Err(CalendarError::OutOfRange),
+        };
+        Ok(DateDiff::Whole(diff))
     }
 
     /// Computes civil-clock wall time difference across DST transitions.
@@ -619,7 +609,7 @@ impl DifferenceEngine {
         unit: TimeUnit,
     ) -> DateDiff {
         let delta = to.duration_since(from);
-        DateDiff::Fractional(delta.as_secs_f64() / unit.nominal_seconds())
+        DateDiff::Fractional(delta.as_secs_f64() / unit.nominal_seconds_f64())
     }
 
     /// Computes physical elapsed duration between two date-times.
@@ -629,7 +619,7 @@ impl DifferenceEngine {
         unit: TimeUnit,
     ) -> DateDiff {
         let delta = to.duration_since(from);
-        DateDiff::Fractional(delta.as_secs_f64() / unit.nominal_seconds())
+        DateDiff::Fractional(delta.as_secs_f64() / unit.nominal_seconds_f64())
     }
 
     /// Computes whole-unit differences using civil delta seconds.
@@ -643,33 +633,8 @@ impl DifferenceEngine {
             TimeUnit::Hour => Ok(DateDiff::Whole(delta.as_secs() / 3_600)),
             TimeUnit::Minute => Ok(DateDiff::Whole(delta.as_secs() / 60)),
             TimeUnit::Second => Ok(DateDiff::Whole(delta.as_secs())),
-            TimeUnit::Millisecond => i64::try_from(delta.as_millis())
-                .map(DateDiff::Whole)
-                .map_err(|_| CalendarError::OutOfRange),
             _ => Err(CalendarError::OutOfRange),
         }
-    }
-
-    fn whole_years_between(from: civil::Date, to: civil::Date) -> i64 {
-        Self::whole_months_between(from, to) / 12
-    }
-
-    fn whole_months_between(from: civil::Date, to: civil::Date) -> i64 {
-        let (earlier, later, sign) = if to >= from {
-            (from, to, 1)
-        } else {
-            (to, from, -1)
-        };
-        #[expect(
-            clippy::arithmetic_side_effects,
-            reason = "bounded year/month/day fields cannot overflow i64"
-        )]
-        let months = sign
-            * (i64::from(later.year() - earlier.year()) * 12
-                + i64::from(later.month())
-                - i64::from(earlier.month())
-                - i64::from(later.day() < earlier.day()));
-        months
     }
 }
 
@@ -2723,12 +2688,6 @@ mod tests {
                 TimeUnit::Second,
                 DateDiff::Whole(691_200)
             )]
-            #[case::millisecond(
-                "2026-07-29",
-                "2026-08-06",
-                TimeUnit::Millisecond,
-                DateDiff::Whole(691_200_000)
-            )]
             fn returns_whole_counts_between_calendar_points(
                 #[case] from: &str,
                 #[case] to: &str,
@@ -2823,10 +2782,6 @@ mod tests {
             #[case::hour(TimeUnit::Hour, DateDiff::Fractional(1.5))]
             #[case::minute(TimeUnit::Minute, DateDiff::Fractional(90.0))]
             #[case::second(TimeUnit::Second, DateDiff::Fractional(5400.0))]
-            #[case::millisecond(
-                TimeUnit::Millisecond,
-                DateDiff::Fractional(5_400_000.0)
-            )]
             #[case::calendar_day(TimeUnit::Day, DateDiff::Fractional(0.0625))]
             #[case::calendar_week(
                 TimeUnit::Week,
@@ -3186,7 +3141,6 @@ mod tests {
                 month_b in 1_u32..=12,
                 day_b in 1_u32..=28,
                 unit in prop_oneof![
-                    Just(TimeUnit::Millisecond),
                     Just(TimeUnit::Second),
                     Just(TimeUnit::Minute),
                     Just(TimeUnit::Hour),

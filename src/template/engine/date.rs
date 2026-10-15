@@ -1607,13 +1607,8 @@ mod tests {
         #[case::minutes_seconds("1m 30s", "1 minute, 30 seconds")]
         #[case::zero_duration("0s", "0 seconds")]
         #[case::negative_duration("-3d 4h", "-3 days, 4 hours")]
-        #[case::sub_second_milliseconds("500ms", "500 milliseconds")]
-        #[case::fractional_seconds("1.5s", "1 second, 500 milliseconds")]
-        #[case::sub_millisecond_residual("0.0001s", "< 1 millisecond")]
-        #[case::negative_fractional_seconds(
-            "-1.5s",
-            "-1 second, 500 milliseconds"
-        )]
+        #[case::fractional_seconds("1.5s", "2 seconds")]
+        #[case::negative_fractional_seconds("-1.5s", "-2 seconds")]
         fn formats_compound_durations(
             #[case] input: &str,
             #[case] expected: &str,
@@ -1932,15 +1927,15 @@ mod tests {
         }
 
         #[test]
-        fn milliseconds_are_a_whole_count_for_date_only_inputs() {
+        fn seconds_are_a_whole_count_for_date_only_inputs() {
             let rendered = env()
                 .render_str(
-                    r#"{{ "2026-07-23" | date_diff("2026-07-24", unit="ms") }}"#,
+                    r#"{{ "2026-07-23" | date_diff("2026-07-24", unit="s") }}"#,
                     minijinja::context!(),
                 )
                 .expect("render succeeds");
 
-            assert_eq!(rendered, "86400000");
+            assert_eq!(rendered, "86400");
         }
 
         #[rstest]
@@ -1979,12 +1974,6 @@ mod tests {
             "2026-08-06 00:00:00",
             "weeks",
             "2.0"
-        )]
-        #[case::milliseconds_as_a_fixed_unit(
-            "2026-07-23 00:00:00",
-            "2026-07-23T00:00:01.5",
-            "ms",
-            "1500.0"
         )]
         fn returns_sub_day_precision_when_both_inputs_have_time(
             #[case] value: &str,

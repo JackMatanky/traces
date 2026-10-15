@@ -30,7 +30,6 @@ use jiff::{
     Span,
     fmt::friendly::{Designator, Direction, SpanPrinter},
 };
-use num_traits::ToPrimitive as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
@@ -42,19 +41,18 @@ use super::{
 ///
 /// Month and Year are omitted: nominal ratios describe identity, not calendar
 /// application, so a synthesized magnitude never claims those components.
-pub(crate) const NOMINAL_COMPOSITION_ORDER: [TimeUnit; 6] = [
+pub(super) const NOMINAL_COMPOSITION_ORDER: [TimeUnit; 5] = [
     TimeUnit::Week,
     TimeUnit::Day,
     TimeUnit::Hour,
     TimeUnit::Minute,
     TimeUnit::Second,
-    TimeUnit::Millisecond,
 ];
 
 /// Largest-first order for rendering a compound English magnitude.
 ///
 /// Milliseconds are rounded and rendered from the remaining magnitude.
-pub(crate) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
+pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
     TimeUnit::Year,
     TimeUnit::Month,
     TimeUnit::Week,
@@ -64,18 +62,13 @@ pub(crate) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
     TimeUnit::Second,
 ];
 
-/// Nanoseconds per microsecond: a sub-second conversion factor with no
-/// registry row; all registered unit ratios come from `TEMPORAL_UNITS`.
-const NANOS_PER_MICRO: i128 = 1_000;
-
 const MAX_NOMINAL_SECONDS: f64 = 631_107_417_600.0;
-const MAX_NOMINAL_MILLISECONDS: f64 = 631_107_417_600_000.0;
 
 const PRINTER: SpanPrinter = SpanPrinter::new()
     .designator(Designator::Compact)
     .direction(Direction::Sign);
 
-/// Internal representation of the ten Jiff [`Span`] unit fields.
+/// Internal representation of the seven Jiff [`Span`] unit fields.
 ///
 /// Encapsulates fieldwise arithmetic and checked conversions between raw
 /// integer components and a validated [`Span`].
@@ -88,19 +81,27 @@ struct DurationFields {
     hours: i64,
     minutes: i64,
     seconds: i64,
-    milliseconds: i64,
-    microseconds: i64,
-    nanoseconds: i64,
 }
 
 impl DurationFields {
     #[inline]
     #[expect(
+        clippy::arithmetic_side_effects,
         clippy::as_conversions,
         clippy::cast_lossless,
-        reason = "infallible widening from i32 to i64"
+        clippy::cast_precision_loss,
+        reason = "infallible widening and rounding into i64 seconds"
     )]
     fn from_span(span: Span) -> Self {
+        let sub_nanos = i128::from(span.get_milliseconds()) * 1_000_000
+            + i128::from(span.get_microseconds()) * 1_000
+            + i128::from(span.get_nanoseconds());
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "sub-second rounding produces at most +-1 second"
+        )]
+        let sub_seconds = (sub_nanos as f64 / 1_000_000_000.0).round() as i64;
+        let seconds = span.get_seconds().saturating_add(sub_seconds);
         Self {
             years: span.get_years() as i64,
             months: span.get_months() as i64,
@@ -108,10 +109,7 @@ impl DurationFields {
             days: span.get_days() as i64,
             hours: span.get_hours() as i64,
             minutes: span.get_minutes(),
-            seconds: span.get_seconds(),
-            milliseconds: span.get_milliseconds(),
-            microseconds: span.get_microseconds(),
-            nanoseconds: span.get_nanoseconds(),
+            seconds,
         }
     }
 
@@ -125,12 +123,6 @@ impl DurationFields {
             .map_err(|_| DurationError::SecondsOutOfRange)?;
         let days_i32 = i32::try_from(self.days)
             .map_err(|_| DurationError::SecondsOutOfRange)?;
-        let millis_i32 = i32::try_from(self.milliseconds)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-        let micros_i32 = i32::try_from(self.microseconds)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-        let nanos_i32 = i32::try_from(self.nanoseconds)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
 
         Span::new()
             .try_years(years_i32)
@@ -140,9 +132,6 @@ impl DurationFields {
             .and_then(|s| s.try_hours(self.hours))
             .and_then(|s| s.try_minutes(self.minutes))
             .and_then(|s| s.try_seconds(self.seconds))
-            .and_then(|s| s.try_milliseconds(millis_i32))
-            .and_then(|s| s.try_microseconds(micros_i32))
-            .and_then(|s| s.try_nanoseconds(nanos_i32))
             .map_err(|_| DurationError::SecondsOutOfRange)
     }
 
@@ -176,18 +165,6 @@ impl DurationFields {
             seconds: self
                 .seconds
                 .checked_add(other.seconds)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            milliseconds: self
-                .milliseconds
-                .checked_add(other.milliseconds)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            microseconds: self
-                .microseconds
-                .checked_add(other.microseconds)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            nanoseconds: self
-                .nanoseconds
-                .checked_add(other.nanoseconds)
                 .ok_or(DurationError::SecondsOutOfRange)?,
         })
     }
@@ -223,18 +200,6 @@ impl DurationFields {
                 .seconds
                 .checked_mul(factor)
                 .ok_or(DurationError::SecondsOutOfRange)?,
-            milliseconds: self
-                .milliseconds
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            microseconds: self
-                .microseconds
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            nanoseconds: self
-                .nanoseconds
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
         })
     }
 
@@ -248,9 +213,6 @@ impl DurationFields {
             self.hours,
             self.minutes,
             self.seconds,
-            self.milliseconds,
-            self.microseconds,
-            self.nanoseconds,
         ];
         fields.iter().any(|&v| v > 0) && fields.iter().any(|&v| v < 0)
     }
@@ -258,21 +220,17 @@ impl DurationFields {
     #[inline]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "bounded Span unit values safely convert and sum into i128 \
-                  nanoseconds"
+        reason = "bounded Span unit values safely convert and sum into i64 \
+                  seconds"
     )]
-    fn nominal_nanoseconds(self) -> i128 {
-        i128::from(self.years) * TimeUnit::Year.nominal_nanoseconds()
-            + i128::from(self.months) * TimeUnit::Month.nominal_nanoseconds()
-            + i128::from(self.weeks) * TimeUnit::Week.nominal_nanoseconds()
-            + i128::from(self.days) * TimeUnit::Day.nominal_nanoseconds()
-            + i128::from(self.hours) * TimeUnit::Hour.nominal_nanoseconds()
-            + i128::from(self.minutes) * TimeUnit::Minute.nominal_nanoseconds()
-            + i128::from(self.seconds) * TimeUnit::Second.nominal_nanoseconds()
-            + i128::from(self.milliseconds)
-                * TimeUnit::Millisecond.nominal_nanoseconds()
-            + i128::from(self.microseconds) * NANOS_PER_MICRO
-            + i128::from(self.nanoseconds)
+    fn nominal_seconds(self) -> i64 {
+        self.years * TimeUnit::Year.nominal_seconds()
+            + self.months * TimeUnit::Month.nominal_seconds()
+            + self.weeks * TimeUnit::Week.nominal_seconds()
+            + self.days * TimeUnit::Day.nominal_seconds()
+            + self.hours * TimeUnit::Hour.nominal_seconds()
+            + self.minutes * TimeUnit::Minute.nominal_seconds()
+            + self.seconds
     }
 }
 
@@ -316,7 +274,6 @@ impl DurationValue {
     #[expect(
         clippy::as_conversions,
         clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
         reason = "finite nominal seconds bounded by Jiff span limits"
     )]
     pub(crate) fn from_nominal_seconds(
@@ -328,16 +285,13 @@ impl DurationValue {
         if seconds.abs() > MAX_NOMINAL_SECONDS {
             return Err(DurationError::SecondsOutOfRange);
         }
-        if seconds == 0.0 {
+        let total_secs = seconds.round() as i64;
+        if total_secs == 0 {
             return Ok(Self(Span::new()));
         }
-        let is_negative = seconds < 0.0;
-        let total_ms = (seconds.abs() * 1_000.0).round();
-        if total_ms > MAX_NOMINAL_MILLISECONDS {
-            return Err(DurationError::SecondsOutOfRange);
-        }
-        let total_ms = total_ms as u64;
-        let (parts, _) = decompose(total_ms, &NOMINAL_COMPOSITION_ORDER);
+        let is_negative = total_secs < 0;
+        let (parts, _) =
+            decompose(total_secs.unsigned_abs(), &NOMINAL_COMPOSITION_ORDER);
         let mut span = Span::new();
         for part in parts {
             let count = i64::try_from(part.count())
@@ -368,9 +322,6 @@ impl DurationValue {
                     .map_err(|_| DurationError::SecondsOutOfRange)?,
                 TimeUnit::Second => span
                     .try_seconds(count)
-                    .map_err(|_| DurationError::SecondsOutOfRange)?,
-                TimeUnit::Millisecond => span
-                    .try_milliseconds(count as i32)
                     .map_err(|_| DurationError::SecondsOutOfRange)?,
                 _ => span,
             };
@@ -415,7 +366,7 @@ impl DurationValue {
             let span: Span =
                 trimmed.parse().map_err(|_| DurationError::UnknownUnit)?;
             let val = Self(span);
-            if val.nominal_seconds().abs() > MAX_NOMINAL_SECONDS {
+            if val.magnitude() > MAX_NOMINAL_SECONDS {
                 return Err(DurationError::SecondsOutOfRange);
             }
             return Ok(val);
@@ -429,7 +380,7 @@ impl DurationValue {
             .map_err(|err| classify_jiff_error(&normalized, err))?;
 
         let val = Self(span);
-        if val.nominal_seconds().abs() > MAX_NOMINAL_SECONDS {
+        if val.magnitude() > MAX_NOMINAL_SECONDS {
             return Err(DurationError::SecondsOutOfRange);
         }
 
@@ -438,7 +389,7 @@ impl DurationValue {
 
     /// Parses a duration prefix from `input`, returning its spanned extent.
     pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
-        crate::lexer::lex_prefix(input, Self::scan_prefix)
+        crate::lexer::lex_prefix(input, super::lexer::scan_duration_prefix)
     }
 
     /// Adds two durations using field-by-field arithmetic.
@@ -448,12 +399,18 @@ impl DurationValue {
     /// - [`DurationError::SecondsOutOfRange`] if the sum exceeds Jiff's
     ///   representable span range.
     #[inline]
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_precision_loss,
+        reason = "nominal seconds fits within f64"
+    )]
     pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
         let f1 = DurationFields::from_span(self.0);
         let f2 = DurationFields::from_span(rhs.0);
         let sum = f1.checked_add(f2)?;
         if sum.has_mixed_signs() {
-            let total_secs = self.nominal_seconds() + rhs.nominal_seconds();
+            let total_secs = (self.nominal_seconds() as f64)
+                + (rhs.nominal_seconds() as f64);
             Self::from_nominal_seconds(total_secs)
         } else {
             sum.to_span().map(Self)
@@ -489,6 +446,7 @@ impl DurationValue {
         #[expect(
             clippy::as_conversions,
             clippy::cast_possible_truncation,
+            clippy::cast_precision_loss,
             reason = "integral factor is checked before truncation"
         )]
         if factor.fract() == 0.0 {
@@ -497,7 +455,7 @@ impl DurationValue {
             let scaled = fields.checked_mul(f)?;
             scaled.to_span().map(Self)
         } else {
-            let total = self.nominal_seconds() * factor;
+            let total = (self.nominal_seconds() as f64) * factor;
             Self::from_nominal_seconds(total)
         }
     }
@@ -519,20 +477,16 @@ impl DurationValue {
         use std::fmt::Write as _;
 
         let total_secs = self.nominal_seconds();
-        if total_secs == 0.0 || total_secs.is_nan() {
+        if total_secs == 0 {
             return "0 seconds".to_owned();
         }
-        let Some(total_ms) = (total_secs.abs() * 1_000.0).round().to_u64()
-        else {
-            return format!("{total_secs:e} seconds");
-        };
-        if total_ms == 0 {
-            return "< 1 millisecond".to_owned();
-        }
-        let is_negative = total_secs < 0.0;
-
-        let (parts, remainder_ms) = decompose(total_ms, &COMPOUND_FORMAT_ORDER);
+        let is_negative = total_secs < 0;
+        let (parts, _) =
+            decompose(total_secs.unsigned_abs(), &COMPOUND_FORMAT_ORDER);
         let mut text = String::new();
+        if is_negative {
+            text.push('-');
+        }
         for part in parts {
             let (singular, plural) = part.unit().human_names();
             let name = if part.count() == 1 {
@@ -540,37 +494,23 @@ impl DurationValue {
             } else {
                 plural
             };
-            if !text.is_empty() {
+            if !text.is_empty() && text != "-" {
                 text.push_str(", ");
             }
             let _ = write!(text, "{} {name}", part.count());
         }
-        if remainder_ms > 0 {
-            let name = if remainder_ms == 1 {
-                "millisecond"
-            } else {
-                "milliseconds"
-            };
-            if !text.is_empty() {
-                text.push_str(", ");
-            }
-            let _ = write!(text, "{remainder_ms} {name}");
+        if text.is_empty() || text == "-" {
+            "0 seconds".to_owned()
+        } else {
+            text
         }
-
-        if text.is_empty() {
-            return "< 1 millisecond".to_owned();
-        }
-        if is_negative {
-            text.insert(0, '-');
-        }
-        text
     }
 
-    /// Returns the exact nominal duration in integer nanoseconds.
+    /// Returns the exact nominal duration in integer seconds.
     #[inline]
     #[must_use]
-    pub(crate) fn nominal_nanoseconds(&self) -> i128 {
-        DurationFields::from_span(self.0).nominal_nanoseconds()
+    pub(crate) fn nominal_seconds(&self) -> i64 {
+        DurationFields::from_span(self.0).nominal_seconds()
     }
 
     /// Returns the nominal duration in seconds as an `f64` value.
@@ -579,16 +519,10 @@ impl DurationValue {
     #[expect(
         clippy::as_conversions,
         clippy::cast_precision_loss,
-        reason = "lossless float conversion of nanoseconds within \
-                  representable range"
+        reason = "nominal seconds fits within f64"
     )]
-    pub(crate) fn nominal_seconds(&self) -> f64 {
-        let nanos = self.nominal_nanoseconds();
-        if nanos == 0 {
-            0.0
-        } else {
-            (nanos as f64) / 1_000_000_000.0
-        }
+    pub(crate) fn magnitude(&self) -> f64 {
+        self.nominal_seconds() as f64
     }
 
     /// Returns the underlying Jiff [`Span`].
@@ -598,128 +532,11 @@ impl DurationValue {
         self.0
     }
 
-    #[expect(
-        clippy::indexing_slicing,
-        clippy::arithmetic_side_effects,
-        reason = "bounded cursor movement and lookaheads"
-    )]
-    fn scan_prefix(input: &str) -> Option<(Self, usize)> {
-        let bytes = input.as_bytes();
-        let mut pos = 0;
-        if bytes.is_empty() {
-            return None;
-        }
-
-        let first = *bytes.first()?;
-        if first == b'+' || first == b'-' {
-            pos = 1;
-            let next = *bytes.get(pos)?;
-            if !next.is_ascii_digit() && next != b'.' {
-                return None;
-            }
-        }
-
-        let mut has_digit = false;
-        let mut has_dot = false;
-        while let Some(&b) = bytes.get(pos) {
-            if b.is_ascii_digit() {
-                has_digit = true;
-                pos += 1;
-            } else if b == b'.' && !has_dot {
-                has_dot = true;
-                pos += 1;
-            } else {
-                break;
-            }
-        }
-        if !has_digit {
-            return None;
-        }
-
-        while bytes.get(pos).is_some_and(u8::is_ascii_whitespace) {
-            pos += 1;
-        }
-
-        let unit_start = pos;
-        while bytes.get(pos).is_some_and(u8::is_ascii_alphabetic) {
-            pos += 1;
-        }
-        if unit_start == pos {
-            return None;
-        }
-        let mut last_end = pos;
-
-        loop {
-            let mut next_pos = last_end;
-            let mut has_ws = false;
-            while bytes.get(next_pos).is_some_and(u8::is_ascii_whitespace) {
-                has_ws = true;
-                next_pos += 1;
-            }
-
-            if next_pos >= bytes.len() {
-                break;
-            }
-
-            let next_byte = bytes[next_pos];
-            if next_byte == b'+' || next_byte == b'-' {
-                return None;
-            }
-
-            let starts_num = next_byte.is_ascii_digit()
-                || (next_byte == b'.'
-                    && bytes.get(next_pos + 1).is_some_and(u8::is_ascii_digit));
-
-            if !starts_num {
-                break;
-            }
-
-            if !has_ws && !bytes[last_end - 1].is_ascii_alphabetic() {
-                break;
-            }
-
-            let mut cur = next_pos;
-            let mut num_digit = false;
-            let mut num_dot = false;
-            while let Some(&b) = bytes.get(cur) {
-                if b.is_ascii_digit() {
-                    num_digit = true;
-                    cur += 1;
-                } else if b == b'.' && !num_dot {
-                    num_dot = true;
-                    cur += 1;
-                } else {
-                    break;
-                }
-            }
-            if !num_digit {
-                break;
-            }
-
-            while bytes.get(cur).is_some_and(u8::is_ascii_whitespace) {
-                cur += 1;
-            }
-
-            let comp_unit_start = cur;
-            while bytes.get(cur).is_some_and(u8::is_ascii_alphabetic) {
-                cur += 1;
-            }
-            if comp_unit_start == cur {
-                break;
-            }
-
-            last_end = cur;
-        }
-
-        let candidate = input.get(..last_end)?;
-        let dv = Self::parse(candidate).ok()?;
-        Some((dv, last_end))
-    }
-
     /// Wraps an existing Jiff [`Span`].
     #[cfg(test)]
     #[inline]
     #[must_use]
+    #[expect(dead_code, reason = "test helper constructor")]
     pub(crate) const fn from_span(span: Span) -> Self {
         Self(span)
     }
@@ -778,12 +595,6 @@ impl DurationValue {
                 unit: TimeUnit::Second,
             });
         }
-        if span.get_milliseconds() != 0 {
-            result.push(DurationComponent {
-                magnitude: span.get_milliseconds() as f64,
-                unit: TimeUnit::Millisecond,
-            });
-        }
         result
     }
 
@@ -820,7 +631,7 @@ impl FromStr for DurationValue {
 impl PartialEq for DurationValue {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.nominal_nanoseconds() == other.nominal_nanoseconds()
+        self.nominal_seconds() == other.nominal_seconds()
     }
 }
 
@@ -836,14 +647,14 @@ impl PartialOrd for DurationValue {
 impl Ord for DurationValue {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
-        self.nominal_nanoseconds().cmp(&other.nominal_nanoseconds())
+        self.nominal_seconds().cmp(&other.nominal_seconds())
     }
 }
 
 impl Hash for DurationValue {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.nominal_nanoseconds().hash(state);
+        self.nominal_seconds().hash(state);
     }
 }
 
@@ -956,12 +767,12 @@ fn validate_friendly_input(input: &str) -> Result<(), DurationError> {
         if digits_len > 300 {
             return Err(DurationError::NumberOverflow);
         }
-        // The closed unit vocabulary stops at milliseconds; Jiff's own `us`
+        // The closed unit vocabulary stops at seconds; Jiff's own `ms`, `us`
         // and `ns` spellings must not leak through.
         let unit = word.trim_start_matches(|c: char| {
             c.is_ascii_digit() || matches!(c, '.' | '+' | '-')
         });
-        if matches!(unit, "us" | "ns") {
+        if matches!(unit, "ms" | "millisecond" | "milliseconds" | "us" | "ns") {
             return Err(DurationError::UnknownUnit);
         }
     }
@@ -1121,7 +932,7 @@ mod tests {
 
     fn parse_seconds(input: &str) -> Result<f64, String> {
         DurationValue::parse(input)
-            .map(|duration| duration.nominal_seconds())
+            .map(|duration| duration.magnitude())
             .map_err(|error| error.to_string())
     }
 
@@ -1136,7 +947,7 @@ mod tests {
                 (
                     duration.to_string(),
                     parsed.span_usize().end,
-                    duration.nominal_seconds(),
+                    duration.magnitude(),
                 )
             })
             .ok_or_else(|| "prefix rejected".to_owned())
@@ -1150,7 +961,7 @@ mod tests {
         #[case::zero(0.0, "0s")]
         #[case::seconds(90.0, "1m 30s")]
         #[case::minutes(5_400.0, "1h 30m")]
-        #[case::sub_second(0.5, "500ms")]
+        #[case::sub_second(0.5, "1s")]
         #[case::large_compound(
             604_800.0 + 86_400.0 + 3_600.0 + 60.0 + 1.0,
             "1w 1d 1h 1m 1s"
@@ -1163,13 +974,9 @@ mod tests {
         ) {
             let duration = synthesized(raw_secs);
             assert_eq!(duration.to_string(), expected);
-            #[expect(
-                clippy::float_cmp,
-                reason = "nominal identity is exact integer nanoseconds"
-            )]
             {
                 if raw_secs == 0.0 || raw_secs == -0.0 {
-                    assert_eq!(duration.nominal_seconds(), 0.0);
+                    assert_eq!(duration.nominal_seconds(), 0);
                 }
             }
         }
@@ -1199,7 +1006,6 @@ mod tests {
         use super::*;
 
         #[rstest]
-        #[case::milliseconds("500ms", 0.5)]
         #[case::seconds("90s", 90.0)]
         #[case::minutes("30m", 1_800.0)]
         #[case::hours("1h", 3_600.0)]
@@ -1214,7 +1020,6 @@ mod tests {
         #[case::long_hours("5 hours", 18_000.0)]
         #[case::long_minutes("6 minutes", 360.0)]
         #[case::long_seconds("7 seconds", 7.0)]
-        #[case::long_milliseconds("8 milliseconds", 0.008)]
         fn accepts_each_unit_alone(#[case] input: &str, #[case] expected: f64) {
             let result = parse_seconds(input);
             assert_eq!(result, Ok(expected));
@@ -1251,7 +1056,7 @@ mod tests {
         #[rstest]
         #[case::hour_fraction("1.5h", 5_400.0)]
         #[case::fraction_without_zero(".5h", 1_800.0)]
-        #[case::seconds_fraction(".5s", 0.5)]
+        #[case::seconds_fraction(".5s", 1.0)]
         #[case::negative_fraction("-.5h", -1_800.0)]
         #[case::positive_fraction("+.5h", 1_800.0)]
         fn accepts_hour_or_smaller_fraction_on_lowest_unit(
@@ -1310,6 +1115,8 @@ mod tests {
         #[rstest]
         #[case::unknown_unit("1x")]
         #[case::unknown_word_unit("1fortnight")]
+        #[case::milli_unit("1ms")]
+        #[case::milli_word("8 milliseconds")]
         #[case::micro_unit("1us")]
         #[case::capital_with_space("1 H")]
         #[case::exponent("1e3s")]
@@ -1440,12 +1247,8 @@ mod tests {
             let day = DurationValue::parse("1d").unwrap();
             let diff = day.checked_sub(day).unwrap();
             assert_eq!(diff.to_string(), "0s");
-            #[expect(
-                clippy::float_cmp,
-                reason = "exact zero is representable in integer nanoseconds"
-            )]
             {
-                assert_eq!(diff.nominal_seconds(), 0.0);
+                assert_eq!(diff.nominal_seconds(), 0);
             }
         }
 
@@ -1581,7 +1384,7 @@ mod tests {
         #[rstest]
         #[case::zero(0.0, "0s")]
         #[case::negative(-5_400.0, "-1h 30m")]
-        #[case::sub_second(0.5, "500ms")]
+        #[case::sub_second(0.5, "1s")]
         #[case::compound_calendar(2.0f64.mul_add(2_592_000.0, 31_536_000.0), "1y 2mo")]
         #[case::mixed(
             31_536_000.0 + 2_592_000.0 + 86_400.0 + 3_600.0 + 60.0 + 1.0,
@@ -1678,11 +1481,11 @@ mod tests {
         }
 
         #[test]
-        fn sub_millisecond_rounds() {
-            let dur = synthesized(0.0004);
+        fn fractional_seconds_round_to_nearest_whole_second() {
+            let dur = synthesized(0.4);
             assert_eq!(dur.to_string(), "0s");
-            let dur2 = synthesized(0.0006);
-            assert_eq!(dur2.to_string(), "1ms");
+            let dur2 = synthesized(1.5);
+            assert_eq!(dur2.to_string(), "2s");
         }
     }
 
@@ -1701,19 +1504,13 @@ mod tests {
             "1 year, 1 month, 1 day"
         )]
         #[case::negative(-3_600.0, "-1 hour")]
-        #[case::sub_millisecond(0.000_4, "< 1 millisecond")]
+        #[case::fractional_rounds(0.4, "0 seconds")]
         fn renders_compound_english_from_nominal_seconds(
             #[case] raw_secs: f64,
             #[case] expected: &str,
         ) {
-            #[expect(
-                clippy::float_cmp,
-                reason = "case literals compare exactly against themselves"
-            )]
             let duration = if raw_secs > 2_592_000.0 {
                 DurationValue::parse("1y 1mo 1d").unwrap()
-            } else if raw_secs == 0.000_4 {
-                DurationValue::from_span(Span::new().nanoseconds(400_000))
             } else {
                 synthesized(raw_secs)
             };
@@ -1728,9 +1525,9 @@ mod tests {
         #[test]
         fn component_iteration_order_largest_to_smallest() {
             let duration =
-                DurationValue::parse("1y 2mo 3w 4d 5h 6m 7s 8ms").unwrap();
+                DurationValue::parse("1y 2mo 3w 4d 5h 6m 7s").unwrap();
             let components = duration.components();
-            assert_eq!(components.len(), 8);
+            assert_eq!(components.len(), 7);
             #[expect(
                 clippy::float_cmp,
                 reason = "component magnitudes are exact unit counts"
@@ -1740,8 +1537,8 @@ mod tests {
                 assert_eq!(first.unit(), TimeUnit::Year);
                 assert_eq!(first.magnitude(), 1.0);
                 let last = components.last().expect("at least one component");
-                assert_eq!(last.unit(), TimeUnit::Millisecond);
-                assert_eq!(last.magnitude(), 8.0);
+                assert_eq!(last.unit(), TimeUnit::Second);
+                assert_eq!(last.magnitude(), 7.0);
             }
         }
 
@@ -1785,14 +1582,13 @@ mod tests {
             }
 
             #[test]
-            fn nominal_constructor_preserves_integer_milliseconds(
-                milliseconds in -1_000_000_000_i32..=1_000_000_000_i32,
+            fn nominal_constructor_preserves_integer_seconds(
+                seconds in -1_000_000_000_i32..=1_000_000_000_i32,
             ) {
-                let expected = f64::from(milliseconds) / 1_000.0;
-                let duration = synthesized(expected);
+                let duration = synthesized(f64::from(seconds));
                 prop_assert_eq!(
-                    duration.nominal_seconds().to_bits(),
-                    expected.to_bits(),
+                    duration.nominal_seconds(),
+                    i64::from(seconds),
                 );
             }
 
@@ -1805,11 +1601,6 @@ mod tests {
                 let restored = duration
                     .checked_neg()
                     .and_then(DurationValue::checked_neg);
-                #[expect(
-                    clippy::float_cmp,
-                    reason =
-                        "double negation restores exact integer nanoseconds"
-                )]
                 {
                     prop_assert!(matches!(
                         restored,
@@ -1825,12 +1616,12 @@ mod tests {
             ) {
                 let left_val = synthesized(f64::from(left));
                 let right_val = synthesized(f64::from(right));
-                let expected = left_val.nominal_nanoseconds();
+                let expected = left_val.nominal_seconds();
 
                 let sum = left_val.checked_add(right_val).unwrap();
                 let diff = sum.checked_sub(right_val).unwrap();
 
-                prop_assert_eq!(diff.nominal_nanoseconds(), expected);
+                prop_assert_eq!(diff.nominal_seconds(), expected);
             }
 
             #[test]
@@ -1857,10 +1648,6 @@ mod tests {
                 let duration = synthesized(f64::from(seconds));
                 let original = duration.nominal_seconds();
                 let scaled = duration.checked_mul(1.0);
-                #[expect(
-                    clippy::float_cmp,
-                    reason = "scaling by one restores exact integer nanoseconds"
-                )]
                 {
                     prop_assert!(matches!(
                         scaled,

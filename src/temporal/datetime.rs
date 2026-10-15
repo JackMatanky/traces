@@ -196,16 +196,6 @@ impl DateTimeValue {
 
     /// Returns the local clock time of this date-time.
     ///
-    /// # Errors
-    ///
-    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
-    #[inline]
-    pub(crate) fn local_datetime_or_utc(
-        self,
-    ) -> Result<civil::DateTime, DateError> {
-        self.local_datetime()
-    }
-
     /// Returns the local calendar date of this date-time, discarding
     /// time-of-day.
     ///
@@ -214,7 +204,7 @@ impl DateTimeValue {
     /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
     #[inline]
     pub(crate) fn local_date(self) -> Result<DateValue, DateError> {
-        Ok(self.local_datetime_or_utc()?.date().into())
+        Ok(self.local_datetime()?.date().into())
     }
 
     /// Returns `true` if this date-time is exactly local-zone midnight on
@@ -394,7 +384,7 @@ impl<'de> Deserialize<'de> for DateTimeValue {
 /// Defines recognized date-time input shapes, tried in order by
 /// [`DateTimeValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateTimeShape {
+pub(super) enum DateTimeShape {
     /// RFC 3339 format with offset: `2026-07-29T14:30:00Z`.
     Rfc3339,
     /// `T`-separated seconds, optionally fractional: `2026-07-29T14:30:00.123`.
@@ -501,7 +491,7 @@ impl DateTimeShape {
 
 /// Stores the parsed date-time shape before local-zone resolution.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateTimeInput {
+pub(super) enum DateTimeInput {
     /// Stores an explicit RFC 3339 date-time with its offset applied.
     Absolute(Timestamp),
     /// Stores a naive local civil date-time that must resolve through

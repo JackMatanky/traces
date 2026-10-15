@@ -13,7 +13,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
     CalendarError, DateTimeValue, error::DateError, lexer::starts_with_year,
-    point::DatePrecision,
 };
 
 /// Defines the canonical display format for [`DateValue`]: `2026-07-29`.
@@ -217,11 +216,20 @@ impl<'de> Deserialize<'de> for DateValue {
     }
 }
 
+/// Tracks whether a zone-free date point uses month or full-date precision.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DatePrecision {
+    /// Specifies year and month precision.
+    Month,
+    /// Specifies full calendar date precision.
+    Day,
+}
+
 /// Defines the recognized date input shapes, tried in order by
 /// [`DateShape::parse_any`] for [`DatePoint::parse`](super::DatePoint::parse)
 /// and [`DateValue::parse_iso`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DateShape {
+pub(super) enum DateShape {
     /// Matches a full ISO date: `2026-07-29`.
     YearMonthDay,
     /// Matches year-month reduced precision: `2026-07` (day defaults to 1).

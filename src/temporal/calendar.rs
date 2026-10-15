@@ -15,8 +15,6 @@
 
 use jiff::civil;
 
-use super::error::CalendarError;
-
 /// Represents a calendar period that date-point boundaries select.
 ///
 /// Selecting a variant fixes the span a start-of or end-of boundary lands on:
@@ -34,60 +32,38 @@ pub(crate) enum CalendarPeriod {
 impl CalendarPeriod {
     /// Computes the boundary date of this calendar period for a given date.
     ///
-    /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if the target date cannot be
     ///   represented.
-    pub(crate) fn snap_date(
+    #[must_use]
+    pub(super) fn snap_date(
         self,
         edge: PeriodEdge,
         date: civil::Date,
-    ) -> Result<civil::Date, CalendarError> {
-        match self {
-            Self::Week => {
-                let iso = date.iso_week_date();
-                let target = match edge {
-                    PeriodEdge::Start => civil::Weekday::Monday,
-                    PeriodEdge::End => civil::Weekday::Sunday,
-                };
-                civil::ISOWeekDate::new(iso.year(), iso.week(), target)
-                    .map(civil::Date::from)
-            }
-            Self::Month => {
-                civil::Date::new(date.year(), date.month(), match edge {
-                    PeriodEdge::Start => 1,
-                    PeriodEdge::End => date.days_in_month(),
-                })
-            }
-            Self::Year => civil::Date::new(
-                date.year(),
-                match edge {
-                    PeriodEdge::Start => 1,
-                    PeriodEdge::End => 12,
-                },
-                match edge {
-                    PeriodEdge::Start => 1,
-                    PeriodEdge::End => 31,
-                },
-            ),
+    ) -> civil::Date {
+        match (self, edge) {
+            (Self::Week, PeriodEdge::Start) => date
+                .iso_week_date()
+                .first_of_week()
+                .map_or(date, jiff::civil::ISOWeekDate::date),
+            (Self::Week, PeriodEdge::End) => date
+                .iso_week_date()
+                .last_of_week()
+                .map_or(date, jiff::civil::ISOWeekDate::date),
+            (Self::Month, PeriodEdge::Start) => date.first_of_month(),
+            (Self::Month, PeriodEdge::End) => date.last_of_month(),
+            (Self::Year, PeriodEdge::Start) => date.first_of_year(),
+            (Self::Year, PeriodEdge::End) => date.last_of_year(),
         }
-        .map_err(|_| CalendarError::OutOfRange)
     }
 
-    /// Aligns a date to a target weekday within its ISO week.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the target date cannot be
-    ///   represented.
-    pub(crate) fn snap_weekday(
+    #[must_use]
+    pub(super) fn snap_weekday(
         date: civil::Date,
         target: civil::Weekday,
-    ) -> Result<civil::Date, CalendarError> {
+    ) -> civil::Date {
         let iso = date.iso_week_date();
         civil::ISOWeekDate::new(iso.year(), iso.week(), target)
-            .map(civil::Date::from)
-            .map_err(|_| CalendarError::OutOfRange)
+            .map_or(date, civil::Date::from)
     }
 }
 
@@ -131,17 +107,10 @@ pub(crate) const CALENDAR_PERIOD_EDGES: [(&str, CalendarPeriod, PeriodEdge);
 /// Sunday-based conventions disagree on it (Sunday is `0` in some and `1` in
 /// others).
 #[must_use]
-pub(crate) const fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
-    match n {
-        1 => Some(civil::Weekday::Monday),
-        2 => Some(civil::Weekday::Tuesday),
-        3 => Some(civil::Weekday::Wednesday),
-        4 => Some(civil::Weekday::Thursday),
-        5 => Some(civil::Weekday::Friday),
-        6 => Some(civil::Weekday::Saturday),
-        7 => Some(civil::Weekday::Sunday),
-        _ => None,
-    }
+pub(crate) fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
+    i8::try_from(n)
+        .ok()
+        .and_then(|v| civil::Weekday::from_monday_one_offset(v).ok())
 }
 
 #[cfg(test)]
@@ -373,11 +342,11 @@ mod tests {
             #[case] input: civil::Date,
             #[case] expected: civil::Date,
         ) {
-            // Arrange
+            // Arrange: `period`, `edge`, and `input` are case literals.
             // Act
             let actual = period.snap_date(edge, input);
             // Assert
-            assert_eq!(actual, Ok(expected));
+            assert_eq!(actual, expected);
         }
 
         #[test]
@@ -388,7 +357,7 @@ mod tests {
             let friday =
                 CalendarPeriod::snap_weekday(wednesday, civil::Weekday::Friday);
             // Assert
-            assert_eq!(friday, Ok(date(2026, 7, 31)));
+            assert_eq!(friday, date(2026, 7, 31));
         }
     }
 }
