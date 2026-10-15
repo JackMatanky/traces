@@ -75,3 +75,11 @@ Decide:
 ### Research
 
 Consolidated: `research/22-template-intelligence.md` (637 lines, §0–§9) — grounding corrections, four round-decision sections with stress verdicts, downstream wiring table, Round-4 answers. Fourteen source reports (4 grounding + 10 stress) merged here and deleted.
+
+### Amended by 25 (2026-10-15)
+
+- **β generalized beyond templates (25 Q3-R)**: 22's β single-lane publisher is the publication path for **all** diagnostics (links, schema, query, footnotes, tasks), not only template diagnostics; adopted as-is for MVP (generation counters arrive with scope B, inside the diagnostics module; separate lane and facade DirtySet rejected). Workspace warm-up bypasses the β FIFO.
+- **Timing (Q19 line)**: "timing provisional to 25" resolved — T1 100ms, T2 ~50ms (adaptive clamp `[50ms, compute, 500ms]`), T3 event-driven.
+- **Citation fix (22:34)**: the debounce bullet lives at `map.md:32`, not `map.md:31`.
+- **14 §2 wording**: 22's proposed "Amends 14 §2 scope-limited (14's 150ms sleep stands)" is **superseded** — 14 §2 is superseded outright: no in-handler sleep anywhere; debounce = spawn + generation counter (14 amended directly by 25).
+- **22:72 receipt**: 25 accepts the owed inputs list with per-item pointers — class list → Q15-R2 `DiagnosticRule` enum (`template.*` codes); source/code set → Q6-R Scheme C (`source: "traces"`, hierarchical codes); fallback-ladder rule → 25's severity calibration does not touch it (construction-failure stays 22's degrade design); severities incl. undef-var FP rationale → the four phase-1 classes are undeclared, so Q5-R applies, defaulting them to Information as 22 proposed (FP rationale recorded; taxonomy = registry); cadence proposal → Q3-R (live-debounced, T2 lane); single-publisher/β coordination → Q3-R (β adopted, generalized); SchemaLoad class → registry code `template.schema-load` with 22's proposed severity standing under Q5-R; construction-failure degradation note → env-free classes only, silence-not-ranges (accepted).

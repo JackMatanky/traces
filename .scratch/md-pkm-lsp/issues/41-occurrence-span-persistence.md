@@ -18,3 +18,8 @@ Also in scope of the decision:
 - If C wins: where the `Option` boundary sits — inside `Spanned<T>`, or plain values in `Note`'s persisted collections with spans attached only in transient views.
 
 Feeds: note-parse ticket 04 (already rewritten Heading-only; spans return as a follow-up ticket once this decides) and md-pkm-lsp ticket 11 §1/§8.
+
+## Inputs from 25 (2026-10-15)
+
+- **Byte-precision closed-file diagnostics need link ranges (25 §4.4)**: even span-persistence option 41-B doesn't give closed-file *link* ranges (`Link` has no position field at all). Byte-precision diagnostics on closed files therefore require either 41's persisted link spans or re-reading file text on cold compute (costed in 25's research). Feeds the 41-B vs 41-C choice: 41-C (plain `Option<ByteSpan>`) leaves closed-file link diagnostics cold-compute-only.
+- **blake3 sidecar cache question routes HERE (25 §10.4/11.1)**, not to resolved 13: an optional blake3 sidecar cache (file-hash → computed results, eliminating disk re-read on cold compute) is *not* a redb table, so 13's "no new redb tables" constraint is untouched either way; 41 owns the sidecar-or-not decision (it interacts with span persistence — the sidecar would need to carry spans too).

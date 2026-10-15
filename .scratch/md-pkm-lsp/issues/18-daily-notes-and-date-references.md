@@ -44,3 +44,7 @@ Informed by zk's daily-note/date conventions research (ticket 04). Decide:
 - No creation prompt on hover (diagnostic-driven only)
 - No diagnostic for future-date unresolved links (intentional forward references)
 - No full NL parsing in v1 (custom parser covers common patterns; `chrono-english` for v2)
+
+### Amended by 25 (2026-10-15)
+
+- **Day-rollover timer (25 Q12-R; 23 routed re-evaluation here)**: date-dependency invalidation is a single background timer armed to the next local-midnight boundary. On fire: bump a generation, re-enqueue date-dependent diagnostics for the affected set (daily notes + their referrers, class D in 25's dependency table). Recompute+publish rides the T3 event-driven path (β lane for open docs; pull-cache invalidation for the workspace) — no polling loop, no periodic re-scan. Covers 18's past-date unresolved links and 23's C1/C2 relative-date severities (both need `today`).

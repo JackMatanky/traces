@@ -57,3 +57,7 @@ Startup reindex is a one-time cost. Adding `$/progress` requires threading progr
 | Cancellation            | Stale-result discard                 | Industry standard; no production Rust LSP does cooperative cancel    |
 | Refresh exclusivity     | Sequential (refresh before next)     | N=1 makes this natural; simplest correct model                       |
 | `$/progress`            | Not initially                        | UX polish, not a concurrency decision                                |
+
+### Amended by 25 (2026-10-15)
+
+- **§1 extended by 22's β publisher, generalized by 25**: the single-lane publisher (FIFO `Compute`/`Clear`/`Opened` with coalesce-by-URI, publish-gate on open/version/no-newer-pending, single-publisher-per-URI) rides *within* `concurrency_level(1)` sequential dispatch: compute runs on-lane; publication happens in a long-lived background task holding owned payloads + a `Client` clone (22:Q19). **25 generalizes β beyond templates**: it is the publication path for *all* diagnostics (links, schema, query, footnotes, tasks), not just template diagnostics. §3 (refresh exclusivity, Arc swap) unaffected. Workspace warm-up bypasses the FIFO (streamed partials into the pull cache). Generation counters arrive with scope B, inside the diagnostics module.

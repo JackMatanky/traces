@@ -95,3 +95,7 @@ note (default), abstract (summary, tldr), info, todo, tip (hint, important), suc
 - Neither requires new redb tables — transient, recomputed per parse
 - Both feed into ticket 27 (structural/editor intelligence) for folding ranges
 - Parser stays pulldown-cmark with full re-parse per edit (matches all peers)
+
+### Amended by 25 (2026-10-15)
+
+- **MD066 cession (25 Q9-R)**: rumdl MD066 covers footnote undefined-reference, unused-definition, and duplicate-definition. Those three diagnostics are **dropped from 17** (docs guidance: users wanting them back enable MD066; `tags: [Unnecessary]` remains the idiomatic unused-def rendering in docs). Footnote **self-reference** and **blockquoted-definition** stay Traces-owned (MD066 does not rule them; live probe). The footnote hover idea loses any dependency on the ceded diagnostics — hover stays only where Traces still owns the rule.

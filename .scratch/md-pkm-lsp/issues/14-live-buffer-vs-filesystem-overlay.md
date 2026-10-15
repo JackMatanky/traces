@@ -36,3 +36,7 @@ Decide:
 - `WorkspaceIndex::files() -> &[FileBase]` (trivial — entries are sorted by path)
 - `FileBase::new_buffer(path, size)` constructor (public, not test-gated)
 - Mutable inlink reconstruction from `FileEntry.inlinks()` for per-request patching
+
+### Amended by 25 (2026-10-15)
+
+- **§2 (re-parse debounce) superseded — not scope-limited** (25 supersedes 22's original "Amends 14 §2 scope-limited" wording): no `tokio::time::sleep` in any handler flow. Debounce = spawn a timer task + generation counter. T1 content/index re-parse = **100ms** (was 150ms); T2 diagnostics publish = **~50ms** adaptive clamp `[50ms, measured compute, 500ms]` (was 300ms). The β single-lane publisher (22:Q19, generalized by 25) is the publication path for *all* diagnostics. Rest of 14 (transient replacement, `BufferState`, `ContentResolver`, inlink reconciliation, lifecycle) unchanged.

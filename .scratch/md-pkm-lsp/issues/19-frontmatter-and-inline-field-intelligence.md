@@ -101,3 +101,7 @@ Three tiers:
 ### Type-aware treatment
 
 Follow Dataview's inference cascade for unscoped mode: empty→null, date→duration→quoted string→tag→link→bool→number→null→fallback string. Different types are incomparable (NOT alphabetical like Dataview). Unscoped mode: informational diagnostics only (no validation without schema). **This decision covers unscoped mode only.** Scoped mode (schema-bound validation) is ticket 20's scope and will use the same Dataview cascade but with schema type as the expected type.
+
+### Amended by 25 (2026-10-15)
+
+- **Frontmatter-missing-delimiter severity recorded (25 Q13-R2)**: 19's Error for missing `---` delimiters **stands**. Premises corrected against a live rumdl 0.2.79 probe: MD041 (Warning) fires on every broken shape; MD065 (Warning) fires only when the leading `---` parses as a horizontal rule (missing closing delimiter); both are suppressible only by disabling the rule itself (impractical for transient mid-edit breakage). Traces' diagnostic is a frontmatter-parse code (`frontmatter.missing-delimiter`), not a heading judgment, so it does not duplicate the ceded MD041/MD065 heading rules. Coexistence note ships to 32.

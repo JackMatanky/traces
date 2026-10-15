@@ -148,3 +148,9 @@ pub enum SchemaDiagnosticKind {
 | 4 | Medium | No ordered resolution chain on Schema | Add `parent_order: Vec<SchemaName>`. Low effort. |
 | 5 | Medium | Overlay files not in completion | Merge DocumentStore overlays. Low effort. |
 | 6 | Medium | Manual `PartialEq` on both Frontmatter and SchemaFieldDef | Document convention. Add size assertions. Low effort. |
+
+### Amended by 25 (2026-10-15)
+
+- **`source` and debounce (25 Q3-R/Q6-R/Q15-R2)**: `source` moves from `"traces-schema"` to the unified Scheme C — `source: "traces"` + hierarchical `<feature>.<rule>` codes (schema rules live under `schema.*`); `relatedInformation` for inherited fields stands. `[schemas.diagnostics].debounce_ms` default 300 → the T2 value (**~50ms** typical, adaptive clamp `[50ms, compute, 500ms]`); the key survives as an optional override.
+- **Per-source severity (20:56, Q14) → per-code O1 keys (25 Q15-R2)**: severity overrides are per diagnostic code in the editor-sourced O1 override map (`schema.<rule>` keys, vocabulary `hint|info|warn|error|off`), not per-source settings. `[schemas.diagnostics]` remains an **emission gate** (`enabled`); severity resolution is the registry's job (orthogonal, per Q7-R).
+- **22:64 receipt**: the optional v2 range-less schema-file diagnostic is deferred with a named vehicle — it lands behind 20's `[schemas.diagnostics]` gate as `schema-file.*` registry codes, consumed via the same per-code override keys; the watch trigger that feeds it is owed to 31 (schema-dir `didChangeWatchedFiles`).

@@ -67,3 +67,10 @@ Decisions (23 owns product content; mechanics deferred per seams below):
 - → 32: rumdl non-overlap assertion for task diagnostics; → 34: predicate extraction, `TaskStatusMap::iter()`, visibility widening; → 16: row-shape conventions shared with 23.
 
 Hidden dependencies registered: `byte_to_utf16_cu` absent (11/19 prereq), `today` absent, `Heading` absent (11), `scan_marker_prefix`/`TaskScan` visibility (34), tower-lsp-server not yet in Cargo.toml (09), 18/24/26 open.
+
+### Amended by 25 (2026-10-15)
+
+- **Severities adopted verbatim, closing "23 proposes; 25 decides" (25 Q5-R)**: A1 = Hint; B1/B2/B3/B5/D1/D2/C1 = Warning; C2/C4/C5/C6 = Information; **B4 dropped** (confirmed); **B6 default-off** (registry default `off`, user-enables via override key). C1/C2 still need `today` (18's timer, amended by 25).
+- **Source and codes (25 Q6-R/Q15-R2)**: `source: "traces"` (Scheme C; `traces-tasks` retired) + per-rule codes under `tasks.*` (e.g. `tasks.date.invalid`); never `MD…`.
+- **Delivery line (25 Q1-R/Q3-R')**: "push for open docs via 14's settled 300ms debounce" → document-level **pull is primary** (push only as fallback for pull-incapable clients); T2 publish timer (for push fallback and cache freshness) = ~50ms adaptive clamp. The cross-file panel recommendation (pull `workspace/diagnostic` + `resultId`) is now the Phase A/B primary mechanism, not a recommendation.
+- **23:37 receipt**: "workspace-scope default severity → 25" — workspace-scoped task diagnostics (C1/C2 relative-date classes) inherit their per-rule defaults from the registry (Warning/Information as adopted above); no separate workspace-severity tier exists (per-code O1 overrides apply uniformly, 31's schema).
