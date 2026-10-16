@@ -2,12 +2,11 @@
 
 ## Redesign Behavior-Change Register (`R1 to R18`)
 
-This section is the **allow-list for Stage 2 oracle diffs**. Stage 1 of the
-temporal redesign is behavior-preserving: the migration oracle
-(`src/temporal_oracle.rs`) must show a **zero diff** after every Stage 1
-commit. Stage 2 (the engine swap) may change behavior only as listed below,
-and **every oracle diff line must carry a register tag**; any diff line
-outside `R1` to `R18` is a defect and triggers the Stage 2 drop condition.
+This section is the **allow-list for the approved temporal behavior changes**.
+R1–R18 remain the behavior contract; the Stage 2 migration oracle was removed
+in S2.6 and must not be recreated. Its lasting behavior expectations belong in
+owner-module and integration tests. The register is not evidence that every
+listed behavior has been implemented or verified.
 
 Rows `R1` to `R15` come from
 `.design/2026-10-12-review-temporal/redesign-plan.md` (section 6); `R16` to
@@ -267,12 +266,9 @@ by owner-module tests.
 
 The entries below predate the redesign: they document intentional
 architectural and behavioral divergences between Traces and external systems
-(Dataview, `Templater`, SQL engines, `Luxon`, and Temporal), citing design
-decisions and the underlying research corpus:
-
-- [SQL Temporal Conventions](.scratch/temporal-core/research/sql-temporal-conventions.md)
-- [General Temporal Libraries](.scratch/temporal-core/research/general-temporal-libraries.md)
-- [Rust Temporal Ecosystem](.scratch/temporal-core/research/rust-temporal-ecosystem.md)
+(Dataview, `Templater`, SQL engines, `Luxon`, and Temporal). They are retained
+for historical context. The research-note files referenced by the original
+register are not present in this worktree.
 
 ### Entry 1: UTC Storage of Instants
 

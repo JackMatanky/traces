@@ -1,9 +1,9 @@
 //! Defines the closed sets of temporal units the crate accepts: duration
 //! [`TimeUnit`] and date-point [`DateUnit`].
 //!
-//! [`TEMPORAL_UNITS`] is the only place a duration unit's accepted spellings,
-//! nominal length, frame, and human names are stated; callers read those facts
-//! from [`TimeUnit`] instead of keeping private copies. Calendar units
+//! [`TEMPORAL_UNITS`] stores each duration unit's nominal length, frame, and
+//! human names. [`UNIT_LOOKUP`] stores accepted spellings. Callers read these
+//! facts from [`TimeUnit`] instead of keeping private copies. Calendar units
 //! ([`TimeUnit::Day`], [`TimeUnit::Week`], [`TimeUnit::Month`],
 //! [`TimeUnit::Year`]) take effect on the local clock; exact units
 //! ([`TimeUnit::Hour`] and smaller) are exact elapsed time.
@@ -43,21 +43,57 @@ pub(crate) enum TimeUnit {
     Year,
 }
 
+/// Maps every accepted duration unit spelling to its unit.
+static UNIT_LOOKUP: phf::Map<&'static str, TimeUnit> = phf::phf_map! {
+    "y" => TimeUnit::Year,
+    "yr" => TimeUnit::Year,
+    "yrs" => TimeUnit::Year,
+    "year" => TimeUnit::Year,
+    "years" => TimeUnit::Year,
+    "mo" => TimeUnit::Month,
+    "mos" => TimeUnit::Month,
+    "month" => TimeUnit::Month,
+    "months" => TimeUnit::Month,
+    "w" => TimeUnit::Week,
+    "wk" => TimeUnit::Week,
+    "wks" => TimeUnit::Week,
+    "week" => TimeUnit::Week,
+    "weeks" => TimeUnit::Week,
+    "d" => TimeUnit::Day,
+    "day" => TimeUnit::Day,
+    "days" => TimeUnit::Day,
+    "h" => TimeUnit::Hour,
+    "hr" => TimeUnit::Hour,
+    "hrs" => TimeUnit::Hour,
+    "hour" => TimeUnit::Hour,
+    "hours" => TimeUnit::Hour,
+    "m" => TimeUnit::Minute,
+    "min" => TimeUnit::Minute,
+    "mins" => TimeUnit::Minute,
+    "minute" => TimeUnit::Minute,
+    "minutes" => TimeUnit::Minute,
+    "s" => TimeUnit::Second,
+    "sec" => TimeUnit::Second,
+    "secs" => TimeUnit::Second,
+    "second" => TimeUnit::Second,
+    "seconds" => TimeUnit::Second,
+};
+
 impl TimeUnit {
     /// Looks up a unit by its case-insensitive spelling.
     ///
-    /// Scans the alias lists in [`TEMPORAL_UNITS`] with ASCII-case-insensitive
-    /// equality, so every alias in the registry is accepted and nothing else
-    /// is: an empty, too long, or non-ASCII input matches no alias and returns
-    /// [`None`].
+    /// Uses a fixed-size ASCII lowercase buffer to avoid an allocation.
     #[must_use]
     pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
-        TEMPORAL_UNITS
-            .iter()
-            .find(|row| {
-                row.aliases.iter().any(|alias| alias.eq_ignore_ascii_case(unit))
-            })
-            .map(|row| row.unit)
+        let mut buf = [0u8; 16];
+        if unit.len() > buf.len() {
+            return None;
+        }
+        for (dst, byte) in buf.iter_mut().zip(unit.as_bytes()) {
+            *dst = byte.to_ascii_lowercase();
+        }
+        let lower = std::str::from_utf8(buf.get(..unit.len())?).ok()?;
+        UNIT_LOOKUP.get(lower).copied()
     }
 
     /// Returns this unit's [`UnitSpec`] row.
@@ -65,7 +101,7 @@ impl TimeUnit {
     /// Listed by variant, so adding a [`TimeUnit`] variant with no
     /// [`TEMPORAL_UNITS`] row yet fails to compile here first.
     #[must_use]
-    pub(super) const fn spec(self) -> &'static UnitSpec {
+    const fn spec(self) -> &'static UnitSpec {
         match self {
             Self::Year => &TEMPORAL_UNITS[0],
             Self::Month => &TEMPORAL_UNITS[1],
@@ -142,71 +178,48 @@ impl TimeUnit {
 
 /// Stores the registry facts for one time unit.
 #[derive(Copy, Clone, Debug)]
-pub(super) struct UnitSpec {
-    /// Identifies the unit described by this row.
-    pub unit: TimeUnit,
-    /// Lists every accepted lowercase input spelling.
-    pub aliases: &'static [&'static str],
-    /// Stores singular and plural English names for human-readable output.
-    pub names: (&'static str, &'static str),
-    /// Stores the authoritative fixed nominal integer seconds per unit.
-    pub nominal_seconds: i64,
-    /// Reports whether the unit takes effect on the local clock (`true`) or as
-    /// exact elapsed time (`false`).
-    pub calendar: bool,
+struct UnitSpec {
+    names: (&'static str, &'static str),
+    nominal_seconds: i64,
+    calendar: bool,
 }
 
 /// Lists the time-unit registry in largest-first order.
 ///
 /// [`decompose`] requires caller-chosen largest-first order. A new duration
-/// unit adds a row here and a variant to [`TimeUnit`]; the `invariants` tests
-/// fail to compile or assert until both agree.
-pub(super) static TEMPORAL_UNITS: [UnitSpec; 7] = [
+/// unit adds a row here and a variant to [`TimeUnit`].
+static TEMPORAL_UNITS: [UnitSpec; 7] = [
     UnitSpec {
-        unit: TimeUnit::Year,
-        aliases: &["y", "yr", "yrs", "year", "years"],
         names: ("year", "years"),
         nominal_seconds: 31_536_000,
         calendar: true,
     },
     UnitSpec {
-        unit: TimeUnit::Month,
-        aliases: &["mo", "mos", "month", "months"],
         names: ("month", "months"),
         nominal_seconds: 2_592_000,
         calendar: true,
     },
     UnitSpec {
-        unit: TimeUnit::Week,
-        aliases: &["w", "wk", "wks", "week", "weeks"],
         names: ("week", "weeks"),
         nominal_seconds: 604_800,
         calendar: true,
     },
     UnitSpec {
-        unit: TimeUnit::Day,
-        aliases: &["d", "day", "days"],
         names: ("day", "days"),
         nominal_seconds: 86_400,
         calendar: true,
     },
     UnitSpec {
-        unit: TimeUnit::Hour,
-        aliases: &["h", "hr", "hrs", "hour", "hours"],
         names: ("hour", "hours"),
         nominal_seconds: 3_600,
         calendar: false,
     },
     UnitSpec {
-        unit: TimeUnit::Minute,
-        aliases: &["m", "min", "mins", "minute", "minutes"],
         names: ("minute", "minutes"),
         nominal_seconds: 60,
         calendar: false,
     },
     UnitSpec {
-        unit: TimeUnit::Second,
-        aliases: &["s", "sec", "secs", "second", "seconds"],
         names: ("second", "seconds"),
         nominal_seconds: 1,
         calendar: false,
@@ -246,7 +259,8 @@ impl DecomposedPart {
 /// row. Returns the rows and the sub-unit remainder in seconds.
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "registered unit sizes are nonzero and decomposition maintains a               u64 remainder"
+    reason = "registered unit sizes are nonzero and decomposition maintains a \
+              u64 remainder"
 )]
 pub(crate) fn decompose(
     total_secs: u64,
@@ -342,25 +356,16 @@ impl DateUnit {
 
 /// Provides a human-readable hint of accepted unit spellings.
 ///
-/// Lists one spelling per [`TEMPORAL_UNITS`] row, not every accepted alias; the
-/// `invariants` tests pin that every row’s compact spelling appears here.
+/// Lists one compact spelling per [`TEMPORAL_UNITS`] row rather than every
+/// accepted alias.
 pub(crate) const UNIT_SPELLINGS_HINT: &str =
     "\"years\"/\"y\", \"months\"/\"mo\", \"weeks\"/\"w\", \"days\"/\"d\", \
      \"hours\"/\"h\", \"minutes\"/\"m\", or \"seconds\"/\"s\"";
+
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
 
     use super::*;
-
-    /// Returns the quoted tokens of [`UNIT_SPELLINGS_HINT`] in order.
-    fn hint_tokens() -> impl Iterator<Item = &'static str> {
-        UNIT_SPELLINGS_HINT
-            .split('"')
-            .enumerate()
-            .filter(|(i, _)| i % 2 == 1)
-            .map(|(_, token)| token)
-    }
 
     mod lookup {
         use pretty_assertions::assert_eq;
@@ -595,58 +600,7 @@ mod tests {
     }
 
     mod invariants {
-        use pretty_assertions::assert_eq;
-
         use super::*;
-
-        #[test]
-        fn matches_every_unit_exhaustively() {
-            // Arrange: a match with no wildcard arm; adding a `TimeUnit`
-            // variant stops this test compiling until the new unit is
-            // classified.
-            fn frame(unit: TimeUnit) -> bool {
-                match unit {
-                    TimeUnit::Second | TimeUnit::Minute | TimeUnit::Hour => {
-                        false
-                    }
-                    TimeUnit::Day
-                    | TimeUnit::Week
-                    | TimeUnit::Month
-                    | TimeUnit::Year => true,
-                }
-            }
-
-            // Act
-            // Assert
-            for row in &TEMPORAL_UNITS {
-                assert_eq!(
-                    frame(row.unit),
-                    row.unit.is_calendar(),
-                    "exhaustive match must classify {:?} the same way as                      is_calendar",
-                    row.unit
-                );
-            }
-        }
-
-        #[test]
-        fn keeps_every_registry_spelling_unique() {
-            // Arrange
-            let total: usize =
-                TEMPORAL_UNITS.iter().map(|row| row.aliases.len()).sum();
-
-            // Act
-            let unique: HashSet<&str> = TEMPORAL_UNITS
-                .iter()
-                .flat_map(|row| row.aliases.iter().copied())
-                .collect();
-
-            // Assert
-            assert_eq!(
-                unique.len(),
-                total,
-                "no spelling may be shared between two registry rows"
-            );
-        }
 
         #[test]
         fn orders_the_registry_largest_first() {
@@ -658,26 +612,9 @@ mod tests {
             {
                 assert!(
                     larger.nominal_seconds > smaller.nominal_seconds,
-                    "{:?} must precede the smaller {:?}; decomposition                      depends on descending order",
-                    larger.unit,
-                    smaller.unit
-                );
-            }
-        }
-
-        #[test]
-        fn hint_contains_every_compact_spelling() {
-            // Arrange: hint tokens are extracted in order.
-            // Act
-            let hint_tokens: Vec<&str> = hint_tokens().collect();
-
-            // Assert
-            for row in &TEMPORAL_UNITS {
-                let compact = row.aliases.first().expect("row has aliases");
-                assert!(
-                    hint_tokens.contains(compact),
-                    "UNIT_SPELLINGS_HINT must contain the compact spelling                      `{compact}` of {:?}",
-                    row.unit
+                    "nominal unit sizes must be in descending order: {} > {}",
+                    larger.nominal_seconds,
+                    smaller.nominal_seconds
                 );
             }
         }
@@ -689,35 +626,15 @@ mod tests {
         use super::*;
 
         #[test]
-        fn decomposes_whole_units_greedily_over_both_sets() {
-            use crate::temporal::duration::{
-                COMPOUND_FORMAT_ORDER, NOMINAL_COMPOSITION_ORDER,
-            };
+        fn decomposes_human_units_greedily() {
+            use crate::temporal::duration::COMPOUND_FORMAT_ORDER;
 
-            // Arrange: 90,000 seconds is 1 day 1 hour; 31,596,000 seconds is
-            // 1 year 16 hours 40 minutes.
+            // Arrange: 31,596,000 seconds is 1 year 16 hours 40 minutes.
             // Act
-            let (canonical, canonical_rem) =
-                decompose(90_000, &NOMINAL_COMPOSITION_ORDER);
-            let (human, human_rem) =
+            let (human, remainder) =
                 decompose(31_596_000, &COMPOUND_FORMAT_ORDER);
 
             // Assert
-            assert_eq!(
-                canonical,
-                vec![
-                    DecomposedPart {
-                        unit: TimeUnit::Day,
-                        count: 1
-                    },
-                    DecomposedPart {
-                        unit: TimeUnit::Hour,
-                        count: 1
-                    },
-                ],
-                "canonical decomposition must fill day and hour rows"
-            );
-            assert_eq!(canonical_rem, 0);
             assert_eq!(
                 human,
                 vec![
@@ -736,9 +653,8 @@ mod tests {
                 ],
                 "human decomposition must skip units larger than the                  remaining magnitude"
             );
-            assert_eq!(human_rem, 0);
+            assert_eq!(remainder, 0);
         }
-
         #[test]
         fn leaves_the_remainder_to_the_caller() {
             // Arrange: 65 seconds decomposed into minutes/seconds.

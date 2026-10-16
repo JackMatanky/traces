@@ -10,7 +10,6 @@
 use jiff::{Span, Timestamp, civil, tz::TimeZone};
 use logos::Logos;
 
-pub(super) use super::date::DatePrecision;
 use super::{
     CalendarError, CalendarPeriod, DEFAULT_DATE_PATTERN, DateError,
     DateTimeValue, DateUnit, DateValue, DurationValue, PeriodEdge, TimeUnit,
@@ -22,6 +21,15 @@ use super::{
     },
     zone::local_zone,
 };
+
+/// Tracks whether a zone-free date point uses month or full-date precision.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DatePrecision {
+    /// Specifies year and month precision.
+    Month,
+    /// Specifies full calendar date precision.
+    Day,
+}
 
 /// Represents a date at its written precision or a Date-Time.
 ///
@@ -44,14 +52,26 @@ pub(crate) enum DatePoint {
 }
 
 impl DatePoint {
+    pub(super) fn from_date_shape(date: civil::Date, shape: DateShape) -> Self {
+        let date_precision = match shape {
+            DateShape::YearMonthDay => DatePrecision::Day,
+            DateShape::YearMonth => DatePrecision::Month,
+        };
+        Self::Calendar {
+            date: DateValue::from_civil_date(date),
+            date_precision,
+        }
+    }
+
     /// Parses a date or date-time shape, retaining date precision.
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if the input does not begin with two or
-    ///   four ASCII digits followed by `-`, or if no accepted shape matches.
-    /// - [`DateError::YearNotFourDigits`] if it starts that way but the year is
-    ///   not four ASCII digits.
+    /// - [`DateError::InvalidValue`] if the input does not begin with an
+    ///   unsigned two- or four-digit year, or a signed four-digit year,
+    ///   followed by `-`, or if no accepted shape matches.
+    /// - [`DateError::YearNotFourDigits`] if an unsigned two-digit year prefix
+    ///   matches but does not contain four ASCII digits.
     /// - [`DateError::LocalZoneLookup`] if a naive date-time cannot be resolved
     ///   in the local zone.
     pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
@@ -67,12 +87,9 @@ impl DatePoint {
                 input: trimmed.into(),
             });
         }
-        if trimmed.len() <= 10 {
+        if trimmed.len() <= 11 {
             return DateShape::parse_any(trimmed)
-                .map(|(date, date_precision)| Self::Calendar {
-                    date: DateValue::from_civil_date(date),
-                    date_precision,
-                })
+                .map(|(date, shape)| Self::from_date_shape(date, shape))
                 .map_err(|reason| DateError::InvalidValue {
                     input: trimmed.into(),
                     reason,
@@ -103,10 +120,7 @@ impl DatePoint {
         }
 
         match DateShape::parse_any(trimmed) {
-            Ok((date, date_precision)) => Ok(Self::Calendar {
-                date: DateValue::from_civil_date(date),
-                date_precision,
-            }),
+            Ok((date, shape)) => Ok(Self::from_date_shape(date, shape)),
             Err(date_err) => {
                 let reason = if matches!(
                     trimmed.as_bytes().get(10),
@@ -147,27 +161,12 @@ impl DatePoint {
     ) -> Result<Self, DateError> {
         let trimmed_text = text.trim();
         let trimmed_pattern = pattern.trim();
-        let has_time_fields = pattern_has_time_fields(trimmed_pattern)
-            .ok_or_else(|| DateError::InvalidValue {
+        let fields = pattern_fields(trimmed_pattern).ok_or_else(|| {
+            DateError::InvalidValue {
                 input: trimmed_text.into(),
                 reason: "bad format pattern",
-            })?;
-        if let Ok(timestamp) =
-            Timestamp::strptime(trimmed_pattern, trimmed_text)
-        {
-            return Ok(Self::DateTime(
-                DateTimeInput::Absolute(timestamp).resolve(trimmed_text)?,
-            ));
-        }
-        if has_time_fields
-            && let Ok(local_datetime) =
-                civil::DateTime::strptime(trimmed_pattern, trimmed_text)
-        {
-            return Ok(Self::DateTime(
-                DateTimeInput::LocalClock(local_datetime)
-                    .resolve(trimmed_text)?,
-            ));
-        }
+            }
+        })?;
         if trimmed_pattern == "%Y-%m"
             && let Ok(
                 date_point @ Self::Calendar {
@@ -178,19 +177,7 @@ impl DatePoint {
         {
             return Ok(date_point);
         }
-        let date = civil::Date::strptime(trimmed_pattern, trimmed_text)
-            .map_err(|source| DateError::InvalidValue {
-                input: trimmed_text.into(),
-                reason: if source.is_range() {
-                    "a field is out of range"
-                } else {
-                    "invalid input"
-                },
-            })?;
-        Ok(Self::Calendar {
-            date: DateValue::from_civil_date(date),
-            date_precision: DatePrecision::Day,
-        })
+        parse_pattern_value(trimmed_text, trimmed_pattern, fields)
     }
 
     /// Returns the calendar date of this date point in the supplied zone.
@@ -638,12 +625,25 @@ impl DifferenceEngine {
     }
 }
 
-/// Returns whether a strtime `pattern` includes any time-of-day directives.
+/// Selects how a parsed pattern becomes a date point.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum PatternKind {
+    Calendar,
+    LocalClock,
+    OffsetDateTime,
+    Timestamp,
+}
+
+/// Scans policy-relevant fields while Jiff owns parsing and validation.
 ///
 /// Returns [`None`] if the pattern contains an unsupported `%Q` directive.
-fn pattern_has_time_fields(pattern: &str) -> Option<bool> {
+const PATTERN_CLOCK: u8 = 1;
+const PATTERN_TIMESTAMP: u8 = 2;
+const PATTERN_OFFSET: u8 = 4;
+
+fn pattern_fields(pattern: &str) -> Option<PatternKind> {
     let mut characters = pattern.chars().peekable();
-    let mut has_time_fields = false;
+    let mut fields = 0;
     while let Some(character) = characters.next() {
         if character != '%' {
             continue;
@@ -658,7 +658,7 @@ fn pattern_has_time_fields(pattern: &str) -> Option<bool> {
             || directive.is_ascii_digit()
         {
             let Some(next) = characters.next() else {
-                return Some(has_time_fields);
+                return Some(pattern_kind(fields));
             };
             directive = next;
         }
@@ -674,29 +674,101 @@ fn pattern_has_time_fields(pattern: &str) -> Option<bool> {
         if directive == 'Q' {
             return None;
         }
-        if matches!(
-            directive,
-            'H' | 'I'
-                | 'k'
-                | 'l'
-                | 'M'
-                | 'S'
-                | 'f'
-                | 'T'
-                | 'R'
-                | 'r'
-                | 'X'
-                | 'c'
-                | 'p'
-                | 's'
-                | 'Z'
-                | 'z'
-                | '+'
-        ) {
-            has_time_fields = true;
+        match directive {
+            'H' | 'I' | 'k' | 'l' | 'M' | 'S' | 'f' | 'T' | 'R' | 'r' | 'X'
+            | 'c' | 'p' => fields |= PATTERN_CLOCK,
+            's' => fields |= PATTERN_TIMESTAMP,
+            'Z' | 'z' => fields |= PATTERN_OFFSET,
+            '+' => fields |= PATTERN_CLOCK | PATTERN_OFFSET,
+            _ => {}
         }
     }
-    Some(has_time_fields)
+    Some(pattern_kind(fields))
+}
+
+fn pattern_kind(fields: u8) -> PatternKind {
+    if fields & PATTERN_TIMESTAMP != 0 {
+        PatternKind::Timestamp
+    } else if fields & (PATTERN_CLOCK | PATTERN_OFFSET)
+        == (PATTERN_CLOCK | PATTERN_OFFSET)
+    {
+        PatternKind::OffsetDateTime
+    } else if fields & PATTERN_CLOCK != 0 {
+        PatternKind::LocalClock
+    } else {
+        PatternKind::Calendar
+    }
+}
+
+fn parse_pattern_value(
+    text: &str,
+    pattern: &str,
+    kind: PatternKind,
+) -> Result<DatePoint, DateError> {
+    let broken = parse_pattern_fields(text, pattern)?;
+    match kind {
+        PatternKind::Timestamp => broken
+            .to_timestamp()
+            .map(|timestamp| {
+                DatePoint::DateTime(DateTimeValue::from_timestamp(timestamp))
+            })
+            .map_err(|source| pattern_value_error(text, &source)),
+        PatternKind::OffsetDateTime => {
+            if let Ok(timestamp) = broken.to_timestamp() {
+                return Ok(DatePoint::DateTime(DateTimeValue::from_timestamp(
+                    timestamp,
+                )));
+            }
+            parse_local_pattern_value(text, pattern)
+        }
+        PatternKind::LocalClock => broken
+            .to_datetime()
+            .map_err(|source| pattern_value_error(text, &source))
+            .and_then(|datetime| {
+                DateTimeInput::LocalClock(datetime)
+                    .resolve(text)
+                    .map(DatePoint::DateTime)
+            }),
+        PatternKind::Calendar => broken
+            .to_date()
+            .map(|date| {
+                DatePoint::from_date_shape(date, DateShape::YearMonthDay)
+            })
+            .map_err(|source| pattern_value_error(text, &source)),
+    }
+}
+
+fn parse_local_pattern_value(
+    text: &str,
+    pattern: &str,
+) -> Result<DatePoint, DateError> {
+    parse_pattern_fields(text, pattern)?
+        .to_datetime()
+        .map_err(|source| pattern_value_error(text, &source))
+        .and_then(|datetime| {
+            DateTimeInput::LocalClock(datetime)
+                .resolve(text)
+                .map(DatePoint::DateTime)
+        })
+}
+
+fn parse_pattern_fields(
+    text: &str,
+    pattern: &str,
+) -> Result<jiff::fmt::strtime::BrokenDownTime, DateError> {
+    jiff::fmt::strtime::BrokenDownTime::parse(pattern, text)
+        .map_err(|source| pattern_value_error(text, &source))
+}
+
+fn pattern_value_error(text: &str, source: &jiff::Error) -> DateError {
+    DateError::InvalidValue {
+        input: text.into(),
+        reason: if source.is_range() {
+            "a field is out of range"
+        } else {
+            "invalid input"
+        },
+    }
 }
 
 /// Resolves the process-local time zone for calendar operations.
@@ -733,6 +805,22 @@ mod tests {
         #[rstest]
         #[case::day("2026-07-29", DatePrecision::Day, ymd(2026, 7, 29))]
         #[case::month("2026-07", DatePrecision::Month, ymd(2026, 7, 1))]
+        #[case::negative_year_day(
+            "-2026-07-29",
+            DatePrecision::Day,
+            ymd(-2026, 7, 29)
+        )]
+        #[case::negative_year_month(
+            "-2026-07",
+            DatePrecision::Month,
+            ymd(-2026, 7, 1)
+        )]
+        #[case::minimum_year("-9999-01-01", DatePrecision::Day, ymd(-9999, 1, 1))]
+        #[case::maximum_year(
+            "9999-12-31",
+            DatePrecision::Day,
+            ymd(9999, 12, 31)
+        )]
         fn parses_a_date_shape_to_a_calendar_point(
             #[case] text: &str,
             #[case] expected_precision: DatePrecision,
@@ -834,8 +922,8 @@ mod tests {
         #[case::blank("  ")]
         #[case::year_only("2026")]
         #[case::non_digit_year("abcd-01-01")]
-        #[case::slashes("2026/08/22")]
         #[case::five_digit_year("20265-01-01")]
+        #[case::signed_five_digit_year("-10000-01-01")]
         fn rejects_text_without_a_date_shape(#[case] text: &str) {
             // Arrange: `text` lacks the two-or-four-digit year and dash prefix
             // that marks a date-like shape.
@@ -1064,6 +1152,16 @@ mod tests {
         }
 
         #[rstest]
+        #[case::offset_datetime(
+            "2026-07-29 14:30:00 -04:00",
+            "%Y-%m-%d %H:%M:%S %:z",
+            "2026-07-29T18:30:00Z"
+        )]
+        #[case::timestamp_takes_precedence_over_conflicting_fields(
+            "2026-07-29 14:30:00 0",
+            "%Y-%m-%d %H:%M:%S %s",
+            "1970-01-01T00:00:00Z"
+        )]
         #[case::seconds(
             "2026-07-29 14:30:00",
             "%Y-%m-%d %H:%M:%S",

@@ -40,7 +40,8 @@ mod unit;
 mod zone;
 
 pub(crate) use calendar::{
-    CALENDAR_PERIOD_EDGES, CalendarPeriod, PeriodEdge, weekday_from_number,
+    CalendarPeriod, PERIOD_EDGE_LOOKUP, PeriodEdge, resolve_period_edge,
+    weekday_from_number,
 };
 pub(crate) use date::DEFAULT_DATE_PATTERN;
 pub use date::DateValue;

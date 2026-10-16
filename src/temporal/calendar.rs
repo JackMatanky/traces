@@ -31,9 +31,6 @@ pub(crate) enum CalendarPeriod {
 
 impl CalendarPeriod {
     /// Computes the boundary date of this calendar period for a given date.
-    ///
-    ///
-    ///   represented.
     #[must_use]
     pub(super) fn snap_date(
         self,
@@ -79,27 +76,41 @@ pub(crate) enum PeriodEdge {
     End,
 }
 
-/// Lists every accepted period-boundary shorthand in its short and long
-/// spellings.
-///
-/// Shared by query-filter name resolution and template-filter registration,
-/// preventing the two surfaces from drifting. Names are matched
-/// ASCII-case-insensitively and are unique.
-pub(crate) const CALENDAR_PERIOD_EDGES: [(&str, CalendarPeriod, PeriodEdge);
-    12] = [
-    ("sow", CalendarPeriod::Week, PeriodEdge::Start),
-    ("start_of_week", CalendarPeriod::Week, PeriodEdge::Start),
-    ("eow", CalendarPeriod::Week, PeriodEdge::End),
-    ("end_of_week", CalendarPeriod::Week, PeriodEdge::End),
-    ("som", CalendarPeriod::Month, PeriodEdge::Start),
-    ("start_of_month", CalendarPeriod::Month, PeriodEdge::Start),
-    ("eom", CalendarPeriod::Month, PeriodEdge::End),
-    ("end_of_month", CalendarPeriod::Month, PeriodEdge::End),
-    ("soy", CalendarPeriod::Year, PeriodEdge::Start),
-    ("start_of_year", CalendarPeriod::Year, PeriodEdge::Start),
-    ("eoy", CalendarPeriod::Year, PeriodEdge::End),
-    ("end_of_year", CalendarPeriod::Year, PeriodEdge::End),
-];
+/// Maps accepted period-boundary shorthands to periods and edges.
+pub(crate) static PERIOD_EDGE_LOOKUP: phf::Map<
+    &'static str,
+    (CalendarPeriod, PeriodEdge),
+> = phf::phf_map! {
+    "sow" => (CalendarPeriod::Week, PeriodEdge::Start),
+    "start_of_week" => (CalendarPeriod::Week, PeriodEdge::Start),
+    "eow" => (CalendarPeriod::Week, PeriodEdge::End),
+    "end_of_week" => (CalendarPeriod::Week, PeriodEdge::End),
+    "som" => (CalendarPeriod::Month, PeriodEdge::Start),
+    "start_of_month" => (CalendarPeriod::Month, PeriodEdge::Start),
+    "eom" => (CalendarPeriod::Month, PeriodEdge::End),
+    "end_of_month" => (CalendarPeriod::Month, PeriodEdge::End),
+    "soy" => (CalendarPeriod::Year, PeriodEdge::Start),
+    "start_of_year" => (CalendarPeriod::Year, PeriodEdge::Start),
+    "eoy" => (CalendarPeriod::Year, PeriodEdge::End),
+    "end_of_year" => (CalendarPeriod::Year, PeriodEdge::End),
+};
+
+/// Resolves a period boundary shorthand name ASCII-case-insensitively.
+#[must_use]
+#[inline]
+pub(crate) fn resolve_period_edge(
+    name: &str,
+) -> Option<(CalendarPeriod, PeriodEdge)> {
+    let mut buf = [0u8; 16];
+    if name.len() > buf.len() {
+        return None;
+    }
+    for (dst, byte) in buf.iter_mut().zip(name.as_bytes()) {
+        *dst = byte.to_ascii_lowercase();
+    }
+    let lower = std::str::from_utf8(buf.get(..name.len())?).ok()?;
+    PERIOD_EDGE_LOOKUP.get(lower).copied()
+}
 
 /// Maps an ISO weekday number to its [`civil::Weekday`].
 ///
@@ -118,8 +129,6 @@ mod tests {
     use super::*;
 
     mod period_edges {
-        use std::collections::HashSet;
-
         use pretty_assertions::assert_eq;
         use rstest::rstest;
 
@@ -131,28 +140,9 @@ mod tests {
             // Act
             // Assert
             assert_eq!(
-                CALENDAR_PERIOD_EDGES.len(),
+                PERIOD_EDGE_LOOKUP.len(),
                 12,
                 "three periods by two edges by short and long spelling"
-            );
-        }
-
-        #[test]
-        fn keeps_every_name_unique() {
-            // Arrange
-            let total = CALENDAR_PERIOD_EDGES.len();
-
-            // Act
-            let unique: HashSet<&str> = CALENDAR_PERIOD_EDGES
-                .iter()
-                .map(|&(name, _, _)| name)
-                .collect();
-
-            // Assert
-            assert_eq!(
-                unique.len(),
-                total,
-                "no shorthand name may resolve to two (period, edge) rows"
             );
         }
 
@@ -200,12 +190,7 @@ mod tests {
         ) {
             // Arrange: the expected row is declared in the case.
             // Act
-            let actual = CALENDAR_PERIOD_EDGES
-                .iter()
-                .find(|&&(candidate, _, _)| {
-                    candidate.eq_ignore_ascii_case(name)
-                })
-                .map(|&(_, period, edge)| (period, edge));
+            let actual = resolve_period_edge(name);
             // Assert
             assert_eq!(
                 actual,
@@ -232,10 +217,10 @@ mod tests {
         ) {
             // Arrange: the rows of one period are the arranged input.
             // Act
-            let mut names: Vec<&str> = CALENDAR_PERIOD_EDGES
-                .iter()
-                .filter(|&&(_, p, _)| p == period)
-                .map(|&(name, _, _)| name)
+            let mut names: Vec<&str> = PERIOD_EDGE_LOOKUP
+                .entries()
+                .filter(|&(_, &(p, _))| p == period)
+                .map(|(name, _)| *name)
                 .collect();
             names.sort_unstable();
 

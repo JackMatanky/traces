@@ -93,8 +93,10 @@ impl DateNamespace {
         env.add_filter("sub_months", sub_months);
         env.add_filter("add_years", add_years);
         env.add_filter("sub_years", sub_years);
-        for &(name, period, edge) in &crate::temporal::CALENDAR_PERIOD_EDGES {
-            env.add_filter(name, move |value: &str| {
+        for (name, &(period, edge)) in
+            crate::temporal::PERIOD_EDGE_LOOKUP.entries()
+        {
+            env.add_filter(*name, move |value: &str| {
                 render_period_edge(value, period, edge)
             });
         }
@@ -644,7 +646,7 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 /// original precision.
 ///
 /// Backs every name in
-/// [`CALENDAR_PERIOD_EDGES`](crate::temporal::CALENDAR_PERIOD_EDGES): the
+/// [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP): the
 /// `start_of_week`/`sow` filter returns the first day (Monday) of the ISO
 /// week, `end_of_week`/`eow` the last (Sunday), and the month and year
 /// spellings behave the same on their period.

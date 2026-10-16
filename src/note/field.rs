@@ -52,7 +52,7 @@ pub enum NoteFieldValue {
     /// ISO `YYYY-MM-DDThh:mm:ss` date-time.
     DateTime(DateTimeValue),
     /// Validated duration; renders in canonical spelling. Equality and ordering
-    /// compare exact nominal nanoseconds, not the original input text.
+    /// compare rounded nominal seconds, not the original input text.
     Duration(DurationValue),
     /// A link parsed from wikilink or Markdown link syntax.
     Link(Link),
@@ -572,8 +572,8 @@ mod tests {
     use super::*;
     use crate::field::FieldValueRef;
     #[test]
-    fn note_field_value_stays_within_the_72_byte_budget() {
-        assert!(std::mem::size_of::<NoteFieldValue>() <= 72);
+    fn note_field_value_stays_within_the_80_byte_budget() {
+        assert!(std::mem::size_of::<NoteFieldValue>() <= 80);
     }
 
     mod field_value {

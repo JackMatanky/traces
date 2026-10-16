@@ -216,15 +216,6 @@ impl<'de> Deserialize<'de> for DateValue {
     }
 }
 
-/// Tracks whether a zone-free date point uses month or full-date precision.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DatePrecision {
-    /// Specifies year and month precision.
-    Month,
-    /// Specifies full calendar date precision.
-    Day,
-}
-
 /// Defines the recognized date input shapes, tried in order by
 /// [`DateShape::parse_any`] for [`DatePoint::parse`](super::DatePoint::parse)
 /// and [`DateValue::parse_iso`].
@@ -245,35 +236,33 @@ impl DateShape {
     /// reason for 7-byte input (`YYYY-MM`), or the full-date reason otherwise.
     pub(crate) fn parse_any(
         s: &str,
-    ) -> Result<(civil::Date, DatePrecision), &'static str> {
-        Self::YearMonthDay.parse_precision(s).or_else(|day_reason| {
-            Self::YearMonth.parse_precision(s).map_err(|month_reason| {
-                if s.len() == 7 {
-                    month_reason
-                } else {
-                    day_reason
-                }
+    ) -> Result<(civil::Date, Self), &'static str> {
+        Self::YearMonthDay
+            .parse_date(s)
+            .map(|date| (date, Self::YearMonthDay))
+            .or_else(|day_reason| {
+                Self::YearMonth
+                    .parse_date(s)
+                    .map(|date| (date, Self::YearMonth))
+                    .map_err(|month_reason| {
+                        if s.len() == 7 {
+                            month_reason
+                        } else {
+                            day_reason
+                        }
+                    })
             })
-        })
     }
 
-    /// Parses `s` according to this shape, returning the date and precision.
+    /// Parses `s` according to this shape.
     ///
     /// # Errors
     ///
     /// Returns a static reason if `s` does not match this shape.
-    fn parse_precision(
-        self,
-        s: &str,
-    ) -> Result<(civil::Date, DatePrecision), &'static str> {
+    fn parse_date(self, s: &str) -> Result<civil::Date, &'static str> {
         match self {
-            Self::YearMonthDay => {
-                let date = Self::parse_year_month_day(s)?;
-                Ok((date, DatePrecision::Day))
-            }
-            Self::YearMonth => {
-                Self::parse_year_month(s).map(|d| (d, DatePrecision::Month))
-            }
+            Self::YearMonthDay => Self::parse_year_month_day(s),
+            Self::YearMonth => Self::parse_year_month(s),
         }
     }
 
@@ -284,7 +273,8 @@ impl DateShape {
     /// Returns a static reason if `s` is not a valid full date string.
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "year length is 4 or 5 bytes"
+        reason = "the input has exactly four year digits and a fixed \
+                  separator shape"
     )]
     fn parse_year_month_day(s: &str) -> Result<civil::Date, &'static str> {
         let year_len = if s.starts_with('-') {
@@ -299,7 +289,29 @@ impl DateShape {
         if s.len() > date_len && has_padded_date_prefix(s) {
             return Err("unexpected trailing input");
         }
-        if s.len() != date_len || !has_padded_date_prefix(s) {
+        if s.len() != date_len {
+            return Err("invalid input");
+        }
+        if year_len == 4 {
+            let date = speedate::Date::parse_bytes_rfc3339(s.as_bytes())
+                .map_err(|error| match error {
+                    speedate::ParseError::OutOfRangeMonth
+                    | speedate::ParseError::OutOfRangeDay => {
+                        "a field is out of range"
+                    }
+                    _ => "invalid input",
+                })?;
+            return civil::Date::new(
+                i16::try_from(date.year)
+                    .map_err(|_| "a field is out of range")?,
+                i8::try_from(date.month)
+                    .map_err(|_| "a field is out of range")?,
+                i8::try_from(date.day)
+                    .map_err(|_| "a field is out of range")?,
+            )
+            .map_err(|_| "a field is out of range");
+        }
+        if !has_padded_date_prefix(s) {
             return Err("invalid input");
         }
         let year = s.get(..year_len).ok_or("invalid input")?;
@@ -540,6 +552,37 @@ mod tests {
                 result,
                 Ok(ymd(2026, 7, 29)),
                 "`2026-07-29` must parse to its calendar day"
+            );
+        }
+
+        #[rstest]
+        #[case::leap_day("2024-02-29", 2024, 2, 29)]
+        #[case::year_zero("0000-02-29", 0, 2, 29)]
+        #[case::negative_year("-2024-02-29", -2024, 2, 29)]
+        fn parses_supported_full_date_years(
+            #[case] input: &str,
+            #[case] year: i32,
+            #[case] month: u32,
+            #[case] day: u32,
+        ) {
+            assert_eq!(input.parse::<DateValue>(), Ok(ymd(year, month, day)));
+        }
+
+        #[rstest]
+        #[case::non_leap_day("2026-02-29", "a field is out of range")]
+        #[case::month_outside_range("2026-13-01", "a field is out of range")]
+        #[case::day_zero("2026-01-00", "a field is out of range")]
+        #[case::non_digit_day("2026-07-2x", "invalid input")]
+        fn rejects_hostile_full_dates_with_existing_reason(
+            #[case] input: &str,
+            #[case] reason: &'static str,
+        ) {
+            assert_eq!(
+                input.parse::<DateValue>(),
+                Err(DateError::InvalidValue {
+                    input: input.into(),
+                    reason,
+                })
             );
         }
 

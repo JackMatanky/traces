@@ -8,13 +8,22 @@
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
 
-use jiff::{SignedDuration, Span, Timestamp, civil, tz::TimeZone};
+use jiff::{
+    SignedDuration, Span, Timestamp, civil, fmt::temporal::DateTimeParser,
+    tz::TimeZone,
+};
+use logos::Logos;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    CalendarError, DateValue, TimeUnit, date::has_padded_date_prefix,
-    error::DateError, lexer::starts_with_year, zone::local_zone,
+    CalendarError, DateValue, TimeUnit,
+    date::has_padded_date_prefix,
+    error::DateError,
+    lexer::{TemporalShapeToken, starts_with_year},
+    zone::local_zone,
 };
+
+static DATETIME_PARSER: DateTimeParser = DateTimeParser::new();
 
 /// Defines the canonical display format for [`DateTimeValue`]:
 /// `2026-07-29T14:30:00`.
@@ -132,28 +141,24 @@ impl DateTimeValue {
         local_datetime: civil::DateTime,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
-        local_datetime
-            .to_zoned(zone.clone())
-            .map(|zoned| Self(zoned.timestamp()))
+        zone.to_timestamp(local_datetime)
+            .map(Self)
             .map_err(|_| CalendarError::OutOfRange)
     }
 
-    /// Parses an RFC 3339 or ISO-8601 date-time string using
-    /// [`DateTimeShape::ALL`].
+    /// Parses an RFC 3339 or ISO-8601 date-time string with Jiff's Temporal
+    /// parser after applying the accepted application grammar.
     ///
-    /// Surrounding whitespace is ignored. The cascade matches shapes only: a
-    /// matched naive input then resolves through [`DateTimeValue::from_local`]
-    /// (an explicit-offset input already carries an offset and stores
-    /// directly). Resolution runs once after the cascade, because a resolution
-    /// failure must not retry later formats.
+    /// Surrounding whitespace is ignored. Accepted whitespace runs between
+    /// date and time normalize to one separator before parsing.
     ///
     /// # Errors
     ///
     /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
     ///   digits.
     /// - [`DateError::InvalidValue`] if no accepted shape matches.
-    /// - [`DateError::LocalZoneLookup`] if local zone lookup fails while
-    ///   resolving a naive input.
+    /// - [`DateError::LocalZoneLookup`] if local-zone lookup fails while
+    ///   resolving naive input.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_with_year(trimmed) {
@@ -191,7 +196,7 @@ impl DateTimeValue {
     #[inline]
     #[must_use]
     pub(crate) fn local_datetime_in(self, zone: &TimeZone) -> civil::DateTime {
-        self.0.to_zoned(zone.clone()).datetime()
+        zone.to_datetime(self.0)
     }
 
     /// Returns the local clock time of this date-time.
@@ -381,61 +386,100 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     }
 }
 
-/// Defines recognized date-time input shapes, tried in order by
-/// [`DateTimeValue::parse_iso`].
+/// Identifies the accepted date-time shape before local-zone resolution.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum DateTimeShape {
     /// RFC 3339 format with offset: `2026-07-29T14:30:00Z`.
     Rfc3339,
-    /// `T`-separated seconds, optionally fractional: `2026-07-29T14:30:00.123`.
+    /// `T`-separated seconds, optionally fractional.
     LocalTSeconds,
-    /// `T`-separated minute-only precision: `2026-07-29T14:30`.
+    /// `T`-separated minute-only precision.
     LocalTMinutes,
-    /// Space-separated seconds, optionally fractional: `2026-07-29
-    /// 14:30:00.123`.
+    /// Space-separated seconds, optionally fractional.
     LocalSpaceSeconds,
-    /// Space-separated minute-only precision: `2026-07-29 14:30`.
+    /// Space-separated minute-only precision.
     LocalSpaceMinutes,
 }
 
 impl DateTimeShape {
-    /// Formats tried in order by [`DateTimeValue::parse_iso`] (most
-    /// specific/unambiguous first).
-    pub(crate) const ALL: [Self; 5] = [
-        Self::Rfc3339,
-        Self::LocalTSeconds,
-        Self::LocalTMinutes,
-        Self::LocalSpaceSeconds,
-        Self::LocalSpaceMinutes,
-    ];
-
-    /// Parses `s` as the first matching shape in [`Self::ALL`] order.
+    /// Parses a strict application date-time shape with Jiff's Temporal parser.
     ///
     /// # Errors
     ///
     /// Returns a static reason if no accepted date-time shape matches `s`.
     pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
-        let normalized_input = normalized.as_ref();
-        if normalized_input.len() <= 10 {
+        let normalized = Self::normalize_separator(normalized);
+        let input = normalized.as_ref();
+        let date_len = if input.starts_with('-') {
+            11
+        } else {
+            10
+        };
+        if input.len() <= date_len || !has_padded_date_prefix(input) {
             return Err("input is too short");
         }
-        if normalized_input.get(16..19) == Some(":60") {
+        if input
+            .as_bytes()
+            .get(date_len..)
+            .and_then(|date_time| date_time.get(6..9))
+            == Some(b":60")
+        {
             return Err("invalid input");
         }
-        let [first, rest @ ..] = Self::ALL;
-        let mut result = first.parse_shape(normalized_input);
-        for format in rest {
-            if result.is_ok() {
-                break;
-            }
-            result = format.parse_shape(normalized_input);
+        let shape = Self::recognize(input)?;
+        if shape == Self::Rfc3339 && !numeric_rfc3339_offset_is_valid(input) {
+            return Err("invalid input");
         }
-        result.and_then(|parsed| {
-            has_padded_date_prefix(normalized_input)
-                .then_some(parsed)
-                .ok_or("input is too short")
-        })
+        let pieces = DATETIME_PARSER
+            .parse_pieces(input.as_bytes())
+            .map_err(|_| "invalid input")?;
+        let time = pieces.time().ok_or("invalid input")?;
+        let datetime = pieces.date().to_datetime(time);
+        match shape {
+            Self::Rfc3339 => {
+                let offset = pieces
+                    .to_numeric_offset()
+                    .ok_or("input does not match RFC 3339")?;
+                offset
+                    .to_timestamp(datetime)
+                    .map(DateTimeInput::Absolute)
+                    .map_err(|_| "invalid input")
+            }
+            Self::LocalTSeconds
+            | Self::LocalTMinutes
+            | Self::LocalSpaceSeconds
+            | Self::LocalSpaceMinutes => {
+                Ok(DateTimeInput::LocalClock(datetime))
+            }
+        }
+    }
+
+    fn recognize(input: &str) -> Result<Self, &'static str> {
+        let mut lexer = TemporalShapeToken::lexer(input);
+        let Some(Ok(token)) = lexer.next() else {
+            return Err("invalid input");
+        };
+        let span = lexer.span();
+        if span.start != 0 || span.end != input.len() {
+            return Err("invalid input");
+        }
+        let separator = if input.starts_with('-') {
+            11
+        } else {
+            10
+        };
+        let is_t = input.as_bytes().get(separator) == Some(&b'T');
+        match token {
+            TemporalShapeToken::Rfc3339 => Ok(Self::Rfc3339),
+            TemporalShapeToken::LocalSeconds if is_t => Ok(Self::LocalTSeconds),
+            TemporalShapeToken::LocalSeconds => Ok(Self::LocalSpaceSeconds),
+            TemporalShapeToken::LocalMinutes if is_t => Ok(Self::LocalTMinutes),
+            TemporalShapeToken::LocalMinutes => Ok(Self::LocalSpaceMinutes),
+            TemporalShapeToken::FullDate
+            | TemporalShapeToken::YearMonth
+            | TemporalShapeToken::TwoDigitYear => Err("invalid input"),
+        }
     }
 
     fn truncate_fractional_seconds(input: &str) -> Cow<'_, str> {
@@ -455,40 +499,40 @@ impl DateTimeShape {
         Cow::Owned(format!("{prefix}.{leading}{suffix}"))
     }
 
-    /// Parses this format into a parsed date-time shape.
-    ///
-    /// # Errors
-    ///
-    /// - A static reason if the input does not match this format.
-    fn parse_shape(self, s: &str) -> Result<DateTimeInput, &'static str> {
-        match self.pattern() {
-            None if !numeric_rfc3339_offset_is_valid(s) => {
-                Err("input does not match RFC 3339")
-            }
-            None => s
-                .parse::<Timestamp>()
-                .map(DateTimeInput::Absolute)
-                .map_err(|_| "input does not match RFC 3339"),
-            Some(pattern) => civil::DateTime::strptime(pattern, s)
-                .map(DateTimeInput::LocalClock)
-                .map_err(|_| "invalid input"),
+    fn normalize_separator(input: Cow<'_, str>) -> Cow<'_, str> {
+        let separator_at = if input.starts_with('-') {
+            11
+        } else {
+            10
+        };
+        let bytes = input.as_bytes();
+        let Some(&separator) = bytes.get(separator_at) else {
+            return input;
+        };
+        if !separator.is_ascii_whitespace() {
+            return input;
         }
-    }
-
-    /// Returns the strftime pattern for this format, or `None` for
-    /// [`Self::Rfc3339`] which uses dedicated RFC 3339 parsing.
-    #[must_use]
-    pub(crate) const fn pattern(self) -> Option<&'static str> {
-        match self {
-            Self::Rfc3339 => None,
-            Self::LocalTSeconds => Some("%Y-%m-%dT%H:%M:%S%.f"),
-            Self::LocalTMinutes => Some("%Y-%m-%dT%H:%M"),
-            Self::LocalSpaceSeconds => Some("%Y-%m-%d %H:%M:%S%.f"),
-            Self::LocalSpaceMinutes => Some("%Y-%m-%d %H:%M"),
+        let whitespace_len = bytes
+            .get(separator_at..)
+            .unwrap_or_default()
+            .iter()
+            .take_while(|byte| byte.is_ascii_whitespace())
+            .count();
+        if whitespace_len == 1 && separator == b' ' {
+            return input;
         }
+        let Some(time_start) = separator_at.checked_add(whitespace_len) else {
+            return input;
+        };
+        let Some(prefix) = input.get(..separator_at) else {
+            return input;
+        };
+        let Some(time) = input.get(time_start..) else {
+            return input;
+        };
+        Cow::Owned(format!("{prefix} {time}"))
     }
 }
-
 /// Stores the parsed date-time shape before local-zone resolution.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum DateTimeInput {
@@ -948,6 +992,53 @@ mod tests {
             );
         }
 
+        #[rstest]
+        #[case::positive_offset(
+            "2026-07-29T14:30:00+02:30",
+            "2026-07-29T12:00:00Z"
+        )]
+        #[case::negative_offset(
+            "2026-07-29T14:30:00-05:45",
+            "2026-07-29T20:15:00Z"
+        )]
+        #[case::submicrosecond(
+            "2026-07-29T14:30:00.123456789+02:30",
+            "2026-07-29T12:00:00.123456789Z"
+        )]
+        #[case::nanosecond(
+            "2026-07-29T14:30:00.000000001Z",
+            "2026-07-29T14:30:00.000000001Z"
+        )]
+        #[case::overprecision(
+            "2026-07-29T14:30:00.123456789123Z",
+            "2026-07-29T14:30:00.123456789Z"
+        )]
+        #[case::max_timestamp(
+            "9999-12-30T22:00:00.999999999Z",
+            "9999-12-30T22:00:00.999999999Z"
+        )]
+        fn parses_explicit_offsets_without_losing_nanoseconds(
+            #[case] input: &str,
+            #[case] expected: &str,
+        ) {
+            ZoneGuard::set("Etc/GMT-2");
+            let expected =
+                expected.parse::<Timestamp>().expect("valid UTC instant");
+            let actual = DateTimeValue::parse_iso(input);
+            assert_eq!(actual.map(DateTimeValue::utc), Ok(expected));
+        }
+
+        #[test]
+        fn parses_unzoned_seconds_in_the_local_zone() {
+            ZoneGuard::set("Etc/GMT-2");
+            let actual =
+                DateTimeValue::parse_iso("2026-07-29T14:30:00.123456789");
+            let expected = "2026-07-29T12:30:00.123456789Z"
+                .parse::<Timestamp>()
+                .expect("valid UTC instant");
+            assert_eq!(actual.map(DateTimeValue::utc), Ok(expected));
+        }
+
         #[test]
         fn parses_a_naive_date_time_in_the_local_zone() {
             // Arrange: UTC+2, no DST.
@@ -985,12 +1076,14 @@ mod tests {
             assert!(matches!(result, Err(DateError::InvalidValue { .. })));
         }
 
-        #[test]
-        fn rejects_rfc3339_leap_seconds() {
-            // Arrange
-            let input = "2026-07-29T23:59:60Z";
-
-            // Act
+        #[rstest]
+        #[case::utc("2026-07-29T23:59:60Z")]
+        #[case::positive_offset("2026-07-29T23:59:60+01:00")]
+        #[case::negative_offset("2026-07-29T23:59:60-01:00")]
+        #[case::unknown_zero_offset("2026-07-29T23:59:60-00:00")]
+        #[case::naive("2026-07-29T23:59:60")]
+        fn rejects_leap_seconds_before_any_parser_path(#[case] input: &str) {
+            // Arrange / Act
             let result = DateTimeValue::parse_iso(input);
 
             // Assert
@@ -998,6 +1091,21 @@ mod tests {
         }
         #[rstest]
         #[case::missing_time("2026-07-29", "input is too short")]
+        #[case::impossible_date("2026-02-30T14:30:00Z", "invalid input")]
+        #[case::one_second_after_max("9999-12-30T22:00:01Z", "invalid input")]
+        #[case::beyond_timestamp_range(
+            "9999-12-31T23:59:59-01:00",
+            "invalid input"
+        )]
+        #[case::out_of_range_offset(
+            "2026-07-29T14:30:00+24:00",
+            "invalid input"
+        )]
+        #[case::out_of_range_minute(
+            "2026-07-29T14:30:00-03:60",
+            "invalid input"
+        )]
+        #[case::malformed_fraction("2026-07-29T14:30:00.12xZ", "invalid input")]
         #[case::trailing_offset_text(
             "2026-07-29T14:30:00+02:00x",
             "invalid input"
@@ -1110,52 +1218,24 @@ mod tests {
         }
 
         #[test]
-        fn parses_whole_seconds_through_the_fractional_shape() {
-            // Arrange: the same wall-clock time in both separators.
-            let local_datetime = civil::Date::new(2026, 7, 29)
-                .expect("valid fixture date")
-                .at(14, 30, 0, 0);
+        fn parses_seconds_with_t_and_space_separators() {
+            // Arrange: UTC keeps parsed clock values unchanged.
+            ZoneGuard::set("UTC");
+
             // Act
-            let t_separated = DateTimeShape::parse_any("2026-07-29T14:30:00");
+            let t_separated = DateTimeValue::parse_iso("2026-07-29T14:30:00");
             let space_separated =
-                DateTimeShape::parse_any("2026-07-29 14:30:00");
+                DateTimeValue::parse_iso("2026-07-29 14:30:00");
 
             // Assert
-            assert!(matches!(
-                t_separated,
-                Ok(DateTimeInput::LocalClock(parsed)) if parsed == local_datetime
-            ));
-            assert!(matches!(
-                space_separated,
-                Ok(DateTimeInput::LocalClock(parsed)) if parsed == local_datetime
-            ));
-        }
-
-        #[rstest]
-        #[case::rfc3339(DateTimeShape::Rfc3339, None)]
-        #[case::t_seconds(
-            DateTimeShape::LocalTSeconds,
-            Some("%Y-%m-%dT%H:%M:%S%.f")
-        )]
-        #[case::t_minutes(DateTimeShape::LocalTMinutes, Some("%Y-%m-%dT%H:%M"))]
-        #[case::space_seconds(
-            DateTimeShape::LocalSpaceSeconds,
-            Some("%Y-%m-%d %H:%M:%S%.f")
-        )]
-        #[case::space_minutes(
-            DateTimeShape::LocalSpaceMinutes,
-            Some("%Y-%m-%d %H:%M")
-        )]
-        fn maps_each_shape_to_its_strftime_pattern(
-            #[case] shape: DateTimeShape,
-            #[case] expected: Option<&str>,
-        ) {
-            // Arrange: `shape` is the case value.
-            // Act
-            let pattern = shape.pattern();
-
-            // Assert
-            assert_eq!(pattern, expected, "one strftime pattern per shape");
+            assert_eq!(
+                t_separated.map(|value| value.to_string()),
+                Ok("2026-07-29T14:30:00".to_owned())
+            );
+            assert_eq!(
+                space_separated.map(|value| value.to_string()),
+                Ok("2026-07-29T14:30:00".to_owned())
+            );
         }
     }
 

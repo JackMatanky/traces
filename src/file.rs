@@ -493,6 +493,16 @@ mod tests {
             }
 
             #[test]
+            fn derives_a_negative_year_from_the_filename() {
+                let expected = DateValue::parse_iso("-9999-01-01")
+                    .expect("valid minimum signed-year date");
+
+                let record = FileMeta::note_for_test("-9999-01-01-daily.md");
+
+                assert_eq!(record.day(), Some(expected));
+            }
+
+            #[test]
             fn falls_back_to_created_at_when_filename_has_no_date() {
                 // Arrange
                 let created_day = DateValue::parse_iso("2026-03-15").unwrap();

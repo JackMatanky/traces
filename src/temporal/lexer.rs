@@ -1,12 +1,17 @@
-//! Declarative token recognition for date and date-time input shapes.
+//! Date shape recognition and byte-exact duration prefix parsing.
 //!
-//! Uses [`logos::Logos`] to classify date, date-time, and duration shapes in a
-//! single pass, replacing procedural heuristics with parse-don't-validate
-//! recognition.
+//! Logos classifies date shapes; winnow locates duration boundaries before
+//! Jiff validates the complete duration.
 
 use logos::Logos;
+use winnow::{
+    ascii::digit1,
+    combinator::{alt, opt},
+    prelude::*,
+    token::{one_of, take_while},
+};
 
-use super::{DateValue, DurationValue, date::DateShape, point::DatePoint};
+use super::{DurationValue, date::DateShape, point::DatePoint};
 
 /// Token classification for temporal prefix recognition.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
@@ -18,16 +23,6 @@ enum DatePrefixToken {
     /// Year-month ISO date: `YYYY-MM` or `-YYYY-MM`.
     #[regex(r"-?[0-9]{4}-[0-9]{2}")]
     YearMonth,
-}
-
-/// Token classification for duration prefix recognition.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
-enum DurationToken {
-    #[regex(r"[+-]?([0-9]+(\.[0-9]+)?|\.[0-9]+)\s*[a-zA-Z]+")]
-    Part,
-
-    #[regex(r"[ \t\n\f\r]+", logos::skip)]
-    Whitespace,
 }
 
 /// Token classification for whole temporal input shapes.
@@ -58,10 +53,17 @@ pub(super) enum TemporalShapeToken {
     TwoDigitYear,
 }
 
-/// Returns `true` if `bytes` begins with two or four ASCII digits followed by
-/// a hyphen.
+/// Returns `true` if `bytes` begins with a two- or four-digit date year, or a
+/// signed four-digit year, followed by a hyphen.
 #[must_use]
 pub(crate) fn starts_like_date(bytes: &[u8]) -> bool {
+    if bytes.first() == Some(&b'-') {
+        return bytes
+            .get(1..5)
+            .is_some_and(|year| year.iter().all(u8::is_ascii_digit))
+            && bytes.get(5) == Some(&b'-');
+    }
+
     bytes.len() >= 5
         && [2, 4].into_iter().any(|digits| {
             bytes
@@ -103,51 +105,46 @@ pub(super) fn scan_date_prefix(input: &str) -> Option<(DatePoint, usize)> {
     if matched.len() == 7 && trimmed_start[span.end..].starts_with('-') {
         return None;
     }
-    let (date, precision) = DateShape::parse_any(matched).ok()?;
-    let point = DatePoint::Calendar {
-        date: DateValue::from_civil_date(date),
-        date_precision: precision,
-    };
+    let (date, shape) = DateShape::parse_any(matched).ok()?;
+    let point = DatePoint::from_date_shape(date, shape);
     Some((point, leading_ws.saturating_add(span.end)))
 }
 
-/// Scans a duration prefix from `input`, returning the parsed [`DurationValue`]
-/// and consumed byte count.
+/// Parses a duration prefix, returning its validated value and consumed bytes.
+///
+/// Jiff's `SpanParser::parse_span` consumes complete input but does not report
+/// a prefix length; winnow locates the candidate without interpreting units.
 #[must_use]
-pub(super) fn scan_duration_prefix(
+pub(super) fn parse_duration_prefix(
     input: &str,
 ) -> Option<(DurationValue, usize)> {
-    let mut lexer = DurationToken::lexer(input);
-    let mut last_end = 0;
-    while let Some(Ok(DurationToken::Part)) = lexer.next() {
-        let span = lexer.span();
-        if last_end == 0 && span.start != 0 {
-            return None;
-        }
-        last_end = span.end;
-        let rem = &input[last_end..];
-        let trimmed = rem.trim_start();
+    let mut rest = input;
+    duration_part.parse_next(&mut rest).ok()?;
+    loop {
+        let trimmed = rest.trim_start();
         if trimmed.starts_with(['+', '-']) {
             return None;
         }
         if !trimmed.starts_with(|c: char| c.is_ascii_digit() || c == '.') {
             break;
         }
+        rest = trimmed;
+        duration_part.parse_next(&mut rest).ok()?;
     }
-    if last_end == 0 {
-        return None;
-    }
-    let rem = &input[last_end..];
-    let trimmed = rem.trim_start();
-    if trimmed.starts_with(['+', '-']) {
-        return None;
-    }
-    if trimmed.starts_with(|c: char| c.is_ascii_digit() || c == '.') {
-        return None;
-    }
-    let candidate = &input[..last_end];
-    let val = DurationValue::parse(candidate).ok()?;
-    Some((val, last_end))
+    let end = input.len().saturating_sub(rest.len());
+    Some((DurationValue::parse(&input[..end]).ok()?, end))
+}
+
+/// Recognizes one signed numeric component and its unit without allocating.
+fn duration_part(input: &mut &str) -> ModalResult<()> {
+    (
+        opt(one_of(['+', '-'])),
+        alt(((digit1, opt(('.', digit1))).take(), ('.', digit1).take())),
+        take_while(0.., char::is_whitespace),
+        take_while(1.., |c: char| c.is_ascii_alphabetic()),
+    )
+        .void()
+        .parse_next(input)
 }
 
 #[cfg(test)]
@@ -160,6 +157,10 @@ mod tests {
     #[rstest]
     #[case::standard_full_date("2026-07-29 after", 10)]
     #[case::standard_year_month("2026-07 after", 7)]
+    #[case::negative_full_date("-2026-07-29 after", 11)]
+    #[case::negative_year_month("-2026-07 after", 8)]
+    #[case::minimum_year("-9999-01-01 after", 11)]
+    #[case::maximum_year("9999-12-31 after", 10)]
     #[case::leading_whitespace("   2026-07-29 after", 13)]
     fn scans_valid_date_prefixes(
         #[case] input: &str,
@@ -182,12 +183,39 @@ mod tests {
     #[case::single_unit("1h remaining", 2)]
     #[case::compound("1h 30m remaining", 6)]
     #[case::signed("-2d extra", 3)]
-    fn scans_valid_duration_prefixes(
+    #[case::fractional(".5h remaining", 3)]
+    fn parses_valid_duration_prefixes(
         #[case] input: &str,
         #[case] expected_len: usize,
     ) {
         let (_val, len) =
-            scan_duration_prefix(input).expect("valid duration prefix");
+            parse_duration_prefix(input).expect("valid duration prefix");
         assert_eq!(len, expected_len);
+    }
+
+    #[rstest]
+    #[case::packed("2w3d] trailing", 4)]
+    #[case::utf8_boundary("1h é", 2)]
+    #[case::attached_utf8("1h°C", 2)]
+    #[case::comma_boundary("1h, 30m", 2)]
+    fn returns_exact_byte_extent_of_duration_candidate(
+        #[case] input: &str,
+        #[case] expected_len: usize,
+    ) {
+        let (_, len) = parse_duration_prefix(input).expect("valid prefix");
+        assert_eq!(len, expected_len);
+        assert!(input.is_char_boundary(len));
+    }
+
+    #[rstest]
+    #[case::invalid_next_unit("1h 1x")]
+    #[case::incomplete_next_part("1h 2")]
+    #[case::internal_negative("1h -30m")]
+    #[case::internal_positive("1h +30m")]
+    #[case::invalid_unit("1ms")]
+    #[case::leading_space(" 1h")]
+    #[case::unicode_separator("1h\u{2003}30m")]
+    fn rejects_invalid_duration_prefix(#[case] input: &str) {
+        assert!(parse_duration_prefix(input).is_none());
     }
 }

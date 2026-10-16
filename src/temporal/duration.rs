@@ -8,9 +8,9 @@
 //!
 //! # Identity and application
 //!
-//! Nominal nanoseconds are the identity of a Duration: one month counts as 30
-//! days and one year as 365 days, so equality, ordering, and hashing compare
-//! nominal nanoseconds and never the spelling.
+//! Nominal seconds are the identity of a Duration: one month counts as 30 days
+//! and one year as 365 days, so equality, ordering, and hashing compare rounded
+//! nominal seconds and never the spelling.
 //!
 //! # Key Types
 //!
@@ -27,7 +27,7 @@ use std::{
 };
 
 use jiff::{
-    Span,
+    Span, SpanRound, Unit,
     fmt::friendly::{Designator, Direction, SpanPrinter},
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -36,18 +36,6 @@ use super::{
     error::DurationError,
     unit::{TimeUnit, decompose},
 };
-
-/// Largest-first order for synthesizing a nominal duration from seconds.
-///
-/// Month and Year are omitted: nominal ratios describe identity, not calendar
-/// application, so a synthesized magnitude never claims those components.
-pub(super) const NOMINAL_COMPOSITION_ORDER: [TimeUnit; 5] = [
-    TimeUnit::Week,
-    TimeUnit::Day,
-    TimeUnit::Hour,
-    TimeUnit::Minute,
-    TimeUnit::Second,
-];
 
 /// Largest-first order for rendering a compound English magnitude.
 ///
@@ -68,178 +56,85 @@ const PRINTER: SpanPrinter = SpanPrinter::new()
     .designator(Designator::Compact)
     .direction(Direction::Sign);
 
-/// Internal representation of the seven Jiff [`Span`] unit fields.
-///
-/// Encapsulates fieldwise arithmetic and checked conversions between raw
-/// integer components and a validated [`Span`].
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-struct DurationFields {
-    years: i64,
-    months: i64,
-    weeks: i64,
-    days: i64,
-    hours: i64,
-    minutes: i64,
-    seconds: i64,
+/// Rounds a span's fractional seconds exactly once for nominal identity and
+/// fieldwise arithmetic. Calendar fields stay untouched.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "Jiff bounds each subsecond field below one second"
+)]
+fn rounded_seconds(span: Span) -> i64 {
+    let nanos = i128::from(span.get_milliseconds()) * 1_000_000
+        + i128::from(span.get_microseconds()) * 1_000
+        + i128::from(span.get_nanoseconds());
+    let carry = if nanos >= 500_000_000 {
+        1
+    } else if nanos <= -500_000_000 {
+        -1
+    } else {
+        0
+    };
+    span.get_seconds().saturating_add(carry)
 }
 
-impl DurationFields {
-    #[inline]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        clippy::as_conversions,
-        clippy::cast_lossless,
-        clippy::cast_precision_loss,
-        reason = "infallible widening and rounding into i64 seconds"
-    )]
-    fn from_span(span: Span) -> Self {
-        let sub_nanos = i128::from(span.get_milliseconds()) * 1_000_000
-            + i128::from(span.get_microseconds()) * 1_000
-            + i128::from(span.get_nanoseconds());
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "sub-second rounding produces at most +-1 second"
-        )]
-        let sub_seconds = (sub_nanos as f64 / 1_000_000_000.0).round() as i64;
-        let seconds = span.get_seconds().saturating_add(sub_seconds);
-        Self {
-            years: span.get_years() as i64,
-            months: span.get_months() as i64,
-            weeks: span.get_weeks() as i64,
-            days: span.get_days() as i64,
-            hours: span.get_hours() as i64,
-            minutes: span.get_minutes(),
-            seconds,
-        }
-    }
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "Jiff's bounded span units safely sum into i64 nominal seconds"
+)]
+fn nominal_seconds(span: Span) -> i64 {
+    i64::from(span.get_years()) * TimeUnit::Year.nominal_seconds()
+        + i64::from(span.get_months()) * TimeUnit::Month.nominal_seconds()
+        + i64::from(span.get_weeks()) * TimeUnit::Week.nominal_seconds()
+        + i64::from(span.get_days()) * TimeUnit::Day.nominal_seconds()
+        + i64::from(span.get_hours()) * TimeUnit::Hour.nominal_seconds()
+        + span.get_minutes() * TimeUnit::Minute.nominal_seconds()
+        + rounded_seconds(span)
+}
 
-    #[inline]
-    fn to_span(self) -> Result<Span, DurationError> {
-        let years_i32 = i32::try_from(self.years)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-        let months_i32 = i32::try_from(self.months)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-        let weeks_i32 = i32::try_from(self.weeks)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-        let days_i32 = i32::try_from(self.days)
-            .map_err(|_| DurationError::SecondsOutOfRange)?;
-
-        Span::new()
-            .try_years(years_i32)
-            .and_then(|s| s.try_months(months_i32))
-            .and_then(|s| s.try_weeks(weeks_i32))
-            .and_then(|s| s.try_days(days_i32))
-            .and_then(|s| s.try_hours(self.hours))
-            .and_then(|s| s.try_minutes(self.minutes))
-            .and_then(|s| s.try_seconds(self.seconds))
-            .map_err(|_| DurationError::SecondsOutOfRange)
+/// Adds each written unit independently, preserving the calendar regime.
+///
+/// Jiff's `checked_add` balances calendar units relative to a date instead of
+/// adding fields. `None` denotes mixed signs, which must be decomposed by
+/// nominal identity.
+fn add_fields(lhs: Span, rhs: Span) -> Result<Option<Span>, DurationError> {
+    macro_rules! sum {
+        ($getter:ident) => {
+            i64::from(lhs.$getter())
+                .checked_add(i64::from(rhs.$getter()))
+                .ok_or(DurationError::SecondsOutOfRange)?
+        };
     }
-
-    #[inline]
-    fn checked_add(self, other: Self) -> Result<Self, DurationError> {
-        Ok(Self {
-            years: self
-                .years
-                .checked_add(other.years)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            months: self
-                .months
-                .checked_add(other.months)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            weeks: self
-                .weeks
-                .checked_add(other.weeks)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            days: self
-                .days
-                .checked_add(other.days)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            hours: self
-                .hours
-                .checked_add(other.hours)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            minutes: self
-                .minutes
-                .checked_add(other.minutes)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            seconds: self
-                .seconds
-                .checked_add(other.seconds)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-        })
+    let years = sum!(get_years);
+    let months = sum!(get_months);
+    let weeks = sum!(get_weeks);
+    let days = sum!(get_days);
+    let hours = sum!(get_hours);
+    let minutes = sum!(get_minutes);
+    let seconds = rounded_seconds(lhs)
+        .checked_add(rounded_seconds(rhs))
+        .ok_or(DurationError::SecondsOutOfRange)?;
+    let fields = [years, months, weeks, days, hours, minutes, seconds];
+    if fields.iter().any(|&value| value > 0)
+        && fields.iter().any(|&value| value < 0)
+    {
+        return Ok(None);
     }
-
-    #[inline]
-    fn checked_mul(self, factor: i64) -> Result<Self, DurationError> {
-        Ok(Self {
-            years: self
-                .years
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            months: self
-                .months
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            weeks: self
-                .weeks
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            days: self
-                .days
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            hours: self
-                .hours
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            minutes: self
-                .minutes
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-            seconds: self
-                .seconds
-                .checked_mul(factor)
-                .ok_or(DurationError::SecondsOutOfRange)?,
-        })
-    }
-
-    #[inline]
-    fn has_mixed_signs(self) -> bool {
-        let fields = [
-            self.years,
-            self.months,
-            self.weeks,
-            self.days,
-            self.hours,
-            self.minutes,
-            self.seconds,
-        ];
-        fields.iter().any(|&v| v > 0) && fields.iter().any(|&v| v < 0)
-    }
-
-    #[inline]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "bounded Span unit values safely convert and sum into i64 \
-                  seconds"
-    )]
-    fn nominal_seconds(self) -> i64 {
-        self.years * TimeUnit::Year.nominal_seconds()
-            + self.months * TimeUnit::Month.nominal_seconds()
-            + self.weeks * TimeUnit::Week.nominal_seconds()
-            + self.days * TimeUnit::Day.nominal_seconds()
-            + self.hours * TimeUnit::Hour.nominal_seconds()
-            + self.minutes * TimeUnit::Minute.nominal_seconds()
-            + self.seconds
-    }
+    Span::new()
+        .try_years(years)
+        .and_then(|span| span.try_months(months))
+        .and_then(|span| span.try_weeks(weeks))
+        .and_then(|span| span.try_days(days))
+        .and_then(|span| span.try_hours(hours))
+        .and_then(|span| span.try_minutes(minutes))
+        .and_then(|span| span.try_seconds(seconds))
+        .map(Some)
+        .map_err(|_| DurationError::SecondsOutOfRange)
 }
 
 /// Represents a validated duration with a nominal identity and a calendar
 /// application regime.
 ///
-/// Stores a Jiff [`Span`]. Nominal nanoseconds define equality, ordering, and
-/// hashing. Checked arithmetic rejects values outside Jiff's representable span
-/// range.
+/// Stores a Jiff [`Span`] and its rounded nominal seconds. Checked arithmetic
+/// rejects values outside Jiff's span range.
 ///
 /// # Examples
 ///
@@ -249,7 +144,7 @@ impl DurationFields {
 /// let written: DurationValue = "1h 30m".parse()?;
 /// assert_eq!(written.to_string(), "1h 30m");
 ///
-/// // Equality compares nominal nanoseconds, not spelling.
+/// // Equality compares rounded nominal seconds, not spelling.
 /// assert_eq!(written, "90m".parse::<DurationValue>()?);
 ///
 /// let error = "not a duration"
@@ -259,10 +154,21 @@ impl DurationFields {
 /// assert_eq!(error.to_string(), "no number before unit");
 /// # Ok::<(), DurationError>(())
 /// ```
-#[derive(Copy, Clone, Debug)]
-pub struct DurationValue(Span);
+#[derive(Copy, Clone)]
+pub struct DurationValue {
+    span: Span,
+    nominal_seconds: i64,
+}
 
 impl DurationValue {
+    #[inline]
+    fn new(span: Span) -> Self {
+        Self {
+            span,
+            nominal_seconds: nominal_seconds(span),
+        }
+    }
+
     /// Synthesizes a canonical [`DurationValue`] from a nominal seconds value.
     ///
     /// # Errors
@@ -287,46 +193,18 @@ impl DurationValue {
         }
         let total_secs = seconds.round() as i64;
         if total_secs == 0 {
-            return Ok(Self(Span::new()));
+            return Ok(Self::new(Span::new()));
         }
-        let is_negative = total_secs < 0;
-        let (parts, _) =
-            decompose(total_secs.unsigned_abs(), &NOMINAL_COMPOSITION_ORDER);
-        let mut span = Span::new();
-        for part in parts {
-            let count = i64::try_from(part.count())
-                .map_err(|_| DurationError::SecondsOutOfRange)?;
-            let count = if is_negative {
-                count.checked_neg().ok_or(DurationError::SecondsOutOfRange)?
-            } else {
-                count
-            };
-            span = match part.unit() {
-                TimeUnit::Week => span
-                    .try_weeks(
-                        i32::try_from(count)
-                            .map_err(|_| DurationError::SecondsOutOfRange)?,
-                    )
-                    .map_err(|_| DurationError::SecondsOutOfRange)?,
-                TimeUnit::Day => span
-                    .try_days(
-                        i32::try_from(count)
-                            .map_err(|_| DurationError::SecondsOutOfRange)?,
-                    )
-                    .map_err(|_| DurationError::SecondsOutOfRange)?,
-                TimeUnit::Hour => span
-                    .try_hours(count)
-                    .map_err(|_| DurationError::SecondsOutOfRange)?,
-                TimeUnit::Minute => span
-                    .try_minutes(count)
-                    .map_err(|_| DurationError::SecondsOutOfRange)?,
-                TimeUnit::Second => span
-                    .try_seconds(count)
-                    .map_err(|_| DurationError::SecondsOutOfRange)?,
-                _ => span,
-            };
-        }
-        Ok(Self(span))
+
+        let span = Span::new()
+            .try_seconds(total_secs)
+            .and_then(|span| {
+                span.round(
+                    SpanRound::new().largest(Unit::Week).days_are_24_hours(),
+                )
+            })
+            .map_err(|_| DurationError::SecondsOutOfRange)?;
+        Ok(Self::new(span))
     }
 
     /// Parses a human-readable or ISO 8601 duration string.
@@ -365,7 +243,7 @@ impl DurationValue {
         if unsigned.starts_with('P') || unsigned.starts_with('p') {
             let span: Span =
                 trimmed.parse().map_err(|_| DurationError::UnknownUnit)?;
-            let val = Self(span);
+            let val = Self::new(span);
             if val.magnitude() > MAX_NOMINAL_SECONDS {
                 return Err(DurationError::SecondsOutOfRange);
             }
@@ -379,7 +257,7 @@ impl DurationValue {
             .parse()
             .map_err(|err| classify_jiff_error(&normalized, err))?;
 
-        let val = Self(span);
+        let val = Self::new(span);
         if val.magnitude() > MAX_NOMINAL_SECONDS {
             return Err(DurationError::SecondsOutOfRange);
         }
@@ -389,7 +267,7 @@ impl DurationValue {
 
     /// Parses a duration prefix from `input`, returning its spanned extent.
     pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
-        crate::lexer::lex_prefix(input, super::lexer::scan_duration_prefix)
+        crate::lexer::lex_prefix(input, super::lexer::parse_duration_prefix)
     }
 
     /// Adds two durations using field-by-field arithmetic.
@@ -405,15 +283,17 @@ impl DurationValue {
         reason = "nominal seconds fits within f64"
     )]
     pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
-        let f1 = DurationFields::from_span(self.0);
-        let f2 = DurationFields::from_span(rhs.0);
-        let sum = f1.checked_add(f2)?;
-        if sum.has_mixed_signs() {
-            let total_secs = (self.nominal_seconds() as f64)
-                + (rhs.nominal_seconds() as f64);
-            Self::from_nominal_seconds(total_secs)
-        } else {
-            sum.to_span().map(Self)
+        match add_fields(self.span, rhs.span) {
+            Ok(Some(span)) => Ok(Self::new(span)),
+            // Jiff spans have one sign for all fields. The original mixed-sign
+            // rule decomposes the nominal sum instead of changing calendar
+            // math.
+            Ok(None) => {
+                let total_secs = (self.nominal_seconds() as f64)
+                    + (rhs.nominal_seconds() as f64);
+                Self::from_nominal_seconds(total_secs)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -424,8 +304,12 @@ impl DurationValue {
     /// - [`DurationError::SecondsOutOfRange`] if the difference exceeds Jiff's
     ///   representable span range.
     #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "Neg uses Jiff's infallible Span::negate on validated spans"
+    )]
     pub fn checked_sub(self, rhs: Self) -> Result<Self, DurationError> {
-        self.checked_add(Self(rhs.0.negate()))
+        self.checked_add(-rhs)
     }
 
     /// Multiplies a duration by a finite scale factor.
@@ -441,7 +325,7 @@ impl DurationValue {
             return Err(DurationError::NonFiniteSeconds);
         }
         if factor == 0.0 {
-            return Ok(Self(Span::new()));
+            return Ok(Self::new(Span::new()));
         }
         #[expect(
             clippy::as_conversions,
@@ -451,9 +335,25 @@ impl DurationValue {
         )]
         if factor.fract() == 0.0 {
             let f = factor as i64;
-            let fields = DurationFields::from_span(self.0);
-            let scaled = fields.checked_mul(f)?;
-            scaled.to_span().map(Self)
+            // Arithmetic historically rounds any parsed fractional second
+            // before multiplying written fields.
+            let rounded = if self.span.get_milliseconds() == 0
+                && self.span.get_microseconds() == 0
+                && self.span.get_nanoseconds() == 0
+            {
+                self.span
+            } else {
+                self.span
+                    .try_milliseconds(0)
+                    .and_then(|s| s.try_microseconds(0))
+                    .and_then(|s| s.try_nanoseconds(0))
+                    .and_then(|s| s.try_seconds(rounded_seconds(self.span)))
+                    .map_err(|_| DurationError::SecondsOutOfRange)?
+            };
+            let span = rounded
+                .checked_mul(f)
+                .map_err(|_| DurationError::SecondsOutOfRange)?;
+            Ok(Self::new(span))
         } else {
             let total = (self.nominal_seconds() as f64) * factor;
             Self::from_nominal_seconds(total)
@@ -467,8 +367,12 @@ impl DurationValue {
     /// - [`DurationError::SecondsOutOfRange`] if the negated duration exceeds
     ///   Jiff's representable span range.
     #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "Neg uses Jiff's infallible Span::negate on validated spans"
+    )]
     pub fn checked_neg(self) -> Result<Self, DurationError> {
-        Ok(Self(self.0.negate()))
+        Ok(-self)
     }
 
     /// Renders this duration as a comma-separated English magnitude.
@@ -510,7 +414,7 @@ impl DurationValue {
     #[inline]
     #[must_use]
     pub(crate) fn nominal_seconds(&self) -> i64 {
-        DurationFields::from_span(self.0).nominal_seconds()
+        self.nominal_seconds
     }
 
     /// Returns the nominal duration in seconds as an `f64` value.
@@ -529,16 +433,15 @@ impl DurationValue {
     #[inline]
     #[must_use]
     pub(crate) const fn span(self) -> Span {
-        self.0
+        self.span
     }
 
     /// Wraps an existing Jiff [`Span`].
     #[cfg(test)]
     #[inline]
     #[must_use]
-    #[expect(dead_code, reason = "test helper constructor")]
-    pub(crate) const fn from_span(span: Span) -> Self {
-        Self(span)
+    pub(crate) fn from_span(span: Span) -> Self {
+        Self::new(span)
     }
 
     /// Returns the written components that witness the regime.
@@ -552,7 +455,7 @@ impl DurationValue {
     )]
     pub(crate) fn components(&self) -> Vec<DurationComponent> {
         let mut result = Vec::new();
-        let span = self.0;
+        let span = self.span;
         if span.get_years() != 0 {
             result.push(DurationComponent {
                 magnitude: f64::from(span.get_years()),
@@ -603,10 +506,17 @@ impl DurationValue {
     #[inline]
     #[must_use]
     pub(crate) fn has_calendar_component(&self) -> bool {
-        self.0.get_years() != 0
-            || self.0.get_months() != 0
-            || self.0.get_weeks() != 0
-            || self.0.get_days() != 0
+        self.span.get_years() != 0
+            || self.span.get_months() != 0
+            || self.span.get_weeks() != 0
+            || self.span.get_days() != 0
+    }
+}
+
+impl fmt::Debug for DurationValue {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("DurationValue").field(&self.span).finish()
     }
 }
 
@@ -614,7 +524,7 @@ impl fmt::Display for DurationValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         PRINTER
-            .print_span(&self.0, jiff::fmt::StdFmtWrite(f))
+            .print_span(&self.span, jiff::fmt::StdFmtWrite(f))
             .map_err(|_| fmt::Error)
     }
 }
@@ -704,7 +614,7 @@ impl Neg for DurationValue {
 
     #[inline]
     fn neg(self) -> Self {
-        Self(self.0.negate())
+        Self::new(self.span.negate())
     }
 }
 
@@ -999,6 +909,60 @@ mod tests {
                 Err(DurationError::NonFiniteSeconds)
             ));
         }
+
+        #[test]
+        fn nominal_seconds_rounding_is_symmetric_and_accepts_the_bound() {
+            for (seconds, expected_seconds) in [
+                (1.0, 1_i64),
+                (60.0, 60),
+                (617_145.0, 617_145),
+                (MAX_NOMINAL_SECONDS, 631_107_417_600),
+            ] {
+                let positive =
+                    DurationValue::from_nominal_seconds(seconds).unwrap();
+                let negative =
+                    DurationValue::from_nominal_seconds(-seconds).unwrap();
+
+                assert_eq!(
+                    negative.to_string(),
+                    format!("-{positive}"),
+                    "seconds: {seconds}"
+                );
+                assert_eq!(
+                    positive.nominal_seconds(),
+                    expected_seconds,
+                    "seconds: {seconds}"
+                );
+            }
+        }
+
+        #[test]
+        fn nominal_seconds_just_outside_the_bound_are_rejected() {
+            for seconds in
+                [MAX_NOMINAL_SECONDS + 1.0, -MAX_NOMINAL_SECONDS - 1.0]
+            {
+                assert!(matches!(
+                    DurationValue::from_nominal_seconds(seconds),
+                    Err(DurationError::SecondsOutOfRange)
+                ));
+            }
+        }
+        #[test]
+        fn caches_nominal_seconds_for_every_constructor() {
+            let written = DurationValue::parse("-1mo 2d 3h").unwrap();
+            let iso = DurationValue::parse("PT1H").unwrap();
+            let fraction = DurationValue::parse("-1.5s").unwrap();
+            let synthesized =
+                DurationValue::from_nominal_seconds(-5_400.0).unwrap();
+            let from_span =
+                DurationValue::from_span(Span::new().hours(2).minutes(15));
+            for duration in [written, iso, fraction, synthesized, from_span] {
+                assert_eq!(
+                    duration.nominal_seconds(),
+                    nominal_seconds(duration.span())
+                );
+            }
+        }
     }
     mod parse {
         use pretty_assertions::assert_eq;
@@ -1261,11 +1225,61 @@ mod tests {
         }
 
         #[test]
+        fn preserves_calendar_fields_when_signs_agree() {
+            let left = DurationValue::parse("-1mo 2d").unwrap();
+            let right = DurationValue::parse("-2mo 1d").unwrap();
+            let sum = left.checked_add(right).unwrap();
+            assert_eq!(sum.to_string(), "-3mo 3d");
+            assert_eq!(sum.nominal_seconds(), -3 * 2_592_000 - 3 * 86_400);
+        }
+
+        #[test]
+        fn decomposes_mixed_calendar_and_clock_signs_nominally() {
+            let month = DurationValue::parse("1mo").unwrap();
+            let day = DurationValue::parse("1d").unwrap();
+            let difference = month.checked_sub(day).unwrap();
+            assert_eq!(difference.to_string(), "4w 1d");
+            assert_eq!(difference.nominal_seconds(), 29 * 86_400);
+        }
+
+        #[test]
+        fn rounds_fractional_seconds_before_fieldwise_arithmetic() {
+            let fraction = DurationValue::parse(".5s").unwrap();
+            let second = DurationValue::parse("1s").unwrap();
+            assert_eq!(fraction.checked_add(second).unwrap().to_string(), "2s");
+            assert_eq!(
+                (-fraction).checked_add(-second).unwrap().to_string(),
+                "-2s"
+            );
+        }
+
+        #[test]
         fn checked_negation() {
             let hour = DurationValue::parse("1h").unwrap();
             let neg = hour.checked_neg().unwrap();
             assert_eq!(neg.to_string(), "-1h");
             assert_eq!(neg.checked_neg().unwrap(), hour);
+        }
+
+        #[test]
+        fn maintains_cached_seconds_through_arithmetic() {
+            let month = DurationValue::parse("1mo").unwrap();
+            let day = DurationValue::parse("1d").unwrap();
+            let fraction = DurationValue::parse("1.5s").unwrap();
+            let results = [
+                month.checked_add(day).unwrap(),
+                month.checked_sub(day).unwrap(),
+                fraction.checked_mul(2.0).unwrap(),
+                day.checked_mul(0.5).unwrap(),
+                (-fraction).checked_neg().unwrap(),
+                day.checked_mul(0.0).unwrap(),
+            ];
+            for duration in results {
+                assert_eq!(
+                    duration.nominal_seconds(),
+                    nominal_seconds(duration.span())
+                );
+            }
         }
     }
 
@@ -1278,6 +1292,16 @@ mod tests {
             let dur = DurationValue::parse("1d 2h").unwrap();
             let scaled = dur.checked_mul(2.0).unwrap();
             assert_eq!(scaled.to_string(), "2d 4h");
+        }
+
+        #[test]
+        fn rounds_fractional_seconds_before_integral_scaling() {
+            let fraction = DurationValue::parse("1.5s").unwrap();
+            assert_eq!(fraction.checked_mul(2.0).unwrap().to_string(), "4s");
+            assert_eq!(
+                (-fraction).checked_mul(2.0).unwrap().to_string(),
+                "-4s"
+            );
         }
 
         #[test]
@@ -1411,6 +1435,15 @@ mod tests {
             };
             assert_eq!(duration.to_string(), expected);
         }
+
+        #[test]
+        fn preserves_tuple_debug_format_when_cached() {
+            let duration = DurationValue::parse("1h 30m").unwrap();
+            assert_eq!(
+                format!("{duration:?}"),
+                format!("DurationValue({:?})", duration.span())
+            );
+        }
     }
 
     mod serialization {
@@ -1438,6 +1471,16 @@ mod tests {
             let duration: DurationValue =
                 serde_json::from_str(json).expect("deserializes");
             assert_eq!(duration, DurationValue::parse("1h 30m").unwrap());
+        }
+
+        #[test]
+        fn restores_cached_seconds_when_deserializing() {
+            let duration: DurationValue =
+                serde_json::from_str("\"-1mo 2d\"").unwrap();
+            assert_eq!(
+                duration.nominal_seconds(),
+                nominal_seconds(duration.span())
+            );
         }
 
         #[test]
