@@ -147,14 +147,14 @@ src/config/model.rs: pub(super) fn from_raw_or_default(
 src/config/model.rs: pub(super) fn new(
 src/config/model.rs: pub(super) use schemas::{DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR};
 src/config/model.rs: pub(super) use templates::TemplateConfig;
+src/config/model/digest.rs: pub(crate) const fn frontmatter(&self) -> FrontmatterDigests {
+src/config/model/digest.rs: pub(crate) const fn root(&self) -> Blake3Digest {
+src/config/model/digest.rs: pub(crate) const fn schemas(&self) -> SchemaDigests {
+src/config/model/digest.rs: pub(crate) const fn tasks(&self) -> TaskDigests {
+src/config/model/digest.rs: pub(crate) const fn templates(&self) -> TemplateDigests {
 src/config/model/digest.rs: pub(crate) fn compose(&self) -> Blake3Digest {
 src/config/model/digest.rs: pub(crate) fn digests(&self) -> ConfigDigests {
-src/config/model/digest.rs: pub(crate) frontmatter: FrontmatterDigests,
-src/config/model/digest.rs: pub(crate) root: Blake3Digest,
-src/config/model/digest.rs: pub(crate) schemas: SchemaDigests,
 src/config/model/digest.rs: pub(crate) struct ConfigDigests {
-src/config/model/digest.rs: pub(crate) tasks: TaskDigests,
-src/config/model/digest.rs: pub(crate) templates: TemplateDigests,
 src/config/model/digest.rs: pub(in super::super) const NAMES: [&str; 15] = [
 src/config/model/digest.rs: pub(in super::super) fn base() -> Config {
 src/config/model/digest.rs: pub(in super::super) fn ordered(
@@ -170,23 +170,23 @@ src/config/model/frontmatter.rs: pub fn title_name(&self) -> &str {
 src/config/model/frontmatter.rs: pub fn with_tags_name<T: Into<String>>(mut self, tags: T) -> Self {
 src/config/model/frontmatter.rs: pub struct DateFieldConfig {
 src/config/model/frontmatter.rs: pub struct FrontmatterConfig {
-src/config/model/frontmatter.rs: pub(crate) aliases: Blake3Digest,
-src/config/model/frontmatter.rs: pub(crate) date_created: DateFieldDigests,
-src/config/model/frontmatter.rs: pub(crate) date_modified: DateFieldDigests,
-src/config/model/frontmatter.rs: pub(crate) format: Blake3Digest,
-src/config/model/frontmatter.rs: pub(crate) name: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) const fn aliases(&self) -> Blake3Digest {
+src/config/model/frontmatter.rs: pub(crate) const fn date_created(&self) -> DateFieldDigests {
+src/config/model/frontmatter.rs: pub(crate) const fn date_modified(&self) -> DateFieldDigests {
+src/config/model/frontmatter.rs: pub(crate) const fn format(&self) -> Blake3Digest {
+src/config/model/frontmatter.rs: pub(crate) const fn name(&self) -> Blake3Digest {
+src/config/model/frontmatter.rs: pub(crate) const fn tags(&self) -> Blake3Digest {
+src/config/model/frontmatter.rs: pub(crate) const fn title(&self) -> Blake3Digest {
 src/config/model/frontmatter.rs: pub(crate) struct DateFieldDigests {
 src/config/model/frontmatter.rs: pub(crate) struct FrontmatterDigests {
-src/config/model/frontmatter.rs: pub(crate) tags: Blake3Digest,
-src/config/model/frontmatter.rs: pub(crate) title: Blake3Digest,
 src/config/model/frontmatter.rs: pub(super) fn digests(&self) -> FrontmatterDigests {
 src/config/model/frontmatter.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
 src/config/model/schemas.rs: pub fn class_field_name(&self) -> &str {
 src/config/model/schemas.rs: pub fn directory(&self) -> &Path {
 src/config/model/schemas.rs: pub fn for_test(class_field: &str) -> Self {
 src/config/model/schemas.rs: pub struct SchemasConfig {
-src/config/model/schemas.rs: pub(crate) class_field: Blake3Digest,
-src/config/model/schemas.rs: pub(crate) directory: Blake3Digest,
+src/config/model/schemas.rs: pub(crate) const fn class_field(&self) -> Blake3Digest {
+src/config/model/schemas.rs: pub(crate) const fn directory(&self) -> Blake3Digest {
 src/config/model/schemas.rs: pub(crate) struct SchemaDigests {
 src/config/model/schemas.rs: pub(in crate::config) const DEFAULT_CLASS_FIELD: &str = "class";
 src/config/model/schemas.rs: pub(in crate::config) const DEFAULT_LOCAL_SCHEMAS_DIR: &str =
@@ -199,15 +199,15 @@ src/config/model/tasks.rs: pub fn from_tags(tags: &[&str]) -> Self {
 src/config/model/tasks.rs: pub fn tag_filters(&self) -> &[Tag] {
 src/config/model/tasks.rs: pub struct TaskConfig {
 src/config/model/tasks.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
-src/config/model/tasks.rs: pub(crate) statuses: Blake3Digest,
+src/config/model/tasks.rs: pub(crate) const fn statuses(&self) -> Blake3Digest {
+src/config/model/tasks.rs: pub(crate) const fn tag_filters(&self) -> Blake3Digest {
 src/config/model/tasks.rs: pub(crate) struct TaskDigests {
-src/config/model/tasks.rs: pub(crate) tag_filters: Blake3Digest,
 src/config/model/tasks.rs: pub(super) fn digests(&self) -> TaskDigests {
 src/config/model/tasks.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
 src/config/model/templates.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
-src/config/model/templates.rs: pub(crate) global: Blake3Digest,
-src/config/model/templates.rs: pub(crate) local: Blake3Digest,
-src/config/model/templates.rs: pub(crate) output: Blake3Digest,
+src/config/model/templates.rs: pub(crate) const fn global(&self) -> Blake3Digest {
+src/config/model/templates.rs: pub(crate) const fn local(&self) -> Blake3Digest {
+src/config/model/templates.rs: pub(crate) const fn output(&self) -> Blake3Digest {
 src/config/model/templates.rs: pub(crate) struct TemplateDigests {
 src/config/model/templates.rs: pub(in crate::config) const fn new(
 src/config/model/templates.rs: pub(in crate::config) struct TemplateConfig {

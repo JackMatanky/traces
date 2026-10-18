@@ -63,9 +63,36 @@ const TEMPLATES_OUTPUT: &[u8] = b"templates.output";
 /// Holds the digests of [`TemplateConfig`] settings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct TemplateDigests {
-    pub(crate) local: Blake3Digest,
-    pub(crate) global: Blake3Digest,
-    pub(crate) output: Blake3Digest,
+    local: Blake3Digest,
+    global: Blake3Digest,
+    output: Blake3Digest,
+}
+
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "reserved for index cache invalidation")
+)]
+impl TemplateDigests {
+    /// Returns the digest of the local Template Directory setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn local(&self) -> Blake3Digest {
+        self.local
+    }
+
+    /// Returns the digest of the global Template Directory setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn global(&self) -> Blake3Digest {
+        self.global
+    }
+
+    /// Returns the digest of the output directory setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn output(&self) -> Blake3Digest {
+        self.output
+    }
 }
 
 impl TemplateDigests {

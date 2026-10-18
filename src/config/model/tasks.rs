@@ -135,8 +135,28 @@ const TASKS_TAG_FILTERS: &[u8] = b"tasks.tag_filters";
 /// Holds the digests of [`TaskConfig`] settings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct TaskDigests {
-    pub(crate) statuses: Blake3Digest,
-    pub(crate) tag_filters: Blake3Digest,
+    statuses: Blake3Digest,
+    tag_filters: Blake3Digest,
+}
+
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "reserved for index cache invalidation")
+)]
+impl TaskDigests {
+    /// Returns the digest of the task statuses setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn statuses(&self) -> Blake3Digest {
+        self.statuses
+    }
+
+    /// Returns the digest of the task tag filters setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn tag_filters(&self) -> Blake3Digest {
+        self.tag_filters
+    }
 }
 
 impl TaskDigests {

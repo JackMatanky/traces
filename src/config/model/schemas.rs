@@ -116,8 +116,28 @@ const SCHEMAS_CLASS_FIELD: &[u8] = b"schemas.class_field";
 /// Holds the digests of [`SchemasConfig`] settings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct SchemaDigests {
-    pub(crate) directory: Blake3Digest,
-    pub(crate) class_field: Blake3Digest,
+    directory: Blake3Digest,
+    class_field: Blake3Digest,
+}
+
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "reserved for index cache invalidation")
+)]
+impl SchemaDigests {
+    /// Returns the digest of the schema registry directory setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn directory(&self) -> Blake3Digest {
+        self.directory
+    }
+
+    /// Returns the digest of the class field setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn class_field(&self) -> Blake3Digest {
+        self.class_field
+    }
 }
 
 impl SchemaDigests {

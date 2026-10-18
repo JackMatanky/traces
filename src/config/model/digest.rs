@@ -30,11 +30,52 @@ const ROOT: &[u8] = b"root";
 /// Holds one framed digest per resolved setting, grouped by config section.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigDigests {
-    pub(crate) root: Blake3Digest,
-    pub(crate) templates: TemplateDigests,
-    pub(crate) schemas: SchemaDigests,
-    pub(crate) frontmatter: FrontmatterDigests,
-    pub(crate) tasks: TaskDigests,
+    root: Blake3Digest,
+    templates: TemplateDigests,
+    schemas: SchemaDigests,
+    frontmatter: FrontmatterDigests,
+    tasks: TaskDigests,
+}
+
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "reserved for index cache invalidation")
+)]
+impl ConfigDigests {
+    /// Returns the digest of the workspace root setting.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn root(&self) -> Blake3Digest {
+        self.root
+    }
+
+    /// Returns the Template Directory digests.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn templates(&self) -> TemplateDigests {
+        self.templates
+    }
+
+    /// Returns the schema settings digests.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn schemas(&self) -> SchemaDigests {
+        self.schemas
+    }
+
+    /// Returns the frontmatter settings digests.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn frontmatter(&self) -> FrontmatterDigests {
+        self.frontmatter
+    }
+
+    /// Returns the Task Configuration digests.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn tasks(&self) -> TaskDigests {
+        self.tasks
+    }
 }
 
 /// Digests one setting: the label's length-prefixed bytes, then the value
@@ -142,49 +183,26 @@ mod tests {
         pub(in super::super) fn ordered(
             digests: &ConfigDigests,
         ) -> [Blake3Digest; 15] {
-            let ConfigDigests {
-                root,
-                templates:
-                    TemplateDigests {
-                        local,
-                        global,
-                        output,
-                    },
-                schemas:
-                    SchemaDigests {
-                        directory,
-                        class_field,
-                    },
-                frontmatter:
-                    FrontmatterDigests {
-                        title,
-                        aliases,
-                        tags,
-                        date_created,
-                        date_modified,
-                    },
-                tasks:
-                    TaskDigests {
-                        statuses,
-                        tag_filters,
-                    },
-            } = digests;
+            let templates = digests.templates();
+            let schemas = digests.schemas();
+            let frontmatter = digests.frontmatter();
+            let tasks = digests.tasks();
             [
-                *root,
-                *local,
-                *global,
-                *output,
-                *directory,
-                *class_field,
-                *title,
-                *aliases,
-                *tags,
-                date_created.name,
-                date_created.format,
-                date_modified.name,
-                date_modified.format,
-                *statuses,
-                *tag_filters,
+                digests.root(),
+                templates.local(),
+                templates.global(),
+                templates.output(),
+                schemas.directory(),
+                schemas.class_field(),
+                frontmatter.title(),
+                frontmatter.aliases(),
+                frontmatter.tags(),
+                frontmatter.date_created().name(),
+                frontmatter.date_created().format(),
+                frontmatter.date_modified().name(),
+                frontmatter.date_modified().format(),
+                tasks.statuses(),
+                tasks.tag_filters(),
             ]
         }
     }
@@ -242,7 +260,7 @@ mod tests {
             let digests = base().digests();
 
             assert_eq!(
-                digests.schemas.class_field.to_hex().as_ref(),
+                digests.schemas().class_field().to_hex().as_ref(),
                 raw.finalize().to_hex().as_str()
             );
         }
@@ -259,7 +277,7 @@ mod tests {
             let digests = base().digests();
 
             assert_eq!(
-                digests.templates.local.to_hex().as_ref(),
+                digests.templates().local().to_hex().as_ref(),
                 raw.finalize().to_hex().as_str()
             );
         }
