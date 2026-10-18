@@ -1,0 +1,30 @@
+# Index read model: role of redb, in-memory structure, and mutation/overlay
+
+Type: grilling
+Blocked by: 02, 03, 14, 06
+
+## Question
+
+The index has three roles tangled together: a persisted cache (`IndexStore`, ~2.7K lines: redb lifecycle/recovery, whole-table codec, incremental patching, secondary-index extraction from `Note` facets such as tags and file classes, and query-backend point reads), an immutable in-memory snapshot (`WorkspaceIndex`: path-sorted `FileEntry` slice, inlinks), and a derived link graph (`InlinkMap`, `LinkResolver`, trie). Queries reportedly take two entirely different paths: an in-memory linear scan and a store-backed multimap candidate selection that synthesizes a transient `WorkspaceIndex`. Freshness on `main` is mtime/size only; config drift is being added by in-flight work (see *Fixed inputs*). The LSP needs an in-memory mutable/overlayable index that never writes redb per keystroke. Decide the **target read model**: what redb is for (warm-start cache vs queryable store), whether secondary indexes live in storage, in memory, or nowhere, whether one query path remains, what the snapshot/mutation/overlay contract is, and where the storage engine ends and index semantics begin.
+
+## Fixed inputs (in-flight, NOT open here)
+
+The maintainer is implementing [config-service/07](../../config-service/issues/07-config-digest-sections.md) then [index-query/17](../../index-query/issues/17-config-drift-detection-and-rebuild.md) (map Notes, *In-flight implementation baseline*). Decided and assumed landed: the index owns invalidation policy through an index-owned `IndexFingerprint` consuming `ConfigDigests` (`index → config` only); the store carries a `meta` table written in the same transaction as the index rows; a legacy store wipes at open; refresh has a `Drifted` state that wins over staleness and is fail-closed for a populated store with a missing/undecodable meta row; `RefreshReport` is `Unchanged | FilesChanged | ConfigDrift`. This ticket decides the read model *around* those facts: the target design must have a natural home for the fingerprint row and the drift state, and must not require re-deciding them. A real tension (for example, if dropping or relocating store tables would orphan the `meta` row's same-transaction guarantee) is recorded as an *amendment candidate* for the maintainer, not resolved unilaterally.
+
+## Evidence status
+
+Survey leads (UNVERIFIED until tickets [Verify system findings](02-research-verify-system-findings.md) §1–2 and [Performance evidence](03-research-performance-evidence.md) land): [index §2–§9, §11](../survey/index.md), [query §7, §11.1](../survey/query.md). Plans to treat as inputs: ADR-0005 and ADR-0009 (index refresh), md-pkm-lsp tickets 10 (analysis host, `Arc<WorkspaceIndex>` swap), 13 (persistence), 14 (live-buffer overlay), 33 (performance targets: inverted index built now, <100 MB idle). The "keep" hypothesis for the `InlinkMap` flat-scan/trie hybrid is not in dispute here unless evidence emerges.
+
+**Verified (ledgers landed 2026-10-18)** — [02 §1–2, §8](../research/02-verify-system-findings.md): `IndexStore` has seven responsibility clusters over ~1,560 production lines (lifecycle/recovery, transactions, table codec primitives, bulk reads, incremental patching, secondary-axis extraction from `Note` via `IndexDimension::visit_values`, query-backend reads); `query::service` calls store methods directly via `pub(crate)`. `main` has **8 tables** (`FILES`, `NOTES`, `LINKS`, `PATHS_BY_TAG`, `PATHS_BY_FILE_CLASS`, `TAGS_BY_PATH`, `FILE_CLASSES_BY_PATH`, `CACHE_FORMAT`; no `lists` table; ADR-0005 and the LSP map's "three tables" are wrong) — reconcile this count with `index-query/17`'s "legacy 7-table store" wording when 17 lands. The **CLI uses only `run_from_store`; templates use only `run`**; both share row expansion and plan execution and give identical results for `Not`, class, and folder sources (`Not` and folder sources fall back to *all* indexed paths). Fail-open exists only for incremental persist in `refresh`; opening a store fails closed and `refresh_store` propagates persist failure. `SortedByPath::assumed_sorted` is a `debug_assert!` only. [03 §2, §3, §5, §8](../research/03-performance-evidence.md): fixed floors — redb commit ≈ 36.8 ms, redb open+read ≈ 16.0 ms, process start ≈ 4.5 ms, config+trust ≈ 0.3–1.5 ms. In-memory `QueryService::run` costs 3.9 µs (1K notes) / 75 µs (20K); store-backed 1-match query costs 16–71 ms and allocates 21.2 MB / 129k allocations at 20K to assemble a transient index. End-to-end at 20K notes: no-change refresh 92.6 ms, selective query 55.0 ms, unfiltered 93.1 ms, cold build 1.30 s; the 55 ms selective floor is dominated by directory scan + `stat` (~40–45 ms). **Implication:** the survey hypothesis that an in-memory inverted index would speed CLI queries is not supported (scans are µs); measured cost sits in the filesystem walk, redb floors, and whole-index assembly (55% of in-memory build at 20K).
+
+## Alternatives (not exhaustive)
+
+- redb as a pure warm-start cache that loads into an in-memory structure with its own inverted indexes; one query path.
+- Keep store-backed selective queries but split the storage engine from index semantics so storage is domain-agnostic.
+- Drop secondary indexes from redb (derive in memory) if the cold-query evidence does not justify them.
+- Snapshot-plus-delta (immutable snapshots, overlay layer for unsaved buffers) vs a mutable index with versioned reads.
+- Where the fingerprint/meta row and the refresh state machine sit relative to the storage-engine / index-semantics split (the decision to check drift at refresh and write it in the same transaction is fixed).
+
+## Done when
+
+The answer states the components and their seams (engine, index semantics, snapshot, link graph), the single (or deliberately dual) query-facing read interface, the persistence format ownership and versioning, the freshness/invalidation contract, the mutation/overlay model for a live host, complexity claims backed by [Performance evidence](03-research-performance-evidence.md)'s numbers, and the effect on the query-core and host tickets.
