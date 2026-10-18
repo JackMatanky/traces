@@ -24,6 +24,9 @@ use thiserror::Error;
 pub struct Blake3Digest(blake3::Hash);
 
 impl Blake3Digest {
+    /// Counts the bytes of a raw digest.
+    pub(crate) const LEN: usize = blake3::OUT_LEN;
+
     /// Computes the BLAKE3 hash of `path`'s current contents.
     ///
     /// Reads `path` fully into memory before hashing. Use this only when the
@@ -48,6 +51,20 @@ impl Blake3Digest {
     #[must_use]
     pub fn to_hex(self) -> impl AsRef<str> + Display {
         self.0.to_hex()
+    }
+
+    /// Returns the raw digest bytes, the form persisted by stores.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn to_bytes(self) -> [u8; Self::LEN] {
+        *self.0.as_bytes()
+    }
+
+    /// Rebuilds a digest from the raw bytes [`Self::to_bytes`] produced.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn from_bytes(bytes: [u8; Self::LEN]) -> Self {
+        Self(blake3::Hash::from_bytes(bytes))
     }
 }
 
@@ -258,6 +275,14 @@ mod tests {
             assert_eq!(display_string.len(), 64);
             let expected_raw_hash = blake3::hash(b"hello").to_hex().to_string();
             assert_eq!(display_string, expected_raw_hash);
+        }
+
+        #[test]
+        fn round_trips_through_raw_bytes() {
+            let digest = Blake3Digest::from("hello");
+
+            assert_eq!(digest.to_bytes(), *blake3::hash(b"hello").as_bytes());
+            assert_eq!(Blake3Digest::from_bytes(digest.to_bytes()), digest);
         }
     }
 

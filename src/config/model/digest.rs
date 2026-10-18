@@ -30,16 +30,16 @@ const CONFIG_LABEL: &[u8] = b"traces.config.v1";
 /// Holds one framed digest per resolved setting, grouped by config section.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigDigests {
-    root: Blake3Digest,
-    templates: TemplateDigests,
-    schemas: SchemaDigests,
-    frontmatter: FrontmatterDigests,
-    tasks: TaskDigests,
+    pub(crate) root: Blake3Digest,
+    pub(crate) templates: TemplateDigests,
+    pub(crate) schemas: SchemaDigests,
+    pub(crate) frontmatter: FrontmatterDigests,
+    pub(crate) tasks: TaskDigests,
 }
 
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "reserved for index cache invalidation")
+    expect(dead_code, reason = "compose is reached only through Config::hash")
 )]
 impl ConfigDigests {
     /// Composes every setting digest into one digest under
@@ -64,41 +64,6 @@ impl ConfigDigests {
         frontmatter.feed_into(&mut fp);
         tasks.feed_into(&mut fp);
         fp.finish()
-    }
-
-    /// Returns the digest of the workspace root setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn root(&self) -> Blake3Digest {
-        self.root
-    }
-
-    /// Returns the Template Directory digests.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn templates(&self) -> TemplateDigests {
-        self.templates
-    }
-
-    /// Returns the schema settings digests.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn schemas(&self) -> SchemaDigests {
-        self.schemas
-    }
-
-    /// Returns the frontmatter settings digests.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn frontmatter(&self) -> FrontmatterDigests {
-        self.frontmatter
-    }
-
-    /// Returns the Task Configuration digests.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn tasks(&self) -> TaskDigests {
-        self.tasks
     }
 
     /// Assembles the resolved setting digests in declaration order.
@@ -386,26 +351,29 @@ mod tests {
         pub(in super::super) fn ordered(
             digests: &ConfigDigests,
         ) -> [Blake3Digest; 15] {
-            let templates = digests.templates();
-            let schemas = digests.schemas();
-            let frontmatter = digests.frontmatter();
-            let tasks = digests.tasks();
+            let ConfigDigests {
+                root,
+                templates,
+                schemas,
+                frontmatter,
+                tasks,
+            } = *digests;
             [
-                digests.root(),
+                root,
                 templates.local(),
                 templates.global(),
                 templates.output(),
-                schemas.directory(),
-                schemas.class_field(),
-                frontmatter.title(),
-                frontmatter.aliases(),
-                frontmatter.tags(),
-                frontmatter.date_created().name(),
-                frontmatter.date_created().format(),
-                frontmatter.date_modified().name(),
-                frontmatter.date_modified().format(),
-                tasks.statuses(),
-                tasks.tag_filters(),
+                schemas.directory,
+                schemas.class_field,
+                frontmatter.title,
+                frontmatter.aliases,
+                frontmatter.tags,
+                frontmatter.date_created.name,
+                frontmatter.date_created.format,
+                frontmatter.date_modified.name,
+                frontmatter.date_modified.format,
+                tasks.statuses,
+                tasks.tag_filters,
             ]
         }
     }

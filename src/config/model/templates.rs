@@ -88,7 +88,7 @@ pub(crate) struct TemplateDigests {
 
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "reserved for index cache invalidation")
+    expect(dead_code, reason = "the index ignores template directories")
 )]
 impl TemplateDigests {
     /// Returns the digest of the local Template Directory setting.

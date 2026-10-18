@@ -61,7 +61,10 @@ pub(crate) use error::{
 pub(crate) use file::LocalConfigFile;
 pub(crate) use file::{LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE};
 pub use model::{Config, FrontmatterConfig, SchemasConfig, TaskConfig};
-pub(crate) use model::{ConfigSubDir, DEFAULT_LOCAL_TEMPLATES_DIR};
+pub(crate) use model::{
+    ConfigDigests, ConfigSubDir, DEFAULT_LOCAL_TEMPLATES_DIR, DateFieldDigests,
+    FrontmatterDigests, SchemaDigests, TaskDigests,
+};
 pub(crate) use raw::{RawConfig, RawTemplateConfig};
 pub use service::ConfigService;
 pub(crate) use tracker::TrackerStore;

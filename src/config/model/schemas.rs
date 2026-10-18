@@ -130,29 +130,11 @@ const SCHEMAS_CLASS_FIELD: &[u8] = b"schemas.class_field";
 /// Holds the digests of [`SchemasConfig`] settings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SchemaDigests {
-    directory: Blake3Digest,
-    class_field: Blake3Digest,
+    pub(crate) directory: Blake3Digest,
+    pub(crate) class_field: Blake3Digest,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "reserved for index cache invalidation")
-)]
 impl SchemaDigests {
-    /// Returns the digest of the schema registry directory setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn directory(&self) -> Blake3Digest {
-        self.directory
-    }
-
-    /// Returns the digest of the class field setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn class_field(&self) -> Blake3Digest {
-        self.class_field
-    }
-
     /// Feeds every setting digest in declaration order.
     pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
@@ -195,7 +177,7 @@ mod tests {
         }
 
         fn ordered(digests: &SchemaDigests) -> [Blake3Digest; 2] {
-            [digests.directory(), digests.class_field()]
+            [digests.directory, digests.class_field]
         }
 
         #[test]
@@ -209,7 +191,7 @@ mod tests {
             let digests = base().digests();
 
             assert_eq!(
-                digests.class_field().to_hex().as_ref(),
+                digests.class_field.to_hex().as_ref(),
                 raw.finalize().to_hex().as_str()
             );
         }

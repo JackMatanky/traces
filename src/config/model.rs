@@ -22,11 +22,15 @@ use std::{
     sync::Arc,
 };
 
-use digest::{ConfigDigests, setting};
+pub(crate) use digest::ConfigDigests;
+use digest::setting;
 pub use frontmatter::FrontmatterConfig;
+pub(crate) use frontmatter::{DateFieldDigests, FrontmatterDigests};
+pub(crate) use schemas::SchemaDigests;
 pub use schemas::SchemasConfig;
 pub(super) use schemas::{DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR};
 pub use tasks::TaskConfig;
+pub(crate) use tasks::TaskDigests;
 pub(crate) use templates::DEFAULT_LOCAL_TEMPLATES_DIR;
 pub(super) use templates::TemplateConfig;
 
@@ -140,17 +144,17 @@ impl Config {
     /// Computes the Config Fingerprint: every setting digest of
     /// [`Config::digests`] composed under `b"traces.config.v1"`.
     ///
-    /// Persisted fingerprints support index cache invalidation across process
-    /// restarts, so the encoding is pinned by tests; see the `digest` module
-    /// for the framing.
+    /// The index does not persist this digest; it stores a subset of the
+    /// per-setting digests instead. The encoding is pinned by tests; see the
+    /// `digest` module for the framing.
     #[inline]
     #[must_use]
     #[cfg_attr(
         not(test),
         expect(
             dead_code,
-            reason = "no current caller outside tests; reserved for future \
-                      index cache invalidation"
+            reason = "no caller outside tests; the index fingerprints \
+                      per-setting digests instead"
         )
     )]
     pub(crate) fn hash(&self) -> Blake3Digest {
@@ -431,7 +435,7 @@ mod tests {
             raw.update(path);
 
             assert_eq!(
-                config.digests().root().to_hex().as_ref(),
+                config.digests().root.to_hex().as_ref(),
                 raw.finalize().to_hex().as_str()
             );
         }
