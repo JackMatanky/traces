@@ -210,7 +210,7 @@ impl<'a> TaskScan<'a> {
         fields
             .get(&FieldKeyRef::new(key_name))?
             .iter()
-            .find_map(|val| val.as_date().map(Into::into))
+            .find_map(NoteFieldValue::as_date)
     }
 
     /// Collapses in-line whitespace runs to single spaces, drops blank lines,
@@ -300,7 +300,6 @@ pub(super) struct TaskClassificationParams<'a> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
     use rstest::rstest;
 
     use super::{super::list::ListTracker, *};
@@ -1116,7 +1115,7 @@ mod tests {
         use super::*;
 
         fn date(year: i32, month: u32, day: u32) -> Option<DateValue> {
-            NaiveDate::from_ymd_opt(year, month, day).map(Into::into)
+            DateValue::from_ymd(year, month, day).ok()
         }
         #[rstest]
         #[case::emoji(

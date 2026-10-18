@@ -242,63 +242,6 @@ src/config/trust.rs: pub(super) fn project(&self, name: &str) -> PathBuf {
 src/config/trust.rs: pub(super) fn write_config(root: &Path, contents: &str) -> PathBuf {
 src/config/trust.rs: pub(super) store: TrustStore,
 src/config/trust.rs: pub(super) struct Fixture {
-src/date.rs: pub enum DateError {
-src/date.rs: pub struct DateTimeValue(DateTime<Utc>);
-src/date.rs: pub struct DateValue(NaiveDate);
-src/date.rs: pub(crate) const ALL: [Self; 2] = [Self::Full, Self::YearMonth];
-src/date.rs: pub(crate) const ALL: [Self; 7] = [
-src/date.rs: pub(crate) const DEFAULT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
-src/date.rs: pub(crate) const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
-src/date.rs: pub(crate) const fn has_time(&self) -> bool {
-src/date.rs: pub(crate) const fn has_time(self) -> bool {
-src/date.rs: pub(crate) const fn into_inner(self) -> DateTime<Utc> {
-src/date.rs: pub(crate) const fn into_inner(self) -> NaiveDate {
-src/date.rs: pub(crate) const fn new(
-src/date.rs: pub(crate) const fn pattern(self) -> Option<&'static str> {
-src/date.rs: pub(crate) enum DateDiff {
-src/date.rs: pub(crate) enum DateFormat {
-src/date.rs: pub(crate) enum DateTimeFormat {
-src/date.rs: pub(crate) enum ParsedDateTimeShape {
-src/date.rs: pub(crate) enum Precision {
-src/date.rs: pub(crate) enum RecognizedDateValue {
-src/date.rs: pub(crate) fn apply(
-src/date.rs: pub(crate) fn apply(
-src/date.rs: pub(crate) fn apply(
-src/date.rs: pub(crate) fn classify(
-src/date.rs: pub(crate) fn date(&self) -> DateValue {
-src/date.rs: pub(crate) fn date(self) -> DateValue {
-src/date.rs: pub(crate) fn diff(
-src/date.rs: pub(crate) fn format_pattern(self, wall: NaiveDateTime) -> &'static str {
-src/date.rs: pub(crate) fn from_recognized(rec: &RecognizedDate) -> Self {
-src/date.rs: pub(crate) fn instant(&self) -> DateTime<Utc> {
-src/date.rs: pub(crate) fn is_equal_to_date(self, date: DateValue) -> bool {
-src/date.rs: pub(crate) fn local_wall(self) -> Option<NaiveDateTime> {
-src/date.rs: pub(crate) fn month_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn parse_any(
-src/date.rs: pub(crate) fn parse_any(
-src/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn parse_prefix(s: &str) -> Option<(RecognizedDate, usize)> {
-src/date.rs: pub(crate) fn parse_with(
-src/date.rs: pub(crate) fn point(&self) -> DatePoint {
-src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn shift(
-src/date.rs: pub(crate) fn to_date_string(self) -> String {
-src/date.rs: pub(crate) fn to_datetime_string(self) -> String {
-src/date.rs: pub(crate) fn to_f64(self) -> Option<f64> {
-src/date.rs: pub(crate) fn wall_or_utc(&self) -> NaiveDateTime {
-src/date.rs: pub(crate) fn wall_or_utc(self) -> NaiveDateTime {
-src/date.rs: pub(crate) fn week_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date.rs: pub(crate) fn weekday_point(
-src/date.rs: pub(crate) fn year_boundary(self, end: bool) -> Result<Self, DateError> {
-src/date.rs: pub(crate) instant: DateTime<Utc>,
-src/date.rs: pub(crate) precision: Precision,
-src/date.rs: pub(crate) precision: Precision,
-src/date.rs: pub(crate) struct DatePoint {
-src/date.rs: pub(crate) struct RecognizedDate {
-src/date.rs: pub(crate) value: RecognizedDateValue,
-src/date.rs: pub(crate) wall: NaiveDateTime,
 src/delimiter.rs: pub(crate) const fn classify(character: char) -> Option<Self> {
 src/delimiter.rs: pub(crate) const fn close_char(self) -> Option<char> {
 src/delimiter.rs: pub(crate) const fn close_len(self) -> usize {
@@ -344,35 +287,6 @@ src/dirtree.rs: pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
 src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
 src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 src/dirtree.rs: pub(crate) struct DirTree {
-src/duration.rs: pub enum DurationError {
-src/duration.rs: pub struct DurationValue {
-src/duration.rs: pub(crate) const UNIT_HINT: &str =
-src/duration.rs: pub(crate) const fn as_f64(self) -> f64 {
-src/duration.rs: pub(crate) const fn fixed_seconds(self) -> f64 {
-src/duration.rs: pub(crate) const fn fixed_seconds_i64(self) -> Option<i64> {
-src/duration.rs: pub(crate) const fn is_calendar(self) -> bool {
-src/duration.rs: pub(crate) const fn to_seconds(&self) -> DurationSeconds {
-src/duration.rs: pub(crate) enum DurationUnit {
-src/duration.rs: pub(crate) fn as_str(&self) -> &str {
-src/duration.rs: pub(crate) fn classify(s: &str) -> Option<Result<Self, DurationError>> {
-src/duration.rs: pub(crate) fn from_seconds(seconds: DurationSeconds) -> Self {
-src/duration.rs: pub(crate) fn is_calendar(&self) -> bool {
-src/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
-src/duration.rs: pub(crate) fn parse(unit: &str) -> Option<Self> {
-src/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<(Self, usize)> {
-src/duration.rs: pub(crate) fn parts(&self) -> Option<&[(f64, DurationUnit)]> {
-src/duration.rs: pub(crate) struct DurationSeconds(pub(crate) f64);
-src/duration.rs: pub(super) enum ScanMode {
-src/duration.rs: pub(super) fn apply_sign(
-src/duration.rs: pub(super) fn can_start_duration_segment(bytes: &[u8], pos: usize) -> bool {
-src/duration.rs: pub(super) fn has_digits_after_sign(
-src/duration.rs: pub(super) fn parse_number(
-src/duration.rs: pub(super) fn parse_unit(
-src/duration.rs: pub(super) fn parsed_number(
-src/duration.rs: pub(super) fn parsed_unit(
-src/duration.rs: pub(super) fn scan_part(
-src/duration.rs: pub(super) fn skip_separators(bytes: &[u8], pos: &mut usize) {
-src/duration.rs: pub(super) fn skip_whitespace(bytes: &[u8], pos: &mut usize) {
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =
@@ -587,13 +501,14 @@ src/index/store.rs: pub(super) fn wrap_redb_error(
 src/index/store.rs: pub(super) struct IndexDimensions {
 src/index/store.rs: pub(super) struct PersistRequest<'a> {
 src/index/store.rs: pub(super) type StoreSnapshot =
+src/index/tables.rs: pub(super) const CACHE_FORMAT: TableDefinition<
 src/index/tables.rs: pub(super) const FILES: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const LINKS: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const NOTES: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const PATHS_BY_TAG: MultimapTableDefinition<
-src/index/tables.rs: pub(super) const TABLES: [TableSpec; 7] = [
+src/index/tables.rs: pub(super) const TABLES: [TableSpec; 8] = [
 src/index/tables.rs: pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
 src/index/tables.rs: pub(super) fn delete(
 src/index/tables.rs: pub(super) fn probe(
@@ -607,6 +522,7 @@ src/lexer.rs: pub(crate) desc: &'static str,
 src/lexer.rs: pub(crate) enum LexError {
 src/lexer.rs: pub(crate) fn expect<U>(
 src/lexer.rs: pub(crate) fn expect_map<F, R>(
+src/lexer.rs: pub(crate) fn lex_prefix<T>(
 src/lexer.rs: pub(crate) fn lexical_unquote(raw: &str) -> String {
 src/lexer.rs: pub(crate) fn new(tokens: Vec<T>) -> Self {
 src/lexer.rs: pub(crate) fn next(&mut self) -> Option<T> {
@@ -632,14 +548,12 @@ src/lib.rs: pub fn create_trusted_project(
 src/lib.rs: pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
 src/lib.rs: pub fn fixture_service(root: &Path) -> ConfigService {
 src/lib.rs: pub fn indexer(&self) -> IndexerService {
-src/lib.rs: pub fn keep() {
 src/lib.rs: pub fn parse_note<P: AsRef<Path>>(path: P, src: &str) -> Note {
 src/lib.rs: pub fn parse_note_str(src: &str) -> Note {
 src/lib.rs: pub fn parse_tag(s: &str) -> Tag {
 src/lib.rs: pub fn resolve_safe_path<P: AsRef<Path>>(
 src/lib.rs: pub fn root(&self) -> &Path {
 src/lib.rs: pub fn service(&self) -> &ConfigService {
-src/lib.rs: pub fn set(zone: &str) {
 src/lib.rs: pub fn trust(&self) {
 src/lib.rs: pub fn trusted<P: Into<PathBuf>>(root: P) -> Self {
 src/lib.rs: pub fn untrust(&self) -> usize {
@@ -655,21 +569,17 @@ src/lib.rs: pub fn write_template<P: AsRef<Path>>(
 src/lib.rs: pub mod cli;
 src/lib.rs: pub mod testing {
 src/lib.rs: pub struct TestProject {
-src/lib.rs: pub struct TzGuard {
 src/lib.rs: pub use crate::{
-src/lib.rs: pub use date::{DateError, DateTimeValue, DateValue};
 src/lib.rs: pub use dialog::{
-src/lib.rs: pub use duration::{DurationError, DurationValue};
 src/lib.rs: pub use file::FileMeta;
 src/lib.rs: pub use note::{
 src/lib.rs: pub use position::{PositionError, SourceLine};
 src/lib.rs: pub use tag::{Tag, TagError};
 src/lib.rs: pub use task::{
+src/lib.rs: pub use temporal::{
 src/lib.rs: pub(crate) use config::{Config, ConfigService, TaskConfig, TrustRequest};
-src/lib.rs: pub(crate) use date::{DEFAULT_DATE_FORMAT, DEFAULT_DATETIME_FORMAT};
 src/lib.rs: pub(crate) use delimiter::DelimiterType;
 src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
-src/lib.rs: pub(crate) use duration::{DurationSeconds, DurationUnit, UNIT_HINT};
 src/lib.rs: pub(crate) use field::{
 src/lib.rs: pub(crate) use file::{BaseName, BaseNameRef, FileName};
 src/lib.rs: pub(crate) use file_tracker::{
@@ -679,23 +589,24 @@ src/lib.rs: pub(crate) use lexer::{
 src/lib.rs: pub(crate) use note::NoteFieldType;
 src/lib.rs: pub(crate) use position::{BytePos, ByteSpan, LineIndex, Spanned};
 src/lib.rs: pub(crate) use template::TemplateService;
+src/lib.rs: pub(crate) use temporal::{
 src/note/cursor.rs: pub(super) const fn len(&self) -> usize {
 src/note/cursor.rs: pub(super) const fn new(source: &'a str) -> Self {
 src/note/cursor.rs: pub(super) fn advance(&self, pos: usize, bytes: usize) -> usize {
 src/note/cursor.rs: pub(super) fn advance_char(&self, pos: usize, ch: char) -> usize {
 src/note/cursor.rs: pub(super) fn from(&self, pos: usize) -> Option<&'a str> {
 src/note/cursor.rs: pub(super) fn get(&self, range: Range<usize>) -> Option<&'a str> {
-src/note/cursor.rs: pub(super) fn token_end(
 src/note/cursor.rs: pub(super) struct SourceText<'a>(&'a str);
 src/note/field.rs: pub enum NoteFieldValue {
 src/note/field.rs: pub enum NoteFieldValueRef<'a> {
-src/note/field.rs: pub fn as_date(&self) -> Option<chrono::NaiveDate> {
+src/note/field.rs: pub fn as_date(&self) -> Option<DateValue> {
 src/note/field.rs: pub fn as_ref(&self) -> NoteFieldValueRef<'_> {
 src/note/field.rs: pub fn as_str(&self) -> Option<&str> {
 src/note/field.rs: pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
 src/note/field.rs: pub(crate) const fn rank(self) -> u8 {
 src/note/field.rs: pub(crate) enum NoteFieldType {
 src/note/field.rs: pub(crate) fn append_text(&self, out: &mut String) {
+src/note/field.rs: pub(crate) fn as_date_point(&self) -> Option<DatePoint> {
 src/note/field.rs: pub(crate) fn as_str(&self) -> Option<&str> {
 src/note/field.rs: pub(crate) fn is_containing(&self, target: &NoteFieldValue) -> bool {
 src/note/field.rs: pub(crate) fn is_equal_to_literal(&self, literal: &NoteFieldValue) -> bool {
@@ -958,6 +869,7 @@ src/query/grammar/field.rs: pub(super) fn parse(name: &str) -> Option<Self> {
 src/query/grammar/filter.rs: pub(crate) enum ArithOp {
 src/query/grammar/filter.rs: pub(crate) enum FilterAtom {
 src/query/grammar/filter.rs: pub(crate) enum FilterFunction {
+src/query/grammar/filter.rs: pub(crate) enum QueryFunction {
 src/query/grammar/filter.rs: pub(crate) enum ValueExpr {
 src/query/grammar/filter.rs: pub(crate) fn and(self, other: Self) -> Self {
 src/query/grammar/filter.rs: pub(crate) fn is_matching(&self, row: &QueryRow) -> bool {
@@ -1358,7 +1270,7 @@ src/template/engine/cache.rs: pub(super) fn cached<T, E>(
 src/template/engine/cache.rs: pub(super) fn get_temp<T>(state: &State, key: &'static str) -> Option<T>
 src/template/engine/cache.rs: pub(super) fn set_temp<T>(state: &State, key: &'static str, value: T)
 src/template/engine/date.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
-src/template/engine/date.rs: pub(super) struct DateOps;
+src/template/engine/date.rs: pub(super) struct DateNamespace;
 src/template/engine/error.rs: pub(super) fn confine_error(path: &str, source: PathError) -> Error {
 src/template/engine/error.rs: pub(super) fn invalid_operation<E>(
 src/template/engine/error.rs: pub(super) type TemplateEngineResult<T> = std::result::Result<T, Error>;
@@ -1434,4 +1346,135 @@ src/template/writer.rs: pub(super) fn trusted(root: &Path, candidate: PathBuf) -
 src/template/writer.rs: pub(super) fn with_declared(
 src/template/writer.rs: pub(super) fn write(
 src/template/writer.rs: pub(super) struct TemplateWriteTarget<'a> {
+src/temporal/calendar.rs: pub(crate) enum CalendarPeriod {
+src/temporal/calendar.rs: pub(crate) enum PeriodEdge {
+src/temporal/calendar.rs: pub(crate) fn resolve_period_edge(
+src/temporal/calendar.rs: pub(crate) fn weekday_from_number(n: i64) -> Option<civil::Weekday> {
+src/temporal/calendar.rs: pub(crate) static PERIOD_EDGE_LOOKUP: phf::Map<
+src/temporal/calendar.rs: pub(super) fn snap_date(
+src/temporal/calendar.rs: pub(super) fn snap_weekday(
+src/temporal/date.rs: pub fn from_ymd(
+src/temporal/date.rs: pub struct DateValue(civil::Date);
+src/temporal/date.rs: pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
+src/temporal/date.rs: pub(crate) const fn civil_date(self) -> civil::Date {
+src/temporal/date.rs: pub(crate) const fn from_civil_date(date: civil::Date) -> Self {
+src/temporal/date.rs: pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
+src/temporal/date.rs: pub(crate) fn parse_any(
+src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/temporal/date.rs: pub(super) enum DateShape {
+src/temporal/date.rs: pub(super) fn advance_span(
+src/temporal/datetime.rs: pub fn from_unix_seconds(seconds: i64) -> Result<Self, DateError> {
+src/temporal/datetime.rs: pub struct DateTimeValue(Timestamp);
+src/temporal/datetime.rs: pub(crate) const DEFAULT_DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
+src/temporal/datetime.rs: pub(crate) const fn from_timestamp(timestamp: Timestamp) -> Self {
+src/temporal/datetime.rs: pub(crate) const fn utc(self) -> Timestamp {
+src/temporal/datetime.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/temporal/datetime.rs: pub(crate) fn checked_add_span(
+src/temporal/datetime.rs: pub(crate) fn duration_since(self, earlier: Self) -> SignedDuration {
+src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) -> bool {
+src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, DateError> {
+src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Result<civil::DateTime, DateError> {
+src/temporal/datetime.rs: pub(crate) fn local_datetime_in(self, zone: &TimeZone) -> civil::DateTime {
+src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
+src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/temporal/datetime.rs: pub(crate) fn resolve(
+src/temporal/datetime.rs: pub(crate) fn shift(
+src/temporal/datetime.rs: pub(super) enum DateTimeInput {
+src/temporal/datetime.rs: pub(super) enum DateTimeShape {
+src/temporal/datetime.rs: pub(super) fn from_local(
+src/temporal/datetime.rs: pub(super) fn from_local_in(
+src/temporal/duration.rs: pub fn checked_add(self, rhs: Self) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub fn checked_mul(self, factor: f64) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub fn checked_neg(self) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub fn checked_sub(self, rhs: Self) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub struct DurationValue {
+src/temporal/duration.rs: pub(crate) const fn span(self) -> Span {
+src/temporal/duration.rs: pub(crate) fn components(&self) -> Vec<DurationComponent> {
+src/temporal/duration.rs: pub(crate) fn from_nominal_seconds(
+src/temporal/duration.rs: pub(crate) fn from_span(span: Span) -> Self {
+src/temporal/duration.rs: pub(crate) fn has_calendar_component(&self) -> bool {
+src/temporal/duration.rs: pub(crate) fn magnitude(&self) -> f64 {
+src/temporal/duration.rs: pub(crate) fn magnitude(&self) -> f64 {
+src/temporal/duration.rs: pub(crate) fn nominal_seconds(&self) -> i64 {
+src/temporal/duration.rs: pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
+src/temporal/duration.rs: pub(crate) fn parse_prefix(input: &str) -> Option<crate::Spanned<Self>> {
+src/temporal/duration.rs: pub(crate) fn to_compound_string(self) -> String {
+src/temporal/duration.rs: pub(crate) fn unit(&self) -> TimeUnit {
+src/temporal/duration.rs: pub(crate) magnitude: f64,
+src/temporal/duration.rs: pub(crate) struct DurationComponent {
+src/temporal/duration.rs: pub(crate) unit: TimeUnit,
+src/temporal/duration.rs: pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
+src/temporal/error.rs: pub enum DateError {
+src/temporal/error.rs: pub enum DurationError {
+src/temporal/error.rs: pub(crate) enum CalendarError {
+src/temporal/error.rs: pub(crate) fn into_date_error(self, input: &str) -> DateError {
+src/temporal/lexer.rs: pub(crate) fn starts_like_date(bytes: &[u8]) -> bool {
+src/temporal/lexer.rs: pub(crate) fn starts_with_year(s: &str) -> bool {
+src/temporal/lexer.rs: pub(super) enum TemporalShapeToken {
+src/temporal/lexer.rs: pub(super) fn parse_duration_prefix(
+src/temporal/lexer.rs: pub(super) fn scan_date_prefix(input: &str) -> Option<(DatePoint, usize)> {
+src/temporal/mod.rs: pub fn keep() {
+src/temporal/mod.rs: pub fn set(zone: &str) {
+src/temporal/mod.rs: pub fn with<R, F: FnOnce() -> R>(zone: &str, action: F) -> R {
+src/temporal/mod.rs: pub struct ZoneGuard {
+src/temporal/mod.rs: pub use date::DateValue;
+src/temporal/mod.rs: pub use datetime::DateTimeValue;
+src/temporal/mod.rs: pub use duration::DurationValue;
+src/temporal/mod.rs: pub use error::{DateError, DurationError};
+src/temporal/mod.rs: pub(crate) fn fixed_datetime() -> DateTimeValue {
+src/temporal/mod.rs: pub(crate) fn fixed_offset_zone(seconds: i32) -> TimeZone {
+src/temporal/mod.rs: pub(crate) fn london_zone() -> TimeZone {
+src/temporal/mod.rs: pub(crate) fn lord_howe_zone() -> TimeZone {
+src/temporal/mod.rs: pub(crate) fn midnight_gap_zone() -> TimeZone {
+src/temporal/mod.rs: pub(crate) fn new_york_zone() -> TimeZone {
+src/temporal/mod.rs: pub(crate) fn set_timezone(zone: TimeZone) {
+src/temporal/mod.rs: pub(crate) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
+src/temporal/mod.rs: pub(crate) mod fixtures {
+src/temporal/mod.rs: pub(crate) mod test_support {
+src/temporal/mod.rs: pub(crate) use calendar::{
+src/temporal/mod.rs: pub(crate) use date::DEFAULT_DATE_PATTERN;
+src/temporal/mod.rs: pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
+src/temporal/mod.rs: pub(crate) use error::CalendarError;
+src/temporal/mod.rs: pub(crate) use point::{DateDiff, DatePoint};
+src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
+src/temporal/mod.rs: pub(crate) use zone::local_zone;
+src/temporal/mod.rs: pub(super) fn current_override() -> Option<TimeZone> {
+src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
+src/temporal/point.rs: pub(crate) enum DateDiff {
+src/temporal/point.rs: pub(crate) enum DatePoint {
+src/temporal/point.rs: pub(crate) enum DatePrecision {
+src/temporal/point.rs: pub(crate) fn apply(
+src/temporal/point.rs: pub(crate) fn canonical_pattern(self) -> &'static str {
+src/temporal/point.rs: pub(crate) fn component(self, unit: DateUnit, zone: &TimeZone) -> i64 {
+src/temporal/point.rs: pub(crate) fn date(self) -> Result<DateValue, CalendarError> {
+src/temporal/point.rs: pub(crate) fn date_in(self, zone: &TimeZone) -> DateValue {
+src/temporal/point.rs: pub(crate) fn diff(
+src/temporal/point.rs: pub(crate) fn end_of(
+src/temporal/point.rs: pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
+src/temporal/point.rs: pub(crate) fn local_datetime_in(
+src/temporal/point.rs: pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
+src/temporal/point.rs: pub(crate) fn parse_prefix(s: &str) -> Option<crate::Spanned<Self>> {
+src/temporal/point.rs: pub(crate) fn parse_with_pattern(
+src/temporal/point.rs: pub(crate) fn shift(
+src/temporal/point.rs: pub(crate) fn start_of(
+src/temporal/point.rs: pub(crate) fn to_f64(self) -> Option<f64> {
+src/temporal/point.rs: pub(crate) fn with_weekday(
+src/temporal/point.rs: pub(crate) fn zoned_datetime_in(
+src/temporal/point.rs: pub(super) fn from_date_shape(date: civil::Date, shape: DateShape) -> Self {
+src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
+src/temporal/unit.rs: pub(crate) const fn count(&self) -> u64 {
+src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
+src/temporal/unit.rs: pub(crate) const fn is_calendar(self) -> bool {
+src/temporal/unit.rs: pub(crate) const fn nominal_seconds(self) -> i64 {
+src/temporal/unit.rs: pub(crate) const fn nominal_seconds_f64(self) -> f64 {
+src/temporal/unit.rs: pub(crate) const fn unit(&self) -> TimeUnit {
+src/temporal/unit.rs: pub(crate) enum DateUnit {
+src/temporal/unit.rs: pub(crate) enum TimeUnit {
+src/temporal/unit.rs: pub(crate) fn decompose(
+src/temporal/unit.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
+src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
+src/temporal/unit.rs: pub(crate) fn of(self, local_datetime: civil::DateTime) -> i64 {
+src/temporal/unit.rs: pub(crate) struct DecomposedPart {
+src/temporal/unit.rs: pub(super) fn to_span(self, n: i64) -> Result<Span, CalendarError> {
+src/temporal/zone.rs: pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
 src/yaml.rs: pub(crate) fn parse(text: &str) -> Result<noyalib::Value, noyalib::Error> {

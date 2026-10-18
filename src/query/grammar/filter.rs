@@ -5,7 +5,8 @@
 //! - Dotted and bare field path lookups resolved via [`FieldPath`].
 //! - Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) with type
 //!   coercion.
-//! - Function calls such as `contains(field, target)` with tag prefix matching.
+//! - Function calls (for example, contains(field, target)) support tag-prefix
+//!   matching.
 //! - Value expressions: date ± duration, date − date (duration result),
 //!   duration ± duration and duration × number, plus `dur`, `date_add`,
 //!   `date_diff`, and `date_component` calls. Arithmetic groups left-to-right
@@ -22,15 +23,16 @@ use super::{
     },
 };
 use crate::{
-    DateTimeValue, DurationSeconds, DurationUnit, DurationValue, LexError,
-    NoteFieldValue, NoteFieldValueRef, Spanned, SpannedTokenStream, TokenSpec,
-    date::{DateError, DatePoint, Precision},
-    lexical_unquote,
+    DurationValue, LexError, NoteFieldValue, NoteFieldValueRef, Spanned,
+    SpannedTokenStream, TimeUnit, TokenSpec, lexical_unquote,
     query::{
         QueryRow,
         error::{QueryBuilderError, QueryDialect, QuerySyntaxError},
         sort::TextShape,
         value::QueryFieldValueRef,
+    },
+    temporal::{
+        CalendarError, CalendarPeriod, DatePoint, DateUnit, PeriodEdge,
     },
 };
 
@@ -67,8 +69,7 @@ impl FilterExpr {
                             expected: "a finite numeric literal",
                         }),
                         Err(_) => {
-                            if let Some(Ok(dv)) = DurationValue::classify(&word)
-                            {
+                            if let Ok(dv) = DurationValue::parse(&word) {
                                 Ok(Spanned::new(
                                     FilterToken::Literal(
                                         NoteFieldValue::Duration(dv),
@@ -80,6 +81,30 @@ impl FilterExpr {
                             }
                         }
                     },
+                    FilterToken::DateLiteral(text) => {
+                        match TextShape::classify(&text) {
+                            TextShape::DateTime(datetime) => Ok(Spanned::new(
+                                FilterToken::Literal(NoteFieldValue::DateTime(
+                                    datetime,
+                                )),
+                                span,
+                            )),
+                            TextShape::Date(date) => Ok(Spanned::new(
+                                FilterToken::Literal(NoteFieldValue::Date(
+                                    date,
+                                )),
+                                span,
+                            )),
+                            TextShape::Duration(_) | TextShape::Plain => {
+                                Err(LexError::UnexpectedToken {
+                                    span: span.to_range(),
+                                    found: text,
+                                    expected: "a valid date or date-time \
+                                               literal",
+                                })
+                            }
+                        }
+                    }
                     other => Ok(Spanned::new(other, span)),
                 }
             })
@@ -200,14 +225,16 @@ impl ComparisonExpr {
         self.op.is_satisfied_by_values(&lhs_val, &rhs_val)
     }
 
-    /// Promotes a filter literal's `String` payload to `Date`/`DateTime`/
-    /// `Duration` when its text has that shape, once, at query-build time (not
-    /// per row). Only `NoteFieldValue::String` needs inspection: the filter
-    /// grammar's `Literal` token never produces `Date`/`DateTime`/
-    /// `Duration`/`Link`/`List`/`Object` directly (`Null`/`Bool`/`Number`/
-    /// `String` are its only literal shapes). Reuses [`TextShape::classify`]
-    /// (the same heuristic `SortKey::from_text` uses), so filter literals and
-    /// sort-key text classify identically, not via a second hand-rolled copy.
+    /// Promotes a quoted filter literal's `String` payload to `Date`/
+    /// `DateTime`/`Duration` when its text has that shape, once, at
+    /// query-build time (not per row).
+    ///
+    /// Only `NoteFieldValue::String` needs inspection: bare date literals are
+    /// promoted while tokenizing, and the grammar's other literal shapes
+    /// (`Null`, `Bool`, `Number`) are already typed. Reuses
+    /// [`TextShape::classify`] (the same heuristic `SortKey::from_text`
+    /// uses), so filter literals and sort-key text classify identically, not
+    /// via a duplicate implementation.
     pub(super) fn classify_literal(literal: NoteFieldValue) -> NoteFieldValue {
         let NoteFieldValue::String(text) = &literal else {
             return literal;
@@ -231,7 +258,7 @@ pub(crate) enum ValueExpr {
     /// A value-returning function call (e.g. `dur`, `date_add`, `date_diff`,
     /// `date_component`).
     Call {
-        name: String,
+        function: QueryFunction,
         args: Vec<Self>,
     },
     /// An arithmetic binary operation evaluated left-to-right.
@@ -240,6 +267,70 @@ pub(crate) enum ValueExpr {
         op: ArithOp,
         rhs: Box<Self>,
     },
+}
+
+impl ValueExpr {
+    /// Evaluates a value expression; an invalid row value cannot satisfy a
+    /// comparison.
+    fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
+        match self {
+            Self::Field(path) => Some(row.resolve_ref(path).to_owned_value()),
+            Self::Literal(value) => Some(value.clone()),
+            Self::Call {
+                function,
+                args,
+            } => {
+                let values = args
+                    .iter()
+                    .map(|arg| arg.evaluate(row))
+                    .collect::<Option<Vec<_>>>()?;
+                function.evaluate(&values)
+            }
+            Self::Binary {
+                lhs,
+                op,
+                rhs,
+            } => {
+                let left = lhs.evaluate(row)?;
+                op.evaluate(&left, rhs.evaluate(row)?)
+            }
+        }
+    }
+
+    /// Whether this is arithmetic over number literals only.
+    fn is_number_only(&self) -> bool {
+        match self {
+            Self::Literal(NoteFieldValue::Number(_)) => true,
+            Self::Binary {
+                lhs,
+                rhs,
+                ..
+            } => lhs.is_number_only() && rhs.is_number_only(),
+            Self::Field(_)
+            | Self::Literal(_)
+            | Self::Call {
+                ..
+            } => false,
+        }
+    }
+
+    /// Whether this is a string literal that names no duration unit.
+    fn is_unrecognized_unit(&self) -> bool {
+        matches!(
+            self,
+            Self::Literal(NoteFieldValue::String(unit))
+                if TimeUnit::from_spelling(unit).is_none()
+        )
+    }
+
+    /// Whether this is a string literal that is not a valid duration.
+    fn is_invalid_duration_literal(&self) -> bool {
+        matches!(
+            self,
+            Self::Literal(NoteFieldValue::String(text))
+                if DurationValue::parse(text).is_err()
+        )
+    }
 }
 
 /// Represents a binary arithmetic operator.
@@ -253,164 +344,321 @@ pub(crate) enum ArithOp {
     Mul,
 }
 
-impl ValueExpr {
-    /// Evaluates a value expression; an invalid row value cannot satisfy a
-    /// comparison.
-    fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
+impl ArithOp {
+    /// Applies the operator to two evaluated values.
+    ///
+    /// Returns `Null` when either operand is `Null` or the operand types do
+    /// not support the operator, and `None` when a date or duration result is
+    /// not representable.
+    fn evaluate(
+        self,
+        left: &NoteFieldValue,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
+        match left {
+            NoteFieldValue::Date(date) => {
+                self.evaluate_date((*date).into(), right)
+            }
+            NoteFieldValue::DateTime(datetime) => {
+                self.evaluate_date((*datetime).into(), right)
+            }
+            NoteFieldValue::Duration(duration) => {
+                self.evaluate_duration(*duration, right)
+            }
+            NoteFieldValue::Number(factor) => {
+                self.evaluate_number(*factor, right)
+            }
+            _ => Some(NoteFieldValue::Null),
+        }
+    }
+
+    fn evaluate_date(
+        self,
+        date: DatePoint,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
         match self {
-            Self::Field(path) => Some(row.resolve_ref(path).to_owned_value()),
-            Self::Literal(value) => Some(value.clone()),
-            Self::Call {
-                name,
-                args,
-            } => {
-                let values = args
-                    .iter()
-                    .map(|arg| arg.evaluate(row))
-                    .collect::<Option<Vec<_>>>()?;
-                evaluate_registry_call(name, &values)
-            }
-            Self::Binary {
-                lhs,
-                op,
-                rhs,
-            } => evaluate_binary(lhs.evaluate(row)?, *op, rhs.evaluate(row)?),
+            Self::Add => match right {
+                NoteFieldValue::Duration(duration) => {
+                    Some(NoteFieldValue::from(
+                        date.apply(
+                            &duration,
+                            &crate::temporal::local_zone().ok()?,
+                        )
+                        .ok()?,
+                    ))
+                }
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Sub => match right {
+                NoteFieldValue::Duration(duration) => {
+                    let duration = duration.checked_neg().ok()?;
+                    Some(NoteFieldValue::from(
+                        date.apply(
+                            &duration,
+                            &crate::temporal::local_zone().ok()?,
+                        )
+                        .ok()?,
+                    ))
+                }
+                other @ (NoteFieldValue::Date(_)
+                | NoteFieldValue::DateTime(_)) => {
+                    let diff = other
+                        .as_date_point()?
+                        .diff(
+                            date,
+                            TimeUnit::Second,
+                            &crate::temporal::local_zone().ok()?,
+                        )
+                        .ok()?;
+                    let seconds = diff.to_f64()?;
+                    Some(NoteFieldValue::Duration(
+                        DurationValue::from_nominal_seconds(seconds).ok()?,
+                    ))
+                }
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Mul => Some(NoteFieldValue::Null),
         }
     }
-}
 
-fn date_point(value: &NoteFieldValue) -> Option<DatePoint> {
-    match value {
-        NoteFieldValue::Date(date) => Some(DatePoint::new(
-            date.into_inner().and_hms_opt(0, 0, 0)?,
-            DateTimeValue::from(*date).into_inner(),
-            Precision::Date,
-        )),
-        NoteFieldValue::DateTime(datetime) => Some(DatePoint::new(
-            datetime.wall_or_utc(),
-            datetime.into_inner(),
-            Precision::DateTime,
-        )),
-        _ => None,
-    }
-}
-
-#[expect(
-    clippy::arithmetic_side_effects,
-    reason = "duration operators preserve overflow as non-finite; consuming \
-              conversions reject it"
-)]
-fn evaluate_binary(
-    left: NoteFieldValue,
-    op: ArithOp,
-    right: NoteFieldValue,
-) -> Option<NoteFieldValue> {
-    if matches!(left, NoteFieldValue::Null)
-        || matches!(right, NoteFieldValue::Null)
-    {
-        return Some(NoteFieldValue::Null);
-    }
-    match (left, op, right) {
-        (
-            NoteFieldValue::Date(date),
-            ArithOp::Add,
-            NoteFieldValue::Duration(duration),
-        )
-        | (
-            NoteFieldValue::Duration(duration),
-            ArithOp::Add,
-            NoteFieldValue::Date(date),
-        ) => Some(NoteFieldValue::Date(date.apply(&duration).ok()?)),
-        (
-            NoteFieldValue::DateTime(datetime),
-            ArithOp::Add,
-            NoteFieldValue::Duration(duration),
-        )
-        | (
-            NoteFieldValue::Duration(duration),
-            ArithOp::Add,
-            NoteFieldValue::DateTime(datetime),
-        ) => Some(NoteFieldValue::DateTime(datetime.apply(&duration).ok()?)),
-        (
-            NoteFieldValue::Date(date),
-            ArithOp::Sub,
-            NoteFieldValue::Duration(duration),
-        ) => Some(NoteFieldValue::Date(date.apply(&(duration * -1.0)).ok()?)),
-        (
-            NoteFieldValue::DateTime(datetime),
-            ArithOp::Sub,
-            NoteFieldValue::Duration(duration),
-        ) => Some(NoteFieldValue::DateTime(
-            datetime.apply(&(duration * -1.0)).ok()?,
-        )),
-        (
-            date1 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-            ArithOp::Sub,
-            date2 @ (NoteFieldValue::Date(_) | NoteFieldValue::DateTime(_)),
-        ) => {
-            let diff = date_point(&date2)?
-                .diff(date_point(&date1)?, DurationUnit::Second)
-                .ok()?;
-            let seconds = diff.to_f64()?;
-            Some(NoteFieldValue::Duration(DurationValue::from_seconds(
-                DurationSeconds::try_from(seconds).ok()?,
-            )))
+    fn evaluate_duration(
+        self,
+        duration: DurationValue,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
+        match self {
+            Self::Add => match right {
+                date @ (NoteFieldValue::Date(_)
+                | NoteFieldValue::DateTime(_)) => Some(NoteFieldValue::from(
+                    date.as_date_point()?
+                        .apply(&duration, &crate::temporal::local_zone().ok()?)
+                        .ok()?,
+                )),
+                NoteFieldValue::Duration(other) => Some(
+                    NoteFieldValue::Duration(duration.checked_add(other).ok()?),
+                ),
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Sub => match right {
+                NoteFieldValue::Duration(other) => Some(
+                    NoteFieldValue::Duration(duration.checked_sub(other).ok()?),
+                ),
+                _ => Some(NoteFieldValue::Null),
+            },
+            Self::Mul => match right {
+                NoteFieldValue::Number(factor) => {
+                    Some(NoteFieldValue::Duration(
+                        duration.checked_mul(factor).ok()?,
+                    ))
+                }
+                _ => Some(NoteFieldValue::Null),
+            },
         }
-        (
-            NoteFieldValue::Duration(a),
-            ArithOp::Add,
-            NoteFieldValue::Duration(b),
-        ) => Some(NoteFieldValue::Duration(a + b)),
-        (
-            NoteFieldValue::Duration(a),
-            ArithOp::Sub,
-            NoteFieldValue::Duration(b),
-        ) => Some(NoteFieldValue::Duration(a - b)),
-        (
-            NoteFieldValue::Duration(duration),
-            ArithOp::Mul,
-            NoteFieldValue::Number(n),
-        )
-        | (
-            NoteFieldValue::Number(n),
-            ArithOp::Mul,
-            NoteFieldValue::Duration(duration),
-        ) => Some(NoteFieldValue::Duration(duration * n)),
-        _ => Some(NoteFieldValue::Null),
     }
-}
 
-#[expect(
-    clippy::too_many_lines,
-    clippy::large_stack_frames,
-    reason = "evaluates all registered temporal functions across query rows"
-)]
-fn evaluate_registry_call(
-    name: &str,
-    args: &[NoteFieldValue],
-) -> Option<NoteFieldValue> {
-    if name.eq_ignore_ascii_case("dur") {
-        return match args {
-            [NoteFieldValue::Duration(duration)] => {
-                Some(NoteFieldValue::Duration(duration.clone()))
-            }
-            [NoteFieldValue::String(text)] => {
-                Some(NoteFieldValue::Duration(DurationValue::parse(text).ok()?))
-            }
-            [_] => Some(NoteFieldValue::Null),
-            _ => None,
-        };
-    }
-    if name.eq_ignore_ascii_case("date_add") {
-        return match args {
-            [date, NoteFieldValue::Duration(duration)] => evaluate_binary(
-                date.clone(),
-                ArithOp::Add,
-                NoteFieldValue::Duration(duration.clone()),
+    fn evaluate_number(
+        self,
+        factor: f64,
+        right: NoteFieldValue,
+    ) -> Option<NoteFieldValue> {
+        match (self, right) {
+            (Self::Mul, NoteFieldValue::Duration(duration)) => Some(
+                NoteFieldValue::Duration(duration.checked_mul(factor).ok()?),
             ),
-            [date, NoteFieldValue::String(text)] => evaluate_binary(
-                date.clone(),
-                ArithOp::Add,
+            _ => Some(NoteFieldValue::Null),
+        }
+    }
+}
+
+/// A function callable from a filter expression, resolved at parse time.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum QueryFunction {
+    /// `dur(text)`: duration literal conversion.
+    Dur,
+    /// `date_add(date, duration)` or `date_add(date, n, unit)`.
+    DateAdd,
+    /// `date_diff(date1, date2[, unit])`.
+    DateDiff,
+    /// `date_component(date, name)`.
+    DateComponent,
+    /// First day of a calendar period (`sow`, `som`, `soy` and long spellings).
+    StartOf(CalendarPeriod),
+    /// Last day of a calendar period (`eow`, `eom`, `eoy` and long spellings).
+    EndOf(CalendarPeriod),
+    /// `date(text[, pattern])`: date literal conversion.
+    Date,
+}
+
+impl QueryFunction {
+    /// Functions whose names do not come from the calendar period lookup.
+    const FIXED_NAMES: &'static [(&'static str, Self)] = &[
+        ("dur", Self::Dur),
+        ("date_add", Self::DateAdd),
+        ("date_diff", Self::DateDiff),
+        ("date_component", Self::DateComponent),
+        ("date", Self::Date),
+    ];
+
+    /// Resolves a function name, ASCII case-insensitively.
+    ///
+    /// Period-boundary names (`sow`, `start_of_week`) resolve through
+    /// [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP), so the
+    /// filter grammar and the template filters accept the same spellings.
+    fn from_name(name: &str) -> Option<Self> {
+        Self::FIXED_NAMES
+            .iter()
+            .find(|(candidate, _)| name.eq_ignore_ascii_case(candidate))
+            .map(|&(_, function)| function)
+            .or_else(|| {
+                crate::temporal::resolve_period_edge(name).map(
+                    |(period, edge)| match edge {
+                        PeriodEdge::Start => Self::StartOf(period),
+                        PeriodEdge::End => Self::EndOf(period),
+                    },
+                )
+            })
+    }
+
+    /// Checks the argument count and the statically known literal arguments.
+    ///
+    /// # Errors
+    ///
+    /// - [`QueryBuilderError::Syntax`] if the argument count does not fit the
+    ///   function, or a literal duration, duration unit, or date component
+    ///   argument is not valid.
+    fn validate_args(
+        self,
+        args: &[ValueExpr],
+        input: &str,
+        span: std::ops::Range<usize>,
+    ) -> Result<(), QueryBuilderError> {
+        let expected = match self {
+            Self::Dur => {
+                if args.len() != 1 {
+                    Some("1 argument for dur()")
+                } else if args
+                    .first()
+                    .is_some_and(ValueExpr::is_invalid_duration_literal)
+                {
+                    Some("valid duration")
+                } else {
+                    None
+                }
+            }
+            Self::DateAdd => {
+                if !matches!(args.len(), 2 | 3) {
+                    Some("2 or 3 arguments for date_add()")
+                } else if args.len() == 2
+                    && args
+                        .get(1)
+                        .is_some_and(ValueExpr::is_invalid_duration_literal)
+                {
+                    Some("valid duration")
+                } else if args.len() == 3
+                    && args.get(2).is_some_and(ValueExpr::is_unrecognized_unit)
+                {
+                    Some("recognized duration unit")
+                } else {
+                    None
+                }
+            }
+            Self::DateDiff => {
+                if !matches!(args.len(), 2 | 3) {
+                    Some("2 or 3 arguments for date_diff()")
+                } else if args
+                    .get(2)
+                    .is_some_and(ValueExpr::is_unrecognized_unit)
+                {
+                    Some("recognized duration unit")
+                } else {
+                    None
+                }
+            }
+            Self::DateComponent => {
+                if args.len() != 2 {
+                    Some("2 arguments for date_component()")
+                } else if matches!(
+                    args.get(1),
+                    Some(ValueExpr::Literal(NoteFieldValue::String(name)))
+                        if DateUnit::from_name(name).is_none()
+                ) {
+                    Some(
+                        "valid component: year, month, day, hour, minute, \
+                         second, weekday, week",
+                    )
+                } else {
+                    None
+                }
+            }
+            Self::StartOf(_) | Self::EndOf(_) => {
+                if args.len() == 1 {
+                    None
+                } else {
+                    Some("1 argument for bucketing function")
+                }
+            }
+            Self::Date => {
+                if matches!(args.len(), 1 | 2) {
+                    None
+                } else {
+                    Some("1 or 2 arguments for date()")
+                }
+            }
+        };
+        if let Some(expected) = expected {
+            return Err(QuerySyntaxError::unexpected_end(
+                QueryDialect::Filter,
+                input,
+                span,
+                expected,
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Evaluates the call over already evaluated argument values.
+    ///
+    /// Returns `None` when the arguments cannot satisfy a comparison.
+    fn evaluate(self, args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
+        match self {
+            Self::Dur => match args {
+                [NoteFieldValue::Duration(duration)] => {
+                    Some(NoteFieldValue::Duration(*duration))
+                }
+                [NoteFieldValue::String(text)] => Some(
+                    NoteFieldValue::Duration(DurationValue::parse(text).ok()?),
+                ),
+                [_] => Some(NoteFieldValue::Null),
+                _ => None,
+            },
+            Self::DateAdd => Self::date_add(args),
+            Self::DateDiff => Self::date_diff(args),
+            Self::DateComponent => Self::date_component(args),
+            Self::StartOf(calendar_period) => {
+                let zone = crate::temporal::local_zone().ok()?;
+                Self::date_boundary(args, |date_point| {
+                    date_point.start_of(calendar_period, &zone)
+                })
+            }
+            Self::EndOf(calendar_period) => {
+                let zone = crate::temporal::local_zone().ok()?;
+                Self::date_boundary(args, |date_point| {
+                    date_point.end_of(calendar_period, &zone)
+                })
+            }
+            Self::Date => Self::date(args),
+        }
+    }
+
+    fn date_add(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
+        match args {
+            [date, NoteFieldValue::Duration(duration)] => {
+                ArithOp::Add.evaluate(date, NoteFieldValue::Duration(*duration))
+            }
+            [date, NoteFieldValue::String(text)] => ArithOp::Add.evaluate(
+                date,
                 NoteFieldValue::Duration(DurationValue::parse(text).ok()?),
             ),
             [date, NoteFieldValue::Number(n), NoteFieldValue::String(unit)] => {
@@ -418,29 +666,23 @@ fn evaluate_registry_call(
                 if matches!(date, NoteFieldValue::Null) {
                     return Some(NoteFieldValue::Null);
                 }
-                let unit = DurationUnit::parse(unit)?;
+                let unit = TimeUnit::from_spelling(unit)?;
                 let n = (n.fract() == 0.0).then(|| n.to_i64()).flatten()?;
-                let shifted = date_point(date)?.shift(n, unit).ok()?;
-                match date {
-                    NoteFieldValue::Date(_) => Some(NoteFieldValue::Date(
-                        crate::DateValue::from(shifted.wall.date()),
-                    )),
-                    NoteFieldValue::DateTime(_) => {
-                        Some(NoteFieldValue::DateTime(DateTimeValue::from(
-                            shifted.instant,
-                        )))
-                    }
-                    _ => Some(NoteFieldValue::Null),
-                }
+                let shifted = date
+                    .as_date_point()?
+                    .shift(n, unit, &crate::temporal::local_zone().ok()?)
+                    .ok()?;
+                Some(NoteFieldValue::from(shifted))
             }
             _ => None,
-        };
+        }
     }
-    if name.eq_ignore_ascii_case("date_diff") {
+
+    fn date_diff(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
         let (date1, date2, unit) = match args {
-            [date1, date2] => (date1, date2, DurationUnit::Day),
+            [date1, date2] => (date1, date2, TimeUnit::Day),
             [date1, date2, NoteFieldValue::String(unit)] => {
-                (date1, date2, DurationUnit::parse(unit)?)
+                (date1, date2, TimeUnit::from_spelling(unit)?)
             }
             _ => return None,
         };
@@ -449,36 +691,19 @@ fn evaluate_registry_call(
         {
             return Some(NoteFieldValue::Null);
         }
-        let diff = date_point(date1)?.diff(date_point(date2)?, unit).ok()?;
-        return Some(NoteFieldValue::Number(diff.to_f64()?));
+        let diff = date1
+            .as_date_point()?
+            .diff(
+                date2.as_date_point()?,
+                unit,
+                &crate::temporal::local_zone().ok()?,
+            )
+            .ok()?;
+        Some(NoteFieldValue::Number(diff.to_f64()?))
     }
-    if name.eq_ignore_ascii_case("date_component") {
-        return evaluate_date_component(args);
-    }
-    if name.eq_ignore_ascii_case("sow") {
-        return date_boundary(args, |pt| pt.week_boundary(false));
-    }
-    if name.eq_ignore_ascii_case("eow") {
-        return date_boundary(args, |pt| pt.week_boundary(true));
-    }
-    if name.eq_ignore_ascii_case("som")
-        || name.eq_ignore_ascii_case("start_of_month")
-    {
-        return date_boundary(args, |pt| pt.month_boundary(false));
-    }
-    if name.eq_ignore_ascii_case("eom")
-        || name.eq_ignore_ascii_case("end_of_month")
-    {
-        return date_boundary(args, |pt| pt.month_boundary(true));
-    }
-    if name.eq_ignore_ascii_case("soy") {
-        return date_boundary(args, |pt| pt.year_boundary(false));
-    }
-    if name.eq_ignore_ascii_case("eoy") {
-        return date_boundary(args, |pt| pt.year_boundary(true));
-    }
-    if name.eq_ignore_ascii_case("date") {
-        return match args {
+
+    fn date(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
+        match args {
             [NoteFieldValue::Date(d)]
             | [NoteFieldValue::Date(d), NoteFieldValue::String(_)] => {
                 Some(NoteFieldValue::Date(*d))
@@ -488,206 +713,56 @@ fn evaluate_registry_call(
                 Some(NoteFieldValue::DateTime(*dt))
             }
             [NoteFieldValue::String(s)] => {
-                let rec = crate::DateValue::classify(s)?.ok()?;
-                Some(if rec.precision.has_time() {
-                    NoteFieldValue::DateTime(DateTimeValue::from(rec.instant()))
-                } else {
-                    NoteFieldValue::Date(rec.date())
-                })
+                Some(NoteFieldValue::from(DatePoint::parse(s).ok()?))
             }
             [NoteFieldValue::String(s), NoteFieldValue::String(fmt)] => {
-                let rec = crate::DateValue::parse_with(s, fmt).ok()?;
-                Some(if rec.precision.has_time() {
-                    NoteFieldValue::DateTime(DateTimeValue::from(rec.instant()))
-                } else {
-                    NoteFieldValue::Date(rec.date())
-                })
+                Some(NoteFieldValue::from(
+                    DatePoint::parse_with_pattern(s, fmt).ok()?,
+                ))
             }
             [NoteFieldValue::Null] | [NoteFieldValue::Null, _] => {
                 Some(NoteFieldValue::Null)
             }
             _ => None,
+        }
+    }
+
+    fn date_boundary(
+        args: &[NoteFieldValue],
+        op: impl FnOnce(DatePoint) -> Result<DatePoint, CalendarError>,
+    ) -> Option<NoteFieldValue> {
+        let date = args.first()?;
+        if matches!(date, NoteFieldValue::Null) {
+            return Some(NoteFieldValue::Null);
+        }
+        let point = match op(date.as_date_point()?) {
+            Ok(point) => point,
+            Err(
+                CalendarError::OutOfRange
+                | CalendarError::Zone {
+                    ..
+                },
+            ) => {
+                return None;
+            }
         };
+        Some(NoteFieldValue::from(point))
     }
-    None
-}
 
-fn date_boundary(
-    args: &[NoteFieldValue],
-    op: impl FnOnce(DatePoint) -> Result<DatePoint, DateError>,
-) -> Option<NoteFieldValue> {
-    let date = args.first()?;
-    if matches!(date, NoteFieldValue::Null) {
-        return Some(NoteFieldValue::Null);
+    fn date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
+        use num_traits::ToPrimitive as _;
+        let [date, NoteFieldValue::String(component)] = args else {
+            return Some(NoteFieldValue::Null);
+        };
+        if matches!(date, NoteFieldValue::Null) {
+            return Some(NoteFieldValue::Null);
+        }
+        let component = DateUnit::from_name(component)?;
+        let zone = crate::temporal::local_zone().ok()?;
+        Some(NoteFieldValue::Number(
+            date.as_date_point()?.component(component, &zone).to_f64()?,
+        ))
     }
-    let pt = date_point(date)?;
-    let shifted = op(pt).ok()?;
-    match date {
-        NoteFieldValue::Date(_) => Some(NoteFieldValue::Date(
-            crate::DateValue::from(shifted.wall.date()),
-        )),
-        NoteFieldValue::DateTime(_) => {
-            Some(NoteFieldValue::DateTime(DateTimeValue::from(shifted.instant)))
-        }
-        _ => Some(NoteFieldValue::Null),
-    }
-}
-fn evaluate_date_component(args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
-    use chrono::{Datelike as _, Timelike as _};
-    let [date, NoteFieldValue::String(component)] = args else {
-        return Some(NoteFieldValue::Null);
-    };
-    if matches!(date, NoteFieldValue::Null) {
-        return Some(NoteFieldValue::Null);
-    }
-    let wall = date_point(date)?.wall;
-    let number = if component.eq_ignore_ascii_case("year") {
-        f64::from(wall.year())
-    } else if component.eq_ignore_ascii_case("month") {
-        f64::from(wall.month())
-    } else if component.eq_ignore_ascii_case("day") {
-        f64::from(wall.day())
-    } else if component.eq_ignore_ascii_case("hour") {
-        f64::from(wall.hour())
-    } else if component.eq_ignore_ascii_case("minute") {
-        f64::from(wall.minute())
-    } else if component.eq_ignore_ascii_case("second") {
-        f64::from(wall.second())
-    } else if component.eq_ignore_ascii_case("weekday") {
-        f64::from(wall.weekday().number_from_monday())
-    } else if component.eq_ignore_ascii_case("week") {
-        f64::from(wall.iso_week().week())
-    } else {
-        return Some(NoteFieldValue::Null);
-    };
-    Some(NoteFieldValue::Number(number))
-}
-
-fn validate_registry_function_name(
-    name: &str,
-    input: &str,
-    span: std::ops::Range<usize>,
-) -> Result<(), QueryBuilderError> {
-    if [
-        "dur",
-        "date_add",
-        "date_diff",
-        "date_component",
-        "sow",
-        "eow",
-        "som",
-        "start_of_month",
-        "eom",
-        "end_of_month",
-        "soy",
-        "eoy",
-        "date",
-    ]
-    .iter()
-    .any(|entry| name.eq_ignore_ascii_case(entry))
-    {
-        Ok(())
-    } else {
-        Err(QuerySyntaxError::unexpected_end(
-            QueryDialect::Filter,
-            input,
-            span,
-            "recognized filter function",
-        )
-        .into())
-    }
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "checks the four registry signatures and literal arguments in \
-              one pass"
-)]
-fn validate_call_args(
-    name: &str,
-    args: &[ValueExpr],
-    input: &str,
-    span: std::ops::Range<usize>,
-) -> Result<(), QueryBuilderError> {
-    let expected = if name.eq_ignore_ascii_case("dur") {
-        if args.len() != 1 {
-            Some("1 argument for dur()")
-        } else if matches!(args.first(), Some(ValueExpr::Literal(NoteFieldValue::String(text))) if DurationValue::parse(text).is_err())
-        {
-            Some("valid duration")
-        } else {
-            None
-        }
-    } else if name.eq_ignore_ascii_case("date_add") {
-        if !matches!(args.len(), 2 | 3) {
-            Some("2 or 3 arguments for date_add()")
-        } else if matches!(args.get(1), Some(ValueExpr::Literal(NoteFieldValue::String(text))) if DurationValue::parse(text).is_err())
-            && args.len() == 2
-        {
-            Some("valid duration")
-        } else if args.len() == 3
-            && matches!(args.get(2), Some(ValueExpr::Literal(NoteFieldValue::String(unit))) if DurationUnit::parse(unit).is_none())
-        {
-            Some("recognized duration unit")
-        } else {
-            None
-        }
-    } else if name.eq_ignore_ascii_case("date_diff") {
-        if !matches!(args.len(), 2 | 3) {
-            Some("2 or 3 arguments for date_diff()")
-        } else if matches!(args.get(2), Some(ValueExpr::Literal(NoteFieldValue::String(unit))) if DurationUnit::parse(unit).is_none())
-        {
-            Some("recognized duration unit")
-        } else {
-            None
-        }
-    } else if name.eq_ignore_ascii_case("date_component") {
-        if args.len() != 2 {
-            Some("2 arguments for date_component()")
-        } else if matches!(args.get(1), Some(ValueExpr::Literal(NoteFieldValue::String(comp))) if !["year", "month", "day", "hour", "minute", "second", "weekday", "week"].iter().any(|valid| comp.eq_ignore_ascii_case(valid)))
-        {
-            Some(
-                "valid component: year, month, day, hour, minute, second, \
-                 weekday, week",
-            )
-        } else {
-            None
-        }
-    } else if matches!(
-        name.to_ascii_lowercase().as_str(),
-        "sow"
-            | "eow"
-            | "som"
-            | "start_of_month"
-            | "eom"
-            | "end_of_month"
-            | "soy"
-            | "eoy"
-    ) {
-        if args.len() == 1 {
-            None
-        } else {
-            Some("1 argument for bucketing function")
-        }
-    } else if name.eq_ignore_ascii_case("date") {
-        if matches!(args.len(), 1 | 2) {
-            None
-        } else {
-            Some("1 or 2 arguments for date()")
-        }
-    } else {
-        None
-    };
-    if let Some(expected) = expected {
-        return Err(QuerySyntaxError::unexpected_end(
-            QueryDialect::Filter,
-            input,
-            span,
-            expected,
-        )
-        .into());
-    }
-    Ok(())
 }
 
 /// Comparison operator parsed from filter syntax.
@@ -870,10 +945,17 @@ impl FilterGrammar {
     fn parse_registry_call(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
-        name: String,
+        name: &str,
         span: std::ops::Range<usize>,
     ) -> Result<ValueExpr, QueryBuilderError> {
-        validate_registry_function_name(&name, input, span.clone())?;
+        let function = QueryFunction::from_name(name).ok_or_else(|| {
+            QuerySyntaxError::unexpected_end(
+                QueryDialect::Filter,
+                input,
+                span.clone(),
+                "recognized filter function",
+            )
+        })?;
         tokens.next();
         let mut args = Vec::new();
         if !tokens.peek_is_value(&FilterToken::RParen) {
@@ -896,18 +978,19 @@ impl FilterGrammar {
             .map_err(|err| {
                 QuerySyntaxError::from_lex(QueryDialect::Filter, input, err)
             })?;
-        validate_call_args(&name, &args, input, span)?;
+        function.validate_args(&args, input, span)?;
+        if function == QueryFunction::Dur
+            && let [ValueExpr::Literal(value)] = args.as_slice()
+            && let Some(value) = function.evaluate(std::slice::from_ref(value))
+        {
+            return Ok(ValueExpr::Literal(value));
+        }
         Ok(ValueExpr::Call {
-            name,
+            function,
             args,
         })
     }
 
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "duration negation preserves non-finite results without \
-                  panicking"
-    )]
     fn parse_primary(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
@@ -932,7 +1015,7 @@ impl FilterGrammar {
             FilterToken::Ident(name)
                 if tokens.peek_is_value(&FilterToken::LParen) =>
             {
-                Self::parse_registry_call(input, tokens, name, span.clone())?
+                Self::parse_registry_call(input, tokens, &name, span.clone())?
             }
             FilterToken::Ident(name) => {
                 ValueExpr::Field(FieldPath::parse(&name)?)
@@ -954,9 +1037,18 @@ impl FilterGrammar {
             ValueExpr::Literal(NoteFieldValue::Number(number)) => {
                 Ok(ValueExpr::Literal(NoteFieldValue::Number(-number)))
             }
-            ValueExpr::Literal(NoteFieldValue::Duration(duration)) => Ok(
-                ValueExpr::Literal(NoteFieldValue::Duration(duration * -1.0)),
-            ),
+            ValueExpr::Literal(NoteFieldValue::Duration(duration)) => {
+                Ok(ValueExpr::Literal(NoteFieldValue::Duration(
+                    duration.checked_neg().map_err(|_| {
+                        QuerySyntaxError::unexpected_end(
+                            QueryDialect::Filter,
+                            input,
+                            span.clone(),
+                            "a representable negative duration",
+                        )
+                    })?,
+                )))
+            }
             _ => Err(QuerySyntaxError::unexpected_end(
                 QueryDialect::Filter,
                 input,
@@ -984,7 +1076,18 @@ impl FilterGrammar {
                 break;
             };
             tokens.next();
+            let rhs_span = tokens.next_span(input);
             let rhs = Self::parse_primary(input, tokens)?;
+            if lhs.is_number_only() && rhs.is_number_only() {
+                return Err(QuerySyntaxError::unexpected_end(
+                    QueryDialect::Filter,
+                    input,
+                    rhs_span,
+                    "a field, date, or duration operand (arithmetic on number \
+                     literals alone is not supported; quote date literals)",
+                )
+                .into());
+            }
             lhs = ValueExpr::Binary {
                 lhs: Box::new(lhs),
                 op,
@@ -1013,6 +1116,7 @@ impl AtomParser for FilterGrammar {
             | FilterToken::Star
             | FilterToken::Op(_)
             | FilterToken::Literal(_)
+            | FilterToken::DateLiteral(_)
             | FilterToken::Ident(_) => None,
         }
     }
@@ -1108,11 +1212,17 @@ enum FilterToken {
     #[token("null", |_| NoteFieldValue::Null, priority = 3)]
     #[token("Null", |_| NoteFieldValue::Null, priority = 3)]
     Literal(NoteFieldValue),
+    /// A bare ISO date or date-time shape, validated while tokenizing.
+    #[regex(
+        r"[0-9]{4}-[0-9]{2}(-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:[0-9]{2})?)?)?",
+        |lex| lex.slice().to_owned()
+    )]
+    DateLiteral(String),
     #[regex(r#"[^\s()'",=!<>&|+*-]+"#, |lex| lex.slice().to_owned())]
     Ident(String),
 }
 
-/// Unescapes a quoted string literal into a [`NoteFieldValue::String`].
+/// Decodes a quoted string literal into a string field value.
 #[expect(
     clippy::needless_pass_by_ref_mut,
     reason = "logos Callback trait requires &mut Lexer"
@@ -1227,7 +1337,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::test_support::TzGuard;
+        use crate::temporal::test_support::ZoneGuard;
 
         #[rstest]
         #[case::greater_than("rating > 5", &["high"])]
@@ -1290,13 +1400,14 @@ mod tests {
             ]);
 
             // In canonical rank: Number < Text.
-            // rating > 5 matches num_high (7 > 5) and text ("gold" > 5 by
-            // rank).
+            // Rating > 5 matches the numeric row (7 > 5) and the text row
+            // ("gold" > 5 by rank).
             let filtered =
                 rows.clone().filter("rating > 5").expect("valid filter");
             assert_eq!(names(&filtered), ["num_high", "text"]);
 
-            // sort rating asc orders: num_low (3), num_high (7), text ("gold").
+            // Sorting rating ascending yields the numeric rows (3, 7), then
+            // text ("gold").
             let sorted = rows.sort("rating", false).expect("valid sort");
             assert_eq!(names(&sorted), ["num_low", "num_high", "text"]);
         }
@@ -1322,6 +1433,75 @@ mod tests {
                 rows.filter("due == \"2026-01-01\"").expect("valid filter");
 
             assert_eq!(filtered.len(), 1);
+        }
+
+        fn dated_rows() -> QuerySet {
+            rows_for_files(&[
+                ("has.md", "---\ndue: 2026-01-01\n---"),
+                ("other.md", "---\ndue: 2026-06-01\n---"),
+                ("nodue.md", "---\nstatus: draft\n---"),
+            ])
+        }
+
+        #[rstest]
+        #[case::equal("due == 2026-01-01", &["has"])]
+        #[case::less("due < 2026-03-01", &["has"])]
+        #[case::greater_equal("due >= 2026-03-01", &["other"])]
+        fn evaluates_unquoted_iso_date_literals(
+            #[case] expr: &str,
+            #[case] expected: &[&str],
+        ) {
+            let rows = dated_rows();
+
+            let filtered = rows.filter(expr).expect("valid filter");
+
+            assert_eq!(names(&filtered), expected);
+        }
+
+        #[rstest]
+        #[case::date("due != 2026-01-01", "due != \"2026-01-01\"")]
+        #[case::datetime(
+            "due < 2026-07-29T14:30:00Z",
+            "due < \"2026-07-29T14:30:00Z\""
+        )]
+        fn unquoted_iso_literal_matches_its_quoted_form(
+            #[case] unquoted: &str,
+            #[case] quoted: &str,
+        ) {
+            let rows = dated_rows();
+
+            let bare = rows.clone().filter(unquoted).expect("valid filter");
+            let string = rows.filter(quoted).expect("valid filter");
+
+            assert_eq!(names(&bare), names(&string));
+        }
+
+        #[rstest]
+        #[case::unpadded_date("due == 2026-1-1")]
+        #[case::number_arithmetic("1 + 2 == 3")]
+        fn rejects_arithmetic_on_number_literals_alone(#[case] expr: &str) {
+            assert!(matches!(
+                FilterExpr::parse(expr),
+                Err(QueryBuilderError::Syntax(_))
+            ));
+        }
+
+        #[rstest]
+        #[case::impossible_day("due != 2026-02-30")]
+        #[case::month_out_of_range("due != 2026-13")]
+        #[case::month_and_day_out_of_range("due == 2026-13-45")]
+        #[case::impossible_time("due == 2026-01-01T25:00")]
+        fn rejects_unquoted_date_shapes_that_are_not_dates(#[case] expr: &str) {
+            let err = FilterExpr::parse(expr).expect_err("not a date");
+
+            assert!(matches!(err, QueryBuilderError::Syntax(_)), "{err}");
+        }
+
+        #[rstest]
+        #[case::duration_times_number("dur(\"1d\") * 2 == dur(\"2d\")")]
+        #[case::number_times_duration("2 * dur(\"1d\") == dur(\"2d\")")]
+        fn accepts_duration_scaling_by_a_number(#[case] expr: &str) {
+            assert!(FilterExpr::parse(expr).is_ok());
         }
 
         #[test]
@@ -1375,11 +1555,10 @@ mod tests {
 
         #[test]
         fn evaluates_a_date_only_literal_at_local_midnight() {
-            // A naive literal means the reader's zone: the boundaries here
-            // are local midnight in the pinned UTC+2 zone (2025-12-31T22:00Z
-            // through 2026-01-01T22:00Z), which still separates the two
-            // fixture instants.
-            TzGuard::set("Etc/GMT-2");
+            // A naive literal uses the reader's zone. In the pinned UTC+2 zone,
+            // local midnight falls at December 31 at 22:00 UTC through January
+            // 1 at 22:00 UTC, which still separates the fixture instants.
+            ZoneGuard::set("Etc/GMT-2");
 
             let temp = tempfile::tempdir().expect("create temp dir");
             let p1 = temp.path().join("jan1.md");
@@ -1424,9 +1603,10 @@ mod tests {
 
         #[test]
         fn matches_calendar_days_via_mdate() {
-            // `mdate` is the mtime's local calendar date, so the expectation
-            // only holds in the pinned zone.
-            TzGuard::set("UTC");
+            // This field is a local calendar date derived from file
+            // modification time, so the expectation only holds in
+            // the pinned zone.
+            ZoneGuard::set("UTC");
 
             let temp = tempfile::tempdir().expect("create temp dir");
             let p1 = temp.path().join("jan1.md");
@@ -1923,5 +2103,21 @@ mod tests {
             ),
             vec!["wed"],
         );
+    }
+
+    #[rstest::rstest]
+    #[case::start_of_week("start_of_week(when) == sow(when)")]
+    #[case::end_of_week("end_of_week(when) == eow(when)")]
+    #[case::start_of_year("start_of_year(when) == soy(when)")]
+    #[case::end_of_year("end_of_year(when) == eoy(when)")]
+    fn query_long_period_names_match_their_short_aliases(#[case] expr: &str) {
+        let rows = rows_for_files(&[
+            ("sun.md", "---\nwhen: 2026-02-01\n---"),
+            ("wed.md", "---\nwhen: 2026-07-29\n---"),
+        ]);
+
+        let filtered = rows.filter(expr).expect("recognized alias");
+
+        assert_eq!(names(&filtered), vec!["sun", "wed"]);
     }
 }

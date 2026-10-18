@@ -245,7 +245,8 @@ mod tests {
         #[test]
         fn returns_true_when_comparing_date_ref_to_midnight_datetime_literal() {
             let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            let midnight_datetime = DateTimeValue::from(date);
+            let midnight_datetime = DateTimeValue::try_from(date)
+                .expect("test date has a representable local midnight");
             assert!(
                 QueryFieldValueRef::Note(NoteFieldValueRef::Date(date))
                     .is_equal_to_literal(&NoteFieldValue::DateTime(
@@ -271,7 +272,8 @@ mod tests {
         #[test]
         fn returns_true_when_comparing_datetime_ref_to_midnight_date_literal() {
             let date = DateValue::parse_iso("2026-07-29").expect("valid date");
-            let midnight_datetime = DateTimeValue::from(date);
+            let midnight_datetime = DateTimeValue::try_from(date)
+                .expect("test date has a representable local midnight");
             assert!(
                 QueryFieldValueRef::Note(NoteFieldValueRef::DateTime(
                     midnight_datetime

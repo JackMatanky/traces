@@ -2,7 +2,7 @@
 //! store.
 //!
 //! [`IndexStore`] owns connections and row payloads; this module owns the
-//! static schema: seven [`TableSpec`] entries pairing each table's definition
+//! static schema: eight `TableSpec` entries pairing each table's definition
 //! with its rebuild wipe policy.
 //!
 //! [`IndexStore`]: super::store::IndexStore
@@ -69,6 +69,12 @@ pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("classes_by_path");
 
+/// The cache-format marker, whose version identifies persisted row semantics.
+pub(super) const CACHE_FORMAT: TableDefinition<
+    'static,
+    &'static [u8],
+    &'static [u8],
+> = TableDefinition::new("cache_format");
 /// Represents a schema table: to-one row or to-many multimap.
 enum TableDef {
     ToOne(TableDefinition<'static, &'static [u8], &'static [u8]>),
@@ -91,7 +97,7 @@ pub(super) struct TableSpec {
 }
 
 /// Lists every table in the schema in declaration order.
-pub(super) const TABLES: [TableSpec; 7] = [
+pub(super) const TABLES: [TableSpec; 8] = [
     TableSpec {
         def: TableDef::ToOne(FILES),
         policy: DeletePolicy::Required,
@@ -118,6 +124,10 @@ pub(super) const TABLES: [TableSpec; 7] = [
     },
     TableSpec {
         def: TableDef::ToMany(FILE_CLASSES_BY_PATH),
+        policy: DeletePolicy::BestEffort,
+    },
+    TableSpec {
+        def: TableDef::ToOne(CACHE_FORMAT),
         policy: DeletePolicy::BestEffort,
     },
 ];

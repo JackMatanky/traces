@@ -9,8 +9,8 @@ use rstest::rstest;
 use traces_pkm::{
     PresetDialogProvider,
     testing::{
-        CommitPolicy, TemplatePathInput, TemplateService, TestProject, TzGuard,
-        WriteMode, WriteOutcome,
+        CommitPolicy, TemplatePathInput, TemplateService, TestProject,
+        WriteMode, WriteOutcome, ZoneGuard,
     },
 };
 
@@ -352,7 +352,7 @@ fn template_shorthands_support_iso_offsets_and_reference_format() {
     let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template(
         "offsets.md",
-        r#"{{ date.now("YYYY-MM-DD", "P1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.now("YYYY-MM-DD", "P-1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.sow(reference="2026-02-01", reference_format="%Y-%m-%d") }}|{{ date.eow(reference="2026-02-01", reference_format="%Y-%m-%d") }}"#,
+        r#"{{ date.now("YYYY-MM-DD", "P1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.now("YYYY-MM-DD", "-P1M", "2026-05-15", "%Y-%m-%d") }}|{{ date.now("YYYY-MM-DD", "P1DT2H", "2026-05-15", "%Y-%m-%d") }}|{{ date.sow(reference="2026-02-01", reference_format="%Y-%m-%d") }}|{{ date.eow(reference="2026-02-01", reference_format="%Y-%m-%d") }}"#,
     );
     let config = project.config_with_templates_if_present();
     let service =
@@ -375,7 +375,7 @@ fn template_shorthands_support_iso_offsets_and_reference_format() {
     .expect("commit mode must write");
     assert_eq!(
         std::fs::read_to_string(path).expect("read report"),
-        "2026-06-15|2026-04-15|2026-01-26|2026-02-01"
+        "2026-06-15|2026-04-15|2026-05-16|2026-01-26|2026-02-01"
     );
 }
 
@@ -415,6 +415,7 @@ fn template_filters_support_bucketing_aliases_and_weekday_arg() {
 
 /// Proves template weekday rejects out-of-range argument.
 #[rstest]
+#[case::zero(0)]
 #[case::above_range(8)]
 #[case::negative(-1)]
 #[case::far_out_of_range(99)]
@@ -509,7 +510,7 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 
     // Query under UTC+14
     {
-        TzGuard::set("Pacific/Kiritimati");
+        ZoneGuard::set("Pacific/Kiritimati");
         let written = service
             .render_to_file(
                 &input,
@@ -528,7 +529,7 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
 
     // Query under UTC-12
     {
-        TzGuard::set("Etc/GMT+12");
+        ZoneGuard::set("Etc/GMT+12");
         let written = service
             .render_to_file(
                 &input,
@@ -544,11 +545,11 @@ fn file_day_persists_at_index_time_across_query_time_zone_changes() {
         assert_eq!(std::fs::read_to_string(path).expect("read report"), "1");
     }
 }
-/// Proves date.now renders local wall clock while storage stays UTC under
+/// Proves date.now renders local clock time while storage stays UTC under
 /// injected TZ.
 #[test]
 fn template_seam_renders_local_clock_under_injected_tz() {
-    TzGuard::set("Etc/GMT-5"); // UTC+05:00
+    ZoneGuard::set("Etc/GMT-5"); // UTC+05:00
     let temp = tempfile::tempdir().expect("create temp dir");
     let project = TestProject::untrusted(temp.path().join("project"));
     project.write_template("clock.md", r#"{{ date.now("%Y") }}"#);

@@ -28,11 +28,14 @@ use super::{
     inlinks::InlinkMap,
     sort::SortedByPath,
     tables::{
-        FILE_CLASSES_BY_PATH, FILES, LINKS, NOTES, PATHS_BY_FILE_CLASS,
-        PATHS_BY_TAG, TABLES, TAGS_BY_PATH,
+        CACHE_FORMAT, FILE_CLASSES_BY_PATH, FILES, LINKS, NOTES,
+        PATHS_BY_FILE_CLASS, PATHS_BY_TAG, TABLES, TAGS_BY_PATH,
     },
 };
 use crate::{FileMeta, Note, Tag, file::FileFormat};
+
+const CACHE_FORMAT_VERSION_KEY: &[u8] = b"version";
+const CACHE_FORMAT_VERSION: &[u8] = b"1";
 
 /// Stored files, path-sorted notes, and target-keyed inlinks loaded together.
 pub(super) type StoreSnapshot =
@@ -592,7 +595,17 @@ impl IndexStore {
         Ok(())
     }
 
-    /// Writes every [`FileEntry`]'s inbound-link edges into the `links`
+    fn write_cache_format(&self, txn: &WriteTransaction) -> IndexResult<()> {
+        let mut table = txn
+            .open_table(CACHE_FORMAT)
+            .map_err(|source| self.wrap_redb_error(source))?;
+        table
+            .insert(CACHE_FORMAT_VERSION_KEY, CACHE_FORMAT_VERSION)
+            .map_err(|source| self.wrap_redb_error(source))?;
+        Ok(())
+    }
+
+    /// Writes every [`FileEntry`]'s inbound-link edges into the [links]
     /// multimap table.
     ///
     /// # Errors
@@ -690,6 +703,7 @@ impl IndexStore {
         );
         all_res?;
         axes_res?;
+        self.write_cache_format(&txn)?;
         self.commit(txn)?;
         Ok(())
     }
@@ -727,6 +741,7 @@ impl IndexStore {
         );
         core_res?;
         links_res?;
+        self.write_cache_format(&txn)?;
         self.commit(txn)?;
         Ok(())
     }
@@ -837,10 +852,30 @@ impl IndexStore {
                 }
             }
         }
-        Ok(present && missing)
+        if !present {
+            return Ok(false);
+        }
+        if missing {
+            return Ok(true);
+        }
+        let table = read_txn.open_table(CACHE_FORMAT).map_err(|source| {
+            StoreError::Redb {
+                path: path.to_path_buf(),
+                source: Box::new(source.into()),
+            }
+        })?;
+        let Some(version) =
+            table.get(CACHE_FORMAT_VERSION_KEY).map_err(|source| {
+                StoreError::Redb {
+                    path: path.to_path_buf(),
+                    source: Box::new(source.into()),
+                }
+            })?
+        else {
+            return Ok(true);
+        };
+        Ok(version.value() != CACHE_FORMAT_VERSION)
     }
-
-    // --- Batch read helpers -------------------------------------------
 
     /// Point-reads and decodes `paths` from `kind`'s table in parallel,
     /// warning and skipping corrupted rows. Preserves the input order.
@@ -1714,6 +1749,52 @@ mod tests {
             assert_eq!(
                 note.list_items().next().expect("task retained").clean_text(),
                 "kept task"
+            );
+        }
+
+        #[test]
+        fn rebuilds_a_cache_with_an_outdated_format_marker() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            fs::write(temp.path().join("note.md"), "- [ ] retained task")
+                .expect("write note");
+            let service = IndexerService::for_tests(temp.path());
+            let index = service.build().expect("build index");
+            service.persist(&index).expect("persist index");
+
+            let store = IndexStore::open(temp.path()).expect("open store");
+            let txn = store.begin_write().expect("begin write transaction");
+            {
+                let mut table = txn
+                    .open_table(CACHE_FORMAT)
+                    .expect("open cache format table");
+                table
+                    .insert(CACHE_FORMAT_VERSION_KEY, b"0".as_slice())
+                    .expect("write outdated format version");
+            }
+            txn.commit().expect("commit outdated format marker");
+            drop(store);
+
+            let reopened =
+                IndexStore::open(temp.path()).expect("rebuild outdated cache");
+            let (_, rebuilt_notes, _) =
+                reopened.read_all().expect("read rebuilt cache");
+            assert_eq!(rebuilt_notes.as_slice(), []);
+            drop(reopened);
+
+            let repaired =
+                service.refresh_store().expect("reindex source files");
+            let reindexed_notes =
+                repaired.read_all_notes().expect("read reindexed note");
+            assert_eq!(
+                reindexed_notes
+                    .as_slice()
+                    .first()
+                    .expect("retained note")
+                    .list_items()
+                    .next()
+                    .expect("retained task")
+                    .clean_text(),
+                "retained task"
             );
         }
     }

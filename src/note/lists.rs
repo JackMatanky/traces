@@ -650,11 +650,12 @@ pub(crate) fn descendants_of(
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
     use rstest::rstest;
 
     use super::*;
-    use crate::{TaskDate, TaskDateType, TaskStatusSymbol, TaskStatusType};
+    use crate::{
+        DateValue, TaskDate, TaskDateType, TaskStatusSymbol, TaskStatusType,
+    };
 
     fn done_task() -> ListItemType {
         ListItemType::Task(TaskListItem::new(
@@ -891,11 +892,13 @@ mod tests {
                 let dates = TaskDateSet::from_iter([
                     TaskDate::new(
                         TaskDateType::Created,
-                        NaiveDate::from_ymd_opt(2025, 1, 1).unwrap().into(),
+                        DateValue::from_ymd(2025, 1, 1)
+                            .expect("valid fixture date"),
                     ),
                     TaskDate::new(
                         TaskDateType::Due,
-                        NaiveDate::from_ymd_opt(2025, 1, 15).unwrap().into(),
+                        DateValue::from_ymd(2025, 1, 15)
+                            .expect("valid fixture date"),
                     ),
                 ]);
                 let item = TaskListItem::new(
@@ -994,14 +997,15 @@ mod tests {
                 );
                 let dates = TaskDateSet::from_iter([TaskDate::new(
                     TaskDateType::Due,
-                    NaiveDate::from_ymd_opt(2025, 2, 1).unwrap().into(),
+                    DateValue::from_ymd(2025, 2, 1)
+                        .expect("valid fixture date"),
                 )]);
                 let item = TaskListItem::new(dates, None, status, false);
 
                 assert_eq!(item.dates(), dates);
                 assert_eq!(
                     item.dates().get(TaskDateType::Due),
-                    NaiveDate::from_ymd_opt(2025, 2, 1).map(Into::into)
+                    DateValue::from_ymd(2025, 2, 1).ok()
                 );
             }
         }
@@ -1042,7 +1046,7 @@ mod tests {
             ] {
                 assert_eq!(
                     decoded.dates().get(kind),
-                    NaiveDate::from_ymd_opt(2025, 1, day).map(Into::into)
+                    DateValue::from_ymd(2025, 1, day).ok()
                 );
             }
             assert_eq!(decoded.priority(), Some(TaskPriority::High));

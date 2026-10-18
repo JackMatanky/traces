@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use super::Link;
 use crate::{
     DateTimeValue, DateValue, DurationValue, Tag, field::FieldValueRef,
+    temporal::DatePoint,
 };
 
 /// Represents a metadata value parsed from YAML frontmatter or inline field
@@ -52,9 +53,8 @@ pub enum NoteFieldValue {
     Date(DateValue),
     /// ISO `YYYY-MM-DDThh:mm:ss` date-time.
     DateTime(DateTimeValue),
-    /// Duration literal in source spelling, such as `4h15m` or `4 yrs, 6 wks`.
-    /// Equality and ordering compare by total parsed seconds, not source
-    /// spelling.
+    /// Validated duration; renders in canonical spelling. Equality and ordering
+    /// compare rounded nominal seconds, not the original input text.
     Duration(DurationValue),
     /// A link parsed from wikilink or Markdown link syntax.
     Link(Link),
@@ -65,8 +65,8 @@ pub enum NoteFieldValue {
 }
 
 impl NoteFieldValue {
-    /// Returns the inner text for [`NoteFieldValue::String`] and
-    /// [`NoteFieldValue::Duration`] variants, or `None` for any other kind.
+    /// Borrows the inner text of a [`NoteFieldValue::String`], or returns
+    /// `None` for any other kind. Durations are formatted on demand instead.
     ///
     /// # Examples
     ///
@@ -84,7 +84,6 @@ impl NoteFieldValue {
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(s),
-            Self::Duration(dv) => Some(dv.as_str()),
             _ => None,
         }
     }
@@ -97,23 +96,36 @@ impl NoteFieldValue {
     /// # Examples
     ///
     /// ```rust
-    /// use chrono::NaiveDate;
-    /// use traces_pkm::NoteFieldValue;
+    /// use traces_pkm::{DateValue, NoteFieldValue};
     ///
     /// let str_val = NoteFieldValue::String("2025-01-15T12:00:00".to_owned());
-    /// assert_eq!(str_val.as_date(), NaiveDate::from_ymd_opt(2025, 1, 15));
+    /// assert_eq!(str_val.as_date(), "2025-01-15".parse::<DateValue>().ok());
     ///
     /// let invalid = NoteFieldValue::String("not-a-date".to_owned());
     /// assert_eq!(invalid.as_date(), None);
     /// ```
     #[inline]
     #[must_use]
-    pub fn as_date(&self) -> Option<chrono::NaiveDate> {
+    pub fn as_date(&self) -> Option<DateValue> {
         match self {
-            Self::Date(value) => Some(value.into_inner()),
-            Self::DateTime(value) => Some(value.date().into_inner()),
-            Self::String(s) => DateValue::parse_prefix(s)
-                .map(|(rec, _)| rec.date().into_inner()),
+            Self::Date(value) => Some(*value),
+            Self::DateTime(value) => value.local_date().ok(),
+            Self::String(s) => DatePoint::parse_prefix(s)
+                .and_then(|point| point.value().date().ok()),
+            _ => None,
+        }
+    }
+
+    /// Returns this value as a day-precision date point if it is
+    /// [`NoteFieldValue::Date`] or [`NoteFieldValue::DateTime`].
+    ///
+    /// Strings are not parsed: query evaluation only treats typed date values
+    /// as dates.
+    #[must_use]
+    pub(crate) fn as_date_point(&self) -> Option<DatePoint> {
+        match self {
+            Self::Date(date) => Some(DatePoint::from(*date)),
+            Self::DateTime(datetime) => Some(DatePoint::from(*datetime)),
             _ => None,
         }
     }
@@ -142,6 +154,21 @@ impl NoteFieldValue {
             Self::Link(v) => NoteFieldValueRef::Link(v),
             Self::List(v) => NoteFieldValueRef::List(v),
             Self::Object(v) => NoteFieldValueRef::Object(v),
+        }
+    }
+}
+
+impl From<DatePoint> for NoteFieldValue {
+    /// Converts a calendar point to [`NoteFieldValue::Date`] and an instant to
+    /// [`NoteFieldValue::DateTime`], dropping the written precision.
+    #[inline]
+    fn from(date_point: DatePoint) -> Self {
+        match date_point {
+            DatePoint::Calendar {
+                date,
+                ..
+            } => Self::Date(date),
+            DatePoint::DateTime(datetime) => Self::DateTime(datetime),
         }
     }
 }
@@ -267,12 +294,10 @@ impl NoteFieldValueRef<'_> {
             (Self::Duration(a), Self::Duration(b)) => a.cmp(b),
             (Self::Date(a), Self::Date(b)) => a.cmp(b),
             (Self::DateTime(a), Self::DateTime(b)) => a.cmp(b),
-            (Self::Date(a), Self::DateTime(b)) => {
-                DateTimeValue::from(*a).cmp(b)
-            }
-            (Self::DateTime(a), Self::Date(b)) => {
-                a.cmp(&DateTimeValue::from(*b))
-            }
+            (Self::Date(a), Self::DateTime(b)) => DateTimeValue::try_from(*a)
+                .map_or(Ordering::Less, |date_time| date_time.cmp(b)),
+            (Self::DateTime(a), Self::Date(b)) => DateTimeValue::try_from(*b)
+                .map_or(Ordering::Greater, |date_time| a.cmp(&date_time)),
             (Self::String(a), Self::String(b)) => a.cmp(b),
             (Self::Link(a), Self::Link(b)) => {
                 a.target().cmp(b.target()).then_with(|| a.text().cmp(b.text()))
@@ -303,7 +328,9 @@ impl NoteFieldValueRef<'_> {
                 let _ = write!(out, "{value}");
             }
             Self::String(value) => out.push_str(value),
-            Self::Duration(value) => out.push_str(value.as_str()),
+            Self::Duration(value) => {
+                let _ = write!(out, "{value}");
+            }
             Self::Date(value) => {
                 let _ = write!(out, "{value}");
             }
@@ -332,12 +359,10 @@ impl NoteFieldValueRef<'_> {
         }
     }
 
-    /// Returns the borrowed string for [`Self::String`] or the duration's
-    /// source spelling for [`Self::Duration`], or `None` for any other kind.
+    /// Borrows a string field; formatted durations have no borrowed spelling.
     pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(value) => Some(value),
-            Self::Duration(value) => Some(value.as_str()),
             _ => None,
         }
     }
@@ -352,7 +377,7 @@ impl NoteFieldValueRef<'_> {
             Self::String(value) => NoteFieldValue::String(value.to_owned()),
             Self::Date(value) => NoteFieldValue::Date(value),
             Self::DateTime(value) => NoteFieldValue::DateTime(value),
-            Self::Duration(value) => NoteFieldValue::Duration((*value).clone()),
+            Self::Duration(value) => NoteFieldValue::Duration(*value),
             Self::Link(value) => NoteFieldValue::Link((*value).clone()),
             Self::List(values) => NoteFieldValue::List(values.into()),
             Self::Object(value) => NoteFieldValue::Object((*value).clone()),
@@ -380,14 +405,12 @@ impl NoteFieldValueRef<'_> {
             }
             Self::Date(value) => match literal {
                 NoteFieldValue::Date(other) => value == other,
-                NoteFieldValue::DateTime(other) => {
-                    other.is_equal_to_date(*value)
-                }
+                NoteFieldValue::DateTime(other) => other.is_midnight_of(*value),
                 _ => false,
             },
             Self::DateTime(value) => match literal {
                 NoteFieldValue::DateTime(other) => value == other,
-                NoteFieldValue::Date(other) => value.is_equal_to_date(*other),
+                NoteFieldValue::Date(other) => value.is_midnight_of(*other),
                 _ => false,
             },
             Self::Duration(dv) => match literal {
@@ -528,7 +551,7 @@ impl From<FieldValueRef<'_>> for NoteFieldValue {
                     Self::Null
                 } else if let Some(link) = Link::parse_wikilink(trimmed) {
                     Self::Link(link)
-                } else if let Some(Ok(dv)) = DurationValue::classify(trimmed) {
+                } else if let Ok(dv) = DurationValue::parse(trimmed) {
                     Self::Duration(dv)
                 } else {
                     Self::String(s.into_owned())
@@ -552,6 +575,10 @@ impl From<FieldValueRef<'_>> for NoteFieldValue {
 mod tests {
     use super::*;
     use crate::field::FieldValueRef;
+    #[test]
+    fn note_field_value_stays_within_the_80_byte_budget() {
+        assert!(std::mem::size_of::<NoteFieldValue>() <= 80);
+    }
 
     mod field_value {
         use pretty_assertions::assert_eq;
@@ -770,11 +797,11 @@ mod tests {
         }
 
         #[test]
-        fn as_str_returns_inner_str_for_duration_variant() {
+        fn returns_none_for_a_duration_field() {
             let dur_val = NoteFieldValue::Duration(
                 DurationValue::parse("4h").expect("valid duration"),
             );
-            assert_eq!(dur_val.as_str(), Some("4h"));
+            assert_eq!(dur_val.as_str(), None);
         }
 
         #[test]
@@ -813,7 +840,7 @@ mod tests {
             );
             assert_eq!(
                 date_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 2)
+                Some(DateValue::parse_iso("2026-09-02").expect("valid date"))
             );
         }
 
@@ -825,7 +852,7 @@ mod tests {
             );
             assert_eq!(
                 datetime_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 2)
+                Some(DateValue::parse_iso("2026-09-02").expect("valid date"))
             );
         }
 
@@ -835,7 +862,7 @@ mod tests {
                 NoteFieldValue::String("2026-09-02T14:30:00".to_owned());
             assert_eq!(
                 str_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 2)
+                Some(DateValue::parse_iso("2026-09-02").expect("valid date"))
             );
         }
 
@@ -844,7 +871,7 @@ mod tests {
             let str_val = NoteFieldValue::String("2026-09".to_owned());
             assert_eq!(
                 str_val.as_date(),
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 1)
+                Some(DateValue::parse_iso("2026-09").expect("valid month"))
             );
         }
 
@@ -880,12 +907,9 @@ mod tests {
             let str_field = NoteFieldValue::String("1h".to_owned());
             let dur_field = NoteFieldValue::Duration(dur_val);
 
-            // string_field == dur("1h") is true because String arm matches any
-            // as_str
-            assert!(str_field.as_ref().is_equal_to_literal(&dur_field));
-
-            // duration_field == "1h" is false because Duration arm requires
-            // Duration literal
+            // Strict typing: a string never equals a duration literal and a
+            // duration never equals a string literal, regardless of text.
+            assert!(!str_field.as_ref().is_equal_to_literal(&dur_field));
             assert!(!dur_field.as_ref().is_equal_to_literal(&str_field));
         }
     }
@@ -896,7 +920,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::test_support::TzGuard;
+        use crate::temporal::test_support::ZoneGuard;
 
         fn date(s: &str) -> DateValue {
             DateValue::parse_iso(s).expect("valid date")
@@ -1014,7 +1038,7 @@ mod tests {
 
         #[test]
         fn a_bare_date_promotes_to_local_zone_midnight_for_ordering() {
-            TzGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
+            ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             let d = date("2026-07-29");
             // 23:00Z on the 28th falls between the date's local-zone

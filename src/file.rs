@@ -33,6 +33,7 @@ use thiserror::Error;
 use crate::{
     DateValue,
     path::{FolderRef, RelativePath},
+    temporal::DatePoint,
 };
 
 /// Stores filesystem metadata captured for one regular file under a project
@@ -89,11 +90,11 @@ impl FileMeta {
         created_at: Option<SystemTime>,
     ) -> Option<DateValue> {
         if let Some(name) = BaseNameRef::from_path(path)
-            && let Some((rec, _)) = DateValue::parse_prefix(name.as_str())
+            && let Some(date_point) = DatePoint::parse_prefix(name.as_str())
         {
-            return Some(rec.date());
+            return date_point.value().date().ok();
         }
-        created_at.map(DateValue::from)
+        created_at.and_then(|time| DateValue::try_from(time).ok())
     }
 
     /// Builds a [`FileMeta`] with custom fields for test fixtures.
@@ -481,7 +482,9 @@ mod tests {
                 let filename_day = DateValue::parse_iso("2026-07-29").unwrap();
                 let created_day = DateValue::parse_iso("2025-01-01").unwrap();
                 let created_time = SystemTime::from(
-                    crate::DateTimeValue::from(created_day).into_inner(),
+                    crate::DateTimeValue::try_from(created_day)
+                        .expect("test date has a representable local midnight")
+                        .utc(),
                 );
 
                 // Act
@@ -495,11 +498,23 @@ mod tests {
             }
 
             #[test]
+            fn derives_a_negative_year_from_the_filename() {
+                let expected = DateValue::parse_iso("-9999-01-01")
+                    .expect("valid minimum signed-year date");
+
+                let record = FileMeta::note_for_test("-9999-01-01-daily.md");
+
+                assert_eq!(record.day(), Some(expected));
+            }
+
+            #[test]
             fn falls_back_to_created_at_when_filename_has_no_date() {
                 // Arrange
                 let created_day = DateValue::parse_iso("2026-03-15").unwrap();
                 let created_time = SystemTime::from(
-                    crate::DateTimeValue::from(created_day).into_inner(),
+                    crate::DateTimeValue::try_from(created_day)
+                        .expect("test date has a representable local midnight")
+                        .utc(),
                 );
 
                 // Act

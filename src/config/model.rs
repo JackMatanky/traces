@@ -922,7 +922,7 @@ impl DateFieldConfig {
         Self {
             name: FieldName::try_from(name)
                 .expect("role-name constant is a valid field key"),
-            format: crate::DEFAULT_DATETIME_FORMAT.to_owned(),
+            format: crate::DEFAULT_DATETIME_PATTERN.to_owned(),
         }
     }
 
@@ -951,7 +951,7 @@ impl DateFieldConfig {
                     raw.name.unwrap_or_else(|| default_name.to_owned()),
                 )?,
                 format: raw.format.unwrap_or_else(|| {
-                    crate::DEFAULT_DATETIME_FORMAT.to_owned()
+                    crate::DEFAULT_DATETIME_PATTERN.to_owned()
                 }),
             },
         })

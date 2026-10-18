@@ -271,25 +271,39 @@ impl QueryRow {
             FileField::CreatedDateTime => {
                 let ts =
                     file.created_at().unwrap_or_else(|| file.modified_at());
-                QueryFieldValueRef::Note(NoteFieldValueRef::DateTime(
-                    DateTimeValue::from(ts),
-                ))
+                match DateTimeValue::try_from(ts) {
+                    Ok(value) => QueryFieldValueRef::Note(
+                        NoteFieldValueRef::DateTime(value),
+                    ),
+                    Err(_) => QueryFieldValueRef::Note(NoteFieldValueRef::Null),
+                }
             }
             FileField::CreatedDate => {
                 let ts =
                     file.created_at().unwrap_or_else(|| file.modified_at());
-                QueryFieldValueRef::Note(NoteFieldValueRef::Date(
-                    DateValue::from(ts),
-                ))
+                match DateValue::try_from(ts) {
+                    Ok(date) => {
+                        QueryFieldValueRef::Note(NoteFieldValueRef::Date(date))
+                    }
+                    Err(_) => QueryFieldValueRef::Note(NoteFieldValueRef::Null),
+                }
+            }
+            FileField::ModifiedDate => {
+                match DateValue::try_from(file.modified_at()) {
+                    Ok(date) => {
+                        QueryFieldValueRef::Note(NoteFieldValueRef::Date(date))
+                    }
+                    Err(_) => QueryFieldValueRef::Note(NoteFieldValueRef::Null),
+                }
             }
             FileField::ModifiedDateTime => {
-                QueryFieldValueRef::Note(NoteFieldValueRef::DateTime(
-                    DateTimeValue::from(file.modified_at()),
-                ))
+                match DateTimeValue::try_from(file.modified_at()) {
+                    Ok(value) => QueryFieldValueRef::Note(
+                        NoteFieldValueRef::DateTime(value),
+                    ),
+                    Err(_) => QueryFieldValueRef::Note(NoteFieldValueRef::Null),
+                }
             }
-            FileField::ModifiedDate => QueryFieldValueRef::Note(
-                NoteFieldValueRef::Date(DateValue::from(file.modified_at())),
-            ),
             FileField::Day => match file.day() {
                 Some(day) => {
                     QueryFieldValueRef::Note(NoteFieldValueRef::Date(day))
@@ -914,12 +928,16 @@ mod tests {
             let row = rows.get(0).expect("row");
             let file = row.file();
 
-            let modified_dt = DateTimeValue::from(file.modified_at());
-            let modified_date = DateValue::from(file.modified_at());
+            let modified_dt = DateTimeValue::try_from(file.modified_at())
+                .expect("modified timestamp fits Jiff's range");
+            let modified_date = DateValue::try_from(file.modified_at())
+                .expect("modified time fits the date range");
             let created_ts =
                 file.created_at().unwrap_or_else(|| file.modified_at());
-            let created_dt = DateTimeValue::from(created_ts);
-            let created_date = DateValue::from(created_ts);
+            let created_dt = DateTimeValue::try_from(created_ts)
+                .expect("created timestamp fits Jiff's range");
+            let created_date = DateValue::try_from(created_ts)
+                .expect("created time fits the date range");
 
             assert_eq!(
                 row.field("file.mtime"),
@@ -939,6 +957,8 @@ mod tests {
             );
             assert_eq!(row.field("file.created_at"), row.field("file.ctime"));
             assert_eq!(row.field("file.modified_at"), row.field("file.mtime"));
+            assert_eq!(row.field("file.cday"), row.field("file.cdate"));
+            assert_eq!(row.field("file.mday"), row.field("file.mdate"));
         }
 
         #[test]
@@ -1282,17 +1302,18 @@ rating: note
 
             let grouped = rows.group_by("spent").expect("valid group_by");
 
-            let spellings: Vec<String> = grouped
+            let rendered: Vec<String> = grouped
                 .iter()
                 .map(|row| {
+                    let mut text = String::new();
                     row.field("spent")
                         .expect("valid path")
-                        .as_str()
-                        .expect("duration field has text")
-                        .to_owned()
+                        .as_ref()
+                        .append_text(&mut text);
+                    text
                 })
                 .collect();
-            assert_eq!(spellings, ["10m", "1h 30m", "90m"]);
+            assert_eq!(rendered, ["10m", "1h 30m", "90m"]);
         }
 
         #[test]

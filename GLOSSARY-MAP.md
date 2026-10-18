@@ -12,6 +12,8 @@ domain terms, and seams for that area.
   diagnostic mapping (`src/cli/`)
 - [Config](./src/config/GLOSSARY.md) — Discovery, TOML parsing, workspace trust
   verification, and config tracking (`src/config/`)
+- [Temporal](./src/temporal/GLOSSARY.md) — Date, Date-Time and Duration parsing,
+  local-zone resolution, and calendar arithmetic (`src/temporal/`)
 - [Dialog](./src/dialog/GLOSSARY.md) — Object-safe interactive and automated
   user prompt seam (`src/dialog/`)
 - [Index](./src/index/GLOSSARY.md) — Persistent file index, redb storage, and

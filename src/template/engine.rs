@@ -42,7 +42,7 @@ use minijinja::{Environment, Error};
 use uuid::Uuid;
 
 use self::{
-    date::DateOps,
+    date::DateNamespace,
     file::{FileOps, WRITE_TO_KEY},
     num::NumOps,
     path::PathOps,
@@ -156,7 +156,7 @@ impl TemplateEngine {
         QueryOps::register_terminal_filters(&mut env);
         PathOps::new(Arc::clone(&root)).register(&mut env);
         UiOps::new(provider).register(&mut env);
-        DateOps.register(&mut env);
+        DateNamespace.register(&mut env);
         StrOps::register(&mut env);
         NumOps::register(&mut env);
         YamlOps::register(&mut env);

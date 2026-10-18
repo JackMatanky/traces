@@ -145,8 +145,8 @@ pub(crate) fn metadata_lookup_note_source(
 /// Returns note content with `rating` present on 7 of every 10 notes and
 /// omitted entirely on the remainder.
 ///
-/// Used by sort benchmarks that need a field resolving to `SortKey::Null` on
-/// a meaningful fraction of rows, not synthetic `ProjectShape` variance.
+/// Used by sort benchmarks that need a field resolving to `SortKey::Null` on a
+/// meaningful fraction of rows, not synthetic `ProjectShape` variance.
 pub(crate) fn nullable_rating_note_source(note_index: usize) -> String {
     if note_index % 10 < 7 {
         plain_note_source(note_index)
@@ -157,8 +157,8 @@ pub(crate) fn nullable_rating_note_source(note_index: usize) -> String {
 
 /// Returns note content with one sortable duration-literal metadata field.
 ///
-/// `estimate` values cycle through 1-12 hours and 0-59 minutes so
-/// `DurationValue::parse` sees varied, non-trivial literals.
+/// `estimate` values cycle through 1 to 12 hours and 0 to 59 minutes so
+/// `DurationValue::parse` sees varied, complex literals.
 pub(crate) fn duration_field_note_source(note_index: usize) -> String {
     format!(
         "---\nestimate: {}h{}m\n---\n\n# Note {note_index}\nBody text for \
@@ -168,10 +168,31 @@ pub(crate) fn duration_field_note_source(note_index: usize) -> String {
     )
 }
 
+/// Returns note content with calendar-date, date-time, and duration metadata
+/// fields.
+///
+/// `due` cycles through the months of 2026, `seen` through the hours of one
+/// day, and `estimate` through 1 to 12 hours and 0 to 59 minutes, so the
+/// temporal parsers see varied date, date-time, and duration literals.
+pub(crate) fn date_field_note_source(note_index: usize) -> String {
+    let day_of_year = note_index % 365;
+    let month = day_of_year / 31 + 1;
+    let day = day_of_year % 28 + 1;
+    format!(
+        "---\ndue: 2026-{month:02}-{day:02}\nseen: \
+         2026-07-29T{:02}:{:02}:00Z\nestimate: {}h{}m\n---\n\n# Note \
+         {note_index}\n",
+        note_index % 24,
+        (note_index * 7) % 60,
+        (note_index % 12) + 1,
+        (note_index * 7) % 60,
+    )
+}
+
 /// Returns note content with one sortable frontmatter text field (`title`).
 ///
-/// Titles use pseudo-randomized index order matching `plain_note_source`'s
-/// shuffle so timsort does not measure near-linear sorted input.
+/// Titles use pseudo-randomized index order, matching the shuffle used by
+/// `plain_note_source`, so timsort does not measure near-linear sorted input.
 pub(crate) fn title_field_note_source(note_index: usize) -> String {
     format!(
         "---\ntitle: Note {:06}\n---\n\n# Note {note_index}\nBody text for \
@@ -262,8 +283,8 @@ pub(crate) fn task_triplet_note_source(note_index: usize) -> String {
     task_note_source(note_index, 3)
 }
 
-/// Status markers cycling through every default [`TaskStatusType`]: todo
-/// (`[ ]`), in-progress (`[/]`), done (`[x]`), cancelled (`[-]`), and on-hold
+/// Status markers cycling through every default [`TaskStatusType`]: to-do
+/// (`[ ]`), in-progress (`[/]`), done (`[x]`), canceled (`[-]`), and on-hold
 /// (`[!]`).
 ///
 /// [`TaskStatusType`]: traces_pkm::TaskStatusType
@@ -286,11 +307,11 @@ const SORT_FIXTURE_WORDS: [&str; 8] =
 ///
 /// Marker, priority, due-date day/month, and word selection each use a
 /// distinct multiplicative hash of the item's global index (derived from
-/// `note_index` and `item_index`), so the four resulting sort keys
-/// (`list.text`, `list.due`, `list.priority`, `list.status`) are decorrelated:
-/// an input ordering that is nearly sorted for one field is not nearly sorted
-/// for the others. This defeats comparison-sort fast paths that a uniform or
-/// monotonic fixture would hide.
+/// `note_index` and `item_index`). The four resulting sort keys
+/// (`list.text`, `list.due`, `list.priority`, `list.status`) do not correlate
+/// with each other. An input ordering that is nearly sorted for one field is
+/// not nearly sorted for the others. This defeats comparison-sort fast paths
+/// that a uniform or monotonic fixture would hide.
 pub(crate) fn task_sort_fixture_source(
     note_index: usize,
     item_count: usize,

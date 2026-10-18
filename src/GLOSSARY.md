@@ -38,49 +38,17 @@ The universal filesystem metadata captured for every regular file in a project:
 relative path, size, timestamps, and format classification.
 *Avoid*: fs entry, file record
 
-#### Date
-
-A parsed civil calendar date with no time-of-day component. `src/date.rs` is the
-crate's single owner of date recognition, parsing, and formatting; every
-date-shaped string — including serde deserialization — funnels through it.
-Enforces the four-digit year invariant (rejecting two-digit ambiguous years) and
-hoists precision (`YearMonth`, `Date`, `DateTime`) to the recognition layer,
-reducing `YYYY-MM` to day 1.
-*Avoid*: NaiveDate, calendar value
-
-#### Date-Time
-
-A parsed date-time point, stored as UTC and rendered as the reader's local wall
-clock. Shares `src/date.rs`'s parser with Date, where naive input represents the
-local zone, resolved to UTC at parse time. DST ambiguities resolve to the
-earliest occurrence (RFC 5545 / Temporal `'compatible'`), spring-forward gaps
-advance across the gap, and zone lookup failures surface as explicit errors.
-Comparing across Date and Date-Time promotes the Date at local midnight, with a
-declared exception falling back to the neutral UTC frame if zone lookup fails.
-*Avoid*: Timestamp, instant
-
 #### Duration
 
 An elapsed duration carrying both its total seconds magnitude and written source
-components. `src/duration.rs` is the sole owner of duration recognition, parsing,
-and the unit registry (`UNIT_MAP`, `DurationUnit`, `fixed_seconds`). Compares and
+components. `src/temporal/` is the sole owner of duration recognition, parsing,
+and the unit registry (`TEMPORAL_UNITS`, `TimeUnit`, `nominal_seconds`). Compares and
 hashes canonically by total seconds, so `1h 30m` and `90m` are equal. Negative
 zeros normalize (`-0m` equals `0m`) at construction; raw float comparisons follow
 a unified signed-zero doctrine (ticket 09 extraction home). The unit vocabulary
-maintains a strict sync contract between `UNIT_HINT` and `UNIT_MAP` (ticket 04 test
-home).
+maintains a strict sync contract between `UNIT_SPELLINGS_HINT` and `TEMPORAL_UNITS`
+(invariant test in `unit.rs`).
 *Avoid*: elapsed time, time span, interval
-
-#### Calendar Owner & Regime
-
-`src/date.rs` is the single calendar owner for shift, diff, and duration
-application; query and template engines are callers over it, owning no duplicate
-calendar arithmetic. Operates under a dual regime: identity equals total magnitude
-in seconds, while application treats day, week, month, and year as calendar units
-applied left-to-right on the local wall clock, and sub-day units as exact duration
-seconds. Consequently, equal duration values (such as `1d` and `24h`) may shift
-dates differently across calendar boundaries and DST transitions.
-*Avoid*: calendar engine, custom date math
 
 #### Temporal Strictness & Resolution
 
@@ -93,6 +61,7 @@ glossary are strictly prohibited from appearing as concept names or definitions.
 *Avoid*: locale week, lenient parser
 
 #### Path Codec
+
 The platform-native (de)serialization of `PathBuf` fields crossing a
 serialized format. `src/path.rs` is the crate's single owner; every such
 field funnels through `crate::path::codec`.

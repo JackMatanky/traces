@@ -378,3 +378,41 @@ fn task_from_nonexistent_markdown_path_matches_nothing_without_erroring() {
         from_missing.stderr
     );
 }
+
+/// Exercises offset and nanosecond parsing through note ingestion and a CLI
+/// filter, not just direct temporal parsing.
+#[test]
+fn list_filters_rfc3339_field_by_its_exact_instant() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_note(
+        "matching.md",
+        "---\ndue: 2026-07-29T14:30:00.123456789+02:00\n---\n",
+    );
+    sandbox.write_note(
+        "different.md",
+        "---\ndue: 2026-07-29T14:30:00.123456788+02:00\n---\n",
+    );
+    sandbox.run(&["index"]).assert_success();
+
+    let list = sandbox.run(&[
+        "list",
+        "--where",
+        "due == \"2026-07-29T12:30:00.123456789Z\"",
+    ]);
+    list.assert_success();
+    list.assert_stdout_eq("- matching.md\n");
+}
+
+/// Exercises multi-part duration prefixes through note ingestion and a CLI
+/// filter.
+#[test]
+fn list_filters_an_inline_multi_part_duration() {
+    let sandbox = Sandbox::trusted_via_cli();
+    sandbox.write_note("matching.md", "[duration:: 1h 30m]\n");
+    sandbox.write_note("different.md", "[duration:: 1h 31m]\n");
+    sandbox.run(&["index"]).assert_success();
+
+    let list = sandbox.run(&["list", "--where", "duration == \"90m\""]);
+    list.assert_success();
+    list.assert_stdout_eq("- matching.md\n");
+}

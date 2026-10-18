@@ -7,8 +7,8 @@ use logos::{Filter, Lexer, Logos};
 
 use super::{FlushedMetadata, inline::parse_inline_value};
 use crate::{
-    DateValue, DelimiterType, FieldKey, Spanned, Tag, TaskDate, TaskDateType,
-    TaskPriority, note::NoteFieldValue,
+    DelimiterType, FieldKey, Spanned, Tag, TaskDate, TaskDateType,
+    TaskPriority, note::NoteFieldValue, temporal::DatePoint,
 };
 
 /// Extracts inline fields from `text` in document order.
@@ -243,9 +243,10 @@ fn task_date_callback(
         .find(|&(_, ch)| !matches!(ch, ' ' | '\t'))
         .map_or(remainder.len(), |(offset, _)| offset);
     let after_ws = remainder.get(ws_end..).unwrap_or_default();
-    let Some((rec, consumed)) = DateValue::parse_prefix(after_ws) else {
+    let Some(parsed) = DatePoint::parse_prefix(after_ws) else {
         return Filter::Skip;
     };
+    let consumed = parsed.span_usize().end;
     if after_ws
         .get(consumed..)
         .and_then(|tail| tail.chars().next())
@@ -254,7 +255,10 @@ fn task_date_callback(
         return Filter::Skip;
     }
     lex.bump(ws_end.saturating_add(consumed));
-    Filter::Emit(TaskDate::new(kind, rec.date()))
+    let Ok(date) = parsed.value().date() else {
+        return Filter::Skip;
+    };
+    Filter::Emit(TaskDate::new(kind, date))
 }
 
 /// Parses a Markdown tag following the leading `#` character.
@@ -321,7 +325,7 @@ pub(super) fn scan_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::DurationValue;
+    use crate::{DateValue, DurationValue};
     mod inline_fields {
         use pretty_assertions::assert_eq;
         use rstest::rstest;

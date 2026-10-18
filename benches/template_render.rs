@@ -91,6 +91,11 @@ fn prepare_project(n: usize) -> (TempDir, std::path::PathBuf, Config) {
         "table_report.md",
         r#"{{ query.from().where("rating >= 5").sort("file.name", false).table(["Path", "Rating", "Status"], ["file.path", "rating", "status"]) }}"#,
     );
+    project.write_template(
+        "date_report.md",
+        r#"{% for i in range(200) %}{{ "2026-01-31" | date_add(1, unit="months") }}|{{ "2026-07-29T14:30:00Z" | date_format("%Y-%m-%d %H:%M") }}|{{ "2026-07-29" | sow }}|{{ "2026-07-29" | eom }}|{{ "1h 30m" | durationformat }}
+{% endfor %}"#,
+    );
     let _ = project.build_and_persist();
     let config = Config::test_default(&root).with_templates();
     (temp, root, config)
@@ -189,9 +194,45 @@ fn bench_render(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measures the date and duration template filters in isolation.
+///
+/// Parameters: a fixed 50-note project renders one template that repeats
+/// `date_add`, `date_format`, `sow`, `eom`, and `durationformat` 200 times; it
+/// reports filter-iteration throughput and is independent of note count.
+///
+/// Fixture project, config, dialog provider, service, and template input are
+/// built outside timing.
+///
+/// Expected outcomes:
+/// - Cost scales with filter calls, not with the note count of the project.
+///
+/// Unexpected outcomes:
+/// - Per-call cost far above the other template filters, indicating per-call
+///   zone resolution or parsing allocation in the date path.
+fn bench_date_filters(c: &mut Criterion) {
+    let mut group = c.benchmark_group("TemplateService::date_filters");
+    let (_temp, _root, config) = prepare_project(50);
+    let dialog = Arc::new(PresetDialogProvider::new());
+    let service =
+        TemplateService::new(&config, dialog).expect("valid schema directory");
+    let date_input =
+        TemplatePathInput::parse(std::path::Path::new("date_report"))
+            .expect("valid template input");
+    group.throughput(Throughput::Elements(200));
+    group.bench_function("render_200", |b| {
+        b.iter_with_large_drop(|| {
+            let outcome = service
+                .render_to_file(&date_input, None, WriteMode::DryRun)
+                .expect("render date report");
+            black_box(outcome)
+        });
+    });
+    group.finish();
+}
+
 criterion_group! {
     name = benches;
     config = common::criterion_config();
-    targets = bench_render
+    targets = bench_render, bench_date_filters
 }
 criterion_main!(benches);

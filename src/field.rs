@@ -36,7 +36,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{DateTimeValue, DateValue};
+use crate::{DateTimeValue, DateValue, temporal::DatePoint};
 
 /// Stores an exact schema field identifier.
 ///
@@ -829,16 +829,14 @@ impl<'a> FieldStringValue<'a> {
         self,
         coercion: DateTimeCoercion,
     ) -> FieldValueRef<'a> {
-        if coercion == DateTimeCoercion::Classify
-            && let Some(Ok(rec)) = DateValue::classify(&self.0)
-        {
-            return match rec.value {
-                crate::date::RecognizedDateValue::DateTime(dt) => {
-                    FieldValueRef::DateTime(dt)
-                }
-                crate::date::RecognizedDateValue::Date(d) => {
-                    FieldValueRef::Date(d)
-                }
+        if coercion == DateTimeCoercion::Classify {
+            return match DatePoint::parse(&self.0) {
+                Ok(DatePoint::DateTime(dt)) => FieldValueRef::DateTime(dt),
+                Ok(DatePoint::Calendar {
+                    date,
+                    ..
+                }) => FieldValueRef::Date(date),
+                Err(_) => FieldValueRef::String(self.0),
             };
         }
         FieldValueRef::String(self.0)

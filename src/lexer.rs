@@ -1,10 +1,11 @@
 //! Provides shared lexer primitives for tokenizing text into typed token
 //! streams.
 //!
-//! Provides token streaming with one-token lookahead ([`LexTokenStream`]),
-//! spanned token wrappers ([`Spanned`]), token expectations ([`TokenSpec`]),
-//! error diagnostics ([`LexError`]), and string unescaping
-//! ([`lexical_unquote`], [`lexical_backslash_unescape`]).
+//! Provides shared prefix recognition ([`lex_prefix`]), token streaming with
+//! one-token lookahead ([`LexTokenStream`]), spanned token wrappers
+//! ([`Spanned`]), token expectations ([`TokenSpec`]), error diagnostics
+//! ([`LexError`]), and string unescaping ([`lexical_unquote`],
+//! [`lexical_backslash_unescape`]).
 
 use std::{iter::Peekable, ops::Range, vec};
 
@@ -12,6 +13,17 @@ use logos::Logos;
 use thiserror::Error;
 
 use crate::Spanned;
+
+/// Parses a value from the recognized prefix of `input`, retaining its byte
+/// extent.
+pub(crate) fn lex_prefix<T>(
+    input: &str,
+    parse: impl FnOnce(&str) -> Option<(T, usize)>,
+) -> Option<Spanned<T>> {
+    let (value, end) = parse(input)?;
+    input.get(..end)?;
+    Some(Spanned::from_usize_range(value, 0..end))
+}
 
 /// Stores an owning one-token-lookahead cursor over a materialized token
 /// stream.
@@ -299,6 +311,46 @@ impl LexError {
 mod tests {
     use super::*;
 
+    mod prefix {
+        use logos::Logos;
+
+        use super::*;
+
+        #[derive(Debug, PartialEq, Logos)]
+        enum Token {
+            #[regex(r"[0-9]+", |lex| lex.slice().parse::<u32>().ok())]
+            Number(u32),
+        }
+
+        fn lex(input: &str) -> Option<Spanned<Token>> {
+            lex_prefix(input, |input| {
+                let mut lexer = Token::lexer(input);
+                let value = lexer.next()?.ok()?;
+                Some((value, lexer.span().end))
+            })
+        }
+
+        #[test]
+        fn returns_a_prefix_token_and_its_extent() {
+            let parsed = lex("42tail").expect("number at offset zero");
+
+            assert_eq!(parsed.value(), &Token::Number(42));
+            assert_eq!(parsed.span_usize(), 0..2);
+        }
+
+        #[test]
+        fn does_not_skip_whitespace_or_consume_trailing_text() {
+            assert!(lex(" 42").is_none());
+            assert_eq!(lex("42tail").expect("number").span_usize(), 0..2);
+        }
+
+        #[test]
+        fn accepts_full_input_and_multibyte_tails() {
+            assert_eq!(lex("42").expect("full token").span_usize(), 0..2);
+            assert_eq!(lex("42é").expect("multibyte tail").span_usize(), 0..2);
+            assert!(lex("").is_none());
+        }
+    }
     mod lex_error {
         use super::*;
 

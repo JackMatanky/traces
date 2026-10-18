@@ -134,6 +134,11 @@ impl ExecutionPlan {
 }
 
 /// Represents a single transformation operation in an [`ExecutionPlan`].
+#[expect(
+    clippy::large_enum_variant,
+    reason = "inline filters avoid heap allocation during query planning and \
+              execution"
+)]
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum QueryTransform {
     Filter(FilterExpr),

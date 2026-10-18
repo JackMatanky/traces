@@ -19,8 +19,8 @@ use super::{
     value::QueryFieldValueRef,
 };
 use crate::{
-    DateTimeValue, DateValue, DurationSeconds, NoteFieldType, NoteFieldValue,
-    NoteFieldValueRef, note::normalize_zero,
+    DateTimeValue, DateValue, DurationValue, NoteFieldType, NoteFieldValue,
+    NoteFieldValueRef, note::normalize_zero, temporal::DatePoint,
 };
 
 /// Represents a composite ordering clause made of one or more [`SortTerm`]
@@ -342,8 +342,8 @@ pub(super) enum SortKey<'a> {
     Number(f64),
     /// Date or date-time value, normalized to a date-time.
     DateTime(DateTimeValue),
-    /// Duration value, normalized to seconds.
-    Duration(DurationSeconds),
+    /// Duration value with exact nominal ordering.
+    Duration(DurationValue),
     /// Text value, borrowed where possible.
     Text(Cow<'a, str>),
 }
@@ -373,10 +373,9 @@ impl<'a> SortKey<'a> {
             NoteFieldValueRef::Bool(b) => Self::Bool(b),
             NoteFieldValueRef::Number(n) => Self::Number(normalize_zero(n)),
             NoteFieldValueRef::DateTime(value) => Self::DateTime(value),
-            NoteFieldValueRef::Date(value) => {
-                Self::DateTime(DateTimeValue::from(value))
-            }
-            NoteFieldValueRef::Duration(dv) => Self::Duration(dv.to_seconds()),
+            NoteFieldValueRef::Date(value) => DateTimeValue::try_from(value)
+                .map_or(Self::Null, Self::DateTime),
+            NoteFieldValueRef::Duration(dv) => Self::Duration(*dv),
             NoteFieldValueRef::String(s) => Self::from_text(Cow::Borrowed(s)),
             NoteFieldValueRef::Link(link) => {
                 Self::Text(Cow::Borrowed(link.target()))
@@ -394,10 +393,9 @@ impl<'a> SortKey<'a> {
     fn from_text(s: Cow<'a, str>) -> Self {
         match TextShape::classify(&s) {
             TextShape::DateTime(value) => Self::DateTime(value),
-            TextShape::Date(value) => {
-                Self::DateTime(DateTimeValue::from(value))
-            }
-            TextShape::Duration(dv) => Self::Duration(dv.to_seconds()),
+            TextShape::Date(value) => DateTimeValue::try_from(value)
+                .map_or(Self::Null, Self::DateTime),
+            TextShape::Duration(dv) => Self::Duration(dv),
             TextShape::Plain => Self::Text(s),
         }
     }
@@ -459,19 +457,19 @@ pub(super) enum TextShape {
 impl TextShape {
     /// Inspects free text for a date, date-time, or duration shape.
     ///
-    /// Delegates to [`DateValue::classify`] and
-    /// [`crate::DurationValue::classify`].
+    /// Delegates to [`DatePoint::parse`] and
+    /// [`crate::DurationValue::parse`].
     pub(super) fn classify(s: &str) -> Self {
         let trimmed = s.trim();
-        if let Some(Ok(rec)) = DateValue::classify(trimmed) {
-            return match rec.value {
-                crate::date::RecognizedDateValue::DateTime(dt) => {
-                    Self::DateTime(dt)
-                }
-                crate::date::RecognizedDateValue::Date(d) => Self::Date(d),
-            };
+        match DatePoint::parse(trimmed) {
+            Ok(DatePoint::DateTime(dt)) => return Self::DateTime(dt),
+            Ok(DatePoint::Calendar {
+                date,
+                ..
+            }) => return Self::Date(date),
+            Err(_) => {}
         }
-        if let Some(Ok(dv)) = crate::DurationValue::classify(trimmed) {
+        if let Ok(dv) = crate::DurationValue::parse(trimmed) {
             return Self::Duration(dv);
         }
         Self::Plain
@@ -713,7 +711,7 @@ mod tests {
         use super::super::{
             NullPlacement, SortDirection, SortKey, SortOrder, SortTerm,
         };
-        use crate::{DurationSeconds, query::grammar::FieldPath};
+        use crate::{DurationValue, query::grammar::FieldPath};
 
         #[rstest]
         #[case::number(SortKey::Number(1.0))]
@@ -728,10 +726,12 @@ mod tests {
 
         #[test]
         fn compares_durations_numerically() {
-            let one_hour =
-                SortKey::Duration(DurationSeconds::try_from(3_600.0).unwrap());
-            let thirty_mins =
-                SortKey::Duration(DurationSeconds::try_from(1_800.0).unwrap());
+            let one_hour = SortKey::Duration(
+                "1h".parse::<DurationValue>().expect("valid duration"),
+            );
+            let thirty_mins = SortKey::Duration(
+                "30m".parse::<DurationValue>().expect("valid duration"),
+            );
             assert_eq!(one_hour.cmp(&thirty_mins), Ordering::Greater);
             assert_eq!(thirty_mins.cmp(&one_hour), Ordering::Less);
         }
@@ -848,8 +848,8 @@ mod tests {
 
         use super::super::{QueryFieldValueRef, SortKey};
         use crate::{
-            DateTimeValue, DateValue, DurationSeconds, DurationValue,
-            NoteFieldValue, NoteFieldValueRef,
+            DateTimeValue, DateValue, DurationValue, NoteFieldValue,
+            NoteFieldValueRef,
         };
 
         fn date(s: &str) -> DateValue {
@@ -867,7 +867,10 @@ mod tests {
             ));
             assert_eq!(
                 key,
-                SortKey::DateTime(DateTimeValue::from(date("2026-07-29")))
+                SortKey::DateTime(
+                    DateTimeValue::try_from(date("2026-07-29"))
+                        .expect("test date has a representable local midnight"),
+                ),
             );
         }
 
@@ -887,7 +890,10 @@ mod tests {
             ));
             assert_eq!(
                 key,
-                SortKey::DateTime(DateTimeValue::from(date("2026-07-29")))
+                SortKey::DateTime(
+                    DateTimeValue::try_from(date("2026-07-29"))
+                        .expect("test date has a representable local midnight"),
+                ),
             );
         }
 
@@ -905,10 +911,7 @@ mod tests {
             let key = SortKey::from_value_ref(QueryFieldValueRef::Note(
                 NoteFieldValueRef::Duration(&dv),
             ));
-            assert_eq!(
-                key,
-                SortKey::Duration(DurationSeconds::try_from(5_400.0).unwrap())
-            );
+            assert_eq!(key, SortKey::Duration(dv));
         }
 
         #[test]

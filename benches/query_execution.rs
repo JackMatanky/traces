@@ -1,7 +1,7 @@
 //! Performance benchmark suite for query execution.
 //!
-//! Exposes and monitors the CPU cost of [`QueryService::run`] over pre-built
-//! page and task indexes.
+//! Exposes and monitors the CPU cost of [`QueryService::run`] over page and
+//! task indexes prepared ahead of each timed run.
 //!
 //! ### Data Flow Diagram
 //!
@@ -45,8 +45,8 @@ mod common;
 use common::{
     WORKSPACE_FILE_COUNTS,
     content::{
-        ProjectShape, metadata_lookup_note_source, task_note_source,
-        task_triplet_note_source,
+        ProjectShape, date_field_note_source, metadata_lookup_note_source,
+        task_note_source, task_triplet_note_source,
     },
     project::{build_index_arc, build_index_arc_from_note_source},
 };
@@ -56,12 +56,12 @@ use common::{
 // ----------------------------------------------------------- //
 
 const QUERY_METADATA_FIELD_COUNTS: &[usize] = &[1, 5, 10, 20];
-/// Task-per-note sweep for [`bench_query_tasks_density`]: sparse, moderate,
-/// and heavy task lists per note.
+/// Task-per-note sweep for [`bench_query_tasks_density`]: sparse, moderate, and
+/// heavy task lists per note.
 const TASK_DENSITY_COUNTS: &[usize] = &[1, 10, 100];
 
-/// Workspace file-count sweep for [`bench_query_tasks_density`], independent
-/// of the shared `WORKSPACE_FILE_COUNTS` tiers.
+/// Workspace file-count sweep for [`bench_query_tasks_density`], independent of
+/// the shared `WORKSPACE_FILE_COUNTS` tiers.
 const TASK_DENSITY_FILE_COUNTS: &[usize] = &[100, 1_000, 10_000];
 
 // ----------------------------------------------------------- //
@@ -80,8 +80,8 @@ const TASK_DENSITY_FILE_COUNTS: &[usize] = &[100, 1_000, 10_000];
 /// - Cost scales linearly with indexed entries.
 ///
 /// Unexpected outcomes:
-/// - Super-linear scaling with note count, indicating row materialization or
-///   source iteration does redundant work.
+/// - Scaling faster than linear with note count, indicating row materialization
+///   or source iteration does redundant work.
 fn bench_run_pages(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryService::run");
     group.plot_config(
@@ -151,8 +151,8 @@ fn bench_run_tasks(c: &mut Criterion) {
 /// Parameters: varies [`WORKSPACE_FILE_COUNTS`]; reports input note throughput.
 ///
 /// Fixture: [`ProjectShape::Plain`] in-memory indexes are built outside timing.
-/// Query construction is untimed setup; timed work runs `All pages ->
-/// filter("rating > 2") -> sort("rating")`.
+/// Query construction is performed outside the timed window; timed work runs
+/// `All pages -> filter("rating > 2") -> sort("rating")`.
 ///
 /// This group covers the combined end-to-end path only. The filter-width and
 /// sort-only benchmarks are diagnostic context, but they are not a controlled
@@ -208,9 +208,11 @@ fn bench_run_pages_by_metadata(c: &mut Criterion) {
 /// 20,000-note workspace size.
 ///
 /// Parameters: varies metadata field count over `{1, 5, 10, 20}`; reports
-/// 20,000 input rows per iteration. Fixture indexes are built outside timing by
-/// `metadata_lookup_note_source`, which places `rating` after the synthetic
-/// fields so accidental linear metadata lookup is visible.
+/// 20,000 input rows per iteration.
+///
+/// Fixture indexes are built outside timing by `metadata_lookup_note_source`,
+/// which places `rating` after the synthetic fields so accidental linear
+/// metadata lookup is visible.
 ///
 /// Runs `rows_floor` (unfiltered page selection across varied field width)
 /// alongside `filter` (`rating > 2`).
@@ -269,21 +271,81 @@ fn bench_filter_by_metadata_field_count(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measures task expansion throughput across a task-density x
-/// workspace-size matrix.
+/// Measures filter cost for date, date-time, and duration predicates at a fixed
+/// 20,000-note workspace size.
+///
+/// Parameters: varies the predicate shape over `{date_compare,
+/// datetime_compare, date_arithmetic, date_function, shorthand_period,
+/// duration_compare}`; reports 20,000 input rows per iteration.
+///
+/// Fixture indexes are built outside timing by `date_field_note_source`; `due`
+/// is a calendar date, `seen` a UTC date-time, and `estimate` a duration.
+///
+/// Expected outcomes:
+/// - `date_compare` and `datetime_compare` stay near the `rating > 2` filter in
+///   [`bench_filter_by_metadata_field_count`], because both operands are
+///   already parsed values.
+/// - `date_arithmetic` costs more per row because each row applies a duration
+///   to a date point.
+/// - `date_function` and `shorthand_period` cost more than `date_compare`
+///   because each row evaluates a calendar function before comparing.
+/// - `duration_compare` stays near `date_compare`: both compare two parsed
+///   values.
+///
+/// Unexpected outcomes:
+/// - Any variant growing by an order of magnitude over `date_compare`,
+///   indicating per-row date parsing, zone lookup, or allocation in the
+///   comparison path.
+fn bench_filter_by_date(c: &mut Criterion) {
+    const FILTERS: [(&str, &str); 6] = [
+        ("date_compare", r#"due > "2026-06-15""#),
+        ("datetime_compare", r#"seen > "2026-07-29T12:00:00Z""#),
+        ("date_arithmetic", r#"due + dur("1 month") > "2026-07-01""#),
+        ("date_function", r#"date("2026-06-15") < due"#),
+        ("shorthand_period", r#"eom(due) > "2026-06-30""#),
+        ("duration_compare", r#"estimate > "6h""#),
+    ];
+    let mut group = c.benchmark_group("QueryService::run/filter_by_date");
+    let service = QueryService::new("class");
+    let n = 20_000_usize;
+    let index =
+        build_index_arc_from_note_source(n, |i, _| date_field_note_source(i));
+    group.throughput(Throughput::Elements(
+        u64::try_from(n).expect("note count fits u64"),
+    ));
+    for (name, filter) in FILTERS {
+        group.bench_function(name, |b| {
+            b.iter_batched(
+                || {
+                    QueryBuilder::pages(SourceSelector::All)
+                        .filter(filter)
+                        .expect("valid filter")
+                },
+                |query| service.run(&index, query),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
+}
+
+/// Measures task expansion throughput across a task-density x workspace-size
+/// matrix.
 ///
 /// Parameters: sweeps [`TASK_DENSITY_COUNTS`] (`1, 10, 100` tasks per note)
 /// across [`TASK_DENSITY_FILE_COUNTS`] (`100, 1_000, 10_000` files); reports
-/// total expanded task-row throughput. Fixture indexes are built outside
-/// timing through `task_note_source` and `WorkspaceIndex::for_test`.
+/// total expanded task-row throughput.
+///
+/// Fixture indexes are built outside timing through `task_note_source` and
+/// `WorkspaceIndex::for_test`.
 ///
 /// Expected outcomes:
 /// - Execution time scales linearly with total expanded task rows (`file_count`
 ///   × `tasks_per_note`), independent of which factor grows.
 ///
 /// Unexpected outcomes:
-/// - Super-linear growth with task density at fixed file count, or with file
-///   count at fixed task density, indicating per-note allocation churn or
+/// - Growth faster than linear with task density at fixed file count, or with
+///   file count at fixed task density, indicating per-note allocation churn or
 ///   inefficient slice traversal in `Note::tasks()`.
 fn bench_query_tasks_density(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryService::run/tasks_density");
@@ -327,8 +389,8 @@ fn bench_query_tasks_density(c: &mut Criterion) {
 /// Parameters: varies [`WORKSPACE_FILE_COUNTS`]; `n` is a size-sensitivity
 /// probe, not processed work inside the timed clone.
 ///
-/// Fixture: a plain in-memory index and unmaterialized no-transform
-/// [`QuerySet`] are built outside timing.
+/// Fixture: a plain in-memory index and a no-transform [`QuerySet`] are built
+/// outside timing.
 ///
 /// `QuerySet::base` is `Arc<Vec<QueryRow>>`, so cloning should copy the `Arc`
 /// and empty plan state, not row data.
@@ -363,8 +425,8 @@ fn bench_clone_query_set(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measures `QuerySet`'s owned `IntoIterator::into_iter()` sole-owner path,
-/// swept over workspace size and row shape.
+/// Measures the owned `IntoIterator::into_iter()` sole-owner path of
+/// `QuerySet`, swept over workspace size and row shape.
 ///
 /// Parameters: varies [`WORKSPACE_FILE_COUNTS`] and shape (`pages`, `tasks`);
 /// reports output rows (`n` or `3 * n`). Query construction happens in
@@ -381,9 +443,9 @@ fn bench_clone_query_set(c: &mut Criterion) {
 ///   regressions.
 ///
 /// Unexpected outcomes:
-/// - Cost approaching [`bench_clone_query_set`]'s deep-copy levels or growing
-///   super-linearly with `n`, indicating `Arc::try_unwrap` failed on the fresh
-///   set and `into_iter` clones row bodies.
+/// - Cost approaching the deep-copy levels of [`bench_clone_query_set`] or
+///   growing super-linearly with `n`, indicating `Arc::try_unwrap` failed on
+///   the fresh set and `into_iter` clones row bodies.
 fn bench_into_iter_owned(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryService::run/into_iter_owned");
     group.plot_config(
@@ -486,6 +548,7 @@ criterion_group! {
     config = common::criterion_config();
     targets = bench_run_pages, bench_run_tasks, bench_query_tasks_density,
         bench_run_pages_by_metadata, bench_filter_by_metadata_field_count,
-        bench_clone_query_set, bench_into_iter_owned, bench_filter_then_sort
+        bench_filter_by_date, bench_clone_query_set, bench_into_iter_owned,
+        bench_filter_then_sort
 }
 criterion_main!(benches);

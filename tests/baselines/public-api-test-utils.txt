@@ -1908,49 +1908,6 @@ impl<T> either::into_either::IntoEither for traces_pkm::testing::TestProject
 impl<T> tracing::instrument::Instrument for traces_pkm::testing::TestProject
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::TestProject
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::TestProject where T: 'static
-pub struct traces_pkm::testing::TzGuard
-impl traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::keep()
-pub fn traces_pkm::testing::TzGuard::set(&str)
-impl core::fmt::Debug for traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::ops::drop::Drop for traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::drop(&mut self)
-impl core::marker::Freeze for traces_pkm::testing::TzGuard
-impl !core::marker::Send for traces_pkm::testing::TzGuard
-impl core::marker::Sync for traces_pkm::testing::TzGuard
-impl core::marker::Unpin for traces_pkm::testing::TzGuard
-impl core::marker::UnsafeUnpin for traces_pkm::testing::TzGuard
-impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::testing::TzGuard
-impl core::panic::unwind_safe::UnwindSafe for traces_pkm::testing::TzGuard
-impl<D> owo_colors::OwoColorize for traces_pkm::testing::TzGuard
-impl<T, U> core::convert::Into<U> for traces_pkm::testing::TzGuard where U: core::convert::From<T>
-pub fn traces_pkm::testing::TzGuard::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for traces_pkm::testing::TzGuard where U: core::convert::Into<T>
-pub type traces_pkm::testing::TzGuard::Error = never
-pub fn traces_pkm::testing::TzGuard::try_from(U) -> core::result::Result<T, never>
-impl<T, U> core::convert::TryInto<U> for traces_pkm::testing::TzGuard where U: core::convert::TryFrom<T>
-pub type traces_pkm::testing::TzGuard::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn traces_pkm::testing::TzGuard::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> core::any::Any for traces_pkm::testing::TzGuard where T: 'static + ?core::marker::Sized
-pub fn traces_pkm::testing::TzGuard::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for traces_pkm::testing::TzGuard where T: ?core::marker::Sized
-pub fn traces_pkm::testing::TzGuard::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for traces_pkm::testing::TzGuard where T: ?core::marker::Sized
-pub fn traces_pkm::testing::TzGuard::borrow_mut(&mut self) -> &mut T
-impl<T> core::convert::From<T> for traces_pkm::testing::TzGuard
-pub fn traces_pkm::testing::TzGuard::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::testing::TzGuard
-pub type traces_pkm::testing::TzGuard::Init = T
-pub const traces_pkm::testing::TzGuard::ALIGN: usize
-pub unsafe fn traces_pkm::testing::TzGuard::deref<'a>(usize) -> &'a T
-pub unsafe fn traces_pkm::testing::TzGuard::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn traces_pkm::testing::TzGuard::drop(usize)
-pub unsafe fn traces_pkm::testing::TzGuard::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for traces_pkm::testing::TzGuard
-impl<T> tracing::instrument::Instrument for traces_pkm::testing::TzGuard
-impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::TzGuard
-impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::TzGuard where T: 'static
 pub struct traces_pkm::testing::WorkspaceIndex
 impl traces_pkm::testing::WorkspaceIndex
 pub fn traces_pkm::testing::WorkspaceIndex::entries(&self) -> &[traces_pkm::testing::FileEntry]
@@ -2002,6 +1959,50 @@ impl<T> either::into_either::IntoEither for traces_pkm::testing::WorkspaceIndex
 impl<T> tracing::instrument::Instrument for traces_pkm::testing::WorkspaceIndex
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::WorkspaceIndex
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::WorkspaceIndex where T: 'static
+pub struct traces_pkm::testing::ZoneGuard
+impl traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::keep()
+pub fn traces_pkm::testing::ZoneGuard::set(&str)
+pub fn traces_pkm::testing::ZoneGuard::with<R, F: core::ops::function::FnOnce() -> R>(&str, F) -> R
+impl core::fmt::Debug for traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::ops::drop::Drop for traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::drop(&mut self)
+impl core::marker::Freeze for traces_pkm::testing::ZoneGuard
+impl !core::marker::Send for traces_pkm::testing::ZoneGuard
+impl core::marker::Sync for traces_pkm::testing::ZoneGuard
+impl core::marker::Unpin for traces_pkm::testing::ZoneGuard
+impl core::marker::UnsafeUnpin for traces_pkm::testing::ZoneGuard
+impl core::panic::unwind_safe::RefUnwindSafe for traces_pkm::testing::ZoneGuard
+impl core::panic::unwind_safe::UnwindSafe for traces_pkm::testing::ZoneGuard
+impl<D> owo_colors::OwoColorize for traces_pkm::testing::ZoneGuard
+impl<T, U> core::convert::Into<U> for traces_pkm::testing::ZoneGuard where U: core::convert::From<T>
+pub fn traces_pkm::testing::ZoneGuard::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces_pkm::testing::ZoneGuard where U: core::convert::Into<T>
+pub type traces_pkm::testing::ZoneGuard::Error = never
+pub fn traces_pkm::testing::ZoneGuard::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces_pkm::testing::ZoneGuard where U: core::convert::TryFrom<T>
+pub type traces_pkm::testing::ZoneGuard::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces_pkm::testing::ZoneGuard::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for traces_pkm::testing::ZoneGuard where T: 'static + ?core::marker::Sized
+pub fn traces_pkm::testing::ZoneGuard::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces_pkm::testing::ZoneGuard where T: ?core::marker::Sized
+pub fn traces_pkm::testing::ZoneGuard::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces_pkm::testing::ZoneGuard where T: ?core::marker::Sized
+pub fn traces_pkm::testing::ZoneGuard::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for traces_pkm::testing::ZoneGuard
+pub fn traces_pkm::testing::ZoneGuard::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces_pkm::testing::ZoneGuard
+pub type traces_pkm::testing::ZoneGuard::Init = T
+pub const traces_pkm::testing::ZoneGuard::ALIGN: usize
+pub unsafe fn traces_pkm::testing::ZoneGuard::deref<'a>(usize) -> &'a T
+pub unsafe fn traces_pkm::testing::ZoneGuard::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces_pkm::testing::ZoneGuard::drop(usize)
+pub unsafe fn traces_pkm::testing::ZoneGuard::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for traces_pkm::testing::ZoneGuard
+impl<T> tracing::instrument::Instrument for traces_pkm::testing::ZoneGuard
+impl<T> tracing::instrument::WithSubscriber for traces_pkm::testing::ZoneGuard
+impl<T> yoke::erased::ErasedDestructor for traces_pkm::testing::ZoneGuard where T: 'static
 pub const traces_pkm::testing::DEFAULT_SCHEMAS_DIR: &str
 pub const traces_pkm::testing::DEFAULT_SCHEMA_VALUES_DIR: &str
 pub const traces_pkm::testing::DEFAULT_TEMPLATES_DIR: &str
@@ -2017,21 +2018,19 @@ pub fn traces_pkm::testing::write_schema<P: core::convert::AsRef<std::path::Path
 pub fn traces_pkm::testing::write_template<P: core::convert::AsRef<std::path::Path>>(&std::path::Path, P, &str) -> std::path::PathBuf
 pub type traces_pkm::testing::QueryResult<T> = core::result::Result<T, traces_pkm::query::error::QueryError>
 #[non_exhaustive] pub enum traces_pkm::DateError
-pub traces_pkm::DateError::InvalidYearDigits
-pub traces_pkm::DateError::InvalidYearDigits::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::InvalidValue
+pub traces_pkm::DateError::InvalidValue::input: alloc::boxed::Box<str>
+pub traces_pkm::DateError::InvalidValue::reason: &'static str
 pub traces_pkm::DateError::LocalZoneLookup
 pub traces_pkm::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
-pub traces_pkm::DateError::OutOfRange
-pub traces_pkm::DateError::Unparseable
-pub traces_pkm::DateError::Unparseable::input: alloc::boxed::Box<str>
-pub traces_pkm::DateError::Unparseable::source: chrono::format::ParseError
+pub traces_pkm::DateError::YearNotFourDigits
+pub traces_pkm::DateError::YearNotFourDigits::input: alloc::boxed::Box<str>
 impl core::clone::Clone for traces_pkm::DateError
 pub fn traces_pkm::DateError::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DateError
 impl core::cmp::PartialEq for traces_pkm::DateError
 pub fn traces_pkm::DateError::eq(&self, &Self) -> bool
 impl core::error::Error for traces_pkm::DateError
-pub fn traces_pkm::DateError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Debug for traces_pkm::DateError
 pub fn traces_pkm::DateError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DateError
@@ -2143,20 +2142,15 @@ impl<T> tracing::instrument::WithSubscriber for traces_pkm::DialogError
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::DialogError where T: 'static
 #[non_exhaustive] pub enum traces_pkm::DurationError
 pub traces_pkm::DurationError::Empty
-pub traces_pkm::DurationError::InvalidNumber
-pub traces_pkm::DurationError::InvalidNumber::input: alloc::string::String
 pub traces_pkm::DurationError::MalformedNumber
-pub traces_pkm::DurationError::MalformedNumber::input: alloc::string::String
 pub traces_pkm::DurationError::MalformedNumber::source: core::num::float_parse::ParseFloatError
+pub traces_pkm::DurationError::MisplacedSign
 pub traces_pkm::DurationError::MissingNumber
-pub traces_pkm::DurationError::MissingNumber::input: alloc::string::String
 pub traces_pkm::DurationError::MissingUnit
-pub traces_pkm::DurationError::MissingUnit::input: alloc::string::String
-pub traces_pkm::DurationError::NonFiniteNumber
-pub traces_pkm::DurationError::NonFiniteNumber::input: alloc::string::String
 pub traces_pkm::DurationError::NonFiniteSeconds
+pub traces_pkm::DurationError::NumberOverflow
+pub traces_pkm::DurationError::SecondsOutOfRange
 pub traces_pkm::DurationError::UnknownUnit
-pub traces_pkm::DurationError::UnknownUnit::input: alloc::string::String
 impl core::clone::Clone for traces_pkm::DurationError
 pub fn traces_pkm::DurationError::clone(&self) -> Self
 impl core::error::Error for traces_pkm::DurationError
@@ -2291,7 +2285,7 @@ pub traces_pkm::NoteFieldValue::Number(f64)
 pub traces_pkm::NoteFieldValue::Object(indexmap::map::IndexMap<alloc::string::String, Self>)
 pub traces_pkm::NoteFieldValue::String(alloc::string::String)
 impl traces_pkm::NoteFieldValue
-pub fn traces_pkm::NoteFieldValue::as_date(&self) -> core::option::Option<chrono::naive::date::NaiveDate>
+pub fn traces_pkm::NoteFieldValue::as_date(&self) -> core::option::Option<traces_pkm::DateValue>
 pub fn traces_pkm::NoteFieldValue::as_ref(&self) -> traces_pkm::NoteFieldValueRef<'_>
 pub fn traces_pkm::NoteFieldValue::as_str(&self) -> core::option::Option<&str>
 impl core::clone::Clone for traces_pkm::NoteFieldValue
@@ -2866,6 +2860,8 @@ impl<T> tracing::instrument::Instrument for traces_pkm::TaskStatusType
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::TaskStatusType
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::TaskStatusType where T: 'static
 #[repr(transparent)] pub struct traces_pkm::DateTimeValue(_)
+impl traces_pkm::DateTimeValue
+pub fn traces_pkm::DateTimeValue::from_unix_seconds(i64) -> core::result::Result<Self, traces_pkm::DateError>
 impl core::clone::Clone for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DateTimeValue
@@ -2875,14 +2871,12 @@ impl core::cmp::PartialEq for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::From<chrono::datetime::DateTime<chrono::offset::utc::Utc>> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> Self
-impl core::convert::From<std::time::SystemTime> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(std::time::SystemTime) -> Self
-impl core::convert::From<traces_pkm::DateTimeValue> for chrono::datetime::DateTime<chrono::offset::utc::Utc>
-pub fn chrono::datetime::DateTime<chrono::offset::utc::Utc>::from(traces_pkm::DateTimeValue) -> Self
-impl core::convert::From<traces_pkm::DateValue> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(traces_pkm::DateValue) -> Self
+impl core::convert::TryFrom<std::time::SystemTime> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(std::time::SystemTime) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<traces_pkm::DateValue> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(traces_pkm::DateValue) -> core::result::Result<Self, Self::Error>
 impl core::fmt::Debug for traces_pkm::DateTimeValue
 pub fn traces_pkm::DateTimeValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DateTimeValue
@@ -2951,6 +2945,8 @@ impl<T> tracing::instrument::Instrument for traces_pkm::DateTimeValue
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateTimeValue
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateTimeValue where T: 'static
 #[repr(transparent)] pub struct traces_pkm::DateValue(_)
+impl traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from_ymd(i32, u32, u32) -> core::result::Result<Self, traces_pkm::DateError>
 impl core::clone::Clone for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DateValue
@@ -2960,14 +2956,14 @@ impl core::cmp::PartialEq for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::From<chrono::naive::date::NaiveDate> for traces_pkm::DateValue
-pub fn traces_pkm::DateValue::from(chrono::naive::date::NaiveDate) -> Self
-impl core::convert::From<std::time::SystemTime> for traces_pkm::DateValue
-pub fn traces_pkm::DateValue::from(std::time::SystemTime) -> Self
-impl core::convert::From<traces_pkm::DateValue> for chrono::naive::date::NaiveDate
-pub fn chrono::naive::date::NaiveDate::from(traces_pkm::DateValue) -> Self
-impl core::convert::From<traces_pkm::DateValue> for traces_pkm::DateTimeValue
-pub fn traces_pkm::DateTimeValue::from(traces_pkm::DateValue) -> Self
+impl core::convert::From<jiff::civil::date::Date> for traces_pkm::DateValue
+pub fn traces_pkm::DateValue::from(jiff::civil::date::Date) -> Self
+impl core::convert::TryFrom<std::time::SystemTime> for traces_pkm::DateValue
+pub type traces_pkm::DateValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateValue::try_from(std::time::SystemTime) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<traces_pkm::DateValue> for traces_pkm::DateTimeValue
+pub type traces_pkm::DateTimeValue::Error = traces_pkm::DateError
+pub fn traces_pkm::DateTimeValue::try_from(traces_pkm::DateValue) -> core::result::Result<Self, Self::Error>
 impl core::fmt::Debug for traces_pkm::DateValue
 pub fn traces_pkm::DateValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DateValue
@@ -3036,6 +3032,11 @@ impl<T> tracing::instrument::Instrument for traces_pkm::DateValue
 impl<T> tracing::instrument::WithSubscriber for traces_pkm::DateValue
 impl<T> yoke::erased::ErasedDestructor for traces_pkm::DateValue where T: 'static
 pub struct traces_pkm::DurationValue
+impl traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::checked_add(self, Self) -> core::result::Result<Self, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::checked_mul(self, f64) -> core::result::Result<Self, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::checked_neg(self) -> core::result::Result<Self, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::checked_sub(self, Self) -> core::result::Result<Self, traces_pkm::DurationError>
 impl core::clone::Clone for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::clone(&self) -> Self
 impl core::cmp::Eq for traces_pkm::DurationValue
@@ -3045,27 +3046,28 @@ impl core::cmp::PartialEq for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
-impl core::convert::TryFrom<traces_pkm::DurationValue> for chrono::time_delta::TimeDelta
-pub type chrono::time_delta::TimeDelta::Error = traces_pkm::DurationError
-pub fn chrono::time_delta::TimeDelta::try_from(traces_pkm::DurationValue) -> core::result::Result<Self, Self::Error>
 impl core::fmt::Debug for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for traces_pkm::DurationValue
 pub fn traces_pkm::DurationValue::hash<H: core::hash::Hasher>(&self, &mut H)
+impl core::marker::Copy for traces_pkm::DurationValue
 impl core::ops::arith::Add for traces_pkm::DurationValue
-pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
-pub fn traces_pkm::DurationValue::add(self, Self) -> Self
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::add(self, Self) -> Self::Output
 impl core::ops::arith::Mul<f64> for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::mul(self, f64) -> Self::Output
+impl core::ops::arith::Mul<i64> for traces_pkm::DurationValue
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::mul(self, i64) -> Self::Output
+impl core::ops::arith::Neg for traces_pkm::DurationValue
 pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
-pub fn traces_pkm::DurationValue::mul(self, f64) -> Self
-impl core::ops::arith::Mul<traces_pkm::DurationValue> for f64
-pub type f64::Output = traces_pkm::DurationValue
-pub fn f64::mul(self, traces_pkm::DurationValue) -> traces_pkm::DurationValue
+pub fn traces_pkm::DurationValue::neg(self) -> Self
 impl core::ops::arith::Sub for traces_pkm::DurationValue
-pub type traces_pkm::DurationValue::Output = traces_pkm::DurationValue
-pub fn traces_pkm::DurationValue::sub(self, Self) -> Self
+pub type traces_pkm::DurationValue::Output = core::result::Result<traces_pkm::DurationValue, traces_pkm::DurationError>
+pub fn traces_pkm::DurationValue::sub(self, Self) -> Self::Output
 impl core::str::traits::FromStr for traces_pkm::DurationValue
 pub type traces_pkm::DurationValue::Err = traces_pkm::DurationError
 pub fn traces_pkm::DurationValue::from_str(&str) -> core::result::Result<Self, Self::Err>
