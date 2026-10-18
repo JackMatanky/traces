@@ -184,4 +184,65 @@ mod tests {
             assert_eq!(config.class_field_name(), "kind");
         }
     }
+
+    mod digests {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        fn base() -> SchemasConfig {
+            SchemasConfig::new(
+                PathBuf::from("/project/schemas"),
+                FieldName::try_from("class").expect("valid field name"),
+            )
+        }
+
+        fn ordered(digests: &SchemaDigests) -> [Blake3Digest; 2] {
+            [digests.directory(), digests.class_field()]
+        }
+
+        #[test]
+        fn frames_the_class_field_as_label_then_value() {
+            let mut raw = blake3::Hasher::new();
+            raw.update(&19_u64.to_le_bytes());
+            raw.update(b"schemas.class_field");
+            raw.update(&5_u64.to_le_bytes());
+            raw.update(b"class");
+
+            let digests = base().digests();
+
+            assert_eq!(
+                digests.class_field().to_hex().as_ref(),
+                raw.finalize().to_hex().as_str()
+            );
+        }
+
+        #[rstest]
+        #[case::directory(PathBuf::from("/other"), "class", 0)]
+        #[case::class_field(PathBuf::from("/project/schemas"), "kind", 1)]
+        fn changes_only_the_digest_of_the_changed_setting(
+            #[case] directory: PathBuf,
+            #[case] class_field: &str,
+            #[case] expected: usize,
+        ) {
+            let changed = SchemasConfig::new(
+                directory,
+                FieldName::try_from(class_field).expect("valid field name"),
+            );
+
+            let before = ordered(&base().digests());
+            let after = ordered(&changed.digests());
+
+            let differing: Vec<usize> = before
+                .iter()
+                .zip(after.iter())
+                .enumerate()
+                .filter(|(_, (old, new))| old != new)
+                .map(|(index, _)| index)
+                .collect();
+
+            assert_eq!(differing, [expected]);
+        }
+    }
 }

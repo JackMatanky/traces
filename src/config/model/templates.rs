@@ -128,3 +128,85 @@ impl TemplateConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    mod digests {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::super::*;
+
+        fn base() -> TemplateConfig {
+            TemplateConfig::new(
+                Some(PathBuf::from("/project/local")),
+                Some(PathBuf::from("/global")),
+                PathBuf::from("/project/out"),
+            )
+        }
+
+        fn ordered(digests: &TemplateDigests) -> [Blake3Digest; 3] {
+            [digests.local(), digests.global(), digests.output()]
+        }
+
+        #[test]
+        fn frames_a_present_local_directory_with_its_presence_tag() {
+            let mut raw = blake3::Hasher::new();
+            raw.update(&15_u64.to_le_bytes());
+            raw.update(b"templates.local");
+            raw.update(&[1]);
+            raw.update(&14_u64.to_le_bytes());
+            raw.update(b"/project/local");
+
+            let digests = base().digests();
+
+            assert_eq!(
+                digests.local().to_hex().as_ref(),
+                raw.finalize().to_hex().as_str()
+            );
+        }
+
+        #[rstest]
+        #[case::local(
+            TemplateConfig::new(
+                None,
+                Some(PathBuf::from("/global")),
+                PathBuf::from("/project/out")
+            ),
+            0
+        )]
+        #[case::global(
+            TemplateConfig::new(
+                Some(PathBuf::from("/project/local")),
+                None,
+                PathBuf::from("/project/out")
+            ),
+            1
+        )]
+        #[case::output(
+            TemplateConfig::new(
+                Some(PathBuf::from("/project/local")),
+                Some(PathBuf::from("/global")),
+                PathBuf::from("/other")
+            ),
+            2
+        )]
+        fn changes_only_the_digest_of_the_changed_setting(
+            #[case] changed: TemplateConfig,
+            #[case] expected: usize,
+        ) {
+            let before = ordered(&base().digests());
+            let after = ordered(&changed.digests());
+
+            let differing: Vec<usize> = before
+                .iter()
+                .zip(after.iter())
+                .enumerate()
+                .filter(|(_, (old, new))| old != new)
+                .map(|(index, _)| index)
+                .collect();
+
+            assert_eq!(differing, [expected]);
+        }
+    }
+}

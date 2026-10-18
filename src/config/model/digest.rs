@@ -6,9 +6,10 @@
 //!
 //! # Exhaustive destructuring
 //!
-//! Each `digests` constructor and each bundle's `feed_into` destructures its
-//! type without `..`. Adding a setting to a config type then fails to compile
-//! here until the setting gets a label and a place in the encoding. A
+//! Each `digests` constructor, each bundle's `feed_into`, and
+//! [`ConfigDigests::compose`] destructure their type without `..`. Adding a
+//! setting to a config type, or a bundle to [`ConfigDigests`], then fails to
+//! compile here until it gets a label and a place in the encoding. A
 //! source-scanning test pins the convention because the compiler cannot tell a
 //! rest pattern from an exhaustive one.
 //!
@@ -236,7 +237,6 @@ mod tests {
         };
 
         use pretty_assertions::{assert_eq, assert_ne};
-        use rstest::rstest;
 
         use super::{
             super::*,
@@ -244,43 +244,8 @@ mod tests {
         };
         use crate::{
             FieldName,
-            config::model::{
-                FrontmatterConfig, SchemasConfig, TaskConfig, TemplateConfig,
-            },
+            config::model::{FrontmatterConfig, SchemasConfig},
         };
-
-        #[test]
-        fn frames_a_required_path_setting_as_label_then_value() {
-            let mut raw = blake3::Hasher::new();
-            raw.update(&19_u64.to_le_bytes());
-            raw.update(b"schemas.class_field");
-            raw.update(&5_u64.to_le_bytes());
-            raw.update(b"class");
-
-            let digests = base().digests();
-
-            assert_eq!(
-                digests.schemas().class_field().to_hex().as_ref(),
-                raw.finalize().to_hex().as_str()
-            );
-        }
-
-        #[test]
-        fn frames_a_present_optional_path_with_its_presence_tag() {
-            let mut raw = blake3::Hasher::new();
-            raw.update(&15_u64.to_le_bytes());
-            raw.update(b"templates.local");
-            raw.update(&[1]);
-            raw.update(&14_u64.to_le_bytes());
-            raw.update(b"/project/local");
-
-            let digests = base().digests();
-
-            assert_eq!(
-                digests.templates().local().to_hex().as_ref(),
-                raw.finalize().to_hex().as_str()
-            );
-        }
 
         #[test]
         fn composes_every_setting_digest_under_the_version_label() {
@@ -303,7 +268,13 @@ mod tests {
 
         #[test]
         fn keeps_settings_with_equal_values_apart_by_label() {
-            let mut config = base();
+            let same = || PathBuf::from("same");
+            let mut config =
+                Config::for_test(same(), Some(same()), Some(same()), same());
+            config.schemas = SchemasConfig::new(
+                same(),
+                FieldName::try_from("same").expect("valid field name"),
+            );
             config.frontmatter = FrontmatterConfig::for_test("same", "same")
                 .with_tags_name("same");
 
@@ -320,48 +291,11 @@ mod tests {
             }
         }
 
-        #[rstest]
-        #[case::root(|c: &mut Config| c.root = Arc::from(Path::new("/other")), "root")]
-        #[case::local_templates(
-            |c: &mut Config| c.templates = TemplateConfig::new(None, Some(PathBuf::from("/global")), PathBuf::from("/project/out")),
-            "templates.local"
-        )]
-        #[case::global_templates(
-            |c: &mut Config| c.templates = TemplateConfig::new(Some(PathBuf::from("/project/local")), None, PathBuf::from("/project/out")),
-            "templates.global"
-        )]
-        #[case::output(
-            |c: &mut Config| c.templates = TemplateConfig::new(Some(PathBuf::from("/project/local")), Some(PathBuf::from("/global")), PathBuf::from("/o")),
-            "templates.output"
-        )]
-        #[case::schemas_directory(
-            |c: &mut Config| c.schemas = SchemasConfig::new(PathBuf::from("/s"), FieldName::try_from(c.schemas.class_field_name()).expect("valid")),
-            "schemas.directory"
-        )]
-        #[case::class_field(
-            |c: &mut Config| c.schemas = SchemasConfig::new(c.schemas.directory().to_path_buf(), FieldName::try_from("kind").expect("valid")),
-            "schemas.class_field"
-        )]
-        #[case::title(
-            |c: &mut Config| c.frontmatter = FrontmatterConfig::for_test("heading", c.frontmatter.aliases_name()),
-            "frontmatter.title"
-        )]
-        #[case::aliases(
-            |c: &mut Config| c.frontmatter = FrontmatterConfig::for_test(c.frontmatter.title_name(), "akas"),
-            "frontmatter.aliases"
-        )]
-        #[case::tags(
-            |c: &mut Config| c.frontmatter = FrontmatterConfig::default().with_tags_name("labels"),
-            "frontmatter.tags"
-        )]
-        #[case::tag_filters(|c: &mut Config| c.tasks = TaskConfig::from_tags(&["#work"]), "tasks.tag_filters")]
-        fn changes_only_the_digest_of_the_replaced_setting(
-            #[case] mutate: fn(&mut Config),
-            #[case] expected: &str,
-        ) {
+        #[test]
+        fn changes_only_the_root_digest_when_the_root_changes() {
             let before = ordered(&base().digests());
             let mut changed = base();
-            mutate(&mut changed);
+            changed.root = Arc::from(Path::new("/other"));
             let after = ordered(&changed.digests());
 
             let differing: Vec<&str> = NAMES
@@ -371,12 +305,13 @@ mod tests {
                 .map(|(name, _)| *name)
                 .collect();
 
-            assert_eq!(differing, [expected]);
+            assert_eq!(differing, ["root"]);
         }
     }
 
     mod exhaustive_destructuring {
         use pretty_assertions::assert_eq;
+        use rstest::rstest;
         use syn::{
             ImplItemFn, ItemImpl, PatRest, Type,
             visit::{self, Visit},
@@ -417,7 +352,10 @@ mod tests {
             fn visit_pat_rest(&mut self, _: &'ast PatRest) {
                 // Other code (error matching in tests, `Raw*` parsing) may use
                 // rest patterns freely; only the digest encoders must not.
-                if matches!(self.current_fn.as_str(), "digests" | "feed_into") {
+                if matches!(
+                    self.current_fn.as_str(),
+                    "digests" | "feed_into" | "compose"
+                ) {
                     self.rest_patterns.push(format!(
                         "{}::{}",
                         self.self_type, self.current_fn
@@ -433,12 +371,19 @@ mod tests {
             scan
         }
 
-        #[test]
-        fn flags_a_rest_pattern_in_a_destructuring() {
-            let source = "impl Section { fn digests(&self) { let Self { a, .. \
-                          } = self; } }";
+        #[rstest]
+        #[case::constructor("digests")]
+        #[case::bundle_encoder("feed_into")]
+        #[case::composer("compose")]
+        fn flags_a_rest_pattern_in_a_digest_encoder(#[case] name: &str) {
+            let source = format!(
+                "impl Section {{ fn {name}(&self) {{ let Self {{ a, .. }} = \
+                 self; }} }}"
+            );
 
-            assert_eq!(scan(source).rest_patterns, ["Section::digests"]);
+            assert_eq!(scan(&source).rest_patterns, [format!(
+                "Section::{name}"
+            )]);
         }
 
         /// Every file that defines a digest constructor or a bundle encoder.

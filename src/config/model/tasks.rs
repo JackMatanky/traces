@@ -375,5 +375,14 @@ mod tests {
             assert_ne!(before.statuses, after.statuses);
             assert_eq!(before.tag_filters, after.tag_filters);
         }
+
+        #[test]
+        fn changes_only_the_tag_filters_digest_when_a_filter_is_added() {
+            let before = TaskConfig::default().digests();
+            let after = TaskConfig::from_tags(&["#work"]).digests();
+
+            assert_eq!(before.statuses, after.statuses);
+            assert_ne!(before.tag_filters, after.tag_filters);
+        }
     }
 }
