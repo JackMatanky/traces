@@ -89,3 +89,8 @@ Consolidated research: `research/21-query-language-intelligence.md` (603 lines, 
 - **Debounce (21:39)**: "single 300ms debounce for all diagnostics" → query diagnostics ride the T2 lane (**~50ms** typical, adaptive clamp `[50ms, compute, 500ms]`, coalesced per URI; 25 Q3-R').
 - **Phase-2 "Pull diagnostics (LSP 3.17)" (21:64) withdrawn as a transport decision (25 Q1-R)**: pull is the **Phase A primary** transport (document-level pull; push only as fallback for pull-incapable clients), not a deferred Phase-2 item. The Phase-2 list keeps only its remaining items.
 - **21:68 receipt**: "T25 owns severity calibration policy, three-tier debounce model" — both answered: calibration policy = Q5-R (undeclared severities only, Error budget for new rules; 21's three declared severities are adopted as-is, carved out per Q5-R); debounce = Q3-R three-tier model (T1 100ms, T2 ~50ms, T3 event-driven).
+
+### Amended by 26 (2026-10-18)
+
+- **Receipt: query identifiers are non-renamable v1** (prepareRename returns `Ok(null)`; rename refuses identically).
+- **Hover markup kind resolved**: query hover rides 26's shared renderer (negotiated Markdown with stripped-plaintext fallback, one escaping helper, always-set range); 21's producers emit the body content only.

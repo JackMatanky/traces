@@ -40,3 +40,8 @@ Decide:
 ### Amended by 25 (2026-10-15)
 
 - **§2 (re-parse debounce) superseded — not scope-limited** (25 supersedes 22's original "Amends 14 §2 scope-limited" wording): no `tokio::time::sleep` in any handler flow. Debounce = spawn a timer task + generation counter. T1 content/index re-parse = **100ms** (was 150ms); T2 diagnostics publish = **~50ms** adaptive clamp `[50ms, measured compute, 500ms]` (was 300ms). The β single-lane publisher (22:Q19, generalized by 25) is the publication path for *all* diagnostics. Rest of 14 (transient replacement, `BufferState`, `ContentResolver`, inlink reconciliation, lifecycle) unchanged.
+
+### Amended by 26 (2026-10-18)
+
+- **Overlay keys move `Url` -> `Uri`** (ls-types' fluent-uri `Uri` from tower-lsp-server 0.23), or through one explicit edge-owned conversion helper, so overlay and WorkspaceEdit keying share one identity type. The edge resolves `PathBuf` -> `Uri` by consulting the open-document map for the client's spelling first; `from_file_path` only for never-named docs (never round-trip a client-named document: Windows canonical form does not match editor-spelled strings; percent-encoding/drive-letter/symlink variants stay distinct keys).
+- **Ropey reconciliation**: `BufferState` being String-backed (no rope) is the stated reason 11's two-function disk/ropey split collapses into one LineIndex-backed helper; see 11's Amended-by-26 block.

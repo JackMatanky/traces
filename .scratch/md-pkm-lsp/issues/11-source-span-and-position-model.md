@@ -72,3 +72,9 @@ Spans are cheap to recompute (re-parsing a file the LSP just read also re-derive
 ### 9. Ropey — scoped to live buffers (ticket 14), not universal
 
 `ropey::Rope` becomes the text representation for live open buffers. Closed/persisted notes stay as `&str` (today's model). The Note AST carries `Range<BytePos>` (protocol-agnostic); the LSP adapter converts using whichever text representation is in scope. Ropey-everywhere is not foreclosed architecturally but is not adopted now.
+
+### Amended by 26 (2026-10-18)
+
+- **Position-encoding negotiation decided (closes 11's open Question)**: negotiate utf-8-if-offered-else-utf-16 (first client-preference encoding Traces implements; never utf-32; default utf-16), echoed via `capabilities.positionEncoding`. One total `convert` module at the protocol boundary (`negotiate`, `to_lsp_position`, `to_lsp_range`, `to_byte_pos`; all functions clamp, never panic) supersedes §4's `byte_to_utf16_cu`-only method and §5's two-function disk/ropey split; `byte_to_utf16_cu` is retained as a thin `LineIndex` method so 19/23's prerequisite text stays true; inbound `to_byte_pos` covers the direction 11 never handled; the module doubles as the miette bridge (miette SourceSpan = byte offset + len, no adapter crate needed).
+- **§5/§9 ropey branch deleted**: ticket 14 resolved `BufferState { content: String, version: i32 }` (no rope); disk and overlay both surface as `&str` via `ContentResolver::text_of`, so one LineIndex-backed conversion helper serves both. This reconciles the 11/14 inconsistency (11's "ropey for live buffers" had nothing to split over).
+- **§8 sentence amended**: cross-file definition/references/rename DO consume spans for closed files, not only live-editing-session requests. Serving model: re-parse on demand from `ContentResolver::text_of` for cold files, resident spans when cached; 26 does not require persisted spans (41-C acceptable, 41-B is the upgrade path).

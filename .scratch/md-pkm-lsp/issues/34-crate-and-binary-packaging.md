@@ -16,3 +16,9 @@ Grounding: Traces is currently a **single package**, not a Cargo workspace (`Car
 ## Inputs from 25 (2026-10-15)
 
 - **Diagnostics fold module home pending here (25 Q4-R)**: the protocol-free diagnostic type + fold functions + `DiagnosticRule` registry + `OverrideSet` need a module home. Constraint from 25 Q15-R2: the registry must be a **leaf module** reachable from feature modules (links, footnotes, frontmatter, schema, query, template, tasks) and the LSP boundary without cycles; dotted `<feature>.<rule>` codes, `enum DiagnosticRule` with `code()`/`default_severity()`/`const ALL`. Placement interacts with 22's engine-adjacent `src/template/analysis.rs` gate question (protocol-free invariant applies here too).
+
+## Inputs from 26 (2026-10-18)
+
+- **Module homes to place**: the nav spine (`nav::Occurrence`/`NavTarget`/`Resolution`, protocol-free core module) and the `convert` module (protocol-boundary module), both with the same "pending 34" status as 25's fold; 26's Answer carries the qualifier verbatim.
+- **Visibility widening budgeted as part of placement**: `ByteSpan` to pub(crate), a `LinkResolver` facade method (`resolve_link`-style), and `paths_with_tag` exposure (two named changes, billed to this ticket not discovered downstream).
+- **Pin the tower-lsp-server <-> ls-types pairing**: ls-types' `Uri` helpers are load-bearing for 14's `Url` -> `Uri` migration and 26's edge conversion; re-verify at implementation time (feeds 09 as well).

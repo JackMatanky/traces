@@ -105,3 +105,9 @@ Follow Dataview's inference cascade for unscoped mode: empty→null, date→dura
 ### Amended by 25 (2026-10-15)
 
 - **Frontmatter-missing-delimiter severity recorded (25 Q13-R2)**: 19's Error for missing `---` delimiters **stands**. Premises corrected against a live rumdl 0.2.79 probe: MD041 (Warning) fires on every broken shape; MD065 (Warning) fires only when the leading `---` parses as a horizontal rule (missing closing delimiter); both are suppressible only by disabling the rule itself (impractical for transient mid-edit breakage). Traces' diagnostic is a frontmatter-parse code (`frontmatter.missing-delimiter`), not a heading judgment, so it does not duplicate the ceded MD041/MD065 heading rules. Coexistence note ships to 32.
+
+### Amended by 26 (2026-10-18)
+
+- **Schema-bound field hover renders the field name as bold, not H2**: 26's heading ban (intersection-safe subset; this ticket's own cross-IDE rationale is the stronger half of its internal inconsistency) wins.
+- **Tier-2 field rename (FileClass-schema-own fields) deferred to 20's schema-TOML span work** (schema-TOML spans are forbidden in v1); tier 1 (note-local canonical `FieldKey` match) and `$ref` tier 3 unchanged.
+- **This ticket's refresh-time content preview cache is adopted as the wikilink/embed hover producer source** (disk files), with `ContentResolver` for overlays (staleness ≤ T1 100ms). Wikilink/embed hover content decided by 26: title + resolved path + bounded first-lines preview + inlink count, with ambiguity labelled rather than silently first-picked.

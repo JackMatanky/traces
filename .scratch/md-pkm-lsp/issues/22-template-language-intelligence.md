@@ -83,3 +83,8 @@ Consolidated: `research/22-template-intelligence.md` (637 lines, §0–§9) — 
 - **Citation fix (22:34)**: the debounce bullet lives at `map.md:32`, not `map.md:31`.
 - **14 §2 wording**: 22's proposed "Amends 14 §2 scope-limited (14's 150ms sleep stands)" is **superseded** — 14 §2 is superseded outright: no in-handler sleep anywhere; debounce = spawn + generation counter (14 amended directly by 25).
 - **22:72 receipt**: 25 accepts the owed inputs list with per-item pointers — class list → Q15-R2 `DiagnosticRule` enum (`template.*` codes); source/code set → Q6-R Scheme C (`source: "traces"`, hierarchical codes); fallback-ladder rule → 25's severity calibration does not touch it (construction-failure stays 22's degrade design); severities incl. undef-var FP rationale → the four phase-1 classes are undeclared, so Q5-R applies, defaulting them to Information as 22 proposed (FP rationale recorded; taxonomy = registry); cadence proposal → Q3-R (live-debounced, T2 lane); single-publisher/β coordination → Q3-R (β adopted, generalized); SchemaLoad class → registry code `template.schema-load` with 22's proposed severity standing under Q5-R; construction-failure degradation note → env-free classes only, silence-not-ranges (accepted).
+
+### Amended by 26 (2026-10-18)
+
+- **Which hover tiers render (22's open handoff to 26) resolved**: render `Doc` and `Identified`, suppress only `None`; the construction-failure state gets an explicit degradation banner (never silently empty: failed-load is byte-identical to schema-less).
+- **Receipt: template identifiers are non-renamable v1** (prepareRename returns `Ok(null)`). Template hover rides 26's negotiated-markdown renderer with producer-owned caps.

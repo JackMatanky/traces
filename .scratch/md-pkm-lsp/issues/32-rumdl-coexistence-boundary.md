@@ -20,3 +20,10 @@ Decide and document as the shipped product contract:
 - **Namespacing confirmed (25 Q6-R)**: Scheme C — one `source: "traces"` + hierarchical `<feature>.<rule>` codes + pull `identifier: "traces"`; rumdl emits `source: "rumdl"` + `MDxxx`/`inline-config` codes. Zero collision by construction (distinct `source` + disjoint code vocabularies); `traces-tasks` retired.
 - **Hint asymmetry line**: 23's A1 is Hint; rumdl has no Hint level. The joint-setup docs must not promise severity symmetry across the two servers.
 - **Transport attribution facts**: Traces' push/pull gate is capability-driven (25 Q1-R/Q2-R, detection seam owed to 29); rumdl's push/pull branch is its own implementation — no cross-server coordination beyond the documented `enableLink*` companion settings (15's joint-setup block, amended by 25 to make it the primary config path).
+
+## Inputs from 26 (2026-10-18)
+
+- **Standard-link rename boundary**: 26 rewrites url/fragment only at reference and definition sites; display-text positions **refuse**. Confirm this boundary against rumdl's ownership here.
+- **Heading rename rewrites same-document standard-link fragments `(#h)`** as well as same-file wikilink anchors and cross-file `file.md#h`: Traces rewrites text in rumdl's validation domain (MD051) without claiming validation (the 26<->32 line).
+- **Comparison-key scope**: `match_key` (NFC + casefold ladder, byte-exact-first) covers **wikilink path/stem matching only**; standard-link fragments and slug generation stay byte-exact (GitHub/MD051 contract).
+- **Live divergences to document in the coexistence design**: Obsidian's filename/stem normalization and NFD heading anchors. NFKC is rejected everywhere (rationale corrected: 15 revoked title matching, so the Obsidian-title argument was stale).

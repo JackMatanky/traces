@@ -15,3 +15,10 @@ Grounded by the Microsoft markdown-language-service research (ticket 05) and the
 - CodeLens: reference-count lens above headings/notes ("3 references"), informed by whether Marksman/Markdown Oxide do this (tickets 01/02) — decide value vs cost (requires backlink computation eagerly for every visible heading).
 - Code actions beyond quick-fixes already covered elsewhere: e.g. "convert Markdown link to wikilink" or vice versa, "extract selection to new note".
 - Semantic tokens: decide whether Traces defines any at all —ground this against whether TextMate/tree-sitter grammar-based client-side highlighting already covers Markdown/wikilink syntax adequately (likely yes, semantic tokens add limited value for prose-heavy Markdown vs code) versus a specific case semantic tokens would uniquely enable (e.g. distinguishing a *resolved* vs *unresolved* wikilink by token type/modifier, which syntax highlighting alone cannot do).
+
+## Inputs from 26 (2026-10-18)
+
+- **documentLink emits for `Unique` and `Ambiguous` targets** (never errors on ambiguity); semantic-token modifiers are **three-valued** (resolved / unresolved / ambiguous), not a boolean, per 26's `Resolution` enum.
+- The spine exposes `highlight(target, doc)` for 16's tags and this ticket's documentHighlight registration; documentHighlight is document-local span matching and **never** errors on target ambiguity.
+- The 5,000 references ceiling (26's named constant) is deliberately distinct from symbol-result ceilings; keep the two consciously distinct rather than unifying them.
+- The create-note action's offering side must check `create` in `resourceOperations` (shared predicate with 25's code-action path).

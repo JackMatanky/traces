@@ -119,3 +119,10 @@ Evidence base:
    - Map frontmatter tag values to `Range<BytePos>` from `noyalib`'s `Spanned<T>` output (ticket 19's frontmatter span mechanism; the hand-rolled re-scanner originally referenced here was dropped in the 2026-09-23 reconciliation).
 3. **LSP Tag Index Facade**:
    - Inverted tag map (`tag -> Vec<(Url, Range<BytePos>)>`) stored in memory, updated incrementally via the buffer overlay model (Ticket 14).
+
+### Amended by 26 (2026-10-18)
+
+- **Rename/validation error code switch**: `InvalidParams` (-32602) becomes **`RequestFailed` (-32803)** for tag rename validation failures (26's two-tier taxonomy; no mixed codes for the same operation class).
+- **prepareRename pins**: body tag range includes the `#`, placeholder `#projects/active`; frontmatter tag range excludes the `#`, placeholder `projects/active`.
+- **5,000 references cap receipt**: find-references truncates at 5,000 with a `window/logMessage` notice (26's named constant). Hierarchical descendant inclusion at occurrence granularity via `Tag::is_contained_in` unchanged.
+- **Negative pin: tags are never `Ambiguous`.** Tag resolution yields `Unique`/`Unresolved` only, so the -32803 ambiguity refusal never fires for tags (fields likewise never ambiguous per 19's fileClass-wins and 20's origin resolution).

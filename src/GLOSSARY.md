@@ -98,6 +98,53 @@ serialized format. `src/path.rs` is the crate's single owner; every such
 field funnels through `crate::path::codec`.
 *Avoid*: path serde, path serialization, filesystem encoding
 
+### Navigation & Resolution
+
+#### Occurrence
+
+A position-tagged instance of a navigable entity inside a note: a byte span
+plus a kind carrying its domain payload (wikilink, embed, frontmatter link
+value, heading, tag, footnote, field key, inline field, schema field, daily
+date). Produced by the navigation spine's locate step; transient, never
+persisted.
+*Avoid*: entity instance, use site, reference record
+
+#### NavTarget
+
+The resolved destination of an Occurrence: target document path, target kind,
+and optional name and scope byte spans (name contained within scope when both
+exist). Protocol-free; converts to LSP Locations only at the protocol edge.
+*Avoid*: destination node, goto target, resolved link
+
+#### Resolution
+
+The three-state outcome of resolving an Occurrence against the workspace:
+Unresolved (no candidate), Unique (one best candidate), or Ambiguous (two or
+more equally best candidates, carrying an AmbiguityKind and the candidate
+list). Each feature consumes the states per the settled consumer matrix
+(definition returns all candidates, hover lists them bounded, references
+returns the capped union, rename refuses).
+*Avoid*: resolution result, target option, link outcome
+
+#### Ambiguity
+
+The state where two or more candidates are equally best for one Occurrence:
+StemTie (same-basename notes at equal folder distance), HeadingAnchor (duplicate
+pre-dedup heading slugs within a note), or PathTie (case/folded path
+collisions). Ambiguity is normal in PKM: never a diagnostic, navigation reports
+it, rename refuses it with a RequestFailed error naming the candidates.
+*Avoid*: conflict, ambiguity error, tie failure
+
+#### Comparison Key
+
+The derived form of a wikilink path, file stem, or request path used only for
+equality comparisons at index-build and query boundaries: NFC, then
+`char::to_lowercase`, then trailing NFC, with byte-exact matching attempted
+first at every tier (the fold consulted only on a miss). Never applied to
+spans, Uri/overlay keys, redb keys, sort order, I/O paths, slug generation, or
+edit payloads; original spellings are preserved everywhere in output.
+*Avoid*: normalized path, canonical path, fold key
+
 ### Traversal & State
 
 #### Directory Tree

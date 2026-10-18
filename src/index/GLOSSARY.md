@@ -71,6 +71,14 @@ A derived inbound reference mapping a note's path to all other notes linking to
 it via Markdown links or wikilinks.
 *Avoid*: backlink, incoming link, reverse ref
 
+#### Folder Distance
+
+The separation between two notes measured by their location in the directory
+tree (distance to their lowest common ancestor folder), used to pick the
+nearest candidate when one basename maps to several notes and to detect
+equal-distance ties, which remain undisambiguated rather than resolved.
+*Avoid*: path distance, LCA metric, resolution distance
+
 #### Incremental Delta
 
 The differential change set inside an Index Update that compares timestamps and

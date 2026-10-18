@@ -121,3 +121,11 @@ Metadata (paths, tags, links, headings, file-classes, frontmatter field names) a
 
 - **Transient diagnostics tier → bounded ~10MB workspace cache (25 Q1-R)**: the "diagnostic results" transient-tier line gains a bounded (~10MB) workspace cache serving pull; workspace-scoped, conditional on open ticket 30 (multi-root).
 - **Diagnostics latency budgets (25 perf review)**: document pull **warm p95 ≤10ms**, **cold p95 ≤100ms**, 300ms absolute ceiling; workspace first pull served as streamed partials with a ~50ms flush throttle (ty #19657); warm-up 1.5–2s @20K stands, now bracketed by external data (rumdl 0.45ms/file incl. startup; 53-rule lint 1.46ms/file upper). Owed benches stand: diagnostics rule-eval bench, full redb scan+decode wall time, warm-up wall time @1K/5K/20K in `lsp_latency.rs`.
+
+### Amended by 26 (2026-10-18)
+
+- **Hover row tightened**: <2ms target / <1ms stretch (supersedes the table's <10ms/<5ms hover row; SOTA warm markdown hover measures <1ms). The real test is edit-to-hover over the T1-coalesced snapshot.
+- **Rename row stays binding, restated byte-tiered**: ≤100ms @ ≤1MB total bytes, ≤1s @ ≤10MB (file-count tiers rejected as the wrong unit); workDone `$/progress` implemented for rename (see 12's block). prepareRename <5ms (locate-class, measured ~3ms class).
+- **Find-refs row read as "≤20ms for ≤5,000 results"**, measured over the merged occurrence-resolved union path with the per-candidate-file scan as the dominant term.
+- **Benches owed to 33**: the >5,000-refs cap case, index-maintenance (edit -> index -> query, where markdown LSPs measurably fall over), the pathological 51KB single-line locate micro-bench, and edit-to-hover.
+- **Unverified figure flagged**: the "Marksman 1.5-3us goto definition" citation has no primary source (traced to issue #179 with no measurements); remove or re-source.

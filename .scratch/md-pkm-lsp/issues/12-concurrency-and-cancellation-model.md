@@ -61,3 +61,7 @@ Startup reindex is a one-time cost. Adding `$/progress` requires threading progr
 ### Amended by 25 (2026-10-15)
 
 - **§1 extended by 22's β publisher, generalized by 25**: the single-lane publisher (FIFO `Compute`/`Clear`/`Opened` with coalesce-by-URI, publish-gate on open/version/no-newer-pending, single-publisher-per-URI) rides *within* `concurrency_level(1)` sequential dispatch: compute runs on-lane; publication happens in a long-lived background task holding owned payloads + a `Client` clone (22:Q19). **25 generalizes β beyond templates**: it is the publication path for *all* diagnostics (links, schema, query, footnotes, tasks), not just template diagnostics. §3 (refresh exclusivity, Arc swap) unaffected. Workspace warm-up bypasses the FIFO (streamed partials into the pull cache). Generation counters arrive with scope B, inside the diagnostics module.
+
+### Amended by 26 (2026-10-18)
+
+- **`$/progress` is implemented for `textDocument/rename`** (workDone progress), amending the "`$/progress`: not initially / UX polish" row: 33's binding rename row explicitly allows it, rename is the sole handler permitted to exceed the 100ms handler budget under `concurrency_level(1)`, and N=1 is retained. The blocking consequence (a long rename makes every subsequent request wait, breaking hover's own budget) is recorded with 41 as the structural fix point.
