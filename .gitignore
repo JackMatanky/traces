@@ -15,6 +15,9 @@ __MACOSX/
 
 # -------------------- Build & Compilation -------------------- #
 /target
+# --- Durable Criterion benchmark history (symlinked as target/criterion) --- #
+/.criterion/
+/.criterion.fork.*
 lcov.info
 tarpaulin-report.html
 /report.json

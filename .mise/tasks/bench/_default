@@ -92,6 +92,11 @@
 # shellcheck disable=SC2154  # usage_* are injected by mise
 set -euo pipefail
 
+# Durable benchmark store contract: target/criterion is a symlink into
+# .criterion/; migrate/park strays before any measurement writes data.
+# shellcheck source=/dev/null
+source "${MISE_PROJECT_ROOT:?}/.mise/scripts/criterion_store.sh"
+
 declare -a bench_files=()
 declare -a targets=()
 declare -a criterion_args=()
@@ -231,6 +236,7 @@ resolve_baseline_name() {
   # Explicit `-r <name>`; bare `-r` parses as the literal `true` and falls
   # through to the auto-name below.
   if [[ -n "${usage_report:-}" && "${usage_report}" != "true" ]]; then
+    require_safe_baseline_name "bench" "-r/--report" "${usage_report}"
     printf '%s' "${usage_report}"
     return
   fi
@@ -265,7 +271,7 @@ resolve_baseline_name() {
 # working natively on every live run.
 #
 # Globals:
-#   `usage_no_report`
+#   `usage_no_report`; `CRITERION_STORE` (from the sourced helper)
 # Arguments:
 #   `baseline_name`: resolved name of the baseline to snapshot
 # Outputs:
@@ -277,13 +283,19 @@ snapshot_baseline() {
   local baseline_name="${1:-}"
   [[ -z "${baseline_name}" ]] && return 0
   [[ "${usage_no_report:-false}" == "true" ]] && return 0
-  [[ -d "target/criterion" ]] || return 0
+  [[ -d "${CRITERION_STORE}" ]] || return 0
 
-  local new_dir parent_dir
+  local new_dir parent_dir dest
   while IFS= read -r -d '' new_dir; do
     parent_dir="${new_dir%/new}"
-    cp -R "${new_dir}" "${parent_dir}/${baseline_name}"
-  done < <(find target/criterion -type d -name "new" -print0)
+    dest="${parent_dir}/${baseline_name}"
+    # Replace, never nest: `cp -R new existing-dir/` copies INTO the
+    # directory, so a re-run of the same branch+sha would nest one level
+    # per run (observed in the live store). Same name = superseded by
+    # definition; remove the previous snapshot first.
+    rm -rf "${dest}"
+    cp -R "${new_dir}" "${dest}"
+  done < <(find "${CRITERION_STORE}" -type d -name "new" -print0)
 }
 
 #######################################
@@ -301,6 +313,10 @@ snapshot_baseline() {
 #   `2` if no bench file matches; otherwise the run's exit status
 #######################################
 main() {
+  # Raw `cargo clean` (or hand-typed `cargo bench` after one) can leave a
+  # stray real target/criterion; reconcile before measuring.
+  ensure_criterion_store
+
   if ! collect_bench_files; then
     return 2
   fi

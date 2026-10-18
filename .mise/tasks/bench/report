@@ -175,6 +175,12 @@ print_footer() {
 #   Writes benchmark summary to `stdout`
 #######################################
 main() {
+  # Recreate target/criterion (symlink) after a full/raw clean so the
+  # summary sees persisted history again.
+  # shellcheck source=/dev/null
+  source "${MISE_PROJECT_ROOT:?}/.mise/scripts/criterion_store.sh"
+  ensure_criterion_store
+
   if ! has_criterion_output; then
     echo "No criterion output found at ${CRITERION_DIR}"
     return 0

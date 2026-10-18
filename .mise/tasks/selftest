@@ -1,0 +1,419 @@
+#!/bin/bash
+#MISE description="Sandbox regression tests for mise task scripts (criterion store contract)"
+#MISE outputs=[]
+#MISE cache = { enabled = false }
+# Selftest harness for destructive-task safety contracts. Builds throwaway
+# sandboxes under $TMPDIR, runs the REAL task scripts against a fake crate,
+# and asserts filesystem outcomes. No framework: repo precedent is sandbox +
+# grep (docs/digests/plans/2026-09-27-quality-gates.md).
+
+# shellcheck disable=SC2034,SC2154  # CLEAN_TASK/BENCH_TASK used by T6/T7 in later tasks; usage_* reserved
+set -euo pipefail
+
+ROOT="${MISE_PROJECT_ROOT:?}"
+CLEAN_TASK="${ROOT}/.mise/tasks/clean/_default"
+BENCH_TASK="${ROOT}/.mise/tasks/bench/_default"
+
+pass_count=0
+fail_count=0
+
+#######################################
+# Assert a command succeeds; print ok/FAIL line.
+# Arguments: description, then command + args.
+#######################################
+assert() {
+  local desc="${1}"; shift
+  if "$@" >/dev/null 2>&1; then
+    pass_count=$((pass_count + 1)); printf 'ok   - %s\n' "${desc}"
+  else
+    fail_count=$((fail_count + 1)); printf 'FAIL - %s\n' "${desc}" >&2
+  fi
+}
+
+#######################################
+# Create a minimal fake cargo crate sandbox with BOTH sourced helpers
+# copied in (clean/_default unconditionally sources size_gate.sh, so a
+# sandbox missing it would abort the suite under set -e instead of
+# recording failures).
+# Outputs: sandbox path on stdout.
+#######################################
+new_sandbox() {
+  local sbx
+  sbx="$(mktemp -d -t mise_selftest.XXXXXX)"
+  mkdir -p "${sbx}/src" "${sbx}/.mise/scripts" "${sbx}/benches"
+  printf '[package]\nname="sbx"\nversion="0.1.0"\nedition="2021"\n' \
+    > "${sbx}/Cargo.toml"
+  echo 'pub fn f() {}' > "${sbx}/src/lib.rs"
+  echo '#[cfg(test)] fn t() {}' > "${sbx}/benches/sbx_bench.rs"
+  cp "${ROOT}/.mise/scripts/"*.sh "${sbx}/.mise/scripts/"
+  # Some task paths call git (baseline naming); give the sandbox a repo
+  # so those paths behave like production instead of erroring.
+  git -C "${sbx}" init -q 2>/dev/null || true
+  git -C "${sbx}" -c user.email=selftest@test -c user.name=selftest \
+    commit -q --allow-empty -m init 2>/dev/null || true
+  printf '%s' "${sbx}"
+}
+
+#######################################
+# Plant a criterion tree with a marker file at the leaf.
+# Arguments: sandbox dir, marker content.
+#######################################
+seed_criterion() {
+  mkdir -p "${1}/target/criterion/g1/100/new"
+  printf '%s\n' "${2}" > "${1}/target/criterion/g1/100/new/estimates.json"
+}
+
+#######################################
+# Invoke the helper's ensure function inside a sandbox.
+# Arguments: sandbox dir, optional CRITERION_TARGET_DIR (default target).
+#######################################
+run_ensure() {
+  # -e -u -o pipefail: match production caller semantics (clean/bench run
+  # under set -euo pipefail); the suite must exercise the same failure paths.
+  ( cd "${1}" && MISE_PROJECT_ROOT="${1}" \
+      CRITERION_TARGET_DIR="${2:-target}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store' )
+}
+
+#######################################
+# T1: first migration, real dir, no store -> store + symlink.
+#######################################
+test_migration() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" pre-migration
+  run_ensure "${sbx}"
+  assert "T1 store created from real dir" \
+    test -f "${sbx}/.criterion/g1/100/new/estimates.json"
+  assert "T1 target/criterion is a symlink" test -L "${sbx}/target/criterion"
+  assert "T1 link text is ../.criterion" \
+    test "$(readlink "${sbx}/target/criterion")" = "../.criterion"
+  assert "T1 marker survives via link" \
+    grep -q pre-migration "${sbx}/target/criterion/g1/100/new/estimates.json"
+}
+
+#######################################
+# T2: idempotence, second ensure on a correct link is a no-op.
+#######################################
+test_idempotent() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" keep
+  run_ensure "${sbx}"
+  run_ensure "${sbx}"
+  assert "T2 still a symlink after re-ensure" test -L "${sbx}/target/criterion"
+  assert "T2 data intact" \
+    grep -q keep "${sbx}/.criterion/g1/100/new/estimates.json"
+}
+
+#######################################
+# T3: fork, real dir reappears while store exists -> parked, never merged
+# or deleted; link rebuilt; store untouched.
+#######################################
+test_fork_parked() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" first-run
+  run_ensure "${sbx}"                       # migrate: store has first-run
+  rm "${sbx}/target/criterion"              # simulate raw cargo clean link removal
+  mkdir -p "${sbx}/target/criterion/g2/1/new"
+  echo fork-data > "${sbx}/target/criterion/g2/1/new/estimates.json"
+  run_ensure "${sbx}"                       # fork detected
+  assert "T3 store still has original data" \
+    grep -q first-run "${sbx}/.criterion/g1/100/new/estimates.json"
+  assert "T3 link rebuilt" test -L "${sbx}/target/criterion"
+  local fork
+  fork="$(find "${sbx}" -maxdepth 1 -type d -name '.criterion.fork.*' | head -1)"
+  assert "T3 fork parked outside target" \
+    grep -q fork-data "${fork}/g2/1/new/estimates.json"
+}
+
+#######################################
+# T4: wrong/broken symlink -> replaced with the canonical link.
+#######################################
+test_wrong_link() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" data
+  run_ensure "${sbx}"
+  rm "${sbx}/target/criterion"
+  ln -s /nonexistent/elsewhere "${sbx}/target/criterion"
+  run_ensure "${sbx}"
+  assert "T4 link repointed" \
+    test "$(readlink "${sbx}/target/criterion")" = "../.criterion"
+}
+
+#######################################
+# T5: link missing entirely (fresh target/ after cargo clean) -> recreated.
+################################=======
+test_recreate_missing() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" data
+  run_ensure "${sbx}"
+  rm -rf "${sbx}/target"                    # simulate full cargo clean
+  run_ensure "${sbx}"
+  assert "T5 link recreated after target wiped" \
+    test -L "${sbx}/target/criterion"
+  assert "T5 history visible through recreated link" \
+    grep -q data "${sbx}/target/criterion/g1/100/new/estimates.json"
+}
+
+#######################################
+# T8: non-default target dir (custom --target-dir) -> the REAL override
+# path is the positional argument; regression for the bug class where the
+# link path was computed once at source time and an override would
+# silently protect the wrong directory (would leave custom target dirs
+# unprotected).
+#######################################
+test_custom_target_dir() {
+  local sbx; sbx="$(new_sandbox)"
+  mkdir -p "${sbx}/alt/criterion/g1/100/new"
+  printf '%s\n' alt-dir > "${sbx}/alt/criterion/g1/100/new/estimates.json"
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store alt' )
+  assert "T8 store created from custom target dir" \
+    test -f "${sbx}/.criterion/g1/100/new/estimates.json"
+  assert "T8 alt/criterion is a symlink" test -L "${sbx}/alt/criterion"
+  assert "T8 link text is ../.criterion" \
+    test "$(readlink "${sbx}/alt/criterion")" = "../.criterion"
+}
+
+#######################################
+# T9: nested target dir (depth 2) -> link text climbs two levels; without
+# this the hardcoded ../.criterion would resolve to out/.criterion and
+# Criterion would silently grow a second history tree outside the store.
+#######################################
+test_nested_target_dir() {
+  local sbx; sbx="$(new_sandbox)"
+  mkdir -p "${sbx}/out/release/criterion/g1/100/new"
+  printf '%s\n' nested > "${sbx}/out/release/criterion/g1/100/new/estimates.json"
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store out/release' )
+  assert "T9 store created from nested target dir" \
+    test -f "${sbx}/.criterion/g1/100/new/estimates.json"
+  assert "T9 nested link is a symlink" test -L "${sbx}/out/release/criterion"
+  assert "T9 link text climbs two levels" \
+    test "$(readlink "${sbx}/out/release/criterion")" = "../../.criterion"
+}
+
+#######################################
+# T10: unexpected regular file at the link path -> warn, leave untouched,
+# still exit 0 (resilient no-op, not a silent handled-state).
+#######################################
+test_regular_file_at_link() {
+  local sbx; sbx="$(new_sandbox)"
+  mkdir -p "${sbx}/target"
+  echo not-a-dir > "${sbx}/target/criterion"
+  local status=0 output
+  output="$( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+    bash -e -u -o pipefail -c \
+      'source .mise/scripts/criterion_store.sh; ensure_criterion_store' \
+    2>&1 )" || status=$?
+  assert "T10 ensure exits zero on unexpected file" test "${status}" -eq 0
+  assert "T10 file left untouched" grep -q not-a-dir "${sbx}/target/criterion"
+  # shellcheck disable=SC2016  # $1 expands in the inner bash, not here (intentional)
+  assert "T10 warning emitted" \
+    bash -c 'grep -q "unexpected non-directory" <<< "$1"' _ "${output}"
+}
+
+#######################################
+# T11: CRITERION_TARGET_DIR env-var default (no positional arg) is honored
+# when set before sourcing.
+#######################################
+test_target_dir_env_var() {
+  local sbx; sbx="$(new_sandbox)"
+  mkdir -p "${sbx}/alt/criterion/g1/100/new"
+  printf '%s\n' env-dir > "${sbx}/alt/criterion/g1/100/new/estimates.json"
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" CRITERION_TARGET_DIR=alt \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store' )
+  assert "T11 link created via CRITERION_TARGET_DIR env" \
+    test -L "${sbx}/alt/criterion"
+  assert "T11 link text is ../.criterion" \
+    test "$(readlink "${sbx}/alt/criterion")" = "../.criterion"
+}
+
+#######################################
+# T12: path normalization and refusals. `./target` and `out//release`
+# normalize to the same depths as `target` / `out/release` (a naive count
+# would climb one level too many and orphan history); absolute, `..`-containing,
+# and repo-root target dirs are refused with status 1.
+#######################################
+test_path_normalization_and_refusals() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" data
+  local status=0
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store ./target' )
+  assert "T12 ./target normalized to one level" \
+    test "$(readlink "${sbx}/target/criterion")" = "../.criterion"
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store out//release' ) \
+    2>/dev/null
+  assert "T12 duplicate slashes normalized to two levels" \
+    test "$(readlink "${sbx}/out/release/criterion")" = "../../.criterion"
+  status=0
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store /tmp/evil' \
+      ) 2>/dev/null || status=$?
+  assert "T12 absolute target dir refused" test "${status}" -eq 1
+  status=0
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store ../evil' \
+      ) 2>/dev/null || status=$?
+  assert "T12 dotdot component refused" test "${status}" -eq 1
+  status=0
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        'source .mise/scripts/criterion_store.sh; ensure_criterion_store .' \
+      ) 2>/dev/null || status=$?
+  assert "T12 repo-root target dir refused" test "${status}" -eq 1
+}
+
+#######################################
+# T13: the store is anchored at MISE_PROJECT_ROOT; running ensure from any
+# other cwd must refuse (it would reconcile a foreign target dir and could
+# move foreign data into this repo's store).
+#######################################
+test_cwd_must_be_project_root() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" data
+  local status=0
+  ( cd "${sbx}/src" && MISE_PROJECT_ROOT="${sbx}" \
+      bash -e -u -o pipefail -c \
+        "source ${sbx}/.mise/scripts/criterion_store.sh; ensure_criterion_store" \
+      ) 2>/dev/null || status=$?
+  assert "T13 refuses to run outside project root" test "${status}" -eq 1
+  assert "T13 store never created" test ! -e "${sbx}/.criterion"
+}
+
+#######################################
+# T6: clean --dry-run never mutates: task exits zero, no store created,
+# no data moved, target/criterion stays a real directory, and no
+# CACHEDIR.TAG remains (a transient one may be written and removed to
+# satisfy cargo clean --dry-run's tag requirement; the assertion checks the
+# final state, which must equal the starting state). Status is captured
+# (never bare) so a failing task records FAIL instead of aborting the
+# suite under set -e.
+#######################################
+test_clean_dry_run_no_mutation() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" dry-run-data
+  cp "${CLEAN_TASK}" "${sbx}/clean_task"
+  local status=0
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" MISE_TASK_DIR="${sbx}" \
+      usage_dry_run=true usage_target_dir=target \
+      bash ./clean_task ) >/dev/null 2>&1 || status=$?
+  assert "T6 task exits zero" test "${status}" -eq 0
+  assert "T6 history in place after dry-run" \
+    test -f "${sbx}/target/criterion/g1/100/new/estimates.json"
+  assert "T6 no store created" test ! -e "${sbx}/.criterion"
+  assert "T6 real dir untouched (not a symlink)" \
+    test ! -L "${sbx}/target/criterion"
+  assert "T6 no CACHEDIR.TAG written" \
+    test ! -e "${sbx}/target/CACHEDIR.TAG"
+}
+
+#######################################
+# T2b: full clean with store present, cargo clean wipes artifacts,
+# history survives via the link, link is restored afterwards.
+#######################################
+test_clean_full_preserves_history() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" precious
+  run_ensure "${sbx}"                       # store + link in place
+  mkdir -p "${sbx}/target/debug"; echo junk > "${sbx}/target/debug/bin"
+  cp "${CLEAN_TASK}" "${sbx}/clean_task"
+  local status=0
+  ( cd "${sbx}" && MISE_PROJECT_ROOT="${sbx}" MISE_TASK_DIR="${sbx}" \
+      usage_dry_run=false usage_target_dir=target \
+      bash ./clean_task ) >/dev/null 2>&1 || status=$?
+  assert "T2b task exits zero" test "${status}" -eq 0
+  assert "T2b build artifact removed" test ! -e "${sbx}/target/debug/bin"
+  assert "T2b history survives full clean" \
+    grep -q precious "${sbx}/.criterion/g1/100/new/estimates.json"
+  assert "T2b link restored after clean" test -L "${sbx}/target/criterion"
+}
+
+#######################################
+# T7: bench snapshot replaces a same-name baseline instead of nesting into
+# it (cp -R into an existing dir would copy *inside* it, one level per
+# re-run of the same branch+sha). Uses a stub `cargo` on PATH.
+#######################################
+test_snapshot_replaces_not_nests() {
+  local sbx; sbx="$(new_sandbox)"
+  seed_criterion "${sbx}" seed
+  mkdir -p "${sbx}/bin"
+  cat > "${sbx}/bin/cargo" <<'EOF'
+#!/bin/bash
+# stub: emulate `cargo bench` writing criterion output
+if [[ "${1:-}" == "bench" ]]; then
+  mkdir -p target/criterion/g1/100/new target/criterion/report
+  printf '{"stub":1}\n' > target/criterion/g1/100/new/estimates.json
+  printf '<html></html>\n' > target/criterion/report/index.html
+fi
+exit 0
+EOF
+  chmod +x "${sbx}/bin/cargo"
+  cp "${BENCH_TASK}" "${sbx}/bench_task"
+  local run=(
+    env MISE_PROJECT_ROOT="${sbx}" MISE_TASK_DIR="${sbx}"
+    usage_mode=normal usage_verbose=false usage_report=mybase
+    usage_args= usage_files= usage_mod= usage_compare=
+    usage_no_report=false usage_model=false usage_plot=false
+    PATH="${sbx}/bin:${PATH}" bash ./bench_task
+  )
+  local st1=0 st2=0
+  ( cd "${sbx}" && "${run[@]}" ) >/dev/null 2>&1 || st1=$?
+  ( cd "${sbx}" && "${run[@]}" ) >/dev/null 2>&1 || st2=$?    # second run, same name
+  assert "T7 bench runs exit zero" test "${st1}-${st2}" = "0-0"
+  assert "T7 baseline dir replaced, not nested" \
+    test -f "${sbx}/.criterion/g1/100/mybase/estimates.json"
+  assert "T7 no nested new/ inside baseline" \
+    test ! -d "${sbx}/.criterion/g1/100/mybase/new"
+  assert "T7 store link intact for critcmp" test -L "${sbx}/target/criterion"
+
+  # Traversal regression: a `-r ../sib` name must be refused before it can
+  # `rm -rf` a sibling of the baseline dir, so the sibling survives and the
+  # run exits non-zero. Status captured (never bare) so a failure records
+  # FAIL instead of aborting the suite under set -e.
+  mkdir -p "${sbx}/.criterion/g1/100/sib"
+  printf 'keep\n' > "${sbx}/.criterion/g1/100/sib/estimates.json"
+  local bad=(
+    env MISE_PROJECT_ROOT="${sbx}" MISE_TASK_DIR="${sbx}"
+    usage_mode=normal usage_verbose=false usage_report=../sib
+    usage_args= usage_files= usage_mod= usage_compare=
+    usage_no_report=false usage_model=false usage_plot=false
+    PATH="${sbx}/bin:${PATH}" bash ./bench_task
+  )
+  local st3=0
+  ( cd "${sbx}" && "${bad[@]}" ) >/dev/null 2>&1 || st3=$?
+  assert "T7 traversal baseline name refused" test "${st3}" -ne 0
+  assert "T7 sibling baseline survives traversal attempt" \
+    test -f "${sbx}/.criterion/g1/100/sib/estimates.json"
+}
+
+main() {
+  test_migration
+  test_idempotent
+  test_fork_parked
+  test_wrong_link
+  test_recreate_missing
+  test_custom_target_dir
+  test_nested_target_dir
+  test_regular_file_at_link
+  test_target_dir_env_var
+  test_path_normalization_and_refusals
+  test_cwd_must_be_project_root
+  test_clean_dry_run_no_mutation
+  test_clean_full_preserves_history
+  test_snapshot_replaces_not_nests
+
+  printf '\nselftest: %d passed, %d failed\n' "${pass_count}" "${fail_count}"
+  [[ "${fail_count}" -eq 0 ]]
+}
+
+main "$@"
