@@ -118,89 +118,104 @@ src/config/mod.rs: pub(crate) use raw::{RawConfig, RawTemplateConfig};
 src/config/mod.rs: pub(crate) use tracker::TrackerStore;
 src/config/mod.rs: pub(crate) use trust::ConfigTrustStatus;
 src/config/mod.rs: pub(crate) use trust::{TrustRequests, TrustScope, TrustStore};
-src/config/model.rs: pub const fn date_created(&self) -> &DateFieldConfig {
-src/config/model.rs: pub const fn date_modified(&self) -> &DateFieldConfig {
 src/config/model.rs: pub const fn frontmatter(&self) -> &FrontmatterConfig {
 src/config/model.rs: pub const fn schemas(&self) -> &SchemasConfig {
 src/config/model.rs: pub const fn tasks(&self) -> &TaskConfig {
-src/config/model.rs: pub fn aliases_name(&self) -> &str {
 src/config/model.rs: pub fn as_path(&self) -> &Path {
-src/config/model.rs: pub fn class_field_name(&self) -> &str {
-src/config/model.rs: pub fn directory(&self) -> &Path {
 src/config/model.rs: pub fn for_test(
-src/config/model.rs: pub fn for_test(class_field: &str) -> Self {
-src/config/model.rs: pub fn for_test(tag_filters: Vec<Tag>) -> Self {
-src/config/model.rs: pub fn for_test<T: Into<String>, A: Into<String>>(
-src/config/model.rs: pub fn format(&self) -> &str {
-src/config/model.rs: pub fn from_tags(tags: &[&str]) -> Self {
 src/config/model.rs: pub fn global_template_dir(&self) -> Option<&Path> {
 src/config/model.rs: pub fn local_template_dir(&self) -> Option<&Path> {
-src/config/model.rs: pub fn name(&self) -> &str {
 src/config/model.rs: pub fn output_dir(&self) -> &Path {
 src/config/model.rs: pub fn root(&self) -> &Path {
-src/config/model.rs: pub fn tag_filters(&self) -> &[Tag] {
-src/config/model.rs: pub fn tags_name(&self) -> &str {
 src/config/model.rs: pub fn test_default<P: Into<PathBuf>>(root: P) -> Self {
-src/config/model.rs: pub fn title_name(&self) -> &str {
 src/config/model.rs: pub fn with_frontmatter(mut self, frontmatter: FrontmatterConfig) -> Self {
 src/config/model.rs: pub fn with_schemas(mut self, schemas: SchemasConfig) -> Self {
-src/config/model.rs: pub fn with_tags_name<T: Into<String>>(mut self, tags: T) -> Self {
 src/config/model.rs: pub fn with_tasks(mut self, tasks: TaskConfig) -> Self {
 src/config/model.rs: pub fn with_templates(mut self) -> Self {
 src/config/model.rs: pub struct Config {
-src/config/model.rs: pub struct DateFieldConfig {
-src/config/model.rs: pub struct FrontmatterConfig {
-src/config/model.rs: pub struct SchemasConfig {
-src/config/model.rs: pub struct TaskConfig {
-src/config/model.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
-src/config/model.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
+src/config/model.rs: pub use frontmatter::FrontmatterConfig;
+src/config/model.rs: pub use schemas::SchemasConfig;
+src/config/model.rs: pub use tasks::TaskConfig;
 src/config/model.rs: pub(crate) fn class_field_arc(&self) -> Arc<str> {
 src/config/model.rs: pub(crate) fn hash(&self) -> Blake3Digest {
 src/config/model.rs: pub(crate) fn resolve(
 src/config/model.rs: pub(crate) fn resolve_against(
 src/config/model.rs: pub(crate) fn root_arc(&self) -> Arc<Path> {
 src/config/model.rs: pub(crate) struct ConfigSubDir(RelativePath);
-src/config/model.rs: pub(super) const DEFAULT_CLASS_FIELD: &str = "class";
-src/config/model.rs: pub(super) const DEFAULT_LOCAL_SCHEMAS_DIR: &str = ".traces/schemas/";
-src/config/model.rs: pub(super) const fn new(
-src/config/model.rs: pub(super) const fn new(
-src/config/model.rs: pub(super) fn default_for_root(root: &Path) -> Self {
+src/config/model.rs: pub(crate) use templates::DEFAULT_LOCAL_TEMPLATES_DIR;
 src/config/model.rs: pub(super) fn from_raw_or_default(
-src/config/model.rs: pub(super) fn global(&self) -> Option<&Path> {
-src/config/model.rs: pub(super) fn local(&self) -> Option<&Path> {
 src/config/model.rs: pub(super) fn new(
-src/config/model.rs: pub(super) fn output(&self) -> &Path {
-src/config/model.rs: pub(super) struct TemplateConfig {
-src/config/model/digest.rs: pub(crate) aliases: Blake3Digest,
-src/config/model/digest.rs: pub(crate) class_field: Blake3Digest,
-src/config/model/digest.rs: pub(crate) date_created: DateFieldDigests,
-src/config/model/digest.rs: pub(crate) date_modified: DateFieldDigests,
-src/config/model/digest.rs: pub(crate) directory: Blake3Digest,
+src/config/model.rs: pub(super) use schemas::{DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR};
+src/config/model.rs: pub(super) use templates::TemplateConfig;
 src/config/model/digest.rs: pub(crate) fn compose(&self) -> Blake3Digest {
 src/config/model/digest.rs: pub(crate) fn digests(&self) -> ConfigDigests {
-src/config/model/digest.rs: pub(crate) format: Blake3Digest,
 src/config/model/digest.rs: pub(crate) frontmatter: FrontmatterDigests,
-src/config/model/digest.rs: pub(crate) global: Blake3Digest,
-src/config/model/digest.rs: pub(crate) local: Blake3Digest,
-src/config/model/digest.rs: pub(crate) name: Blake3Digest,
-src/config/model/digest.rs: pub(crate) output: Blake3Digest,
 src/config/model/digest.rs: pub(crate) root: Blake3Digest,
 src/config/model/digest.rs: pub(crate) schemas: SchemaDigests,
-src/config/model/digest.rs: pub(crate) statuses: Blake3Digest,
 src/config/model/digest.rs: pub(crate) struct ConfigDigests {
-src/config/model/digest.rs: pub(crate) struct DateFieldDigests {
-src/config/model/digest.rs: pub(crate) struct FrontmatterDigests {
-src/config/model/digest.rs: pub(crate) struct SchemaDigests {
-src/config/model/digest.rs: pub(crate) struct TaskDigests {
-src/config/model/digest.rs: pub(crate) struct TemplateDigests {
-src/config/model/digest.rs: pub(crate) tag_filters: Blake3Digest,
-src/config/model/digest.rs: pub(crate) tags: Blake3Digest,
 src/config/model/digest.rs: pub(crate) tasks: TaskDigests,
 src/config/model/digest.rs: pub(crate) templates: TemplateDigests,
-src/config/model/digest.rs: pub(crate) title: Blake3Digest,
 src/config/model/digest.rs: pub(in super::super) const NAMES: [&str; 15] = [
 src/config/model/digest.rs: pub(in super::super) fn base() -> Config {
 src/config/model/digest.rs: pub(in super::super) fn ordered(
+src/config/model/digest.rs: pub(super) fn setting<F>(label: &[u8], feed: F) -> Blake3Digest
+src/config/model/frontmatter.rs: pub const fn date_created(&self) -> &DateFieldConfig {
+src/config/model/frontmatter.rs: pub const fn date_modified(&self) -> &DateFieldConfig {
+src/config/model/frontmatter.rs: pub fn aliases_name(&self) -> &str {
+src/config/model/frontmatter.rs: pub fn for_test<T: Into<String>, A: Into<String>>(
+src/config/model/frontmatter.rs: pub fn format(&self) -> &str {
+src/config/model/frontmatter.rs: pub fn name(&self) -> &str {
+src/config/model/frontmatter.rs: pub fn tags_name(&self) -> &str {
+src/config/model/frontmatter.rs: pub fn title_name(&self) -> &str {
+src/config/model/frontmatter.rs: pub fn with_tags_name<T: Into<String>>(mut self, tags: T) -> Self {
+src/config/model/frontmatter.rs: pub struct DateFieldConfig {
+src/config/model/frontmatter.rs: pub struct FrontmatterConfig {
+src/config/model/frontmatter.rs: pub(crate) aliases: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) date_created: DateFieldDigests,
+src/config/model/frontmatter.rs: pub(crate) date_modified: DateFieldDigests,
+src/config/model/frontmatter.rs: pub(crate) format: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) name: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) struct DateFieldDigests {
+src/config/model/frontmatter.rs: pub(crate) struct FrontmatterDigests {
+src/config/model/frontmatter.rs: pub(crate) tags: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) title: Blake3Digest,
+src/config/model/frontmatter.rs: pub(super) fn digests(&self) -> FrontmatterDigests {
+src/config/model/frontmatter.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
+src/config/model/schemas.rs: pub fn class_field_name(&self) -> &str {
+src/config/model/schemas.rs: pub fn directory(&self) -> &Path {
+src/config/model/schemas.rs: pub fn for_test(class_field: &str) -> Self {
+src/config/model/schemas.rs: pub struct SchemasConfig {
+src/config/model/schemas.rs: pub(crate) class_field: Blake3Digest,
+src/config/model/schemas.rs: pub(crate) directory: Blake3Digest,
+src/config/model/schemas.rs: pub(crate) struct SchemaDigests {
+src/config/model/schemas.rs: pub(in crate::config) const DEFAULT_CLASS_FIELD: &str = "class";
+src/config/model/schemas.rs: pub(in crate::config) const DEFAULT_LOCAL_SCHEMAS_DIR: &str =
+src/config/model/schemas.rs: pub(in crate::config) const fn new(
+src/config/model/schemas.rs: pub(super) fn default_for_root(root: &Path) -> Self {
+src/config/model/schemas.rs: pub(super) fn digests(&self) -> SchemaDigests {
+src/config/model/schemas.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
+src/config/model/tasks.rs: pub fn for_test(tag_filters: Vec<Tag>) -> Self {
+src/config/model/tasks.rs: pub fn from_tags(tags: &[&str]) -> Self {
+src/config/model/tasks.rs: pub fn tag_filters(&self) -> &[Tag] {
+src/config/model/tasks.rs: pub struct TaskConfig {
+src/config/model/tasks.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
+src/config/model/tasks.rs: pub(crate) statuses: Blake3Digest,
+src/config/model/tasks.rs: pub(crate) struct TaskDigests {
+src/config/model/tasks.rs: pub(crate) tag_filters: Blake3Digest,
+src/config/model/tasks.rs: pub(super) fn digests(&self) -> TaskDigests {
+src/config/model/tasks.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
+src/config/model/templates.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
+src/config/model/templates.rs: pub(crate) global: Blake3Digest,
+src/config/model/templates.rs: pub(crate) local: Blake3Digest,
+src/config/model/templates.rs: pub(crate) output: Blake3Digest,
+src/config/model/templates.rs: pub(crate) struct TemplateDigests {
+src/config/model/templates.rs: pub(in crate::config) const fn new(
+src/config/model/templates.rs: pub(in crate::config) struct TemplateConfig {
+src/config/model/templates.rs: pub(super) fn digests(&self) -> TemplateDigests {
+src/config/model/templates.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
+src/config/model/templates.rs: pub(super) fn global(&self) -> Option<&Path> {
+src/config/model/templates.rs: pub(super) fn local(&self) -> Option<&Path> {
+src/config/model/templates.rs: pub(super) fn output(&self) -> &Path {
 src/config/raw.rs: pub(crate) aliases: Option<String>,
 src/config/raw.rs: pub(crate) class_field: Option<String>,
 src/config/raw.rs: pub(crate) date_created: Option<RawDateFieldConfig>,

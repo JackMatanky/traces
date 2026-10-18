@@ -9,49 +9,23 @@
 //! Each `digests` constructor and each bundle's `feed_into` destructures its
 //! type without `..`. Adding a setting to a config type then fails to compile
 //! here until the setting gets a label and a place in the encoding. A
-//! source-scanning test pins the convention because the compiler cannot tell
-//! a rest pattern from an exhaustive one.
+//! source-scanning test pins the convention because the compiler cannot tell a
+//! rest pattern from an exhaustive one.
 //!
 //! # Key Types
 //!
 //! - [`ConfigDigests`]: one digest per setting, grouped by section.
 
 use super::{
-    Config, DateFieldConfig, FrontmatterConfig, SchemasConfig, TaskConfig,
-    TemplateConfig,
+    Config, frontmatter::FrontmatterDigests, schemas::SchemaDigests,
+    tasks::TaskDigests, templates::TemplateDigests,
 };
-use crate::{Blake3Digest, Blake3Hasher, TaskStatus};
+use crate::{Blake3Digest, Blake3Hasher};
 
 /// Versions the composed Config Fingerprint encoding.
 const CONFIG_LABEL: &[u8] = b"traces.config.v1";
 
 const ROOT: &[u8] = b"root";
-const TEMPLATES_LOCAL: &[u8] = b"templates.local";
-const TEMPLATES_GLOBAL: &[u8] = b"templates.global";
-const TEMPLATES_OUTPUT: &[u8] = b"templates.output";
-const SCHEMAS_DIRECTORY: &[u8] = b"schemas.directory";
-const SCHEMAS_CLASS_FIELD: &[u8] = b"schemas.class_field";
-const FRONTMATTER_TITLE: &[u8] = b"frontmatter.title";
-const FRONTMATTER_ALIASES: &[u8] = b"frontmatter.aliases";
-const FRONTMATTER_TAGS: &[u8] = b"frontmatter.tags";
-const TASKS_STATUSES: &[u8] = b"tasks.statuses";
-const TASKS_TAG_FILTERS: &[u8] = b"tasks.tag_filters";
-
-/// Labels the two settings of a [`DateFieldConfig`] for one metadata role.
-struct DateLabels {
-    name: &'static [u8],
-    format: &'static [u8],
-}
-
-const DATE_CREATED: DateLabels = DateLabels {
-    name: b"frontmatter.date_created.name",
-    format: b"frontmatter.date_created.format",
-};
-
-const DATE_MODIFIED: DateLabels = DateLabels {
-    name: b"frontmatter.date_modified.name",
-    format: b"frontmatter.date_modified.format",
-};
 
 /// Holds one framed digest per resolved setting, grouped by config section.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,51 +37,12 @@ pub(crate) struct ConfigDigests {
     pub(crate) tasks: TaskDigests,
 }
 
-/// Holds the digests of [`TemplateConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct TemplateDigests {
-    pub(crate) local: Blake3Digest,
-    pub(crate) global: Blake3Digest,
-    pub(crate) output: Blake3Digest,
-}
-
-/// Holds the digests of [`SchemasConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct SchemaDigests {
-    pub(crate) directory: Blake3Digest,
-    pub(crate) class_field: Blake3Digest,
-}
-
-/// Holds the digests of [`FrontmatterConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct FrontmatterDigests {
-    pub(crate) title: Blake3Digest,
-    pub(crate) aliases: Blake3Digest,
-    pub(crate) tags: Blake3Digest,
-    pub(crate) date_created: DateFieldDigests,
-    pub(crate) date_modified: DateFieldDigests,
-}
-
-/// Holds the digests of one [`DateFieldConfig`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct DateFieldDigests {
-    pub(crate) name: Blake3Digest,
-    pub(crate) format: Blake3Digest,
-}
-
-/// Holds the digests of [`TaskConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct TaskDigests {
-    pub(crate) statuses: Blake3Digest,
-    pub(crate) tag_filters: Blake3Digest,
-}
-
 /// Digests one setting: the label's length-prefixed bytes, then the value
 /// bytes `feed` adds.
 ///
 /// The label frame lives here rather than in [`Blake3Hasher`], whose value
 /// methods stay label-agnostic.
-fn setting<F>(label: &[u8], feed: F) -> Blake3Digest
+pub(super) fn setting<F>(label: &[u8], feed: F) -> Blake3Digest
 where
     F: FnOnce(&mut Blake3Hasher),
 {
@@ -143,74 +78,6 @@ impl ConfigDigests {
     }
 }
 
-impl TemplateDigests {
-    /// Feeds every setting digest in declaration order.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            local,
-            global,
-            output,
-        } = self;
-        fp.digest(local);
-        fp.digest(global);
-        fp.digest(output);
-    }
-}
-
-impl SchemaDigests {
-    /// Feeds every setting digest in declaration order.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            directory,
-            class_field,
-        } = self;
-        fp.digest(directory);
-        fp.digest(class_field);
-    }
-}
-
-impl FrontmatterDigests {
-    /// Feeds every setting digest in declaration order.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            title,
-            aliases,
-            tags,
-            date_created,
-            date_modified,
-        } = self;
-        fp.digest(title);
-        fp.digest(aliases);
-        fp.digest(tags);
-        date_created.feed_into(fp);
-        date_modified.feed_into(fp);
-    }
-}
-
-impl DateFieldDigests {
-    /// Feeds both setting digests in declaration order.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            name,
-            format,
-        } = self;
-        fp.digest(name);
-        fp.digest(format);
-    }
-}
-
-impl TaskDigests {
-    /// Feeds every setting digest in declaration order.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            statuses,
-            tag_filters,
-        } = self;
-        fp.digest(statuses);
-        fp.digest(tag_filters);
-    }
-}
-
 impl Config {
     /// Digests every resolved setting separately.
     ///
@@ -233,115 +100,6 @@ impl Config {
             schemas: schemas.digests(),
             frontmatter: frontmatter.digests(),
             tasks: tasks.digests(),
-        }
-    }
-}
-
-impl TemplateConfig {
-    /// Digests the Template Directories and the output directory.
-    fn digests(&self) -> TemplateDigests {
-        let Self {
-            local,
-            global,
-            output,
-        } = self;
-        TemplateDigests {
-            local: setting(TEMPLATES_LOCAL, |fp| {
-                fp.optional_path(local.as_deref());
-            }),
-            global: setting(TEMPLATES_GLOBAL, |fp| {
-                fp.optional_path(global.as_deref());
-            }),
-            output: setting(TEMPLATES_OUTPUT, |fp| fp.path(output)),
-        }
-    }
-}
-
-impl SchemasConfig {
-    /// Digests the schema registry directory and the class field.
-    fn digests(&self) -> SchemaDigests {
-        let Self {
-            directory,
-            class_field,
-        } = self;
-        SchemaDigests {
-            directory: setting(SCHEMAS_DIRECTORY, |fp| fp.path(directory)),
-            class_field: setting(SCHEMAS_CLASS_FIELD, |fp| {
-                class_field.feed_into(fp);
-            }),
-        }
-    }
-}
-
-impl FrontmatterConfig {
-    /// Digests the metadata role names and date formats.
-    fn digests(&self) -> FrontmatterDigests {
-        let Self {
-            title,
-            aliases,
-            tags,
-            date_created,
-            date_modified,
-        } = self;
-        FrontmatterDigests {
-            title: setting(FRONTMATTER_TITLE, |fp| title.feed_into(fp)),
-            aliases: setting(FRONTMATTER_ALIASES, |fp| aliases.feed_into(fp)),
-            tags: setting(FRONTMATTER_TAGS, |fp| tags.feed_into(fp)),
-            date_created: date_created.digests(&DATE_CREATED),
-            date_modified: date_modified.digests(&DATE_MODIFIED),
-        }
-    }
-}
-
-impl DateFieldConfig {
-    /// Digests the date key name and format under `labels`.
-    fn digests(&self, labels: &DateLabels) -> DateFieldDigests {
-        let Self {
-            name,
-            format,
-        } = self;
-        DateFieldDigests {
-            name: setting(labels.name, |fp| name.feed_into(fp)),
-            format: setting(labels.format, |fp| fp.bytes(format.as_bytes())),
-        }
-    }
-}
-
-impl TaskConfig {
-    /// Digests the task statuses and tag filters.
-    ///
-    /// Statuses enter in symbol order so map iteration order never leaks;
-    /// filters enter in configured order.
-    fn digests(&self) -> TaskDigests {
-        let Self {
-            statuses,
-            tag_filters,
-        } = self;
-        TaskDigests {
-            statuses: setting(TASKS_STATUSES, |fp| {
-                let mut ordered: Vec<&TaskStatus> = statuses.iter().collect();
-                ordered
-                    .sort_unstable_by_key(|status| status.symbol().as_char());
-                fp.len(ordered.len());
-                for status in ordered {
-                    let mut symbol = [0_u8; 4];
-                    fp.bytes(
-                        status
-                            .symbol()
-                            .as_char()
-                            .encode_utf8(&mut symbol)
-                            .as_bytes(),
-                    );
-                    fp.bytes(status.name().as_bytes());
-                    fp.bytes(status.kind().as_str().as_bytes());
-                }
-            }),
-            tag_filters: setting(TASKS_TAG_FILTERS, |fp| {
-                fp.len(tag_filters.len());
-                for tag in tag_filters {
-                    fp.bytes(tag.as_str().as_bytes());
-                }
-            }),
         }
     }
 }
@@ -466,7 +224,12 @@ mod tests {
             super::*,
             fixtures::{NAMES, base, ordered},
         };
-        use crate::{FieldName, TaskStatusSymbol, TaskStatusType};
+        use crate::{
+            FieldName,
+            config::model::{
+                FrontmatterConfig, SchemasConfig, TaskConfig, TemplateConfig,
+            },
+        };
 
         #[test]
         fn frames_a_required_path_setting_as_label_then_value() {
@@ -541,25 +304,40 @@ mod tests {
 
         #[rstest]
         #[case::root(|c: &mut Config| c.root = Arc::from(Path::new("/other")), "root")]
-        #[case::local_templates(|c: &mut Config| c.templates.local = None, "templates.local")]
-        #[case::global_templates(|c: &mut Config| c.templates.global = None, "templates.global")]
-        #[case::output(|c: &mut Config| c.templates.output = PathBuf::from("/o"), "templates.output")]
-        #[case::schemas_directory(|c: &mut Config| c.schemas.directory = PathBuf::from("/s"), "schemas.directory")]
-        #[case::class_field(|c: &mut Config| c.schemas.class_field = FieldName::try_from("kind").expect("valid"), "schemas.class_field")]
-        #[case::title(|c: &mut Config| c.frontmatter.title = FieldName::try_from("heading").expect("valid"), "frontmatter.title")]
-        #[case::aliases(|c: &mut Config| c.frontmatter.aliases = FieldName::try_from("akas").expect("valid"), "frontmatter.aliases")]
-        #[case::tags(|c: &mut Config| c.frontmatter.tags = FieldName::try_from("labels").expect("valid"), "frontmatter.tags")]
-        #[case::created_name(|c: &mut Config| c.frontmatter.date_created.name = FieldName::try_from("made").expect("valid"), "frontmatter.date_created.name")]
-        #[case::created_format(|c: &mut Config| c.frontmatter.date_created.format = "%Y".to_owned(), "frontmatter.date_created.format")]
-        #[case::modified_name(|c: &mut Config| c.frontmatter.date_modified.name = FieldName::try_from("edited").expect("valid"), "frontmatter.date_modified.name")]
-        #[case::modified_format(|c: &mut Config| c.frontmatter.date_modified.format = "%Y".to_owned(), "frontmatter.date_modified.format")]
-        #[case::added_status(|c: &mut Config| c.tasks.statuses.insert(TaskStatus::new(
-            TaskStatusSymbol::new('!'),
-            "Urgent",
-            TaskStatusType::Todo,
-        )).expect("insert status"), "tasks.statuses")]
+        #[case::local_templates(
+            |c: &mut Config| c.templates = TemplateConfig::new(None, Some(PathBuf::from("/global")), PathBuf::from("/project/out")),
+            "templates.local"
+        )]
+        #[case::global_templates(
+            |c: &mut Config| c.templates = TemplateConfig::new(Some(PathBuf::from("/project/local")), None, PathBuf::from("/project/out")),
+            "templates.global"
+        )]
+        #[case::output(
+            |c: &mut Config| c.templates = TemplateConfig::new(Some(PathBuf::from("/project/local")), Some(PathBuf::from("/global")), PathBuf::from("/o")),
+            "templates.output"
+        )]
+        #[case::schemas_directory(
+            |c: &mut Config| c.schemas = SchemasConfig::new(PathBuf::from("/s"), FieldName::try_from(c.schemas.class_field_name()).expect("valid")),
+            "schemas.directory"
+        )]
+        #[case::class_field(
+            |c: &mut Config| c.schemas = SchemasConfig::new(c.schemas.directory().to_path_buf(), FieldName::try_from("kind").expect("valid")),
+            "schemas.class_field"
+        )]
+        #[case::title(
+            |c: &mut Config| c.frontmatter = FrontmatterConfig::for_test("heading", c.frontmatter.aliases_name()),
+            "frontmatter.title"
+        )]
+        #[case::aliases(
+            |c: &mut Config| c.frontmatter = FrontmatterConfig::for_test(c.frontmatter.title_name(), "akas"),
+            "frontmatter.aliases"
+        )]
+        #[case::tags(
+            |c: &mut Config| c.frontmatter = FrontmatterConfig::default().with_tags_name("labels"),
+            "frontmatter.tags"
+        )]
         #[case::tag_filters(|c: &mut Config| c.tasks = TaskConfig::from_tags(&["#work"]), "tasks.tag_filters")]
-        fn changes_only_the_digest_of_the_changed_setting(
+        fn changes_only_the_digest_of_the_replaced_setting(
             #[case] mutate: fn(&mut Config),
             #[case] expected: &str,
         ) {
@@ -615,11 +393,18 @@ mod tests {
                     self.constructors.push(self.self_type.clone());
                 }
                 visit::visit_impl_item_fn(self, node);
+                self.current_fn.clear();
             }
 
             fn visit_pat_rest(&mut self, _: &'ast PatRest) {
-                self.rest_patterns
-                    .push(format!("{}::{}", self.self_type, self.current_fn));
+                // Other code (error matching in tests, `Raw*` parsing) may use
+                // rest patterns freely; only the digest encoders must not.
+                if matches!(self.current_fn.as_str(), "digests" | "feed_into") {
+                    self.rest_patterns.push(format!(
+                        "{}::{}",
+                        self.self_type, self.current_fn
+                    ));
+                }
             }
         }
 
@@ -638,16 +423,31 @@ mod tests {
             assert_eq!(scan(source).rest_patterns, ["Section::digests"]);
         }
 
-        #[test]
-        fn finds_no_rest_pattern_in_the_digest_source() {
-            let scan = scan(include_str!("digest.rs"));
+        /// Every file that defines a digest constructor or a bundle encoder.
+        const SOURCES: [&str; 5] = [
+            include_str!("digest.rs"),
+            include_str!("frontmatter.rs"),
+            include_str!("schemas.rs"),
+            include_str!("tasks.rs"),
+            include_str!("templates.rs"),
+        ];
 
-            assert_eq!(scan.rest_patterns, Vec::<String>::new());
+        #[test]
+        fn finds_no_rest_pattern_in_any_digest_encoder() {
+            let rest_patterns: Vec<String> = SOURCES
+                .iter()
+                .flat_map(|source| scan(source).rest_patterns)
+                .collect();
+
+            assert_eq!(rest_patterns, Vec::<String>::new());
         }
 
         #[test]
         fn finds_a_digests_constructor_on_every_section_type() {
-            let mut constructors = scan(include_str!("digest.rs")).constructors;
+            let mut constructors: Vec<String> = SOURCES
+                .iter()
+                .flat_map(|source| scan(source).constructors)
+                .collect();
             constructors.sort_unstable();
 
             assert_eq!(constructors, [

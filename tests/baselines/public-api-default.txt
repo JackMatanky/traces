@@ -1679,7 +1679,7 @@ impl<T> tracing::instrument::WithSubscriber for traces::ListText
 impl<T> yoke::erased::ErasedDestructor for traces::ListText where T: 'static
 pub struct traces::MarkdownParserInput<'a>
 impl<'a> traces::MarkdownParserInput<'a>
-pub const fn traces::MarkdownParserInput<'a>::new(&'a std::path::Path, &'a str, &'a traces::config::model::TaskConfig, &'a traces::config::model::FrontmatterConfig) -> Self
+pub const fn traces::MarkdownParserInput<'a>::new(&'a std::path::Path, &'a str, &'a traces::config::model::tasks::TaskConfig, &'a traces::config::model::frontmatter::FrontmatterConfig) -> Self
 impl<'a> core::clone::Clone for traces::MarkdownParserInput<'a>
 pub fn traces::MarkdownParserInput<'a>::clone(&self) -> Self
 impl<'a> core::fmt::Debug for traces::MarkdownParserInput<'a>

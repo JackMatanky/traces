@@ -886,14 +886,6 @@ mod test_support {
                     std::any::type_name::<crate::config::ConfigBuilder>(),
                     "traces::config::builder::ConfigBuilder"
                 );
-                assert_eq!(
-                    std::any::type_name::<crate::config::SchemasConfig>(),
-                    "traces::config::model::SchemasConfig"
-                );
-                assert_eq!(
-                    std::any::type_name::<crate::config::FrontmatterConfig>(),
-                    "traces::config::model::FrontmatterConfig"
-                );
             }
         }
     }
