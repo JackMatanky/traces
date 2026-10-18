@@ -26,9 +26,10 @@ use super::{
 use crate::{
     Blake3Digest, FieldName, FieldNameError, Tag, TaskStatus, TaskStatusMap,
     TaskStatusSymbol, TaskStatusType,
-    hash::Blake3Hasher,
     path::{PathError, RelativePath, SafeRelativePath},
 };
+
+mod digest;
 
 /// Names the default local schemas directory.
 pub(super) const DEFAULT_LOCAL_SCHEMAS_DIR: &str = ".traces/schemas/";
@@ -234,13 +235,12 @@ impl Config {
         self
     }
 
-    /// Computes a deterministic Config Fingerprint over every resolved value.
+    /// Computes the Config Fingerprint: every setting digest of
+    /// [`Config::digests`] composed under `b"traces.config.v1"`.
     ///
-    /// Length-prefixes variable-length fields, hashes paths as raw OS bytes,
-    /// and tags optional paths for an unambiguous encoding. Hashes task
-    /// statuses in symbol order and tag filters in configured order, so
-    /// reordering filters changes the [`Blake3Digest`]. Persisted fingerprints
-    /// support index cache invalidation across process restarts.
+    /// Persisted fingerprints support index cache invalidation across process
+    /// restarts, so the encoding is pinned by tests; see the `digest` module
+    /// for the framing.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -252,20 +252,7 @@ impl Config {
         )
     )]
     pub(crate) fn hash(&self) -> Blake3Digest {
-        let Self {
-            root,
-            templates,
-            schemas,
-            frontmatter,
-            tasks,
-        } = self;
-        let mut fp = Blake3Hasher::new();
-        fp.path(root);
-        templates.feed_into(&mut fp);
-        schemas.feed_into(&mut fp);
-        frontmatter.feed_into(&mut fp);
-        tasks.feed_into(&mut fp);
-        fp.finish()
+        self.digests().compose()
     }
 }
 
@@ -315,20 +302,6 @@ impl TemplateConfig {
     pub(super) fn output(&self) -> &Path {
         &self.output
     }
-
-    /// Feeds every field into the Config Fingerprint.
-    ///
-    /// Destructuring all fields forces new fields into this encoding.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            local,
-            global,
-            output,
-        } = self;
-        fp.optional_path(local.as_deref());
-        fp.optional_path(global.as_deref());
-        fp.path(output);
-    }
 }
 
 /// Holds the schema registry directory and class field name.
@@ -353,18 +326,6 @@ impl SchemasConfig {
             directory,
             class_field,
         }
-    }
-
-    /// Feeds every field into the Config Fingerprint.
-    ///
-    /// Destructuring all fields forces new fields into this encoding.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            directory,
-            class_field,
-        } = self;
-        fp.bytes(class_field.as_str().as_bytes());
-        fp.path(directory);
     }
 
     /// Returns the frontmatter key for a note's file class.
@@ -531,24 +492,6 @@ impl FrontmatterConfig {
             .expect("test fixture tags is a valid field key");
         self
     }
-
-    /// Feeds every field into the Config Fingerprint.
-    ///
-    /// Destructuring all fields forces new fields into this encoding.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            title,
-            aliases,
-            tags,
-            date_created,
-            date_modified,
-        } = self;
-        fp.bytes(title.as_str().as_bytes());
-        fp.bytes(aliases.as_str().as_bytes());
-        fp.bytes(tags.as_str().as_bytes());
-        date_created.feed_into(fp);
-        date_modified.feed_into(fp);
-    }
 }
 
 impl Default for FrontmatterConfig {
@@ -679,32 +622,6 @@ impl TaskConfig {
         let tag_filters =
             tags.iter().map(|&t| Tag::parse(t).expect("valid tag")).collect();
         Self::for_test(tag_filters)
-    }
-
-    /// Feeds statuses and tag filters into the Config Fingerprint.
-    ///
-    /// Hashes statuses in symbol order and filters in configured order.
-    /// Destructuring all fields forces new fields into this encoding.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            statuses,
-            tag_filters,
-        } = self;
-        let mut ordered: Vec<&TaskStatus> = statuses.iter().collect();
-        ordered.sort_unstable_by_key(|status| status.symbol().as_char());
-        fp.len(ordered.len());
-        for status in ordered {
-            let mut symbol = [0_u8; 4];
-            fp.bytes(
-                status.symbol().as_char().encode_utf8(&mut symbol).as_bytes(),
-            );
-            fp.bytes(status.name().as_bytes());
-            fp.bytes(status.kind().as_str().as_bytes());
-        }
-        fp.len(tag_filters.len());
-        for tag in tag_filters {
-            fp.bytes(tag.as_str().as_bytes());
-        }
     }
 }
 
@@ -956,18 +873,6 @@ impl DateFieldConfig {
             },
         })
     }
-
-    /// Feeds both fields into the Config Fingerprint.
-    ///
-    /// Destructuring both fields forces new fields into this encoding.
-    fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            name,
-            format,
-        } = self;
-        fp.bytes(name.as_str().as_bytes());
-        fp.bytes(format.as_bytes());
-    }
 }
 
 #[cfg(test)]
@@ -1015,12 +920,13 @@ mod tests {
         #[test]
         fn matches_the_pinned_digest_for_a_fixed_config() {
             // Persisted Config Fingerprints must survive releases; this pins
-            // the encoding and field order.
+            // the per-setting encoding, labels, and compose order. Re-pinned
+            // once when the aggregate chain became compose-all.
             let digest = base().hash().to_hex();
 
             assert_eq!(
                 digest.as_ref(),
-                "ce5503dd2df8687312cdd13cdff34d5490a8aacc1615d5f8765ee39f3ce6887b"
+                "eab509cd36bf89013b65124fb1f456889f859d84b600ec6ef7ecb38f1852e571"
             );
         }
 

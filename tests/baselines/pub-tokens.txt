@@ -171,6 +171,36 @@ src/config/model.rs: pub(super) fn local(&self) -> Option<&Path> {
 src/config/model.rs: pub(super) fn new(
 src/config/model.rs: pub(super) fn output(&self) -> &Path {
 src/config/model.rs: pub(super) struct TemplateConfig {
+src/config/model/digest.rs: pub(crate) aliases: Blake3Digest,
+src/config/model/digest.rs: pub(crate) class_field: Blake3Digest,
+src/config/model/digest.rs: pub(crate) date_created: DateFieldDigests,
+src/config/model/digest.rs: pub(crate) date_modified: DateFieldDigests,
+src/config/model/digest.rs: pub(crate) directory: Blake3Digest,
+src/config/model/digest.rs: pub(crate) fn compose(&self) -> Blake3Digest {
+src/config/model/digest.rs: pub(crate) fn digests(&self) -> ConfigDigests {
+src/config/model/digest.rs: pub(crate) format: Blake3Digest,
+src/config/model/digest.rs: pub(crate) frontmatter: FrontmatterDigests,
+src/config/model/digest.rs: pub(crate) global: Blake3Digest,
+src/config/model/digest.rs: pub(crate) local: Blake3Digest,
+src/config/model/digest.rs: pub(crate) name: Blake3Digest,
+src/config/model/digest.rs: pub(crate) output: Blake3Digest,
+src/config/model/digest.rs: pub(crate) root: Blake3Digest,
+src/config/model/digest.rs: pub(crate) schemas: SchemaDigests,
+src/config/model/digest.rs: pub(crate) statuses: Blake3Digest,
+src/config/model/digest.rs: pub(crate) struct ConfigDigests {
+src/config/model/digest.rs: pub(crate) struct DateFieldDigests {
+src/config/model/digest.rs: pub(crate) struct FrontmatterDigests {
+src/config/model/digest.rs: pub(crate) struct SchemaDigests {
+src/config/model/digest.rs: pub(crate) struct TaskDigests {
+src/config/model/digest.rs: pub(crate) struct TemplateDigests {
+src/config/model/digest.rs: pub(crate) tag_filters: Blake3Digest,
+src/config/model/digest.rs: pub(crate) tags: Blake3Digest,
+src/config/model/digest.rs: pub(crate) tasks: TaskDigests,
+src/config/model/digest.rs: pub(crate) templates: TemplateDigests,
+src/config/model/digest.rs: pub(crate) title: Blake3Digest,
+src/config/model/digest.rs: pub(in super::super) const NAMES: [&str; 15] = [
+src/config/model/digest.rs: pub(in super::super) fn base() -> Config {
+src/config/model/digest.rs: pub(in super::super) fn ordered(
 src/config/raw.rs: pub(crate) aliases: Option<String>,
 src/config/raw.rs: pub(crate) class_field: Option<String>,
 src/config/raw.rs: pub(crate) date_created: Option<RawDateFieldConfig>,
@@ -304,6 +334,7 @@ src/field.rs: pub(crate) fn canonical(&self) -> &str {
 src/field.rs: pub(crate) fn canonicalize(raw: &str) -> String {
 src/field.rs: pub(crate) fn classify(
 src/field.rs: pub(crate) fn deserialize_with<'de, D>(
+src/field.rs: pub(crate) fn feed_into(&self, fp: &mut Blake3Hasher) {
 src/field.rs: pub(crate) fn is_canonical_match(&self, candidate: &str) -> bool {
 src/field.rs: pub(crate) fn is_match(&self, candidate: &str) -> bool {
 src/field.rs: pub(crate) fn is_name_match(&self, candidate: &FieldName) -> bool {
@@ -360,6 +391,7 @@ src/hash.rs: pub struct Blake3PathHash([u8; 64]);
 src/hash.rs: pub struct HashError {
 src/hash.rs: pub(crate) fn as_str(&self) -> &str {
 src/hash.rs: pub(crate) fn bytes(&mut self, bytes: &[u8]) {
+src/hash.rs: pub(crate) fn digest(&mut self, digest: &Blake3Digest) {
 src/hash.rs: pub(crate) fn finish(self) -> Blake3Digest {
 src/hash.rs: pub(crate) fn len(&mut self, len: usize) {
 src/hash.rs: pub(crate) fn new() -> Self {

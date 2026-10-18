@@ -1982,6 +1982,7 @@ dependencies = [
  "stats_alloc",
  "strict-path",
  "strsim",
+ "syn 2.0.119",
  "tempfile",
  "thiserror",
  "toml",

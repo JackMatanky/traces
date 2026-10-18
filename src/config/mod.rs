@@ -17,6 +17,19 @@
 //! revoking trust leaves that path tracked. [`crate::dirs`] supplies OS paths
 //! for both stores.
 //!
+//! # Config Digests
+//!
+//! `Config::digests` hashes every resolved setting on its own under a
+//! section-qualified label, so each stored digest names the setting it covers.
+//! `Config::hash` composes them under `b"traces.config.v1"` into the Config
+//! Fingerprint; that is the only live encoding.
+//!
+//! Every digest constructor and bundle destructures its type exhaustively and
+//! never with `..`. Adding a setting to a config type then fails to compile
+//! until the setting gets a label and a place in the encoding. A `syn` scan of
+//! the digest source pins the convention, because the compiler cannot tell a
+//! rest pattern from an exhaustive one.
+//!
 //! # Key Types
 //!
 //! - [`ConfigService`]: loads configuration and administers trust.

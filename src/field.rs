@@ -36,7 +36,9 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{DateTimeValue, DateValue, temporal::DatePoint};
+use crate::{
+    DateTimeValue, DateValue, hash::Blake3Hasher, temporal::DatePoint,
+};
 
 /// Stores an exact schema field identifier.
 ///
@@ -57,6 +59,16 @@ impl FieldName {
     #[must_use]
     pub(crate) fn as_ref(&self) -> FieldNameRef<'_> {
         FieldNameRef(&self.0)
+    }
+
+    /// Feeds this name into `fp` as its exact UTF-8 bytes.
+    ///
+    /// Case and punctuation are preserved, so `status` and `Status` feed
+    /// different bytes. Digests built from this encoding persist, so the
+    /// contract is part of their format.
+    #[inline]
+    pub(crate) fn feed_into(&self, fp: &mut Blake3Hasher) {
+        fp.bytes(self.0.as_bytes());
     }
 
     /// Validates `raw` as a field name.
@@ -1146,6 +1158,38 @@ mod tests {
             let name = FieldNameRef::try_from("Status").expect("valid name");
             let borrowed: &str = std::borrow::Borrow::borrow(&name);
             assert_eq!(borrowed, "Status");
+        }
+
+        mod feed_into {
+            use pretty_assertions::{assert_eq, assert_ne};
+
+            use super::super::super::*;
+            use crate::hash::Blake3Hasher;
+
+            #[test]
+            fn feeds_the_exact_utf8_bytes_of_the_name() {
+                let name = FieldName::try_from("Zażółć").expect("valid name");
+                let mut actual = Blake3Hasher::new();
+                let mut expected = Blake3Hasher::new();
+
+                name.feed_into(&mut actual);
+                expected.bytes("Zażółć".as_bytes());
+
+                assert_eq!(actual.finish(), expected.finish());
+            }
+
+            #[test]
+            fn preserves_case_in_the_fed_bytes() {
+                let lower = FieldName::try_from("status").expect("valid name");
+                let upper = FieldName::try_from("Status").expect("valid name");
+                let mut lower_hasher = Blake3Hasher::new();
+                let mut upper_hasher = Blake3Hasher::new();
+
+                lower.feed_into(&mut lower_hasher);
+                upper.feed_into(&mut upper_hasher);
+
+                assert_ne!(lower_hasher.finish(), upper_hasher.finish());
+            }
         }
     }
 

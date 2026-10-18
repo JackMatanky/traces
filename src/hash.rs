@@ -96,6 +96,13 @@ impl Blake3Hasher {
         self.0.update(&u64::try_from(len).unwrap_or(u64::MAX).to_le_bytes());
     }
 
+    /// Feeds `digest` behind a length prefix.
+    ///
+    /// Composes digests into a parent digest.
+    pub(crate) fn digest(&mut self, digest: &Blake3Digest) {
+        self.bytes(digest.0.as_bytes());
+    }
+
     /// Feeds `path`'s raw OS bytes, so non-UTF-8 paths stay distinct.
     pub(crate) fn path(&mut self, path: &Path) {
         self.bytes(path.as_os_str().as_encoded_bytes());

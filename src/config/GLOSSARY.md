@@ -83,10 +83,13 @@ the directory you choose.
 
 #### Config Fingerprint
 
-A deterministic digest over every resolved value of a loaded configuration,
-built with the length-prefixed `Blake3Hasher`. Reserved for index cache
-invalidation; its framing and field order are pinned by a test because stored
-digests must survive releases.
+A deterministic digest of a loaded configuration, composed from one framed
+digest per resolved setting under `b"traces.config.v1"`. Each setting digest
+hashes its section-qualified label before its value, so it names the setting it
+covers. Reserved for index cache invalidation; its labels, framing and
+order are pinned by a test because stored digests must survive releases. The
+compose-all encoding replaced the earlier aggregate chain in a one-time
+re-pin; it is the single live encoding.
 *Avoid*: config hash, checksum
 
 ### Canonical Metadata
