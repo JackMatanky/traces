@@ -275,6 +275,24 @@ mod tests {
 
             assert_eq!(edited, IndexFingerprint::for_test());
         }
+
+        #[test]
+        fn ignores_the_project_location_and_template_directories() {
+            let at = |root: &str, local: &str, output: &str| {
+                let config = crate::Config::for_test(
+                    root.into(),
+                    Some(local.into()),
+                    None,
+                    output.into(),
+                );
+                IndexFingerprint::new(&config.digests())
+            };
+
+            assert_eq!(
+                at("/old", "/old/templates", "/old/out"),
+                at("/moved", "/moved/other", "/moved/else")
+            );
+        }
     }
 
     mod encoding {
@@ -286,11 +304,32 @@ mod tests {
         #[test]
         fn lays_out_raw_digests_in_setting_order() {
             let digests = crate::Config::test_default("/project").digests();
+            let FrontmatterDigests {
+                title,
+                aliases,
+                tags,
+                date_created,
+                date_modified,
+            } = digests.frontmatter;
+
             let bytes = IndexFingerprint::new(&digests).encode();
 
-            assert_eq!(bytes[0], digests.frontmatter.title.to_bytes());
-            assert_eq!(bytes[7], digests.tasks.statuses.to_bytes());
-            assert_eq!(bytes[9], digests.schemas.class_field.to_bytes());
+            assert_eq!(
+                bytes,
+                [
+                    title,
+                    aliases,
+                    tags,
+                    date_created.name,
+                    date_created.format,
+                    date_modified.name,
+                    date_modified.format,
+                    digests.tasks.statuses,
+                    digests.tasks.tag_filters,
+                    digests.schemas.class_field,
+                ]
+                .map(Blake3Digest::to_bytes)
+            );
         }
 
         #[test]
@@ -370,15 +409,25 @@ mod tests {
 
         #[rstest]
         #[case::title(IndexSetting::Title, "[frontmatter] title")]
+        #[case::aliases(IndexSetting::Aliases, "[frontmatter] aliases")]
         #[case::tags(IndexSetting::Tags, "[frontmatter] tags")]
         #[case::date_created_name(
             IndexSetting::DateCreatedName,
             "[frontmatter.date_created] name"
         )]
+        #[case::date_created_format(
+            IndexSetting::DateCreatedFormat,
+            "[frontmatter.date_created] format"
+        )]
+        #[case::date_modified_name(
+            IndexSetting::DateModifiedName,
+            "[frontmatter.date_modified] name"
+        )]
         #[case::date_modified_format(
             IndexSetting::DateModifiedFormat,
             "[frontmatter.date_modified] format"
         )]
+        #[case::statuses(IndexSetting::Statuses, "[tasks] statuses")]
         #[case::tag_filters(IndexSetting::TagFilters, "[tasks] tag_filters")]
         #[case::class_field(IndexSetting::ClassField, "[schemas] class_field")]
         fn qualifies_the_key_with_its_section(

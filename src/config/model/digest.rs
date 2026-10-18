@@ -39,7 +39,7 @@ pub(crate) struct ConfigDigests {
 
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "reserved for index cache invalidation")
+    expect(dead_code, reason = "compose is reached only through Config::hash")
 )]
 impl ConfigDigests {
     /// Composes every setting digest into one digest under

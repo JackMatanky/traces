@@ -58,7 +58,8 @@ pub enum RefreshReport {
     )
 )]
 impl RefreshReport {
-    /// Returns the number of files inserted or updated.
+    /// Returns the number of files inserted or updated, or zero unless files
+    /// changed.
     #[inline]
     #[must_use]
     pub const fn upserted_count(&self) -> usize {
@@ -74,7 +75,8 @@ impl RefreshReport {
         }
     }
 
-    /// Returns the number of files deleted from the index.
+    /// Returns the number of files deleted from the index, or zero unless
+    /// files changed.
     #[inline]
     #[must_use]
     pub const fn deleted_count(&self) -> usize {
@@ -90,7 +92,8 @@ impl RefreshReport {
         }
     }
 
-    /// Returns the number of inbound link edges updated.
+    /// Returns the number of inbound link edges updated, or zero unless files
+    /// changed.
     #[inline]
     #[must_use]
     pub const fn links_modified_count(&self) -> usize {

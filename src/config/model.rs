@@ -144,17 +144,17 @@ impl Config {
     /// Computes the Config Fingerprint: every setting digest of
     /// [`Config::digests`] composed under `b"traces.config.v1"`.
     ///
-    /// Persisted fingerprints support index cache invalidation across process
-    /// restarts, so the encoding is pinned by tests; see the `digest` module
-    /// for the framing.
+    /// The index does not persist this digest; it stores a subset of the
+    /// per-setting digests instead. The encoding is pinned by tests; see the
+    /// `digest` module for the framing.
     #[inline]
     #[must_use]
     #[cfg_attr(
         not(test),
         expect(
             dead_code,
-            reason = "no current caller outside tests; reserved for future \
-                      index cache invalidation"
+            reason = "no caller outside tests; the index fingerprints \
+                      per-setting digests instead"
         )
     )]
     pub(crate) fn hash(&self) -> Blake3Digest {

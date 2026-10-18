@@ -248,11 +248,12 @@ impl IndexerService {
     /// [`WorkspaceIndex`].
     ///
     /// Cold empty deltas return the opened store without decoding notes or
-    /// writing rows. Unlike [`Self::refresh`] (which absorbs persist failures
-    /// by logging a warning and falling back to an in-memory index), persist
-    /// failures are propagated directly as [`IndexError::Store`] because
-    /// callers read from the returned persisted store and have no in-memory
-    /// fallback.
+    /// writing rows. A store built under different index-relevant config is
+    /// rebuilt in full first. Unlike [`Self::refresh`] (which absorbs persist
+    /// failures by logging a warning and falling back to an in-memory index),
+    /// persist failures are propagated directly as [`IndexError::Store`]
+    /// because callers read from the returned persisted store and have no
+    /// in-memory fallback.
     ///
     /// # Errors
     ///
@@ -312,10 +313,15 @@ impl IndexerService {
             ),
             RefreshReport::ConfigDrift {
                 changed,
-            } => tracing::info!(
-                changed = ?changed,
-                "index rebuilt after config drift"
-            ),
+            } => {
+                // Drift is rare, so joining the qualified names is cheap.
+                let changed = changed
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                tracing::info!(%changed, "index rebuilt after config drift");
+            }
         }
     }
 

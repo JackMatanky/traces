@@ -546,6 +546,11 @@ impl IndexStore {
     ///
     /// An absent table means a virgin store. A table without a decodable
     /// fingerprint is unreadable, so callers fail closed.
+    ///
+    /// # Errors
+    ///
+    /// - [`StoreError::Redb`] if `META` cannot be opened or its fingerprint row
+    ///   cannot be read.
     fn read_fingerprint(
         &self,
         txn: &ReadTransaction,
