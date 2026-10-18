@@ -79,7 +79,8 @@ Bad, because:
 
 - RefreshState and RefreshReport change shape, breaking their test and bench
   call sites.
-- The store gains an 8th table; legacy 7-table stores are wiped once via the
+- The store's `cache_format` table is renamed `meta` and gains the
+  fingerprint beside the format version; legacy stores are wiped once via the
   existing upgrade path (full rebuild on first open after upgrade).
 - Config::hash() is re-expressed as a composition of per-section digests,
   requiring a one-time re-pin of its encoding test.
