@@ -35,8 +35,11 @@ use super::{
 };
 use crate::{FileMeta, Note, Tag, file::FileFormat};
 
+/// Keys the cache format version row in `META`.
 const META_VERSION_KEY: &[u8] = b"version";
+/// Identifies the persisted row semantics; a mismatch wipes the store at open.
 const META_VERSION: &[u8] = b"1";
+/// Keys the raw Index Fingerprint row in `META`.
 const META_FINGERPRINT_KEY: &[u8] = b"fingerprint";
 
 /// Stored files, path-sorted notes, and target-keyed inlinks loaded together.
@@ -1931,10 +1934,14 @@ mod tests {
         }
     }
 
-    mod fingerprint_row {
+    mod fingerprint {
         use pretty_assertions::assert_eq;
+        use rstest::rstest;
 
         use super::*;
+        use crate::{Blake3Digest, index::fingerprint::SETTING_COUNT};
+
+        const ENCODED_LEN: usize = SETTING_COUNT * Blake3Digest::LEN;
 
         fn stored(store: &IndexStore) -> StoredFingerprint {
             store.read_files_and_fingerprint().expect("read fingerprint").1
@@ -1968,8 +1975,8 @@ mod tests {
             let store = IndexStore::open(temp.path()).expect("open store");
             write_all_parts(&store, &[], &[], &InlinkMap::default())
                 .expect("persist first rebuild");
-            let newer =
-                IndexFingerprint::decode(&[7; 320]).expect("320 bytes decode");
+            let newer = IndexFingerprint::decode(&[7; ENCODED_LEN])
+                .expect("one digest per setting decodes");
 
             store
                 .persist(&PersistRequest::rebuild(
@@ -2008,24 +2015,20 @@ mod tests {
             assert_eq!(stored(&store), recorded(&IndexFingerprint::for_test()));
         }
 
-        #[test]
-        fn reads_rows_without_a_fingerprint_key_as_unreadable() {
+        #[rstest]
+        #[case::missing_key(None)]
+        #[case::short_value(Some(ENCODED_LEN - 1))]
+        #[case::long_value(Some(ENCODED_LEN + 1))]
+        fn reads_a_damaged_fingerprint_as_unreadable(
+            #[case] damaged_len: Option<usize>,
+        ) {
             let temp = tempfile::tempdir().expect("create temp dir");
             let store = IndexStore::open(temp.path()).expect("open store");
             write_all_parts(&store, &[], &[], &InlinkMap::default())
                 .expect("persist rebuild");
-            store.write_fingerprint_bytes(None);
-
-            assert_eq!(stored(&store), StoredFingerprint::Unreadable);
-        }
-
-        #[test]
-        fn reads_a_wrong_length_fingerprint_as_unreadable() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let store = IndexStore::open(temp.path()).expect("open store");
-            write_all_parts(&store, &[], &[], &InlinkMap::default())
-                .expect("persist rebuild");
-            store.write_fingerprint_bytes(Some(&[0; 319]));
+            store.write_fingerprint_bytes(
+                damaged_len.map(|len| vec![0; len]).as_deref(),
+            );
 
             assert_eq!(stored(&store), StoredFingerprint::Unreadable);
         }

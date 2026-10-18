@@ -12,8 +12,11 @@
 //!
 //! Fresh builds run through [`IndexerService::build`]; cold CLI reads use
 //! [`IndexerService::refresh_store`](service::IndexerService::refresh_store) to
-//! load and refresh an existing store.
+//! load and refresh an existing store. A refresh also compares the store's
+//! recorded [`fingerprint`] of index-relevant config settings with the running
+//! config and rebuilds in full when they differ.
 //!
+//! [`fingerprint`]: mod@fingerprint
 //! [`store`]: mod@store
 mod codec;
 mod delta;

@@ -124,8 +124,11 @@ pub(super) enum RefreshState {
     /// memory from the plan's own scan, and `store` is the plan's handle, ready
     /// for the heal to rewrite.
     Drifted {
+        /// Lists the settings whose digest differed from the stored one.
         changed: Box<[IndexSetting]>,
+        /// Holds the index rebuilt from the plan's scan.
         index: WorkspaceIndex,
+        /// Holds the plan's open store, the only handle redb allows.
         store: IndexStore,
     },
 }

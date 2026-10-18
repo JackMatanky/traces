@@ -5,8 +5,9 @@
 //! is config drift, healed by a full rebuild.
 //!
 //! The fingerprint is deliberately wider than what index-time code reads today:
-//! `title`, `aliases`, and the date keys are included on purpose. Over-matching
-//! costs one harmless rebuild per edit, while under-matching serves stale rows.
+//! `title`, `aliases`, and the date keys are included on purpose. Matching too
+//! much costs one harmless rebuild per edit, while matching too little serves
+//! stale rows.
 //!
 //! # Exhaustive destructuring
 //!
@@ -33,12 +34,12 @@ use crate::{
 };
 
 /// Counts the settings that enter the fingerprint.
-const SETTING_COUNT: usize = 10;
+pub(super) const SETTING_COUNT: usize = 10;
 
 /// Names one config setting that shapes persisted index rows.
 ///
-/// Variants are named after their `traces.toml` keys, and [`Display`] adds the
-/// section. The type serves diagnosis only: config never learns of it.
+/// Variants are named after their keys in the config file, and [`Display`] adds
+/// the section. The type serves diagnosis only: config never learns of it.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IndexSetting {
     /// The `[frontmatter] title` key.
@@ -170,18 +171,19 @@ impl IndexFingerprint {
     }
 
     /// Returns the digests' raw bytes, in [`IndexSetting`] order.
-    pub(super) fn encode(&self) -> [[u8; 32]; SETTING_COUNT] {
+    pub(super) fn encode(&self) -> [[u8; Blake3Digest::LEN]; SETTING_COUNT] {
         self.0.map(Blake3Digest::to_bytes)
     }
 
     /// Decodes bytes written from [`Self::encode`], or `None` if they are
     /// not exactly one digest per setting.
     pub(super) fn decode(bytes: &[u8]) -> Option<Self> {
-        let (digests, rest) = bytes.as_chunks::<32>();
+        let (digests, rest) = bytes.as_chunks::<{ Blake3Digest::LEN }>();
         if !rest.is_empty() {
             return None;
         }
-        let digests: &[[u8; 32]; SETTING_COUNT] = digests.try_into().ok()?;
+        let digests: &[[u8; Blake3Digest::LEN]; SETTING_COUNT] =
+            digests.try_into().ok()?;
         Some(Self((*digests).map(Blake3Digest::from_bytes)))
     }
 
@@ -295,9 +297,8 @@ mod tests {
         }
     }
 
-    mod encoding {
+    mod encode {
         use pretty_assertions::assert_eq;
-        use rstest::rstest;
 
         use super::*;
 
@@ -331,9 +332,18 @@ mod tests {
                 .map(Blake3Digest::to_bytes)
             );
         }
+    }
+
+    mod decode {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        const ENCODED_LEN: usize = SETTING_COUNT * Blake3Digest::LEN;
 
         #[test]
-        fn round_trips_through_stored_bytes() {
+        fn returns_the_fingerprint_that_was_encoded() {
             let fingerprint = IndexFingerprint::for_test();
             let stored = fingerprint.encode();
 
@@ -345,9 +355,9 @@ mod tests {
 
         #[rstest]
         #[case::empty(0)]
-        #[case::one_byte_short(SETTING_COUNT * 32 - 1)]
-        #[case::one_byte_long(SETTING_COUNT * 32 + 1)]
-        #[case::whole_extra_digest(SETTING_COUNT * 32 + 32)]
+        #[case::one_byte_short(ENCODED_LEN - 1)]
+        #[case::one_byte_long(ENCODED_LEN + 1)]
+        #[case::whole_extra_digest(ENCODED_LEN + Blake3Digest::LEN)]
         fn rejects_bytes_of_the_wrong_length(#[case] len: usize) {
             assert_eq!(IndexFingerprint::decode(&vec![0; len]), None);
         }

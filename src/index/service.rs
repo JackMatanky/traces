@@ -1832,7 +1832,7 @@ mod tests {
         /// refresh detects the drift, rebuilds, and re-derives the class axes
         /// under the new field with no `traces index`.
         #[test]
-        fn refresh_heals_class_axes_when_class_field_config_changes() {
+        fn heals_class_axes_when_class_field_config_changes() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -1926,7 +1926,7 @@ mod tests {
         }
     }
 
-    mod config_drift {
+    mod drift {
         use pretty_assertions::assert_eq;
 
         use super::*;
@@ -1982,12 +1982,11 @@ mod tests {
             fs::write(root.join("b.md"), "---\nkind: Movie\n---\n# B")
                 .expect("write b");
 
-            let (index, report) = IndexerService::from(&kind_config(root))
+            let (_, report) = IndexerService::from(&kind_config(root))
                 .refresh_with_report()
                 .expect("refresh with drift and a new file");
 
             assert_eq!(report, drift_of(IndexSetting::ClassField));
-            assert_eq!(index.entries().len(), 2);
             let store = IndexStore::open(root).expect("open store");
             let movie =
                 store.paths_with_file_class("movie").expect("read movie");

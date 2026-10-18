@@ -409,8 +409,9 @@ src/hash.rs: pub fn to_hex(self) -> impl AsRef<str> + Display {
 src/hash.rs: pub struct Blake3Digest(blake3::Hash);
 src/hash.rs: pub struct Blake3PathHash([u8; 64]);
 src/hash.rs: pub struct HashError {
-src/hash.rs: pub(crate) const fn from_bytes(bytes: [u8; 32]) -> Self {
-src/hash.rs: pub(crate) const fn to_bytes(self) -> [u8; 32] {
+src/hash.rs: pub(crate) const LEN: usize = blake3::OUT_LEN;
+src/hash.rs: pub(crate) const fn from_bytes(bytes: [u8; Self::LEN]) -> Self {
+src/hash.rs: pub(crate) const fn to_bytes(self) -> [u8; Self::LEN] {
 src/hash.rs: pub(crate) fn as_str(&self) -> &str {
 src/hash.rs: pub(crate) fn bytes(&mut self, bytes: &[u8]) {
 src/hash.rs: pub(crate) fn digest(&mut self, digest: &Blake3Digest) {
@@ -460,10 +461,11 @@ src/index/error.rs: pub(crate) enum StoreError {
 src/index/error.rs: pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
 src/index/fingerprint.rs: pub enum IndexSetting {
 src/index/fingerprint.rs: pub(super) const ALL: [Self; SETTING_COUNT] = [
+src/index/fingerprint.rs: pub(super) const SETTING_COUNT: usize = 10;
 src/index/fingerprint.rs: pub(super) enum StoredFingerprint {
 src/index/fingerprint.rs: pub(super) fn decode(bytes: &[u8]) -> Option<Self> {
 src/index/fingerprint.rs: pub(super) fn drift(
-src/index/fingerprint.rs: pub(super) fn encode(&self) -> [[u8; 32]; SETTING_COUNT] {
+src/index/fingerprint.rs: pub(super) fn encode(&self) -> [[u8; Blake3Digest::LEN]; SETTING_COUNT] {
 src/index/fingerprint.rs: pub(super) fn for_test() -> Self {
 src/index/fingerprint.rs: pub(super) fn new(digests: &ConfigDigests) -> Self {
 src/index/fingerprint.rs: pub(super) struct IndexFingerprint([Blake3Digest; SETTING_COUNT]);
