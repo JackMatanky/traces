@@ -509,6 +509,65 @@ mod tests {
             // kept.
             assert_eq!(names, vec!["note.md"]);
         }
+
+        #[test]
+        fn filter_configured_after_the_first_next_is_ignored() {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "a.md");
+            write(root, "b.md");
+            write(root, "c.md");
+
+            // Act: pull one entry, then reconfigure the started walk with a
+            // predicate that matches everything.
+            let mut tree = DirTree::children(root);
+            assert!(
+                tree.next().expect("entries exist").is_ok(),
+                "first entry is fine"
+            );
+            let tree = tree.filter(|_| true);
+            let rest: Vec<_> = tree.collect();
+
+            // Assert: the pre-start builder was already consumed, so the late
+            // filter is silently ignored; an honored predicate would empty
+            // the remaining walk.
+            assert_eq!(rest.len(), 2, "post-start filter must not prune");
+            assert!(rest.iter().all(Result::is_ok));
+        }
+
+        #[test]
+        fn sorted_by_configured_after_the_first_next_is_ignored() {
+            // Arrange: the comparator counts its invocations.
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "a.md");
+            write(root, "b.md");
+            write(root, "c.md");
+            let comparisons =
+                std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let comparisons_in_compare = std::sync::Arc::clone(&comparisons);
+
+            // Act: pull one entry, then reconfigure the started walk.
+            let mut tree = DirTree::children(root);
+            assert!(tree.next().expect("entries exist").is_ok());
+            let tree = tree.sorted_by(move |a, b| {
+                comparisons_in_compare
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                a.file_name().cmp(b.file_name())
+            });
+            let rest: Vec<_> = tree.collect();
+
+            // Assert: ordering is applied when the walk starts, so a
+            // comparator attached afterwards never runs while the remaining
+            // entries still yield.
+            assert_eq!(rest.len(), 2, "remaining entries still yield");
+            assert_eq!(
+                comparisons.load(std::sync::atomic::Ordering::Relaxed),
+                0,
+                "post-start comparator must never run"
+            );
+        }
     }
 
     mod descendants {
@@ -806,10 +865,10 @@ mod tests {
         fn children_yields_an_unreadable_subdirectory_without_error() {
             use std::os::unix::fs::PermissionsExt;
 
-            // Arrange: walkdir opens child directories eagerly even under
-            // max_depth(1), but a failed open is stored in the child's dir
-            // list and popped before it can be polled, so flat listings
-            // yield the locked directory as a plain entry with no error.
+            // Arrange: a subdirectory that cannot be opened. The contract
+            // under test is the documented one - a flat listing yields it as
+            // a plain entry with no error, while recursive walks surface a
+            // NodeInaccessible instead.
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
             let kid = root.join("locked-kid");
