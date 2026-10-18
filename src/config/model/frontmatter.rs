@@ -70,6 +70,24 @@ impl FrontmatterConfig {
         &self.date_modified
     }
 
+    /// Digests the metadata role names and date formats.
+    pub(super) fn digests(&self) -> FrontmatterDigests {
+        let Self {
+            title,
+            aliases,
+            tags,
+            date_created,
+            date_modified,
+        } = self;
+        FrontmatterDigests {
+            title: setting(FRONTMATTER_TITLE, |fp| title.feed_into(fp)),
+            aliases: setting(FRONTMATTER_ALIASES, |fp| aliases.feed_into(fp)),
+            tags: setting(FRONTMATTER_TAGS, |fp| tags.feed_into(fp)),
+            date_created: date_created.digests(&DATE_CREATED),
+            date_modified: date_modified.digests(&DATE_MODIFIED),
+        }
+    }
+
     /// Builds test metadata settings with custom title and aliases keys.
     ///
     /// # Panics
@@ -214,27 +232,6 @@ impl DateFieldConfig {
         &self.format
     }
 
-    /// Builds a date field from a hardcoded role name and default format.
-    ///
-    /// # Panics
-    ///
-    /// - `name` is not a valid field key; callers pass only
-    ///   [`DEFAULT_DATE_CREATED_FIELD`] or [`DEFAULT_DATE_MODIFIED_FIELD`].
-    #[inline]
-    #[expect(
-        clippy::expect_used,
-        reason = "callers only pass hardcoded role-name constants; failure \
-                  here means a constant itself is malformed, not a \
-                  recoverable caller error"
-    )]
-    fn default_for(name: &str) -> Self {
-        Self {
-            name: FieldName::try_from(name)
-                .expect("role-name constant is a valid field key"),
-            format: crate::DEFAULT_DATETIME_PATTERN.to_owned(),
-        }
-    }
-
     /// Resolves a date field from raw values or role-specific defaults.
     ///
     /// # Errors
@@ -265,6 +262,39 @@ impl DateFieldConfig {
             },
         })
     }
+
+    /// Digests the date key name and format under `labels`.
+    fn digests(&self, labels: &DateLabels) -> DateFieldDigests {
+        let Self {
+            name,
+            format,
+        } = self;
+        DateFieldDigests {
+            name: setting(labels.name, |fp| name.feed_into(fp)),
+            format: setting(labels.format, |fp| fp.bytes(format.as_bytes())),
+        }
+    }
+
+    /// Builds a date field from a hardcoded role name and default format.
+    ///
+    /// # Panics
+    ///
+    /// - `name` is not a valid field key; callers pass only
+    ///   [`DEFAULT_DATE_CREATED_FIELD`] or [`DEFAULT_DATE_MODIFIED_FIELD`].
+    #[inline]
+    #[expect(
+        clippy::expect_used,
+        reason = "callers only pass hardcoded role-name constants; failure \
+                  here means a constant itself is malformed, not a \
+                  recoverable caller error"
+    )]
+    fn default_for(name: &str) -> Self {
+        Self {
+            name: FieldName::try_from(name)
+                .expect("role-name constant is a valid field key"),
+            format: crate::DEFAULT_DATETIME_PATTERN.to_owned(),
+        }
+    }
 }
 
 const FRONTMATTER_TITLE: &[u8] = b"frontmatter.title";
@@ -288,7 +318,7 @@ const DATE_MODIFIED: DateLabels = DateLabels {
 };
 
 /// Holds the digests of [`FrontmatterConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FrontmatterDigests {
     title: Blake3Digest,
     aliases: Blake3Digest,
@@ -336,10 +366,26 @@ impl FrontmatterDigests {
     pub(crate) const fn date_modified(&self) -> DateFieldDigests {
         self.date_modified
     }
+
+    /// Feeds every setting digest in declaration order.
+    pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
+        let Self {
+            title,
+            aliases,
+            tags,
+            date_created,
+            date_modified,
+        } = self;
+        fp.digest(title);
+        fp.digest(aliases);
+        fp.digest(tags);
+        date_created.feed_into(fp);
+        date_modified.feed_into(fp);
+    }
 }
 
 /// Holds the digests of one [`DateFieldConfig`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DateFieldDigests {
     name: Blake3Digest,
     format: Blake3Digest,
@@ -363,27 +409,7 @@ impl DateFieldDigests {
     pub(crate) const fn format(&self) -> Blake3Digest {
         self.format
     }
-}
 
-impl FrontmatterDigests {
-    /// Feeds every setting digest in declaration order.
-    pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
-        let Self {
-            title,
-            aliases,
-            tags,
-            date_created,
-            date_modified,
-        } = self;
-        fp.digest(title);
-        fp.digest(aliases);
-        fp.digest(tags);
-        date_created.feed_into(fp);
-        date_modified.feed_into(fp);
-    }
-}
-
-impl DateFieldDigests {
     /// Feeds both setting digests in declaration order.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
@@ -392,40 +418,6 @@ impl DateFieldDigests {
         } = self;
         fp.digest(name);
         fp.digest(format);
-    }
-}
-
-impl FrontmatterConfig {
-    /// Digests the metadata role names and date formats.
-    pub(super) fn digests(&self) -> FrontmatterDigests {
-        let Self {
-            title,
-            aliases,
-            tags,
-            date_created,
-            date_modified,
-        } = self;
-        FrontmatterDigests {
-            title: setting(FRONTMATTER_TITLE, |fp| title.feed_into(fp)),
-            aliases: setting(FRONTMATTER_ALIASES, |fp| aliases.feed_into(fp)),
-            tags: setting(FRONTMATTER_TAGS, |fp| tags.feed_into(fp)),
-            date_created: date_created.digests(&DATE_CREATED),
-            date_modified: date_modified.digests(&DATE_MODIFIED),
-        }
-    }
-}
-
-impl DateFieldConfig {
-    /// Digests the date key name and format under `labels`.
-    fn digests(&self, labels: &DateLabels) -> DateFieldDigests {
-        let Self {
-            name,
-            format,
-        } = self;
-        DateFieldDigests {
-            name: setting(labels.name, |fp| name.feed_into(fp)),
-            format: setting(labels.format, |fp| fp.bytes(format.as_bytes())),
-        }
     }
 }
 

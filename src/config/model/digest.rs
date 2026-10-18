@@ -2,23 +2,24 @@
 //!
 //! Every setting digests on its own under a section-qualified label, so a
 //! stored digest says which setting it covers and cannot collide with a
-//! sibling. [`Config::hash`] composes all of them under one version label.
+//! sibling. [`super::Config::hash`] composes all of them under one version
+//! label.
 //!
 //! # Exhaustive destructuring
 //!
 //! Each `digests` constructor, each bundle's `feed_into`, and
 //! [`ConfigDigests::compose`] destructure their type without `..`. Adding a
 //! setting to a config type, or a bundle to [`ConfigDigests`], then fails to
-//! compile here until it gets a label and a place in the encoding. A
-//! source-scanning test pins the convention because the compiler cannot tell a
-//! rest pattern from an exhaustive one.
+//! compile until it gets a label and a place in the encoding. A source-scanning
+//! test pins the convention because the compiler cannot tell a rest pattern
+//! from an exhaustive one.
 //!
 //! # Key Types
 //!
 //! - [`ConfigDigests`]: one digest per setting, grouped by section.
 
 use super::{
-    Config, frontmatter::FrontmatterDigests, schemas::SchemaDigests,
+    frontmatter::FrontmatterDigests, schemas::SchemaDigests,
     tasks::TaskDigests, templates::TemplateDigests,
 };
 use crate::{Blake3Digest, Blake3Hasher};
@@ -26,10 +27,8 @@ use crate::{Blake3Digest, Blake3Hasher};
 /// Versions the composed Config Fingerprint encoding.
 const CONFIG_LABEL: &[u8] = b"traces.config.v1";
 
-const ROOT: &[u8] = b"root";
-
 /// Holds one framed digest per resolved setting, grouped by config section.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigDigests {
     root: Blake3Digest,
     templates: TemplateDigests,
@@ -43,6 +42,30 @@ pub(crate) struct ConfigDigests {
     expect(dead_code, reason = "reserved for index cache invalidation")
 )]
 impl ConfigDigests {
+    /// Composes every setting digest into one digest under
+    /// `b"traces.config.v1"`.
+    ///
+    /// Settings enter in declaration order, so the result is the Config
+    /// Fingerprint. Changing the order, the labels, or the version label
+    /// invalidates every persisted fingerprint.
+    pub(crate) fn compose(&self) -> Blake3Digest {
+        let Self {
+            root,
+            templates,
+            schemas,
+            frontmatter,
+            tasks,
+        } = self;
+        let mut fp = Blake3Hasher::new();
+        fp.bytes(CONFIG_LABEL);
+        fp.digest(root);
+        templates.feed_into(&mut fp);
+        schemas.feed_into(&mut fp);
+        frontmatter.feed_into(&mut fp);
+        tasks.feed_into(&mut fp);
+        fp.finish()
+    }
+
     /// Returns the digest of the workspace root setting.
     #[inline]
     #[must_use]
@@ -77,10 +100,27 @@ impl ConfigDigests {
     pub(crate) const fn tasks(&self) -> TaskDigests {
         self.tasks
     }
+
+    /// Assembles the resolved setting digests in declaration order.
+    pub(super) const fn new(
+        root: Blake3Digest,
+        templates: TemplateDigests,
+        schemas: SchemaDigests,
+        frontmatter: FrontmatterDigests,
+        tasks: TaskDigests,
+    ) -> Self {
+        Self {
+            root,
+            templates,
+            schemas,
+            frontmatter,
+            tasks,
+        }
+    }
 }
 
-/// Digests one setting: the label's length-prefixed bytes, then the value
-/// bytes `feed` adds.
+/// Digests one setting: the label's length-prefixed bytes, then the value bytes
+/// `feed` adds.
 ///
 /// The label frame lives here rather than in [`Blake3Hasher`], whose value
 /// methods stay label-agnostic.
@@ -94,142 +134,8 @@ where
     fp.finish()
 }
 
-impl ConfigDigests {
-    /// Composes every setting digest into one digest under
-    /// `b"traces.config.v1"`.
-    ///
-    /// Settings enter in declaration order, so the result is the Config
-    /// Fingerprint. Changing the order, the labels, or the version label
-    /// invalidates every persisted fingerprint.
-    pub(crate) fn compose(&self) -> Blake3Digest {
-        let Self {
-            root,
-            templates,
-            schemas,
-            frontmatter,
-            tasks,
-        } = self;
-        let mut fp = Blake3Hasher::new();
-        fp.bytes(CONFIG_LABEL);
-        fp.digest(root);
-        templates.feed_into(&mut fp);
-        schemas.feed_into(&mut fp);
-        frontmatter.feed_into(&mut fp);
-        tasks.feed_into(&mut fp);
-        fp.finish()
-    }
-}
-
-impl Config {
-    /// Digests every resolved setting separately.
-    ///
-    /// Each digest starts with its section-qualified label, so a stored
-    /// digest names the setting it covers. [`ConfigDigests::compose`] folds
-    /// them into the Config Fingerprint.
-    #[inline]
-    #[must_use]
-    pub(crate) fn digests(&self) -> ConfigDigests {
-        let Self {
-            root,
-            templates,
-            schemas,
-            frontmatter,
-            tasks,
-        } = self;
-        ConfigDigests {
-            root: setting(ROOT, |fp| fp.path(root)),
-            templates: templates.digests(),
-            schemas: schemas.digests(),
-            frontmatter: frontmatter.digests(),
-            tasks: tasks.digests(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    mod fixtures {
-        use std::path::PathBuf;
-
-        use super::super::*;
-
-        pub(in super::super) const NAMES: [&str; 15] = [
-            "root",
-            "templates.local",
-            "templates.global",
-            "templates.output",
-            "schemas.directory",
-            "schemas.class_field",
-            "frontmatter.title",
-            "frontmatter.aliases",
-            "frontmatter.tags",
-            "frontmatter.date_created.name",
-            "frontmatter.date_created.format",
-            "frontmatter.date_modified.name",
-            "frontmatter.date_modified.format",
-            "tasks.statuses",
-            "tasks.tag_filters",
-        ];
-
-        pub(in super::super) fn base() -> Config {
-            Config::for_test(
-                PathBuf::from("/project"),
-                Some(PathBuf::from("/project/local")),
-                Some(PathBuf::from("/global")),
-                PathBuf::from("/project/out"),
-            )
-        }
-
-        /// Lists every setting digest in [`NAMES`] order.
-        pub(in super::super) fn ordered(
-            digests: &ConfigDigests,
-        ) -> [Blake3Digest; 15] {
-            let templates = digests.templates();
-            let schemas = digests.schemas();
-            let frontmatter = digests.frontmatter();
-            let tasks = digests.tasks();
-            [
-                digests.root(),
-                templates.local(),
-                templates.global(),
-                templates.output(),
-                schemas.directory(),
-                schemas.class_field(),
-                frontmatter.title(),
-                frontmatter.aliases(),
-                frontmatter.tags(),
-                frontmatter.date_created().name(),
-                frontmatter.date_created().format(),
-                frontmatter.date_modified().name(),
-                frontmatter.date_modified().format(),
-                tasks.statuses(),
-                tasks.tag_filters(),
-            ]
-        }
-    }
-
-    mod setting {
-        use pretty_assertions::assert_eq;
-
-        use super::super::*;
-
-        #[test]
-        fn hashes_the_label_frame_before_the_value_frame() {
-            let mut raw = blake3::Hasher::new();
-            raw.update(&13_u64.to_le_bytes());
-            raw.update(b"test.my_label");
-            raw.update(&5_u64.to_le_bytes());
-            raw.update(b"value");
-
-            let digest = setting(b"test.my_label", |fp| fp.bytes(b"value"));
-
-            assert_eq!(
-                digest.to_hex().as_ref(),
-                raw.finalize().to_hex().as_str()
-            );
-        }
-    }
-
     mod config_digests {
         use std::{
             path::{Path, PathBuf},
@@ -238,13 +144,10 @@ mod tests {
 
         use pretty_assertions::{assert_eq, assert_ne};
 
-        use super::{
-            super::*,
-            fixtures::{NAMES, base, ordered},
-        };
+        use super::fixtures::{NAMES, base, ordered};
         use crate::{
             FieldName,
-            config::model::{FrontmatterConfig, SchemasConfig},
+            config::model::{Config, FrontmatterConfig, SchemasConfig},
         };
 
         #[test]
@@ -387,7 +290,8 @@ mod tests {
         }
 
         /// Every file that defines a digest constructor or a bundle encoder.
-        const SOURCES: [&str; 5] = [
+        const SOURCES: [&str; 6] = [
+            include_str!("../model.rs"),
             include_str!("digest.rs"),
             include_str!("frontmatter.rs"),
             include_str!("schemas.rs"),
@@ -421,6 +325,88 @@ mod tests {
                 "TaskConfig",
                 "TemplateConfig",
             ]);
+        }
+    }
+
+    mod setting {
+        use pretty_assertions::assert_eq;
+
+        use super::super::*;
+
+        #[test]
+        fn hashes_the_label_frame_before_the_value_frame() {
+            let mut raw = blake3::Hasher::new();
+            raw.update(&13_u64.to_le_bytes());
+            raw.update(b"test.my_label");
+            raw.update(&5_u64.to_le_bytes());
+            raw.update(b"value");
+
+            let digest = setting(b"test.my_label", |fp| fp.bytes(b"value"));
+
+            assert_eq!(
+                digest.to_hex().as_ref(),
+                raw.finalize().to_hex().as_str()
+            );
+        }
+    }
+
+    mod fixtures {
+        use std::path::PathBuf;
+
+        use super::super::{super::Config, *};
+
+        pub(in super::super) const NAMES: [&str; 15] = [
+            "root",
+            "templates.local",
+            "templates.global",
+            "templates.output",
+            "schemas.directory",
+            "schemas.class_field",
+            "frontmatter.title",
+            "frontmatter.aliases",
+            "frontmatter.tags",
+            "frontmatter.date_created.name",
+            "frontmatter.date_created.format",
+            "frontmatter.date_modified.name",
+            "frontmatter.date_modified.format",
+            "tasks.statuses",
+            "tasks.tag_filters",
+        ];
+
+        pub(in super::super) fn base() -> Config {
+            Config::for_test(
+                PathBuf::from("/project"),
+                Some(PathBuf::from("/project/local")),
+                Some(PathBuf::from("/global")),
+                PathBuf::from("/project/out"),
+            )
+        }
+
+        /// Lists every setting digest in [`NAMES`] order.
+        pub(in super::super) fn ordered(
+            digests: &ConfigDigests,
+        ) -> [Blake3Digest; 15] {
+            let templates = digests.templates();
+            let schemas = digests.schemas();
+            let frontmatter = digests.frontmatter();
+            let tasks = digests.tasks();
+            [
+                digests.root(),
+                templates.local(),
+                templates.global(),
+                templates.output(),
+                schemas.directory(),
+                schemas.class_field(),
+                frontmatter.title(),
+                frontmatter.aliases(),
+                frontmatter.tags(),
+                frontmatter.date_created().name(),
+                frontmatter.date_created().format(),
+                frontmatter.date_modified().name(),
+                frontmatter.date_modified().format(),
+                tasks.statuses(),
+                tasks.tag_filters(),
+            ]
         }
     }
 }

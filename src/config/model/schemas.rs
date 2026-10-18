@@ -20,6 +20,27 @@ pub struct SchemasConfig {
 }
 
 impl SchemasConfig {
+    /// Returns the schema registry directory.
+    ///
+    /// Config File loading resolves a configured directory against its
+    /// Configuration Scope root, or the workspace root when unconfigured.
+    /// [`SchemasConfig::default`] retains a relative directory because it has
+    /// no workspace root.
+    #[inline]
+    #[must_use]
+    pub fn directory(&self) -> &Path {
+        &self.directory
+    }
+
+    /// Returns the frontmatter key for a note's file class.
+    ///
+    /// Defaults to `class` when unconfigured.
+    #[inline]
+    #[must_use]
+    pub fn class_field_name(&self) -> &str {
+        self.class_field.as_str()
+    }
+
     /// Assembles validated schema settings from resolved values.
     ///
     /// Requires `directory` to have been resolved against its Configuration
@@ -36,25 +57,18 @@ impl SchemasConfig {
         }
     }
 
-    /// Returns the frontmatter key for a note's file class.
-    ///
-    /// Defaults to `class` when unconfigured.
-    #[inline]
-    #[must_use]
-    pub fn class_field_name(&self) -> &str {
-        self.class_field.as_str()
-    }
-
-    /// Returns the schema registry directory.
-    ///
-    /// Config File loading resolves a configured directory against its
-    /// Configuration Scope root, or the workspace root when unconfigured.
-    /// [`SchemasConfig::default`] retains a relative directory because it has
-    /// no workspace root.
-    #[inline]
-    #[must_use]
-    pub fn directory(&self) -> &Path {
-        &self.directory
+    /// Digests the schema registry directory and the class field.
+    pub(super) fn digests(&self) -> SchemaDigests {
+        let Self {
+            directory,
+            class_field,
+        } = self;
+        SchemaDigests {
+            directory: setting(SCHEMAS_DIRECTORY, |fp| fp.path(directory)),
+            class_field: setting(SCHEMAS_CLASS_FIELD, |fp| {
+                class_field.feed_into(fp);
+            }),
+        }
     }
 
     /// Builds test schema settings with a validated class field.
@@ -114,7 +128,7 @@ const SCHEMAS_DIRECTORY: &[u8] = b"schemas.directory";
 const SCHEMAS_CLASS_FIELD: &[u8] = b"schemas.class_field";
 
 /// Holds the digests of [`SchemasConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SchemaDigests {
     directory: Blake3Digest,
     class_field: Blake3Digest,
@@ -138,9 +152,7 @@ impl SchemaDigests {
     pub(crate) const fn class_field(&self) -> Blake3Digest {
         self.class_field
     }
-}
 
-impl SchemaDigests {
     /// Feeds every setting digest in declaration order.
     pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
@@ -149,22 +161,6 @@ impl SchemaDigests {
         } = self;
         fp.digest(directory);
         fp.digest(class_field);
-    }
-}
-
-impl SchemasConfig {
-    /// Digests the schema registry directory and the class field.
-    pub(super) fn digests(&self) -> SchemaDigests {
-        let Self {
-            directory,
-            class_field,
-        } = self;
-        SchemaDigests {
-            directory: setting(SCHEMAS_DIRECTORY, |fp| fp.path(directory)),
-            class_field: setting(SCHEMAS_CLASS_FIELD, |fp| {
-                class_field.feed_into(fp);
-            }),
-        }
     }
 }
 

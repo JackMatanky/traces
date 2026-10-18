@@ -54,6 +54,24 @@ impl TemplateConfig {
     pub(super) fn output(&self) -> &Path {
         &self.output
     }
+
+    /// Digests the Template Directories and the output directory.
+    pub(super) fn digests(&self) -> TemplateDigests {
+        let Self {
+            local,
+            global,
+            output,
+        } = self;
+        TemplateDigests {
+            local: setting(TEMPLATES_LOCAL, |fp| {
+                fp.optional_path(local.as_deref());
+            }),
+            global: setting(TEMPLATES_GLOBAL, |fp| {
+                fp.optional_path(global.as_deref());
+            }),
+            output: setting(TEMPLATES_OUTPUT, |fp| fp.path(output)),
+        }
+    }
 }
 
 const TEMPLATES_LOCAL: &[u8] = b"templates.local";
@@ -61,7 +79,7 @@ const TEMPLATES_GLOBAL: &[u8] = b"templates.global";
 const TEMPLATES_OUTPUT: &[u8] = b"templates.output";
 
 /// Holds the digests of [`TemplateConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TemplateDigests {
     local: Blake3Digest,
     global: Blake3Digest,
@@ -93,9 +111,7 @@ impl TemplateDigests {
     pub(crate) const fn output(&self) -> Blake3Digest {
         self.output
     }
-}
 
-impl TemplateDigests {
     /// Feeds every setting digest in declaration order.
     pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
@@ -106,26 +122,6 @@ impl TemplateDigests {
         fp.digest(local);
         fp.digest(global);
         fp.digest(output);
-    }
-}
-
-impl TemplateConfig {
-    /// Digests the Template Directories and the output directory.
-    pub(super) fn digests(&self) -> TemplateDigests {
-        let Self {
-            local,
-            global,
-            output,
-        } = self;
-        TemplateDigests {
-            local: setting(TEMPLATES_LOCAL, |fp| {
-                fp.optional_path(local.as_deref());
-            }),
-            global: setting(TEMPLATES_GLOBAL, |fp| {
-                fp.optional_path(global.as_deref());
-            }),
-            output: setting(TEMPLATES_OUTPUT, |fp| fp.path(output)),
-        }
     }
 }
 

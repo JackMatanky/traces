@@ -11,29 +11,30 @@
 //! - [`SchemasConfig`]: schema registry and class field.
 //! - [`FrontmatterConfig`]: canonical metadata key names and date fields.
 //! - [`TaskConfig`]: Task Configuration statuses and tag filters.
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
-use super::error::ConfigValueError;
-use crate::{
-    Blake3Digest,
-    path::{PathError, RelativePath, SafeRelativePath},
-};
-
 mod digest;
 mod frontmatter;
 mod schemas;
 mod tasks;
 mod templates;
 
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+use digest::{ConfigDigests, setting};
 pub use frontmatter::FrontmatterConfig;
 pub use schemas::SchemasConfig;
 pub(super) use schemas::{DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR};
 pub use tasks::TaskConfig;
 pub(crate) use templates::DEFAULT_LOCAL_TEMPLATES_DIR;
 pub(super) use templates::TemplateConfig;
+
+use super::error::ConfigValueError;
+use crate::{
+    Blake3Digest,
+    path::{PathError, RelativePath, SafeRelativePath},
+};
 
 /// Holds resolved Config File values after the discovery, read, trust and value
 /// stages.
@@ -133,6 +134,50 @@ impl Config {
         Arc::from(self.schemas().class_field_name())
     }
 
+    /// Computes the Config Fingerprint: every setting digest of
+    /// [`Config::digests`] composed under `b"traces.config.v1"`.
+    ///
+    /// Persisted fingerprints support index cache invalidation across process
+    /// restarts, so the encoding is pinned by tests; see the `digest` module
+    /// for the framing.
+    #[inline]
+    #[must_use]
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "no current caller outside tests; reserved for future \
+                      index cache invalidation"
+        )
+    )]
+    pub(crate) fn hash(&self) -> Blake3Digest {
+        self.digests().compose()
+    }
+
+    /// Digests every resolved setting separately.
+    ///
+    /// Each digest starts with its section-qualified label, so a stored digest
+    /// names the setting it covers. [`ConfigDigests::compose`] folds them into
+    /// the Config Fingerprint.
+    #[inline]
+    #[must_use]
+    pub(crate) fn digests(&self) -> ConfigDigests {
+        let Self {
+            root,
+            templates,
+            schemas,
+            frontmatter,
+            tasks,
+        } = self;
+        ConfigDigests::new(
+            setting(b"root", |fp| fp.path(root)),
+            templates.digests(),
+            schemas.digests(),
+            frontmatter.digests(),
+            tasks.digests(),
+        )
+    }
+
     /// Builds a resolved configuration without Config File discovery for tests.
     ///
     /// Use [`super::service::ConfigService::at`] with TOML fixtures to test the
@@ -213,26 +258,6 @@ impl Config {
     pub fn with_schemas(mut self, schemas: SchemasConfig) -> Self {
         self.schemas = schemas;
         self
-    }
-
-    /// Computes the Config Fingerprint: every setting digest of
-    /// [`Config::digests`] composed under `b"traces.config.v1"`.
-    ///
-    /// Persisted fingerprints support index cache invalidation across process
-    /// restarts, so the encoding is pinned by tests; see the `digest` module
-    /// for the framing.
-    #[inline]
-    #[must_use]
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "no current caller outside tests; reserved for future \
-                      index cache invalidation"
-        )
-    )]
-    pub(crate) fn hash(&self) -> Blake3Digest {
-        self.digests().compose()
     }
 }
 

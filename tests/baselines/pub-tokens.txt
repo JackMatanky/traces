@@ -137,6 +137,7 @@ src/config/model.rs: pub use frontmatter::FrontmatterConfig;
 src/config/model.rs: pub use schemas::SchemasConfig;
 src/config/model.rs: pub use tasks::TaskConfig;
 src/config/model.rs: pub(crate) fn class_field_arc(&self) -> Arc<str> {
+src/config/model.rs: pub(crate) fn digests(&self) -> ConfigDigests {
 src/config/model.rs: pub(crate) fn hash(&self) -> Blake3Digest {
 src/config/model.rs: pub(crate) fn resolve(
 src/config/model.rs: pub(crate) fn resolve_against(
@@ -153,11 +154,11 @@ src/config/model/digest.rs: pub(crate) const fn schemas(&self) -> SchemaDigests 
 src/config/model/digest.rs: pub(crate) const fn tasks(&self) -> TaskDigests {
 src/config/model/digest.rs: pub(crate) const fn templates(&self) -> TemplateDigests {
 src/config/model/digest.rs: pub(crate) fn compose(&self) -> Blake3Digest {
-src/config/model/digest.rs: pub(crate) fn digests(&self) -> ConfigDigests {
 src/config/model/digest.rs: pub(crate) struct ConfigDigests {
 src/config/model/digest.rs: pub(in super::super) const NAMES: [&str; 15] = [
 src/config/model/digest.rs: pub(in super::super) fn base() -> Config {
 src/config/model/digest.rs: pub(in super::super) fn ordered(
+src/config/model/digest.rs: pub(super) const fn new(
 src/config/model/digest.rs: pub(super) fn setting<F>(label: &[u8], feed: F) -> Blake3Digest
 src/config/model/frontmatter.rs: pub const fn date_created(&self) -> &DateFieldConfig {
 src/config/model/frontmatter.rs: pub const fn date_modified(&self) -> &DateFieldConfig {

@@ -18,13 +18,6 @@ pub struct TaskConfig {
 }
 
 impl TaskConfig {
-    /// Returns the task status lookup map used by the parser.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn statuses(&self) -> &TaskStatusMap {
-        &self.statuses
-    }
-
     /// Returns the configured task tag filters.
     ///
     /// An empty list accepts every status-marked list item as a task.
@@ -32,6 +25,50 @@ impl TaskConfig {
     #[must_use]
     pub fn tag_filters(&self) -> &[Tag] {
         &self.tag_filters
+    }
+
+    /// Returns the task status lookup map used by the parser.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn statuses(&self) -> &TaskStatusMap {
+        &self.statuses
+    }
+
+    /// Digests the task statuses and tag filters.
+    ///
+    /// Statuses enter in symbol order so map iteration order never leaks;
+    /// filters enter in configured order.
+    pub(super) fn digests(&self) -> TaskDigests {
+        let Self {
+            statuses,
+            tag_filters,
+        } = self;
+        TaskDigests {
+            statuses: setting(TASKS_STATUSES, |fp| {
+                let mut ordered: Vec<&TaskStatus> = statuses.iter().collect();
+                ordered
+                    .sort_unstable_by_key(|status| status.symbol().as_char());
+                fp.len(ordered.len());
+                for status in ordered {
+                    let mut symbol = [0_u8; 4];
+                    fp.bytes(
+                        status
+                            .symbol()
+                            .as_char()
+                            .encode_utf8(&mut symbol)
+                            .as_bytes(),
+                    );
+                    fp.bytes(status.name().as_bytes());
+                    fp.bytes(status.kind().as_str().as_bytes());
+                }
+            }),
+            tag_filters: setting(TASKS_TAG_FILTERS, |fp| {
+                fp.len(tag_filters.len());
+                for tag in tag_filters {
+                    fp.bytes(tag.as_str().as_bytes());
+                }
+            }),
+        }
     }
 
     /// Builds test Task Configuration with custom tag filters.
@@ -133,7 +170,7 @@ const TASKS_STATUSES: &[u8] = b"tasks.statuses";
 const TASKS_TAG_FILTERS: &[u8] = b"tasks.tag_filters";
 
 /// Holds the digests of [`TaskConfig`] settings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TaskDigests {
     statuses: Blake3Digest,
     tag_filters: Blake3Digest,
@@ -157,9 +194,7 @@ impl TaskDigests {
     pub(crate) const fn tag_filters(&self) -> Blake3Digest {
         self.tag_filters
     }
-}
 
-impl TaskDigests {
     /// Feeds every setting digest in declaration order.
     pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
@@ -168,45 +203,6 @@ impl TaskDigests {
         } = self;
         fp.digest(statuses);
         fp.digest(tag_filters);
-    }
-}
-
-impl TaskConfig {
-    /// Digests the task statuses and tag filters.
-    ///
-    /// Statuses enter in symbol order so map iteration order never leaks;
-    /// filters enter in configured order.
-    pub(super) fn digests(&self) -> TaskDigests {
-        let Self {
-            statuses,
-            tag_filters,
-        } = self;
-        TaskDigests {
-            statuses: setting(TASKS_STATUSES, |fp| {
-                let mut ordered: Vec<&TaskStatus> = statuses.iter().collect();
-                ordered
-                    .sort_unstable_by_key(|status| status.symbol().as_char());
-                fp.len(ordered.len());
-                for status in ordered {
-                    let mut symbol = [0_u8; 4];
-                    fp.bytes(
-                        status
-                            .symbol()
-                            .as_char()
-                            .encode_utf8(&mut symbol)
-                            .as_bytes(),
-                    );
-                    fp.bytes(status.name().as_bytes());
-                    fp.bytes(status.kind().as_str().as_bytes());
-                }
-            }),
-            tag_filters: setting(TASKS_TAG_FILTERS, |fp| {
-                fp.len(tag_filters.len());
-                for tag in tag_filters {
-                    fp.bytes(tag.as_str().as_bytes());
-                }
-            }),
-        }
     }
 }
 
