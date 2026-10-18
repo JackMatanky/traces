@@ -22,6 +22,7 @@
 //! - [`IndexFingerprint`]: one digest per index-relevant setting.
 //! - [`IndexSetting`]: names one such setting for diagnosis.
 //! - [`StoredFingerprint`]: what a store holds, before comparison.
+//! - [`DriftCause`]: why a store no longer matches the running config.
 
 use std::fmt::{self, Display, Formatter};
 
@@ -100,6 +101,35 @@ impl Display for IndexSetting {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.qualified())
+    }
+}
+
+/// Explains why a stored index no longer matches the running config.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DriftCause {
+    /// These settings differ from the recorded fingerprint, in fingerprint
+    /// order.
+    Settings(Box<[IndexSetting]>),
+    /// The store holds rows but no readable fingerprint, so no setting can be
+    /// blamed.
+    Unrecorded,
+}
+
+impl Display for DriftCause {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Settings(settings) => {
+                for (position, setting) in settings.iter().enumerate() {
+                    if position > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{setting}")?;
+                }
+                Ok(())
+            }
+            Self::Unrecorded => f.write_str("no recorded fingerprint"),
+        }
     }
 }
 
@@ -187,27 +217,30 @@ impl IndexFingerprint {
         Some(Self((*digests).map(Blake3Digest::from_bytes)))
     }
 
-    /// Lists the settings whose digest differs from what `stored` records.
+    /// Explains why `stored` no longer protects the running config.
     ///
     /// Returns `None` when nothing drifted. A virgin store has no rows to
     /// protect, so it never drifts. Rows without a readable fingerprint drift
-    /// on every setting: with nothing to diff, failing closed is the only safe
-    /// answer.
+    /// with [`DriftCause::Unrecorded`]: with nothing to diff, failing closed is
+    /// the only safe answer, and no setting can honestly be blamed.
     pub(super) fn drift(
         &self,
         stored: &StoredFingerprint,
-    ) -> Option<Box<[IndexSetting]>> {
-        let changed: Box<[IndexSetting]> = match stored {
+    ) -> Option<DriftCause> {
+        let recorded = match stored {
             StoredFingerprint::Virgin => return None,
-            StoredFingerprint::Unreadable => IndexSetting::ALL.into(),
-            StoredFingerprint::Recorded(recorded) => IndexSetting::ALL
-                .into_iter()
-                .zip(self.0.iter().zip(&recorded.0))
-                .filter(|(_, (expected, recorded))| expected != recorded)
-                .map(|(setting, _)| setting)
-                .collect(),
+            StoredFingerprint::Unreadable => {
+                return Some(DriftCause::Unrecorded);
+            }
+            StoredFingerprint::Recorded(recorded) => recorded,
         };
-        (!changed.is_empty()).then_some(changed)
+        let changed: Box<[IndexSetting]> = IndexSetting::ALL
+            .into_iter()
+            .zip(self.0.iter().zip(&recorded.0))
+            .filter(|(_, (expected, recorded))| expected != recorded)
+            .map(|(setting, _)| setting)
+            .collect();
+        (!changed.is_empty()).then_some(DriftCause::Settings(changed))
     }
 
     /// Builds the fingerprint of the default test configuration.
@@ -262,10 +295,8 @@ mod tests {
             let edited = fingerprint_after(|d| edit(d, changed()));
 
             assert_eq!(
-                edited
-                    .drift(&StoredFingerprint::Recorded(Box::new(expected)))
-                    .as_deref(),
-                Some([setting].as_slice())
+                edited.drift(&StoredFingerprint::Recorded(Box::new(expected))),
+                Some(DriftCause::Settings(Box::from([setting])))
             );
         }
 
@@ -387,11 +418,11 @@ mod tests {
         }
 
         #[test]
-        fn reports_every_setting_when_the_fingerprint_is_unreadable() {
+        fn reports_an_unrecorded_fingerprint_without_naming_settings() {
             let drift = IndexFingerprint::for_test()
                 .drift(&StoredFingerprint::Unreadable);
 
-            assert_eq!(drift.as_deref(), Some(IndexSetting::ALL.as_slice()));
+            assert_eq!(drift, Some(DriftCause::Unrecorded));
         }
 
         #[test]
@@ -405,8 +436,11 @@ mod tests {
                 .drift(&StoredFingerprint::Recorded(Box::new(recorded)));
 
             assert_eq!(
-                drift.as_deref(),
-                Some([IndexSetting::Tags, IndexSetting::ClassField].as_slice())
+                drift,
+                Some(DriftCause::Settings(Box::from([
+                    IndexSetting::Tags,
+                    IndexSetting::ClassField
+                ])))
             );
         }
     }
@@ -445,6 +479,26 @@ mod tests {
             #[case] expected: &str,
         ) {
             assert_eq!(setting.to_string(), expected);
+        }
+
+        #[rstest]
+        #[case::one(
+            DriftCause::Settings(Box::from([IndexSetting::Tags])),
+            "[frontmatter] tags"
+        )]
+        #[case::several(
+            DriftCause::Settings(Box::from([
+                IndexSetting::Tags,
+                IndexSetting::ClassField
+            ])),
+            "[frontmatter] tags, [schemas] class_field"
+        )]
+        #[case::unrecorded(DriftCause::Unrecorded, "no recorded fingerprint")]
+        fn joins_the_settings_of_a_drift_cause(
+            #[case] cause: DriftCause,
+            #[case] expected: &str,
+        ) {
+            assert_eq!(cause.to_string(), expected);
         }
     }
 

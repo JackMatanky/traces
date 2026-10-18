@@ -49,7 +49,7 @@ pub(super) type StoreSnapshot =
 /// Represents a store-owned persistence request for full rebuilds and
 /// incremental refreshes.
 pub(super) struct PersistRequest<'a> {
-    dimensions: IndexDimensions,
+    dimensions: &'a IndexDimensions,
     fingerprint: &'a IndexFingerprint,
     rows: PersistRows<'a>,
 }
@@ -58,7 +58,7 @@ impl<'a> PersistRequest<'a> {
     /// Replaces every persisted row from an assembled index.
     #[inline]
     pub(super) const fn rebuild(
-        dimensions: IndexDimensions,
+        dimensions: &'a IndexDimensions,
         fingerprint: &'a IndexFingerprint,
         entries: &'a [FileEntry],
     ) -> Self {
@@ -75,7 +75,7 @@ impl<'a> PersistRequest<'a> {
     /// awaiting persistence.
     #[inline]
     pub(super) const fn incremental(
-        dimensions: IndexDimensions,
+        dimensions: &'a IndexDimensions,
         fingerprint: &'a IndexFingerprint,
         delta: &'a FileDelta,
         notes: &'a [&'a Note],
@@ -741,7 +741,7 @@ impl IndexStore {
                 entries,
             } => self.apply_rebuild(
                 entries,
-                &request.dimensions,
+                request.dimensions,
                 request.fingerprint,
             ),
             PersistRows::Incremental {
@@ -757,7 +757,7 @@ impl IndexStore {
                     "prepare_pass gates empty passes"
                 );
                 self.apply_incremental(
-                    &request.dimensions,
+                    request.dimensions,
                     request.fingerprint,
                     &IncrementalRows {
                         delta,
@@ -1681,6 +1681,7 @@ impl WriteTarget {
 }
 
 /// Manages store-owned dimensions written for tag and file-class indexes.
+#[derive(Clone, Debug)]
 pub(super) struct IndexDimensions {
     dimensions: [IndexDimension; 2],
 }
@@ -1989,7 +1990,7 @@ mod tests {
 
             store
                 .persist(&PersistRequest::rebuild(
-                    IndexDimensions::for_class_field("class"),
+                    &IndexDimensions::for_class_field("class"),
                     &newer,
                     &[],
                 ))
@@ -2013,7 +2014,7 @@ mod tests {
 
             store
                 .persist(&PersistRequest::incremental(
-                    IndexDimensions::for_class_field("class"),
+                    &IndexDimensions::for_class_field("class"),
                     &IndexFingerprint::for_test(),
                     &delta,
                     &[&note],
@@ -2131,7 +2132,7 @@ mod tests {
             links.clone(),
         );
         store.persist(&PersistRequest::rebuild(
-            IndexDimensions::for_class_field("class"),
+            &IndexDimensions::for_class_field("class"),
             &IndexFingerprint::for_test(),
             index.entries(),
         ))

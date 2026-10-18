@@ -40,7 +40,7 @@ pub struct IndexerService {
     root: PathBuf,
     tasks: TaskConfig,
     frontmatter: FrontmatterConfig,
-    class_field: String,
+    dimensions: IndexDimensions,
     fingerprint: Box<IndexFingerprint>,
 }
 
@@ -51,7 +51,9 @@ impl From<&Config> for IndexerService {
             root: config.root().to_path_buf(),
             tasks: config.tasks().clone(),
             frontmatter: config.frontmatter().clone(),
-            class_field: config.schemas().class_field_name().to_owned(),
+            dimensions: IndexDimensions::for_class_field(
+                config.schemas().class_field_name(),
+            ),
             fingerprint: Box::new(IndexFingerprint::new(&config.digests())),
         }
     }
@@ -156,9 +158,8 @@ impl IndexerService {
             RefreshState::Stale(pending) => {
                 let pending = *pending;
                 let report = pending.report();
-                let dimensions =
-                    IndexDimensions::for_class_field(&self.class_field);
-                let persisted = pending.apply(dimensions, &self.fingerprint);
+                let persisted =
+                    pending.apply(&self.dimensions, &self.fingerprint);
                 if persisted.is_ok() {
                     Self::log_report(&report);
                 }
@@ -166,12 +167,12 @@ impl IndexerService {
                 Ok((index, report))
             }
             RefreshState::Drifted {
-                changed,
+                cause,
                 index,
                 store,
             } => {
                 let report = RefreshReport::ConfigDrift {
-                    changed,
+                    cause,
                 };
                 match self.persist_into(&store, &index) {
                     Ok(()) => Self::log_report(&report),
@@ -201,11 +202,11 @@ impl IndexerService {
 
     fn prepare_pass(&self) -> IndexResult<RefreshState> {
         let mut plan = RefreshPlan::collect(&self.root, &self.fingerprint)?;
-        if let Some(changed) = plan.take_drift() {
+        if let Some(cause) = plan.take_drift() {
             let (store, files) = plan.into_scan();
             let index = self.build_from(files)?;
             return Ok(RefreshState::Drifted {
-                changed,
+                cause,
                 index,
                 store,
             });
@@ -274,9 +275,7 @@ impl IndexerService {
             } => Ok(store),
             RefreshState::Stale(pending) => {
                 let report = pending.report();
-                let dimensions =
-                    IndexDimensions::for_class_field(&self.class_field);
-                match (*pending).apply(dimensions, &self.fingerprint) {
+                match (*pending).apply(&self.dimensions, &self.fingerprint) {
                     Ok(persisted) => {
                         Self::log_report(&report);
                         Ok(persisted.into_store())
@@ -285,13 +284,13 @@ impl IndexerService {
                 }
             }
             RefreshState::Drifted {
-                changed,
+                cause,
                 index,
                 store,
             } => {
                 self.persist_into(&store, &index)?;
                 Self::log_report(&RefreshReport::ConfigDrift {
-                    changed,
+                    cause,
                 });
                 Ok(store)
             }
@@ -312,16 +311,8 @@ impl IndexerService {
                 "index refreshed"
             ),
             RefreshReport::ConfigDrift {
-                changed,
-            } => {
-                // Drift is rare, so joining the qualified names is cheap.
-                let changed = changed
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                tracing::info!(%changed, "index rebuilt after config drift");
-            }
+                cause,
+            } => tracing::info!(%cause, "index rebuilt after config drift"),
         }
     }
 
@@ -378,7 +369,7 @@ impl IndexerService {
         index: &WorkspaceIndex,
     ) -> IndexResult<()> {
         store.persist(&PersistRequest::rebuild(
-            IndexDimensions::for_class_field(&self.class_field),
+            &self.dimensions,
             &self.fingerprint,
             index.entries(),
         ))
@@ -1296,7 +1287,7 @@ mod tests {
             let links = InlinkMap::from_raw(links);
             store
                 .persist(&PersistRequest::rebuild(
-                    IndexDimensions::for_class_field("class"),
+                    &IndexDimensions::for_class_field("class"),
                     &IndexFingerprint::for_test(),
                     WorkspaceIndex::assemble(
                         SortedByPath::sorted(files),
@@ -1745,7 +1736,10 @@ mod tests {
         use super::*;
         use crate::{
             config::{Config, SchemasConfig},
-            index::{fingerprint::IndexSetting, store::IndexStore},
+            index::{
+                fingerprint::{DriftCause, IndexSetting},
+                store::IndexStore,
+            },
         };
 
         #[test]
@@ -1856,7 +1850,9 @@ mod tests {
             // Assert: drift names the setting, and the axes follow the new
             // field
             assert_eq!(report, RefreshReport::ConfigDrift {
-                changed: Box::from([IndexSetting::ClassField]),
+                cause: DriftCause::Settings(Box::from([
+                    IndexSetting::ClassField
+                ])),
             });
             let store = IndexStore::open(root).expect("open store");
             let book = store.paths_with_file_class("book").expect("read book");
@@ -1932,7 +1928,10 @@ mod tests {
         use super::*;
         use crate::{
             config::{Config, SchemasConfig},
-            index::{fingerprint::IndexSetting, store::IndexStore},
+            index::{
+                fingerprint::{DriftCause, IndexSetting},
+                store::IndexStore,
+            },
         };
 
         fn kind_config(root: &Path) -> Config {
@@ -1956,7 +1955,7 @@ mod tests {
 
         fn drift_of(setting: IndexSetting) -> RefreshReport {
             RefreshReport::ConfigDrift {
-                changed: Box::from([setting]),
+                cause: DriftCause::Settings(Box::from([setting])),
             }
         }
 
@@ -2025,7 +2024,8 @@ mod tests {
         }
 
         #[test]
-        fn reports_every_setting_when_the_stored_fingerprint_is_missing() {
+        fn reports_an_unrecorded_cause_when_the_stored_fingerprint_is_missing()
+        {
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
             let service = persisted_under_default_config(root);
@@ -2037,7 +2037,7 @@ mod tests {
                 service.refresh_with_report().expect("refresh missing key");
 
             assert_eq!(report, RefreshReport::ConfigDrift {
-                changed: IndexSetting::ALL.into(),
+                cause: DriftCause::Unrecorded,
             });
         }
 

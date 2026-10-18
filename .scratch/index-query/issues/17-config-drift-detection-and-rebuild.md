@@ -66,7 +66,9 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       as-persisted for tests/benches).
 - [x] `RefreshReport` collapses into
       `enum RefreshReport { #[default] Unchanged, FilesChanged { upserted,
-      deleted, links_modified }, ConfigDrift { changed: Box<[IndexSetting]> } }`
+      deleted, links_modified }, ConfigDrift { cause: DriftCause } }` where
+      `DriftCause` is `Settings(Box<[IndexSetting]>)` or `Unrecorded` (rows
+      without a readable fingerprint blame no setting)
       with count accessors kept as documented methods (they return 0 for
       `Unchanged` and `ConfigDrift`: a heal reports settings, not row counts);
       no file-path lists. Loses `Copy`: the test/bench comparison sites are

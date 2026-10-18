@@ -459,6 +459,7 @@ src/index/error.rs: pub enum IndexError {
 src/index/error.rs: pub type IndexResult<T> = std::result::Result<T, IndexError>;
 src/index/error.rs: pub(crate) enum StoreError {
 src/index/error.rs: pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
+src/index/fingerprint.rs: pub enum DriftCause {
 src/index/fingerprint.rs: pub enum IndexSetting {
 src/index/fingerprint.rs: pub(super) const ALL: [Self; SETTING_COUNT] = [
 src/index/fingerprint.rs: pub(super) const SETTING_COUNT: usize = 10;
@@ -488,7 +489,7 @@ src/index/inlinks.rs: pub(super) struct LinkResolver<'a> {
 src/index/mod.rs: pub struct PermissionsGuard<'a>(pub &'a Path);
 src/index/mod.rs: pub use entry::{FileEntry, WorkspaceIndex};
 src/index/mod.rs: pub use error::{IndexError, IndexResult};
-src/index/mod.rs: pub use fingerprint::IndexSetting;
+src/index/mod.rs: pub use fingerprint::{DriftCause, IndexSetting};
 src/index/mod.rs: pub use inlinks::InlinkMap;
 src/index/mod.rs: pub use refresh::RefreshReport;
 src/index/mod.rs: pub use service::IndexerService;
@@ -501,7 +502,7 @@ src/index/refresh.rs: pub const fn links_modified_count(&self) -> usize {
 src/index/refresh.rs: pub const fn upserted_count(&self) -> usize {
 src/index/refresh.rs: pub enum RefreshReport {
 src/index/refresh.rs: pub(super) const fn source(&self) -> &IndexError {
-src/index/refresh.rs: pub(super) const fn take_drift(&mut self) -> Option<Box<[IndexSetting]>> {
+src/index/refresh.rs: pub(super) const fn take_drift(&mut self) -> Option<DriftCause> {
 src/index/refresh.rs: pub(super) enum NoteScope {
 src/index/refresh.rs: pub(super) enum RefreshState {
 src/index/refresh.rs: pub(super) fn apply(

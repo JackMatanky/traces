@@ -16,7 +16,7 @@ use std::{cmp::Ordering, collections::HashSet, path::Path};
 use super::{
     IndexError, IndexResult, WorkspaceIndex,
     delta::{FileDelta, InlinkDelta},
-    fingerprint::{IndexFingerprint, IndexSetting},
+    fingerprint::{DriftCause, IndexFingerprint},
     inlinks::{self, InlinkMap},
     service::IndexerService,
     sort::SortedByPath,
@@ -44,8 +44,8 @@ pub enum RefreshReport {
     },
     /// The index was built under different config and was rebuilt in full.
     ConfigDrift {
-        /// Lists the settings whose digest differed, in fingerprint order.
-        changed: Box<[IndexSetting]>,
+        /// Explains why the stored index no longer matched the config.
+        cause: DriftCause,
     },
 }
 
@@ -124,8 +124,8 @@ pub(super) enum RefreshState {
     /// memory from the plan's own scan, and `store` is the plan's handle, ready
     /// for the heal to rewrite.
     Drifted {
-        /// Lists the settings whose digest differed from the stored one.
-        changed: Box<[IndexSetting]>,
+        /// Explains why the stored index no longer matched the config.
+        cause: DriftCause,
         /// Holds the index rebuilt from the plan's scan.
         index: WorkspaceIndex,
         /// Holds the plan's open store, the only handle redb allows.
@@ -153,7 +153,7 @@ impl PendingApply {
     /// exactly the rows that failed to persist.
     pub(super) fn apply(
         self,
-        dimensions: IndexDimensions,
+        dimensions: &IndexDimensions,
         fingerprint: &IndexFingerprint,
     ) -> Result<Persisted, PersistFailed> {
         let result = {
@@ -313,7 +313,7 @@ pub(super) struct RefreshPlan {
     current_files: SortedByPath<FileMeta>,
     persisted_files: SortedByPath<FileMeta>,
     delta: FileDelta,
-    drift: Option<Box<[IndexSetting]>>,
+    drift: Option<DriftCause>,
 }
 
 impl RefreshPlan {
@@ -359,7 +359,7 @@ impl RefreshPlan {
     /// Takes the settings that drifted, or `None` if the store matches the
     /// running config.
     #[inline]
-    pub(super) const fn take_drift(&mut self) -> Option<Box<[IndexSetting]>> {
+    pub(super) const fn take_drift(&mut self) -> Option<DriftCause> {
         self.drift.take()
     }
 

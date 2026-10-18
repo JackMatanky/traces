@@ -44,8 +44,9 @@ wins over staleness; a virgin store never drifts.
 
 What one refresh found, as one of three variants: `Unchanged` for a `Fresh`
 RefreshState, `FilesChanged` with the changed-file and changed-link counts for a
-`Stale` one, or `ConfigDrift` naming the settings that changed for a `Drifted`
-one. A heal reports settings, never row counts.
+`Stale` one, or `ConfigDrift` carrying the drift cause for a `Drifted` one: the
+settings that changed, or `Unrecorded` when the store holds rows but no
+readable fingerprint. A heal reports its cause, never row counts.
 *Avoid*: sync report, update result, refresh outcome
 
 #### Index Fingerprint

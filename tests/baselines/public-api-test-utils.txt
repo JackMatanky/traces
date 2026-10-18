@@ -335,6 +335,68 @@ impl<T> either::into_either::IntoEither for traces::testing::CommitPolicy
 impl<T> tracing::instrument::Instrument for traces::testing::CommitPolicy
 impl<T> tracing::instrument::WithSubscriber for traces::testing::CommitPolicy
 impl<T> yoke::erased::ErasedDestructor for traces::testing::CommitPolicy where T: 'static
+pub enum traces::testing::DriftCause
+pub traces::testing::DriftCause::Settings(alloc::boxed::Box<[traces::testing::IndexSetting]>)
+pub traces::testing::DriftCause::Unrecorded
+impl core::clone::Clone for traces::testing::DriftCause
+pub fn traces::testing::DriftCause::clone(&self) -> Self
+impl core::cmp::Eq for traces::testing::DriftCause
+impl core::cmp::PartialEq for traces::testing::DriftCause
+pub fn traces::testing::DriftCause::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces::testing::DriftCause
+pub fn traces::testing::DriftCause::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces::testing::DriftCause
+pub fn traces::testing::DriftCause::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces::testing::DriftCause
+impl core::marker::Freeze for traces::testing::DriftCause
+impl core::marker::Send for traces::testing::DriftCause
+impl core::marker::Sync for traces::testing::DriftCause
+impl core::marker::Unpin for traces::testing::DriftCause
+impl core::marker::UnsafeUnpin for traces::testing::DriftCause
+impl core::panic::unwind_safe::RefUnwindSafe for traces::testing::DriftCause
+impl core::panic::unwind_safe::UnwindSafe for traces::testing::DriftCause
+impl<D> owo_colors::OwoColorize for traces::testing::DriftCause
+impl<Q, K> equivalent::Equivalent<K> for traces::testing::DriftCause where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces::testing::DriftCause::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces::testing::DriftCause where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces::testing::DriftCause::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces::testing::DriftCause where U: core::convert::From<T>
+pub fn traces::testing::DriftCause::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces::testing::DriftCause where U: core::convert::Into<T>
+pub type traces::testing::DriftCause::Error = never
+pub fn traces::testing::DriftCause::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces::testing::DriftCause where U: core::convert::TryFrom<T>
+pub type traces::testing::DriftCause::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces::testing::DriftCause::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces::testing::DriftCause where T: core::clone::Clone
+pub type traces::testing::DriftCause::Owned = T
+pub fn traces::testing::DriftCause::clone_into(&self, &mut T)
+pub fn traces::testing::DriftCause::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces::testing::DriftCause where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces::testing::DriftCause::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces::testing::DriftCause where T: 'static + ?core::marker::Sized
+pub fn traces::testing::DriftCause::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces::testing::DriftCause where T: ?core::marker::Sized
+pub fn traces::testing::DriftCause::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces::testing::DriftCause where T: ?core::marker::Sized
+pub fn traces::testing::DriftCause::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces::testing::DriftCause where T: core::clone::Clone
+pub unsafe fn traces::testing::DriftCause::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces::testing::DriftCause
+pub fn traces::testing::DriftCause::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces::testing::DriftCause
+pub type traces::testing::DriftCause::Init = T
+pub const traces::testing::DriftCause::ALIGN: usize
+pub unsafe fn traces::testing::DriftCause::deref<'a>(usize) -> &'a T
+pub unsafe fn traces::testing::DriftCause::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces::testing::DriftCause::drop(usize)
+pub unsafe fn traces::testing::DriftCause::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces::testing::DriftCause where T: core::clone::Clone
+pub fn traces::testing::DriftCause::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces::testing::DriftCause
+impl<T> tracing::instrument::Instrument for traces::testing::DriftCause
+impl<T> tracing::instrument::WithSubscriber for traces::testing::DriftCause
+impl<T> yoke::erased::ErasedDestructor for traces::testing::DriftCause where T: 'static
 pub enum traces::testing::FileFormat
 pub traces::testing::FileFormat::Note
 pub traces::testing::FileFormat::Other
@@ -538,7 +600,7 @@ impl<T> tracing::instrument::WithSubscriber for traces::testing::QueryBuilderErr
 impl<T> yoke::erased::ErasedDestructor for traces::testing::QueryBuilderError where T: 'static
 pub enum traces::testing::RefreshReport
 pub traces::testing::RefreshReport::ConfigDrift
-pub traces::testing::RefreshReport::ConfigDrift::changed: alloc::boxed::Box<[traces::testing::IndexSetting]>
+pub traces::testing::RefreshReport::ConfigDrift::cause: traces::testing::DriftCause
 pub traces::testing::RefreshReport::FilesChanged
 pub traces::testing::RefreshReport::FilesChanged::deleted: usize
 pub traces::testing::RefreshReport::FilesChanged::links_modified: usize

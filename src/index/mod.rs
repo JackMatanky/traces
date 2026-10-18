@@ -35,7 +35,7 @@ pub(crate) use entry::RowIndex;
 pub use entry::{FileEntry, WorkspaceIndex};
 pub use error::{IndexError, IndexResult};
 #[cfg(any(test, feature = "test-utils"))]
-pub use fingerprint::IndexSetting;
+pub use fingerprint::{DriftCause, IndexSetting};
 #[cfg(any(test, feature = "test-utils"))]
 pub use inlinks::InlinkMap;
 #[cfg(any(test, feature = "test-utils"))]

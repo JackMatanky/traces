@@ -186,8 +186,8 @@ pub mod testing {
         file::FileFormat,
         hash::{Blake3Digest, Blake3PathHash},
         index::{
-            FileEntry, IndexSetting, IndexerService, InlinkMap, RefreshReport,
-            WorkspaceIndex,
+            DriftCause, FileEntry, IndexSetting, IndexerService, InlinkMap,
+            RefreshReport, WorkspaceIndex,
         },
         path::codec as path_codec,
         query::{
