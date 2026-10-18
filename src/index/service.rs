@@ -6,6 +6,8 @@
 //! `refresh` and `refresh_store` share one incremental core: content-only
 //! deltas patch inbound links from touched notes, while path-set changes force
 //! a full recompute because wikilink resolution depends on every indexed path.
+//! A store built under different index-relevant config is rebuilt in full
+//! instead, reusing the refresh's own scan and store handle.
 
 use std::path::{Path, PathBuf};
 
@@ -13,6 +15,7 @@ use rayon::prelude::*;
 
 use super::{
     INDEX_FILE, IndexError, IndexResult, WorkspaceIndex,
+    fingerprint::IndexFingerprint,
     inlinks::{InlinkMap, LinkResolver},
     refresh::{RefreshPlan, RefreshReport, RefreshState},
     sort::SortedByPath,
@@ -30,13 +33,15 @@ use crate::{
 ///
 /// `refresh` returns a full [`WorkspaceIndex`] and logs persist failures;
 /// `refresh_store` keeps only the persisted store current and propagates
-/// persist failures because it has no in-memory fallback.
+/// persist failures because it has no in-memory fallback. Both rebuild the
+/// index when the config it was built under has drifted.
 #[derive(Clone, Debug)]
 pub struct IndexerService {
     root: PathBuf,
     tasks: TaskConfig,
     frontmatter: FrontmatterConfig,
     class_field: String,
+    fingerprint: Box<IndexFingerprint>,
 }
 
 impl From<&Config> for IndexerService {
@@ -47,6 +52,7 @@ impl From<&Config> for IndexerService {
             tasks: config.tasks().clone(),
             frontmatter: config.frontmatter().clone(),
             class_field: config.schemas().class_field_name().to_owned(),
+            fingerprint: Box::new(IndexFingerprint::new(&config.digests())),
         }
     }
 }
@@ -72,7 +78,19 @@ impl IndexerService {
     ///   project-relative path.
     #[inline]
     pub fn build(&self) -> IndexResult<WorkspaceIndex> {
-        let files = SortedByPath::assumed_sorted(Self::scan(&self.root)?);
+        self.build_from(SortedByPath::assumed_sorted(Self::scan(&self.root)?))
+    }
+
+    /// Parses `files` and assembles the [`WorkspaceIndex`] they describe.
+    ///
+    /// # Errors
+    ///
+    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
+    ///   as UTF-8.
+    fn build_from(
+        &self,
+        files: SortedByPath<FileMeta>,
+    ) -> IndexResult<WorkspaceIndex> {
         let (notes_res, resolver) = rayon::join(
             || self.parse_notes(files.as_slice()),
             || LinkResolver::new(files.as_slice()),
@@ -88,6 +106,11 @@ impl IndexerService {
     /// Unchanged Markdown notes reuse persisted parses; changed notes are
     /// parsed from disk; deleted files vanish with the fresh scan. Persist
     /// failures are logged and the refreshed in-memory index is still returned.
+    ///
+    /// An index built under different index-relevant config is rebuilt in
+    /// full, so a config edit heals on the next refresh. A failed heal is
+    /// logged and leaves the stored fingerprint stale, so the next refresh
+    /// heals again.
     ///
     /// Inlinks are patched only for content-only deltas. Any added, deleted, or
     /// renamed path forces a full recompute because an unedited note's resolved
@@ -109,7 +132,7 @@ impl IndexerService {
         Ok(index)
     }
 
-    /// Refreshes the persisted index and returns changed-row counts.
+    /// Refreshes the persisted index and reports what changed.
     ///
     /// # Errors
     ///
@@ -135,11 +158,28 @@ impl IndexerService {
                 let report = pending.report();
                 let dimensions =
                     IndexDimensions::for_class_field(&self.class_field);
-                let persisted = pending.apply(dimensions);
+                let persisted = pending.apply(dimensions, &self.fingerprint);
                 if persisted.is_ok() {
                     Self::log_report(&report);
                 }
                 let index = super::materialize_apply(persisted)?;
+                Ok((index, report))
+            }
+            RefreshState::Drifted {
+                changed,
+                index,
+                store,
+            } => {
+                let report = RefreshReport::ConfigDrift {
+                    changed,
+                };
+                match self.persist_into(&store, &index) {
+                    Ok(()) => Self::log_report(&report),
+                    Err(error) => tracing::warn!(
+                        source = %error,
+                        "failed to persist rebuilt index"
+                    ),
+                }
                 Ok((index, report))
             }
         }
@@ -160,7 +200,16 @@ impl IndexerService {
     }
 
     fn prepare_pass(&self) -> IndexResult<RefreshState> {
-        let plan = RefreshPlan::collect(&self.root)?;
+        let mut plan = RefreshPlan::collect(&self.root, &self.fingerprint)?;
+        if let Some(changed) = plan.take_drift() {
+            let (store, files) = plan.into_scan();
+            let index = self.build_from(files)?;
+            return Ok(RefreshState::Drifted {
+                changed,
+                index,
+                store,
+            });
+        }
         if plan.is_fresh() {
             return Ok(plan.into_fresh());
         }
@@ -226,7 +275,7 @@ impl IndexerService {
                 let report = pending.report();
                 let dimensions =
                     IndexDimensions::for_class_field(&self.class_field);
-                match (*pending).apply(dimensions) {
+                match (*pending).apply(dimensions, &self.fingerprint) {
                     Ok(persisted) => {
                         Self::log_report(&report);
                         Ok(persisted.into_store())
@@ -234,16 +283,40 @@ impl IndexerService {
                     Err(failed) => Err(failed.into_error()),
                 }
             }
+            RefreshState::Drifted {
+                changed,
+                index,
+                store,
+            } => {
+                self.persist_into(&store, &index)?;
+                Self::log_report(&RefreshReport::ConfigDrift {
+                    changed,
+                });
+                Ok(store)
+            }
         }
     }
 
     fn log_report(report: &RefreshReport) {
-        tracing::debug!(
-            upserted = report.upserted_count(),
-            deleted = report.deleted_count(),
-            links_modified = report.links_modified_count(),
-            "index refreshed"
-        );
+        match report {
+            RefreshReport::Unchanged => {}
+            RefreshReport::FilesChanged {
+                upserted,
+                deleted,
+                links_modified,
+            } => tracing::debug!(
+                upserted,
+                deleted,
+                links_modified,
+                "index refreshed"
+            ),
+            RefreshReport::ConfigDrift {
+                changed,
+            } => tracing::info!(
+                changed = ?changed,
+                "index rebuilt after config drift"
+            ),
+        }
     }
 
     /// Parses every Markdown-classified file in `files` in parallel, stopping
@@ -284,8 +357,23 @@ impl IndexerService {
     ///   created, the transaction fails, or a row cannot be encoded.
     #[inline]
     pub fn persist(&self, index: &WorkspaceIndex) -> IndexResult<()> {
-        IndexStore::open(&self.root)?.persist(&PersistRequest::rebuild(
+        self.persist_into(&IndexStore::open(&self.root)?, index)
+    }
+
+    /// Replaces every row of `store` with `index` under this service's config.
+    ///
+    /// # Errors
+    ///
+    /// - [`IndexError::Store`] if the transaction fails or a row cannot be
+    ///   encoded.
+    fn persist_into(
+        &self,
+        store: &IndexStore,
+        index: &WorkspaceIndex,
+    ) -> IndexResult<()> {
+        store.persist(&PersistRequest::rebuild(
             IndexDimensions::for_class_field(&self.class_field),
+            &self.fingerprint,
             index.entries(),
         ))
     }
@@ -1203,6 +1291,7 @@ mod tests {
             store
                 .persist(&PersistRequest::rebuild(
                     IndexDimensions::for_class_field("class"),
+                    &IndexFingerprint::for_test(),
                     WorkspaceIndex::assemble(
                         SortedByPath::sorted(files),
                         SortedByPath::sorted(notes),
@@ -1650,7 +1739,7 @@ mod tests {
         use super::*;
         use crate::{
             config::{Config, SchemasConfig},
-            index::store::IndexStore,
+            index::{fingerprint::IndexSetting, store::IndexStore},
         };
 
         #[test]
@@ -1733,21 +1822,11 @@ mod tests {
             assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
         }
 
-        /// Regression (ticket 04, ruled correct-as-designed): executes the
-        /// Fresh arm of `refresh_with_report` — file metadata unchanged — and
-        /// asserts persisted selector axes are served unchanged when the
-        /// config's `class_field` differs from the one the index was built
-        /// under. Defect class: unwitnessed freshness contract.
-        ///
-        /// Executes-vs-asserts: the seam executes the real metadata
-        /// fingerprint comparison and Fresh-arm assembly; only derived-row
-        /// outcomes are asserted. The E2E staleness recipe (edit config →
-        /// re-trust → query stale rows) is deliberately asserted nowhere —
-        /// it would pin behavior ticket 04 left to the healing contract
-        /// (`traces index`).
+        /// A `class_field` edit leaves file metadata untouched, yet the next
+        /// refresh detects the drift, rebuilds, and re-derives the class axes
+        /// under the new field with no `traces index`.
         #[test]
-        fn fresh_refresh_serves_persisted_class_axes_unchanged_when_class_field_config_changes()
-         {
+        fn refresh_heals_class_axes_when_class_field_config_changes() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -1768,15 +1847,17 @@ mod tests {
                 .refresh_with_report()
                 .expect("refresh with report");
 
-            // Assert: Fresh arm — zero rows touched, old-field axis intact,
-            // new-field value never derived
-            assert_eq!(report, RefreshReport::default());
+            // Assert: drift names the setting, and the axes follow the new
+            // field
+            assert_eq!(report, RefreshReport::ConfigDrift {
+                changed: Box::from([IndexSetting::ClassField]),
+            });
             let store = IndexStore::open(root).expect("open store");
             let book = store.paths_with_file_class("book").expect("read book");
-            assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
+            assert_eq!(book.as_ref(), <&[PathBuf]>::default());
             let novel =
                 store.paths_with_file_class("novel").expect("read novel");
-            assert_eq!(novel.as_ref(), <&[PathBuf]>::default());
+            assert_eq!(novel.as_ref(), [PathBuf::from("a.md")]);
         }
 
         #[rstest]
@@ -1833,6 +1914,140 @@ mod tests {
             let index = service.build().expect("build index");
             service.persist(&index).expect("persist index");
 
+            let store = IndexStore::open(root).expect("open store");
+            let book = store.paths_with_file_class("book").expect("read book");
+            assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
+        }
+    }
+
+    mod config_drift {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        use crate::{
+            config::{Config, SchemasConfig},
+            index::{fingerprint::IndexSetting, store::IndexStore},
+        };
+
+        fn kind_config(root: &Path) -> Config {
+            Config::test_default(root.to_path_buf())
+                .with_schemas(SchemasConfig::for_test("kind"))
+        }
+
+        /// Persists an index of one classed note built under the default
+        /// config.
+        fn persisted_under_default_config(root: &Path) -> IndexerService {
+            fs::write(
+                root.join("a.md"),
+                "---\nclass: Book\nkind: Novel\n---\n# A",
+            )
+            .expect("write a");
+            let service = IndexerService::for_tests(root);
+            let index = service.build().expect("build index");
+            service.persist(&index).expect("persist index");
+            service
+        }
+
+        fn drift_of(setting: IndexSetting) -> RefreshReport {
+            RefreshReport::ConfigDrift {
+                changed: Box::from([setting]),
+            }
+        }
+
+        #[test]
+        fn reports_unchanged_on_the_refresh_after_the_heal() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            persisted_under_default_config(root);
+            let service = IndexerService::from(&kind_config(root));
+            service.refresh_with_report().expect("healing refresh");
+
+            let (_, report) =
+                service.refresh_with_report().expect("refresh after heal");
+
+            assert_eq!(report, RefreshReport::Unchanged);
+        }
+
+        #[test]
+        fn lets_drift_win_over_file_changes() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            persisted_under_default_config(root);
+            fs::write(root.join("b.md"), "---\nkind: Movie\n---\n# B")
+                .expect("write b");
+
+            let (index, report) = IndexerService::from(&kind_config(root))
+                .refresh_with_report()
+                .expect("refresh with drift and a new file");
+
+            assert_eq!(report, drift_of(IndexSetting::ClassField));
+            assert_eq!(index.entries().len(), 2);
+            let store = IndexStore::open(root).expect("open store");
+            let movie =
+                store.paths_with_file_class("movie").expect("read movie");
+            assert_eq!(movie.as_ref(), [PathBuf::from("b.md")]);
+        }
+
+        #[test]
+        fn reports_the_first_build_into_a_virgin_store_as_a_file_change() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            fs::write(root.join("a.md"), "# A").expect("write a");
+
+            let (_, report) = IndexerService::for_tests(root)
+                .refresh_with_report()
+                .expect("first build");
+
+            assert_eq!(report, RefreshReport::FilesChanged {
+                upserted: 1,
+                deleted: 0,
+                links_modified: 0,
+            });
+        }
+
+        #[test]
+        fn reports_every_setting_when_the_stored_fingerprint_is_missing() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            let service = persisted_under_default_config(root);
+            IndexStore::open(root)
+                .expect("open store")
+                .write_fingerprint_bytes(None);
+
+            let (_, report) =
+                service.refresh_with_report().expect("refresh missing key");
+
+            assert_eq!(report, RefreshReport::ConfigDrift {
+                changed: IndexSetting::ALL.into(),
+            });
+        }
+
+        #[test]
+        fn heals_the_store_for_callers_that_read_it_directly() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            persisted_under_default_config(root);
+
+            let store = IndexerService::from(&kind_config(root))
+                .refresh_store()
+                .expect("refresh store with drift");
+
+            let novel =
+                store.paths_with_file_class("novel").expect("read novel");
+            assert_eq!(novel.as_ref(), [PathBuf::from("a.md")]);
+        }
+
+        #[test]
+        fn leaves_the_stored_index_as_persisted_for_load() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            persisted_under_default_config(root);
+
+            let loaded = IndexerService::from(&kind_config(root))
+                .load()
+                .expect("load under changed config");
+
+            assert_eq!(loaded.entries().len(), 1);
             let store = IndexStore::open(root).expect("open store");
             let book = store.paths_with_file_class("book").expect("read book");
             assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);

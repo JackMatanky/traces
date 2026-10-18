@@ -113,7 +113,7 @@ src/config/mod.rs: pub(crate) use builder::ConfigBuilder;
 src/config/mod.rs: pub(crate) use error::{
 src/config/mod.rs: pub(crate) use file::LocalConfigFile;
 src/config/mod.rs: pub(crate) use file::{LOCAL_CONFIG_DIR, LOCAL_CONFIG_FILE};
-src/config/mod.rs: pub(crate) use model::{ConfigSubDir, DEFAULT_LOCAL_TEMPLATES_DIR};
+src/config/mod.rs: pub(crate) use model::{
 src/config/mod.rs: pub(crate) use raw::{RawConfig, RawTemplateConfig};
 src/config/mod.rs: pub(crate) use tracker::TrackerStore;
 src/config/mod.rs: pub(crate) use trust::ConfigTrustStatus;
@@ -143,18 +143,22 @@ src/config/model.rs: pub(crate) fn resolve(
 src/config/model.rs: pub(crate) fn resolve_against(
 src/config/model.rs: pub(crate) fn root_arc(&self) -> Arc<Path> {
 src/config/model.rs: pub(crate) struct ConfigSubDir(RelativePath);
+src/config/model.rs: pub(crate) use digest::ConfigDigests;
+src/config/model.rs: pub(crate) use frontmatter::{DateFieldDigests, FrontmatterDigests};
+src/config/model.rs: pub(crate) use schemas::SchemaDigests;
+src/config/model.rs: pub(crate) use tasks::TaskDigests;
 src/config/model.rs: pub(crate) use templates::DEFAULT_LOCAL_TEMPLATES_DIR;
 src/config/model.rs: pub(super) fn from_raw_or_default(
 src/config/model.rs: pub(super) fn new(
 src/config/model.rs: pub(super) use schemas::{DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR};
 src/config/model.rs: pub(super) use templates::TemplateConfig;
-src/config/model/digest.rs: pub(crate) const fn frontmatter(&self) -> FrontmatterDigests {
-src/config/model/digest.rs: pub(crate) const fn root(&self) -> Blake3Digest {
-src/config/model/digest.rs: pub(crate) const fn schemas(&self) -> SchemaDigests {
-src/config/model/digest.rs: pub(crate) const fn tasks(&self) -> TaskDigests {
-src/config/model/digest.rs: pub(crate) const fn templates(&self) -> TemplateDigests {
 src/config/model/digest.rs: pub(crate) fn compose(&self) -> Blake3Digest {
+src/config/model/digest.rs: pub(crate) frontmatter: FrontmatterDigests,
+src/config/model/digest.rs: pub(crate) root: Blake3Digest,
+src/config/model/digest.rs: pub(crate) schemas: SchemaDigests,
 src/config/model/digest.rs: pub(crate) struct ConfigDigests {
+src/config/model/digest.rs: pub(crate) tasks: TaskDigests,
+src/config/model/digest.rs: pub(crate) templates: TemplateDigests,
 src/config/model/digest.rs: pub(in super::super) const NAMES: [&str; 15] = [
 src/config/model/digest.rs: pub(in super::super) fn base() -> Config {
 src/config/model/digest.rs: pub(in super::super) fn ordered(
@@ -171,23 +175,23 @@ src/config/model/frontmatter.rs: pub fn title_name(&self) -> &str {
 src/config/model/frontmatter.rs: pub fn with_tags_name<T: Into<String>>(mut self, tags: T) -> Self {
 src/config/model/frontmatter.rs: pub struct DateFieldConfig {
 src/config/model/frontmatter.rs: pub struct FrontmatterConfig {
-src/config/model/frontmatter.rs: pub(crate) const fn aliases(&self) -> Blake3Digest {
-src/config/model/frontmatter.rs: pub(crate) const fn date_created(&self) -> DateFieldDigests {
-src/config/model/frontmatter.rs: pub(crate) const fn date_modified(&self) -> DateFieldDigests {
-src/config/model/frontmatter.rs: pub(crate) const fn format(&self) -> Blake3Digest {
-src/config/model/frontmatter.rs: pub(crate) const fn name(&self) -> Blake3Digest {
-src/config/model/frontmatter.rs: pub(crate) const fn tags(&self) -> Blake3Digest {
-src/config/model/frontmatter.rs: pub(crate) const fn title(&self) -> Blake3Digest {
+src/config/model/frontmatter.rs: pub(crate) aliases: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) date_created: DateFieldDigests,
+src/config/model/frontmatter.rs: pub(crate) date_modified: DateFieldDigests,
+src/config/model/frontmatter.rs: pub(crate) format: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) name: Blake3Digest,
 src/config/model/frontmatter.rs: pub(crate) struct DateFieldDigests {
 src/config/model/frontmatter.rs: pub(crate) struct FrontmatterDigests {
+src/config/model/frontmatter.rs: pub(crate) tags: Blake3Digest,
+src/config/model/frontmatter.rs: pub(crate) title: Blake3Digest,
 src/config/model/frontmatter.rs: pub(super) fn digests(&self) -> FrontmatterDigests {
 src/config/model/frontmatter.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
 src/config/model/schemas.rs: pub fn class_field_name(&self) -> &str {
 src/config/model/schemas.rs: pub fn directory(&self) -> &Path {
 src/config/model/schemas.rs: pub fn for_test(class_field: &str) -> Self {
 src/config/model/schemas.rs: pub struct SchemasConfig {
-src/config/model/schemas.rs: pub(crate) const fn class_field(&self) -> Blake3Digest {
-src/config/model/schemas.rs: pub(crate) const fn directory(&self) -> Blake3Digest {
+src/config/model/schemas.rs: pub(crate) class_field: Blake3Digest,
+src/config/model/schemas.rs: pub(crate) directory: Blake3Digest,
 src/config/model/schemas.rs: pub(crate) struct SchemaDigests {
 src/config/model/schemas.rs: pub(in crate::config) const DEFAULT_CLASS_FIELD: &str = "class";
 src/config/model/schemas.rs: pub(in crate::config) const DEFAULT_LOCAL_SCHEMAS_DIR: &str =
@@ -200,9 +204,9 @@ src/config/model/tasks.rs: pub fn from_tags(tags: &[&str]) -> Self {
 src/config/model/tasks.rs: pub fn tag_filters(&self) -> &[Tag] {
 src/config/model/tasks.rs: pub struct TaskConfig {
 src/config/model/tasks.rs: pub(crate) const fn statuses(&self) -> &TaskStatusMap {
-src/config/model/tasks.rs: pub(crate) const fn statuses(&self) -> Blake3Digest {
-src/config/model/tasks.rs: pub(crate) const fn tag_filters(&self) -> Blake3Digest {
+src/config/model/tasks.rs: pub(crate) statuses: Blake3Digest,
 src/config/model/tasks.rs: pub(crate) struct TaskDigests {
+src/config/model/tasks.rs: pub(crate) tag_filters: Blake3Digest,
 src/config/model/tasks.rs: pub(super) fn digests(&self) -> TaskDigests {
 src/config/model/tasks.rs: pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
 src/config/model/templates.rs: pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
@@ -405,6 +409,8 @@ src/hash.rs: pub fn to_hex(self) -> impl AsRef<str> + Display {
 src/hash.rs: pub struct Blake3Digest(blake3::Hash);
 src/hash.rs: pub struct Blake3PathHash([u8; 64]);
 src/hash.rs: pub struct HashError {
+src/hash.rs: pub(crate) const fn from_bytes(bytes: [u8; 32]) -> Self {
+src/hash.rs: pub(crate) const fn to_bytes(self) -> [u8; 32] {
 src/hash.rs: pub(crate) fn as_str(&self) -> &str {
 src/hash.rs: pub(crate) fn bytes(&mut self, bytes: &[u8]) {
 src/hash.rs: pub(crate) fn digest(&mut self, digest: &Blake3Digest) {
@@ -452,6 +458,15 @@ src/index/error.rs: pub enum IndexError {
 src/index/error.rs: pub type IndexResult<T> = std::result::Result<T, IndexError>;
 src/index/error.rs: pub(crate) enum StoreError {
 src/index/error.rs: pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
+src/index/fingerprint.rs: pub enum IndexSetting {
+src/index/fingerprint.rs: pub(super) const ALL: [Self; SETTING_COUNT] = [
+src/index/fingerprint.rs: pub(super) enum StoredFingerprint {
+src/index/fingerprint.rs: pub(super) fn decode(bytes: &[u8]) -> Option<Self> {
+src/index/fingerprint.rs: pub(super) fn drift(
+src/index/fingerprint.rs: pub(super) fn encode(&self) -> [[u8; 32]; SETTING_COUNT] {
+src/index/fingerprint.rs: pub(super) fn for_test() -> Self {
+src/index/fingerprint.rs: pub(super) fn new(digests: &ConfigDigests) -> Self {
+src/index/fingerprint.rs: pub(super) struct IndexFingerprint([Blake3Digest; SETTING_COUNT]);
 src/index/inlinks.rs: pub fn has_target(&self, target: &Path) -> bool {
 src/index/inlinks.rs: pub fn inlinks_of(&self, target: &Path) -> &[PathBuf] {
 src/index/inlinks.rs: pub fn into_entries(
@@ -471,6 +486,7 @@ src/index/inlinks.rs: pub(super) struct LinkResolver<'a> {
 src/index/mod.rs: pub struct PermissionsGuard<'a>(pub &'a Path);
 src/index/mod.rs: pub use entry::{FileEntry, WorkspaceIndex};
 src/index/mod.rs: pub use error::{IndexError, IndexResult};
+src/index/mod.rs: pub use fingerprint::IndexSetting;
 src/index/mod.rs: pub use inlinks::InlinkMap;
 src/index/mod.rs: pub use refresh::RefreshReport;
 src/index/mod.rs: pub use service::IndexerService;
@@ -478,22 +494,23 @@ src/index/mod.rs: pub(crate) mod fixtures {
 src/index/mod.rs: pub(crate) use entry::RowIndex;
 src/index/mod.rs: pub(crate) use sort::SortedByPath;
 src/index/mod.rs: pub(crate) use store::IndexStore;
-src/index/refresh.rs: pub const fn deleted_count(self) -> usize {
-src/index/refresh.rs: pub const fn links_modified_count(self) -> usize {
-src/index/refresh.rs: pub const fn new(
-src/index/refresh.rs: pub const fn upserted_count(self) -> usize {
-src/index/refresh.rs: pub struct RefreshReport {
+src/index/refresh.rs: pub const fn deleted_count(&self) -> usize {
+src/index/refresh.rs: pub const fn links_modified_count(&self) -> usize {
+src/index/refresh.rs: pub const fn upserted_count(&self) -> usize {
+src/index/refresh.rs: pub enum RefreshReport {
 src/index/refresh.rs: pub(super) const fn source(&self) -> &IndexError {
+src/index/refresh.rs: pub(super) const fn take_drift(&mut self) -> Option<Box<[IndexSetting]>> {
 src/index/refresh.rs: pub(super) enum NoteScope {
 src/index/refresh.rs: pub(super) enum RefreshState {
 src/index/refresh.rs: pub(super) fn apply(
-src/index/refresh.rs: pub(super) fn collect(root: &Path) -> IndexResult<Self> {
+src/index/refresh.rs: pub(super) fn collect(
 src/index/refresh.rs: pub(super) fn into_error(self) -> IndexError {
 src/index/refresh.rs: pub(super) fn into_fresh(self) -> RefreshState {
 src/index/refresh.rs: pub(super) fn into_index(
 src/index/refresh.rs: pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
 src/index/refresh.rs: pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
 src/index/refresh.rs: pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
+src/index/refresh.rs: pub(super) fn into_scan(self) -> (IndexStore, SortedByPath<FileMeta>) {
 src/index/refresh.rs: pub(super) fn into_store(self) -> IndexStore {
 src/index/refresh.rs: pub(super) fn is_fresh(&self) -> bool {
 src/index/refresh.rs: pub(super) fn persisted_files(&self) -> &SortedByPath<FileMeta> {
@@ -542,17 +559,18 @@ src/index/store.rs: pub(super) fn for_class_field(class_field: &str) -> Self {
 src/index/store.rs: pub(super) fn persist(
 src/index/store.rs: pub(super) fn poison_note_row(&self, path: &Path) -> IndexResult<()> {
 src/index/store.rs: pub(super) fn read_all(&self) -> IndexResult<StoreSnapshot> {
-src/index/store.rs: pub(super) fn read_all_files(&self) -> IndexResult<SortedByPath<FileMeta>> {
 src/index/store.rs: pub(super) fn read_all_links(
 src/index/store.rs: pub(super) fn read_all_notes(&self) -> IndexResult<SortedByPath<Note>> {
+src/index/store.rs: pub(super) fn read_files_and_fingerprint(
 src/index/store.rs: pub(super) fn wrap_redb_error(
+src/index/store.rs: pub(super) fn write_fingerprint_bytes(&self, value: Option<&[u8]>) {
 src/index/store.rs: pub(super) struct IndexDimensions {
 src/index/store.rs: pub(super) struct PersistRequest<'a> {
 src/index/store.rs: pub(super) type StoreSnapshot =
-src/index/tables.rs: pub(super) const CACHE_FORMAT: TableDefinition<
 src/index/tables.rs: pub(super) const FILES: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const LINKS: MultimapTableDefinition<
+src/index/tables.rs: pub(super) const META: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const NOTES: TableDefinition<'static, &'static [u8], &'static [u8]> =
 src/index/tables.rs: pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const PATHS_BY_TAG: MultimapTableDefinition<

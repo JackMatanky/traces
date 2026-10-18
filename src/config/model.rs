@@ -22,11 +22,15 @@ use std::{
     sync::Arc,
 };
 
-use digest::{ConfigDigests, setting};
+pub(crate) use digest::ConfigDigests;
+use digest::setting;
 pub use frontmatter::FrontmatterConfig;
+pub(crate) use frontmatter::{DateFieldDigests, FrontmatterDigests};
+pub(crate) use schemas::SchemaDigests;
 pub use schemas::SchemasConfig;
 pub(super) use schemas::{DEFAULT_CLASS_FIELD, DEFAULT_LOCAL_SCHEMAS_DIR};
 pub use tasks::TaskConfig;
+pub(crate) use tasks::TaskDigests;
 pub(crate) use templates::DEFAULT_LOCAL_TEMPLATES_DIR;
 pub(super) use templates::TemplateConfig;
 
@@ -431,7 +435,7 @@ mod tests {
             raw.update(path);
 
             assert_eq!(
-                config.digests().root().to_hex().as_ref(),
+                config.digests().root.to_hex().as_ref(),
                 raw.finalize().to_hex().as_str()
             );
         }

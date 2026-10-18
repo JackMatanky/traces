@@ -33,16 +33,30 @@ synchronization, not yet applied.
 
 #### RefreshState
 
-The state from comparing current project files with the persisted index:
-`Fresh` when the opened store remains current, or `Stale` when an Index Update
-awaits persistence.
+The state from comparing current project files and the stored Index Fingerprint
+with the persisted index: `Fresh` when the opened store remains current,
+`Stale` when an Index Update awaits persistence, or `Drifted` when the store was
+built under different index-relevant config and must be rebuilt in full. Drift
+wins over staleness; a virgin store never drifts.
 *Avoid*: sync pass, scan pass, refresh transaction
 
 #### Refresh Report
 
-The changed-file and changed-link counts: zero for a `Fresh` RefreshState, or
-the reconciled changes for a `Stale` RefreshState.
+What one refresh found, as one of three variants: `Unchanged` for a `Fresh`
+RefreshState, `FilesChanged` with the changed-file and changed-link counts for a
+`Stale` one, or `ConfigDrift` naming the settings that changed for a `Drifted`
+one. A heal reports settings, never row counts.
 *Avoid*: sync report, update result, refresh outcome
+
+#### Index Fingerprint
+
+The digests of the index-relevant config settings, persisted beside the rows
+they shaped and compared at every refresh to detect drift. It is a subset of
+the config's per-setting digests: root, template directories, and the schema
+directory are excluded, so moving a project does not rebuild its index, while
+every setting that could change a derived row is included, even those no
+index-time code reads today.
+*Avoid*: config hash, cache key, config stamp
 
 ### Indexed Data
 

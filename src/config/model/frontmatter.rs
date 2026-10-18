@@ -320,53 +320,14 @@ const DATE_MODIFIED: DateLabels = DateLabels {
 /// Holds the digests of [`FrontmatterConfig`] settings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FrontmatterDigests {
-    title: Blake3Digest,
-    aliases: Blake3Digest,
-    tags: Blake3Digest,
-    date_created: DateFieldDigests,
-    date_modified: DateFieldDigests,
+    pub(crate) title: Blake3Digest,
+    pub(crate) aliases: Blake3Digest,
+    pub(crate) tags: Blake3Digest,
+    pub(crate) date_created: DateFieldDigests,
+    pub(crate) date_modified: DateFieldDigests,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "reserved for index cache invalidation")
-)]
 impl FrontmatterDigests {
-    /// Returns the digest of the title key setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn title(&self) -> Blake3Digest {
-        self.title
-    }
-
-    /// Returns the digest of the aliases key setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn aliases(&self) -> Blake3Digest {
-        self.aliases
-    }
-
-    /// Returns the digest of the tags key setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn tags(&self) -> Blake3Digest {
-        self.tags
-    }
-
-    /// Returns the digests of the creation date field settings.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn date_created(&self) -> DateFieldDigests {
-        self.date_created
-    }
-
-    /// Returns the digests of the modification date field settings.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn date_modified(&self) -> DateFieldDigests {
-        self.date_modified
-    }
-
     /// Feeds every setting digest in declaration order.
     pub(super) fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {
@@ -387,29 +348,11 @@ impl FrontmatterDigests {
 /// Holds the digests of one [`DateFieldConfig`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DateFieldDigests {
-    name: Blake3Digest,
-    format: Blake3Digest,
+    pub(crate) name: Blake3Digest,
+    pub(crate) format: Blake3Digest,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "reserved for index cache invalidation")
-)]
 impl DateFieldDigests {
-    /// Returns the digest of the date key name setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn name(&self) -> Blake3Digest {
-        self.name
-    }
-
-    /// Returns the digest of the date format setting.
-    #[inline]
-    #[must_use]
-    pub(crate) const fn format(&self) -> Blake3Digest {
-        self.format
-    }
-
     /// Feeds both setting digests in declaration order.
     fn feed_into(&self, fp: &mut Blake3Hasher) {
         let Self {

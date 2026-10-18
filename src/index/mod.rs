@@ -19,6 +19,7 @@ mod codec;
 mod delta;
 mod entry;
 mod error;
+mod fingerprint;
 mod inlinks;
 mod refresh;
 mod service;
@@ -30,6 +31,8 @@ mod trie;
 pub(crate) use entry::RowIndex;
 pub use entry::{FileEntry, WorkspaceIndex};
 pub use error::{IndexError, IndexResult};
+#[cfg(any(test, feature = "test-utils"))]
+pub use fingerprint::IndexSetting;
 #[cfg(any(test, feature = "test-utils"))]
 pub use inlinks::InlinkMap;
 #[cfg(any(test, feature = "test-utils"))]

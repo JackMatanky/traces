@@ -13,7 +13,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
 
 **Status:** ready-for-agent
 
-- [ ] `IndexFingerprint` (index-owned type, `Copy`) holds the 10 index-relevant
+- [x] `IndexFingerprint` (index-owned type, `Copy`) holds the 10 index-relevant
       framed digests: frontmatter title/aliases/tags,
       date_created name+format, date_modified name+format; tasks
       statuses/tag_filters; schemas class_field. Built by exhaustive
@@ -27,12 +27,12 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       Drop the now-live `expect(dead_code)` on `FrontmatterDigests`,
       `DateFieldDigests`, and `TaskDigests`; keep it where accessors stay
       unused (`root`, templates, `schemas.directory`).
-- [ ] `IndexSetting` enum (index-owned; derives `Copy`/`PartialEq`; one variant
+- [x] `IndexSetting` enum (index-owned; derives `Copy`/`PartialEq`; one variant
       per fingerprint digest, named after the raw.toml key; qualified `Display`
       such as `[frontmatter] tags` and `[frontmatter.date_created] name`) for
       diagnosis only: config never learns of it. It is `pub` and re-exported
       through the `testing` facade because `RefreshReport` is public there.
-- [ ] The existing `cache_format` table is renamed `meta` (const `CACHE_FORMAT`
+- [x] The existing `cache_format` table is renamed `meta` (const `CACHE_FORMAT`
       → `META`, redb table name `"meta"`, `write_cache_format` → `write_meta`,
       version consts renamed to match) and becomes the store's single metadata
       table: no extra `TableSpec`. It gains a `fingerprint` key beside
@@ -45,7 +45,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       at both write sites (service persist and PendingApply; the first build
       into a virgin store goes through the incremental path, so both need it).
       The row persists exactly the `IndexFingerprint`, never the whole config.
-- [ ] `RefreshPlan::collect` takes the expected fingerprint and reads the
+- [x] `RefreshPlan::collect` takes the expected fingerprint and reads the
       `fingerprint` key in the same read txn as the file listing (a combined
       store read; the current `read_all_files` opens its own txn).
       `prepare_pass` gains `Drifted { index, store }` (drift wins over
@@ -55,7 +55,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       path. A present table with a missing or wrong-length `fingerprint` is
       drift (fail-closed); with nothing stored to diff, `changed` lists every
       `IndexSetting`.
-- [ ] Heal for drift is the existing rebuild verb, handing the plan's own
+- [x] Heal for drift is the existing rebuild verb, handing the plan's own
       store back to the refresh path: no second `IndexStore::open` (redb
       rejects a second handle on the file; today's `persist()` opens its own).
       Factor a `build_from(files)` out of `build()` so the heal reuses the
@@ -64,7 +64,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       old fingerprint, so the next refresh heals again). `refresh_store()`
       propagates the persist error. `load()` remains untouched (documented
       as-persisted for tests/benches).
-- [ ] `RefreshReport` collapses into
+- [x] `RefreshReport` collapses into
       `enum RefreshReport { #[default] Unchanged, FilesChanged { upserted,
       deleted, links_modified }, ConfigDrift { changed: Box<[IndexSetting]> } }`
       with count accessors kept as documented methods (they return 0 for
@@ -72,7 +72,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       no file-path lists. Loses `Copy`: the test/bench comparison sites are
       updated, `log_report` handles all three variants, and the `tests/baselines`
       public-API and pub-token files are regenerated.
-- [ ] Tests: inverted pinned test (`index::service::tests::class_field::
+- [x] Tests: inverted pinned test (`index::service::tests::class_field::
       fresh_refresh_serves_persisted_class_axes_unchanged_when_class_field_config_changes`
       becomes: config `class_field` edit → `ConfigDrift` with the exact changed
       settings and axes re-derived from the new config, no `traces index`);
@@ -86,7 +86,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       `PersistRequest::rebuild(IndexDimensions::for_class_field(..), ..)`
       (`index/service.rs` ~L1204, `index/store.rs` helpers and tests) must
       persist the matching fingerprint or they now observe drift.
-- [ ] Glossary: new **Index Fingerprint** entry; extend **RefreshState**
+- [x] Glossary: new **Index Fingerprint** entry; extend **RefreshState**
       and **Refresh Report** (the Config Fingerprint amend lives in
       config-service/07, which defines the new encoding). Amend ADR 0009
       (index-refresh) consequences to "`meta` table; legacy stores". Add
@@ -146,3 +146,22 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
 > rebuild_needed, persist}` (`src/index/store.rs`); `TABLES`
 > (`src/index/tables.rs`); `Config::digests` (`src/config/model/digest.rs`).
 > Gate: `mise run verify`.
+>
+> ### Implementation notes
+>
+> - The digest bundles' fields are now `pub(crate)` and their accessors are
+>   gone (except `TemplateDigests`, whose accessors stay test-only): a
+>   constructor outside `config` can only destructure exhaustively if the
+>   fields are visible. `IndexFingerprint::new` is that constructor, pinned
+>   against `..` by a source-scanning test.
+> - `IndexFingerprint` is 320 bytes, so `PersistRequest` and `PendingApply::apply`
+>   borrow it, `StoredFingerprint::Recorded` boxes it, and `IndexerService`
+>   keeps it boxed (clippy `large_types_passed_by_value`,
+>   `large_enum_variant`, and the bench stack-frame lint).
+> - Found, not fixed (out of scope): the incremental persist path only opens
+>   the tables it writes, so a first build into a virgin store of notes with no
+>   links, tags, or classes leaves a partial schema. The next `open` sees
+>   "present and missing" and wipes it, so the second refresh rebuilds again.
+>   Results stay correct, and drift cannot be misreported (a wiped store is
+>   virgin), but the "all tables or none" premise above does not hold for that
+>   case.

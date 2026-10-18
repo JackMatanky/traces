@@ -399,6 +399,77 @@ impl<T> serde_core::de::DeserializeOwned for traces::testing::FileFormat where T
 impl<T> tracing::instrument::Instrument for traces::testing::FileFormat
 impl<T> tracing::instrument::WithSubscriber for traces::testing::FileFormat
 impl<T> yoke::erased::ErasedDestructor for traces::testing::FileFormat where T: 'static
+pub enum traces::testing::IndexSetting
+pub traces::testing::IndexSetting::Aliases
+pub traces::testing::IndexSetting::ClassField
+pub traces::testing::IndexSetting::DateCreatedFormat
+pub traces::testing::IndexSetting::DateCreatedName
+pub traces::testing::IndexSetting::DateModifiedFormat
+pub traces::testing::IndexSetting::DateModifiedName
+pub traces::testing::IndexSetting::Statuses
+pub traces::testing::IndexSetting::TagFilters
+pub traces::testing::IndexSetting::Tags
+pub traces::testing::IndexSetting::Title
+impl core::clone::Clone for traces::testing::IndexSetting
+pub fn traces::testing::IndexSetting::clone(&self) -> Self
+impl core::cmp::Eq for traces::testing::IndexSetting
+impl core::cmp::PartialEq for traces::testing::IndexSetting
+pub fn traces::testing::IndexSetting::eq(&self, &Self) -> bool
+impl core::fmt::Debug for traces::testing::IndexSetting
+pub fn traces::testing::IndexSetting::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for traces::testing::IndexSetting
+pub fn traces::testing::IndexSetting::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for traces::testing::IndexSetting
+impl core::marker::StructuralPartialEq for traces::testing::IndexSetting
+impl core::marker::Freeze for traces::testing::IndexSetting
+impl core::marker::Send for traces::testing::IndexSetting
+impl core::marker::Sync for traces::testing::IndexSetting
+impl core::marker::Unpin for traces::testing::IndexSetting
+impl core::marker::UnsafeUnpin for traces::testing::IndexSetting
+impl core::panic::unwind_safe::RefUnwindSafe for traces::testing::IndexSetting
+impl core::panic::unwind_safe::UnwindSafe for traces::testing::IndexSetting
+impl<D> owo_colors::OwoColorize for traces::testing::IndexSetting
+impl<Q, K> equivalent::Equivalent<K> for traces::testing::IndexSetting where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces::testing::IndexSetting::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces::testing::IndexSetting where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces::testing::IndexSetting::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces::testing::IndexSetting where U: core::convert::From<T>
+pub fn traces::testing::IndexSetting::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces::testing::IndexSetting where U: core::convert::Into<T>
+pub type traces::testing::IndexSetting::Error = never
+pub fn traces::testing::IndexSetting::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces::testing::IndexSetting where U: core::convert::TryFrom<T>
+pub type traces::testing::IndexSetting::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces::testing::IndexSetting::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces::testing::IndexSetting where T: core::clone::Clone
+pub type traces::testing::IndexSetting::Owned = T
+pub fn traces::testing::IndexSetting::clone_into(&self, &mut T)
+pub fn traces::testing::IndexSetting::to_owned(&self) -> T
+impl<T> alloc::string::ToString for traces::testing::IndexSetting where T: core::fmt::Display + ?core::marker::Sized
+pub fn traces::testing::IndexSetting::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for traces::testing::IndexSetting where T: 'static + ?core::marker::Sized
+pub fn traces::testing::IndexSetting::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces::testing::IndexSetting where T: ?core::marker::Sized
+pub fn traces::testing::IndexSetting::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces::testing::IndexSetting where T: ?core::marker::Sized
+pub fn traces::testing::IndexSetting::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces::testing::IndexSetting where T: core::clone::Clone
+pub unsafe fn traces::testing::IndexSetting::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces::testing::IndexSetting
+pub fn traces::testing::IndexSetting::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces::testing::IndexSetting
+pub type traces::testing::IndexSetting::Init = T
+pub const traces::testing::IndexSetting::ALIGN: usize
+pub unsafe fn traces::testing::IndexSetting::deref<'a>(usize) -> &'a T
+pub unsafe fn traces::testing::IndexSetting::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces::testing::IndexSetting::drop(usize)
+pub unsafe fn traces::testing::IndexSetting::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces::testing::IndexSetting where T: core::clone::Clone
+pub fn traces::testing::IndexSetting::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces::testing::IndexSetting
+impl<T> tracing::instrument::Instrument for traces::testing::IndexSetting
+impl<T> tracing::instrument::WithSubscriber for traces::testing::IndexSetting
+impl<T> yoke::erased::ErasedDestructor for traces::testing::IndexSetting where T: 'static
 pub enum traces::testing::QueryBuilderError
 pub traces::testing::QueryBuilderError::FieldPath(traces::query::error::FieldPathError)
 pub traces::testing::QueryBuilderError::LimitOutOfRange
@@ -465,6 +536,75 @@ impl<T> either::into_either::IntoEither for traces::testing::QueryBuilderError
 impl<T> tracing::instrument::Instrument for traces::testing::QueryBuilderError
 impl<T> tracing::instrument::WithSubscriber for traces::testing::QueryBuilderError
 impl<T> yoke::erased::ErasedDestructor for traces::testing::QueryBuilderError where T: 'static
+pub enum traces::testing::RefreshReport
+pub traces::testing::RefreshReport::ConfigDrift
+pub traces::testing::RefreshReport::ConfigDrift::changed: alloc::boxed::Box<[traces::testing::IndexSetting]>
+pub traces::testing::RefreshReport::FilesChanged
+pub traces::testing::RefreshReport::FilesChanged::deleted: usize
+pub traces::testing::RefreshReport::FilesChanged::links_modified: usize
+pub traces::testing::RefreshReport::FilesChanged::upserted: usize
+pub traces::testing::RefreshReport::Unchanged
+impl traces::testing::RefreshReport
+pub const fn traces::testing::RefreshReport::deleted_count(&self) -> usize
+pub const fn traces::testing::RefreshReport::links_modified_count(&self) -> usize
+pub const fn traces::testing::RefreshReport::upserted_count(&self) -> usize
+impl core::clone::Clone for traces::testing::RefreshReport
+pub fn traces::testing::RefreshReport::clone(&self) -> Self
+impl core::cmp::Eq for traces::testing::RefreshReport
+impl core::cmp::PartialEq for traces::testing::RefreshReport
+pub fn traces::testing::RefreshReport::eq(&self, &Self) -> bool
+impl core::default::Default for traces::testing::RefreshReport
+pub fn traces::testing::RefreshReport::default() -> Self
+impl core::fmt::Debug for traces::testing::RefreshReport
+pub fn traces::testing::RefreshReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for traces::testing::RefreshReport
+impl core::marker::Freeze for traces::testing::RefreshReport
+impl core::marker::Send for traces::testing::RefreshReport
+impl core::marker::Sync for traces::testing::RefreshReport
+impl core::marker::Unpin for traces::testing::RefreshReport
+impl core::marker::UnsafeUnpin for traces::testing::RefreshReport
+impl core::panic::unwind_safe::RefUnwindSafe for traces::testing::RefreshReport
+impl core::panic::unwind_safe::UnwindSafe for traces::testing::RefreshReport
+impl<D> owo_colors::OwoColorize for traces::testing::RefreshReport
+impl<Q, K> equivalent::Equivalent<K> for traces::testing::RefreshReport where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces::testing::RefreshReport::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for traces::testing::RefreshReport where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn traces::testing::RefreshReport::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for traces::testing::RefreshReport where U: core::convert::From<T>
+pub fn traces::testing::RefreshReport::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for traces::testing::RefreshReport where U: core::convert::Into<T>
+pub type traces::testing::RefreshReport::Error = never
+pub fn traces::testing::RefreshReport::try_from(U) -> core::result::Result<T, never>
+impl<T, U> core::convert::TryInto<U> for traces::testing::RefreshReport where U: core::convert::TryFrom<T>
+pub type traces::testing::RefreshReport::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn traces::testing::RefreshReport::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for traces::testing::RefreshReport where T: core::clone::Clone
+pub type traces::testing::RefreshReport::Owned = T
+pub fn traces::testing::RefreshReport::clone_into(&self, &mut T)
+pub fn traces::testing::RefreshReport::to_owned(&self) -> T
+impl<T> core::any::Any for traces::testing::RefreshReport where T: 'static + ?core::marker::Sized
+pub fn traces::testing::RefreshReport::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for traces::testing::RefreshReport where T: ?core::marker::Sized
+pub fn traces::testing::RefreshReport::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for traces::testing::RefreshReport where T: ?core::marker::Sized
+pub fn traces::testing::RefreshReport::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for traces::testing::RefreshReport where T: core::clone::Clone
+pub unsafe fn traces::testing::RefreshReport::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for traces::testing::RefreshReport
+pub fn traces::testing::RefreshReport::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for traces::testing::RefreshReport
+pub type traces::testing::RefreshReport::Init = T
+pub const traces::testing::RefreshReport::ALIGN: usize
+pub unsafe fn traces::testing::RefreshReport::deref<'a>(usize) -> &'a T
+pub unsafe fn traces::testing::RefreshReport::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn traces::testing::RefreshReport::drop(usize)
+pub unsafe fn traces::testing::RefreshReport::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> dyn_clone::DynClone for traces::testing::RefreshReport where T: core::clone::Clone
+pub fn traces::testing::RefreshReport::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
+impl<T> either::into_either::IntoEither for traces::testing::RefreshReport
+impl<T> tracing::instrument::Instrument for traces::testing::RefreshReport
+impl<T> tracing::instrument::WithSubscriber for traces::testing::RefreshReport
+impl<T> yoke::erased::ErasedDestructor for traces::testing::RefreshReport where T: 'static
 pub enum traces::testing::RenderFailureKind
 pub traces::testing::RenderFailureKind::Index
 pub traces::testing::RenderFailureKind::Io
@@ -1425,70 +1565,6 @@ impl<T> minijinja::value::object::ObjectExt for traces::testing::QuerySet where 
 impl<T> tracing::instrument::Instrument for traces::testing::QuerySet
 impl<T> tracing::instrument::WithSubscriber for traces::testing::QuerySet
 impl<T> yoke::erased::ErasedDestructor for traces::testing::QuerySet where T: 'static
-pub struct traces::testing::RefreshReport
-impl traces::testing::RefreshReport
-pub const fn traces::testing::RefreshReport::deleted_count(self) -> usize
-pub const fn traces::testing::RefreshReport::links_modified_count(self) -> usize
-pub const fn traces::testing::RefreshReport::new(usize, usize, usize) -> Self
-pub const fn traces::testing::RefreshReport::upserted_count(self) -> usize
-impl core::clone::Clone for traces::testing::RefreshReport
-pub fn traces::testing::RefreshReport::clone(&self) -> Self
-impl core::cmp::Eq for traces::testing::RefreshReport
-impl core::cmp::PartialEq for traces::testing::RefreshReport
-pub fn traces::testing::RefreshReport::eq(&self, &Self) -> bool
-impl core::default::Default for traces::testing::RefreshReport
-pub fn traces::testing::RefreshReport::default() -> Self
-impl core::fmt::Debug for traces::testing::RefreshReport
-pub fn traces::testing::RefreshReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for traces::testing::RefreshReport
-impl core::marker::StructuralPartialEq for traces::testing::RefreshReport
-impl core::marker::Freeze for traces::testing::RefreshReport
-impl core::marker::Send for traces::testing::RefreshReport
-impl core::marker::Sync for traces::testing::RefreshReport
-impl core::marker::Unpin for traces::testing::RefreshReport
-impl core::marker::UnsafeUnpin for traces::testing::RefreshReport
-impl core::panic::unwind_safe::RefUnwindSafe for traces::testing::RefreshReport
-impl core::panic::unwind_safe::UnwindSafe for traces::testing::RefreshReport
-impl<D> owo_colors::OwoColorize for traces::testing::RefreshReport
-impl<Q, K> equivalent::Equivalent<K> for traces::testing::RefreshReport where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn traces::testing::RefreshReport::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for traces::testing::RefreshReport where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn traces::testing::RefreshReport::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for traces::testing::RefreshReport where U: core::convert::From<T>
-pub fn traces::testing::RefreshReport::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for traces::testing::RefreshReport where U: core::convert::Into<T>
-pub type traces::testing::RefreshReport::Error = never
-pub fn traces::testing::RefreshReport::try_from(U) -> core::result::Result<T, never>
-impl<T, U> core::convert::TryInto<U> for traces::testing::RefreshReport where U: core::convert::TryFrom<T>
-pub type traces::testing::RefreshReport::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn traces::testing::RefreshReport::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for traces::testing::RefreshReport where T: core::clone::Clone
-pub type traces::testing::RefreshReport::Owned = T
-pub fn traces::testing::RefreshReport::clone_into(&self, &mut T)
-pub fn traces::testing::RefreshReport::to_owned(&self) -> T
-impl<T> core::any::Any for traces::testing::RefreshReport where T: 'static + ?core::marker::Sized
-pub fn traces::testing::RefreshReport::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for traces::testing::RefreshReport where T: ?core::marker::Sized
-pub fn traces::testing::RefreshReport::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for traces::testing::RefreshReport where T: ?core::marker::Sized
-pub fn traces::testing::RefreshReport::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for traces::testing::RefreshReport where T: core::clone::Clone
-pub unsafe fn traces::testing::RefreshReport::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for traces::testing::RefreshReport
-pub fn traces::testing::RefreshReport::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for traces::testing::RefreshReport
-pub type traces::testing::RefreshReport::Init = T
-pub const traces::testing::RefreshReport::ALIGN: usize
-pub unsafe fn traces::testing::RefreshReport::deref<'a>(usize) -> &'a T
-pub unsafe fn traces::testing::RefreshReport::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn traces::testing::RefreshReport::drop(usize)
-pub unsafe fn traces::testing::RefreshReport::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> dyn_clone::DynClone for traces::testing::RefreshReport where T: core::clone::Clone
-pub fn traces::testing::RefreshReport::__clone_box(&self, dyn_clone::sealed::Private) -> *mut ()
-impl<T> either::into_either::IntoEither for traces::testing::RefreshReport
-impl<T> tracing::instrument::Instrument for traces::testing::RefreshReport
-impl<T> tracing::instrument::WithSubscriber for traces::testing::RefreshReport
-impl<T> yoke::erased::ErasedDestructor for traces::testing::RefreshReport where T: 'static
 pub struct traces::testing::Schema
 impl traces::testing::Schema
 pub fn traces::testing::Schema::field(&self, &str) -> core::option::Option<&traces::testing::SchemaFieldDef>

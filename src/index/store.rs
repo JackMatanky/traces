@@ -25,17 +25,19 @@ use super::{
     delta::{FileDelta, InlinkDelta},
     entry::FileEntry,
     error::{IndexError, IndexResult, StoreError, StoreResult},
+    fingerprint::{IndexFingerprint, StoredFingerprint},
     inlinks::InlinkMap,
     sort::SortedByPath,
     tables::{
-        CACHE_FORMAT, FILE_CLASSES_BY_PATH, FILES, LINKS, NOTES,
-        PATHS_BY_FILE_CLASS, PATHS_BY_TAG, TABLES, TAGS_BY_PATH,
+        FILE_CLASSES_BY_PATH, FILES, LINKS, META, NOTES, PATHS_BY_FILE_CLASS,
+        PATHS_BY_TAG, TABLES, TAGS_BY_PATH,
     },
 };
 use crate::{FileMeta, Note, Tag, file::FileFormat};
 
-const CACHE_FORMAT_VERSION_KEY: &[u8] = b"version";
-const CACHE_FORMAT_VERSION: &[u8] = b"1";
+const META_VERSION_KEY: &[u8] = b"version";
+const META_VERSION: &[u8] = b"1";
+const META_FINGERPRINT_KEY: &[u8] = b"fingerprint";
 
 /// Stored files, path-sorted notes, and target-keyed inlinks loaded together.
 pub(super) type StoreSnapshot =
@@ -45,6 +47,7 @@ pub(super) type StoreSnapshot =
 /// incremental refreshes.
 pub(super) struct PersistRequest<'a> {
     dimensions: IndexDimensions,
+    fingerprint: &'a IndexFingerprint,
     rows: PersistRows<'a>,
 }
 
@@ -53,10 +56,12 @@ impl<'a> PersistRequest<'a> {
     #[inline]
     pub(super) const fn rebuild(
         dimensions: IndexDimensions,
+        fingerprint: &'a IndexFingerprint,
         entries: &'a [FileEntry],
     ) -> Self {
         Self {
             dimensions,
+            fingerprint,
             rows: PersistRows::Rebuild {
                 entries,
             },
@@ -68,12 +73,14 @@ impl<'a> PersistRequest<'a> {
     #[inline]
     pub(super) const fn incremental(
         dimensions: IndexDimensions,
+        fingerprint: &'a IndexFingerprint,
         delta: &'a FileDelta,
         notes: &'a [&'a Note],
         edges: &'a InlinkDelta,
     ) -> Self {
         Self {
             dimensions,
+            fingerprint,
             rows: PersistRows::Incremental {
                 delta,
                 notes,
@@ -355,6 +362,29 @@ impl IndexStore {
         self.poison_note_row_in(self.begin_write()?, path)
     }
 
+    /// Overwrites or removes the stored fingerprint to simulate a damaged
+    /// `META` row in tests.
+    #[cfg(test)]
+    pub(super) fn write_fingerprint_bytes(&self, value: Option<&[u8]>) {
+        let txn = self.begin_write().expect("begin write transaction");
+        {
+            let mut table = txn.open_table(META).expect("open meta table");
+            match value {
+                Some(bytes) => {
+                    table
+                        .insert(META_FINGERPRINT_KEY, bytes)
+                        .expect("write fingerprint");
+                }
+                None => {
+                    table
+                        .remove(META_FINGERPRINT_KEY)
+                        .expect("remove fingerprint");
+                }
+            }
+        }
+        txn.commit().expect("commit fingerprint edit");
+    }
+
     #[cfg(test)]
     #[inline(never)]
     fn poison_note_row_in(
@@ -492,16 +522,44 @@ impl IndexStore {
         self.read_table(&txn, NOTES)
     }
 
-    /// Reads every persisted [`FileMeta`], sorted by path.
+    /// Reads every persisted [`FileMeta`], sorted by path, together with the
+    /// fingerprint recorded beside them.
+    ///
+    /// Both come from one read transaction, so they describe the same commit.
     ///
     /// # Errors
     ///
-    /// - [`Store`] if opening the transaction or reading `FILES` fails.
+    /// - [`Store`] if opening the transaction or reading `FILES` or `META`
+    ///   fails.
     ///
     /// [`Store`]: IndexError::Store
-    pub(super) fn read_all_files(&self) -> IndexResult<SortedByPath<FileMeta>> {
+    pub(super) fn read_files_and_fingerprint(
+        &self,
+    ) -> IndexResult<(SortedByPath<FileMeta>, StoredFingerprint)> {
         let txn = self.begin_read()?;
-        self.read_table(&txn, FILES)
+        let files = self.read_table(&txn, FILES)?;
+        let fingerprint = self.read_fingerprint(&txn)?;
+        Ok((files, fingerprint))
+    }
+
+    /// Reads the fingerprint recorded in `META`.
+    ///
+    /// An absent table means a virgin store. A table without a decodable
+    /// fingerprint is unreadable, so callers fail closed.
+    fn read_fingerprint(
+        &self,
+        txn: &ReadTransaction,
+    ) -> StoreResult<StoredFingerprint> {
+        let Some(meta) = self.open_table_for_read(txn, META)? else {
+            return Ok(StoredFingerprint::Virgin);
+        };
+        let recorded = meta
+            .get(META_FINGERPRINT_KEY)
+            .map_err(|source| self.wrap_redb_error(source))?
+            .and_then(|bytes| IndexFingerprint::decode(bytes.value()));
+        Ok(recorded.map_or(StoredFingerprint::Unreadable, |fingerprint| {
+            StoredFingerprint::Recorded(Box::new(fingerprint))
+        }))
     }
 
     /// Reads all persisted inlink edges, resolving path bytes against `files`.
@@ -595,12 +653,27 @@ impl IndexStore {
         Ok(())
     }
 
-    fn write_cache_format(&self, txn: &WriteTransaction) -> IndexResult<()> {
+    /// Writes the format version and `fingerprint` into `META`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Store`] if the table cannot be opened or written.
+    ///
+    /// [`Store`]: IndexError::Store
+    fn write_meta(
+        &self,
+        txn: &WriteTransaction,
+        fingerprint: &IndexFingerprint,
+    ) -> IndexResult<()> {
         let mut table = txn
-            .open_table(CACHE_FORMAT)
+            .open_table(META)
             .map_err(|source| self.wrap_redb_error(source))?;
         table
-            .insert(CACHE_FORMAT_VERSION_KEY, CACHE_FORMAT_VERSION)
+            .insert(META_VERSION_KEY, META_VERSION)
+            .map_err(|source| self.wrap_redb_error(source))?;
+        let recorded = fingerprint.encode();
+        table
+            .insert(META_FINGERPRINT_KEY, recorded.as_flattened())
             .map_err(|source| self.wrap_redb_error(source))?;
         Ok(())
     }
@@ -658,7 +731,11 @@ impl IndexStore {
         match &request.rows {
             PersistRows::Rebuild {
                 entries,
-            } => self.apply_rebuild(entries, &request.dimensions),
+            } => self.apply_rebuild(
+                entries,
+                &request.dimensions,
+                request.fingerprint,
+            ),
             PersistRows::Incremental {
                 delta,
                 notes,
@@ -671,11 +748,15 @@ impl IndexStore {
                     !delta.is_empty() || !notes.is_empty() || !edges.is_empty(),
                     "prepare_pass gates empty passes"
                 );
-                self.apply_incremental(&request.dimensions, &IncrementalRows {
-                    delta,
-                    notes,
-                    edges,
-                })
+                self.apply_incremental(
+                    &request.dimensions,
+                    request.fingerprint,
+                    &IncrementalRows {
+                        delta,
+                        notes,
+                        edges,
+                    },
+                )
             }
         }
     }
@@ -685,8 +766,14 @@ impl IndexStore {
         &self,
         entries: &[FileEntry],
         dimensions: &IndexDimensions,
+        fingerprint: &IndexFingerprint,
     ) -> IndexResult<()> {
-        self.apply_rebuild_in(self.begin_cache_txn()?, entries, dimensions)
+        self.apply_rebuild_in(
+            self.begin_cache_txn()?,
+            entries,
+            dimensions,
+            fingerprint,
+        )
     }
 
     #[inline(never)]
@@ -695,6 +782,7 @@ impl IndexStore {
         txn: WriteTransaction,
         entries: &[FileEntry],
         dimensions: &IndexDimensions,
+        fingerprint: &IndexFingerprint,
     ) -> IndexResult<()> {
         self.delete_tables(&txn)?;
         let (all_res, axes_res) = rayon::join(
@@ -703,7 +791,7 @@ impl IndexStore {
         );
         all_res?;
         axes_res?;
-        self.write_cache_format(&txn)?;
+        self.write_meta(&txn, fingerprint)?;
         self.commit(txn)?;
         Ok(())
     }
@@ -712,9 +800,15 @@ impl IndexStore {
     fn apply_incremental(
         &self,
         dimensions: &IndexDimensions,
+        fingerprint: &IndexFingerprint,
         rows: &IncrementalRows<'_>,
     ) -> IndexResult<()> {
-        self.apply_incremental_in(self.begin_cache_txn()?, dimensions, rows)
+        self.apply_incremental_in(
+            self.begin_cache_txn()?,
+            dimensions,
+            fingerprint,
+            rows,
+        )
     }
 
     #[inline(never)]
@@ -722,6 +816,7 @@ impl IndexStore {
         &self,
         txn: WriteTransaction,
         dimensions: &IndexDimensions,
+        fingerprint: &IndexFingerprint,
         rows: &IncrementalRows<'_>,
     ) -> IndexResult<()> {
         // Core tables (FILES, NOTES, tag/class axes) and the LINKS multimap
@@ -741,7 +836,7 @@ impl IndexStore {
         );
         core_res?;
         links_res?;
-        self.write_cache_format(&txn)?;
+        self.write_meta(&txn, fingerprint)?;
         self.commit(txn)?;
         Ok(())
     }
@@ -858,23 +953,20 @@ impl IndexStore {
         if missing {
             return Ok(true);
         }
-        let table = read_txn.open_table(CACHE_FORMAT).map_err(|source| {
-            StoreError::Redb {
+        let table =
+            read_txn.open_table(META).map_err(|source| StoreError::Redb {
                 path: path.to_path_buf(),
                 source: Box::new(source.into()),
-            }
-        })?;
+            })?;
         let Some(version) =
-            table.get(CACHE_FORMAT_VERSION_KEY).map_err(|source| {
-                StoreError::Redb {
-                    path: path.to_path_buf(),
-                    source: Box::new(source.into()),
-                }
+            table.get(META_VERSION_KEY).map_err(|source| StoreError::Redb {
+                path: path.to_path_buf(),
+                source: Box::new(source.into()),
             })?
         else {
             return Ok(true);
         };
-        Ok(version.value() != CACHE_FORMAT_VERSION)
+        Ok(version.value() != META_VERSION)
     }
 
     /// Point-reads and decodes `paths` from `kind`'s table in parallel,
@@ -1764,11 +1856,10 @@ mod tests {
             let store = IndexStore::open(temp.path()).expect("open store");
             let txn = store.begin_write().expect("begin write transaction");
             {
-                let mut table = txn
-                    .open_table(CACHE_FORMAT)
-                    .expect("open cache format table");
+                let mut table =
+                    txn.open_table(META).expect("open cache format table");
                 table
-                    .insert(CACHE_FORMAT_VERSION_KEY, b"0".as_slice())
+                    .insert(META_VERSION_KEY, b"0".as_slice())
                     .expect("write outdated format version");
             }
             txn.commit().expect("commit outdated format marker");
@@ -1796,6 +1887,142 @@ mod tests {
                     .clean_text(),
                 "retained task"
             );
+        }
+
+        #[test]
+        fn wipes_a_legacy_store_whose_metadata_table_is_named_cache_format() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            fs::write(temp.path().join("note.md"), "- [ ] retained task")
+                .expect("write note");
+            let service = IndexerService::for_tests(temp.path());
+            let index = service.build().expect("build index");
+            service.persist(&index).expect("persist index");
+
+            let store = IndexStore::open(temp.path()).expect("open store");
+            let txn = store.begin_write().expect("begin write transaction");
+            txn.delete_table(META).expect("delete meta table");
+            {
+                let legacy: TableDefinition<&[u8], &[u8]> =
+                    TableDefinition::new("cache_format");
+                let mut table =
+                    txn.open_table(legacy).expect("open legacy table");
+                table
+                    .insert(META_VERSION_KEY, META_VERSION)
+                    .expect("write legacy format version");
+            }
+            txn.commit().expect("commit legacy schema");
+            drop(store);
+
+            let reopened =
+                IndexStore::open(temp.path()).expect("wipe legacy store");
+            let (files, notes, _) =
+                reopened.read_all().expect("read wiped store");
+            assert_eq!(files.as_slice(), []);
+            assert_eq!(notes.as_slice(), []);
+            let (_, fingerprint) = reopened
+                .read_files_and_fingerprint()
+                .expect("read wiped fingerprint");
+            assert_eq!(fingerprint, StoredFingerprint::Virgin);
+        }
+    }
+
+    mod fingerprint_row {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        fn stored(store: &IndexStore) -> StoredFingerprint {
+            store.read_files_and_fingerprint().expect("read fingerprint").1
+        }
+
+        fn recorded(fingerprint: &IndexFingerprint) -> StoredFingerprint {
+            StoredFingerprint::Recorded(Box::new(*fingerprint))
+        }
+
+        #[test]
+        fn reads_a_never_persisted_store_as_virgin() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let store = IndexStore::open(temp.path()).expect("open store");
+
+            assert_eq!(stored(&store), StoredFingerprint::Virgin);
+        }
+
+        #[test]
+        fn reads_back_the_fingerprint_of_a_rebuild() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let store = IndexStore::open(temp.path()).expect("open store");
+            write_all_parts(&store, &[], &[], &InlinkMap::default())
+                .expect("persist rebuild");
+
+            assert_eq!(stored(&store), recorded(&IndexFingerprint::for_test()));
+        }
+
+        #[test]
+        fn replaces_the_recorded_fingerprint_on_the_next_rebuild() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let store = IndexStore::open(temp.path()).expect("open store");
+            write_all_parts(&store, &[], &[], &InlinkMap::default())
+                .expect("persist first rebuild");
+            let newer =
+                IndexFingerprint::decode(&[7; 320]).expect("320 bytes decode");
+
+            store
+                .persist(&PersistRequest::rebuild(
+                    IndexDimensions::for_class_field("class"),
+                    &newer,
+                    &[],
+                ))
+                .expect("persist second rebuild");
+
+            assert_eq!(stored(&store), recorded(&newer));
+        }
+
+        #[test]
+        fn records_the_fingerprint_of_the_first_incremental_persist() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let store = IndexStore::open(temp.path()).expect("open store");
+            let files =
+                SortedByPath::sorted(vec![FileMeta::note_for_test("a.md")]);
+            let delta = FileDelta::compute(&files, &SortedByPath::default());
+            let edges = InlinkDelta::compute(
+                &InlinkMap::default(),
+                &InlinkMap::default(),
+            );
+            let note = parse("a.md", "# A");
+
+            store
+                .persist(&PersistRequest::incremental(
+                    IndexDimensions::for_class_field("class"),
+                    &IndexFingerprint::for_test(),
+                    &delta,
+                    &[&note],
+                    &edges,
+                ))
+                .expect("persist first build incrementally");
+
+            assert_eq!(stored(&store), recorded(&IndexFingerprint::for_test()));
+        }
+
+        #[test]
+        fn reads_rows_without_a_fingerprint_key_as_unreadable() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let store = IndexStore::open(temp.path()).expect("open store");
+            write_all_parts(&store, &[], &[], &InlinkMap::default())
+                .expect("persist rebuild");
+            store.write_fingerprint_bytes(None);
+
+            assert_eq!(stored(&store), StoredFingerprint::Unreadable);
+        }
+
+        #[test]
+        fn reads_a_wrong_length_fingerprint_as_unreadable() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let store = IndexStore::open(temp.path()).expect("open store");
+            write_all_parts(&store, &[], &[], &InlinkMap::default())
+                .expect("persist rebuild");
+            store.write_fingerprint_bytes(Some(&[0; 319]));
+
+            assert_eq!(stored(&store), StoredFingerprint::Unreadable);
         }
     }
 
@@ -1888,6 +2115,7 @@ mod tests {
         );
         store.persist(&PersistRequest::rebuild(
             IndexDimensions::for_class_field("class"),
+            &IndexFingerprint::for_test(),
             index.entries(),
         ))
     }
@@ -2288,7 +2516,8 @@ mod tests {
             // Proves `read_all_links` reconstructs from disk without
             // `read_all`'s note decode, under the same drop-orphaned-edges
             // policy.
-            let stored_files = store.read_all_files().expect("read files");
+            let (stored_files, _) =
+                store.read_files_and_fingerprint().expect("read files");
             let reconstructed =
                 store.read_all_links(&stored_files).expect("reconstruct load");
             assert_eq!(

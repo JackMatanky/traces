@@ -140,3 +140,13 @@ suites: it would pin the behavior now under judgment. Ticket 12 must not use
 it. If the maintainer rules correct-as-designed, the narrowest regression
 (in-crate, refresh/freshness seam) pins only the Fresh arm's metadata-scoped
 freshness — never the stale-row symptom itself.
+
+### Superseded by index-query/17 (2026-10-18)
+
+The "correct-as-designed" ruling no longer holds: refresh now stores an Index
+Fingerprint beside the rows and detects config drift, rebuilding in full and
+reporting `ConfigDrift` with the changed settings (mitigation (c) above, ADR
+0009). The pinned test was inverted to
+`index::service::tests::class_field::refresh_heals_class_axes_when_class_field_config_changes`,
+and `tests/e2e/index.rs::config_edit_heals_the_index_on_the_next_query` asserts
+the healed outcome. The stale-row symptom itself is still never asserted.

@@ -69,12 +69,15 @@ pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("classes_by_path");
 
-/// The cache-format marker, whose version identifies persisted row semantics.
-pub(super) const CACHE_FORMAT: TableDefinition<
-    'static,
-    &'static [u8],
-    &'static [u8],
-> = TableDefinition::new("cache_format");
+/// Defines the store's single metadata table.
+///
+/// Key `version`: the cache format version identifying persisted row semantics.
+/// Key `fingerprint`: the raw digests of the index-relevant config settings
+/// that produced the rows, as written by
+/// [`super::fingerprint::IndexFingerprint`].
+pub(super) const META: TableDefinition<'static, &'static [u8], &'static [u8]> =
+    TableDefinition::new("meta");
+
 /// Represents a schema table: to-one row or to-many multimap.
 enum TableDef {
     ToOne(TableDefinition<'static, &'static [u8], &'static [u8]>),
@@ -127,7 +130,7 @@ pub(super) const TABLES: [TableSpec; 8] = [
         policy: DeletePolicy::BestEffort,
     },
     TableSpec {
-        def: TableDef::ToOne(CACHE_FORMAT),
+        def: TableDef::ToOne(META),
         policy: DeletePolicy::BestEffort,
     },
 ];
