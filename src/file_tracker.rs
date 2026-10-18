@@ -142,11 +142,8 @@ impl FilePathTracker {
         &self,
         companion_suffixes: &[&str],
     ) -> Result<Vec<PathBuf>, FilePathTrackerError> {
-        if !self.root.is_dir() {
-            return Ok(Vec::new());
-        }
         let mut targets = Vec::new();
-        for node in DirTree::children(&self.root) {
+        for node in DirTree::children(&self.root).missing_as_empty() {
             let node = node.map_err(store_error)?;
             let entry = node.path().to_path_buf();
             if has_suffix(&entry, companion_suffixes) {
@@ -342,11 +339,8 @@ impl FilePathTracker {
         &self,
         companion_suffixes: &[&str],
     ) -> Result<Vec<PathBuf>, FilePathTrackerError> {
-        if !self.root.is_dir() {
-            return Ok(Vec::new());
-        }
         let mut removed = Vec::new();
-        for node in DirTree::children(&self.root) {
+        for node in DirTree::children(&self.root).missing_as_empty() {
             let node = node.map_err(store_error)?;
             let entry = node.path().to_path_buf();
             if has_suffix(&entry, companion_suffixes) {

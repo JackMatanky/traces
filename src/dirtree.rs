@@ -12,7 +12,8 @@
 //! Errors are classified into three variants based on where they occur:
 //!
 //! - [`DirTreeError::MissingRoot`]: the walk root does not exist. Callers
-//!   decide their policy: degrade to empty or propagate.
+//!   decide their policy: absorb it into an empty walk via
+//!   [`DirTree::missing_as_empty`] or propagate it.
 //! - [`DirTreeError::RootInaccessible`]: the root exists but could not be
 //!   opened.
 //! - [`DirTreeError::NodeInaccessible`]: a node beneath the root failed
@@ -162,6 +163,7 @@ pub(crate) struct DirTree {
     root: PathBuf,
     prune: Option<PrunePredicate>,
     inner: Option<InnerIter>,
+    absorb_missing_root: bool,
 }
 
 impl DirTree {
@@ -186,6 +188,7 @@ impl DirTree {
             root: dir.to_path_buf(),
             prune: None,
             inner: None,
+            absorb_missing_root: false,
         }
     }
 
@@ -207,7 +210,25 @@ impl DirTree {
             root: dir.to_path_buf(),
             prune: None,
             inner: None,
+            absorb_missing_root: false,
         }
+    }
+
+    /// Absorbs a missing walk root into an empty walk.
+    ///
+    /// [`DirTreeError::MissingRoot`] is the only variant this absorbs: the
+    /// walk yields nothing instead of one error item. Other failures
+    /// ([`DirTreeError::RootInaccessible`], [`DirTreeError::NodeInaccessible`])
+    /// still surface, so callers keep their strict handling of unreadable
+    /// roots. This is the shared policy for callers that treat an absent
+    /// directory as "no entries" (schema registry, template lookup, file
+    /// tracker store).
+    ///
+    /// Has no effect once iteration has begun.
+    #[must_use]
+    pub(crate) fn missing_as_empty(mut self) -> Self {
+        self.absorb_missing_root = true;
+        self
     }
 
     /// Removes every subtree whose directory satisfies `predicate`.
@@ -290,14 +311,27 @@ impl Iterator for DirTree {
     type Item = Result<DirNode, DirTreeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.start().next().map(|result| DirNode::try_new(&self.root, result))
+        while let Some(item) = self
+            .start()
+            .next()
+            .map(|result| DirNode::try_new(&self.root, result))
+        {
+            let absorbed = self.absorb_missing_root
+                && matches!(&item, Err(DirTreeError::MissingRoot { .. }));
+            if !absorbed {
+                return Some(item);
+            }
+        }
+        None
     }
 }
 
 /// Represents a failure raised while traversing a directory tree.
 ///
-/// Callers match to state their missing-root policy and convert remaining
-/// errors via [`into_parts`](Self::into_parts).
+/// Callers absorb [`MissingRoot`](Self::MissingRoot) via
+/// [`DirTree::missing_as_empty`] or match it to state their missing-root
+/// policy, and convert remaining errors via
+/// [`into_parts`](Self::into_parts).
 #[derive(Debug, Error)]
 pub(crate) enum DirTreeError {
     /// The walk root does not exist.
@@ -523,6 +557,55 @@ mod tests {
                 collected.into_iter().next().expect("one item"),
                 Err(DirTreeError::MissingRoot { .. })
             ));
+        }
+
+        #[test]
+        fn missing_as_empty_absorbs_a_missing_root_into_an_empty_walk() {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let missing = temp.path().join("gone");
+            write(temp.path(), "note.md");
+
+            // Act
+            let flat: Vec<_> =
+                DirTree::children(&missing).missing_as_empty().collect();
+            let deep: Vec<_> =
+                DirTree::descendants(&missing).missing_as_empty().collect();
+            let present: Vec<_> =
+                DirTree::children(temp.path()).missing_as_empty().collect();
+
+            // Assert
+            assert!(flat.is_empty(), "flat walk must yield nothing");
+            assert!(deep.is_empty(), "recursive walk must yield nothing");
+            assert_eq!(present.len(), 1, "existing roots are unaffected");
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn missing_as_empty_still_surfaces_root_inaccessible() {
+            use std::os::unix::fs::PermissionsExt;
+
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "inside.md");
+            fs::set_permissions(root, fs::Permissions::from_mode(0o000))
+                .expect("revoke root permissions");
+            let _restore = RestorePermissions(root);
+
+            // Act
+            let collected: Vec<_> =
+                DirTree::children(root).missing_as_empty().collect();
+
+            // Assert: only MissingRoot is absorbed; other failures propagate.
+            assert_eq!(collected.len(), 1);
+            assert!(
+                matches!(
+                    collected.into_iter().next().expect("one item"),
+                    Err(DirTreeError::RootInaccessible { .. })
+                ),
+                "other failures must not be absorbed"
+            );
         }
 
         #[test]

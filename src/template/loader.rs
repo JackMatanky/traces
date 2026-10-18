@@ -34,7 +34,7 @@ use std::{
 use minijinja::{Error, ErrorKind};
 
 use super::path::{TemplatePath, TemplatePathError, TemplatePathInput};
-use crate::{Config, DirTree, DirTreeError};
+use crate::{Config, DirTree};
 
 /// A template search path: at most one local directory and at most one global
 /// directory, searched local-first.
@@ -171,13 +171,11 @@ impl TemplateLoader {
         let key = path.file_stem().unwrap_or(path.as_os_str());
         let mut hits = Vec::new();
         let entries = DirTree::children(&search_dir)
+            .missing_as_empty()
             .sorted_by(|a, b| a.file_name().cmp(b.file_name()));
         for entry in entries {
             let node = match entry {
                 Ok(node) => node,
-                Err(DirTreeError::MissingRoot {
-                    ..
-                }) => return Ok(None),
                 Err(error) => {
                     let (directory, source) = error.into_parts();
                     return Err(TemplatePathError::DirectoryRead {
