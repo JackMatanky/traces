@@ -118,6 +118,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
 > observed). Run `mise run verify` on `main` before starting.
 >
 > **Corrected premises.**
+>
 > - The store already has a metadata table (`cache_format`: format version
 >   row, written in the same txn as the index rows, checked by
 >   `rebuild_needed`). It is renamed `meta` and the fingerprint joins it as a
