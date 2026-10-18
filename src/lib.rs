@@ -147,7 +147,7 @@ pub(crate) use file::{BaseName, BaseNameRef, FileName};
 pub(crate) use file_tracker::{
     CleanMode, FilePathTracker, FilePathTrackerError,
 };
-pub(crate) use hash::{Blake3Digest, Blake3PathHash};
+pub(crate) use hash::{Blake3Digest, Blake3Hasher, Blake3PathHash};
 pub(crate) use index::IndexerService;
 pub(crate) use lexer::{
     LexError, SpannedTokenStream, TokenSpec, lexical_unquote,

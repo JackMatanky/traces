@@ -615,7 +615,7 @@ src/lib.rs: pub(crate) use dirtree::{DirNode, DirTree, DirTreeError};
 src/lib.rs: pub(crate) use field::{
 src/lib.rs: pub(crate) use file::{BaseName, BaseNameRef, FileName};
 src/lib.rs: pub(crate) use file_tracker::{
-src/lib.rs: pub(crate) use hash::{Blake3Digest, Blake3PathHash};
+src/lib.rs: pub(crate) use hash::{Blake3Digest, Blake3Hasher, Blake3PathHash};
 src/lib.rs: pub(crate) use index::IndexerService;
 src/lib.rs: pub(crate) use lexer::{
 src/lib.rs: pub(crate) use note::NoteFieldType;

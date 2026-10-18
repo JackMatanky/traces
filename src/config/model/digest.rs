@@ -20,7 +20,7 @@ use super::{
     Config, DateFieldConfig, FrontmatterConfig, SchemasConfig, TaskConfig,
     TemplateConfig,
 };
-use crate::{Blake3Digest, TaskStatus, hash::Blake3Hasher};
+use crate::{Blake3Digest, Blake3Hasher, TaskStatus};
 
 /// Versions the composed Config Fingerprint encoding.
 const CONFIG_LABEL: &[u8] = b"traces.config.v1";

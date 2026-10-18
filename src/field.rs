@@ -36,9 +36,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{
-    DateTimeValue, DateValue, hash::Blake3Hasher, temporal::DatePoint,
-};
+use crate::{Blake3Hasher, DateTimeValue, DateValue, temporal::DatePoint};
 
 /// Stores an exact schema field identifier.
 ///
@@ -1164,7 +1162,6 @@ mod tests {
             use pretty_assertions::{assert_eq, assert_ne};
 
             use super::super::super::*;
-            use crate::hash::Blake3Hasher;
 
             #[test]
             fn feeds_the_exact_utf8_bytes_of_the_name() {
