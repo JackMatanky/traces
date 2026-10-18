@@ -889,16 +889,16 @@ impl<T> yoke::erased::ErasedDestructor for traces::testing::Blake3PathHash where
 pub struct traces::testing::Config
 impl traces::testing::Config
 pub fn traces::testing::Config::for_test(std::path::PathBuf, core::option::Option<std::path::PathBuf>, core::option::Option<std::path::PathBuf>, std::path::PathBuf) -> Self
-pub const fn traces::testing::Config::frontmatter(&self) -> &traces::config::model::FrontmatterConfig
+pub const fn traces::testing::Config::frontmatter(&self) -> &traces::config::model::frontmatter::FrontmatterConfig
 pub fn traces::testing::Config::global_template_dir(&self) -> core::option::Option<&std::path::Path>
 pub fn traces::testing::Config::local_template_dir(&self) -> core::option::Option<&std::path::Path>
 pub fn traces::testing::Config::output_dir(&self) -> &std::path::Path
 pub fn traces::testing::Config::root(&self) -> &std::path::Path
-pub const fn traces::testing::Config::schemas(&self) -> &traces::config::model::SchemasConfig
+pub const fn traces::testing::Config::schemas(&self) -> &traces::config::model::schemas::SchemasConfig
 pub const fn traces::testing::Config::tasks(&self) -> &traces::testing::TaskConfig
 pub fn traces::testing::Config::test_default<P: core::convert::Into<std::path::PathBuf>>(P) -> Self
-pub fn traces::testing::Config::with_frontmatter(self, traces::config::model::FrontmatterConfig) -> Self
-pub fn traces::testing::Config::with_schemas(self, traces::config::model::SchemasConfig) -> Self
+pub fn traces::testing::Config::with_frontmatter(self, traces::config::model::frontmatter::FrontmatterConfig) -> Self
+pub fn traces::testing::Config::with_schemas(self, traces::config::model::schemas::SchemasConfig) -> Self
 pub fn traces::testing::Config::with_tasks(self, traces::testing::TaskConfig) -> Self
 pub fn traces::testing::Config::with_templates(self) -> Self
 impl core::clone::Clone for traces::testing::Config
@@ -3430,7 +3430,7 @@ impl<T> yoke::erased::ErasedDestructor for traces::ListText where T: 'static
 pub struct traces::MarkdownParserInput<'a>
 impl<'a> traces::MarkdownParserInput<'a>
 pub fn traces::MarkdownParserInput<'a>::for_test(&'a std::path::Path, &'a str) -> Self
-pub const fn traces::MarkdownParserInput<'a>::new(&'a std::path::Path, &'a str, &'a traces::testing::TaskConfig, &'a traces::config::model::FrontmatterConfig) -> Self
+pub const fn traces::MarkdownParserInput<'a>::new(&'a std::path::Path, &'a str, &'a traces::testing::TaskConfig, &'a traces::config::model::frontmatter::FrontmatterConfig) -> Self
 impl<'a> core::clone::Clone for traces::MarkdownParserInput<'a>
 pub fn traces::MarkdownParserInput<'a>::clone(&self) -> Self
 impl<'a> core::fmt::Debug for traces::MarkdownParserInput<'a>

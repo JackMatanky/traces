@@ -113,3 +113,29 @@ fail-closed guarantee for every future config setting.
 > `syn`-based source-scanning unit test instead of trybuild; the config types
 > are crate-private, so trybuild's external-crate harness cannot observe them,
 > making trybuild architecturally incapable of pinning this convention.
+
+> Implementation note (through `a2b6eb01`): `src/config/model.rs`
+> defines `Config::digests()` and `Config::hash()`; section-local
+> `digests()` methods live in `src/config/model/{templates,schemas,frontmatter,tasks}.rs`.
+> `src/config/model/digest.rs` owns the digest bundles, the length-prefixed
+> setting-label frame, and composition under `b"traces.config.v1"`.
+> `FieldName::feed_into()` in `src/field.rs` encodes exact UTF-8 bytes,
+> while `Blake3Hasher::digest()` in `src/hash.rs` frames child digests.
+> The previous aggregate encoding was removed; no index or persistence
+> consumer was added in this ticket.
+>
+> Verification note: unit tests cover setting framing (including the
+> named `ROOT` label), isolated setting changes, bundle composition, the
+> pinned whole-config fingerprint, and a `syn` scan for rest patterns in
+> digest constructors and encoders. A focused config-model test run
+> passed 45/45 tests and a format check passed before `a2b6eb01`.
+> The later `mise run verify` request timed out while processes were
+> still running; its final result was not observed. The manual dummy-field
+> compile-fail check in the acceptance criteria remains unverified.
+>
+> Design review note: the section types own encoding of their fields,
+> `Config` gathers section bundles, and `ConfigDigests` composes them.
+> No evidenced redesign was identified. `TaskConfig::digests()` sorts
+> borrowed status references into deterministic symbol order, allocating
+> a vector per call; no production digest consumer or performance baseline
+> yet justifies changing that representation.
