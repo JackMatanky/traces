@@ -2,7 +2,7 @@
 
 **Ticket:** `.scratch/arch-redesign/issues/07-research-query-ir-template-boundary-precedent.md`  
 **Date:** 2026-10-18  
-**Caveat:** lessons citing minijinja 3.0 (`State::get_or_insert_extension`, `Template::undeclared_variables`, `state.rs:537-542`) come from upstream 3.0 sources; `Cargo.toml` pins `minijinja 2.24.0`, so their availability must be checked against 2.24.0 (or a crate bump decided) in the template-engine-boundary ticket.
+**Caveat:** lessons citing minijinja 3.0 (`State::get_or_insert_extension`, `Template::undeclared_variables`, `state.rs:537-542`) come from upstream 3.0 sources; `Cargo.toml` pins `minijinja 2.24.0`, so their availability had to be checked against 2.24.0. **Checked in [research 21](21-carry-forward-evidence-gaps.md) Gap B:** `undeclared_variables` exists in 2.24.0; `get_or_insert_extension` is 3.0-only. Lesson 7's "extensions replace the downcasting caches" therefore needs a crate bump (cost unchecked).
 **Scope:** Precedent research for query core (Ticket 16) and template engine boundary (Ticket 18). Evaluates comparables across database engines (DataFusion, Polars), stream processors (jq, jaq), pathspec engines (gitoxide, ignore), template engines (Minijinja, Zola/Tera, Helm), scaffolding generators (cargo-generate, Copier, Cookiecutter), and Obsidian plugins (Dataview, Templater, Tasks). Planning-only; zero modifications to production code, tests, or documentation.
 
 ---
@@ -117,7 +117,7 @@
   - *Minijinja Static Analysis:* `Template::undeclared_variables(nested: bool)` and `Expression::undeclared_variables(nested: bool)` (`minijinja/src/template.rs:317-326`, `minijinja/src/expression.rs:93-104`) parse the AST via `minijinja::machinery::parse` and return all variable references and nested attribute paths (`foo.bar`) without executing templates, filters, or control flow.
 - **Transferability Test:**
   - *Traces Constraints:* md-pkm-lsp (Ticket 22) requires static template analysis that never executes templates; Traces currently downcasts string-keyed `State` temp-storage (`query.index_cache`, `schema.service_cache`) and re-parses root templates on every render (`src/template/engine.rs:190-193`).
-  - Minijinja's native `State::extensions` replaces custom downcasting caches, while `undeclared_variables(nested: true)` provides variable and namespace extraction for LSP without sandboxing or mock execution.
+  - Minijinja's native `State::extensions` replaces custom downcasting caches, while `undeclared_variables(nested: true)` provides variable and namespace extraction for LSP without sandboxing or mock execution. *Version note (research 21 Gap B):* `undeclared_variables` is available in the pinned 2.24.0; `State::get_or_insert_extension` is not (3.0-only).
 - **Negative Lesson:**
   - Do NOT implement custom AST walkers or sandboxed mock evaluators to find template dependencies; Minijinja's built-in AST analysis (`undeclared_variables`) inspects all identifiers and attribute paths natively.
 

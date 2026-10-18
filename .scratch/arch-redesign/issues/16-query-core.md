@@ -1,7 +1,7 @@
 # Query core: predicate algebra, row model, and execution against the index
 
 Type: grilling
-Blocked by: 02, 10, 12, 15, 07
+Blocked by: 02, 10, 12, 15, 07, 21
 
 ## Question
 
@@ -12,6 +12,8 @@ The query subsystem has separate lexers, ASTs, and evaluators for *source select
 Survey leads (UNVERIFIED until ticket [Verify system findings](02-research-verify-system-findings.md) §2–4 lands): [query §2–§11](../survey/query.md), [cross-cutting §6](../survey/cross-cutting.md). ADR-0008 (source grammar) and ADR-0009 (filter date literals) are claims; the `FileClassExpander` "keep" verdict is a hypothesis.
 
 **Verified (ledgers landed 2026-10-18)** — [02 §2–4](../research/02-verify-system-findings.md): `QueryRow` is **48 bytes** (not 112) and clones an `Arc<WorkspaceIndex>` per row (`results.rs:44-50,57`); `cmp_document_order` (`results.rs:426-432`) compares only note `position`, so list/task rows from the same note compare `Equal` — a real, untested defect exposed to templates via `custom_cmp` (`template/engine/query.rs:539`). Sources (`--from`: `SourceLexer`/`SourceSelector`, `source.rs`) and filters (`--where`: `FilterLexer`/`FilterExpr`, `filter.rs`) are separate lexers and ASTs expressing overlapping tag/class/folder predicates at different pipeline stages. `TextShape::classify` is called from sort (`sort.rs:394`) and filter (`filter.rs:85,242`). `FileClassExpander`: one production impl (`SchemaService`, `file_class_expander.rs:15`), one test mock, built at `cli/mod.rs:479-480` and `template/engine/query.rs:132-133`; `query` has zero `schema` references. [03 §5–7](../research/03-performance-evidence.md): in-memory `run` is 48 B/row; sorted 184 B/row; `QuerySet::clone` is 12 ns (Arc); materializing a chained plan with transforms does `base.to_vec()` (20K rows → 20K `Arc` increments + ~960 KB) — a shallow-clone design that still copies on materialization. Evaluation costs are small at 20K rows (sort 0.57–1.2 ms; date filters 0.83–2.7 ms).
+
+**Verified (research landed 2026-10-18)** — [Carry-forward evidence gaps](21-research-carry-forward-evidence-gaps.md) ([ledger](../research/21-carry-forward-evidence-gaps.md) Gap A): the filter comparison operators (`filter.rs:807,832`) call `NoteFieldValueRef::compare`, whose `Date`/`DateTime` cross-kind arms read the ambient zone on every call and map a lookup failure to a fixed ordering (`note/field.rs:297-300`). Cross-kind ordering is therefore a semantic the query core must either fix explicitly (zone supplied by the evaluation context) or define as an error.
 
 ## Alternatives (not exhaustive)
 
