@@ -35,29 +35,6 @@ use std::{
 use thiserror::Error;
 use walkdir::{DirEntry, WalkDir};
 
-/// Classifies one raw walkdir failure against the walk's root.
-fn classify(fallback: &Path, source: walkdir::Error) -> DirTreeError {
-    let depth = source.depth();
-    let path = source.path().unwrap_or(fallback).to_path_buf();
-    let source = io::Error::from(source);
-    match depth {
-        0 if source.kind() == io::ErrorKind::NotFound => {
-            DirTreeError::MissingRoot {
-                path,
-                source,
-            }
-        }
-        0 => DirTreeError::RootInaccessible {
-            path,
-            source,
-        },
-        _ => DirTreeError::NodeInaccessible {
-            path,
-            source,
-        },
-    }
-}
-
 /// Represents a node of a directory tree: a file, directory, or symlink yielded
 /// by [`DirTree::children`] or [`DirTree::descendants`].
 ///
@@ -84,15 +61,40 @@ impl<'a> DirNodeRef<'a> {
 impl DirNode {
     /// Adapts one raw walkdir item into this module's interface.
     ///
-    /// Entries become nodes; failures are classified against the walk's root.
+    /// Entries become nodes; failures are classified against the walk's root:
+    /// a depth-0 [`NotFound`](io::ErrorKind::NotFound) is a
+    /// [`DirTreeError::MissingRoot`], any other depth-0 failure is a
+    /// [`DirTreeError::RootInaccessible`], and a failure beneath the root is
+    /// a [`DirTreeError::NodeInaccessible`]. Mid-readdir errors that carry no
+    /// path fall back to the walk root.
     fn try_new(
         root: &Path,
         result: walkdir::Result<DirEntry>,
     ) -> Result<Self, DirTreeError> {
-        match result {
-            Ok(entry) => Ok(Self(entry)),
-            Err(source) => Err(classify(root, source)),
-        }
+        let failure = match result {
+            Ok(entry) => return Ok(Self(entry)),
+            Err(failure) => failure,
+        };
+        let depth = failure.depth();
+        let path = failure.path().unwrap_or(root).to_path_buf();
+        let source = io::Error::from(failure);
+        let error = match depth {
+            0 if source.kind() == io::ErrorKind::NotFound => {
+                DirTreeError::MissingRoot {
+                    path,
+                    source,
+                }
+            }
+            0 => DirTreeError::RootInaccessible {
+                path,
+                source,
+            },
+            _ => DirTreeError::NodeInaccessible {
+                path,
+                source,
+            },
+        };
+        Err(error)
     }
 
     /// Returns the node's full path, including the walk root prefix.
@@ -135,6 +137,9 @@ type PrunePredicate = Box<dyn FnMut(&DirEntry) -> bool>;
 enum InnerIter {
     Plain(walkdir::IntoIter),
     Filtered(walkdir::FilterEntry<walkdir::IntoIter, PrunePredicate>),
+    /// Terminal state for a walk that never obtained a builder: yields
+    /// nothing instead of fabricating a dummy root.
+    Done,
 }
 
 impl Iterator for InnerIter {
@@ -145,6 +150,7 @@ impl Iterator for InnerIter {
         match self {
             Self::Plain(iter) => iter.next(),
             Self::Filtered(iter) => iter.next(),
+            Self::Done => None,
         }
     }
 }
@@ -293,10 +299,10 @@ impl DirTree {
             ..
         } = self;
         inner.get_or_insert_with(|| {
-            let iter = builder.take().map_or_else(
-                || WalkDir::new("").into_iter(),
-                WalkDir::into_iter,
-            );
+            let Some(builder) = builder.take() else {
+                return InnerIter::Done;
+            };
+            let iter = WalkDir::into_iter(builder);
             match prune.take() {
                 Some(predicate) => {
                     InnerIter::Filtered(iter.filter_entry(predicate))
