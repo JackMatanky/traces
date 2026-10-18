@@ -262,7 +262,7 @@ mod tests {
     }
 
     mod blake3_hasher {
-        use pretty_assertions::assert_ne;
+        use pretty_assertions::{assert_eq, assert_ne};
 
         use super::*;
 
@@ -284,6 +284,21 @@ mod tests {
             });
 
             assert_ne!(first, second);
+        }
+
+        #[test]
+        fn feeds_a_child_digest_as_a_length_prefixed_32_byte_field() {
+            let child = Blake3Digest::from("child");
+            let mut raw = blake3::Hasher::new();
+            raw.update(&32_u64.to_le_bytes());
+            raw.update(blake3::hash(b"child").as_bytes());
+
+            let composed = digest(|hasher| hasher.digest(&child));
+
+            assert_eq!(
+                composed.to_hex().as_ref(),
+                raw.finalize().to_hex().as_str()
+            );
         }
 
         #[test]
