@@ -578,6 +578,7 @@ src/index/tables.rs: pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefiniti
 src/index/tables.rs: pub(super) const PATHS_BY_TAG: MultimapTableDefinition<
 src/index/tables.rs: pub(super) const TABLES: [TableSpec; 8] = [
 src/index/tables.rs: pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
+src/index/tables.rs: pub(super) fn create(
 src/index/tables.rs: pub(super) fn delete(
 src/index/tables.rs: pub(super) fn probe(
 src/index/tables.rs: pub(super) struct TableSpec {

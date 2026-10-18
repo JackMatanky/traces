@@ -827,6 +827,7 @@ impl IndexStore {
         fingerprint: &IndexFingerprint,
         rows: &IncrementalRows<'_>,
     ) -> IndexResult<()> {
+        self.create_tables(&txn)?;
         // Core tables (FILES, NOTES, tag/class axes) and the LINKS multimap
         // are fully disjoint, so their write batches overlap via rayon::join.
         let (core_res, links_res) = rayon::join(
@@ -1284,6 +1285,14 @@ impl IndexStore {
     fn delete_tables(&self, txn: &WriteTransaction) -> IndexResult<()> {
         TABLES.iter().try_for_each(|spec| {
             spec.delete(self, txn).map_err(IndexError::from)
+        })
+    }
+
+    /// Creates every missing table so an incremental write never leaves a
+    /// partial schema behind.
+    fn create_tables(&self, txn: &WriteTransaction) -> IndexResult<()> {
+        TABLES.iter().try_for_each(|spec| {
+            spec.create(self, txn).map_err(IndexError::from)
         })
     }
 

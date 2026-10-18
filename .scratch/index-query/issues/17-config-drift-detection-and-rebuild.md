@@ -159,10 +159,11 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
 >   borrow it, `StoredFingerprint::Recorded` boxes it, and `IndexerService`
 >   keeps it boxed (clippy `large_types_passed_by_value`,
 >   `large_enum_variant`, and the bench stack-frame lint).
-> - Found, not fixed (out of scope): the incremental persist path only opens
->   the tables it writes, so a first build into a virgin store of notes with no
->   links, tags, or classes leaves a partial schema. The next `open` sees
->   "present and missing" and wipes it, so the second refresh rebuilds again.
->   Results stay correct, and drift cannot be misreported (a wiped store is
->   virgin), but the "all tables or none" premise above does not hold for that
->   case.
+> - Found and fixed in this ticket: the incremental persist path only opened
+>   the tables it wrote, so a first build into a virgin store of notes with no
+>   links, tags, or classes left a partial schema. The next `open` saw
+>   "present and missing" and wiped it, so every refresh of such a project
+>   rebuilt from scratch and the ticket's "all tables or none" premise did not
+>   hold. `apply_incremental_in` now creates every missing table first
+>   (`TableSpec::create`), pinned by
+>   `reports_a_second_refresh_after_the_first_build_as_unchanged`.

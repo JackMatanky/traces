@@ -2011,6 +2011,20 @@ mod tests {
         }
 
         #[test]
+        fn reports_a_second_refresh_after_the_first_build_as_unchanged() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            fs::write(root.join("a.md"), "# A").expect("write a");
+            let service = IndexerService::for_tests(root);
+            service.refresh_with_report().expect("first build");
+
+            let (_, report) =
+                service.refresh_with_report().expect("second refresh");
+
+            assert_eq!(report, RefreshReport::Unchanged);
+        }
+
+        #[test]
         fn reports_every_setting_when_the_stored_fingerprint_is_missing() {
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();

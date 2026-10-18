@@ -159,6 +159,30 @@ impl TableSpec {
         self.def.probe(txn)
     }
 
+    /// Creates this table in `txn` when it does not exist yet.
+    ///
+    /// Incremental writes only open the tables whose rows they touch, so
+    /// without this a first build into a virgin store could leave a partial
+    /// schema that the next open wipes.
+    ///
+    /// # Errors
+    ///
+    /// - [`StoreError::Redb`] if redb cannot open the table, or the stored
+    ///   definition does not match.
+    ///
+    /// [`StoreError::Redb`]: super::error::StoreError::Redb
+    pub(super) fn create(
+        &self,
+        store: &IndexStore,
+        txn: &WriteTransaction,
+    ) -> StoreResult<()> {
+        match &self.def {
+            TableDef::ToOne(def) => txn.open_table(*def).map(|_| ()),
+            TableDef::ToMany(def) => txn.open_multimap_table(*def).map(|_| ()),
+        }
+        .map_err(|source| store.wrap_redb_error(source))
+    }
+
     /// Deletes this table's contents per its [`DeletePolicy`].
     ///
     /// `Required` propagates every storage error; `BestEffort` tolerates only a
