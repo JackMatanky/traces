@@ -186,8 +186,8 @@
 - **Negative Lesson**:
   - Fragmenting a 25-module codebase into a micro-crate workspace (e.g., separate crates for `dirtree`, `strsim`, `position`, `lexer`, `yaml`, `env_vars`) when they are strictly internal utilities with no external consumers produces architectural bloat without performance or modularity gains.
 - **Transferability Test for Traces**:
-  - *Traces Context*: Traces has 25 top-level modules. The ledger in `01-verify-core-findings.md` Claim 8 proves that root primitives (`strsim`, `yaml`, `env_vars`, `hash`) have multiple internal consumers but no independent utility outside Traces.
-  - *Transferability*: **Directly transferable**. Traces must avoid the hyper-fragmentation trap. If any crate extraction occurs, it must only be for high-level cohesive tiers (e.g., a core library vs CLI binary), not micro-crates for internal leaf utilities.
+  - *Traces Context*: Traces has 25 top-level modules. The ledger in `01-verify-core-findings.md` Claim 8 (PARTIAL; see its Errata) shows that root primitives such as `dirs`, `delimiter` and `lexer` have multiple internal consumers; this file did not establish that they lack independent utility outside Traces.
+  - *Transferability*: Likely transferable (hypothesis for the crate-topology ticket). The hyper-fragmentation trap argues against micro-crates; if any crate extraction occurs, the precedent favours only high-level cohesive tiers (e.g., a core library vs CLI binary), not micro-crates for internal leaf utilities.
 
 ---
 
