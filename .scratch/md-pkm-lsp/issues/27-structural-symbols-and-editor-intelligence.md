@@ -1,7 +1,9 @@
 # Structural/editor intelligence: symbols, folding, selection ranges, document links, CodeLens, code actions, semantic tokens
 
 Type: grilling
+Status: open
 Blocked by: 05, 15, 23
+Assigned: agent
 
 ## Question
 
