@@ -43,7 +43,8 @@ format version. Their failure is modeled as three first-class refresh states:
 Heal for drift is the existing rebuild verb: the refresh path performs a full
 rebuild and reports it, so operators never need a separate `traces index`
 invocation after a config change. The report distinguishes what happened
-(Unchanged / FilesChanged / ConfigDrift with the specific changed settings)
+(Unchanged / FilesChanged / ConfigDrift with the changed settings, or
+`Unrecorded` when the store holds rows but no readable fingerprint)
 rather than a bare row count.
 
 Boundaries this decision keeps:

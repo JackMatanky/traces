@@ -27,7 +27,7 @@ use crate::{FileMeta, Note};
 /// Reports what one refresh found and healed.
 ///
 /// Count accessors return zero for every variant that does not carry counts:
-/// a config drift heal reports the settings that changed, not row counts.
+/// a config drift heal reports its cause, not row counts.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum RefreshReport {
     /// Nothing changed: the persisted index served as it was.
@@ -356,7 +356,7 @@ impl RefreshPlan {
         })
     }
 
-    /// Takes the settings that drifted, or `None` if the store matches the
+    /// Takes the cause of the drift, or `None` if the store matches the
     /// running config.
     #[inline]
     pub(super) const fn take_drift(&mut self) -> Option<DriftCause> {

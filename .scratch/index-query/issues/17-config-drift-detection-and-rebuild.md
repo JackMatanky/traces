@@ -70,7 +70,7 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
       `DriftCause` is `Settings(Box<[IndexSetting]>)` or `Unrecorded` (rows
       without a readable fingerprint blame no setting)
       with count accessors kept as documented methods (they return 0 for
-      `Unchanged` and `ConfigDrift`: a heal reports settings, not row counts);
+      `Unchanged` and `ConfigDrift`: a heal reports its cause, not row counts);
       no file-path lists. Loses `Copy`: the test/bench comparison sites are
       updated, `log_report` handles all three variants, and the `tests/baselines`
       public-API and pub-token files are regenerated.
