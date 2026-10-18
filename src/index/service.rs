@@ -642,6 +642,23 @@ mod tests {
         }
 
         #[test]
+        fn scans_a_root_whose_own_name_is_ignored() {
+            // Arrange: the workspace root itself matches `is_ignored_dir`
+            // ("target"), so a seam that applies the prune predicate to the
+            // root would silently return an empty index.
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path().join("target");
+            fs::create_dir(&root).expect("mkdir target");
+            fs::write(root.join("note.md"), "content").expect("write note.md");
+
+            // Act
+            let files = IndexerService::scan(&root).expect("scan");
+
+            // Assert
+            assert_eq!(paths(&files), vec![Path::new("note.md")]);
+        }
+
+        #[test]
         fn scans_nested_files_in_sorted_order() {
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();

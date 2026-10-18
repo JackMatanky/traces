@@ -140,9 +140,10 @@ impl ConfigLocator {
 
 /// Collects local Config Files at or below `dir`.
 ///
-/// Skips subtrees named by [`env_vars::is_ignored_dir`], but always scans `dir`
-/// itself, even if its name is ignored. Propagates traversal failures instead
-/// of treating them as an empty subtree.
+/// Skips subtrees named by [`env_vars::is_ignored_dir`]. The walk root `dir`
+/// is exempt from pruning ([`DirTree::filter`] never consults the predicate
+/// for it), so an ignored name on `dir` itself does not empty the scan.
+/// Propagates traversal failures instead of treating them as an empty subtree.
 ///
 /// # Errors
 ///
@@ -152,11 +153,10 @@ impl ConfigLocator {
 fn collect_descendant_configs(
     dir: &Path,
 ) -> ConfigDiscoveryResult<Vec<LocalConfigFile<Discovered>>> {
-    let root = dir.to_path_buf();
     let mut configs = Vec::new();
-    for node in DirTree::descendants(dir).filter(move |node| {
-        node.path() != root && env_vars::is_ignored_dir(node.file_name())
-    }) {
+    for node in DirTree::descendants(dir)
+        .filter(|node| env_vars::is_ignored_dir(node.file_name()))
+    {
         let node = node.map_err(|error| {
             let (path, source) = error.into_parts();
             ConfigDiscoveryError::Inaccessible {

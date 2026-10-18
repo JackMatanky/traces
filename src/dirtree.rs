@@ -78,13 +78,6 @@ impl<'a> DirNodeRef<'a> {
     pub(crate) fn file_name(self) -> &'a OsStr {
         self.0.file_name()
     }
-
-    /// Returns the node's full path.
-    #[inline]
-    #[must_use]
-    pub(crate) fn path(self) -> &'a Path {
-        self.0.path()
-    }
 }
 
 impl DirNode {
@@ -219,11 +212,12 @@ impl DirTree {
 
     /// Removes every subtree whose directory satisfies `predicate`.
     ///
-    /// `predicate` receives a [`DirNode`] for each directory. Returning `true`
-    /// removes that directory *and* everything beneath it from the walk.
-    /// Non-matching entries (including files whose name satisfies the
-    /// predicate) are yielded unchanged. A predicate matching the walk root
-    /// itself empties the whole walk.
+    /// `predicate` is consulted only for directories *beneath* the walk root.
+    /// Returning `true` removes that directory *and* everything beneath it
+    /// from the walk. Non-matching entries (including files whose name
+    /// satisfies the predicate) are yielded unchanged. The walk root itself
+    /// is exempt: the predicate never sees it, so a predicate that matches
+    /// the root's own name leaves the walk intact.
     ///
     /// Works on both [`Self::children`] and [`Self::descendants`]: for flat
     /// walks, filtered directories are simply omitted from the listing.
@@ -235,7 +229,9 @@ impl DirTree {
         F: FnMut(&DirNodeRef<'_>) -> bool + 'static,
     {
         self.prune = Some(Box::new(move |entry: &DirEntry| {
-            !entry.file_type().is_dir() || !predicate(&DirNodeRef(entry))
+            entry.depth() == 0
+                || !entry.file_type().is_dir()
+                || !predicate(&DirNodeRef(entry))
         }));
         self
     }
@@ -629,6 +625,47 @@ mod tests {
 
             // Assert: pruned subtree absent AND surviving siblings ordered.
             assert_eq!(relatives, vec!["", "b", "b/note.md"]);
+        }
+
+        #[test]
+        fn filter_never_consults_the_predicate_for_the_walk_root() {
+            // Arrange: the root deliberately carries an "ignored" name, and
+            // the predicate counts every directory it is asked about.
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path().join("target");
+            fs::create_dir(&root).expect("create root");
+            write(&root, "note.md");
+            let seen =
+                std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let seen_in_predicate = std::sync::Arc::clone(&seen);
+            let root_name = root.file_name().expect("named").to_os_string();
+
+            // Act
+            let relatives: Vec<String> = DirTree::descendants(&root)
+                .filter(move |node| {
+                    seen_in_predicate
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    node.file_name() == root_name.as_os_str()
+                })
+                .map(|entry| entry.expect("entry is ok"))
+                .map(|node| {
+                    node.path()
+                        .strip_prefix(&root)
+                        .expect("under root")
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect();
+
+            // Assert: the root survives its own name-matching predicate and
+            // the predicate never runs at depth 0, so callers no longer guard
+            // against emptying the walk.
+            assert_eq!(relatives, vec!["", "note.md"]);
+            assert_eq!(
+                seen.load(std::sync::atomic::Ordering::Relaxed),
+                0,
+                "predicate must not be invoked for the walk root"
+            );
         }
     }
 
