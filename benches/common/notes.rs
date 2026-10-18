@@ -2,7 +2,7 @@
 //!
 //! Use this module when the benchmark needs [`Note`] values or matching
 //! [`FileMeta`] records but not a real directory tree. Every generator returns
-//! notes sorted by path so [`InlinkMap`](traces_pkm::testing::InlinkMap)
+//! notes sorted by path so [`InlinkMap`](traces::testing::InlinkMap)
 //! callers get deterministic input order.
 //!
 //! Do not add filesystem setup here. If a benchmark needs actual files,
@@ -13,7 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
-use traces_pkm::{FileMeta, Note};
+use traces::{FileMeta, Note};
 
 use super::content::{
     attachment_note_source, duplicate_link_note_source, linked_note_source,
@@ -21,7 +21,7 @@ use super::content::{
 
 /// Parses a synthetic note at `path` from `content`.
 pub(crate) fn parse_note(path: &Path, content: &str) -> Note {
-    traces_pkm::testing::parse_note(path, content)
+    traces::testing::parse_note(path, content)
 }
 
 /// Returns sorted [`FileMeta`] note records matching `notes`.
@@ -130,7 +130,7 @@ pub(crate) fn generate_ambiguous_target_link_notes(
 /// Generates parsed notes that link to attachment-looking paths plus matching
 /// [`FileMeta`] records.
 ///
-/// Use this for in-memory [`InlinkMap`](traces_pkm::testing::InlinkMap)
+/// Use this for in-memory [`InlinkMap`](traces::testing::InlinkMap)
 /// benchmarks. It does not create files on disk; use
 /// [`super::project::create_project`] with
 /// [`ProjectShape::AttachmentProject`](super::content::ProjectShape::AttachmentProject)
@@ -149,11 +149,11 @@ pub(crate) fn generate_attachment_link_notes(
     for i in 0..20 {
         files.push(FileMeta::for_test(
             format!("assets/image-{i}.png"),
-            traces_pkm::testing::FileFormat::Other,
+            traces::testing::FileFormat::Other,
         ));
         files.push(FileMeta::for_test(
             format!("docs/spec-{i}.pdf"),
-            traces_pkm::testing::FileFormat::Other,
+            traces::testing::FileFormat::Other,
         ));
     }
     notes.sort_by(|a, b| a.path().cmp(b.path()));

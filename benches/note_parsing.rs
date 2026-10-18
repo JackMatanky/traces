@@ -37,7 +37,7 @@ use std::hint::black_box;
 use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
-use traces_pkm::Note;
+use traces::Note;
 
 #[expect(
     dead_code,

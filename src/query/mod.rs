@@ -52,7 +52,7 @@
 //! # {
 //! use std::sync::Arc;
 //!
-//! use traces_pkm::testing::{
+//! use traces::testing::{
 //!     IndexerService, QueryBuilder, QueryService, SourceSelector,
 //! };
 //!

@@ -1,14 +1,14 @@
 //! Runs the `traces` CLI.
 //!
-//! Argument parsing and command dispatch live in [`traces_pkm::cli::run`].
+//! Argument parsing and command dispatch live in [`traces::cli::run`].
 //! This file only maps the top-level outcome to a process exit code.
 
 use std::process::ExitCode;
 
-use traces_pkm::cli::{CommandOutcome, UserAbort};
+use traces::cli::{CommandOutcome, UserAbort};
 
 fn main() -> ExitCode {
-    exit_code(traces_pkm::cli::run())
+    exit_code(traces::cli::run())
 }
 
 /// Maps the CLI result to a process [`ExitCode`].
@@ -17,7 +17,7 @@ fn main() -> ExitCode {
 /// (POSIX SIGINT convention). Any other error is printed to stderr and
 /// exits with `1`.
 fn exit_code(
-    result: Result<CommandOutcome, traces_pkm::cli::CliError>,
+    result: Result<CommandOutcome, traces::cli::CliError>,
 ) -> ExitCode {
     match result {
         Ok(
@@ -37,7 +37,7 @@ fn exit_code(
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
-    use traces_pkm::cli::CliError;
+    use traces::cli::CliError;
 
     use super::*;
 

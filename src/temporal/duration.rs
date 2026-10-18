@@ -139,7 +139,7 @@ fn add_fields(lhs: Span, rhs: Span) -> Result<Option<Span>, DurationError> {
 /// # Examples
 ///
 /// ```
-/// use traces_pkm::{DurationError, DurationValue};
+/// use traces::{DurationError, DurationValue};
 ///
 /// let written: DurationValue = "1h 30m".parse()?;
 /// assert_eq!(written.to_string(), "1h 30m");

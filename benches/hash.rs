@@ -35,7 +35,7 @@ use std::hint::black_box;
 use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
-use traces_pkm::testing::{Blake3Digest, Blake3PathHash};
+use traces::testing::{Blake3Digest, Blake3PathHash};
 #[expect(
     dead_code,
     reason = "shared benchmark common helpers are compiled into each bench \

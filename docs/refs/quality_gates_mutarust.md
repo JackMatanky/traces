@@ -1003,7 +1003,7 @@ cargo-mutants nor the prior note offers.
 
 ### 9.17 Capability → opportunity summary
 
-| Capability | Improvement for traces-pkm | Human | Agent |
+| Capability | Improvement for traces | Human | Agent |
 | --- | --- | --- | --- |
 | `mutarust-agentic.json` (+schemas) | replaces prose `mutants-report.md` with structured kill tasks (id/diff/context/test_files/kill_hint) | ★★ read one file | ★★★ parse, plan, verify |
 | `--run-mutant-id` | verify a newly written test killed exactly that mutant | ★ | ★★★ closed loop |

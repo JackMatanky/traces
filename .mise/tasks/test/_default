@@ -71,14 +71,14 @@ run_phase() {
   echo "==> test phase: ${label}"
   if ((${#phase_args[@]} > 0)); then
     local matches
-    matches="$(cargo nextest list -p traces-pkm --message-format oneline "$@")"
+    matches="$(cargo nextest list -p traces --message-format oneline "$@")"
     if [[ -z "${matches}" ]]; then
       echo "==> no matching ${label} tests"
       return 0
     fi
     matched_phases=$((matched_phases + 1))
   fi
-  cargo nextest run -p traces-pkm --no-tests fail "$@"
+  cargo nextest run -p traces --no-tests fail "$@"
 }
 
 #######################################
@@ -96,7 +96,7 @@ main() {
   parse_passthrough_tokens
 
   # Unit/component: production configuration (no test-utils, no features).
-  run_phase unit --no-default-features --lib --bin traces-pkm \
+  run_phase unit --no-default-features --lib --bin traces \
     "${phase_args[@]+"${phase_args[@]}"}"
 
   # Integration: the cross-module suite requires the test-utils feature.

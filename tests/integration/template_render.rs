@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use pretty_assertions::{assert_eq, assert_ne};
 use rstest::rstest;
-use traces_pkm::{
+use traces::{
     PresetDialogProvider,
     testing::{
         CommitPolicy, TemplatePathInput, TemplateService, TestProject,
@@ -273,7 +273,7 @@ fn tasks_pipeline_rejects_obsolete_task_field_syntax_with_diagnostic() {
 /// namespace's generic rows cannot silently pass through a formatter that
 /// requires task fields.
 ///
-/// [`QueryError::TaskListRequiresTaskRows`]: traces_pkm::QueryError::TaskListRequiresTaskRows
+/// [`QueryError::TaskListRequiresTaskRows`]: traces::QueryError::TaskListRequiresTaskRows
 #[test]
 fn lists_pipeline_rejects_task_list_formatter_on_non_task_rows() {
     use std::error::Error as StdError;

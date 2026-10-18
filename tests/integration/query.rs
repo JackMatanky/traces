@@ -5,7 +5,7 @@
 use std::{path::Path, sync::Arc};
 
 use pretty_assertions::{assert_eq, assert_ne};
-use traces_pkm::{
+use traces::{
     SourceLine,
     testing::{
         IndexerService, QueryBuilder, QueryBuilderError, QueryService,
@@ -39,7 +39,7 @@ fn page_query_returns_real_indexed_notes() {
 }
 
 /// Checks a date-typed frontmatter field, parsed through the real note
-/// index (not a hand-built [`traces_pkm::NoteFieldValue`]), sorts
+/// index (not a hand-built [`traces::NoteFieldValue`]), sorts
 /// chronologically through the public sort API. Mixes a bare ISO date with
 /// an RFC 3339 datetime carrying a `Z` offset, proving both accepted shapes
 /// resolve to the same comparable field through the full pipeline.

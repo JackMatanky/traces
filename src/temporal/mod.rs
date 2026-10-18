@@ -74,7 +74,7 @@ pub(crate) mod test_support {
     /// # #[cfg(feature = "test-utils")]
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # use pretty_assertions::assert_eq;
-    /// use traces_pkm::{DateTimeValue, testing::ZoneGuard};
+    /// use traces::{DateTimeValue, testing::ZoneGuard};
     ///
     /// ZoneGuard::set("UTC");
     /// let value = DateTimeValue::from_unix_seconds(0)?;

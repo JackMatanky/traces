@@ -246,7 +246,7 @@ impl ListItemType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{ListItemType, TaskDateSet, TaskListItem, TaskStatus};
+    /// use traces::{ListItemType, TaskDateSet, TaskListItem, TaskStatus};
     ///
     /// let kind = ListItemType::Task(TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -269,7 +269,7 @@ impl ListItemType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{ListItemType, TaskDateSet, TaskListItem, TaskStatus};
+    /// use traces::{ListItemType, TaskDateSet, TaskListItem, TaskStatus};
     ///
     /// let kind = ListItemType::Task(TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -294,7 +294,7 @@ impl ListItemType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::ListItemType;
+    /// use traces::ListItemType;
     ///
     /// let kind = ListItemType::Checkbox;
     /// assert!(kind.is_checkbox());
@@ -311,7 +311,7 @@ impl ListItemType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::ListItemType;
+    /// use traces::ListItemType;
     ///
     /// let kind = ListItemType::Plain;
     /// assert!(kind.is_plain());
@@ -333,7 +333,7 @@ impl ListItemType {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::{TaskDateSet, TaskListItem, TaskPriority, TaskStatus};
+/// use traces::{TaskDateSet, TaskListItem, TaskPriority, TaskStatus};
 ///
 /// let task = TaskListItem::new(
 ///     TaskDateSet::default(),
@@ -359,7 +359,7 @@ impl TaskListItem {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{TaskDateSet, TaskListItem, TaskPriority, TaskStatus};
+    /// use traces::{TaskDateSet, TaskListItem, TaskPriority, TaskStatus};
     ///
     /// let task = TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -391,7 +391,7 @@ impl TaskListItem {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{TaskDateSet, TaskListItem, TaskStatus};
+    /// use traces::{TaskDateSet, TaskListItem, TaskStatus};
     ///
     /// let task = TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -413,7 +413,7 @@ impl TaskListItem {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{TaskDateSet, TaskListItem, TaskStatus};
+    /// use traces::{TaskDateSet, TaskListItem, TaskStatus};
     ///
     /// let task = TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -434,7 +434,7 @@ impl TaskListItem {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{TaskDateSet, TaskListItem, TaskPriority, TaskStatus};
+    /// use traces::{TaskDateSet, TaskListItem, TaskPriority, TaskStatus};
     ///
     /// let task = TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -455,7 +455,7 @@ impl TaskListItem {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{TaskDateSet, TaskListItem, TaskStatus};
+    /// use traces::{TaskDateSet, TaskListItem, TaskStatus};
     ///
     /// let task = TaskListItem::new(
     ///     TaskDateSet::default(),
@@ -484,7 +484,7 @@ impl TaskListItem {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::ListText;
+/// use traces::ListText;
 ///
 /// let text = ListText::new("Buy milk 📅 2025-01-15", "Buy milk");
 /// assert_eq!(text.raw(), "Buy milk 📅 2025-01-15");
@@ -507,7 +507,7 @@ impl ListText {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::ListText;
+    /// use traces::ListText;
     ///
     /// let text = ListText::new("Task 📅 2025-01-15", "Task");
     /// assert_eq!(text.clean(), "Task");
@@ -533,7 +533,7 @@ impl ListText {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::ListText;
+    /// use traces::ListText;
     ///
     /// let text = ListText::new("Task 📅 2025-01-15", "Task");
     /// assert_eq!(text.raw(), "Task 📅 2025-01-15");
@@ -549,7 +549,7 @@ impl ListText {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::ListText;
+    /// use traces::ListText;
     ///
     /// let text = ListText::new("Task 📅 2025-01-15", "Task");
     /// assert_eq!(text.clean(), "Task");

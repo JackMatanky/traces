@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Filename:    traces-pkm/rustfmt.toml
+# Filename:    traces/rustfmt.toml
 # Docs:        https://rust-lang.github.io/rustfmt/
 # Description: Configuration for rustfmt, defining code style standards such
 #              as edition, line endings, and import grouping.

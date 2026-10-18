@@ -14,7 +14,7 @@
 /// # Examples
 ///
 /// ```
-/// use traces_pkm::{DateError, DateValue};
+/// use traces::{DateError, DateValue};
 ///
 /// let valid = "2026-07-29".parse::<DateValue>()?;
 /// assert_eq!(valid.to_string(), "2026-07-29");
@@ -75,7 +75,7 @@ pub enum DateError {
 /// # Examples
 ///
 /// ```
-/// use traces_pkm::{DurationError, DurationValue};
+/// use traces::{DurationError, DurationValue};
 ///
 /// let valid = "1h 30m".parse::<DurationValue>()?;
 /// assert_eq!(valid.to_string(), "1h 30m");

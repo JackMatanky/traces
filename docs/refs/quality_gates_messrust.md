@@ -362,7 +362,7 @@ If it proves noisy at first, keep it out of hk and run it as a standalone
    trimmed repo XML policy (drop the redundant rules, keep `codesize` +
    coupling/cohesion + explicitness) would be the real configuration work.
 6. **Upstream self-gate ≠ our gate**: upstream's clean run on *their* source
-   says nothing about findings on traces-pkm's ~80k lines.
+   says nothing about findings on traces's ~80k lines.
 
 **Recommendation: adopt later (trial now, gate after tuning).**
 
@@ -487,8 +487,8 @@ Resulting policy sketch:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<ruleset name="traces-pkm policy" xmlns="http://pmd.sf.net/ruleset/1.0.0">
-  <description>traces-pkm: rust preset minus rules already denied by
+<ruleset name="traces policy" xmlns="http://pmd.sf.net/ruleset/1.0.0">
+  <description>traces: rust preset minus rules already denied by
   clippy/rustc, minus rules with open upstream FP bugs.</description>
   <rule ref="rust">
     <exclude name="CamelCaseClassName"/>
@@ -951,7 +951,7 @@ already cited in §6.)
   propagation into callers; nested `fn` excluded but closures included in the
   enclosing function.
 
-**Verdict for traces-pkm: valuable as an on-demand analysis lens, not as part
+**Verdict for traces: valuable as an on-demand analysis lens, not as part
 of the default policy.**
 
 - *For this code:* it produces an **effect map** — every function touching

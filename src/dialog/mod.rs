@@ -70,11 +70,11 @@ pub trait DialogProvider: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let p = PresetDialogProvider::new().with_confirm(true);
     /// assert!(p.confirm("proceed?", None)?);
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     fn confirm(&self, label: &str, default: Option<bool>)
     -> DialogResult<bool>;
@@ -95,12 +95,12 @@ pub trait DialogProvider: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let items = vec!["x".into(), "y".into(), "z".into()];
     /// let p = PresetDialogProvider::new().with_multi_select([0, 2]);
     /// assert_eq!(p.multi_select("pick", &items)?, vec![0, 2]);
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     fn multi_select(
         &self,
@@ -130,12 +130,12 @@ pub trait DialogProvider: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let items = vec!["alpha".into(), "beta".into(), "gamma".into()];
     /// let p = PresetDialogProvider::new().with_select(1);
     /// assert_eq!(p.select("pick", &items)?, 1);
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     fn select(&self, label: &str, items: &[String]) -> DialogResult<usize>;
 
@@ -156,11 +156,11 @@ pub trait DialogProvider: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let p = PresetDialogProvider::new().with_text("claude");
     /// assert_eq!(p.text("name", None)?, "claude");
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     fn text(&self, label: &str, default: Option<&str>) -> DialogResult<String>;
 }

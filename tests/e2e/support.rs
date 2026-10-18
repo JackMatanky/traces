@@ -56,7 +56,7 @@ use std::{
 use pretty_assertions::{assert_eq, assert_ne};
 use tempfile::TempDir;
 /// Path to the product binary used by end-to-end tests.
-pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces-pkm");
+pub(crate) const TRACES_BIN: &str = env!("CARGO_BIN_EXE_traces");
 
 /// Runs an ignored child-only test with one controlled ambient variable,
 /// without mutating this test process's environment.

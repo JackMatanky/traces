@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Filename:    traces-pkm/adrs.toml
+# Filename:    traces/adrs.toml
 # Docs:        https://joshrotenberg.com/adrs/
 # Description: CLI and MCP tool for creating and managing Architecture Decision
 #              Records (ADRs).

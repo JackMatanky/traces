@@ -2,7 +2,7 @@
 
 ## Conclusion
 
-Do not add Cucumber to `traces-pkm` now. The existing `tests/integration.rs` and
+Do not add Cucumber to `traces` now. The existing `tests/integration.rs` and
 `tests/e2e.rs` already exercise the public library and real CLI in isolated
 temporary sandboxes; the repository's normal `mise test` route uses
 `cargo nextest`. Cucumber would add Gherkin-to-Rust step glue and a separate

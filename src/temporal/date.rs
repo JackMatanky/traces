@@ -30,7 +30,7 @@ pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
 /// # Examples
 ///
 /// ```
-/// use traces_pkm::{DateError, DateValue};
+/// use traces::{DateError, DateValue};
 ///
 /// let date: DateValue = "2026-07-29".parse()?;
 /// assert_eq!(date.to_string(), "2026-07-29");

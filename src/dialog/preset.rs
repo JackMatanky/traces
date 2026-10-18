@@ -36,12 +36,12 @@ fn get_mut<T>(m: &mut Mutex<T>) -> &mut T {
 /// # Examples
 ///
 /// ```
-/// use traces_pkm::{DialogProvider, PresetDialogProvider};
+/// use traces::{DialogProvider, PresetDialogProvider};
 ///
 /// let p = PresetDialogProvider::new().with_text("claude").with_confirm(true);
 /// assert_eq!(p.text("name", None)?, "claude");
 /// assert!(p.confirm("proceed?", None)?);
-/// # Ok::<_, traces_pkm::DialogError>(())
+/// # Ok::<_, traces::DialogError>(())
 /// ```
 #[derive(Debug, Default)]
 pub struct PresetDialogProvider {
@@ -70,12 +70,12 @@ impl PresetDialogProvider {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let p = PresetDialogProvider::new().with_text("alice").with_text("bob");
     /// assert_eq!(p.text("name", None)?, "alice");
     /// assert_eq!(p.text("name", None)?, "bob");
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     #[inline]
     #[must_use]
@@ -89,12 +89,12 @@ impl PresetDialogProvider {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let p = PresetDialogProvider::new().with_confirm(true).with_confirm(false);
     /// assert!(p.confirm("proceed?", None)?);
     /// assert!(!p.confirm("proceed?", None)?);
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     #[inline]
     #[must_use]
@@ -119,12 +119,12 @@ impl PresetDialogProvider {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let items = vec!["a".to_owned(), "b".to_owned()];
     /// let p = PresetDialogProvider::new().with_select(1);
     /// assert_eq!(p.select("pick", &items)?, 1);
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     #[inline]
     #[must_use]
@@ -139,12 +139,12 @@ impl PresetDialogProvider {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::{DialogProvider, PresetDialogProvider};
+    /// use traces::{DialogProvider, PresetDialogProvider};
     ///
     /// let items = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
     /// let p = PresetDialogProvider::new().with_multi_select([0, 2]);
     /// assert_eq!(p.multi_select("pick", &items)?, vec![0, 2]);
-    /// # Ok::<_, traces_pkm::DialogError>(())
+    /// # Ok::<_, traces::DialogError>(())
     /// ```
     #[inline]
     #[must_use]

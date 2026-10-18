@@ -38,7 +38,7 @@ use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, Throughput,
     criterion_group, criterion_main,
 };
-use traces_pkm::testing::InlinkMap;
+use traces::testing::InlinkMap;
 
 #[expect(
     dead_code,

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Filename:    traces-pkm/Cargo.toml
+# Filename:    traces/Cargo.toml
 # Docs:        https://doc.rust-lang.org/cargo/reference/manifest.html
 # Description: Workspace manifest for the Traces Rust project, defining
 #              package metadata, dependencies, and workspace-wide lints.
@@ -9,14 +9,14 @@
 #                            Package                            #
 # ------------------------------------------------------------- #
 [package]
-name = "traces-pkm"
+name = "traces"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.96"
 description = "Personal knowledge management traces"
-documentation = "https://docs.rs/traces-pkm"
+documentation = "https://docs.rs/traces"
 readme = "README.md"
-repository = "https://github.com/JackMatanky/traces-pkm"
+repository = "https://github.com/JackMatanky/traces"
 license = "MIT"
 keywords = ["notes", "pkm", "templates"]
 categories = ["command-line-utilities", "development-tools"]
@@ -31,7 +31,7 @@ bench = false
 
 [[bin]]
 bench = false
-name = "traces-pkm"
+name = "traces"
 path = "src/main.rs"
 
 # ------------------------------------------------------------- #

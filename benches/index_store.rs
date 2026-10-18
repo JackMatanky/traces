@@ -36,7 +36,7 @@ use criterion::{
     Throughput, criterion_group, criterion_main,
 };
 use tempfile::TempDir;
-use traces_pkm::testing::{FileEntry, IndexerService, WorkspaceIndex};
+use traces::testing::{FileEntry, IndexerService, WorkspaceIndex};
 
 #[expect(
     dead_code,

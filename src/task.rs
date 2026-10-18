@@ -18,7 +18,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use traces_pkm::{TaskPriority, TaskStatus, TaskStatusType};
+//! use traces::{TaskPriority, TaskStatus, TaskStatusType};
 //!
 //! let status = TaskStatus::default();
 //! assert_eq!(status.name(), "Todo");
@@ -40,7 +40,7 @@ use crate::{DateValue, delimiter::DelimiterType};
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::{TaskStatus, TaskStatusSymbol, TaskStatusType};
+/// use traces::{TaskStatus, TaskStatusSymbol, TaskStatusType};
 ///
 /// let status = TaskStatus::default();
 /// assert_eq!(status.symbol().as_char(), ' ');
@@ -110,7 +110,7 @@ impl Default for TaskStatus {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::TaskStatusMap;
+/// use traces::TaskStatusMap;
 ///
 /// let map = TaskStatusMap::default();
 /// assert!(format!("{map:?}").contains("Todo"));
@@ -291,7 +291,7 @@ impl Default for TaskStatusMap {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::TaskStatusType;
+/// use traces::TaskStatusType;
 ///
 /// assert_ne!(TaskStatusType::Done, TaskStatusType::InProgress);
 /// assert_eq!(TaskStatusType::NonTask, TaskStatusType::NonTask);
@@ -368,7 +368,7 @@ impl TaskStatusType {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::TaskStatusSymbol;
+/// use traces::TaskStatusSymbol;
 ///
 /// let sym = TaskStatusSymbol::new('x');
 /// assert_eq!(sym.as_char(), 'x');
@@ -493,7 +493,7 @@ fn normalize_name(name: &str) -> String {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::{DateValue, TaskDate, TaskDateSet, TaskDateType};
+/// use traces::{DateValue, TaskDate, TaskDateSet, TaskDateType};
 ///
 /// let due = DateValue::from_ymd(2025, 1, 15).expect("valid date");
 /// let dates = TaskDateSet::from_iter([TaskDate::new(TaskDateType::Due, due)]);
@@ -537,7 +537,7 @@ impl TaskDateSet {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{DateValue, TaskDate, TaskDateSet, TaskDateType};
+    /// use traces::{DateValue, TaskDate, TaskDateSet, TaskDateType};
     ///
     /// let due = DateValue::from_ymd(2025, 1, 15).expect("valid date");
     /// let dates = TaskDateSet::from_iter([TaskDate::new(TaskDateType::Due, due)]);
@@ -562,7 +562,7 @@ impl TaskDateSet {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateSet;
+    /// use traces::TaskDateSet;
     ///
     /// let dates = TaskDateSet::default();
     /// assert!(dates.is_empty());
@@ -583,7 +583,7 @@ impl TaskDateSet {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{DateValue, TaskDate, TaskDateSet, TaskDateType};
+    /// use traces::{DateValue, TaskDate, TaskDateSet, TaskDateType};
     ///
     /// let d1 = DateValue::from_ymd(2025, 1, 1).expect("valid date");
     /// let d2 = DateValue::from_ymd(2025, 1, 15).expect("valid date");
@@ -687,7 +687,7 @@ impl Iterator for TaskDateSetIter {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::{DateValue, TaskDate, TaskDateType};
+/// use traces::{DateValue, TaskDate, TaskDateType};
 ///
 /// let date_val = DateValue::from_ymd(2025, 1, 15).expect("valid date");
 /// let task_date = TaskDate::new(TaskDateType::Due, date_val);
@@ -707,7 +707,7 @@ impl TaskDate {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{DateValue, TaskDate, TaskDateType};
+    /// use traces::{DateValue, TaskDate, TaskDateType};
     /// let date_val = DateValue::from_ymd(2025, 1, 15).expect("valid date");
     /// let task_date = TaskDate::new(TaskDateType::Due, date_val);
     /// assert_eq!(task_date.kind(), TaskDateType::Due);
@@ -744,7 +744,7 @@ impl TaskDate {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::TaskDateType;
+/// use traces::TaskDateType;
 ///
 /// assert_eq!(TaskDateType::from_emoji("📅"), Some(TaskDateType::Due));
 /// assert_eq!(TaskDateType::Due.field_keys(), &["due"]);
@@ -772,7 +772,7 @@ impl TaskDateType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateType;
+    /// use traces::TaskDateType;
     ///
     /// assert_eq!(TaskDateType::ALL.len(), 6);
     /// assert_eq!(TaskDateType::ALL[0], TaskDateType::Created);
@@ -790,7 +790,7 @@ impl TaskDateType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateType;
+    /// use traces::TaskDateType;
     ///
     /// assert_eq!(TaskDateType::EMOJIS[3], ("\u{1F4C5}", TaskDateType::Due));
     /// ```
@@ -810,7 +810,7 @@ impl TaskDateType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateType;
+    /// use traces::TaskDateType;
     ///
     /// assert_eq!(TaskDateType::from_emoji("📅"), Some(TaskDateType::Due));
     /// assert_eq!(
@@ -837,7 +837,7 @@ impl TaskDateType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateType;
+    /// use traces::TaskDateType;
     ///
     /// assert_eq!(TaskDateType::Due.field_keys(), &["due"]);
     /// assert_eq!(TaskDateType::Done.field_keys(), &["done", "completion"]);
@@ -860,7 +860,7 @@ impl TaskDateType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateType;
+    /// use traces::TaskDateType;
     ///
     /// assert_eq!(TaskDateType::Due.as_str(), "due");
     /// assert_eq!(TaskDateType::Created.as_str(), "created");
@@ -886,7 +886,7 @@ impl TaskDateType {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskDateType;
+    /// use traces::TaskDateType;
     ///
     /// assert!(TaskDateType::is_field_key("due"));
     /// assert!(TaskDateType::is_field_key("COMPLETION"));
@@ -945,7 +945,7 @@ impl std::str::FromStr for TaskDateType {
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::TaskPriority;
+/// use traces::TaskPriority;
 ///
 /// assert!(TaskPriority::Highest > TaskPriority::High);
 /// assert!(TaskPriority::High > TaskPriority::Medium);
@@ -986,7 +986,7 @@ impl TaskPriority {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskPriority;
+    /// use traces::TaskPriority;
     ///
     /// assert_eq!(TaskPriority::EMOJIS[0], ("\u{1F53A}", TaskPriority::Highest));
     /// ```
@@ -1003,7 +1003,7 @@ impl TaskPriority {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskPriority;
+    /// use traces::TaskPriority;
     ///
     /// assert_eq!(TaskPriority::Highest.as_str(), "highest");
     /// assert_eq!(TaskPriority::Normal.as_str(), "normal");
@@ -1055,7 +1055,7 @@ impl TaskPriority {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskPriority;
+    /// use traces::TaskPriority;
     ///
     /// assert_eq!(TaskPriority::from_emoji("🔺"), Some(TaskPriority::Highest));
     /// assert_eq!(TaskPriority::from_emoji("⏬"), Some(TaskPriority::Lowest));
@@ -1080,7 +1080,7 @@ impl TaskPriority {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::TaskPriority;
+    /// use traces::TaskPriority;
     ///
     /// assert_eq!(TaskPriority::Highest.emoji(), Some("🔺"));
     /// assert_eq!(TaskPriority::Normal.emoji(), None);

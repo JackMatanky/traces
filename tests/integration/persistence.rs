@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use pretty_assertions::assert_eq;
-use traces_pkm::{
+use traces::{
     DateValue, SourceLine, TaskDateType, TaskListItem, TaskPriority,
     TaskStatusType,
     testing::{

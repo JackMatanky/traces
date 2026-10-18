@@ -9,7 +9,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use traces_pkm::NoteFieldValue;
+//! use traces::NoteFieldValue;
 //!
 //! let val = NoteFieldValue::String("value".to_owned());
 //! assert_eq!(val.as_str(), Some("value"));
@@ -34,7 +34,7 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
-/// use traces_pkm::NoteFieldValue;
+/// use traces::NoteFieldValue;
 ///
 /// let val = NoteFieldValue::String("Draft".to_owned());
 /// assert_eq!(val.as_str(), Some("Draft"));
@@ -71,7 +71,7 @@ impl NoteFieldValue {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::NoteFieldValue;
+    /// use traces::NoteFieldValue;
     ///
     /// let val = NoteFieldValue::String("Draft".to_owned());
     /// assert_eq!(val.as_str(), Some("Draft"));
@@ -96,7 +96,7 @@ impl NoteFieldValue {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{DateValue, NoteFieldValue};
+    /// use traces::{DateValue, NoteFieldValue};
     ///
     /// let str_val = NoteFieldValue::String("2025-01-15T12:00:00".to_owned());
     /// assert_eq!(str_val.as_date(), "2025-01-15".parse::<DateValue>().ok());
@@ -135,7 +135,7 @@ impl NoteFieldValue {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::{NoteFieldValue, NoteFieldValueRef};
+    /// use traces::{NoteFieldValue, NoteFieldValueRef};
     ///
     /// let owned = NoteFieldValue::Number(42.0);
     /// assert_eq!(owned.as_ref(), NoteFieldValueRef::Number(42.0));

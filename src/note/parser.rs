@@ -33,7 +33,7 @@
 //! # {
 //! use std::path::Path;
 //!
-//! use traces_pkm::{MarkdownParserInput, parse_markdown};
+//! use traces::{MarkdownParserInput, parse_markdown};
 //!
 //! let path = Path::new("daily.md");
 //! let input = MarkdownParserInput::for_test(path, "# Notes\n- [ ] Task item");
@@ -93,7 +93,7 @@ const HEADING_OPTIONS: Options = MARKDOWN_OPTIONS.union(Options::ENABLE_MATH);
 /// # {
 /// use std::path::Path;
 ///
-/// use traces_pkm::{MarkdownParserInput, parse_markdown};
+/// use traces::{MarkdownParserInput, parse_markdown};
 ///
 /// let path = Path::new("example.md");
 /// let input = MarkdownParserInput::for_test(path, "# Title\n- [x] Done");

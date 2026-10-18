@@ -28,7 +28,7 @@ use std::{alloc::System, hint::black_box, path::Path, time::Duration};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
-use traces_pkm::{
+use traces::{
     MarkdownParserInput, parse_markdown,
     testing::{IndexerService, QueryBuilder, QueryService, SourceSelector},
 };
@@ -399,7 +399,7 @@ fn bench_list_items_memory_footprint(c: &mut Criterion) {
          = {}",
         stats.bytes_allocated,
         stats.allocations,
-        std::mem::size_of::<traces_pkm::ListItem>(),
+        std::mem::size_of::<traces::ListItem>(),
     );
     assert!(
         bytes_per_item < MAX_LIST_ITEM_FOOTPRINT_BYTES,

@@ -193,7 +193,7 @@ exec_target_clean() {
   if [[ "${has_criterion}" == "true" \
     && "${is_full_clean}" == "true" \
     && "${usage_dry_run:-false}" != "true" ]]; then
-    backup_tmp="$(mktemp -d -t traces_pkm_criterion_clean.XXXXXX)"
+    backup_tmp="$(mktemp -d -t traces_criterion_clean.XXXXXX)"
     mv "${criterion_dir}" "${backup_tmp}/criterion"
     [[ -f "${tag_file}" ]] && cp "${tag_file}" "${backup_tmp}/CACHEDIR.TAG"
 

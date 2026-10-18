@@ -1,5 +1,5 @@
 //! Integration test harness: proves cross-module data flow through
-//! `traces_pkm`'s `test-utils`-gated public surface alone (no process spawning,
+//! `traces`'s `test-utils`-gated public surface alone (no process spawning,
 //! no crate-internal imports). See `tests/e2e.rs` for process-boundary coverage
 //! of the same command surface.
 #![cfg(feature = "test-utils")]

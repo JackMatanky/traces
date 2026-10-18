@@ -55,14 +55,14 @@ declare -a unit_args=()
 #######################################
 resolve_package_feature_args() {
   if [[ "${usage_feature:-all}" == "all" ]]; then
-    unit_args+=(-p traces-pkm --all-features)
+    unit_args+=(-p traces --all-features)
   elif [[ "${usage_feature:-all}" == "none" ]]; then
     # Production configuration: the crate defines no `default` feature, so
     # no feature flags are passed (the old `--features default` value was a
     # hard cargo error).
-    unit_args+=(-p traces-pkm --no-default-features)
+    unit_args+=(-p traces --no-default-features)
   else
-    unit_args+=(-p traces-pkm --features "${usage_feature}")
+    unit_args+=(-p traces --features "${usage_feature}")
   fi
 }
 

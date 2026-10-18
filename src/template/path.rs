@@ -60,7 +60,7 @@ impl TemplatePathInput {
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use std::path::Path;
     ///
-    /// use traces_pkm::testing::TemplatePathInput;
+    /// use traces::testing::TemplatePathInput;
     ///
     /// let input = TemplatePathInput::parse(Path::new("daily.md"))?;
     /// assert_eq!(input.as_ref(), Path::new("daily.md"));

@@ -7,7 +7,7 @@ use std::{
 };
 
 use pretty_assertions::assert_eq;
-use traces_pkm::testing::{
+use traces::testing::{
     FileEntry, QueryBuilder, QueryService, SourceSelector, TestProject,
 };
 

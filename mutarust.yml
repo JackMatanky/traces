@@ -1,5 +1,5 @@
 ---
-# mutarust.yml — mutation-testing policy for traces-pkm.
+# mutarust.yml — mutation-testing policy for traces.
 # mutarust reads this ONLY via `--config mutarust.yml` (no auto-discovery);
 # the `mutants` mise task always passes it. Schema (11 fields,
 # additionalProperties: false): docs/refs/mutarust/schema/mutarust.schema.json

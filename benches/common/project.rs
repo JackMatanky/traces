@@ -20,7 +20,7 @@
 use std::{fs, path::Path, sync::Arc};
 
 use tempfile::TempDir;
-use traces_pkm::testing::{
+use traces::testing::{
     IndexerService, WorkspaceIndex, build_test_index, resolve_safe_path,
     write_note,
 };

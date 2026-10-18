@@ -177,7 +177,7 @@ impl RenderFailureKind {
     /// # #[cfg(feature = "test-utils")]
     /// # {
     /// use minijinja::{Error, ErrorKind};
-    /// use traces_pkm::testing::RenderFailureKind;
+    /// use traces::testing::RenderFailureKind;
     ///
     /// let error = Error::new(ErrorKind::SyntaxError, "bad syntax");
     /// assert_eq!(RenderFailureKind::classify(&error), RenderFailureKind::Syntax);

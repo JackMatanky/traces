@@ -68,42 +68,42 @@
 //!
 //! ```compile_fail
 //! // ConfigError must not be nameable from outside the crate.
-//! use traces_pkm::ConfigError;
+//! use traces::ConfigError;
 //! ```
 //!
 //! ```rust
 //! // Positive control: CliError is the public error entrypoint.
-//! use traces_pkm::cli::CliError;
+//! use traces::cli::CliError;
 //! ```
 //!
 //! ```compile_fail
 //! // ConfigBuilder must not be nameable from outside the crate.
-//! use traces_pkm::ConfigBuilder;
+//! use traces::ConfigBuilder;
 //! ```
 //!
 //! ```rust
 //! // Positive control: Note is a public item always available.
-//! use traces_pkm::Note;
+//! use traces::Note;
 //! ```
 //!
 //! ```compile_fail
 //! // SchemasConfig must not be nameable from outside the crate.
-//! use traces_pkm::SchemasConfig;
+//! use traces::SchemasConfig;
 //! ```
 //!
 //! ```rust
 //! // Positive control: Tag is a public item always available.
-//! use traces_pkm::Tag;
+//! use traces::Tag;
 //! ```
 //!
 //! ```compile_fail
 //! // FrontmatterConfig must not be nameable from outside the crate.
-//! use traces_pkm::FrontmatterConfig;
+//! use traces::FrontmatterConfig;
 //! ```
 //!
 //! ```rust
 //! // Positive control: TaskStatus is a public item always available.
-//! use traces_pkm::TaskStatus;
+//! use traces::TaskStatus;
 //! ```
 
 pub mod cli;
@@ -268,7 +268,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::testing::TestProject;
+    /// # use traces::testing::TestProject;
     /// let temp = tempfile::tempdir().unwrap();
     /// let project = TestProject::trusted(temp.path().join("project"));
     /// project.write_note("notes/sample.md", "# Sample\n");
@@ -548,7 +548,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::testing::parse_note;
+    /// # use traces::testing::parse_note;
     /// let note = parse_note("notes/daily.md", "# Today\n\n- [ ] Task");
     /// assert_eq!(note.path().to_str(), Some("notes/daily.md"));
     /// ```
@@ -563,7 +563,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::testing::parse_note_str;
+    /// # use traces::testing::parse_note_str;
     /// let note = parse_note_str("# Sample\n\nContent");
     /// assert_eq!(note.path().to_str(), Some("note.md"));
     /// ```
@@ -579,7 +579,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::testing::build_test_index;
+    /// # use traces::testing::build_test_index;
     /// let index = build_test_index(&[("a.md", "# A"), ("b.md", "# B")]);
     /// assert_eq!(index.entries().len(), 2);
     /// ```
@@ -599,7 +599,7 @@ mod test_support {
     /// # Examples
     ///
     /// ```rust
-    /// # use traces_pkm::testing::parse_tag;
+    /// # use traces::testing::parse_tag;
     /// let tag = parse_tag("#projects/active");
     /// assert_eq!(tag.as_str(), "#projects/active");
     /// ```
@@ -880,19 +880,19 @@ mod test_support {
             fn retains_config_internals_under_expected_names() {
                 assert_eq!(
                     std::any::type_name::<crate::config::ConfigError>(),
-                    "traces_pkm::config::error::ConfigError"
+                    "traces::config::error::ConfigError"
                 );
                 assert_eq!(
                     std::any::type_name::<crate::config::ConfigBuilder>(),
-                    "traces_pkm::config::builder::ConfigBuilder"
+                    "traces::config::builder::ConfigBuilder"
                 );
                 assert_eq!(
                     std::any::type_name::<crate::config::SchemasConfig>(),
-                    "traces_pkm::config::model::SchemasConfig"
+                    "traces::config::model::SchemasConfig"
                 );
                 assert_eq!(
                     std::any::type_name::<crate::config::FrontmatterConfig>(),
-                    "traces_pkm::config::model::FrontmatterConfig"
+                    "traces::config::model::FrontmatterConfig"
                 );
             }
         }

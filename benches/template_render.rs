@@ -39,7 +39,7 @@ use criterion::{
     criterion_group, criterion_main,
 };
 use tempfile::TempDir;
-use traces_pkm::{
+use traces::{
     PresetDialogProvider,
     testing::{
         Config, IndexerService, TemplatePathInput, TemplateService,

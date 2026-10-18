@@ -36,7 +36,7 @@ use criterion::{
     Throughput, criterion_group, criterion_main,
 };
 use tempfile::TempDir;
-use traces_pkm::testing::{
+use traces::testing::{
     IndexerService, QueryBuilder, QueryService, QuerySet, RefreshReport,
     SourceSelector, WorkspaceIndex,
 };

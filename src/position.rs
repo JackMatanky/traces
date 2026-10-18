@@ -14,7 +14,7 @@
 //! # Examples
 //!
 //! ```
-//! use traces_pkm::SourceLine;
+//! use traces::SourceLine;
 //!
 //! let line = SourceLine::new(42).expect("valid line number");
 //! assert_eq!(line.get(), 42);
@@ -260,7 +260,7 @@ impl TryFrom<usize> for BytePos {
 /// # Examples
 ///
 /// ```
-/// use traces_pkm::SourceLine;
+/// use traces::SourceLine;
 ///
 /// let line = SourceLine::new(42).expect("non-zero");
 /// assert_eq!(line.get(), 42);
@@ -280,7 +280,7 @@ impl SourceLine {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::SourceLine;
+    /// use traces::SourceLine;
     ///
     /// assert!(SourceLine::new(1).is_some());
     /// assert!(SourceLine::new(0).is_none());

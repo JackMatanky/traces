@@ -39,7 +39,7 @@ use criterion::{
     AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration,
     Throughput, criterion_group, criterion_main,
 };
-use traces_pkm::{
+use traces::{
     NoteFieldValue,
     testing::{QueryBuilder, QueryRow, QueryService, SourceSelector},
 };

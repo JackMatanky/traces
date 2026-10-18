@@ -17,7 +17,7 @@ use thiserror::Error;
 /// # Examples
 ///
 /// ```
-/// # use traces_pkm::Tag;
+/// # use traces::Tag;
 /// let tag = Tag::parse("#projects/active").unwrap();
 /// assert_eq!(tag.as_str(), "#projects/active");
 /// assert!(tag.is_contained_in("#projects"));
@@ -48,7 +48,7 @@ impl Tag {
     /// # Examples
     ///
     /// ```
-    /// # use traces_pkm::Tag;
+    /// # use traces::Tag;
     /// let tag = Tag::parse("#rust/pkm").unwrap();
     /// assert_eq!(tag.as_str(), "#rust/pkm");
     /// ```
@@ -174,7 +174,7 @@ impl Tag {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::Tag;
+    /// use traces::Tag;
     ///
     /// let tag = Tag::parse("#a/b/c").expect("valid tag");
     /// let segments: Vec<_> = tag.segments().collect();
@@ -193,7 +193,7 @@ impl Tag {
     /// # Examples
     ///
     /// ```rust
-    /// use traces_pkm::Tag;
+    /// use traces::Tag;
     ///
     /// let tag = Tag::parse("#projects/active").expect("valid tag");
     /// assert!(tag.is_contained_in("#projects"));

@@ -287,12 +287,12 @@ pub(crate) fn task_triplet_note_source(note_index: usize) -> String {
 /// (`[ ]`), in-progress (`[/]`), done (`[x]`), canceled (`[-]`), and on-hold
 /// (`[!]`).
 ///
-/// [`TaskStatusType`]: traces_pkm::TaskStatusType
+/// [`TaskStatusType`]: traces::TaskStatusType
 const SORT_FIXTURE_MARKERS: [char; 5] = [' ', '/', 'x', '-', '!'];
 
 /// Priority emojis cycling through every non-`Normal` [`TaskPriority`].
 ///
-/// [`TaskPriority`]: traces_pkm::TaskPriority
+/// [`TaskPriority`]: traces::TaskPriority
 const SORT_FIXTURE_PRIORITIES: [&str; 4] = ["⏫", "🔼", "🔽", "⏬"];
 
 /// Word pool giving `list.text` sort keys real lexical variety instead of a

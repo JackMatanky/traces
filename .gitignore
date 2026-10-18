@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Filename:     traces-pkm/.gitignore
+# Filename:     traces/.gitignore
 # Docs:         https://git-scm.com/docs/gitignore
 # Description:  Prevents Git from tracking system, environment, editor,
 #               build, and cache files

@@ -1,6 +1,6 @@
 # Benchmark Suite
 
-Performance benchmarks for `traces-pkm`, measuring CPU cost of parsing,
+Performance benchmarks for `traces`, measuring CPU cost of parsing,
 indexing, querying, sorting, hashing, and template rendering across
 workspace sizes from 50 to 20,000 notes.
 

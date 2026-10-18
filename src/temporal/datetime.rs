@@ -50,7 +50,7 @@ pub(crate) const DEFAULT_DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use std::time::{Duration, SystemTime};
 ///
-/// use traces_pkm::{DateTimeValue, testing::ZoneGuard};
+/// use traces::{DateTimeValue, testing::ZoneGuard};
 ///
 /// ZoneGuard::set("UTC");
 ///
@@ -88,7 +88,7 @@ impl DateTimeValue {
     /// # Examples
     ///
     /// ```
-    /// use traces_pkm::DateTimeValue;
+    /// use traces::DateTimeValue;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let epoch = DateTimeValue::from_unix_seconds(0)?;

@@ -9,12 +9,12 @@
 //!
 //! - [`content`] owns raw Markdown strings and [`content::ProjectShape`]. It
 //!   does not parse notes or touch the filesystem.
-//! - [`notes`] owns parsed [`Note`](traces_pkm::Note) and
-//!   [`FileMeta`](traces_pkm::FileMeta) collections for in-memory benches. It
-//!   does not create files on disk.
+//! - [`notes`] owns parsed [`Note`](traces::Note) and
+//!   [`FileMeta`](traces::FileMeta) collections for in-memory benches. It does
+//!   not create files on disk.
 //! - [`project`] owns [`TempDir`](tempfile::TempDir)-backed project trees and
-//!   [`WorkspaceIndex`](traces_pkm::testing::WorkspaceIndex) builders for
-//!   scanner, persistence, and query benches that need real filesystem state.
+//!   [`WorkspaceIndex`](traces::testing::WorkspaceIndex) builders for scanner,
+//!   persistence, and query benches that need real filesystem state.
 //!
 //! # Usage rules
 //!
@@ -25,7 +25,7 @@
 //! when persistence itself is the measured operation.
 //!
 //! Use `notes::*` helpers for in-memory benchmarks such as
-//! [`InlinkMap`](traces_pkm::testing::InlinkMap) construction. Those helpers
+//! [`InlinkMap`](traces::testing::InlinkMap) construction. Those helpers
 //! parse project-relative note paths and never touch the filesystem.
 //!
 //! Use identifiers that name the measured unit, not the implementation detail:
