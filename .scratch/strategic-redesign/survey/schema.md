@@ -1,5 +1,7 @@
 # Slice Survey: Schema Subsystem
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** Only `src/index/service.rs` line numbers moved (fileClass tests are `mod class_field`, `service.rs:1732`). `src/schema` is untouched. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **Schema TOML deserialization & raw validation**: Parses `.traces/schemas/<name>.toml` via `serde` (`src/schema/raw.rs:28-40`). Collects type-specific options into untyped `IndexMap<String, FieldValue>` bags (`src/schema/raw.rs:59-60`).

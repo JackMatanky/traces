@@ -1,5 +1,7 @@
 # Research: Freshness, Invalidation, and Fingerprinting Precedents
 
+> **Re-verification note (main @ `207cc3fb`).** The Traces-side premise below ("unimplemented config-drift fingerprint") is outdated: `207cc3fb` implemented ADR-0009. Lesson 1 (type-owned completeness by exhaustive destructuring) and Lesson 3 (fingerprint in the redb `meta` table, same transaction as the rows) were realized almost exactly as recommended (`src/index/fingerprint.rs`, `src/index/store.rs`), which is convergent confirmation, not new evidence. Lesson 2 (inverted unresolved-stem index) stays superseded by `research/11` (97% of the cliff is note deserialization). Lesson 4 (racy-timestamp guard) is **still open** (`src/index/delta.rs` untouched; no `racy` handling in `src/index`). Differences from the recommendation: the landed code keeps `ConfigDigests` as the source and derives the index fingerprint from it (rather than deleting `digest.rs`), and the `syn` source scan still exists.
+
 **Ticket:** `.scratch/strategic-redesign/issues/05-research-freshness-fingerprint-precedent.md`  
 **Deliverable:** `.scratch/strategic-redesign/research/05-freshness-fingerprint-precedent.md`  
 **Status:** Complete

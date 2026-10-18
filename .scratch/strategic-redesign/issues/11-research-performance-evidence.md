@@ -33,3 +33,5 @@ Key findings affecting architectural decisions:
 5. **Unified Value Enum**: A unified `Value` enum measures exactly 80 bytes (matching `NoteFieldValue`'s budget), eliminating duplicate AST conversions and visitors without layout expansion.
 6. **Template QuerySet Laziness**: Refuted eager cloning claim; `QuerySet` is already lazy via `ExecutionPlan` and chaining costs < 1 µs without row cloning.
 7. **Redb Commit Floor**: Confirmed ~25–34 ms floor magnitude, but refuted commit attribution; transaction commit with `Durability::None` is 18 µs; the floor is 99.6% redb file lifecycle open/create + drop overhead.
+
+Re-verified (main @ `207cc3fb`): refresh and cold-query path unchanged within noise (A-B-A control, 44 benchmark IDs, median +0.7% vs 1.7% noise floor). See `reverification.md`.

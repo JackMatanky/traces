@@ -34,4 +34,4 @@ Deliverable: `.scratch/strategic-redesign/research/01-verify-load-bearing-claims
 ## Resolution
 
 Deliverable completed: `.scratch/strategic-redesign/research/01-verify-load-bearing-claims.md`.
-All 14 scout claims and ADRs 0001–0009 were adversarially verified against production code: 12 confirmed, 2 partially confirmed with corrections (Claim 1: default deserialization is passthrough, coercion requires explicit classify; Claim 7: QuerySet method chaining does NOT clone the row vec, only Arc and ExecutionPlan). ADR-0009 drift detection is verified unbuilt. Four new architectural facts documented.
+All 14 scout claims and ADRs 0001–0009 were adversarially verified against production code: 12 confirmed, 2 partially confirmed with corrections (Claim 1: default deserialization is passthrough, coercion requires explicit classify; Claim 7: QuerySet method chaining does NOT clone the row vec, only Arc and ExecutionPlan). ADR-0009 drift detection was verified unbuilt at `2dc3250d`; **superseded**: it landed in main @ `207cc3fb` (see `reverification.md`). Four new architectural facts documented.

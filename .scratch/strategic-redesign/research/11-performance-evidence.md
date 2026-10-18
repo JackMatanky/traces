@@ -1,5 +1,7 @@
 # Research Deliverable 11: Architectural Performance Evidence
 
+> **Re-verification note (main @ `207cc3fb`).** Measured at `2dc3250d`; a controlled A-B-A re-run of `benches/index_refresh.rs` on `207cc3fb` found no detectable change in the refresh or cold-query path (median +0.7% vs a 1.7% noise floor over 44 IDs; see `../reverification.md`). The mechanism claims hold because `reconcile`, `merge_refreshed_notes`, `read_all_notes` and `run_from_store` are untouched. Line citations shifted: `refresh.rs` reconcile `:410`, `is_paths_unchanged` `:475`, `merge_refreshed_notes` `:555`, `read_all_notes` `:560`; `store.rs` `set_durability` `:357`, `Database::create` `:899`; `service.rs` `persist` `:356`; `tables.rs` now defines `META` (`:78`) in place of `cache_format`. Also note `TaskStatusMap::iter` is no longer dead code.
+
 - **Author**: `ResPerformance`
 - **Date**: 2026-10-18
 - **Target Ticket**: `.scratch/strategic-redesign/issues/11-research-performance-evidence.md`

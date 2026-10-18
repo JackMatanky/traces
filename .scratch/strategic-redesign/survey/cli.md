@@ -1,5 +1,7 @@
 # Architectural Survey: CLI (`src/cli/**`, `src/main.rs`)
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** `src/cli` is untouched; `src/config/scaffold.rs` is a proposed destination; `src/query/source.rs` should read `src/query/grammar/source.rs` (the cited path never existed). Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 - **Process Entrypoint & Outcome Mapping**: `main.rs:10-35` runs `cli::run()` and maps `CommandOutcome::Completed` & `Aborted(UserAbort::Cancelled)` -> 0, `Aborted(UserAbort::Interrupted)` -> 130, and `Err(CliError)` -> prints `miette::Report` to stderr, exits 1.
 - **Root Parser & Command Routing**: `src/cli/mod.rs:82-111, 148-208` parses argv via `clap`. Supports shorthand `traces -i <name>` and interactive `traces -i` via `Option<Option<PathBuf>>` (`src/cli/mod.rs:90-111, 128-135`), routing to 10 subcommands (`init`, `trust`, `untrust`, `index`, `list`, `table`, `task`, `template`, `completions`, `tracked`).

@@ -1,5 +1,7 @@
 # Architectural Survey: Index Subsystem
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** Config-drift detection **landed**: the `Config Drift Rebuild Invalidation (Invariant Gap)` bullet is obsolete and [H3] is implemented (10-setting `IndexFingerprint` in the redb `meta` table, `Drifted` refresh state, `RefreshReport` is now an enum). `cache_format` is now `META` (`src/index/tables.rs:78`); the stale pin `service.rs:1749-1780` is replaced by `heals_class_axes_when_class_field_config_changes` (`service.rs:1829`). Line shifts: `reconcile` `refresh.rs:410`, `is_paths_unchanged` `:475`, `merge_refreshed_notes` `:555`, `read_all_notes` `:560`, `visit_values` `store.rs:1749`, `set_durability` `store.rs:357`. [H2] (inverted stem index) is superseded by `research/11`; the racy-timestamp gap is still open. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **What it owns**:

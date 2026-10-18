@@ -9,4 +9,5 @@ Where does service composition live (config load + trust, schema load, index ref
 
 Facts: `survey/cli.md`, `survey/config-dialog.md` H4/H5, ADR-0004, `src/cli/mod.rs`, `src/dialog/*`.
 Alternatives: extract `WorkspaceHost`; keep composition in CLI but move domain leakage out; per-command narrow context. Include keep-as-is. If the forward-consumer decision refuses a second consumer, test whether the host is still worth it for testability and cohesion.
+Re-verified (main @ `207cc3fb`): `IndexerService::from(&Config)` now also derives an `IndexFingerprint` from `config.digests()` (`src/index/service.rs:47-59`), and a drift heal is only logged (`tracing::info!`), never surfaced to the CLI; both bear on what the host composes and reports.
 Inputs: `research/04`, `research/08` (Cargo/jj/Ruff composition roots), execution context, config ownership, read model, freshness.

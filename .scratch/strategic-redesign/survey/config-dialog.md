@@ -1,5 +1,7 @@
 # Architectural Survey: Config & Dialog (`src/config/**`, `src/dialog/**`, `src/dirs.rs`, `src/env_vars.rs`)
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** [H1] (replace dead-code `ConfigDigests` with a fingerprint over index-consumed types) was **partly adopted in a different shape**: digests are kept and now have a production consumer (`IndexFingerprint::new` destructures `ConfigDigests` exhaustively and uses 10 of 15); `digest.rs` is 380 lines (was 412), per-setting accessor methods were replaced by `pub(crate)` fields, and `Config::hash`/`compose`, the root/templates/schema-directory digests and the `syn` scan remain without a production consumer. The `config -> index` edge now also carries `ConfigDigests` (`src/config/mod.rs:64-67`). Citation fix: `src/note/task.rs` should read `src/note/parser/task.rs` (the cited path never existed); `src/config/tracking.rs` is mise's file, not Traces'. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **Path & Environment Resolution**: `src/dirs.rs:85-191` resolves platform-specific XDG/OS paths (`CONFIG_HOME`, `STATE_HOME`, `TRACES_STATE_DIR`, `TRACKED_CONFIGS`, `TRUSTED_CONFIGS`) via static `LazyLock`s. `src/env_vars.rs:8-44` parses discovery walk ceilings (`CEILING_DIRS`) and directory filters (`IGNORED_DIRS`, `is_ignored_dir`).

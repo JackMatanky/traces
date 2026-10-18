@@ -1,5 +1,7 @@
 # Document Model, Position Spans, and Metadata Caching Precedent
 
+> **Re-verification note (main @ `207cc3fb`).** `src/task.rs` changed only at `TaskStatusMap::iter` (a `dead_code` expectation was dropped); the cited `TaskStatus` shape (`src/task.rs:51-55`) and all `src/note` citations are untouched. `src/lib.rs` lines after 190 are shifted by +1. Conclusions stand.
+
 Type: comparative research
 Status: completed
 Ticket: `.scratch/strategic-redesign/issues/10-research-document-model-spans-precedent.md`

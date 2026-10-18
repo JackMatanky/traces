@@ -1,5 +1,7 @@
 # Architectural Survey: Template Subsystem
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** Only `src/lib.rs` lines after 190 moved (+1). `src/template` is untouched. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **What it owns**: Template lookup/resolution across local/global paths, minijinja environment wiring (10 helper namespaces/filter groups), interactive dialog orchestration during render, query/schema reflection inside templates, temporal format translation (Moment to strftime), output path resolution/collision recovery, and atomic root-confined file writing.

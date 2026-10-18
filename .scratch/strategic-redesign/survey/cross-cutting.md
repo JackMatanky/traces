@@ -1,5 +1,7 @@
 # Architecture Survey: Cross-Cutting Crate Topology & Infrastructure
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** Baseline counts changed: `pub-tokens.txt` 1,550 lines (was 1,528), `public-api-test-utils.txt` 4,444 (was 4,306), `public-api-default.txt` 2,555 (unchanged); `traces::testing` is 46 identifiers (was 45). ADR-0009 is implemented in code (ADR file still `proposed`). `src/hash.rs` gained `Blake3Digest::{LEN,to_bytes,from_bytes}`; `src/task.rs` `TaskStatusMap::iter` is no longer dead code. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **Slice Scope & Ownership**: Whole-crate topology (25 top-level modules, 139 source files, 93,568 SLoC in `src/`), process composition root (`src/main.rs:10-35`), public library facade (`src/lib.rs:109-175`), `test-utils` testing backdoor (`src/lib.rs:177-210`), CLI diagnostic hierarchy (`src/cli/error.rs:38`), task orchestration (`mise.toml:88-574`), and baseline visibility verification (`mise.toml:123-146`).

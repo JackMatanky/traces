@@ -1,5 +1,7 @@
 # Strategic Architectural Survey: Temporal
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** `src/task.rs` changed only at `TaskStatusMap::iter`; `src/temporal` is untouched. `src/temporal/format.rs` in H5 is a proposed destination, not an existing file. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **Domain ownership:** Owns parsing, validation, representation, formatting, and calendar arithmetic for civil dates (`DateValue`), UTC instants rendering in local civil time (`DateTimeValue`), durations with nominal identity (`DurationValue`), and poly-temporal algebraic points (`DatePoint`) (`src/temporal/mod.rs:1-31`). Single source of truth for temporal semantics in Traces (`src/temporal/GLOSSARY.md:3-4`).

@@ -1,5 +1,7 @@
 # Research: Adversarial Verification of Load-Bearing Scout Claims
 
+> **Re-verification note (main @ `207cc3fb`, after this file was written at `2dc3250d`).** Claim 3, the ADR-0009 matrix row, the "Config Staleness Safety" invariant row and the "Dead Config Hashing Infrastructure" fact are **superseded**: config-drift detection landed (see `../reverification.md`). Claims 1, 2, 4, 6-7, 9-14 are untouched by the diff and stand. Claims 5 and 8 stand in substance with shifted lines: `reconcile` `src/index/refresh.rs:410`, `is_paths_unchanged` `:475`, `merge_refreshed_notes` `:555`, `read_all_notes` `:560`; `visit_values` `src/index/store.rs:1749`; the fileClass tests are `src/index/service.rs` `mod class_field` (`:1732`). Claim 14 ADR-0009 (index refresh) is now **TRUE in code with one deviation** (format-version mismatch wipes the store at open rather than producing a `Drifted` state; the ADR file still says `proposed`).
+
 **Ticket:** `.scratch/strategic-redesign/issues/01-research-verify-load-bearing-claims.md`  
 **Deliverable:** `.scratch/strategic-redesign/research/01-verify-load-bearing-claims.md`  
 **Status:** Complete
@@ -12,7 +14,7 @@
 |---|---|---|---|---|
 | 1 | Value models | `FieldValueRef` coerces ISO strings at deserialization; 3-stage frontmatter conversion; 4 value enums exist | **Partially Confirmed** | `src/field.rs:781,838-854,976`; `src/note/metadata.rs:71-72`; `src/note/field.rs:43,179` |
 | 2 | Temporal cmp | `NoteFieldValueRef::compare` promotes Date to local midnight, diverging from `NoteFieldValue` derived `PartialEq` | **Confirmed** | `src/note/field.rs:297-300`; `src/temporal/datetime.rs:340-345` |
-| 3 | Config hash | `ConfigDigests`/`Config::hash` dead code; config drift pinned as stale in tests | **Confirmed** | `src/config/model.rs:156-158`; `src/index/service.rs:1749-1780` |
+| 3 | Config hash | `ConfigDigests`/`Config::hash` dead code; config drift pinned as stale in tests | **Confirmed at `2dc3250d`; SUPERSEDED at `207cc3fb`** (10 of 15 digests now feed `IndexFingerprint`; `Config::hash`/`compose` still dead; stale test replaced by `heals_class_axes_when_class_field_config_changes`) | `src/config/model.rs:156-158`; `src/index/service.rs:1749-1780` |
 | 4 | Query paths | `run_from_store` partial index breaks totality; `Not` scans all paths; `run` is linear scan | **Confirmed** | `src/query/service.rs:162-166,323,395`; `src/index/entry.rs:15` |
 | 5 | Index refresh | Path add/delete forces reading all notes from redb and re-resolving all links; content edits do not | **Confirmed** | `src/index/refresh.rs:343-344,361-386,487` |
 | 6 | Document order | `QueryRow::cmp_document_order` ignores `item_idx` | **Confirmed** | `src/query/results.rs:427-432` |
@@ -129,7 +131,7 @@
   - **ADR-0006 (File Class Schemas):** Constrains schema model. **Invariant TRUE in code** (`.traces/schemas/*.toml`, `extends` DAG, bounded `$ref`, `deny_unknown_fields`).
   - **ADR-0007 (Field Inheritance & extends-as-is-a):** Constrains schema inheritance & query matching. **Invariant TRUE in code** (Kahn topological sort, multi-parent, `global.toml`).
   - **ADR-0008 (Source Expression Grammar):** Constrains query DSL. **Invariant TRUE in code** (`from()` accepting `#tag`, `folder/`, `@Class`, `"exact.md"`, boolean ops).
-  - **ADR-0009 (Refresh-driven Index Rebuilds / Drift Detection):** Constrains index freshness. **Invariant FALSE in code** (status `proposed`; no redb config fingerprinting table exists; config drift is ignored).
+  - **ADR-0009 (Refresh-driven Index Rebuilds / Drift Detection):** Constrains index freshness. **Invariant FALSE at `2dc3250d`; TRUE at `207cc3fb`** (`meta` table with fingerprint, drift heals on refresh; deviation: format version mismatch wipes at open, ADR file still `proposed`).
   - **ADR-0009 (Filter date literals):** Constrains query parser. **Invariant TRUE in code** (unquoted ISO dates lexed as date literals and number-only arithmetic rejected in `src/query/grammar/filter.rs:84-107,301-325`).
 
 ---
@@ -143,7 +145,7 @@
 | **Temporal Cross-Kind Equality** | `note::field` | Inconsistent [V] | `compare` equates Date and DateTime at local midnight; derived `PartialEq` never equates them |
 | **Root Confinement** | `path` | Bypassed in Template [V] | `PathInspection::resolve` accepts absolute paths; `WriteMode::DryRun` skips target checks |
 | **Document Ordering** | `query::results` | Violated for Items [V] | `QueryRow::cmp_document_order` ignores `item_idx`, making list/task sorting unstable |
-| **Config Staleness Safety** | `index::service` | Missing [V] | Index never invalidates on config changes; ADR-0009 proposed drift detection is unbuilt |
+| **Config Staleness Safety** | `index::fingerprint` + `index::refresh` | Missing at `2dc3250d`; **Present at `207cc3fb`** [V] | Fail-closed completeness is compile-time (exhaustive destructure); remaining gap: parser version is not fingerprinted (hand-bumped `META_VERSION`) |
 
 ---
 
@@ -182,7 +184,7 @@
 
 ## 8. New Architectural Facts Discovered
 
-- **[V] Dead Config Hashing Infrastructure:** Extensive Blake3 hashing logic across `src/config/model/digest.rs` (390 lines) is completely unconsumed in production.
+- **[V] Dead Config Hashing Infrastructure (at `2dc3250d`; narrowed at `207cc3fb`):** per-setting digests (now `src/config/model/digest.rs`, 380 lines) have one production consumer, `IndexFingerprint::new`; `Config::hash`/`compose`, the root/templates/schema-directory digests and the `syn` scan remain unconsumed.
 - **[V] Multi-Valued Inline Fields are Write-Only:** Notes parse and store multiple values for an inline field key (`Box<[NoteFieldValue]>`), but the lookup API (`Note::get`) hardcodes `.first()`.
 - **[V] CLI Pre-Query Filesystem Probing:** `src/cli/mod.rs:436-468` intercepts user input and runs `is_file()` checks against disk to rewrite source strings before passing them to `QueryService`.
 - **[V] Unhandled SIGPIPE Across Output Commands:** `traces list`, `traces table`, `traces task`, and `traces completions` all invoke unbuffered `print!` directly, panicking when piped to standard Unix tools like `head`.

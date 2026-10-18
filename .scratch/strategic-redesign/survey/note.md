@@ -1,5 +1,7 @@
 # Architectural Survey: Note Domain & Parsing Subsystem
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** Only line numbers moved: `src/index/service.rs` fileClass tests are now `mod class_field` (`service.rs:1732`), `visit_values` is `src/index/store.rs:1749`, `src/lib.rs` lines after 190 are +1; `src/task.rs` changed only at `TaskStatusMap::iter`. The note parser, model and `TaskStatus` shape are untouched. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **What it owns**: In-memory Markdown note document model (`Note`, `Heading`, `ListItem`, `ListText`, `ListItemType`, `TaskListItem`, `Link`, `LinkType`, `LinkTarget`, `Frontmatter`, `NoteFieldValue`, `NoteFieldValueRef`); infallible parsing via `parse_markdown` (`src/note/parser.rs:106`); pulldown-cmark event traversal; frontmatter YAML extraction via `noyalib` (`src/note/metadata.rs:57`); streaming task marker accumulation (`src/note/parser/marker.rs:15`); Logos-based item tokenization for inline fields, task emojis, dates, and tags (`src/note/parser/lexer.rs:14`); inline field recursive-descent value parsing (`src/note/parser/inline.rs:51`); hierarchical list item tracking and subtask completion rollup (`src/note/parser/list.rs:30`, `src/note/parser/task.rs:171`); outgoing link/wikilink extraction and target splitting (`src/note/links.rs:28, 113`); shared task and tag domain primitives (`src/task.rs`, `src/tag.rs`).

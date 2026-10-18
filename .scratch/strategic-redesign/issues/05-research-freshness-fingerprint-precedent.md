@@ -6,7 +6,7 @@ Blocked by: none
 
 ## Question
 
-Traces' persistent index is a redb cache with a hardcoded format byte, content/stat-based file deltas, and an unimplemented config-drift fingerprint (ADR-0009 `docs/adr/0009-index-refresh.md`, `.scratch/index-query/issues/17-config-drift-detection-and-rebuild.md`); path-set changes trigger whole-vault re-resolution while content edits patch locally (`src/index/refresh.rs:344-386`). See `survey/index.md` H2/H3, `survey/config-dialog.md` H1.
+Traces' persistent index is a redb cache with a hardcoded format byte, content/stat-based file deltas, and a config-drift fingerprint that was unimplemented when charted and has since landed (`207cc3fb`) (ADR-0009 `docs/adr/0009-index-refresh.md`, `.scratch/index-query/issues/17-config-drift-detection-and-rebuild.md`); path-set changes trigger whole-vault re-resolution while content edits patch locally (`src/index/refresh.rs:344-386`). See `survey/index.md` H2/H3, `survey/config-dialog.md` H1.
 
 Study: Cargo fingerprints (`src/cargo/core/compiler/fingerprint/`, `DepFingerprint`, `StaleItem`, env/config/flag inputs); rustc incremental (`rustc_query_system/src/dep_graph`, red-green marking, `Fingerprint`, `DepNode`); Git index (`gix-index` stat cache, racy-git, `gix-dir`); Mercurial dirstate (v2) ; rumdl's cache (key derivation including config hash); Ruff's cache (`ruff_cache`, `CacheKey` trait); Obsidian Dataview and advanced-metadata-cache (how link resolution is recomputed on rename/delete); `watchman`/`notify` only if they inform path-set invalidation.
 

@@ -1,5 +1,7 @@
 # Architecture Survey: Root Primitives & Crate Infrastructure
 
+> **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** `src/hash.rs` grew three `Blake3Digest` members (raw-byte round-trip for persistence; the `Blake3Hasher` framing at the cited `:95-115` shifted by about +17 lines) and `TaskStatusMap::iter` is now live (consumed by the config digest). `src/lib.rs` lines after 190 are +1 and the `testing` list has 46 identifiers. `src/test_support.rs` in H4 is the proposed destination: the fixtures are today the inline `mod test_support` at `src/lib.rs:232`. Authoritative corrections: `reverification.md`.
+
 ## 1. Responsibilities & seams
 
 - **Scope & Scale**: 19 root files (11,642 LoC: 6,888 prod / 4,754 test across slice). Spans crate facade (`lib.rs`, `main.rs`), domain models hoisted to root (`task.rs`, `field.rs`, `tag.rs`), spatial/text primitives (`position.rs`, `lexer.rs`, `delimiter.rs`, `strsim.rs`, `yaml.rs`), filesystem/identity leaf types (`file.rs`, `path.rs`, `dirtree.rs`, `hash.rs`), OS configuration leaf stores (`dirs.rs`, `env_vars.rs`, `file_tracker.rs`), and an inter-subsystem adapter (`file_class_expander.rs`).
