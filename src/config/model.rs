@@ -36,6 +36,9 @@ use crate::{
     path::{PathError, RelativePath, SafeRelativePath},
 };
 
+/// Labels the workspace root setting in the configuration fingerprint.
+const ROOT: &[u8] = b"root";
+
 /// Holds resolved Config File values after the discovery, read, trust and value
 /// stages.
 #[derive(Clone, Debug)]
@@ -156,9 +159,9 @@ impl Config {
 
     /// Digests every resolved setting separately.
     ///
-    /// Each digest starts with its section-qualified label, so a stored digest
-    /// names the setting it covers. [`ConfigDigests::compose`] folds them into
-    /// the Config Fingerprint.
+    /// Each digest starts with its constant, section-qualified label, so a
+    /// stored digest names the setting it covers. [`ConfigDigests::compose`]
+    /// folds them into the Config Fingerprint.
     #[inline]
     #[must_use]
     pub(crate) fn digests(&self) -> ConfigDigests {
@@ -170,7 +173,7 @@ impl Config {
             tasks,
         } = self;
         ConfigDigests::new(
-            setting(b"root", |fp| fp.path(root)),
+            setting(ROOT, |fp| fp.path(root)),
             templates.digests(),
             schemas.digests(),
             frontmatter.digests(),
@@ -406,6 +409,31 @@ mod tests {
         #[test]
         fn is_equal_for_separately_built_equal_configs() {
             assert_eq!(base().hash(), base().hash());
+        }
+
+        #[test]
+        fn frames_the_root_digest_with_its_setting_label() {
+            let config = base();
+            let root = config.root();
+            let mut raw = blake3::Hasher::new();
+            raw.update(
+                &u64::try_from(ROOT.len())
+                    .expect("root label length fits in u64")
+                    .to_le_bytes(),
+            );
+            raw.update(ROOT);
+            let path = root.as_os_str().as_encoded_bytes();
+            raw.update(
+                &u64::try_from(path.len())
+                    .expect("root path length fits in u64")
+                    .to_le_bytes(),
+            );
+            raw.update(path);
+
+            assert_eq!(
+                config.digests().root().to_hex().as_ref(),
+                raw.finalize().to_hex().as_str()
+            );
         }
 
         #[test]
