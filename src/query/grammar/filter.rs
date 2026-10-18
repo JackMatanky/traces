@@ -226,15 +226,15 @@ impl ComparisonExpr {
     }
 
     /// Promotes a quoted filter literal's `String` payload to `Date`/
-    /// `DateTime`/`Duration` when its text has that shape, once, at
-    /// query-build time (not per row).
+    /// `DateTime`/`Duration` when its text has that shape, once, at query-build
+    /// time (not per row).
     ///
     /// Only `NoteFieldValue::String` needs inspection: bare date literals are
     /// promoted while tokenizing, and the grammar's other literal shapes
     /// (`Null`, `Bool`, `Number`) are already typed. Reuses
-    /// [`TextShape::classify`] (the same heuristic `SortKey::from_text`
-    /// uses), so filter literals and sort-key text classify identically, not
-    /// via a duplicate implementation.
+    /// [`TextShape::classify`] (the same heuristic `SortKey::from_text` uses),
+    /// so filter literals and sort-key text classify identically, not via a
+    /// duplicate implementation.
     pub(super) fn classify_literal(literal: NoteFieldValue) -> NoteFieldValue {
         let NoteFieldValue::String(text) = &literal else {
             return literal;
@@ -347,9 +347,9 @@ pub(crate) enum ArithOp {
 impl ArithOp {
     /// Applies the operator to two evaluated values.
     ///
-    /// Returns `Null` when either operand is `Null` or the operand types do
-    /// not support the operator, and `None` when a date or duration result is
-    /// not representable.
+    /// Returns `Null` when either operand is `Null` or the operand types do not
+    /// support the operator, and `None` when a date or duration result is not
+    /// representable.
     fn evaluate(
         self,
         left: &NoteFieldValue,
