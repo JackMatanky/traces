@@ -18,11 +18,11 @@ Several candidate decisions rest on performance claims that are currently reason
 
 Record machine, commands, raw numbers (table), and state which claims are confirmed, refuted, or inconclusive. Existing baselines in `target/criterion` or the mise criterion store (`docs/superpowers/plans/2026-10-18-criterion-store.md`) may be reused if current.
 
-Deliverable: `.scratch/strategic-redesign/research/11-performance-evidence.md` (tables + verdicts). Do not modify `src/` or committed benches.
+Deliverable: `.scratch/arch-design/research/11-performance-evidence.md` (tables + verdicts). Do not modify `src/` or committed benches.
 
 ## Resolution
 
-Empirical performance measurements across all 7 research questions have been completed and recorded in [.scratch/strategic-redesign/research/11-performance-evidence.md](../research/11-performance-evidence.md).
+Empirical performance measurements across all 7 research questions have been completed and recorded in [.scratch/arch-design/research/11-performance-evidence.md](../research/11-performance-evidence.md).
 
 Key findings affecting architectural decisions:
 

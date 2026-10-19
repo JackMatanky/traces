@@ -14,8 +14,8 @@ Focus: what is the unit of "execution context" (one struct vs several), where is
 
 Informs: ambient environment and execution context, config ownership and lifecycle, temporal boundary, workspace host and composition.
 
-Deliverable: `.scratch/strategic-redesign/research/04-execution-context-precedent.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
+Deliverable: `.scratch/arch-design/research/04-execution-context-precedent.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
 
 ## Resolution
 
-Research complete. Deliverable produced at `.scratch/strategic-redesign/research/04-execution-context-precedent.md`.
+Research complete. Deliverable produced at `.scratch/arch-design/research/04-execution-context-precedent.md`.

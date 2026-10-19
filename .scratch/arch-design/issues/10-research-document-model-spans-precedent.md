@@ -14,8 +14,8 @@ Focus: minimum position information that keeps later features cheap (edit-in-pla
 
 Informs: note document model, index read model, forward consumers, value model.
 
-Deliverable: `.scratch/strategic-redesign/research/10-document-model-spans-precedent.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
+Deliverable: `.scratch/arch-design/research/10-document-model-spans-precedent.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
 
 ## Resolution
 
-Deliverable completed at `.scratch/strategic-redesign/research/10-document-model-spans-precedent.md`.
+Deliverable completed at `.scratch/arch-design/research/10-document-model-spans-precedent.md`.

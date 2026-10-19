@@ -4,7 +4,7 @@
 
 - **Author**: `ResPerformance`
 - **Date**: 2026-10-18
-- **Target Ticket**: `.scratch/strategic-redesign/issues/11-research-performance-evidence.md`
+- **Target Ticket**: `.scratch/arch-design/issues/11-research-performance-evidence.md`
 - **Machine**: Apple M4 Pro (12 physical cores, 12 logical cores), 24 GB RAM, macOS Darwin 27.0.0 (aarch64)
 - **Tooling**: Rust nightly-2026-10-01, release builds (`-O3`), isolated process execution for RSS benchmarks, Criterion store (`.criterion/`).
 

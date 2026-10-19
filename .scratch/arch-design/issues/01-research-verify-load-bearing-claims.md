@@ -23,15 +23,15 @@ The ten breadth-first scouts (`survey/*.md`) made claims that later decisions wi
 13. The production module DAG is acyclic (10 tiers), `note -> config` is an upward edge (`src/note/parser/input.rs:9`), `file_tracker` has exactly two callers (`src/config/tracker.rs`, `src/config/trust.rs`); the edge table in `survey/cross-cutting.md` is accurate.
 14. For each existing ADR (0001-0009) record which candidate redesign areas it constrains and whether the ADR's stated invariant is still true in code.
 
-Use codegraph + reading; do not run benchmarks (separate ticket). Source surveys: all files under `.scratch/strategic-redesign/survey/`.
+Use codegraph + reading; do not run benchmarks (separate ticket). Source surveys: all files under `.scratch/arch-design/survey/`.
 
 ## Output
 
 For every numbered claim: verdict (confirmed / refuted / partially, with correction), exact current `path:line`, and any new adjacent fact discovered. Also list any *new* architectural facts found while verifying.
 
-Deliverable: `.scratch/strategic-redesign/research/01-verify-load-bearing-claims.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
+Deliverable: `.scratch/arch-design/research/01-verify-load-bearing-claims.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
 
 ## Resolution
 
-Deliverable completed: `.scratch/strategic-redesign/research/01-verify-load-bearing-claims.md`.
+Deliverable completed: `.scratch/arch-design/research/01-verify-load-bearing-claims.md`.
 All 14 scout claims and ADRs 0001–0009 were adversarially verified against production code: 12 confirmed, 2 partially confirmed with corrections (Claim 1: default deserialization is passthrough, coercion requires explicit classify; Claim 7: QuerySet method chaining does NOT clone the row vec, only Arc and ExecutionPlan). ADR-0009 drift detection was verified unbuilt at `2dc3250d`; **superseded**: it landed in main @ `207cc3fb` (see `reverification.md`). Four new architectural facts documented.

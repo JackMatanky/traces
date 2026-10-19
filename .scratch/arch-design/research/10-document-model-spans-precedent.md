@@ -4,8 +4,8 @@
 
 Type: comparative research
 Status: completed
-Ticket: `.scratch/strategic-redesign/issues/10-research-document-model-spans-precedent.md`
-Deliverable: `.scratch/strategic-redesign/research/10-document-model-spans-precedent.md`
+Ticket: `.scratch/arch-design/issues/10-research-document-model-spans-precedent.md`
+Deliverable: `.scratch/arch-design/research/10-document-model-spans-precedent.md`
 
 ---
 

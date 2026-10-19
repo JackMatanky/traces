@@ -2,7 +2,7 @@
 
 > **Re-verification note (main @ `207cc3fb`).** Counts changed after `207cc3fb`: `traces::testing` now exposes **46** identifiers (was 45), `tests/baselines/pub-tokens.txt` is **1,550** lines (was 1,528), `public-api-test-utils.txt` **4,444** (was 4,306), `public-api-default.txt` unchanged (2,555). `src/lib.rs:177-210` is now `:178-211`. The merge itself edited the baselines and changed a public `testing` type (`RefreshReport` struct to enum), which is a live example of the frozen-baseline friction this file describes.
 
-Research ticket: `.scratch/strategic-redesign/issues/08-research-errors-topology-precedent.md`  
+Research ticket: `.scratch/arch-design/issues/08-research-errors-topology-precedent.md`  
 Scope: Comparative study of error handling, diagnostics, crate boundaries, and test seams across 7 mature Rust codebases: **rustc**, **Ruff**, **uv**, **Cargo**, **gitoxide**, **rumdl**, and **jj**. All citations reference real source paths and symbols verified from shallow clones.
 
 ---

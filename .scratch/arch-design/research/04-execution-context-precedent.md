@@ -1,7 +1,7 @@
 # Research Precedent: Explicit Execution Context, Ambient State, and Deterministic Host Environments
 
 Research ticket: `issues/04-research-execution-context-precedent.md`
-Deliverable: `.scratch/strategic-redesign/research/04-execution-context-precedent.md`
+Deliverable: `.scratch/arch-design/research/04-execution-context-precedent.md`
 
 Investigates how mature CLIs and tools (Cargo, Jujutsu, Gitoxide, Ruff, ripgrep, uv, Jiff, Obsidian Templater) model execution context, capture process-ambient state (paths, env, cwd, clock, time zone), enforce trust, and achieve determinism for tests and long-lived hosts.
 

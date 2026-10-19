@@ -14,8 +14,8 @@ Focus questions: owned vs borrowed twin types (do any keep a `Ref` mirror and wh
 
 Informs decision tickets: value model, coercion and comparison policy, schema-note typing and validation, note document model.
 
-Deliverable: `.scratch/strategic-redesign/research/02-value-model-precedent.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
+Deliverable: `.scratch/arch-design/research/02-value-model-precedent.md` (<= 300 lines). Study real source (shallow-clone into a temp dir, rust-docs-mcp `get_item_source`, or GitHub raw files) and cite repo path + symbol/line for every claim. Structure: (1) what each comparable actually does (verified from source), (2) the invariants and who owns them, (3) tradeoffs and costs they pay, (4) transferable lessons for Traces, (5) lessons that do NOT transfer and why, (6) what this changes or challenges in the Traces hypotheses named above. Mark facts [V], interpretation [H]. Do not propose the final decision; that belongs to the decision tickets that list this ticket in Blocked by.
 
 ## Resolution
 
-Resolved by comparative research deliverable: [.scratch/strategic-redesign/research/02-value-model-precedent.md](../research/02-value-model-precedent.md).
+Resolved by comparative research deliverable: [.scratch/arch-design/research/02-value-model-precedent.md](../research/02-value-model-precedent.md).

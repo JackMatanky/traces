@@ -1,7 +1,7 @@
 # Research Precedent: Template Host Value Bridging, Date Formatting, and Service Injection
 
 Research ticket: `issues/07-research-template-bridge-precedent.md`
-Deliverable: `.scratch/strategic-redesign/research/07-template-bridge-precedent.md`
+Deliverable: `.scratch/arch-design/research/07-template-bridge-precedent.md`
 
 Investigates how embedded template engines (Minijinja, Liquid, Jinja2) and domain evaluators (Typst, Rhai, Obsidian Templater) bridge domain values, dialect formatting, service injection, and error spans.
 

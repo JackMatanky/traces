@@ -2,8 +2,8 @@
 
 > **Re-verification note (main @ `207cc3fb`, after this file was written at `2dc3250d`).** Claim 3, the ADR-0009 matrix row, the "Config Staleness Safety" invariant row and the "Dead Config Hashing Infrastructure" fact are **superseded**: config-drift detection landed (see `../reverification.md`). Claims 1, 2, 4, 6-7, 9-14 are untouched by the diff and stand. Claims 5 and 8 stand in substance with shifted lines: `reconcile` `src/index/refresh.rs:410`, `is_paths_unchanged` `:475`, `merge_refreshed_notes` `:555`, `read_all_notes` `:560`; `visit_values` `src/index/store.rs:1749`; the fileClass tests are `src/index/service.rs` `mod class_field` (`:1732`). Claim 14 ADR-0009 (index refresh) is now **TRUE in code with one deviation** (format-version mismatch wipes the store at open rather than producing a `Drifted` state; the ADR file still says `proposed`).
 
-**Ticket:** `.scratch/strategic-redesign/issues/01-research-verify-load-bearing-claims.md`  
-**Deliverable:** `.scratch/strategic-redesign/research/01-verify-load-bearing-claims.md`  
+**Ticket:** `.scratch/arch-design/issues/01-research-verify-load-bearing-claims.md`  
+**Deliverable:** `.scratch/arch-design/research/01-verify-load-bearing-claims.md`  
 **Status:** Complete
 
 ---
