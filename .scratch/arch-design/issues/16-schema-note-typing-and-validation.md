@@ -27,3 +27,11 @@ Inputs: `survey/schema.md`, `research/03`, value model and coercion decisions,
 compat envelope.
 
 Graduates fog: schema internals simplification (see map).
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). Schema options use a
+schema-local literal type (strings stay strings, no date/duration/link
+variants; native TOML dates read as strings). Select values that name links
+are interpreted as links only here, at the consumer boundary, with the shared
+root `Link` wikilink parser.

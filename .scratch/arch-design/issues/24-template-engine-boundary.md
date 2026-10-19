@@ -29,3 +29,9 @@ Inputs: `research/07`, query core, temporal boundary, value model, compat
 envelope.
 
 Graduates fog: template micro-optimisations (AST cache, regex caches).
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). Two adapters remain: natural
+serde for schema literals and the hand-written runtime adapter. `Int` renders
+`5` where `Number(f64)` rendered `5.0` (measured), an intentional change.

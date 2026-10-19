@@ -30,3 +30,13 @@ the value model; remove implicit promotion (needs compat decision).
 Inputs: `survey/query.md` H6, `survey/temporal.md` H3, `survey/note.md` H7,
 `research/03`, value model decision, execution-context decision for the zone
 input.
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). Handed to this ticket:
+frontmatter literal-string escape (frontmatter classification is
+quote-insensitive, inline quotes are the escape); `Int`/`Float` share one
+numeric rank, derived `PartialEq` stays structural so semantic numeric
+equality lives here; `Link` equality and order, including `embedded`;
+zone-shifted naive datetimes (frontmatter `12:00` was observed as `10:00Z`,
+persisted in the cache); schema select strings vs note `Link` matching.

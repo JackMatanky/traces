@@ -26,3 +26,9 @@ Inputs: `survey/config-dialog.md`, `survey/temporal.md`, `survey/cli.md`,
 
 Unlocks: config ownership, temporal boundary, query/template evaluation
 signature, workspace host.
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). Naive frontmatter datetimes are
+zone-shifted at parse time and persisted in the postcard cache, so the zone
+input also affects index contents, not only evaluation.

@@ -40,3 +40,9 @@ document model, forward-consumer decision (cold CLI vs long-lived host).
 
 Graduates fog: index internals (CandidateTrie/indextree, store engine/repository
 split).
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). Postcard encodes `Date`,
+`DateTime` and `Duration` as text and re-parses them on every cache load; a
+compact binary form (via `is_human_readable()`) is a candidate, unmeasured.

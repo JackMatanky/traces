@@ -26,3 +26,11 @@ with pushdown extraction; typed expression builder as the single IR with DSL as
 a frontend. Include keep-as-is.
 
 Inputs: `research/06`, value model, coercion policy, read-model decision.
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). The model has no borrowed
+mirror enum; any view enum is query-local. `NoteFieldValueRef` is deleted only
+after benchmarking owned vs view for `file.name` sort and filter
+(`resolve_file_ref` borrows `&str` today). Computed fields (`file.size`,
+`list.line`, `list.depth`, `list.parent`) become `Int`.

@@ -1,7 +1,7 @@
 # Which future consumers and scale points must the architecture be shaped for?
 
 Type: grilling
-Status: claimed
+Status: resolved
 Blocked by: none
 
 ## Question
@@ -16,6 +16,7 @@ daemons (`survey/config-dialog.md` H2). Scale: vault sizes (1k? 20k? 100k
 notes), cold-start CLI vs long-lived process, single-user vs multi-root.
 
 Decide:
+
 - (a) is a headless/long-lived host (LSP/MCP) a committed second consumer or
   optional?
 - (b) are note mutations (write-back to markdown) in scope, which would require
@@ -98,5 +99,3 @@ DORA metrics are downstream outcomes, not direct architecture targets.
 This decision does not justify a general note-editing API, an async core, or
 multi-workspace machinery without concrete requirements. It also does not
 require every operation to meet one performance threshold at every vault size.
-
-Status: resolved

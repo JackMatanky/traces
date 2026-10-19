@@ -48,3 +48,11 @@ internals once the CLI is out (a test-support crate vs narrow re-exports); (d)
 the order in which later splits could follow once the CLI boundary is proven.
 The split is blocked in practice by the workspace-host ticket, since composition
 currently lives in the CLI.
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). `NoteFieldValue` and `Link` are
+`pub` today but externally nearly opaque (no default-feature public function
+returns a value; `Note::outlinks()` accessors are `pub(crate)`). Decide their
+visibility under the reduce-`pub` rule; the root `Link`'s module name is also
+chosen here.

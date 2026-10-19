@@ -190,6 +190,19 @@ itself is not implemented here; the map ends at hand-off to specification.
   operation-specific performance across the seven target vault sizes. Reopen the
   note-model choice in ticket 19; resolve open-buffer/index consistency in
   ticket 30. [fc]: ./issues/13-grilling-forward-consumers-and-design-pressure.md
+- [What is the single dynamic value model, and who owns
+  it?](./issues/14-value-model.md): two owned types and no borrowed mirror enum.
+  `note::NoteFieldValue` (`Int(i64)`/`Float(f64)`, `Link`, derived tagged serde,
+  80 B kept) for notes, queries and templates; a schema-local literal type
+  (strings stay strings) replaces the schema `FieldValue`; only a root `Link`
+  (`target`, normalized `display`, `embedded`) is shared. `NoteLink` (syntax
+  kind, span) is the editor-side type for ticket 19. Frontmatter keeps the
+  Noyalib compat parser and converts its AST directly (huge integers become
+  `Float` instead of dropping the block); classification is quote-insensitive in
+  frontmatter and shares one parser set with inline. `FieldValueRef`,
+  `DateTimeCoercion` and the double conversion are removable. Handoffs: zone for
+  naive datetimes (15, 17), temporal cache encoding (20, 21), view enum
+  benchmark (22).
 
 ## Not yet specified
 

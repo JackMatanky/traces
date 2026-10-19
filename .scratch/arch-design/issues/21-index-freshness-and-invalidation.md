@@ -60,3 +60,10 @@ deserialization (18.5 ms) and 2.7% link re-resolution (0.5 ms).
 
 Inputs: `research/05`, `research/11` (#2), config-ownership decision (residual
 digest surface), read-model decision.
+
+## Inputs from the value model decision
+
+See [ticket 14's Answer](./14-value-model.md). The runtime value's serde shape
+changes (`Number` becomes `Int`/`Float`, `Link` gains `embedded` and
+normalized display), so the cache format and parser version must invalidate
+existing indexes.
