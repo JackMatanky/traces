@@ -101,3 +101,16 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 - S1 attempt 3 (dir `*-ATTEMPT3-C6-fail-METRICS`) was valid GREEN but failed C6 (3727 > 3535) because it consulted METRICS.md for the section 2/5 delta rubric. Task 18 fix: report-template.md section 2 comment now scopes Review mode to zero delta and redirects SLoC thresholds to DISCOVERY.md (corpus 5326 -> 5344). S1 attempt 4 (recorded above) passed C6 = 2945 without opening METRICS.md.
 - S3 failed attempt 1 (permission denial) and attempt 2 (transient certificate verification error) before attempt 3 succeeded.
 - Baseline scenario runs also dispatched without nested subagent tools; both baseline and GREEN runs disclosed in-process lens execution. Main checkout `.agents/skills/rust-design/` was temporarily synced to GREEN bytes for the skill loader and has been restored to baseline (`git restore` + removed untracked report-template.md).
+
+## Final Word Counts
+
+```
+     246 .agents/skills/rust-design/report-template.md
+     733 .agents/skills/rust-design/TOOLING.md
+     779 .agents/skills/rust-design/DEEPENING.md
+     804 .agents/skills/rust-design/METRICS.md
+     816 .agents/skills/rust-design/MODELING.md
+     866 .agents/skills/rust-design/DISCOVERY.md
+    1100 .agents/skills/rust-design/SKILL.md
+    5344 total
+```
