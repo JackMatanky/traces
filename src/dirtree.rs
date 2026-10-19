@@ -523,13 +523,14 @@ mod tests {
             write(root, "c.md");
 
             // Act: pull one entry, then reconfigure the started walk with a
-            // predicate that matches everything.
+            // predicate that matches nothing; an honored predicate would
+            // empty the remaining walk.
             let mut tree = DirTree::children(root);
             assert!(
                 tree.next().expect("entries exist").is_ok(),
                 "first entry is fine"
             );
-            let tree = tree.filter(|_| true);
+            let tree = tree.filter(|_| false);
             let rest: Vec<_> = tree.collect();
 
             // Assert: the pre-start builder was already consumed, so the late
