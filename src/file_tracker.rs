@@ -359,16 +359,17 @@ impl FilePathTracker {
 
     /// Lazily yields the store root's entry paths, companion files excluded.
     ///
-    /// Walks the root one level deep, absorbing an absent root into an empty
-    /// walk, and skips any entry whose file name ends in one of
-    /// `companion_suffixes`. Failures while reading the root or an entry
-    /// surface as [`StoreIo`] items at their original position in the walk.
+    /// Walks the root one level deep, absorbing an absent or non-directory
+    /// root into an empty walk, and skips any entry whose file name ends in
+    /// one of `companion_suffixes`. Failures while reading the root or an
+    /// entry surface as [`StoreIo`] items at their original position in the
+    /// walk.
     ///
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
-    fn entry_paths<'a>(
-        &'a self,
-        companion_suffixes: &'a [&'a str],
-    ) -> impl Iterator<Item = Result<PathBuf, FilePathTrackerError>> + 'a {
+    fn entry_paths(
+        &self,
+        companion_suffixes: &[&str],
+    ) -> impl Iterator<Item = Result<PathBuf, FilePathTrackerError>> {
         DirTree::children(&self.root).missing_as_empty().filter_map(
             move |node| match node.map_err(store_error) {
                 Err(error) => Some(Err(error)),
