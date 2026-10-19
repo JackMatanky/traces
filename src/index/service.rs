@@ -643,12 +643,20 @@ mod tests {
 
         #[test]
         fn scans_a_root_whose_own_name_is_ignored() {
-            // Arrange: the workspace root itself matches `is_ignored_dir`
-            // ("target"), so a seam that applies the prune predicate to the
-            // root would silently return an empty index.
+            // Arrange: the workspace root itself matches `is_ignored_dir`, so
+            // a seam that applies the prune predicate to the root would
+            // silently return an empty index. The name comes from the same
+            // list production code prunes with, and must satisfy
+            // `is_ignored_dir` for the arrangement to hold.
             let temp = tempfile::tempdir().expect("create temp dir");
-            let root = temp.path().join("target");
-            fs::create_dir(&root).expect("mkdir target");
+            let root_name = crate::env_vars::DEFAULT_IGNORED_DIRS
+                .into_iter()
+                .find(|name| {
+                    crate::env_vars::is_ignored_dir(std::ffi::OsStr::new(name))
+                })
+                .expect("a default ignored dir satisfies is_ignored_dir");
+            let root = temp.path().join(root_name);
+            fs::create_dir(&root).expect("mkdir ignored root");
             fs::write(root.join("note.md"), "content").expect("write note.md");
 
             // Act

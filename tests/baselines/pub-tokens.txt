@@ -287,6 +287,7 @@ src/dirtree.rs: pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
 src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
 src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
 src/dirtree.rs: pub(crate) struct DirTree {
+src/env_vars.rs: pub(crate) const DEFAULT_IGNORED_DIRS: [&str; 4] =
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =

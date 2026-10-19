@@ -143,12 +143,8 @@ impl FilePathTracker {
         companion_suffixes: &[&str],
     ) -> Result<Vec<PathBuf>, FilePathTrackerError> {
         let mut targets = Vec::new();
-        for node in DirTree::children(&self.root).missing_as_empty() {
-            let node = node.map_err(store_error)?;
-            let entry = node.path().to_path_buf();
-            if has_suffix(&entry, companion_suffixes) {
-                continue;
-            }
+        for entry in self.entry_paths(companion_suffixes) {
+            let entry = entry?;
             if let Some(target) = recorded_target(&entry)
                 && target.try_exists().unwrap_or(true)
             {
@@ -340,12 +336,8 @@ impl FilePathTracker {
         companion_suffixes: &[&str],
     ) -> Result<Vec<PathBuf>, FilePathTrackerError> {
         let mut removed = Vec::new();
-        for node in DirTree::children(&self.root).missing_as_empty() {
-            let node = node.map_err(store_error)?;
-            let entry = node.path().to_path_buf();
-            if has_suffix(&entry, companion_suffixes) {
-                continue;
-            }
+        for entry in self.entry_paths(companion_suffixes) {
+            let entry = entry?;
             let Some(target) = recorded_target(&entry) else {
                 continue;
             };
@@ -363,6 +355,30 @@ impl FilePathTracker {
             }
         }
         Ok(removed)
+    }
+
+    /// Lazily yields the store root's entry paths, companion files excluded.
+    ///
+    /// Walks the root one level deep, absorbing an absent root into an empty
+    /// walk, and skips any entry whose file name ends in one of
+    /// `companion_suffixes`. Failures while reading the root or an entry
+    /// surface as [`StoreIo`] items at their original position in the walk.
+    ///
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
+    fn entry_paths<'a>(
+        &'a self,
+        companion_suffixes: &'a [&'a str],
+    ) -> impl Iterator<Item = Result<PathBuf, FilePathTrackerError>> + 'a {
+        DirTree::children(&self.root).missing_as_empty().filter_map(
+            move |node| match node.map_err(store_error) {
+                Err(error) => Some(Err(error)),
+                Ok(node) => {
+                    let entry = node.path().to_path_buf();
+                    (!has_suffix(&entry, companion_suffixes))
+                        .then_some(Ok(entry))
+                }
+            },
+        )
     }
 }
 

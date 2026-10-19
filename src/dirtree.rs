@@ -61,12 +61,10 @@ impl<'a> DirNodeRef<'a> {
 impl DirNode {
     /// Adapts one raw walkdir item into this module's interface.
     ///
-    /// Entries become nodes; failures are classified against the walk's root:
-    /// a depth-0 [`NotFound`](io::ErrorKind::NotFound) is a
-    /// [`DirTreeError::MissingRoot`], any other depth-0 failure is a
-    /// [`DirTreeError::RootInaccessible`], and a failure beneath the root is
-    /// a [`DirTreeError::NodeInaccessible`]. Mid-readdir errors that carry no
-    /// path fall back to the walk root.
+    /// Depth 0 denotes the walk root itself, so a depth-0 failure is
+    /// classified against the root rather than as a node beneath it. Errors
+    /// that carry no path (mid-readdir stream glitches) fall back to the
+    /// walk root.
     fn try_new(
         root: &Path,
         result: walkdir::Result<DirEntry>,
@@ -226,9 +224,8 @@ impl DirTree {
     /// walk yields nothing instead of one error item. Other failures
     /// ([`DirTreeError::RootInaccessible`], [`DirTreeError::NodeInaccessible`])
     /// still surface, so callers keep their strict handling of unreadable
-    /// roots. This is the shared policy for callers that treat an absent
-    /// directory as "no entries" (schema registry, template lookup, file
-    /// tracker store).
+    /// roots. This is the shared policy for callers that must tolerate a
+    /// missing directory and see it as "no entries".
     ///
     /// Has no effect once iteration has begun.
     #[must_use]
