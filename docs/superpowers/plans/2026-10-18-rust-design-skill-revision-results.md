@@ -4,7 +4,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 ## Efficiency gates (RED now, GREEN after edits)
 - E1: wc -w .agents/skills/rust-design/SKILL.md <= 1100 (baseline: 1633 -> FAILS now = RED)
-- E2: wc -w .agents/skills/rust-design/*.md incl. future report-template.md <= 5200 (baseline: 6505 measured on the 6 pre-existing files -> FAILS now = RED)
+- E2: wc -w .agents/skills/rust-design/*.md incl. report-template.md <= 5350 (baseline: 6505 -> RED; amended from <=5200 during GREEN before Task 17 verification: duplication-based safe cuts exhausted at 5326, and the next 126 words would remove rules rather than redundancy; user-approved 2026-10-18)
 
 ## Capability assertions (per-mode scoping noted on each line; must pass BEFORE and AFTER edits)
 - C1: Deliverables under .design/<date>-<mode>-<slug>/ only. Check: `git status --short` shows no new paths outside the scenario's .design/ dir, and `ls .design/` shows exactly one directory per scenario run so far (this run's dir plus prior scenario dirs), with no stray dirs. (Clarified during RED: the original "exactly that one scenario dir" was only true for the first scenario.)

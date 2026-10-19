@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Cut the `rust-design` skill's token cost (SKILL.md ≤1100 words from 1633; full corpus ≤5200 words from 6505) with zero capability loss, proven by before/after subagent scenario tests, and add a `grill-me` follow-up offer for all modes.
+**Goal:** Cut the `rust-design` skill's token cost (SKILL.md ≤1100 words from 1633; full corpus ≤5200 words from 6505 (original target, later amended to ≤5350, see E2 note)) with zero capability loss, proven by before/after subagent scenario tests, and add a `grill-me` follow-up offer for all modes.
 
 **Architecture:** RED first: run three capability scenarios against the current skill and record an oracle (assertions + word counts + files consulted). GREEN: apply Tier A cuts (information-preserving relocations), then Tier B cuts (cross-file dedup with REQUIRED pointer hardening). Re-run the same scenarios; any capability regression triggers REFACTOR (restore or re-harden, re-test).
 
@@ -62,7 +62,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 ## Efficiency gates (RED now, GREEN after edits)
 - E1: wc -w .agents/skills/rust-design/SKILL.md <= 1100 (baseline: 1633 -> FAILS now = RED)
-- E2: wc -w .agents/skills/rust-design/*.md incl. future report-template.md <= 5200 (baseline: 6505 measured on the 6 pre-existing files -> FAILS now = RED)
+- E2: wc -w .agents/skills/rust-design/*.md incl. future report-template.md <= 5350 (baseline: 6505 measured on the 6 pre-existing files -> FAILS now = RED) (amended from <=5200, see results file E2 note)
 
 ## Capability assertions (must pass BEFORE and AFTER edits)
 - C1: Deliverables under .design/<date>-<mode>-<slug>/ only. Check: `git status --short` shows no new paths outside the scenario's .design/ dir, and `ls .design/` shows exactly one directory per scenario run so far (this run's dir plus prior scenario dirs, no stray dirs). (Clarified during RED.)
@@ -671,7 +671,7 @@ Run:
 grep -c 'DEFERRED_TOOL_UNAVAILABLE' .agents/skills/rust-design/*.md
 grep -c 'Comment Preservation Rule' .agents/skills/rust-design/*.md
 grep -c 'improve/<run-id>-<trial-id>' .agents/skills/rust-design/*.md
-grep -c 'Structural or Computational Gain' .agents/skills/rust-design/*.md
+grep -c 'Structural/Computational Gain' .agents/skills/rust-design/*.md
 ```
 
 Expected: each pattern appears in exactly one file (deferrals → DISCOVERY.md; comment preservation → METRICS.md; worktree naming → TOOLING.md or DEEPENING.md, whichever still holds it; EAV formula → DISCOVERY.md).
@@ -703,7 +703,7 @@ For each scenario assert: every assertion applicable to that scenario PASSes (C2
 - [ ] **Step 3: Efficiency gates**
 
 Run: `wc -w .agents/skills/rust-design/*.md`
-Expected: SKILL.md ≤1100 (E1 PASS); total incl. `report-template.md` ≤5200 (E2 PASS).
+Expected: SKILL.md ≤1100 (E1 PASS); total incl. `report-template.md` ≤5350 (E2 PASS).
 
 ### Task 18: REFACTOR loop (conditional)
 
