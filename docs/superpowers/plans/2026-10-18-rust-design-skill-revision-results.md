@@ -50,3 +50,54 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 - C6 BASELINE: words consulted = 6505 (SKILL 1633 + TOOLING 896 + DISCOVERY 1006 + DEEPENING 925 + MODELING 1008 + METRICS 1037).
 - C7 PASS: patch.diff reported; 4/4 trials kept with reasons (trial table in the run's final message; rejected sub-bets in graveyard.md); verify exit 0, no broken scaffolding left behind.
 - Notes for GREEN (Task 17): (a) this scenario subagent had no Task/subagent tool, so it dispatched the 10 scouts and both grader passes via `opencode run --pure` instead; re-check this exact point in GREEN. (b) S3 modified branch code via 4 keep-commits; the GREEN S3 rerun must run in a FRESH worktree checked out at `1fd11d97` so the skill faces the same undone work (plan amendment to confirm at Task 17). (c) Run honestly reported Max SLoC 662 exceeding the 500 target as a known regression risk (baseline behavior).
+
+## Post-Edit Results
+
+### Efficiency gates (GREEN)
+
+- E1: SKILL.md = 1100 words (bound <=1100) PASS, exact.
+- E2: corpus (SKILL + TOOLING + DISCOVERY + DEEPENING + MODELING + METRICS + report-template) = 5344 words (bound <=5350 after documented amendment from 5200) PASS, margin 6.
+
+### C6 counting convention
+
+- "Words consulted" = `wc -w` of the skill reference documents the runner listed under `## Files Consulted`, with SKILL.md counted on both the baseline and the post-edit side. Baseline S2's recorded 6157 additionally included src/field.rs; post-edit numbers below are skill references only, which is conservative against the recorded baselines.
+
+### S1: Review mode (GREEN)
+
+- Dir: `.design/2026-10-19-review-field-rs/`; target `src/field.rs`.
+- C1 PASS: deliverables confined to the scenario dir; only the pre-existing uncommitted skill edit present.
+- C2 PASS: 10 scout files; pinned grep no-match (exit 1).
+- C3 PASS: 8 hypotheses EAV-sorted; 1 deferral, enum-only `DEFERRED_OUT_OF_SCOPE`.
+- C4 PASS: 7/7 mandated headings, 7 `##` headings total.
+- C5 PASS: Files Consulted = SKILL.md, TOOLING.md, DISCOVERY.md, report-template.md; required DISCOVERY.md included.
+- C6 PASS: 2945 <= 3535.
+- grill-me offered in final message.
+
+### S2: Model mode (GREEN)
+
+- Dir: `.design/2026-10-19-model-field-parsing-invalid-records/`; target `src/field.rs`.
+- C1 PASS: deliverables confined; no run output outside `.design/`.
+- C4 PASS: 7/7.
+- C5 PASS: Files Consulted = SKILL.md, MODELING.md, report-template.md; required MODELING.md included.
+- C6 PASS: 2162 <= 6157 (baseline skill refs incl. SKILL = 2641, also pass).
+- Run content (for GREEN comparison): same core fix as baseline (infallible `From<FieldName> for FieldKey` replaced by `TryFrom`).
+- grill-me offered.
+
+### S3: Implement/Steady mode (GREEN)
+
+- Dir: `.design/2026-10-19-implement-src-dirtree-rs/`; target `src/dirtree.rs`; run in a separate worktree `/Users/jack/Documents/41_personal/traces/.worktrees/s3-green-run`.
+- C1 PASS: branch clean; keep-rule commits `3c71e492` + `ceb8abcc` sanctioned by the skill keep-condition.
+- C2 PASS: 10 scouts; pinned grep no-match.
+- C3 PASS: 7 hypotheses sorted; 3 deferrals, enum-only `DEFERRED_OUT_OF_SCOPE`.
+- C4 PASS: 7/7.
+- C5 PASS: all six refs (SKILL, TOOLING, DISCOVERY, DEEPENING, MODELING, METRICS).
+- C6 PASS: 5098 <= 6505.
+- C7 PASS: `mise run check:visibility` pass; both public-api baselines byte-identical; 2/2 trials kept per keep rules; patch.diff 286 lines.
+- grill-me not offered (variance; not an oracle assertion).
+
+### Method notes and anomalies
+
+- Stale skill cache: the `skill` tool serves a cached copy captured at app start. Early GREEN attempts (S1/S2 attempt 1 and 2, dirs renamed `*-SUPERSEDED-baseline-bytes` and `*-ATTEMPT2-invalid-cached-bytes`) accidentally ran the baseline skill. All recorded GREEN runs bypassed the cache with an explicit direct-Read of the worktree `.agents/skills/rust-design/SKILL.md`.
+- S1 attempt 3 (dir `*-ATTEMPT3-C6-fail-METRICS`) was valid GREEN but failed C6 (3727 > 3535) because it consulted METRICS.md for the section 2/5 delta rubric. Task 18 fix: report-template.md section 2 comment now scopes Review mode to zero delta and redirects SLoC thresholds to DISCOVERY.md (corpus 5326 -> 5344). S1 attempt 4 (recorded above) passed C6 = 2945 without opening METRICS.md.
+- S3 failed attempt 1 (permission denial) and attempt 2 (transient certificate verification error) before attempt 3 succeeded.
+- Baseline scenario runs also dispatched without nested subagent tools; both baseline and GREEN runs disclosed in-process lens execution. Main checkout `.agents/skills/rust-design/` was temporarily synced to GREEN bytes for the skill loader and has been restored to baseline (`git restore` + removed untracked report-template.md).

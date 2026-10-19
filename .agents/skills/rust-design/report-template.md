@@ -12,7 +12,9 @@ Every execution writes `report.md` under these mandatory Markdown headings:
 - Architectural Thesis: [Summary of recursive depth and knowledge transformation]
 
 ## 2. True Architectural Baseline vs. Final State
-<!-- Embed output table directly from: uv run .../diff.py baseline.json final.json -->
+<!-- Embed output table directly from: uv run .../diff.py baseline.json final.json
+Review mode: zero delta; sections 2/5 emit baseline only; METRICS.md is not
+consulted (SLoC thresholds live in DISCOVERY.md). -->
 
 ## 3. Recursive Depth & Seam Decomposition
 - Parent Module Simplification: [What vanished from parent obligations]
