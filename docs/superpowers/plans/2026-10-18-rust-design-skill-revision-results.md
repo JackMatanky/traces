@@ -119,7 +119,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
      804 .agents/skills/rust-design/METRICS.md
      816 .agents/skills/rust-design/MODELING.md
      866 .agents/skills/rust-design/DISCOVERY.md
-     1100 .agents/skills/rust-design/SKILL.md
+    1100 .agents/skills/rust-design/SKILL.md
     5348 total
 ```
 
