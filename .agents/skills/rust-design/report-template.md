@@ -27,6 +27,7 @@ exist. -->
 - Eliminated Anti-Patterns: [Removed junk drawer files, deep path traversals]
 
 ## 5. Deletion Dividend Ledger
+<!-- Model mode: no trials; record N/A or supersessions only. -->
 - Superseded Types & Functions: [Deleted symbols]
 - Eliminated Adapters & Wrappers: [Collapsed layers]
 - Removed Dependencies: [Eliminated crates]

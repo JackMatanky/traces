@@ -4,7 +4,7 @@
 
 ## 1. Automated Tool Metrics
 
-The following metrics are deterministically extracted by `measure.py` and compared via `diff.py`:
+Metrics are deterministically extracted by `measure.py`, compared via `diff.py`:
 
 | Metric Dimension | Tool / Source | Threshold / Target |
 | :--- | :--- | :--- |
@@ -16,7 +16,7 @@ The following metrics are deterministically extracted by `measure.py` and compar
 | **Maintainability Hotspots** | `messrust` | Reduced |
 | **Cyclic Dependency Edges** | `cargo-modules` | 0 cycles |
 | **Duplicate Crate Versions** | `cargo tree -d` | 0 duplicates |
-| **Graph Edge Density** | `codegraph`/`rustgraph`| Reduced |
+| **Graph Edge Density (GED)** | `codegraph`/`rustgraph`| Reduced |
 | **Max File SLoC** | `measure.py` | `<= 500` SLoC |
 | **Module / File Count** | `measure.py` | Cohesive count |
 | **Unbounded Channels / Queues** | `measure.py` | 0 unbounded |
@@ -31,7 +31,7 @@ The following metrics are deterministically extracted by `measure.py` and compar
 | Seam width & caller burden | `IKL`, `PS` | Public API items, `cargo-public-api`, LSP references |
 | Boundary integrity & encapsulation | `BR`, `GED` | Import paths, `cargo-modules dependencies`, re-exports |
 | Impact of changes across seams | `PD` | Frozen change scenario evaluated against seam boundaries |
-| Structure made obsolete & simplified | `DD`, `SLoC` delta | Removed types, collapsed modules, `cargo tree -d` |
+| Structure made obsolete & simplified | `DD` (Deletion Dividend), `SLoC` delta | Removed types, collapsed modules, `cargo tree -d` |
 | Risk & test fragility | `CRAP` | `cargo-crap`, test coverage entering seam |
 | Invariant & state representation | `ISR`, `ITE` | Typestates, enum state machines, compile-time invariants |
 | Fault isolation & runtime buffering | `BBR`, `SPR` | Static channel scan, unwrap scan, `cargo-crap` |
@@ -40,7 +40,7 @@ The following metrics are deterministically extracted by `measure.py` and compar
 
 ## 3. Semantic Architectural Rubrics
 
-Tool counters provide raw evidence, not architectural verdicts. Evaluate candidate seams against these semantic rubrics:
+Tool counters provide raw evidence, not verdicts. Evaluate candidate seams against these rubrics:
 
 ### Interface Knowledge Load (IKL)
 Count the independent facts a caller must know to use the seam correctly:
@@ -52,22 +52,22 @@ Count the independent facts a caller must know to use the seam correctly:
 *Target:* Minimize caller obligations while maximizing capability.
 
 ### Parent Simplification (PS)
-Evaluate what disappeared from the parent module when extracting the child:
-- Child concepts and internal representations removed from parent.
+Evaluate what disappeared from the parent when extracting the child:
+- Child concepts and representations removed from parent.
 - State machines and validation rules absorbed behind child seam.
 - Child dependencies eliminated from parent imports.
 *Target:* The parent's implementation becomes shorter and higher-level.
 
 ### Seam Bypass Ratio (BR) & Change Propagation Distance (PD)
-- **Seam Bypass (BR):** Inspect whether callers bypass parent interfaces to reach child submodules directly via deep imports. *Target:* Zero bypass paths.
-- **Change Propagation Distance (PD):** Count intended architectural seams crossed by a minimal correct change for a representative scenario. *Target:* Changes remain contained behind local seams.
+- **Seam Bypass (BR):** Inspect whether callers bypass parent interfaces to reach child submodules via deep imports. *Target:* Zero bypass paths.
+- **Change Propagation Distance (PD):** Count intended seams crossed by a minimal correct change for a representative scenario. *Target:* Changes remain contained behind local seams.
 
 ### Invariant & State Guarantees (ISR & ITE)
 - **Invalid States Representable (ISR):** Zero invalid states permitted by struct field combinations at construction ("parse, don't validate").
 - **Illegal Transitions Expressible (ITE):** Zero illegal state transitions permitted by method signatures (enforced via typestates or sealed enums).
 
 ### Fault Isolation & Runtime Stability (BBR & SPR)
-- **Bounded Buffering Ratio (BBR):** All message channels, thread pools, and queues have explicit capacity bounds to prevent out-of-memory cascades.
+- **Bounded Buffering Ratio (BBR):** All channels, thread pools, and queues have explicit capacity bounds to prevent out-of-memory cascades.
 - **Seam Panic Ratio (SPR):** Zero unhandled `.unwrap()`, `.expect()`, or `panic!` calls on public and cross-crate entry points.
 
 ---
@@ -77,14 +77,14 @@ Evaluate what disappeared from the parent module when extracting the child:
 Size metrics must measure **Source Lines of Code (SLoC)**: non-comment, non-blank lines of Rust code.
 
 - **Comment Preservation Rule:** Stripping, deleting, or compressing doc comments (`///`, `//!`), inline explanations, or rustdoc examples to artificially reduce line counts is strictly prohibited. Any proposal that decreases comment-to-code ratios without justification fails verification.
-- **Semantic Deletion Dividend:** The deletion dividend evaluates the removal of architectural complexity (dead types, obsolete traits, collapsed wrappers, unused dependencies), not explanatory prose.
-- **Isolated Semantic Gauges:** Never combine metric indicators into an aggregate score. Treat each indicator as an isolated semantic dimension.
+- **Semantic Deletion Dividend:** The deletion dividend evaluates removal of architectural complexity (dead types, obsolete traits, collapsed wrappers, unused dependencies), not explanatory prose.
+- **Isolated Semantic Gauges:** Never combine metric indicators into an aggregate score. Treat each indicator as an isolated dimension.
 
 ---
 
 ## 5. Progression Scoreboard Schema
 
-In multi-trial iterative refactorings, track metrics across checkpoints using the Scoreboard format generated by `diff.py --scoreboard` (abbreviated example: header plus baseline row):
+In multi-trial refactorings, track metrics across checkpoints using the Scoreboard format from `diff.py --scoreboard` (abbreviated example: header plus baseline row):
 
 ```markdown
 ## Multi-Trial Progression Scoreboard

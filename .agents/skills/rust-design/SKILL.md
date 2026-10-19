@@ -41,15 +41,17 @@ All analysis, scout findings, trial records, and reports go under the project ro
 ```text
 .design/YYYY-MM-DD-<mode>-<target-slug>/
 ├── baseline.json        # measure.py
-├── ledger.json          # Ranked hypotheses
+├── final.json
+├── final-diff.md
+├── ledger.json          # Hypotheses
 ├── graveyard.md         # Rejected prototypes
 ├── report.md
 ├── scouts/
 │   ├── lens1-modern.md ... lens10-checks.md
-└── patch.diff           # Implement mode only
+└── patch.diff           # Implement only
 ```
 
-No loose evaluation directories or scout files are created at the workspace root.
+No loose evaluation directories or scout files at the workspace root.
 
 ---
 
@@ -117,7 +119,7 @@ Read [`DISCOVERY.md`](DISCOVERY.md) for lens definitions and indicator interpret
 ### 6. Boundary Verification & Adversarial Grader Audit
 
 1. **Boundary Reconsideration:** Inspect downward for newly visible concepts and upward for parent or sibling simplifications.
-2. **Adversarial Grader Audit:** Run an independent grader pass against the Done Criteria of Steps 1–5 to ensure zero vacuous completions or unjustified deferrals.
+2. **Adversarial Grader Audit:** Run an independent grader pass against the Done Criteria of active steps to ensure zero vacuous completions or unjustified deferrals.
 3. **Emit Architectural Report:** Compile `.design/YYYY-MM-DD-<mode>-<target-slug>/report.md` using [`report-template.md`](report-template.md).
 
 **Done when:** Inspected boundaries and parent/child relationships documented; all findings have definitive dispositions; final report written to `.design/.../report.md` with zero vacuous completions.
