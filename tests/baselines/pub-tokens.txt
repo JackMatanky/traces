@@ -327,9 +327,10 @@ src/dirtree.rs: pub(crate) fn children(dir: impl AsRef<Path>) -> Self {
 src/dirtree.rs: pub(crate) fn descendants(dir: impl AsRef<Path>) -> Self {
 src/dirtree.rs: pub(crate) fn file_name(&self) -> &OsStr {
 src/dirtree.rs: pub(crate) fn file_name(self) -> &'a OsStr {
-src/dirtree.rs: pub(crate) fn file_type(&self) -> fs::FileType {
 src/dirtree.rs: pub(crate) fn filter<F>(mut self, mut predicate: F) -> Self
 src/dirtree.rs: pub(crate) fn into_parts(self) -> (PathBuf, io::Error) {
+src/dirtree.rs: pub(crate) fn is_dir(&self) -> bool {
+src/dirtree.rs: pub(crate) fn is_file(&self) -> bool {
 src/dirtree.rs: pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
 src/dirtree.rs: pub(crate) fn missing_as_empty(mut self) -> Self {
 src/dirtree.rs: pub(crate) fn path(&self) -> &Path {

@@ -164,7 +164,7 @@ fn collect_descendant_configs(
                 source,
             }
         })?;
-        if !node.file_type().is_dir() {
+        if !node.is_dir() {
             continue;
         }
         let candidate = LocalConfigFile::at(node.path());

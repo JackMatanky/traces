@@ -251,13 +251,20 @@ impl DirNode {
         self.0.file_name()
     }
 
-    /// Returns the node's type without following symlinks.
+    /// Reports whether the node is a regular file, without following symlinks.
     ///
-    /// A symlinked file reports [`fs::FileType::is_symlink`], never its
-    /// target's type.
+    /// A symlinked file reports `false`, never its target's type.
     #[must_use]
-    pub(crate) fn file_type(&self) -> fs::FileType {
-        self.0.file_type()
+    pub(crate) fn is_file(&self) -> bool {
+        self.0.file_type().is_file()
+    }
+
+    /// Reports whether the node is a directory, without following symlinks.
+    ///
+    /// A symlinked directory reports `false`, never its target's type.
+    #[must_use]
+    pub(crate) fn is_dir(&self) -> bool {
+        self.0.file_type().is_dir()
     }
 
     /// Returns the node's filesystem metadata without following symlinks.
@@ -1036,6 +1043,25 @@ mod tests {
             assert_eq!(metadata.len(), 7);
         }
 
+        #[test]
+        fn exposes_path_file_name_and_is_file() {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            let file = write(root, "daily.md");
+
+            // Act
+            let node = DirTree::children(root)
+                .next()
+                .expect("one entry")
+                .expect("entry is readable");
+
+            // Assert
+            assert_eq!(node.path(), file);
+            assert_eq!(node.file_name(), std::ffi::OsStr::new("daily.md"));
+            assert!(node.is_file());
+        }
+
         #[cfg(unix)]
         #[test]
         fn returns_symlink_type_without_following_target() {
@@ -1057,7 +1083,10 @@ mod tests {
 
             // Assert
             assert_eq!(node.path(), link);
-            assert!(node.file_type().is_symlink(), "entry remains a symlink");
+            assert!(
+                !node.is_file() && !node.is_dir(),
+                "entry remains a symlink, neither a file nor a directory"
+            );
             assert!(
                 metadata.file_type().is_symlink(),
                 "metadata remains for the symlink rather than its target"

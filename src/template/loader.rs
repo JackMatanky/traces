@@ -142,7 +142,7 @@ impl TemplateLoader {
     /// Searches `dir` itself, or `dir`'s subdirectory named by `path`'s parent
     /// component, for files sharing `path`'s file stem: `None` for no matches,
     /// the sole match for exactly one. Like [`Self::find_path_in`], a symlink
-    /// never counts as a match because [`crate::dirtree::DirNode::file_type`]
+    /// never counts as a match because [`crate::dirtree::DirNode::is_file`]
     /// reports the link's own type, not its target's.
     ///
     /// # Errors
@@ -185,9 +185,7 @@ impl TemplateLoader {
                 }
             };
             let file_name = node.file_name();
-            if node.file_type().is_file()
-                && Path::new(file_name).file_stem() == Some(key)
-            {
+            if node.is_file() && Path::new(file_name).file_stem() == Some(key) {
                 hits.push(subdir.map_or_else(
                     || PathBuf::from(file_name),
                     |parent| parent.join(file_name),
@@ -273,7 +271,7 @@ impl TemplateLoader {
     /// `dir`.
     ///
     /// A symlink entry does not count, matching the
-    /// [`crate::dirtree::DirNode::file_type`]
+    /// [`crate::dirtree::DirNode::is_file`]
     /// check in [`Self::find_name_in`]. Returns empty when `dir` is `None`,
     /// does not exist, or cannot be read: listing failures shrink the
     /// candidate list, deliberately; there is no `Result` here to report
@@ -288,7 +286,7 @@ impl TemplateLoader {
                 let Ok(node) = entry else {
                     return None;
                 };
-                if !node.file_type().is_file() {
+                if !node.is_file() {
                     return None;
                 }
                 let path = Path::new(node.file_name());

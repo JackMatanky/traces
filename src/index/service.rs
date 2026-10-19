@@ -417,8 +417,7 @@ impl IndexerService {
                     Err(error) => return Some(Err(IndexError::Scan(error))),
                 };
                 let path = node.path();
-                (node.file_type().is_file() && path != index_db)
-                    .then_some(Ok(node))
+                (node.is_file() && path != index_db).then_some(Ok(node))
             })
             .collect::<IndexResult<Vec<DirNode>>>()?;
         let mut files = entries
