@@ -56,8 +56,8 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 ### Efficiency gates (GREEN)
 
 - E1: SKILL.md = 1100 words (bound <=1100) PASS, exact.
-- E2: corpus (SKILL + TOOLING + DISCOVERY + DEEPENING + MODELING + METRICS + report-template) = 5344 words (bound <=5350 after documented amendment from 5200) PASS, margin 6.
-- Gate margin risk: E1 is exact (SKILL.md = 1100 = bound) and E2 has margin 6 (5344 of 5350), so any future edit to SKILL.md requires re-trimming within SKILL.md (E1 counts SKILL.md alone), while corpus edits (E2) can be offset by trimming any reference doc; a fresh `wc -w` check is needed before commit.
+- E2: corpus (SKILL + TOOLING + DISCOVERY + DEEPENING + MODELING + METRICS + report-template) = 5348 words (live after review-fix squeeze; GREEN measured 5344; bound <=5350 after documented amendment from 5200) PASS, margin 2.
+- Gate margin risk: E1 is exact (SKILL.md = 1100 = bound) and E2 has margin 2 (5348 of 5350), so any future edit to SKILL.md requires re-trimming within SKILL.md (E1 counts SKILL.md alone), while corpus edits (E2) can be offset by trimming any reference doc; a fresh `wc -w` check is needed before commit.
 
 ### C6 counting convention
 
@@ -110,12 +110,12 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 ## Final Word Counts
 
 ```
-     246 .agents/skills/rust-design/report-template.md
+     250 .agents/skills/rust-design/report-template.md
      733 .agents/skills/rust-design/TOOLING.md
      779 .agents/skills/rust-design/DEEPENING.md
      804 .agents/skills/rust-design/METRICS.md
      816 .agents/skills/rust-design/MODELING.md
      866 .agents/skills/rust-design/DISCOVERY.md
     1100 .agents/skills/rust-design/SKILL.md
-    5344 total
+    5348 total
 ```

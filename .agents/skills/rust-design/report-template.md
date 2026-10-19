@@ -14,8 +14,8 @@ Every execution writes `report.md` under these mandatory Markdown headings:
 ## 2. True Architectural Baseline vs. Final State
 <!-- Embed output table directly from: uv run .../diff.py baseline.json final.json
 Review mode: zero delta; sections 2/5 emit baseline only; METRICS.md not
-consulted (governs delta scoring); thresholds live in METRICS.md, read only
-when deltas exist. -->
+consulted (delta scoring); thresholds in METRICS.md, read only when deltas
+exist. -->
 
 ## 3. Recursive Depth & Seam Decomposition
 - Parent Module Simplification: [What vanished from parent obligations]
