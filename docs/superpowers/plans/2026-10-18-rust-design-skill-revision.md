@@ -701,7 +701,7 @@ Commit `cdb006bb` ("REFACTOR trims for E1/E2 gates") removed content beyond the 
 
 Dispatch the same three prompts from Tasks 2 through 4 verbatim (fresh subagents). Record results in `docs/superpowers/plans/2026-10-18-rust-design-skill-revision-results.md` under a `## Post-Edit Results` heading.
 
-- The S3 GREEN rerun executes in a fresh isolated worktree created from the baseline commit (`git worktree add` from `1fd11d97`, GREEN skill docs committed at its base) so the skill faces undone work in the same state as the baseline run; `.design/` deliverables are later copied back to this worktree's `.design/2026-10-19-implement-src-dirtree-rs/`.
+- The S3 GREEN rerun executes in a fresh isolated worktree created from the baseline commit (`git worktree add` from `1fd11d97`) with the GREEN skill docs installed at the correct `.agents/skills/rust-design/` path in its base commit so the skill faces undone work in the same state as the baseline run (the earlier attempt `2a6449fa` botched this with a doubled `.agents/skills/rust-design/rust-design/` path, so it ran the baseline skill and its results are marked invalid); `.design/` deliverables are later copied back to this worktree's `.design/2026-10-19-implement-dirtree/`.
 
 - [ ] **Step 2: Compare against baseline**
 

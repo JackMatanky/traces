@@ -86,21 +86,24 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 ### S3: Implement/Steady mode (GREEN)
 
-- Dir: `.design/2026-10-19-implement-src-dirtree-rs/`; target `src/dirtree.rs`; run in a separate worktree `/Users/jack/Documents/41_personal/traces/.worktrees/s3-green-run`.
-- C1 PASS: branch clean; keep-rule commits `3c71e492` + `ceb8abcc` sanctioned by the skill keep-condition.
-- C2 PASS: 10 scouts; pinned grep no-match.
-- C3 PASS: 7 hypotheses sorted; 3 deferrals, enum-only `DEFERRED_OUT_OF_SCOPE`.
-- C4 PASS: 7/7.
-- C5 PASS: all six refs (SKILL, TOOLING, DISCOVERY, DEEPENING, MODELING, METRICS).
-- C6 PASS: 5098 <= 6505.
-- C7 PASS: `mise run check:visibility` pass; both public-api baselines byte-identical; 2/2 trials kept per keep rules; patch.diff 286 lines.
-- grill-me not offered (variance; not an oracle assertion).
+- Previous attempt INVALID: the first recorded S3 GREEN rerun (worktree `/Users/jack/Documents/41_personal/traces/.worktrees/s3-green-run`, dir `.design/2026-10-19-implement-src-dirtree-rs/`, now renamed `.design/2026-10-19-implement-src-dirtree-rs-INVALID-baseline-bytes/`) actually executed the BASELINE skill. Its setup commit `2a6449fa` installed the GREEN docs at a doubled path `.agents/skills/rust-design/rust-design/` while the real skill path stayed baseline (`git show 2a6449fa:.agents/skills/rust-design/SKILL.md | wc -w` = 1633; baseline markers present; no report-template.md). Corroborating artifacts: the dir's `checklist.md` opens with `# Workflow Execution Checklist` (a heading deleted from the skill in Task 6) and grill-me was not offered. Its recorded assertions and numbers (including the old C6 = 5098, which was arithmetic over files that run did not actually read) are void.
+- Valid rerun (record of truth): fresh worktree `/Users/jack/Documents/41_personal/traces/.worktrees/s3-green-run-2` from baseline `1fd11d97`; setup commit `e66be7e4` installed the current GREEN skill docs at the correct `.agents/skills/rust-design/` path (SKILL.md = 1100 words, zero baseline markers, report-template.md present, corpus 5348); skill loaded via direct-Read of `.agents/skills/rust-design/SKILL.md` (skill-tool cache bypassed, as documented for all GREEN runs). Scenario: Implement/Steady, target `src/dirtree.rs`.
+- Dir: `.design/2026-10-19-implement-dirtree/` (evidence copied into this worktree's `.design/`; note the dir name differs from the invalid attempt's).
+- C1 PASS: worktree clean apart from keep-commits; deliverables confined to the scenario dir.
+- C2 PASS: 10 scout files; pinned grep no-match (exit 1).
+- C3 PASS: 4 hypotheses, EAV-sorted (values 0.675, 0.375, ...); 0 formal deferrals (dismissed candidates in graveyard).
+- C4 PASS: 7/7 headings.
+- C5 PASS: Files Consulted = all seven skill docs (SKILL, TOOLING, DISCOVERY, DEEPENING, MODELING, METRICS, report-template); METRICS is correct for Implement (step 5.4).
+- C6 PASS: 5348 <= 6505.
+- C7 PASS: keep-commits `07e41d20` + `ef7d0e76` on branch `s3-green-run-2` per keep rules; patch.diff 278 lines; run reports `cargo public-api` diff zero vs run base; `tests/baselines/pub-tokens.txt` updated inside the keep-commits (required by the visibility freeze for the intentional pub(crate) changes); 2/2 trials kept after gates green (trial 2 needed one refinement after a `walkdir::Error` vs `io::Error` mismatch).
+- Disclosures: 10 lenses run in-process (no subagent tool); one `cargo public-api` bad-flag retry; one pre-existing flaky `temporal` TZ test observed.
+- grill-me offered in the closing message: yes.
 
 ### Method notes and anomalies
 
 - Stale skill cache: the `skill` tool serves a cached copy captured at app start. Early GREEN attempts (S1/S2 attempt 1 and 2, dirs renamed `*-SUPERSEDED-baseline-bytes` and `*-ATTEMPT2-invalid-cached-bytes`) accidentally ran the baseline skill. All recorded GREEN runs bypassed the cache with an explicit direct-Read of the worktree `.agents/skills/rust-design/SKILL.md`.
 - S1 attempt 3 (dir `*-ATTEMPT3-C6-fail-METRICS`) was valid GREEN but failed C6 (3727 > 3535) because it consulted METRICS.md for the section 2/5 delta rubric. Task 18 fix: report-template.md section 2 comment scoped Review mode to zero delta and originally redirected SLoC thresholds to DISCOVERY.md (corpus 5326 -> 5344); review-fix commit 5fc169ae (with f6d6ae2c) later corrected the attribution to METRICS.md and single-sourced the policy. S1 attempt 4 (recorded above) passed C6 = 2945 without opening METRICS.md.
-- S3 failed attempt 1 (permission denial) and attempt 2 (transient certificate verification error) before attempt 3 succeeded.
+- S3 failed attempt 1 (permission denial) and attempt 2 (transient certificate verification error) before the run that is now marked INVALID completed (see the S3 GREEN section above; the valid rerun is the `s3-green-run-2` record).
 - Baseline scenario runs also dispatched without nested subagent tools; both baseline and GREEN runs disclosed in-process lens execution. Main checkout `.agents/skills/rust-design/` was temporarily synced to GREEN bytes for the skill loader and has been restored to baseline (`git restore` + removed untracked report-template.md).
 
 ### Task 19: repo verification gate (`mise run verify`)
