@@ -4,7 +4,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 ## Efficiency gates (RED now, GREEN after edits)
 - E1: wc -w .agents/skills/rust-design/SKILL.md <= 1100 (baseline: 1633 -> FAILS now = RED)
-- E2: wc -w .agents/skills/rust-design/*.md incl. report-template.md <= 5350 (baseline: 6505 -> RED; amended from <=5200 during GREEN before Task 17 verification: the REFACTOR trims of commit cdb006bb reached 5326 by removing a diagram, a metric-purpose column, and scoreboard example rows, so the next candidates were rule text rather than redundancy; user-approved 2026-10-18, recorded in commit 9bbe59ca)
+- E2: wc -w .agents/skills/rust-design/*.md incl. report-template.md <= 5350 (baseline: 6505 -> RED; amended from <=5200 during GREEN before Task 17 verification: the REFACTOR trims of commit cdb006bb reached 5326 by removing a diagram, an "Evaluation Purpose" column, scoreboard example rows, and compressing SKILL.md prose, so the next candidates were rule text rather than redundancy; user-approved 2026-10-18, recorded in commit 9bbe59ca)
 
 ## Capability assertions (per-mode scoping noted on each line; must pass BEFORE and AFTER edits)
 - C1: Deliverables under .design/<date>-<mode>-<slug>/ only. Check: `git status --short` shows no new paths outside the scenario's .design/ dir, and `ls .design/` shows exactly one directory per scenario run so far (this run's dir plus prior scenario dirs), with no stray dirs. (Clarified during RED: the original "exactly that one scenario dir" was only true for the first scenario.)
@@ -57,7 +57,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 - E1: SKILL.md = 1100 words (bound <=1100) PASS, exact.
 - E2: corpus (SKILL + TOOLING + DISCOVERY + DEEPENING + MODELING + METRICS + report-template) = 5344 words (bound <=5350 after documented amendment from 5200) PASS, margin 6.
-- Gate margin risk: E1 is exact (SKILL.md = 1100 = bound) and E2 has margin 6 (5344 of 5350), so any future edit to SKILL.md requires re-trimming elsewhere and any corpus edit needs a fresh `wc -w` check before commit.
+- Gate margin risk: E1 is exact (SKILL.md = 1100 = bound) and E2 has margin 6 (5344 of 5350), so any future edit to SKILL.md requires re-trimming within SKILL.md (E1 counts SKILL.md alone), while corpus edits (E2) can be offset by trimming any reference doc; a fresh `wc -w` check is needed before commit.
 
 ### C6 counting convention
 

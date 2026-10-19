@@ -686,7 +686,7 @@ git commit -m "refactor(rust-design): single-source mechanics in reference docs 
 
 - [ ] **REFACTOR amendment (E2 remediation passes 1 through 3, retroactively authorized)**
 
-Commit `cdb006bb` ("REFACTOR trims for E1/E2 gates") removed content beyond the levers literally specified in Tasks 9 through 16. The four cuts, hereby authorized so plan, results, and diff agree: (1) DEEPENING.md's seam diagram and blockquote; (2) METRICS.md §1's "Evaluation Purpose" column (13 rows); (3) two scoreboard example rows; (4) a DISCOVERY.md scout-isolation reword. Together they brought the corpus from 5545 to 5326; the resulting corpus was then ratified by the user-approved E2 amendment from ≤5200 to ≤5350 (commit `9bbe59ca`).
+Commit `cdb006bb` ("REFACTOR trims for E1/E2 gates") removed content beyond the levers literally specified in Tasks 9 through 16. The five cuts, hereby authorized so plan, results, and diff agree: (1) DEEPENING.md's seam diagram and blockquote; (2) METRICS.md §1's "Evaluation Purpose" column (13 rows); (3) two scoreboard example rows; (4) a DISCOVERY.md scout-isolation reword; (5) SKILL.md prose compressions: intro/description, Steady/Breakthrough bullets, grilling section (SKILL 1141 -> 1100). Together they brought the corpus from 5545 to 5326; the resulting corpus was then ratified by the user-approved E2 amendment from ≤5200 to ≤5350 (commit `9bbe59ca`).
 
 ---
 
@@ -754,7 +754,7 @@ Verify each analysis requirement has a task: efficiency gates (T1, T10, T17), ca
 - [ ] **Step 2: Placeholder scan**
 
 `grep -nE 'TBD|TODO|fill in|Similar to Task' docs/superpowers/plans/2026-10-18-rust-design-skill-revision.md`
-Expected: only the self-reference on this line matches (the grep pattern itself contains `TBD`); no other matches.
+Expected: the grep self-matches two lines (the command literal above and this expectation line, which mentions `TBD`); no other matches.
 
 - [ ] **Step 3: Name consistency check**
 
