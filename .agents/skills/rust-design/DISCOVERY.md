@@ -6,7 +6,7 @@
 
 During architectural discovery, the orchestrator dispatches read-only investigations across ten distinct lenses.
 
-- **Strict Scout Isolation Rule:** Scouts inspect source code, documentation, and AST facts. They are forbidden from running builds, tests, or diagnostic scripts. Only the main orchestrator runs CLI tools.
+- **Strict Scout Isolation Rule:** read-only inspection of source, docs, and AST facts; scouts never run builds, tests, or diagnostic scripts (SSOT: [`TOOLING.md`](TOOLING.md) §1). Only the main orchestrator runs CLI tools.
 - **Reporting Limit:** Each lens reports up to 5 ranked hypotheses citing exact `file:line` locations, estimated SLoC deletion dividend, and Expected Architectural Value (EAV).
 - **Synthesis:** Before hypotheses are committed to `ledger.json`, the orchestrator synthesizes scout findings to identify compounding transformations and resolve conflicts.
 

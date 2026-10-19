@@ -4,31 +4,16 @@
 
 ## 1. Recursive Depth & Seam Mechanics
 
-Deepening concentrates coherent behavior, policy, state, and invariants behind a simpler seam:
-
-> **A module is recursively deep when its internal decomposition concentrates knowledge behind meaningful seams, and those seams make their parent simpler and deeper rather than merely adding layers.**
-
-```text
-+------------------------------------------------------------------------------+
-| Parent Seam: Unified Domain Concept (Minimal Caller Knowledge Burden)        |
-+------------------------------------------------------------------------------+
-                                          |
-                                          v
-+------------------------------------------------------------------------------+
-| Deep Internal Child A                    | Deep Internal Child B             |
-| - Owns state machine and lifecycle       | - Owns wire encoding and framing  |
-| - Hides all transition validation rules  | - Hides ring-buffer memory pool   |
-+------------------------------------------------------------------------------+
-```
+Deepening concentrates coherent behavior, policy, state, and invariants behind a simpler seam. A module is recursively deep when its internal decomposition concentrates knowledge behind meaningful seams that make the parent simpler and deeper, not layered: a parent seam exposes a unified domain concept while internal children own state machines, encoding, validation, and memory pools.
 
 ### The Recursive Depth Test
 
-When extracting or reviewing internal child module $C$ within parent $P$:
+When extracting or reviewing internal child module `C` within parent `P`:
 
-1. **Local Depth:** Does $C$'s seam provide substantial capability relative to the small interface it exposes to $P$?
-2. **Depth Propagation:** Does $P$'s implementation become shorter, simpler, and higher-level? Did internal states, dependencies, and ordering rules vanish from $P$?
-3. **The Anti-Layering Rule:** If $P$ still coordinates $C$'s internal sequence, inspects $C$'s internal states, or maps $C$'s errors directly upward, $C$ is a shallow layer, not a recursively deep module.
-4. **Sibling Isolation:** When $P$ contains multiple children, ensure their knowledge is independent. Cross-sibling changes indicate misplaced boundaries or unowned shared invariants. Contain lower-level child types and errors below $P$'s seam.
+1. **Local Depth:** Does `C`'s seam provide substantial capability relative to the small interface it exposes to `P`?
+2. **Depth Propagation:** Does `P`'s implementation become shorter, simpler, and higher-level? Did internal states, dependencies, and ordering rules vanish from `P`?
+3. **The Anti-Layering Rule:** If `P` still coordinates `C`'s internal sequence, inspects `C`'s internal states, or maps `C`'s errors directly upward, `C` is a shallow layer, not a recursively deep module.
+4. **Sibling Isolation:** When `P` contains multiple children, ensure their knowledge is independent. Cross-sibling changes indicate misplaced boundaries or unowned shared invariants. Contain lower-level child types and errors below `P`'s seam.
 
 ---
 

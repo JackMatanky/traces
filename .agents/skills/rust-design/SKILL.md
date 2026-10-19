@@ -6,9 +6,9 @@ description: >
 
 # Rust Design
 
-Discover and deepen Rust software architecture. Concentrate coherent behavior, policy, state, and invariants behind well-placed seams so callers learn less, maintainers change less, and Rust enforces domain constraints at compile time.
+Deepen Rust architecture: concentrate behavior, policy, state, and invariants behind well-placed seams so callers learn less and Rust enforces domain constraints at compile time.
 
-Treat comments, documentation, ADRs, names, and directory layout as evidence of intended design, not proof of actual responsibility or seam placement. Validate design claims against behavior, dependencies, state, callers, tests, and source structure. Load `rust-skills` only after a design concern or latent concept has been discovered, consulting relevant categories rather than applying rules as a generic checklist.
+Treat comments, docs, ADRs, names, and layout as evidence of intended design, not proof of responsibility or seam placement. Validate claims against behavior, dependencies, state, callers, tests, and source structure. Load `rust-skills` only after a design concern is discovered; consult relevant categories rather than applying rules as a generic checklist.
 
 ---
 
@@ -23,20 +23,20 @@ Classify user prompt intent into an operational mode and strategy:
 | **Implement** | **Steady** | "refactor", "deepen", "optimize", "fix seam", "reorganize", "steady" | **1, 2, 3, 4, 5, 6** | High-EAV hypotheses evaluated via empirical trial loop; verified against baseline; patch emitted. |
 | **Implement** | **Breakthrough** | "breakthrough", "radical", "paradigm shift", "fundamental", "from scratch" | **1, 2, 3, 4, 5, 6** | Single high-leverage bet prototyped against explicit drop condition; verified or logged to graveyard. |
 
-- **Steady (Targeted Deepening):** Works the Hypothesis Ledger sequentially by Expected Architectural Value (EAV). Restructures internals, extracts recursively deep child modules, collapses shallow wrappers, and eliminates cyclic dependencies while preserving public crate contracts.
-- **Breakthrough (Architectural Leap):** Focuses the run budget on a single ambitious bet (such as replacing dynamic dispatch with zero-cost typestates, data-oriented layout restructuring, or inverting cross-crate ownership). Requires an explicit drop condition and sandboxed trial mechanics.
+- **Steady (Targeted Deepening):** Works the ledger sequentially by EAV: restructure internals, extract deep child modules, collapse shallow wrappers, eliminate cyclic dependencies; preserve public crate contracts.
+- **Breakthrough (Architectural Leap):** Spend the run budget on one ambitious bet (e.g. zero-cost typestates, data-oriented layout, inverted cross-crate ownership); requires an explicit drop condition and sandboxed trial.
 
 ---
 
 ## Grilling Follow-Up (All Modes)
 
-After any run produces its deliverable (review report, type model, or verified patch), offer a `grill-me` session (user-invoked only; never auto-chain) to stress-test the design theses, top-ranked `ledger.json` items, or proposed types with the user.
+After any run produces its deliverable (report, model, or patch), offer a `grill-me` session (user-invoked only; never auto-chain) to stress-test design theses, top `ledger.json` items, or proposed types.
 
 ---
 
 ## Deliverable Containment
 
-All generated analysis, scout findings, trial records, and reports are stored strictly inside the project root `.design/` directory:
+All analysis, scout findings, trial records, and reports go under the project root `.design/` directory:
 
 ```text
 .design/YYYY-MM-DD-<mode>-<target-slug>/
@@ -49,7 +49,7 @@ All generated analysis, scout findings, trial records, and reports are stored st
 └── patch.diff           # Implement mode only
 ```
 
-There are zero loose evaluation directories or scout files created at the workspace root.
+No loose evaluation directories or scout files are created at the workspace root.
 
 ---
 
