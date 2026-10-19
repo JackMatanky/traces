@@ -47,22 +47,6 @@ There are zero loose evaluation directories or scout files created at the worksp
 
 ---
 
-## Interactive Workflow Checklist
-
-Copy and maintain this checklist in the scratchpad across execution:
-
-```markdown
-### Workflow Execution Checklist
-- [ ] 1. Establish Current Design & Baseline: Probe environment; run measure.py to freeze True Baseline.
-- [ ] 2. Discover Hypotheses via 10-Lens Scouting: Dispatch 10 read-only scouts; populate and rank ledger by EAV.
-- [ ] 3. Empirical Trial-and-Revert Search Loop: Prototype top bets in sandboxed trials; commit wins or revert to graveyard.
-- [ ] 4. Model Design in Rust: Translate semantics into concrete types, parse-don't-validate, and typestates.
-- [ ] 5. Verify Implementation: Run test suites, verify API stability, compute deltas via diff.py. (If tests fail, return to Step 3).
-- [ ] 6. Boundary Verification & Grader Audit: Verify boundaries, run independent grader pass, emit report.md.
-```
-
----
-
 ## Step-by-Step Process
 
 ### 1. Establish Current Design & Freeze True Baseline
@@ -145,50 +129,6 @@ Read [`METRICS.md`](METRICS.md) for metric definitions and anti-gaming rules.
 
 1. **Boundary Reconsideration:** Inspect downward for newly visible concepts and upward for parent or sibling simplifications.
 2. **Adversarial Grader Audit:** Run an independent grader pass against the Done Criteria of Steps 1–5 to ensure zero vacuous completions or unjustified deferrals.
-3. **Emit Architectural Report:** Compile `.design/YYYY-MM-DD-<mode>-<target-slug>/report.md` matching the schema below.
+3. **Emit Architectural Report:** Compile `.design/YYYY-MM-DD-<mode>-<target-slug>/report.md` using [`report-template.md`](report-template.md).
 
 **Done when:** Inspected boundaries and parent/child relationships documented; all findings have definitive dispositions; final report written to `.design/.../report.md` with zero vacuous completions.
-
----
-
-## Architectural Report Schema
-
-Every execution formats its final output under these mandatory Markdown headings in `report.md`:
-
-```markdown
-# Architectural Report: [Scope / Target Name]
-
-## 1. Executive Summary & Strategy
-- Mode: [Review | Model | Implement] (Strategy: [Steady | Breakthrough])
-- Primary Target: [Target Path or Module]
-- Deliverable Path: `.design/YYYY-MM-DD-<mode>-<target-slug>/`
-- Architectural Thesis: [Summary of recursive depth and knowledge transformation]
-
-## 2. True Architectural Baseline vs. Final State
-<!-- Embed output table directly from: uv run .../diff.py baseline.json final.json -->
-
-## 3. Recursive Depth & Seam Decomposition
-- Parent Module Simplification: [What vanished from parent obligations]
-- Deep Child Modules Extracted: [Child responsibilities and local depth ratios]
-- Depth Propagation Evidence: [Why the parent seam is now deeper]
-
-## 4. Predictability & Layout Refactor
-- Cohesion Fixes: [Resolved disjoint reference clusters in files]
-- Eliminated Anti-Patterns: [Removed junk drawer files, deep path traversals]
-
-## 5. Deletion Dividend Ledger
-- Superseded Types & Functions: [Deleted symbols]
-- Eliminated Adapters & Wrappers: [Collapsed layers]
-- Removed Dependencies: [Eliminated crates]
-- Net SLoC Removed: [Exact count from diff.py]
-
-## 6. Architectural Graveyard (Tried & Rejected)
-- Candidate: [Concept]
-- Hypothesis: [Intended improvement]
-- Rejection Evidence: [Concrete failure metrics or errors]
-
-## 7. Verification & Grader Audit
-- Seam Behavior Verification: [Tests executed through intended seams]
-- Public API Stability: [Diff verified via cargo-public-api]
-- Done Criteria Verification: [Audited by independent pass]
-```

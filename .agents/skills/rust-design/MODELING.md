@@ -1,16 +1,5 @@
 # Modeling: Rust Types, Invariants & Layout Architecture
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Module & File Layout (POLS SSOT)](#1-module--file-layout-pols-ssot) | Principle of Least Surprise, 500 SLoC rule, junk drawers | Line 16 |
-| [2. Validated Types & Parse, Don't Validate](#2-validated-types--parse-dont-validate) | Invariants at construction, eliminating runtime checks | Line 28 |
-| [3. Traits, Variation & Generic Costs](#3-traits-variation--generic-costs) | Justifying traits, generics as caller burden | Line 38 |
-| [4. Ownership, Borrowing & Visibility](#4-ownership-borrowing--visibility) | Avoiding `Arc`/`Mutex` masking responsibility, scoped vis | Line 48 |
-| [5. Data-Oriented Layout & Cache Locality](#5-data-oriented-layout--cache-locality) | Hot/cold segregation, struct alignment, contiguous buffers | Line 58 |
-| [6. Zero-Copy Models & Lifecycles](#6-zero-copy-models--lifecycles) | Borrowing, `Cow<'a, T>`, arena allocation, small vectors | Line 68 |
-| [7. Typestate & Compile-Time State Machines](#7-typestate--compile-time-state-machines) | Zero-cost transitions vs caller ceremony trade-offs | Line 78 |
-| [8. Error Boundaries & Panic-Free Seams](#8-error-boundaries--panic-free-seams) | Fault isolation, panic containment, contract evolution | Line 90 |
-
 ---
 
 ## 1. Module & File Layout (POLS SSOT)
@@ -31,7 +20,7 @@ Structure file and directory layouts to match the cognitive map of the domain:
 Translate discovered invariants into idiomatic Rust types:
 
 - **Move Validity to Construction:** Ensure invalid states cannot be constructed. Downstream operations assume validity and discard runtime checks.
-- **Enums over Correlated Booleans:** Replace boolean flags, incompatible `Option` pairs, and tag-plus-payload structs with enums representing semantic alternatives ($\text{ISR} = 0$).
+- **Enums over Correlated Booleans:** Replace boolean flags, incompatible `Option` pairs, and tag-plus-payload structs with enums representing semantic alternatives (`ISR = 0`).
 - **Newtypes for Domain Vocabulary:** Use newtypes to prevent confusing semantically distinct values of identical underlying primitives and to own construction validation. Avoid wrappers that enforce nothing.
 - **Constructor Encapsulation:** Private fields alone do not protect invariants if public constructors, `Default` derivations, or serialization bypass validation.
 
@@ -77,7 +66,7 @@ Eliminate heap allocation overhead while maintaining clean seams:
 
 ## 7. Typestate & Compile-Time State Machines
 
-Use typestate when states are well-defined, transitions are central to correctness, and different states expose materially different legal operations ($\text{ITE} = 0$):
+Use typestate when states are well-defined, transitions are central to correctness, and different states expose materially different legal operations (`ITE = 0`):
 
 ```rust
 pub struct Session<State> {

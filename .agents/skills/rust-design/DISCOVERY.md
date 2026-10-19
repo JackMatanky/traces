@@ -1,13 +1,5 @@
 # Discovery: Multi-Lens Scouting & Hypothesis Ledger
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Scouting Protocol & Rules](#1-scouting-protocol--rules) | Read-only scout isolation, execution constraints | Line 13 |
-| [2. The 10 Architectural Lenses](#2-the-10-architectural-lenses) | 10 modular scout directives and focus targets | Line 23 |
-| [3. The Indicator Hypothesis](#3-the-indicator-hypothesis) | Translating raw tool signals into domain questions (SSOT) | Line 89 |
-| [4. Expected Architectural Value (EAV)](#4-expected-architectural-value-eav) | EAV formula, scoring factors, consequential triggers | Line 104 |
-| [5. Candidate Output & Ledger Schema](#5-candidate-output--ledger-schema) | Scout reporting schema and `ledger.json` format | Line 124 |
-
 ---
 
 ## 1. Scouting Protocol & Rules
@@ -106,11 +98,11 @@ Do not combine indicators into an aggregate score. Treat each gauge as an isolat
 
 Rank candidate redesigns in `ledger.json` using Expected Architectural Value:
 
-$$\text{EAV} = \frac{\text{Structural or Computational Gain (1–5)} \times \text{Confidence (0.0–1.0)}}{\text{Blast Radius (1–5)} + \text{Implementation Friction (1–5)}}$$
+`EAV = (Structural/Computational Gain [1-5] × Confidence [0.0-1.0]) / (Blast Radius [1-5] + Implementation Friction [1-5])`
 
 ### Consequential Candidate Triggers
 
-A candidate is consequential if $\text{EAV} \ge 1.0$, or if it satisfies at least one observable trigger:
+A candidate is consequential if `EAV >= 1.0`, or if it satisfies at least one observable trigger:
 
 1. Changes or bypasses a public API signature, visibility boundary, or trait contract.
 2. Alters cross-module or cross-crate dependency direction (introducing or removing edges/cycles).

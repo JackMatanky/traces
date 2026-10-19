@@ -1,14 +1,5 @@
 # Tooling: Analyzer Matrix & Execution Protocol
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Resource & Worktree Isolation (SSOT)](#1-resource--worktree-isolation-ssot) | Read-only scouts, sandboxed git worktrees | Line 15 |
-| [2. Three-Tier Fallback Ladder](#2-three-tier-fallback-ladder) | Automated scripts, task runners, Cargo baseline | Line 24 |
-| [3. Tool Guidance & Execution Matrix](#3-tool-guidance--execution-matrix) | Invocation, capability, and limits for 8 analyzers | Line 56 |
-| [4. Choose Evidence by Question](#4-choose-evidence-by-question) | Mapping architectural questions to tools | Line 70 |
-| [5. Audit Views Protocol](#5-audit-views-protocol) | Required views before concluding design audit | Line 85 |
-| [6. Empirical Benchmark Protocol](#6-empirical-benchmark-protocol) | Baselines, alternating runs, noise isolation | Line 95 |
-
 ---
 
 ## 1. Resource & Worktree Isolation (SSOT)
@@ -24,31 +15,9 @@ To eliminate resource contention and workspace contamination:
 
 Follow this three-tier capability ladder across diverse host environments:
 
-```text
-+-------------------------------------------------------------------------------+
-| Tier 1: Automated Script (Preferred)                                          |
-| Run `uv run .agents/skills/rust-design/scripts/probe.py` (capability probe)   |
-| Run `uv run .agents/skills/rust-design/scripts/measure.py <target> [out]`     |
-| Run `uv run .agents/skills/rust-design/scripts/diff.py <base> <final>`        |
-+-------------------------------------------------------------------------------+
-                                  | (if script/uv absent)
-                                  v
-+-------------------------------------------------------------------------------+
-| Tier 2: Configured Environment Tasks (Fallback)                               |
-| Inspect `mise tasks`, `just --list`, `cargo make`, or `Makefile`              |
-| Run configured aliases: modules:tree, mess, crap, orphans                     |
-+-------------------------------------------------------------------------------+
-                                  | (if task runner absent)
-                                  v
-+-------------------------------------------------------------------------------+
-| Tier 3: Standard Cargo Toolchain (Universal Minimal)                          |
-| Structure: `cargo check`, LSP references, manual file inspection              |
-| Quality:   `cargo clippy --all-targets -- -D warnings`                        |
-| Testing:   `cargo test`                                                       |
-| Dependencies: `cargo tree`, `cargo tree -d` (duplicate versions)              |
-| Mark unavailable metrics explicitly as `not measured (tool unavailable)`      |
-+-------------------------------------------------------------------------------+
-```
+1. **Tier 1: Automated Script (preferred):** `uv run .agents/skills/rust-design/scripts/probe.py` (probe), `measure.py <target> [out]`, `diff.py <base> <final>`.
+2. **Tier 2: Configured environment tasks (fallback):** inspect `mise tasks`, `just --list`, `cargo make`, or `Makefile`; run configured aliases (`modules:tree`, `mess`, `crap`, `orphans`).
+3. **Tier 3: Standard Cargo toolchain (universal minimal):** structure via `cargo check`, LSP references, manual inspection; quality via `cargo clippy --all-targets -- -D warnings`; testing via `cargo test`; dependencies via `cargo tree` / `cargo tree -d`. Mark unavailable metrics `not measured (tool unavailable)`.
 
 ---
 

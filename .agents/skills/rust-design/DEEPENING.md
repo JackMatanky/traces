@@ -1,13 +1,5 @@
 # Deepening: Seam Transformations & Empirical Trial Loop
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Recursive Depth & Seam Mechanics](#1-recursive-depth--seam-mechanics) | Depth propagation, anti-layering, sibling isolation | Line 13 |
-| [2. Core Seam Operations](#2-core-seam-operations) | Consolidating, collapsing, relocating, and replacing | Line 48 |
-| [3. The Deletion Dividend](#3-the-deletion-dividend) | Subtraction discipline, eliminating superseded code | Line 79 |
-| [4. Empirical Trial-and-Revert Protocol](#4-empirical-trial-and-revert-protocol) | Sandboxed worktrees, drop conditions, clean rollbacks | Line 90 |
-| [5. Active Graveyard & Convergence Gates](#5-active-graveyard--convergence-gates) | Logging dead ends, plateau and convergence gates | Line 105 |
-
 ---
 
 ## 1. Recursive Depth & Seam Mechanics
@@ -105,6 +97,6 @@ The Active Graveyard (`.design/.../graveyard.md`) is an active filter for subseq
 
 ### Search Termination & Convergence Gates
 The search loop iterates until one of three stopping conditions is met:
-1. **Convergence Gate:** All candidate hypotheses with Expected Architectural Value $\text{EAV} \ge 1.0$ have been evaluated and either committed or cleanly rejected.
-2. **Plateau Gate:** Two consecutive trials fail to produce an accepted change. The orchestrator triggers an adversarial 10-lens re-scouting pass. If re-scouting produces no new hypotheses above $\text{EAV} \ge 1.0$, terminate the search.
+1. **Convergence Gate:** All candidate hypotheses with Expected Architectural Value `EAV >= 1.0` have been evaluated and either committed or cleanly rejected.
+2. **Plateau Gate:** Two consecutive trials fail to produce an accepted change. The orchestrator triggers an adversarial 10-lens re-scouting pass. If re-scouting produces no new hypotheses above `EAV >= 1.0`, terminate the search.
 3. **Budget Gate:** The allocated run budget (time limit or maximum trial count) is exhausted.

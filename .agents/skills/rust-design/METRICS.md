@@ -1,13 +1,5 @@
 # Metrics: Automated Gauges & Semantic Evaluation Rubrics
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Automated Tool Metrics](#1-automated-tool-metrics) | Deterministic gauges from `measure.py` and `diff.py` | Line 13 |
-| [2. Claim Routing Table](#2-claim-routing-table) | Connecting design claims to applicable gauges | Line 35 |
-| [3. Semantic Architectural Rubrics](#3-semantic-architectural-rubrics) | Qualitative IKL, PS, BR, PD, and safety rubrics | Line 50 |
-| [4. Anti-Gaming Guardrails (SSOT)](#4-anti-gaming-guardrails-ssot) | Comment preservation rule, semantic deletion dividend | Line 85 |
-| [5. Progression Scoreboard Schema](#5-progression-scoreboard-schema) | Multi-trial tracking table via `diff.py --scoreboard` | Line 95 |
-
 ---
 
 ## 1. Automated Tool Metrics
@@ -25,7 +17,7 @@ The following metrics are deterministically extracted by `measure.py` and compar
 | **Cyclic Dependency Edges** | `cargo-modules` | 0 cycles | Cross-module circular dependency edges. |
 | **Duplicate Crate Versions** | `cargo tree -d` | 0 duplicates | Redundant crate versions in dependency graph. |
 | **Graph Edge Density** | `codegraph`/`rustgraph`| Reduced | Total caller and dependency edges across target scope. |
-| **Max File SLoC** | `measure.py` | $\le 500$ SLoC | God-module risk; indicates entangled invariants. |
+| **Max File SLoC** | `measure.py` | `<= 500` SLoC | God-module risk; indicates entangled invariants. |
 | **Module / File Count** | `measure.py` | Cohesive count | Track structural decomposition and layer thinning. |
 | **Unbounded Channels / Queues** | `measure.py` | 0 unbounded | Static scan for unbounded memory buffers and channels. |
 | **Non-Test Unwraps / Panics** | `measure.py` | 0 on public paths | Crash hazards outside test modules. |
