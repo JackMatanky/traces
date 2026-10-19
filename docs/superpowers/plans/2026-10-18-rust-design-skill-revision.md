@@ -18,6 +18,7 @@
 - **Scope:** `git add` only paths listed in each task's commit step. Never stage pre-existing dirty files (`.scratch/md-pkm-lsp/*` is unrelated work-in-progress).
 - **Test oracle:** Assertions C1 through C7 and gates E1/E2 (defined in Task 1) are the definition of "capability preserved." A failing C-assertion after an edit = regression, fix before moving on.
 - Word-count baseline measured in Task 1: `SKILL.md = 1633`, corpus (6 files) `= 6505`.
+- Baseline S3 keep-commits (sanctioned exception to the Scope rule): the baseline Implement scenario (Task 4) ran under the skill's keep-commit rules ("commit wins") and produced commits `c22f33fd`, `e5514607`, `5b509c5f`, and `7dfc2e1f`, touching `src/dirtree.rs`, `src/config/discovery.rs`, `src/file_tracker.rs`, `src/index/service.rs`, `src/schema/service.rs`, `src/template/loader.rs`, and `tests/baselines/pub-tokens.txt`. These are intentional branch content (already disclosed in the results file); the Scope ground rule's `git add` restriction governs this plan's own task commits, not sanctioned scenario keep-commits.
 
 ## File Structure
 
@@ -683,6 +684,10 @@ git add .agents/skills/rust-design/
 git commit -m "refactor(rust-design): single-source mechanics in reference docs with hardened pointers, lens table, grilling follow-up"
 ```
 
+- [ ] **REFACTOR amendment (E2 remediation passes 1 through 3, retroactively authorized)**
+
+Commit `cdb006bb` ("REFACTOR trims for E1/E2 gates") removed content beyond the levers literally specified in Tasks 9 through 16. The four cuts, hereby authorized so plan, results, and diff agree: (1) DEEPENING.md's seam diagram and blockquote; (2) METRICS.md §1's "Evaluation Purpose" column (13 rows); (3) two scoreboard example rows; (4) a DISCOVERY.md scout-isolation reword. Together they brought the corpus from 5545 to 5326; the resulting corpus was then ratified by the user-approved E2 amendment from ≤5200 to ≤5350 (commit `9bbe59ca`).
+
 ---
 
 ## Phase GREEN Verification + REFACTOR (Tasks 17 through 20)
@@ -695,6 +700,8 @@ git commit -m "refactor(rust-design): single-source mechanics in reference docs 
 - [ ] **Step 1: Re-run S1, S2, S3**
 
 Dispatch the same three prompts from Tasks 2 through 4 verbatim (fresh subagents). Record results in `docs/superpowers/plans/2026-10-18-rust-design-skill-revision-results.md` under a `## Post-Edit Results` heading.
+
+- The S3 GREEN rerun executes in a fresh isolated worktree created from the baseline commit (`git worktree add` from `1fd11d97`, GREEN skill docs committed at its base) so the skill faces undone work in the same state as the baseline run; `.design/` deliverables are later copied back to this worktree's `.design/2026-10-19-implement-src-dirtree-rs/`.
 
 - [ ] **Step 2: Compare against baseline**
 
@@ -747,7 +754,7 @@ Verify each analysis requirement has a task: efficiency gates (T1, T10, T17), ca
 - [ ] **Step 2: Placeholder scan**
 
 `grep -nE 'TBD|TODO|fill in|Similar to Task' docs/superpowers/plans/2026-10-18-rust-design-skill-revision.md`
-Expected: no matches.
+Expected: only the self-reference on this line matches (the grep pattern itself contains `TBD`); no other matches.
 
 - [ ] **Step 3: Name consistency check**
 

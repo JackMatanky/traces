@@ -4,7 +4,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 ## Efficiency gates (RED now, GREEN after edits)
 - E1: wc -w .agents/skills/rust-design/SKILL.md <= 1100 (baseline: 1633 -> FAILS now = RED)
-- E2: wc -w .agents/skills/rust-design/*.md incl. report-template.md <= 5350 (baseline: 6505 -> RED; amended from <=5200 during GREEN before Task 17 verification: duplication-based safe cuts exhausted at 5326, and the next 126 words would remove rules rather than redundancy; user-approved 2026-10-18)
+- E2: wc -w .agents/skills/rust-design/*.md incl. report-template.md <= 5350 (baseline: 6505 -> RED; amended from <=5200 during GREEN before Task 17 verification: the REFACTOR trims of commit cdb006bb reached 5326 by removing a diagram, a metric-purpose column, and scoreboard example rows, so the next candidates were rule text rather than redundancy; user-approved 2026-10-18, recorded in commit 9bbe59ca)
 
 ## Capability assertions (per-mode scoping noted on each line; must pass BEFORE and AFTER edits)
 - C1: Deliverables under .design/<date>-<mode>-<slug>/ only. Check: `git status --short` shows no new paths outside the scenario's .design/ dir, and `ls .design/` shows exactly one directory per scenario run so far (this run's dir plus prior scenario dirs), with no stray dirs. (Clarified during RED: the original "exactly that one scenario dir" was only true for the first scenario.)
@@ -57,6 +57,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 
 - E1: SKILL.md = 1100 words (bound <=1100) PASS, exact.
 - E2: corpus (SKILL + TOOLING + DISCOVERY + DEEPENING + MODELING + METRICS + report-template) = 5344 words (bound <=5350 after documented amendment from 5200) PASS, margin 6.
+- Gate margin risk: E1 is exact (SKILL.md = 1100 = bound) and E2 has margin 6 (5344 of 5350), so any future edit to SKILL.md requires re-trimming elsewhere and any corpus edit needs a fresh `wc -w` check before commit.
 
 ### C6 counting convention
 
@@ -101,6 +102,10 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 - S1 attempt 3 (dir `*-ATTEMPT3-C6-fail-METRICS`) was valid GREEN but failed C6 (3727 > 3535) because it consulted METRICS.md for the section 2/5 delta rubric. Task 18 fix: report-template.md section 2 comment now scopes Review mode to zero delta and redirects SLoC thresholds to DISCOVERY.md (corpus 5326 -> 5344). S1 attempt 4 (recorded above) passed C6 = 2945 without opening METRICS.md.
 - S3 failed attempt 1 (permission denial) and attempt 2 (transient certificate verification error) before attempt 3 succeeded.
 - Baseline scenario runs also dispatched without nested subagent tools; both baseline and GREEN runs disclosed in-process lens execution. Main checkout `.agents/skills/rust-design/` was temporarily synced to GREEN bytes for the skill loader and has been restored to baseline (`git restore` + removed untracked report-template.md).
+
+### Task 19: repo verification gate (`mise run verify`)
+
+- Recorded from the execution session's output (not re-run for this hygiene edit): Task 19 Step 1's `mise run verify` passed at final state with exit 0; fmt/check/lint/test all green. Evidence: 3634 unit + 41 integration + 61 e2e tests passed (2 skipped), 86 doctests; `check:visibility` freeze passed with 39 pre-existing non-fatal rustdoc private-link warnings; `check:layers` passed with pre-existing `tests/common/` path warnings.
 
 ## Final Word Counts
 
