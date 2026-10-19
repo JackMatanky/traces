@@ -7,7 +7,7 @@
 To eliminate resource contention and workspace contamination:
 
 - **Strict Scout Read-Only Rule:** Parallel subagents (such as the 10 read-only scouting lenses in Step 2) operate strictly in **read-only mode**. Scouts are **forbidden** from running `cargo build`, `cargo test`, or diagnostic scripts, eliminating Cargo target directory lock contention. Only the main orchestrator executes CLI tools or test suites.
-- **Sandboxed Prototyping Worktrees:** Run non-trivial implementation trials in an ephemeral Git worktree or branch (`improve/<run-id>-<trial-id>`). This prevents incomplete experiments from dirtying the primary development worktree.
+- **Sandboxed Prototyping Worktrees:** Run non-trivial implementation trials in an ephemeral Git worktree or branch (naming convention in [`DEEPENING.md`](DEEPENING.md) §4). This prevents incomplete experiments from dirtying the primary development worktree.
 
 ---
 

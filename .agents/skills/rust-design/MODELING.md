@@ -83,7 +83,8 @@ Prefer ordinary enums or runtime validation when typestate would leak marker typ
 
 Error types are part of the interface because callers must act on failure modes:
 
-- **Panic-Free Seams:** Public and cross-crate entry points must never expose unhandled `.unwrap()`, `.expect()`, or `panic!` calls. Errors crossing seams must be structured `Result<T, E>` domain enums (`thiserror`).
-- **Domain Error Classification:** Hide internal child errors behind cohesive domain classifications rather than mechanically mirroring every internal error variant.
-- **Panic Containment:** Seams hosting worker tasks or plugins must isolate thread panics (`std::panic::catch_unwind` or tokio task join handling) to prevent cascading process failure.
-- **Contract Evolution (Expand-and-Contract):** Use `#[non_exhaustive]` on public enums so variant additions are backward-compatible; use builder patterns with defaults for struct parameter expansion; employ parallel deprecation (`#[deprecated]`) over breaking signature changes.
+- **Panic-Free Seams:** Public and cross-crate entry points must never expose unhandled `.unwrap()`, `.expect()`, or `panic!`. Errors crossing seams are structured `Result<T, E>` domain enums.
+- **Domain Error Classification:** Hide internal child errors behind cohesive domain classifications rather than mirroring every internal variant.
+- **Panic Containment:** Seams hosting worker tasks or plugins isolate thread panics (`catch_unwind` / tokio join handling).
+
+Coding-level error and contract-evolution rules (`thiserror` usage, `#[non_exhaustive]`, expand-and-contract, deprecation) live in `rust-skills`; load it when implementing.

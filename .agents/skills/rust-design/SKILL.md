@@ -28,19 +28,25 @@ Classify user prompt intent into an operational mode and strategy:
 
 ---
 
+## Grilling Follow-Up (All Modes)
+
+After any run produces its deliverable (review report, type model, or verified patch), offer a `grill-me` session (user-invoked only; never auto-chain) to stress-test the design theses, top-ranked `ledger.json` items, or proposed types with the user.
+
+---
+
 ## Deliverable Containment
 
 All generated analysis, scout findings, trial records, and reports are stored strictly inside the project root `.design/` directory:
 
 ```text
 .design/YYYY-MM-DD-<mode>-<target-slug>/
-├── baseline.json        # Output from scripts/measure.py
-├── ledger.json          # Architectural Hypothesis Ledger & scoreboards
-├── graveyard.md         # Active Graveyard (tried and rejected prototypes)
-├── report.md            # Authoritative Architectural Report
-├── scouts/              # Findings from 10 read-only lens subagents
+├── baseline.json        # measure.py
+├── ledger.json          # Ranked hypotheses
+├── graveyard.md         # Rejected prototypes
+├── report.md
+├── scouts/
 │   ├── lens1-modern.md ... lens10-checks.md
-└── patch.diff           # (Implement mode only) Verified Git patch
+└── patch.diff           # Implement mode only
 ```
 
 There are zero loose evaluation directories or scout files created at the workspace root.
@@ -72,45 +78,30 @@ Read [`DISCOVERY.md`](DISCOVERY.md) for lens definitions and indicator interpret
 
 1. **Dispatch Parallel Scouts:** Dispatch 10 read-only subagents, one per architectural lens.
    - *Scout Isolation Rule:* Scouts operate strictly read-only and must never run `cargo build`, `cargo test`, or diagnostic scripts.
-2. **Expected Architectural Value (EAV):** Rank candidate redesigns in `ledger.json` using:
-   $$\text{EAV} = \frac{\text{Structural or Computational Gain (1–5)} \times \text{Confidence (0–1)}}{\text{Blast Radius (1–5)} + \text{Implementation Friction (1–5)}}$$
-   A candidate is consequential if $\text{EAV} \ge 1.0$.
-3. **Closed Deferral Reason Enum:** Every deferred finding must use one of three enum variants, capped at 3 deferrals per review without explicit user approval:
-   - `DEFERRED_TOOL_UNAVAILABLE`: Required diagnostic binary is absent from host.
-   - `DEFERRED_OUT_OF_SCOPE`: Finding resides entirely outside requested target boundary.
-   - `DEFERRED_HIGH_TRACE_COST`: Verification requires exhaustive dynamic tracing exceeding turn boundaries.
+2. **Rank by Expected Architectural Value (EAV):** Score every candidate in `ledger.json` per [`DISCOVERY.md`](DISCOVERY.md) §4 (formula + consequential triggers). Consequential means `EAV >= 1.0` or any listed trigger.
+3. **Closed Deferral Enum:** **REQUIRED:** defer only with the three variants defined in [`DISCOVERY.md`](DISCOVERY.md) §5 (Closed Deferral Reason Enum); maximum 3 per review without explicit user approval.
 
 **Done when:** All 10 lenses report into `.design/.../scouts/`; `ledger.json` populated and sorted by descending EAV; every tool finding has a recorded disposition (investigated, dismissed, or Closed Deferral Enum max 3).
 
 ### 3. Empirical Trial-and-Revert Search Loop
 
-Read [`DEEPENING.md`](DEEPENING.md) for trial mechanics, graveyard specifications, and termination gates.
+**REQUIRED:** Read [`DEEPENING.md`](DEEPENING.md) §4 and §5 before the first trial; sandbox rules, drop conditions, attempt limits, rollback, graveyard format, and gate definitions live only there.
 
 1. **Select Candidate:** In Steady mode, select the top-ranked item from `ledger.json`. In Breakthrough mode, select the single highest-leverage fundamental bet.
-2. **Sandboxed Trial:** Create a clean worktree or branch (`improve/<run-id>-<trial-id>`). For Breakthrough bets, record the explicit drop condition before writing code.
-3. **Iterate & Refine:** Apply candidate transformations. Limit iterative compilation attempts to at most 3 refinements per candidate.
-4. **Commit or Revert Decision:**
-   - *Keep Condition:* Tests pass, external API contracts hold, and the scoreboard demonstrates a positive delta without uncompensated regressions. Update `ledger.json` and advance the baseline.
-   - *Revert Condition:* If tests fail or drop conditions trigger, roll back immediately with `git reset --hard` or worktree disposal. Log the trial record and rejection post-mortem to `.design/.../graveyard.md`.
-5. **Termination Gates:** Stop when all high-EAV hypotheses are evaluated (Convergence), two consecutive trials fail (Plateau: trigger re-scouting), or budget is exhausted (Budget).
+2. **Sandboxed Trial:** Work in a clean worktree/branch; for Breakthrough bets state the drop condition before editing.
+3. **Iterate & Refine:** Apply candidate transformations within the attempt limit.
+4. **Commit or Revert:** Keep only on green tests + stable public API + positive scoreboard delta; otherwise revert immediately and log the post-mortem to `.design/.../graveyard.md`.
+5. **Termination Gates:** Convergence, Plateau (two consecutive failures → re-scout), or Budget; definitions in [`DEEPENING.md`](DEEPENING.md) §5.
 
 **Done when:** All selected hypotheses empirically evaluated and committed or reverted; Deletion Dividend lists superseded types, wrappers, dependencies; Graveyard records rejected bets with concrete failure evidence.
 
 ### 4. Model Design in Rust
 
-Read [`MODELING.md`](MODELING.md) for idiomatic type modeling and Principle of Least Surprise (POLS) layout rules.
-
-- Prefer concrete structs and functions before introducing traits or generics.
-- Apply "parse, don't validate" to eliminate invalid states at construction ($\text{ISR} = 0$).
-- Use typestates only when states are stable and transitions are central to correctness ($\text{ITE} = 0$).
-- Maintain panic-free public seams: entry points return structured `Result<T, E>`.
-- Enforce POLS: file layouts match domain ownership; eliminate utility "junk drawers".
+**REQUIRED:** Read [`MODELING.md`](MODELING.md) before proposing any type. In one line: concrete types first, invalid states unconstructable (`ISR = 0`), typestates only when transitions are correctness-critical (`ITE = 0`), panic-free `Result` seams, POLS layout with no junk drawers.
 
 **Done when:** Proposed types, ownership, errors, and traits directly serve intended seams; invariants enforced at construction or compile time; type ceremony balanced against caller burden.
 
 ### 5. Verify Implementation
-
-Read [`METRICS.md`](METRICS.md) for metric definitions and anti-gaming rules.
 
 1. **Test Verification:** Verify required behavior through the intended seam using project test suites. If tests fail, return to Step 3 for refinement or rollback.
 2. **Public API Stability:** Run `cargo public-api` diff checking to verify zero accidental breaking changes.
@@ -119,9 +110,7 @@ Read [`METRICS.md`](METRICS.md) for metric definitions and anti-gaming rules.
    uv run .agents/skills/rust-design/scripts/measure.py <target-path> .design/.../final.json
    uv run .agents/skills/rust-design/scripts/diff.py .design/.../baseline.json .design/.../final.json
    ```
-4. **Anti-Gaming Guardrails:**
-   - *Comment Preservation Rule:* Doc comments (`///`, `//!`) and explanations must not be stripped or compressed to inflate line reduction counts.
-   - *Semantic Deletion Dividend:* The deletion dividend evaluates removal of architectural complexity (dead types, obsolete traits, collapsed wrappers), not prose.
+4. **Anti-Gaming Guardrails:** **REQUIRED:** Read [`METRICS.md`](METRICS.md) §4 before scoring any delta; comment preservation and semantic deletion dividend rules live only there.
 
 **Done when:** Intended behavior verified through tests entering seam; public API diff verified clean; SLoC deltas and comment preservation verified; superseded structure accounted for in Deletion Dividend.
 
