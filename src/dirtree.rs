@@ -271,9 +271,14 @@ impl DirNode {
     ///
     /// # Errors
     ///
-    /// - [`std::io::Error`] if the filesystem cannot read the metadata.
-    pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
-        self.0.metadata().map_err(io::Error::from)
+    /// - [`DirTreeError::NodeInaccessible`] naming the node if the metadata
+    ///   cannot be read, keeping the walk's error classification intact for
+    ///   callers.
+    pub(crate) fn metadata(&self) -> Result<fs::Metadata, DirTreeError> {
+        self.0.metadata().map_err(|source| DirTreeError::NodeInaccessible {
+            path: self.0.path().to_path_buf(),
+            source: io::Error::from(source),
+        })
     }
 }
 

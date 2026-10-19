@@ -176,10 +176,12 @@ impl QueryService {
     /// # Errors
     ///
     /// - `IndexError::Store` if database access or row serialization fails.
-    /// - `IndexError::Scan` if directory traversal fails during index refresh.
+    /// - `IndexError::Scan` if directory traversal or node access fails during
+    ///   index refresh.
     /// - `IndexError::Path` if path validation fails.
     /// - `IndexError::NoteParse` if reading or parsing a note fails.
-    /// - `IndexError::Inspect` if inspecting file metadata fails.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn sync_and_run(

@@ -72,8 +72,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory cannot be read.
-    /// - `IndexError::Inspect` if a file's metadata cannot be inspected.
+    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
+    ///   included.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
@@ -120,8 +122,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory cannot be read.
-    /// - `IndexError::Inspect` if file metadata cannot be inspected.
+    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
+    ///   included.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
@@ -138,8 +142,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory cannot be read.
-    /// - `IndexError::Inspect` if file metadata cannot be inspected.
+    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
+    ///   included.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
@@ -232,8 +238,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
+    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
+    ///   included.
+    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    ///   record.
     /// - [`IndexError::NoteParse`] if a note cannot be read or decoded as
     ///   UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
@@ -258,8 +266,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
+    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
+    ///   included.
+    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    ///   record.
     /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
@@ -403,8 +413,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if a file's metadata cannot be inspected.
+    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
+    ///   included.
+    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    ///   record.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
     ///   project-relative path.
     pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
@@ -436,10 +448,7 @@ fn scan_file_metadata(node: &DirNode, root: &Path) -> IndexResult<FileMeta> {
     // failure actually occurs.
     let path = node.path();
     let relative = RelativePath::derive(root, path)?;
-    let metadata = node.metadata().map_err(|source| IndexError::Inspect {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let metadata = node.metadata()?;
     FileMeta::from_metadata(relative, &metadata).map_err(|source| {
         IndexError::Inspect {
             path: path.to_path_buf(),
