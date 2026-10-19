@@ -6,6 +6,12 @@ Blocked by: 19, 20, 21
 
 ## Question
 
-For committed long-lived LSP and likely MCP consumers, what source-of-truth and consistency rules should apply when an editor has unsaved content that differs from the persisted vault and index? Decide which reads use the buffer, how queries and links observe edits, and how close/save/refresh transitions reconcile buffered and indexed state.
+For committed long-lived LSP and likely MCP consumers, what source-of-truth and
+consistency rules should apply when an editor has unsaved content that differs
+from the persisted vault and index? Decide which reads use the buffer, how
+queries and links observe edits, and how close/save/refresh transitions
+reconcile buffered and indexed state.
 
-Resolve after the note document model, index read model, and freshness/invalidation policies are decided. Keep protocol-specific behavior outside the shared semantics unless it creates a real variation.
+Resolve after the note document model, index read model, and
+freshness/invalidation policies are decided. Keep protocol-specific behavior
+outside the shared semantics unless it creates a real variation.
