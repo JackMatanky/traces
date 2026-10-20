@@ -71,7 +71,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 - C3 PASS: 8 hypotheses EAV-sorted; 1 deferral, enum-only `DEFERRED_OUT_OF_SCOPE`.
 - C4 PASS: 7/7 mandated headings, 7 `##` headings total.
 - C5 PASS: Files Consulted = SKILL.md, TOOLING.md, DISCOVERY.md, report-template.md; required DISCOVERY.md included.
-- C6 PASS: 2945 <= 3535 (original measurement; stale by +4 because report-template.md shifted 246 -> 250 after this run, giving corrected 2949, the same class of stale-bytes arithmetic the S3 section documents; still passing).
+- C6 PASS: 2945 <= 3535 (original measurement; stale by +4 because report-template.md shifted 246 -> 250 after this run, giving corrected 2949 computed against the run-time corpus when report-template was 250 words (re-wc against the current post-Task-E docs will differ); the same class of stale-bytes arithmetic the S3 section documents; still passing).
 - grill-me offered in final message.
 
 ### S2: Model mode (GREEN)
@@ -80,7 +80,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 - C1 PASS: deliverables confined; no run output outside `.design/`.
 - C4 N/A: Model mode runs Step 4 only, so C4 was scoped out of the oracle in the RED S2 record.
 - C5 PASS: Files Consulted = SKILL.md, MODELING.md, report-template.md; required MODELING.md included.
-- C6 PASS: 2162 <= 6157 (original measurement; stale by +4 because report-template.md shifted 246 -> 250, giving corrected 2166, still passing; baseline skill refs incl. SKILL = 2641, also pass).
+- C6 PASS: 2162 <= 6157 (original measurement; stale by +4 because report-template.md shifted 246 -> 250, giving corrected 2166 computed against the run-time corpus when report-template was 250 words (re-wc against the current post-Task-E docs will differ); still passing; baseline skill refs incl. SKILL = 2641, also pass).
 - Run content (for GREEN comparison): same core fix as baseline (infallible `From<FieldName> for FieldKey` replaced by `TryFrom`).
 - grill-me offered.
 
@@ -102,14 +102,14 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 ### Method notes and anomalies
 
 - Stale skill cache: the `skill` tool serves a cached copy captured at app start. Early GREEN attempts (S1/S2 attempt 1 and 2, dirs renamed `*-SUPERSEDED-baseline-bytes` and `*-ATTEMPT2-invalid-cached-bytes`) accidentally ran the baseline skill. All recorded GREEN runs bypassed the cache with an explicit direct-Read of the worktree `.agents/skills/rust-design/SKILL.md`.
-- S1 attempt 3 (dir `*-ATTEMPT3-C6-fail-METRICS`) was valid GREEN but failed C6 (3727 > 3535) because it consulted METRICS.md for the section 2/5 delta rubric. Task 18 fix: report-template.md section 2 comment scoped Review mode to zero delta and originally redirected SLoC thresholds to DISCOVERY.md (corpus 5326 -> 5344); review-fix commit 5fc169ae (with f6d6ae2c) later corrected the attribution to METRICS.md and single-sourced the policy. S1 attempt 4 (recorded above) passed C6 = 2945 without opening METRICS.md (original measurement; corrected to 2949 after report-template.md's 246 -> 250 shift, still passing).
+- S1 attempt 3 (dir `*-ATTEMPT3-C6-fail-METRICS`) was valid GREEN but failed C6 (3727 > 3535) because it consulted METRICS.md for the section 2/5 delta rubric. Task 18 fix: report-template.md section 2 comment scoped Review mode to zero delta and originally redirected SLoC thresholds to DISCOVERY.md (corpus 5326 -> 5344); review-fix commit 5fc169ae (with f6d6ae2c) later corrected the attribution to METRICS.md and single-sourced the policy. S1 attempt 4 (recorded above) passed C6 = 2945 without opening METRICS.md (original measurement; corrected to 2949 against the run-time corpus when report-template was 250 words (re-wc against the current post-Task-E docs will differ), still passing).
 - S3 failed attempt 1 (permission denial) and attempt 2 (transient certificate verification error) before the run that is now marked INVALID completed (see the S3 GREEN section above; the valid rerun is the `s3-green-run-2` record).
 - Baseline scenario runs also dispatched without nested subagent tools; both baseline and GREEN runs disclosed in-process lens execution. Main checkout `.agents/skills/rust-design/` was temporarily synced to GREEN bytes for the skill loader and has been restored to baseline (`git restore` + removed untracked report-template.md).
 
 ### Task 19: repo verification gate (`mise run verify`)
 
 - Recorded from the execution session's output (not re-run for this hygiene edit): Task 19 Step 1's `mise run verify` passed at 43750831 (the execution session's final commit; Rust tree at the baseline keep-commit tip `7dfc2e1f`) with exit 0; fmt/check/lint/test all green. Evidence: 3634 unit + 41 integration + 61 e2e tests passed (2 skipped), 86 doctests; `check:visibility` freeze passed with 39 pre-existing non-fatal rustdoc private-link warnings; `check:layers` passed with pre-existing `tests/common/` path warnings. Verify was subsequently re-run green at b11bb827 (covering the review-fix Rust commits 6498eda5 and b11bb827) with identical numbers.
-- Task C visibility: the review-fix `pub(crate)` changes (`entry_paths` helper in `src/file_tracker.rs`, `DEFAULT_IGNORED_DIRS` const in `src/env_vars.rs`) were accepted by the `check:visibility` freeze via a `tests/baselines/pub-tokens.txt` baseline update made inside commit 6498eda5, the same mechanism the S3 keep-commits used.
+- Task C visibility: the review-fix `pub(crate)` const `DEFAULT_IGNORED_DIRS` in `src/env_vars.rs` was accepted by the `check:visibility` freeze via a `tests/baselines/pub-tokens.txt` baseline update made inside commit 6498eda5 (the freeze tracks `pub`-prefixed declarations; that update added exactly this one line), the same mechanism the S3 keep-commits used. The companion `entry_paths` helper at `src/file_tracker.rs:369` is a private bare `fn`, not `pub(crate)`, so it is outside the freeze and never needed a baseline entry.
 
 ## Final Word Counts
 
