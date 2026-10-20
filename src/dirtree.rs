@@ -34,126 +34,6 @@ use std::{
 use thiserror::Error;
 use walkdir::{DirEntry, WalkDir};
 
-/// Classifies one raw walkdir failure against the walk's root.
-fn classify(fallback: &Path, source: walkdir::Error) -> DirTreeError {
-    let depth = source.depth();
-    let path = source.path().unwrap_or(fallback).to_path_buf();
-    let source = io::Error::from(source);
-    match depth {
-        0 if source.kind() == io::ErrorKind::NotFound => {
-            DirTreeError::MissingRoot {
-                path,
-                source,
-            }
-        }
-        0 => DirTreeError::RootInaccessible {
-            path,
-            source,
-        },
-        _ => DirTreeError::NodeInaccessible {
-            path,
-            source,
-        },
-    }
-}
-
-/// Represents a node of a directory tree: a file, directory, or symlink yielded
-/// by [`DirTree::children`] or [`DirTree::descendants`].
-///
-/// Wraps walkdir's entry so callers never touch walkdir types. Accessors
-/// delegate to the underlying [`walkdir::DirEntry`] and report failures through
-/// the same [`DirTreeError`] as iteration.
-#[repr(transparent)]
-#[derive(Clone, Debug)]
-pub(crate) struct DirNode(DirEntry);
-
-/// Represents a borrowed view of a directory node for zero-clone comparisons.
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
-
-impl<'a> DirNodeRef<'a> {
-    /// Returns the node's final path component.
-    #[inline]
-    #[must_use]
-    pub(crate) fn file_name(self) -> &'a OsStr {
-        self.0.file_name()
-    }
-
-    /// Returns the node's full path.
-    #[inline]
-    #[must_use]
-    pub(crate) fn path(self) -> &'a Path {
-        self.0.path()
-    }
-}
-
-impl DirNode {
-    /// Adapts one raw walkdir item into this module's interface.
-    ///
-    /// Entries become nodes; failures are classified against the walk's root.
-    fn try_new(
-        root: &Path,
-        result: walkdir::Result<DirEntry>,
-    ) -> Result<Self, DirTreeError> {
-        match result {
-            Ok(entry) => Ok(Self(entry)),
-            Err(source) => Err(classify(root, source)),
-        }
-    }
-
-    /// Returns the node's full path, including the walk root prefix.
-    #[must_use]
-    pub(crate) fn path(&self) -> &Path {
-        self.0.path()
-    }
-
-    /// Returns the node's final path component.
-    #[must_use]
-    pub(crate) fn file_name(&self) -> &OsStr {
-        self.0.file_name()
-    }
-
-    /// Returns the node's type without following symlinks.
-    ///
-    /// A symlinked file reports [`FileType::is_symlink`], never its target's
-    /// type.
-    ///
-    /// [`FileType::is_symlink`]: std::fs::FileType::is_symlink
-    #[must_use]
-    pub(crate) fn file_type(&self) -> fs::FileType {
-        self.0.file_type()
-    }
-
-    /// Returns the node's filesystem metadata without following symlinks.
-    ///
-    /// # Errors
-    ///
-    /// Returns an [`std::io::Error`] if metadata cannot be read.
-    pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
-        self.0.metadata().map_err(io::Error::from)
-    }
-}
-
-/// Type-erased pruner: the caller's node predicate wrapped so
-/// [`walkdir::FilterEntry`] can apply it to raw entries.
-type PrunePredicate = Box<dyn FnMut(&DirEntry) -> bool>;
-
-enum InnerIter {
-    Plain(walkdir::IntoIter),
-    Filtered(walkdir::FilterEntry<walkdir::IntoIter, PrunePredicate>),
-}
-
-impl Iterator for InnerIter {
-    type Item = walkdir::Result<DirEntry>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Plain(iter) => iter.next(),
-            Self::Filtered(iter) => iter.next(),
-        }
-    }
-}
 /// Iterates over a directory tree with classified, path-contextualized errors.
 ///
 /// Created by [`DirTree::children`] (flat, one level) or
@@ -298,6 +178,63 @@ impl Iterator for DirTree {
     }
 }
 
+/// Represents a node of a directory tree: a file, directory, or symlink yielded
+/// by [`DirTree::children`] or [`DirTree::descendants`].
+///
+/// Wraps walkdir's entry so callers never touch walkdir types. Accessors
+/// delegate to the underlying [`walkdir::DirEntry`] and report failures through
+/// the same [`DirTreeError`] as iteration.
+#[repr(transparent)]
+#[derive(Clone, Debug)]
+pub(crate) struct DirNode(DirEntry);
+
+impl DirNode {
+    /// Adapts one raw walkdir item into this module's interface.
+    ///
+    /// Entries become nodes; failures are classified against the walk's root.
+    fn try_new(
+        root: &Path,
+        result: walkdir::Result<DirEntry>,
+    ) -> Result<Self, DirTreeError> {
+        match result {
+            Ok(entry) => Ok(Self(entry)),
+            Err(source) => Err(classify(root, source)),
+        }
+    }
+
+    /// Returns the node's full path, including the walk root prefix.
+    #[must_use]
+    pub(crate) fn path(&self) -> &Path {
+        self.0.path()
+    }
+
+    /// Returns the node's final path component.
+    #[must_use]
+    pub(crate) fn file_name(&self) -> &OsStr {
+        self.0.file_name()
+    }
+
+    /// Returns the node's type without following symlinks.
+    ///
+    /// A symlinked file reports [`FileType::is_symlink`], never its target's
+    /// type.
+    ///
+    /// [`FileType::is_symlink`]: std::fs::FileType::is_symlink
+    #[must_use]
+    pub(crate) fn file_type(&self) -> fs::FileType {
+        self.0.file_type()
+    }
+
+    /// Returns the node's filesystem metadata without following symlinks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`std::io::Error`] if metadata cannot be read.
+    pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
+        self.0.metadata().map_err(io::Error::from)
+    }
+}
+
 /// Represents a failure raised while traversing a directory tree.
 ///
 /// Callers match to state their missing-root policy and convert remaining
@@ -361,22 +298,76 @@ impl DirTreeError {
     }
 }
 
+/// Represents a borrowed view of a directory node for zero-clone comparisons.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
+
+impl<'a> DirNodeRef<'a> {
+    /// Returns the node's final path component.
+    #[inline]
+    #[must_use]
+    pub(crate) fn file_name(self) -> &'a OsStr {
+        self.0.file_name()
+    }
+
+    /// Returns the node's full path.
+    #[inline]
+    #[must_use]
+    pub(crate) fn path(self) -> &'a Path {
+        self.0.path()
+    }
+}
+
+/// Type-erased pruner: the caller's node predicate wrapped so
+/// [`walkdir::FilterEntry`] can apply it to raw entries.
+type PrunePredicate = Box<dyn FnMut(&DirEntry) -> bool>;
+
+enum InnerIter {
+    Plain(walkdir::IntoIter),
+    Filtered(walkdir::FilterEntry<walkdir::IntoIter, PrunePredicate>),
+}
+
+impl Iterator for InnerIter {
+    type Item = walkdir::Result<DirEntry>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Plain(iter) => iter.next(),
+            Self::Filtered(iter) => iter.next(),
+        }
+    }
+}
+
+/// Classifies one raw walkdir failure against the walk's root.
+fn classify(fallback: &Path, source: walkdir::Error) -> DirTreeError {
+    let depth = source.depth();
+    let path = source.path().unwrap_or(fallback).to_path_buf();
+    let source = io::Error::from(source);
+    match depth {
+        0 if source.kind() == io::ErrorKind::NotFound => {
+            DirTreeError::MissingRoot {
+                path,
+                source,
+            }
+        }
+        0 => DirTreeError::RootInaccessible {
+            path,
+            source,
+        },
+        _ => DirTreeError::NodeInaccessible {
+            path,
+            source,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
 
     use super::*;
 
-    /// Writes `rel` under `dir` with placeholder content, creating parent
-    /// directories, and returns the absolute path.
-    fn write(dir: &Path, rel: &str) -> PathBuf {
-        let path = dir.join(rel);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).expect("create parent dirs");
-        }
-        fs::write(&path, "content").expect("write fixture file");
-        path
-    }
     mod children {
         use pretty_assertions::assert_eq;
 
@@ -490,80 +481,6 @@ mod tests {
             // Assert: .git directory removed, note.md and remaining entries
             // kept.
             assert_eq!(names, vec!["note.md"]);
-        }
-    }
-
-    mod builder {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn returns_unfiltered_entries_when_filter_is_configured_after_iteration_starts()
-         {
-            // Arrange
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let root = temp.path();
-            write(root, "a.md");
-            write(root, "b.md");
-            write(root, "c.md");
-            write(root, "sub/nested.md");
-            let mut tree = DirTree::children(root).sorted_by(|left, right| {
-                left.file_name().cmp(right.file_name())
-            });
-
-            // Act
-            let first = tree
-                .next()
-                .expect("first child")
-                .expect("first child is readable");
-            let names: Vec<String> = tree
-                .filter(|node| node.file_name() == "sub")
-                .map(|entry| entry.expect("child is readable"))
-                .map(|node| node.file_name().to_string_lossy().into_owned())
-                .collect();
-
-            // Assert
-            assert_eq!(first.file_name(), std::ffi::OsStr::new("a.md"));
-            assert_eq!(names, vec!["b.md", "c.md", "sub"]);
-        }
-
-        #[test]
-        fn leaves_comparator_uninvoked_when_sorting_is_configured_after_iteration_starts()
-         {
-            // Arrange
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let root = temp.path();
-            write(root, "a.md");
-            write(root, "b.md");
-            write(root, "c.md");
-            let comparisons =
-                std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-            let comparisons_in_compare = std::sync::Arc::clone(&comparisons);
-            let mut tree = DirTree::children(root);
-
-            // Act
-            let first = tree.next().expect("first child");
-            let rest: Vec<_> = tree
-                .sorted_by(move |left, right| {
-                    comparisons_in_compare
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    left.file_name().cmp(right.file_name())
-                })
-                .collect();
-
-            // Assert
-            assert!(first.is_ok(), "first child is readable: {first:?}");
-            assert_eq!(rest.len(), 2);
-            assert!(
-                rest.iter().all(Result::is_ok),
-                "remaining children are readable: {rest:?}"
-            );
-            assert_eq!(
-                comparisons.load(std::sync::atomic::Ordering::Relaxed),
-                0,
-                "late comparator must not run"
-            );
         }
     }
 
@@ -699,8 +616,8 @@ mod tests {
                 })
                 .collect();
 
-            // Assert: depth-first with siblings name-ordered per directory;
-            // the root itself still comes first.
+            // Assert: depth-first with siblings name-ordered per directory; the
+            // root itself still comes first.
             assert_eq!(relatives, vec![
                 "",
                 "a.md",
@@ -758,8 +675,8 @@ mod tests {
                 })
                 .collect();
 
-            // Assert: the .traces/config.toml file is pruned with its dir;
-            // root itself and surviving files remain.
+            // Assert: the .traces/config.toml file is pruned with its dir; root
+            // itself and surviving files remain.
             assert_eq!(relatives, vec!["", "proj", "proj/a.md"]);
         }
 
@@ -798,17 +715,77 @@ mod tests {
         }
     }
 
-    /// RAII guard that restores permissions on drop so that a `0o000` directory
-    /// does not block the tempdir's cleanup.
-    #[cfg(unix)]
-    struct RestorePermissions<'a>(&'a Path);
+    mod builder {
+        use pretty_assertions::assert_eq;
 
-    #[cfg(unix)]
-    impl Drop for RestorePermissions<'_> {
-        fn drop(&mut self) {
-            use std::os::unix::fs::PermissionsExt;
-            let _ =
-                fs::set_permissions(self.0, fs::Permissions::from_mode(0o700));
+        use super::*;
+
+        #[test]
+        fn returns_unfiltered_entries_when_filter_is_configured_after_iteration_starts()
+         {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "a.md");
+            write(root, "b.md");
+            write(root, "c.md");
+            write(root, "sub/nested.md");
+            let mut tree = DirTree::children(root).sorted_by(|left, right| {
+                left.file_name().cmp(right.file_name())
+            });
+
+            // Act
+            let first = tree
+                .next()
+                .expect("first child")
+                .expect("first child is readable");
+            let names: Vec<String> = tree
+                .filter(|node| node.file_name() == "sub")
+                .map(|entry| entry.expect("child is readable"))
+                .map(|node| node.file_name().to_string_lossy().into_owned())
+                .collect();
+
+            // Assert
+            assert_eq!(first.file_name(), std::ffi::OsStr::new("a.md"));
+            assert_eq!(names, vec!["b.md", "c.md", "sub"]);
+        }
+
+        #[test]
+        fn leaves_comparator_uninvoked_when_sorting_is_configured_after_iteration_starts()
+         {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "a.md");
+            write(root, "b.md");
+            write(root, "c.md");
+            let comparisons =
+                std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let comparisons_in_compare = std::sync::Arc::clone(&comparisons);
+            let mut tree = DirTree::children(root);
+
+            // Act
+            let first = tree.next().expect("first child");
+            let rest: Vec<_> = tree
+                .sorted_by(move |left, right| {
+                    comparisons_in_compare
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    left.file_name().cmp(right.file_name())
+                })
+                .collect();
+
+            // Assert
+            assert!(first.is_ok(), "first child is readable: {first:?}");
+            assert_eq!(rest.len(), 2);
+            assert!(
+                rest.iter().all(Result::is_ok),
+                "remaining children are readable: {rest:?}"
+            );
+            assert_eq!(
+                comparisons.load(std::sync::atomic::Ordering::Relaxed),
+                0,
+                "late comparator must not run"
+            );
         }
     }
 
@@ -816,6 +793,22 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
+
+        /// RAII guard that restores permissions on drop so that a `0o000`
+        /// directory does not block the tempdir's cleanup.
+        #[cfg(unix)]
+        struct RestorePermissions<'a>(&'a Path);
+
+        #[cfg(unix)]
+        impl Drop for RestorePermissions<'_> {
+            fn drop(&mut self) {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = fs::set_permissions(
+                    self.0,
+                    fs::Permissions::from_mode(0o700),
+                );
+            }
+        }
 
         #[cfg(unix)]
         #[test]
@@ -833,8 +826,8 @@ mod tests {
             // Act
             let collected: Vec<_> = DirTree::children(root).collect();
 
-            // Assert: stat on the root still succeeds (parent grants it),
-            // so this is an access failure, not absence.
+            // Assert: stat on the root still succeeds (parent grants it), so
+            // this is an access failure, not absence.
             assert_eq!(collected.len(), 1);
             let error = collected
                 .into_iter()
@@ -963,5 +956,16 @@ mod tests {
                 "metadata remains for the symlink rather than its target"
             );
         }
+    }
+
+    /// Writes `rel` under `dir` with placeholder content, creating parent
+    /// directories, and returns the absolute path.
+    fn write(dir: &Path, rel: &str) -> PathBuf {
+        let path = dir.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dirs");
+        }
+        fs::write(&path, "content").expect("write fixture file");
+        path
     }
 }
