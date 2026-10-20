@@ -271,6 +271,32 @@ mod tests {
         }
 
         #[test]
+        fn builtin_arithmetic_matches_jinja2_semantics() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let engine = TemplateEngine::new(
+                &loader_from_dir(temp.path()),
+                preset_provider(),
+                &config_for(temp.path()),
+            )
+            .expect("valid test schema directory");
+
+            let rendered = engine
+                .render(
+                    "{{ 7 // -2 }}|{{ 7 % -2 }}|{{ 2.5 | round }}",
+                    "test.md",
+                )
+                .expect("render succeeds");
+
+            assert_eq!(rendered.content, "-4|-1|2.0");
+
+            let error = engine
+                .render("{{ 1.0 / 0.0 }}", "test.md")
+                .expect_err("division by zero fails");
+
+            assert_eq!(error.kind(), minijinja::ErrorKind::InvalidOperation);
+        }
+
+        #[test]
         fn resolves_include_from_local_dir() {
             let temp = tempfile::tempdir().expect("create temp dir");
             fs::write(temp.path().join("partial.md"), "included")

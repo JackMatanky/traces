@@ -1337,8 +1337,6 @@ src/template/engine.rs: pub(super) struct RenderOutput {
 src/template/engine.rs: pub(super) struct TemplateEngine {
 src/template/engine.rs: pub(super) write_to: Option<DeclaredOutputPath>,
 src/template/engine/cache.rs: pub(super) fn cached<T, E>(
-src/template/engine/cache.rs: pub(super) fn get_temp<T>(state: &State, key: &'static str) -> Option<T>
-src/template/engine/cache.rs: pub(super) fn set_temp<T>(state: &State, key: &'static str, value: T)
 src/template/engine/date.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
 src/template/engine/date.rs: pub(super) struct DateNamespace;
 src/template/engine/error.rs: pub(super) fn confine_error(path: &str, source: PathError) -> Error {

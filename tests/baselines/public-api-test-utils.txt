@@ -1575,7 +1575,7 @@ pub type traces::testing::QuerySet::IntoIter = alloc::vec::into_iter::IntoIter<<
 pub type traces::testing::QuerySet::Item = traces::testing::QueryRow
 pub fn traces::testing::QuerySet::into_iter(self) -> Self::IntoIter
 impl minijinja::value::object::Object for traces::testing::QuerySet
-pub fn traces::testing::QuerySet::call_method(&alloc::rcs::arc::Arc<Self>, &minijinja::vm::state::State<'_, '_>, &str, &[minijinja::value::Value]) -> core::result::Result<minijinja::value::Value, minijinja::error::Error>
+pub fn traces::testing::QuerySet::call_method(&alloc::rcs::arc::Arc<Self>, &mut minijinja::vm::state::State<'_, '_>, &str, &[minijinja::value::Value]) -> core::result::Result<minijinja::value::Value, minijinja::error::Error>
 pub fn traces::testing::QuerySet::enumerate(&alloc::rcs::arc::Arc<Self>) -> minijinja::value::object::Enumerator
 pub fn traces::testing::QuerySet::get_value(&alloc::rcs::arc::Arc<Self>, &minijinja::value::Value) -> core::option::Option<minijinja::value::Value>
 pub fn traces::testing::QuerySet::repr(&alloc::rcs::arc::Arc<Self>) -> minijinja::value::object::ObjectRepr

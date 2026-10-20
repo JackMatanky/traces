@@ -48,9 +48,9 @@
 //! [`Schema`]'s own `Object` impl carries no context fields (no per-instance
 //! registry/config bundle, unlike a wrapper type): `.field()`/`.children()`/
 //! `.descendants()` instead re-fetch the render's `Arc<SchemaService>` from
-//! `State`'s temp storage on demand, seeded once by `schema.get` (see
-//! [`cached_service`]). `.descendants()`/`.children()` themselves are *not*
-//! memoized across calls within a render: each call re-fetches the
+//! `State`'s typed extension storage on demand, seeded once by `schema.get`
+//! (see [`cached_service`]). `.descendants()`/`.children()` themselves are
+//! *not* memoized across calls within a render: each call re-fetches the
 //! (`State`-cached) registry and reads the target Schema's already-precomputed
 //! `children`/`descendants` set, with no per-call registry scan.
 
@@ -59,7 +59,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use indexmap::IndexMap;
 use minijinja::{
     Environment, Error, ErrorKind, State,
-    value::{Enumerator, Object, Value},
+    value::{Enumerator, Object, Serde, Value},
 };
 
 use super::error::TemplateEngineResult;
@@ -79,15 +79,18 @@ const METHODS: &[&str] = &["get"];
 /// [`Schema`]'s own `impl Object` below.
 const SCHEMA_METHODS: &[&str] = &["children", "descendants", "field", "name"];
 
-/// The [`State::set_temp`] key seeding the render's `Arc<SchemaService>`, so
-/// [`Schema`]'s own [`Object`] impl can reach [`SchemaService::matches`]/
+/// Render-local extension holding the `Arc<SchemaService>`, so [`Schema`]'s
+/// own [`Object`] impl can reach [`SchemaService::matches`]/
 /// [`SchemaService::children_of`]/[`SchemaService::descendants_of`] without
 /// holding a context field itself.
 /// Seeded by [`SchemaOps::get_value`]'s `"get"` branch before it hands out any
 /// `Schema`-backed value, so every live `Schema` [`Value`] in a render is
 /// guaranteed to have this already stashed by the time
-/// `.field()`/`.children()`/`.descendants()` runs.
-const SCHEMA_SERVICE_CACHE_KEY: &str = "schema.service_cache";
+/// `.field()`/`.children()`/`.descendants()` runs. Insertion is
+/// first-write-wins; every seed in a render carries the same shared service,
+/// so whichever wins is equivalent.
+#[derive(Debug)]
+struct SchemaServiceCache(Arc<SchemaService>);
 
 /// Backs the `schema` namespace object.
 #[derive(Debug)]
@@ -119,14 +122,12 @@ impl Object for SchemaOps {
             "get" => {
                 let ops = Arc::clone(self);
                 Some(Value::from_function(
-                    move |state: &State,
+                    move |state: &mut State,
                           name: &str|
                           -> TemplateEngineResult<Value> {
-                        super::cache::set_temp(
-                            state,
-                            SCHEMA_SERVICE_CACHE_KEY,
-                            Arc::clone(&ops.service),
-                        );
+                        state.get_or_insert_extension_with(|| {
+                            SchemaServiceCache(Arc::clone(&ops.service))
+                        });
                         ops.service
                             .get(name)
                             .cloned()
@@ -159,12 +160,15 @@ impl Object for SchemaOps {
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// no `Schema` value produced this render ever went through `schema.get`.
 fn cached_service(state: &State) -> TemplateEngineResult<Arc<SchemaService>> {
-    super::cache::get_temp(state, SCHEMA_SERVICE_CACHE_KEY).ok_or_else(|| {
-        Error::new(
-            ErrorKind::InvalidOperation,
-            "internal error: no Schema service cached for this render",
-        )
-    })
+    state
+        .get_extension::<SchemaServiceCache>()
+        .map(|cached| Arc::clone(&cached.0))
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                "internal error: no Schema service cached for this render",
+            )
+        })
 }
 
 impl Object for Schema {
@@ -253,12 +257,12 @@ fn bind_related(
 /// value objects or external values-file entries.
 fn select_entry_value(entry: &SchemaSelectFieldEntry) -> Value {
     if entry.label() == entry.value() && entry.extra().is_empty() {
-        return Value::from_serialize(entry.value());
+        return Value::from(Serde(entry.value()));
     }
     let mut object: IndexMap<String, FieldValue> = entry.extra().clone();
     object.insert("value".to_owned(), entry.value().clone());
     object.insert("label".to_owned(), entry.label().clone());
-    Value::from_serialize(&object)
+    Value::from(Serde(&object))
 }
 
 /// Builds a [`SourceSelector`] filter from a `file` field's declaration.
@@ -907,7 +911,7 @@ mod tests {
         fn a_descendants_own_descendants_are_also_reachable() {
             // Proves the "descendants" branch threads the render-cached
             // `SchemaService`/registry into each returned bound `Schema`
-            // (via `bind_related`'s own `cached_service`/`cached_schema_set`
+            // (via `bind_related`'s own `cached_service`
             // calls, not a fresh/empty one): the service-level
             // `descendants` test already proves the underlying data is
             // transitively correct; this proves the render-facing chain
