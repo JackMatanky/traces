@@ -123,7 +123,7 @@ python3 -c "import json;d=json.load(open('.design/<review-dir>/ledger.json'));c=
 grep -E 'Ran `cargo (test|build)`|Executed `cargo|I ran cargo (test|build)' .design/<review-dir>/scouts/*.md
 ```
 
-Expected: `git status --short` shows no new paths outside `.design/` and `ls .design/` shows exactly one dir per scenario run so far (`<review-dir>/` plus any prior scenario dirs) (C1); report has 7 `##` headings (C4); any deferral strings are `DEFERRED_TOOL_UNAVAILABLE|DEFERRED_OUT_OF_SCOPE|DEFERRED_HIGH_TRACE_COST` with total ≤3 (C3; the pinned python count reads `deferrals`/`closed_deferrals` length and cross-checks `deferral_count`); pinned scout grep prints no matches (C2; negated mentions like "did not run cargo test" are not violations).
+Expected: `git status --short` shows no new paths outside `.design/` and `ls .design/` shows exactly one dir per scenario run so far (`<review-dir>/` plus any prior scenario dirs) (C1); report has 7 `##` headings (C4); any deferral strings are `DEFERRED_TOOL_UNAVAILABLE|DEFERRED_OUT_OF_SCOPE|DEFERRED_HIGH_TRACE_COST` with total ≤3 (C3; the pinned python count reads `deferrals`/`closed_deferrals` length and cross-checks `deferral_count`; the pinned EAV sort check lives in the results file); pinned scout grep prints no matches (C2; negated mentions like "did not run cargo test" are not violations).
 
 - [ ] **Step 3: Record S1 results**
 
@@ -199,7 +199,7 @@ python3 -c "import json;d=json.load(open('.design/<impl-dir>/ledger.json'));c=d.
 grep -E 'Ran `cargo (test|build)`|Executed `cargo|I ran cargo (test|build)' .design/<impl-dir>/scouts/*.md
 ```
 
-Expected: only `.design/<impl-dir>/` created and worktree clean of broken scaffolding (C1, C7); 10 scout files and pinned C2 grep empty (C2); report has 7 `##` headings (C4); deferral strings within the closed enum, total ≤3 (C3; pinned python count reads `deferrals`/`closed_deferrals` length, cross-checks `deferral_count`); `Files Consulted` includes `DEEPENING.md` and `METRICS.md` (C5); patch.diff status reported and every trial logged kept or reverted with a reason (C7).
+Expected: only `.design/<impl-dir>/` created and worktree clean of broken scaffolding (C1, C7); 10 scout files and pinned C2 grep empty (C2); report has 7 `##` headings (C4); deferral strings within the closed enum, total ≤3 (C3; pinned python count reads `deferrals`/`closed_deferrals` length, cross-checks `deferral_count`; the pinned EAV sort check lives in the results file); `Files Consulted` includes `DEEPENING.md` and `METRICS.md` (C5); patch.diff status reported and every trial logged kept or reverted with a reason (C7).
 
 - [ ] **Step 3: Record S3 results**
 
