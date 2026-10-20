@@ -4,7 +4,7 @@
 
 ## 1. Automated Tool Metrics
 
-Metrics extracted by `measure.py`, compared via `diff.py`:
+Metrics are deterministically extracted by `measure.py`, compared via `diff.py`:
 
 | Metric Dimension | Tool / Source | Threshold / Target |
 | :--- | :--- | :--- |
@@ -78,7 +78,7 @@ Size metrics must measure **Source Lines of Code (SLoC)**: non-comment, non-blan
 
 - **Comment Preservation Rule:** Stripping, deleting, or compressing doc comments (`///`, `//!`), inline explanations, or rustdoc examples to artificially reduce line counts is strictly prohibited. Any proposal that decreases comment-to-code ratios without justification fails verification.
 - **Semantic Deletion Dividend:** Evaluates removal of architectural complexity (dead types, obsolete traits, collapsed wrappers, unused dependencies), not explanatory prose.
-- **Isolated Semantic Gauges:** Never combine indicators into an aggregate score. Treat each indicator as an isolated dimension.
+- **Isolated Semantic Gauges:** Never combine indicators into an aggregate score. Treat indicators in isolation.
 
 ---
 
