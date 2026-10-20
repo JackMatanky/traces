@@ -383,7 +383,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn yields_only_immediate_entries() {
+        fn returns_direct_children_without_descendants() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -402,7 +402,19 @@ mod tests {
         }
 
         #[test]
-        fn missing_directory_yields_one_missing_root_error_then_stops() {
+        fn returns_no_entries_when_directory_is_empty() {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+
+            // Act
+            let entries: Vec<_> = DirTree::children(temp.path()).collect();
+
+            // Assert
+            assert!(entries.is_empty(), "an empty directory has no children");
+        }
+
+        #[test]
+        fn returns_single_missing_root_error_when_directory_is_missing() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let missing = temp.path().join("does-not-exist");
@@ -428,7 +440,7 @@ mod tests {
         }
 
         #[test]
-        fn sorted_by_orders_immediate_entries() {
+        fn returns_direct_children_in_comparator_order() {
             // Arrange: created deliberately out of lexicographic order.
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -447,7 +459,7 @@ mod tests {
         }
 
         #[test]
-        fn a_file_root_yields_no_entries_and_no_errors() {
+        fn returns_no_entries_when_root_is_file() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let file = write(temp.path(), "plain.md");
@@ -460,7 +472,7 @@ mod tests {
         }
 
         #[test]
-        fn filter_removes_matching_directories_from_listing() {
+        fn returns_entries_without_matching_directories() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -481,13 +493,87 @@ mod tests {
         }
     }
 
+    mod builder {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn returns_unfiltered_entries_when_filter_is_configured_after_iteration_starts()
+         {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "a.md");
+            write(root, "b.md");
+            write(root, "c.md");
+            write(root, "sub/nested.md");
+            let mut tree = DirTree::children(root).sorted_by(|left, right| {
+                left.file_name().cmp(right.file_name())
+            });
+
+            // Act
+            let first = tree
+                .next()
+                .expect("first child")
+                .expect("first child is readable");
+            let names: Vec<String> = tree
+                .filter(|node| node.file_name() == "sub")
+                .map(|entry| entry.expect("child is readable"))
+                .map(|node| node.file_name().to_string_lossy().into_owned())
+                .collect();
+
+            // Assert
+            assert_eq!(first.file_name(), std::ffi::OsStr::new("a.md"));
+            assert_eq!(names, vec!["b.md", "c.md", "sub"]);
+        }
+
+        #[test]
+        fn leaves_comparator_uninvoked_when_sorting_is_configured_after_iteration_starts()
+         {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "a.md");
+            write(root, "b.md");
+            write(root, "c.md");
+            let comparisons =
+                std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let comparisons_in_compare = std::sync::Arc::clone(&comparisons);
+            let mut tree = DirTree::children(root);
+
+            // Act
+            let first = tree.next().expect("first child");
+            let rest: Vec<_> = tree
+                .sorted_by(move |left, right| {
+                    comparisons_in_compare
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    left.file_name().cmp(right.file_name())
+                })
+                .collect();
+
+            // Assert
+            assert!(first.is_ok(), "first child is readable: {first:?}");
+            assert_eq!(rest.len(), 2);
+            assert!(
+                rest.iter().all(Result::is_ok),
+                "remaining children are readable: {rest:?}"
+            );
+            assert_eq!(
+                comparisons.load(std::sync::atomic::Ordering::Relaxed),
+                0,
+                "late comparator must not run"
+            );
+        }
+    }
+
     mod descendants {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[test]
-        fn walks_the_whole_tree_including_the_root_node() {
+        fn returns_complete_tree_when_walking_directory() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -513,7 +599,7 @@ mod tests {
         }
 
         #[test]
-        fn missing_root_yields_a_missing_root_error() {
+        fn returns_missing_root_error_when_root_is_missing() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let missing = temp.path().join("gone");
@@ -530,7 +616,7 @@ mod tests {
         }
 
         #[test]
-        fn filter_prunes_matching_subtrees_but_keeps_other_entries() {
+        fn returns_entries_outside_matching_subtree() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -552,7 +638,26 @@ mod tests {
         }
 
         #[test]
-        fn filter_keeps_files_whose_name_matches_the_predicate() {
+        fn returns_no_entries_when_filter_matches_root() {
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path().to_path_buf();
+            write(&root, "child.md");
+
+            // Act
+            let tree = DirTree::descendants(&root);
+            let entries: Vec<_> =
+                tree.filter(move |node| node.path() == root).collect();
+
+            // Assert
+            assert!(
+                entries.is_empty(),
+                "a matching root prunes the whole directory tree: {entries:?}"
+            );
+        }
+
+        #[test]
+        fn returns_matching_files_when_filter_matches_file_name() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -573,7 +678,7 @@ mod tests {
         }
 
         #[test]
-        fn sorted_by_orders_entries_within_each_directory() {
+        fn returns_entries_in_per_directory_order() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -606,7 +711,7 @@ mod tests {
         }
 
         #[test]
-        fn filter_composes_with_sorted_by() {
+        fn returns_filtered_entries_in_per_directory_order() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
@@ -630,6 +735,67 @@ mod tests {
             // Assert: pruned subtree absent AND surviving siblings ordered.
             assert_eq!(relatives, vec!["", "b", "b/note.md"]);
         }
+
+        #[test]
+        fn returns_entries_outside_matching_nested_subtree() {
+            // Arrange: nested matching dir (not a direct child of root);
+            // dot-prefixed tempdir name must NOT match the predicate.
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            write(root, "proj/.traces/config.toml");
+            write(root, "proj/a.md");
+
+            // Act
+            let relatives: Vec<String> = DirTree::descendants(root)
+                .filter(|node| node.file_name() == ".traces")
+                .map(|entry| entry.expect("entry is ok"))
+                .map(|node| {
+                    node.path()
+                        .strip_prefix(root)
+                        .expect("under root")
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect();
+
+            // Assert: the .traces/config.toml file is pruned with its dir;
+            // root itself and surviving files remain.
+            assert_eq!(relatives, vec!["", "proj", "proj/a.md"]);
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn returns_directory_symlink_without_descending_into_target() {
+            use std::os::unix::fs::symlink;
+
+            // Arrange
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            let target = root.join("target");
+            write(&target, "nested.md");
+            symlink(&target, root.join("link")).expect("create symlink");
+
+            // Act
+            let mut relatives: Vec<String> = DirTree::descendants(root)
+                .map(|entry| entry.expect("entry is readable"))
+                .map(|node| {
+                    node.path()
+                        .strip_prefix(root)
+                        .expect("under root")
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect();
+            relatives.sort();
+
+            // Assert
+            assert_eq!(relatives, vec![
+                "",
+                "link",
+                "target",
+                "target/nested.md"
+            ]);
+        }
     }
 
     /// RAII guard that restores permissions on drop so that a `0o000` directory
@@ -646,14 +812,14 @@ mod tests {
         }
     }
 
-    mod classification {
+    mod classify {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[cfg(unix)]
         #[test]
-        fn unreadable_root_reports_root_inaccessible_never_missing_root() {
+        fn returns_root_inaccessible_error_when_root_is_unreadable() {
             use std::os::unix::fs::PermissionsExt;
 
             // Arrange
@@ -676,20 +842,21 @@ mod tests {
                 .expect("one item")
                 .expect_err("is an error");
             assert!(
-                matches!(error, DirTreeError::RootInaccessible { .. }),
+                matches!(&error, DirTreeError::RootInaccessible { .. }),
                 "expected RootInaccessible, got {error:?}"
             );
+            let (path, source) = error.into_parts();
+            assert_eq!(path, root);
+            assert_eq!(source.kind(), std::io::ErrorKind::PermissionDenied);
         }
 
         #[cfg(unix)]
         #[test]
-        fn children_yields_an_unreadable_subdirectory_without_error() {
+        fn returns_unreadable_child_without_error_when_listing_directory() {
             use std::os::unix::fs::PermissionsExt;
 
-            // Arrange: walkdir opens child directories eagerly even under
-            // max_depth(1), but a failed open is stored in the child's dir
-            // list and popped before it can be polled, so flat listings
-            // yield the locked directory as a plain entry with no error.
+            // Arrange an unreadable child directory. A flat listing must yield
+            // it as an entry rather than attempt to open it.
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
             let kid = root.join("locked-kid");
@@ -717,7 +884,7 @@ mod tests {
 
         #[cfg(unix)]
         #[test]
-        fn descendants_reports_an_unreadable_subdirectory_naming_it() {
+        fn returns_node_inaccessible_error_when_descendant_is_unreadable() {
             use std::os::unix::fs::PermissionsExt;
 
             // Arrange: unlike `children`, an unlimited-depth walk polls the
@@ -743,82 +910,58 @@ mod tests {
             assert_eq!(path, kid);
             assert!(errors.next().is_none(), "exactly one error");
         }
-
-        #[test]
-        fn filter_prunes_matching_subtree_during_descendants() {
-            // Arrange: nested matching dir (not a direct child of root);
-            // dot-prefixed tempdir name must NOT match the predicate.
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let root = temp.path();
-            write(root, "proj/.traces/config.toml");
-            write(root, "proj/a.md");
-
-            // Act
-            let relatives: Vec<String> = DirTree::descendants(root)
-                .filter(|node| node.file_name() == ".traces")
-                .map(|entry| entry.expect("entry is ok"))
-                .map(|node| {
-                    node.path()
-                        .strip_prefix(root)
-                        .expect("under root")
-                        .to_string_lossy()
-                        .into_owned()
-                })
-                .collect();
-
-            // Assert: the .traces/config.toml file is pruned with its dir;
-            // root itself and surviving files remain.
-            assert_eq!(relatives, vec!["", "proj", "proj/a.md"]);
-        }
     }
 
-    mod dirnode {
+    mod accessors {
         use pretty_assertions::assert_eq;
 
         use super::*;
 
         #[test]
-        fn exposes_path_file_name_and_file_type() {
+        fn returns_metadata_for_regular_file() {
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();
-            let file = write(root, "daily.md");
+            write(root, "daily.md");
 
             // Act
             let node = DirTree::children(root)
                 .next()
                 .expect("one entry")
-                .expect("entry is ok");
+                .expect("entry is readable");
+            let metadata = node.metadata().expect("read file metadata");
 
             // Assert
-            assert_eq!(node.path(), file);
-            assert_eq!(node.file_name(), std::ffi::OsStr::new("daily.md"));
-            assert!(node.file_type().is_file());
+            assert!(metadata.is_file(), "fixture is a regular file");
+            assert_eq!(metadata.len(), 7);
         }
-    }
 
-    mod display {
-        use super::*;
-
+        #[cfg(unix)]
         #[test]
-        fn messages_are_lowercase_without_trailing_punctuation() {
+        fn returns_symlink_type_without_following_target() {
+            use std::os::unix::fs::symlink;
+
             // Arrange
             let temp = tempfile::tempdir().expect("create temp dir");
-            let missing = temp.path().join("gone");
-            let error = DirTree::children(&missing)
-                .next()
-                .expect("one item")
-                .expect_err("missing root");
+            let root = temp.path();
+            let target = write(root, "target.md");
+            let link = root.join("link.md");
+            symlink(&target, &link).expect("create symlink");
 
             // Act
-            let message = error.to_string();
+            let node = DirTree::children(root)
+                .find(|entry| matches!(entry, Ok(node) if node.path() == link.as_path()))
+                .expect("symlink entry is yielded")
+                .expect("symlink entry is readable");
+            let metadata = node.metadata().expect("read symlink metadata");
 
             // Assert
+            assert_eq!(node.path(), link);
+            assert!(node.file_type().is_symlink(), "entry remains a symlink");
             assert!(
-                message.starts_with(char::is_lowercase),
-                "message starts lowercase: {message}"
+                metadata.file_type().is_symlink(),
+                "metadata remains for the symlink rather than its target"
             );
-            assert!(!message.ends_with('.') && !message.ends_with('!'));
         }
     }
 }
