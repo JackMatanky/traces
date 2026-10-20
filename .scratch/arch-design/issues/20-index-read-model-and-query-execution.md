@@ -46,3 +46,11 @@ split).
 See [ticket 14's Answer](./14-value-model.md). Postcard encodes `Date`,
 `DateTime` and `Duration` as text and re-parses them on every cache load; a
 compact binary form (via `is_human_readable()`) is a candidate, unmeasured.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Naive
+datetimes are persisted as civil values, so the cache holds no machine zone and
+its format changes. Collation sort keys are never persisted. Any secondary-table
+key order must agree with the filter relations (Int and Float compare by
+value; links by folded target).

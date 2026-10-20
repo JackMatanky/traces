@@ -32,3 +32,12 @@ signature, workspace host.
 See [ticket 14's Answer](./14-value-model.md). Naive frontmatter datetimes are
 zone-shifted at parse time and persisted in the postcard cache, so the zone
 input also affects index contents, not only evaluation.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Naive
+datetimes are now civil values, so the zone no longer affects index contents;
+it is needed only at evaluation. The context must supply the zone and
+`today`/`now` when sort keys and filter operands are built (civil vs instant,
+day literals against instants, relative and natural-language dates). No
+comparison may read the clock or system zone. Decide the default zone.

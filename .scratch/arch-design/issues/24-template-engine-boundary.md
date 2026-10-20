@@ -35,3 +35,10 @@ Graduates fog: template micro-optimisations (AST cache, regex caches).
 See [ticket 14's Answer](./14-value-model.md). Two adapters remain: natural
 serde for schema literals and the hand-written runtime adapter. `Int` renders
 `5` where `Number(f64)` rendered `5.0` (measured), an intentional change.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Template
+comparisons and date handling use the shared relation module, not minijinja's
+own comparison. The natural-language date grammar (ticket 23) is shared with
+`date()` and `date_add` filters. `now`/`today` come from the execution context.

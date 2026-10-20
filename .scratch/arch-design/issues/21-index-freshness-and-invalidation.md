@@ -67,3 +67,10 @@ See [ticket 14's Answer](./14-value-model.md). The runtime value's serde shape
 changes (`Number` becomes `Int`/`Float`, `Link` gains `embedded` and
 normalized display), so the cache format and parser version must invalidate
 existing indexes.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). The cache
+format change (civil datetimes, `Int`/`Float`, normalized `Link`) must
+invalidate existing indexes. A host zone change need not invalidate the index,
+since naive datetimes no longer embed it.

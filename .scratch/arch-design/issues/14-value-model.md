@@ -555,3 +555,13 @@ become `Int`. Quoted frontmatter values keep their current classification.
   number rendering.
 - [Crate topology and public surface](./28-crate-topology-and-public-surface.md):
   visibility of the value types, `Link` and `NoteLink`.
+
+## Superseded in part by ticket 15
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). It revokes
+"Inline does not gain `DateTime`" (the reason was the persisted zone shift;
+naive datetimes become civil values). It settles the handoffs from this ticket:
+no frontmatter literal-string escape (classification stays quote-insensitive; a
+schema override covers text), exact `Int`/`Float` comparison outside the
+structural `PartialEq`, `Link` equality on the folded target only, and schema
+select strings matching links by literal adoption.

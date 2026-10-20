@@ -56,3 +56,11 @@ See [ticket 14's Answer](./14-value-model.md). `NoteFieldValue` and `Link` are
 returns a value; `Note::outlinks()` accessors are `pub(crate)`). Decide their
 visibility under the reduce-`pub` rule; the root `Link`'s module name is also
 chosen here.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Decide the
+visibility of the new value-semantics module (loose equality, bracketed order,
+sort key). Sorting adds a collation dependency (`icu_collator`; binary size and
+its presence in the tree are unverified), which counts in the dependency
+pruning.

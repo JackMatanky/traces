@@ -209,6 +209,25 @@ itself is not implemented here; the map ends at hand-off to specification.
   model](./issues/20-index-read-model-and-query-execution.md), [index
   freshness](./issues/21-index-freshness-and-invalidation.md)), view enum
   benchmark ([query core](./issues/22-query-core-and-plan.md)).
+- [Where do coercion and cross-type comparison live, and what is the
+  policy?](./issues/15-coercion-and-comparison-policy.md): `PartialEq` stays
+  structural; one value-semantics module owns loose equality, bracketed
+  order for filters (cross-kind `==` false, relational no match, MongoDB-style)
+  and a total sort order built with an explicit context. Sort sniffing is
+  deleted; Unicode collation (`icu_collator` root, numeric) for sorting only;
+  exact `Int`/`Float` comparison, `NaN` to `Null`. Naive datetimes become
+  civil and the cache holds no zone. Classification stays quote-insensitive
+  (no quote escape: measured too costly and it would silently drop quoted
+  dates); quoted query literals adapt per row to Date, DateTime, Duration,
+  Link, Number or Bool from pre-parsed candidates, coarse date literals are
+  intervals, and a natural-language candidate is a hook. Link equality uses
+  the folded target only; `date(link)` reads the target. Two advisory stderr
+  notices. Handoffs: [query core](./issues/22-query-core-and-plan.md),
+  [temporal boundary](./issues/23-temporal-boundary-and-dialects.md) (natural
+  language grammar, `DateConfig`), [execution
+  context](./issues/17-ambient-environment-and-execution-context.md), [schema
+  typing](./issues/16-schema-note-typing-and-validation.md), [index
+  model](./issues/20-index-read-model-and-query-execution.md).
 
 ## Not yet specified
 

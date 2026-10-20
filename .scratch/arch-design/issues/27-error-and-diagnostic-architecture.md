@@ -19,3 +19,12 @@ Facts: `survey/cli.md` H3/H7, `survey/cross-cutting.md` §3 (error table),
 ADR-0004, `src/query/error.rs`, `src/cli/error.rs:39-52`.
 
 Inputs: `research/08`, schema validation decision, workspace host decision.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Two advisory
+stderr notices need a mechanism (stdout and exit codes unchanged): a count of
+rows excluded by a bracket mismatch, and a build-time warning for a date-shaped
+but invalid quoted literal. A parse-time `NaN`-to-`Null` warning is a third.
+Filters never error at evaluation; a bare invalid date literal stays a syntax
+error.

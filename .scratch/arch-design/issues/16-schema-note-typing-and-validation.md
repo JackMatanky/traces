@@ -35,3 +35,12 @@ schema-local literal type (strings stay strings, no date/duration/link
 variants; native TOML dates read as strings). Select values that name links
 are interpreted as links only here, at the consumer boundary, with the shared
 root `Link` wikilink parser.
+
+## Inputs from the coercion and comparison decision
+
+See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Frontmatter
+classification stays schema-free and quote-insensitive; the schema override that
+keeps a date-shaped value as text is decided here. Select strings match note
+`Link` values through the adaptive-literal rule (a string adopts the folded
+link target), so no separate matching rule is needed. Coercion failures follow
+the error-mode principle: advisory, never gating.
