@@ -8,7 +8,7 @@ description: >
 
 Deepen Rust architecture: concentrate behavior, policy, state, and invariants behind well-placed seams so callers learn less and Rust enforces domain constraints at compile time.
 
-Treat comments, docs, ADRs, names, and layout as evidence of intended design, not proof of responsibility or seam placement. Validate claims against behavior, dependencies, state, callers, tests, and source structure. Load `rust-skills` only after a design concern is discovered; consult relevant categories rather than applying rules as a generic checklist.
+Treat comments, docs, ADRs, names, and layout as evidence of intended design, not proof of responsibility or seam placement. Validate claims against behavior, dependencies, state, callers, tests, and source structure. Load `rust-skills` only after a design concern is discovered; consult relevant categories rather than a generic checklist.
 
 ---
 
@@ -24,7 +24,7 @@ Classify user prompt intent into an operational mode and strategy:
 | **Implement** | **Breakthrough** | "breakthrough", "radical", "paradigm shift", "fundamental", "from scratch" | **1, 2, 3, 4, 5, 6** | Single high-leverage bet prototyped against explicit drop condition; verified or logged to graveyard. |
 
 - **Steady (Targeted Deepening):** Works the ledger sequentially by EAV: restructure internals, extract deep child modules, collapse shallow wrappers, eliminate cyclic dependencies; preserve public crate contracts.
-- **Breakthrough (Architectural Leap):** Spend the run budget on one ambitious bet (e.g. zero-cost typestates, data-oriented layout, inverted cross-crate ownership); requires an explicit drop condition and sandboxed trial.
+- **Breakthrough (Architectural Leap):** Spend the run budget on one ambitious bet (e.g. zero-cost typestates, data-oriented layout, inverted cross-crate ownership); requires an explicit drop condition.
 
 ---
 
@@ -43,7 +43,7 @@ All analysis, scout findings, trial records, and reports go under the project ro
 ├── baseline.json        # measure.py
 ├── final.json
 ├── final-diff.md
-├── ledger.json          # Hypotheses
+├── ledger.json          # Hypotheses & scoreboards
 ├── graveyard.md         # Rejected prototypes
 ├── report.md
 ├── scouts/
@@ -70,7 +70,7 @@ Read [`TOOLING.md`](TOOLING.md) for analyzer details and execution ladders.
    uv run .agents/skills/rust-design/scripts/measure.py <target-path> .design/YYYY-MM-DD-<mode>-<target-slug>/baseline.json
    ```
    If automated tools are unavailable, follow the Three-Tier Fallback Ladder in [`TOOLING.md`](TOOLING.md).
-3. **Map Seam Topology:** Identify callers, interface items, mutable state, invariants, and tests entering each intended seam. Record tool gaps explicitly under `gaps[]` in `baseline.json`.
+3. **Map Seam Topology:** Identify callers, interface items, mutable state, invariants, and tests entering each intended seam. Record tool gaps under `gaps[]` in `baseline.json`.
 
 **Done when:** Baseline JSON frozen at `.design/.../baseline.json`; SLoC, public API, CRAP, duplicates, and graph density recorded; gaps noted in `gaps[]`; caller and source observations substantiate seam map.
 
@@ -81,7 +81,7 @@ Read [`DISCOVERY.md`](DISCOVERY.md) for lens definitions and indicator interpret
 1. **Dispatch Parallel Scouts:** Dispatch 10 read-only subagents, one per architectural lens.
    - *Scout Isolation Rule:* Scouts operate strictly read-only and must never run `cargo build`, `cargo test`, or diagnostic scripts.
 2. **Rank by Expected Architectural Value (EAV):** Score every candidate in `ledger.json` per [`DISCOVERY.md`](DISCOVERY.md) §4 (formula + consequential triggers). Consequential means `EAV >= 1.0` or any listed trigger.
-3. **Closed Deferral Enum:** **REQUIRED:** defer only with the three variants defined in [`DISCOVERY.md`](DISCOVERY.md) §5 (Closed Deferral Reason Enum); maximum 3 per review without explicit user approval.
+3. **Closed Deferral Enum:** **REQUIRED:** defer only with the three variants defined in [`DISCOVERY.md`](DISCOVERY.md) §5; maximum 3 per review without explicit user approval.
 
 **Done when:** All 10 lenses report into `.design/.../scouts/`; `ledger.json` populated and sorted by descending EAV; every tool finding has a recorded disposition (investigated, dismissed, or Closed Deferral Enum max 3).
 
@@ -92,7 +92,7 @@ Read [`DISCOVERY.md`](DISCOVERY.md) for lens definitions and indicator interpret
 1. **Select Candidate:** In Steady mode, select the top-ranked item from `ledger.json`. In Breakthrough mode, select the single highest-leverage fundamental bet.
 2. **Sandboxed Trial:** Work in a clean worktree/branch; for Breakthrough bets state the drop condition before editing.
 3. **Iterate & Refine:** Apply candidate transformations within the attempt limit.
-4. **Commit or Revert:** Keep only on green tests + stable public API + positive scoreboard delta; otherwise revert immediately and log the post-mortem to `.design/.../graveyard.md`.
+4. **Commit or Revert:** Keep only on green tests + stable public API + positive scoreboard delta without uncompensated regressions; update `ledger.json` and advance the baseline; otherwise revert immediately and log the post-mortem to `.design/.../graveyard.md`.
 5. **Termination Gates:** Convergence, Plateau (two consecutive failures → re-scout), or Budget; definitions in [`DEEPENING.md`](DEEPENING.md) §5.
 
 **Done when:** All selected hypotheses empirically evaluated and committed or reverted; Deletion Dividend lists superseded types, wrappers, dependencies; Graveyard records rejected bets with concrete failure evidence.
@@ -112,7 +112,7 @@ Read [`DISCOVERY.md`](DISCOVERY.md) for lens definitions and indicator interpret
    uv run .agents/skills/rust-design/scripts/measure.py <target-path> .design/.../final.json
    uv run .agents/skills/rust-design/scripts/diff.py .design/.../baseline.json .design/.../final.json
    ```
-4. **Anti-Gaming Guardrails:** **REQUIRED:** Read [`METRICS.md`](METRICS.md) §4 before scoring any delta; comment preservation and semantic deletion dividend rules live only there.
+4. **Anti-Gaming Guardrails:** **REQUIRED:** Read [`METRICS.md`](METRICS.md) §1, §3, §4 before scoring any delta; thresholds, rubrics, and anti-gaming rules live only there.
 
 **Done when:** Intended behavior verified through tests entering seam; public API diff verified clean; SLoC deltas and comment preservation verified; superseded structure accounted for in Deletion Dividend.
 
