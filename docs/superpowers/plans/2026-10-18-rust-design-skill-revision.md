@@ -1,6 +1,6 @@
 # Rust-Design Skill Revision (Token Reduction) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking; only task-item lines carry the `- [ ]` marker (headers and prose stay unboxed).
 
 **Goal:** Cut the `rust-design` skill's token cost (SKILL.md ≤1100 words from 1633; full corpus ≤5200 words from 6505 (original target, later amended to ≤5350, see E2 note)) with zero capability loss, proven by before/after subagent scenario tests, and add a `grill-me` follow-up offer for all modes.
 
@@ -18,7 +18,7 @@
 - **Scope:** `git add` only paths listed in each task's commit step. Never stage pre-existing dirty files (`.scratch/md-pkm-lsp/*` is unrelated work-in-progress).
 - **Test oracle:** Assertions C1 through C7 and gates E1/E2 (defined in Task 1) are the definition of "capability preserved." A failing C-assertion after an edit = regression, fix before moving on.
 - Word-count baseline measured in Task 1: `SKILL.md = 1633`, corpus (6 files) `= 6505`.
-- Baseline S3 keep-commits (sanctioned exception to the Scope rule): the baseline Implement scenario (Task 4) ran under the skill's keep-commit rules ("commit wins") and produced commits `c22f33fd`, `e5514607`, `5b509c5f`, and `7dfc2e1f`, touching `src/dirtree.rs`, `src/config/discovery.rs`, `src/file_tracker.rs`, `src/index/service.rs`, `src/schema/service.rs`, `src/template/loader.rs`, and `tests/baselines/pub-tokens.txt`. These are intentional branch content (already disclosed in the results file); the Scope ground rule's `git add` restriction governs this plan's own task commits, not sanctioned scenario keep-commits.
+- Baseline S3 keep-commits (sanctioned exception to the Scope rule): the baseline Implement scenario (Task 4) ran under the skill's keep-commit rules ("commit wins") and produced commits `c22f33fd`, `e5514607`, `5b509c5f`, and `7dfc2e1f`, touching `src/dirtree.rs`, `src/config/discovery.rs`, `src/file_tracker.rs`, `src/index/service.rs`, `src/schema/service.rs`, `src/template/loader.rs`, and `tests/baselines/pub-tokens.txt`. Count correction (second review): this batch is exactly 4 commits (`git rev-list --count 1fd11d97..7dfc2e1f` = 4); `e5514607` is trial-2's keep cherry-picked into the batch (tree- and message-identical to its trial commit `7590b0b2`), so no fifth commit was folded in. These are intentional branch content (already disclosed in the results file); the Scope ground rule's `git add` restriction governs this plan's own task commits, not sanctioned scenario keep-commits.
 
 ## File Structure
 
@@ -66,7 +66,7 @@ Scenario results are appended under "## Scenario results" (RED baseline) and "##
 - E2: wc -w .agents/skills/rust-design/*.md incl. future report-template.md <= 5350 (baseline: 6505 measured on the 6 pre-existing files -> FAILS now = RED) (amended from <=5200, see results file E2 note)
 
 ## Capability assertions (must pass BEFORE and AFTER edits)
-- C1: Deliverables under .design/<date>-<mode>-<slug>/ only. Check: `git status --short` shows no new paths outside the scenario's .design/ dir, and `ls .design/` shows exactly one directory per scenario run so far (this run's dir plus prior scenario dirs, no stray dirs). (Clarified during RED.)
+- C1: Deliverables confined to .design/<date>-<mode>-<slug>/ (plus sanctioned keep-commits for Implement runs). Check: `git status --short` shows no new paths outside the scenario's .design/ dir and the sanctioned keep-commits, and `ls .design/` shows exactly one directory per scenario run so far (this run's dir plus prior scenario dirs, no stray dirs). (Clarified during RED.)
 - C2: 10 scout files present in .design/.../scouts/ (Review) and no scout claims an executed build/test run. Check: ``grep -E 'Ran `cargo (test|build)`|Executed `cargo|I ran cargo (test|build)' .design/<dir>/scouts/*.md`` finds nothing (negated mentions such as "did not run cargo test" are fine).
 - C3: ledger.json exists, sorted by descending EAV; every finding has a disposition; deferrals use only DEFERRED_TOOL_UNAVAILABLE | DEFERRED_OUT_OF_SCOPE | DEFERRED_HIGH_TRACE_COST, total <= 3.
 - C4: report.md contains all 7 mandated section headings (## 1 through ## 7).
@@ -119,10 +119,11 @@ ls -R .design/<review-dir>/
 git status --short
 grep -c '^## ' .design/<review-dir>/report.md
 grep -o 'DEFERRED_[A-Z_]*' .design/<review-dir>/ledger.json | sort | uniq -c
+python3 -c "import json;d=json.load(open('.design/<review-dir>/ledger.json'));c=d.get('deferral_count');n=len(d.get('deferrals') or d.get('closed_deferrals') or []);print('deferrals',n,'count',c,'ok',n<=3 and (c is None or c==n))"
 grep -E 'Ran `cargo (test|build)`|Executed `cargo|I ran cargo (test|build)' .design/<review-dir>/scouts/*.md
 ```
 
-Expected: `git status --short` shows no new paths outside `.design/` and `ls .design/` shows exactly one dir per scenario run so far (`<review-dir>/` plus any prior scenario dirs) (C1); report has 7 `##` headings (C4); any deferral strings are `DEFERRED_TOOL_UNAVAILABLE|DEFERRED_OUT_OF_SCOPE|DEFERRED_HIGH_TRACE_COST` with total ≤3 (C3); pinned scout grep prints no matches (C2; negated mentions like "did not run cargo test" are not violations).
+Expected: `git status --short` shows no new paths outside `.design/` and `ls .design/` shows exactly one dir per scenario run so far (`<review-dir>/` plus any prior scenario dirs) (C1); report has 7 `##` headings (C4); any deferral strings are `DEFERRED_TOOL_UNAVAILABLE|DEFERRED_OUT_OF_SCOPE|DEFERRED_HIGH_TRACE_COST` with total ≤3 (C3; the pinned python count reads `deferrals`/`closed_deferrals` length and cross-checks `deferral_count`); pinned scout grep prints no matches (C2; negated mentions like "did not run cargo test" are not violations).
 
 - [ ] **Step 3: Record S1 results**
 
@@ -194,10 +195,11 @@ git status --short
 ls .design/<impl-dir>/scouts/ | wc -l
 grep -c '^## ' .design/<impl-dir>/report.md
 grep -o 'DEFERRED_[A-Z_]*' .design/<impl-dir>/ledger.json | sort | uniq -c
+python3 -c "import json;d=json.load(open('.design/<impl-dir>/ledger.json'));c=d.get('deferral_count');n=len(d.get('deferrals') or d.get('closed_deferrals') or []);print('deferrals',n,'count',c,'ok',n<=3 and (c is None or c==n))"
 grep -E 'Ran `cargo (test|build)`|Executed `cargo|I ran cargo (test|build)' .design/<impl-dir>/scouts/*.md
 ```
 
-Expected: only `.design/<impl-dir>/` created and worktree clean of broken scaffolding (C1, C7); 10 scout files and pinned C2 grep empty (C2); report has 7 `##` headings (C4); deferral strings within the closed enum, total ≤3 (C3); `Files Consulted` includes `DEEPENING.md` and `METRICS.md` (C5); patch.diff status reported and every trial logged kept or reverted with a reason (C7).
+Expected: only `.design/<impl-dir>/` created and worktree clean of broken scaffolding (C1, C7); 10 scout files and pinned C2 grep empty (C2); report has 7 `##` headings (C4); deferral strings within the closed enum, total ≤3 (C3; pinned python count reads `deferrals`/`closed_deferrals` length, cross-checks `deferral_count`); `Files Consulted` includes `DEEPENING.md` and `METRICS.md` (C5); patch.diff status reported and every trial logged kept or reverted with a reason (C7).
 
 - [ ] **Step 3: Record S3 results**
 
