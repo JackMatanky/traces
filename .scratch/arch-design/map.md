@@ -196,13 +196,19 @@ itself is not implemented here; the map ends at hand-off to specification.
   80 B kept) for notes, queries and templates; a schema-local literal type
   (strings stay strings) replaces the schema `FieldValue`; only a root `Link`
   (`target`, normalized `display`, `embedded`) is shared. `NoteLink` (syntax
-  kind, span) is the editor-side type for ticket 19. Frontmatter keeps the
-  Noyalib compat parser and converts its AST directly (huge integers become
-  `Float` instead of dropping the block); classification is quote-insensitive in
+  kind, span) is the editor-side type for [the note document
+  model](./issues/19-note-document-model.md). Frontmatter keeps the Noyalib
+  compat parser and converts its AST directly (huge integers become `Float`
+  instead of dropping the block); classification is quote-insensitive in
   frontmatter and shares one parser set with inline. `FieldValueRef`,
-  `DateTimeCoercion` and the double conversion are removable. Handoffs: zone for
-  naive datetimes (15, 17), temporal cache encoding (20, 21), view enum
-  benchmark (22).
+  `DateTimeCoercion` and the double conversion are removable. Handoffs: zone
+  for naive datetimes ([coercion
+  policy](./issues/15-coercion-and-comparison-policy.md), [execution
+  context](./issues/17-ambient-environment-and-execution-context.md)), temporal
+  cache encoding ([index read
+  model](./issues/20-index-read-model-and-query-execution.md), [index
+  freshness](./issues/21-index-freshness-and-invalidation.md)), view enum
+  benchmark ([query core](./issues/22-query-core-and-plan.md)).
 
 ## Not yet specified
 
