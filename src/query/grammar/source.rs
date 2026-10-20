@@ -45,7 +45,7 @@ impl SourceSelector {
     ///
     /// # Errors
     ///
-    /// - [`QueryError::Syntax`] if nonblank `input` is not a valid source
+    /// - `QueryError::Syntax` if nonblank `input` is not a valid source
     ///   expression.
     #[inline]
     pub fn parse(input: &str) -> QueryResult<Self> {

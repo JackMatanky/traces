@@ -47,12 +47,11 @@ impl TemplatePathInput {
     ///
     /// # Errors
     ///
-    /// - [`Absolute`] if `path` is absolute.
-    /// - [`UnsafeComponent`] if `path` contains `..`, any component that is not
-    ///   a plain name or `.`, or no [`Component::Normal`].
+    /// - `TemplatePathError::Absolute` if `path` is absolute.
+    /// - `TemplatePathError::UnsafeComponent` if `path` contains `..`, any
+    ///   component that is not a plain name or `.`, or no
+    ///   [`Component::Normal`].
     ///
-    /// [`Absolute`]: TemplatePathError::Absolute
-    /// [`UnsafeComponent`]: TemplatePathError::UnsafeComponent
     /// [`Component::Normal`]: std::path::Component::Normal
     ///
     /// ```rust

@@ -35,7 +35,7 @@ impl Blake3Digest {
     ///
     /// # Errors
     ///
-    /// Returns a [`HashError`] if `path` cannot be read.
+    /// - `HashError` if `path` cannot be read.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn from_path(path: &Path) -> Result<Self, HashError> {

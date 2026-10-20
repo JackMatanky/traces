@@ -175,17 +175,11 @@ impl QueryService {
     ///
     /// # Errors
     ///
-    /// - [`Store`] if database access or row serialization fails.
-    /// - [`Scan`] if directory traversal fails during index refresh.
-    /// - [`Path`] if path validation fails.
-    /// - [`NoteParse`] if reading or parsing a note fails.
-    /// - [`Inspect`] if inspecting file metadata fails.
-    ///
-    /// [`Store`]: crate::index::IndexError::Store
-    /// [`Scan`]: crate::index::IndexError::Scan
-    /// [`Path`]: crate::index::IndexError::Path
-    /// [`NoteParse`]: crate::index::IndexError::NoteParse
-    /// [`Inspect`]: crate::index::IndexError::Inspect
+    /// - `IndexError::Store` if database access or row serialization fails.
+    /// - `IndexError::Scan` if directory traversal fails during index refresh.
+    /// - `IndexError::Path` if path validation fails.
+    /// - `IndexError::NoteParse` if reading or parsing a note fails.
+    /// - `IndexError::Inspect` if inspecting file metadata fails.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn sync_and_run(

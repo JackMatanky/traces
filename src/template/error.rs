@@ -138,13 +138,11 @@ pub enum TemplateError {
     SchemaLoad(#[from] crate::schema::SchemaError),
 }
 
-/// Classifies a [`TemplateError::Render`] failure for diagnostics.
+/// Classifies template rendering failures for CLI diagnostics.
 ///
-/// Provides just enough detail for [`crate::cli::error`] to choose a stable
-/// diagnostic code and help text. Classification inspects
-/// [`minijinja::Error::kind`] and the retained source chain instead of parsing
-/// display text, so new custom functions don't need to update string-matching
-/// logic in the CLI diagnostic layer.
+/// Inspects [`minijinja::Error::kind`] and the retained source chain instead of
+/// parsing display text, so new custom functions do not require string matching
+/// in the CLI diagnostic layer.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RenderFailureKind {
     /// The template's own minijinja syntax is invalid.

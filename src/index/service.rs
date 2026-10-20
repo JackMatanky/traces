@@ -72,11 +72,11 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if a file's metadata cannot be inspected.
-    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
+    /// - `IndexError::Scan` if a directory cannot be read.
+    /// - `IndexError::Inspect` if a file's metadata cannot be inspected.
+    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
+    /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
     #[inline]
     pub fn build(&self) -> IndexResult<WorkspaceIndex> {
@@ -120,13 +120,13 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
-    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
+    /// - `IndexError::Scan` if a directory cannot be read.
+    /// - `IndexError::Inspect` if file metadata cannot be inspected.
+    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
+    /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
-    /// - [`IndexError::Store`] if the persisted index cannot be opened or read,
+    /// - `IndexError::Store` if the persisted index cannot be opened or read,
     ///   including when unchanged notes cannot be recalled.
     #[inline]
     pub fn refresh(&self) -> IndexResult<WorkspaceIndex> {
@@ -138,13 +138,13 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
-    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
+    /// - `IndexError::Scan` if a directory cannot be read.
+    /// - `IndexError::Inspect` if file metadata cannot be inspected.
+    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
+    /// - `IndexError::Path` if a walked file cannot be derived as a safe
     ///   project-relative path.
-    /// - [`IndexError::Store`] if the persisted index cannot be opened or read,
+    /// - `IndexError::Store` if the persisted index cannot be opened or read,
     ///   including when unchanged notes cannot be recalled.
     #[inline]
     pub fn refresh_with_report(
@@ -350,7 +350,7 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if the database's parent directory cannot be
+    /// - `IndexError::Store` if the database's parent directory cannot be
     ///   created, the transaction fails, or a row cannot be encoded.
     #[inline]
     pub fn persist(&self, index: &WorkspaceIndex) -> IndexResult<()> {
@@ -380,8 +380,8 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if the index store cannot be opened or
-    ///   recovered, or persisted rows cannot be read or decoded.
+    /// - `IndexError::Store` if the index store cannot be opened or recovered,
+    ///   or persisted rows cannot be read or decoded.
     #[inline]
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
