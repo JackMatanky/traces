@@ -215,6 +215,13 @@ first; ranges and sorts over date-titled `Link`s go through `date()`.
 
 Research: [brief](../research/15-prep/brief.md) and its inputs `a` to `k`.
 
+## Superseded in part by ticket 16
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The schema
+override for date-shaped text referred to above is not built: `input` accepts
+any scalar, consumers get a text view rendered from the typed value, and no
+`string()` cast is added until a real use appears.
+
 ## TODOs
 
 Glossary updates deferred until the specification is written (do not edit the

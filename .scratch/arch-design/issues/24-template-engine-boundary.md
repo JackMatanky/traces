@@ -42,3 +42,12 @@ See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). Template
 comparisons and date handling use the shared relation module, not minijinja's
 own comparison. The natural-language date grammar (ticket 23) is shared with
 `date()` and `date_add` filters. `now`/`today` come from the execution context.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The
+template service stays free of `note`. An app-layer use case runs an advisory
+check between `render()` and `write()` (parse rendered frontmatter, resolve
+class, call the schema check); it is skipped without frontmatter or class and
+also runs under `--dry-run`. The schema stays a source of values, not of
+prompts (ADR-0006).

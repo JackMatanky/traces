@@ -43,3 +43,12 @@ may now yield `DateTime` (civil when naive). Classification stays at parse and
 is never re-sniffed; decide how multi-valued inline fields classify element by
 element. Parse-time `NaN` becomes `Null` with a warning. `Link` identity is the
 folded target, with `display` and `embedded` as attributes.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The schema
+check is span-blind and takes a field map; adapters need a span per field key
+(and per list element where known) from whichever editor shape is chosen.
+Merging inline fields into that map is app-layer business and is not promised
+by 16. An MCP agent that edits files directly is checked post hoc; it adds no
+write-back requirement here.

@@ -565,3 +565,9 @@ no frontmatter literal-string escape (classification stays quote-insensitive; a
 schema override covers text), exact `Int`/`Float` comparison outside the
 structural `PartialEq`, `Link` equality on the folded target only, and schema
 select strings matching links by literal adoption.
+
+## Superseded in part by ticket 16
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The
+"schema override covers text" handoff is not built (no override). Select values
+that name links are parsed with the root `Link` parser at the schema check.

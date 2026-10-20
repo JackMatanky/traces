@@ -28,3 +28,10 @@ Output: the list of specification-ready decisions with their dependency order
 and the explicit non-decisions.
 
 Inputs: every resolved ticket and `research/*`.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The map's
+"provisionally withstands scrutiny" claim for the `FileClassExpander` seam is
+overturned. Re-test the other provisional claims with the same adversarial
+method, and treat the author's vault as one example, not as evidence.

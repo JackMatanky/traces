@@ -52,3 +52,19 @@ this ticket:
   for day matching, null placement, and the `GroupBy` key relation.
 - Two advisory stderr notices are required of the grammar and executor (rows
   excluded by a bracket mismatch; a date-shaped but invalid quoted literal).
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Delete
+`FileClassExpander`, its crate-root impl, the `&mut ClassExpansionMode`
+out-parameter and `Option<Arc<dyn>>`. The query service receives a plain class
+hierarchy (keyed by one normalising `ClassName`) from the app layer, returns
+unknown classes as data instead of logging, and behaves the same with or
+without a hierarchy attached. Verified latent hazard: with no expander
+attached, store queries fall back to exact match (`src/query/service.rs:402-406`)
+but in-memory filters match nothing (`src/query/grammar/source.rs:228-229`,
+empty class set). Production always attaches one when classes are used
+(`src/cli/mod.rs:478-480`, `src/template/engine/query.rs:121-122`), so this is
+a hazard for a new host or library caller, not a current user-visible bug.
+Where the hierarchy type lives is for
+this ticket and 28.

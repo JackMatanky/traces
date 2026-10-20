@@ -55,3 +55,12 @@ this ticket:
   pattern argument for non-ISO titles.
 - The temporal glossary line saying a Date promotes to local midnight is
   superseded.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Schema
+`date.format` is a write-format hint; the note model has no time-of-day or
+year-only variant, so the `date` check accepts any scalar when the format has
+no date component. The schema's own tests use Moment tokens while temporal and
+the template filter seam translate them. Pick the dialect; if one is chosen the
+date-format check can be added.

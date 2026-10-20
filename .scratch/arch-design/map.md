@@ -64,8 +64,9 @@ itself is not implemented here; the map ends at hand-off to specification.
 - Research deviation: this tracker is local markdown, so research findings land
   in `research/NN-*.md` on the working tree and are linked from the ticket; no
   `research/<name>` git branches are pushed.
-- Provisionally withstand scrutiny (scouts, unverified): `FileClassExpander`
-  query/schema seam; `DatePoint`/`DifferenceEngine` and `DurationValue` nominal
+- Provisionally withstand scrutiny (scouts, unverified; the `FileClassExpander`
+  seam was overturned by ticket 16): `DatePoint`/`DifferenceEngine` and
+  `DurationValue` nominal
   identity; schema Kahn linearisation + ancestor-bounded `$ref` +
   whole-directory reload; redb derived-cache design (`Durability::None`,
   auto-recreate, fail-open); infallible note parser, `MarkerAccumulator`,
@@ -228,16 +229,33 @@ itself is not implemented here; the map ends at hand-off to specification.
   context](./issues/17-ambient-environment-and-execution-context.md), [schema
   typing](./issues/16-schema-note-typing-and-validation.md), [index
   model](./issues/20-index-read-model-and-query-execution.md).
+- [Does the schema subsystem validate and type note data, and where does that
+  capability live?](./issues/16-schema-note-typing-and-validation.md): advisory,
+  on-demand check; no parse-time typing, no read-path gating, schema never enters
+  the index or fingerprint. `schema` owns the pure, span-free rule over resolved
+  effective fields (`ResolvedFields::check`), the runtime value type sits below
+  `schema` and `note` (placement to 28), and gating is a host policy over stable
+  violation codes. Layering principle: cli, lsp and mcp are thin hosts of core,
+  whose app layer composes domain modules with plain data and no one-implementor
+  traits, so `FileClassExpander` and its crate-root impl are deleted for a plain
+  class hierarchy. `required` kept (absent, null, blank or empty list is
+  missing); first-listed class wins; `step` checked, `date.format` a hint until
+  23; `origin`, `description`, `parent_order` added. Template check is a
+  post-render advisory use case; direct agent edits are detected not prevented,
+  true gating only where MCP tools own the write; `traces check --before
+  --after`; delta rule; class change asks. Date-shaped text: no override, no
+  quote convention. Handoffs: [query core](./issues/22-query-core-and-plan.md),
+  [note document model](./issues/19-note-document-model.md), [temporal
+  boundary](./issues/23-temporal-boundary-and-dialects.md), [template
+  boundary](./issues/24-template-engine-boundary.md), [diagnostics](./issues/27-error-and-diagnostic-architecture.md), [crate
+  topology](./issues/28-crate-topology-and-public-surface.md), [schema
+  internals](./issues/31-schema-internals-simplification.md).
 
 ## Not yet specified
 
-- **Schema internals**: `fields/select.rs` external select-values (2.0k LoC),
-  imperative option parsing vs serde, five nested field-error enums, CSR graph
-  scale-fit, `SchemaService::new` dead constructor, template `Schema` handle.
-  Cannot be sharpened until [Does the schema subsystem validate and type note
-  data, and where does that capability
-  live?](./issues/16-schema-note-typing-and-validation.md) fixes what schema
-  must produce.
+- **Schema internals**: graduated to [What schema internals survive now that
+  schema produces a checker and a class
+  hierarchy?](./issues/31-schema-internals-simplification.md).
 - **Note parser internals**: status interning, second pulldown-cmark pass,
   `ListItem` footprint, footnote/callout/slug modelling. Sharpen after [What is
   the note document model: spans, facts, items, multi-value

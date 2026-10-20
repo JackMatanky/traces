@@ -41,3 +41,16 @@ own must be settled here so the CLI crate can shrink to argument parsing,
 prompting, output and exit codes. Include in the alternatives a core-API shape
 that the CLI crate can consume without widening visibility beyond what an
 outward-facing boundary needs.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Standing
+principle: consumers (cli, lsp, mcp) are thin hosts of core; core's app layer
+holds use cases as functions with explicit inputs (`check_note(before, after)`,
+class resolution, template check). Host policy maps violation codes to ignore,
+warn or reject. `traces check --before --after` is a thin cli command over a
+core use case.
+
+Fact: the cli currently decides whether to load schemas for a query
+(`has_classes`, `src/cli/mod.rs:474-480`), i.e. it owns composition that the
+app layer should own.

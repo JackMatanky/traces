@@ -28,3 +28,11 @@ rows excluded by a bracket mismatch, and a build-time warning for a date-shaped
 but invalid quoted literal. A parse-time `NaN`-to-`Null` warning is a third.
 Filters never error at evaluation; a bare invalid date literal stays a syntax
 error.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). 16 pins
+span-free, severity-free `Violation` records with stable codes and a bounded
+`expected`. This ticket owns the diagnostic envelope, severities, per-code
+overrides and the registry (md-pkm-lsp 25 is a fallible input). Type problems
+are never `Error` by default (ticket 15). Gating is a host policy over codes.

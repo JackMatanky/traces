@@ -64,3 +64,13 @@ visibility of the new value-semantics module (loose equality, bracketed order,
 sort key). Sorting adds a collation dependency (`icu_collator`; binary size and
 its presence in the tree are unverified), which counts in the dependency
 pruning.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The
+runtime value type must sit below both `schema` and `note` (schema literals stay
+separate); the class hierarchy type needs an owner; the app layer of core holds
+use cases composed from domain modules. A one-implementor trait in a crate-root
+glue file fails the orphan rule once the modules are separate crates, so
+module-to-module wiring is plain data. The checker, the violation type and
+field descriptors are outward-facing for lsp and mcp consumers.

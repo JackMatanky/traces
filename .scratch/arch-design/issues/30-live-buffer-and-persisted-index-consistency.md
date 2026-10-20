@@ -15,3 +15,9 @@ reconcile buffered and indexed state.
 Resolve after the note document model, index read model, and
 freshness/invalidation policies are decided. Keep protocol-specific behavior
 outside the shared semantics unless it creates a real variation.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The check
+runs on an in-memory parsed buffer without persistence; the index never
+depends on schemas.
