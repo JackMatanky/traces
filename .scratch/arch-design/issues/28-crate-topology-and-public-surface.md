@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 8, 12, 18, 25, 26, 27
+Blocked by: 8, 12, 18, 25, 26, 27, 33
 
 ## Question
 
@@ -74,3 +74,16 @@ use cases composed from domain modules. A one-implementor trait in a crate-root
 glue file fails the orphan rule once the modules are separate crates, so
 module-to-module wiring is plain data. The checker, the violation type and
 field descriptors are outward-facing for lsp and mcp consumers.
+
+## Inputs from the IWE research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md). IWE is a
+five-crate workspace [V]: `liwe` (zero-I/O domain: graph, model, parsing,
+operations, query), `diwe` (engine: filesystem, loader, watcher, config, search,
+`find`, `retrieve`) and three hosts (`iwe` CLI, `iwes` LSP, `iwec` MCP), each
+depending on both libraries. It is a data point beyond the 2-3 crate shape of
+research 08: the app layer is a separate library crate from the domain crate.
+Whether that split earns its cost for Traces (versus the app layer inside one
+core crate, as ticket 16 states it) is open and untested here. Each crate
+bundles its integration tests into one `tests/main.rs` binary to avoid
+per-test link cost [V]. Not examined: how strictly `liwe` limits `pub`.

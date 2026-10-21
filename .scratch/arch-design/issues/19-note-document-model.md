@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 14, 10, 13
+Blocked by: 14, 10, 13, 33
 
 ## Question
 
@@ -56,3 +56,20 @@ write-back requirement here.
 Ticket 32 (body-section schemas) is blocked by this ticket: it needs to know
 which body facts and spans the note model keeps. Class binding reads a note's
 tags and path, both already available.
+
+## Inputs from the IWE and Fileclass research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md) and
+[35](../research/35-fileclass-model-binding-and-validation.md). IWE stores raw
+text per key beside an arena tree of block nodes; spans are 1-based line ranges
+per block node only, with no byte offsets and none on inlines
+(`crates/liwe/src/graph.rs`, `model.rs`) [V], enough for its LSP, which uses
+full-document sync. Its writer re-synthesises markdown from the tree
+(`pulldown-cmark-to-cmark`); the CHANGELOGs record repeated text-loss
+regressions and two reversals: normalise-on-write clobbering external edits
+(iwe v0.26.0) and a normalise pass touching every file (diwe v0.24.1) [V].
+[H] This supports ticket 13's "no general write-back" and says any future writer
+must splice spans into the original bytes instead of re-rendering; it does not
+by itself refute the lossless-tree alternative. Fileclass has no body model
+(frontmatter only, written through the host's `processFrontMatter`) and gives no
+input.

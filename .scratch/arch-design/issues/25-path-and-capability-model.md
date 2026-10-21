@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 9, 12
+Blocked by: 9, 12, 33
 
 ## Question
 
@@ -33,3 +33,12 @@ exclusions, matched against the note's carried relative path (the existing glob
 dialect, `books/` compiles to `books/**`). `check_note` takes a path on each
 side; a path may be absent (stdin, dry-run), in which case path bindings do not
 apply.
+
+## Inputs from the IWE research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md). IWE
+identifies a note by a portable, extensionless, `/`-separated key (watcher keys
+were normalised to `/` on Windows, iwec CHANGELOG) and checks workspace escape
+in one place before touching disk or graph (`crates/diwe/src/fs.rs`,
+`key_escapes_workspace`, `workspace_document_path`) [V]. It is consistent with
+the portable-path lesson of research 09 and offers no capability handle.

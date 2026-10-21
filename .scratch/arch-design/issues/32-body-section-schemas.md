@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 16, 19
+Blocked by: 16, 19, 34, 36
 
 ## Question
 
@@ -30,3 +30,24 @@ sections, blocks and budgets. Include the keep-as-is option.
 
 Inputs: ticket 16 Answer, `research/16-prep/round4/report.md` and
 `F-agent-and-mcp-vault-tools.md`, note document model (19).
+
+## Inputs from the IWE research
+
+See [research 34](../research/34-iwe-query-schema-and-agent-write-gating.md)
+(sections 1.3 to 1.4). IWE's body schema is an ordered, greedy,
+non-backtracking walk over sections with per-entry `const`, `enum`, `pattern`,
+length and `maxTokens`, occurrence bounds `minContains`/`maxContains`
+(counted across the node, not by run), `additionalSections` (open, forbidden or
+a subschema) and terminal-only wildcards (a non-terminal wildcard is a schema
+error, exit 2) [V: `docs/document-schema.md`]. Violations locate by header
+breadcrumb. Token budgets count with `tiktoken_rs` `o200k_base`
+(`crates/diwe/src/tokens.rs`) [V], a model-specific tokenizer and dependency.
+IWE has no inheritance: schemas bind by path glob, so body rules never compose
+across a class hierarchy; Traces would have to decide that. Fileclass has no
+body validation. The implementation lives in an external crate; ticket 36
+investigates it.
+
+Ticket 36 result: the crate is a poor fit (second dialect, recursive section
+tree, no spans); the matcher semantics are reusable as a design, about 150 to
+250 lines over the flat heading slice [H]. No dependency decision is left for
+this ticket.

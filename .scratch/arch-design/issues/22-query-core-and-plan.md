@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 6, 14, 15, 20
+Blocked by: 6, 14, 15, 20, 34
 
 ## Question
 
@@ -77,3 +77,22 @@ exclusion atom ("has a known explicit class"). Optimise folder-style globs
 (`folder/**`) to the `paths_in_folder` lookup and benchmark the remaining
 `Path` scan (currently linear, `src/query/service.rs:417-424`). Membership and
 the validation resolver must agree, tested on the unreduced class set.
+
+## Inputs from the IWE research
+
+See [research 34](../research/34-iwe-query-schema-and-agent-write-gating.md).
+IWE's query is a serialisable document (YAML or JSON, MongoDB-style `$`
+operators) with four operations (`find`, `count`, `update`, `delete`), a
+published JSON Schema for the language (`iwe docs query-schema`, iwe v0.23.0),
+graph operators with depth bounds, and no pushdown: evaluation is in-memory
+over the whole graph [V]. [H] Question for this ticket: should the query IR
+have a serde form so that LSP and MCP hosts build queries as data rather than
+as DSL strings? Its value semantics converge with [ticket
+15](./15-coercion-and-comparison-policy.md) (strict scalar types, cross-type
+`==` false, cross-type ordering undefined for filters, ICU natural collation,
+nulls first ascending, a rank-based total order for sort) [V:
+`crates/liwe/src/query/filter.rs`, `sort.rs`, `collation.rs`]. Also: `update`
+and `delete` are all-or-nothing across documents, require `expect` count guards
+and accept `dry_run` [V]; `find` (structured projection) and `retrieve` (agent
+context assembly with graph expansion and token budget) are separate
+operations. Retrieve is a product feature outside the destination.

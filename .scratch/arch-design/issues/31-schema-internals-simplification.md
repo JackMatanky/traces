@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 16, 28
+Blocked by: 16, 28, 34, 35
 
 ## Question
 
@@ -42,3 +42,25 @@ exclusions) on class schemas, not inherited; `global` becomes a lowest-
 precedence layer for every note (update the invariant at
 `src/schema/mod.rs:48-51`); new schema keys `description` and an `origin`
 record; multiple `extends` parents are kept.
+
+## Inputs from the IWE and Fileclass research
+
+See [research 34](../research/34-iwe-query-schema-and-agent-write-gating.md)
+and [35](../research/35-fileclass-model-binding-and-validation.md). Fileclass:
+28 field types in the AST, of which 22 take input, 2 are dead stubs (`Formula`,
+`Lookup`) and 3 are canvas sync; `Cycle` validates exactly like `Select` and
+only about ten are structurally distinct (`src/schema/field.ts`,
+`src/fields/support.ts`, `validate.ts`) [V]. Nested fields are identified by
+`path\0name`, so an object property never collides with a root field
+(`src/schema/inheritance.ts`) [V]. A child redefinition replaces the ancestor's
+field in the ancestor's position; `excludes` accumulate toward ancestors; the
+global class is the first entry of the merge list, so it has the lowest
+precedence for every note [V]. `step` is a UI helper only and `required`
+treats `[]` as present (`validate.ts:58`) [V]. IWE binds by globs in host
+config with gitignore-style `!` (the last matching pattern decides), has no
+inheritance, and composes overlapping schemas order-free [V]. Both tools check
+bindings that can never bind at design time (Fileclass strikes through a tag
+containing a space; IWE exits 2 for unreachable entries) [V], a candidate for
+`traces check` schema errors. IWE delegates validation to an external crate
+(`schematter-validator` 0.2.0); see [ticket
+36](./36-research-schematter-validator-and-document-schema.md).

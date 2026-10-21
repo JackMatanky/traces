@@ -64,6 +64,13 @@ itself is not implemented here; the map ends at hand-off to specification.
 - Research deviation: this tracker is local markdown, so research findings land
   in `research/NN-*.md` on the working tree and are linked from the ticket; no
   `research/<name>` git branches are pushed.
+- Late precedent research (2026-10-21): IWE and Fileclass were first read from
+  source after ticket 16 resolved ([core and
+  hosts](./issues/33-research-iwe-core-and-hosts-architecture.md), [query,
+  schema and gating](./issues/34-research-iwe-query-schema-and-agent-write-gating.md),
+  [Fileclass](./issues/35-research-fileclass-model-binding-and-validation.md)).
+  Open tickets carry an "Inputs from the IWE (and Fileclass) research" section;
+  ticket 16 and 15 carry a dated comment. Digests live in `docs/digests/`.
 - Provisionally withstand scrutiny (scouts, unverified; the `FileClassExpander`
   seam was overturned by ticket 16): `DatePoint`/`DifferenceEngine` and
   `DurationValue` nominal
@@ -262,6 +269,40 @@ itself is not implemented here; the map ends at hand-off to specification.
   topology](./issues/28-crate-topology-and-public-surface.md), [schema
   internals](./issues/31-schema-internals-simplification.md), [body
   sections](./issues/32-body-section-schemas.md).
+- [How does IWE structure one core shared by a CLI, an LSP, an MCP server and a
+  daemon?](./issues/33-research-iwe-core-and-hosts-architecture.md): confirms
+  ticket 16's layering (pure operations return a plain `Changes` set; hosts
+  apply it; no one-implementor traits) but puts the app layer in its own crate
+  (`diwe`, for ticket 28). The LSP writes open buffers into the one in-memory
+  graph and drops watcher events for open keys; that works only because IWE
+  has no persisted index. No persistent cache: 20k notes cold in 705 ms (M3
+  Pro, synthetic), a cost model for tickets 20 and 21, not a verdict. Its lossy
+  tree writer regressed repeatedly: writers must splice spans and never rewrite
+  unchanged bytes (tickets 19, 21).
+- [What do IWE's query language, document schema, search and MCP write path
+  teach Traces?](./issues/34-research-iwe-query-schema-and-agent-write-gating.md):
+  IWE's query value semantics converge with ticket 15; its query is a
+  serialisable document (question for ticket 22). Schema binds by host-config
+  globs, no inheritance; the MCP gate is always on, all-or-nothing, validates
+  whole pending documents with no delta rule (supports ticket 16's delta rule),
+  and requires `expect` count guards on query mutations. Body schemas use an
+  ordered greedy section matcher via an external crate (ticket 36). Corrects
+  earlier claims: no frontmatter `type` binding, no "strict mode" switch,
+  reserved-prefix fields are validated.
+- [What does Fileclass's source teach about class resolution, typed fields and
+  validation?](./issues/35-research-fileclass-model-binding-and-validation.md):
+  `global` as the lowest-precedence layer for every note and per-class origin
+  confirmed; its code lets a lower-ranked binding override a frontmatter class
+  (docs say otherwise), supporting ticket 16's suppression and conflict
+  reporting. Its validation is weaker than ticket 16's (`step` UI-only, `[]`
+  satisfies `required`, custom date formats unchecked). 28 field types, about
+  ten distinct (ticket 31). No body or buffer model.
+- [What are `schematter-validator` and the document-schema
+  spec?](./issues/36-research-schematter-validator-and-document-schema.md):
+  IWE's validator crate (about 1,200 lines, `jsonschema` dependency, one
+  implementation, draft spec) is a poor fit: second schema dialect, recursive
+  section tree, no spans. Its matcher semantics are reusable as a design over
+  Traces' flat headings (ticket 32); no dependency decision remains.
 
 ## Not yet specified
 

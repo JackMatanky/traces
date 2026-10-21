@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 5, 18, 20
+Blocked by: 5, 18, 20, 33
 
 ## Question
 
@@ -85,3 +85,13 @@ If a "notes changed since the last check" notice is adopted (16, agent
 guardrail), refresh already knows the changed set; a check watermark and the
 violation keys at the last check would live in a derived store outside the
 index and its fingerprint. Whether that store exists, and its cost, is open.
+
+## Inputs from the IWE research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md). IWE has no
+staleness model for the CLI (it rebuilds); its servers feed `notify` events
+(poll fallback) into the live graph. Its CHANGELOGs add one invariant relevant
+to item 4: `write_file_if_changed` exists because a normalise pass that rewrote
+identical bytes touched every file's mtime (diwe v0.24.1) [V]. Any Traces write
+path that rewrites unchanged bytes would defeat an mtime-based delta, so "a
+host never rewrites unchanged content" belongs with the freshness model.

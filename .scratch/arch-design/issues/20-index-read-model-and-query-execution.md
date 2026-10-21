@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 11, 13, 19, 1
+Blocked by: 11, 13, 19, 1, 33
 
 ## Question
 
@@ -67,3 +67,20 @@ A "notes changed since the last check" notice (16, agent guardrail) would read
 the changed set that refresh already computes; any baseline store sits outside
 the index and its fingerprint. Ownership of that store is open here and in
 tickets 21 and 27.
+
+## Inputs from the IWE research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md). IWE is
+the measured pure in-memory alternative: no persistent cache, the CLI parses the
+whole vault with Rayon on every run. Synthetic ~700 B notes on an M3 Pro: 5k
+144 ms, 10k 329 ms, 20k 705 ms cold load (plain; +36% with its BM25 index)
+[V: `docs/benchmark.md:155-171`]. Queries then cost 12 ms for a field filter at
+20k and are super-linear for graph filters (`--roots` 60 ms; the unbounded
+included-by filter reaches ~94% of the corpus) [V: `docs/benchmark.md:185-208`].
+Servers load once and update in place (`Graph::update_document`). Different
+machine and corpus from ticket 11 (M4 Pro, 20k cold query 60 to 74 ms), so use
+this as a cost model for the keep-as-is comparison, not as a head-to-head. Its
+evaluator partitions an `and` into graph-walk generators and scalar predicates
+and intersects candidate key sets before running scalar predicates
+(`crates/liwe/src/query/eval.rs`, `eval_and`) [V], a candidate-set-first plan
+that needs no store.

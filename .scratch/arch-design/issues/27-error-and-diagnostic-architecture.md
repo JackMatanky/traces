@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 8, 16, 26
+Blocked by: 8, 16, 26, 33, 34
 
 ## Question
 
@@ -48,3 +48,18 @@ the lint exit code, the MCP `isError` result, the LSP and the notice on read.
 Open: whether a stored "violation keys at last check" baseline (for a delta
 without git) is a diagnostic concern or a read-model concern, and the
 behaviour of a gate when the schema is broken (fail closed, distinct code).
+
+## Inputs from the IWE and Fileclass research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md), [34](../research/34-iwe-query-schema-and-agent-write-gating.md)
+and [35](../research/35-fileclass-model-binding-and-validation.md). IWE has no
+central error type: narrow enums in `liwe` (`OperationError`) and plain
+`Result<T, String>` in `diwe`, adapted per host (LSP `ResponseError`, CLI
+strings) [V]; the string results lose structure, so it is no model for the
+library error type. Its violation record is richer: header breadcrumb, message,
+`hint` from the nearest `description`, JSON-Pointer `schemaPath` and failing
+keyword, with exit 0, 1 and 2 for clean, violations and a broken schema (an
+unreachable schema entry is a load-time exit 2) [V]. It has no severities and no
+code registry. Fileclass violations are `{ ok, message }` only, shown as a
+coloured indicator (`src/fields/validate.ts`) [V], so ticket 16's coded
+violations and this ticket's registry go beyond both.

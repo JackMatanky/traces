@@ -41,3 +41,13 @@ a note" and is now a lowest-precedence layer for every note
 (`src/schema/mod.rs:48-51`); first-listed-wins no longer decides class-versus-
 class conflicts (it still decides `extends` parents); the index and fingerprint
 stay schema-free because class binding is expanded at query time.
+
+## Inputs from the IWE and Fileclass research
+
+Research [33](../research/33-iwe-core-and-hosts-architecture.md),
+[34](../research/34-iwe-query-schema-and-agent-write-gating.md) and
+[35](../research/35-fileclass-model-binding-and-validation.md) were added after
+ticket 16 resolved. Re-test the resolved decisions against their per-ticket
+notes and the comment appended to ticket 16, and re-test the layering
+principle against IWE's `liwe`/`diwe` split (ticket 28). Corrections to earlier
+claims are listed in each research file's ledger and in ticket 16's comment.

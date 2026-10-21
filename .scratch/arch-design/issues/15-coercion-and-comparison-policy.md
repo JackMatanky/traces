@@ -245,3 +245,17 @@ glossaries yet; they describe the current code):
 - TODO new terms to define with a Not-this list: *Classification* (parse-time
   typing of text), *Cast* (explicit query-time conversion, fails to `Null`),
   *Collation* (sort-only string order).
+
+## Comments
+
+2026-10-21, after [research 34](../research/34-iwe-query-schema-and-agent-write-gating.md)
+and [35](../research/35-fileclass-model-binding-and-validation.md): no decision
+changes. IWE independently uses the same value semantics for its query engine:
+strict scalar types, cross-type `==` false, cross-type ordering undefined for
+filters, ICU natural collation, nulls first ascending, a rank-based total order
+for sort (`crates/liwe/src/query/filter.rs`, `sort.rs`, `collation.rs`) [V]. It
+has no date, duration or link kinds, so it does not test adaptive literals or
+interval semantics. Fileclass's validator goes the other way: a number field
+accepts any string `Number()` can parse and a boolean field accepts `"true"` and
+`"false"` (`src/fields/validate.ts:66-81`) [V]. That is the lenient behaviour
+this ticket's classification rule avoids.

@@ -412,3 +412,53 @@ edit the glossaries or ADRs yet; they describe the current code):
   stage" wording is superseded (they are checked advisorily; gating is host
   policy); add the layering principle and host-policy model as a new ADR
   (status `proposed`, per the ADR rule).
+
+## Comments
+
+2026-10-21, re-test against [research 33](../research/33-iwe-core-and-hosts-architecture.md),
+[34](../research/34-iwe-query-schema-and-agent-write-gating.md) and
+[35](../research/35-fileclass-model-binding-and-validation.md) (IWE and
+Fileclass were read from source for the first time). **No decision is
+overturned.** Confirmed or refined:
+
+- *Suppression and conflict reporting.* Fileclass's code collects every bound
+  class and lets the last win a shared key, so a lower-ranked source (path,
+  bookmark, base view) overrides a frontmatter class although its docs list
+  frontmatter first (`src/schema/resolver.ts:119-180`; code-read, no test, intent
+  unknown). This is the failure the suppression rule and the one-per-note
+  `schema.class-conflict` avoid.
+- *`global` layer.* Fileclass prepends its global class to every note's merge
+  list, so it is the lowest-precedence layer for classed and unclassed notes
+  (`resolveBinding`, `src/schema/resolver.ts:200-219`) [V]. Same design.
+- *`origin`.* Fileclass keeps a `BindingOrigin` per class (frontmatter, tag,
+  path, bookmark, global) [V], the same idea as the violation `origin`.
+- *Delta rule.* IWE's gate, `validate_pending_documents`, validates each pending
+  `(key, content)` pair in isolation in a throwaway graph, with no base to
+  compare (`crates/diwe/src/schema.rs:255-312`) [V]; any violation in a touched
+  document blocks the write. It is the same shape as `check_note`, minus the
+  delta. The block-on-pre-existing-violation consequence is [H].
+- *Other gates.* IWE's MCP schema gate is always on; "strict" means mandatory
+  `expect` count guards on `iwe_query` mutations (`docs/mcp.md:99`), and every
+  write tool accepts `dry_run`. Multi-document changes are all-or-nothing.
+  `expect` guards are a candidate for the MCP host's bulk guards (ticket 26).
+- *Stricter than both.* Fileclass never validates `step`, lets `[]` satisfy
+  `required` (`validate.ts:58`) and accepts any non-empty string for a field with
+  a custom date format. IWE has no `step`. The Answer's rules stand.
+- *Binding placement.* IWE binds in the host config (`[schemas.<name>].match`,
+  globs with gitignore-style `!`, last match wins), has no inheritance and
+  composes overlapping schemas order-free. The Answer keeps class-owned
+  `[binding]`; ticket 31 should state how `!` ordering works in the existing
+  glob dialect.
+- *Design-time checks.* IWE exits 2 for unreachable schema entries and Fileclass
+  strikes through a tag that can never bind; a "binding that can never match"
+  check fits the schema-error exit code.
+
+*Corrections to earlier claims about these tools* (details in the ledgers of
+research 34 and 35): IWE does not bind by a frontmatter `type` (round-4 file D);
+its "strict mode" is not the gate's on switch; fields with a reserved prefix
+(`_`, `$`, `.`, `#`, `@`) are validated since iwe 0.22.0, so the "[V] IWE
+ignores reserved-prefix fields" row in the round-4 report is withdrawn (the doc
+it read, `crates/iwe/docs/schema.md:83`, is stale; source test
+`liwe/src/schema/document.rs` `builds_section_tree_with_levels_and_keeps_prefixed_frontmatter`); Fileclass has 28
+field types in its AST (22 take input), not 26; its documented binding priority
+does not match its code.

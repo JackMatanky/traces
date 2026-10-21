@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 17, 15, 18
+Blocked by: 17, 15, 18, 35
 
 ## Question
 
@@ -64,3 +64,17 @@ year-only variant, so the `date` check accepts any scalar when the format has
 no date component. The schema's own tests use Moment tokens while temporal and
 the template filter seam translate them. Pick the dialect; if one is chosen the
 date-format check can be added.
+
+## Inputs from the Fileclass research
+
+See [research 35](../research/35-fileclass-model-binding-and-validation.md).
+Fileclass checks dates with ISO regexes only; a field with a custom Moment
+`dateFormat` accepts any non-empty string, and a wikilink is accepted as a
+date (`src/fields/validate.ts:62-64,90-100`) [V]. `dateFormatCheck.ts` instead
+lints the declared format string's tokens, not the values [V]. Durations are
+validated against an RFC 5545 subset (weeks, or days and time; no years or
+months) (`src/fields/duration.ts`) [V]. [H] Two cheap options for the dialect
+choice here: check a declared format at schema load (a schema error, not a note
+violation), and keep the value check separate until a dialect is fixed. IWE
+gives no input: it has no date type and hands YAML dates to its validator as
+ISO strings.

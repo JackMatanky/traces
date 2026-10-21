@@ -2,11 +2,12 @@
 
 Type: grilling
 Status: open
-Blocked by: 17
+Blocked by: 17, 33
 
 ## Question
 
 Resolve the config subsystem's boundary:
+
 - (a) why `task.rs`/`tag.rs`/`field.rs` live at crate root and whether
   `TaskStatusMap`, tag filters and status/emoji parsing belong to config, note,
   or a leaf;
@@ -36,3 +37,15 @@ so the spec can sequence them.
 Inputs: execution-context decision, `research/04`, `research/05` (its
 digest-vs-fingerprint lesson was realized by `207cc3fb`; see
 `reverification.md`), `research/01`.
+
+## Inputs from the IWE research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md). IWE keeps
+one `.iwe/config.toml` with `deny_unknown_fields`, a `version` key and in-place
+migrations through `toml_edit` that preserve user comments
+(`crates/diwe/src/config.rs`, `migrate`) [V]; it still had to rename a whole
+table (`[library]` to `[workspace]`, v0.25.0). Schema binding lives in this host
+config (`[schemas.<name>].match`), not in the schema files; [ticket
+16](./16-schema-note-typing-and-validation.md) chose class-owned `[binding]`.
+The only transferable point for this ticket is the comment-preserving migration
+technique if the config format ever changes.

@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 13, 17, 18, 20, 21
+Blocked by: 13, 17, 18, 20, 21, 33, 34
 
 ## Question
 
@@ -75,3 +75,29 @@ an integrity-protected `requestState`, denying when the client declares no
 per-caller state (a notice of out-of-band changes) is meaningful; it must
 stay best effort. See the
 [round-6 addendum](../research/16-prep/round6/I-mcp-server-guards.md).
+
+## Inputs from the IWE research
+
+See [research 33](../research/33-iwe-core-and-hosts-architecture.md) and [34](../research/34-iwe-query-schema-and-agent-write-gating.md).
+IWE is a worked example of the layering principle from ticket 16 [V]: `liwe`
+holds pure operations (`rename`, `extract`, `inline`, `attach`, `delete`) as
+functions over `&Graph` returning a plain `Changes { creates, updates, removes }`;
+`diwe` applies them (`apply_changes`, workspace check, write only if changed);
+the CLI writes the changes, the LSP converts them to a `WorkspaceEdit`, the MCP
+server writes and syncs its graph. Read use cases are small structs borrowing
+the graph (`DocumentFinder`, `DocumentReader`). No one-implementor trait crosses
+the seam. [H] A plain changeset is a candidate shape for any write use case that
+later appears, so hosts differ only in how they apply it; ticket 13 keeps
+write-back out of scope, so this is design pressure only.
+
+Its agent gate matches the `check_note` shape: `validate_pending_documents`
+checks `(key, content)` pairs against bound schemas by building a throwaway
+graph before anything is written (`crates/diwe/src/schema.rs`) [V]. The MCP
+gate is always on (the round-4 "strict mode" reading was wrong: strict means
+mandatory `expect` count guards on `iwe_query` mutations); multi-document
+changes are all-or-nothing, and every write tool accepts `dry_run`
+(`docs/mcp.md:125`) [V]. `expect` count guards are a stronger bulk guard than a
+per-call cap and could be weighed when the MCP host is specified. Non-blocking
+stats warnings (orphans, dangling links, near-duplicates) ride on successful
+results once per session [V: iwec CHANGELOG], an in-process "notice" channel
+with the best-effort limits already recorded in ticket 16.
