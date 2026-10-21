@@ -62,3 +62,8 @@ binding by tag and path is expanded at query time into the existing `Class`,
 `Tag` and `Path` atoms, so the index stores no derived class and learns
 nothing about schemas. A "has a known explicit class" exclusion is needed in
 source selection; a secondary lookup for it would avoid the `Not` full scan.
+
+A "notes changed since the last check" notice (16, agent guardrail) would read
+the changed set that refresh already computes; any baseline store sits outside
+the index and its fingerprint. Ownership of that store is open here and in
+tickets 21 and 27.

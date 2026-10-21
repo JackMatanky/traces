@@ -59,3 +59,9 @@ app layer should own.
 class binding depends on the path and tags and a move is a class change;
 `traces check` gains `--before-path` and `--after-path`, and distinct exit codes
 for a broken schema and for note violations.
+
+Guardrail design pressure (16): the host must support validated CLI write
+commands that share the MCP edit use case, `check_note` over a change set with
+a per-file base and a destination path (for an isolated session or inbox
+workflow, which are product features outside the map), and generating a
+per-folder `AGENTS.md` snippet from class bindings.

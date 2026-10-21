@@ -186,6 +186,9 @@ Channels by what the harness provides [P, `research/16-prep/round5/report.md`]:
   code.
 - *A shell or post-edit command:* a lint loop (Aider `--lint-cmd` [V]), a git
   pre-commit on staged blobs, CI.
+- *A shell:* validated CLI write commands (`traces new`, a field-set command)
+  sharing the MCP edit use case, so any agent with a shell has a gated path;
+  it is a path, not a barrier.
 - *Any `traces` call:* a bounded notice of notes changed since the last check
   that gained violations. It needs a check watermark and the violation keys at
   the last check as the `before`; a second derived store outside the index and
@@ -202,6 +205,19 @@ Channels by what the harness provides [P, `research/16-prep/round5/report.md`]:
   Code's pre-write hook does carry the full `content` for whole-file writes
   [V], so the earlier claim that hooks never see the resulting file is
   withdrawn; shell writes remain invisible to hooks.
+- *Placement:* the only harness-independent prevention is to keep the writer
+  away from the canonical store, which is a workflow, not a filter [H;
+  consistent with every surveyed tool, none of which prevents raw writes]. An
+  isolated working copy (git worktree or branch; APFS/Btrfs clone elsewhere)
+  or an `_inbox/` folder, promoted by a gated `traces merge` or `promote` that
+  runs `check_note` on the destination path (bindings need it). It holds only
+  where the writer is launched inside the copy; same-user processes can still
+  reach the canonical vault. A product feature outside the map's destination;
+  the design pressure on core is that `check_note` must run over a change set
+  with a base to detect concurrent edits.
+- *Instruction files:* a per-folder `AGENTS.md` snippet generated from the
+  `[binding].paths` of each class steers writers where they work (loaded
+  lazily by Claude Code [V], others unknown [S]); soft, never relied on.
 
 Constraints given up front: MCP tool input schemas and a schema resource (large
 enums and strftime formats are not projected and are checked after the call).
@@ -215,10 +231,17 @@ distinct code for a broken schema (it never reads as "notes are fine") and
 another for note violations. Notes with no class, no binding and no global
 field are unvalidated; MCP create tools should require a class or a bound
 location. Under `--dry-run` the template check has no output path, so path
-bindings do not apply there. Rejected: staging directory with promote (an
-instruction without enforcement), watcher daemon (no channel to the agent),
-auto-revert (destroys data), ACP or FUSE interception (custom client,
-kernel dependency), hook-based gating as a design basis.
+bindings do not apply there. Rejected as a design basis or default: hook-based
+gating; a staging directory without a launch convention (an instruction); a
+watcher daemon (no channel to the agent); auto-revert (destroys data); ACP,
+FUSE or WebDAV interception (custom client, kernel extension, fragile mounts);
+git clean filters (break `checkout` and `diff`); `reference-transaction` hooks
+(see commit hashes only); YAML-comment or `$schema` hints in notes (Obsidian
+strips comments [V]; `$schema` pollutes every note). A loopback NFS mount
+gates atomic-rename writers on macOS without root [V, one experiment in
+round 6] but not in-place writes (a shell `>` exits 0 while the server
+rejects), is bypassed through the backing directory, and hangs processes if
+the daemon dies; at most a documented recipe.
 
 **MCP edits:** how an MCP edit tool applies a change to a note (a lossless
 frontmatter edit) belongs to the MCP host, not core. 16 puts no write-back or
@@ -306,6 +329,14 @@ wins to Metadata Menu was wrong, and the arXiv paper cited for "agents ignore
 advisory warnings" does not show that, so the guardrail rests on protocol
 arguments and not on that paper. Scout E's default severities and
 element-indexed delta key are superseded by this Answer.
+Round 5 and 6 ([claim checks and guardrail channels](../research/16-prep/round5/report.md),
+[harness-independent guardrails](../research/16-prep/round6/report.md)) read
+the remaining scout claims at the source (LDAP, CUE, Kubernetes pruning, Plone,
+Tana, SilverBullet, Metadata Enforcer, Obsidian rewriting verified; Dendron
+"fatal" path binding, Logseq "broken trees" and Letta/Graphiti delta
+validation refuted), withdrew the hook-payload claim, and found no filter-level
+prevention that is both preventive and portable. Per-harness capability cells
+are unaudited beyond Claude Code and Aider.
 
 **Remains unresolved (handed off):**
 
@@ -337,6 +368,11 @@ element-indexed delta key are superseded by this Answer.
   [diagnostics](./27-error-and-diagnostic-architecture.md).
 - `[binding]` table and `global` semantics in the schema format and internals:
   [ticket 31](./31-schema-internals-simplification.md).
+- Notice-on-read baseline store, CLI write commands, change-set check and the
+  session/inbox workflow: [read model](./20-index-read-model-and-query-execution.md),
+  [freshness](./21-index-freshness-and-invalidation.md),
+  [diagnostics](./27-error-and-diagnostic-architecture.md),
+  [workspace host](./26-workspace-host-and-composition.md).
 
 ## TODOs
 

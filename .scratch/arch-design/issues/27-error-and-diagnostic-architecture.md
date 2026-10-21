@@ -42,3 +42,9 @@ derives a distinct code family `schema.global.*`, which this ticket is asked to
 rank below class violations by default. A violation also carries a `hint` from
 the field's `description`. A broken schema is reported separately from note
 violations.
+
+Guardrail channels (16, agent guardrail) reuse one violation envelope across
+the lint exit code, the MCP `isError` result, the LSP and the notice on read.
+Open: whether a stored "violation keys at last check" baseline (for a delta
+without git) is a diagnostic concern or a read-model concern, and the
+behaviour of a gate when the schema is broken (fail closed, distinct code).

@@ -250,8 +250,8 @@ itself is not implemented here; the map ends at hand-off to specification.
   detect and feed back through tiered channels (lint command, git, a notice on
   read, LSP), true gating only where MCP tools own every write; `traces check`
   takes paths, splits schema errors from violations; delta rule; class-set
-  change asks. Date-shaped text:
-  no override, no quote convention. Body-section schemas are a separate ticket.
+  change asks. Date-shaped text: no override, no quote convention.
+  Body-section schemas are a separate ticket.
   Handoffs: [query core](./issues/22-query-core-and-plan.md), [note document
   model](./issues/19-note-document-model.md), [temporal
   boundary](./issues/23-temporal-boundary-and-dialects.md), [template
@@ -282,6 +282,12 @@ itself is not implemented here; the map ends at hand-off to specification.
   workspace-host decisions.
 - **Persistence portability** (cache across OSes) hangs on the compatibility
   envelope and the path model.
+- **Agent workflows around the check** (validated CLI write commands, isolated
+  session or inbox with a gated merge, per-folder instruction snippets): product
+  features outside the destination; only their pressure on core (a change-set
+  check with a base and destination path) is recorded in [ticket
+  16](./issues/16-schema-note-typing-and-validation.md) and
+  [26](./issues/26-workspace-host-and-composition.md).
 
 ## Out of scope
 
