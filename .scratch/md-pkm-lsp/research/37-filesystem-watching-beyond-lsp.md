@@ -28,16 +28,17 @@ A Traces-owned, independent filesystem watcher would fill specific gaps that an 
 - **Out-of-Workspace Files**: If Traces eventually needs to watch a global config file (e.g., `~/.config/traces/`) or an external referenced vault that the editor doesn't consider part of the active workspace, `didChangeWatchedFiles` cannot help.
 
 ### 3. Precedent from Other Tools
-Cross-checking the research on other PKM tools confirms that bundling a custom file watcher *inside* an LSP is generally avoided:
+Cross-checking the research on other PKM tools confirms that bundling a custom file watcher *inside* an LSP is generally avoided among the four tools originally studied (Markdown Oxide, Marksman, zk, rust-analyzer); iwe is the counterexample (amended 2026-10-21 by iwe/fileclass research):
 - **Markdown Oxide**: Relies exclusively on the LSP client (`did_change_watched_files` for disk changes, `did_change` for buffer changes). It has no independent watcher. In fact, on `did_change_watched_files`, it just drops the whole vault and rebuilds it from disk.
 - **Marksman**: Operates on an eager scan at startup and then trusts the LSP client's `didChange`, `didOpen`, and `didClose` events to mutate the in-memory state. No independent OS watcher is mentioned.
 - **zk**: Uses an embedded SQLite database. It syncs state by manually diffing a filesystem `Walk` against the database's `IndexedPaths()`, and leverages the LSP `TextDocumentSyncKindIncremental` for unsaved buffer changes. It does not actively watch the filesystem in the background outside of explicit triggers.
 - **rust-analyzer**: Uses a VFS (Virtual File System). Within an LSP context, the VFS is the *sole sync boundary* and is fed entirely by the editor's notifications. `rust-analyzer` explicitly treats the editor as the source of truth to avoid race conditions between unsaved buffers and disk reads.
+- **iwe** (amended 2026-10-21 by iwe/fileclass research): bundles a server-side watcher in `diwe/src/watcher.rs` (notify + PollWatcher fallback, ~300ms debounce, gitignore-filtered, defers events for open buffers) while still accepting client `workspace/didChangeWatchedFiles` notifications as a backstop (without dynamic registration; only DELETED events are handled, CREATED/CHANGED are no-ops). Its watcher exists partly to serve iwe's separate CLI/MCP processes sharing its graph, a motivation Traces' LSP host doesn't have today ([tool-iwe](tool-iwe.md) Part 2, iwe digest :6598).
 
 ### 4. Concrete Recommendation
 **Do not adopt a Traces-owned filesystem watcher for the LSP host (Ticket 10).**
 
-The lazy, correct path (YAGNI) is to rely entirely on the LSP client (`didChangeWatchedFiles` and `didChange`) for the LSP server. Duplicating file-watching server-side introduces severe complexities: race conditions between the editor's unsaved buffer state and the disk state, handling editor-specific atomic save maneuvers, and managing background thread lifecycles, all for a capability the editor *already provides*. 
+The lazy, correct path (YAGNI) is to rely entirely on the LSP client (`didChangeWatchedFiles` and `didChange`) for the LSP server. Duplicating file-watching server-side introduces severe complexities: race conditions between the editor's unsaved buffer state and the disk state, handling editor-specific atomic save maneuvers, and managing background thread lifecycles, all for a capability the editor *already provides*. iwe's shipped bundled watcher does not change this verdict: it exists in part to serve iwe's separate CLI and MCP processes sharing its graph, consumers Traces' LSP host doesn't have, so the LSP host itself still doesn't need one ([tool-iwe](tool-iwe.md) Part 2; amended 2026-10-21 by iwe/fileclass research).
 
 **When to adopt it:**
 A `notify`-based watcher does not earn its keep until a concrete, **non-LSP consumer** is actually being built. It should remain strictly out of scope for Ticket 10. 
