@@ -313,3 +313,21 @@ element-indexed delta key are superseded by this Answer.
   [diagnostics](./27-error-and-diagnostic-architecture.md).
 - `[binding]` table and `global` semantics in the schema format and internals:
   [ticket 31](./31-schema-internals-simplification.md).
+
+## TODOs
+
+Glossary and ADR updates deferred until the specification is written (do not
+edit the glossaries or ADRs yet; they describe the current code):
+
+- TODO `src/schema/GLOSSARY.md`: rewrite *Global Schema* (a `$ref` pool that is
+  also the lowest-precedence layer for every note; still never a File Class);
+  add *Class Binding* (tags, paths, `!` exclusions; defaults for notes without
+  a known explicit class), *Class Set* (unreduced vs most-derived),
+  *Class Conflict*, *Violation* (layer, origin, hint) with a Not-this list
+  against *Diagnostic*.
+- TODO `src/GLOSSARY.md` and `GLOSSARY-MAP.md`: add *Core* and *App Layer* and
+  the consumer (cli, lsp, mcp) vocabulary when ticket 28 names them.
+- TODO `docs/adr/0006`: its "`required`/`multi` inert until the MCP guardrail
+  stage" wording is superseded (they are checked advisorily; gating is host
+  policy); add the layering principle and host-policy model as a new ADR
+  (status `proposed`, per the ADR rule).

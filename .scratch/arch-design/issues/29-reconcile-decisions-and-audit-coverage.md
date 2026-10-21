@@ -35,3 +35,9 @@ See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). The map's
 "provisionally withstands scrutiny" claim for the `FileClassExpander` seam is
 overturned. Re-test the other provisional claims with the same adversarial
 method, and treat the author's vault as one example, not as evidence.
+
+Invariants changed by 16 to re-check: the `global` schema was "never applied to
+a note" and is now a lowest-precedence layer for every note
+(`src/schema/mod.rs:48-51`); first-listed-wins no longer decides class-versus-
+class conflicts (it still decides `extends` parents); the index and fingerprint
+stay schema-free because class binding is expanded at query time.

@@ -24,3 +24,12 @@ Windows reality from `research/09`.
 
 Inputs: `research/09`, compat envelope (cache portability irrelevant if the
 cache is disposable).
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Class
+binding `paths` are vault-relative globs with portable `/` separators and `!`
+exclusions, matched against the note's carried relative path (the existing glob
+dialect, `books/` compiles to `books/**`). `check_note` takes a path on each
+side; a path may be absent (stdin, dry-run), in which case path bindings do not
+apply.
