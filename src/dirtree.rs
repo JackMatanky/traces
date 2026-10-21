@@ -34,25 +34,45 @@ use std::{
 use thiserror::Error;
 use walkdir::{DirEntry, WalkDir};
 
-/// Iterates over a directory tree and reports classified, path-contextualized
-/// errors.
+/// Configured-but-not-started phase: owns the walk configuration until
+/// [`walk`](DirTree::walk) consumes it.
 ///
-/// [`DirTree::children`] creates a flat, one-level iterator, and
-/// [`DirTree::descendants`] creates a recursive one. Configure the iterator
-/// with [`DirTree::filter`] and [`DirTree::sorted_by`] before iteration begins.
-/// Yields [`Result<DirNode, DirTreeError>`].
-///
-/// Builder configuration takes effect only before the first [`Iterator::next`]
-/// call. Further configuration is ignored after iteration begins.
-pub(crate) struct DirTree {
-    builder: Option<WalkDir>,
+/// This phase exposes configuration ([`filter`](DirTree::filter),
+/// [`sorted_by`](DirTree::sorted_by),
+/// [`missing_as_empty`](DirTree::missing_as_empty)) but not iteration through
+/// a stored handle, so configuration and execution cannot interleave.
+pub(crate) struct Ready {
+    builder: WalkDir,
     root: PathBuf,
     prune: Option<PrunePredicate>,
-    inner: Option<InnerIter>,
     absorb_missing_root: bool,
 }
 
-impl DirTree {
+/// Mid-iteration phase: owns the running walk.
+///
+/// This phase implements [`Iterator`] but exposes no configuration methods,
+/// so reconfiguring a started walk is unrepresentable at compile time.
+pub(crate) struct Walking {
+    inner: InnerIter,
+    root: PathBuf,
+    absorb_missing_root: bool,
+}
+
+/// Iterates over a directory tree with classified, path-contextualized errors.
+///
+/// Created by [`DirTree::children`] (flat, one level) or
+/// [`DirTree::descendants`] (recursive, whole tree). The typestate parameter
+/// tracks the walk phase: the [`Ready`] phase accepts [`DirTree::filter`] and
+/// [`DirTree::sorted_by`]; [`DirTree::walk`] (or [`IntoIterator`], used by
+/// `for` loops) transitions to the [`Walking`] phase, which yields
+/// [`Result<DirNode, DirTreeError>`]. Because configuration methods exist
+/// only on the [`Ready`] phase, configuring a walk after it has started is a
+/// compile error rather than a silent no-op.
+pub(crate) struct DirTree<S> {
+    state: S,
+}
+
+impl DirTree<Ready> {
     /// Lists the immediate entries of `dir`.
     ///
     /// Yields every direct child of `dir`, including files, directories, and
@@ -69,11 +89,12 @@ impl DirTree {
     pub(crate) fn children(dir: impl AsRef<Path>) -> Self {
         let dir = dir.as_ref();
         Self {
-            builder: Some(WalkDir::new(dir).min_depth(1).max_depth(1)),
-            root: dir.to_path_buf(),
-            prune: None,
-            inner: None,
-            absorb_missing_root: false,
+            state: Ready {
+                builder: WalkDir::new(dir).min_depth(1).max_depth(1),
+                root: dir.to_path_buf(),
+                prune: None,
+                absorb_missing_root: false,
+            },
         }
     }
 
@@ -91,11 +112,12 @@ impl DirTree {
     pub(crate) fn descendants(dir: impl AsRef<Path>) -> Self {
         let dir = dir.as_ref();
         Self {
-            builder: Some(WalkDir::new(dir)),
-            root: dir.to_path_buf(),
-            prune: None,
-            inner: None,
-            absorb_missing_root: false,
+            state: Ready {
+                builder: WalkDir::new(dir),
+                root: dir.to_path_buf(),
+                prune: None,
+                absorb_missing_root: false,
+            },
         }
     }
 
@@ -108,10 +130,11 @@ impl DirTree {
     /// roots. This is the shared policy for callers that must tolerate a
     /// missing directory and see it as "no entries".
     ///
-    /// Has no effect once iteration has begun.
+    /// Available only in the [`Ready`] phase; the [`Walking`] phase has no
+    /// configuration methods.
     #[must_use]
     pub(crate) fn missing_as_empty(mut self) -> Self {
-        self.absorb_missing_root = true;
+        self.state.absorb_missing_root = true;
         self
     }
 
@@ -127,18 +150,23 @@ impl DirTree {
     /// Works with [`Self::children`] and [`Self::descendants`]. For flat walks,
     /// matching directories are omitted from the listing.
     ///
-    /// Has no effect after iteration begins.
+    /// Available only in the [`Ready`] phase; the [`Walking`] phase has no
+    /// configuration methods.
     #[must_use]
-    pub(crate) fn filter<F>(mut self, mut predicate: F) -> Self
+    pub(crate) fn filter<F>(self, mut predicate: F) -> Self
     where
         F: FnMut(&DirNodeRef<'_>) -> bool + 'static,
     {
-        self.prune = Some(Box::new(move |entry: &DirEntry| {
-            entry.depth() == 0
-                || !entry.file_type().is_dir()
-                || !predicate(&DirNodeRef(entry))
-        }));
-        self
+        Self {
+            state: Ready {
+                prune: Some(Box::new(move |entry: &DirEntry| {
+                    entry.depth() == 0
+                        || !entry.file_type().is_dir()
+                        || !predicate(&DirNodeRef(entry))
+                })),
+                ..self.state
+            },
+        }
     }
 
     /// Orders each listed directory's entries with `compare`.
@@ -147,60 +175,74 @@ impl DirTree {
     /// The sorting closure receives borrowed node views and must be [`Send`]
     /// and [`Sync`].
     ///
-    /// Has no effect after iteration begins.
-    pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
+    /// Available only in the [`Ready`] phase; the [`Walking`] phase has no
+    /// configuration methods.
+    pub(crate) fn sorted_by<F>(self, mut compare: F) -> Self
     where
         F: FnMut(&DirNodeRef<'_>, &DirNodeRef<'_>) -> std::cmp::Ordering
             + Send
             + Sync
             + 'static,
     {
-        if let Some(pending) = self.builder.take() {
-            self.builder =
-                Some(pending.sort_by(move |a, b| {
-                    compare(&DirNodeRef(a), &DirNodeRef(b))
-                }));
+        let mut state = self.state;
+        state.builder = state
+            .builder
+            .sort_by(move |a, b| compare(&DirNodeRef(a), &DirNodeRef(b)));
+        Self {
+            state,
         }
-        self
     }
 
-    /// Starts the walk lazily and returns the inner iterator.
+    /// Starts the walk, transitioning from the [`Ready`] to the [`Walking`]
+    /// phase.
     ///
-    /// Consumes the builder on the first call and returns the same iterator on
-    /// subsequent calls. Applies the [`Self::filter`] predicate when
-    /// configured.
-    fn start(&mut self) -> &mut InnerIter {
-        let Self {
+    /// The [`Walking`] phase implements [`Iterator`] and has no configuration
+    /// methods, so any later reconfiguration attempt fails to compile. `for`
+    /// loops transition implicitly via [`IntoIterator`].
+    pub(crate) fn walk(self) -> DirTree<Walking> {
+        let Ready {
             builder,
+            root,
             prune,
-            inner,
-            ..
-        } = self;
-        inner.get_or_insert_with(|| {
-            let Some(builder) = builder.take() else {
-                return InnerIter::Done;
-            };
-            let iter = WalkDir::into_iter(builder);
-            match prune.take() {
-                Some(predicate) => {
-                    InnerIter::Filtered(iter.filter_entry(predicate))
-                }
-                None => InnerIter::Plain(iter),
-            }
-        })
+            absorb_missing_root,
+        } = self.state;
+        let inner = match prune {
+            Some(predicate) => InnerIter::Filtered(
+                WalkDir::into_iter(builder).filter_entry(predicate),
+            ),
+            None => InnerIter::Plain(WalkDir::into_iter(builder)),
+        };
+        DirTree {
+            state: Walking {
+                inner,
+                root,
+                absorb_missing_root,
+            },
+        }
     }
 }
 
-impl Iterator for DirTree {
+impl IntoIterator for DirTree<Ready> {
+    type IntoIter = DirTree<Walking>;
+    type Item = Result<DirNode, DirTreeError>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.walk()
+    }
+}
+
+impl Iterator for DirTree<Walking> {
     type Item = Result<DirNode, DirTreeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(item) = self
-            .start()
+            .state
+            .inner
             .next()
-            .map(|result| DirNode::try_new(&self.root, result))
+            .map(|result| DirNode::try_new(&self.state.root, result))
         {
-            let absorbed = self.absorb_missing_root
+            let absorbed = self.state.absorb_missing_root
                 && matches!(&item, Err(DirTreeError::MissingRoot { .. }));
             if !absorbed {
                 return Some(item);
@@ -364,9 +406,6 @@ type PrunePredicate = Box<dyn FnMut(&DirEntry) -> bool>;
 enum InnerIter {
     Plain(walkdir::IntoIter),
     Filtered(walkdir::FilterEntry<walkdir::IntoIter, PrunePredicate>),
-    /// Terminal state for a walk that never obtained a builder: yields
-    /// nothing instead of fabricating a dummy root.
-    Done,
 }
 
 impl Iterator for InnerIter {
@@ -377,7 +416,6 @@ impl Iterator for InnerIter {
         match self {
             Self::Plain(iter) => iter.next(),
             Self::Filtered(iter) => iter.next(),
-            Self::Done => None,
         }
     }
 }
@@ -444,6 +482,7 @@ mod tests {
 
             // Act
             let mut names: Vec<String> = DirTree::children(root)
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| node.file_name().to_string_lossy().into_owned())
                 .collect();
@@ -459,7 +498,8 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
 
             // Act
-            let entries: Vec<_> = DirTree::children(temp.path()).collect();
+            let entries: Vec<_> =
+                DirTree::children(temp.path()).walk().collect();
 
             // Assert
             assert!(entries.is_empty(), "an empty directory has no children");
@@ -472,7 +512,8 @@ mod tests {
             let missing = temp.path().join("does-not-exist");
 
             // Act
-            let collected: Vec<_> = DirTree::children(&missing).collect();
+            let collected: Vec<_> =
+                DirTree::children(&missing).walk().collect();
 
             // Assert
             assert_eq!(
@@ -502,6 +543,7 @@ mod tests {
             // Act
             let names: Vec<String> = DirTree::children(root)
                 .sorted_by(|a, b| a.file_name().cmp(b.file_name()))
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| node.file_name().to_string_lossy().into_owned())
                 .collect();
@@ -518,7 +560,7 @@ mod tests {
 
             // Act / Assert
             assert!(
-                DirTree::children(&file).next().is_none(),
+                DirTree::children(&file).walk().next().is_none(),
                 "a file root lists nothing"
             );
         }
@@ -534,6 +576,7 @@ mod tests {
             // Act
             let mut names: Vec<String> = DirTree::children(root)
                 .filter(|node| node.file_name() == ".git")
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| node.file_name().to_string_lossy().into_owned())
                 .collect();
@@ -560,6 +603,7 @@ mod tests {
 
             // Act
             let mut relatives: Vec<String> = DirTree::descendants(root)
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
                     node.path()
@@ -582,7 +626,8 @@ mod tests {
             let missing = temp.path().join("gone");
 
             // Act
-            let collected: Vec<_> = DirTree::descendants(&missing).collect();
+            let collected: Vec<_> =
+                DirTree::descendants(&missing).walk().collect();
 
             // Assert
             assert_eq!(collected.len(), 1);
@@ -601,11 +646,15 @@ mod tests {
 
             // Act
             let flat: Vec<_> =
-                DirTree::children(&missing).missing_as_empty().collect();
-            let deep: Vec<_> =
-                DirTree::descendants(&missing).missing_as_empty().collect();
-            let present: Vec<_> =
-                DirTree::children(temp.path()).missing_as_empty().collect();
+                DirTree::children(&missing).missing_as_empty().walk().collect();
+            let deep: Vec<_> = DirTree::descendants(&missing)
+                .missing_as_empty()
+                .walk()
+                .collect();
+            let present: Vec<_> = DirTree::children(temp.path())
+                .missing_as_empty()
+                .walk()
+                .collect();
 
             // Assert
             assert!(flat.is_empty(), "flat walk must yield nothing");
@@ -628,7 +677,7 @@ mod tests {
 
             // Act
             let collected: Vec<_> =
-                DirTree::children(root).missing_as_empty().collect();
+                DirTree::children(root).missing_as_empty().walk().collect();
 
             // Assert: only MissingRoot is absorbed; other failures propagate.
             assert_eq!(collected.len(), 1);
@@ -652,6 +701,7 @@ mod tests {
             // Act
             let mut names: Vec<String> = DirTree::descendants(root)
                 .filter(|node| node.file_name() == ".git")
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| node.file_name().to_string_lossy().into_owned())
                 .collect();
@@ -674,6 +724,7 @@ mod tests {
             // Act
             let mut names: Vec<String> = DirTree::descendants(root)
                 .filter(|node| node.file_name() == ".git")
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| node.file_name().to_string_lossy().into_owned())
                 .collect();
@@ -697,6 +748,7 @@ mod tests {
             // Act
             let relatives: Vec<String> = DirTree::descendants(root)
                 .sorted_by(|a, b| a.file_name().cmp(b.file_name()))
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
                     node.path()
@@ -730,6 +782,7 @@ mod tests {
             let relatives: Vec<String> = DirTree::descendants(root)
                 .filter(|node| node.file_name() == ".git")
                 .sorted_by(|a, b| a.file_name().cmp(b.file_name()))
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
                     node.path()
@@ -765,6 +818,7 @@ mod tests {
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     node.file_name() == root_name.as_os_str()
                 })
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
                     node.path()
@@ -798,6 +852,7 @@ mod tests {
             // Act
             let relatives: Vec<String> = DirTree::descendants(root)
                 .filter(|node| node.file_name() == ".traces")
+                .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
                     node.path()
@@ -827,6 +882,7 @@ mod tests {
 
             // Act
             let mut relatives: Vec<String> = DirTree::descendants(root)
+                .walk()
                 .map(|entry| entry.expect("entry is readable"))
                 .map(|node| {
                     node.path()
@@ -845,80 +901,6 @@ mod tests {
                 "target",
                 "target/nested.md"
             ]);
-        }
-    }
-
-    mod builder {
-        use pretty_assertions::assert_eq;
-
-        use super::*;
-
-        #[test]
-        fn returns_unfiltered_entries_when_filter_is_configured_after_iteration_starts()
-         {
-            // Arrange
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let root = temp.path();
-            write(root, "a.md");
-            write(root, "b.md");
-            write(root, "c.md");
-            write(root, "sub/nested.md");
-            let mut tree = DirTree::children(root).sorted_by(|left, right| {
-                left.file_name().cmp(right.file_name())
-            });
-
-            // Act
-            let first = tree
-                .next()
-                .expect("first child")
-                .expect("first child is readable");
-            let names: Vec<String> = tree
-                .filter(|node| node.file_name() == "sub")
-                .map(|entry| entry.expect("child is readable"))
-                .map(|node| node.file_name().to_string_lossy().into_owned())
-                .collect();
-
-            // Assert
-            assert_eq!(first.file_name(), std::ffi::OsStr::new("a.md"));
-            assert_eq!(names, vec!["b.md", "c.md", "sub"]);
-        }
-
-        #[test]
-        fn leaves_comparator_uninvoked_when_sorting_is_configured_after_iteration_starts()
-         {
-            // Arrange
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let root = temp.path();
-            write(root, "a.md");
-            write(root, "b.md");
-            write(root, "c.md");
-            let comparisons =
-                std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-            let comparisons_in_compare = std::sync::Arc::clone(&comparisons);
-            let mut tree = DirTree::children(root);
-
-            // Act
-            let first = tree.next().expect("first child");
-            let rest: Vec<_> = tree
-                .sorted_by(move |left, right| {
-                    comparisons_in_compare
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    left.file_name().cmp(right.file_name())
-                })
-                .collect();
-
-            // Assert
-            assert!(first.is_ok(), "first child is readable: {first:?}");
-            assert_eq!(rest.len(), 2);
-            assert!(
-                rest.iter().all(Result::is_ok),
-                "remaining children are readable: {rest:?}"
-            );
-            assert_eq!(
-                comparisons.load(std::sync::atomic::Ordering::Relaxed),
-                0,
-                "late comparator must not run"
-            );
         }
     }
 
@@ -941,7 +923,7 @@ mod tests {
             let _restore = RestorePermissions(root);
 
             // Act
-            let collected: Vec<_> = DirTree::children(root).collect();
+            let collected: Vec<_> = DirTree::children(root).walk().collect();
 
             // Assert: Permission denial maps to an inaccessible root rather
             // than a missing root.
@@ -978,7 +960,7 @@ mod tests {
             let _restore = RestorePermissions(&kid);
 
             // Act
-            let collected: Vec<_> = DirTree::children(root).collect();
+            let collected: Vec<_> = DirTree::children(root).walk().collect();
 
             // Assert
             assert_eq!(collected.len(), 1);
@@ -1010,7 +992,8 @@ mod tests {
             let _restore = RestorePermissions(&kid);
 
             // Act
-            let mut errors = DirTree::descendants(root).filter_map(Result::err);
+            let mut errors =
+                DirTree::descendants(root).walk().filter_map(Result::err);
 
             // Assert
             let error = errors.next();
@@ -1038,6 +1021,7 @@ mod tests {
 
             // Act
             let node = DirTree::children(root)
+                .walk()
                 .next()
                 .expect("one entry")
                 .expect("entry is readable");
@@ -1057,6 +1041,7 @@ mod tests {
 
             // Act
             let node = DirTree::children(root)
+                .walk()
                 .next()
                 .expect("one entry")
                 .expect("entry is readable");
@@ -1081,6 +1066,7 @@ mod tests {
 
             // Act
             let node = DirTree::children(root)
+                .walk()
                 .find(|entry| matches!(entry, Ok(node) if node.path() == link.as_path()))
                 .expect("symlink entry is yielded")
                 .expect("symlink entry is readable");

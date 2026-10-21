@@ -370,7 +370,7 @@ impl FilePathTracker {
         &self,
         companion_suffixes: &[&str],
     ) -> impl Iterator<Item = Result<PathBuf, FilePathTrackerError>> {
-        DirTree::children(&self.root).missing_as_empty().filter_map(
+        DirTree::children(&self.root).missing_as_empty().walk().filter_map(
             move |node| match node.map_err(store_error) {
                 Err(error) => Some(Err(error)),
                 Ok(node) => {
