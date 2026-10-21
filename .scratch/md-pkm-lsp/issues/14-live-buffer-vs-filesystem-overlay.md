@@ -45,3 +45,8 @@ Decide:
 
 - **Overlay keys move `Url` -> `Uri`** (ls-types' fluent-uri `Uri` from tower-lsp-server 0.23), or through one explicit edge-owned conversion helper, so overlay and WorkspaceEdit keying share one identity type. The edge resolves `PathBuf` -> `Uri` by consulting the open-document map for the client's spelling first; `from_file_path` only for never-named docs (never round-trip a client-named document: Windows canonical form does not match editor-spelled strings; percent-encoding/drive-letter/symlink variants stay distinct keys).
 - **Ropey reconciliation**: `BufferState` being String-backed (no rope) is the stated reason 11's two-function disk/ropey split collapses into one LineIndex-backed helper; see 11's Amended-by-26 block.
+
+### Amended by iwe and fileclass research (2026-10-21)
+
+- iwe's overlay contract is identical (open buffer wins over disk, close-time reconcile, watcher-as-disk-truth) with one recorded nuance: its didSave-as-no-op works only because it owns a server-side watcher — Traces' didSave→refresh remains correct under client-side watching (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 2).
+- fileclass's production-measured `processFrontMatter` write-clobbering incident (user data loss, full-fidelity read→edit→write roundtrip) is the first external example of the write-side hazard Traces' write path must avoid (amended 2026-10-21 by iwe/fileclass research, [tool-fileclass](../research/tool-fileclass.md) §7).

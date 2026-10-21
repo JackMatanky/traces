@@ -62,7 +62,9 @@ supersedes §0).
    one bounded overlay-only resolve-time read legal (create-note flow keeps docs). Budgets owed
    to 33: resolve p95 ≤1 ms, 20-item burst ≤20 ms gate-time; D7 duration histogram = launch
    gate. Counts/badges mirror into `detail` (Zed never renders `labelDetails`). `itemDefaults` =
-   upstream ls-types PR path, not a permanent wall.
+   upstream ls-types PR path, not a permanent wall. iwe is the shipped counterpoint that validates
+   the split as deliberate: eager completion with identity-resolve is a shipped shape, not an
+   oversight (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 6).
 4. **Wikilink insert** — the zero-snippets draft was refuted and flipped to option (A):
    `snippetSupport` is verified true in all five primary clients, no-auto-pair is stock Neovim's
    default, and 15 names Neovim the primary PKM demographic. Decision: range covers an existing

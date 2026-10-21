@@ -30,3 +30,7 @@ Feeds: note-parse ticket 04 (already rewritten Heading-only; spans return as a f
 - **11 §8 amended**: its "only live-editing-session requests need spans" sentence is corrected (see 11's Amended-by-26 block); this ticket's framing inherits the correction.
 - **Evidence corrected**: gopls v0.12 (Sept 2023) persists per-identifier cross-reference indexes (go.dev/blog/gopls-scalability), so "no PKM peer persists occurrence indexes" is false as previously stated. The transient-spans justification is now "markdown occurrence scanning is cheap (KB-scale notes) and index maintenance is the measured failure mode elsewhere" (markdown-oxide MAX_INDEXED_LINES, zk ~7-minute cold index), not "nobody persists".
 - **Blocking consequence**: under `concurrency_level(1)` a long rename blocks every subsequent request (26's A2 decision: rename is the sole >100ms handler with `$/progress`); this ticket's serving/persistence choice is the structural fix point.
+
+## Inputs from iwe research (2026-10-21)
+
+- (amended 2026-10-21 by iwe research) iwe's rebuild-every-start (~958ms @ 20k docs, indexed load) and raw-markdown `ServerParams.state` handoff corroborate that markdown graph rebuild is cheap and content handoff beats serialized indexes ([tool-iwe](../research/tool-iwe.md) Part 3, Part 4).

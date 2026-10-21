@@ -48,3 +48,7 @@ If Traces were to adopt an actor model, the Rust ecosystem offers several paths,
 - **Simplicity:** Exposing a standard Rust `impl Coordinator { pub fn query(...) }` API is far less boilerplate than defining message enums and oneshot response channels.
 - **Extensibility:** To add an MCP server later, you simply instantiate the MCP transport loop and pass it a clone of the `Arc<Coordinator>`, exactly as you do for the LSP transport loop. No internal logic needs to be duplicated or rearchitected.
 - **Precedent:** This aligns directly with `rust-analyzer`'s proven Host/Snapshot architecture, which handles exact same concurrency requirements at a massive scale.
+
+## Topology note (amended 2026-10-21 by iwe research)
+
+A second topology is now on record: iwe's `iwec` MCP server is a fully separate process from its `iwes` LSP — own graph, own watcher, filesystem-only consistency ([tool-iwe](tool-iwe.md) Part 2). The actor-model rejection and the `Arc`-swap decision stand; the same-process-vs-dual-process topology choice is explicitly left to the eventual MCP ticket.

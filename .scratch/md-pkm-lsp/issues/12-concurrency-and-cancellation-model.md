@@ -25,13 +25,13 @@ Why not N>1: tower-lsp-server has a known ordering bug (#284) where `buffer_unor
 
 Why not `spawn_blocking` per handler: every handler would need manual `tokio::task::spawn_blocking` wrapping, losing tower-lsp-server's `$/cancelRequest` support (spawn_blocking threads can't be interrupted), adding per-handler bridge overhead, and introducing sync/async boundary complexity (Biome's `catch_lsp_operation` pattern catches panics and Salsa cancellation at this boundary — non-trivial code).
 
-Why not lsp-server (crossbeam-channel): ticket 09 evaluated this. `lsp-server` gives full dispatch control but requires implementing JSON-RPC framing, request routing, progress, and cancellation manually. The ~125-line scaffold is the floor; a full-featured LSP is significantly more. Tower-lsp-server provides all of this. The framework choice stands.
+Why not lsp-server (crossbeam-channel): ticket 09 evaluated this. `lsp-server` gives full dispatch control but requires implementing request routing, progress, and cancellation manually; JSON-RPC framing, however, is handled by `Connection` (its stdio transport parses and writes Content-Length-framed messages). The ~125-line scaffold is the floor; a full-featured LSP is significantly more. Tower-lsp-server provides all of this. The framework choice stands (amended 2026-10-21 by iwe/fileclass research: framing claim corrected; the routing/progress/cancellation rationale for rejection is unchanged, and iwe ships `lsp_server::Connection::stdio()` with zero framing code ([tool-iwe](../research/tool-iwe.md) Part 1)).
 
 `concurrency_level(1)` also implicitly disables `$/cancelRequest` support (per tower-lsp-server docs), which aligns with the stale-result discard strategy (decision 2).
 
 ### 2. Cancellation: stale-result discard
 
-No production Rust LSP implements cooperative `$/cancelRequest` handling. rust-analyzer detects staleness via salsa's revision counter and returns `ContentModified`. Biome catches cancellation at the sync/async boundary. The industry-standard pattern: let the handler finish, discard the result if stale.
+No production Rust LSP implements cooperative `$/cancelRequest` handling. rust-analyzer detects staleness via salsa's revision counter and returns `ContentModified`. Biome catches cancellation at the sync/async boundary. The industry-standard pattern: let the handler finish, discard the result if stale. (amended 2026-10-21 by iwe/fileclass research: iwe corroborates "no `$/cancelRequest` handling" in a shipped server and adds per-message `catch_unwind` as a citable resilience idiom ([tool-iwe](../research/tool-iwe.md) Part 1).)
 
 With N=1 and <100ms handler budgets, there is no mid-execution cancellation to implement. When the user types quickly, multiple completion/hover requests fire — the old one finishes, its result is discarded, the new one runs. When the document changes mid-handler, return `ContentModified` error.
 

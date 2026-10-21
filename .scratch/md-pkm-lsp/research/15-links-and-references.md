@@ -17,6 +17,8 @@ Sources: All LSP digests (Marksman, Markdown Oxide, VS Code markdown-language-se
 | Unresolved policy | BrokenLink error | Information + "Create file" code action | Configurable severity | N/A | No diagnostic |
 | Reference-style links | Full parity (IL/RF/RC/RS) | Regex extraction | Full parity | N/A | pulldown-cmark parses all |
 
+iwe (surveyed 2026-10-21): all-absent for fragment support — navigation resolves by document key alone (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 6).
+
 ## Wikilink resolution algorithms
 
 ### Marksman

@@ -11,7 +11,7 @@ Consolidated from: rust-docs-mcp crate analysis, LSP ecosystem survey, performan
 
 ## Executive Summary
 
-The ecosystem splits into two layers: **editor plugins** (Obsidian ecosystem) handle daily note creation/navigation at the UI level, while **LSP servers** (Markdown Oxide, Marksman) handle link resolution and completion. Only Markdown Oxide has native LSP-level date intelligence. The rest rely on convention (filename pattern) or external plugins.
+The ecosystem splits into two layers: **editor plugins** (Obsidian ecosystem) handle daily note creation/navigation at the UI level, while **LSP servers** (Markdown Oxide, Marksman) handle link resolution and completion. Only Markdown Oxide has native LSP-level date intelligence. The rest rely on convention (filename pattern) or external plugins. iwe also lacks date resolution; Markdown Oxide fuzzydate remains the sole precedent (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 8).
 
 For Traces, daily notes are a *configuration-driven* concern — the LSP needs the user's date format, folder structure, and granularity preferences. The canonical pattern across performant LSPs: **extract date metadata cheaply at index time, compute all LSP features lazily at request time**.
 

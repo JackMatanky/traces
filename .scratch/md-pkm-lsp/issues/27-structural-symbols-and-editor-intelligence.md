@@ -24,3 +24,7 @@ Grounded by the Microsoft markdown-language-service research (ticket 05) and the
 - The spine exposes `highlight(target, doc)` for 16's tags and this ticket's documentHighlight registration; documentHighlight is document-local span matching and **never** errors on target ambiguity.
 - The 5,000 references ceiling (26's named constant) is deliberately distinct from symbol-result ceilings; keep the two consciously distinct rather than unifying them.
 - The create-note action's offering side must check `create` in `resourceOperations` (shared predicate with 25's code-action path).
+
+## Input from iwe research (2026-10-21)
+
+- (amended 2026-10-21) Research 27 Part V gained an Option E (inlay hints, iwe precedent) on 2026-10-21 — new option-space, NOT a reopened decision ([tool-iwe](../research/tool-iwe.md) Part 6).

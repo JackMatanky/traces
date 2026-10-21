@@ -20,7 +20,7 @@ Once the analysis-host (10), concurrency (12), and persistence/caching (13) deci
 
 ### Scale basis
 
-Target vault sizes from `benches/common/mod.rs:63`: `WORKSPACE_FILE_COUNTS` = [50, 200, 1_000, 5_000, 20_000] (reconciled 2026-09-23 — the earlier-drafted longer list was stale), with extrapolation to 50K/100K via `bench-model` script. The 20K anchor is the primary design target; 50K/100K are extrapolation checkpoints, not hard commitments. Markdown files average 5–20KB; typical PKM vaults range 100–5,000 notes; power users reach 10K–20K. No PKM LSP publishes vault-size benchmarks — Traces will set the standard.
+Target vault sizes from `benches/common/mod.rs:63`: `WORKSPACE_FILE_COUNTS` = [50, 200, 1_000, 5_000, 20_000] (reconciled 2026-09-23 — the earlier-drafted longer list was stale), with extrapolation to 50K/100K via `bench-model` script. The 20K anchor is the primary design target; 50K/100K are extrapolation checkpoints, not hard commitments. Markdown files average 5–20KB; typical PKM vaults range 100–5,000 notes; power users reach 10K–20K. No studied PKM LSP published vault-size benchmarks at planning time (Traces will set the standard); however, iwe (2026-10-21 survey) now publishes criterion graph-load numbers (20k docs ~705ms plain / ~958ms indexed, M3 Pro) but explicitly not LSP latency ("We don't benchmark iwes"), harvestable as an external comparator against the cold <2s target ([tool-iwe](../research/tool-iwe.md) Part 4). (amended 2026-10-21 by iwe/fileclass research) One-line contrast: iwe's full-rebuild-inline (stall-not-staleness) index model differs from Traces' stale-result-discard design ([tool-iwe](../research/tool-iwe.md) Part 4).
 
 ### 1. Startup targets (cold & warm)
 

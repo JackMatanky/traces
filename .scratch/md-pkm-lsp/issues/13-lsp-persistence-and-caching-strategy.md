@@ -22,7 +22,7 @@ Blocks: 28(file operations/cascading edits), 33(performance targets).
 
 ### 1. No new redb tables
 
-No markdown/PKM LSP persists its workspace index to disk — rumdl LSP, Markdown Oxide, and Marksman all keep their index in-memory and re-scan on startup. Traces' existing 7 redb tables already store everything the LSP needs: parsed ASTs (frontmatter/tags/links/lists), inlink multimap, tag/file-class lookup indices. Derived LSP data (reference-resolution graph, diagnostic state) is cheap to reconstruct from these at startup. redb persists as a warm-start cache, not as the query source. No schema versioning changes needed — redb's `open_table` creates-if-not-exists, and `check_rebuild_needed` already handles schema mismatches via wipe-and-recreate.
+No markdown/PKM LSP persists its workspace index to disk — rumdl LSP, Markdown Oxide, and Marksman all keep their index in-memory and re-scan on startup. iwe never persists or warm-starts its graph — full rebuild every server start (~958ms @ 20k docs, M3 Pro) — fifth datapoint for the no-warm-start default (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 3). Traces' existing 7 redb tables already store everything the LSP needs: parsed ASTs (frontmatter/tags/links/lists), inlink multimap, tag/file-class lookup indices. Derived LSP data (reference-resolution graph, diagnostic state) is cheap to reconstruct from these at startup. redb persists as a warm-start cache, not as the query source. No schema versioning changes needed — redb's `open_table` creates-if-not-exists, and `check_rebuild_needed` already handles schema mismatches via wipe-and-recreate.
 
 ### 2. In-memory mutable index (editor buffer is authoritative)
 

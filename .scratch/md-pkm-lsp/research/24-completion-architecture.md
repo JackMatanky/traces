@@ -165,7 +165,10 @@ closest match for helper-namespace completion; JSON-schema-in-YAML for schema-la
 strongest named precedents for the other rows — IntelliJ language injection, graphql
 marker-activation, gopls template AST, Liquid LS (`novel:35-40,49-56`); **no direct match** for
 triple-nesting (query DSL inside a template string inside Markdown) — first-principles, bounded by
-22's D5 ("completion-offered ⇒ find-resolvable") and 21's token classification. Unit 7's rejection
+22's D5 ("completion-offered ⇒ find-resolvable") and 21's token classification. The matrix source is
+external (the deleted `24-novel-embedded-context-precedent.md` unit, cited here only by reference);
+the iwe entry is recorded here: eager completion, identity resolve, bracket-prefix regions
+(amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 6). Unit 7's rejection
 table (`novel:212-221`): union-of-completers lists; helm-style child-server delegation (2 IPC hops
 vs <20 ms, `novel:216`); client-side `embeddedLanguages` injection (not LSP-portable, `:217`);
 Templater's region-blind regex as sole detector (`:219`). Note what is **not** a rejection: VS Code
@@ -227,6 +230,8 @@ capable server (`lsp_store.rs:7910-7941`), so a Traces-only char such as `[` als
 expect nothing from client-side selective routing. Also: Zed never queries on multi-char input
 (paste, `completions.rs:1527-1529`) — bulk insertion is `Invoked`/absent-context territory (§1.4
 already requires identical classification).
+
+iwe datapoint (amended 2026-10-21 by iwe/fileclass research): single registered `[` trigger char with bracket-prefix shape-picking at request time (`[`→markdown, `[[`→wiki, bare `[` defaults) — server-side shape classification over one char, matching the ladder model ([tool-iwe](tool-iwe.md) Part 6).
 
 ### 2.3 Collision matrix & client fan-out (unit 2 §3, §6)
 

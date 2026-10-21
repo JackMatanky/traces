@@ -54,7 +54,7 @@ Evidence base:
 
 **`textDocument/definition`**:
 - Returns `None` (empty).
-- Rationale: Tags are distributed classifications, not declared symbols. Navigating to an arbitrary occurrence on F12 violates LSP expectations in editors like Helix and Zed, which jump to the first item rather than presenting a selection list. Marksman and zk omit definition for tags entirely. If dedicated "tag notes" are added in the future, definition will navigate to that note.
+- Rationale: Tags are distributed classifications, not declared symbols. Navigating to an arbitrary occurrence on F12 violates LSP expectations in editors like Helix and Zed, which jump to the first item rather than presenting a selection list. Marksman and zk omit definition for tags entirely; iwe ships zero tag intelligence too (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 7). If dedicated "tag notes" are added in the future, definition will navigate to that note.
 
 **`textDocument/references`**:
 - Hierarchical prefix matching: Querying `#projects` returns all occurrences of `#projects` and every descendant sub-tag (e.g. `#projects/active` and `#projects/active/backend`), evaluated via `Tag::is_contained_in`.

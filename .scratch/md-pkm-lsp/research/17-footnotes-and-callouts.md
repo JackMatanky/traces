@@ -66,7 +66,7 @@ pub enum BlockQuoteKind { Note, Tip, Important, Warning, Caution }
 
 ### Key finding
 
-Markdown Oxide is the only major Rust LSP with both footnote and callout intelligence. md-lsp (less widely adopted) has the most complete footnote support. No LSP provides callout diagnostics beyond suppressing false-positive warnings.
+Markdown Oxide is the only major Rust LSP with both footnote and callout intelligence. md-lsp (less widely adopted) has the most complete footnote support. No LSP provides callout diagnostics beyond suppressing false-positive warnings. iwe has neither footnotes nor callouts; Markdown Oxide remains the sole Rust precedent (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 8).
 
 ---
 
