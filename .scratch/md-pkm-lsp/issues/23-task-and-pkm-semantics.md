@@ -6,7 +6,7 @@ Status: resolved
 
 ## Question
 
-Grounding: `ListItem` (`src/note/lists.rs:64`) already models `kind: ListItemType::Task(TaskStatus)` with `text`, `children`, local `fields`, and a line-only `position: ListItemPosition`. `TaskStatus`/`TaskStatusMap` are configurable via `[tasks]` in Config (checkbox-symbol→status mapping, tag-filter classification). Query DSL already has a dedicated `Query Mode::Tasks` (one row per task). Informed by Markdown Oxide/Marksman task handling if any (tickets 01, 02) and the obsidian-tasks parity findings folded into ticket 08.
+Grounding: `ListItem` (`src/note/lists.rs:64`) already models `kind: ListItemType::Task(TaskStatus)` with `text`, `children`, local `fields`, and a line-only `position: ListItemPosition`. `TaskStatus`/`TaskStatusMap` are configurable via `[tasks]` in Config (checkbox-symbol→status mapping, tag-filter classification). Query DSL already has a dedicated `Query Mode::Tasks` (one row per task). Informed by Markdown Oxide/Marksman task handling if any (tickets 01, 02) and the obsidian-tasks parity findings folded into ticket 08. iwe ships no task intelligence either (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 7).
 
 Decide:
 - Completion: task-status checkbox-symbol completion (informed by the project's configured `TaskStatusMap`, not a hardcoded set).
