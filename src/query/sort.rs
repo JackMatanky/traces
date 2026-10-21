@@ -3,9 +3,9 @@
 //!
 //! This module implements ordering semantics across diverse metadata types,
 //! mapping dynamically typed [`NoteFieldValue`] and borrowed
-//! [`QueryFieldValueRef`] variants into comparable [`SortKey`] values.
-//! It defines canonical cross-type ranking, case-insensitive text
-//! normalization, date and duration ordering, and configurable null placement.
+//! [`QueryFieldValueRef`] variants into comparable [`SortKey`] values. It
+//! defines canonical cross-type ranking, case-insensitive text normalization,
+//! date and duration ordering, and configurable null placement.
 //!
 //! Complex, multi-column orderings are represented via [`SortOrder`], which
 //! combines multiple [`SortTerm`] clauses into an efficient row-major key
@@ -146,17 +146,16 @@ impl SortOrder {
 
         let mut opt_rows: Vec<Option<QueryRow>> =
             rows.into_iter().map(Some).collect();
-        // `order`'s length is `opt_rows.len()` by construction and every
-        // index is unique and taken exactly once, so the output length is
-        // exactly `order.len()` - but `filter_map`'s `size_hint` lower
-        // bound is conservatively 0 (the compiler can't know the closure
-        // always succeeds), so a bare `.collect()` can't preallocate
-        // exactly and falls back to `Vec`'s amortized growth. Unlike a
-        // `Copy` element type, `QueryRow`'s `Arc` field and non-trivial
-        // drop glue block the size-matched-reuse optimization that (for
-        // Copy types) makes this normally free - measured via temporary
-        // instrumentation (reverted): 5 reallocations at n=100, 8 at
-        // n=1000 without this pre-sizing.
+        // `order`'s length is `opt_rows.len()` by construction and every index
+        // is unique and taken exactly once, so the output length is exactly
+        // `order.len()` - but `filter_map`'s `size_hint` lower bound is
+        // conservatively 0 (the compiler can't know the closure always
+        // succeeds), so a bare `.collect()` can't preallocate exactly and falls
+        // back to `Vec`'s amortized growth. Unlike a `Copy` element type,
+        // `QueryRow`'s `Arc` field and non-trivial drop glue block the
+        // size-matched-reuse optimization that (for Copy types) makes this
+        // normally free - measured via temporary instrumentation (reverted): 5
+        // reallocations at n=100, 8 at n=1000 without this pre-sizing.
         let mut sorted = Vec::with_capacity(order.len());
         sorted.extend(
             order
@@ -457,8 +456,7 @@ pub(super) enum TextShape {
 impl TextShape {
     /// Inspects free text for a date, date-time, or duration shape.
     ///
-    /// Delegates to [`DatePoint::parse`] and
-    /// [`crate::DurationValue::parse`].
+    /// Delegates to [`DatePoint::parse`] and [`crate::DurationValue::parse`].
     pub(super) fn classify(s: &str) -> Self {
         let trimmed = s.trim();
         match DatePoint::parse(trimmed) {

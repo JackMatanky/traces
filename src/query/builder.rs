@@ -70,8 +70,8 @@ impl QueryBuilder {
         }
     }
 
-    /// Builds a list-row query that emits one row per list item (plain
-    /// bullets, checkboxes, and tasks) in each matching note.
+    /// Builds a list-row query that emits one row per list item (plain bullets,
+    /// checkboxes, and tasks) in each matching note.
     #[inline]
     #[must_use]
     pub fn lists(source: SourceSelector) -> Self {
@@ -93,9 +93,9 @@ impl QueryBuilder {
         }
     }
 
-    /// Builds a query for `mode`, dispatching to the mode-specific
-    /// constructor so callers can hold a bare [`QueryMode`] without knowing
-    /// which constructor it selects.
+    /// Builds a query for `mode`, dispatching to the mode-specific constructor
+    /// so callers can hold a bare [`QueryMode`] without knowing which
+    /// constructor it selects.
     #[inline]
     #[must_use]
     pub(crate) fn from_mode(mode: QueryMode, source: SourceSelector) -> Self {

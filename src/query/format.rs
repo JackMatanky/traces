@@ -17,8 +17,8 @@ pub(crate) enum TaskPathStyle {
     /// Omits paths for template rendering.
     #[default]
     None,
-    /// Appends paths in parentheses for `traces task` and 1-indexed source
-    /// line coordinates for `traces task -l`.
+    /// Appends paths in parentheses for `traces task` and 1-indexed source line
+    /// coordinates for `traces task -l`.
     Suffix,
     /// Append file path and 1-indexed source line coordinates for
     /// `traces task -l`.
@@ -103,18 +103,17 @@ impl QueryDisplayFormat {
     /// Renders a Markdown table with resolved, escaped cells.
     ///
     /// Hand-rolls the `comfy-table` crate's `ASCII_MARKDOWN` preset layout
-    /// (left-aligned cells, space-padded to each column's max
-    /// [`unicode_width`] across header and data, `| cell | cell |` rows,
-    /// dash separator matching each column's padded width) directly via
-    /// `String` writes. `comfy-table` computes the same layout through a
-    /// general-purpose table-building/wrapping pipeline (column
-    /// constraints, dynamic width arrangement, ANSI styling) that this
-    /// call site never uses (no wrapping: `Table::new()` defaults to
-    /// `ContentArrangement::Disabled`, confirmed empirically with an
-    /// 80-plus-character cell producing no wrap) - the fixed single-preset,
-    /// no-styling use here needs only the width-then-pad computation, not
-    /// the general machinery. Measured ~30x faster (1.1ms -> ~35us at
-    /// n=1000 rows).
+    /// (left-aligned cells, space-padded to each column's max [`unicode_width`]
+    /// across header and data, `| cell | cell |` rows, dash separator matching
+    /// each column's padded width) directly via `String` writes. `comfy-table`
+    /// computes the same layout through a general-purpose
+    /// table-building/wrapping pipeline (column constraints, dynamic width
+    /// arrangement, ANSI styling) that this call site never uses (no wrapping:
+    /// `Table::new()` defaults to `ContentArrangement::Disabled`, confirmed
+    /// empirically with an 80-plus-character cell producing no wrap) - the
+    /// fixed single-preset, no-styling use here needs only the width-then-pad
+    /// computation, not the general machinery. Measured ~30x faster (1.1ms ->
+    /// ~35us at n=1000 rows).
     fn render_table(
         headers: &[String],
         columns: &[String],
@@ -127,12 +126,12 @@ impl QueryDisplayFormat {
             });
         }
         // A zero-column table has nothing to pad or separate; `comfy-table`
-        // (the prior implementation) collapsed this degenerate case to a
-        // bare `||` border regardless of row count, since there's no
-        // per-column width to draw a header/separator/data distinction
-        // from. No real caller produces a 0-column table (the CLI/template
-        // surface always requires at least one header); preserved only so
-        // this edge case still can't panic and stays byte-compatible.
+        // (the prior implementation) collapsed this degenerate case to a bare
+        // `||` border regardless of row count, since there's no per-column
+        // width to draw a header/separator/data distinction from. No real
+        // caller produces a 0-column table (the CLI/template surface always
+        // requires at least one header); preserved only so this edge case still
+        // can't panic and stays byte-compatible.
         if headers.is_empty() {
             return Ok("||\n".to_owned());
         }
@@ -171,8 +170,8 @@ impl QueryDisplayFormat {
         Ok(out)
     }
 
-    /// Writes one `| cell | cell |` row, left-aligned and space-padded to
-    /// each column's precomputed width.
+    /// Writes one `| cell | cell |` row, left-aligned and space-padded to each
+    /// column's precomputed width.
     fn write_table_row(out: &mut String, cells: &[String], widths: &[usize]) {
         out.push('|');
         for (cell, &width) in cells.iter().zip(widths) {
@@ -187,9 +186,8 @@ impl QueryDisplayFormat {
         out.push('\n');
     }
 
-    /// Writes the `|------|------|` header/data divider matching each
-    /// column's padded width (`width + 2` for the one-space margin on each
-    /// side).
+    /// Writes the `|------|------|` header/data divider matching each column's
+    /// padded width (`width + 2` for the one-space margin on each side).
     fn write_table_separator(out: &mut String, widths: &[usize]) {
         out.push('|');
         for &width in widths {
@@ -274,13 +272,13 @@ impl QueryDisplayFormat {
     }
 
     /// Escapes Markdown table cell text by replacing newlines with spaces and
-    /// escaping pipes. Short-circuits to a plain copy when neither character
-    /// is present, avoiding the two intermediate allocations a chained
-    /// `.replace().replace()` would otherwise cost every cell. Accepts an
-    /// owned `String` (the common case: `row.resolve_ref(path).text()`
-    /// already allocates one) so the no-escape-needed fast path returns it
-    /// directly with zero extra allocation, instead of re-copying into a
-    /// second `String` the way a `&str -> String` signature would force.
+    /// escaping pipes. Short-circuits to a plain copy when neither character is
+    /// present, avoiding the two intermediate allocations a chained
+    /// `.replace().replace()` would otherwise cost every cell. Accepts an owned
+    /// `String` (the common case: `row.resolve_ref(path).text()` already
+    /// allocates one) so the no-escape-needed fast path returns it directly
+    /// with zero extra allocation, instead of re-copying into a second `String`
+    /// the way a `&str -> String` signature would force.
     fn escape_table_cell<'a>(text: impl Into<Cow<'a, str>>) -> String {
         let text = text.into();
         if !text.contains(['\n', '|']) {

@@ -4,6 +4,7 @@
 //! executes queries against either an in-memory [`WorkspaceIndex`] or directly
 //! against on-disk [`IndexStore`] tables without loading the full index into
 //! memory.
+//!
 //! It resolves candidate paths from [`SourceSelector`] expressions, expands
 //! File Class inheritance trees via [`FileClassExpander`], instantiates
 //! [`QueryRow`] items, and applies the optimized
@@ -87,9 +88,9 @@ impl QueryService {
         self
     }
 
-    /// Expands `source`'s File Class atoms through this service's expander,
-    /// if one is attached. Both execution paths call this before row
-    /// generation so class matching shares one implementation.
+    /// Expands `source`'s File Class atoms through this service's expander, if
+    /// one is attached. Both execution paths call this before row generation so
+    /// class matching shares one implementation.
     fn resolve_source_classes(&self, source: &mut SourceSelector) {
         if source.has_classes()
             && let Some(expander) = self.class_expander.as_deref()
@@ -207,21 +208,19 @@ impl QueryService {
         }
     }
 
-    /// Materializes [`Self::matched_file_rows`] into a `Vec`, pre-sized
-    /// exactly when `source` is [`SourceSelector::All`] (every entry
-    /// matches, so the output length is `index.entries().len()`, known
-    /// upfront) and left to `Vec`'s default growth otherwise, since a
-    /// selective filter's true output length isn't knowable ahead of time
-    /// and pre-sizing to the full entry count there would be the opposite
-    /// mistake.
+    /// Materializes [`Self::matched_file_rows`] into a `Vec`, pre-sized exactly
+    /// when `source` is [`SourceSelector::All`] (every entry matches, so the
+    /// output length is `index.entries().len()`, known upfront) and left to
+    /// `Vec`'s default growth otherwise, since a selective filter's true output
+    /// length isn't knowable ahead of time and pre-sizing to the full entry
+    /// count there would be the opposite mistake.
     ///
-    /// `Filter`'s `size_hint` lower bound is always 0 (any entry could fail
-    /// the predicate), so a bare `.collect()` can't know the exact output
-    /// length upfront and falls back to `Vec`'s amortized power-of-two
-    /// growth, which can overshoot the real length by up to ~2x depending on
-    /// where it lands (empirically: 28% waste at n=100, 64% at n=10000, only
-    /// 2.4% at n=1000 - pure luck of the draw, not a fixable-by-input-shape
-    /// coincidence).
+    /// `Filter`'s `size_hint` lower bound is always 0 (any entry could fail the
+    /// predicate), so a bare `.collect()` can't know the exact output length
+    /// upfront and falls back to `Vec`'s amortized power-of-two growth, which
+    /// can overshoot the real length by up to ~2x depending on where it lands
+    /// (empirically: 28% waste at n=100, 64% at n=10000, only 2.4% at n=1000 -
+    /// pure luck of the draw, not a fixable-by-input-shape coincidence).
     fn collect_matched_file_rows(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -270,15 +269,14 @@ impl QueryService {
     /// before building rows, avoiding the reallocation-copy cost that
     /// [`QueryRow`]'s `Arc<WorkspaceIndex>` field makes non-trivial: unlike a
     /// `Copy` type, growing this `Vec` without a hint cannot reuse the old
-    /// buffer in place, so every regrowth copies live `Arc` clones one by
-    /// one. Counting via `is_wanted` itself (rather than reserving every
-    /// matched note's total list-item count as an upper bound) matters for
-    /// sparse predicates like `tasks()`: a vault with many list-heavy but
-    /// task-free notes would otherwise reserve megabytes for a handful of
-    /// actual rows. `base_rows` itself goes through
-    /// [`Self::collect_matched_file_rows`] for the same reason: a bare
-    /// `.collect()` here would reintroduce the exact overshoot this method
-    /// exists to avoid, one level up.
+    /// buffer in place, so every regrowth copies live `Arc` clones one by one.
+    /// Counting via `is_wanted` itself (rather than reserving every matched
+    /// note's total list-item count as an upper bound) matters for sparse
+    /// predicates like `tasks()`: a vault with many list-heavy but task-free
+    /// notes would otherwise reserve megabytes for a handful of actual rows.
+    /// `base_rows` itself goes through [`Self::collect_matched_file_rows`] for
+    /// the same reason: a bare `.collect()` here would reintroduce the exact
+    /// overshoot this method exists to avoid, one level up.
     fn item_rows(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -308,9 +306,9 @@ impl QueryService {
         out
     }
 
-    /// Creates one row per indexed file matching `source`, at note
-    /// granularity. List and task modes expand these base rows into per-item
-    /// rows via [`Self::item_rows`].
+    /// Creates one row per indexed file matching `source`, at note granularity.
+    /// List and task modes expand these base rows into per-item rows via
+    /// [`Self::item_rows`].
     fn matched_file_rows<'b>(
         &'b self,
         index: &'b Arc<WorkspaceIndex>,
