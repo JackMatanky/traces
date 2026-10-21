@@ -56,6 +56,15 @@ Grounding: `SchemaService` (`src/schema/service.rs`) is a load-once registry ove
 | **Q14** | Config: `[schemas.diagnostics]` with `enabled` + `debounce_ms`. Per-source severity via editor LSP settings, not project config. | Follows existing config nesting pattern. Minimal project config; editor controls diagnostic display. |
 | **Q18** | Validator: standalone `SchemaValidator` struct. `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`. Pure function, reusable for future CLI. | No LSP backend exists yet — must be library function. `SchemaDiagnostic` carries `field: FieldName`, `range: Option<Range<BytePos>>`, `kind: SchemaDiagnosticKind`, `message: String`. |
 
+### Fileclass precedents (2026-10-21)
+
+- **Q6 corroboration**: fileclass's `validateInList`/`options` treats an empty/absent list as unconstrained — an independent production match for 20's read of the incumbent semantics ([tool-fileclass](../research/tool-fileclass.md)).
+- **Q11 reverse case (recorded, not decided)**: 20's matrix addresses list-on-non-multi but not the reverse (scalar-valued field on a multi-valued fileclass); fileclass's measured calibration rule (Multi/MultiInput lenient, MultiFile/MultiMedia strict — "flag only what queries can observe") is input for the implementation spec ([tool-fileclass](../research/tool-fileclass.md)).
+- The deferred `schema-file.*` diagnostic codes now have a shipped reference design: fileclass's vault-wide definition-side audit (ERROR/WARNING taxonomy, fingerprinted once-per-problem logging, sessionly+rename triggers) ([tool-fileclass](../research/tool-fileclass.md)).
+- Multi-class collision order (last-frontmatter-declared-wins) is specified by the incumbent plugin but missing from 20's resolution matrix — flagged for the implementation spec ([tool-fileclass](../research/tool-fileclass.md)).
+
+Decision unchanged; block is precedent-recording only.
+
 ## Model Change Summary
 
 ### `Frontmatter` (src/note/metadata.rs)
@@ -153,4 +162,4 @@ pub enum SchemaDiagnosticKind {
 
 - **`source` and debounce (25 Q3-R/Q6-R/Q15-R2)**: `source` moves from `"traces-schema"` to the unified Scheme C — `source: "traces"` + hierarchical `<feature>.<rule>` codes (schema rules live under `schema.*`); `relatedInformation` for inherited fields stands. `[schemas.diagnostics].debounce_ms` default 300 → the T2 value (**~50ms** typical, adaptive clamp `[50ms, compute, 500ms]`); the key survives as an optional override.
 - **Per-source severity (20:56, Q14) → per-code O1 keys (25 Q15-R2)**: severity overrides are per diagnostic code in the editor-sourced O1 override map (`schema.<rule>` keys, vocabulary `hint|info|warn|error|off`), not per-source settings. `[schemas.diagnostics]` remains an **emission gate** (`enabled`); severity resolution is the registry's job (orthogonal, per Q7-R).
-- **22:64 receipt**: the optional v2 range-less schema-file diagnostic is deferred with a named vehicle — it lands behind 20's `[schemas.diagnostics]` gate as `schema-file.*` registry codes, consumed via the same per-code override keys; the watch trigger that feeds it is owed to 31 (schema-dir `didChangeWatchedFiles`).
+- **22:64 receipt**: the optional v2 range-less schema-file diagnostic is deferred with a named vehicle — it lands behind 20's `[schemas.diagnostics]` gate as `schema-file.*` registry codes, consumed via the same per-code override keys; the watch trigger that feeds it is owed to 31 (schema-dir `didChangeWatchedFiles`). (amended 2026-10-21 by fileclass research: fileclass's audit is the worked reference design for the deferred diagnostic, and its trigger model (sessionly + on-demand + rename, explicitly not per-rebuild) informs 31's watch — [tool-fileclass](../research/tool-fileclass.md).)

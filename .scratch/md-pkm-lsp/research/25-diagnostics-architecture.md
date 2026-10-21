@@ -212,6 +212,8 @@ gating on it would silence every real client, **[D]** 33155-33168).
 | day rollover | timer — **blocked on 18** (23 routed re-evaluation to 25) |
 | client pull | on demand from resultId cache |
 
+**Diagnostics-lifetime note (amended 2026-10-21 by fileclass research):** definition-side (schema-file) diagnostics plausibly want a persisted findings log — fileclass's sessionly, fingerprinted once-per-problem pattern — versus this document's ephemeral per-document publish model: two tiers, two lifetimes. Flagged for the implementation spec; no decision change ([tool-fileclass](tool-fileclass.md)).
+
 ### 3.3 Invariants (transferable lessons — no corpus number is authoritative)
 
 Observed keystroke-debounce spread: **50ms (clangd) / 200ms (Marksman, yaml-ls) / 300ms (Markdown

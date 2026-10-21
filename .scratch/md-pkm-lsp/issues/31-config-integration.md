@@ -17,3 +17,7 @@ Decide how the existing two-tier `Config File` system (`.traces/config.toml` loc
 - **`[tasks.diagnostics]` lands here** (23's toggle valve, per its Q4 note).
 - **`[schemas.diagnostics]` stays an emission gate** (25 Q7-R): `enabled` gates whether schema diagnostics emit; severity resolution is the registry's job, not this section's.
 - Schema-dir `didChangeWatchedFiles` trigger (22's `reset_engine` note) also lands here.
+
+## Inputs from fileclass research (2026-10-21)
+
+- (amended 2026-10-21 by fileclass research) fileclass's audit trigger model (sessionly + on-demand + rename, explicitly not per-rebuild) with fingerprint suppression is a production-tested shape for schema-dir watching ([tool-fileclass](../research/tool-fileclass.md)).
