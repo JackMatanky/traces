@@ -58,15 +58,14 @@ pub(crate) use zone::local_zone;
 pub(crate) mod test_support {
     use jiff::tz::TimeZone;
 
-    /// Serializes test access to the process-wide local-zone override and
-    /// restores the previous override when its owning test thread exits. Reads
-    /// are synchronized separately, so they do not wait on the guard lifecycle
-    /// lock.
+    /// Installs a thread-local local-zone override for the current test
+    /// thread and restores the previous override when dropped. Overrides do
+    /// not cross thread boundaries, so parallel tests cannot observe each
+    /// other's zones.
     ///
     /// Repeated calls to [`Self::set`] replace the active override while
-    /// retaining the original zone and serialization lock. Use [`Self::with`]
-    /// for nested scoped changes; each scope restores its immediate parent even
-    /// during unwind.
+    /// retaining the original zone. Use [`Self::with`] for nested scoped
+    /// changes; each scope restores its immediate parent even during unwind.
     ///
     /// # Examples
     ///
@@ -92,15 +91,15 @@ pub(crate) mod test_support {
     #[must_use]
     pub struct ZoneGuard {
         previous: Option<TimeZone>,
-        _lock: std::sync::MutexGuard<'static, ()>,
     }
 
     impl ZoneGuard {
-        /// Sets the process-wide local zone for the current test thread.
+        /// Sets the thread-local zone override for the current test thread.
         ///
-        /// Readers on other threads observe the override. Repeated calls
-        /// replace it; the original value is restored when the owning test
-        /// thread exits. Use [`Self::with`] for nested overrides.
+        /// Readers on other threads observe their own zone. Repeated calls
+        /// replace it; the original value is restored when the parked guard
+        /// is cleared by [`Self::reset`] or the thread exits. Use
+        /// [`Self::with`] for scoped overrides.
         ///
         /// # Panics
         ///
@@ -116,10 +115,10 @@ pub(crate) mod test_support {
             Self::set_timezone(zone);
         }
 
-        /// Runs `action` with a process-wide local-zone override.
+        /// Runs `action` with a thread-local zone override.
         ///
-        /// Nested calls restore the immediately enclosing zone. The override is
-        /// restored during normal return and panic unwinding.
+        /// Nested calls restore the immediately enclosing zone. The override
+        /// is restored during normal return and panic unwinding.
         ///
         /// # Panics
         ///
@@ -132,71 +131,49 @@ pub(crate) mod test_support {
         pub fn with<R, F: FnOnce() -> R>(zone: &str, action: F) -> R {
             let zone = TimeZone::get(zone)
                 .unwrap_or_else(|_| panic!("unknown time zone: {zone}"));
-            let has_owner = ZONE_GUARD.with(|slot| slot.borrow().is_some());
-            if has_owner {
-                let previous = ZONE_OVERRIDE
-                    .write()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .replace(zone);
-                let restore = ScopedZoneRestore {
-                    previous,
-                };
-                let result = action();
-                drop(restore);
-                result
+            let guard = Self::install(Some(zone));
+            let result = action();
+            drop(guard);
+            result
+        }
+
+        /// Clears any override parked on the current thread, restoring the
+        /// zone that was active before the parked guard was installed.
+        #[inline]
+        pub fn reset() {
+            let guard = ZONE_GUARD.with(|slot| slot.borrow_mut().take());
+            drop(guard);
+        }
+
+        /// Sets the thread-local override to a previously resolved zone.
+        ///
+        /// Repeated calls replace the active override; the original value is
+        /// restored when the parked guard is cleared or the thread exits.
+        pub(crate) fn set_timezone(zone: TimeZone) {
+            let parked = ZONE_GUARD.with(|slot| slot.borrow().is_some());
+            if parked {
+                ZONE_OVERRIDE.with(|cell| {
+                    *cell.borrow_mut() = Some(zone);
+                });
             } else {
                 ZONE_GUARD.with(|slot| {
                     *slot.borrow_mut() = Some(Self::install(Some(zone)));
                 });
-                let _restore = ThreadZoneRestore;
-                action()
             }
         }
 
-        /// Holds the zone lock without changing the current zone.
-        #[inline]
-        pub fn keep() {
-            ZONE_GUARD.with(|slot| {
-                let mut slot = slot.borrow_mut();
-                if slot.is_none() {
-                    *slot = Some(Self::install(None));
-                }
-            });
-        }
-
-        /// Sets the process-wide local zone to a previously resolved zone.
-        ///
-        /// Repeated calls replace the active override; the original value is
-        /// restored when the owning test thread exits.
-        pub(crate) fn set_timezone(zone: TimeZone) {
-            ZONE_GUARD.with(|slot| {
-                let mut slot = slot.borrow_mut();
-                if slot.is_some() {
-                    *ZONE_OVERRIDE
-                        .write()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                        Some(zone);
-                } else {
-                    *slot = Some(Self::install(Some(zone)));
-                }
-            });
-        }
-
-        /// Installs a new override zone and acquires the serialization lock.
+        /// Installs a new override zone, returning a guard that restores the
+        /// previous zone when dropped.
         fn install(zone: Option<TimeZone>) -> Self {
-            let lock = ZONE_LOCK
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut previous = ZONE_OVERRIDE
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let previous = match zone {
-                Some(zone) => previous.replace(zone),
-                None => previous.clone(),
-            };
+            let previous = ZONE_OVERRIDE.with(|cell| {
+                let mut cell = cell.borrow_mut();
+                match zone {
+                    Some(zone) => cell.replace(zone),
+                    None => cell.clone(),
+                }
+            });
             Self {
                 previous,
-                _lock: lock,
             }
         }
     }
@@ -205,53 +182,25 @@ pub(crate) mod test_support {
         #[inline]
         fn drop(&mut self) {
             let previous = self.previous.take();
-            *ZONE_OVERRIDE
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = previous;
+            // At thread exit the override cell may already be destroyed, in
+            // which case there is nothing left to restore.
+            let _ = ZONE_OVERRIDE.try_with(|cell| {
+                *cell.borrow_mut() = previous;
+            });
         }
     }
 
     #[inline]
     pub(super) fn current_override() -> Option<TimeZone> {
-        ZONE_OVERRIDE
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-    }
-
-    /// Restores the previous zone override when dropped.
-    struct ScopedZoneRestore {
-        previous: Option<TimeZone>,
-    }
-
-    impl Drop for ScopedZoneRestore {
-        fn drop(&mut self) {
-            *ZONE_OVERRIDE
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                self.previous.take();
-        }
-    }
-
-    /// Cleans up thread-local zone state on test thread exit.
-    struct ThreadZoneRestore;
-
-    impl Drop for ThreadZoneRestore {
-        fn drop(&mut self) {
-            let guard = ZONE_GUARD.with(|slot| slot.borrow_mut().take());
-            drop(guard);
-        }
+        ZONE_OVERRIDE.with(|cell| cell.borrow().clone())
     }
 
     thread_local! {
         static ZONE_GUARD: std::cell::RefCell<Option<ZoneGuard>> =
             const { std::cell::RefCell::new(None) };
+        static ZONE_OVERRIDE: std::cell::RefCell<Option<TimeZone>> =
+            const { std::cell::RefCell::new(None) };
     }
-
-    static ZONE_OVERRIDE: std::sync::RwLock<Option<TimeZone>> =
-        std::sync::RwLock::new(None);
-
-    static ZONE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[cfg(test)]
     pub(crate) mod fixtures {
@@ -328,7 +277,7 @@ pub(crate) mod test_support {
 
     #[cfg(test)]
     mod tests {
-        use std::{sync::mpsc, time::Duration};
+        use std::sync::mpsc;
 
         use super::*;
         use crate::temporal::local_zone;
@@ -348,13 +297,13 @@ pub(crate) mod test_support {
         }
 
         #[test]
-        fn keeps_the_current_zone_unchanged() {
+        fn reset_leaves_the_system_zone_unchanged() {
             // Arrange
+            ZoneGuard::reset();
             let expected = local_zone().expect("system time zone available");
 
             // Act
-            ZoneGuard::keep();
-            ZoneGuard::keep();
+            ZoneGuard::reset();
 
             // Assert
             assert_eq!(
@@ -366,6 +315,7 @@ pub(crate) mod test_support {
         #[test]
         fn restores_the_previous_zone_when_dropped() {
             // Arrange
+            ZoneGuard::reset();
             let previous = local_zone().expect("system time zone available");
             let guard = ZoneGuard::install(Some(
                 TimeZone::get("Etc/GMT-2").expect("valid fixture zone"),
@@ -385,6 +335,7 @@ pub(crate) mod test_support {
 
         #[test]
         fn nested_scopes_restore_the_parent_zone_and_outer_zone() {
+            ZoneGuard::reset();
             let original = local_zone().expect("system time zone available");
 
             ZoneGuard::with("Etc/GMT-2", || {
@@ -419,6 +370,7 @@ pub(crate) mod test_support {
             reason = "test deliberately unwinds to prove scoped restoration"
         )]
         fn scoped_zone_is_restored_during_unwind() {
+            ZoneGuard::reset();
             let original = local_zone().expect("system time zone available");
             let result =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -475,9 +427,11 @@ pub(crate) mod test_support {
 
         #[test]
         fn repeated_sets_replace_the_active_override() {
-            // Arrange: the first set call installs the thread-local guard.
+            // Arrange: reset so the first set call parks the thread-local
+            // guard.
 
             // Act
+            ZoneGuard::reset();
             ZoneGuard::set("Etc/GMT-2");
             ZoneGuard::set("UTC");
 
@@ -489,43 +443,46 @@ pub(crate) mod test_support {
         }
 
         #[test]
-        fn serializes_concurrent_guards() {
+        fn isolates_overrides_across_threads() {
             // Arrange
+            ZoneGuard::reset();
+            let system = local_zone().expect("system time zone available");
             let (held_tx, held_rx) = mpsc::channel();
             let (release_tx, release_rx) = mpsc::channel();
             let first = std::thread::spawn(move || {
                 ZoneGuard::set("UTC");
                 held_tx.send(()).expect("receiver remains open");
                 release_rx.recv().expect("release signal arrives");
+                assert_eq!(
+                    local_zone().expect("system time zone available"),
+                    TimeZone::UTC,
+                    "the owning thread observes its own override"
+                );
             });
-            held_rx.recv().expect("first guard acquires the lock");
+            held_rx.recv().expect("first guard is installed");
 
-            let (started_tx, started_rx) = mpsc::channel();
-            let (acquired_tx, acquired_rx) = mpsc::channel();
-
-            // Act
+            // Act: the second thread installs its own override while the
+            // first guard is still live; no lock blocks it.
             let second = std::thread::spawn(move || {
-                started_tx.send(()).expect("receiver remains open");
                 ZoneGuard::set("Etc/GMT-2");
-                acquired_tx.send(()).expect("receiver remains open");
+                let expected =
+                    TimeZone::get("Etc/GMT-2").expect("valid fixture zone");
+                assert_eq!(
+                    local_zone().expect("system time zone available"),
+                    expected,
+                    "the owning thread observes its own override"
+                );
             });
-            started_rx.recv().expect("second thread starts");
-
-            assert_eq!(
-                local_zone().expect("active override is available"),
-                TimeZone::UTC,
-                "other threads observe the active override"
-            );
-            assert!(
-                acquired_rx.recv_timeout(Duration::from_millis(20)).is_err()
-            );
-
-            release_tx.send(()).expect("first guard can be released");
-            acquired_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("second guard acquires the lock after the first drops");
-            first.join().expect("first thread exits cleanly");
             second.join().expect("second thread exits cleanly");
+
+            // Assert
+            assert_eq!(
+                local_zone().expect("system time zone available"),
+                system,
+                "other threads never observe a foreign override"
+            );
+            release_tx.send(()).expect("first guard can be released");
+            first.join().expect("first thread exits cleanly");
         }
 
         #[test]

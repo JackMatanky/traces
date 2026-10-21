@@ -1365,8 +1365,7 @@ mod tests {
 
         #[test]
         fn round_trips_display_output_back_through_parse_iso() {
-            // Arrange: the current zone (kept) hosts this rendering.
-            ZoneGuard::keep();
+            // Arrange: the current zone hosts this rendering.
             let value = fixed_datetime();
 
             // Act
@@ -1778,8 +1777,7 @@ mod tests {
 
         #[test]
         fn requires_exact_local_midnight_for_is_midnight_of() {
-            // Arrange: the current zone (kept) hosts the promotion.
-            ZoneGuard::keep();
+            // Arrange: the current zone hosts the promotion.
             let date = ymd(2026, 7, 29);
             let midnight = DateTimeValue::try_from(date)
                 .expect("test date has a representable local midnight");

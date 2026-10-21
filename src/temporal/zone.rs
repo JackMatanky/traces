@@ -78,6 +78,7 @@ mod tests {
         #[test]
         fn returns_the_system_zone_without_a_guard() {
             // Arrange
+            ZoneGuard::reset();
             let expected = resolve(TimeZone::try_system)
                 .expect("system time zone available");
 

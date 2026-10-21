@@ -1134,9 +1134,8 @@ mod tests {
     use crate::temporal::test_support::ZoneGuard;
 
     fn env() -> Environment<'static> {
-        // Every date filter reads the local zone through the core parser, so
-        // the render below must own `TZ` against concurrent tests.
-        ZoneGuard::keep();
+        // Date filters read the thread-local zone, so no serialization is
+        // needed against concurrent tests.
         let mut env = Environment::new();
         DateNamespace.register(&mut env);
         env

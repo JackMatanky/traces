@@ -2099,7 +2099,7 @@ impl<T> tracing::instrument::WithSubscriber for traces::testing::WorkspaceIndex
 impl<T> yoke::erased::ErasedDestructor for traces::testing::WorkspaceIndex where T: 'static
 pub struct traces::testing::ZoneGuard
 impl traces::testing::ZoneGuard
-pub fn traces::testing::ZoneGuard::keep()
+pub fn traces::testing::ZoneGuard::reset()
 pub fn traces::testing::ZoneGuard::set(&str)
 pub fn traces::testing::ZoneGuard::with<R, F: core::ops::function::FnOnce() -> R>(&str, F) -> R
 impl core::fmt::Debug for traces::testing::ZoneGuard
@@ -2107,7 +2107,7 @@ pub fn traces::testing::ZoneGuard::fmt(&self, &mut core::fmt::Formatter<'_>) -> 
 impl core::ops::drop::Drop for traces::testing::ZoneGuard
 pub fn traces::testing::ZoneGuard::drop(&mut self)
 impl core::marker::Freeze for traces::testing::ZoneGuard
-impl !core::marker::Send for traces::testing::ZoneGuard
+impl core::marker::Send for traces::testing::ZoneGuard
 impl core::marker::Sync for traces::testing::ZoneGuard
 impl core::marker::Unpin for traces::testing::ZoneGuard
 impl core::marker::UnsafeUnpin for traces::testing::ZoneGuard

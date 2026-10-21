@@ -1486,7 +1486,7 @@ src/temporal/lexer.rs: pub(crate) fn starts_with_year(s: &str) -> bool {
 src/temporal/lexer.rs: pub(super) enum TemporalShapeToken {
 src/temporal/lexer.rs: pub(super) fn parse_duration_prefix(
 src/temporal/lexer.rs: pub(super) fn scan_date_prefix(input: &str) -> Option<(DatePoint, usize)> {
-src/temporal/mod.rs: pub fn keep() {
+src/temporal/mod.rs: pub fn reset() {
 src/temporal/mod.rs: pub fn set(zone: &str) {
 src/temporal/mod.rs: pub fn with<R, F: FnOnce() -> R>(zone: &str, action: F) -> R {
 src/temporal/mod.rs: pub struct ZoneGuard {
