@@ -60,7 +60,7 @@ Evaluate what disappeared from the parent when extracting the child:
 
 ### Seam Bypass Ratio (BR) & Change Propagation Distance (PD)
 - **Seam Bypass (BR):** Inspect whether callers bypass parent interfaces to reach child submodules via deep imports. *Target:* Zero bypass paths.
-- **Change Propagation Distance (PD):** Count intended seams crossed by a minimal correct change for a scenario. *Target:* Changes remain contained behind local seams.
+- **Change Propagation Distance (PD):** Count intended seams crossed by a minimal correct change for a representative scenario. *Target:* Changes remain contained behind local seams.
 
 ### Invariant & State Guarantees (ISR & ITE)
 - **Invalid States Representable (ISR):** Zero invalid states permitted by struct field combinations at construction ("parse, don't validate").
