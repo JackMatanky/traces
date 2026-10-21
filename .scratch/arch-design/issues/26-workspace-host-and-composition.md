@@ -65,3 +65,13 @@ commands that share the MCP edit use case, `check_note` over a change set with
 a per-file base and a destination path (for an isolated session or inbox
 workflow, which are product features outside the map), and generating a
 per-folder `AGENTS.md` snippet from class bindings.
+
+MCP host (16, protocol revision 2026-07-28, which has no sessions or
+`initialize`): the host runs its own guards (content-hash precondition,
+validate-then-atomic-write with re-check, undo journal, delete/move/bulk
+guards) and confirms class-set changes through an `input_required` result with
+an integrity-protected `requestState`, denying when the client declares no
+`elicitation`. Open here: stdio or HTTP transport, which decides whether any
+per-caller state (a notice of out-of-band changes) is meaningful; it must
+stay best effort. See the
+[round-6 addendum](../research/16-prep/round6/I-mcp-server-guards.md).

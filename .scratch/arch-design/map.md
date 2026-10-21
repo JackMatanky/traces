@@ -248,7 +248,9 @@ itself is not implemented here; the map ends at hand-off to specification.
   `description`, `parent_order` added. Template check is a post-render advisory
   use case; no design depends on harness hooks: the portable guarantee is
   detect and feed back through tiered channels (lint command, git, a notice on
-  read, LSP), true gating only where MCP tools own every write; `traces check`
+  read, LSP), prevention only by placement (isolated copy or inbox, product
+  features outside the destination) or where MCP tools own every write, with
+  host-run guards over the stateless 2026-07-28 protocol; `traces check`
   takes paths, splits schema errors from violations; delta rule; class-set
   change asks. Date-shaped text: no override, no quote convention.
   Body-section schemas are a separate ticket.

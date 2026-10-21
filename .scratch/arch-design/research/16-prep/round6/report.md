@@ -51,3 +51,10 @@ filter on the existing files.
 - Windows and Linux behaviour of the placement workflows is unmeasured.
 - Product features (session, inbox, write commands) are outside the map's
   destination; only their design pressure on core is recorded in ticket 16.
+
+## 5. Outcome
+
+Folded into [ticket 16's Answer](../../../issues/16-schema-note-typing-and-validation.md)
+(agent guardrail): placement workflows, CLI write commands, per-folder
+instruction snippets, the rejected list. MCP-server guards:
+[addendum I](./I-mcp-server-guards.md).
