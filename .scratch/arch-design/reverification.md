@@ -39,26 +39,26 @@ Limits: step 6 proves *unchanged since charting*, not *true*. Scout claims outsi
 | [capability and path precedent](./issues/09-research-capability-path-precedent.md) | Stands | `src/path.rs` untouched; `hash.rs` additions unrelated |
 | [document model precedent](./issues/10-research-document-model-spans-precedent.md) | Stands | `src/note` untouched; `task.rs:51-55` shape unchanged |
 | [performance evidence](./issues/11-research-performance-evidence.md) | **Amended** | Mechanism claims hold (reconcile logic untouched); line citations shifted; refresh numbers re-measured (below) |
-| [compatibility envelope](./issues/12-grilling-compatibility-envelope.md) | **Amended** | New evidence: baselines are rewritten per commit; observable heal behaviour and legacy-store wipe landed. Still unanswered, still the frontier |
-| [forward consumers](./issues/13-grilling-forward-consumers-and-design-pressure.md) | Stands | Unaffected |
-| [value model](./issues/14-value-model.md) | Stands | `field.rs`/`note/field.rs` untouched |
-| [coercion policy](./issues/15-coercion-and-comparison-policy.md) | Stands | Unaffected |
-| [schema typing](./issues/16-schema-note-typing-and-validation.md) | **Amended (lines)** | fileClass tests now `service.rs:1732-1923` |
-| [ambient environment](./issues/17-ambient-environment-and-execution-context.md) | Stands | Unaffected |
-| [config ownership](./issues/18-config-ownership-and-lifecycle.md) | **Amended** | Sub-question (c) premise ("no production consumer") is false for 10 of 15 digests; re-scoped to the residual surface |
-| [note document model](./issues/19-note-document-model.md) | Stands | `src/note` untouched |
-| [index read model](./issues/20-index-read-model-and-query-execution.md) | **Amended (note)** | Query path untouched; cold path now includes the drift check and full-rebuild-on-drift |
-| [index freshness](./issues/21-index-freshness-and-invalidation.md) | **Rewritten** | Premise inverted: drift detection exists. Ticket now ratifies/revises the landed model and settles the four still-open items |
-| [query core](./issues/22-query-core-and-plan.md) | Stands | `src/query` untouched; `QuerySet` cloning correction already applied |
-| [temporal boundary](./issues/23-temporal-boundary-and-dialects.md) | Stands | `src/temporal` untouched |
-| [template boundary](./issues/24-template-engine-boundary.md) | Stands | `src/template` untouched |
-| [path and capability](./issues/25-path-and-capability-model.md) | Stands | `src/path.rs` untouched |
-| [workspace host](./issues/26-workspace-host-and-composition.md) | **Amended (note)** | `IndexerService::from(&Config)` derives a fingerprint; heal is log-only |
-| [error architecture](./issues/27-error-and-diagnostic-architecture.md) | Stands | `src/cli/error.rs` untouched; heal observability noted in the ledger |
-| [crate topology](./issues/28-crate-topology-and-public-surface.md) | **Amended (numbers)** | 46 identifiers, 1,550-line baseline |
-| [reconcile](./issues/29-reconcile-decisions-and-audit-coverage.md) | **Amended** | Standing re-check of drift and ADR-0009 supersession added |
+| [compatibility envelope](./issues/16-grilling-compatibility-envelope.md) | **Amended** | New evidence: baselines are rewritten per commit; observable heal behaviour and legacy-store wipe landed. Still unanswered, still the frontier |
+| [forward consumers](./issues/17-grilling-forward-consumers-and-design-pressure.md) | Stands | Unaffected |
+| [value model](./issues/18-value-model.md) | Stands | `field.rs`/`note/field.rs` untouched |
+| [coercion policy](./issues/19-coercion-and-comparison-policy.md) | Stands | Unaffected |
+| [schema typing](./issues/20-schema-note-typing-and-validation.md) | **Amended (lines)** | fileClass tests now `service.rs:1732-1923` |
+| [ambient environment](./issues/21-ambient-environment-and-execution-context.md) | Stands | Unaffected |
+| [config ownership](./issues/22-config-ownership-and-lifecycle.md) | **Amended** | Sub-question (c) premise ("no production consumer") is false for 10 of 15 digests; re-scoped to the residual surface |
+| [note document model](./issues/23-note-document-model.md) | Stands | `src/note` untouched |
+| [index read model](./issues/24-index-read-model-and-query-execution.md) | **Amended (note)** | Query path untouched; cold path now includes the drift check and full-rebuild-on-drift |
+| [index freshness](./issues/25-index-freshness-and-invalidation.md) | **Rewritten** | Premise inverted: drift detection exists. Ticket now ratifies/revises the landed model and settles the four still-open items |
+| [query core](./issues/26-query-core-and-plan.md) | Stands | `src/query` untouched; `QuerySet` cloning correction already applied |
+| [temporal boundary](./issues/27-temporal-boundary-and-dialects.md) | Stands | `src/temporal` untouched |
+| [template boundary](./issues/28-template-engine-boundary.md) | Stands | `src/template` untouched |
+| [path and capability](./issues/29-path-and-capability-model.md) | Stands | `src/path.rs` untouched |
+| [workspace host](./issues/30-workspace-host-and-composition.md) | **Amended (note)** | `IndexerService::from(&Config)` derives a fingerprint; heal is log-only |
+| [error architecture](./issues/31-error-and-diagnostic-architecture.md) | Stands | `src/cli/error.rs` untouched; heal observability noted in the ledger |
+| [crate topology](./issues/32-crate-topology-and-public-surface.md) | **Amended (numbers)** | 46 identifiers, 1,550-line baseline |
+| [reconcile](./issues/33-reconcile-decisions-and-audit-coverage.md) | **Amended** | Standing re-check of drift and ADR-0009 supersession added |
 
-Totals: 29 tickets: 17 stand unchanged by construction, 12 amended (of which 1, the freshness ticket, was rewritten), 0 invalidated outright; no ticket lost its reason to exist. The frontier is unchanged: [compatibility envelope](./issues/12-grilling-compatibility-envelope.md) and [forward consumers](./issues/13-grilling-forward-consumers-and-design-pressure.md).
+Totals: 29 tickets: 17 stand unchanged by construction, 12 amended (of which 1, the freshness ticket, was rewritten), 0 invalidated outright; no ticket lost its reason to exist. The frontier is unchanged: [compatibility envelope](./issues/16-grilling-compatibility-envelope.md) and [forward consumers](./issues/17-grilling-forward-consumers-and-design-pressure.md).
 
 ## Findings promoted to the ledger
 

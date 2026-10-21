@@ -2,7 +2,7 @@
 
 > **Survey baseline: `2dc3250d`. Re-verification note (main @ `207cc3fb`).** Only `src/index/service.rs` line numbers moved (fileClass tests are `mod class_field`, `service.rs:1732`). `src/schema` is untouched. Authoritative corrections: `reverification.md`.
 
-> **Superseded in part by ticket 16 (checked in round 5, `research/16-prep/round5/R2-spec-claims.md` section 6.2).** The praise for the `FileClassExpander` seam (sections 1, 8) is overturned; `global` is no longer only a `$ref` pool (sections 2, 8) but also the lowest-precedence layer for every note; "note value validation is absent" (section 2, hypothesis H1 in section 4) is resolved by an advisory check; "first-listed wins" (section 1) no longer decides class-versus-class conflicts (it still decides `extends` parents); query-typing fog (section 7) is resolved (schema never types values at parse or query time). See [ticket 16's Answer](../issues/16-schema-note-typing-and-validation.md).
+> **Superseded in part by ticket 16 (checked in round 5, `research/20-prep/round5/R2-spec-claims.md` section 6.2).** The praise for the `FileClassExpander` seam (sections 1, 8) is overturned; `global` is no longer only a `$ref` pool (sections 2, 8) but also the lowest-precedence layer for every note; "note value validation is absent" (section 2, hypothesis H1 in section 4) is resolved by an advisory check; "first-listed wins" (section 1) no longer decides class-versus-class conflicts (it still decides `extends` parents); query-typing fog (section 7) is resolved (schema never types values at parse or query time). See [ticket 16's Answer](../issues/20-schema-note-typing-and-validation.md).
 
 ## 1. Responsibilities & seams
 

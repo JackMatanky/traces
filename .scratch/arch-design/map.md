@@ -65,14 +65,19 @@ itself is not implemented here; the map ends at hand-off to specification.
   in `research/NN-*.md` on the working tree and are linked from the ticket; no
   `research/<name>` git branches are pushed.
 - Late precedent research (2026-10-21): IWE and Fileclass were first read from
-  source after ticket 16 resolved ([core and
-  hosts](./issues/33-research-iwe-core-and-hosts-architecture.md), [query,
-  schema and gating](./issues/34-research-iwe-query-schema-and-agent-write-gating.md),
-  [Fileclass](./issues/35-research-fileclass-model-binding-and-validation.md)).
+  source after ticket 20 resolved ([core and
+  hosts](./issues/12-research-iwe-core-and-hosts-architecture.md), [query,
+  schema and gating](./issues/13-research-iwe-query-schema-and-agent-write-gating.md),
+  [Fileclass](./issues/14-research-fileclass-model-binding-and-validation.md)).
   Open tickets carry an "Inputs from the IWE (and Fileclass) research" section;
-  ticket 16 and 15 carry a dated comment. Digests live in `docs/digests/`.
+  ticket 20 and 19 carry a dated comment. Digests live in `docs/digests/`.
+- Renumbering (2026-10-21): the four IWE/Fileclass research tickets were moved
+  to 12 to 15, after the other research tickets, and the earlier tickets 12 to
+  32 became 16 to 36 (add 4). Ticket numbers inside `research/19-prep/` and
+  `research/20-prep/` (formerly `15-prep`, `16-prep`) and in git history use
+  the old numbering.
 - Provisionally withstand scrutiny (scouts, unverified; the `FileClassExpander`
-  seam was overturned by ticket 16): `DatePoint`/`DifferenceEngine` and
+  seam was overturned by ticket 20): `DatePoint`/`DifferenceEngine` and
   `DurationValue` nominal
   identity; schema Kahn linearisation + ancestor-bounded `$ref` +
   whole-directory reload; redb derived-cache design (`Durability::None`,
@@ -180,8 +185,42 @@ itself is not implemented here; the map ends at hand-off to specification.
   lazy); the ~25 ms redb commit floor is `Database::create`/drop lifecycle, not
   durability. Re-measured at `207cc3fb` with an A-B-A control: the merged drift
   check adds no detectable cost (median +0.7% vs 1.7% noise).
+- [How does IWE structure one core shared by a CLI, an LSP, an MCP server and a
+  daemon?](./issues/12-research-iwe-core-and-hosts-architecture.md): confirms
+  ticket 20's layering (pure operations return a plain `Changes` set; hosts
+  apply it; no one-implementor traits) but puts the app layer in its own crate
+  (`diwe`, for ticket 32). The LSP writes open buffers into the one in-memory
+  graph and drops watcher events for open keys; that works only because IWE
+  has no persisted index. No persistent cache: 20k notes cold in 705 ms (M3
+  Pro, synthetic), a cost model for tickets 24 and 25, not a verdict. Its lossy
+  tree writer regressed repeatedly: writers must splice spans and never rewrite
+  unchanged bytes (tickets 23, 25).
+- [What do IWE's query language, document schema, search and MCP write path
+  teach Traces?](./issues/13-research-iwe-query-schema-and-agent-write-gating.md):
+  IWE's query value semantics converge with ticket 19; its query is a
+  serialisable document (question for ticket 26). Schema binds by host-config
+  globs, no inheritance; the MCP gate is always on, all-or-nothing, validates
+  whole pending documents with no delta rule (supports ticket 20's delta rule),
+  and requires `expect` count guards on query mutations. Body schemas use an
+  ordered greedy section matcher via an external crate (ticket 15). Corrects
+  earlier claims: no frontmatter `type` binding, no "strict mode" switch,
+  reserved-prefix fields are validated.
+- [What does Fileclass's source teach about class resolution, typed fields and
+  validation?](./issues/14-research-fileclass-model-binding-and-validation.md):
+  `global` as the lowest-precedence layer for every note and per-class origin
+  confirmed; its code lets a lower-ranked binding override a frontmatter class
+  (docs say otherwise), supporting ticket 20's suppression and conflict
+  reporting. Its validation is weaker than ticket 20's (`step` UI-only, `[]`
+  satisfies `required`, custom date formats unchecked). 28 field types, about
+  ten distinct (ticket 35). No body or buffer model.
+- [What are `schematter-validator` and the document-schema
+  spec?](./issues/15-research-schematter-validator-and-document-schema.md):
+  IWE's validator crate (about 1,200 lines, `jsonschema` dependency, one
+  implementation, draft spec) is a poor fit: second schema dialect, recursive
+  section tree, no spans. Its matcher semantics are reusable as a design over
+  Traces' flat headings (ticket 36); no dependency decision remains.
 - [What counts as the externally observable surface the redesign must
-  preserve?](./issues/12-grilling-compatibility-envelope.md): sole consumer, so
+  preserve?](./issues/16-grilling-compatibility-envelope.md): sole consumer, so
   almost everything is Migratable via the spec's own change table (no standing
   register). Frozen: vault-format parsing, index result equivalence with a fresh
   parse, exit codes and the stdout/stderr split, stdout payload shapes,
@@ -196,29 +235,29 @@ itself is not implemented here; the map ends at hand-off to specification.
   for?][fc]: LSP is the next committed consumer; MCP is likely. Support
   source-aware editor features, keep the core synchronous by default, and assess
   operation-specific performance across the seven target vault sizes. Reopen the
-  note-model choice in ticket 19; resolve open-buffer/index consistency in
-  ticket 30. [fc]: ./issues/13-grilling-forward-consumers-and-design-pressure.md
+  note-model choice in ticket 23; resolve open-buffer/index consistency in
+  ticket 34. [fc]: ./issues/17-grilling-forward-consumers-and-design-pressure.md
 - [What is the single dynamic value model, and who owns
-  it?](./issues/14-value-model.md): two owned types and no borrowed mirror enum.
+  it?](./issues/18-value-model.md): two owned types and no borrowed mirror enum.
   `note::NoteFieldValue` (`Int(i64)`/`Float(f64)`, `Link`, derived tagged serde,
   80 B kept) for notes, queries and templates; a schema-local literal type
   (strings stay strings) replaces the schema `FieldValue`; only a root `Link`
   (`target`, normalized `display`, `embedded`) is shared. `NoteLink` (syntax
   kind, span) is the editor-side type for [the note document
-  model](./issues/19-note-document-model.md). Frontmatter keeps the Noyalib
+  model](./issues/23-note-document-model.md). Frontmatter keeps the Noyalib
   compat parser and converts its AST directly (huge integers become `Float`
   instead of dropping the block); classification is quote-insensitive in
   frontmatter and shares one parser set with inline. `FieldValueRef`,
   `DateTimeCoercion` and the double conversion are removable. Handoffs: zone
   for naive datetimes ([coercion
-  policy](./issues/15-coercion-and-comparison-policy.md), [execution
-  context](./issues/17-ambient-environment-and-execution-context.md)), temporal
+  policy](./issues/19-coercion-and-comparison-policy.md), [execution
+  context](./issues/21-ambient-environment-and-execution-context.md)), temporal
   cache encoding ([index read
-  model](./issues/20-index-read-model-and-query-execution.md), [index
-  freshness](./issues/21-index-freshness-and-invalidation.md)), view enum
-  benchmark ([query core](./issues/22-query-core-and-plan.md)).
+  model](./issues/24-index-read-model-and-query-execution.md), [index
+  freshness](./issues/25-index-freshness-and-invalidation.md)), view enum
+  benchmark ([query core](./issues/26-query-core-and-plan.md)).
 - [Where do coercion and cross-type comparison live, and what is the
-  policy?](./issues/15-coercion-and-comparison-policy.md): `PartialEq` stays
+  policy?](./issues/19-coercion-and-comparison-policy.md): `PartialEq` stays
   structural; one value-semantics module owns loose equality, bracketed
   order for filters (cross-kind `==` false, relational no match, MongoDB-style)
   and a total sort order built with an explicit context. Sort sniffing is
@@ -230,18 +269,18 @@ itself is not implemented here; the map ends at hand-off to specification.
   Link, Number or Bool from pre-parsed candidates, coarse date literals are
   intervals, and a natural-language candidate is a hook. Link equality uses
   the folded target only; `date(link)` reads the target. Two advisory stderr
-  notices. Handoffs: [query core](./issues/22-query-core-and-plan.md),
-  [temporal boundary](./issues/23-temporal-boundary-and-dialects.md) (natural
+  notices. Handoffs: [query core](./issues/26-query-core-and-plan.md),
+  [temporal boundary](./issues/27-temporal-boundary-and-dialects.md) (natural
   language grammar, `DateConfig`), [execution
-  context](./issues/17-ambient-environment-and-execution-context.md), [schema
-  typing](./issues/16-schema-note-typing-and-validation.md), [index
-  model](./issues/20-index-read-model-and-query-execution.md).
+  context](./issues/21-ambient-environment-and-execution-context.md), [schema
+  typing](./issues/20-schema-note-typing-and-validation.md), [index
+  model](./issues/24-index-read-model-and-query-execution.md).
 - [Does the schema subsystem validate and type note data, and where does that
-  capability live?](./issues/16-schema-note-typing-and-validation.md): advisory,
+  capability live?](./issues/20-schema-note-typing-and-validation.md): advisory,
   on-demand check; no parse-time typing, no read-path gating, schema never
   enters the index or fingerprint. `schema` owns the pure, span-free rule over
   resolved effective fields; the runtime value type sits below `schema` and
-  `note` (placement to 28); gating is a host policy over stable violation codes
+  `note` (placement to 32); gating is a host policy over stable violation codes
   that carry a layer (`class` or `global`). Layering principle: cli, lsp and mcp
   are thin hosts of core, whose app layer composes domain modules with plain
   data and no one-implementor traits, so `FileClassExpander` and its crate-root
@@ -251,7 +290,7 @@ itself is not implemented here; the map ends at hand-off to specification.
   `global` becomes the lowest-precedence layer for every note. Class binding by
   tag and path (class-owned `[binding]`) supplies classes to notes without a
   known explicit class, expanded at query time so the index stays schema-free.
-  `required` kept; `step` checked; `date.format` a hint until 23; `origin`,
+  `required` kept; `step` checked; `date.format` a hint until 27; `origin`,
   `description`, `parent_order` added. Template check is a post-render advisory
   use case; no design depends on harness hooks: the portable guarantee is
   detect and feed back through tiered channels (lint command, git, a notice on
@@ -261,65 +300,31 @@ itself is not implemented here; the map ends at hand-off to specification.
   takes paths, splits schema errors from violations; delta rule; class-set
   change asks. Date-shaped text: no override, no quote convention.
   Body-section schemas are a separate ticket.
-  Handoffs: [query core](./issues/22-query-core-and-plan.md), [note document
-  model](./issues/19-note-document-model.md), [temporal
-  boundary](./issues/23-temporal-boundary-and-dialects.md), [template
-  boundary](./issues/24-template-engine-boundary.md),
-  [diagnostics](./issues/27-error-and-diagnostic-architecture.md), [crate
-  topology](./issues/28-crate-topology-and-public-surface.md), [schema
-  internals](./issues/31-schema-internals-simplification.md), [body
-  sections](./issues/32-body-section-schemas.md).
-- [How does IWE structure one core shared by a CLI, an LSP, an MCP server and a
-  daemon?](./issues/33-research-iwe-core-and-hosts-architecture.md): confirms
-  ticket 16's layering (pure operations return a plain `Changes` set; hosts
-  apply it; no one-implementor traits) but puts the app layer in its own crate
-  (`diwe`, for ticket 28). The LSP writes open buffers into the one in-memory
-  graph and drops watcher events for open keys; that works only because IWE
-  has no persisted index. No persistent cache: 20k notes cold in 705 ms (M3
-  Pro, synthetic), a cost model for tickets 20 and 21, not a verdict. Its lossy
-  tree writer regressed repeatedly: writers must splice spans and never rewrite
-  unchanged bytes (tickets 19, 21).
-- [What do IWE's query language, document schema, search and MCP write path
-  teach Traces?](./issues/34-research-iwe-query-schema-and-agent-write-gating.md):
-  IWE's query value semantics converge with ticket 15; its query is a
-  serialisable document (question for ticket 22). Schema binds by host-config
-  globs, no inheritance; the MCP gate is always on, all-or-nothing, validates
-  whole pending documents with no delta rule (supports ticket 16's delta rule),
-  and requires `expect` count guards on query mutations. Body schemas use an
-  ordered greedy section matcher via an external crate (ticket 36). Corrects
-  earlier claims: no frontmatter `type` binding, no "strict mode" switch,
-  reserved-prefix fields are validated.
-- [What does Fileclass's source teach about class resolution, typed fields and
-  validation?](./issues/35-research-fileclass-model-binding-and-validation.md):
-  `global` as the lowest-precedence layer for every note and per-class origin
-  confirmed; its code lets a lower-ranked binding override a frontmatter class
-  (docs say otherwise), supporting ticket 16's suppression and conflict
-  reporting. Its validation is weaker than ticket 16's (`step` UI-only, `[]`
-  satisfies `required`, custom date formats unchecked). 28 field types, about
-  ten distinct (ticket 31). No body or buffer model.
-- [What are `schematter-validator` and the document-schema
-  spec?](./issues/36-research-schematter-validator-and-document-schema.md):
-  IWE's validator crate (about 1,200 lines, `jsonschema` dependency, one
-  implementation, draft spec) is a poor fit: second schema dialect, recursive
-  section tree, no spans. Its matcher semantics are reusable as a design over
-  Traces' flat headings (ticket 32); no dependency decision remains.
+  Handoffs: [query core](./issues/26-query-core-and-plan.md), [note document
+  model](./issues/23-note-document-model.md), [temporal
+  boundary](./issues/27-temporal-boundary-and-dialects.md), [template
+  boundary](./issues/28-template-engine-boundary.md),
+  [diagnostics](./issues/31-error-and-diagnostic-architecture.md), [crate
+  topology](./issues/32-crate-topology-and-public-surface.md), [schema
+  internals](./issues/35-schema-internals-simplification.md), [body
+  sections](./issues/36-body-section-schemas.md).
 
 ## Not yet specified
 
 - **Schema internals**: graduated to [What schema internals survive now that
   schema produces a checker and a class
-  hierarchy?](./issues/31-schema-internals-simplification.md).
+  hierarchy?](./issues/35-schema-internals-simplification.md).
 - **Note parser internals**: status interning, second pulldown-cmark pass,
   `ListItem` footprint, footnote/callout/slug modelling. Sharpen after [What is
   the note document model: spans, facts, items, multi-value
-  metadata?](./issues/19-note-document-model.md).
+  metadata?](./issues/23-note-document-model.md).
 - **Index internals**: `CandidateTrie`/`indextree` retention, store engine vs
   repository split, inline-field class extraction. Sharpen after [What is the
   index read model, and is there one query execution path or
-  two?](./issues/20-index-read-model-and-query-execution.md).
+  two?](./issues/24-index-read-model-and-query-execution.md).
 - **Template internals**: compiled-AST and regex caches, lazy schema load.
   Sharpen after [What is the template engine boundary with query, schema,
-  temporal, and the host?](./issues/24-template-engine-boundary.md).
+  temporal, and the host?](./issues/28-template-engine-boundary.md).
 - **Output formats** (`--format json|csv`) and where formatting lives; **async
   dialog bridging** for a long-lived host. Both hang on the forward-consumer and
   workspace-host decisions.
@@ -329,8 +334,8 @@ itself is not implemented here; the map ends at hand-off to specification.
   session or inbox with a gated merge, per-folder instruction snippets): product
   features outside the destination; only their pressure on core (a change-set
   check with a base and destination path) is recorded in [ticket
-  16](./issues/16-schema-note-typing-and-validation.md) and
-  [26](./issues/26-workspace-host-and-composition.md).
+  20](./issues/20-schema-note-typing-and-validation.md) and
+  [30](./issues/30-workspace-host-and-composition.md).
 
 ## Out of scope
 
