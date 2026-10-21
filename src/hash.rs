@@ -24,6 +24,9 @@ use thiserror::Error;
 pub struct Blake3Digest(blake3::Hash);
 
 impl Blake3Digest {
+    /// Counts the bytes of a raw digest.
+    pub(crate) const LEN: usize = blake3::OUT_LEN;
+
     /// Computes the BLAKE3 hash of `path`'s current contents.
     ///
     /// Reads `path` fully into memory before hashing. Use this only when the
@@ -32,7 +35,7 @@ impl Blake3Digest {
     ///
     /// # Errors
     ///
-    /// Returns a [`HashError`] if `path` cannot be read.
+    /// - `HashError` if `path` cannot be read.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn from_path(path: &Path) -> Result<Self, HashError> {
@@ -48,6 +51,20 @@ impl Blake3Digest {
     #[must_use]
     pub fn to_hex(self) -> impl AsRef<str> + Display {
         self.0.to_hex()
+    }
+
+    /// Returns the raw digest bytes, the form persisted by stores.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn to_bytes(self) -> [u8; Self::LEN] {
+        *self.0.as_bytes()
+    }
+
+    /// Rebuilds a digest from the raw bytes [`Self::to_bytes`] produced.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn from_bytes(bytes: [u8; Self::LEN]) -> Self {
+        Self(blake3::Hash::from_bytes(bytes))
     }
 }
 
@@ -94,6 +111,13 @@ impl Blake3Hasher {
     /// unreachable for in-memory data.
     pub(crate) fn len(&mut self, len: usize) {
         self.0.update(&u64::try_from(len).unwrap_or(u64::MAX).to_le_bytes());
+    }
+
+    /// Feeds `digest` behind a length prefix.
+    ///
+    /// Composes digests into a parent digest.
+    pub(crate) fn digest(&mut self, digest: &Blake3Digest) {
+        self.bytes(digest.0.as_bytes());
     }
 
     /// Feeds `path`'s raw OS bytes, so non-UTF-8 paths stay distinct.
@@ -252,10 +276,18 @@ mod tests {
             let expected_raw_hash = blake3::hash(b"hello").to_hex().to_string();
             assert_eq!(display_string, expected_raw_hash);
         }
+
+        #[test]
+        fn round_trips_through_raw_bytes() {
+            let digest = Blake3Digest::from("hello");
+
+            assert_eq!(digest.to_bytes(), *blake3::hash(b"hello").as_bytes());
+            assert_eq!(Blake3Digest::from_bytes(digest.to_bytes()), digest);
+        }
     }
 
     mod blake3_hasher {
-        use pretty_assertions::assert_ne;
+        use pretty_assertions::{assert_eq, assert_ne};
 
         use super::*;
 
@@ -277,6 +309,21 @@ mod tests {
             });
 
             assert_ne!(first, second);
+        }
+
+        #[test]
+        fn feeds_a_child_digest_as_a_length_prefixed_32_byte_field() {
+            let child = Blake3Digest::from("child");
+            let mut raw = blake3::Hasher::new();
+            raw.update(&32_u64.to_le_bytes());
+            raw.update(blake3::hash(b"child").as_bytes());
+
+            let composed = digest(|hasher| hasher.digest(&child));
+
+            assert_eq!(
+                composed.to_hex().as_ref(),
+                raw.finalize().to_hex().as_str()
+            );
         }
 
         #[test]

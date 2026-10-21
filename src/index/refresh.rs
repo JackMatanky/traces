@@ -2,10 +2,12 @@
 //! store.
 //!
 //! [`RefreshState`] models the refresh lifecycle: fresh scans can
-//! materialize directly from the store, while stale scans must pass
-//! through [`PendingApply`] before callers can receive a persisted store. A
-//! [`PersistFailed`] keeps the pending state so [`IndexerService::refresh`] can
-//! still materialize a fail-open in-memory index from the same reconciliation.
+//! materialize directly from the store, stale scans must pass
+//! through [`PendingApply`] before callers can receive a persisted store, and
+//! drifted scans, whose store was built under different config, are rebuilt in
+//! full. Drift wins over staleness. A [`PersistFailed`] keeps the pending state
+//! so [`IndexerService::refresh`] can still materialize a fail-open in-memory
+//! index from the same reconciliation.
 //!
 //! [`IndexerService::refresh`]: super::service::IndexerService::refresh
 
@@ -14,6 +16,7 @@ use std::{cmp::Ordering, collections::HashSet, path::Path};
 use super::{
     IndexError, IndexResult, WorkspaceIndex,
     delta::{FileDelta, InlinkDelta},
+    fingerprint::{DriftCause, IndexFingerprint},
     inlinks::{self, InlinkMap},
     service::IndexerService,
     sort::SortedByPath,
@@ -21,54 +24,89 @@ use super::{
 };
 use crate::{FileMeta, Note};
 
-/// Records changed-row counts resulting from an incremental refresh.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-#[expect(
-    clippy::struct_field_names,
-    reason = "upserted_count/deleted_count/links_modified_count disambiguate \
-              these counts from FileDelta/InlinkDelta collection accessors"
-)]
-pub struct RefreshReport {
-    upserted_count: usize,
-    deleted_count: usize,
-    links_modified_count: usize,
+/// Reports what one refresh found and healed.
+///
+/// Count accessors return zero for every variant that does not carry counts:
+/// a config drift heal reports its cause, not row counts.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum RefreshReport {
+    /// Nothing changed: the persisted index served as it was.
+    #[default]
+    Unchanged,
+    /// File metadata changed and the affected rows were updated.
+    FilesChanged {
+        /// Counts files inserted or updated.
+        upserted: usize,
+        /// Counts files deleted from the index.
+        deleted: usize,
+        /// Counts inbound link edges updated.
+        links_modified: usize,
+    },
+    /// The index was built under different config and was rebuilt in full.
+    ConfigDrift {
+        /// Explains why the stored index no longer matched the config.
+        cause: DriftCause,
+    },
 }
 
+#[cfg_attr(
+    not(any(test, feature = "test-utils")),
+    expect(
+        dead_code,
+        reason = "production only logs reports; tests and benches read the \
+                  counts through the testing facade"
+    )
+)]
 impl RefreshReport {
-    /// Creates a report from changed-row counts.
+    /// Returns the number of files inserted or updated, or zero unless files
+    /// changed.
     #[inline]
     #[must_use]
-    pub const fn new(
-        upserted_count: usize,
-        deleted_count: usize,
-        links_modified_count: usize,
-    ) -> Self {
-        Self {
-            upserted_count,
-            deleted_count,
-            links_modified_count,
+    pub const fn upserted_count(&self) -> usize {
+        match self {
+            Self::FilesChanged {
+                upserted,
+                ..
+            } => *upserted,
+            Self::Unchanged
+            | Self::ConfigDrift {
+                ..
+            } => 0,
         }
     }
 
-    /// Returns the number of files inserted or updated.
+    /// Returns the number of files deleted from the index, or zero unless
+    /// files changed.
     #[inline]
     #[must_use]
-    pub const fn upserted_count(self) -> usize {
-        self.upserted_count
+    pub const fn deleted_count(&self) -> usize {
+        match self {
+            Self::FilesChanged {
+                deleted,
+                ..
+            } => *deleted,
+            Self::Unchanged
+            | Self::ConfigDrift {
+                ..
+            } => 0,
+        }
     }
 
-    /// Returns the number of files deleted from the index.
+    /// Returns the number of inbound link edges updated, or zero unless files
+    /// changed.
     #[inline]
     #[must_use]
-    pub const fn deleted_count(self) -> usize {
-        self.deleted_count
-    }
-
-    /// Returns the number of inbound link edges updated.
-    #[inline]
-    #[must_use]
-    pub const fn links_modified_count(self) -> usize {
-        self.links_modified_count
+    pub const fn links_modified_count(&self) -> usize {
+        match self {
+            Self::FilesChanged {
+                links_modified,
+                ..
+            } => *links_modified,
+            Self::Unchanged
+            | Self::ConfigDrift {
+                ..
+            } => 0,
+        }
     }
 }
 
@@ -82,6 +120,17 @@ pub(super) enum RefreshState {
     },
     /// File metadata changed and is reconciled but not yet persisted.
     Stale(Box<PendingApply>),
+    /// The store was built under different config. The index is rebuilt in
+    /// memory from the plan's own scan, and `store` is the plan's handle, ready
+    /// for the heal to rewrite.
+    Drifted {
+        /// Explains why the stored index no longer matched the config.
+        cause: DriftCause,
+        /// Holds the index rebuilt from the plan's scan.
+        index: WorkspaceIndex,
+        /// Holds the plan's open store, the only handle redb allows.
+        store: IndexStore,
+    },
 }
 
 /// Holds reconciled refresh data waiting for a store write.
@@ -104,12 +153,14 @@ impl PendingApply {
     /// exactly the rows that failed to persist.
     pub(super) fn apply(
         self,
-        dimensions: IndexDimensions,
+        dimensions: &IndexDimensions,
+        fingerprint: &IndexFingerprint,
     ) -> Result<Persisted, PersistFailed> {
         let result = {
             let notes = self.update.notes_to_upsert();
             self.store.persist(&PersistRequest::incremental(
                 dimensions,
+                fingerprint,
                 self.update.delta(),
                 &notes,
                 self.update.inlink_delta(),
@@ -262,14 +313,17 @@ pub(super) struct RefreshPlan {
     current_files: SortedByPath<FileMeta>,
     persisted_files: SortedByPath<FileMeta>,
     delta: FileDelta,
+    drift: Option<DriftCause>,
 }
 
 impl RefreshPlan {
-    /// Opens [`IndexStore`], scans the filesystem, and reads persisted files.
+    /// Opens [`IndexStore`], scans the filesystem, and reads persisted files
+    /// and the fingerprint recorded with them.
     ///
     /// The filesystem walk runs concurrently with [`IndexStore::open`] and the
     /// store read. This state does not decode link rows; reconciliation or
-    /// final index materialization loads them only when needed.
+    /// final index materialization loads them only when needed. A virgin store
+    /// never drifts: its first build is an ordinary file change.
     ///
     /// # Errors
     ///
@@ -278,16 +332,19 @@ impl RefreshPlan {
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
     ///   project-relative path.
     /// - [`IndexError::Store`] if opening or reading the store fails.
-    pub(super) fn collect(root: &Path) -> IndexResult<Self> {
+    pub(super) fn collect(
+        root: &Path,
+        expected: &IndexFingerprint,
+    ) -> IndexResult<Self> {
         let (opened, scanned) = rayon::join(
             || -> IndexResult<_> {
                 let store = IndexStore::open(root)?;
-                let persisted_files = store.read_all_files()?;
-                Ok((store, persisted_files))
+                let persisted = store.read_files_and_fingerprint()?;
+                Ok((store, persisted))
             },
             || IndexerService::scan(root),
         );
-        let (store, persisted_files) = opened?;
+        let (store, (persisted_files, stored)) = opened?;
         let current_files = SortedByPath::assumed_sorted(scanned?);
         let delta = FileDelta::compute(&current_files, &persisted_files);
         Ok(Self {
@@ -295,7 +352,22 @@ impl RefreshPlan {
             current_files,
             persisted_files,
             delta,
+            drift: expected.drift(&stored),
         })
+    }
+
+    /// Takes the cause of the drift, or `None` if the store matches the
+    /// running config.
+    #[inline]
+    pub(super) const fn take_drift(&mut self) -> Option<DriftCause> {
+        self.drift.take()
+    }
+
+    /// Consumes the plan into its store handle and the scan it already did, so
+    /// a rebuild reuses both.
+    #[inline]
+    pub(super) fn into_scan(self) -> (IndexStore, SortedByPath<FileMeta>) {
+        (self.store, self.current_files)
     }
 
     /// Reports whether the scan produced no changes.
@@ -422,14 +494,15 @@ pub(super) struct IndexUpdate {
 impl IndexUpdate {
     /// Returns changed-row counts for this update.
     pub(super) fn report(&self) -> RefreshReport {
-        RefreshReport::new(
-            self.delta.upserted().len(),
-            self.delta.deleted().len(),
-            self.inlink_delta
+        RefreshReport::FilesChanged {
+            upserted: self.delta.upserted().len(),
+            deleted: self.delta.deleted().len(),
+            links_modified: self
+                .inlink_delta
                 .upserted()
                 .len()
                 .saturating_add(self.inlink_delta.deleted().len()),
-        )
+        }
     }
 
     #[inline]
@@ -547,7 +620,11 @@ mod tests {
                 inlink_delta,
             };
 
-            assert_eq!(update.report(), RefreshReport::new(1, 1, 0));
+            assert_eq!(update.report(), RefreshReport::FilesChanged {
+                upserted: 1,
+                deleted: 1,
+                links_modified: 0,
+            });
         }
     }
 
@@ -626,7 +703,8 @@ mod tests {
         fs::write(temp.path().join("note.md"), "---\ntitle: new\n---\n# A")
             .expect("rewrite note");
         let plan =
-            RefreshPlan::collect(temp.path()).expect("collect refresh plan");
+            RefreshPlan::collect(temp.path(), &IndexFingerprint::for_test())
+                .expect("collect refresh plan");
         let persisted_links = plan
             .store()
             .read_all_links(plan.persisted_files())

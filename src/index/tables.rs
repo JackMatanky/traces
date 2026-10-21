@@ -69,12 +69,15 @@ pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("classes_by_path");
 
-/// The cache-format marker, whose version identifies persisted row semantics.
-pub(super) const CACHE_FORMAT: TableDefinition<
-    'static,
-    &'static [u8],
-    &'static [u8],
-> = TableDefinition::new("cache_format");
+/// Defines the store's single metadata table.
+///
+/// Key `version`: the cache format version identifying persisted row semantics.
+/// Key `fingerprint`: the raw digests of the index-relevant config settings
+/// that produced the rows, as written by
+/// [`super::fingerprint::IndexFingerprint`].
+pub(super) const META: TableDefinition<'static, &'static [u8], &'static [u8]> =
+    TableDefinition::new("meta");
+
 /// Represents a schema table: to-one row or to-many multimap.
 enum TableDef {
     ToOne(TableDefinition<'static, &'static [u8], &'static [u8]>),
@@ -127,7 +130,7 @@ pub(super) const TABLES: [TableSpec; 8] = [
         policy: DeletePolicy::BestEffort,
     },
     TableSpec {
-        def: TableDef::ToOne(CACHE_FORMAT),
+        def: TableDef::ToOne(META),
         policy: DeletePolicy::BestEffort,
     },
 ];
@@ -154,6 +157,30 @@ impl TableSpec {
         txn: &ReadTransaction,
     ) -> Result<(), redb::TableError> {
         self.def.probe(txn)
+    }
+
+    /// Creates this table in `txn` when it does not exist yet.
+    ///
+    /// Incremental writes only open the tables whose rows they touch, so
+    /// without this a first build into a virgin store could leave a partial
+    /// schema that the next open wipes.
+    ///
+    /// # Errors
+    ///
+    /// - [`StoreError::Redb`] if redb cannot open the table, or the stored
+    ///   definition does not match.
+    ///
+    /// [`StoreError::Redb`]: super::error::StoreError::Redb
+    pub(super) fn create(
+        &self,
+        store: &IndexStore,
+        txn: &WriteTransaction,
+    ) -> StoreResult<()> {
+        match &self.def {
+            TableDef::ToOne(def) => txn.open_table(*def).map(|_| ()),
+            TableDef::ToMany(def) => txn.open_multimap_table(*def).map(|_| ()),
+        }
+        .map_err(|source| store.wrap_redb_error(source))
     }
 
     /// Deletes this table's contents per its [`DeletePolicy`].

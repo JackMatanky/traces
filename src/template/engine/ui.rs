@@ -423,9 +423,10 @@ mod tests {
                 .get_value(&Value::from("text_input"))
                 .expect("text_input is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let result = text_input
-                .call(&env.empty_state(), &[Value::from("name")])
+                .call(&mut state, &[Value::from("name")])
                 .expect("text_input succeeds");
 
             assert_eq!(result, Value::from("claude"));
@@ -438,9 +439,10 @@ mod tests {
                 .get_value(&Value::from("text_input"))
                 .expect("text_input is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let result = text_input
-                .call(&env.empty_state(), &[
+                .call(&mut state, &[
                     Value::from("name"),
                     Value::from("fallback"),
                 ])
@@ -456,9 +458,10 @@ mod tests {
                 .get_value(&Value::from("text_input"))
                 .expect("text_input is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = text_input
-                .call(&env.empty_state(), &[Value::from("name")])
+                .call(&mut state, &[Value::from("name")])
                 .expect_err("provider failure fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -483,9 +486,10 @@ mod tests {
                 .get_value(&Value::from("confirm"))
                 .expect("confirm is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let result = confirm
-                .call(&env.empty_state(), &[Value::from("proceed?")])
+                .call(&mut state, &[Value::from("proceed?")])
                 .expect("confirm succeeds");
 
             assert_eq!(result, Value::from(true));
@@ -499,9 +503,10 @@ mod tests {
                 .get_value(&Value::from("confirm"))
                 .expect("confirm is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let result = confirm
-                .call(&env.empty_state(), &[Value::from("proceed?")])
+                .call(&mut state, &[Value::from("proceed?")])
                 .expect("confirm succeeds");
 
             assert_eq!(result, Value::from(false));
@@ -514,9 +519,10 @@ mod tests {
                 .get_value(&Value::from("confirm"))
                 .expect("confirm is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = confirm
-                .call(&env.empty_state(), &[Value::from("proceed?")])
+                .call(&mut state, &[Value::from("proceed?")])
                 .expect_err("provider failure fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -541,10 +547,11 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec!["a", "b", "c"]);
 
             let result = select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect("select succeeds");
 
             assert_eq!(result, Value::from("b"));
@@ -557,13 +564,14 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec![
                 minijinja::context! { label => "US", value => 1 },
                 minijinja::context! { label => "GB", value => 44 },
             ]);
 
             let result = select
-                .call(&env.empty_state(), &[Value::from("country"), items])
+                .call(&mut state, &[Value::from("country"), items])
                 .expect("select succeeds");
 
             assert_eq!(
@@ -579,10 +587,11 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec![1_i64, 2, 3]);
 
             let result = select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect("select succeeds");
 
             assert_eq!(result, Value::from(1));
@@ -595,12 +604,10 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = select
-                .call(&env.empty_state(), &[
-                    Value::from("pick"),
-                    Value::from(1),
-                ])
+                .call(&mut state, &[Value::from("pick"), Value::from(1)])
                 .expect_err("non-iterable items fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -613,10 +620,11 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec!["a", "b"]);
 
             let error = select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect_err("an out-of-range index fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -629,10 +637,11 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(Vec::<String>::new());
 
             let error = select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect_err("selecting from an empty list fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -649,6 +658,7 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec![
                 minijinja::context! { name => "US", value => 1 },
                 minijinja::context! { name => "GB", value => 44 },
@@ -657,11 +667,7 @@ mod tests {
                 Kwargs::from_iter([("attribute", Value::from("name"))]).into();
 
             let result = select
-                .call(&env.empty_state(), &[
-                    Value::from("pick"),
-                    items,
-                    call_kwargs,
-                ])
+                .call(&mut state, &[Value::from("pick"), items, call_kwargs])
                 .expect("select succeeds");
 
             assert_eq!(
@@ -677,16 +683,13 @@ mod tests {
                 .get_value(&Value::from("select"))
                 .expect("select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec!["a", "b"]);
             let call_kwargs: Value =
                 Kwargs::from_iter([("bogus", Value::from(1))]).into();
 
             let error = select
-                .call(&env.empty_state(), &[
-                    Value::from("pick"),
-                    items,
-                    call_kwargs,
-                ])
+                .call(&mut state, &[Value::from("pick"), items, call_kwargs])
                 .expect_err("an unknown kwarg fails");
 
             assert_eq!(error.kind(), ErrorKind::TooManyArguments);
@@ -894,10 +897,11 @@ mod tests {
                 .get_value(&Value::from("multi_select"))
                 .expect("multi_select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec!["a", "b", "c"]);
 
             let result = multi_select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect("multi_select succeeds");
 
             assert_eq!(result, Value::from(vec!["a", "c"]));
@@ -910,10 +914,11 @@ mod tests {
                 .get_value(&Value::from("multi_select"))
                 .expect("multi_select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec!["a", "b"]);
 
             let result = multi_select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect("multi_select succeeds");
 
             assert_eq!(result, Value::from(Vec::<String>::new()));
@@ -926,10 +931,11 @@ mod tests {
                 .get_value(&Value::from("multi_select"))
                 .expect("multi_select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(Vec::<String>::new());
 
             let result = multi_select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect("multi_select succeeds on an empty item list");
 
             assert_eq!(result, Value::from(Vec::<String>::new()));
@@ -944,10 +950,11 @@ mod tests {
                 .get_value(&Value::from("multi_select"))
                 .expect("multi_select is a known method");
             let env = env();
+            let mut state = env.empty_state();
             let items = Value::from(vec!["a", "b"]);
 
             let error = multi_select
-                .call(&env.empty_state(), &[Value::from("pick"), items])
+                .call(&mut state, &[Value::from("pick"), items])
                 .expect_err("an out-of-range index fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);

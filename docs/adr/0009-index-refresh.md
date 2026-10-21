@@ -43,7 +43,8 @@ format version. Their failure is modeled as three first-class refresh states:
 Heal for drift is the existing rebuild verb: the refresh path performs a full
 rebuild and reports it, so operators never need a separate `traces index`
 invocation after a config change. The report distinguishes what happened
-(Unchanged / FilesChanged / ConfigDrift with the specific changed settings)
+(Unchanged / FilesChanged / ConfigDrift with the changed settings, or
+`Unrecorded` when the store holds rows but no readable fingerprint)
 rather than a bare row count.
 
 Boundaries this decision keeps:
@@ -79,7 +80,8 @@ Bad, because:
 
 - RefreshState and RefreshReport change shape, breaking their test and bench
   call sites.
-- The store gains an 8th table; legacy 7-table stores are wiped once via the
+- The store's `cache_format` table is renamed `meta` and gains the
+  fingerprint beside the format version; legacy stores are wiped once via the
   existing upgrade path (full rebuild on first open after upgrade).
 - Config::hash() is re-expressed as a composition of per-section digests,
   requiring a one-time re-pin of its encoding test.

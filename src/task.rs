@@ -193,14 +193,6 @@ impl TaskStatusMap {
     /// Callers needing a stable order must sort the result themselves, e.g. by
     /// [`TaskStatus::symbol`].
     #[inline]
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "no current caller outside tests; consumed by \
-                      Config::hash's future index-fingerprint use"
-        )
-    )]
     pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskStatus> {
         self.symbols.values()
     }

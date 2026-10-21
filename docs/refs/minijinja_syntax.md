@@ -81,7 +81,7 @@ MiniJinja allows you to calculate with values. The following operators are suppo
 - `*`: Multiply the left operand with the right one. `` would return `4`.
 - `**`: Raise the left operand to the power of the right operand. `` would return `8`.
 
-Note on divisions: divisions in Jinja2 are flooring, divisions in MiniJinja are at present using euclidean division. They are almost the same but not quite.
+Note on divisions: divisions in Jinja2 are flooring; since MiniJinja 3.0 the same flooring semantics apply here (`7 // -2` is `-4`, `7 % -2` is `-1`), replacing the euclidean division MiniJinja 2.x used. Division or modulo by zero is now an error rather than `inf`/`nan`. The upstream syntax page still describes the 2.x behavior.
 
 ### Comparisons
 

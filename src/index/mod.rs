@@ -12,13 +12,17 @@
 //!
 //! Fresh builds run through [`IndexerService::build`]; cold CLI reads use
 //! [`IndexerService::refresh_store`](service::IndexerService::refresh_store) to
-//! load and refresh an existing store.
+//! load and refresh an existing store. A refresh also compares the store's
+//! recorded [`fingerprint`] of index-relevant config settings with the running
+//! config and rebuilds in full when they differ.
 //!
+//! [`fingerprint`]: mod@fingerprint
 //! [`store`]: mod@store
 mod codec;
 mod delta;
 mod entry;
 mod error;
+mod fingerprint;
 mod inlinks;
 mod refresh;
 mod service;
@@ -30,6 +34,8 @@ mod trie;
 pub(crate) use entry::RowIndex;
 pub use entry::{FileEntry, WorkspaceIndex};
 pub use error::{IndexError, IndexResult};
+#[cfg(any(test, feature = "test-utils"))]
+pub use fingerprint::{DriftCause, IndexSetting};
 #[cfg(any(test, feature = "test-utils"))]
 pub use inlinks::InlinkMap;
 #[cfg(any(test, feature = "test-utils"))]

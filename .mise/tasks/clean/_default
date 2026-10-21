@@ -15,7 +15,7 @@
 #USAGE flag "--all" {
 #USAGE   help "Clean entire Cargo target directory and report files"
 #USAGE   long_help """
-#USAGE   Wipes the entire Cargo target directory and all quality report files. Explicitly preserves historical benchmark results in `target/criterion/`.
+#USAGE   Wipes the entire Cargo target directory and all quality report files. Benchmark history is NEVER deleted: it lives in `.criterion/` at the repo root, and `target/criterion` is a symlink into it (recreated after the clean).
 #USAGE   """
 #USAGE }
 #USAGE flag "--if-over-gib <gib>" {
@@ -47,6 +47,7 @@ source "${MISE_PROJECT_ROOT:?}/.mise/scripts/size_gate.sh"
 readonly TARGET_DIR="${usage_target_dir:-target}"
 # Clean the Cargo target directly or via the sweep task, and/or remove
 # generated quality and test report files.
+# Benchmark history is protected by the durable store contract in .mise/scripts/criterion_store.sh.
 
 plan_clean_target=true
 plan_clean_reports=false
@@ -138,8 +139,12 @@ exec_sweep_delegation() {
 }
 
 #######################################
-# Executes cargo clean with size gating and target/criterion benchmark results
-# preservation.
+# Executes cargo clean with size gating. Benchmark history is protected by
+# the durable store contract (.mise/scripts/criterion_store.sh): history
+# lives in `.criterion/` behind the `target/criterion` symlink, so `cargo
+# clean` can only ever remove the link. A stray real directory is moved into
+# the store BEFORE cleaning; after a full clean the link is recreated so
+# bench tooling sees history again.
 #
 # Globals:
 #   TARGET_DIR
@@ -148,10 +153,11 @@ exec_sweep_delegation() {
 #   usage_release
 #   usage_doc
 #   usage_profile
+#   MISE_PROJECT_ROOT
 # Arguments:
 #   None
 # Outputs:
-#   Size diagnostics and preservation messages to STDOUT.
+#   Size diagnostics, contract preview/preservation lines to STDOUT.
 # Returns:
 #   Status of cargo clean.
 #######################################
@@ -170,46 +176,32 @@ exec_target_clean() {
     is_full_clean=false
   fi
 
-  local criterion_dir="${TARGET_DIR}/criterion"
-  local tag_file="${TARGET_DIR}/CACHEDIR.TAG"
-  local has_criterion=false
-  if [[ -d "${criterion_dir}" ]]; then
-    has_criterion=true
+  # shellcheck source=/dev/null
+  source "${MISE_PROJECT_ROOT:?}/.mise/scripts/criterion_store.sh"
+
+  if [[ "${usage_dry_run:-false}" == "true" ]]; then
+    criterion_dry_run_note "${TARGET_DIR}"
+  else
+    # Migrate/park any stray real target/criterion BEFORE cargo clean can
+    # delete it in place. Argument (not env prefix): the link path must be
+    # re-derived per call, or a custom --target-dir override is ignored.
+    ensure_criterion_store "${TARGET_DIR}"
   fi
 
+  local tag_file="${TARGET_DIR}/CACHEDIR.TAG"
+  local dry_run_temp_tag=false
   if [[ -d "${TARGET_DIR}" && ! -f "${tag_file}" ]]; then
     printf '%s\n%s\n' \
       'Signature: 8a477f597d28d172789f06886806bc55' \
       '# This file is a cache directory tag created by cargo.' \
       > "${tag_file}" 2>/dev/null || true
-  fi
-
-  if [[ "${has_criterion}" == "true" \
-    && "${usage_dry_run:-false}" == "true" ]]; then
-    printf 'clean: preserving %s benchmark results\n' "${criterion_dir}"
-  fi
-
-  local backup_tmp=""
-  if [[ "${has_criterion}" == "true" \
-    && "${is_full_clean}" == "true" \
-    && "${usage_dry_run:-false}" != "true" ]]; then
-    backup_tmp="$(mktemp -d -t traces_criterion_clean.XXXXXX)"
-    mv "${criterion_dir}" "${backup_tmp}/criterion"
-    [[ -f "${tag_file}" ]] && cp "${tag_file}" "${backup_tmp}/CACHEDIR.TAG"
-
-    # Trap to restore criterion if clean aborts
-    trap '
-      if [[ -d "'"${backup_tmp}"'/criterion" ]]; then
-        mkdir -p "'"${TARGET_DIR}"'"
-        mv "'"${backup_tmp}"'/criterion" \
-          "'"${criterion_dir}"'" 2>/dev/null || true
-        if [[ -f "'"${backup_tmp}"'/CACHEDIR.TAG" ]]; then
-          cp "'"${backup_tmp}"'/CACHEDIR.TAG" \
-            "'"${TARGET_DIR}"'/CACHEDIR.TAG" 2>/dev/null || true
-        fi
-      fi
-      rm -rf "'"${backup_tmp}"'"
-    ' EXIT INT TERM
+    if [[ "${usage_dry_run:-false}" == "true" ]]; then
+      # cargo clean refuses to run without a CACHEDIR.TAG (even with
+      # --dry-run), so a dry-run in a tagless target dir writes one
+      # transiently and removes it again after cargo: the dry-run must
+      # leave the filesystem unchanged.
+      dry_run_temp_tag=true
+    fi
   fi
 
   declare -a cargo_args=(clean --target-dir "${TARGET_DIR}")
@@ -218,17 +210,28 @@ exec_target_clean() {
   [[ "${usage_doc:-false}" == "true" ]] && cargo_args+=(--doc)
   [[ -n "${usage_profile:-}" ]] && cargo_args+=(--profile "${usage_profile}")
 
-  cargo "${cargo_args[@]}"
+  local cargo_status=0
+  cargo "${cargo_args[@]}" || cargo_status=$?
+  if [[ "${dry_run_temp_tag}" == "true" ]]; then
+    rm -f "${tag_file}"
+  fi
+  if [[ "${cargo_status}" -ne 0 ]]; then
+    return "${cargo_status}"
+  fi
 
-  if [[ -n "${backup_tmp}" && -d "${backup_tmp}/criterion" ]]; then
-    mkdir -p "${TARGET_DIR}"
-    mv "${backup_tmp}/criterion" "${criterion_dir}"
-    if [[ -f "${backup_tmp}/CACHEDIR.TAG" ]]; then
-      cp "${backup_tmp}/CACHEDIR.TAG" "${tag_file}"
+  if [[ "${is_full_clean}" == "true" \
+    && "${usage_dry_run:-false}" != "true" ]]; then
+    # cargo clean removed target/ including the symlink; restore the link
+    # (no-op when no store exists) and re-tag the directory.
+    ensure_criterion_store "${TARGET_DIR}"
+    if [[ -L "${TARGET_DIR}/criterion" ]]; then
+      printf '%s\n' \
+        'clean: benchmark history in .criterion/ is untouched; target/criterion symlink restored'
+      printf '%s\n%s\n' \
+        'Signature: 8a477f597d28d172789f06886806bc55' \
+        '# This file is a cache directory tag created by cargo.' \
+        > "${tag_file}" 2>/dev/null || true
     fi
-    trap - EXIT INT TERM
-    rm -rf "${backup_tmp}"
-    printf 'clean: preserved %s benchmark results\n' "${criterion_dir}"
   fi
 }
 

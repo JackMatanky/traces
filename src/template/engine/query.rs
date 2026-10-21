@@ -88,17 +88,6 @@ use crate::{
 /// [`QueryOps::enumerate`].
 const METHODS: &[&str] = &["from"];
 
-/// The [`State::set_temp`] key used to cache one refreshed [`WorkspaceIndex`]
-/// for the current render.
-///
-/// Shared by the `query`, `lists`, and `tasks` namespaces (all dispatch
-/// through [`QueryOps::run`]) so a render calling into multiple pays for one
-/// [`IndexerService::refresh`] instead of one per query call. `State`'s temp
-/// storage is scoped to one render, including `{% include %}`s, and resets for
-/// the next. A cache field on [`QueryOps`] itself would wrongly persist across
-/// independent renders on a reused [`Environment`]/[`super::TemplateEngine`].
-const INDEX_CACHE_KEY: &str = "query.index_cache";
-
 /// Backs the `query`, `lists`, and `tasks` minijinja namespace objects: one
 /// instance per namespace, differing only in which global it registers as and
 /// which [`QueryBuilder`] mode it executes.
@@ -196,7 +185,7 @@ impl QueryOps {
 
     /// Runs this namespace's query method for `source` against `state`'s cached
     /// [`WorkspaceIndex`], refreshing it first if not already cached this
-    /// render. See [`INDEX_CACHE_KEY`].
+    /// render. See [`Self::cached_index`].
     ///
     /// # Errors
     ///
@@ -205,7 +194,7 @@ impl QueryOps {
     /// if refreshing the index fails.
     fn run(
         &self,
-        state: &State,
+        state: &mut State,
         source: SourceSelector,
     ) -> TemplateEngineResult<Value> {
         let index = self.cached_index(state)?;
@@ -214,7 +203,14 @@ impl QueryOps {
     }
 
     /// Returns this render's cached [`WorkspaceIndex`], refreshing and caching
-    /// it first if not already cached this render. See [`INDEX_CACHE_KEY`] and
+    /// it first if not already cached this render. The cache lives in `state`'s
+    /// render-local typed extensions, shared by the `query`, `lists`, and
+    /// `tasks` namespaces (all dispatch through [`QueryOps::run`]) so a render
+    /// calling into multiple pays for one [`IndexerService::refresh`] instead
+    /// of one per query call. Extensions are scoped to one render, including
+    /// `{% include %}`s, and reset for the next. A cache field on [`QueryOps`]
+    /// itself would wrongly persist across independent renders on a reused
+    /// [`Environment`]/[`super::TemplateEngine`]. See
     /// [`super::cache::cached`].
     ///
     /// # Errors
@@ -225,9 +221,9 @@ impl QueryOps {
     /// [`source`]. [`source`]: `std::error::Error::source`
     fn cached_index(
         &self,
-        state: &State,
+        state: &mut State,
     ) -> TemplateEngineResult<Arc<WorkspaceIndex>> {
-        super::cache::cached(state, INDEX_CACHE_KEY, || {
+        super::cache::cached(state, || {
             self.indexer.refresh().map(Arc::new).map_err(|source| {
                 super::error::invalid_operation(
                     "failed to refresh the file index",
@@ -244,7 +240,7 @@ impl Object for QueryOps {
             "from" => {
                 let ops = Arc::clone(self);
                 Some(Value::from_function(
-                    move |state: &State,
+                    move |state: &mut State,
                           expr: Option<Value>|
                           -> TemplateEngineResult<Value> {
                         let source = resolve_from_arg(expr.as_ref())?;
@@ -302,8 +298,8 @@ fn resolve_from_arg(
 /// Lets `.field()` hand a [`SourceSelector`] filter across the minijinja
 /// boundary: `.from()` and the `with_children`/`with_descendants` filters
 /// downcast it back via [`Value::downcast_object_ref`]. No method overrides;
-/// mirrors `cache.rs`'s `Cached<T>`, this crate's other bare `impl Object` used
-/// purely to smuggle a typed value through a `Value`.
+/// the only bare `impl Object` in this crate used purely to smuggle a typed
+/// value through a `Value`.
 impl Object for SourceSelector {}
 
 impl Object for QuerySet {
@@ -361,7 +357,7 @@ impl Object for QuerySet {
     #[inline]
     fn call_method(
         self: &Arc<Self>,
-        _state: &State<'_, '_>,
+        _state: &mut State<'_, '_>,
         method: &str,
         args: &[Value],
     ) -> TemplateEngineResult<Value> {
@@ -1730,16 +1726,16 @@ mod tests {
                 .get_value(&Value::from("from"))
                 .expect("from is a known method");
             let env = Environment::new();
-            let state = env.empty_state();
+            let mut state = env.empty_state();
 
-            // Populates state's cached WorkspaceIndex; both namespaces dispatch
-            // through the same INDEX_CACHE_KEY.
-            page_from.call(&state, &[]).expect("query.from succeeds");
+            // Populates the render's cached WorkspaceIndex; both namespaces
+            // share the same cached extension.
+            page_from.call(&mut state, &[]).expect("query.from succeeds");
             // Written after the index was cached: a cache-sharing tasks.from()
             // call must not observe this new task.
             write_note(temp.path(), "todo.md", "- [ ] buy milk\n");
             let tasks =
-                task_from.call(&state, &[]).expect("tasks.from succeeds");
+                task_from.call(&mut state, &[]).expect("tasks.from succeeds");
 
             let count = tasks
                 .downcast_object_ref::<QuerySet>()

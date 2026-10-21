@@ -649,11 +649,11 @@ fn renders_class_expanded_source_selectors_through_the_schema_graph() {
     );
 }
 
-/// Guards the cross-render freshness constraint named in code on
-/// `INDEX_CACHE_KEY` (`src/template/engine/query.rs`: "A cache field on
+/// Guards the cross-render freshness constraint named in `cached_index`'s
+/// docs (`src/template/engine/query.rs`: "A cache field on
 /// `QueryOps` itself would wrongly persist across independent renders on a
 /// reused `Environment`/`TemplateEngine`"): the refreshed index is cached in
-/// render-scoped `State` temp storage, so a second render on the same
+/// a render-scoped typed extension, so a second render on the same
 /// service must observe filesystem changes made after the first render.
 ///
 /// All other template integration tests are single-render; this is the only

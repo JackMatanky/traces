@@ -51,10 +51,8 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - [`SchemaLoad`] if constructing the underlying [`TemplateEngine`] fails
-    ///   to load the Schema registry.
-    ///
-    /// [`SchemaLoad`]: TemplateError::SchemaLoad
+    /// - `TemplateError::SchemaLoad` if constructing the underlying
+    ///   `TemplateEngine` fails to load the Schema registry.
     #[inline]
     pub fn new(
         config: &'a Config,
@@ -100,29 +98,19 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - [`Resolve`] if resolving the template name fails.
-    /// - [`Read`] if reading the resolved template source fails.
-    /// - [`Render`] if minijinja evaluation fails.
-    /// - [`OutputPathEscapesRoot`] if the output path attempts to escape the
-    ///   root.
-    /// - [`OutputPathUnverifiable`] if `strict-path` cannot validate the root
-    ///   boundary or resolve existing candidate components.
-    /// - [`Prompt`] if an interactive UI prompt inside the template fails or is
-    ///   cancelled.
-    /// - [`OutputFileAlreadyExists`] if the output file already exists under
-    ///   [`CommitPolicy::CreateNew`].
-    /// - [`Write`] if creating parent directories, creating the output file, or
-    ///   writing rendered content fails.
-    ///
-    /// [`Resolve`]: TemplateError::Resolve
-    /// [`Read`]: TemplateError::Read
-    /// [`Render`]: TemplateError::Render
-    /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
-    /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
-    /// [`Prompt`]: TemplateError::Prompt
-    /// [`OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
-    /// [`Write`]: TemplateError::Write
-    /// [`CommitPolicy::CreateNew`]: super::writer::CommitPolicy::CreateNew
+    /// - `TemplateError::Resolve` if resolving the template name fails.
+    /// - `TemplateError::Read` if reading the resolved template source fails.
+    /// - `TemplateError::Render` if minijinja evaluation fails.
+    /// - `TemplateError::OutputPathEscapesRoot` if the output path attempts to
+    ///   escape the root.
+    /// - `TemplateError::OutputPathUnverifiable` if `strict-path` cannot
+    ///   validate the root boundary or resolve existing candidate components.
+    /// - `TemplateError::Prompt` if an interactive UI prompt inside the
+    ///   template fails or is cancelled.
+    /// - `TemplateError::OutputFileAlreadyExists` if the output file already
+    ///   exists under `CommitPolicy::CreateNew`.
+    /// - `TemplateError::Write` if creating parent directories, creating the
+    ///   output file, or writing rendered content fails.
     #[inline]
     pub fn render_to_file(
         &self,

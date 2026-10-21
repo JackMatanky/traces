@@ -4,7 +4,7 @@
 
 use std::fs;
 
-use super::support::Sandbox;
+use super::{config_fixture::ConfigFixture, support::Sandbox};
 
 /// Verifies a content edit between two spawned queries is query-visible.
 ///
@@ -132,8 +132,8 @@ fn newly_created_link_target_resolves_inlinks_after_spawned_refresh() {
 /// proving the first query genuinely read the store instead of silently
 /// rebuilding.
 ///
-/// This is the canonical recipe (portable); it must never be reused to pin
-/// the config-staleness behavior (ticket 04 forbids that recipe).
+/// This recipe stays about metadata freshness; config drift has its own canary,
+/// [`config_edit_heals_the_index_on_the_next_query`].
 ///
 /// Executes vs asserts:
 /// - Executes: `traces index`, `traces task`, a same-length note edit with the
@@ -231,4 +231,44 @@ fn list_creates_an_index_store_without_an_explicit_index_command() {
     assert!(list.is_success(), "stderr: {}", list.stderr);
     list.assert_stdout_eq("- a.md\n");
     assert!(sandbox.root().join(".traces/index.redb").is_file());
+}
+
+/// Verifies an index-relevant config edit heals the index on the next spawned
+/// query, with no `traces index` in between.
+///
+/// Executes vs asserts:
+/// - Executes: `traces trust`, `traces index` and class queries under
+///   `class_field = "class"`, then an edit to `class_field = "kind"`, a
+///   re-trust, and the same class queries again.
+/// - Asserts: before the edit `@Book` matches and `@Novel` does not; after it
+///   `@Novel` matches and `@Book` does not, though no note file changed.
+///
+/// Defect class: stale-secondary-index (config drift).
+#[test]
+fn config_edit_heals_the_index_on_the_next_query() {
+    let sandbox = Sandbox::new();
+    sandbox.write_config_fixture(
+        &ConfigFixture::new().with_templates("templates"),
+    );
+    sandbox.write_note("a.md", "---\nclass: Book\nkind: Novel\n---\n# A\n");
+    sandbox.run(&["trust"]).assert_success();
+    sandbox.run(&["index"]).assert_success();
+
+    let book_before = sandbox.run(&["list", "--from", "@Book"]);
+    book_before.assert_success();
+    book_before.assert_stdout_eq("- a.md\n");
+
+    sandbox.write_config_fixture(
+        &ConfigFixture::new()
+            .with_templates("templates")
+            .with_schemas(".traces/schemas", Some("kind")),
+    );
+    sandbox.run(&["trust"]).assert_success();
+
+    let novel = sandbox.run(&["list", "--from", "@Novel"]);
+    novel.assert_success();
+    novel.assert_stdout_eq("- a.md\n");
+    let book_after = sandbox.run(&["list", "--from", "@Book"]);
+    book_after.assert_success();
+    book_after.assert_stdout_eq("");
 }

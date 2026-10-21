@@ -12,7 +12,7 @@
 //! [`Object`]: minijinja::value::Object
 //! [`Environment::add_filter`]: minijinja::Environment::add_filter
 
-use minijinja::{Environment, Value};
+use minijinja::{Environment, Value, value::Serde};
 
 use super::error::{TemplateEngineResult, invalid_operation};
 
@@ -67,7 +67,7 @@ pub(super) fn from_yaml(text: &str) -> TemplateEngineResult<Value> {
     let parsed = crate::yaml::parse(text).map_err(|err| {
         invalid_operation("from_yaml: failed to parse YAML string", err)
     })?;
-    Ok(Value::from_serialize(&parsed))
+    Ok(Value::from(Serde(&parsed)))
 }
 
 #[cfg(test)]

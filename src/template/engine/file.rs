@@ -70,7 +70,7 @@ impl Object for FileOps {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         match key.as_str()? {
             "write_to" => {
-                Some(Value::from_function(|state: &State, path: &str| {
+                Some(Value::from_function(|state: &mut State, path: &str| {
                     state.set_temp(WRITE_TO_KEY, Value::from(path));
                     Value::UNDEFINED
                 }))
@@ -173,10 +173,10 @@ mod tests {
                 .get_value(&Value::from("write_to"))
                 .expect("write_to is a known method");
             let env = env();
-            let state = env.empty_state();
+            let mut state = env.empty_state();
 
             write_to
-                .call(&state, &[Value::from("notes/daily.md")])
+                .call(&mut state, &[Value::from("notes/daily.md")])
                 .expect("write_to succeeds");
 
             assert_eq!(
@@ -192,9 +192,10 @@ mod tests {
                 .get_value(&Value::from("write_to"))
                 .expect("write_to is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = write_to
-                .call(&env.empty_state(), &[])
+                .call(&mut state, &[])
                 .expect_err("missing argument fails");
 
             assert_eq!(error.kind(), ErrorKind::MissingArgument);
@@ -207,9 +208,10 @@ mod tests {
                 .get_value(&Value::from("write_to"))
                 .expect("write_to is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = write_to
-                .call(&env.empty_state(), &[Value::from(1)])
+                .call(&mut state, &[Value::from(1)])
                 .expect_err("non-string argument fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -222,12 +224,10 @@ mod tests {
                 .get_value(&Value::from("write_to"))
                 .expect("write_to is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = write_to
-                .call(&env.empty_state(), &[
-                    Value::from("a.md"),
-                    Value::from("b.md"),
-                ])
+                .call(&mut state, &[Value::from("a.md"), Value::from("b.md")])
                 .expect_err("too many arguments fails");
 
             assert_eq!(error.kind(), ErrorKind::TooManyArguments);
@@ -253,9 +253,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let content = include
-                .call(&env.empty_state(), &[Value::from("notes.md")])
+                .call(&mut state, &[Value::from("notes.md")])
                 .expect("include succeeds");
 
             assert_eq!(content, Value::from("included content"));
@@ -273,9 +274,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let content = include
-                .call(&env.empty_state(), &[Value::from("sub/note.md")])
+                .call(&mut state, &[Value::from("sub/note.md")])
                 .expect("include succeeds");
 
             assert_eq!(content, Value::from("nested"));
@@ -291,9 +293,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let content = include
-                .call(&env.empty_state(), &[Value::from("./notes.md")])
+                .call(&mut state, &[Value::from("./notes.md")])
                 .expect("include succeeds");
 
             assert_eq!(content, Value::from("included content"));
@@ -314,9 +317,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from(path)])
+                .call(&mut state, &[Value::from(path)])
                 .expect_err("escaping path fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -330,9 +334,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[])
+                .call(&mut state, &[])
                 .expect_err("missing argument fails");
 
             assert_eq!(error.kind(), ErrorKind::MissingArgument);
@@ -346,9 +351,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from(1)])
+                .call(&mut state, &[Value::from(1)])
                 .expect_err("non-string argument fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -362,12 +368,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[
-                    Value::from("a.md"),
-                    Value::from("b.md"),
-                ])
+                .call(&mut state, &[Value::from("a.md"), Value::from("b.md")])
                 .expect_err("too many arguments fails");
 
             assert_eq!(error.kind(), ErrorKind::TooManyArguments);
@@ -381,9 +385,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from("missing.md")])
+                .call(&mut state, &[Value::from("missing.md")])
                 .expect_err("missing file fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -403,9 +408,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from("sub")])
+                .call(&mut state, &[Value::from("sub")])
                 .expect_err("directory is not readable as a file");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -424,9 +430,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from("notes.md")])
+                .call(&mut state, &[Value::from("notes.md")])
                 .expect_err("an unresolvable root fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -446,9 +453,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from("leak.md")])
+                .call(&mut state, &[Value::from("leak.md")])
                 .expect_err("symlink escaping root fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -469,9 +477,10 @@ mod tests {
                 .get_value(&Value::from("include"))
                 .expect("include is a known method");
             let env = env();
+            let mut state = env.empty_state();
 
             let error = include
-                .call(&env.empty_state(), &[Value::from("secret.md")])
+                .call(&mut state, &[Value::from("secret.md")])
                 .expect_err("unreadable file fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
