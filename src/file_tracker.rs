@@ -142,16 +142,9 @@ impl FilePathTracker {
         &self,
         companion_suffixes: &[&str],
     ) -> Result<Vec<PathBuf>, FilePathTrackerError> {
-        if !self.root.is_dir() {
-            return Ok(Vec::new());
-        }
         let mut targets = Vec::new();
-        for node in DirTree::children(&self.root) {
-            let node = node.map_err(store_error)?;
-            let entry = node.path().to_path_buf();
-            if has_suffix(&entry, companion_suffixes) {
-                continue;
-            }
+        for entry in self.entry_paths(companion_suffixes) {
+            let entry = entry?;
             if let Some(target) = recorded_target(&entry)
                 && target.try_exists().unwrap_or(true)
             {
@@ -342,16 +335,9 @@ impl FilePathTracker {
         &self,
         companion_suffixes: &[&str],
     ) -> Result<Vec<PathBuf>, FilePathTrackerError> {
-        if !self.root.is_dir() {
-            return Ok(Vec::new());
-        }
         let mut removed = Vec::new();
-        for node in DirTree::children(&self.root) {
-            let node = node.map_err(store_error)?;
-            let entry = node.path().to_path_buf();
-            if has_suffix(&entry, companion_suffixes) {
-                continue;
-            }
+        for entry in self.entry_paths(companion_suffixes) {
+            let entry = entry?;
             let Some(target) = recorded_target(&entry) else {
                 continue;
             };
@@ -369,6 +355,31 @@ impl FilePathTracker {
             }
         }
         Ok(removed)
+    }
+
+    /// Lazily yields the store root's entry paths, companion files excluded.
+    ///
+    /// Walks the root one level deep, absorbing an absent or non-directory
+    /// root into an empty walk, and skips any entry whose file name ends in
+    /// one of `companion_suffixes`. Failures while reading the root or an
+    /// entry surface as [`StoreIo`] items at their original position in the
+    /// walk.
+    ///
+    /// [`StoreIo`]: FilePathTrackerError::StoreIo
+    fn entry_paths(
+        &self,
+        companion_suffixes: &[&str],
+    ) -> impl Iterator<Item = Result<PathBuf, FilePathTrackerError>> {
+        DirTree::children(&self.root).missing_as_empty().walk().filter_map(
+            move |node| match node.map_err(store_error) {
+                Err(error) => Some(Err(error)),
+                Ok(node) => {
+                    let entry = node.path().to_path_buf();
+                    (!has_suffix(&entry, companion_suffixes))
+                        .then_some(Ok(entry))
+                }
+            },
+        )
     }
 }
 

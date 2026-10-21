@@ -327,16 +327,21 @@ src/dirtree.rs: pub(crate) fn children(dir: impl AsRef<Path>) -> Self {
 src/dirtree.rs: pub(crate) fn descendants(dir: impl AsRef<Path>) -> Self {
 src/dirtree.rs: pub(crate) fn file_name(&self) -> &OsStr {
 src/dirtree.rs: pub(crate) fn file_name(self) -> &'a OsStr {
-src/dirtree.rs: pub(crate) fn file_type(&self) -> fs::FileType {
-src/dirtree.rs: pub(crate) fn filter<F>(mut self, mut predicate: F) -> Self
+src/dirtree.rs: pub(crate) fn filter<F>(self, mut predicate: F) -> Self
 src/dirtree.rs: pub(crate) fn into_parts(self) -> (PathBuf, io::Error) {
-src/dirtree.rs: pub(crate) fn metadata(&self) -> io::Result<fs::Metadata> {
+src/dirtree.rs: pub(crate) fn is_dir(&self) -> bool {
+src/dirtree.rs: pub(crate) fn is_file(&self) -> bool {
+src/dirtree.rs: pub(crate) fn metadata(&self) -> Result<fs::Metadata, DirTreeError> {
+src/dirtree.rs: pub(crate) fn missing_as_empty(mut self) -> Self {
 src/dirtree.rs: pub(crate) fn path(&self) -> &Path {
-src/dirtree.rs: pub(crate) fn path(self) -> &'a Path {
-src/dirtree.rs: pub(crate) fn sorted_by<F>(mut self, mut compare: F) -> Self
+src/dirtree.rs: pub(crate) fn sorted_by<F>(self, mut compare: F) -> Self
+src/dirtree.rs: pub(crate) fn walk(self) -> DirTree<Walking> {
 src/dirtree.rs: pub(crate) struct DirNode(DirEntry);
 src/dirtree.rs: pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
-src/dirtree.rs: pub(crate) struct DirTree {
+src/dirtree.rs: pub(crate) struct DirTree<S> {
+src/dirtree.rs: pub(crate) struct Ready {
+src/dirtree.rs: pub(crate) struct Walking {
+src/env_vars.rs: pub(crate) const DEFAULT_IGNORED_DIRS: [&str; 4] =
 src/env_vars.rs: pub(crate) fn is_ignored_dir(file_name: &OsStr) -> bool {
 src/env_vars.rs: pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 src/env_vars.rs: pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =

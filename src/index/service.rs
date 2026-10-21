@@ -72,8 +72,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory cannot be read.
-    /// - `IndexError::Inspect` if a file's metadata cannot be inspected.
+    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
+    ///   included.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
@@ -120,8 +122,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory cannot be read.
-    /// - `IndexError::Inspect` if file metadata cannot be inspected.
+    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
+    ///   included.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
@@ -138,8 +142,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory cannot be read.
-    /// - `IndexError::Inspect` if file metadata cannot be inspected.
+    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
+    ///   included.
+    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    ///   record.
     /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - `IndexError::Path` if a walked file cannot be derived as a safe
@@ -232,8 +238,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
+    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
+    ///   included.
+    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    ///   record.
     /// - [`IndexError::NoteParse`] if a note cannot be read or decoded as
     ///   UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
@@ -258,8 +266,10 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if file metadata cannot be inspected.
+    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
+    ///   included.
+    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    ///   record.
     /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
     ///   as UTF-8.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
@@ -403,22 +413,24 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory cannot be read.
-    /// - [`IndexError::Inspect`] if a file's metadata cannot be inspected.
+    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
+    ///   included.
+    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    ///   record.
     /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
     ///   project-relative path.
     pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
         let index_db = root.join(INDEX_FILE);
         let entries = DirTree::descendants(root)
             .filter(|node| crate::env_vars::is_ignored_dir(node.file_name()))
+            .walk()
             .filter_map(|node| {
                 let node = match node {
                     Ok(node) => node,
                     Err(error) => return Some(Err(IndexError::Scan(error))),
                 };
                 let path = node.path();
-                (node.file_type().is_file() && path != index_db)
-                    .then_some(Ok(node))
+                (node.is_file() && path != index_db).then_some(Ok(node))
             })
             .collect::<IndexResult<Vec<DirNode>>>()?;
         let mut files = entries
@@ -437,10 +449,7 @@ fn scan_file_metadata(node: &DirNode, root: &Path) -> IndexResult<FileMeta> {
     // failure actually occurs.
     let path = node.path();
     let relative = RelativePath::derive(root, path)?;
-    let metadata = node.metadata().map_err(|source| IndexError::Inspect {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let metadata = node.metadata()?;
     FileMeta::from_metadata(relative, &metadata).map_err(|source| {
         IndexError::Inspect {
             path: path.to_path_buf(),
@@ -724,6 +733,31 @@ mod tests {
 
         fn paths(files: &[FileMeta]) -> Vec<&Path> {
             files.iter().map(FileMeta::path).collect()
+        }
+
+        #[test]
+        fn scans_a_root_whose_own_name_is_ignored() {
+            // Arrange: the workspace root itself matches `is_ignored_dir`, so
+            // a seam that applies the prune predicate to the root would
+            // silently return an empty index. The name comes from the same
+            // list production code prunes with, and must satisfy
+            // `is_ignored_dir` for the arrangement to hold.
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root_name = crate::env_vars::DEFAULT_IGNORED_DIRS
+                .into_iter()
+                .find(|name| {
+                    crate::env_vars::is_ignored_dir(std::ffi::OsStr::new(name))
+                })
+                .expect("a default ignored dir satisfies is_ignored_dir");
+            let root = temp.path().join(root_name);
+            fs::create_dir(&root).expect("mkdir ignored root");
+            fs::write(root.join("note.md"), "content").expect("write note.md");
+
+            // Act
+            let files = IndexerService::scan(&root).expect("scan");
+
+            // Assert
+            assert_eq!(paths(&files), vec![Path::new("note.md")]);
         }
 
         #[test]

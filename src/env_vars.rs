@@ -15,16 +15,17 @@ pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
         .unwrap_or_default()
 });
 
-/// Holds directory names parsed from `TRACES_IGNORED_DIRS` to prune during
-/// directory scans.
+/// Holds the default directory names ignored during scans; user-configured
+/// names from `TRACES_IGNORED_DIRS` are added on top of these.
+pub(crate) const DEFAULT_IGNORED_DIRS: [&str; 4] =
+    [".git", "target", "node_modules", ".traces"];
+
+/// Holds the directory names to prune during scans: [`DEFAULT_IGNORED_DIRS`]
+/// plus any names parsed from `TRACES_IGNORED_DIRS`.
 pub(crate) static IGNORED_DIRS: LazyLock<HashSet<String>> =
     LazyLock::new(|| {
-        let mut set = HashSet::from([
-            ".git".to_owned(),
-            "target".to_owned(),
-            "node_modules".to_owned(),
-            ".traces".to_owned(),
-        ]);
+        let mut set: HashSet<String> =
+            DEFAULT_IGNORED_DIRS.into_iter().map(str::to_owned).collect();
         if let Ok(val) = std::env::var("TRACES_IGNORED_DIRS") {
             for part in val.split([':', ',']) {
                 let trimmed = part.trim();

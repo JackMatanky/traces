@@ -16,7 +16,7 @@ use super::{
     fields::SchemaFieldBuildContext,
     model::Schema,
 };
-use crate::{BaseNameRef, DirTree, DirTreeError};
+use crate::{BaseNameRef, DirTree};
 
 /// Represents an error encountered while loading or resolving schemas.
 #[derive(Debug, Error)]
@@ -220,12 +220,9 @@ fn read_raw_schemas(
     dir: &Path,
 ) -> SchemaResult<IndexMap<SchemaName, RawSchema>> {
     let mut schemas = IndexMap::new();
-    for node in DirTree::children(dir) {
+    for node in DirTree::children(dir).missing_as_empty() {
         let node = match node {
             Ok(node) => node,
-            Err(DirTreeError::MissingRoot {
-                ..
-            }) => return Ok(IndexMap::new()),
             Err(error) => {
                 let (directory, source) = error.into_parts();
                 return Err(SchemaError::ReadDirectory {
