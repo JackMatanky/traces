@@ -2,7 +2,7 @@
 
 Deliverable:
 `.scratch/arch-design/research/20-prep/round6/H3-prior-art-and-in-band.md`  
-Target: Ticket 16 (Schema Note Typing and Validation) Round 6  
+Target: Ticket 20 (Schema Note Typing and Validation) Round 6  
 Scope: Exhaustive prior-art survey and in-band technique analysis for keeping
 markdown/YAML-frontmatter note stores valid when edited by AI agents, arbitrary
 processes, or human editors, WITHOUT relying on agent harness features (no

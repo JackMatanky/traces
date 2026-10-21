@@ -1,6 +1,6 @@
 # External Precedent: Declarative Schema Validation of Semi-Structured & Open-World Data
 
-- **Topic:** External precedent across language ecosystems, databases, query engines, and validation frameworks for Wayfinder Ticket 16 (Schema Note Typing and Validation).
+- **Topic:** External precedent across language ecosystems, databases, query engines, and validation frameworks for Wayfinder Ticket 20 (Schema Note Typing and Validation).
 - **Status:** Complete research deliverable.
 - **Deliverable:** `.scratch/arch-design/research/20-prep/c-validation-precedent.md`.
 - **Relationship to prior prep:** Extends `research/03-coercion-validation-precedent.md` and `research/19-prep/c-external-precedent.md` without duplicating SQLite affinity or basic DuckDB casting tables.

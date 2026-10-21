@@ -1,7 +1,7 @@
 # Template Pre-Check: Schema Validation of Generated Notes
 
 - **Topic:** Code-grounded and precedent-grounded analysis of using schemas as a template pre-check (validating notes produced by templates before writing to disk).
-- **Status:** Complete research deliverable for Wayfinder Ticket 16 (Schema Note Typing and Validation).
+- **Status:** Complete research deliverable for Wayfinder Ticket 20 (Schema Note Typing and Validation).
 - **Deliverable:** `.scratch/arch-design/research/20-prep/i-template-precheck.md`.
 - **Sources audited:**
   - Codebase: `src/template/` (`service.rs`, `writer.rs`, `engine.rs`, `loader.rs`, `path.rs`, `GLOSSARY.md`, `engine/ui.rs`, `engine/schema.rs`, `engine/query.rs`), `src/cli/template.rs`, `src/dialog/` (`mod.rs`, `terminal.rs`, `preset.rs`), `src/schema/` (`service.rs`, `fields.rs`, `raw.rs`, `types.rs`).
@@ -189,18 +189,18 @@ The post-render check (S1) and the LSP validator should use the **identical vali
 - Ticket 20 Q15 explicitly settled this: *"File fields: type + multi only (no file-existence check). Pure function model preserved — no filesystem access needed. Type checking (is value a Link?) is cheap and pure"* [V].
 - Even though `TemplateEngine` already instantiates `IndexerService::from(config)` (`src/template/engine.rs:135`) for `query.*` expressions, keeping the validation kernel pure (taking only `&Note` and `&Schema`) ensures it remains ultra-fast, deterministic, and decoupled from index state [P].
 
-### 3.4 Error Mode: Ticket 15 Advisory vs ADR-0006 MCP Gating
+### 3.4 Error Mode: Ticket 19 Advisory vs ADR-0006 MCP Gating
 
 There is an apparent tension between two foundational decisions:
 
-1. **Ticket 15's Error-Mode Principle:** *"Coercion failures follow the error-mode principle: advisory, never gating"* (`.scratch/arch-design/issues/19-coercion-and-comparison-policy.md:45-46`) [V].
+1. **Ticket 19's Error-Mode Principle:** *"Coercion failures follow the error-mode principle: advisory, never gating"* (`.scratch/arch-design/issues/19-coercion-and-comparison-policy.md:45-46`) [V].
 2. **ADR-0006's MCP Guardrail Stage:** *"required/multi are declared now but inert until the deferred MCP guardrail stage; LSP and MCP stages are deferred to later phases... one field definition is shared across templates, queries, and future LSP completions/MCP guardrails"* (`ADR-0006: Consequences`) [V].
 
 #### Reconciliation Policy
 
 The divergence resolves cleanly across consumer modalities [P]:
 
-- **Interactive Human CLI (`traces template`):** Follows **Ticket 15 (Advisory)**.
+- **Interactive Human CLI (`traces template`):** Follows **Ticket 19 (Advisory)**.
   - Aborting a write after prompts complete discards human effort [H].
   - Behavior: `commit()` proceeds to write the file; any validation diagnostics are printed to `stderr` as warnings (e.g. `warning: field 'status' is not a valid option for schema 'book'`) [P]. An optional `--strict` flag can turn warnings into an abort [P].
 - **Non-Interactive / MCP / Agent Mode (`traces template --no-input` or MCP tool call):** Follows **ADR-0006 (Gating)**.
@@ -268,7 +268,7 @@ Where should the template pre-check live in Traces?
 
 - **Mechanism:** `TemplateService::write` (or a helper inside `service.rs`) parses the rendered note, calls `schema::validate::validate(&note, &schema)`, and handles advisory/gating outcomes [P].
 - **Dependency Direction:** `src/template/` already depends on `src/schema/` (`src/template/engine.rs:60`, `src/template/engine/schema.rs:69-72`) [V]. Calling `schema::validate` adds no new dependency edge [H].
-- **Workspace Split Steer (Ticket 34):** In a multi-crate workspace split (`traces-schema`, `traces-template`), `traces-template` naturally depends on `traces-schema`. This direction is clean and acyclic [H].
+- **Workspace Split Steer (Ticket 32):** In a multi-crate workspace split (`traces-schema`, `traces-template`), `traces-template` naturally depends on `traces-schema`. This direction is clean and acyclic [H].
 
 ### 5.2 Option B: Trait Injection (`dyn NoteValidator` into `TemplateService`)
 
@@ -307,10 +307,10 @@ Where should the template pre-check live in Traces?
 
 ### 5.4 What Can Be Simplified or Deleted in `template/engine/schema.rs`?
 
-If schemas drive a unified validation kernel and value model (Tickets 14 & 16):
+If schemas drive a unified validation kernel and value model (Tickets 18 & 20):
 
 - `template/engine/schema.rs` currently implements custom `select_entry_value` conversion (`src/template/engine/schema.rs:258-266`) and `FieldValue` conversions (`src/template/engine/schema.rs:67`) [V].
-- With Ticket 14's unified value model (`NoteFieldValue`), schema select entries and note values share one representation [V].
+- With Ticket 18's unified value model (`NoteFieldValue`), schema select entries and note values share one representation [V].
 - `template/engine/schema.rs` is freed from any validation responsibility: it remains purely a minijinja data provider (`schema.get(name).field(f)`), while all validation logic consolidates in `schema::validate` [P].
 
 ---
@@ -323,7 +323,7 @@ If schemas drive a unified validation kernel and value model (Tickets 14 & 16):
 
 ---
 
-## 7. What This Changes for Ticket 16
+## 7. What This Changes for Ticket 20
 
 1. **Template Pre-Check is firmly (S1) Post-Render Check:**
    Static template analysis (S3) is impossible because frontmatter is unparsed text inside minijinja AST; pre-prompt constraint (S2) is blocked by the *No-Declaration Format* and minimalist `DialogProvider`. The only viable "template pre-check" is validating the rendered note text immediately before writing [P].
@@ -331,7 +331,7 @@ If schemas drive a unified validation kernel and value model (Tickets 14 & 16):
    No separate template validator is needed. The pure `SchemaValidator::validate(&Note, &Schema)` designed in Ticket 20 serves both the LSP and the template pre-check [P].
 3. **Spans are Optional:**
    Confirms Ticket 20's design of `range: Option<Range<BytePos>>`. Template checks emit diagnostics with `range = None`, reporting field-level issues to `stderr` or MCP without needing editor coordinate mapping [P].
-4. **Dual Failure Policy Resolves Ticket 15 vs ADR-0006:**
+4. **Dual Failure Policy Resolves Ticket 19 vs ADR-0006:**
    - Interactive CLI (`traces template`): Advisory (warn on stderr, write file). Preserves user prompt effort [P].
    - Non-interactive / MCP (`traces template --no-input`): Gating guardrail. Fails write and returns structured error payload to agent [P].
 5. **No Architectural Coupling Needed:**

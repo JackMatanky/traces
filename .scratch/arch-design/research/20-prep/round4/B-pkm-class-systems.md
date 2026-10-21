@@ -2,7 +2,7 @@
 
 This report evaluates class, tag, and schema systems across personal knowledge
 management (PKM) tools, note databases, and markdown systems to stress-test
-the design decisions of Traces Ticket 16.
+the design decisions of Traces Ticket 20.
 
 Claims are tagged `[V]` (verified against documentation, source code, issue
 trackers, or release notes with full URLs) or `[H]` (hypothesis, recollection,
@@ -379,7 +379,7 @@ Notable, Reflect, Heptabase)*
 
 | System | Field Types | Required? | Constraints | Inheritance / Composition | Conflict Rule | Class Declared In | Validation Timing | World Model | External Values | Schema Format | Diagnostics Surface |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **Traces (T16)** | input, select, number, date, boolean, file | Yes (`required`) | min, max, step, format, multi | Multiple `extends` + multi-class frontmatter | First listed wins; advisory conflict code | Frontmatter `class: [A, B]` | On-demand advisory check; gating host policy | Open (unknown fields reported with closest match) | JSON external value lists (value, label, link) | Strict TOML files in schema dir | Stable codes, bounded expected sets, no spans |
+| **Traces (T20)** | input, select, number, date, boolean, file | Yes (`required`) | min, max, step, format, multi | Multiple `extends` + multi-class frontmatter | First listed wins; advisory conflict code | Frontmatter `class: [A, B]` | On-demand advisory check; gating host policy | Open (unknown fields reported with closest match) | JSON external value lists (value, label, link) | Strict TOML files in schema dir | Stable codes, bounded expected sets, no spans |
 | **Logseq DB** | text, number, node, date, datetime, checkbox, url | Yes | choices, tag-constrained node | Multiple `Extends` on tags | Global property entity; scoped choices | Block/page tag (`#Tag`) | UI input formatting | Open (can add ad-hoc props) | Scoped tag choice lists | SQLite property/tag entities | Visual warnings in UI |
 | **Tana** | plain, options, date, number, user, url, email, checkbox | Yes (visual warning only) | min, max on number, supertag node filters | Single `Extend` on supertag; additive multi-tags | Deduplicated by field node ID; additive | Node supertag (`#Tag`) | Purely advisory on view/edit | Open (nodes can take arbitrary fields) | Options from supertag query | Graph node definitions | Yellow warning badge on field |
 | **Obsidian Metadata Menu / Fileclass** | input, number, select, multi, date, boolean, file, lookup, formula, object | Optional | regex, format, options list, dvQuery | Single `extends` + `excludes` | Priority cascade: frontmatter array (last-wins) > tag > path | Frontmatter `fileClass`, tag, or folder | Advisory in UI menus & table views | Open (unmanaged frontmatter preserved) | `valuesListNotePath` note link | YAML frontmatter in `.md` files in folder | In-modal errors, table cell highlights |
@@ -393,7 +393,7 @@ Notable, Reflect, Heptabase)*
 
 ---
 
-## 4. Challenges to Traces' Ticket 16 Design
+## 4. Challenges to Traces' Ticket 20 Design
 
 ### 4.1 Is Advisory-Only Validation Right?
 
@@ -415,7 +415,7 @@ Notable, Reflect, Heptabase)*
     preventing corrupt data from entering the database
     [V](https://developers.notion.com/reference/database).
 - **Recommendation:** **Keep advisory-only as the core rule, but support host
-  gating for agent write tools.** The Ticket 16 decision—where the check is
+  gating for agent write tools.** The Ticket 20 decision—where the check is
   pure and advisory, producing structured violations, while the host (CLI exit
   code, LSP diagnostic, MCP tool error) chooses whether to reject—matches the
   exact equilibrium discovered by SilverBullet and Tana.
@@ -543,7 +543,7 @@ Notable, Reflect, Heptabase)*
     edit, avoiding blame for pre-existing legacy violations [H].
   - Large option lists (e.g., 3,700 job titles) cannot be dumped into LLM tool
     JSON schemas without blowing up context windows [H].
-- **Recommendation:** **The Ticket 16 agent guardrail decisions are strongly
+- **Recommendation:** **The Ticket 20 agent guardrail decisions are strongly
   validated by precedent:**
   1. Project small enums into tool JSON schemas; check large external lists
      post-write via the delta check.
@@ -611,7 +611,7 @@ Notable, Reflect, Heptabase)*
    disk during note checking.
 5. **Protect Agents with Delta Rules:** When LLM agents edit notes, checking
    the whole note will fail on pre-existing legacy violations. The delta rule
-   planned in Ticket 16 (`(field, code, hash(value))`) is essential for agentic
+   planned in Ticket 20 (`(field, code, hash(value))`) is essential for agentic
    workflows.
 6. **Prefer Flat Composition over Deep Inheritance DAGs:** Precedent from
    Anytype, Capacities, and Logseq DB shows that deep multiple-inheritance

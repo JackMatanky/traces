@@ -1,4 +1,4 @@
-# Ticket 16 round 3: synthesis of scouts A-E, FG
+# Ticket 20 round 3: synthesis of scouts A-E, FG
 
 Mode: Model (research only; no baseline, trial loop or patch was run). Scout
 files are in this directory (`A-` to `FG-`; copied from the untracked
@@ -6,11 +6,11 @@ files are in this directory (`A-` to `FG-`; copied from the untracked
 by the orchestrator, [S] come from a scout and were not re-read, [P] proposals,
 [H] hypotheses.
 
-Status: input to [ticket 16's Answer](../../../issues/20-schema-note-typing-and-validation.md),
+Status: input to [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md),
 which supersedes this file where they differ: `traces check` takes `--before`
 and `--after` (not a git baseline), the delta key is `(field, code,
 hash(value))` without the element index, `step` is checked, severities belong to
-ticket 27 (not scout E), and the author's vault is one example, not evidence.
+ticket 31 (not scout E), and the author's vault is one example, not evidence.
 
 ## 1. What changed since brief revision 2
 
@@ -21,8 +21,8 @@ ticket 27 (not scout E), and the author's vault is one example, not evidence.
 | `file_class_expander.rs` is a sound seam (survey) | Rejected | See section 3 |
 | "LSP binds the agent" | LSP is feedback, not a gate | Section 5 |
 | Date-shaped text needs an override or quote convention | Narrower than thought | Section 6 |
-| Violations carry default severity (scout E) | Not adopted | Ticket 27 owns severity |
-| Move `NoteFieldValue` into `src/field.rs` (scout A) | Open | Ticket 14 left its home to ticket 28 |
+| Violations carry default severity (scout E) | Not adopted | Ticket 31 owns severity |
+| Move `NoteFieldValue` into `src/field.rs` (scout A) | Open | Ticket 18 left its home to ticket 32 |
 
 ## 2. Layering that survives a CLI-first workspace split [P]
 
@@ -81,8 +81,8 @@ ResolvedFields::check(&FieldMap) -> Vec<Violation>    (pure, span-free)
   (`NoteFieldValue`: Null, Bool, Int, Float, String, Date, DateTime, Duration,
   Link, List, Object) must sit below both. Its dependencies are `Link`,
   temporal values and `IndexMap`, all already root-level [H, not traced].
-  Ticket 14 rejected one enum shared with schema literals but left the home of
-  the runtime value open (module placement by ticket 28), so this is a
+  Ticket 18 rejected one enum shared with schema literals but left the home of
+  the runtime value open (module placement by ticket 32), so this is a
   placement decision, not a reversal. Schema literals stay a separate type.
 - Tier-2 `file` checks (folders, ext, class of the link target) need the
   index. The checker exposes the file-field constraints as data; the app layer
@@ -116,7 +116,7 @@ model module (broad blast radius).
 - Delta key [P]: `(field, code, hash(value))`, not element index, which shifts
   when a list item is removed.
 
-## 6. Date-shaped text (ticket 15 handoff) [S: D, partly V]
+## 6. Date-shaped text (ticket 19 handoff) [S: D, partly V]
 
 - Quoted numbers and versions already stay text: `"2001"` and `"1.10"` parse
   as strings; leading-zero values (`01234`, ISBN-10 with a leading zero) are
@@ -129,16 +129,16 @@ model module (broad blast radius).
   and Obsidian's property editor rewrites quote style on save (forum bug
   #65851 [S]). Not adopted.
 - Recommendation [P]: no override; `input` accepts any scalar; text view from
-  the typed value; a `string()` cast only if a real use appears (ticket 15).
+  the typed value; a `string()` cast only if a real use appears (ticket 19).
 
 ## 7. Violation model [S: E, with one disagreement]
 
 - `Violation { field, element, kind, expected, found }`, stable codes, no span,
   no severity. Bounded expected: count, truncated flag, top-k closest via
   `strsim`.
-- Disagreement: E has 16 pin default severities. Ticket 27 blocks on 16 for the
-  diagnostic envelope; 16 pins codes and the principle that type problems are
-  never `Error` by default, and 27 owns severities and overrides.
+- Disagreement: E has 20 pin default severities. Ticket 31 blocks on 20 for the
+  diagnostic envelope; 20 pins codes and the principle that type problems are
+  never `Error` by default, and 31 owns severities and overrides.
 - Huge enums and strftime formats cannot be projected to JSON Schema; they
   stay unconstrained there and are checked after the call.
 
@@ -151,7 +151,7 @@ model module (broad blast radius).
   it (3,734 entries for `job_titles`); a shared `Arc` lookup would avoid it.
 - Conflict rule between classes: first-listed wins, with an advisory.
 - External select lists with `value = "link"` produce wikilinks, so they are
-  relations in practice, which needs ticket 15's adaptive literal rule.
+  relations in practice, which needs ticket 19's adaptive literal rule.
 
 ## 9. Not verified
 

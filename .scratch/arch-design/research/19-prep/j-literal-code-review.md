@@ -12,6 +12,7 @@
 Today Traces employs a **global, parse-time heuristic sniffing** model for filter literals: any quoted string matching a Date, DateTime, or Duration shape is eagerly converted into a typed `NoteFieldValue` once during AST compilation (`ComparisonExpr::classify_literal`, `src/query/grammar/filter.rs:238` [V]). This leads to severe anomalies: querying a string field with `title == "2025-01-15"` sniffs the literal to a `Date`, causing the comparison against `String("2025-01-15")` to evaluate to `false` [V: probe].
 
 **Core Verdict:**
+
 1. **Adopt Operand-Adaptive Literals for Comparisons:** Quoted string literals in binary comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`) should defer classification until row evaluation, adapting to the target operand's kind per row [P].
 2. **Zero-Per-Row Parsing Implementation:** Deferral does NOT require per-row parsing or allocation. The filter compiler pre-parses all candidate shapes (`Date`, `DateTime`, `Duration`, `Link`) ONCE at query build time into an `AdaptiveLiteral` struct [P]. Per-row execution requires only a single enum discriminant branch (~5–10 CPU cycles, 0 allocations, ~0.2 ms for 50k rows) [H].
 3. **`string()` Is NOT Needed as an Escape, but Necessary for Cross-Field Queries:** If literals adapt, `title == "2025-01-15"` matches whether `title` is `String` or `Date`, rendering `string()` unnecessary for literal queries [P]. However, `string()` remains required for: (a) cross-field comparisons between heterogeneous kinds (`date_col == str_col`), (b) substring `contains()` on typed temporals, and (c) grouping/formatting when schema typing is absent [P].
@@ -21,12 +22,14 @@ Today Traces employs a **global, parse-time heuristic sniffing** model for filte
 ## 2. Codebase Touch Points: How Literals Interact with Types Today
 
 ### 2.1 Filter Lexing & Tokenization (`src/query/grammar/filter.rs`)
+
 - **Bare ISO Dates:** `FilterToken::DateLiteral` regex (`filter.rs:1216-1220` [V]) captures unquoted ISO dates (`YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`). In `tokenize_with` (`filter.rs:84-107` [V]), bare dates are eagerly classified into `FilterToken::Literal(NoteFieldValue::Date|DateTime)`. Invalid calendar shapes (`2026-02-30`) throw a `LexError::UnexpectedToken` [V: ADR-0009].
 - **Quoted Strings:** Tokenized via `string_callback` (`filter.rs:1209, 1230` [V]) into `FilterToken::Literal(NoteFieldValue::String)`.
 - **Bare Numbers & Durations:** `FilterToken::Ident` (`filter.rs:59-82` [V]) attempts `f64` parse first (rejecting NaN/inf [V:66]); if that fails, it attempts `DurationValue::parse` [V:72], promoting bare `1h30m` into `Literal(NoteFieldValue::Duration)`.
 - **Booleans & Null:** `true`, `false`, `null`, `Null` are tokenized directly as typed `Literal` variants (`filter.rs:1210-1213` [V]).
 
 ### 2.2 Parse-Time Literal Sniffing (`classify_literal`)
+
 - In `FilterGrammar::parse_primary` (`filter.rs:1012-1014` [V]), every `FilterToken::Literal(val)` is wrapped via `ComparisonExpr::classify_literal(value)`.
 - `classify_literal` (`filter.rs:238-248` [V]) inspects `NoteFieldValue::String` using `TextShape::classify` (`src/query/sort.rs:462` [V]):
   - `TextShape::DateTime` -> `NoteFieldValue::DateTime`
@@ -36,14 +39,17 @@ Today Traces employs a **global, parse-time heuristic sniffing** model for filte
 - **Flaw:** This promotion occurs statically at query build time without knowing the type of the field being compared against [V].
 
 ### 2.3 Relational & Equality Evaluation
+
 - **Equality (`==`, `!=`):** `CompareOp::is_satisfied_by_values` (`filter.rs:814-826` [V]) delegates to `NoteFieldValueRef::is_equal_to_literal` (`src/note/field.rs:393-428` [V]). Equality across different kinds is strictly `false` (except Date vs local-midnight DateTime [V:408, 413]). `!=` is the exact boolean complement (`!equal` [V:824]).
 - **Relational (`<`, `<=`, `>`, `>=`):** If neither operand is Null, `CompareOp` delegates to `NoteFieldValueRef::compare` (`src/note/field.rs:286-312` [V]). When kinds differ, it falls back to internal ordinal rank: `Null(0) < Bool(1) < Number(2) < Duration(3) < Temporal(4) < Text(5) < Link(6) < List(7) < Object(8)` (`field.rs:238-250` [V]). Thus `42 < "hello"` is `true`, leaking storage rank [V].
 
 ### 2.4 Arithmetic & The "Quote Date Literals" Error
+
 - `ArithOp::evaluate` (`filter.rs:347-472` [V]) implements `Date ± Duration`, `Date - Date -> Duration`, `Duration ± Duration`, and `Duration * Number`.
 - `filter.rs:1081-1090` [V]: If both arithmetic operands are numeric literals (`lhs.is_number_only() && rhs.is_number_only()`), the parser rejects it: `"a field, date, or duration operand (arithmetic on number literals alone is not supported; quote date literals)"`. This error exists specifically because unquoted dates like `2026-01-01` historically split into `2026 - 1 - 1` [V: ADR-0009].
 
 ### 2.5 Function Evaluation & `contains`
+
 - **Query Functions (`filter.rs:474-501` [V]):** `dur(text)`, `date(text[, pattern])`, `date_add`, `date_diff`, `date_component`, `sow/eow/som/eom/soy/eoy`.
   - `date(text)` (`filter.rs:705-728` [V]) accepts String, Date, DateTime; invalid text returns `None` (`TRY_CAST` semantics) [V].
   - `dur(text)` (`filter.rs:626-635` [V]) parses string durations; invalid text returns `None` [V].
@@ -54,11 +60,13 @@ Today Traces employs a **global, parse-time heuristic sniffing** model for filte
   - For scalar fields, it evaluates `(lhs.as_str(), target.as_str())` [V:442]. Because `as_str()` returns `None` for `Date`, `DateTime`, `Duration`, `Number`, `contains(due, "2025")` evaluates to `false` [V: probe].
 
 ### 2.6 CLI Paths & Shell Quoting (`src/cli/**`)
+
 - `--where` arguments in `list.rs:32`, `table.rs:26`, `task.rs:154` receive raw strings from `clap` [V].
 - Shell quote stripping forces users to escape nested quotes: `--where 'due < "2026-01-01"'` or `--where "due < \"2026-01-01\""` [V: `list.rs:30`].
 - Bare ISO date support (`due < 2026-01-01`) was added via ADR-0009 specifically to relieve this quoting friction [V].
 
 ### 2.7 Template Engine Coercion (`src/template/engine/**`)
+
 - Template filters (`date_format`, `date_add`, `timestamp`, `weekday`, `is_past`) accept strings and coerce them on the fly via `DatePoint::parse` (`template/engine/date.rs:448, 473` [V]).
 - Standard comparisons (`{% if a == b %}`) in templates are handled by `minijinja` using Serde-rendered values [V].
 
@@ -90,6 +98,7 @@ Every occurrence of quoted date/duration/link literals across tests, docs, and f
 | `src/query/grammar/filter.rs:1936` | `when - dur("1d") == "2026-01-30"` | Matches `Date` | **BREAKS** | Matches `Date` | Matches `Date` |
 
 **Conclusion on Inventory:**
+
 - **Removing sniffing entirely (a) is a catastrophic breaking change:** it breaks ~18 existing integration, E2E, and grammar tests and invalidates documented ADR-0009 behavior [V, H].
 - **Operand-adaptive literals (b) preserve 100% of existing passing tests** while fixing the string-field collision bug (`title == "2025-01-15"`) [H, P].
 
@@ -173,13 +182,14 @@ However, `string(expr)` is **still required** for four specific use cases [P]:
    - Grouping notes by year-month (`2025-01`) or formatting duration text requires converting the typed value to a string representation.
    - *Alternative:* `date_format(due, "%Y-%m")` covers dates, but no formatting function exists for links or generic fields.
 4. **String Functions Missing from Query Grammar:**
-   - Neither `lower()`, `upper()`, `startswith()`, `endswith()`, nor `regex_match()` exist in Traces query filters today (only `contains` exists) [V]. When ticket 22 adds these functions, they will require string inputs.
+   - Neither `lower()`, `upper()`, `startswith()`, `endswith()`, nor `regex_match()` exist in Traces query filters today (only `contains` exists) [V]. When ticket 26 adds these functions, they will require string inputs.
 
 ---
 
 ## 8. Implementation Sketch: Per-Row Operand-Adaptive Literals
 
 ### 8.1 The Core Mechanism
+
 Instead of eagerly converting `FilterToken::Literal(String)` to `NoteFieldValue::Date|DateTime|Duration` at query build time, quoted strings are wrapped in an `AdaptiveLiteral` [P]:
 
 ```rust
@@ -199,7 +209,9 @@ pub(crate struct AdaptiveLiteral {
 ```
 
 ### 8.2 Build-Time Compilation (Executed ONCE per query)
+
 When parsing `ValueExpr::Literal`:
+
 ```rust
 impl AdaptiveLiteral {
     pub(crate) fn new(raw: String) -> Self {
@@ -217,7 +229,9 @@ impl AdaptiveLiteral {
 ```
 
 ### 8.3 Row Evaluation (Zero Allocations, Zero Parsing)
+
 When comparing against a row's `NoteFieldValueRef`:
+
 ```rust
 impl AdaptiveLiteral {
     #[inline]
@@ -247,6 +261,7 @@ impl AdaptiveLiteral {
 ```
 
 ### 8.4 Performance Impact on 50,000 Rows
+
 - **Memory allocations per row:** `0` (borrows from `&self` or copies 4-byte/16-byte copy types) [P].
 - **String parsing per row:** `0` (all parsing executed once during AST construction) [P].
 - **CPU Instruction cost:** One discriminant match + pointer unwrap (~5–10 clock cycles ≈ 2–4 ns) [H].
@@ -263,13 +278,13 @@ impl AdaptiveLiteral {
    - If a vault note has `title: "1h"` (String) and user queries `--where 'title == "1h"'`, the target is `String`, so `AdaptiveLiteral` selects `String` and matches correctly [P].
    - If user queries `--where 'time < "1h"'` on duration `time: 30m`, target is `Duration`, so it selects `Duration` and matches correctly [P].
 3. **Array Membership (`tags == "x"`):**
-   - Adaptive literals do NOT change array scalar comparisons: `List == String` remains `false` under Type Bracketing [V]. Users must continue to use `contains(tags, "#x")` or ticket 22's planned `any()` / `in` operator.
+   - Adaptive literals do NOT change array scalar comparisons: `List == String` remains `false` under Type Bracketing [V]. Users must continue to use `contains(tags, "#x")` or ticket 26's planned `any()` / `in` operator.
 4. **Arithmetic Expression Types (`when - "2026-01-31"`):**
    - In arithmetic expressions (`ArithOp`), the literal must adapt to the *other* arithmetic operand: in `Date - Literal`, the literal must adapt to `Date` (yielding `Duration`); in `Duration * Literal`, the literal must adapt to `Number`. This requires threading operand expectation into `ValueExpr::Binary` [H, P].
 
 ---
 
-## 10. Implications for Ticket 15
+## 10. Implications for Ticket 19
 
 ### Concrete Decision Options
 
@@ -284,7 +299,9 @@ impl AdaptiveLiteral {
   - *Cons:* Small compiler-layer implementation addition in `src/query/grammar/filter.rs`.
 
 ### Final Recommendation
+
 **Adopt Option C (Pre-Parsed Operand-Adaptive Literals).** Combine with:
+
 1. Retaining bare ISO dates (`due == 2025-01-15`) via ADR-0009 for zero-quoting CLI ergonomics [P].
 2. Providing explicit `date()`, `dur()`, and `string()` cast functions with TRY_CAST semantics (failure -> Null) for cross-field comparisons and explicit conversions [P].
-3. Leaving frontmatter classification quote-insensitive at parse time (matching ticket 14 answer lines 501-502 and `h-quote-escape-feasibility.md`), with string-forcing handled by schema typing (`type = "string"`) [P].
+3. Leaving frontmatter classification quote-insensitive at parse time (matching ticket 18 answer lines 501-502 and `h-quote-escape-feasibility.md`), with string-forcing handled by schema typing (`type = "string"`) [P].

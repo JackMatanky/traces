@@ -1,7 +1,7 @@
 # Agent & MCP Vault Tools: Frontmatter Guardrails & Schema Enforcement
 
 Deliverable: `round4/F-agent-and-mcp-vault-tools.md`  
-Target: Ticket 16 (Schema Note Typing and Validation)  
+Target: Ticket 20 (Schema Note Typing and Validation)  
 Scope: Tools, specifications, and empirical precedent for LLM agents reading
 and writing markdown notes, knowledge bases, and structured frontmatter.  
 Evidence tags: `[V]` verified from primary documentation, source code,
@@ -585,9 +585,9 @@ No project relies solely on unverified memory.
 
 ---
 
-## 4. Challenges to Traces' Design (Ticket 16 Answer)
+## 4. Challenges to Traces' Design (Ticket 20 Answer)
 
-This section systematically tests each decision of Traces' Ticket 16 design
+This section systematically tests each decision of Traces' Ticket 20 design
 against the external precedent gathered above.
 
 ### 4.1 "Schemas validate note data as an advisory, on-demand check"
@@ -727,11 +727,11 @@ against the external precedent gathered above.
 
 ### 4.7 Essential Capabilities Traces Has NOT Considered
 
-External projects reveal four critical capabilities missing from Ticket 16:
+External projects reveal four critical capabilities missing from Ticket 20:
 
-1. **MCP Elicitation for Class-Change Confirmation:** Ticket 16 states:
+1. **MCP Elicitation for Class-Change Confirmation:** Ticket 20 states:
    *"Changing a note's class, or setting an unknown class, asks the user and
-   denies when no confirmation channel exists."* Ticket 16 treats this as an
+   denies when no confirmation channel exists."* Ticket 20 treats this as an
    unsolved problem for MCP. However, the MCP specification already standardized
    **Elicitation** (`client/elicitation`, `ctx.mcpReq.elicitInput`) for this
    exact purpose: a tool handler pauses execution and asks the user for

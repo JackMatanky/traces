@@ -2,7 +2,7 @@
 
 ## 1. Sub-Problems Restated
 
-Ticket 16 must determine how Traces resolves schema definitions and provides
+Ticket 20 must determine how Traces resolves schema definitions and provides
 them to validation, the LSP, templates, and the MCP agent. This scout
 investigates two tightly coupled core engine sub-problems:
 
@@ -29,8 +29,8 @@ investigates two tightly coupled core engine sub-problems:
   entries). Entries map structured attributes (`value`, `label`, `link`, `key`).
   Crucially, several fields configure `value = "link"`, meaning the stored note
   value is a wikilink (e.g. `[[account_collector|Account Collector]]`),
-  coupling select validation to Ticket 14's `NoteFieldValue::Link` and Ticket
-  15's adaptive literal coercion. Today, loading and cloning these large lists
+  coupling select validation to Ticket 18's `NoteFieldValue::Link` and Ticket
+  19's adaptive literal coercion. Today, loading and cloning these large lists
   costs significant memory and parsing time. How should large vocabularies be
   loaded, cached, invalidated on file edits, validated without runaway memory,
   presented in LSP completion without latency spikes, and bounded in diagnostic
@@ -482,7 +482,7 @@ label = "value" }`.
 
 ### Against Candidate 1 (Keep-as-Is)
 
-- **Verdict**: Completely unviable for ticket 16's committed goals.
+- **Verdict**: Completely unviable for ticket 20's committed goals.
 - **Fatal Flaw**: Multi-class notes are pervasive in real vaults
   (`examples/.traces/schemas`
   demonstrates notes that combine organizational and domain schemas). Forcing
@@ -539,7 +539,7 @@ loops
 
 ## 7. Deep Dive: The Schema Model Additions
 
-The LSP (Tickets 19, 20, 26) and MCP require specific extensions to the schema
+The LSP (Tickets 23, 24, 30) and MCP require specific extensions to the schema
 model. Below is the technical specification for each addition:
 
 ### 7.1 Provenance (`origin: SchemaName`) [P]
@@ -628,7 +628,7 @@ pub struct SelectLookupTable {
     source_path: PathBuf,
     /// Fast O(1) set of raw stored values for validation.
     values_set: HashSet<String>,
-    /// Case-folded wikilink targets for Ticket 15 adaptive literal matching.
+    /// Case-folded wikilink targets for Ticket 19 adaptive literal matching.
     /// Maps "account_collector" -> index in entries.
     folded_targets: HashMap<String, usize>,
     /// Preserved display entries for completion and UI rendering.
@@ -677,7 +677,7 @@ pub struct SelectEntry {
   - For lists with $> 10$ items: list the top 3 closest Levenshtein matches or
     the first 3 alphabetical items, plus total count.
 
-### 8.5 The 'Value vs Link' Split (Ticket 14/15 Integration) [V]
+### 8.5 The 'Value vs Link' Split (Ticket 18/19 Integration) [V]
 
 - In `dir_contact.toml`:
   `values = { path = "values/job_titles.json", value = "link", label = "value"
@@ -688,7 +688,7 @@ pub struct SelectEntry {
 - When frontmatter contains `job_title: [[accountant|Accountant]]`:
   1. Frontmatter parser produces `NoteFieldValue::Link(Link)`.
   2. Validator checks membership. It extracts the link target (`accountant`),
-     folds case/whitespace per Ticket 15, and probes
+     folds case/whitespace per Ticket 19, and probes
 `SelectLookupTable::folded_targets`.
   3. Match succeeds in $O(1)$ time without string concatenation or re-parsing.
 
@@ -843,7 +843,7 @@ For same-named fields across multiple classes on a note:
    The checker should take `defs: &ResolvedClassSet` rather than `&Schema`.
    Violations for invalid select values must truncate large expected sets to
    prevent unbounded diagnostic payloads.
-2. **For Ticket 19 (Byte Spans & AST Split)**:
+2. **For Ticket 23 (Byte Spans & AST Split)**:
    The validation kernel needs only frontmatter values and `ResolvedClassSet`.
    It does not need byte spans. Byte spans are attached at the diagnostic
    envelope adapter boundary.
@@ -852,7 +852,7 @@ For same-named fields across multiple classes on a note:
    They require zero dependencies on `src/note/` or `src/index/`. The validator
    lives in a consumer layer (`src/analysis/` or `src/check/`) that imports both
    `schema` and `note`.
-4. **For Ticket 15 (Coercion & Adaptive Literals)**:
+4. **For Ticket 19 (Coercion & Adaptive Literals)**:
    `SelectLookupTable`'s folded target map allows instant $O(1)$ verification
    of wikilink note values against string select options, cleanly fulfilling
-   Ticket 15's adaptive literal mandate.
+   Ticket 19's adaptive literal mandate.

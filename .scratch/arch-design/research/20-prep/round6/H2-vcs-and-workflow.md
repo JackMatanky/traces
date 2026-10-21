@@ -2,7 +2,7 @@
 
 Deliverable:
 `.scratch/arch-design/research/20-prep/round6/H2-vcs-and-workflow.md`  
-Target: Ticket 16 (Schema Note Typing and Validation)  
+Target: Ticket 20 (Schema Note Typing and Validation)  
 Scope: Guardrails at version-control, storage, and workflow layers, and how
 other domains gate untrusted writers without relying on agent harnesses.  
 Tags: `[V]` verified from primary source or local empirical experiment; `[H]`
@@ -13,7 +13,7 @@ source inaccessible.
 
 ## 1. Executive Summary & Architectural Axiom
 
-Ticket 16 established an advisory `check_note(before, after)` contract, noting
+Ticket 20 established an advisory `check_note(before, after)` contract, noting
 that "the portable guarantee is detect-and-feed-back; true prevention only where
 traces owns the write or the harness denies native writes."
 
@@ -583,7 +583,7 @@ categorized by repository type:
 | **Prevention** | Dedicated Branch / Worktree + `traces merge` | Hard Gate | Agent is restricted to an isolated branch/worktree (`agent/<session>`). Canonical `main` is only updated via `traces merge <branch>`, which enforces `check_note(before, after)` before merging. |
 | **Commit Gate** | Pre-Commit Hook on Staged Blobs (`traces check --staged`) | Hard Gate (local) | Vault is a Git repo. Hook inspects index blobs via `git show :<file>`. (Vulnerable to `git commit --no-verify`). |
 | **Server Gate** | Pre-Receive Hook on Remote/Bare Repo | Hard Gate (absolute) | Changes are pushed to a bare/remote repo. Server-side pre-receive hook enforces schema; client `--no-verify` cannot bypass. |
-| **Detection** | Notice on Read (Ticket 16 Tier 2) | Advisory | Any `traces` CLI/MCP invocation checks mtime/watermark of modified notes and returns structured diagnostics for any new violations. |
+| **Detection** | Notice on Read (Ticket 20 Tier 2) | Advisory | Any `traces` CLI/MCP invocation checks mtime/watermark of modified notes and returns structured diagnostics for any new violations. |
 | **Remediation** | Linter Exit Code (`traces check <files>`) | Remediation Loop | Exit code 1 (schema violation) or 2 (class mismatch) with field, expected, found, and hint outputs for agent auto-repair loops. |
 
 ### 2. Vaults NOT Under Git
@@ -598,9 +598,9 @@ categorized by repository type:
 
 ---
 
-## 5. Architectural Conclusions for Ticket 16
+## 5. Architectural Conclusions for Ticket 20
 
-1. **Reaffirmation of the Advisory Contract:** The decision in Ticket 16 to make
+1. **Reaffirmation of the Advisory Contract:** The decision in Ticket 20 to make
    the portable contract `check_note(before, after)` with detect-and-feed-back is
    100% validated. When untrusted processes possess write access to canonical
    files on disk, no in-place mechanism can synchronously prevent byte writes

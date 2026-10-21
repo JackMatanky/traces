@@ -1,6 +1,6 @@
 # External Precedent: Coercion, Equality, Ordering, and Typing Policies
 
-- **Topic:** External precedent across language ecosystems, databases, query languages, and PKM tools for Wayfinder Ticket 15.
+- **Topic:** External precedent across language ecosystems, databases, query languages, and PKM tools for Wayfinder Ticket 19.
 - **Status:** Complete.
 - **Deliverable:** `.scratch/arch-design/research/19-prep/c-external-precedent.md`.
 
@@ -164,57 +164,68 @@
 
 ---
 
-## 10. Implications for Ticket 15
+## 10. Implications for Ticket 19
 
 ### Q1: Where Does String-to-Date/Duration Promotion Live?
+
 - **Option A (Keep as is / Heuristic Classifier):** Strings matching temporal patterns are promoted at ingestion time during frontmatter/inline parsing (`From<noyalib::Value>` and inline lexer). *Cost:* Strings like `title: 2025-01-15` become dates unless escaped.
 - **Option B (Lexical Storage + Query/Schema Cast on Demand):** All unquoted strings store as `String`. Promotion happens only via schema type declarations (`type = "date"`) or explicit query functions (`date(due)` / `TRY_CAST(due AS date)`). Follows Frictionless, Logseq, and DuckDB.
 - **Option C (Dual Ingestion: Safe Classifier + Query Cast):** Ingestion classifies unambiguous ISO dates (`YYYY-MM-DD`) and durations (`P1D`, `2h30m`) into `Date`/`Duration`, but leaves ambiguous text as `String`. Query binder provides `date(...)` and `duration(...)` for explicit coercion.
 
 ### Q2: Frontmatter Literal-String Escape
-- **Option A (Keep as is / Quoting as Escape):** Ticket 14 decided frontmatter classification is quote-insensitive. Users must use inline quotes (`title: '"2025-01-15"'`) or YAML tags (`title: !!str 2025-01-15`).
-- **Option B (YAML Quote Sensitivity via CST/Event Parser):** Use YAML quote presence to distinguish `title: "2025-01-15"` (string) from `title: 2025-01-15` (date). *Cost:* Ticket 14 noted Noyalib CST is fragile on block scalars and dotted keys.
+
+- **Option A (Keep as is / Quoting as Escape):** Ticket 18 decided frontmatter classification is quote-insensitive. Users must use inline quotes (`title: '"2025-01-15"'`) or YAML tags (`title: !!str 2025-01-15`).
+- **Option B (YAML Quote Sensitivity via CST/Event Parser):** Use YAML quote presence to distinguish `title: "2025-01-15"` (string) from `title: 2025-01-15` (date). *Cost:* Ticket 18 noted Noyalib CST is fragile on block scalars and dotted keys.
 - **Option C (Standard YAML `!!str` Tag + Schema Override):** Support `!!str 2025-01-15` as standard YAML escape; schema field definitions (`type = "string"`) override any heuristic classification.
 
 ### Q3: Int vs Float Semantic Equality, NaN, -0.0, and $2^{53}$ Exactness
+
 - **Option A (Derived Structural Equality Only):** `Int(1) == Float(1.0)` is `false`. Query filters require exact matching variant.
 - **Option B (CEL / SQLite Number Line Model):** `NoteFieldValue::PartialEq` remains structural (variant-exact for Rust maps/sets). Query evaluation and filter comparison evaluate mathematical equality across `Int` and `Float` using SQLite's `sqlite3IntFloatCompare` algorithm. `-0.0 == +0.0` is true; `NaN` is not equal to anything (or ordered as null).
 - **Option C (OrderedFloat Wrapper in Enum):** Store `Float(OrderedFloat<f64>)` in `NoteFieldValue`. Equates `-0.0` and `+0.0`; orders `NaN` greater than all numbers. Cross-type `Int` vs `Float` still requires query-layer comparison.
 
 ### Q4: Date vs DateTime Equality and Order (Ambient Zone Elimination)
+
 - **Option A (Keep as is / Ambient Local Zone Promotion):** Promote `Date` to `DateTime` at local midnight using `local_zone()`. Violates determinism; rejected by prior audits.
 - **Option B (Separate Incomparable Ranks):** `Date` and `DateTime` have distinct ranks in `Ord` (`Date < DateTime` or vice versa). Derived `PartialEq` is false. Query equality `date == datetime` is false unless explicit `date(dt)` or `datetime(d)` is called. Zero timezone dependency.
 - **Option C (Pure Civil Midnight Promotion):** In query comparison, promote `Date` to civil `DateTime` at `00:00:00` without consulting any timezone. `2025-01-15 == 2025-01-15T00:00:00` is true. Store naive datetimes as civil `DateTime` (not UTC instant shifted by ambient zone).
 
 ### Q5: Cross-Kind Rank Order and Equality
+
 - **Option A (Keep as is / Global Rank for Sort and Filter):** `Null < Bool < Number < Duration < Temporal < Text < Link < List < Object`. Relational filter operators (`<`, `>`) use this rank directly (SQLite style: `1 < "text"` is true).
 - **Option B (MongoDB Dual Model: Total Sort Order + Type-Bracketed Filtering):** Total rank order is used strictly for `ORDER BY` / sorting. Query filter predicates (`=`, `!=`, `<`, `<=`, `>`, `>=`) use **Type Bracketing**: comparisons across incompatible kinds evaluate to `false` (or `true` for `!=`), never leaking type rank into search results.
 - **Option C (Strict Erroring Filters):** Mixed-kind comparisons in filter expressions raise a query diagnostic/error (CEL static model / SQL standard).
 
 ### Q6: Link Equality and Order
+
 - **Option A (Keep as is / Full Structural Comparison):** `Link` derives `PartialEq`/`Ord` comparing `target`, then `display`, then `embedded`. Two links with different aliases are unequal.
 - **Option B (Target-Only Identity with Normalized Display):** `Link` equality `==` compares `target` only (case-insensitively). `embedded` and `display` are presentation metadata, not target identity. Sorting orders by `target`, then subpath.
 - **Option C (Normalized Path Identity):** Links normalize relative paths and strip `.md`. Equality checks resolved file target identity.
 
 ### Q7: Schema Select String vs Note Link Matching
+
 - **Option A (Literal Textual Match):** Select option `"[[Note]]"` matches note link only if target string exactly matches `"[[Note]]"`.
-- **Option B (Consumer-Boundary Parsing via Root Link):** Schema select strings naming links are parsed through `Link::parse_wikilink` at the validation boundary (Ticket 16). Matching compares parsed `target` case-insensitively.
+- **Option B (Consumer-Boundary Parsing via Root Link):** Schema select strings naming links are parsed through `Link::parse_wikilink` at the validation boundary (Ticket 20). Matching compares parsed `target` case-insensitively.
 
 ### Q8: Query Literal Promotion and Sniffing at Sort Time
+
 - **Option A (Keep as is / `TextShape::classify`):** Sort keys classify unparsed strings at sort time (`src/query/sort.rs:462`). Filter literals classify via `classify_literal` (`src/query/grammar/filter.rs:238`).
 - **Option B (Eliminate Sniffing; Bound Query Types):** Eliminate `TextShape::classify` in `query/sort.rs`. Values sort by their actual stored `NoteFieldValue` variant. Query literals are parsed into typed AST literals during query parsing.
 
 ### Q9: Calendar Duration Comparison Policy
+
 - **Option A (Keep as is / Nominal Seconds):** `DurationValue` caches `nominal_seconds: i64` (1mo = 30d, 1yr = 365d) for total order. Accepts PostgreSQL-style nominal anomalies.
 - **Option B (Jiff Context-Relative Comparison):** Query execution passes `ExecutionContext { now: Timestamp }`. Durations with calendar units evaluate `Span::compare((other, ctx.now))` for accurate elapsed comparison.
 - **Option C (Fieldwise Comparison for Equality, Nominal for Sorting):** `DurationValue` equality requires exact fieldwise equivalence (`1mo != 30d`). Sorting uses nominal seconds as a stable tie-breaker.
 
 ### Q10: String Collation (Case Sensitivity & Normalization)
+
 - **Option A (Keep as is / Standard Rust Byte Comparison):** `String` compares byte-by-byte (`Ord for String`). Sorting is ASCII-first (`Z < a`).
 - **Option B (Deterministic Natural + ASCII Case-Insensitive Collation):** Queries and note sorting use a custom comparator: ASCII case-folded, with natural integer sorting (`Chapter 2` < `Chapter 10`). 100% deterministic across Linux and macOS.
 - **Option C (Unicode `unicase` Collation):** Integrate `unicase` for full Unicode case folding and natural sorting.
 
 ### Q11: Strictness, Seams, and Error Modes
+
 - **Option A (DuckDB Dual Cast: Implicit Null / Explicit Error):** Implicit query coercions evaluate unparseable data to `Null` (filters treat as false). Explicit casts (`CAST(field AS date)`) emit structured diagnostics with `ByteSpan` for LSP.
 - **Option B (Strict Type Checking with Advisory Diagnostics):** Type mismatches emit non-blocking advisory diagnostics (the Taplo pattern); query execution treats mismatched filters as `false`.
 - **Option C (Silent Fallback):** Failed coercions silently return the original string (SQLite affinity model).

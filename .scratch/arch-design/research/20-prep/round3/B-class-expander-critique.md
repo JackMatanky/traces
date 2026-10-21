@@ -1,6 +1,6 @@
 # Scout Report B: FileClassExpander Critique & Class Ownership
 
-- Ticket: 16 (Schema Note Typing and Validation)
+- Ticket: 20 (Schema Note Typing and Validation)
 - Sub-problem: B (Critique `src/file_class_expander.rs` & Class Ownership)
 - Target: `.design/2026-10-21-model-schema-validation/scouts/`
   `B-class-expander-critique.md`
@@ -45,7 +45,7 @@ This scout addresses:
    "orphan glue file" pattern is recognized or viable in multi-crate Rust.
 4. Precedents across 7 real-world systems handling ontology/class expansion.
 5. Menu of 7 candidate solutions, evaluated against Sub-problem A (the checker)
-   and Ticket 28 (workspace crate split).
+   and Ticket 32 (workspace crate split).
 6. Ranked recommendations and transferable architectural lessons.
 
 ---
@@ -383,7 +383,7 @@ IgnoreExpander>>`
 - **Checker (Sub-problem A)**: Follows the same pattern: a new root glue file
 `src/schema_checker.rs` at Tier 8 implementing a consumer trait across `schema`
   and `note`.
-- **Workspace Split (Ticket 28)**: **Fails immediately under RFC 1023**. Root
+- **Workspace Split (Ticket 32)**: **Fails immediately under RFC 1023**. Root
   crate cannot implement `traces_query::FileClassExpander` for
   `traces_schema::SchemaService` without artificial newtype wrappers.
 - **Strongest Argument Against**: Preserves all 7 verified design smells, blocks
@@ -413,7 +413,7 @@ IgnoreExpander>>`
   `SchemaCatalog`
   as pure data. The checker is a pure function:
   `validate_note(note: &Note, rules: &SchemaCatalog) -> Vec<Diagnostic>`.
-- **Workspace Split (Ticket 28)**: Clean. `ClassHierarchy` lives in
+- **Workspace Split (Ticket 32)**: Clean. `ClassHierarchy` lives in
   `traces-core`
   or `traces-query`. `traces-schema` produces it; `traces-query` consumes it. No
   orphan rule issues.
@@ -431,7 +431,7 @@ Table)
 - **Checker (Sub-problem A)**: Notes are validated at index time; invalid notes
   are
   rejected or flagged in Redb.
-- **Workspace Split (Ticket 28)**: Couples `index` crate to `schema` crate.
+- **Workspace Split (Ticket 32)**: Couples `index` crate to `schema` crate.
 - **Strongest Argument Against**: **Directly violates ADR-0009 and settled
   facts**
   [V: `local://20-prep-context-3.md:32-33`]. ADR-0009 mandates that index
@@ -448,7 +448,7 @@ Table)
 - **Checker (Sub-problem A)**: Diagnostic models, note field values, and schema
 types live in `vault_model`, giving both `note` and `schema` a shared vocabulary
   without circular dependencies.
-- **Workspace Split (Ticket 28)**: Forms `traces-model` or `traces-core`, the
+- **Workspace Split (Ticket 32)**: Forms `traces-model` or `traces-core`, the
   foundational leaf crate in the workspace DAG.
 - **Strongest Argument Against**: Adds a new module/crate. For class expansion
   alone, a 50-line data struct might feel like premature modularization if not
@@ -465,7 +465,7 @@ types live in `vault_model`, giving both `note` and `schema` a shared vocabulary
     before building `QueryBuilder`.
 - **Checker (Sub-problem A)**: Caller explicitly coordinates validation before
   calling consumers.
-- **Workspace Split (Ticket 28)**: `traces-query` has zero schema knowledge.
+- **Workspace Split (Ticket 32)**: `traces-query` has zero schema knowledge.
 - **Strongest Argument Against**: Leaks query AST traversal into every caller
   (CLI, Minijinja template adapter, future LSP). High duplication risk.
 
@@ -478,7 +478,7 @@ types live in `vault_model`, giving both `note` and `schema` a shared vocabulary
     inside `src/schema/service.rs`.
 - **Checker (Sub-problem A)**: Schema imports `note` and defines
   `SchemaService::validate(&self, note: &Note)`.
-- **Workspace Split (Ticket 28)**: Requires `traces-schema` to depend on
+- **Workspace Split (Ticket 32)**: Requires `traces-schema` to depend on
   `traces-query`.
 - **Strongest Argument Against**: Inverts natural dependency ordering:
   metadata/schema
@@ -519,7 +519,7 @@ Class { name: String, mode: ClassExpansionMode }, // mode has NO inner BTreeSet!
 - AST is never mutated in-place.
 - **Checker (Sub-problem A)**: Checker compiles note frontmatter against schema
   definitions into an immutable `ValidationPlan`.
-- **Workspace Split (Ticket 28)**: Clean separation of AST (syntax), Schema
+- **Workspace Split (Ticket 32)**: Clean separation of AST (syntax), Schema
   (metadata),
   and Plan (execution).
 - **Strongest Argument Against**: Slightly more boilerplate (two atom enums:
@@ -601,7 +601,7 @@ to empty. When resolving candidate rows, `hierarchy.expand(name, mode)` returns
    consistently across both store-backed and in-memory queries!
 
 **Rank 2: Candidate 4 (Neutral `class` / `vault_model` Module)** [P]
-If Ticket 16 decides that field types and note validation also need shared
+If Ticket 20 decides that field types and note validation also need shared
 types,
 hoist `ClassHierarchy` and `ClassName` into `src/vault_model/`.
 
@@ -647,7 +647,7 @@ errors.
 The checker must return structured `Vec<Diagnostic>` with source byte spans
 (for LSP diagnostics and CLI output), never unencapsulated log calls.
 
-### Lesson 3: Workspace Split Durability (Ticket 28)
+### Lesson 3: Workspace Split Durability (Ticket 32)
 
 Cross-crate boundaries in Rust should exchange **plain data types**, not
 cross-crate consumer traits with orphan implementations. Data crosses crates

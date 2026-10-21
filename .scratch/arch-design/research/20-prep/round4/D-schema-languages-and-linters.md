@@ -3,7 +3,7 @@
 - **Document:** `round4/D-schema-languages-and-linters.md`
 - **Topic:** External precedent across schema definition languages, constraint
   engines, configuration systems, data modeling frameworks, frontmatter
-  linters, and Language Server Protocol (LSP) diagnostics for Ticket 16
+  linters, and Language Server Protocol (LSP) diagnostics for Ticket 20
   (Schema Note Typing and Validation).
 - **Scope & Focus:** Deep structural investigation of required vs optional
   semantics, open vs closed world models, inheritance and composition,
@@ -487,7 +487,7 @@ configuration languages, markdown tooling, and the Rust ecosystem.
   - `yaml-language-server` does the same: it validates parsed ASTs via
     `vscode-json-languageservice` and maps JSON Pointers to AST node ranges.
 - **Key lesson for Traces:**
-  - **Completely validates Ticket 16's architectural split.** `schema::check`
+  - **Completely validates Ticket 20's architectural split.** `schema::check`
     should remain a pure, span-free function that evaluates a field map and
     returns field paths with stable error codes. The host layer (LSP, CLI) maps
     those field paths back to CST byte spans in the note document.
@@ -602,13 +602,13 @@ configuration languages, markdown tooling, and the Rust ecosystem.
 | **Backstage Catalog** | JSON Schema primitives in `spec` | Required fields declared in kind schemas | Standard JSON Schema validation constraints | Fixed envelope (`Entity`); per-kind `spec` | No inheritance; kinds are distinct schemas | `kind` and `apiVersion` in YAML envelope | Advisory on ingest (status); gating on API | Closed `spec` based on kind schema | Error status on entity, catalog log |
 | **Home Assistant** | Python primitives, entities, templates, time | `vol.Required()` and `vol.Optional()` | `cv.has_at_least_one_key`, `cv.exclusive` | Procedural schema composition in Python | Procedural: first check or dict update | `platform` or domain key in YAML | Gating at startup; advisory in UI config | Closed by default (`extra=vol.PREVENT_EXTRA`) | Exception with dict path and error string |
 | **Serde (Rust)** | Rust native types (struct, enum, Vec, Option) | `Option<T>` is optional; bare `T` required | Field attributes, custom deserialize fns | Struct composition via `#[serde(flatten)]` | Flat deserialization buffers unknown fields | Externally determined by Rust target type | Gating at deserialization | Open by default; closed via `deny_unknown_fields` | `serde::de::Error` with line/col (no AST) |
-| **Traces (Ticket 16)** | input, select, number, date, boolean, file | `required = true` on field declaration | min, max, step, format, select values | Multiple inheritance (`extends = [...]`) | First-listed class wins whole field declaration | `class` in note frontmatter (default) | Advisory for humans; gating for MCP agents | Open storage/index; advisory unknown-field check | Span-free violation codes; LSP maps spans |
+| **Traces (Ticket 20)** | input, select, number, date, boolean, file | `required = true` on field declaration | min, max, step, format, select values | Multiple inheritance (`extends = [...]`) | First-listed class wins whole field declaration | `class` in note frontmatter (default) | Advisory for humans; gating for MCP agents | Open storage/index; advisory unknown-field check | Span-free violation codes; LSP maps spans |
 
 ---
 
-## 4. Challenges to Traces' Ticket 16 Design
+## 4. Challenges to Traces' Ticket 20 Design
 
-This section evaluates the specific decisions in Ticket 16's Answer against
+This section evaluates the specific decisions in Ticket 20's Answer against
 the external precedent surveyed above.
 
 ### Decision A: Advisory-Only Validation and Untyped Storage
@@ -628,7 +628,7 @@ the external precedent surveyed above.
     non-conforming entries [V].
   - *IWE Strict Mode:* Automatically blocks AI agent writes via MCP if the
     resulting frontmatter violates the schema [V].
-- **Recommendation:** **KEEP.** Ticket 16's decision is completely sound for a
+- **Recommendation:** **KEEP.** Ticket 20's decision is completely sound for a
   human-centric markdown vault. However, Traces must pair advisory parsing with
   IWE's model: **hard gating on the write path for AI agents (MCP tools)** to
   prevent automated vault degradation.
@@ -777,7 +777,7 @@ the external precedent surveyed above.
    caching [V]. Traces must ensure external JSON/link value sources are resolved
    by an independent provider, not baked into the schema validator core.
 3. **Diagnostic Severities (SHACL `sh:severity`):**
-   Ticket 16 deferred severities to Ticket 27. SHACL proves that distinguishing
+   Ticket 20 deferred severities to Ticket 31. SHACL proves that distinguishing
    `Violation` (invalid syntax/type), `Warning` (unknown field, missing
    recommended metadata), and `Info` (deprecated field) is vital for actionable
    editor diagnostics [V].

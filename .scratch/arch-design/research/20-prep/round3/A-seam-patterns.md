@@ -30,7 +30,7 @@ This scout evaluates the module boundaries, dependency directions, trait costs,
 and import topologies of eight candidate seam architectures, applying the
 principles of the `rust-design` skill (`MODELING.md`, `DISCOVERY.md`), and
 assesses how each candidate withstands a future workspace crate split
-(Ticket 28).
+(Ticket 32).
 
 ---
 
@@ -186,7 +186,7 @@ documented post-mortems or regrets.
   schema validation failures back to source byte spans via DOM node ranges.
 - **Lesson for Traces**: Taplo cleanly separates the validation engine (pure
   schema rules) from the diagnostic span mapper (AST/DOM adapter). This matches
-  the two-phase kernel/adapter split proposed in Ticket 16 revision 2 [V:
+  the two-phase kernel/adapter split proposed in Ticket 20 revision 2 [V:
   `brief.md:107-125`].
 
 ### 3.7 `rust-analyzer` (`ide_diagnostics`) and `ruff` (`ruff_linter`)
@@ -323,7 +323,7 @@ We evaluate eight candidate architectures for connecting `schema` and `note`.
 - **Description**: Both `src/schema` and `src/note` depend on a neutral,
   lower-tier value representation: the canonical `FieldValue` enum in
   `src/field.rs` (Tier 3 [V: `survey/cross-cutting.md:35`]), as resolved by
-  Ticket 14 [V: `.scratch/arch-design/issues/18-value-model.md:15-17, 77-82`].
+  Ticket 18 [V: `.scratch/arch-design/issues/18-value-model.md:15-17, 77-82`].
   The validation kernel lives directly on `Schema` in `src/schema/validate.rs`:
 
   ```rust
@@ -420,7 +420,7 @@ We evaluate eight candidate architectures for connecting `schema` and `note`.
 | **2. Consumer Glue** | Semantic homelessness and consumer fragmentation. Validation is a core schema capability, not an editor quirk. Stashing it in LSP forces templates and MCP agents to depend on LSP or duplicate code. Recreates the disliked orphan glue of `file_class_expander.rs` [V: `20-prep-context-3:46-54`]. |
 | **3. Schema -> Note** | Inverts architectural domain hierarchy. Schemas (abstract declarative rules) become coupled to the concrete Markdown document parser (`traces-note`). Schemas cannot be reused to validate non-note inputs (e.g. MCP JSON tool parameters, CSV imports) without dragging in Markdown AST dependencies [V: `MODELING.md:57-61`]. |
 | **4. Note -> Schema** | Severe breach of PKM domain invariant: notes are open-world, schemaless documents that parse and persist unconditionally into Redb without schemas [V: `docs/adr/0009:76-77`]. Coupling note parsing to schemas risks circular dependencies, breaks isolated note testing, and turns schema TOML errors into note parsing liabilities. |
-| **5. Shared Vocabulary** | Requires completing the Ticket 14 value unification: migrating `NoteFieldValue` into the canonical `FieldValue` in `src/field.rs`. Note-specific types (such as `Link`) must be accommodated in the shared value enum at Tier 3 rather than remaining private to `src/note` [V: `.scratch/arch-design/issues/18-value-model.md:57-65`]. |
+| **5. Shared Vocabulary** | Requires completing the Ticket 18 value unification: migrating `NoteFieldValue` into the canonical `FieldValue` in `src/field.rs`. Note-specific types (such as `Link`) must be accommodated in the shared value enum at Tier 3 rather than remaining private to `src/note` [V: `.scratch/arch-design/issues/18-value-model.md:57-65`]. |
 | **6. Small View Trait** | Trait-in-provider dilemma: `note` cannot implement `schema::ValueView` without depending directly on `schema` or resorting to an orphan glue file. Introduces trait indirection and dynamic dispatch for a system with exactly one data representation, violating `MODELING.md:40-46`. |
 | **7. Compiled Generic** | Extreme over-engineering. JSON Schema validators compile execution trees because JSON Schema has hundreds of recursive, combinatorial keywords (`$defs`, `anyOf`, regex, `patternProperties`). Traces schemas validate six flat scalar types and two boolean flags. A generic compiled execution engine violates YAGNI. |
 | **8. Unified Model** | Conflates distinct operational lifecycles: schema definitions are static, configuration-time TOML metadata loaded once at startup; note documents are thousands of user files parsed, indexed, and modified continuously. Packing them into one crate inflates compilation blast radius. |
@@ -432,7 +432,7 @@ We evaluate eight candidate architectures for connecting `schema` and `note`.
 ### 6.1 Ranked Order
 
 1. **Rank 1: Candidate 5 (Shared Foundation Vocabulary in `src/field.rs`)**
-   - **Why**: Perfectly aligns with the resolved Ticket 14 decision ("not one
+   - **Why**: Perfectly aligns with the resolved Ticket 18 decision ("not one
      model and not four. Two owned enums: a runtime `FieldValue` for notes and
      queries, and a schema-local literal type... choose the lowest existing
      layer", `.scratch/arch-design/issues/18-value-model.md:15-17, 77-80` [V]).
@@ -468,7 +468,7 @@ We evaluate eight candidate architectures for connecting `schema` and `note`.
 
 ### 6.2 Evidence That Would Change the Recommendation
 
-- **Evidence favoring Candidate 3 over 5**: If Ticket 14's value unification is
+- **Evidence favoring Candidate 3 over 5**: If Ticket 18's value unification is
   reopened and it is decided that `NoteFieldValue` must remain strictly private
   to `src/note` (e.g. due to note-specific span pointers or AST references),
   Candidate 5 becomes blocked. In that scenario, `schema -> note` (Candidate 3)

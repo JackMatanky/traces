@@ -1,4 +1,4 @@
-# Content Systems and Frontmatter Schemas: Precedent Search for Ticket 16
+# Content Systems and Frontmatter Schemas: Precedent Search for Ticket 20
 
 Research date: 2026-10-21
 Context: External architectural precedents for markdown frontmatter schemas,

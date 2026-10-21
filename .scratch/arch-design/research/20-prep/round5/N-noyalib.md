@@ -55,7 +55,7 @@ The exact source and evidentiary basis for the numbers is located in
   Noyalib repository [V: search across upstream benches and docs]. Upstream
   does not publish a "+59%" figure.
 - The claim is a **local empirical measurement** run on an Apple Silicon host
-  during Round 15 preparation using a throwaway test probe that evaluated
+  during Round 19 preparation using a throwaway test probe that evaluated
   `parse_document` vs `from_str_with_config::<noyalib::Value>` over a 30-line
   frontmatter fixture (`h-quote-escape-feasibility.md:58` [V]).
 - The ratio $\frac{56.27}{35.45} \approx 1.5873$ (+58.73%, rounded to +59%).
@@ -258,7 +258,7 @@ criterion_group!(benches, bench_frontmatter_cst_cost);
 criterion_main!(benches);
 ```
 
-### 4.3 Summary of Findings for Ticket 16 & Architecture Design
+### 4.3 Summary of Findings for Ticket 20 & Architecture Design
 
 - The +59% claim originates from a local throwaway benchmark on Apple Silicon
   measuring `parse_document` (56.27 µs) vs `from_str_with_config` (35.45 µs).
@@ -268,7 +268,7 @@ criterion_main!(benches);
 - Using Noyalib's CST for quote-style detection would mandate parsing every note
   with `parse_document`, incurring ~1.59× parse latency, and would remain
   mechanically brittle for dotted keys, YAML tags (`!!str`), and block scalars.
-- The architectural decision in Tickets 14 and 15 to reject CST-based
+- The architectural decision in Tickets 18 and 19 to reject CST-based
   quote sniffing in favor of quote-insensitive parse-time heuristic
   classification plus schema overrides is solidly grounded in Noyalib's API
   limitations and mechanics.

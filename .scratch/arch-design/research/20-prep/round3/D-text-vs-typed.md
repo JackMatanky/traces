@@ -2,7 +2,7 @@
 
 ## 1. Sub-problem Restated
 
-Ticket 16 must resolve how the schema subsystem types and validates note data,
+Ticket 20 must resolve how the schema subsystem types and validates note data,
 and where that capability lives. Sub-problem D addresses a concrete ergonomic
 challenge at the note-parsing boundary: **how can a date- or number-shaped
 frontmatter value be retained as plain text rather than eagerly promoted to a
@@ -24,10 +24,10 @@ distinguishing single quotes (`'...'`) from double quotes (`"..."`):
 - Double quotes allow classification (so wikilinks like `"[[Note]]"` and dates
   like `"2025-01-15"` can still parse into `Link` and `Date` variants).
 
-Ticket 15 withdrew quote-sensitive frontmatter classification because YAML
+Ticket 19 withdrew quote-sensitive frontmatter classification because YAML
 requires quotes to write a wikilink (`"[[x]]"`), and the CST route to inspect
 quote delimiters added a +59% parse latency penalty while remaining unsound on
-dotted keys and tagged scalars (`15:64-67` [V]). This scout investigates whether
+dotted keys and tagged scalars (`19:64-67` [V]). This scout investigates whether
 that reasoning is airtight, stress-tests the TOML-like proposal against real
 tools (Obsidian, Dataview, static site generators, and YAML round-trippers),
 verifies the capabilities of the pinned parser (`noyalib`), evaluates 7
@@ -261,7 +261,7 @@ via `rust-docs` confirms:
 | **C4** | **Standard YAML `!!str` [P] Explicit Tag** | Users write `title: !!str 2025-01-15` or `version: !!str 1.10`. The `!!str` tag forces string type. |
 | **C5** | **Raw-Lexeme Retention [P] for Ambiguous Scalars** | `NoteFieldValue::Number` and `Date` retain the original raw source string slice (e.g. `Number { value: f64, raw: Box<str> }`). |
 | **C6** | **Schema `type = "input"` [P] with On-Demand Frontmatter Re-read** | Frontmatter parses quote-insensitively into the standard value model. When a consumer (LSP, template, validator) needs raw text for an `input` field, it re-reads `RawFrontmatter::as_str()`. |
-| **C7** | **Schema-Declared Text Intent [P] at Query & Validation Boundary** | Frontmatter parsing stays schema-free and quote-insensitive. Schema `type = "input"` defines text intent. Ticket 15's adaptive literals handle queries; schema validator warns on unquoted numbers; explicit `string()` function handles query casts. |
+| **C7** | **Schema-Declared Text Intent [P] at Query & Validation Boundary** | Frontmatter parsing stays schema-free and quote-insensitive. Schema `type = "input"` defines text intent. Ticket 19's adaptive literals handle queries; schema validator warns on unquoted numbers; explicit `string()` function handles query casts. |
 
 ---
 
@@ -281,7 +281,7 @@ like `startswith(title, "2025-01")` or case formatting require explicit casting.
    exception is carved out for `[[...]]`.
 2. **Silent query breakage:** Templater (`due: "<% tp.date.now() %>"`), Metadata
    Menu, and Prettier quote dates (`due: "2025-01-15"`). Under strict type
-   bracketing (Ticket 15), these notes silently drop out of date queries
+   bracketing (Ticket 19), these notes silently drop out of date queries
    (`--where 'due <= 2025-01-01'`) without warning (`19-prep/h:85-95` [V]).
 3. **Parse cost:** Noyalib's `Value` drops quotes. Inspecting quotes requires
    the
@@ -295,7 +295,7 @@ like `startswith(title, "2025-01")` or case formatting require explicit casting.
    (`"..."`) [V: forum #65851]. The moment a user modifies a note in Obsidian,
    their `'2025-01-15'` is rewritten to `"2025-01-15"` or bare `2025-01-15`,
    silently turning back into a Date in Traces!
-2. **High parse latency penalty:** As measured in Ticket 15 prep
+2. **High parse latency penalty:** As measured in Ticket 19 prep
    (`19-prep/h:57-73`
    [V]), accessing quote styles in Noyalib requires the CST
    (`noyalib::cst::Document`).
@@ -329,7 +329,7 @@ like `startswith(title, "2025-01")` or case formatting require explicit casting.
 2. **Memory layout bloat:** `NoteFieldValue` is strictly budgeted at <= 80
    bytes (`src/note/field.rs:579-581` [V]). Adding `Option<Box<str>>` to scalar
    variants increases memory footprint across millions of indexed field values.
-3. **Contradicts ADR-0009 and Ticket 14:** Settled facts state that notes keep
+3. **Contradicts ADR-0009 and Ticket 18:** Settled facts state that notes keep
    no byte spans and no raw scalar text (`local://20-prep-context-3.md:30-31`
    [V]).
 
@@ -371,7 +371,7 @@ vaults), it would become a literal `String`, breaking outgoing link indexing.
 In existing Obsidian and markdown vaults, single and double quotes are used
 interchangeably. Many authors write `due: '2025-01-15'`. Under the TOML-like
 convention, this note's `due` field would become a `String`, while a neighbor's
-`due: "2025-01-15"` would become a `Date`. Under Ticket 15's type bracketing
+`due: "2025-01-15"` would become a `Date`. Under Ticket 19's type bracketing
 (where comparisons across different type brackets do not match),
 `--where 'due <= 2025-01-01'` would silently exclude the single-quoted note.
 This silent breakage is unacceptable in a PKM tool.
@@ -407,9 +407,9 @@ Traces runs `cst::parse_document_with_config`. Empirical benchmarks
   and
   block scalars.
 
-#### 6.5 Consistency with Ticket 15's Adaptive-Literal Rule
+#### 6.5 Consistency with Ticket 19's Adaptive-Literal Rule
 
-Ticket 15 established that query filters use **adaptive literals** (`15:107-135`
+Ticket 19 established that query filters use **adaptive literals** (`19:107-135`
 [V]): a quoted literal in a query (e.g. `due == "2025-01-15"`) adapts at
 evaluation time to match the row's field type.
 
@@ -417,9 +417,9 @@ evaluation time to match the row's field type.
 - If the field is a `String`, it matches as a String.
 This already eliminates query-side friction without mutating frontmatter
 classification. Reintroducing quote-sensitivity at parse time directly conflicts
-with Ticket 15's settled rule:
+with Ticket 19's settled rule:
 > "Frontmatter classification stays quote-insensitive (links stay recognised
-> when quoted); inline quotes remain the escape." (`15:102-105` [V])
+> when quoted); inline quotes remain the escape." (`19:102-105` [V])
 
 ---
 
@@ -444,7 +444,7 @@ with Ticket 15's settled rule:
 Boundary)
 
 **Adopt C7.** This is the cleanest, most robust, and highest-performance
-architecture. It honors all settled facts from Ticket 14 and Ticket 15:
+architecture. It honors all settled facts from Ticket 18 and Ticket 19:
 
 1. **Keep frontmatter parsing quote-insensitive, infallible, and fast (1.0x):**
    No CST overhead, no green-tree traversals, and no reliance on fragile quote
@@ -457,12 +457,12 @@ architecture. It honors all settled facts from Ticket 14 and Ticket 15:
 3. **Handle rare date-shaped strings via Schema and Query Casts:**
    - For fields that look like dates but represent text (e.g. `title:
      2025-01-15`):
-     - In queries, Ticket 15's **adaptive literals** ensure that
+     - In queries, Ticket 19's **adaptive literals** ensure that
        `title == "2025-01-15"` matches seamlessly regardless of whether `title`
        is stored as `Date` or `String`.
      - In templates, rendering `{{ note.title }}` outputs `"2025-01-15"`.
      - In schemas, declaring `[fields.title] type = "input"` instructs the
-       validator (Ticket 16) that text is expected. If an author writes unquoted
+       validator (Ticket 20) that text is expected. If an author writes unquoted
        `title: 2001` (Number), the validator flags an advisory diagnostic:
        `"Field 'title' expects text but parsed as number; wrap in quotes"`.
      - In query expressions requiring string methods, users invoke
@@ -524,7 +524,7 @@ architecturally dominant.
    **standard double quotes (`"..."`)**, never single quotes or YAML explicit
    tags (`!!str`), ensuring compatibility with Obsidian Properties and standard
    YAML parsers.
-4. **To Ticket 15 Integration:**
-   Re-confirming quote-insensitive classification solidifies Ticket 15's
+4. **To Ticket 19 Integration:**
+   Re-confirming quote-insensitive classification solidifies Ticket 19's
    adaptive literal model. Query literals adapt to the data; note parsers do
    not play guessing games with quote characters.

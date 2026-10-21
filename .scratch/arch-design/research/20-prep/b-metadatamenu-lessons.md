@@ -1,13 +1,13 @@
 # Metadata Menu Lessons: Schemas, Typing, Validation, and Invalidation in PKM
 
-- **Topic:** Empirical audit of Obsidian Metadata Menu (`mdelobelle-metadatamenu`) across docs, source, and architecture digests for Wayfinder Ticket 16 (Schema Note Typing and Validation).
+- **Topic:** Empirical audit of Obsidian Metadata Menu (`mdelobelle-metadatamenu`) across docs, source, and architecture digests for Wayfinder Ticket 20 (Schema Note Typing and Validation).
 - **Status:** Complete research deliverable.
 - **Deliverable:** `.scratch/arch-design/research/20-prep/b-metadatamenu-lessons.md`.
 - **Sources audited:**
   - `docs/digests/obsidian_mdelobelle-metadatamenu-docs-digest.txt` (96 KB, 2,175 lines) [cited as `docs:`]
   - `docs/digests/obsidian_mdelobelle-metadatamenu-src-digest.txt` (1 MB, 24,868 lines) [cited as `src:`]
   - `docs/digests/obsidian_mdelobelle-metadatamenu-digest.txt` (1.1 MB, 28,624 lines) [cited as `repo:`]
-  - Traces baseline: `src/schema/GLOSSARY.md`, `.scratch/arch-design/survey/schema.md`, `issues/16-*.md`.
+  - Traces baseline: `src/schema/GLOSSARY.md`, `.scratch/arch-design/survey/schema.md`, `issues/20-*.md`.
 
 ---
 
@@ -240,12 +240,12 @@ Audit of `validateValue` implementations revealed critical design shortcuts:
 
 ---
 
-## 6. Architectural Lessons for Traces Ticket 16
+## 6. Architectural Lessons for Traces Ticket 20
 
 ### 6.1 (a) Advisory vs Gating
 
 - **Empirical Proof:** Metadata Menu is the primary inspiration for fileClasses in Obsidian, and it is **100% non-gating** [V]. It never prevents a note from being indexed, searched, or displayed because of a schema violation [V].
-- **Lesson for Traces:** Ticket 16 MUST NOT make schema validation a gate for note indexing or query ingestion [P]. A vault is an open-world filesystem; treating schema violations as fatal errors breaks valid user workflows. Validation must be an on-demand, advisory diagnostic pass [P].
+- **Lesson for Traces:** Ticket 20 MUST NOT make schema validation a gate for note indexing or query ingestion [P]. A vault is an open-world filesystem; treating schema violations as fatal errors breaks valid user workflows. Validation must be an on-demand, advisory diagnostic pass [P].
 
 ### 6.2 (b) Typing at Write vs Read
 
@@ -257,7 +257,7 @@ Audit of `validateValue` implementations revealed critical design shortcuts:
 
 - **MM's Stance:** MM treats schemas entirely as **UI hints and autocompletion templates** [docs: 28-30, 75-96]. Fields serve to generate buttons, dropdowns, and insertion boilerplate.
 - **Risk of Over-Engineering:** Traces built 12k LoC of strict schema compilation (Tarjan DFS, Kahn sort, CSR graphs) for a system that currently provides zero runtime behavior [V: `survey/schema.md:35-37`]. If schemas do not validate notes, they are passive prompt metadata.
-- **Lesson for Traces:** Ticket 16 must decide whether Traces schemas remain pure UI hints (like MM) or become structured contracts for query execution and advisory diagnostics [P].
+- **Lesson for Traces:** Ticket 20 must decide whether Traces schemas remain pure UI hints (like MM) or become structured contracts for query execution and advisory diagnostics [P].
 
 ### 6.4 (d) Multi-Class & Inheritance Conflicts
 
@@ -270,11 +270,11 @@ Audit of `validateValue` implementations revealed critical design shortcuts:
   - Extra unmapped fields: Ignored completely, preserved as-is [V: 19416].
   - Mismatched types: Displayed as raw text in modals and tables; reported as `isValid: false` in API [V: 2580, 4594].
   - Missing fields: Rendered as `<missing>`; bulk insertion provided via `insertMissingFields` [V: 4591, 4733].
-- **Lesson for Traces:** Ticket 16 should adopt MM's exact tri-state classification for note validation:
+- **Lesson for Traces:** Ticket 20 should adopt MM's exact tri-state classification for note validation:
   1. *Valid Field:* Matches schema definition.
   2. *Missing Field:* Declared in schema, absent in note (advisory diagnostic / quick-fix insertion).
   3. *Unmapped Field:* Present in note, undeclared in schema (open-world data; strictly allowed, non-diagnostic).
-  4. *Type Violation:* Present in note, conflicts with schema type (advisory diagnostic with source span; query treats as null or coerces per Ticket 15) [P].
+  4. *Type Violation:* Present in note, conflicts with schema type (advisory diagnostic with source span; query treats as null or coerces per Ticket 19) [P].
 
 ### 6.6 (f) Known Pitfalls, Limitations, and Anti-Patterns
 

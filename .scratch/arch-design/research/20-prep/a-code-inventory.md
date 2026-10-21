@@ -1,6 +1,6 @@
 # Codebase Inventory: Schema Subsystem, Consumers, and Note Typing
 
-- **Topic:** Code-verified inventory for Ticket 16 (Schema note typing and validation).
+- **Topic:** Code-verified inventory for Ticket 20 (Schema note typing and validation).
 - **Target:** `.scratch/arch-design/research/20-prep/a-code-inventory.md`.
 - **Status:** Complete. Ground truth measured against `HEAD` (2026-10-20). Tags: `[V]` verified, `[H]` inference, `[P]` proposal.
 
@@ -203,9 +203,9 @@ Four field-type enums coexist across the codebase:
 | :--- | :--- | :--- |
 | `Input` | `NoteFieldValue::String` [V: `note/field.rs:51`] | Frontmatter parses unquoted date/temporal strings as `Date`/`DateTime`, or unquoted numbers as `Number`. If schema says `input`, note has `Date` or `Number` variant. Coercion or advisory check required. |
 | `Boolean` | `NoteFieldValue::Bool` [V: `note/field.rs:47`] | Strings `"true"`/`"false"` in YAML are parsed as Bool, but unquoted YAML 1.1 `yes`/`no` stay Strings in YAML 1.2 (`noyalib`). |
-| `Number` | `NoteFieldValue::Number(f64)` [V: `note/field.rs:49`] | Ticket 14 decided `Int(i64)` / `Float(f64)` split. Schema `min`/`max`/`step` are `f64`. Quoted `"42"` stays String. Bounds are currently inaccessible in prod. |
+| `Number` | `NoteFieldValue::Number(f64)` [V: `note/field.rs:49`] | Ticket 18 decided `Int(i64)` / `Float(f64)` split. Schema `min`/`max`/`step` are `f64`. Quoted `"42"` stays String. Bounds are currently inaccessible in prod. |
 | `Date` | `NoteFieldValue::Date` or `DateTime` [V: `note/field.rs:53-55`] | `SchemaDateField` accepts `format: Option<String>`, but `NoteFieldValue` parses ISO `YYYY-MM-DD` (`Date`) and RFC 3339 (`DateTime`). Non-ISO dates stay `String`. Does `Date` schema allow `DateTime` values? |
-| `Select` | `NoteFieldValue::String`, or `NoteFieldValue::Link` [V: `note/field.rs:51, 60`] | Select entries are stored as `FieldValue` literals. If note contains wikilink `[[Target]]` (`NoteFieldValue::Link`), matching against select entry string `Target` requires the adaptive-literal rule from Ticket 15 [V: `19-coercion-and-comparison-policy.md:43-45`]. |
+| `Select` | `NoteFieldValue::String`, or `NoteFieldValue::Link` [V: `note/field.rs:51, 60`] | Select entries are stored as `FieldValue` literals. If note contains wikilink `[[Target]]` (`NoteFieldValue::Link`), matching against select entry string `Target` requires the adaptive-literal rule from Ticket 19 [V: `19-coercion-and-comparison-policy.md:43-45`]. |
 | `File` | `NoteFieldValue::Link` or `String` [V: `note/field.rs:51, 60`] | Validating `file` requires resolving the link target against `IndexStore` and checking `folders`, `ext`, and `class`. Cannot be validated in-memory by `note` alone; requires `WorkspaceIndex`. |
 | *(None)* | `NoteFieldValue::Duration` [V: `note/field.rs:58`] | **Schema has no `duration` type.** |
 | *(None)* | `NoteFieldValue::Object` [V: `note/field.rs:64`] | **Schema has no `object` or nested map type.** |
@@ -301,7 +301,7 @@ From `docs/adr/0006-file-class-schemas.md` [V]:
      - Missing `required` fields.
      - Type compatibility (`NoteFieldValue` vs `SchemaFieldType`).
      - Bounds check for numbers (`min <= n <= max`).
-     - Allowed values check for select (with adaptive-literal for links per Ticket 15).
+     - Allowed values check for select (with adaptive-literal for links per Ticket 19).
      - File link filter validation (`folders`, `ext`, `class`) via `WorkspaceIndex`.
      - Multi-valued list checking (`multi: true` vs scalar).
      - Sizing: **~500 LoC prod, ~700 LoC tests** [H].
@@ -316,7 +316,7 @@ From `docs/adr/0006-file-class-schemas.md` [V]:
   1. `IndexerService` must depend on `Arc<SchemaService>` [V: currently zero dependency].
   2. **Cache invalidation nightmare:** `ConfigDigests` fingerprints config files. Schemas (`.traces/schemas/*.toml`) are NOT fingerprinted [V: `src/config/digests.rs`]. Editing any schema file would require either re-indexing the entire vault or tracking schema file mtimes/digests to invalidate notes with matching `fileClass` [H].
   3. Redb tables: would need schema-typed tables or schema-versioned note records.
-  4. **Violation policy conflict:** Conflicts with Ticket 15 ("coercion failures are advisory, never gating") and Research 03 ("note validation must never gate the index") [V: `20-prep-context.md:19-20`].
+  4. **Violation policy conflict:** Conflicts with Ticket 19 ("coercion failures are advisory, never gating") and Research 03 ("note validation must never gate the index") [V: `20-prep-context.md:19-20`].
 - **Net LoC Impact:** **+2,000 to +3,500 LoC** across `index`, `store`, `config`. High blast radius and fragility.
 
 ---
@@ -354,7 +354,7 @@ The following claims in `.scratch/arch-design/survey/schema.md` are **incorrect 
    - Currently, `Note` and `Frontmatter` completely discard YAML byte offsets and line numbers. Does validation require changing the note parser / `noyalib` integration, or is an on-demand re-parse sufficient for a future `traces check` / LSP pass?
 3. **How should a validator handle the absence of schema types for rich note values?**
    - Notes natively support `Duration` and `Object` (`src/note/field.rs:58, 64`), but schemas have neither. Does having a note field not defined in the schema trigger an "unknown field" warning, or are schemas open/permissive by default (Dataview style)?
-4. **Should schema field definitions override frontmatter classification (Ticket 15 link)?**
-   - Ticket 15 asked: if a frontmatter value is `2024-01-01` (sniffed as `Date`), but the schema defines `type = "input"`, does the validator expect a string, or does schema typing steer frontmatter parsing away from temporal sniffing?
+4. **Should schema field definitions override frontmatter classification (Ticket 19 link)?**
+   - Ticket 19 asked: if a frontmatter value is `2024-01-01` (sniffed as `Date`), but the schema defines `type = "input"`, does the validator expect a string, or does schema typing steer frontmatter parsing away from temporal sniffing?
 5. **Should `file` field validation require an active index?**
    - `file` fields restrict targets by folder, extension, and class. Validating a note's file link cannot be done in isolation—it requires querying `IndexStore`. Should validation be decoupled into pure local structural checks vs whole-vault referential checks?

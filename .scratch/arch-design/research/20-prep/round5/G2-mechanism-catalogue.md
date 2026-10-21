@@ -2,7 +2,7 @@
 
 Deliverable:
 `.scratch/arch-design/research/20-prep/round5/G2-mechanism-catalogue.md`  
-Target: Ticket 16 (Schema Note Typing and Validation)  
+Target: Ticket 20 (Schema Note Typing and Validation)  
 Scope: Catalogue of every plausible mechanism to provide schema validation
 feedback or enforcement when notes are edited or created by AI agents (or
 human editors), without relying on agent-harness hooks.  
@@ -368,7 +368,7 @@ validation can operate at three distinct intervention points:
      ensure notes begin life conforming to their bound schema.
 
 2. **Delta Rule & Self-Correction:**
-   - As established in Ticket 16's Answer, validation errors must provide clear
+   - As established in Ticket 20's Answer, validation errors must provide clear
      `hint` data (taken from field descriptions) and report `(field, code,
      expected, found)` to enable LLM self-correction loops (`M08`).
    - The delta rule ensures an agent editing an existing legacy note with pre-

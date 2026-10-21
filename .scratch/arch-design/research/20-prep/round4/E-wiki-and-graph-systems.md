@@ -8,7 +8,7 @@ property reuse across classes, large allowed-value lists, composition
 (mixins/behaviors) versus inheritance, and architectural separation between
 parsing, storage, and validation.
 
-All findings are evaluated against the design choices of Traces Ticket 16
+All findings are evaluated against the design choices of Traces Ticket 20
 (schema note typing and validation). Claims verified by reading primary
 documentation, issue trackers, source code, or published post-mortems are
 tagged `[V]` with full URLs; historical recollections and inferences are
@@ -442,7 +442,7 @@ trackers, or W3C specifications [V].
 
 ## 4. Challenges to Traces' Design
 
-This section examines the architectural decisions in Traces Ticket 16
+This section examines the architectural decisions in Traces Ticket 20
 against the empirical findings from the 14 precedent systems.
 
 ### 4.1 Advisory-Only Validation in Core

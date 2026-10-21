@@ -1,10 +1,10 @@
 # Arch-Design Review: Note Representation Split, Source Spans, and Schema Validation
 
-A rigorous, full-text architectural review of the arch-design effort for ticket 16 preparation. Evaluates the note document model, source span retention, and schema validation against decisions, research evidence, and live codebase state.
+A rigorous, full-text architectural review of the arch-design effort for ticket 20 preparation. Evaluates the note document model, source span retention, and schema validation against decisions, research evidence, and live codebase state.
 
 - Date: 2026-10-20
 - Target Deliverable: `.scratch/arch-design/research/20-prep/h-arch-design-note-split-review.md`
-- Status: Research input for ticket 16 grilling. Planning only; no code modified.
+- Status: Research input for ticket 20 grilling. Planning only; no code modified.
 
 ---
 
@@ -14,44 +14,44 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
 
 | Topic | Status | Source Citation | Exact Quote / Evidence | Summary |
 |---|---|---|---|---|
-| **LSP as Committed Consumer** | **DECIDED** | `issues/13:37-43` [V] | "The redesign must make the shared core ready for the LSP as the next major consumer and for MCP as a likely near-term consumer... Editor-facing behavior must support source-aware features such as diagnostics, navigation, and completion." | Core must support source-aware editor features. |
-| **Zero-Span Design Rejected** | **DECIDED** | `issues/13:67-68` [V] | "- **Keep the CLI-only, zero-span design:** rejected because the LSP is the next major consumer and needs source-aware editor capabilities." | Status-quo zero-span note model cannot stand. |
-| **Shared vs Split Note Models** | **OPEN** | `issues/13:45-49, 71-73` [V] | "The prior LSP decision to add spans to the shared `Note` AST and reject a parallel model is reopened: the design must compare a shared model against separate editor and indexing representations. The exact model and ownership of source spans belong to [19]... One shared span-aware note model vs separate editor and index models: neither is selected here." | Representation split is formally open for ticket 19. |
-| **`Link` vs `NoteLink` Split** | **DECIDED** | `issues/14:87-91, 484-490` [V] | "Agreed direction — Link split: use distinct `Link` and `NoteLink` types with fields belonging to each type... Root `Link`: `Link { target, display: Option<String>, embedded: bool }`... `NoteLink` (syntax kind and source span) is the editor-side occurrence type and is defined by ticket 19." | Semantic `Link` is root; `NoteLink` (with span) is editor-side. |
-| **Frontmatter Direct AST Parse** | **DECIDED** | `issues/14:124-128, 492-498` [V] | "Agreed: keep Noyalib's compatibility parser as the frontmatter boundary, then convert its owned AST directly into the shared semantic model, removing `FieldValueRef` from that conversion. Do not add a custom `Deserialize` target... Frontmatter conversion: keep the Noyalib compat parser and convert its `Value` directly into `NoteFieldValue`." | Direct AST conversion; no custom Serde visitor on YAML path. |
-| **Noyalib CST for Values** | **DECIDED (REJECTED)** | `issues/14:201-224, 467-470` [V] | "Mechanism reviewed and rejected (Round 1): Noyalib 0.0.57 exposes `cst::parse_document_with_config` and `Document::span_at(path)`... CST path builds a green tree, a typed `Value` and a `SpanTree` per note (+59% parse time)... Path-based CST span lookup is unsound for some keys... Direct Serde visitor or CST for quote style on the YAML path: rejected." | CST rejected for parse-time classification and values. |
-| **Infallible Note Parser** | **DECIDED (FROZEN)** | `issues/12:30; 19:16` [V] | `issues/12:30`: "Vault-format parsing (frontmatter, `Key:: Value` inline fields, wikilinks, tasks, tags): **Frozen** (Same files parse to the same meaning)." `issues/19:16`: "infallibility contract retained." `src/note/parser.rs:106` [V]: `parse_markdown` returns `Note` directly. | Markdown parser is strictly infallible; never returns `Result`. |
-| **Lossless CST for Vault Index** | **LEANING (REJECTED)** | `issues/19:24-25; research/10:53, 98-99` [V] | `issues/19:24-25`: "lossless tree (expected to be rejected — attempt to refute that)." `research/10:98-99`: "Traces is a query engine and template processor over Markdown notes, not a refactoring IDE. Lossless CSTs... carry heavy pointer overhead and cannot be efficiently persisted in redb." | Full lossless CST (Rowan) rejected for core vault index. |
-| **Transient vs Persisted Spans** | **OPEN** | `issues/13:83-85; 19:9-10` [V] | "Source positions must be available to editor features, but whether they belong in one shared model or a separate transient representation remains open for ticket 19." | Persisted index spans vs ephemeral editor spans is open. |
-| **Multi-Valued Inline Fields** | **OPEN / LEANING** | `issues/12:44; 15:204-205; 19:12-13` [V] | `issues/12:44`: "Known defects: ... multi-valued inline fields read via `.first()` only: **Not preserved** (Fixing each is a change-table row)." `research/10:119-120`: collapse to `List` or expose full slice. | Leaning toward Dataview-style collapse or slice exposure. |
-| **Frontmatter Schema Override** | **OPEN** | `issues/15:42-43, 104-105; 16:41-45` [V] | "Frontmatter classification stays quote-insensitive... A frontmatter value that must stay text uses the schema override (ticket 16)... frontmatter classification stays schema-free and quote-insensitive; the schema override that keeps a date-shaped value as text is decided here." | Schema override keeping date as text to be decided in 16. |
-| **Schema Select String Adoption** | **DECIDED** | `issues/14:481-482; 15:122-124` [V] | "Select values that name links stay strings; ticket 16 interprets them at the consumer boundary with the shared wikilink parser... A `Link` row adopts a literal as its folded target... This settles schema select string vs `Link` matching for ticket 16." | Select strings match note `Link`s via adaptive target adoption. |
+| **LSP as Committed Consumer** | **DECIDED** | `issues/17:37-43` [V] | "The redesign must make the shared core ready for the LSP as the next major consumer and for MCP as a likely near-term consumer... Editor-facing behavior must support source-aware features such as diagnostics, navigation, and completion." | Core must support source-aware editor features. |
+| **Zero-Span Design Rejected** | **DECIDED** | `issues/17:67-68` [V] | "- **Keep the CLI-only, zero-span design:** rejected because the LSP is the next major consumer and needs source-aware editor capabilities." | Status-quo zero-span note model cannot stand. |
+| **Shared vs Split Note Models** | **OPEN** | `issues/17:45-49, 71-73` [V] | "The prior LSP decision to add spans to the shared `Note` AST and reject a parallel model is reopened: the design must compare a shared model against separate editor and indexing representations. The exact model and ownership of source spans belong to [23]... One shared span-aware note model vs separate editor and index models: neither is selected here." | Representation split is formally open for ticket 23. |
+| **`Link` vs `NoteLink` Split** | **DECIDED** | `issues/18:87-91, 484-490` [V] | "Agreed direction — Link split: use distinct `Link` and `NoteLink` types with fields belonging to each type... Root `Link`: `Link { target, display: Option<String>, embedded: bool }`... `NoteLink` (syntax kind and source span) is the editor-side occurrence type and is defined by ticket 23." | Semantic `Link` is root; `NoteLink` (with span) is editor-side. |
+| **Frontmatter Direct AST Parse** | **DECIDED** | `issues/18:124-128, 492-498` [V] | "Agreed: keep Noyalib's compatibility parser as the frontmatter boundary, then convert its owned AST directly into the shared semantic model, removing `FieldValueRef` from that conversion. Do not add a custom `Deserialize` target... Frontmatter conversion: keep the Noyalib compat parser and convert its `Value` directly into `NoteFieldValue`." | Direct AST conversion; no custom Serde visitor on YAML path. |
+| **Noyalib CST for Values** | **DECIDED (REJECTED)** | `issues/18:201-224, 467-470` [V] | "Mechanism reviewed and rejected (Round 1): Noyalib 0.0.57 exposes `cst::parse_document_with_config` and `Document::span_at(path)`... CST path builds a green tree, a typed `Value` and a `SpanTree` per note (+59% parse time)... Path-based CST span lookup is unsound for some keys... Direct Serde visitor or CST for quote style on the YAML path: rejected." | CST rejected for parse-time classification and values. |
+| **Infallible Note Parser** | **DECIDED (FROZEN)** | `issues/16:30; 23:16` [V] | `issues/16:30`: "Vault-format parsing (frontmatter, `Key:: Value` inline fields, wikilinks, tasks, tags): **Frozen** (Same files parse to the same meaning)." `issues/23:16`: "infallibility contract retained." `src/note/parser.rs:106` [V]: `parse_markdown` returns `Note` directly. | Markdown parser is strictly infallible; never returns `Result`. |
+| **Lossless CST for Vault Index** | **LEANING (REJECTED)** | `issues/23:24-25; research/10:53, 98-99` [V] | `issues/23:24-25`: "lossless tree (expected to be rejected — attempt to refute that)." `research/10:98-99`: "Traces is a query engine and template processor over Markdown notes, not a refactoring IDE. Lossless CSTs... carry heavy pointer overhead and cannot be efficiently persisted in redb." | Full lossless CST (Rowan) rejected for core vault index. |
+| **Transient vs Persisted Spans** | **OPEN** | `issues/17:83-85; 23:9-10` [V] | "Source positions must be available to editor features, but whether they belong in one shared model or a separate transient representation remains open for ticket 23." | Persisted index spans vs ephemeral editor spans is open. |
+| **Multi-Valued Inline Fields** | **OPEN / LEANING** | `issues/16:44; 19:204-205; 23:12-13` [V] | `issues/16:44`: "Known defects: ... multi-valued inline fields read via `.first()` only: **Not preserved** (Fixing each is a change-table row)." `research/10:119-120`: collapse to `List` or expose full slice. | Leaning toward Dataview-style collapse or slice exposure. |
+| **Frontmatter Schema Override** | **OPEN** | `issues/19:42-43, 104-105; 20:41-45` [V] | "Frontmatter classification stays quote-insensitive... A frontmatter value that must stay text uses the schema override (ticket 20)... frontmatter classification stays schema-free and quote-insensitive; the schema override that keeps a date-shaped value as text is decided here." | Schema override keeping date as text to be decided in 20. |
+| **Schema Select String Adoption** | **DECIDED** | `issues/18:481-482; 19:122-124` [V] | "Select values that name links stay strings; ticket 20 interprets them at the consumer boundary with the shared wikilink parser... A `Link` row adopts a literal as its folded target... This settles schema select string vs `Link` matching for ticket 20." | Select strings match note `Link`s via adaptive target adoption. |
 
 ### 1.2 Analysis of Decisions and Leans
 
 1. **Splitting Note Types [OPEN, leaning split]**:
-   Ticket 13 explicitly reopened the prior LSP decision (`.scratch/md-pkm-lsp/issues/20`) that mandated a single shared `Note` AST (`issues/13:45-47` [V]). Ticket 14 further segregated semantic values from editor occurrences by splitting `Link` (root semantic data: target, display, embedded) and `NoteLink` (editor occurrence carrying syntax kind and span), assigning `NoteLink` strictly to the editor-side model (`issues/14:87-91, 484-490` [V]).
+   Ticket 17 explicitly reopened the prior LSP decision (`.scratch/md-pkm-lsp/issues/20`) that mandated a single shared `Note` AST (`issues/17:45-47` [V]). Ticket 18 further segregated semantic values from editor occurrences by splitting `Link` (root semantic data: target, display, embedded) and `NoteLink` (editor occurrence carrying syntax kind and span), assigning `NoteLink` strictly to the editor-side model (`issues/18:87-91, 484-490` [V]).
 2. **Span Retention Policy [OPEN]**:
-   Ticket 13 ruled that editor features require source positions (`issues/13:43, 67-68` [V]), but whether spans belong in the shared `Note` or a separate transient representation was explicitly deferred to ticket 19 (`issues/13:83-85` [V]).
+   Ticket 17 ruled that editor features require source positions (`issues/17:43, 67-68` [V]), but whether spans belong in the shared `Note` or a separate transient representation was explicitly deferred to ticket 23 (`issues/17:83-85` [V]).
 3. **Noyalib CST & Frontmatter Spans [DECIDED (REJECTED)]**:
-   Ticket 14 investigated Noyalib 0.0.53/0.0.57 CST (`cst::parse_document_with_config` and `Document::span_at`) and rejected it for runtime value classification (`issues/14:201-224, 467-470` [V]). CST parsing adds +59% CPU overhead per note (2.6x on notes with dates) and path-based span lookup is unsound for dotted keys, tags (`!!str`), block scalars (`|`), and duplicate keys (`issues/14:283-288` [V]). Frontmatter parsing remains direct AST conversion (`issues/14:492-498` [V]).
+   Ticket 18 investigated Noyalib 0.0.53/0.0.57 CST (`cst::parse_document_with_config` and `Document::span_at`) and rejected it for runtime value classification (`issues/18:201-224, 467-470` [V]). CST parsing adds +59% CPU overhead per note (2.6x on notes with dates) and path-based span lookup is unsound for dotted keys, tags (`!!str`), block scalars (`|`), and duplicate keys (`issues/18:283-288` [V]). Frontmatter parsing remains direct AST conversion (`issues/18:492-498` [V]).
 4. **Lossless Tree Alternative [LEANING (REJECTED)]**:
-   Research 10 concluded that Roslyn-style green/red trees (`rowan`) carry heavy pointer overhead and cannot be efficiently persisted in redb (`research/10:53, 98-99` [V]). Ticket 19 records this as expected to be rejected (`issues/19:24-25` [V]).
+   Research 10 concluded that Roslyn-style green/red trees (`rowan`) carry heavy pointer overhead and cannot be efficiently persisted in redb (`research/10:53, 98-99` [V]). Ticket 23 records this as expected to be rejected (`issues/23:24-25` [V]).
 5. **Infallible Parser [DECIDED (FROZEN)]**:
-   Vault parsing compatibility is frozen (`issues/12:30` [V]). `parse_markdown` never returns `Result` or panics (`src/note/parser.rs:106` [V]; `issues/19:16` [V]).
+   Vault parsing compatibility is frozen (`issues/16:30` [V]). `parse_markdown` never returns `Result` or panics (`src/note/parser.rs:106` [V]; `issues/23:16` [V]).
 6. **Multi-Valued Fields [OPEN, leaning collapse/slice]**:
-   `Note.inline_fields` stores `IndexMap<FieldKey, Box<[NoteFieldValue]>>` (`src/note/model.rs:31` [V]), but query resolution only reads `first()` (`src/query/results.rs:328` [V]). Ticket 12 marks this defect unpreserved (`issues/12:44` [V]); ticket 19 settles element-wise classification and representation (`issues/19:12-13, 43` [V]).
+   `Note.inline_fields` stores `IndexMap<FieldKey, Box<[NoteFieldValue]>>` (`src/note/model.rs:31` [V]), but query resolution only reads `first()` (`src/query/results.rs:328` [V]). Ticket 16 marks this defect unpreserved (`issues/16:44` [V]); ticket 23 settles element-wise classification and representation (`issues/23:12-13, 43` [V]).
 
-### 1.3 Hidden Coupling: Ticket 16 vs Ticket 19
+### 1.3 Hidden Coupling: Ticket 20 vs Ticket 23
 
-- **Ticket 19's Mandate** (`issues/19:9-16` [V]): Decides the internal shape of parsed `Note`: byte-span policy; whether list/task items remain children of `Note` or separate entities; duplication of item fields/tags into note collections; multi-valued inline field semantics; per-task status representation (interned symbol vs owned string); single vs dual markdown pass.
+- **Ticket 23's Mandate** (`issues/23:9-16` [V]): Decides the internal shape of parsed `Note`: byte-span policy; whether list/task items remain children of `Note` or separate entities; duplication of item fields/tags into note collections; multi-valued inline field semantics; per-task status representation (interned symbol vs owned string); single vs dual markdown pass.
 - **The Bidirectional Coupling**:
-  - *Coupling 16 -> 19*: Ticket 16 asks whether schemas drive validation and what module owns the validator (`issues/16:11-14` [V]). If ticket 16 specifies a validator `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>` where diagnostics require `ByteSpan` (essential for LSP `Diagnostic.range`, `research/10:59` [V]), it **forces ticket 19** to attach byte spans to the shared `Note` struct. This forecloses ticket 19 from choosing a span-free index model (`NoteFacts`).
-  - *Coupling 19 -> 16*: If ticket 19 runs first and strips spans from `Note` to optimize the index cache, ticket 16 is left unable to generate byte-located diagnostics without re-parsing the file or inventing an uncoordinated sidecar.
+  - *Coupling 20 -> 23*: Ticket 20 asks whether schemas drive validation and what module owns the validator (`issues/20:11-14` [V]). If ticket 20 specifies a validator `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>` where diagnostics require `ByteSpan` (essential for LSP `Diagnostic.range`, `research/10:59` [V]), it **forces ticket 23** to attach byte spans to the shared `Note` struct. This forecloses ticket 23 from choosing a span-free index model (`NoteFacts`).
+  - *Coupling 23 -> 20*: If ticket 23 runs first and strips spans from `Note` to optimize the index cache, ticket 20 is left unable to generate byte-located diagnostics without re-parsing the file or inventing an uncoordinated sidecar.
 - **Resolution Order**:
-  - Ticket 16 does NOT need to wait on Ticket 19 if Ticket 16 defines the validation interface against an **abstract source-aware target** rather than the concrete index `Note` struct.
-  - Specifically, Ticket 16 decides: (1) validation is advisory, on-demand, and non-gating; (2) validator signature takes an editor-facing document / buffer target with field spans; (3) schema text-override semantics.
-  - Ticket 19 then resolves whether that editor-facing target is a unified `Note` or a separate `NoteDocument` paired with a span-free `NoteFacts`.
+  - Ticket 20 does NOT need to wait on Ticket 23 if Ticket 20 defines the validation interface against an **abstract source-aware target** rather than the concrete index `Note` struct.
+  - Specifically, Ticket 20 decides: (1) validation is advisory, on-demand, and non-gating; (2) validator signature takes an editor-facing document / buffer target with field spans; (3) schema text-override semantics.
+  - Ticket 23 then resolves whether that editor-facing target is a unified `Note` or a separate `NoteDocument` paired with a span-free `NoteFacts`.
 
 ---
 
@@ -67,7 +67,7 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
 
 - **[V] pulldown-cmark spans are free**: `Parser::into_offset_iter()` is already called in production (`src/note/parser.rs:109` [V]). In `ParserInner::next_event_range` (`src/parse.rs:2410-2428` [V]; `research/10:48` [V]), pulldown-cmark *already* computes `start..end` for all events. `Parser::next()` simply discards the range (`src/parse.rs:2403` [V]). Keeping `ByteSpan` adds **0.0% parser CPU overhead** (`research/10:48, 87` [V]).
 - **[V] Heading pass wastes 20% to 38% CPU**: `collect_headings` runs a redundant second pulldown-cmark pass solely to strip math syntax (`src/note/parser.rs:118-162` [V]). It accounts for **20.2%** (1 KB note), **26.0%** (5 KB note), and **38.0%** (50-heading note) of total note parse time (`research/11:160-165, 195` [V]). Fusing it saves 20–35% parser CPU.
-- **[V] Noyalib CST cost**: Parsing YAML frontmatter with Noyalib CST adds **+59% parse time** per note, and 2.6x on notes with dates (`issues/15:64-65` [V]; `research/11:227-230` [V]).
+- **[V] Noyalib CST cost**: Parsing YAML frontmatter with Noyalib CST adds **+59% parse time** per note, and 2.6x on notes with dates (`issues/19:64-65` [V]; `research/11:227-230` [V]).
 
 ### 2.3 Memory Footprint & Deserialization Bottleneck
 
@@ -115,8 +115,8 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
 | **Diagnostic Spans Source** | Directly from `Note` fields | Directly from `NoteDocument` spans | From CST `text_range()` | From raw buffer validation scan |
 | **Redb Deserialization Impact** | **Regresses**: +15–25% record size; worsens 18.5 ms cliff | **Improves**: -10–20% record size; speeds up 18.5 ms cliff | Improves 18.5 ms cliff | Neutral (unchanged from today) |
 | **Parser Invocations** | 1 pass (fused) | 1 parser emits `NoteDocument`, projects to `NoteFacts` | 2 separate parsers | 1 pass index; 1 pass per active editor keystroke |
-| **What Ticket 16 Decides** | Validator takes `&Note` | Validator takes `&NoteDocument` | Rejected | Validator takes `(&str, &Schema)` |
-| **What Ticket 16 Defers** | Defers AST span fields to 19 | Defers `NoteFacts` layout to 19 & 20 | N/A | Defers all AST details to 19 |
+| **What Ticket 20 Decides** | Validator takes `&Note` | Validator takes `&NoteDocument` | Rejected | Validator takes `(&str, &Schema)` |
+| **What Ticket 20 Defers** | Defers AST span fields to 23 | Defers `NoteFacts` layout to 23 & 24 | N/A | Defers all AST details to 23 |
 
 ### 3.3 Evaluation of Shapes
 
@@ -128,7 +128,7 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
   - *Validator*: `SchemaValidator::validate(&NoteDocument, &Schema) -> Vec<SchemaDiagnostic>`.
   - *Failure Mode*: Two structs to maintain; conversion code required.
 - **Shape C (Lossless CST)**:
-  - *Verdict*: **REJECTED**. Rowan CSTs cannot be efficiently serialized in redb (`research/10:53, 98-99` [V]); Noyalib CST is unsound for YAML scalars (`issues/14:283-288` [V]).
+  - *Verdict*: **REJECTED**. Rowan CSTs cannot be efficiently serialized in redb (`research/10:53, 98-99` [V]); Noyalib CST is unsound for YAML scalars (`issues/18:283-288` [V]).
 - **Shape D (Shared Model + On-Demand Reparse)**:
   - *Mechanism*: Keep `Note` span-free. Schema validation runs as a text-linter on raw frontmatter string: `validate_frontmatter_str(yaml_str: &str, schema: &Schema)`.
   - *Failure Mode*: Disconnects validation from parsed note semantics; fails if inline fields also require schema validation.
@@ -179,7 +179,7 @@ Tier 9:     [cli] ──► (composition root: imports all services)
 4. **`src/file_class_expander.rs`**:
    - Explicit bridge module at Tier 8 (`src/file_class_expander.rs:1-13` [V]): implements `query::FileClassExpander` for `schema::SchemaService`. Neither `query` nor `schema` imports the other.
 
-### 4.2 Architectural Consequence for Ticket 16
+### 4.2 Architectural Consequence for Ticket 20
 
 - `schema` sits at **Tier 4**; `note` sits at **Tier 5**.
 - `src/schema/` CANNOT validate `Note` directly without creating a Tier 4 -> Tier 5 cyclic inversion.
@@ -189,19 +189,19 @@ Tier 9:     [cli] ──► (composition root: imports all services)
 
 ---
 
-## 5. Downstream Dependencies Across Tickets 20–30
+## 5. Downstream Dependencies Across Tickets 24–34
 
-| Ticket | Citation (path:line) | Direct Dependency on Ticket 16 Choice? | Presupposes Validation Exists? |
+| Ticket | Citation (path:line) | Direct Dependency on Ticket 20 Choice? | Presupposes Validation Exists? |
 |---|---|---|---|
-| **20: Index Read Model** | `issues/20:14-15` [V]: "what the store persists (whole `Note` via postcard vs extracted facts)" | **YES**: If validation runs at index time, redb must persist validation errors. If validation is advisory on-demand, index persists facts without schema coupling. | **NO**: Read model prefers decoupled facts. |
-| **21: Index Freshness** | `issues/21:22-24, 30` [V]: "per-axis invalidation... whether a parser/schema identity enters the fingerprint" | **YES**: If validation gates indexing, schema edits must invalidate redb cache. If validation is an on-demand pass, schema edits do NOT invalidate index. | **NO**: Landed fingerprint (`207cc3fb`) already excludes schemas. |
-| **22: Query Core & Plan** | `issues/22:9-10` [V]; `issues/15:202-203` [V]: "schema note typing: the schema string override" | **YES**: Query core needs to know if schemas provide runtime typing or if note values stay truthful to parse classification. | **PARTIALLY**: Presupposes text-override rule, not diagnostic validation. |
-| **24: Template Boundary** | `issues/24:15-16` [V]: "`Schema` access without the `State` temp-cache hack; schema loading eager vs lazy" | **WEAK**: Relates to passing `Schema` handle to minijinja, not validation. | **NO**. |
-| **26: Workspace Host** | `issues/26:9-10` [V]: "Where does service composition live (config load + trust, schema load, index refresh/persist, query execution...)" | **YES**: Host must compose `SchemaService` with the validator and diagnostic emitter. | **YES**: If `traces check` or LSP diagnostics are hosted services. |
-| **27: Diagnostic Arch** | `issues/27:5, 12-14` [V]: **BLOCKED BY 16**. "where schema validation diagnostics (if any) land" | **DIRECT**: Ticket 27 cannot be resolved until ticket 16 decides where validation diagnostics live and whether they carry AST spans. | **YES**: Explicitly assumes validation diagnostics exist or are rejected. |
-| **28: Crate Topology** | `issues/28:14-15, 39-44` [V]: workspace split starting with CLI; public surface | **YES**: Determines crate boundary placement: if `schema` and `note` are separate crates, validator must live in a higher crate. | **NO**. |
-| **29: Reconciliation** | `issues/29:5, 12-16` [V]: codebase-wide reconciliation | **YES**: Formally blocked on 16 (and 14-28). | **NO**. |
-| **30: Buffer Consistency** | `issues/30:9-13` [V]: "For committed long-lived LSP... rules when editor has unsaved content" | **DIRECT**: In-editor validation must validate live unsaved buffer text with spans, NOT stale index data from redb. | **YES**: Presupposes validation runs over live buffer representations. |
+| **24: Index Read Model** | `issues/24:14-15` [V]: "what the store persists (whole `Note` via postcard vs extracted facts)" | **YES**: If validation runs at index time, redb must persist validation errors. If validation is advisory on-demand, index persists facts without schema coupling. | **NO**: Read model prefers decoupled facts. |
+| **25: Index Freshness** | `issues/25:22-24, 30` [V]: "per-axis invalidation... whether a parser/schema identity enters the fingerprint" | **YES**: If validation gates indexing, schema edits must invalidate redb cache. If validation is an on-demand pass, schema edits do NOT invalidate index. | **NO**: Landed fingerprint (`207cc3fb`) already excludes schemas. |
+| **26: Query Core & Plan** | `issues/26:9-10` [V]; `issues/19:202-203` [V]: "schema note typing: the schema string override" | **YES**: Query core needs to know if schemas provide runtime typing or if note values stay truthful to parse classification. | **PARTIALLY**: Presupposes text-override rule, not diagnostic validation. |
+| **28: Template Boundary** | `issues/28:15-16` [V]: "`Schema` access without the `State` temp-cache hack; schema loading eager vs lazy" | **WEAK**: Relates to passing `Schema` handle to minijinja, not validation. | **NO**. |
+| **30: Workspace Host** | `issues/30:9-10` [V]: "Where does service composition live (config load + trust, schema load, index refresh/persist, query execution...)" | **YES**: Host must compose `SchemaService` with the validator and diagnostic emitter. | **YES**: If `traces check` or LSP diagnostics are hosted services. |
+| **31: Diagnostic Arch** | `issues/31:5, 12-14` [V]: **BLOCKED BY 20**. "where schema validation diagnostics (if any) land" | **DIRECT**: Ticket 31 cannot be resolved until ticket 20 decides where validation diagnostics live and whether they carry AST spans. | **YES**: Explicitly assumes validation diagnostics exist or are rejected. |
+| **32: Crate Topology** | `issues/32:14-15, 39-44` [V]: workspace split starting with CLI; public surface | **YES**: Determines crate boundary placement: if `schema` and `note` are separate crates, validator must live in a higher crate. | **NO**. |
+| **33: Reconciliation** | `issues/33:5, 12-16` [V]: codebase-wide reconciliation | **YES**: Formally blocked on 20 (and 18-32). | **NO**. |
+| **34: Buffer Consistency** | `issues/34:9-13` [V]: "For committed long-lived LSP... rules when editor has unsaved content" | **DIRECT**: In-editor validation must validate live unsaved buffer text with spans, NOT stale index data from redb. | **YES**: Presupposes validation runs over live buffer representations. |
 
 ---
 
@@ -212,24 +212,24 @@ Tier 9:     [cli] ──► (composition root: imports all services)
 The previous reviewer recommended:
 
 1. Retain a **span-free kernel** as a hedge to protect index performance.
-2. Assert that **spans belong entirely to ticket 19** and should be excluded from ticket 16.
+2. Assert that **spans belong entirely to ticket 23** and should be excluded from ticket 20.
 3. Treat schema validation as a future LSP concern that can be deferred without affecting current design.
 
 ### 6.2 Why That Hedge Fails (Adversarial Assessment)
 
-- **Flaw 1: LSP is committed, not speculative**: Ticket 13 explicitly resolved that the LSP is the next committed consumer and that editor features require source-aware capabilities (`issues/13:37-43` [V]). Designing a validator today against a span-free `Note` produces a CLI-only toy that cannot populate LSP `Diagnostic.range` (`research/10:59` [V]).
-- **Flaw 2: The False Dichotomy of Spans**: The hedge assumed that introducing spans meant bloating `Note` and regressing redb deserialization (the 18.48 ms cliff in `research/11:93` [V]). But Ticket 13 reopened the dual-model architecture (`issues/13:45-47` [V]) and Ticket 14 split `Link`/`NoteLink` (`issues/14:484-490` [V]). By separating an editor-shape `NoteDocument` (with `ByteSpan`) from an index-shape `NoteFacts` (span-free), we achieve zero-overhead indexing AND byte-accurate validation.
-- **Flaw 3: Frontmatter Spans Cannot Be Deferred Indefinitely**: Frontmatter is parsed directly from YAML into `NoteFieldValue` (`src/note/metadata.rs:71-72` [V]). Without spans, a diagnostic for `status: "Invalid"` can only point to the whole file. If ticket 16 ignores spans, any validation diagnostic design will be immediately obsolete when editor integration begins.
-- **Flaw 4: Circular Deadlock**: Deferring spans to ticket 19 while trying to decide ticket 16 leaves ticket 16 paralyzed: it cannot specify `validate(&Note, &Schema) -> Vec<Diagnostic>` because it does not know what `Note` provides.
+- **Flaw 1: LSP is committed, not speculative**: Ticket 17 explicitly resolved that the LSP is the next committed consumer and that editor features require source-aware capabilities (`issues/17:37-43` [V]). Designing a validator today against a span-free `Note` produces a CLI-only toy that cannot populate LSP `Diagnostic.range` (`research/10:59` [V]).
+- **Flaw 2: The False Dichotomy of Spans**: The hedge assumed that introducing spans meant bloating `Note` and regressing redb deserialization (the 18.48 ms cliff in `research/11:93` [V]). But Ticket 17 reopened the dual-model architecture (`issues/17:45-47` [V]) and Ticket 18 split `Link`/`NoteLink` (`issues/18:484-490` [V]). By separating an editor-shape `NoteDocument` (with `ByteSpan`) from an index-shape `NoteFacts` (span-free), we achieve zero-overhead indexing AND byte-accurate validation.
+- **Flaw 3: Frontmatter Spans Cannot Be Deferred Indefinitely**: Frontmatter is parsed directly from YAML into `NoteFieldValue` (`src/note/metadata.rs:71-72` [V]). Without spans, a diagnostic for `status: "Invalid"` can only point to the whole file. If ticket 20 ignores spans, any validation diagnostic design will be immediately obsolete when editor integration begins.
+- **Flaw 4: Circular Deadlock**: Deferring spans to ticket 23 while trying to decide ticket 20 leaves ticket 20 paralyzed: it cannot specify `validate(&Note, &Schema) -> Vec<Diagnostic>` because it does not know what `Note` provides.
 
 ### 6.3 Failure Modes Compared
 
 - **Failure Mode of "Validator on Span-Free Note"**:
-  - *Short-term*: Clean and simple in ticket 16.
+  - *Short-term*: Clean and simple in ticket 20.
   - *Long-term*: When LSP is wired up, `validate(&Note)` cannot produce LSP `Range`s. The team is forced to either: (a) re-parse the file with an ad-hoc scanner, (b) bolt on an uncoordinated `spans` sidecar, or (c) rewrite the validator from scratch.
 - **Failure Mode of "Validator on Editor-Shape NoteDocument"**:
-  - *Short-term*: Requires ticket 16 to accept that `Note` will split (or that validation consumes an abstract source target), anticipating ticket 19.
-  - *Long-term*: If ticket 19 unexpectedly rejects the split, the editor validator simply falls back to an on-demand buffer reparse (Shape D, standard in Taplo/rumdl), which still works cleanly and requires zero index cache changes.
+  - *Short-term*: Requires ticket 20 to accept that `Note` will split (or that validation consumes an abstract source target), anticipating ticket 23.
+  - *Long-term*: If ticket 23 unexpectedly rejects the split, the editor validator simply falls back to an on-demand buffer reparse (Shape D, standard in Taplo/rumdl), which still works cleanly and requires zero index cache changes.
 
 ---
 
@@ -241,10 +241,10 @@ The previous reviewer recommended:
 
 ---
 
-## 8. What This Changes for Ticket 16
+## 8. What This Changes for Ticket 20
 
 1. **Decouple Validation from Index Storage [P]**: Schema validation must be strictly **advisory and on-demand** (following `research/03:110-115` [V] Taplo/Metadata Menu precedent). Validation MUST NOT gate indexing or run during `IndexerService::parse_note`. `index.redb` remains an invariant-free facts cache; `.traces/schemas/` remains excluded from `IndexFingerprint`.
-2. **Define Validator Interface on an Abstract Source Target [P]**: Ticket 16 should define the validator signature as:
+2. **Define Validator Interface on an Abstract Source Target [P]**: Ticket 20 should define the validator signature as:
 
    ```rust
    pub trait NoteSourceTarget {
@@ -254,8 +254,8 @@ The previous reviewer recommended:
    pub fn validate_note(target: &impl NoteSourceTarget, schema: &Schema) -> Vec<SchemaDiagnostic>;
    ```
 
-   This unblocks ticket 16 without dictating ticket 19's choice:
-   - If ticket 19 chooses Candidate B (`NoteDocument`), `NoteDocument` implements `NoteSourceTarget`.
-   - If ticket 19 chooses Candidate D (Span-free `Note` + reparse), an ephemeral buffer adapter implements `NoteSourceTarget`.
+   This unblocks ticket 20 without dictating ticket 23's choice:
+   - If ticket 23 chooses Candidate B (`NoteDocument`), `NoteDocument` implements `NoteSourceTarget`.
+   - If ticket 23 chooses Candidate D (Span-free `Note` + reparse), an ephemeral buffer adapter implements `NoteSourceTarget`.
 3. **Place Validator in a Dedicated Bridge Module (Tier 6+) [P]**: Because `src/schema/` (Tier 4) has zero dependencies on `src/note/` (Tier 5), the validator should NOT be placed inside `src/schema/model.rs`. It belongs in a dedicated analysis/validation service (e.g. `src/schema_validator/` or `src/validation/`), maintaining the clean acyclic module DAG.
-4. **Settle Schema Type Override for Text [P]**: Per ticket 15 (`issues/15:104-105` [V]), frontmatter parsing is quote-insensitive. Ticket 16 must ratify the rule that a schema field declared as `type = "string"` overrides heuristic date/duration promotion, preserving text truthfulness without quote hacks.
+4. **Settle Schema Type Override for Text [P]**: Per ticket 19 (`issues/19:104-105` [V]), frontmatter parsing is quote-insensitive. Ticket 20 must ratify the rule that a schema field declared as `type = "string"` overrides heuristic date/duration promotion, preserving text truthfulness without quote hacks.

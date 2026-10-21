@@ -1,4 +1,4 @@
-# Ticket 16 round 6: harness-independent guardrails
+# Ticket 20 round 6: harness-independent guardrails
 
 Inputs: `H1-filesystem-layer.md`, `H2-vcs-and-workflow.md`,
 `H3-prior-art-and-in-band.md`. Tags: [V] read or observed by a worker (I did
@@ -50,11 +50,11 @@ filter on the existing files.
 - No experiment re-run by me; NFS and clone results are worker observations.
 - Windows and Linux behaviour of the placement workflows is unmeasured.
 - Product features (session, inbox, write commands) are outside the map's
-  destination; only their design pressure on core is recorded in ticket 16.
+  destination; only their design pressure on core is recorded in ticket 20.
 
 ## 5. Outcome
 
-Folded into [ticket 16's Answer](../../../issues/20-schema-note-typing-and-validation.md)
+Folded into [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md)
 (agent guardrail): placement workflows, CLI write commands, per-folder
 instruction snippets, the rejected list. MCP-server guards:
 [addendum I](./I-mcp-server-guards.md).

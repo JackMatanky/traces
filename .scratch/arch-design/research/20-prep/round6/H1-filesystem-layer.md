@@ -2,7 +2,7 @@
 
 Deliverable:
 `.scratch/arch-design/research/20-prep/round6/H1-filesystem-layer.md`  
-Target: Ticket 16 (Schema Note Typing and Validation)  
+Target: Ticket 20 (Schema Note Typing and Validation)  
 Scope: Filesystem and OS layer enforcement mechanisms independent of any
 writer or harness (loopback NFS, WebDAV/9P, FUSE/FSKit, ProjFS/WinFsp,
 fanotify, Endpoint Security, inotify/FSEvents/kqueue, immutable flags/ACLs,
@@ -50,7 +50,7 @@ macOS without root privileges or third-party kernel extensions?
    wait (`D` state) unless mounted with `-o soft,intr` [V]. Linux requires root
    or `/etc/fstab` privileges to mount NFS [V]. Windows requires Windows Pro
    or Enterprise [V].
-5. **Architectural Recommendation:** Retain the Ticket 16 Answer: portable
+5. **Architectural Recommendation:** Retain the Ticket 20 Answer: portable
    prevention belongs where `traces` owns the write (MCP edit tools) or where
    processes run in an explicit sandbox. Provide loopback NFS and APFS
    clonefile staging as documented, opt-in recipes for users seeking system-wide

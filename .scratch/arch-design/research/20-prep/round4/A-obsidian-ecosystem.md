@@ -3,7 +3,7 @@
 Topic: Comprehensive audit of note typing, schema definitions, validation,
 and property management across the Obsidian ecosystem, community plugins,
 static site generators, and user workflows.
-Status: Input to Ticket 16 (Schema Note Typing and Validation) stress test.
+Status: Input to Ticket 20 (Schema Note Typing and Validation) stress test.
 Deliverable:
 `.scratch/arch-design/research/20-prep/round4/A-obsidian-ecosystem.md`
 Constraints: Lines <= 80 columns (except tables and URLs); fenced code blocks
@@ -425,7 +425,7 @@ Projects and subsystems examined:
 
 ---
 
-## 4. Challenges to Traces' Design (Ticket 16 Answer)
+## 4. Challenges to Traces' Design (Ticket 20 Answer)
 
 ### 4.1 Advisory-Only Validation vs Gating
 

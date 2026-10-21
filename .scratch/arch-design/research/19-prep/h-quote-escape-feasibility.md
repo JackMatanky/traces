@@ -10,25 +10,28 @@
 
 **Verdict on Lean L5:** **REJECT as primary escape mechanism.** [P]
 While technically implementable via Noyalib's side-table CST (`noyalib::cst::Document`), Lean L5 suffers from three structural flaws:
+
 1. **Mechanical Cost & Flaws:** No zero-allocation route exists in Noyalib 0.0.53 or 0.0.57 [V]. CST parsing adds a 59% latency penalty per note [V: probe]. The proposed "lazy CST" optimization (parse CST only if date-shaped strings exist) degrades to **2.59x slower than baseline** in real PKM vaults where ~85%+ of notes contain dates (`created`, `updated`, `due`), because it parses notes twice [V: probe]. Furthermore, `span_at` fails on tagged scalars (`!!str "2025-01-15"` returns raw `"!!str \"2025-01-15\""` which defeats `starts_with('"')`) [V: probe], requires synthetic bracket syntax (`["a.b"]`) for dotted keys [V: probe], and green-tree CST walks cannot resolve aliases (`*x`) [V: probe].
 2. **Severe Silent Query Breakage:** In real Obsidian vaults, users frequently possess quoted dates written by tools: Templater syntax requires quoting frontmatter tags (`due: "<% tp.date.now() %>"` -> `due: "2025-01-15"`) [V: digest], Metadata Menu forces quotes on serialization [V: digest], and Prettier/YAML formatters quote date-shaped strings [V]. Under L5 combined with L1 (strict type bracketing), `due: "2025-01-15"` becomes `String`, causing queries like `--where 'due <= 2025-01-01'` to **silently drop rows** without warning or error [V, H].
 3. **Ecosystem Divergence:** Obsidian Dataview has zero YAML quote escape (both `"2025-01-15"` and `2025-01-15` parse as `DateTime`) [V: digest]. Obsidian Properties UI enforces typing through a schema file (`.obsidian/types.json`), not YAML quote syntax [V].
 
-**Recommendation:** Maintain **quote-insensitive parse-time heuristic classification** (matching status quo and Ticket 14 Answer lines 501-502) [P]. Implement string-forcing via **schema overrides** (`type = "string"`) and query explicit casts (`string(x)` / `date(x)`) [P].
+**Recommendation:** Maintain **quote-insensitive parse-time heuristic classification** (matching status quo and Ticket 18 Answer lines 501-502) [P]. Implement string-forcing via **schema overrides** (`type = "string"`) and query explicit casts (`string(x)` / `date(x)`) [P].
 
 ---
 
 ## 2. Part 1: Mechanism Analysis (Noyalib 0.0.53 & 0.0.57)
 
 ### 2.1 Public API Landscape
+
 - **`noyalib::Value` AST:** Drops all quote styles. `Value::String(String)` retains only unescaped character contents [V: `src/value/mod.rs`].
-- **YAML Tags:** `!!str 2025-01-15` and `!!str "2025-01-15"` are explicitly resolved directly to plain `Value::String` by Noyalib's loader (`noyalib-0.0.53/src/parser/loader.rs:2180`) [V]. They do NOT surface as `Value::Tagged` [V]. `!str` produces `Value::Tagged`, but Traces' frontmatter pipeline drops all tags to inner values (`src/field.rs:793`, Ticket 14:497) [V].
+- **YAML Tags:** `!!str 2025-01-15` and `!!str "2025-01-15"` are explicitly resolved directly to plain `Value::String` by Noyalib's loader (`noyalib-0.0.53/src/parser/loader.rs:2180`) [V]. They do NOT surface as `Value::Tagged` [V]. `!str` produces `Value::Tagged`, but Traces' frontmatter pipeline drops all tags to inner values (`src/field.rs:793`, Ticket 18:497) [V].
 - **`PolicyEvent`:** `PolicyEvent<'a>` contains only `kind: PolicyEventKind`, `anchor`, `tag`, and `scalar: Option<&'a str>` (`src/policy.rs:84-95`) [V]. It exposes no scalar style or quote delimiter [V].
 - **`StreamingDeserializer`:** Implements `serde::Deserializer`; internal parser events and scanner tokens are `pub(crate)` and inaccessible (`src/streaming.rs:231`) [V].
 - **`Spanned<T>`:** Populates source `Location` during `from_str`, but fails on flattened structs and provides no quote style (`src/spanned.rs:79-125`) [V].
 - **Noyalib 0.0.57:** Crate inspection via `rust-docs` confirms 0.0.57 adds `dominant_quote_style()` on `Document` (file-wide heuristic) [V: `cst/document.rs:2121`], `quote_style()` on `EmitCtx` (serializer only) [V: `cst/emit.rs:120`], and `plain_scalar_strings` in `ParserConfig` (deserializing unquoted scalars into String targets) [V: `de/config.rs:1284`]. **It adds NO public per-scalar quote inspection API to `Value` or deserialization.** [V]
 
 ### 2.2 Probe Accuracy Matrix across Scalar Scenarios
+
 Tested against `noyalib::cst::parse_document` with `span_at(path)` vs custom `GreenNode` walk [V: empirical probe]:
 
 | Scenario | Input YAML | `span_at(path)` Result | Custom `GreenNode` Walk | Assessment |
@@ -50,14 +53,17 @@ Tested against `noyalib::cst::parse_document` with `span_at(path)` vs custom `Gr
 | **Wikilink quoted** | `link: "[[My Note]]"` | `quoted=true`, raw `"\"[[My Note]]\""` | `DoubleQuotedScalar` | Correct (exempt from L5) [V] |
 
 ### 2.3 Non-Noyalib Fallback: Line-Based Pre-Scan
+
 A regex/line scanner (e.g. `^\s*([a-zA-Z0-9_.-]+)\s*:\s*(["'].*["'])`) is superficially attractive but structurally unsound [H]:
+
 - **Failure modes:** Fractures on multi-line scalars, block sequences (`- "2025-01-15"` lacks key), flow mappings (`{a: "..."}`), block/folded scalars (`|`, `>`), anchors/aliases, and duplicate keys [H].
 - **False positives:** Comments with quotes (`due: 2025-01-15 # "target"`) match regexes as quoted [H]. Obsidian Linter explicitly abandoned regex YAML parsing due to severe frontmatter corruption (`digest:244-250`) [V].
 
 ### 2.4 Performance Measurement
+
 Empirical timing on realistic 30-line frontmatter (10,000 iterations, release mode, Apple Silicon) [V: probe]:
 
-```
+```text
 --- Frontmatter WITH date/duration scalars (~85% of real notes) ---
 Baseline (noyalib::Value only):  35.45 µs/note  (1.00x)
 CST always (parse_document):    56.27 µs/note  (1.59x baseline, +20.8 µs)
@@ -76,6 +82,7 @@ Lazy CST (skipped on hit):      34.69 µs/note  (1.01x baseline, +0.49 µs)
 ## 3. Part 2: User Impact & Vault Evidence
 
 ### 3.1 Tooling Landscape: Who Writes Quoted Dates?
+
 1. **Templater / QuickAdd:** In Obsidian templates, YAML frontmatter syntax errors occur if template tags are unquoted (e.g. `due: <% tp.date.now() %>` fails YAML parse because `<` is invalid) [V: digest]. Users MUST write `due: "<% tp.date.now() %>"` or `date: "{{date}}"` [V: digest]. When expanded, the file permanently contains `due: "2025-01-15"` [V].
 2. **Metadata Menu:** `renderValueString` (`digest:19696-19708`) explicitly wraps strings in double quotes (`"${rawValue}"`) whenever writing to frontmatter if YAML re-parsing would not preserve them as strings [V].
 3. **Formatters (Prettier / yaml-lint):** YAML formatters with `singleQuote: true` or string-safety rules automatically quote date-like strings (`created: '2024-12-01'`) [H].
@@ -83,7 +90,9 @@ Lazy CST (skipped on hit):      34.69 µs/note  (1.01x baseline, +0.49 µs)
 5. **Traces Test Suite:** Zero tests or fixtures in `traces` currently quote frontmatter dates [V: `tests/integration/query.rs:50`, `src/field.rs:843`].
 
 ### 3.2 The Silent Breakage Risk
+
 Under Lean L1 (strict type bracketing) and Lean L5:
+
 - A user note generated via Templater contains `due: "2025-01-15"`.
 - Under status quo, Traces parses this as `NoteFieldValue::Date` [V: `src/field.rs:843`].
 - Under L5, Traces parses this as `NoteFieldValue::String("2025-01-15")` [P].
@@ -103,19 +112,19 @@ Under Lean L1 (strict type bracketing) and Lean L5:
 | **M4: Quote-Insensitive Classification + Schema String Override** | Parse-time classification treats `"2025-01-15"` as Date; schema `type = string` treats as String | **Zero breakage**; 1.0x parse cost; matches Dataview | Requires schema to force rare string-date | **RECOMMENDED** [P] |
 | **M5: Opt-in Config Flag** | `[frontmatter] quote_escape = true` | Isolates breakage | Splits ecosystem semantics; configuration burden | Reject [P] |
 
-### 3.4 Precise Behavior Change for Ticket 12
+### 3.4 Precise Behavior Change for Ticket 16
 
 ```markdown
 | Change | Status Quo | Adopted Decision (Refined L5) | Rationale |
 |---|---|---|---|
 | Frontmatter string-date classification | Sniffs ISO dates regardless of quotes (`field.rs:843`) | **Preserve quote-insensitivity** for Date/DateTime/Duration classification at parse time | Prevents silent query failure on Templater/Prettier quoted dates; avoids 2.59x CST parse penalty |
 | Frontmatter string escape mechanism | None (quotes ignored; inline quotes escape) | **Schema declaration** (`type = "string"`) and query explicit cast (`string(field)`) | Provides clean escape hatch without YAML parsing overhead or ambiguous heuristics |
-| Frontmatter wikilinks | Quoted `"[[x]]"` classified as Link; unquoted `[[x]]` is YAML flow sequence error | **Preserve** link recognition on quoted `"[[x]]"` | Preserves valid YAML syntax for links (Ticket 14:279-282) |
+| Frontmatter wikilinks | Quoted `"[[x]]"` classified as Link; unquoted `[[x]]` is YAML flow sequence error | **Preserve** link recognition on quoted `"[[x]]"` | Preserves valid YAML syntax for links (Ticket 18:279-282) |
 ```
 
 ---
 
-## 4. Implications for Ticket 15 (Mapping to Leans L1..L8)
+## 4. Implications for Ticket 19 (Mapping to Leans L1..L8)
 
 - **L1 (Type Bracketing):** **KEEP.** [P]
   - Type bracketing (Numeric, Temporal, Duration, String, Bool, Link, List, Object, Null) solves cross-kind relational leaks (`42 < "hello"` becoming false instead of true).
@@ -128,7 +137,7 @@ Under Lean L1 (strict type bracketing) and Lean L5:
   - Civil model for naive datetimes; zero machine timezone baked into index cache.
 - **L5 (Quote Escape):** **CHANGE / REFINE.** [P]
   - **Do NOT adopt quote-sensitive classification for frontmatter scalars.**
-  - *Concrete wording for Ticket 15:*
+  - *Concrete wording for Ticket 19:*
     > "Frontmatter classification remains quote-insensitive: text matching Date, DateTime, or Duration syntax is eagerly classified at parse time regardless of whether it is written with plain, single, or double quotes. Link recognition on quoted wikilinks (`\"[[target]]\"`) remains active. To treat a date-shaped frontmatter value as a literal string, users specify `type = \"string\"` in the schema or invoke the explicit `string()` function in queries. Explicit casts `date()` and `dur()` in the query engine fail to `Null` (TRY_CAST semantics)."
 - **L6 (Link Identity):** **KEEP.** [P]
   - Semantic equality and sort order compare folded target + subpath only. Display and embedded remain queryable attributes.

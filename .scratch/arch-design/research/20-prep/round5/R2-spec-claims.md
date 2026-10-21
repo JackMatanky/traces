@@ -3,7 +3,7 @@
 - **Target File:**
   `.scratch/arch-design/research/20-prep/round5/R2-spec-claims.md`
 - **Scope:** Primary source verification of six external precedent and
-  specification claims cited in ticket 16's Answer and round-4 research.
+  specification claims cited in ticket 20's Answer and round-4 research.
 - **Status:** Complete.
 
 ---
@@ -80,9 +80,9 @@ Directory Information Models"
   in another, **MUST dominates**. It is required to be present. An optional
   declaration never overrides or relaxes a mandatory requirement.
 
-### 1.4 Relevance to Ticket 16's Answer
+### 1.4 Relevance to Ticket 20's Answer
 
-Directly supports ticket 16's Answer (lines 105-106): unrelated classes
+Directly supports ticket 20's Answer (lines 105-106): unrelated classes
 merge constraints additively where `required` and `multi` arity are checked if
 either class declares them.
 
@@ -142,9 +142,9 @@ When two distinct concrete values (such as `port: 80` and `port: 8080`) are
 unified, their greatest lower bound in the lattice is bottom (`_|_`). Neither
 value overrides or masks the other; evaluation halts with an error.
 
-### 2.4 Relevance to Ticket 16's Answer
+### 2.4 Relevance to Ticket 20's Answer
 
-Directly justifies ticket 16's rejection of "first-listed wins" for
+Directly justifies ticket 20's rejection of "first-listed wins" for
 unrelated classes (lines 102-108, 234-237), adopting CUE's order-independent
 algebra where conflicting declarations yield `schema.class-conflict`.
 
@@ -200,10 +200,10 @@ algebra where conflicting declarations yield `schema.class-conflict`.
    > graduated in Kubernetes 1.25+) to support `--validate=strict` and
    > `--validate=warn`. [V: kubernetes/kubernetes#111074:104-128,249-282]
 
-### 3.4 Relevance to Ticket 16's Answer
+### 3.4 Relevance to Ticket 20's Answer
 
 Confirms that Traces must never silently prune unknown frontmatter fields.
-Ticket 16's Answer adheres to this by keeping notes open-world and returning
+Ticket 20's Answer adheres to this by keeping notes open-world and returning
 unknown fields as advisory diagnostics with closest-match hints (lines 87-88).
 
 ---
@@ -254,11 +254,11 @@ unknown fields as advisory diagnostics with closest-match hints (lines 87-88).
      namespace prefixes caused ambiguous schema collisions and broken field
      ordering (`plone.autoform` changelog 1.7.0, issue #18).
 
-### 4.4 Relevance to Ticket 16's Answer
+### 4.4 Relevance to Ticket 20's Answer
 
 Because Markdown frontmatter is a flat key-value dictionary without
 per-behavior namespace wrappers (unlike Plone's `AnnotationStorage`), ticket
-16's Answer correctly flags duplicate differing declarations across classes
+20's Answer correctly flags duplicate differing declarations across classes
 as a `schema.class-conflict` (lines 104-106).
 
 ---
@@ -313,9 +313,9 @@ as a `schema.class-conflict` (lines 104-106).
    with baseline mechanisms (e.g., `ruff --diff`, `mypy --baseline`), not
    agent memory frameworks.
 
-### 5.4 Relevance to Ticket 16's Answer
+### 5.4 Relevance to Ticket 20's Answer
 
-Does not alter ticket 16's Answer. Ticket 16 defines the delta rule
+Does not alter ticket 20's Answer. Ticket 20 defines the delta rule
 (`check_note(before, after)` keyed by `(field, code, hash(value))`, lines
 186-188) based on PKM operational reality (preventing agents from being
 blocked by legacy note syntax errors). Refuting Letta/Graphiti clarifies the
@@ -323,7 +323,7 @@ historical ledger.
 
 ---
 
-## 6. ADR-0009 and Survey Analysis vs. Ticket 16's Answer
+## 6. ADR-0009 and Survey Analysis vs. Ticket 20's Answer
 
 ### 6.1 ADR-0009 Verification
 
@@ -338,8 +338,8 @@ historical ledger.
   (`schemas.class_field`), frontmatter field mappings, and task status sets
   enter the config fingerprint. Schema definitions themselves are never
   indexed.
-- **Verification vs. Ticket 16 Answer:**
-  Ticket 16's Answer states:
+- **Verification vs. Ticket 20 Answer:**
+  Ticket 20's Answer states:
   > "Decision: schemas validate note data as an advisory, on-demand check.
   > They never type values at parse time, never gate the read or index path,
   > and never enter the index or its fingerprint." (lines 51-53)
@@ -351,12 +351,12 @@ historical ledger.
   > "Expansion happens at query time into the existing Class, Tag and Path
   > atoms plus a 'has a known explicit class' exclusion, so the index and its
   > fingerprint never learn about bindings." (lines 141-144)
-  **Verdict:** **VERIFIED**. Ticket 16's Answer strictly adheres to ADR-0009.
+  **Verdict:** **VERIFIED**. Ticket 20's Answer strictly adheres to ADR-0009.
 
 ### 6.2 Claims in `.scratch/arch-design/survey/schema.md` Contradicting the Answer
 
 Reading `.scratch/arch-design/survey/schema.md` in full reveals five claims
-that contradict ticket 16's Answer:
+that contradict ticket 20's Answer:
 
 1. **`FileClassExpander` Seam:**
    - *Survey Claim (§8, lines 145-146):* Praised as a "model deep interface"
@@ -396,12 +396,12 @@ that contradict ticket 16's Answer:
      violations as open "fog" (whether to coerce, treat as null, or error).
    - *Answer Decision (lines 51-53, 228-229):* **Resolved**. Schemas never
      type values at parse or query time; query-bind typing is rejected per
-     ticket 15 and ADR-0009. Query execution evaluates raw note values
+     ticket 19 and ADR-0009. Query execution evaluates raw note values
      independently of schema validity.
 
-### 6.3 Relevance to Ticket 16's Answer
+### 6.3 Relevance to Ticket 20's Answer
 
-Ticket 16's Answer explicitly acknowledged that it updates the documented
+Ticket 20's Answer explicitly acknowledged that it updates the documented
 invariants in `src/schema/mod.rs` and supersedes the earlier survey findings
 (lines 130-132, 319-333).
 
@@ -409,12 +409,12 @@ invariants in `src/schema/mod.rs` and supersedes the earlier survey findings
 
 ## 7. Summary Ledger
 
-| # | Topic / Claim | Round-4 Status | Round-5 Verdict | Impact on Ticket 16 Answer |
+| # | Topic / Claim | Round-4 Status | Round-5 Verdict | Impact on Ticket 20 Answer |
 |---|---|---|---|---|
 | 1 | LDAP MUST/MAY union & MUST dominance | [H] unread | **VERIFIED** [V] | Validates additive requirement union |
 | 2 | CUE commutative unification & bottom | [H] unread | **VERIFIED** [V] | Validates order-independent class conflict |
 | 3 | K8s pruning & Issue #111074 backlash | [S] unread | **VERIFIED** [V] | Confirms open-world advisory diagnostics |
 | 4 | Plone Dexterity collision handling | [H] unread | **VERIFIED** [V] | Confirms need for flat field conflict detection |
 | 5 | Letta / Graphiti delta validation rule | [S] scout F | **REFUTED** [V] | Refutes precedent; delta rule rests on linters |
-| 6a| ADR-0009 schema index exclusion | [V] ticket 16 | **VERIFIED** [V] | Confirms schemas never enter index/fingerprint |
+| 6a| ADR-0009 schema index exclusion | [V] ticket 20 | **VERIFIED** [V] | Confirms schemas never enter index/fingerprint |
 | 6b| Survey schema.md contradictions | [V] survey | **VERIFIED** [V] | 5 claims superseded/overturned by Answer |

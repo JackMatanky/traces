@@ -73,9 +73,10 @@ itself is not implemented here; the map ends at hand-off to specification.
   ticket 20 and 19 carry a dated comment. Digests live in `docs/digests/`.
 - Renumbering (2026-10-21): the four IWE/Fileclass research tickets were moved
   to 12 to 15, after the other research tickets, and the earlier tickets 12 to
-  32 became 16 to 36 (add 4). Ticket numbers inside `research/19-prep/` and
-  `research/20-prep/` (formerly `15-prep`, `16-prep`) and in git history use
-  the old numbering.
+  32 became 16 to 36 (add 4). The prep folders were renamed to
+  `research/19-prep/` and `research/20-prep/` (formerly `15-prep`, `16-prep`)
+  and their ticket references updated by hand; only git history uses the old
+  numbering.
 - Provisionally withstand scrutiny (scouts, unverified; the `FileClassExpander`
   seam was overturned by ticket 20): `DatePoint`/`DifferenceEngine` and
   `DurationValue` nominal

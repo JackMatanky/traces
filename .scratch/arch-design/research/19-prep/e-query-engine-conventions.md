@@ -34,6 +34,7 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 ## 2. Row-by-Row Deep Dive & Precedent Analysis
 
 ### Row 1 & 2: Cross-Type Equality & Relational Ordering (`num == 'a'`, `num < 'a'`)
+
 - **SQL (Postgres, DuckDB, Polars):** Strongly typed engines reject cross-type comparisons with an error (`Conversion Error: Could not convert string 'a' to INT32` [V: DuckDB probe; PG: `42.8.2`]).
 - **SQLite:** Dynamic typing with storage class ordering (`NULL < INTEGER/REAL < TEXT < BLOB`). `42 == 'a'` is 0; `42 < 'a'` is 1 (`sqlite3.c:110243` [V: https://www.sqlite.org/datatype3.html]).
 - **MongoDB:** Dual regime:
@@ -43,6 +44,7 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 - **Traces Assessment:** Today Traces is in an incoherent hybrid state: `==` is strictly typed (`false`), but `<` leaks the internal rank table (`42 < "a"` is `true` [V: `src/query/grammar/filter.rs:807`, `a-code-inventory:162`]). Lean L1 eliminates the leak by adopting MongoDB-style **Type Bracketing** for filters (`<` across brackets evaluates to NoMatch/false), while reserving the rank table strictly for `SortKey`.
 
 ### Row 3 & 4: Null, Missing Fields, and Three-Valued Logic (3VL)
+
 - **SQL (Postgres, DuckDB, SQLite, MySQL):** Strict 3-valued logic. `NULL != 'a'`, `NULL = NULL`, and `NULL < 5` all evaluate to `NULL`, which is treated as falsy in `WHERE`. SQL requires explicit null-safe constructs (`IS NULL`, `IS DISTINCT FROM`).
 - **Document / PKM (MongoDB, Dataview, jq, Nushell):** 2-valued complement logic.
   - In MongoDB find, `{ x: { $ne: 'a' } }` matches documents where `x` is null, missing, or any non-'a' type [V: `type-bracketing.md`].
@@ -51,6 +53,7 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 - **Traces Assessment:** Traces has always used 2-valued complement equality (`!=` is the exact boolean inverse of `==` [V: `src/query/grammar/filter.rs:792`]). In open-world markdown vaults, 3VL would cause severe user friction: `--filter 'status != "done"'` would drop every note that omitted the `status` field! Keeping 2-valued complement logic aligns Traces firmly with MongoDB, Dataview, jq, and Nushell.
 
 ### Row 5: Null Ordering in ORDER BY
+
 - **SQL Engines:** Split defaults:
   - PostgreSQL & DuckDB: `NULLS LAST` for ASC by default [V: `duckdb.org/docs/sql/query_syntax/orderby`].
   - SQLite & MySQL: `NULLS FIRST` for ASC (null is treated as the lowest value) [V: `sqlite.org/datatype3.html`].
@@ -58,11 +61,13 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 - **Traces Assessment:** Traces sorts `Null` lowest (`Null < Bool < Number...` [V: `src/query/sort.rs:428`]). Relational operators in filters poison Null (always false [V: `src/query/grammar/filter.rs:802`]). Lean L1 keeps this cleanly: Null sorts lowest, but never matches relational filter predicates.
 
 ### Row 6: Law of Excluded Middle (`NOT (x < 5)` vs `x >= 5`)
+
 - In SQL 3VL, the law is broken because `NULL` yields `NULL` for both.
 - In MongoDB find queries, **Type Bracketing breaks the law across types**: if `x` is `"hello"`, `{ x: { $lt: 5 } }` is false, `{ x: { $gte: 5 } }` is false, but `{ x: { $not: { $lt: 5 } } }` is TRUE [V: `type-bracketing.md`].
 - Under Traces Lean L1, Traces **matches MongoDB**: if `due` is string `"tomorrow"`, `due < 2025-01-01` is false, and `due >= 2025-01-01` is false (cross-bracket relational no-match). Therefore `NOT (due < 2025-01-01)` evaluates to `NOT false` = `true`. This asymmetry is an inevitable consequence of type bracketing in a 2-valued filter engine.
 
 ### Row 7 & 8: Numbers, Floats, and NaN / Infinity
+
 - **Int vs Float:** PostgreSQL, SQLite, DuckDB, CEL, MongoDB, and Polars all equate exact integer and float values (`1 == 1.0` is true [V: live DuckDB/SQLite/Polars probes]). SQLite uses `sqlite3IntFloatCompare` to compare 64-bit ints and doubles without loss of precision [V: `sqlite3.c:110052`]. CEL specifies heterogeneous numeric equality across `int`, `uint`, and `double` [V: `cel-spec/doc/langdef.md`].
 - **NaN Handling:**
   - PostgreSQL & DuckDB treat `NaN = NaN` as `true` and sort NaN higher than all other numbers to allow B-tree indexing [V: PG doc `8.1.3`, live DuckDB probe].
@@ -71,6 +76,7 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 - **Traces Assessment:** Lean L3 proposes exact integer/float comparison outside derived `PartialEq`, adopting SQLite's exact numeric comparison. Rejecting NaN to `Null` at ingestion mirrors SQLite's battle-tested policy and removes IEEE non-reflexivity from queries.
 
 ### Row 9 & 10: Temporals and Nominal Duration Equivalence
+
 - **Date vs DateTime / Zones:**
   - PostgreSQL and DuckDB promote `date` to `timestamp` at `00:00:00`. When comparing naive `timestamp` with `timestamptz`, both engines interpret the naive timestamp in the session's local `TimeZone` [V: PG doc `9.9.2`].
   - Polars strictly forbids comparing naive and timezone-aware datetimes (`ComputeError`) [V: Polars doc].
@@ -83,14 +89,17 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
   - Traces Lean L7 aligns with DuckDB and Dataview: nominal seconds (`1mo == 30d`, `1y == 365d`) for comparison and sorting, while calendar arithmetic uses Jiff spans.
 
 ### Row 11: String Collation
+
 - PostgreSQL defaults to database collation (libc or ICU). SQLite and DuckDB default to byte-for-byte `memcmp` (binary) [V: `sqlite.org/datatype3.html`]. MySQL defaults to `utf8mb4_0900_ai_ci` (Unicode UCA, case/accent-insensitive).
 - Lean L8 adopts Unicode-based sorting (NFC normalization, case-folded primary sort, byte tie-break) over raw byte order, matching desktop expectations (Nushell, Dataview) while avoiding host libc dependencies.
 
 ### Row 12 & 13: Array Semantics and Empty String Conflation
+
 - **Multi-Valued Arrays:** MongoDB and Elasticsearch automatically treat `field = scalar` as an any-element match (`{ tags: "rust" }` matches `["rust", "db"]` [V: Mongo doc `type-bracketing.md`]). SQL engines (Postgres, DuckDB) reject scalar equality and require `scalar = ANY(tags)` or `contains` [V]. Dataview supports both auto-unwrapping and `contains()`. Traces uses a dedicated `contains` operator/function [V: `src/note/field.rs:434`], avoiding ambiguity between whole-array equality and element membership.
 - **Empty String vs NULL:** Oracle SQL conflates empty string with NULL. PostgreSQL, SQLite, DuckDB, MySQL, MongoDB, and jq strictly distinguish them. Traces currently coerces empty frontmatter strings to `NoteFieldValue::Null` at parse [V: `src/note/field.rs:551`]. This Oracle-style conflation is justified in markdown frontmatter where `key:` and `key: ""` both signify "no value".
 
 ### Row 14 & 15: Literal Sniffing and GROUP BY
+
 - **Literal Sniffing:** Relational databases resolve untyped string literals based on the target column schema (e.g., PostgreSQL `unknown` literal resolution [V: PG doc `10.1`]). Traces lacks a mandatory schema, so it sniffs quoted string literals in filters (`filter.rs:238` [V]).
 - **GROUP BY:** In PostgreSQL, DuckDB, SQLite, and MongoDB, `1` and `1.0` group into the same bucket [V: live DuckDB probe]. Traces Lean L3 ensures `Int(1)` and `Float(1.0)` group together by evaluating equality via the semantic comparator.
 
@@ -125,6 +134,7 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 ## 4. Adversarial Stress-Tests: Where the Leans Fail
 
 ### Stress-Test 1: Filter Type Bracketing (L1) Breaks Law of Excluded Middle
+
 - *Scenario:* User queries notes with `--filter 'due >= 2025-01-01'` vs `--filter 'NOT (due < 2025-01-01)'`.
 - *Failure Mode:* Note A has `due: "someday"` (String). Note B has `due: null` (Null).
   - Under `due >= 2025-01-01`: Note A is NoMatch (false). Note B is NoMatch (false).
@@ -132,23 +142,26 @@ Columns: **PG** (PostgreSQL 16), **LT** (SQLite 3.45), **DK** (DuckDB 1.1), **MY
 - *Verdict:* The complement of a bracketed comparison includes ALL out-of-bracket values and NULLs. SQL users expect `NOT (a < b)` to equal `a >= b`. In Traces, this identity fails [H].
 
 ### Stress-Test 2: Frontmatter Quoted String Escape (L5) vs Noyalib 0.0.53 Constraints
+
 - *Scenario:* User writes `title: "2025-01-15"` in frontmatter expecting it to remain a string.
-- *Failure Mode:* In Noyalib 0.0.53, `ScalarStyle` is private (`pub(crate)` in `scanner.rs:21` [V: `brief.md:41`]). Both `title: "2025-01-15"` and `title: 2025-01-15` produce identical `noyalib::Value::String`. Ticket 14 demonstrated that Noyalib drops YAML tags (`!!str`) to plain values and `span_at` is unsound for complex keys [V: `14:468-470`].
+- *Failure Mode:* In Noyalib 0.0.53, `ScalarStyle` is private (`pub(crate)` in `scanner.rs:21` [V: `brief.md:41`]). Both `title: "2025-01-15"` and `title: 2025-01-15` produce identical `noyalib::Value::String`. Ticket 18 demonstrated that Noyalib drops YAML tags (`!!str`) to plain values and `span_at` is unsound for complex keys [V: `18:468-470`].
 - *Verdict:* Lean L5 is logically sound but **mechanically blocked** without either a custom frontmatter parser pass, a lazy CST consult, or schema-driven field typing.
 
 ### Stress-Test 3: Date vs DateTime Midnight Instant in Civil Model (L4)
+
 - *Scenario:* Note has `time: 2026-07-29T00:00:00` (naive midnight). Query filters by `date == 2026-07-29`.
 - *Failure Mode:* If `time` is civil and `date` is civil midnight, they match. But if the note specifies `time: 2026-07-29T00:00:00Z` (instant) and query runs in a timezone at UTC+2, local midnight is `2026-07-28T22:00:00Z`. The calendar date no longer contains the instant!
 - *Verdict:* Cross-kind equality between `Date` and `DateTime` depends on whether the datetime is civil or instant, and requires defining whether `date == instant` means "instant falls within the 24 hours of that calendar day in context zone" or "exact instant equals context local midnight" [P].
 
 ### Stress-Test 4: Link Equality Ignoring Display Text (L6)
+
 - *Scenario:* User has notes linking `[[Alice|Dr. Smith]]` and `[[Alice|CEO]]`.
 - *Failure Mode:* If equality checks only canonical target, `--filter 'link == "[[Alice|Dr. Smith]]"'` matches `[[Alice|CEO]]`.
 - *Verdict:* Acceptable if display is exposed as a queryable sub-attribute (`link.display`), but surprising if the query literal explicitly included an alias.
 
 ---
 
-## 5. Implications for Ticket 15
+## 5. Implications for Ticket 19
 
 Mapping findings to leans L1–L8:
 
@@ -161,7 +174,7 @@ Mapping findings to leans L1–L8:
 - **L4 (Civil Model for Naive Datetimes, Context Zone for Instants): KEEP, with calendar containment rule.**
   - *Refinement:* Naive datetimes are stored as civil (no zone shift in postcard cache). When comparing `Date` to an instant `DateTime`, the comparison must evaluate via the query execution context's explicit timezone. Define `Date == DateTime` strictly as: instant falls within the `[start_of_day, end_of_day)` interval of the Date in the context timezone.
 - **L5 (Quoted Frontmatter Scalars Stay Strings): REFINE mechanism requirement.**
-  - *Refinement:* Lean L5 cannot be achieved via Noyalib 0.0.53 AST alone. Mandate one of two concrete implementation paths: (a) evaluate the lazy CST consult for date/duration-shaped plain strings, or (b) defer quote-preservation to Ticket 16 schema typing (`type = "string"`), leaving frontmatter sniffing quote-insensitive in the zero-config fallback.
+  - *Refinement:* Lean L5 cannot be achieved via Noyalib 0.0.53 AST alone. Mandate one of two concrete implementation paths: (a) evaluate the lazy CST consult for date/duration-shaped plain strings, or (b) defer quote-preservation to Ticket 20 schema typing (`type = "string"`), leaving frontmatter sniffing quote-insensitive in the zero-config fallback.
 - **L6 (Link Equality on Folded Target + Subpath Only): KEEP unchanged.**
   - *Refinement:* Canonical equality and ordering compare folded `target` and `subpath` only (reusing `ComparisonKey`). `display` and `embedded` remain queryable record attributes (`link.display`, `link.embedded`).
 - **L7 (Nominal Duration Equivalence: 1mo == 30d, 1y == 365d): KEEP unchanged.**

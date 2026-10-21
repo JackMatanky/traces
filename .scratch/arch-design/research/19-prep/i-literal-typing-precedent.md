@@ -19,12 +19,15 @@
 ## 2. PostgreSQL Untyped Literal (`unknown`) Resolution Engine
 
 ### 2.1 The `unknown` Pseudo-Type (Manual 10.1)
+
 - String literals without explicit type syntax (e.g. `'abc'`, `'2025-01-15'`, but not `DATE '2025-01-15'`) are initially assigned the pseudo-type `unknown` [V: https://www.postgresql.org/docs/current/typeconv-overview.html].
 - Constants of non-string non-numeric types (dates, timestamps, intervals, json) begin lexical life as `unknown` strings [V: 10.1].
 - Data types are partitioned into type categories (`string`, `numeric`, `datetime`, `timespan`, `boolean`, etc.) with designated *preferred types* (e.g., `text` for string, `float8` for numeric) [V: 10.1].
 
 ### 2.2 Operator & Function Type Resolution (Manual 10.2 & 10.3)
+
 Given binary expression `LHS <op> RHS` [V: https://www.postgresql.org/docs/current/typeconv-oper.html]:
+
 - **Step 1:** Lookup candidate operators by name and argument count visible in search path.
 - **Step 2 (Exact Match & Unknown Pair Rule):**
   - **Step 2.a:** If exactly one argument is `unknown`, **assume it is the same type as the other argument** for this check. If an exact operator matches `(T, T)`, use it! (Invocations with two `unknown` inputs never match at Step 2) [V: 10.2.2.a].
@@ -37,6 +40,7 @@ Given binary expression `LHS <op> RHS` [V: https://www.postgresql.org/docs/curre
   - **Step 3.f:** If both `unknown` and known arguments exist and all known have type `T`, assume `unknown` is `T` [V: 10.2.3.f].
 
 ### 2.3 UNION, CASE, and ARRAY Constructs (Manual 10.5)
+
 - All inputs are matched to find a single common supertype [V: https://www.postgresql.org/docs/current/typeconv-union-case.html]:
   - If all inputs are `unknown`, resolve as `text` (preferred string type) [V: 10.5.3].
   - Otherwise, `unknown` inputs are ignored while finding the candidate type among non-unknown inputs [V: 10.5.3].
@@ -55,6 +59,7 @@ Given binary expression `LHS <op> RHS` [V: https://www.postgresql.org/docs/curre
 | `ts_col > 'today'` / `'now'` | `timestamp`| `unknown` | `timestamp_in` recognizes special strings: `today`, `yesterday`, `now`, `epoch`, `infinity`. | Replaced at parse time with current date/time/infinity [V] |
 
 ### 2.5 Error vs False, Static Plan-Time Binding, and Prepared Statements
+
 - **Fatal Error vs False:** PostgreSQL **never** evaluates an invalid literal conversion to `false`. Literal parsing errors (`date_in`, `int4in`) abort transaction execution with a fatal error [V].
 - **One Resolution Per Query:** Resolution occurs strictly in the parser/planner (`parse_analyze.c`) using static catalog metadata (`pg_attribute`, `pg_type`, `pg_operator`) [V]. The executor runs compiled, monomorphic plan nodes (`OpExpr`, `Const`). It is **structurally impossible** for an operator in PostgreSQL to alter its types per row [V].
 - **Prepared Statement Parameter Inference (`$1`):** In `PREPARE p AS SELECT * FROM t WHERE date_col = $1`, `$1` is typed as `unknown` [V: https://www.postgresql.org/docs/current/sql-prepare.html]. The parser infers `$1`'s type as `date` via Step 2.a. If `$1` appears in ambiguous context (`SELECT $1`), prepare fails: `ERROR: could not determine data type of parameter $1` [V].
@@ -97,7 +102,9 @@ Given binary expression `LHS <op> RHS` [V: https://www.postgresql.org/docs/curre
 ## 4. Adapting PostgreSQL's Rule to Dynamic, Open-World PKM (Traces)
 
 ### 4.1 The Fundamental Impedance Mismatch
+
 In PostgreSQL, type resolution succeeds because the schema guarantees that `date_col` is monomorphic across all rows. In Traces, notes are open-world:
+
 - In Note 1: `due: 2025-01-15` (`Date`)
 - In Note 2: `due: "tbd"` (`String`)
 - In Note 3: `due: null` (`Null`)
@@ -108,6 +115,7 @@ If Traces adopts a "per-row literal adaptation" rule, it violates PostgreSQL's f
 ### 4.2 Five Design Variants & Their Failure Modes
 
 #### Variant 1 (V1): Per-Row Adoption with Fallback to String (Proposal Q11)
+
 - *Mechanism:* For each row, inspect LHS kind `K`. If literal string parses as `K`, compare as `K`. If it fails to parse as `K`, it stays `String`.
 - *Failure Modes:*
   1. **Silent Typo Poisoning:** User queries `due < "2025-02-30"`. Feb 30 fails date parsing. It falls back to `String`. Under Type Bracketing (Lean L1), `Date < String` evaluates to `false` (relational no-match). The query **silently returns 0 results** with no error [V, H].
@@ -115,11 +123,14 @@ If Traces adopts a "per-row literal adaptation" rule, it violates PostgreSQL's f
   3. **`!=` Inversion Trap:** In Note 1 (`due` is Date), user queries `due != "tbd"`. `"tbd"` cannot parse as Date -> falls back to String -> `Date == String` is false -> `Date != String` evaluates to `true`. While seemingly benign, `due != "2025-01-15"` on Note 2 (`due: "tbd"`) evaluates `String != String` -> `true`.
 
 #### Variant 2 (V2): Adoption Only When Other Operand is a Bare Field Path
+
 - *Mechanism:* Restricts V1 so adaptation only occurs if the operand is `FieldPath == Literal`.
 - *Failure Modes:* Same silent typo poisoning as V1. Fails unpredictably when user wraps field in an expression: `due == "2025-01-15"` adapts, but `date_add(due, "0d") == "2025-01-15"` does not!
 
 #### Variant 3 (V3): Build-Time Polymorphic Literal (`PolymorphicLiteral`) [RECOMMENDED FOR ADAPTATION]
+
 - *Mechanism:* When compiling the query filter AST, the literal string is parsed **once** into all candidate representations:
+
   ```rust
   struct PolymorphicLiteral {
       raw: String,
@@ -130,6 +141,7 @@ If Traces adopts a "per-row literal adaptation" rule, it violates PostgreSQL's f
       link: Option<LinkTarget>,
   }
   ```
+
   During per-row evaluation:
   - If LHS is `Date`: check `literal.date`. If `Some(d)`, compare `lhs == d`. If `None`, evaluate cross-bracket (false).
   - If LHS is `Duration`: check `literal.duration`.
@@ -137,10 +149,12 @@ If Traces adopts a "per-row literal adaptation" rule, it violates PostgreSQL's f
 - *Advantages:* Zero per-row allocation; zero re-parsing; build-time diagnostics (can emit warning if a literal matches regex `^\d{4}-\d{2}-\d{2}$` but is an invalid calendar day).
 
 #### Variant 4 (V4): Bind-Time Inference from Schema Definition
+
 - *Mechanism:* Relies on `traces.toml` schema declarations. If `due` is declared `date`, bind literal to `Date` at plan time.
 - *Failure Modes:* Markdown vaults are predominantly schema-free (zero-config). V4 is unusable for un-schematized vaults.
 
 #### Variant 5 (V5): Strict Typed Literals + Bare ISO Only (No String Adaptation)
+
 - *Mechanism:* Bare unquoted ISO text (`2025-01-15`, `src/query/grammar/filter.rs:1216`) tokenizes as typed `Date`. Quoted strings (`"2025-01-15"`) are **strictly strings**. Explicit functions `date("2025-01-15")`, `dur("1h")`, `link("Alpha")` construct typed values.
 - *Failure Modes:* Breaks existing user habits and Traces integration tests where users wrote `file.mtime >= "2026-01-01"` (`filter.rs:1596`) [V].
 
@@ -190,14 +204,16 @@ If Traces adopts a "per-row literal adaptation" rule, it violates PostgreSQL's f
 
 ---
 
-## 5. Implications for Ticket 15
+## 5. Implications for Ticket 19
 
 ### 5.1 The Alignment of Q10 (`string()`) and Q11 (Literal Adaptation)
+
 The user's critique asked: *If literals adapt, why is `string()` needed?*
-1. **Frontmatter vs Query Seam:** Frontmatter classification is quote-insensitive (Ticket 14: lines 501-502) [V]. A note with `title: "2025-01-15"` has `NoteFieldValue::Date` in the index [V]. If a user wants to run string operations on that title (`string(title).contains("2025")` or regex match), `string(title)` is required to convert the **stored note field**, not the query literal! [P]
+
+1. **Frontmatter vs Query Seam:** Frontmatter classification is quote-insensitive (Ticket 18: lines 501-502) [V]. A note with `title: "2025-01-15"` has `NoteFieldValue::Date` in the index [V]. If a user wants to run string operations on that title (`string(title).contains("2025")` or regex match), `string(title)` is required to convert the **stored note field**, not the query literal! [P]
 2. **Literal Disambiguation Escape:** If a user queries a heterogeneous field and explicitly wants to match ONLY string values (preventing literal adaptation to Date), writing `v == string("2025-01-15")` forces the literal into a strict, non-adapting `String` [P]. This precisely mirrors PostgreSQL's `'2025-01-15'::text` [V].
 
-### 5.2 Decision-Ready Options for Ticket 15
+### 5.2 Decision-Ready Options for Ticket 19
 
 - **Option A (Status Quo Sniffing - Reject):** Keep `ComparisonExpr::classify_literal` (`filter.rs:238`). Unconditionally converts quoted `"2025-01-15"` into `Date`.
   *Why reject:* Causes severe bugs where `title == "2025-01-15"` fails on notes where `title` is a string (e.g. from inline fields `title:: "2025-01-15"` or schema `type = string`).
@@ -206,7 +222,8 @@ The user's critique asked: *If literals adapt, why is `string()` needed?*
 - **Option C (Strict Bases/Dataview Model V5):** Bare ISO `2025-01-15` is Date; quoted `"2025-01-15"` is strictly String. Explicit functions `date(...)` and `dur(...)` required for quoted temporals.
   *Why consider:* Purest theoretical model, zero ambiguity. Costs breaking existing test idioms and queries with quoted dates.
 
-### 5.3 Concrete Recommendation for Ticket 15
+### 5.3 Concrete Recommendation for Ticket 19
+
 1. **Adopt Option B (Variant 3: Build-Time Polymorphic Literal):** Replace `ComparisonExpr::classify_literal` with build-time multi-representation binding. When a string literal parses as Date/DateTime/Duration/Link, store those parsed values in the literal AST node. In filter evaluation, compare against the representation corresponding to the LHS operand's kind.
 2. **Retain Bare ISO Date Syntax:** Bare ISO dates (`due >= 2025-01-01`) remain first-class typed Date literals (`FilterToken::DateLiteral`).
 3. **Retain Explicit Cast Functions:** Provide `date(x)`, `dur(x)`, and `string(x)`. Explicit `string(lit)` suppresses polymorphic adaptation.

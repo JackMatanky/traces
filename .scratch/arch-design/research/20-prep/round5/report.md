@@ -1,4 +1,4 @@
-# Ticket 16 round 5: claim checks and harness-independent guardrails
+# Ticket 20 round 5: claim checks and harness-independent guardrails
 
 Inputs: `N-noyalib.md`, `R1-ecosystem-claims.md`, `R2-spec-claims.md`,
 `G1-harness-capabilities.md`, `G2-mechanism-catalogue.md`. Tags: [V] read at
@@ -114,7 +114,7 @@ watermark plus the set of violation keys `(field, code, hash(value))` at the
 last check gives a delta without git. Cost: a second derived store outside the
 index and its fingerprint (schema must stay out of the index). Alternative with
 no store: report all violations of changed notes with no delta. Ownership:
-tickets 20, 21 and 27; 16 only requires that the contract can take a stored
+tickets 24, 25 and 31; 20 only requires that the contract can take a stored
 baseline as `before`.
 
 Stance for the Answer: "the portable guarantee is detect and feed back;
@@ -131,6 +131,6 @@ configured to deny native writes."
 
 ## 6. Outcome
 
-Folded into [ticket 16's Answer](../../../issues/20-schema-note-typing-and-validation.md)
+Folded into [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md)
 (agent guardrail): hooks withdrawn as a design basis, tiered channels, MCP gate
 strength rule, rejected mechanisms.

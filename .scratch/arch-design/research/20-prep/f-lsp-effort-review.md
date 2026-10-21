@@ -1,7 +1,7 @@
-# Prior LSP effort review (md-pkm-lsp) for arch-design ticket 16
+# Prior LSP effort review (md-pkm-lsp) for arch-design ticket 20
 
-Exhaustive audit of `.scratch/md-pkm-lsp/` (tickets 08, 10, 11, 14, 19, 20, 21, 22, 23, 25, 26, 33, 40, 41; map.md; research files 20, 25, 26, 39, 40) against current codebase and arch-design tickets 12–15.
-Tags: [V] verified against cited file:line; [H] inference; [P] proposal for ticket 16.
+Exhaustive audit of `.scratch/md-pkm-lsp/` (tickets 08, 10, 11, 14, 19, 20, 21, 22, 23, 25, 26, 33, 40, 41; map.md; research files 20, 25, 26, 39, 40) against current codebase and arch-design tickets 16–19.
+Tags: [V] verified against cited file:line; [H] inference; [P] proposal for ticket 20.
 
 ---
 
@@ -10,9 +10,9 @@ Tags: [V] verified against cited file:line; [H] inference; [P] proposal for tick
 ### (a) Schema validation and typing
 
 - **Frontmatter-only runtime validation [V `issues/20:18` (Q1)]**: DECIDED in ticket 20. Validates type-correctness, range/select/date, required, and multi flags on frontmatter fields only. No inline fields (Q20), no file-existence checks (Q15).
-- **Advisory severity calibration [V `issues/20:27-30` (Q2, Q6, Q11, Q12)]**: DECIDED in 20, AMENDED by 25 (`issues/25:27, 40`). Missing required = Error; type mismatch = Error; invalid select = Warning; list on non-multi = Warning; unknown class with close match = Warning; unknown field without close match = Information; unknown field with typo = Warning (Q2). SUPERSEDED in part by ticket 15 error-mode principle (advisory, never gating; casts fail to Null).
+- **Advisory severity calibration [V `issues/20:27-30` (Q2, Q6, Q11, Q12)]**: DECIDED in 20, AMENDED by 25 (`issues/25:27, 40`). Missing required = Error; type mismatch = Error; invalid select = Warning; list on non-multi = Warning; unknown class with close match = Warning; unknown field without close match = Information; unknown field with typo = Warning (Q2). SUPERSEDED in part by ticket 19 error-mode principle (advisory, never gating; casts fail to Null).
 - **Date validation [V `issues/20:20` (Q16)]**: DECIDED in 20. Syntax parseability only via `chrono`, not `jiff`; ignores schema format string (`YYYY-MM-DD`). CONFLICTS with temporal roadmap and real-vault strftime formats.
-- **Select matching [V `issues/20:28` (Q6)]**: DECIDED in 20. Empty list = skip constraint; non-empty list = strict case-sensitive match. SUPERSEDED by ticket 15 adaptive literals (`issues/15:43-45`).
+- **Select matching [V `issues/20:28` (Q6)]**: DECIDED in 20. Empty list = skip constraint; non-empty list = strict case-sensitive match. SUPERSEDED by ticket 19 adaptive literals (`issues/19:43-45`).
 
 ### (b) Completion, hover, and go-to-definition from schema
 
@@ -76,28 +76,28 @@ Tags: [V] verified against cited file:line; [H] inference; [P] proposal for tick
 - **Severity tiers [V `issues/20:27-30`]**: Error (MissingRequired, TypeMismatch); Warning (InvalidSelect, ListOnNonMulti, UnknownField with typo, UnknownClass); Information (UnknownField without typo).
 - **Q1–Q20 summary**: Q1 frontmatter-only; Q2 two-tier unknown field (canonical match skips); Q3 go-to-def to schema TOML; Q4 file-field completion cap 100; Q5 hover with metadata/suggested-unset; Q6 three-tier select (empty=skip); Q7 frontmatter spans parallel map; Q8 `origin: Option<SchemaName>` on `SchemaFieldDef`; Q9 timing on-open/change/save; Q10/13/17/19 `description: Option<String>` on field defs; Q11 enforce `multi: false`; Q12 single source + code; Q14 config emission gate; Q15 file fields type-only; Q16 date ISO-parseability via chrono; Q18 standalone validator fn; Q20 defer inline fields.
 
-### Critical audit against arch-design decisions 12–15
+### Critical audit against arch-design decisions 16–19
 
-1. **Value model conflict (ticket 14) [V `issues/14:31-37`]**:
-   - Ticket 14 established `NoteFieldValue::Int(i64)` and `Float(f64)`, schema-local literal type for schema options (strings stay strings, native TOML dates stay strings), and NO `FieldValue` in schema.
+1. **Value model conflict (ticket 18) [V `issues/18:31-37`]**:
+   - Ticket 18 established `NoteFieldValue::Int(i64)` and `Float(f64)`, schema-local literal type for schema options (strings stay strings, native TOML dates stay strings), and NO `FieldValue` in schema.
    - Ticket 20's validator assumed `SchemaFieldType::Number` checked against a single `Number(f64)` or `FieldValue::Number`. With `Int` vs `Float`, schema needs to know whether `number` allows both or distinguishes integers (e.g. `step: 1.0` vs integer counts).
-   - Ticket 14 decided select options that name links are interpreted as links ONLY at consumer boundary with shared wikilink parser. Ticket 20 Q6 strictly checked string equality against `select_values()` — this would falsely flag `[[target]]` note fields as `InvalidSelect`!
-2. **Coercion & adaptive literals conflict (ticket 15) [V `issues/15:41-46`]**:
-   - Ticket 15 established adaptive literals: a select string matches a note `Link` value by adopting the folded link target. Ticket 20's `validate` had zero concept of adaptive literal matching.
-   - Ticket 15 established the error-mode principle: coercion failures are advisory, never gating; filters never error. Ticket 20 calibrated `TypeMismatch` as hard Error; under ticket 15, mismatched types fail to Null or produce advisory diagnostics, but never abort processing.
-   - Frontmatter classification is schema-free and quote-insensitive. Ticket 16 decides whether schema can override date inference back to text. Ticket 20 had no mechanism for schema overrides during parsing — it only evaluated post-parse `NoteFieldValue`.
-3. **Compatibility envelope visibility rule (ticket 12) [V `issues/12:16`]**:
-   - Ticket 12 mandates reducing `pub`; `pub` only for outward-facing components.
-   - Ticket 20 made `SchemaValidator`, `SchemaDiagnostic`, `SchemaFieldDef.origin`, `SchemaFieldDef.description`, and `Frontmatter.spans` completely `pub`. If schema validation is internal to core/LSP, leaking these types into the public crate API violates ticket 12.
-4. **Ticket 13 reopening of spans [V `issues/13:17-18`]**:
-   - Ticket 13 explicitly reopened whether `Note` should split into an editor representation (with spans) and an indexed representation (spanless).
+   - Ticket 18 decided select options that name links are interpreted as links ONLY at consumer boundary with shared wikilink parser. Ticket 20 Q6 strictly checked string equality against `select_values()` — this would falsely flag `[[target]]` note fields as `InvalidSelect`!
+2. **Coercion & adaptive literals conflict (ticket 19) [V `issues/19:41-46`]**:
+   - Ticket 19 established adaptive literals: a select string matches a note `Link` value by adopting the folded link target. Ticket 20's `validate` had zero concept of adaptive literal matching.
+   - Ticket 19 established the error-mode principle: coercion failures are advisory, never gating; filters never error. Ticket 20 calibrated `TypeMismatch` as hard Error; under ticket 19, mismatched types fail to Null or produce advisory diagnostics, never abort processing.
+   - Frontmatter classification is schema-free and quote-insensitive. Ticket 20 decides whether schema can override date inference back to text. Ticket 20 had no mechanism for schema overrides during parsing — it only evaluated post-parse `NoteFieldValue`.
+3. **Compatibility envelope visibility rule (ticket 16) [V `issues/16:16`]**:
+   - Ticket 16 mandates reducing `pub`; `pub` only for outward-facing components.
+   - Ticket 20 made `SchemaValidator`, `SchemaDiagnostic`, `SchemaFieldDef.origin`, `SchemaFieldDef.description`, and `Frontmatter.spans` completely `pub`. If schema validation is internal to core/LSP, leaking these types into the public crate API violates ticket 16.
+4. **Ticket 17 reopening of spans [V `issues/17:17-18`]**:
+   - Ticket 17 explicitly reopened whether `Note` should split into an editor representation (with spans) and an indexed representation (spanless).
    - Ticket 20 hardcoded spans directly into `Frontmatter` via `#[serde(skip)] spans`, which was later caught in ticket 40 as part of the Option A type-system lie.
 
 ### Stale assumptions & discrepancies
 
 - **`chrono` vs `jiff` [V `issues/20:20`, `research/20:71`]**: Research 20 recommended `jiff 0.2.37` (`research/20:71`), but Q16 picked `chrono` solely because "chrono is already in codebase" (`issues/20:20`). Traces is actively moving toward `jiff`/temporal-core; ticket 20's chrono ISO-only syntax assumption is stale.
 - **`serde_yaml` [V `issues/19:28`, `issues/20:45`]**: Ticket 20 treated `serde_yaml`'s lack of spans as a blocker requiring line-offset re-scanning. In the current tree, `noyalib` is ALREADY the parser (`src/note/metadata.rs:58`), but `RawFrontmatter::parse` discards `Spanned<T>` and drops all spans.
-- **`FieldValueRef` [V `src/note/metadata.rs:71`]**: Current code still references `FieldValueRef`, but ticket 14 eliminated the borrowed mirror.
+- **`FieldValueRef` [V `src/note/metadata.rs:71`]**: Current code still references `FieldValueRef`, but ticket 18 eliminated the borrowed mirror.
 - **`required` semantics [V `issues/20:18`]**: Q1 treats `NoteFieldValue::Null` as missing. But in YAML frontmatter, an explicit `key: null` or `key: ~` parses as `NoteFieldValue::Null`, whereas an omitted key is absent from the map. Both are reported as `MissingRequired`, but have different diagnostics in LSP tooling.
 - **Date `format` in real vaults [V `brief.md:41`, `issues/20:20`]**: Q16 claimed schema format strings (`YYYY-MM-DD`) don't match chrono formats (`%Y-%m-%d`) and should be ignored. But in the author's real vault (`examples/.traces/schemas/`), 14 schemas explicitly declare strftime formats (`%Y-%m-%d`, `%Y-%m-%dT%H:%M`, `%H:%M`, `%Y`). Q16 completely ignored actual vault practice!
 
@@ -146,38 +146,38 @@ Tags: [V] verified against cited file:line; [H] inference; [P] proposal for tick
 
 | Feature | Schema data needed | Exists today? | Which arch-design ticket owns it |
 |---|---|---|---|
-| **Select value completion** | `SchemaFieldDef::select_values()` | **Yes** [V `src/schema/fields/select.rs:40`] | Ticket 14 (value model literal type), Ticket 16 (typing/completion) |
-| **File-field completion** | `SchemaFileFieldRef` (filters: `folders`, `ext`, `class`) + index lookup | **Yes** [V `src/schema/fields/file.rs:42-53`], no completion handler | Ticket 16 (schema query filter), Ticket 30 (LSP completion) |
-| **Hover on FileClass / field** | `Schema::fields()`, `origin`, `description`, `parent_order` | **Partial**: `fields()` exists; `origin`, `description`, `parent_order` do NOT [V `src/schema/fields.rs:52`] | Ticket 16 (schema field metadata & inheritance) |
-| **Go-to-definition** | Path `{schema_dir}/{name}.toml`, `origin: Option<SchemaName>` | **Partial**: config path exists; `origin` does NOT [V `src/schema/fields.rs:52`] | Ticket 16 (schema metadata) |
-| **Typo suggestions (`suggest_field`)** | Canonical match + Levenshtein distance against schema fields | **Yes** [V `src/schema/service.rs:252` (`suggest_field`)] | Ticket 16 (visibility / service facade) |
-| **Typo suggestions (`suggest_class`)** | Fuzzy match over schema registry names | **No** (proposed in `issues/21:56`) | Ticket 16 (service helper) |
-| **Inheritance chain display** | `parent_order: Vec<SchemaName>` (ordered topological resolution) | **No** (`extends: Vec<SchemaName>` exists, but not resolved order) | Ticket 16 (schema model) |
-| **Field provenance (`origin`)** | `origin: Option<SchemaName>` on `SchemaFieldDef` | **No** [V `src/schema/fields.rs:52`] | Ticket 16 (schema builder stamping) |
-| **Field documentation (`description`)** | `description: Option<String>` on resolved & raw field defs | **No** [V `src/schema/raw.rs:51`] | Ticket 16 (raw & resolved schema AST) |
+| **Select value completion** | `SchemaFieldDef::select_values()` | **Yes** [V `src/schema/fields/select.rs:40`] | Ticket 18 (value model literal type), Ticket 20 (typing/completion) |
+| **File-field completion** | `SchemaFileFieldRef` (filters: `folders`, `ext`, `class`) + index lookup | **Yes** [V `src/schema/fields/file.rs:42-53`], no completion handler | Ticket 20 (schema query filter), Ticket 34 (LSP completion) |
+| **Hover on FileClass / field** | `Schema::fields()`, `origin`, `description`, `parent_order` | **Partial**: `fields()` exists; `origin`, `description`, `parent_order` do NOT [V `src/schema/fields.rs:52`] | Ticket 20 (schema field metadata & inheritance) |
+| **Go-to-definition** | Path `{schema_dir}/{name}.toml`, `origin: Option<SchemaName>` | **Partial**: config path exists; `origin` does NOT [V `src/schema/fields.rs:52`] | Ticket 20 (schema metadata) |
+| **Typo suggestions (`suggest_field`)** | Canonical match + Levenshtein distance against schema fields | **Yes** [V `src/schema/service.rs:252` (`suggest_field`)] | Ticket 20 (visibility / service facade) |
+| **Typo suggestions (`suggest_class`)** | Fuzzy match over schema registry names | **No** (proposed in `issues/21:56`) | Ticket 20 (service helper) |
+| **Inheritance chain display** | `parent_order: Vec<SchemaName>` (ordered topological resolution) | **No** (`extends: Vec<SchemaName>` exists, but not resolved order) | Ticket 20 (schema model) |
+| **Field provenance (`origin`)** | `origin: Option<SchemaName>` on `SchemaFieldDef` | **No** [V `src/schema/fields.rs:52`] | Ticket 20 (schema builder stamping) |
+| **Field documentation (`description`)** | `description: Option<String>` on resolved & raw field defs | **No** [V `src/schema/raw.rs:51`] | Ticket 20 (raw & resolved schema AST) |
 
 ---
 
 ## 5. Architectural conflicts & invalid assumptions
 
-1. **Schema `FieldValue` vs schema-local literal type [V `issues/14:31-37`]**:
+1. **Schema `FieldValue` vs schema-local literal type [V `issues/18:31-37`]**:
    - Prior LSP effort assumed schema options used the general `FieldValue` type (dates, durations, numbers).
-   - Ticket 14 replaced schema `FieldValue` with a schema-local literal type: strings stay strings, native TOML dates stay strings. Schema does NOT own date/duration parsing.
-2. **Select-link adaptive literal matching [V `issues/15:43-45`]**:
+   - Ticket 18 replaced schema `FieldValue` with a schema-local literal type: strings stay strings, native TOML dates stay strings. Schema does NOT own date/duration parsing.
+2. **Select-link adaptive literal matching [V `issues/19:43-45`]**:
    - Prior LSP effort (ticket 20 Q6) assumed select values are strictly strings and matched case-sensitively against string note values.
-   - Ticket 15 established adaptive literals: a select string matches a note `Link` value by folding the link target. Mismatching string vs Link is NOT an error.
-3. **Error-mode principle vs hard Error severity [V `issues/15:46`, `issues/20:27-30`]**:
+   - Ticket 19 established adaptive literals: a select string matches a note `Link` value by folding the link target. Mismatching string vs Link is NOT an error.
+3. **Error-mode principle vs hard Error severity [V `issues/19:46`, `issues/20:27-30`]**:
    - Prior LSP effort classified `TypeMismatch` as hard Error.
-   - Ticket 15 established the error-mode principle: filters never error, explicit casts fail to Null, and type coercion failures produce advisory diagnostics, never gating or hard errors.
-4. **Visibility rules & crate boundary [V `issues/12:16`]**:
+   - Ticket 19 established the error-mode principle: filters never error, explicit casts fail to Null, and type coercion failures produce advisory diagnostics, never gating or hard errors.
+4. **Visibility rules & crate boundary [V `issues/16:16`]**:
    - Prior LSP effort casually made internal schema types `pub` (`SchemaValidator`, `SchemaDiagnostic`, `origin`, `description`).
-   - Ticket 12 mandates reducing `pub`; `pub` only for outward-facing components. Schema validation types must be scoped to `pub(crate)` or private within the schema/LSP boundary.
+   - Ticket 16 mandates reducing `pub`; `pub` only for outward-facing components. Schema validation types must be scoped to `pub(crate)` or private within the schema/LSP boundary.
 5. **YAML parsing & spans [V `issues/19:28-38`, `src/note/metadata.rs:58`]**:
    - Prior LSP effort assumed replacing `serde_yaml` with `noyalib` would immediately yield spans via `Spanned<T>`.
    - Current tree already uses `noyalib`, but `RawFrontmatter::parse` strips all positions and produces plain `IndexMap<FieldKey, NoteFieldValue>`.
 6. **Workspace split & sync core [V `map.md:27`, `issues/10:27-33`]**:
    - Prior LSP effort assumed single-crate synchronous core with `Arc<WorkspaceIndex>` swap cell and `tower-lsp-server` transport loop.
-   - Arch-design tickets 12–13 establish that LSP is a committed consumer, but core remains synchronous and independent.
+   - Arch-design tickets 16–17 establish that LSP is a committed consumer, but core remains synchronous and independent.
 
 ---
 
@@ -213,16 +213,16 @@ Ticket 22 established that templates CANNOT be executed for LSP analysis because
 
 ---
 
-## What this changes for ticket 16
+## What this changes for ticket 20
 
 1. **SchemaValidator is a pure value validator; spans are an adapter layer [P]**:
    Do NOT bake spans into `Schema` or `Frontmatter`. Define `SchemaValidator::validate(fields: &IndexMap<FieldKey, NoteFieldValue>, schema: &Schema) -> Vec<ValidationIssue>`. The LSP (or CLI) maps field keys to spans using whatever representation is in scope (`EditorNote` or on-demand AST scan). This cleanly supports both editor buffers and spanless indexed notes without type pollution.
 2. **Schema does NOT own note typing or coercion [P]**:
-   Frontmatter parsing stays schema-free (per ticket 15). Schema validation is an on-demand advisory pass producing diagnostics (per Research 03 and ticket 20). Coercion failures are advisory warnings, never gating.
+   Frontmatter parsing stays schema-free (per ticket 19). Schema validation is an on-demand advisory pass producing diagnostics (per Research 03 and ticket 20). Coercion failures are advisory warnings, never gating.
 3. **Adaptive literal matching must be honored in validation [P]**:
-   Select validation cannot be a naive string set lookup; it must allow `Link` values whose folded target matches a select option, per ticket 15.
+   Select validation cannot be a naive string set lookup; it must allow `Link` values whose folded target matches a select option, per ticket 19.
 4. **Template schema pre-check is completely novel [P]**:
-   Prior art has zero precedent for checking templates against schemas. If ticket 16 introduces template validation against schemas (e.g., verifying template frontmatter skeleton matches `fileClass`), it must be designed from scratch and cannot rely on runtime rendering.
+   Prior art has zero precedent for checking templates against schemas. If ticket 20 introduces template validation against schemas (e.g., verifying template frontmatter skeleton matches `fileClass`), it must be designed from scratch and cannot rely on runtime rendering.
 5. **Metadata extensions (`origin`, `description`, `parent_order`) belong to schema AST [P]**:
    If LSP go-to-def and hover are supported, `SchemaFieldDef` and `RawSchemaFieldDef` need `origin: Option<SchemaName>` and `description: Option<String>`, with manual `PartialEq` preserving semantic identity.
 6. **Diagnostics follow Scheme C [V `issues/25:28`]**:

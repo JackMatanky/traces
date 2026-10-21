@@ -54,6 +54,7 @@
 ## 2. Current Behavior by Question (Q1..Q11)
 
 ### Q1: Where does string -> Date/DateTime/Duration promotion live?
+
 - **Current Behavior:** Promotion is split across THREE uncoordinated seams [V]:
   1. *Frontmatter ingestion:* Two-stage pipeline: `FieldStringValue::classify` (`src/field.rs:843`) [V] sniffs ISO dates/datetimes into `FieldValueRef::Date`/`DateTime`. Then `From<FieldValueRef> for NoteFieldValue` (`src/note/field.rs:548-558`) [V] trims remaining strings and promotes empty strings to `Null`, wikilinks to `Link`, and duration strings (`DurationValue::parse`) to `Duration`.
   2. *Query filter building:* `ComparisonExpr::classify_literal` (`src/query/grammar/filter.rs:238`) [V] runs `TextShape::classify` on quoted string filter literals, promoting them to `Date`, `DateTime`, or `Duration`.
@@ -62,19 +63,22 @@
 - **Owner(s):** Frontmatter classifier (`src/field.rs`), Note value conversion (`src/note/field.rs`), Query filter classifier (`src/query/grammar/filter.rs`), Query sort classifier (`src/query/sort.rs`).
 
 ### Q2: Frontmatter literal-string escape
+
 - **Current Behavior:** Frontmatter has NO literal-string escape mechanism [V]. Noyalib parses YAML `title: "2025-01-15"` and `title: 2025-01-15` into identical `noyalib::Value::String("2025-01-15")` [V]. `FieldStringValue::classify` (`src/field.rs:843`) [V] treats all strings identically regardless of source quoting, eagerly coercing them into `DateValue`. Inline fields, by contrast, treat quotes (`"..."`) as an explicit escape via `parse_quoted_string_at` (`src/note/parser/inline.rs:148`) [V].
 - **Owner(s):** Note frontmatter parser (`src/note/metadata.rs`), `From<noyalib::Value>` (`src/field.rs`).
 
 ### Q3: Int vs Float semantic equality, ordering, NaN, -0.0, i64 > 2^53
+
 - **Current Behavior:**
   - *Current code state:* `NoteFieldValue` has only `Number(f64)` [V: `src/note/field.rs:49`]. Frontmatter `FieldValueRef::Int(i)` eagerly converts via `i as f64` [V: `src/note/field.rs:545`].
   - *Large integers (> 2^53):* Precision loss occurs immediately at ingestion: `9_007_199_254_740_993` (`2^53 + 1`) is cast to `9007199254740992.0` [V: empirical probe].
   - *Signed zero:* `-0.0 == +0.0` is `true` in `PartialEq` and `is_equal_to_literal` [V]. In `compare()`, `normalize_zero(n)` (`src/note/field.rs:495`) adds `+0.0`, ensuring `-0.0` and `+0.0` produce `Ordering::Equal` [V].
   - *NaN:* `NaN == NaN` is `false` in `PartialEq` and `is_equal_to_literal` (IEEE 754 float comparison) [V]. But in `compare()`, `normalize_zero(NaN).total_cmp(&normalize_zero(NaN))` evaluates to `Ordering::Equal` [V].
-  - *Ticket 14 handoff (`Int(i64)` and `Float(f64)`):* In `FieldValueRef`, derived `PartialEq` evaluates `Int(1) == Float(1.0)` as `false` [V]. No cross-variant integer/float comparator currently exists in `NoteFieldValue` [V].
+- *Ticket 18 handoff (`Int(i64)` and `Float(f64)`):* In `FieldValueRef`, derived `PartialEq` evaluates `Int(1) == Float(1.0)` as `false` [V]. No cross-variant integer/float comparator currently exists in `NoteFieldValue` [V].
 - **Owner(s):** Note field model (`src/note/field.rs`), legacy field model (`src/field.rs`).
 
 ### Q4: Date vs DateTime equality/order, naive zone-shifting, ambient zone, cache determinism
+
 - **Current Behavior:**
   - *Naive zone-shifting:* Naive datetimes (e.g., `2026-07-29T12:00:00`) resolve against the ambient `local_zone()` at parse time (`src/temporal/datetime.rs:151`) [V] and convert to UTC.
   - *Cache freezing:* Postcard cache serializes `DateTimeValue` as an explicit RFC 3339 `...Z` string (`src/temporal/datetime.rs:370`) [V]. Once written, the UTC instant is permanently frozen in cache.
@@ -84,6 +88,7 @@
 - **Owner(s):** Temporal module (`src/temporal/datetime.rs`, `src/temporal/zone.rs`), Note field comparator (`src/note/field.rs`).
 
 ### Q5: Cross-kind rank order and equality; sort vs filters
+
 - **Current Behavior:** Two completely divergent relations govern sorting and filtering [V]:
   - *Rank Lattice:* `Null(0) < Bool(1) < Number(2) < Duration(3) < Temporal(4) < Text(5) < Link(6) < List(7) < Object(8)` (`src/note/field.rs:238`) [V].
   - *Filter Equality (`==`, `!=`):* Strictly typed via `is_equal_to_literal` (`src/note/field.rs:393`) [V]. Mismatched kinds ALWAYS return `false` (e.g. `42 == "42"` is `false`), with the sole exception of `Date` vs `DateTime` at local midnight [V].
@@ -92,6 +97,7 @@
 - **Owner(s):** Note field comparator (`src/note/field.rs`), Query filter operator evaluation (`src/query/grammar/filter.rs`), Query sort key (`src/query/sort.rs`).
 
 ### Q6: Link equality/order, embedded, display, textual vs resolved
+
 - **Current Behavior:**
   - *Link struct:* `Link { target: String, text: Option<String>, kind: LinkType, embedded: bool }` (`src/note/links.rs:28`) [V]. Derived `PartialEq` compares ALL four fields [V].
   - *`compare()` ordering:* Compares `target` first, then `text` (`src/note/field.rs:303`) [V]. It COMPLETELY IGNORES `kind` and `embedded`!
@@ -102,16 +108,19 @@
 - **Owner(s):** Link model (`src/note/links.rs`), Note field comparator (`src/note/field.rs`).
 
 ### Q7: Schema select string vs note Link matching
+
 - **Current Behavior:** Schema select entries store values as `FieldValue::String(s)` (`src/schema/fields/select.rs:158`) [V]. Traces currently has NO runtime note validation against schemas [V: codebase grep confirmed zero calls]. When schema field options are exposed to templates (`src/template/engine/schema.rs:194`) [V], entries are exposed as strings or maps. Note fields containing `NoteFieldValue::Link` cannot match schema `FieldValue::String` under standard equality without an explicit conversion [H].
 - **Owner(s):** Schema select field (`src/schema/fields/select.rs`), Template schema bridge (`src/template/engine/schema.rs`).
 
 ### Q8: Query literal promotion and sort-time sniffing
+
 - **Current Behavior:**
   - *Query literal promotion:* `ComparisonExpr::classify_literal` (`src/query/grammar/filter.rs:238`) [V] promotes quoted string filter literals matching ISO date, datetime, or duration shapes into typed values once at query parse time.
   - *Sort-time sniffing:* `SortKey::from_value_ref` (`src/query/sort.rs:393`) [V] calls `TextShape::classify(&s)` on ANY string field. If a note stored `v_str: "2026-07-29"` as text, sorting by `v_str` opportunistically promotes it to `SortKey::DateTime` [V].
 - **Owner(s):** Query filter parser (`src/query/grammar/filter.rs`), Query sort key (`src/query/sort.rs`).
 
 ### Q9: Duration comparison (Span + i64, calendar units)
+
 - **Current Behavior:** `DurationValue` implements `PartialEq` and `Ord` strictly by `self.nominal_seconds() == other.nominal_seconds()` (`src/temporal/duration.rs:544, 560`) [V].
   - `TimeUnit` defines fixed nominal conversion ratios (`src/temporal/unit.rs:194-224`) [V]: `1y = 31_536_000s (365d)`, `1mo = 2_592_000s (30d)`, `1w = 604_800s (7d)`, `1d = 86_400s`, `1h = 3_600s`, `1m = 60s`.
   - Nominal equality holds universally: `30d == 1mo`, `1h == 60m`, `365d == 1y` [V: empirical probe lines 26-28].
@@ -119,6 +128,7 @@
 - **Owner(s):** Temporal duration (`src/temporal/duration.rs`, `src/temporal/unit.rs`).
 
 ### Q10: String collation (case sensitivity, Unicode normalization)
+
 - **Current Behavior:** String comparison in `NoteFieldValueRef::compare` [V: `src/note/field.rs:301`], `SortKey::cmp` [V: `src/query/sort.rs:436`], and `is_equal_to_literal` [V: `src/note/field.rs:402`] delegates entirely to standard Rust `String::cmp` and `==`.
   - Collation is byte-for-byte UTF-8 code point comparison [V].
   - It is strictly case-sensitive (`"a" != "A"`) [V].
@@ -126,6 +136,7 @@
 - **Owner(s):** Note field (`src/note/field.rs`), Query sort (`src/query/sort.rs`).
 
 ### Q11: Strictness-by-seam spread and error mode on failed coercion
+
 - **Current Behavior across Four Seams:**
   1. *Note Parsing Boundary (Seam 1):* Silent, lossy coercion. Empty strings silently coerce to `Null` [V: `src/note/field.rs:551`]; invalid numbers fallback to strings; integer values lose precision to `f64` [V: `src/note/field.rs:545`].
   2. *Core Value Model (Seam 2):* Derived structural `PartialEq` is strict; `NoteFieldValueRef::compare` is heuristic and total [V].
@@ -175,6 +186,7 @@ Observed directly via in-crate test execution (`cargo test --lib note::field::te
 ## 4. Disagreement Cases between `PartialEq` and `compare() == Equal`
 
 The codebase exhibits THREE distinct semantic equality evaluators:
+
 1. `NoteFieldValue::PartialEq` (derived structural equality) [V: `src/note/field.rs:42`].
 2. `NoteFieldValueRef::compare(&self, &other) == Ordering::Equal` (total ordering comparator) [V: `src/note/field.rs:286`].
 3. `NoteFieldValueRef::is_equal_to_literal(&self, literal)` (query filter `==` evaluator) [V: `src/note/field.rs:393`].
@@ -199,53 +211,64 @@ Empirically verified cases where these disagree [V]:
 
 ---
 
-## 5. Implications for Ticket 15
+## 5. Implications for Ticket 19
 
 ### Q1: Promotion Seam & Lexical Storage
+
 - **Option 1A (Keep as is):** Two-stage ingestion (Noyalib -> `FieldValueRef` -> `NoteFieldValue`), query literal sniffing, and sort-time sniffing. *Risk:* Triplicated classifiers (`src/field.rs`, `src/query/sort.rs`, `src/query/grammar/filter.rs`), high conversion overhead (41% parse time) [P].
 - **Option 1B (Single Parser Boundary):** Parse directly from Noyalib into `NoteFieldValue` using a unified parser order. Eliminate `TextShape::classify` sniffing at sort time. Strings remain strings unless explicitly cast in queries [P].
-- **Option 1C (Lexical Storage with Typing-on-Demand):** Keep all note values as raw strings/spans and classify lazily when evaluated by queries. *Constraint:* Rejected by Ticket 14 Answer (Ticket 14 established owned enum `NoteFieldValue` with postcard cache) [V: `.scratch/arch-design/issues/18-value-model.md:447`].
+- **Option 1C (Lexical Storage with Typing-on-Demand):** Keep all note values as raw strings/spans and classify lazily when evaluated by queries. *Constraint:* Rejected by Ticket 18 Answer (Ticket 18 established owned enum `NoteFieldValue` with postcard cache) [V: `.scratch/arch-design/issues/18-value-model.md:447`].
 
 ### Q2: Frontmatter Literal Escape
+
 - **Option 2A (Keep as is):** Frontmatter is quote-insensitive. `title: "2025-01-15"` is always parsed as `Date`. Escape requires query-side `string(title)` cast function [V].
 - **Option 2B (Schema-Bound Pass):** If a schema declares `type = "string"`, suppress date coercion for that field [P].
-- **Option 2C (Custom Frontmatter String Marker / Tag):** Adopt a convention (e.g. `!str 2025-01-15` or Serde visitor tracking quotes). *Constraint:* Ticket 14 Answer already rejected CST / quote-tracking Serde visitors due to Noyalib AST constraints [V: `.scratch/arch-design/issues/18-value-model.md:467`].
+- **Option 2C (Custom Frontmatter String Marker / Tag):** Adopt a convention (e.g. `!str 2025-01-15` or Serde visitor tracking quotes). *Constraint:* Ticket 18 Answer already rejected CST / quote-tracking Serde visitors due to Noyalib AST constraints [V: `.scratch/arch-design/issues/18-value-model.md:467`].
 
 ### Q3: Int vs Float Equality and Ordering
+
 - **Option 3A (Structural Separation):** Derived `PartialEq` treats `Int(1) != Float(1.0)`. *Risk:* Highly unintuitive for users (`rating == 1.0` fails if frontmatter has integer `1`) [P].
 - **Option 3B (Semantic Numeric Equality):** Custom `PartialEq` or explicit numeric comparator: if both are numbers, promote `Int` to `Float` if within `[-2^53, 2^53]`, or compare with exact mixed integer/float math. Preserve exact integer equality for `i64 > 2^53` [P].
 - **Option 3C (Total IEEE-754 Normalization):** `NaN == NaN` is false in filters, but ordered deterministically at the top or bottom of numeric sort keys [P].
 
 ### Q4: Date vs DateTime Determinism & Ambient Zone
+
 - **Option 4A (Keep as is):** Date promotes to DateTime at local midnight using ambient OS zone. *Risk:* Verified non-deterministic across machines and zones (empirical probe line 25: `Date` compares `Greater` to same-day `DateTime` when zone shifts) [V].
-- **Option 4B (Execution Context Injection):** As decided in Ticket 14, ambient zone must be passed explicitly via an execution context rather than querying global `local_zone()` [V: `.scratch/arch-design/issues/18-value-model.md:546`].
+- **Option 4B (Execution Context Injection):** As decided in Ticket 18, ambient zone must be passed explicitly via an execution context rather than querying global `local_zone()` [V: `.scratch/arch-design/issues/18-value-model.md:546`].
 - **Option 4C (Calendar Day Timeline Separation):** Treat `Date` and `DateTime` as strictly separate domains, or promote `Date` to UTC midnight `00:00:00Z` unconditionally for comparison purposes, guaranteeing machine-independent total order [P].
 
 ### Q5: Sort Order vs Filter Relation
+
 - **Option 5A (Keep as is):** `==` is strictly typed (false for cross-kind), while `<`/`>` falls back to rank ordering (`42 < "hello"` is true). *Risk:* Extremely confusing SQL/filter semantics; ordering behaves differently from equality [P].
 - **Option 5B (SQL / DuckDB Strict Filter Relations):** Relational operators (`<`, `<=`, `>`, `>=`) on mismatched types evaluate to `false` (or 3-valued `Null`). Cross-kind rank order is strictly confined to `ORDER BY` / `SortKey` [P].
 - **Option 5C (Fix SortKey List/Object Bug):** Align `SortKey` with `NoteFieldType::rank` so that `List` and `Object` do not silently sort as `Null` at the top of query outputs [P].
 
 ### Q6: Link Equality and Ordering
+
 - **Option 6A (Canonical Target Equality):** Align `Link::eq` and `compare()`: two links are equal if their canonical normalized targets match. `embedded` and `display` are metadata attributes, not identity [P].
 - **Option 6B (Strict Identity):** Two links are equal only if `target`, `display`, and `embedded` match. Update `compare()` so it does not falsely return `Equal` for embed vs non-embed [P].
 
 ### Q7: Schema Select String vs Note Link Matching
+
 - **Option 7A (String Coercion at Boundary):** When validating a note `Link` against a schema select string, compare `link.target()` to the select string [P].
-- **Option 7B (Ticket 16 Wikilink Parse):** As handed off by Ticket 14, schema select strings that look like links are parsed via the shared wikilink parser at the consumer boundary [V: `.scratch/arch-design/issues/18-value-model.md:481`].
+- **Option 7B (Ticket 20 Wikilink Parse):** As handed off by Ticket 18, schema select strings that look like links are parsed via the shared wikilink parser at the consumer boundary [V: `.scratch/arch-design/issues/18-value-model.md:481`].
 
 ### Q8: Elimination of Sort Sniffing
+
 - **Option 8A (Keep as is):** `SortKey::from_value_ref` continues to sniff date/duration text shape on all strings [V].
 - **Option 8B (No Implicit Sort Promotion):** Strings sort strictly as strings. Dates sort as dates. Users desiring date sorting on text fields must use typed fields or explicit query functions [P].
 
 ### Q9: Duration Comparison Anchor
+
 - **Option 9A (Keep Nominal Conversion):** Keep `1mo == 30d` and `1y == 365d` for nominal comparisons and sorting. Retain dual regime where calendar arithmetic uses Jiff spans [V].
 - **Option 9B (Pure Elapsed Ordering):** Compare durations strictly by elapsed seconds; reject calendar unit equivalence without an explicit reference anchor date [P].
 
 ### Q10: String Collation Policy
+
 - **Option 10A (Keep Byte-Exact):** Keep standard Rust `&str` code point ordering. Fast, zero-allocation, deterministic [V].
 - **Option 10B (Unicode NFC Normalization):** Normalize strings to NFC on ingestion or comparison to prevent cross-platform file/text mismatch [P].
 
 ### Q11: Unified Error Mode on Coercion Failure
+
 - **Option 11A (Silent Null / False - DuckDB TRY_CAST):** Failed conversions or invalid arithmetic silently evaluate to `Null` or `false` without terminating queries [P].
 - **Option 11B (Diagnostic Reporting):** Return `Null` for evaluation, but collect non-fatal query warnings for type mismatches, matching the schema warning doctrine [P].

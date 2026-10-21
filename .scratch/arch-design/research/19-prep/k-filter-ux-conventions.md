@@ -12,6 +12,7 @@
 Proposal Q11 replaces parse-time sniffing (`ComparisonExpr::classify_literal`, `src/query/grammar/filter.rs:238` [V]) with PostgreSQL-style operand-adaptive string literal coercion: an untyped quoted string literal in a comparison adopts the type of the other operand per row when valid, else stays a string [P].
 
 **The Core Tension:** Relational databases execute queries against fixed schemas where `'2025-01-15'` resolves against a known column type at plan time, throwing immediate parse errors on invalid inputs (`'2025-02-30'::date`) [V]. In contrast, personal knowledge management (PKM) vaults are open-world, heterogeneous, and schemaless:
+
 1. **The Silent-False Typo Trap:** If adaptive coercion silently falls back to `String` when an invalid date or typo is supplied (e.g. `due == "2025-02-30"`), type bracketing (Lean L1) evaluates `Date == String` as `false` [V, H]. The query silently returns 0 rows instead of alerting the user to the bad literal [H].
 2. **Point vs Interval Mismatch:** Dates in markdown are often granular (e.g. `due: 2025-01` for a month goal). An adaptive literal rule coerces `"2025-01"` to a single `civil::Date` point (Jan 1), causing `due == "2025-01"` to miss Jan 15 [V, H].
 3. **Shell Friction:** PKM users query via CLI arguments (`--where '...'`). Forcing nested quoting (`--where 'due >= "2025-01-01"'`) creates high syntactic noise compared to bare literals (`due >= 2025-01-01`) [V, H].
@@ -39,46 +40,55 @@ Proposal Q11 replaces parse-time sniffing (`ComparisonExpr::classify_literal`, `
 ## 3. Catalogue of 10 Filter UX Conventions & Adaptive Literal Interlock
 
 ### 1. Partial-Date Granularity & Range Rounding
+
 - **Precedent:** Obsidian Tasks supports `YYYY-mm`, `YYYY-Www`, `YYYY-Qq`, `YYYY` [V: `digest:609`]. Taskwarrior matches partial dates via prefix/granularity (`due:2025-01` matches entire month) [V: `task.1`]. Elasticsearch rounds date math: `gte` rounds *down* to start of unit (`2025-01||/M` -> `2025-01-01T00:00:00`), while `lte` rounds *up* to end of unit (`2025-01||/M` -> `2025-01-31T23:59:59.999`) [V: `query-dsl-range-query.html`].
 - **Traces Today:** `DatePoint::parse` recognizes `DateShape::YearMonth` and flags `DatePrecision::Month` (`src/temporal/point.rs:58` [V]), but `TextShape::classify` strips precision, setting the day to 1 (`sort.rs:466` [V]). `due == "2026-07"` only matches notes due exactly on July 1st [V].
 - **Adaptive Literal Interlock:** **FAILS.** If `"2025-01"` adapts to `civil::Date`, a single date point cannot represent a 31-day month [H]. Equality `due == "2025-01"` must desugar to an interval check: `due >= 2025-01-01 && due <= 2025-01-31` [P]. For inequalities, ES rounding rules apply: `due <= "2025-01"` means `<= 2025-01-31`, while `due >= "2025-01"` means `>= 2025-01-01` [P].
 
 ### 2. Relative Date Keywords & Injected Context
+
 - **Precedent:** Dataview (`date(today)`, `date(sow)`) [V: `digest:4872`]. Tasks (`due before tomorrow`, `due in next week`) [V: `digest:220`]. JQL (`startOfWeek()`, `endOfMonth()`) [V: `jql-history-and-dates.md:118`]. Taskwarrior (`eom`, `sow`, `today`, `yesterday`) [V: `dates`].
 - **Deterministic Pure Engine Requirement:** Ambient time (`Local::now()`) must never leak into query evaluation [V: `brief.md:90-95`]. `ExecutionContext` must inject `today: civil::Date` and `now: civil::DateTime` [P].
 - **Adaptive Literal Interlock:** **HIGH SYNERGY.** If string adaptation supports relative names (`"today"`, `"yesterday"`, `"tomorrow"`, `"sow"`, `"eom"`), `--where 'due <= "tomorrow"'` adapts `"tomorrow"` against `due: Date` using `context.today + 1d` [P]. Crucially, if the target field is `String` (`title == "today"`), `"today"` remains an exact string match [P].
 
 ### 3. Range Syntax (`..`) and Set Membership (`in`)
+
 - **Precedent:** GitHub search (`created:2025-01-01..2025-01-31`) [V: `syntax`]. Nushell (`due in 2025-01-01..2025-01-31`) [V: `types_of_data`]. SQL / JQL (`status in ("todo", "in-progress")`) [V: `jql-history-and-dates.md:143`].
 - **Adaptive Literal Interlock:** **COMPLEMENTARY.** An adaptive literal rule only helps single comparisons (`left == right`). It cannot express set membership: writing `status == "a" || status == "b" || status == "c"` is tedious in CLI filters [H]. `status in ("a", "b", "c")` desugars cleanly. For ranges, `due in 2025-01-01..2025-01-31` allows adapting both bounds [P].
 
 ### 4. String Operators & Case Folding
+
 - **Precedent:** Dataview provides `contains(str, sub)`, `icontains(str, sub)`, `startswith(str, pre)`, `regexmatch(pat, str)` [V: `digest:4239, 4548, 4485`]. Bases provides `string.containsAny()` and `string.lower()` [V: `bases/functions.md:237, 275`]. zk provides `--match-strategy re` and `exact` [V: `zk-docs-digest:1318`].
 - **Adaptive Literal Interlock:** **INDEPENDENT.** Q11 only adapts strings to non-string types. It does nothing for string-vs-string matching [H]. Case-insensitive matching (`tag == "rust"` matching `"Rust"`) requires either a case-folding operator (`~=` / `=~`) or ICU-aware string collation [V: `e-query-engine-conventions.md:87`].
 
 ### 5. Existence & Type Predicates (The Null Trap)
+
 - **Precedent:** In Dataview, `null < date(today)` is `true`, forcing users to guard every query with `typeof(due) = "date" AND due <= date(today)` [V: `digest:3795`]. Tasks inverts this so `non-null < null` [V: `digest:5151`]. JQL provides `field IS EMPTY` / `IS NOT EMPTY` [V: `jql-history-and-dates.md:157`].
 - **Traces Lean L1 Defense:** Traces avoids Dataview's trap by design: under Lean L1 (MongoDB type bracketing), relational ops on `Null` always evaluate to `false` (no match) [V: `e-query-engine-conventions.md:58`]. Missing or null fields never match `<= "today"`.
 - **Adaptive Literal Interlock:** **NEUTRAL.** `exists(field)` or `field != null` is still necessary when a user wants to find notes where a field was explicitly defined regardless of its value [P].
 
 ### 6. Duration Literals & Arithmetic Ergonomics
+
 - **Precedent:** Dataview (`dur(1 day)`, `dur(2yr8mo)`) [V: `digest:1012`]. Bases directly allows string durations in arithmetic: `file.mtime > now() - "1 week"` [V: `bases-syntax.md:288`]. Nushell uses bare tokens `1hr`, `3day` [V: `duration.html`]. DuckDB uses `INTERVAL 1 DAY` [V: `interval`].
 - **Traces Today:** Tokenizes unquoted duration words (`4h15m`) via `DurationValue::parse` (`filter.rs:72` [V]).
 - **Adaptive Literal Interlock:** **EXPANSION NEEDED.** Q11 was specified for binary comparisons (`==`, `<`), but users frequently write arithmetic: `file.mtime >= now() - "2w"` [P]. In `DateTime - String`, the string literal must adapt to `Duration` based on arithmetic operator expectations (`-` on DateTime expects Duration) [P].
 
 ### 7. Link Literals & Wikilink-vs-String Matching
+
 - **Precedent:** Dataview parses bare `[[Note]]` as link literals [V: `digest:4835`]. Metadata Menu strips brackets and aliases when matching link targets against date/select fields (`AbstractDate.validateValue`) [V: `digest:12406`]. zk uses `--link-to <target>` matching path or filename [V: `digest:1527`].
 - **Adaptive Literal Interlock:** **EXCELLENT.** If a note frontmatter holds `project: "[[Alpha]]"` (parsed as `NoteFieldValue::Link`), a query `--where 'project == "Alpha"'` adapts the string literal `"Alpha"` to a `Link` with target `"Alpha"`, matching the field cleanly [P]. Symmetrically, if note frontmatter holds `project: Alpha` (plain string), `"Alpha"` stays a string, matching string equality [P]. This eliminates the need for special link wrapper functions in standard queries [P].
 
 ### 8. Explicit Casts: Why Users Still Need Them
+
 - **Precedent:** Dataview provides `string(x)`, `date(x)`, `number(x)`, `dur(x)` [V: `digest:6865-6971`]. DuckDB provides `TRY_CAST(x AS DATE)` [V: `duckdb.org`].
 - **User Critique Addressed:** "If literals adapt, why is `string()` needed at all?"
   - **Reason 1: Field-to-Field Comparisons.** If note field `a` is Date and note field `b` is String, neither operand is a literal [H]. Q11 does NOT adapt fields [P]. Comparing them requires `a == date(b)` or `string(a) == b`.
-  - **Reason 2: Overriding Frontmatter Heuristic Classification.** An unquoted frontmatter scalar `isbn: 9780131103627` or `title: 2026-07-29` is heuristically parsed as `Int` or `Date` at ingestion (Ticket 14 Answer [V: `14:501`]). To perform string operations (e.g. `startswith(string(isbn), "978")`), the user must cast [H].
+  - **Reason 2: Overriding Frontmatter Heuristic Classification.** An unquoted frontmatter scalar `isbn: 9780131103627` or `title: 2026-07-29` is heuristically parsed as `Int` or `Date` at ingestion (Ticket 18 Answer [V: `18:501`]). To perform string operations (e.g. `startswith(string(isbn), "978")`), the user must cast [H].
   - **Reason 3: Formatting & Output.** MiniJinja template rendering and table column formatting require converting typed temporals/durations into formatted strings (`date.format("%Y-%m-%d")`) [V: `bases/functions.md:144`].
   - **Conclusion:** Adaptive literals eliminate 90% of casts in interactive CLI filters, but explicit casts (`date()`, `string()`) remain mandatory for expressions, field comparisons, and formatting [P].
 
 ### 9. CLI Shell-Quoting Ergonomics for `--where`
+
 - **Precedent:** CLI tools suffer severe usability friction when users must escape inner quotes inside shell arguments (e.g. `traces find --where "due <= \"2025-01-15\""` or `'due <= "2025-01-15"'`) [H].
 - **Mitigations across tools:**
   - Bare ISO dates without quotes: Nushell (`2025-01-15`), Traces today (`FilterToken::DateLiteral` regex in `filter.rs:1216` [V]).
@@ -87,6 +97,7 @@ Proposal Q11 replaces parse-time sniffing (`ComparisonExpr::classify_literal`, `
 - **Adaptive Literal Interlock:** **POTENTIAL TRAP.** If Traces *requires* quotes for literals to adapt, users will constantly trip over shell quote escaping. Bare tokens (`2025-01-15`, `2w`, `today`) MUST be first-class tokens that bypass quotes entirely [P].
 
 ### 10. Diagnostic UX & The Silent-False Typo Trap
+
 - **Precedent:**
   - Dataview: Silent false/null traps require prominent warning callouts in official documentation (`digest:3794-3803` [V]).
   - Taskwarrior: Emits explicit warnings when filter syntax fails to parse or matches no tasks [V: `faq`].
@@ -99,7 +110,7 @@ Proposal Q11 replaces parse-time sniffing (`ComparisonExpr::classify_literal`, `
 
 ---
 
-## 4. Implications for Ticket 15
+## 4. Implications for Ticket 19
 
 ### 4.1 Top 5 Recommended Options for the User
 

@@ -1,6 +1,6 @@
 # Unicode String Sorting and Comparison Policy
 
-Inputs: brief.md [V], a-code-inventory.md [V], ticket 14 Answer [V], `src/GLOSSARY.md:107-116` [V], `src/query/sort.rs:340-480` [V], Cargo.toml/Cargo.lock [V], docs.rs API docs [V].
+Inputs: brief.md [V], a-code-inventory.md [V], ticket 18 Answer [V], `src/GLOSSARY.md:107-116` [V], `src/query/sort.rs:340-480` [V], Cargo.toml/Cargo.lock [V], docs.rs API docs [V].
 Tags: [V] verified in code/docs/spec, [H] inference/measurement, [P] proposal.
 
 ---
@@ -120,16 +120,19 @@ Tags: [V] verified in code/docs/spec, [H] inference/measurement, [P] proposal.
 ## 5. Three Concrete Designs & Comparison
 
 ### Design 1: UCA CLDR Root with Natural Numeric Ordering (`icu_collator`) [Recommended]
+
 - **Mechanism**: `icu_collator::CollatorBorrowed::new_root` with `Strength::Tertiary`, `CollationNumericOrdering::True`, `AlternateHandling::NonIgnorable`, and byte tiebreak `then_with(|| a.cmp(b))` [P].
 - **Pros**: Perfectly solves user surprise: `Chapter 2` < `Chapter 10`, `apfel` < `Äpfel` < `apple`, `apple` < `Zebra`, symbols and emoji properly categorized [V]. 100% deterministic across macOS/Linux/Windows [V].
 - **Cons**: Adds `icu_collator` + `icu_collator_data` dependency; adds ~350 KB to binary size [H].
 
 ### Design 2: Unicode Case Folding + Natural Numeric Sort (`unicase` + `natord`)
+
 - **Mechanism**: Split strings into numeric and text runs. Text runs compared with `unicase::UniCase::new`. Numeric runs compared as `u64`.
 - **Pros**: Near-zero binary overhead (~10 KB); `unicase` already in `Cargo.lock` [V]. Fixes `Zebra` vs `apple` and `Chapter 2` vs `Chapter 10` [V].
 - **Cons**: Fails on non-ASCII European characters: `Äpfel` sorts AFTER `Zebra` because `ä` code point (228) > `z` (122) [V]. Does not handle script hierarchies or emoji sequences.
 
 ### Design 3: Deterministic ASCII-Insensitive Natural Sort (Minimal / Zero Data)
+
 - **Mechanism**: Martin Pool natural order (`natord` algorithm) with ASCII case-folding and raw UTF-8 byte tiebreak.
 - **Pros**: Zero data tables, 4 KB code, zero allocations [V].
 - **Cons**: Non-ASCII characters compare strictly by byte order. `Äpfel` > `Zebra`. Uppercase accented letters sort before lowercase ASCII.
@@ -140,7 +143,7 @@ Tags: [V] verified in code/docs/spec, [H] inference/measurement, [P] proposal.
 
 | # | String | Raw UTF-8 Byte Order (Status Quo) | Design 1: UCA Root + Numeric (`icu_collator`) [Rec.] | Design 2: Case Fold + Natural (`unicase` + `natord`) | Design 3: ASCII Natural (`natord`) |
 |---|---|---|---|---|---|
-| 1 | ` leading space` | 1 (0x20) | 1 (Whitespace) | 2 (0x20) | 1 (0x20) |
+| 1 | `leading space` | 1 (0x20) | 1 (Whitespace) | 2 (0x20) | 1 (0x20) |
 | 2 | `_private` | 6 (0x5F, after 'Z') | 2 (Punctuation) | 3 (0x5F) | 3 (0x5F) |
 | 3 | `🍎 emoji` | 13 (0xF0 high byte) | 3 (Symbol/Pictograph) | 13 (0xF0 high byte) | 13 (0xF0 high byte) |
 | 4 | `2025-01-15` | 2 (0x32) | 4 (Numeric string) | 1 (Digit run first) | 2 (Digit run) |
@@ -155,6 +158,7 @@ Tags: [V] verified in code/docs/spec, [H] inference/measurement, [P] proposal.
 | 13 | `中文 CJK` | 12 (0xE4...) | 13 (Han ideograph) | 12 (0xE4...) | 12 (0xE4...) |
 
 *Diagnostic observations*:
+
 - In Status Quo: `Chapter 10` < `Chapter 2`, `Zebra` < `apple`, and `_private` is sandwiched between uppercase and lowercase letters.
 - In Design 2 & 3: `Äpfel` is thrown to the very bottom after `Zebra`, which is unacceptable for international notes.
 - In Design 1: `Chapter 2` < `Chapter 10`, `apfel` < `Äpfel` < `apple`, and `apple` < `Zebra` are all simultaneously satisfied.
@@ -175,7 +179,7 @@ Tags: [V] verified in code/docs/spec, [H] inference/measurement, [P] proposal.
 
 ---
 
-## Implications for ticket 15
+## Implications for ticket 19
 
 - **L1 (Type bracketing in filters & total rank order in sort)**:
   - **Refine wording**: Keep type bracketing for filters (cross-bracket false, like-bracket exact). For string sorting, define the string rank member to order via `icu_collator` CLDR Root with `numeric_ordering: true` and an exact byte tiebreak (`then_with(|| a.cmp(b))`).

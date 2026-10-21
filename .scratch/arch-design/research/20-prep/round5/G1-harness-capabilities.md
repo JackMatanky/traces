@@ -10,7 +10,7 @@ for schema validation on note frontmatter.
 This research investigates how schema checks can gate or provide feedback on
 note frontmatter modifications across 14 major AI agent harnesses.
 
-Ticket 16 recorded the hypothesis [H]:
+Ticket 20 recorded the hypothesis [H]:
 > "Direct file edits get detection and feedback only, because a pre-write hook
 > sees the edit instruction and not the resulting file [H, from tool
 > documentation, not tested]. True gating exists only where the tool owns the
@@ -524,7 +524,7 @@ In MCP, the tool implementation controls the write:
 ### 3. Layered Guardrail Design for Cross-Harness Reality
 
 Because agents cannot be universally forced into MCP across every harness,
-ticket 16's multi-layered architecture is confirmed as the only viable model:
+ticket 20's multi-layered architecture is confirmed as the only viable model:
 
 ```text
 Layer 1: Up-Front Constraints (Soft Channel)

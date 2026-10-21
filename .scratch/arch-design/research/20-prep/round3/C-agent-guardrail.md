@@ -2,7 +2,7 @@
 
 ## 1. Sub-problem Restated
 
-Ticket 16 addresses whether and how schemas validate note data. This
+Ticket 20 addresses whether and how schemas validate note data. This
 sub-problem (C) specifically addresses how an autonomous agent—whether
 operating through Model Context Protocol (MCP) tools or as a coding-agent
 harness (Claude Code, oh-my-pi/omp, Cursor, Roo Code, Aider)—must be
@@ -572,6 +572,6 @@ diagnostic payload on stdout.
    will be swamped by error serialization.
 4. **Quote Sensitivity & Coercion (Sub-problem B)**:
    Agents writing frontmatter often output unquoted strings or unexpected YAML
-   scalar types. The coercion and comparison policy (Ticket 15) must remain
+   scalar types. The coercion and comparison policy (Ticket 19) must remain
    permissive and quote-insensitive so that syntactically valid edits are not
    falsely blocked.

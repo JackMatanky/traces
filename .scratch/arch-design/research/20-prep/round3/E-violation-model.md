@@ -2,14 +2,14 @@
 
 <!-- rumdl-disable MD013 -->
 
-Superseded where it differs from [ticket 16's
+Superseded where it differs from [ticket 20's
 Answer](../../../issues/20-schema-note-typing-and-validation.md): severities
-belong to ticket 27, and the delta key omits the element index. Its sketches
-assume `NoteFieldValue: Hash`, which ticket 15 rules out.
+belong to ticket 31, and the delta key omits the element index. Its sketches
+assume `NoteFieldValue: Hash`, which ticket 19 rules out.
 
 ## 1. Sub-problem Restated
 
-Ticket 16 must decide whether and how the schema subsystem validates note
+Ticket 20 must decide whether and how the schema subsystem validates note
 data. While the validation kernel logic evaluates whether frontmatter fields
 conform to schemas, this sub-problem (E) focuses on the **result model** and
 **checker API** produced by that evaluation.
@@ -40,7 +40,7 @@ Critical domain pressures include:
   windows.
 - **Severity Ownership**: Clarifying whether severity belongs inside the raw
   validation violation or in the diagnostic presentation envelope owned by
-  Ticket 27.
+  Ticket 31.
 
 ---
 
@@ -77,7 +77,7 @@ pub struct SchemaDiagnostic {
 
 However, this coupled diagnostic presentation (message, range) directly into the
 validation outcome and assumed a hardcoded severity tier (`Error` for missing
-required or type mismatch) that directly contradicted Ticket 15's advisory
+required or type mismatch) that directly contradicted Ticket 19's advisory
 principle (`brief.md:78-86` [V]).
 
 ---
@@ -300,16 +300,16 @@ into JSON Schema, but impedance mismatches exist:
   - Wikilink targets (`[[note]]`): JSON Schema has no concept of PKM links.
   - Dynamic file sources (`values = { path = ... }`).
 
-### 4.6 Severity Ownership: Ticket 16 vs Ticket 27
+### 4.6 Severity Ownership: Ticket 20 vs Ticket 31
 
-- **Ticket 16 Scope**: Owns the domain check and result model:
+- **Ticket 20 Scope**: Owns the domain check and result model:
   `ValidationViolation { field, element, kind }`. Violations state objective
   facts (e.g. "field X is missing", "value Y is not in enum").
-- **Ticket 27 Scope**: Owns the diagnostic envelope and severity mapping:
+- **Ticket 31 Scope**: Owns the diagnostic envelope and severity mapping:
   `Diagnostic { code, severity, span, message, help, fix }`.
-- **Default Severity**: Ticket 16 specifies a *recommended default severity*
+- **Default Severity**: Ticket 20 specifies a *recommended default severity*
   associated with each rule code (e.g. `schema.missing-required` $\to$
-  `Warning`), while Ticket 27 defines configuration overrides
+  `Warning`), while Ticket 31 defines configuration overrides
   (`[schemas.diagnostics]` or host policies) where MCP can treat it as
   `isError: true` while LSP treats it as `Information`.
 
@@ -324,7 +324,7 @@ into JSON Schema, but impedance mismatches exist:
   pass directly inside LSP handlers emitting `lsp_types::Diagnostic`. MCP tool
   runs separate JSON Schema checks.
 - **Strongest Argument Against**: Massive duplication and drift across four
-  hosts. If select value coercion or link matching rules change (Ticket 15),
+  hosts. If select value coercion or link matching rules change (Ticket 19),
   every host breaks or diverges.
 
 ### Candidate 2: Monolithic LSP Diagnostic Envelope
@@ -351,7 +351,7 @@ into JSON Schema, but impedance mismatches exist:
      - MCP Adapter formats `isError: true` with actionable self-correction
        hints.
 - **Strongest Argument Against**: Requires maintaining adapter transformations
-  for each host and coordinating between Ticket 16 (violations) and Ticket 27
+  for each host and coordinating between Ticket 20 (violations) and Ticket 31
   (diagnostics).
 
 ### Candidate 4: Unconventional A — Lazy Violation Stream / Iterator
@@ -384,7 +384,7 @@ into JSON Schema, but impedance mismatches exist:
 ### 6.1 The Data Models
 
 ```rust
-// In src/schema/validate/model.rs (owned by Ticket 16)
+// In src/schema/validate/model.rs (owned by Ticket 20)
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidationViolation {
@@ -464,9 +464,9 @@ When running `traces check --delta` or git pre-commit hooks:
 
 ---
 
-## 7. What Ticket 16 Must Pin vs Leave for Ticket 27
+## 7. What Ticket 20 Must Pin vs Leave for Ticket 31
 
-| Concern | Owned by Ticket 16 | Owned by Ticket 27 |
+| Concern | Owned by Ticket 20 | Owned by Ticket 31 |
 |---|---|---|
 | **Violation Struct & Enum** | Exact `ValidationViolation` & `ViolationKind` | Ignored (consumes them) |
 | **Rule Codes** | Stable string codes (`schema.*`) | Diagnostic code registry & URLs |

@@ -1,10 +1,10 @@
-# Ticket 16 round 4: external precedent, challenge ledger
+# Ticket 20 round 4: external precedent, challenge ledger
 
 Six scouts (`A-` to `F-` in this directory) searched Obsidian plugins, PKM class
 systems, CMS frontmatter schemas, schema languages and linters, wikis and graph
 systems, and agent/MCP vault tools. This file records what the orchestrator
 re-checked, where the scouts disagree or over-reach, and what it means for
-[ticket 16's Answer](../../../issues/20-schema-note-typing-and-validation.md).
+[ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md).
 Tags: [V] read by the orchestrator (URL given), [S] scout claim not re-read, [H]
 recollection. The author's vault is not evidence anywhere in this file.
 
@@ -18,7 +18,7 @@ recollection. The author's vault is not evidence anywhere in this file.
 | arXiv 2603.13404 shows agents ignore advisory warnings | [V] **Not supported.** It is a pilot (one local model, three seeds), success was zero in every condition, and it compares free-form docs vs JSON Schema vs schema plus structured diagnostics. Structured diagnostics reduced interface misuse, not semantic misuse. Scout F's headline claim is a mis-citation |
 | Sitecore: ordered inheritance "first wins" caused silent bugs | [V] **Not supported.** Duplicate field names coexist (both shown); no winner. Best practice is unique names. Umbraco instead rejects the composition (`InvalidCompositionException`, <https://issues.umbraco.org/issue/U4-8631>) [V] |
 | IWE (Rust: CLI `iwe`, LSP `iwes`, MCP `iwec`) validates documents against per-type schemas; a schema-violating MCP write is rejected with the violation named | [V] <https://github.com/iwe-org/iwe>, `crates/iwe/docs/schema.md` |
-| MCP elicitation exists, so class-change confirmation has an in-band channel | [H] strong recollection; scout F wrongly says ticket 16 assumed none (the Answer already asks the user, denying only with no channel) |
+| MCP elicitation exists, so class-change confirmation has an in-band channel | [H] strong recollection; scout F wrongly says ticket 20 assumed none (the Answer already asks the user, denying only with no channel) |
 | `step` has no precedent | [H] **Wrong.** JSON Schema `multipleOf` and HTML `step` are direct precedents (F's claim stands only for document-metadata tools) |
 
 ## 2. IWE, the closest analogue (read in full for schema.md)
@@ -40,7 +40,7 @@ recollection. The author's vault is not evidence anywhere in this file.
 
 ## 3. Challenge ledger
 
-| Ticket 16 decision | Evidence | Verdict |
+| Ticket 20 decision | Evidence | Verdict |
 |---|---|---|
 | Advisory on read, gating by host on writes | Wikidata (advisory constraint reports), SHACL, Fileclass ("a statement about your model, not a gate"), Obsidian Properties, Velite default non-strict, Sanity severities; gating only at tool-owned writes (IWE MCP, Notion API) [S for most] | **Keep** |
 | Frontmatter class as the only binding | Fileclass and every Obsidian plugin add tag/path binding; IWE binds by glob only; Dendron path binding is reported fatal [S]. Notes without a class are unvalidated, including agent-created ones | **Keep, but record limits** (see Q3) |
@@ -64,11 +64,11 @@ recollection. The author's vault is not evidence anywhere in this file.
   Umbraco rejects conflicting compositions at save. Traces could flag
   conflicting declarations once per class set instead of once per note.
 - **Body-structure schemas** (required sections, header patterns, token
-  budgets): IWE and mdschema validate them. Ticket 16 is frontmatter-only.
+  budgets): IWE and mdschema validate them. Ticket 20 is frontmatter-only.
 - **Violation locator.** If body schemas ever arrive, `Violation.field` needs a
   locator that is not only a frontmatter key.
 - **Surgical edits.** Obsidian Local REST API and the Anthropic memory tool show
-  agents damaging formatting with whole-file writes [S]; relevant to ticket 26
+  agents damaging formatting with whole-file writes [S]; relevant to ticket 30
   and the MCP edit mechanism.
 
 ## 5. Scout reliability
@@ -86,8 +86,8 @@ recollection. The author's vault is not evidence anywhere in this file.
 
 ## 6. Outcome
 
-Recorded in [ticket 16's Answer](../../../issues/20-schema-note-typing-and-validation.md):
+Recorded in [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md):
 order-independent multi-class rule, multiple `extends` parents kept, `global`
 as a lowest-precedence layer with its own code family, class binding by tag and
 path (an explicit known class suppresses bindings), `hint`, the exit-code
-split, and body-section schemas deferred to ticket 32.
+split, and body-section schemas deferred to ticket 36.

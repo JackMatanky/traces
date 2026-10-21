@@ -2,8 +2,8 @@
 
 - **Topic:** Survey of note metadata typing, schema definition, violation handling, and diagnostic reporting across PKM tools, markdown language servers, static site generators, and databases.
 - **Deliverable:** `.scratch/arch-design/research/20-prep/e-pkm-typing-and-diagnostics.md`.
-- **Target Issue:** Ticket 16 (Schema Note Typing and Validation) for Wayfinder milestone.
-- **Constraints Applied (Tickets 12–15):** Core is synchronous CLI by default (T13); LSP is next committed consumer (T13); note value model has two owned types (`NoteFieldValue` vs schema-local literal) (T14); select values matching wikilinks use adaptive-literal rule (T14/T15); frontmatter classification is schema-free (T15); coercion failures and validation diagnostics are advisory, never gating (T15/Res03); CLI stdout/stderr split and exit codes frozen (T12).
+- **Target Issue:** Ticket 20 (Schema Note Typing and Validation) for Wayfinder milestone.
+- **Constraints Applied (Tickets 16–19):** Core is synchronous CLI by default (T17); LSP is next committed consumer (T17); note value model has two owned types (`NoteFieldValue` vs schema-local literal) (T18); select values matching wikilinks use adaptive-literal rule (T18/T19); frontmatter classification is schema-free (T19); coercion failures and validation diagnostics are advisory, never gating (T19/Res03); CLI stdout/stderr split and exit codes frozen (T16).
 - **Tags:** `[V]` verified in digest/code/official doc, `[H]` inference, `[P]` proposal for Traces.
 
 ---
@@ -215,7 +215,7 @@
 - **Where Gating Exists:** Gating appears only in:
   - *Build-time compilers* (Astro, Quarto, CI linters), where broken frontmatter produces broken production websites [V].
   - *Database-backed systems* (Logseq DB, Anytype, Airtable, Notion), where writes pass through structured transactional API boundaries [V].
-- **Conclusion for Traces:** Traces core indexing and querying must remain **strictly non-gating** [P: Ticket 15 / Res03]. Schema validation belongs in an on-demand verification command (`traces check` / `traces doctor`) and background LSP diagnostics [P].
+- **Conclusion for Traces:** Traces core indexing and querying must remain **strictly non-gating** [P: Ticket 19 / Res03]. Schema validation belongs in an on-demand verification command (`traces check` / `traces doctor`) and background LSP diagnostics [P].
 
 ### (b) Declaration Topology: Global vs Per-Class vs Per-Note
 
@@ -241,7 +241,7 @@
 - In Obsidian Templater, types exist **only for writing** (rendering input modals) [V].
 - In `remark-lint-frontmatter-schema`, types exist **only for checking** (post-hoc validation) [V].
 - In Tana, Logseq DB, and Obsidian Properties, types serve **both**: the schema drives the input widget during note creation/editing *and* validates existing data [V].
-- **Lesson for Traces:** Ticket 16's schema subsystem must explicitly separate the **Field Definition** (which provides metadata for `ui` interactive prompts in `traces new`) from the **Field Validator** (which checks existing note values) [P]. Sharing a single enum for both confuses prompt options with evaluation constraints [H].
+- **Lesson for Traces:** Ticket 20's schema subsystem must explicitly separate the **Field Definition** (which provides metadata for `ui` interactive prompts in `traces new`) from the **Field Validator** (which checks existing note values) [P]. Sharing a single enum for both confuses prompt options with evaluation constraints [H].
 
 ### (e) Reconciling YAML Inference with Declared Types
 
@@ -250,7 +250,7 @@
   - *Dataview:* Evaluates regex cascades over stringified representations (`obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:3678-3689`) [V].
   - *Astro / Zod:* Applies `z.coerce` to explicitly bridge parsed types to schema types [V].
   - *Obsidian Properties:* Normalizes values when saved through the UI by quoting strings containing YAML special characters [V].
-- **Traces Decision (Ticket 15):** Frontmatter parsing is schema-free and quote-insensitive; classification into `NoteFieldValue` happens without looking at schemas [V: Ticket 15]. The validator therefore inspects the resulting `NoteFieldValue` against the schema field definition: if schema expects `String` but value is `Date(2026-10-20)`, the validator checks whether the date can losslessly format as string without diagnostic error [P].
+- **Traces Decision (Ticket 19):** Frontmatter parsing is schema-free and quote-insensitive; classification into `NoteFieldValue` happens without looking at schemas [V: Ticket 19]. The validator therefore inspects the resulting `NoteFieldValue` against the schema field definition: if schema expects `String` but value is `Date(2026-10-20)`, the validator checks whether the date can losslessly format as string without diagnostic error [P].
 
 ### (f) Multi-Class & Inheritance Conflict Resolution
 
@@ -295,7 +295,7 @@
 
 - **The Trap:** Refusing to parse, index, or query a note whose frontmatter violates schema constraints [V].
 - **Why It Fails:** Destroys the primary value of a local-first markdown tool. A single syntax typo in a note written on mobile causes `traces list` or `traces query` to crash or hide files, infuriating the user [H].
-- **Traces Defense:** Core parsing and indexing must remain 100% schema-free and non-gating [V: Ticket 15]. Schema validation is strictly opt-in via `traces check` or LSP [P].
+- **Traces Defense:** Core parsing and indexing must remain 100% schema-free and non-gating [V: Ticket 19]. Schema validation is strictly opt-in via `traces check` or LSP [P].
 
 #### 3. The Destructive Auto-Formatting Trap (Obsidian Linter Regexes)
 

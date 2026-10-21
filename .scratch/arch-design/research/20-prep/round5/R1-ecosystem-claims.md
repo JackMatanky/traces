@@ -3,7 +3,7 @@
 - **Target File:** `.scratch/arch-design/research/20-prep/round5/R1-ecosystem-claims.md`
 - **Scope:** Primary-source verification of six external ecosystem claims from
   prior research rounds (Dendron, Tana, SilverBullet, Metadata Enforcer,
-  Obsidian Properties, and Logseq DB) and their impact on Ticket 16's Answer.
+  Obsidian Properties, and Logseq DB) and their impact on Ticket 20's Answer.
 - **Status:** Complete.
 
 ---
@@ -55,9 +55,9 @@ startup business realities rather than schema technical failure.
   transitioned to OpenAI, not because dot-namespace schemas collapsed.
   > [GitHub Discussion #3890](https://github.com/dendronhq/dendron/discussions/3890)
 
-### 1.3 Impact on Ticket 16's Answer
+### 1.3 Impact on Ticket 20's Answer
 
-**Does not alter the decision; validates it.** Ticket 16's Answer already
+**Does not alter the decision; validates it.** Ticket 20's Answer already
 adopted path bindings (`[binding]` table with vault-relative globs) as default
 fallback bindings for unclassed notes alongside tags and explicit frontmatter
 classes. Refuting Scout B's alarmist claim confirms that supporting path
@@ -116,11 +116,11 @@ distinct tuple children rather than colliding or gating. Type constraints and
   > warning is visual only and has no consequence."
   > — [Tana Fields Guide](https://outliner.tana.inc/learn/features/fields)
 
-### 2.3 Impact on Ticket 16's Answer
+### 2.3 Impact on Ticket 20's Answer
 
 **Does not alter the decision; validates it.** Tana's pure advisory error
-reporting aligns with Ticket 16's non-gating check principle. Because Traces
-notes use flat YAML frontmatter where two fields cannot share a key, Ticket 16's
+reporting aligns with Ticket 20's non-gating check principle. Because Traces
+notes use flat YAML frontmatter where two fields cannot share a key, Ticket 20's
 decision to report `schema.class-conflict` when unrelated classes differ on the
 same key is the necessary equivalent for flat key-value documents.
 
@@ -183,13 +183,13 @@ gate (`mustValidate: true`) which drops invalid objects from the index.
   > or augment it with a custom `transform` callback."
   > — [SilverBullet API/tag Documentation](https://docs.silverbullet.md/API/tag)
 
-### 3.3 Impact on Ticket 16's Answer
+### 3.3 Impact on Ticket 20's Answer
 
-**Does not alter the decision; validates it.** Ticket 16 decided that schemas
+**Does not alter the decision; validates it.** Ticket 20 decided that schemas
 are purely advisory on the read and index paths ("never gate the read or index
 path, and never enter the index or its fingerprint"), matching SilverBullet's
 default behavior while intentionally rejecting SilverBullet's `mustValidate`
-index-drop gate (per ADR-0009 and Ticket 12/15 decisions).
+index-drop gate (per ADR-0009 and Ticket 16/19 decisions).
 
 ---
 
@@ -245,13 +245,13 @@ expressive and awkward for collection constraints and inheritance.
   > PostgreSQL-level collection integrity enforcement..."
   > — [Omar Bohsali, v2 Announcement](https://omarish.com/p/metadata-enforcer-v2)
 
-### 4.3 Impact on Ticket 16's Answer
+### 4.3 Impact on Ticket 20's Answer
 
-**Does not alter the decision; validates it.** Ticket 16 already rejected JSON
+**Does not alter the decision; validates it.** Ticket 20 already rejected JSON
 Schema as Traces' primary schema format ("JSON Schema as the schema format:
 rejected... Traces schemas also drive prompts, completion, file links and
 label/value mapping"). Bohsali's real-world conclusion that JSON Schema is
-ill-suited for markdown vault entity modeling directly reinforces Ticket 16.
+ill-suited for markdown vault entity modeling directly reinforces Ticket 20.
 
 ---
 
@@ -303,9 +303,9 @@ this to be intended design.
   in [#101635](https://forum.obsidian.md/t/non-source-mode-property-edits-detrimentally-convert-flow-to-block-style-multi-level-yaml-list-of-lists-sequence-of-sequences/101635),
   confirming that native Properties edits alter frontmatter indiscriminately.
 
-### 5.3 Impact on Ticket 16's Answer
+### 5.3 Impact on Ticket 20's Answer
 
-**Does not alter the decision; validates it.** Ticket 16 rejected relying on
+**Does not alter the decision; validates it.** Ticket 20 rejected relying on
 quote conventions or frontmatter comments to disambiguate dates from strings
 ("A TOML-style single versus double quote convention is rejected [S]: Noyalib
 exposes no per-scalar quote style outside the CST (+59% parse time), and
@@ -358,13 +358,13 @@ user confusion over "is-a" vs "has-a" modeling.
   - No hierarchy broke, no graph view collapsed, and no developer advised
     abandoning multi-parent inheritance.
 
-### 6.3 Impact on Ticket 16's Answer
+### 6.3 Impact on Ticket 20's Answer
 
-**Does not alter the decision; validates it.** Ticket 16 Answer states:
+**Does not alter the decision; validates it.** Ticket 20 Answer states:
 "inheritance resolves within each class by the existing `extends` rule
 (multiple parents are kept; first-listed parent wins, a child redefinition wins
 over its parents). The resolved class set is reduced to its most-derived
 members, so an ancestor never conflicts with its own descendant." Disproving
 the claim that multi-parent inheritance is inherently unworkable validates
-Ticket 16's choice to retain multi-parent `extends` with clean most-derived
+Ticket 20's choice to retain multi-parent `extends` with clean most-derived
 reduction and cycle detection.

@@ -1,6 +1,6 @@
-# Cross-Effort Review: Sibling Wayfinder Decisions Bearing on Ticket 16
+# Cross-Effort Review: Sibling Wayfinder Decisions Bearing on Ticket 20
 
-- **Topic:** Architectural audit of all sibling efforts under `.scratch/` (excluding `arch-design` and `md-pkm-lsp`), ADRs 0001–0007, and current codebase reality for Ticket 16 (Schema Note Typing and Validation).
+- **Topic:** Architectural audit of all sibling efforts under `.scratch/` (excluding `arch-design` and `md-pkm-lsp`), ADRs 0001–0007, and current codebase reality for Ticket 20 (Schema Note Typing and Validation).
 - **Scope:** `metadata-schemas`, `note-parse`, `template-service`, `index-query`, `temporal-core`, `config-service`, `prompt-service`, `task-system`, `query-expansion`, `integration-e2e-suite`.
 - **Status:** Complete research synthesis.
 - **Deliverable:** `.scratch/arch-design/research/20-prep/g-other-efforts-review.md`.
@@ -207,7 +207,7 @@ Verifying prior designs against current tree (`src/position.rs`, `src/note/metad
    - `note-parse/issues/04:24, 32` condemned this exact pattern as a *"type-system lie"* where loaded notes carry dummy spans, withdrawing it from `Heading` and occurrence nodes [V].
 4. **Index Invalidation Trap (`metadata-schemas` vs `config-service` / `index-query`):**
    - ADR-0009 and `config-service/issues/07:18` deliberately exclude schema TOML file contents from the index fingerprint [V: `docs/adr/0009:76-77`].
-   - If Ticket 16 introduces index-time schema typing, changing any `.traces/schemas/*.toml` file will NOT invalidate `redb` unless the fingerprint architecture is altered [H].
+   - If Ticket 20 introduces index-time schema typing, changing any `.traces/schemas/*.toml` file will NOT invalidate `redb` unless the fingerprint architecture is altered [H].
 
 ---
 
@@ -219,10 +219,10 @@ Verifying prior designs against current tree (`src/position.rs`, `src/note/metad
 
 ---
 
-## 8. What This Changes for Ticket 16
+## 8. What This Changes for Ticket 20
 
 1. **Keep Schema Passive from Note Ingestion (Hard Barrier):** `metadata-schemas`, `index-query`, and ADR-0009 firmly establish that schemas never type notes at index time. Schema changes do not invalidate the index fingerprint. Note ingestion remains schema-free and open-world tolerant [V].
 2. **Template Pre-Check Must Be Post-Render:** Because of the No-Declaration Template Format, a schema pre-check cannot inspect a template before evaluation. It can only inspect the frontmatter of `rendered.content` after Minijinja runs, right before `write()` [V].
 3. **Validation Cannot Expect AST Byte Spans Today:** Because `src/note/` stores zero byte spans, any validator operating on `&Note` can only emit line-level or field-key diagnostics. Byte-accurate diagnostics require either a separate editor-facing AST (splitting `Note`) or an on-demand CST pass (Taplo/jsonschema pattern) [H].
-4. **`date.format`, `step`, and `min`/`max` are Dead Code or Inert:** Any option for Ticket 16 that promises to validate `number.step` or `date.format` must either implement new parsing/validation infrastructure or formally retire those fields from `src/schema/` [V].
+4. **`date.format`, `step`, and `min`/`max` are Dead Code or Inert:** Any option for Ticket 20 that promises to validate `number.step` or `date.format` must either implement new parsing/validation infrastructure or formally retire those fields from `src/schema/` [V].
 5. **Validation Must Be an On-Demand Advisory Pass:** Consistently with `research/03`, `md-pkm-lsp#20`, and `metadata-schemas`, note validation must be an advisory analysis pass (`validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`), reusable by the CLI (`traces check`), future LSP, and the post-render template writer [P].
