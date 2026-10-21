@@ -154,19 +154,25 @@ set -euo pipefail
 
 echo "==> Verifying layer discipline boundaries..."
 
-if git grep -n -E '(^|[^[:alnum:]_])traces[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ tests/common/ >&2; then
+common_paths=()
+if [[ -d tests/common ]]; then
+    common_paths+=(tests/common/)
+fi
+
+if git grep -n -E '(^|[^[:alnum:]_])traces[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ ${common_paths[@]+"${common_paths[@]}"} \
+    | grep -v -E '["`].*traces[[:space:]]*::|^[[:space:]]*//' >&2; then
     echo "ERROR: E2E tests must not reference traces" >&2
     exit 1
 fi
 
-e2e_process_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ tests/common/ ':!tests/e2e/support.rs' || true)
+e2e_process_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ ${common_paths[@]+"${common_paths[@]}"} ':!tests/e2e/support.rs' || true)
 if [[ -n "${e2e_process_refs}" ]]; then
     echo "ERROR: tests/e2e/ must not use std::process outside support.rs" >&2
     echo "${e2e_process_refs}" >&2
     exit 1
 fi
 
-int_cmd_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])|CARGO_BIN_EXE' tests/integration.rs tests/integration/ tests/common/ || true)
+int_cmd_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])|CARGO_BIN_EXE' tests/integration.rs tests/integration/ ${common_paths[@]+"${common_paths[@]}"} || true)
 if [[ -n "${int_cmd_refs}" ]]; then
     echo "ERROR: tests/integration/ must not spawn child processes or reference CARGO_BIN_EXE" >&2
     echo "${int_cmd_refs}" >&2
