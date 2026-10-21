@@ -1,20 +1,12 @@
 # Discovery: Multi-Lens Scouting & Hypothesis Ledger
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Scouting Protocol & Rules](#1-scouting-protocol--rules) | Read-only scout isolation, execution constraints | Line 13 |
-| [2. The 10 Architectural Lenses](#2-the-10-architectural-lenses) | 10 modular scout directives and focus targets | Line 23 |
-| [3. The Indicator Hypothesis](#3-the-indicator-hypothesis) | Translating raw tool signals into domain questions (SSOT) | Line 89 |
-| [4. Expected Architectural Value (EAV)](#4-expected-architectural-value-eav) | EAV formula, scoring factors, consequential triggers | Line 104 |
-| [5. Candidate Output & Ledger Schema](#5-candidate-output--ledger-schema) | Scout reporting schema and `ledger.json` format | Line 124 |
-
 ---
 
 ## 1. Scouting Protocol & Rules
 
 During architectural discovery, the orchestrator dispatches read-only investigations across ten distinct lenses.
 
-- **Strict Scout Isolation Rule:** Scouts inspect source code, documentation, and AST facts. They are forbidden from running builds, tests, or diagnostic scripts. Only the main orchestrator runs CLI tools.
+- **Strict Scout Isolation Rule:** read-only inspection of source, docs, and AST facts; scouts never run builds, tests, or diagnostic scripts (SSOT: [`TOOLING.md`](TOOLING.md) §1). Only the main orchestrator runs CLI tools.
 - **Reporting Limit:** Each lens reports up to 5 ranked hypotheses citing exact `file:line` locations, estimated SLoC deletion dividend, and Expected Architectural Value (EAV).
 - **Synthesis:** Before hypotheses are committed to `ledger.json`, the orchestrator synthesizes scout findings to identify compounding transformations and resolve conflicts.
 
@@ -22,67 +14,20 @@ During architectural discovery, the orchestrator dispatches read-only investigat
 
 ## 2. The 10 Architectural Lenses
 
-Dispatch parallel subagents using these self-contained directives:
+Dispatch parallel subagents, one row per scout; each row is a self-contained directive:
 
-### Lens 1: Modern Rust & Upstream Capabilities
-
-- **Target:** Upstream language or standard library features that obsolete hand-rolled machinery.
-- **Inspect:** `std::sync::Exclusive`, modern GAT patterns, slice chunking, `portable_simd`, or upstream crate capabilities.
-- **Objective:** Eliminate custom utilities in favor of canonical standard library or compiler intrinsics.
-
-### Lens 2: Data-Oriented Layout & Memory Footprint
-
-- **Target:** Inefficient memory layout, struct padding holes, and cache misses.
-- **Inspect:** Struct field ordering, alignment padding, opportunities for Struct-of-Arrays (SoA) layout, and hot/cold field segregation.
-- **Objective:** Maximize CPU cache-line saturation and eliminate padding waste.
-
-### Lens 3: Allocation, Lifecycles & Zero-Copy
-
-- **Target:** Unnecessary heap allocations and defensive copying.
-- **Inspect:** Defensive `.clone()` calls, unbounded per-item allocations, missing arena or bump allocators for scoped lifecycles, and opportunities for borrowed views or `Cow<'a, T>`.
-- **Objective:** Eliminate runtime allocations on hot paths.
-
-### Lens 4: Seam Placement & Knowledge Asymmetry
-
-- **Target:** Callers knowing too much about implementation mechanisms.
-- **Inspect:** Callers bypassing abstractions, direct struct field manipulation, leaked storage or serialization representations, and loose visibility.
-- **Objective:** Move knowledge behind deep, minimal interfaces.
-
-### Lens 5: State & Invariant Ownership
-
-- **Target:** Invariants distributed across callers or enforced only at runtime.
-- **Inspect:** Invariants split across multiple types, mutable state disconnected from logic, invalid states representable in structs, and runtime assertions that could be compile-time typestates.
-- **Objective:** Enforce "parse, don't validate" to eliminate invalid states at construction.
-
-### Lens 6: Boundary Crossings & Vertical Leakage
-
-- **Target:** Lower-level details bubbling upward through module boundaries.
-- **Inspect:** Internal child error types exposed in ancestor APIs, low-level configuration bubbling upward, and circular imports between sibling modules.
-- **Objective:** Isolate internal churn so changes do not propagate across seams.
-
-### Lens 7: Concurrency, I/O & Contention
-
-- **Target:** Lock contention, blocking operations, and unbounded queues.
-- **Inspect:** Coarse `Mutex` scopes, blocking operations on async reactors, serialization round-trips, unbounded channels (`unbounded_channel()`), and uncontained panic propagation across task boundaries.
-- **Objective:** Bound resource consumption and isolate worker failures.
-
-### Lens 8: Algorithmic Scaling & Hot-Path Complexity
-
-- **Target:** Computational complexity and scaling bottlenecks.
-- **Inspect:** $O(n^2)$ lookups, redundant hashing on hot paths, repeated traversals, and opportunities for memoization or early-exit fast paths.
-- **Objective:** Reduce big-O computational and memory scaling on hot paths.
-
-### Lens 9: Deletion Dividend & Layer Thinning
-
-- **Target:** Redundant, obsolete, or pass-through structure.
-- **Inspect:** Forwarding wrappers, redundant facade traits, one-to-one adapters, dead type conversions, and compatibility scaffolding.
-- **Objective:** Delete architectural complexity and thin unnecessary layers.
-
-### Lens 10: Checks That Can't Fail & Test Ergonomics
-
-- **Target:** Fragile, tautological, or over-mocked tests.
-- **Inspect:** Tests asserting default states, tautological assertions, over-mocked boundaries hiding regressions, and missing error-path verification.
-- **Objective:** Ensure tests verify domain behavior through intended seams.
+| # | Lens | Target | Inspect | Objective |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | Modern Rust & Upstream Capabilities | Upstream features that obsolete hand-rolled machinery | `std::sync::Exclusive`, modern GAT patterns, slice chunking, `portable_simd`, upstream crate capabilities | Replace custom utilities with std/compiler intrinsics |
+| 2 | Data-Oriented Layout & Memory Footprint | Padding holes and cache misses | Field ordering, alignment padding, Struct-of-Arrays (SoA) opportunities, hot/cold field segregation | Maximize cache-line saturation, eliminate padding waste |
+| 3 | Allocation, Lifecycles & Zero-Copy | Unnecessary heap allocations and defensive copying | Defensive `.clone()`, unbounded per-item allocation, missing arena/bump allocators, borrowed views or `Cow<'a, T>` | Eliminate runtime allocations on hot paths |
+| 4 | Seam Placement & Knowledge Asymmetry | Callers knowing implementation mechanisms | Bypassed abstractions, direct field manipulation, leaked storage/serialization representations, loose visibility | Move knowledge behind deep, minimal interfaces |
+| 5 | State & Invariant Ownership | Invariants split across callers or runtime-only | Invariants across multiple types, mutable state disconnected from logic, invalid states representable, runtime assertions → typestates | Enforce "parse, don't validate" (`ISR = 0`) |
+| 6 | Boundary Crossings & Vertical Leakage | Lower-level details bubbling upward | Child error types in ancestor APIs, low-level config bubbling, sibling circular imports | Isolate internal churn across seams |
+| 7 | Concurrency, I/O & Contention | Lock contention, blocking, unbounded queues | Coarse `Mutex` scopes, blocking on async reactors, serialization round-trips, `unbounded_channel()`, panic propagation across tasks | Bound resource consumption, isolate worker failures |
+| 8 | Algorithmic Scaling & Hot-Path Complexity | Complexity and scaling bottlenecks | O(n^2) lookups, redundant hashing, repeated traversals, memoization or early-exit opportunities | Reduce big-O scaling on hot paths |
+| 9 | Deletion Dividend & Layer Thinning | Redundant, obsolete, or pass-through structure | Forwarding wrappers, redundant facade traits, one-to-one adapters, dead conversions, compatibility scaffolding | Delete architectural complexity, thin layers |
+| 10 | Checks That Can't Fail & Test Ergonomics | Fragile, tautological, or over-mocked tests | Default-state assertions, tautologies, over-mocking hiding regressions, missing error-path verification | Verify domain behavior through intended seams |
 
 ---
 
@@ -106,11 +51,11 @@ Do not combine indicators into an aggregate score. Treat each gauge as an isolat
 
 Rank candidate redesigns in `ledger.json` using Expected Architectural Value:
 
-$$\text{EAV} = \frac{\text{Structural or Computational Gain (1–5)} \times \text{Confidence (0.0–1.0)}}{\text{Blast Radius (1–5)} + \text{Implementation Friction (1–5)}}$$
+`EAV = (Structural/Computational Gain [1-5] × Confidence [0.0-1.0]) / (Blast Radius [1-5] + Implementation Friction [1-5])`
 
 ### Consequential Candidate Triggers
 
-A candidate is consequential if $\text{EAV} \ge 1.0$, or if it satisfies at least one observable trigger:
+A candidate is consequential if `EAV >= 1.0`, or if it satisfies at least one observable trigger:
 
 1. Changes or bypasses a public API signature, visibility boundary, or trait contract.
 2. Alters cross-module or cross-crate dependency direction (introducing or removing edges/cycles).
@@ -139,3 +84,11 @@ verify: [Specific behavior or invariant needing empirical test proof]
 ```
 
 Store candidate hypotheses in `.design/YYYY-MM-DD-<mode>-<target-slug>/ledger.json` sorted by descending EAV.
+
+### Closed Deferral Reason Enum
+
+Every deferred finding must use one of three variants, capped at 3 deferrals per review without explicit user approval:
+
+- `DEFERRED_TOOL_UNAVAILABLE`: Required diagnostic binary is absent from host.
+- `DEFERRED_OUT_OF_SCOPE`: Finding resides entirely outside requested target boundary.
+- `DEFERRED_HIGH_TRACE_COST`: Verification requires exhaustive dynamic tracing exceeding turn boundaries.

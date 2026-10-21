@@ -1,34 +1,26 @@
 # Metrics: Automated Gauges & Semantic Evaluation Rubrics
 
-| Section | Focus / Key Concepts | Line Target |
-| :--- | :--- | :--- |
-| [1. Automated Tool Metrics](#1-automated-tool-metrics) | Deterministic gauges from `measure.py` and `diff.py` | Line 13 |
-| [2. Claim Routing Table](#2-claim-routing-table) | Connecting design claims to applicable gauges | Line 35 |
-| [3. Semantic Architectural Rubrics](#3-semantic-architectural-rubrics) | Qualitative IKL, PS, BR, PD, and safety rubrics | Line 50 |
-| [4. Anti-Gaming Guardrails (SSOT)](#4-anti-gaming-guardrails-ssot) | Comment preservation rule, semantic deletion dividend | Line 85 |
-| [5. Progression Scoreboard Schema](#5-progression-scoreboard-schema) | Multi-trial tracking table via `diff.py --scoreboard` | Line 95 |
-
 ---
 
 ## 1. Automated Tool Metrics
 
-The following metrics are deterministically extracted by `measure.py` and compared via `diff.py`:
+Metrics are deterministically extracted by `measure.py`, compared via `diff.py`:
 
-| Metric Dimension | Tool / Source | Threshold / Target | Evaluation Purpose |
-| :--- | :--- | :--- | :--- |
-| **Source Lines of Code (SLoC)** | `measure.py` | Net reduction | Non-comment, non-blank lines of Rust source code. |
-| **Doc Comment Lines** | `measure.py` | Maintained/expanded | Preserved doc comments (`///`, `//!`) enforcing anti-gaming. |
-| **Public API Footprint (IKL)** | `cargo-public-api` | Stable or compressed | Publicly exported items (`pub fn`, `pub struct`, `pub trait`). |
-| **Elevated CRAP Functions** | `cargo-crap` | Reduced (>8.0) | Complexity squared times uncoverage cubed plus complexity. |
-| **High CRAP Functions** | `cargo-crap` | Eliminated (>15.0) | Critical refactoring hazard requiring tests entering seam. |
-| **Maintainability Hotspots** | `messrust` | Reduced | Advisory maintainability risk and tangled responsibilities. |
-| **Cyclic Dependency Edges** | `cargo-modules` | 0 cycles | Cross-module circular dependency edges. |
-| **Duplicate Crate Versions** | `cargo tree -d` | 0 duplicates | Redundant crate versions in dependency graph. |
-| **Graph Edge Density** | `codegraph`/`rustgraph`| Reduced | Total caller and dependency edges across target scope. |
-| **Max File SLoC** | `measure.py` | $\le 500$ SLoC | God-module risk; indicates entangled invariants. |
-| **Module / File Count** | `measure.py` | Cohesive count | Track structural decomposition and layer thinning. |
-| **Unbounded Channels / Queues** | `measure.py` | 0 unbounded | Static scan for unbounded memory buffers and channels. |
-| **Non-Test Unwraps / Panics** | `measure.py` | 0 on public paths | Crash hazards outside test modules. |
+| Metric Dimension | Tool / Source | Threshold / Target |
+| :--- | :--- | :--- |
+| **Source Lines of Code (SLoC)** | `measure.py` | Net reduction |
+| **Doc Comment Lines** | `measure.py` | Maintained/expanded |
+| **Public API Footprint (IKL)** | `cargo-public-api` (publicly exported items: `pub fn`, `pub struct`, `pub trait`) | Stable or compressed |
+| **Elevated CRAP Functions** | `cargo-crap` (complexity squared times uncoverage cubed plus complexity) | Reduced (>8.0) |
+| **High CRAP Functions** | `cargo-crap` | Eliminated (>15.0) |
+| **Maintainability Hotspots** | `messrust` | Reduced |
+| **Cyclic Dependency Edges** | `cargo-modules` | 0 cycles |
+| **Duplicate Crate Versions** | `cargo tree -d` | 0 duplicates |
+| **Graph Edge Density (GED)** | `codegraph`/`rustgraph`| Reduced |
+| **Max File SLoC** | `measure.py` | `<= 500` SLoC |
+| **Module / File Count** | `measure.py` | Cohesive count |
+| **Unbounded Channels / Queues** | `measure.py` | 0 unbounded |
+| **Non-Test Unwraps / Panics** | `measure.py` | 0 on public paths |
 
 ---
 
@@ -39,7 +31,7 @@ The following metrics are deterministically extracted by `measure.py` and compar
 | Seam width & caller burden | `IKL`, `PS` | Public API items, `cargo-public-api`, LSP references |
 | Boundary integrity & encapsulation | `BR`, `GED` | Import paths, `cargo-modules dependencies`, re-exports |
 | Impact of changes across seams | `PD` | Frozen change scenario evaluated against seam boundaries |
-| Structure made obsolete & simplified | `DD`, `SLoC` delta | Removed types, collapsed modules, `cargo tree -d` |
+| Structure made obsolete & simplified | `DD` (Deletion Dividend), `SLoC` delta | Removed types, collapsed modules, `cargo tree -d` |
 | Risk & test fragility | `CRAP` | `cargo-crap`, test coverage entering seam |
 | Invariant & state representation | `ISR`, `ITE` | Typestates, enum state machines, compile-time invariants |
 | Fault isolation & runtime buffering | `BBR`, `SPR` | Static channel scan, unwrap scan, `cargo-crap` |
@@ -48,10 +40,10 @@ The following metrics are deterministically extracted by `measure.py` and compar
 
 ## 3. Semantic Architectural Rubrics
 
-Tool counters provide raw evidence, not architectural verdicts. Evaluate candidate seams against these semantic rubrics:
+Tool counters provide raw evidence, not verdicts. Evaluate seams against these rubrics:
 
 ### Interface Knowledge Load (IKL)
-Count the independent facts a caller must know to use the seam correctly:
+Count the independent facts a caller must know to use the seam:
 - **Types:** Domain concepts and representations exposed.
 - **Invariants:** Preconditions and validity constraints the caller must enforce.
 - **Ordering:** Required lifecycle sequences or call ordering.
@@ -60,39 +52,39 @@ Count the independent facts a caller must know to use the seam correctly:
 *Target:* Minimize caller obligations while maximizing capability.
 
 ### Parent Simplification (PS)
-Evaluate what disappeared from the parent module when extracting child $C$:
-- Child concepts and internal representations removed from parent.
+Evaluate what disappeared from the parent when extracting the child:
+- Child concepts and representations removed from parent.
 - State machines and validation rules absorbed behind child seam.
 - Child dependencies eliminated from parent imports.
 *Target:* The parent's implementation becomes shorter and higher-level.
 
 ### Seam Bypass Ratio (BR) & Change Propagation Distance (PD)
-- **Seam Bypass (BR):** Inspect whether callers bypass parent interfaces to reach child submodules directly via deep imports. *Target:* Zero bypass paths.
-- **Change Propagation Distance (PD):** Count intended architectural seams crossed by a minimal correct change for a representative scenario. *Target:* Changes remain contained behind local seams.
+- **Seam Bypass (BR):** Inspect whether callers bypass parent interfaces to reach child submodules via deep imports. *Target:* Zero bypass paths.
+- **Change Propagation Distance (PD):** Count intended seams crossed by a minimal correct change for a representative scenario. *Target:* Changes remain contained behind local seams.
 
 ### Invariant & State Guarantees (ISR & ITE)
 - **Invalid States Representable (ISR):** Zero invalid states permitted by struct field combinations at construction ("parse, don't validate").
 - **Illegal Transitions Expressible (ITE):** Zero illegal state transitions permitted by method signatures (enforced via typestates or sealed enums).
 
 ### Fault Isolation & Runtime Stability (BBR & SPR)
-- **Bounded Buffering Ratio (BBR):** All message channels, thread pools, and queues have explicit capacity bounds to prevent out-of-memory cascades.
+- **Bounded Buffering Ratio (BBR):** All channels, thread pools, and queues have explicit capacity bounds to prevent out-of-memory cascades.
 - **Seam Panic Ratio (SPR):** Zero unhandled `.unwrap()`, `.expect()`, or `panic!` calls on public and cross-crate entry points.
 
 ---
 
 ## 4. Anti-Gaming Guardrails (SSOT)
 
-Size metrics must measure **Source Lines of Code (SLoC)**: non-comment, non-blank lines of Rust code.
+Size metrics must measure **Source Lines of Code (SLoC)**: non-comment, non-blank Rust lines.
 
 - **Comment Preservation Rule:** Stripping, deleting, or compressing doc comments (`///`, `//!`), inline explanations, or rustdoc examples to artificially reduce line counts is strictly prohibited. Any proposal that decreases comment-to-code ratios without justification fails verification.
-- **Semantic Deletion Dividend:** The deletion dividend evaluates the removal of architectural complexity (dead types, obsolete traits, collapsed wrappers, unused dependencies), not explanatory prose.
-- **Isolated Semantic Gauges:** Never combine metric indicators into an aggregate score. Treat each indicator as an isolated semantic dimension.
+- **Semantic Deletion Dividend:** Evaluates removal of architectural complexity (dead types, obsolete traits, collapsed wrappers, unused dependencies), not explanatory prose.
+- **Isolated Semantic Gauges:** Never combine indicators into an aggregate score. Treat indicators in isolation.
 
 ---
 
 ## 5. Progression Scoreboard Schema
 
-In multi-trial iterative refactorings, track metrics across checkpoints using the Scoreboard format generated by `diff.py --scoreboard`:
+In multi-trial refactorings, track metrics across checkpoints using the Scoreboard from `diff.py --scoreboard` (header plus baseline row):
 
 ```markdown
 ## Multi-Trial Progression Scoreboard
@@ -100,6 +92,4 @@ In multi-trial iterative refactorings, track metrics across checkpoints using th
 | Trial / Step | SLoC | Doc Comments | CRAP > 8.0 | Public API | Graph Edges | Tests | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | baseline | 1,850 | 420 | 5 | 34 | 5,120 | 48 passed | baseline |
-| trial-01-soa | 1,720 | 430 | 3 | 34 | 4,800 | 48 passed | kept |
-| trial-02-typestate | 1,680 | 445 | 1 | 28 | 4,200 | 48 passed | kept |
 ```
