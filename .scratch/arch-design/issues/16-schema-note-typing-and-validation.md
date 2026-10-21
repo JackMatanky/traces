@@ -198,7 +198,27 @@ Channels by what the harness provides [P, `research/16-prep/round5/report.md`]:
   dry-run `check_note` tool taking a path and proposed content. A gate is as
   strong as its weakest open write path: the tools must cover every edit
   operation, body included, or native writes must be denied, otherwise agents
-  fall back to native edit tools that can change frontmatter.
+  fall back to native edit tools that can change frontmatter. Guards the MCP
+  host runs on its own, against protocol revision 2026-07-28 [V, [round-6
+  addendum](../research/16-prep/round6/I-mcp-server-guards.md)]: validate
+  before write with the
+  delta rule; a content-hash precondition on edits (the agent must have read
+  the current note); atomic write, then re-read and re-check; a bounded undo
+  journal; delete, move and bulk guards (inbound links, class-set change, a
+  per-call cap); schema-aware input coercion; violations and a short field
+  summary on every read result. Confirmations use a multi round-trip
+  `input_required` result on `tools/call`, which only clients that declare
+  `elicitation` can answer; with none, deny. `requestState` must be
+  integrity-protected and bound to the request digest and a TTL. A notice
+  of notes changed outside the server needs an in-process watcher and
+  baseline: best effort only, since the protocol has no sessions (state across
+  calls is a server-minted handle or process memory, lost on restart), and
+  the result block that carries it may or may not reach the model [H].
+  Not available or not to be relied on: Roots (deprecated; use server
+  configuration), Logging (deprecated; per-request opt-in), `subscriptions/
+  listen` (client opt-in, no known model feed), the Skills extension (no
+  coding harness in the client matrix), tool annotations (hints, untrusted).
+  Server `instructions` now ride `server/discover`, which clients may skip.
 - *An LSP client:* diagnostics; feedback only (`didChange` cannot deny,
   `willSaveWaitUntil` cannot abort a save).
 - *Hooks, sandboxes, deny rules:* documented recipes, not features. Claude
@@ -233,7 +253,8 @@ field are unvalidated; MCP create tools should require a class or a bound
 location. Under `--dry-run` the template check has no output path, so path
 bindings do not apply there. Rejected as a design basis or default: hook-based
 gating; a staging directory without a launch convention (an instruction); a
-watcher daemon (no channel to the agent); auto-revert (destroys data); ACP,
+watcher daemon as a standalone product (no channel to the agent; inside the MCP
+server it is a best-effort notice, above); auto-revert (destroys data); ACP,
 FUSE or WebDAV interception (custom client, kernel extension, fragile mounts);
 git clean filters (break `checkout` and `diff`); `reference-transaction` hooks
 (see commit hashes only); YAML-comment or `$schema` hints in notes (Obsidian
