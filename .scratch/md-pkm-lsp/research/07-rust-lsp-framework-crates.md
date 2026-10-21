@@ -30,6 +30,7 @@ Both are real inputs to ticket 09. Neither one should silently decide the ticket
 - API: minimal — a `Connection { sender, receiver }` over `crossbeam-channel`; no trait, no router, no request routing, no serialization convenience — you write the `while let Ok(msg) = receiver.recv()` loop and every method dispatch by hand.
 - Runtime: zero async requirement.
 - Cancellation: fully manual — `$/cancelRequest` bookkeeping is provided (`ReqQueue::cancel`, verified in source), but actually *interrupting* in-flight work is entirely the implementer's job, every time, for every request type.
+- Shipped PKM-domain datapoint (amended 2026-10-21 by iwe/fileclass research): iwe/iwes (~1.8k stars, weekly releases) is a fully synchronous `lsp_server` server with no async runtime, panic-isolated per message via `catch_unwind` ([tool-iwe](tool-iwe.md) Part 1; adoption figures Part 8). This datapoint does not alter this file's ecosystem-consensus finding that `tower-lsp-server` remains the standard recommendation.
 
 **`lsp-types` (0.97.0)** — pure protocol DTOs, usable independent of transport choice regardless of which framework is picked. 3.18 features gated behind an unstable `proposed` flag.
 

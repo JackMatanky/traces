@@ -431,13 +431,17 @@ Uses `tower-lsp-server`. Known for being fast and lightweight.
 - `sql-lsp` (Rust): Multi-dialect SQL LSP, uses tower-lsp-server
 - `sqls` (Go): The original sqls is Go-based, not Rust
 
+### 4.5 iwe/iwes
+
+Shipped PKM-domain markdown LSP (~1.8k stars). Fully synchronous: `lsp_server::Connection::stdio()` transport, single-threaded `crossbeam` `select!` loop over messages and file-watch events, no async runtime, per-message `catch_unwind` panic isolation (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 1).
+
 ---
 
 ## 5. Common Patterns Extracted
 
 ### 5.1 The Async Transport + Sync Core Bridge
 
-Every production Rust LSP uses this pattern:
+Every production Rust LSP uses this pattern (amended 2026-10-21 by iwe/fileclass research: qualified; iwe/iwes is a counterexample, with sync transport + sync core and file-watch I/O via a crossbeam `select!` loop, no async layer at all ([tool-iwe](tool-iwe.md) Part 1)):
 
 ```
 Editor ←→ [async I/O layer] ←→ [sync analysis core]
@@ -452,7 +456,7 @@ Editor ←→ [async I/O layer] ←→ [sync analysis core]
 
 ### 5.2 Request Cancellation
 
-No LSP implements `$/cancelRequest` handling at the server level. Instead:
+No LSP implements `$/cancelRequest` handling at the server level (now double-sourced: iwe plus the prior four; amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 1). Instead:
 
 | Strategy | How | Used by |
 |----------|-----|---------|
