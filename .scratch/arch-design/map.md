@@ -246,9 +246,11 @@ itself is not implemented here; the map ends at hand-off to specification.
   known explicit class, expanded at query time so the index stays schema-free.
   `required` kept; `step` checked; `date.format` a hint until 23; `origin`,
   `description`, `parent_order` added. Template check is a post-render advisory
-  use case; direct agent edits are detected not prevented, true gating only
-  where MCP tools own the write; `traces check` takes paths, splits schema
-  errors from violations; delta rule; class-set change asks. Date-shaped text:
+  use case; no design depends on harness hooks: the portable guarantee is
+  detect and feed back through tiered channels (lint command, git, a notice on
+  read, LSP), true gating only where MCP tools own every write; `traces check`
+  takes paths, splits schema errors from violations; delta rule; class-set
+  change asks. Date-shaped text:
   no override, no quote convention. Body-section schemas are a separate ticket.
   Handoffs: [query core](./issues/22-query-core-and-plan.md), [note document
   model](./issues/19-note-document-model.md), [temporal

@@ -80,3 +80,8 @@ since naive datetimes no longer embed it.
 See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Schema
 files, including their class `[binding]` tables and the `global` layer, stay
 out of the fingerprint: bindings are expanded at query time.
+
+If a "notes changed since the last check" notice is adopted (16, agent
+guardrail), refresh already knows the changed set; a check watermark and the
+violation keys at the last check would live in a derived store outside the
+index and its fingerprint. Whether that store exists, and its cost, is open.
