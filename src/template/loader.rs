@@ -286,6 +286,7 @@ impl TemplateLoader {
             return Vec::new();
         };
         DirTree::children(dir)
+            .walk()
             .filter_map(|entry| {
                 let Ok(node) = entry else {
                     return None;

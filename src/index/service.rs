@@ -326,6 +326,7 @@ impl IndexerService {
         let index_db = root.join(INDEX_FILE);
         let entries = DirTree::descendants(root)
             .filter(|node| crate::env_vars::is_ignored_dir(node.file_name()))
+            .walk()
             .filter_map(|node| {
                 let node = match node {
                     Ok(node) => node,
