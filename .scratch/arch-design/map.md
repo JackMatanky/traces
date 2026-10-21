@@ -231,25 +231,33 @@ itself is not implemented here; the map ends at hand-off to specification.
   model](./issues/20-index-read-model-and-query-execution.md).
 - [Does the schema subsystem validate and type note data, and where does that
   capability live?](./issues/16-schema-note-typing-and-validation.md): advisory,
-  on-demand check; no parse-time typing, no read-path gating, schema never enters
-  the index or fingerprint. `schema` owns the pure, span-free rule over resolved
-  effective fields (`ResolvedFields::check`), the runtime value type sits below
-  `schema` and `note` (placement to 28), and gating is a host policy over stable
-  violation codes. Layering principle: cli, lsp and mcp are thin hosts of core,
-  whose app layer composes domain modules with plain data and no one-implementor
-  traits, so `FileClassExpander` and its crate-root impl are deleted for a plain
-  class hierarchy. `required` kept (absent, null, blank or empty list is
-  missing); first-listed class wins; `step` checked, `date.format` a hint until
-  23; `origin`, `description`, `parent_order` added. Template check is a
-  post-render advisory use case; direct agent edits are detected not prevented,
-  true gating only where MCP tools own the write; `traces check --before
-  --after`; delta rule; class change asks. Date-shaped text: no override, no
-  quote convention. Handoffs: [query core](./issues/22-query-core-and-plan.md),
-  [note document model](./issues/19-note-document-model.md), [temporal
+  on-demand check; no parse-time typing, no read-path gating, schema never
+  enters the index or fingerprint. `schema` owns the pure, span-free rule over
+  resolved effective fields; the runtime value type sits below `schema` and
+  `note` (placement to 28); gating is a host policy over stable violation codes
+  that carry a layer (`class` or `global`). Layering principle: cli, lsp and mcp
+  are thin hosts of core, whose app layer composes domain modules with plain
+  data and no one-implementor traits, so `FileClassExpander` and its crate-root
+  impl are deleted for a plain class hierarchy. Several classes resolve
+  order-independently (differing declarations are reported once and left
+  unchecked, ancestors reduced away); multiple `extends` parents are kept.
+  `global` becomes the lowest-precedence layer for every note. Class binding by
+  tag and path (class-owned `[binding]`) supplies classes to notes without a
+  known explicit class, expanded at query time so the index stays schema-free.
+  `required` kept; `step` checked; `date.format` a hint until 23; `origin`,
+  `description`, `parent_order` added. Template check is a post-render advisory
+  use case; direct agent edits are detected not prevented, true gating only
+  where MCP tools own the write; `traces check` takes paths, splits schema
+  errors from violations; delta rule; class-set change asks. Date-shaped text:
+  no override, no quote convention. Body-section schemas are a separate ticket.
+  Handoffs: [query core](./issues/22-query-core-and-plan.md), [note document
+  model](./issues/19-note-document-model.md), [temporal
   boundary](./issues/23-temporal-boundary-and-dialects.md), [template
-  boundary](./issues/24-template-engine-boundary.md), [diagnostics](./issues/27-error-and-diagnostic-architecture.md), [crate
+  boundary](./issues/24-template-engine-boundary.md),
+  [diagnostics](./issues/27-error-and-diagnostic-architecture.md), [crate
   topology](./issues/28-crate-topology-and-public-surface.md), [schema
-  internals](./issues/31-schema-internals-simplification.md).
+  internals](./issues/31-schema-internals-simplification.md), [body
+  sections](./issues/32-body-section-schemas.md).
 
 ## Not yet specified
 

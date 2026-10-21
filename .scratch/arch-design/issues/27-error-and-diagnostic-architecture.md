@@ -36,3 +36,9 @@ span-free, severity-free `Violation` records with stable codes and a bounded
 `expected`. This ticket owns the diagnostic envelope, severities, per-code
 overrides and the registry (md-pkm-lsp 25 is a fallible input). Type problems
 are never `Error` by default (ticket 15). Gating is a host policy over codes.
+
+Violations carry a layer (`class` or `global`) and an `origin`; the adapter
+derives a distinct code family `schema.global.*`, which this ticket is asked to
+rank below class violations by default. A violation also carries a `hint` from
+the field's `description`. A broken schema is reported separately from note
+violations.

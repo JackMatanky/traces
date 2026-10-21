@@ -54,3 +54,8 @@ core use case.
 Fact: the cli currently decides whether to load schemas for a query
 (`has_classes`, `src/cli/mod.rs:474-480`), i.e. it owns composition that the
 app layer should own.
+
+`check_note(before, after)` takes a path and content on each side, because
+class binding depends on the path and tags and a move is a class change;
+`traces check` gains `--before-path` and `--after-path`, and distinct exit codes
+for a broken schema and for note violations.

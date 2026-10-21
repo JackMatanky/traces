@@ -51,3 +51,6 @@ check between `render()` and `write()` (parse rendered frontmatter, resolve
 class, call the schema check); it is skipped without frontmatter or class and
 also runs under `--dry-run`. The schema stays a source of values, not of
 prompts (ADR-0006).
+
+Under `--dry-run` no output path is computed, so the post-render check cannot
+apply path bindings (frontmatter and tag bindings still apply).

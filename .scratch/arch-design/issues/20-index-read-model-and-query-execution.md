@@ -54,3 +54,11 @@ datetimes are persisted as civil values, so the cache holds no machine zone and
 its format changes. Collation sort keys are never persisted. Any secondary-table
 key order must agree with the filter relations (Int and Float compare by
 value; links by folded target).
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Class
+binding by tag and path is expanded at query time into the existing `Class`,
+`Tag` and `Path` atoms, so the index stores no derived class and learns
+nothing about schemas. A "has a known explicit class" exclusion is needed in
+source selection; a secondary lookup for it would avoid the `Not` full scan.

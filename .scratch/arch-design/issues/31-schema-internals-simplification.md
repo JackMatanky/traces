@@ -36,3 +36,9 @@ for the 12k lines (62 percent test code).
 Inputs: ticket 16 Answer, crate topology (28).
 
 Graduated from fog: "Schema internals" in the map.
+
+Also from 16: a strict `[binding]` table (`tags`, `paths` with `!`
+exclusions) on class schemas, not inherited; `global` becomes a lowest-
+precedence layer for every note (update the invariant at
+`src/schema/mod.rs:48-51`); new schema keys `description` and an `origin`
+record; multiple `extends` parents are kept.

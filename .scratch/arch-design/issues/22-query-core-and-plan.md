@@ -68,3 +68,12 @@ empty class set). Production always attaches one when classes are used
 a hazard for a new host or library caller, not a current user-visible bug.
 Where the hierarchy type lives is for
 this ticket and 28.
+
+Binding (also from 16): expand `@class` (and `@class*`) into `Class | Tag |
+Path` atoms from class-owned `[binding]` data (tags with nested matching,
+vault-relative globs with `!` exclusions) handed in by the app layer. A note
+with a known explicit class uses only that class, so bound members need an
+exclusion atom ("has a known explicit class"). Optimise folder-style globs
+(`folder/**`) to the `paths_in_folder` lookup and benchmark the remaining
+`Path` scan (currently linear, `src/query/service.rs:417-424`). Membership and
+the validation resolver must agree, tested on the unreduced class set.

@@ -74,3 +74,9 @@ See [ticket 15's Answer](./15-coercion-and-comparison-policy.md). The cache
 format change (civil datetimes, `Int`/`Float`, normalized `Link`) must
 invalidate existing indexes. A host zone change need not invalidate the index,
 since naive datetimes no longer embed it.
+
+## Inputs from the schema typing decision
+
+See [ticket 16's Answer](./16-schema-note-typing-and-validation.md). Schema
+files, including their class `[binding]` tables and the `global` layer, stay
+out of the fingerprint: bindings are expanded at query time.

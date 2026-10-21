@@ -52,3 +52,7 @@ check is span-blind and takes a field map; adapters need a span per field key
 Merging inline fields into that map is app-layer business and is not promised
 by 16. An MCP agent that edits files directly is checked post hoc; it adds no
 write-back requirement here.
+
+Ticket 32 (body-section schemas) is blocked by this ticket: it needs to know
+which body facts and spans the note model keeps. Class binding reads a note's
+tags and path, both already available.

@@ -51,9 +51,11 @@ the error-mode principle: advisory, never gating.
 **Decision:** schemas validate note data as an advisory, on-demand check. They
 never type values at parse time, never gate the read or index path, and never
 enter the index or its fingerprint. `schema` owns the rule "is this value valid
-for this declaration" as a pure, span-free function over a resolved set of
-effective fields. `note` keeps classification (tickets 14 and 15). Gating is a
-host policy over stable violation codes, not a property of the check.
+for this declaration" as a pure, span-free function over resolved effective
+fields. `note` keeps classification (tickets 14 and 15). Gating is a host
+policy over stable violation codes, not a property of the check. Which schemas
+apply to a note is decided by a class-binding resolver (frontmatter class, tag
+and path bindings) plus a `global` layer, both specified below.
 
 **Roles of the schema:** (a) value and source provider for templates and LSP
 completion; (b) advisory frontmatter checker (LSP diagnostics, post-render
@@ -83,18 +85,28 @@ Use cases are functions with explicit inputs, not a held context object.
   re-implemented.
 - Kinds from `check`: kind mismatch, not in select set, out of range, `step`
   mismatch, missing required, `multi` arity, and unknown field (always returned
-  with an optional `closest` match; hosts filter). Class resolution adds
-  unknown class and `schema.class-conflict`; the app layer adds link target
-  missing or wrong class (next bullet). Expected sets are bounded (count,
-  truncated flag, closest few via `strsim`).
+  with an optional `closest` match; hosts filter). Each violation carries its
+  layer (`class` or `global`), its `origin` and a `hint` taken from the field's
+  `description`, so an agent can self-correct. Class resolution adds unknown
+  class and `schema.class-conflict`; the app layer adds link target missing or
+  wrong class (next bullet). Expected sets are bounded (count, truncated flag,
+  closest few via `strsim`).
 - Tier-2 `file` checks: the check exposes folder, extension and class
   constraints as data; the app layer performs index lookups. No oracle trait.
 - `required` is kept: missing means absent, `null`, blank string or empty list;
   `false` and `0` are present. One code, `found` says absent or blank.
 - Several classes: inheritance resolves within each class by the existing
-  `extends` rule (first-listed parent wins); then the first-listed class wins
-  the whole declaration; unknown classes are skipped; one advisory
-  `schema.class-conflict` per note and field when types differ.
+  `extends` rule (multiple parents are kept; first-listed parent wins, a child
+  redefinition wins over its parents). The resolved class set is reduced to its
+  most-derived members, so an ancestor never conflicts with its own
+  descendant. Between unrelated classes the rule is order-independent:
+  identical declarations (for example through a shared `$ref`) are not a
+  conflict; differing declarations produce one `schema.class-conflict` per note
+  and class set, and value checks on that field are skipped, while `required`
+  and `multi` arity are still checked if either class declares them. Sibling
+  parents that collide with no child redefinition are reported the same way.
+  Unknown classes are skipped. First-listed wins does not decide class-versus-
+  class conflicts.
 - Option semantics, with the principle that no declared option is silently
   ignored: `min`/`max` checked; `step` checked (exact for integers, relative
   tolerance for floats); `date.format` is a write-format hint and the check
@@ -105,6 +117,36 @@ Use cases are functions with explicit inputs, not a held context object.
   field type). `suggest_class` waits for the LSP.
 - The check takes a field map; merging inline fields into it is the app layer's
   business and is not promised here (ticket 19).
+
+**Global layer:** the reserved `global` schema stays a `$ref` pool and also
+becomes the lowest-precedence layer applied to the frontmatter of every note,
+classed or not. It is not a class (no `@global` query, never extended); a class
+declaration of the same field always wins; `required` in `global` still degrades
+to `false`; a class may opt out of a global field with `excludes`. Violations
+from this layer carry layer `global`, and the diagnostic adapter derives a
+distinct code family `schema.global.*`, so hosts can apply a different policy
+(for example hint-level in the LSP, ignored on unclassed notes). Default
+severities belong to ticket 27, which is asked to rank the `global` family
+below class violations. This changes the documented invariant in
+`src/schema/mod.rs:48-51`; the doc comment and the survey are updated with the
+specification.
+
+**Class binding:** a note's class set has three sources: its frontmatter class
+field, `tags` (nested tags count, as in the existing `Tag` source atom) and
+`paths` (vault-relative globs in the existing glob dialect, with `!` exclusion
+patterns) declared in a strict, non-inherited `[binding]` table on the class
+schema. Bookmarks and Base views are not sources. Rule: a note with one or more
+known explicit classes uses only those; bindings are defaults for notes
+without a known explicit class (an empty or unknown class value does not
+suppress them, so a typo does not silently drop validation). Expansion happens
+at query time into the existing `Class`, `Tag` and `Path` atoms plus a
+"has a known explicit class" exclusion, so the index and its fingerprint never
+learn about bindings. One resolver answers both "which classes does note n
+have" and "which notes does class c claim" (with hierarchy expansion for
+`@book*`); equivalence between the two is a tested invariant, stated on the
+unreduced set. A move or a binding-tag edit changes the class set and is a
+class change (see the guardrail). Query cost of path bindings (the `Path` atom
+scans all paths today) is for ticket 22 to optimise and benchmark.
 
 **Class hierarchy as data replaces `FileClassExpander`:** `schema` produces a
 plain hierarchy keyed by a single normalising `ClassName` (the index stores
@@ -135,17 +177,24 @@ of templates (frontmatter is raw text to the template AST) are rejected.
 `willSaveWaitUntil` cannot abort a save. Layers: constraints given to the agent
 up front (MCP tool input schemas, a schema resource; large enums and strftime
 formats are not projected and are checked after the call); a blocking check
-through one core use case `check_note(before, after)`, exposed as `traces check
---before <file|-> --after <file|->` (git is optional sugar) and as MCP tools;
-advisory LSP diagnostics; a commit or CI backstop. Direct file edits get
+through one core use case `check_note(before, after)` where each side is a path
+plus content, exposed as `traces check --before <file|-> --after <file|->` with
+`--before-path`/`--after-path` for stdin (git is optional sugar) and as MCP
+tools; advisory LSP diagnostics; a commit or CI backstop. Direct file edits get
 detection and feedback only, because a pre-write hook sees the edit instruction
 and not the resulting file [H, from tool documentation, not tested]. True gating
 exists only where the tool owns the write (MCP edit tools). The delta rule
 blocks only violations introduced by the edit, keyed `(field, code,
-hash(value))`, not by list position. Changing a note's class, or setting an
-unknown class, asks the user and denies when no confirmation channel exists.
-Host policy maps each code to ignore, warn or reject. The MCP crate renders
-JSON Schema and `isError` results; core has no protocol types.
+hash(value))`, not by list position. A change of the class set, including one
+caused by a move or an edit of a binding tag, asks the user and denies when no
+confirmation channel exists; so does setting an unknown class. Host policy maps
+each code to ignore, warn or reject. The MCP crate renders JSON Schema and
+`isError` results; core has no protocol types. `traces check` exits with a
+distinct code for a broken schema (it never reads as "notes are fine") and
+another for note violations. Notes with no class, no binding and no global
+field are unvalidated; MCP create tools should require a class or a bound
+location. Under `--dry-run` the template check has no output path, so path
+bindings do not apply there.
 
 **MCP edits:** how an MCP edit tool applies a change to a note (a lossless
 frontmatter edit) belongs to the MCP host, not core. 16 puts no write-back or
@@ -182,12 +231,31 @@ duration-shaped strings are promoted regardless of quotes.
   trait).
 - *Binding the agent through the LSP:* rejected (advisory by protocol).
 - *Default severities in the check:* not adopted; ticket 27 owns severities.
+- *Last-listed wins (Fileclass), first-listed wins, conjunction of all classes
+  (IWE, JSON Schema `allOf`), single class only:* order-dependent rules were
+  rejected as the cross-class rule (reordering a class list must not flip
+  results, nothing is masked silently); single-class only is rejected because
+  Fileclass, Metadata Menu, IWE and Logseq all support several [V].
+- *JSON Schema as the schema format:* rejected (IWE uses it for validation
+  only; Traces schemas also drive prompts, completion, file links and
+  label/value mapping); JSON Schema remains an export for MCP.
+- *Binding only by frontmatter class* (the first Answer) and *binding stored in
+  the index:* rejected; binding by tag and path is conventional in Metadata
+  Menu, Fileclass and IWE, and query-time expansion keeps the index
+  schema-free. Union and priority-ordered combination of explicit and bound
+  classes (Metadata Menu, Fileclass, IWE) were considered; suppression was
+  chosen because bindings exist to cover notes without a class, it creates the
+  fewest false conflicts and it keeps one simple rule. Fallback if the query
+  exclusion proves costly: union with source priority.
+- *Global as a reference pool only, or applied only to classed notes:*
+  rejected; applying it to every note types shared fields like `due` in
+  unclassed notes without a binding mechanism.
 
 **Invariant owners:** validity of a value for a declaration (`schema`);
 classification (note parser, tickets 14 and 15); select and link equality
 (value-semantics module, ticket 15); class-name normalisation (one `ClassName`);
-class resolution, delta and class-change detection (core app layer); policy per
-code (each host).
+class binding resolution, class-change detection and the delta (core app
+layer); policy per code (each host); the `global` layer's precedence (`schema`).
 
 **Becomes removable:** `FileClassExpander`, `src/file_class_expander.rs`, the
 `ClassExpansionMode` out-parameter, the `Option<Arc<dyn>>` field and the unknown
@@ -204,9 +272,16 @@ was run. Drift since `207cc3fb` touched `query/service.rs`,
 state API used by the template `Schema` handle; the seams cited here (the
 `FileClassExpander` trait, the `render()`/`write()` split) still exist.
 Research: [brief](../research/16-prep/brief.md) (revision 2 plus MCP section;
-its consumer-module recommendation is superseded here) and the round-3 scouts
-and [synthesis](../research/16-prep/round3/report.md). Scout E's default
-severities and element-indexed delta key are superseded by this Answer.
+its consumer-module recommendation is superseded here), the round-3
+[synthesis](../research/16-prep/round3/report.md) and the round-4
+[external precedent](../research/16-prep/round4/report.md). Verified in round
+4: Fileclass last-wins and class binding sources, Metadata Menu's combined
+mapping, Logseq multi-parent `extends`, IWE's design, Umbraco's rejection of
+conflicting compositions. Corrected: the earlier attribution of first-listed
+wins to Metadata Menu was wrong, and the arXiv paper cited for "agents ignore
+advisory warnings" does not show that, so the guardrail rests on protocol
+arguments and not on that paper. Scout E's default severities and
+element-indexed delta key are superseded by this Answer.
 
 **Remains unresolved (handed off):**
 
@@ -229,3 +304,12 @@ severities and element-indexed delta key are superseded by this Answer.
 - Schema internals (graduated fog): see ticket 31.
 - How MCP edit tools apply note changes, if they need edit ranges: raised when
   MCP is specified (ticket 26 or later).
+- Body-section schemas (required headings, order, depth, later blocks and
+  token budgets): [ticket 32](./32-body-section-schemas.md). 16 keeps the
+  violation locator open to more than a frontmatter key.
+- Query-side expansion of bindings, the "has a known explicit class" atom and
+  the path-scan optimisation: [query core](./22-query-core-and-plan.md).
+- Rank of the `schema.global.*` family and the schema-error exit code:
+  [diagnostics](./27-error-and-diagnostic-architecture.md).
+- `[binding]` table and `global` semantics in the schema format and internals:
+  [ticket 31](./31-schema-internals-simplification.md).
