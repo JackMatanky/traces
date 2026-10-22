@@ -128,8 +128,8 @@ impl FilePathTracker {
     /// Windows. Entries with a path suffix in `companion_suffixes` are skipped.
     /// A live entry has a readable target and is included when that target
     /// exists or its existence cannot be checked. Dangling or unreadable
-    /// entries are omitted. An absent or non-directory root returns an
-    /// empty list.
+    /// entries are omitted. An absent or non-directory root returns an empty
+    /// list.
     ///
     /// # Errors
     ///
@@ -359,11 +359,10 @@ impl FilePathTracker {
 
     /// Lazily yields the store root's entry paths, companion files excluded.
     ///
-    /// Walks the root one level deep, absorbing an absent or non-directory
-    /// root into an empty walk, and skips any entry whose file name ends in
-    /// one of `companion_suffixes`. Failures while reading the root or an
-    /// entry surface as [`StoreIo`] items at their original position in the
-    /// walk.
+    /// Walks the root one level deep, absorbing an absent or non-directory root
+    /// into an empty walk, and skips any entry whose file name ends in one of
+    /// `companion_suffixes`. Failures while reading the root or an entry
+    /// surface as [`StoreIo`] items at their original position in the walk.
     ///
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
     fn entry_paths(
