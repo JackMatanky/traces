@@ -1665,7 +1665,8 @@ mod tests {
                                \"on-hold\"\n\n[schemas]\nclass_field = \
                                \"kind\"\n";
             project.write_file(".traces/config.toml", config_toml);
-            let discovered = crate::config::LocalConfigFile::at(project.root());
+            let discovered =
+                crate::config::LocalConfigFile::from_root(project.root());
             project
                 .service()
                 .trust(&crate::config::TrustRequest::from(&discovered))

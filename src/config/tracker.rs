@@ -18,25 +18,6 @@ pub(crate) struct TrackerStore {
 }
 
 impl TrackerStore {
-    /// Creates a Tracker Store in the OS tracked-config directory.
-    #[must_use]
-    #[inline]
-    pub(crate) fn new() -> Self {
-        Self {
-            store: FilePathTracker::from(dirs::TRACKED_CONFIGS.clone()),
-        }
-    }
-
-    /// Creates a Tracker Store at an explicit root for tests.
-    #[cfg(any(test, feature = "test-utils"))]
-    #[inline]
-    #[must_use]
-    pub(crate) fn at(root: PathBuf) -> Self {
-        Self {
-            store: FilePathTracker::at(root),
-        }
-    }
-
     /// Records a Tracked Config Path, failing if the store cannot persist it.
     ///
     /// Trust grants use this method; configuration loading uses
@@ -90,6 +71,27 @@ impl TrackerStore {
     pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
         self.store.clean(CleanMode::EntriesOnly).map_err(Into::into)
     }
+
+    /// Creates a Tracker Store at an explicit root instead of the OS
+    /// tracked-config directory.
+    #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    #[inline]
+    pub(crate) fn for_test<P: Into<PathBuf>>(root: P) -> Self {
+        Self {
+            store: FilePathTracker::for_test(root),
+        }
+    }
+}
+
+impl Default for TrackerStore {
+    /// Creates a Tracker Store in the OS tracked-config directory.
+    #[inline]
+    fn default() -> Self {
+        Self {
+            store: FilePathTracker::from(dirs::TRACKED_CONFIGS.clone()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -110,7 +112,8 @@ mod tests {
         impl Fixture {
             pub(super) fn new() -> Self {
                 let temp = tempfile::tempdir().expect("create temp dir");
-                let store = TrackerStore::at(temp.path().join("tracked-store"));
+                let store =
+                    TrackerStore::for_test(temp.path().join("tracked-store"));
                 Self {
                     temp,
                     store,

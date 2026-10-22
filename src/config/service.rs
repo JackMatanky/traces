@@ -41,29 +41,6 @@ pub struct ConfigService {
 }
 
 impl ConfigService {
-    /// Creates a service backed by the OS Tracker Store and Trust Store.
-    #[must_use]
-    #[inline]
-    pub(crate) fn new() -> Self {
-        Self {
-            tracked: TrackerStore::new(),
-            trust: TrustStore::new(),
-        }
-    }
-
-    /// Creates a service with explicit Tracker Store and Trust Store roots.
-    ///
-    /// Tests use isolated stores instead of the OS state directories.
-    #[cfg(any(test, feature = "test-utils"))]
-    #[inline]
-    #[must_use]
-    pub fn at(tracked_root: PathBuf, trusted_root: PathBuf) -> Self {
-        Self {
-            tracked: TrackerStore::at(tracked_root),
-            trust: TrustStore::at(trusted_root),
-        }
-    }
-
     /// Returns the trust-administration store.
     #[inline]
     #[must_use]
@@ -197,6 +174,35 @@ impl ConfigService {
     ) -> ConfigDiscoveryResult<TrustRequests> {
         resolve_trust_subjects(&ConfigLocator::from_env(), path, scope)
     }
+
+    /// Creates a service backed by explicit Tracker Store and Trust Store roots
+    /// instead of the OS state directories.
+    ///
+    /// Tests use isolated stores; production code uses
+    /// [`ConfigService::default`] for the OS-backed stores.
+    #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    #[inline]
+    pub fn for_test<P: Into<PathBuf>, Q: Into<PathBuf>>(
+        tracked_root: P,
+        trusted_root: Q,
+    ) -> Self {
+        Self {
+            tracked: TrackerStore::for_test(tracked_root),
+            trust: TrustStore::for_test(trusted_root),
+        }
+    }
+}
+
+impl Default for ConfigService {
+    /// Creates a service backed by the OS Tracker Store and Trust Store.
+    #[inline]
+    fn default() -> Self {
+        Self {
+            tracked: TrackerStore::default(),
+            trust: TrustStore::default(),
+        }
+    }
 }
 
 /// Resolves a path with a [`ConfigLocator`] using
@@ -296,8 +302,10 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let tracked_root = temp.path().join("tracked-store");
             let trusted_root = temp.path().join("trust-store");
-            let service =
-                ConfigService::at(tracked_root.clone(), trusted_root.clone());
+            let service = ConfigService::for_test(
+                tracked_root.clone(),
+                trusted_root.clone(),
+            );
             Self {
                 temp,
                 tracked_root,
@@ -551,7 +559,7 @@ mod tests {
             let cwd = fixture.target_dir("project");
             let config_path = Fixture::create_config(&cwd, "");
             let candidates = DiscoveredConfigs {
-                local: LocalConfigFile::at(&cwd),
+                local: LocalConfigFile::from_root(&cwd),
                 global: None,
             };
             (cwd, config_path, candidates)

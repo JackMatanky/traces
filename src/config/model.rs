@@ -187,8 +187,8 @@ impl Config {
 
     /// Builds a resolved configuration without Config File discovery for tests.
     ///
-    /// Use [`super::service::ConfigService::at`] with TOML fixtures to test the
-    /// real loading pipeline.
+    /// Use [`super::service::ConfigService::for_test`] with TOML fixtures to
+    /// test the real loading pipeline.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]

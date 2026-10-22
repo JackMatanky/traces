@@ -174,7 +174,7 @@ impl LocalConfigFile<Discovered> {
     /// Derives a local Config File path from the project root.
     ///
     /// Path construction does not require the file to exist.
-    pub(crate) fn at(root: &Path) -> Self {
+    pub(crate) fn from_root(root: &Path) -> Self {
         Self::new(root.to_path_buf(), root.join(LOCAL_CONFIG_FILE), Discovered)
     }
 
@@ -342,7 +342,7 @@ mod tests {
         fn at_places_the_config_under_the_root() {
             let root = Path::new("/project");
 
-            let config = LocalConfigFile::at(root);
+            let config = LocalConfigFile::from_root(root);
 
             assert_eq!(config.root(), root);
             assert_eq!(
@@ -414,8 +414,9 @@ mod tests {
                 std::fs::create_dir_all(path.parent().expect("config parent"))
                     .expect("create config directory");
                 std::fs::write(&path, content).expect("write config");
-                let tracker = TrackerStore::at(temp.path().join("tracked"));
-                let trust = TrustStore::at(temp.path().join("trust"));
+                let tracker =
+                    TrackerStore::for_test(temp.path().join("tracked"));
+                let trust = TrustStore::for_test(temp.path().join("trust"));
                 Self {
                     _temp: temp,
                     root,

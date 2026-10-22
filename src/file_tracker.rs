@@ -34,16 +34,6 @@ pub(crate) struct FilePathTracker {
 }
 
 impl FilePathTracker {
-    /// Creates a store rooted at an arbitrary path for tests.
-    #[cfg(any(test, feature = "test-utils"))]
-    #[inline]
-    #[must_use]
-    pub(crate) fn at(root: PathBuf) -> Self {
-        Self {
-            root: StateDirRoot::from(root),
-        }
-    }
-
     /// Records `target`'s canonical path in this store.
     ///
     /// Canonicalizes `target`, hashes the canonical path, and creates the store
@@ -380,6 +370,17 @@ impl FilePathTracker {
             },
         )
     }
+
+    /// Creates a store rooted at an explicit path instead of an OS state
+    /// directory.
+    #[cfg(any(test, feature = "test-utils"))]
+    #[inline]
+    #[must_use]
+    pub(crate) fn for_test<P: Into<PathBuf>>(root: P) -> Self {
+        Self {
+            root: StateDirRoot::from(root.into()),
+        }
+    }
 }
 
 impl From<StateDirRoot> for FilePathTracker {
@@ -550,7 +551,7 @@ mod tests {
     impl Fixture {
         fn new() -> Self {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let store = FilePathTracker::at(temp.path().join("store"));
+            let store = FilePathTracker::for_test(temp.path().join("store"));
             Self {
                 temp,
                 store,

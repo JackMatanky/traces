@@ -1154,10 +1154,12 @@ impl<T> tracing::instrument::WithSubscriber for traces::testing::Config
 impl<T> yoke::erased::ErasedDestructor for traces::testing::Config where T: 'static
 pub struct traces::testing::ConfigService
 impl traces::testing::ConfigService
-pub fn traces::testing::ConfigService::at(std::path::PathBuf, std::path::PathBuf) -> Self
+pub fn traces::testing::ConfigService::for_test<P: core::convert::Into<std::path::PathBuf>, Q: core::convert::Into<std::path::PathBuf>>(P, Q) -> Self
 pub fn traces::testing::ConfigService::untrust(&self, &traces::testing::TrustRequest) -> core::result::Result<usize, traces::config::error::ConfigTrustError>
 impl core::clone::Clone for traces::testing::ConfigService
 pub fn traces::testing::ConfigService::clone(&self) -> Self
+impl core::default::Default for traces::testing::ConfigService
+pub fn traces::testing::ConfigService::default() -> Self
 impl core::fmt::Debug for traces::testing::ConfigService
 pub fn traces::testing::ConfigService::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for traces::testing::ConfigService

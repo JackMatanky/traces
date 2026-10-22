@@ -89,9 +89,9 @@ src/config/error.rs: pub(crate) fn invalid_field_key(
 src/config/error.rs: pub(crate) type ConfigDiscoveryResult<T> =
 src/config/file.rs: pub(crate) const LOCAL_CONFIG_DIR: &str = ".traces";
 src/config/file.rs: pub(crate) const LOCAL_CONFIG_FILE: &str = ".traces/config.toml";
-src/config/file.rs: pub(crate) fn at(root: &Path) -> Self {
 src/config/file.rs: pub(crate) fn from_config_path(path: &Path) -> Option<Self> {
 src/config/file.rs: pub(crate) fn from_content_for_test(
+src/config/file.rs: pub(crate) fn from_root(root: &Path) -> Self {
 src/config/file.rs: pub(crate) fn into_trusted(
 src/config/file.rs: pub(crate) fn path(&self) -> &Path {
 src/config/file.rs: pub(crate) fn root(&self) -> &Path {
@@ -249,19 +249,17 @@ src/config/raw.rs: pub(crate) tags: Option<String>,
 src/config/raw.rs: pub(crate) tasks: RawTaskConfig,
 src/config/raw.rs: pub(crate) templates: RawTemplateConfig,
 src/config/raw.rs: pub(crate) title: Option<String>,
-src/config/service.rs: pub fn at(tracked_root: PathBuf, trusted_root: PathBuf) -> Self {
+src/config/service.rs: pub fn for_test<P: Into<PathBuf>, Q: Into<PathBuf>>(
 src/config/service.rs: pub fn untrust(
 src/config/service.rs: pub struct ConfigService {
 src/config/service.rs: pub(crate) const fn tracker_store(&self) -> &TrackerStore {
 src/config/service.rs: pub(crate) const fn trust_store(&self) -> &TrustStore {
 src/config/service.rs: pub(crate) fn load(&self, cwd: &Path) -> Result<Config, ConfigError> {
-src/config/service.rs: pub(crate) fn new() -> Self {
 src/config/service.rs: pub(crate) fn trust(
 src/config/service.rs: pub(crate) fn trust_subjects(
-src/config/tracker.rs: pub(crate) fn at(root: PathBuf) -> Self {
 src/config/tracker.rs: pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
+src/config/tracker.rs: pub(crate) fn for_test<P: Into<PathBuf>>(root: P) -> Self {
 src/config/tracker.rs: pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
-src/config/tracker.rs: pub(crate) fn new() -> Self {
 src/config/tracker.rs: pub(crate) fn record(&self, path: &Path) -> Result<(), ConfigTrustError> {
 src/config/tracker.rs: pub(crate) fn record_best_effort(&self, path: &Path) {
 src/config/tracker.rs: pub(crate) struct TrackerStore {
@@ -274,12 +272,11 @@ src/config/trust.rs: pub enum TrustRequest {
 src/config/trust.rs: pub(crate) const fn status(&self) -> ConfigTrustStatus {
 src/config/trust.rs: pub(crate) enum ConfigTrustCheck {
 src/config/trust.rs: pub(crate) enum TrustScope {
-src/config/trust.rs: pub(crate) fn at(root: PathBuf) -> Self {
 src/config/trust.rs: pub(crate) fn clean(&self) -> Result<usize, ConfigTrustError> {
 src/config/trust.rs: pub(crate) fn config_file(&self) -> Option<&Path> {
 src/config/trust.rs: pub(crate) fn config_file_trust_check(
+src/config/trust.rs: pub(crate) fn for_test<P: Into<PathBuf>>(root: P) -> Self {
 src/config/trust.rs: pub(crate) fn list(&self) -> Result<Vec<PathBuf>, ConfigTrustError> {
-src/config/trust.rs: pub(crate) fn new() -> Self {
 src/config/trust.rs: pub(crate) fn root_path(&self) -> &Path {
 src/config/trust.rs: pub(crate) fn trust(
 src/config/trust.rs: pub(crate) fn trust_status(
@@ -399,9 +396,9 @@ src/file.rs: pub(crate) struct BaseNameRef<'a>(&'a str);
 src/file.rs: pub(crate) struct FileName(String);
 src/file_tracker.rs: pub enum FilePathTrackerError {
 src/file_tracker.rs: pub(crate) enum CleanMode<'a> {
-src/file_tracker.rs: pub(crate) fn at(root: PathBuf) -> Self {
 src/file_tracker.rs: pub(crate) fn clean(
 src/file_tracker.rs: pub(crate) fn contains(
+src/file_tracker.rs: pub(crate) fn for_test<P: Into<PathBuf>>(root: P) -> Self {
 src/file_tracker.rs: pub(crate) fn from_target(
 src/file_tracker.rs: pub(crate) fn list_all(
 src/file_tracker.rs: pub(crate) fn read_companion(

@@ -166,25 +166,6 @@ pub(crate) struct TrustStore {
 }
 
 impl TrustStore {
-    /// Creates a Trust Store in the OS state directory.
-    #[must_use]
-    #[inline]
-    pub(crate) fn new() -> Self {
-        Self {
-            store: FilePathTracker::from(dirs::TRUSTED_CONFIGS.clone()),
-        }
-    }
-
-    /// Creates a Trust Store at an explicit root for tests.
-    #[cfg(any(test, feature = "test-utils"))]
-    #[inline]
-    #[must_use]
-    pub(crate) fn at(root: PathBuf) -> Self {
-        Self {
-            store: FilePathTracker::at(root),
-        }
-    }
-
     /// Grants trust for a [`TrustRequest`]'s workspace root.
     ///
     /// For a Config File request, records its Companion Hash before trusting
@@ -326,6 +307,27 @@ impl TrustStore {
             .clean(CleanMode::WithCompanions(&[COMPANION_SUFFIX]))
             .map_err(Into::into)
     }
+
+    /// Creates a Trust Store at an explicit root instead of the OS state
+    /// directory.
+    #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    #[inline]
+    pub(crate) fn for_test<P: Into<PathBuf>>(root: P) -> Self {
+        Self {
+            store: FilePathTracker::for_test(root),
+        }
+    }
+}
+
+impl Default for TrustStore {
+    /// Creates a Trust Store in the OS state directory.
+    #[inline]
+    fn default() -> Self {
+        Self {
+            store: FilePathTracker::from(dirs::TRUSTED_CONFIGS.clone()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -347,7 +349,8 @@ mod tests {
         impl Fixture {
             pub(super) fn new() -> Self {
                 let temp = tempfile::tempdir().expect("create temp dir");
-                let store = TrustStore::at(temp.path().join("trust-store"));
+                let store =
+                    TrustStore::for_test(temp.path().join("trust-store"));
                 Self {
                     temp,
                     store,

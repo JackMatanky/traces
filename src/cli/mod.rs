@@ -224,7 +224,7 @@ impl Commands {
 pub fn run() -> Result<CommandOutcome, CliError> {
     let provider: Arc<dyn DialogProvider> =
         Arc::new(crate::TerminalDialogProvider::new());
-    Cli::parse().run(&ConfigService::new(), provider)
+    Cli::parse().run(&ConfigService::default(), provider)
 }
 
 /// Reads the process current directory as a [`Cwd`].
@@ -1059,7 +1059,7 @@ mod tests {
         ) {
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path().join("project");
-            let service = ConfigService::at(
+            let service = ConfigService::for_test(
                 temp.path().join("tracked-store"),
                 temp.path().join("trust-store"),
             );
@@ -1440,7 +1440,7 @@ mod tests {
         #[test]
         fn no_command_returns_no_command_error() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let service = ConfigService::at(
+            let service = ConfigService::for_test(
                 temp.path().join("tracked-store"),
                 temp.path().join("trust-store"),
             );
@@ -1535,7 +1535,7 @@ mod tests {
         #[test]
         fn load_config_fails_without_a_config_file() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            let service = ConfigService::at(
+            let service = ConfigService::for_test(
                 temp.path().join("tracked-store"),
                 temp.path().join("trust-store"),
             );

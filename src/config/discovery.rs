@@ -103,7 +103,7 @@ impl ConfigLocator {
             if self.ceilings.iter().any(|ceiling| ceiling == ancestor) {
                 break;
             }
-            let candidate = LocalConfigFile::at(ancestor);
+            let candidate = LocalConfigFile::from_root(ancestor);
             if is_config_file(candidate.path())? {
                 return Ok(candidate);
             }
@@ -167,7 +167,7 @@ fn collect_descendant_configs(
         if !node.is_dir() {
             continue;
         }
-        let candidate = LocalConfigFile::at(node.path());
+        let candidate = LocalConfigFile::from_root(node.path());
         if is_config_file(candidate.path())? {
             configs.push(candidate);
         }

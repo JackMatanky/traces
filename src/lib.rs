@@ -400,7 +400,7 @@ mod test_support {
         /// wrong.
         #[inline]
         pub fn trust(&self) {
-            let config = LocalConfigFile::at(&self.root);
+            let config = LocalConfigFile::from_root(&self.root);
             self.service
                 .trust(&TrustRequest::from(&config))
                 .expect("trust project config");
@@ -641,7 +641,10 @@ mod test_support {
     #[inline]
     #[must_use]
     pub fn fixture_service(root: &Path) -> ConfigService {
-        ConfigService::at(root.join("tracked-store"), root.join("trust-store"))
+        ConfigService::for_test(
+            root.join("tracked-store"),
+            root.join("trust-store"),
+        )
     }
 
     /// Writes a minimal local config at `root/.traces/config.toml` configuring
@@ -666,7 +669,7 @@ mod test_support {
             .expect("create config parent");
         std::fs::write(&config_path, LOCAL_CONFIG_TOML)
             .expect("write config file");
-        let config = LocalConfigFile::at(root);
+        let config = LocalConfigFile::from_root(root);
         service
             .trust(&TrustRequest::from(&config))
             .expect("trust project config");
