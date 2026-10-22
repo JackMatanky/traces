@@ -88,3 +88,7 @@ Consolidated: `research/22-template-intelligence.md` (637 lines, §0–§9) — 
 
 - **Which hover tiers render (22's open handoff to 26) resolved**: render `Doc` and `Identified`, suppress only `None`; the construction-failure state gets an explicit degradation banner (never silently empty: failed-load is byte-identical to schema-less).
 - **Receipt: template identifiers are non-renamable v1** (prepareRename returns `Ok(null)`). Template hover rides 26's negotiated-markdown renderer with producer-owned caps.
+
+## Input from 27 (2026-10-22)
+
+- Q24(b) answer from 27: template references appear on BOTH channels. Goto-definition over template refs ships as soon as 22's resolution logic exists (not span-gated); documentLink emission for template refs waits for 22's exact-span source (no line-granular underlines); dynamic targets are dropped from emission; existence gated on 22's Q20(b) overlay set. Risk note: Traces ships minijinja 3.0.1 while 22 designs `machinery::parse` behind exact-pin `=2.24.0`, a genuine dep mismatch 22 must reconcile before template documentLinks can exist.

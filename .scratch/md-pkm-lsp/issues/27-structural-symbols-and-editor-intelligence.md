@@ -1,7 +1,7 @@
 # Structural/editor intelligence: symbols, folding, selection ranges, document links, CodeLens, code actions, semantic tokens
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 05, 15, 23
 Assigned: agent
 
@@ -18,6 +18,46 @@ Grounded by the Microsoft markdown-language-service research (ticket 05) and the
 - Code actions beyond quick-fixes already covered elsewhere: e.g. "convert Markdown link to wikilink" or vice versa, "extract selection to new note".
 - Semantic tokens: decide whether Traces defines any at all —ground this against whether TextMate/tree-sitter grammar-based client-side highlighting already covers Markdown/wikilink syntax adequately (likely yes, semantic tokens add limited value for prose-heavy Markdown vs code) versus a specific case semantic tokens would uniquely enable (e.g. distinguishing a *resolved* vs *unresolved* wikilink by token type/modifier, which syntax highlighting alone cannot do).
 
+## Answer
+
+Resolved 2026-10-22 after a fully independent pass-2 re-research (Phase-A substrate review (A1-A3), Phase-B seven-cluster evidence, consolidation and a 16-question grilling round with three questions held for Phase D, then Phase-D hardening: stress-test, benchmark, codegraph design-review, and ecosystem-convention subagents in parallel), and user confirmation of the locked set D1'-D16' ([research, Part XII](../research/27-structural-symbols-editor-intelligence-pass2.md); cluster reports in [research/27-pass2/](../research/27-pass2/)). The pass-2 file supersedes pass 1 on the seven conflicts it lists (Part X). Decisions:
+
+1. **All nine capabilities IN, staged in three waves (d3 design-review inversion).** The parser already receives full byte spans from `into_offset_iter()` and discards the ends; the shared walk is an LSP-side free function `walk(src) -> DocStructure`, cached per `(uri, version)`, NOT a Note method and NOT merged into `collect_headings` (transient LSP spans must never enter the postcard-persisted Note, 11 §8). Wave 0 (prerequisites): `[lsp]` config table + digest; three-method LineIndex extension plus 26's convert wrapper; the already-budgeted `LinkResolver::resolve_link(from, raw) -> Option<PathBuf}` facade method (basename wikilinks). Wave 1 (ships BEFORE 11/14/26): all document-scope features (exact spans where the feature needs them; line-granular where the protocol is line-based). Wave 2 (named-ticket-gated): three-valued ambiguity (26), template-ref links (22), heading-level lens counts (26/38), overlay-fresh counts/tokens (14). **11 and 26 are NOT prerequisites** for 27's document-scope features (d3; corrections filed to 11 and 41).
+
+2. **D1' Outline: headings + tasks as section children, Traces-original.** All five PKM peers emit headings only, but the convention is unexamined for tasks rather than rejected; a task is a definition with stable identity. Task children via a single pass over `note.lists()` with ancestor stack per 23's S3 pin (never `Note::tasks()` + depth), still never QueryService (crate-split hazard, 34). Kind `Array` (separable via VS Code `outline.showArrays`, unlike `String` headings which collide with the built-in). Root/preamble tasks attach to a document-root pseudo-symbol; section-end corner non-normative. Document truncation logged at warn (not debug) at SYMBOL_CEILING (1k soft / 5k hard).
+
+3. **D2' Folding E-lite + riders.** Heading sections, list nesting, code fences, frontmatter, callouts; runs on the raw walk (fences/frontmatter/list-ends/callouts leave no AST residue). Callout mapping "foldable = NOT `+`"; the `-` initially-collapsed state is inexpressible on the 0.23 lane and dropped (client-side); amendment filed to 17 (`is_foldable` bool cannot carry Obsidian's three-state). `collapsedText` needs typed-crate verification.
+
+4. **D3' Selection ranges: S1 IN.** Client-independent baseline; nested expansion through heading sections, list items, inline spans. Property test: every `positions[i]` lies within `ranges[i]`.
+
+5. **D4' documentLink: Option A, exact spans, eager, resolveProvider:false.** Wikilinks, embeds, and standard links with exact walk spans (not line-granular); verify hrefRange overlap with the VS Code built-in at implementation. Emission is not 26-gated (only template refs are 22-gated, and dynamic template targets are dropped from emission); only the ambiguity tooltip joins Wave 2, gated on 26's tie-reporting candidates. Ambiguous links emit (see D6'); unresolved links are dropped (see D5'). No resolve phase: targets computed eagerly via the Wave-0 facade.
+
+6. **D5' Unresolved links: DROP, with the three-way handoff documented.** 25's diagnostic carries the default severity; 15's create-note quickfix rides the diagnostic lane; 26's informational hover is the residual. Silent-hole consequence must be documented, not silent: severity `off` + drop = no link, no diagnostic, no action, hover only.
+
+7. **D6' Ambiguous links: first-candidate deterministic target + "N candidates" tooltip.** Documented graph-vs-nav divergence (inlink graph keeps nearest-picks; navigation reports ties) and the Neovim limitation (`tooltipSupport = false` presents as an unconditional jump with zero signal). No per-client capability split v1; revisit if nvim PKM users complain. Sign-off blocks filed to 15 and 26; 26's "never error on ambiguity" pin untouched.
+
+8. **D7' Semantic tokens: T1 legend, pins re-attached, two-valued Wave 1.** `unresolved` modifier ships in Wave 1 (classified via `resolve_link` Some/None); the `ambiguous` modifier joins in Wave 2 with 26's candidates. Pins: never filter emitted tokens against client-advertised tokenTypes (would delete the only wikilink color channel in VS Code); single-line non-overlapping (VS Code advertises multiline/overlap false); affirmatively do NOT advertise `full.delta` or `range`. T2b modifier-theming fallback unchanged.
+
+9. **D8' Refresh is a server-to-client REQUEST, debounced, gated on refreshSupport.** `workspace/semanticTokens/refresh`, `workspace/codeLens/refresh` through ONE shared "send refresh, swallow error" helper mirroring 25:24's diagnostic refresh (owed to 25/29); each send gated on the client's refreshSupport (Zed lacks folding refresh; none is sent). Subscribe to 25 Q11-R's dirty/referrer snapshot-diff emission; no new transport lane; refresh coalesced per kind: semantic tokens ≥100ms, CodeLens ≥250ms.
+
+10. **D9' CodeLens: staged C→A, zero-reference suppression adopted.** Stage C counts via binary-search `entries` + `FileEntry::inlinks().len()` (free suppression); Stage A heading counts wait on Wave 2. Pins: used-flag = client ever sent `textDocument/codeLens` this session; stale-`data` guard `{uri, range, version}` identity-on-stale; never pre-serialized Location[]. Lens capability default false (client floor).
+
+11. **D10' Code actions: four kinds with re-attached gates.** `refactor.convert.toWikilink`, `refactor.convert.toStandardLink`, `refactor.extract.note`, `refactor.rewrite.cycleStatus` (v1; `quickfix` joins with 25's action set, kind advertisement is static). `disabledSupport` capability gate (Helix absence accepted); 27 owns code-action-originated `CreateFile` emission plus the shared create-predicate (28 compatibility: any client-side create when 28 lands).
+
+12. **D11' VS Code duplication: accept duplicates as default.** Lever set ranked: accept (markdown-oxide practice), document `outline.show*` filters honestly (all LANGUAGE_OVERRIDABLE; two `String` sources cannot be split by kind, state the caveat), Traces-side per-feature config gates shaped like rumdl's `enableSymbols` for proven-duplicative capabilities, companion guidance (rumdl `enableSymbols = false` when Traces provides the outline), whole-extension disable as the heavy option only. Rejected: SymbolKind dodge (zero precedent), Marksman-style identity-gating auto-cession (deletes Traces' task outline). File filed to 32.
+
+13. **D12' Freshness and asymmetry pins.** Workspace symbols reflect last index refresh; overlay-authoritative only for document-scope features; freshness window until 14's RefreshPlan. Tags appear in the workspace picker but not the document outline = intentional asymmetry (16's hide-axis is an outline affordance). Corrected facts carried: rumdl and Marksman both register zero documentLink; Marksman nests tags in its outline (contradicting 16's pin; 16 owner decides).
+
+14. **D13' Corrected performance rows (final set for 33).** Doc symbols <10 target / <5 stretch headings-only, <10 / n-a with tasks (re-measured); workspace/symbol <50ms at the 10k tier, cap 128, derived per 33:117; folding 30/10 honoring client rangeLimit 5000; selection 10/5; documentLink ≤5 warm / ≤10 cold (UX-mandated, nvim gx synchronous); CodeLens discovery 10/3, resolve 20/5; documentHighlight 10/3; semantic tokens 10/5. REFERENCE_CEILING two-tier clangd-shaped: default soft cap 1000 with visible truncation, hard ceiling 5000 configurable (amends 26's named REFERENCE_CEILING constant: 26 pinned a flat 5,000 soft cap "fed to 27/29"; the two-tier model makes 5,000 the configurable hard ceiling and 1,000 the default soft cap). Vault-scale basis: 100 smoke / 1k typical-large / 10k power-user sustained / 50k stress-degradation-only + 20k iwe cross-tool anchor. No Markdown PKM peer publishes per-request LSP latency: adopt an lsp-bench-shaped criterion suite (p50/p95 + RSS) before 33 accepts rows; the 2MB@20k memory claim is equally bench-reported. File filed to 33.
+
+15. **D14' Template refs: split gating.** Goto-definition over template refs ships when 22's resolution logic exists (not span-gated); documentLink emission waits on 22's exact spans (no line-granular underlines); existence gated on 22's Q20(b) overlay set. Risk note: Traces ships minijinja 3.0.1 while 22 designs `machinery::parse` behind exact-pin `=2.24.0` (dep mismatch carried into 22).
+
+16. **D15' Outward record set: nine primary tickets plus sign-offs.** 23 (eager-Location Section 6 amendment), 16 (tags precedent + PROPERTY kind for tag workspace symbols), 11 (ropey method-name correction; 27 doesn't need 11's AST spans), 29 (capability fields for all nine + deliberate non-advertisement: workspaceSymbol/resolve, partialResultProvider, full.delta/range, documentLink/resolve, codeLens resolve until Wave 2), 33 (perf rows), 32 (duplication posture), 22 (Q24(b) restatement + minijinja risk), 41 (demand statement: transient spans only; 41-C acceptable), 17 (callout amendment), plus sign-off blocks to 15 and 26, and a runtime-toggle input to 31.
+
+17. **D16' Capability lifecycle: static initialize-time gates + runtime-disable semantics.** ONE flat `[lsp]` table of per-feature `Option<bool>` (lens default false, rest default true), RawConfig/digest recipe (raw.rs:17, schemas.rs:127 precedent), no nested sub-tables v1. Initialize-time gates decide advertisement; runtime flips make handlers return empty results or method_not_found (framework default), sticky-until-restart per 22:65; live-reload interaction filed to 31. One convert seam (`char_to_utf16_cu(byte_to_char())` idiom) shared by all nine handlers. No dynamic registration except file watchers (29 owns).
+
+18. **Recorded consideration (user note, 2026-10-22): possible Note-type split.** A separate arch-design wayfinder task may split the note type into an index/query-optimized variant and an editor-aware variant. This ticket's design is an early citizen of that split: `DocStructure` is the transient, span-rich, editor-scoped product of the walk and is deliberately NOT persisted or merged into the index-optimized Note (11 §8); the persistent Note stays index-optimized. Carried as input to that future task; no decision here depends on it.
+
 ## Inputs from 26 (2026-10-18)
 
 - **documentLink emits for `Unique` and `Ambiguous` targets** (never errors on ambiguity); semantic-token modifiers are **three-valued** (resolved / unresolved / ambiguous), not a boolean, per 26's `Resolution` enum.
@@ -27,4 +67,9 @@ Grounded by the Microsoft markdown-language-service research (ticket 05) and the
 
 ## Input from iwe research (2026-10-21)
 
-- (amended 2026-10-21) Research 27 Part V gained an Option E (inlay hints, iwe precedent) on 2026-10-21 — new option-space, NOT a reopened decision ([tool-iwe](../research/tool-iwe.md) Part 6).
+- (amended 2026-10-21) Research 27 Part V gained an Option E (inlay hints, iwe precedent) on 2026-10-21: new option-space, NOT a reopened decision ([tool-iwe](../research/tool-iwe.md) Part 6).
+
+## Research
+
+- Pass 1: [27-structural-symbols-editor-intelligence.md](../research/27-structural-symbols-editor-intelligence.md) (consolidated 2026-10-18, amended 2026-10-21).
+- Pass 2 (independent full re-research, 2026-10-22): [27-structural-symbols-editor-intelligence-pass2.md](../research/27-structural-symbols-editor-intelligence-pass2.md), with per-cluster evidence in [research/27-pass2/](../research/27-pass2/). Its Part X lists the seven direct pass-1/pass-2 conflicts and Part XI the merged open questions: grilling agenda tier one.

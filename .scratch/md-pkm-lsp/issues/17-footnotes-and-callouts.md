@@ -99,3 +99,8 @@ note (default), abstract (summary, tldr), info, todo, tip (hint, important), suc
 ### Amended by 25 (2026-10-15)
 
 - **MD066 cession (25 Q9-R)**: rumdl MD066 covers footnote undefined-reference, unused-definition, and duplicate-definition. Those three diagnostics are **dropped from 17** (docs guidance: users wanting them back enable MD066; `tags: [Unnecessary]` remains the idiomatic unused-def rendering in docs). Footnote **self-reference** and **blockquoted-definition** stay Traces-owned (MD066 does not rule them; live probe). The footnote hover idea loses any dependency on the ceded diagnostics — hover stays only where Traces still owns the rule.
+
+## Amendment from 27 (2026-10-22)
+
+- `CalloutBlock.is_foldable` ("+/- modifier", 17:74) cannot carry Obsidian's three-state semantics (no modifier = collapsible/expanded; `-` = starts collapsed but still collapsible; `+` = not collapsible). 27's folding mapping records "foldable = NOT `+`"; the `-` initially-collapsed state is inexpressible on the tower-lsp-server 0.23 lane (no initially-collapsed FoldingRange field) and is dropped server-side as a client-side concern. The owner should either widen `is_foldable` to a three-state enum or document the bool as exactly "foldable = NOT `+`" ([27 pass 2, Part XII.3](../research/27-structural-symbols-editor-intelligence-pass2.md)).
+- Related correction: 17's handoff note that ticket 27 consumes `CalloutBlock` for FoldingRange generation is superseded; 27's folding E-lite runs on its own walk, never the Note AST. `is_foldable` keeps its meaning for 17's own consumers; 27's mapping rule (foldable = NOT `+`) is applied on 27's walk.

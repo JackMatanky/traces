@@ -1,7 +1,7 @@
 # Occurrence-span persistence: persist `Spanned<T>` spans through redb (amending ticket 11 §8), or keep them transient behind `Option<ByteSpan>`?
 
 Type: grilling
-Blocked by: 26, 27
+Blocked by: (resolved) 26, 27
 
 ## Question
 
@@ -34,3 +34,7 @@ Feeds: note-parse ticket 04 (already rewritten Heading-only; spans return as a f
 ## Inputs from iwe research (2026-10-21)
 
 - (amended 2026-10-21 by iwe research) iwe's rebuild-every-start (~958ms @ 20k docs, indexed load) and raw-markdown `ServerParams.state` handoff corroborate that markdown graph rebuild is cheap and content handoff beats serialized indexes ([tool-iwe](../research/tool-iwe.md) Part 3, Part 4).
+
+## Input from 27 (2026-10-22)
+
+- 27 is resolved and no longer blocks 41. Demand statement: 27's document-scope features need transient spans only (the LSP-side walk produces exact byte spans per request; nothing 27 ships reads persisted spans), so 41-C (honest absence, `span: Option<ByteSpan>`) is acceptable from 27's side; 26's cross-file consumers remain 41's other demand source.

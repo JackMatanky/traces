@@ -21,3 +21,7 @@ Decide how the existing two-tier `Config File` system (`.traces/config.toml` loc
 ## Inputs from fileclass research (2026-10-21)
 
 - (amended 2026-10-21 by fileclass research) fileclass's audit trigger model (sessionly + on-demand + rename, explicitly not per-rebuild) with fingerprint suppression is a production-tested shape for schema-dir watching ([tool-fileclass](../research/tool-fileclass.md)).
+
+## Inputs from 27 (2026-10-22)
+
+- LSP feature toggles: 27's `[lsp]` table (per-feature `Option<bool>`, lens default false, rest default true) is read at initialize for capability advertisement. 31 owns runtime toggles via live config reload: handler-level empty results or method_not_found, sticky-until-restart for engine-reset-class changes per 22's precedent. 27 does not promise runtime re-advertisement of capabilities until 31 lands.

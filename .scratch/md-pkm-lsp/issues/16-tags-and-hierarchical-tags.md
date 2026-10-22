@@ -126,3 +126,7 @@ Evidence base:
 - **prepareRename pins**: body tag range includes the `#`, placeholder `#projects/active`; frontmatter tag range excludes the `#`, placeholder `projects/active`.
 - **5,000 references cap receipt**: find-references truncates at 5,000 with a `window/logMessage` notice (26's named constant). Hierarchical descendant inclusion at occurrence granularity via `Tag::is_contained_in` unchanged.
 - **Negative pin: tags are never `Ambiguous`.** Tag resolution yields `Unique`/`Unresolved` only, so the -32803 ambiguity refusal never fires for tags (fields likewise never ambiguous per 19's fileClass-wins and 20's origin resolution).
+
+## Input from 27 (2026-10-22)
+
+- Marksman nests tags in its document outline (children of headings, `String` kind), the only PKM peer precedent, directly contradicting 16's "document symbols omit tags" pin. 27 keeps the pin (tags stay out of Traces' document outline) and records the precedent for 16's owner to weigh. 27 also recommends `SymbolKind::PROPERTY` (7) for tag workspace symbols (distinct kind (and icon) for tags, unlike `String` which collides with heading symbols and cannot be filtered separately). Tags DO appear in Traces' workspace/symbol picker (23's shared-cap plan): intentional outline-vs-picker asymmetry, the hide-axis being an outline affordance.
