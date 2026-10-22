@@ -1,9 +1,9 @@
 //! Provides a path-sorted slice wrapper over stored index rows.
 //!
-//! Every producer that loads rows from disk or the store returns rows sorted
-//! by [`HasPath::path`]. Keeping that ordering in the type lets binary
-//! searches replace linear scans and turns "keep it sorted" from a comment
-//! into an invariant the constructor enforces.
+//! Every producer that loads rows from disk or the store returns rows sorted by
+//! [`HasPath::path`]. Keeping that ordering in the type lets binary searches
+//! replace linear scans and turns "keep it sorted" from a comment into an
+//! invariant the constructor enforces.
 
 use std::path::Path;
 

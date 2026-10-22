@@ -111,10 +111,9 @@ impl IndexerService {
     /// parsed from disk; deleted files vanish with the fresh scan. Persist
     /// failures are logged and the refreshed in-memory index is still returned.
     ///
-    /// An index built under different index-relevant config is rebuilt in
-    /// full, so a config edit heals on the next refresh. A failed heal is
-    /// logged and leaves the stored fingerprint stale, so the next refresh
-    /// heals again.
+    /// An index built under different index-relevant config is rebuilt in full,
+    /// so a config edit heals on the next refresh. A failed heal is logged and
+    /// leaves the stored fingerprint stale, so the next refresh heals again.
     ///
     /// Inlinks are patched only for content-only deltas. Any added, deleted, or
     /// renamed path forces a full recompute because an unedited note's resolved

@@ -828,8 +828,8 @@ impl IndexStore {
         rows: &IncrementalRows<'_>,
     ) -> IndexResult<()> {
         self.create_tables(&txn)?;
-        // Core tables (FILES, NOTES, tag/class axes) and the LINKS multimap
-        // are fully disjoint, so their write batches overlap via rayon::join.
+        // Core tables (FILES, NOTES, tag/class axes) and the LINKS multimap are
+        // fully disjoint, so their write batches overlap via rayon::join.
         let (core_res, links_res) = rayon::join(
             || -> IndexResult<()> {
                 self.apply_diff_deletions(
@@ -921,8 +921,8 @@ impl IndexStore {
         }
     }
 
-    /// Returns `true` if the schema is partial or incompatible, signaling
-    /// that [`Self::open`] should recreate the database. All tables absent is a
+    /// Returns `true` if the schema is partial or incompatible, signaling that
+    /// [`Self::open`] should recreate the database. All tables absent is a
     /// fresh store that needs no replacement.
     fn rebuild_needed(db: &redb::Database, path: &Path) -> StoreResult<bool> {
         let read_txn = match db.begin_read() {
@@ -978,8 +978,8 @@ impl IndexStore {
         Ok(version.value() != META_VERSION)
     }
 
-    /// Point-reads and decodes `paths` from `kind`'s table in parallel,
-    /// warning and skipping corrupted rows. Preserves the input order.
+    /// Point-reads and decodes `paths` from `kind`'s table in parallel, warning
+    /// and skipping corrupted rows. Preserves the input order.
     fn read_batch<'a, T: DeserializeOwned + Send>(
         &self,
         kind: ReadSource,
@@ -1037,8 +1037,7 @@ impl IndexStore {
 
     // --- Path query helpers -------------------------------------------
 
-    /// Reads, sorts, and deduplicates every path stored under `key` in
-    /// `def`.
+    /// Reads, sorts, and deduplicates every path stored under `key` in `def`.
     fn paths_from_multimap(
         &self,
         def: MultimapTableDefinition<'static, &'static [u8], &'static [u8]>,
@@ -1142,18 +1141,18 @@ impl IndexStore {
     /// Deserializes every row in an already-open `table`.
     ///
     /// Decodes each row directly from its borrowed `redb::AccessGuard` bytes
-    /// during the sequential B-tree walk. An earlier revision copied every
-    /// row into an owned buffer first so decoding could run through Rayon;
-    /// measurement showed that copy costing more than the parallel decode
-    /// saved at every workspace size actually benchmarked (regressions up to
-    /// +27% at small/medium table sizes, flat at 20,000 rows), so this
-    /// forfeits decode parallelism in favor of the zero-copy read.
+    /// during the sequential B-tree walk. An earlier revision copied every row
+    /// into an owned buffer first so decoding could run through Rayon;
+    /// measurement showed that copy costing more than the parallel decode saved
+    /// at every workspace size actually benchmarked (regressions up to +27% at
+    /// small/medium table sizes, flat at 20,000 rows), so this forfeits decode
+    /// parallelism in favor of the zero-copy read.
     ///
     /// `T` is [`FileMeta`] or [`Note`]; `Note`'s inline fields put this
     /// function's monomorphized frame just over clippy's default stack-size
     /// threshold. `read_batch`'s equivalent per-row `decode_row::<T>` call
-    /// carries the same worst-case frame size inside a closure, where the
-    /// lint does not fire.
+    /// carries the same worst-case frame size inside a closure, where the lint
+    /// does not fire.
     #[expect(
         clippy::large_stack_frames,
         reason = "decode_row<Note> owns a same-sized frame in read_batch's \
@@ -1328,8 +1327,8 @@ impl IndexStore {
     /// Writes `dimension`'s forward (`value -> [paths]`) table for a full
     /// rebuild.
     ///
-    /// Split from [`Self::write_index_by_path`] so [`WriteTarget::ALL`]
-    /// can write distinct redb tables concurrently.
+    /// Split from [`Self::write_index_by_path`] so [`WriteTarget::ALL`] can
+    /// write distinct redb tables concurrently.
     fn write_index_by_value(
         &self,
         txn: &WriteTransaction,
@@ -1547,10 +1546,9 @@ impl IndexStore {
     }
 
     /// Upserts each of `modified_notes`' current values into `dimension`'s
-    /// forward table, first removing exactly this note's previous values
-    /// via the reverse (path-keyed) table in O(k) time where k is this
-    /// note's previous value count, rather than performing a full-table
-    /// scan.
+    /// forward table, first removing exactly this note's previous values via
+    /// the reverse (path-keyed) table in O(k) time where k is this note's
+    /// previous value count, rather than performing a full-table scan.
     fn upsert_index_axis<'a>(
         &self,
         txn: &WriteTransaction,
@@ -1621,8 +1619,8 @@ impl IndexStore {
     }
 }
 
-/// Batch point-read source: maps a variant to its redb table
-/// definition and structured label for [`read_batch`](IndexStore::read_batch).
+/// Batch point-read source: maps a variant to its redb table definition and
+/// structured label for [`read_batch`](IndexStore::read_batch).
 #[derive(Copy, Clone, Debug)]
 enum ReadSource {
     Files,

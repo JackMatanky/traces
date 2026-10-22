@@ -113,8 +113,8 @@ impl WorkspaceIndex {
     ///
     /// # Panics
     ///
-    /// Panics if `position` is out of bounds for the entries slice. Row
-    /// indices are only constructed from a valid range over entries.
+    /// Panics if `position` is out of bounds for the entries slice. Row indices
+    /// are only constructed from a valid range over entries.
     #[expect(
         clippy::expect_used,
         reason = "RowIndex is always in bounds: values are only constructed \

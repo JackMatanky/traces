@@ -1,12 +1,12 @@
 //! Plans incremental index refreshes and applies typed updates to the index
 //! store.
 //!
-//! [`RefreshState`] models the refresh lifecycle: fresh scans can
-//! materialize directly from the store, stale scans must pass
-//! through [`PendingApply`] before callers can receive a persisted store, and
-//! drifted scans, whose store was built under different config, are rebuilt in
-//! full. Drift wins over staleness. A [`PersistFailed`] keeps the pending state
-//! so [`IndexerService::refresh`] can still materialize a fail-open in-memory
+//! [`RefreshState`] models the refresh lifecycle: fresh scans can materialize
+//! directly from the store, stale scans must pass through [`PendingApply`]
+//! before callers can receive a persisted store, and drifted scans, whose store
+//! was built under different config, are rebuilt in full. Drift wins over
+//! staleness. A [`PersistFailed`] keeps the pending state so
+//! [`IndexerService::refresh`] can still materialize a fail-open in-memory
 //! index from the same reconciliation.
 //!
 //! [`IndexerService::refresh`]: super::service::IndexerService::refresh
@@ -26,8 +26,8 @@ use crate::{FileMeta, Note};
 
 /// Reports what one refresh found and healed.
 ///
-/// Count accessors return zero for every variant that does not carry counts:
-/// a config drift heal reports its cause, not row counts.
+/// Count accessors return zero for every variant that does not carry counts: a
+/// config drift heal reports its cause, not row counts.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum RefreshReport {
     /// Nothing changed: the persisted index served as it was.
@@ -75,8 +75,8 @@ impl RefreshReport {
         }
     }
 
-    /// Returns the number of files deleted from the index, or zero unless
-    /// files changed.
+    /// Returns the number of files deleted from the index, or zero unless files
+    /// changed.
     #[inline]
     #[must_use]
     pub const fn deleted_count(&self) -> usize {
@@ -358,8 +358,8 @@ impl RefreshPlan {
         })
     }
 
-    /// Takes the cause of the drift, or `None` if the store matches the
-    /// running config.
+    /// Takes the cause of the drift, or `None` if the store matches the running
+    /// config.
     #[inline]
     pub(super) const fn take_drift(&mut self) -> Option<DriftCause> {
         self.drift.take()

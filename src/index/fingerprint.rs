@@ -205,8 +205,8 @@ impl IndexFingerprint {
         self.0.map(Blake3Digest::to_bytes)
     }
 
-    /// Decodes bytes written from [`Self::encode`], or `None` if they are
-    /// not exactly one digest per setting.
+    /// Decodes bytes written from [`Self::encode`], or `None` if they are not
+    /// exactly one digest per setting.
     pub(super) fn decode(bytes: &[u8]) -> Option<Self> {
         let (digests, rest) = bytes.as_chunks::<{ Blake3Digest::LEN }>();
         if !rest.is_empty() {

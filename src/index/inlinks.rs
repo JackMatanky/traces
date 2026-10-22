@@ -18,11 +18,10 @@
 //! Most file basenames are unique, so a flat linear scan is fastest for the
 //! common case. When a basename has many candidates (≥
 //! [`crate::index::trie::TRIE_THRESHOLD`]), a `CandidateTrie` precomputes
-//! per-folder subtree aggregates so nearest-
-//! candidate queries run in `O(depth)` instead of `O(candidates)`. The trie
-//! models folder containment as a tree, where
-//! `FolderRef::of(a).distance_to(FolderRef::of(b)) = depth(a) + depth(b) - 2 *
-//! depth(LCA(a, b))`.
+//! per-folder subtree aggregates so nearest-candidate queries run in
+//! `O(depth)` instead of `O(candidates)`. The trie models folder containment as
+//! a tree, where `FolderRef::of(a).distance_to(FolderRef::of(b)) = depth(a) +
+//! depth(b) - 2 * depth(LCA(a, b))`.
 //!
 //! # Hash map choice
 //!
@@ -209,10 +208,10 @@ impl InlinkMap {
     /// Patches inbound edges sourced by `edited_sources` and computes the
     /// exact `InlinkDelta` in one pass.
     ///
-    /// Operates in-place on the consumed map, touching only edited targets
-    /// and sources. Untouched targets and sources are moved, never copied.
-    /// This avoids both the map-wide clone of a manual `without_sources` call
-    /// and the full-vault scan of [`InlinkDelta::compute`].
+    /// Operates in-place on the consumed map, touching only edited targets and
+    /// sources. Untouched targets and sources are moved, never copied. This
+    /// avoids both the map-wide clone of a manual `without_sources` call and
+    /// the full-vault scan of [`InlinkDelta::compute`].
     #[must_use]
     pub(super) fn patch_and_diff(
         mut self,
@@ -247,10 +246,9 @@ impl InlinkMap {
             *slot = sources.into_boxed_slice();
         }
 
-        // Edges that were removed and then re-inserted by `new_edges` are
-        // pure no-ops relative to the persisted graph, so they must not
-        // appear in the delta (which compares the final state to the
-        // original).
+        // Edges that were removed and then re-inserted by `new_edges` are pure
+        // no-ops relative to the persisted graph, so they must not appear in
+        // the delta (which compares the final state to the original).
         upserted.retain(|edge| {
             if let Some(pos) = deleted.iter().position(|d| d == edge) {
                 deleted.swap_remove(pos);
@@ -363,9 +361,8 @@ impl<'a> LinkResolver<'a> {
 
     /// Resolves a split [`LinkTarget`] to an indexed file path.
     ///
-    /// Tries exact path, missing-`.md` path, then nearest basename match
-    /// for Obsidian-style Wikilinks. Equal-distance basename ties stay
-    /// unresolved.
+    /// Tries exact path, missing-`.md` path, then nearest basename match for
+    /// Obsidian-style Wikilinks. Equal-distance basename ties stay unresolved.
     fn resolve(
         &self,
         from: &Path,
@@ -418,8 +415,7 @@ impl<'a> LinkResolver<'a> {
     }
 }
 
-/// Represents a resolved link target: the path of the file an outlink points
-/// to.
+/// Represents a resolved link target: the file path pointed to by an outlink.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Target<'a>(&'a Path);
 

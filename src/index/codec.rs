@@ -1,7 +1,7 @@
 //! Implements row encoding and decoding for redb payloads in the index store.
 //!
-//! Rows use postcard with [`StoreError`] context, and [`path_from_bytes`] has
-//! a lossy fallback for non-Unicode paths read from byte-oriented stores. The
+//! Rows use postcard with [`StoreError`] context, and [`path_from_bytes`] has a
+//! lossy fallback for non-Unicode paths read from byte-oriented stores. The
 //! bytes-of-a-path codec for serde fields lives at [`crate::path::codec`].
 
 use std::{
