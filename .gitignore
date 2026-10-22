@@ -15,11 +15,17 @@ __MACOSX/
 
 # -------------------- Build & Compilation -------------------- #
 /target
-# --- Durable Criterion benchmark history (symlinked as target/criterion) --- #
+
+# ---------------- Criterion Benchmark History ---------------- #
+# symlinked as target/criterion
 /.criterion/
 /.criterion.fork.*
+
+# ----------------------- Test Coverage ----------------------- #
 lcov.info
 tarpaulin-report.html
+
+# --------------------- Mutation Testing ---------------------- #
 /report.json
 /mutarust-agentic.json
 /mutarust-summary.json
@@ -28,6 +34,7 @@ tarpaulin-report.html
 /mutants.out/
 /mutants.out.old/
 /mutants-report.md
+
 # ----------------------- Git Worktrees ----------------------- #
 .worktrees/
 
@@ -46,10 +53,13 @@ __pycache__/
 *digest.txt
 docs/digests/
 
-# -------------------------- Claude --------------------------- #
+# ----------------------- AI Artifacts ------------------------ #
 .claude/
 CLAUDE.md
+.omp/
+
 # --------- Architecture Design Skill Deliverables ------------ #
 .design/
 
+# ------------------ Obsidian Vault Example ------------------- #
 docs/vault/
