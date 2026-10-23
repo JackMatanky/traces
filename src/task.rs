@@ -326,8 +326,8 @@ impl TaskStatusType {
 
     /// Returns the stable lowercase identifier for this status type.
     ///
-    /// Shared by query output and the config fingerprint, so it must not
-    /// change for an existing variant.
+    /// Shared by query output and the config fingerprint, so it must not change
+    /// for an existing variant.
     #[inline]
     #[must_use]
     pub(crate) const fn as_str(self) -> &'static str {
@@ -352,7 +352,8 @@ impl TaskStatusType {
     }
 }
 
-/// The marker character inside `[<char>]`, e.g. `' '`, `'x'`, `'/'`, `'-'`.
+/// Represents the marker character inside a task item's `[<char>]` checkbox,
+/// e.g. `' '`, `'x'`, `'/'`, `'-'`.
 ///
 /// Wraps a single `char` without validation, serving as the lookup key for
 /// standard and custom-scanned task markers.
@@ -366,7 +367,6 @@ impl TaskStatusType {
 /// assert_eq!(sym.as_char(), 'x');
 /// assert_eq!(sym, 'x');
 /// ```
-/// Represents the marker character inside a task item's `[<char>]` checkbox.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
 pub struct TaskStatusSymbol(char);
 

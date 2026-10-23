@@ -39,8 +39,8 @@ use walkdir::{DirEntry, WalkDir};
 ///
 /// This phase exposes configuration ([`filter`](DirTree::filter),
 /// [`sorted_by`](DirTree::sorted_by),
-/// [`missing_as_empty`](DirTree::missing_as_empty)) but not iteration through
-/// a stored handle, so configuration and execution cannot interleave.
+/// [`missing_as_empty`](DirTree::missing_as_empty)) but not iteration through a
+/// stored handle, so configuration and execution cannot interleave.
 pub(crate) struct Ready {
     builder: WalkDir,
     root: PathBuf,
@@ -50,8 +50,8 @@ pub(crate) struct Ready {
 
 /// Mid-iteration phase: owns the running walk.
 ///
-/// This phase implements [`Iterator`] but exposes no configuration methods,
-/// so reconfiguring a started walk is unrepresentable at compile time.
+/// This phase implements [`Iterator`] but exposes no configuration methods, so
+/// reconfiguring a started walk is unrepresentable at compile time.
 pub(crate) struct Walking {
     inner: InnerIter,
     root: PathBuf,
@@ -65,9 +65,9 @@ pub(crate) struct Walking {
 /// tracks the walk phase: the [`Ready`] phase accepts [`DirTree::filter`] and
 /// [`DirTree::sorted_by`]; [`DirTree::walk`] (or [`IntoIterator`], used by
 /// `for` loops) transitions to the [`Walking`] phase, which yields
-/// [`Result<DirNode, DirTreeError>`]. Because configuration methods exist
-/// only on the [`Ready`] phase, configuring a walk after it has started is a
-/// compile error rather than a silent no-op.
+/// [`Result<DirNode, DirTreeError>`]. Because configuration methods exist only
+/// on the [`Ready`] phase, configuring a walk after it has started is a compile
+/// error rather than a silent no-op.
 pub(crate) struct DirTree<S> {
     state: S,
 }
@@ -123,8 +123,8 @@ impl DirTree<Ready> {
 
     /// Absorbs a missing walk root into an empty walk.
     ///
-    /// [`DirTreeError::MissingRoot`] is the only variant this absorbs: the
-    /// walk yields nothing instead of one error item. Other failures
+    /// [`DirTreeError::MissingRoot`] is the only variant this absorbs: the walk
+    /// yields nothing instead of one error item. Other failures
     /// ([`DirTreeError::RootInaccessible`], [`DirTreeError::NodeInaccessible`])
     /// still surface, so callers keep their strict handling of unreadable
     /// roots. This is the shared policy for callers that must tolerate a
@@ -140,12 +140,12 @@ impl DirTree<Ready> {
 
     /// Prunes every subtree whose directory satisfies `predicate`.
     ///
-    /// `predicate` receives a [`DirNodeRef`] for each directory *beneath*
-    /// the walk root. Returning `true` removes that directory and everything
+    /// `predicate` receives a [`DirNodeRef`] for each directory *beneath* the
+    /// walk root. Returning `true` removes that directory and everything
     /// beneath it from the walk. Non-matching entries, including files whose
-    /// names satisfy the predicate, are yielded unchanged. The walk root
-    /// itself is exempt: the predicate never sees it, so a predicate that
-    /// matches the root's own name leaves the walk intact.
+    /// names satisfy the predicate, are yielded unchanged. The walk root itself
+    /// is exempt: the predicate never sees it, so a predicate that matches the
+    /// root's own name leaves the walk intact.
     ///
     /// Works with [`Self::children`] and [`Self::descendants`]. For flat walks,
     /// matching directories are omitted from the listing.
@@ -324,6 +324,40 @@ impl DirNode {
     }
 }
 
+/// Provides a borrowed directory-node view without cloning for comparisons.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
+
+impl<'a> DirNodeRef<'a> {
+    /// Returns the node's final path component.
+    #[inline]
+    #[must_use]
+    pub(crate) fn file_name(self) -> &'a OsStr {
+        self.0.file_name()
+    }
+}
+
+/// Erases a caller-supplied pruning predicate for [`walkdir::FilterEntry`].
+type PrunePredicate = Box<dyn FnMut(&DirEntry) -> bool>;
+
+/// Stores either a plain or pruned walk iterator.
+enum InnerIter {
+    Plain(walkdir::IntoIter),
+    Filtered(walkdir::FilterEntry<walkdir::IntoIter, PrunePredicate>),
+}
+
+impl Iterator for InnerIter {
+    type Item = walkdir::Result<DirEntry>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Plain(iter) => iter.next(),
+            Self::Filtered(iter) => iter.next(),
+        }
+    }
+}
+
 /// Classifies failures raised while traversing a directory tree.
 ///
 /// Callers can distinguish a missing root from access failures, then decompose
@@ -386,45 +420,11 @@ impl DirTreeError {
     }
 }
 
-/// Provides a borrowed directory-node view without cloning for comparisons.
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct DirNodeRef<'a>(&'a DirEntry);
-
-impl<'a> DirNodeRef<'a> {
-    /// Returns the node's final path component.
-    #[inline]
-    #[must_use]
-    pub(crate) fn file_name(self) -> &'a OsStr {
-        self.0.file_name()
-    }
-}
-
-/// Erases a caller-supplied pruning predicate for [`walkdir::FilterEntry`].
-type PrunePredicate = Box<dyn FnMut(&DirEntry) -> bool>;
-
-/// Stores either a plain or pruned walk iterator.
-enum InnerIter {
-    Plain(walkdir::IntoIter),
-    Filtered(walkdir::FilterEntry<walkdir::IntoIter, PrunePredicate>),
-}
-
-impl Iterator for InnerIter {
-    type Item = walkdir::Result<DirEntry>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Plain(iter) => iter.next(),
-            Self::Filtered(iter) => iter.next(),
-        }
-    }
-}
-
 /// Classifies a [`walkdir::Error`] relative to the fallback walk root.
 ///
 /// Depth 0 denotes the walk root itself, so a depth-0 failure is classified
-/// against the root rather than as a node beneath it. Errors that carry no
-/// path (mid-readdir stream glitches) fall back to the walk root.
+/// against the root rather than as a node beneath it. Errors that carry no path
+/// (mid-readdir stream glitches) fall back to the walk root.
 fn classify(fallback: &Path, source: walkdir::Error) -> DirTreeError {
     let depth = source.depth();
     let path = source.path().unwrap_or(fallback).to_path_buf();
@@ -800,8 +800,8 @@ mod tests {
 
         #[test]
         fn filter_never_consults_the_predicate_for_the_walk_root() {
-            // Arrange: the root deliberately carries an "ignored" name, and
-            // the predicate counts every directory it is asked about.
+            // Arrange: the root deliberately carries an "ignored" name, and the
+            // predicate counts every directory it is asked about.
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path().join("target");
             fs::create_dir(&root).expect("create root");
@@ -829,8 +829,8 @@ mod tests {
                 })
                 .collect();
 
-            // Assert: the root survives its own name-matching predicate and
-            // the predicate never runs at depth 0, so callers no longer guard
+            // Assert: the root survives its own name-matching predicate and the
+            // predicate never runs at depth 0, so callers no longer guard
             // against emptying the walk.
             assert_eq!(relatives, vec!["", "note.md"]);
             assert_eq!(
@@ -947,9 +947,9 @@ mod tests {
         fn returns_unreadable_child_without_error_when_listing_directory() {
             use std::os::unix::fs::PermissionsExt;
 
-            // Arrange: a subdirectory that cannot be opened. The contract
-            // under test is the documented one - a flat listing yields it as
-            // a plain entry with no error, while recursive walks surface a
+            // Arrange: a subdirectory that cannot be opened. The contract under
+            // test is the documented one - a flat listing yields it as a plain
+            // entry with no error, while recursive walks surface a
             // NodeInaccessible instead.
             let temp = tempfile::tempdir().expect("create temp dir");
             let root = temp.path();

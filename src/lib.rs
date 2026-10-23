@@ -60,6 +60,7 @@
 //!   Template rendering and file writes.
 //! - `testing::Blake3Digest`, `testing::Blake3PathHash`: BLAKE3 hashing
 //!   primitives.
+//!
 //! # Visibility Probes
 //!
 //! Internal configuration structures remain private to the crate and unnameable

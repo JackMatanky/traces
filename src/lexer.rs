@@ -246,8 +246,8 @@ pub(crate) fn lexical_unquote(raw: &str) -> String {
 /// Strips backslash escapes from `input`, returning the unescaped string.
 ///
 /// A backslash followed by any character consumes both and emits the second
-/// character verbatim (for example, `\"` becomes `"`, and `\\` becomes `\`).
-/// A trailing backslash with no subsequent character is retained verbatim.
+/// character verbatim (for example, `\"` becomes `"`, and `\\` becomes `\`). A
+/// trailing backslash with no subsequent character is retained verbatim.
 #[must_use]
 fn lexical_backslash_unescape(input: &str) -> String {
     let mut output = String::with_capacity(input.len());

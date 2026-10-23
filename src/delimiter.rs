@@ -231,8 +231,8 @@ impl DelimiterType {
     /// (`"..."`, `'...'`).
     ///
     /// `input` begins immediately after this opening delimiter was consumed.
-    /// Returns `Some(pos)` of the matching closing delimiter, or `None`
-    /// if delimiters are unclosed, mismatched, or truncated.
+    /// Returns `Some(pos)` of the matching closing delimiter, or `None` if
+    /// delimiters are unclosed, mismatched, or truncated.
     #[must_use]
     pub(crate) fn find_closing(self, input: &str) -> Option<usize> {
         let mut stack = DelimiterStack::with_root(self);

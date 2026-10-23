@@ -117,8 +117,8 @@ impl FileMeta {
         }
     }
 
-    /// Builds a [`FileMeta`] for a Markdown note with custom paths and
-    /// creation timestamp for test fixtures.
+    /// Builds a [`FileMeta`] for a Markdown note with custom paths and creation
+    /// timestamp for test fixtures.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]

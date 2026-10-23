@@ -73,11 +73,8 @@ impl FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only.
-    /// - [`ContainsSlash`] if `raw` contains `/`.
-    ///
-    /// [`Empty`]: FieldNameError::Empty
-    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    /// - [`FieldNameError::Empty`] if `raw` is empty or whitespace-only.
+    /// - [`FieldNameError::ContainsSlash`] if `raw` contains `/`.
     fn validate(raw: &str) -> Result<(), FieldNameError> {
         if raw.trim().is_empty() {
             return Err(FieldNameError::Empty);
@@ -98,11 +95,8 @@ impl TryFrom<String> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only.
-    /// - [`ContainsSlash`] if `raw` contains `/`.
-    ///
-    /// [`Empty`]: FieldNameError::Empty
-    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    /// - [`FieldNameError::Empty`] if `raw` is empty or whitespace-only.
+    /// - [`FieldNameError::ContainsSlash`] if `raw` contains `/`.
     fn try_from(raw: String) -> Result<Self, Self::Error> {
         Self::validate(&raw)?;
         Ok(Self(raw))
@@ -116,11 +110,8 @@ impl TryFrom<&str> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only.
-    /// - [`ContainsSlash`] if `raw` contains `/`.
-    ///
-    /// [`Empty`]: FieldNameError::Empty
-    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    /// - [`FieldNameError::Empty`] if `raw` is empty or whitespace-only.
+    /// - [`FieldNameError::ContainsSlash`] if `raw` contains `/`.
     fn try_from(raw: &str) -> Result<Self, Self::Error> {
         Self::validate(raw)?;
         Ok(Self(raw.to_owned()))
@@ -142,13 +133,11 @@ impl TryFrom<serde_json::Value> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`NotScalar`] for `Null`, `Array`, and `Object` values.
-    /// - [`Empty`] if the coerced string is empty or whitespace-only.
-    /// - [`ContainsSlash`] if the coerced string contains `/`.
-    ///
-    /// [`NotScalar`]: FieldNameError::NotScalar
-    /// [`Empty`]: FieldNameError::Empty
-    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    /// - [`FieldNameError::NotScalar`] for `Null`, `Array`, and `Object`
+    ///   values.
+    /// - [`FieldNameError::Empty`] if the coerced string is empty or
+    ///   whitespace-only.
+    /// - [`FieldNameError::ContainsSlash`] if the coerced string contains `/`.
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
         let raw = match value {
             serde_json::Value::String(s) => s,
@@ -195,11 +184,8 @@ impl<'de> Deserialize<'de> for FieldName {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if the string is empty or whitespace-only
-    /// - [`ContainsSlash`] if the string contains `/`
-    ///
-    /// [`Empty`]: FieldNameError::Empty
-    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    /// - [`FieldNameError::Empty`] if the string is empty or whitespace-only
+    /// - [`FieldNameError::ContainsSlash`] if the string contains `/`
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -231,11 +217,8 @@ impl<'a> TryFrom<&'a str> for FieldNameRef<'a> {
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `raw` is empty or whitespace-only.
-    /// - [`ContainsSlash`] if `raw` contains `/`.
-    ///
-    /// [`Empty`]: FieldNameError::Empty
-    /// [`ContainsSlash`]: FieldNameError::ContainsSlash
+    /// - [`FieldNameError::Empty`] if `raw` is empty or whitespace-only.
+    /// - [`FieldNameError::ContainsSlash`] if `raw` contains `/`.
     fn try_from(raw: &'a str) -> Result<Self, Self::Error> {
         FieldName::validate(raw)?;
         Ok(Self(raw))
@@ -283,12 +266,9 @@ impl FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`Name`] if `raw` fails [`FieldName`] validation.
-    /// - [`EmptyCanonical`] if canonicalization strips every searchable
-    ///   character.
-    ///
-    /// [`Name`]: FieldKeyError::Name
-    /// [`EmptyCanonical`]: FieldKeyError::EmptyCanonical
+    /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation.
+    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
+    ///   searchable character.
     pub(crate) fn try_new(
         raw: impl Into<String>,
     ) -> Result<Self, FieldKeyError> {
@@ -401,8 +381,8 @@ impl FieldKey {
     /// form, without allocating the canonical form to check.
     ///
     /// Used by [`FieldKeyRef`]'s [`Hash`](std::hash::Hash) impl and
-    /// [`FieldKey::to_canonical`] to avoid allocation when the input is
-    /// already canonical.
+    /// [`FieldKey::to_canonical`] to avoid allocation when the input is already
+    /// canonical.
     fn is_canonical(raw: &str) -> bool {
         !raw.is_empty()
             && raw.chars().all(|ch| {
@@ -463,12 +443,9 @@ impl TryFrom<String> for FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`Name`] if `raw` fails [`FieldName`] validation
-    /// - [`EmptyCanonical`] if canonicalization strips every searchable
-    ///   character
-    ///
-    /// [`Name`]: FieldKeyError::Name
-    /// [`EmptyCanonical`]: FieldKeyError::EmptyCanonical
+    /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation
+    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
+    ///   searchable character
     fn try_from(raw: String) -> Result<Self, Self::Error> {
         Self::try_new(raw)
     }
@@ -481,12 +458,9 @@ impl TryFrom<&str> for FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`Name`] if `raw` fails [`FieldName`] validation.
-    /// - [`EmptyCanonical`] if canonicalization strips every searchable
-    ///   character.
-    ///
-    /// [`Name`]: FieldKeyError::Name
-    /// [`EmptyCanonical`]: FieldKeyError::EmptyCanonical
+    /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation
+    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
+    ///   searchable character
     fn try_from(raw: &str) -> Result<Self, Self::Error> {
         Self::try_new(raw)
     }
@@ -507,14 +481,12 @@ impl TryFrom<serde_json::Value> for FieldKey {
     ///
     /// # Errors
     ///
-    /// - [`NotScalar`] for `Null`, `Array`, and `Object` values.
-    /// - [`Name`] if the coerced string fails [`FieldName`] validation.
-    /// - [`EmptyCanonical`] if canonicalization strips every searchable
-    ///   character.
-    ///
-    /// [`NotScalar`]: FieldNameError::NotScalar
-    /// [`Name`]: FieldKeyError::Name
-    /// [`EmptyCanonical`]: FieldKeyError::EmptyCanonical
+    /// - [`FieldNameError::NotScalar`] for `Null`, `Array`, and `Object`
+    ///   values.
+    /// - [`FieldKeyError::Name`] if the coerced string fails [`FieldName`]
+    ///   validation.
+    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
+    ///   searchable character.
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
         let raw = match value {
             serde_json::Value::String(s) => s,
@@ -797,8 +769,8 @@ impl From<noyalib::Value> for FieldValueRef<'static> {
     }
 }
 
-/// Controls how [`FieldValueRef`] coerces string scalars into date or
-/// datetime values during deserialization from JSON, YAML, or TOML.
+/// Controls how [`FieldValueRef`] coerces string scalars into date or datetime
+/// values during deserialization from JSON, YAML, or TOML.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum DateTimeCoercion {
     /// Classify ISO date and date-time strings as [`FieldValueRef::Date`] or
@@ -892,10 +864,10 @@ impl<'de: 'a, 'a> Visitor<'de> for FieldValueRefVisitor<'a> {
         Ok(FieldValueRef::Int(v))
     }
 
-    /// Saturates at [`i64::MAX`] for a magnitude beyond `i64`'s range.
-    /// Values files in this domain (Schema `select`/`multi` options)
-    /// never need integers that large, so keeping a single
-    /// [`FieldValueRef::Int`] variant is worth that ceiling.
+    /// Saturates at [`i64::MAX`] for a magnitude beyond `i64`'s range. Values
+    /// files in this domain (Schema `select`/`multi` options) never need
+    /// integers that large, so keeping a single [`FieldValueRef::Int`] variant
+    /// is worth that ceiling.
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
         Ok(FieldValueRef::Int(i64::try_from(v).unwrap_or(i64::MAX)))
     }

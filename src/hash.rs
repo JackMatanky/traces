@@ -14,8 +14,8 @@ use std::{
 
 use thiserror::Error;
 
-/// Stores a BLAKE3 digest: of file contents ([`Self::from_path`],
-/// `From<&str>`) or of structured values built with `Blake3Hasher`.
+/// Stores a BLAKE3 digest: of file contents ([`Self::from_path`], `From<&str>`)
+/// or of structured values built with `Blake3Hasher`.
 ///
 /// Prefer hashing already-loaded content when the caller has it. Hashing a path
 /// and then reading the same path again creates a time-of-check to time-of-use

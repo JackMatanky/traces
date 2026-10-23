@@ -30,14 +30,14 @@ use std::{
 use strict_path::{PathBoundary, StrictPathError};
 use thiserror::Error;
 
-/// Rewrites platform-native path separators to `/` for stable, portable
-/// display and query output.
+/// Rewrites platform-native path separators to `/` for stable, portable display
+/// and query output.
 ///
 /// Internal storage and filesystem operations use platform-native encodings
-/// (see module docs); this normalizes only the *textual* representation
-/// shown to users or matched against `/`-separated query syntax. Borrowed on
-/// Unix, where `/` is already the separator; non-UTF-8 components are
-/// lossily converted, matching [`Path::to_string_lossy`].
+/// (see module docs); this normalizes only the *textual* representation shown
+/// to users or matched against `/`-separated query syntax. Borrowed on Unix,
+/// where `/` is already the separator; non-UTF-8 components are lossily
+/// converted, matching [`Path::to_string_lossy`].
 #[must_use]
 pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
     let text = path.to_string_lossy();
