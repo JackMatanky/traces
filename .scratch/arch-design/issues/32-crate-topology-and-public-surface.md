@@ -87,3 +87,16 @@ Whether that split earns its cost for Traces (versus the app layer inside one
 core crate, as ticket 20 states it) is open and untested here. Each crate
 bundles its integration tests into one `tests/main.rs` binary to avoid
 per-test link cost [V]. Not examined: how strictly `liwe` limits `pub`.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
+CLI, LSP and MCP are thin consumers of an app layer inside core; only
+adapters acquire cwd/env, time, local zone and prompt mode. Keep workspace
+policy/config generation and operation-scoped temporal frames distinct;
+do not add a public god-context or a process-global registry merely to
+prepare for multi-root. Provide narrow, justified outward APIs for
+config admission, query execution and fallible results. If enforcing
+ambient-free core with Clippy, enumerate exact disallowed paths rather
+than wildcard method patterns; inventory-only scans cannot establish
+the dependency boundary.

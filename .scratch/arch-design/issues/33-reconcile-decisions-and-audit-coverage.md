@@ -51,3 +51,24 @@ ticket 20 resolved. Re-test the resolved decisions against their per-ticket
 notes and the comment appended to ticket 20, and re-test the layering
 principle against IWE's `liwe`/`diwe` split (ticket 32). Corrections to earlier
 claims are listed in each research file's ledger and in ticket 20's comment.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md)
+and the amendment to [ticket 19](./19-coercion-and-comparison-policy.md).
+Audit the exclusive period boundary, period-versus-point membership versus
+period identity and mixed-type sort, the fallible lazy-result API across
+template callbacks, index coherence under two policies for one canonical
+root, and held-config trust at each request admission. Record the
+`file.day` to filename-only `file.date` migration and creation-time
+nullability, plus the non-TTY/`--no-input` change, in the specification's
+behavior-change table. ADR-0003's non-TTY first/empty fallback is
+superseded by ticket 21, while index-by-position selection survives;
+reconcile that accepted ADR's text alongside ADR-0009 before cutover.
+Verify new filename prefix recognition is isolated from the frozen
+vault-format parser and record changed week/quarter results in the
+behavior-change table. A present creation/modification timestamp needs
+the pinned zone to yield a civil `cdate`/`mdate`; absent creation is
+`Null`, while zone failure is a typed error.
+Keep current-code glossaries unchanged until the implementation updates
+their domain vocabulary.

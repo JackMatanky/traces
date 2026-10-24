@@ -49,8 +49,22 @@ See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). The
 template service stays free of `note`. An app-layer use case runs an advisory
 check between `render()` and `write()` (parse rendered frontmatter, resolve
 class, call the schema check); it is skipped without frontmatter or class and
-also runs under `--dry-run`. The schema stays a source of values, not of
-prompts (ADR-0006).
+also runs under `--dry-run`. The schema stays a source of values, not of prompts
+(ADR-0006).
 
 Under `--dry-run` no output path is computed, so the post-render check cannot
 apply path bindings (frontmatter and tag bindings still apply).
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). A
+render samples one temporal frame; nested queries and any lazy results keep it
+after the render state expires. Do not let minijinja's display, iteration, `len`
+or indexing callbacks convert a typed materialization or zone error into a
+missing value or a blank cell; render/write is all-or-nothing. A template escape
+set that survives rendering retains the same frame. Civil `file.cdate`/`mdate`
+presentation uses the render's pinned zone; filename-derived `file.date` does
+not need one. `DialogProvider` receives an adapter-selected mode and honors
+authored defaults unattended but cannot invent answers; an exhausted preset is
+an error. Random UUID creation remains an explicit separate entropy capability,
+not a hidden request-global service.

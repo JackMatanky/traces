@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 9, 16, 12
+Blocked by: 9, 16, 21, 12
 
 ## Question
 
@@ -42,3 +42,14 @@ were normalised to `/` on Windows, iwec CHANGELOG) and checks workspace escape
 in one place before touching disk or graph (`crates/diwe/src/fs.rs`,
 `key_escapes_workspace`, `workspace_document_path`) [V]. It is consistent with
 the portable-path lesson of research 9 and offers no capability handle.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). The
+adapter supplies a typed OS start path and a fixed base for any relative
+override; distinguish canonical root identity for workspace admission/index
+coordination from a note's portable vault-relative path and from the confined
+filesystem capability. Multi-root readiness does not imply that two roots
+aliasing the same directory can write independent indexes: resolve symlink/alias
+identity and TOCTOU policy here and in tickets 25/30. No registry or new
+capability is presumed.

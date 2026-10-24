@@ -22,6 +22,7 @@ fails closed as `DriftCause::Unrecorded`; a failed heal is logged and retried
 next refresh. Alternatives to weigh against it: per-axis invalidation (only
 `class_field` touches the class axes; `tasks`/`frontmatter` need a reparse),
 whole-cache rebuild (landed), keep the old manual `traces index`.
+
 2. **Parser/format-version policy.** The fingerprint covers config only.
 Persisted `Note` rows also depend on parser behaviour, guarded solely by the
 hand-bumped `META_VERSION = b"1"` (`src/index/store.rs:41`); a version mismatch
@@ -29,16 +30,19 @@ wipes the store at `IndexStore::open`, not through `Drifted` as ADR-0009 text
 implies. [H] a parser change shipped without a manual bump serves stale `Note`
 rows. Decide whether a parser/schema identity enters the fingerprint or the
 version is derived.
+
 3. **Path-set change cliff.** Unchanged by the merge ([V]
 `reconcile`/`is_paths_unchanged`/`merge_refreshed_notes` untouched, now
 `src/index/refresh.rs:410,475,555`). `research/11` shows 97% of the cost is note
 deserialization, not link re-resolution; decide note caching/laziness vs
 accepting it. The inverted unresolved-stem index suggested by `research/05`
 attacks the wrong cost.
+
 4. **Racy-timestamp guard.** [V] still absent: `delta.rs` untouched and no
 `racy` handling anywhere in `src/index`; a same-length edit within one mtime
 tick is missed (`service.rs` tests sleep to let mtime advance). Decide whether a
 content-hash fallback belongs in the model.
+
 5. **Observability of heals.** [V] `RefreshReport` is only logged in production
 (`tracing::info!` for drift, `debug!` for file changes; count accessors are
 test-only). Decide whether a heal is user-visible (links to the host and
@@ -64,9 +68,9 @@ digest surface), read-model decision.
 ## Inputs from the value model decision
 
 See [ticket 18's Answer](./18-value-model.md). The runtime value's serde shape
-changes (`Number` becomes `Int`/`Float`, `Link` gains `embedded` and
-normalized display), so the cache format and parser version must invalidate
-existing indexes.
+changes (`Number` becomes `Int`/`Float`, `Link` gains `embedded` and normalized
+display), so the cache format and parser version must invalidate existing
+indexes.
 
 ## Inputs from the coercion and comparison decision
 
@@ -78,13 +82,13 @@ since naive datetimes no longer embed it.
 ## Inputs from the schema typing decision
 
 See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Schema
-files, including their class `[binding]` tables and the `global` layer, stay
-out of the fingerprint: bindings are expanded at query time.
+files, including their class `[binding]` tables and the `global` layer, stay out
+of the fingerprint: bindings are expanded at query time.
 
 If a "notes changed since the last check" notice is adopted (20, agent
 guardrail), refresh already knows the changed set; a check watermark and the
-violation keys at the last check would live in a derived store outside the
-index and its fingerprint. Whether that store exists, and its cost, is open.
+violation keys at the last check would live in a derived store outside the index
+and its fingerprint. Whether that store exists, and its cost, is open.
 
 ## Inputs from the IWE research
 
@@ -93,5 +97,21 @@ staleness model for the CLI (it rebuilds); its servers feed `notify` events
 (poll fallback) into the live graph. Its CHANGELOGs add one invariant relevant
 to item 4: `write_file_if_changed` exists because a normalise pass that rewrote
 identical bytes touched every file's mtime (diwe v0.24.1) [V]. Any Traces write
-path that rewrites unchanged bytes would defeat an mtime-based delta, so "a
-host never rewrites unchanged content" belongs with the freshness model.
+path that rewrites unchanged bytes would defeat an mtime-based delta, so "a host
+never rewrites unchanged content" belongs with the freshness model.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
+Include effective ignore policy and any persisted filename-period parsing policy
+(recognized formats, week rules, bare-year opt-in) in the index-affecting
+fingerprint, or rederive those fields without relying on persisted parsed
+values. A host's entire policy identity is not the cache key: zone and schema
+changes do not rewrite stored civil note values or filename periods.
+Timestamp-derived civil `cdate`/`mdate` are computed in the pinned zone at
+evaluation, never persisted under a zone-free fingerprint. Preserve a coherent
+index generation per query, and decide how an index writer is admitted when two
+workspaces or processes address the same canonical root with differing policies.
+Do not assume a storage engine's file lock proves policy consistency without
+checking its semantics. Snapshot creation timestamps only when available; never
+substitute mtime for `cdate`.

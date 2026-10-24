@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 11, 17, 23, 1, 12
+Blocked by: 11, 17, 21, 23, 1, 12
 
 ## Question
 
@@ -51,17 +51,19 @@ compact binary form (via `is_human_readable()`) is a candidate, unmeasured.
 
 See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Naive
 datetimes are persisted as civil values, so the cache holds no machine zone and
-its format changes. Collation sort keys are never persisted. Any secondary-table
-key order must agree with the filter relations (Int and Float compare by
-value; links by folded target).
+its format changes. Collation sort keys are never persisted. If a secondary
+table pushes down a filter, its candidates must agree with the filter relation
+(numeric value for Int/Float, folded targets for links); the deterministic total
+sort order does not substitute for period membership or the field-versus-field
+civil-midnight rule.
 
 ## Inputs from the schema typing decision
 
 See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Class
 binding by tag and path is expanded at query time into the existing `Class`,
-`Tag` and `Path` atoms, so the index stores no derived class and learns
-nothing about schemas. A "has a known explicit class" exclusion is needed in
-source selection; a secondary lookup for it would avoid the `Not` full scan.
+`Tag` and `Path` atoms, so the index stores no derived class and learns nothing
+about schemas. A "has a known explicit class" exclusion is needed in source
+selection; a secondary lookup for it would avoid the `Not` full scan.
 
 A "notes changed since the last check" notice (20, agent guardrail) would read
 the changed set that refresh already computes; any baseline store sits outside
@@ -70,12 +72,12 @@ tickets 25 and 31.
 
 ## Inputs from the IWE research
 
-See [research 12](../research/12-iwe-core-and-hosts-architecture.md). IWE is
-the measured pure in-memory alternative: no persistent cache, the CLI parses the
-whole vault with Rayon on every run. Synthetic ~700 B notes on an M3 Pro: 5k
-144 ms, 10k 329 ms, 20k 705 ms cold load (plain; +36% with its BM25 index)
-[V: `docs/benchmark.md:155-171`]. Queries then cost 12 ms for a field filter at
-20k and are super-linear for graph filters (`--roots` 60 ms; the unbounded
+See [research 12](../research/12-iwe-core-and-hosts-architecture.md). IWE is the
+measured pure in-memory alternative: no persistent cache, the CLI parses the
+whole vault with Rayon on every run. Synthetic ~700 B notes on an M3 Pro: 5k 144
+ms, 10k 329 ms, 20k 705 ms cold load (plain; +36% with its BM25 index) [V:
+`docs/benchmark.md:155-171`]. Queries then cost 12 ms for a field filter at 20k
+and are super-linear for graph filters (`--roots` 60 ms; the unbounded
 included-by filter reaches ~94% of the corpus) [V: `docs/benchmark.md:185-208`].
 Servers load once and update in place (`Graph::update_document`). Different
 machine and corpus from ticket 11 (M4 Pro, 20k cold query 60 to 74 ms), so use
@@ -84,3 +86,16 @@ evaluator partitions an `and` into graph-walk generators and scalar predicates
 and intersects candidate key sets before running scalar predicates
 (`crates/liwe/src/query/eval.rs`, `eval_and`) [V], a candidate-set-first plan
 that needs no store.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
+Whichever read path wins, a query starts from one coherent index generation and
+retains its pinned temporal frame across lazy materialization. A refresh from a
+different policy must never silently mix stored rows from different generations;
+the actual read/store boundary is for this ticket and 25. A root's index is not
+isolated merely because two hosts have different in-memory workspace identity.
+Absence of filesystem creation time remains `Null`, not a modification-time
+substitute. Persist source timestamps, not zone-derived `cdate`/`mdate` civil
+projections under a zone-free fingerprint; filename periods remain
+zone-independent whether persisted or parsed when queried.

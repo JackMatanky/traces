@@ -26,8 +26,9 @@ See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Two advisory
 stderr notices need a mechanism (stdout and exit codes unchanged): a count of
 rows excluded by a bracket mismatch, and a build-time warning for a date-shaped
 but invalid quoted literal. A parse-time `NaN`-to-`Null` warning is a third.
-Filters never error at evaluation; a bare invalid date literal stays a syntax
-error.
+Ordinary type mismatches in filters do not error at evaluation; a bare
+invalid date literal stays a syntax error. Ticket 21 requires typed
+environmental/materialization errors instead of blanket no-error semantics.
 
 ## Inputs from the schema typing decision
 
@@ -63,3 +64,16 @@ unreachable schema entry is a load-time exit 2) [V]. It has no severities and no
 code registry. Fileclass violations are `{ ok, message }` only, shown as a
 coloured indicator (`src/fields/validate.ts`) [V], so ticket 20's coded
 violations and this ticket's registry go beyond both.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
+Distinguish a nonmatching row or nullable creation timestamp from missing
+required temporal context, failed lazy result materialization, presentation
+failure, and an unanswered unattended prompt. The latter failures must
+cross query/template boundaries as typed errors and be translated by
+each host without silently dropping rows or emitting partial success.
+Keep the frozen CLI exit codes and successful stdout payloads; update
+the redesign change table and asserted diagnostics for new failure
+paths. A memoized failure on a lazy result must remain observable on
+every terminal accessor.

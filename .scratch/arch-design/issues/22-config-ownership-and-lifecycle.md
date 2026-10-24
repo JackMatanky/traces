@@ -49,3 +49,17 @@ config (`[schemas.<name>].match`), not in the schema files; [ticket
 20](./20-schema-note-typing-and-validation.md) chose class-owned `[binding]`.
 The only transferable point for this ticket is the comment-preserving migration
 technique if the config format ever changes.
+
+## Inputs from the execution-context decision
+
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). The
+adapter snapshots typed OS paths, discovery inputs and overrides at workspace
+open; specify precedence, an explicit base for relative paths (or reject
+relative overrides), and where config-derived policy lives. Do not use a
+Unicode-only environment map for paths. Hash-verify local config before parsing
+and revalidate trust/content at each new held-workspace request; admitted
+requests retain their immutable generation. Global config freshness is separate.
+Supply one workspace's policy to its services, not a process-global value, so
+different roots can coexist. The config surface also owns `DateConfig`
+integration (zone source, week rules and opt-in bare-year filenames); decide its
+syntax with ticket 27, not here.

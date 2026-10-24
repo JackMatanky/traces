@@ -115,15 +115,17 @@ itself is not implemented here; the map ends at hand-off to specification.
 - [Where do mature systems put type coercion and validation, and how do they
   report violations?](./issues/03-research-coercion-validation-precedent.md):
   coercion belongs to query binding / explicit casts (DuckDB `CAST` vs
-  `TRY_CAST`, Polars `strict`), not parsing; note validation should be an
-  on-demand advisory pass emitting span-located diagnostics
-  (jsonschema/taplo/Metadata Menu), never index-gating; cross-kind order must be
-  a fixed lattice (no ambient zone).
+  `TRY_CAST`, Polars `strict`), not parsing; on-demand advisory note
+  validation never gates indexing. Ticket 20 later chooses span-free
+  violations; ticket 19 keeps a fixed cross-kind lattice for *sorting*,
+  while cross-bracket relational filters do not match.
 - [How do mature CLIs make ambient environment (clock, zone, dirs, env)
   explicit?](./issues/04-research-execution-context-precedent.md): jj/uv split
   context rather than one god struct (host environment / workspace / temporal);
-  injecting a pinned zone+now per evaluation deletes `ZoneGuard`; snapshot cwd
-  once; scope dialog to interactive commands.
+  sample `now` once and acquire the zone only if needed (ticket 21's
+  refinement), snapshot cwd for workspace discovery. The research proposed
+  interactive-only prompts; ticket 21 permits authored unattended defaults
+  but rejects invented answers.
 - [How do incremental systems fingerprint inputs and decide
   staleness?](./issues/05-research-freshness-fingerprint-precedent.md): input
   completeness is best owned by the type system (Ruff `CacheKey` derive) over
@@ -233,44 +235,49 @@ itself is not implemented here; the map ends at hand-off to specification.
   `pub` to outward-facing components (widening allowed only with an
   outward-facing justification).
 - [Which forward-looking consumers and scales must the architecture be shaped
-  for?][fc]: LSP is the next committed consumer; MCP is likely. Support
+  for?](./issues/17-grilling-forward-consumers-and-design-pressure.md):
+  LSP is the next committed consumer; MCP is likely. Support
   source-aware editor features, keep the core synchronous by default, and assess
   operation-specific performance across the seven target vault sizes. Reopen the
   note-model choice in ticket 23; resolve open-buffer/index consistency in
-  ticket 34. [fc]: ./issues/17-grilling-forward-consumers-and-design-pressure.md
+  ticket 34.
 - [What is the single dynamic value model, and who owns
   it?](./issues/18-value-model.md): two owned types and no borrowed mirror enum.
-  `note::NoteFieldValue` (`Int(i64)`/`Float(f64)`, `Link`, derived tagged serde,
-  80 B kept) for notes, queries and templates; a schema-local literal type
-  (strings stay strings) replaces the schema `FieldValue`; only a root `Link`
+  The runtime `NoteFieldValue` (`Int(i64)`/`Float(f64)`, `Link`, derived tagged
+  serde, 80 B kept) serves notes, queries and templates; ticket 20 later
+  requires its owner to sit below both note and schema (ticket 32 chooses
+  its exact placement). A schema-local literal type (strings stay strings)
+  replaces the schema `FieldValue`; only a root `Link`
   (`target`, normalized `display`, `embedded`) is shared. `NoteLink` (syntax
   kind, span) is the editor-side type for [the note document
   model](./issues/23-note-document-model.md). Frontmatter keeps the Noyalib
   compat parser and converts its AST directly (huge integers become `Float`
   instead of dropping the block); classification is quote-insensitive in
   frontmatter and shares one parser set with inline. `FieldValueRef`,
-  `DateTimeCoercion` and the double conversion are removable. Handoffs: zone
-  for naive datetimes ([coercion
+  `DateTimeCoercion` and the double conversion are removable. Ticket 19
+  later makes naive datetimes civil, so zone input affects evaluation,
+  not the persisted note value. Handoffs: [coercion
   policy](./issues/19-coercion-and-comparison-policy.md), [execution
-  context](./issues/21-ambient-environment-and-execution-context.md)), temporal
+  context](./issues/21-ambient-environment-and-execution-context.md), temporal
   cache encoding ([index read
   model](./issues/24-index-read-model-and-query-execution.md), [index
   freshness](./issues/25-index-freshness-and-invalidation.md)), view enum
   benchmark ([query core](./issues/26-query-core-and-plan.md)).
 - [Where do coercion and cross-type comparison live, and what is the
   policy?](./issues/19-coercion-and-comparison-policy.md): `PartialEq` stays
-  structural; one value-semantics module owns loose equality, bracketed
-  order for filters (cross-kind `==` false, relational no match, MongoDB-style)
-  and a total sort order built with an explicit context. Sort sniffing is
-  deleted; Unicode collation (`icu_collator` root, numeric) for sorting only;
-  exact `Int`/`Float` comparison, `NaN` to `Null`. Naive datetimes become
-  civil and the cache holds no zone. Classification stays quote-insensitive
-  (no quote escape: measured too costly and it would silently drop quoted
-  dates); quoted query literals adapt per row to Date, DateTime, Duration,
-  Link, Number or Bool from pre-parsed candidates, coarse date literals are
-  intervals, and a natural-language candidate is a hook. Link equality uses
-  the folded target only; `date(link)` reads the target. Two advisory stderr
-  notices. Handoffs: [query core](./issues/26-query-core-and-plan.md),
+  structural; one value-semantics module owns filter equality and bracketed
+  order (across brackets `==` false, relational no match) separately from a
+  total sort order. Numeric values compare exactly; temporal point/period
+  filter membership is not sort equality. Sort sniffing is deleted; Unicode
+  collation (`icu_collator` root, numeric) is sort-only; `NaN` becomes `Null`.
+  Naive datetimes become civil and the cache holds no zone. Classification
+  stays quote-insensitive; quoted query literals adapt per row using
+  pre-parsed candidates including `CalendarPeriod` for date-shaped comparison.
+  Period literals match whole spans with an exclusive upper bound; two
+  periods match only by normalized identity. Typed temporal/environmental
+  failures are distinct from nonmatching data; link equality uses the folded
+  target, while `date(link)` reads the target. Two advisory stderr notices.
+  Handoffs: [query core](./issues/26-query-core-and-plan.md),
   [temporal boundary](./issues/27-temporal-boundary-and-dialects.md) (natural
   language grammar, `DateConfig`), [execution
   context](./issues/21-ambient-environment-and-execution-context.md), [schema
@@ -309,6 +316,30 @@ itself is not implemented here; the map ends at hand-off to specification.
   topology](./issues/32-crate-topology-and-public-surface.md), [schema
   internals](./issues/35-schema-internals-simplification.md), [body
   sections](./issues/36-body-section-schemas.md).
+- [What is the explicit execution context, and what ambient state is
+  eliminated?](./issues/21-ambient-environment-and-execution-context.md):
+  adapters snapshot OS inputs at workspace opening; core workspaces own
+  independent policy/config generations and recheck local trust at each
+  request admission. One frame per query/render/request pins clock, week
+  rule and lazy zone resolution; lazy results memoize errors. A civil
+  `CalendarPeriod` (start + `CalendarUnit`) supplies filename-only
+  `file.date`, which never falls back to `file.cdate`; creation fields never
+  fall back to mtime. Whole-period comparisons use the instant's local
+  civil date; period identity and sorting remain distinct. Authored
+  defaults work unattended; missing answers fail. Multi-root construction
+  is supported without a registry, while same-root index writer
+  coordination stays with tickets 24/25/29/30.
+  Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md),
+  [read model](./issues/24-index-read-model-and-query-execution.md),
+  [freshness](./issues/25-index-freshness-and-invalidation.md),
+  [query](./issues/26-query-core-and-plan.md),
+  [temporal](./issues/27-temporal-boundary-and-dialects.md),
+  [templates](./issues/28-template-engine-boundary.md),
+  [paths](./issues/29-path-and-capability-model.md),
+  [host](./issues/30-workspace-host-and-composition.md),
+  [errors](./issues/31-error-and-diagnostic-architecture.md),
+  [topology](./issues/32-crate-topology-and-public-surface.md),
+  [reconciliation](./issues/33-reconcile-decisions-and-audit-coverage.md).
 
 ## Not yet specified
 
