@@ -1,9 +1,10 @@
----
-# mutarust.yml — mutation-testing policy for traces.
-# mutarust reads this ONLY via `--config mutarust.yml` (no auto-discovery);
-# the `mutants` mise task always passes it. Schema (11 fields,
-# additionalProperties: false): docs/refs/mutarust/schema/mutarust.schema.json
+# -----------------------------------------------------------------------------
+# Filename:    traces/mutarust.yml
+# Docs:        https://github.com/quality-gates/mutarust
+# Description: Mutation-testing policy
+# -----------------------------------------------------------------------------
 
+---
 # Reports land in CWD (all gitignored): report.json (triage) and
 # mutarust-report.html (human). mutarust-agentic.json comes from the task's
 # --logger-agentic-json. NOTE: report.json is clobbered by every run,
