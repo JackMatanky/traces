@@ -83,7 +83,23 @@ def test_findings_preserve_multiline_and_repeated_sentence_locations() -> None:
             text, "test.md", rules, dictionary, only={"R13"}
         )
     ]
-    assert [(finding.line, finding.column) for finding in findings] == [(2, 1), (3, 1)]
+    assert [(finding.line, finding.column) for finding in findings] == [
+        (2, 1),
+        (3, 1),
+    ]
+
+
+def test_findings_preserve_markdown_source_columns() -> None:
+    rules, dictionary = config()
+    text = (
+        "  Utilize the tool.\n\n- Utilize the tool.\n\nFirst line.\n  Utilize the tool."
+    )
+    findings = check_ste.check_text(text, "test.md", rules, dictionary, only={"R13"})
+    assert [(finding.line, finding.column) for finding in findings] == [
+        (1, 3),
+        (3, 3),
+        (6, 3),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -202,7 +218,9 @@ def test_core_rules_and_unknown_domain_verb() -> None:
 def test_compare_is_order_independent_and_detects_number_change() -> None:
     rules, _dictionary = config()
     assert not check_ste.compare_facts(
-        "Use 2 flags: --fast and --safe.", "Use --safe and --fast: 2 flags.", rules
+        "Use 2 flags: --fast and --safe.",
+        "Use --safe and --fast: 2 flags.",
+        rules,
     )
     assert check_ste.compare_facts("Use 2 flags.", "Use 3 flags.", rules)
 
@@ -265,7 +283,14 @@ def test_config_failures_return_exit_two(tmp_path: Path, failure: str) -> None:
     dictionary.write_text(json.dumps(base_dictionary))
     assert (
         check_ste.main(
-            ["check", "-", "--rules", str(rules), "--dictionary", str(dictionary)]
+            [
+                "check",
+                "-",
+                "--rules",
+                str(rules),
+                "--dictionary",
+                str(dictionary),
+            ]
         )
         == 2
     )
@@ -297,7 +322,45 @@ def test_additional_config_failures_return_exit_two(
     dictionary.write_text(json.dumps(base_dictionary))
     assert (
         check_ste.main(
-            ["check", "-", "--rules", str(rules), "--dictionary", str(dictionary)]
+            [
+                "check",
+                "-",
+                "--rules",
+                str(rules),
+                "--dictionary",
+                str(dictionary),
+            ]
+        )
+        == 2
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("severity", []), ("severity", {}), ("check", []), ("check", {})],
+)
+def test_non_string_rule_fields_return_exit_two(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    base_rules = json.loads((Path(__file__).parents[1] / "rules.json").read_text())
+    base_dictionary = json.loads(
+        (Path(__file__).parents[1] / "dictionary.json").read_text()
+    )
+    base_rules["rules"][0][field] = value
+    rules = tmp_path / "rules.json"
+    dictionary = tmp_path / "dictionary.json"
+    rules.write_text(json.dumps(base_rules))
+    dictionary.write_text(json.dumps(base_dictionary))
+    assert (
+        check_ste.main(
+            [
+                "check",
+                "-",
+                "--rules",
+                str(rules),
+                "--dictionary",
+                str(dictionary),
+            ]
         )
         == 2
     )

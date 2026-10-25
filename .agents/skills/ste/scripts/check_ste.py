@@ -52,6 +52,7 @@ class Block:
     line: int
     kind: str
     prose: bool = True
+    column: int = 1
 
 
 @dataclass(frozen=True)
@@ -129,6 +130,10 @@ def validate_config(rules: dict[str, object], dictionary: dict[str, object]) -> 
         checker = rule["check"]
         if not isinstance(identifier, str) or identifier in seen:
             raise ConfigError(f"duplicate or invalid rule id: {identifier!r}")
+        if not isinstance(severity, str):
+            raise ConfigError(f"invalid severity for {identifier}: {severity!r}")
+        if not isinstance(checker, str):
+            raise ConfigError(f"invalid checker for {identifier}: {checker!r}")
         if severity not in VALID_SEVERITIES:
             raise ConfigError(f"invalid severity for {identifier}: {severity!r}")
         if checker not in CHECK_NAMES:
@@ -190,7 +195,7 @@ def markdown_blocks(text: str) -> list[Block]:
     def flush() -> None:
         nonlocal paragraph
         if paragraph:
-            joined = "\n".join(part.strip() for part in paragraph)
+            joined = "\n".join(paragraph)
             blocks.append(Block(joined, paragraph_line, "paragraph"))
             paragraph = []
 
@@ -218,11 +223,22 @@ def markdown_blocks(text: str) -> list[Block]:
         elif re.match(r"^\s{0,3}#{1,6}\s+", line):
             flush()
             blocks.append(
-                Block(re.sub(r"^\s{0,3}#{1,6}\s+", "", line), line_number, "heading")
+                Block(
+                    re.sub(r"^\s{0,3}#{1,6}\s+", "", line),
+                    line_number,
+                    "heading",
+                )
             )
         elif match := re.match(r"^\s*(?:[-*+] |\d+[.)] )(.+)$", line):
             flush()
-            blocks.append(Block(match.group(1), line_number, "list"))
+            blocks.append(
+                Block(
+                    match.group(1),
+                    line_number,
+                    "list",
+                    column=match.start(1) + 1,
+                )
+            )
         else:
             if not paragraph:
                 paragraph_line = line_number
@@ -271,11 +287,14 @@ def split_sentences(
         if value:
             offset = start + leading
             preceding = text[:offset]
+            line_delta = preceding.count("\n")
             result.append(
                 Sentence(
                     value,
-                    line + preceding.count("\n"),
-                    offset - preceding.rfind("\n"),
+                    line + line_delta,
+                    offset
+                    - preceding.rfind("\n")
+                    + (block.column - 1 if block and line_delta == 0 else 0),
                     block or Block(text, line, "paragraph"),
                 )
             )
@@ -286,11 +305,14 @@ def split_sentences(
     if trailing:
         offset = start + leading
         preceding = text[:offset]
+        line_delta = preceding.count("\n")
         result.append(
             Sentence(
                 trailing,
-                line + preceding.count("\n"),
-                offset - preceding.rfind("\n"),
+                line + line_delta,
+                offset
+                - preceding.rfind("\n")
+                + (block.column - 1 if block and line_delta == 0 else 0),
                 block or Block(text, line, "paragraph"),
             )
         )
@@ -452,7 +474,8 @@ def check_passive(
     auxiliaries = [
         re.escape(str(item))
         for item in object_list(
-            object_dict(rule["params"], "params").get("auxiliaries", []), "auxiliaries"
+            object_dict(rule["params"], "params").get("auxiliaries", []),
+            "auxiliaries",
         )
     ]
     pattern = r"\b(?:" + "|".join(auxiliaries) + r")\s+\w+(?:ed|en)\b"
@@ -551,7 +574,12 @@ def check_one_meaning(
                 sentence.text
             ):
                 results.append(
-                    finding(rule, file, sentence, suggestion=str(entry.get("note", "")))
+                    finding(
+                        rule,
+                        file,
+                        sentence,
+                        suggestion=str(entry.get("note", "")),
+                    )
                 )
     return results
 
@@ -602,7 +630,8 @@ def check_second_person(
     if sentence.block.kind != "list":
         return []
     terms = object_list(
-        object_dict(rule["params"], "params")["third_person_actor_terms"], "actor terms"
+        object_dict(rule["params"], "params")["third_person_actor_terms"],
+        "actor terms",
     )
     return (
         [finding(rule, file, sentence)]
@@ -615,7 +644,8 @@ def check_second_person(
 
 
 CHECKS: dict[
-    str, Callable[[dict[str, object], Sentence, str, dict[str, object]], list[Finding]]
+    str,
+    Callable[[dict[str, object], Sentence, str, dict[str, object]], list[Finding]],
 ] = {
     "sentence_words": check_sentence_words,
     "compound_instruction": check_pattern,
@@ -726,7 +756,11 @@ def check_text(
                     for term in terms
                 ) and (not first or first[0] not in terms):
                     findings.append(
-                        finding(rule, file, Sentence(block.text, block.line, 1, block))
+                        finding(
+                            rule,
+                            file,
+                            Sentence(block.text, block.line, 1, block),
+                        )
                     )
         if rule["check"] == "synonym_pair":
             lowered = "\n".join(block.text.lower() for block in blocks if block.prose)
@@ -872,7 +906,10 @@ def render_dictionary(path: Path, dictionary: dict[str, object], check: bool) ->
         )
     replacement = f"{begin}\n{dictionary_table(dictionary)}\n{end}"
     updated = re.sub(
-        re.escape(begin) + r"[\s\S]*?" + re.escape(end), replacement, content, count=1
+        re.escape(begin) + r"[\s\S]*?" + re.escape(end),
+        replacement,
+        content,
+        count=1,
     )
     if check:
         return 0 if updated == content else 1
@@ -921,7 +958,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.compare:
                 before_path, after_path = (Path(item) for item in args.compare)
                 findings = compare_facts(
-                    before_path.read_text(), after_path.read_text(), rules, dictionary
+                    before_path.read_text(),
+                    after_path.read_text(),
+                    rules,
+                    dictionary,
                 )
                 file = str(after_path)
             else:
