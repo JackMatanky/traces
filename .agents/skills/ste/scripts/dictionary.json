@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "matching": {
+    "case_sensitive": false,
+    "boundary": "word_or_phrase",
+    "longest_phrase_wins": true,
+    "condition_scope": "same_sentence"
+  },
   "substitutions": [
     {
       "common": ["follow"],
@@ -95,7 +101,7 @@
     {
       "common": ["attempt"],
       "approved": "try",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },

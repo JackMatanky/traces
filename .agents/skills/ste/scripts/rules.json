@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "matching": {
+    "case_sensitive": false,
+    "boundary": "word_or_phrase",
+    "longest_phrase_wins": true,
+    "condition_scope": "same_sentence"
+  },
   "rules": [
     {
       "id": "R1",
@@ -69,7 +75,10 @@
       "severity": "warn",
       "params": {
         "scope": "instruction",
-        "verbs": ["do", "make", "check", "change", "remove", "start", "stop", "use", "put", "send", "open", "close", "read", "write", "wait", "tighten"]
+        "verbs": ["do", "make", "check", "change", "remove", "start", "stop", "use", "put", "send", "open", "close", "read", "write", "wait", "tighten"],
+        "verbs_role": "known_imperative_seed",
+        "flag_unlisted_leading_verb": false,
+        "allow_caller_domain_verbs": true
       },
       "message": "Start the instruction with a command verb."
     },
@@ -175,8 +184,13 @@
       "name": "warning-block",
       "check": "warning_block",
       "severity": "error",
-      "params": {"terms": ["warning", "caution"], "requires_own_block": true},
-      "message": "Put each warning or caution in its own block before the affected step."
+      "params": {
+        "terms": ["warning", "caution"],
+        "requires_own_block": true,
+        "must_precede_affected_step": true,
+        "placement_detection": "heuristic_only"
+      },
+      "message": "Put each warning or caution in its own block before the affected step; placement detection is heuristic."
     },
     {
       "id": "R19",
