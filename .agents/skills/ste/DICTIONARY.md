@@ -4,32 +4,37 @@ ASD-STE100 gives each approved word one meaning and one part of speech. When you
 
 This is a starter list, not the full ASD-STE100 dictionary. It covers the words that appear most in software and agent output.
 
-| Common word / phrase | Use instead | Note |
-|---|---|---|
-| follow (rules) | obey | "follow" means "come after" only |
-| ensure | make sure | |
-| utilize, leverage | use | |
-| facilitate | help | |
-| initiate | start | |
-| terminate | stop, end | |
-| approximately | about | |
-| prior to | before | |
-| subsequent to, following | after | |
-| in order to | to | |
-| strip out, get rid of | remove | |
-| fix up | repair | |
-| attempt | try | |
-| additional | more | |
-| commence | begin, start | |
-| modify | change | |
-| require | need | |
-| verify | check | |
-| obtain | get | |
-| perform | do, make | "make a test," not "perform a test" |
-| via | with, by, through | |
-| due to the fact that | because | |
-| in the event that | if | |
-| a number of | some, many | state the number if you know it |
+<!-- BEGIN GENERATED: substitutions (from scripts/dictionary.json) -->
+| Common word or phrase | Approved replacement | Automatic |
+| --- | --- | --- |
+| follow | obey | no |
+| ensure | make sure | no |
+| utilize | use | yes |
+| leverage | use | no |
+| facilitate | help | no |
+| initiate | start | no |
+| terminate | stop / end | no |
+| approximately | about | no |
+| prior to | before | yes |
+| subsequent to | after | yes |
+| following | after | no |
+| in order to | to | no |
+| strip out | remove | no |
+| get rid of | remove | no |
+| fix up | repair | no |
+| attempt | try | no |
+| additional | more | no |
+| commence | begin / start | no |
+| modify | change | no |
+| require | need | no |
+| verify | check | no |
+| obtain | get | no |
+| perform | do / make | no |
+| via | with / by / through | no |
+| due to the fact that | because | no |
+| in the event that | if | no |
+| a number of | some / many | no |
+<!-- END GENERATED -->
 
 ## One meaning per word
 

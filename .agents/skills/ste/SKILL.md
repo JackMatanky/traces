@@ -44,3 +44,10 @@ Use STE for procedures, runbooks, agent step logs, API how-tos, and instructions
 For the full rule set, see [RULES.md](./RULES.md). For more word substitutions, see [DICTIONARY.md](./DICTIONARY.md). For before/after samples, see [EXAMPLES.md](./EXAMPLES.md).
 
 Keep all facts, numbers, code, and commands exact. Change only the language. Do not add information. Do not remove any step.
+
+## Verify
+
+1. Check the source before you rewrite it to scope the work.
+2. After rewriting, run `.agents/skills/ste/scripts/check_ste.py check <file>` and fix every error. Warnings are heuristics that need agent judgment.
+3. Compare before and after with `.agents/skills/ste/scripts/check_ste.py check --compare <before> <after>` to make sure facts survived.
+4. `fix <file> -w` applies only unambiguous substitutions.

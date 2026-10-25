@@ -3,6 +3,8 @@
 This is an original, condensed restatement of the publicly described structure
 of ASD-STE100. It is not the Specification text.
 
+`scripts/rules.json` mirrors these IDs, and the checker reports them as `R#`. It does not machine-check R4, R9, R14, or R15.
+
 ## Sentences
 
 - **R1.** Procedural sentence: 20 words maximum.
