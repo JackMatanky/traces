@@ -86,7 +86,7 @@
     {
       "common": ["approximately"],
       "approved": "about",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -128,7 +128,7 @@
     {
       "common": ["get rid of"],
       "approved": "remove",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -163,7 +163,7 @@
     {
       "common": ["modify"],
       "approved": "change",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -177,14 +177,14 @@
     {
       "common": ["verify"],
       "approved": "check",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
     {
       "common": ["obtain"],
       "approved": "get",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -205,14 +205,14 @@
     {
       "common": ["due to the fact that"],
       "approved": "because",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
     {
       "common": ["in the event that"],
       "approved": "if",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
