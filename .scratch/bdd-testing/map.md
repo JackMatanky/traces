@@ -93,8 +93,7 @@ fresh session can start slice 1 with zero open design questions.
   `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration, because
   the step wrappers call `catch_unwind`. Bare `{name}` placeholders avoid a
   lint. A `build.rs` for new feature files costs a package rebuild (ticket 10
-  decides). You can fold scenarios into the existing integration and e2e
-  binaries (ticket 08 decides).
+  decides). Ticket 08 decided: fold scenarios into the e2e binary only.
 - [07: Boundary tiering, b versus c](issues/07-boundary-tiering.md): option (b)
   wins, with a sharper boundary. Scenarios address the spawned process by
   default. A facade seam is allowed only if a frozen baseline already holds the
@@ -113,16 +112,24 @@ fresh session can start slice 1 with zero open design questions.
   the three baselines. Each new shipped entry point of the planned workspace
   (core, cli, lsp, mcp) is a new boundary and reopens the rule. Evidence:
   [research/07](research/07-prior-art.md).
+- [08: Layer responsibilities](issues/08-layer-responsibilities.md): a six-step
+  classification rule (gate, proptest, scenario, e2e, integration, unit).
+  Scenarios fold into the e2e binary only. Prototype
+  [14](issues/14-prototype-bdd-in-e2e.md) must confirm this. `check:layers` must
+  fail when `git grep` exits with code 2 or higher. Proptests stay inline;
+  growth waits for ticket 09. The `integration-e2e-suite` is partially adopted:
+  its invariants and gates bind, its per-test classification does not. The
+  audits feed ticket 12. Ticket 08 sets six anti-goals. Evidence:
+  [research/08-prior-art](research/08-prior-art.md),
+  [audits](research/08-audit-e2e.md).
 
 ## Not yet specified
 
 - Policy for BDD and quality gates beyond layer placement. The tools exist:
   mutarust (`mise run test:mutants`) and `llvm-cov nextest`. Ticket 11 sets the
   thresholds and the scope.
-- Prototype in the repo of the 06 caveats that are only inferred:
-  `check:layers`, the e2e binary without `test-utils`, Linux and Windows CI, and
-  the rebuild cost of edits under a `build.rs`. This item gets sharper after
-  ticket 08 fixes where scenarios run.
+- Result of ticket 14 for the 06 caveats that are only inferred (`check:layers`,
+  Linux and Windows CI, `build.rs` rebuild cost).
 - Fate of the existing `//! Proves` and `Defect class:` documentation style:
   absorbed into Gherkin, kept alongside, or replaced.
 - Scenario density and verbosity norms (how much behavior per scenario, when a
