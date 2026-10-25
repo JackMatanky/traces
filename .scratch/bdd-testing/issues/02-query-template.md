@@ -9,9 +9,9 @@ Which observable behaviors of the query and template pipeline constitute *intent
 
 **Scope**: `src/query/` (source-selection DSL, grammar and filter semantics, planning, memoized result rows, error semantics for malformed queries), `src/template/` (template resolution order, minijinja namespace functions, confined file writing, render errors).
 
-**Method**: breadth-first reading of source, inline tests (the two heaviest modules: 317 and 362 `#[test]`s), `tests/integration/query.rs`, `tests/integration/template_render.rs`, `tests/e2e/query.rs`, `tests/e2e/template.rs`, `src/query/GLOSSARY.md`, `src/template/GLOSSARY.md`, `docs/adr/0005`, `docs/adr/0008`, `docs/adr/0001`. Question which DSL/render behaviors are specified guarantees (documented, glossary'd, ADR'd) versus whatever the parser happens to do; flag contradictions between docs and code.
+**Method**: read source and inline tests breadth-first (the two heaviest modules: 317 and 362 `#[test]`s). Read `tests/integration/query.rs`, `tests/integration/template_render.rs`, `tests/e2e/query.rs`, `tests/e2e/template.rs`, `src/query/GLOSSARY.md`, `src/template/GLOSSARY.md`, `docs/adr/0005`, `docs/adr/0008`, `docs/adr/0001`. Question which DSL/render behaviors are specified guarantees (documented, glossary'd, ADR'd) versus whatever the parser happens to do. Flag contradictions between docs and code.
 
-**Deliverable**: candidate-guarantee inventory in `.scratch/bdd-testing/research/02-query-template.md`, same entry format and citation convention as ticket 01 (guarantee as observable contract, class, intentional/incidental/uncertain with evidence, pinned/unpinned, Gherkin-suitability). Note especially: which query semantics are *user-visible language surface* (strong scenario candidates) versus internal plan optimizations (refactor-sensitive, poor scenario candidates). Max ~400 lines.
+**Deliverable**: candidate-guarantee inventory in `.scratch/bdd-testing/research/02-query-template.md`. Use the same entry format and citation convention as ticket 01: guarantee as observable contract, class, intentional/incidental/uncertain with evidence, pinned/unpinned, Gherkin-suitability. Note especially which query semantics are *user-visible language surface* (strong scenario candidates), versus internal plan optimizations (refactor-sensitive, poor scenario candidates). Max ~400 lines.
 
 ## Answer
 

@@ -9,7 +9,7 @@ Which observable behaviors of the surface layer constitute *intentional guarante
 
 **Scope**: `src/cli/` (command routing, clap argument handling, miette diagnostic and error presentation, table/output formatting), `src/dialog/` (TTY vs automated prompt seam, defaults and fallbacks), `src/config/` (two-level TOML discovery, trust verification, config tracking).
 
-**Method**: breadth-first reading of source, inline tests, `tests/e2e/` (config, env_policy, init, process_contract, completions, workflow), `tests/integration/` where surface behavior leaks through, plus `src/cli/GLOSSARY.md`, `src/config/GLOSSARY.md`, `src/dialog/GLOSSARY.md`, `docs/adr/0002`, `docs/adr/0003`, `docs/adr/0004`, and any `//! Proves` / `Defect class:` headers in this scope. Treat docs and existing tests as evidence to interrogate, not authority.
+**Method**: read source and inline tests breadth-first. Read `tests/e2e/` (config, env_policy, init, process_contract, completions, workflow) and `tests/integration/` where surface behavior leaks through. Read the glossaries: `src/cli/GLOSSARY.md`, `src/config/GLOSSARY.md`, `src/dialog/GLOSSARY.md`. Read `docs/adr/0002`, `docs/adr/0003`, `docs/adr/0004`, and any `//! Proves` / `Defect class:` headers in this scope. Treat docs and existing tests as evidence to interrogate, not authority.
 
 **Deliverable**: a candidate-guarantee inventory in `.scratch/bdd-testing/research/01-surface-workflows.md`, following the citation convention of the existing files in this directory. One entry per guarantee:
 - guarantee stated as an observable contract (inputs, observable outcomes, error semantics, edge cases)
