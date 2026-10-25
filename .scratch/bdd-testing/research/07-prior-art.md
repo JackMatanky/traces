@@ -1,78 +1,114 @@
 # Research 07: Prior art for the boundary-tiering decision
 
-Evidence for [ticket 07](../issues/07-boundary-tiering.md). Inputs: Robert C.
-Martin (blog 2008-2018; AI-era material 2025-26), Dave Farley's ATDD-for-agents
-argument (user-supplied summary of a Modern Software Engineering video, not
-watched), and the five inventories (`research/01`-`05`).
+This note is evidence for [ticket 07](../issues/07-boundary-tiering.md). It uses
+three inputs:
+
+- Robert C. Martin: blog posts (2008 to 2018) and AI-era material (2025 to
+  2026).
+- Dave Farley's ATDD-for-agents argument. The user supplied a summary of a
+  Modern Software Engineering video. Nobody watched the video.
+- The five inventories (`research/01` to `research/05`).
 
 ## Confidence
 
-- **Read directly**: Martin's blog posts *The Truth about BDD* (2008),
-  *First-Class Tests* (2017), *TDD Harms Architecture* (2017), *Pickled State*
-  (2018); the `unclebob/empire-2025` file tree and README.
-- **Secondhand**: Martin's AI-era positions come from search snippets of his X
-  posts (X blocked fetches), a third-party gist of a Matt Pocock interview
-  (2026-08-19), and explainx.ai. The noqta.tn "compiler output" and 8-checkpoint
-  material is community formalization, not Martin; discount it.
+Read directly:
+
+- Martin's blog posts *The Truth about BDD* (2008), *First-Class Tests* (2017),
+  *TDD Harms Architecture* (2017) and *Pickled State* (2018).
+- The file tree and the README of `unclebob/empire-2025`.
+
+Read second-hand:
+
+- X blocked the fetches. Martin's AI-era positions come from search snippets of
+  his X posts.
+- A third-party gist extracts a Matt Pocock interview (2026-08-19).
+- The explainx.ai article summarizes the X thread.
+- The noqta.tn article ("compiler output", 8 checkpoints) is a community
+  formalization. It is not Martin's work. Do not use it as evidence.
 
 ## Martin before AI
 
-- Gherkin is a finite state machine (`GIVEN state / WHEN event / THEN state`).
-  Gherkin is a proper subset of the unit-test state machine; the extra unit-test
-  states are programming details the business cannot see (Pickled State).
-- A one-to-one correspondence between tests and production structure is tight
-  coupling; tests need a decoupling API and must be designed (TDD Harms
+- Gherkin is a finite state machine: `GIVEN state / WHEN event / THEN state`.
+  Gherkin is a proper subset of the unit-test state machine. The extra unit-test
+  states are programming details that the business cannot see (Pickled State).
+- A one-to-one match between test structure and production structure is tight
+  coupling. Tests need a decoupling API. You must design the tests (TDD Harms
   Architecture).
-- Acceptance tests are written by the business. Integration and system tests are
+- The business writes acceptance tests. Integration tests and system tests are
   "plumbing, not business rules" (First-Class Tests).
-- Enumerating states x events finds missing pairs; the thread notes hidden
-  internal state weakens the S x E count (Truth about BDD).
+- You find missing pairs when you list states and events. The comment thread
+  says hidden internal state weakens the count of states times events (Truth
+  about BDD).
 
 ## Martin with AI (lower confidence)
 
-- Does not read agent code; surrounds agents with constraints: unit tests,
-  Gherkin, QA procedures, coverage, CRAP, dependency rules, mutation testing.
-- Agents write unit tests, Gherkin and QA procedures. He reviews Gherkin and QA
-  (thoroughly or spot check, by criticality). Gherkin is written "from a human
-  operator's point of view ... operating this system at the UI".
-- Pipeline of narrow agents: specifier, coder, cleaner (CRAP), hardener
-  (mutation), QA.
-- "Values, not disciplines": strict TDD nano-cycle not imposed on agents.
-- Deterministic tools beat prose rules. Prose spec-driven development "always a
-  disaster"; keeps no persisted prose spec list. Yet `empire-2025` persists ~55
-  acceptance files [INFERENCE: prose specs are ephemeral, executable acceptance
-  tests persist].
-- Doubts test overload: "lots of times I just use unit tests and crap".
-- `empire-2025` mechanical boundaries: specs may not touch `empire.atoms`; use
-  `empire.test-utils`; scripts `check-spec-boundary`,
-  `check-acceptance-boundary`, `check-generated-acceptance-boundary`, a
-  dependency checker and a CI guard. Same pattern as this repo's `check:layers`
-  and `check:visibility`.
+- He does not read agent code. He puts constraints around the agents: unit
+  tests, Gherkin, QA procedures, coverage, CRAP, dependency rules and mutation
+  testing.
+- Agents write the unit tests, the Gherkin and the QA procedures. He reviews the
+  Gherkin and the QA procedures. He reviews some thoroughly and some as a spot
+  check, by criticality.
+- He writes Gherkin "from a human operator's point of view ... operating this
+  system at the UI".
+- He uses a pipeline of narrow agents: specifier, coder, cleaner (CRAP),
+  hardener (mutation) and QA.
+- "Values, not disciplines": he does not impose the strict TDD nano-cycle on
+  agents.
+- Deterministic tools beat prose rules.
+- He calls prose spec-driven development "always a disaster". He keeps no
+  persisted list of prose specs. But `empire-2025` keeps about 55 acceptance
+  files. [INFERENCE: prose specs are short-lived. Executable acceptance tests
+  persist.]
+- He doubts the value of test overload: "lots of times I just use unit tests and
+  crap".
+- `empire-2025` enforces its test boundaries with scripts:
+  - Specs must not touch `empire.atoms`. They use `empire.test-utils`.
+  - The scripts are `check-spec-boundary`, `check-acceptance-boundary` and
+    `check-generated-acceptance-boundary`.
+  - A dependency checker and a CI guard also run.
+  - This is the same pattern as `check:layers` and `check:visibility` in this
+    repo.
 
 ## Farley (user summary)
 
-- Specs in domain language, no endpoints/databases/classes: argues against (c).
-- Layers: spec, DSL, protocol driver, SUT. Here the step glue is the DSL and
-  `Sandbox` (spawn) or `traces::testing` (in-process) is the driver. The tier
-  question is which driver a step binds to.
-- Echo-chamber risk of tests written after code applies to this retrofit:
-  require intent evidence (ADR, glossary, doc claim), not just "currently
-  pinned".
-- Read-only specs, red-first and small cycles belong to tickets 12/13 and agent
-  policy, not 07. Mutation testing is the map's fog item; it is the verifier for
-  the "leave as unit test" direction.
+- Specs use domain language. They name no endpoint, database or class. This
+  argues against option (c).
+- The layers are: spec, DSL, protocol driver and system under test. In this repo
+  the step glue is the DSL. `Sandbox` (spawn) or `traces::testing` (in-process)
+  is the driver. The tier question is: which driver does a step use?
+- Tests that you write after the code can only confirm what the code does. This
+  risk applies to a retrofit. You need intent evidence (ADR, glossary, doc
+  claim). "Currently pinned" is not enough.
+- Read-only specs, red-first and small cycles belong to tickets 12 and 13 and to
+  agent policy. They do not belong to ticket 07.
+- Mutation testing verifies the "leave as unit test" direction. The tool is
+  installed. The task is `mise run test:mutants`. Ticket 11 sets the policy.
 
-## Facts from the inventories that shape 07
+## Facts from the inventories that shape ticket 07
 
-1. `test-utils` "guarantee" membership is not observability: `RefreshReport`,
-   `DriftCause`, `InlinkMap` are exported but production only logs them (03 E).
-2. `check:layers` (05 G6): e2e never names `traces::`; integration never spawns.
-   A scenario's tier is which side of that gate its steps sit on.
-3. Observable-but-unpinned-at-process: G11, G12, G16, G17,
-   `TRACES_CEILING_DIRS`, exit 130 (01, 05). Promotion candidates.
-4. Internal-seam-only strong guarantees: 03 section C items 1-12 (arch tickets
-   23, 24, 25, 32, 34), 02 G14-G18.
-5. Hostile to Gherkin: TTY/pty, signals, byte-level store surgery, `syn` scans,
-   mtime/timing, thread-local TZ, miette wrapping (01 H1-H9, 02 H1-H8, 03 E).
-6. Already owned elsewhere: 4 proptest blocks (04 section 5),
-   `check:visibility`, lint denials, `#[case]` tables.
+1. `test-utils` membership does not mean a user can see the item.
+   `RefreshReport`, `DriftCause` and `InlinkMap` are exported. Production only
+   logs them (research/03, section E).
+2. `check:layers` (research/05, G6): e2e never names `traces::`, and integration
+   never spawns. The side of this gate that a scenario's steps use is the tier
+   of the scenario.
+3. These guarantees are observable but have no spawned test: research/01 G11,
+   G12, G16 and G17, `TRACES_CEILING_DIRS` and exit 130. They are candidates for
+   promotion.
+4. These guarantees are strong but exist only at internal seams: research/03
+   section C items 1 to 12 (arch tickets 23, 24, 25, 32 and 34) and research/02
+   G14 to G18.
+5. These behaviors are hostile to Gherkin:
+   - TTY and pty
+   - signals
+   - byte-level store surgery
+   - `syn` scans
+   - mtime and timing
+   - thread-local time zone
+   - miette wrapping
+
+   The sources are research/01 H1 to H9, research/02 H1 to H8 and research/03
+   section E.
+6. Other owners already hold these guarantees: the 4 proptest blocks
+   (research/04, section 5), `check:visibility`, the lint denials and `#[case]`
+   tables.

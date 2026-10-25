@@ -3,14 +3,19 @@
 ## Destination
 
 An implementation-ready **BDD adoption and implementation strategy** for this
-workspace, delivered as [`spec.md`](./spec.md): the behavioral domains and
-contracts that earn executable specifications, the testing architecture they
-live in (BDD vs unit/integration/e2e/property), the organization of feature
-files/scenarios/steps/fixtures, a coverage-gap methodology, a migration policy
-for existing tests, and a prioritized adoption roadmap naming a concrete first
-slice. Every design decision the strategy rests on must be resolved in a linked
-ticket. Implementing the strategy is out of scope: the map closes when a fresh
-session could start slice 1 with zero open design questions.
+workspace, delivered as [`spec.md`](./spec.md). The strategy contains:
+
+- the behavioral domains and contracts that earn executable specifications
+- the testing architecture that they live in (BDD vs
+  unit/integration/e2e/property)
+- the organization of feature files, scenarios, steps and fixtures
+- a coverage-gap methodology
+- a migration policy for existing tests
+- a prioritized adoption roadmap that names a concrete first slice
+
+Resolve every design decision that the strategy needs in a linked ticket. The
+map does not cover the implementation of the strategy. The map closes when a
+fresh session can start slice 1 with zero open design questions.
 
 ## Notes
 
@@ -20,13 +25,17 @@ session could start slice 1 with zero open design questions.
 - **Skills every session consults**: `research`, `grilling`, `domain-modeling`,
   `prototype`, per ticket type. Research and prototype tickets are AFK; grilling
   tickets are HITL and never answer their own questions.
-- **Standing preferences for this effort**: nextest compatibility is decisive
-  (all four test phases run under cargo-nextest). Specs define *what the system
-  guarantees*, never *how it works*. Use idiomatic Rust and minimal abstraction.
-  Build no custom infra beyond adopting an existing crate. Deny-lints
-  (`panic`/`exit`/`print_stdout`/`unwrap` outside tests) and machine-enforced
-  layer gates (`check:layers`, `check:visibility`) are constraints. Do not route
-  around them. A bounded exception needs a recorded decision (see ticket 06).
+- **Standing preferences for this effort**:
+  - Nextest compatibility is decisive. All four test phases run under
+    cargo-nextest.
+  - Specs define *what the system guarantees*, never *how it works*.
+  - Use idiomatic Rust and minimal abstraction.
+  - Build no custom infrastructure beyond adopting an existing crate.
+  - Obey the deny-lints (`panic`, `exit`, `print_stdout` and `unwrap` outside
+    tests).
+  - Obey the machine-enforced layer gates (`check:layers`, `check:visibility`).
+    Do not route around them.
+  - A bounded exception needs a recorded decision (see ticket 06).
 - **Maintenance duty**: ticket 06 sets one
   `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration. Revisit
   it at every `rstest-bdd` upgrade. The `#[expect]` fails when the lint stops
@@ -87,19 +96,29 @@ session could start slice 1 with zero open design questions.
   decides). You can fold scenarios into the existing integration and e2e
   binaries (ticket 08 decides).
 - [07: Boundary tiering, b versus c](issues/07-boundary-tiering.md): option (b)
-  won, sharpened to "spawned process by default; facade only if already
-  baselined and a spawn cannot express it". Six-part rule (observable behavior,
-  named channels, intent plus code agreement, no gate or proptest owner,
-  hermetic, refactor-stable). Internal seams: promote, else mutation-verified
-  unit test (`mise run test:mutants`), else retire; `test-utils` wrapping
-  forbidden by default. Gate: zero delta to the three baselines. Planned
-  workspace (core/cli/lsp/mcp): each new shipped entry point is a new boundary
-  that reopens the rule. Evidence: [research/07](research/07-prior-art.md).
+  wins, with a sharper boundary. Scenarios address the spawned process by
+  default. A facade seam is allowed only if a frozen baseline already holds the
+  symbol. A spawn must not be able to express the behavior. A six-part rule
+  decides which guarantees earn a scenario:
+  - observable behavior
+  - named channels
+  - intent evidence with code agreement
+  - no gate or proptest owner
+  - hermetic
+  - refactor-stable
+
+  For internal seams, promote first. Then keep a unit test that mutation testing
+  checks (`mise run test:mutants`). Then retire the pin. Wrapping in
+  `test-utils` is forbidden by default. The gate: BDD adoption changes none of
+  the three baselines. Each new shipped entry point of the planned workspace
+  (core, cli, lsp, mcp) is a new boundary and reopens the rule. Evidence:
+  [research/07](research/07-prior-art.md).
 
 ## Not yet specified
 
-- BDD and quality gates beyond layer placement: mutation testing (`mutarust`),
-  coverage (`llvm-cov nextest`).
+- Policy for BDD and quality gates beyond layer placement. The tools exist:
+  mutarust (`mise run test:mutants`) and `llvm-cov nextest`. Ticket 11 sets the
+  thresholds and the scope.
 - Prototype in the repo of the 06 caveats that are only inferred:
   `check:layers`, the e2e binary without `test-utils`, Linux and Windows CI, and
   the rebuild cost of edits under a `build.rs`. This item gets sharper after
@@ -108,8 +127,6 @@ session could start slice 1 with zero open design questions.
   absorbed into Gherkin, kept alongside, or replaced.
 - Scenario density and verbosity norms (how much behavior per scenario, when a
   Scenario Outline beats a rule).
-- Fit (or non-fit) of Gherkin for `dialog` interactive and TTY behavior; may
-  sharpen once ticket 01 reports.
 
 ## Out of scope
 

@@ -27,7 +27,7 @@ and consolidated evidence:
   scenario.
 - (b) Decide what happens to strong guarantees found at internal seams only.
   They can go in three directions: wrap in a test-utils-visible contract, leave
-  as unit tests, or promote via a scenario at a higher boundary.
+  as unit tests, or promote with a scenario at a higher boundary.
 - (c) Give an explicit answer on which option won. Give the reasons.
 
 Consider the goal this whole map serves: behavioral stability with
@@ -40,90 +40,120 @@ discovered guarantee classes that forced exceptions.
 
 ## Answer
 
-Resolved with the user. Evidence:
-[research/07-prior-art.md](../research/07-prior-art.md) and research/01-05.
+The user and the agent resolved this ticket together. The evidence is in
+[research/07-prior-art.md](../research/07-prior-art.md) and in research/01 to
+research/05.
 
-### (c) Winner: option (b), sharpened
+### Decision (c): option (b) wins, with a sharper boundary
 
-Scenarios stop at a **product boundary**: today only the spawned `traces`
-process (the CLI is the only supported surface). Option (c), internal module
-seams, is rejected as a tier: the 12 refactor-hostile guarantees in research/03
-section C and research/02 G14-G18 sit on seams that arch-design tickets 23, 24,
-25, 32 and 34 may move.
+Scenarios stop at a product boundary. Today the only product boundary is the
+spawned `traces` process. The CLI is the only supported surface.
 
-- **Default**: the spawned process. Facade seam allowed only if the symbol is
-  already in a frozen baseline (`public-api-test-utils.txt`) AND a spawn cannot
-  express the behavior (e.g. a value-type observable). The `traces::testing`
-  facade is an exception tier, not a peer: arch ticket 32 may re-home it.
-- The default-features library API is NOT a supported product surface today
-  (`public-api-default.txt` is a frozen internal API, not a scenario seam).
-- **Planned workspace** (core, cli, lsp, future mcp): each new shipped entry
-  point (LSP over stdio, MCP) becomes a product boundary with its own driver.
-  `core`'s public API becomes a seam only if declared supported. Adding a
-  boundary reopens this rule; do not pre-build drivers for it (YAGNI, no custom
-  infra). Keep step text driver-agnostic where free.
+Option (c) is rejected as a tier. It reaches internal module seams. Arch-design
+tickets 23, 24, 25, 32 and 34 can move these seams. They hold 12
+refactor-hostile guarantees (research/03, section C) and the plan internals in
+research/02, G14 to G18.
 
-### (a) Tiering rule
+Boundary rules:
 
-A guarantee earns a scenario only if ALL hold:
+- Default: address the spawned process.
+- Use a facade seam only if both conditions are true:
+  - The symbol is already in a frozen baseline (`public-api-test-utils.txt`).
+  - A spawn cannot express the behavior. Example: a value-type observable.
+- The `traces::testing` facade is an exception tier, not a peer. Arch ticket 32
+  can re-home it.
+- The default-features library API is not a supported product surface today.
+  `public-api-default.txt` freezes an internal API. It is not a scenario seam.
 
-1. **Observable behavior**: a business-visible state transition OR an
-   input-to-output mapping (grammar, sort, date literals, escaping). 2.
-   **Observable channel**: stdout payload, stderr diagnostic *codes* (never
-   miette-wrapped text), exit status, files written under the project root. Not
-   `index.redb` contents, hash-named trust/tracked store entries, or
-   `RefreshReport`/`DriftCause`/`InlinkMap` (exported, not user-visible).
-2. **Intent evidence AND code agreement**: an ADR, glossary entry, doc claim or
-   workflow comment that the code matches. A doc/code contradiction (research 01
-   s2, 02 s3, 03 D, 05 s5) is resolved first by a recorded decision. Documented
-   known limitations are allowed under a distinct tag (e.g. the same-size
-   mtime-restore canary).
-3. **No gate/algebra owner**: excluded only when a compile-time gate, lint, or
-   proptest law owns it (`check:visibility`, `check:layers`, clippy denials, the
-   4 `temporal/` proptest blocks). Overlap with other tests is allowed (two
-   independent streams).
-4. **Hermetic**: runs under the sandbox default-deny env policy. Time zone is
-   set per spawn via `TZ`; it is NOT an exception.
-5. **Refactor-stable**: not a seam an open arch-design ticket will move.
-   Provisional list: research/03 C items 1-12, research/02 G14-G18. Ticket 09
-   owns and refines the list (09 is blocked by 07).
+Planned workspace (core, cli, lsp, future mcp):
 
-### (b) Internal-seam policy, in order
+- Each new shipped entry point (LSP over stdio, MCP) becomes a product boundary.
+  It has its own driver.
+- The public API of `core` becomes a seam only if you declare it supported.
+- A new boundary reopens this rule.
+- Do not build drivers for these boundaries before they exist. The map allows no
+  custom infrastructure.
+- Keep step text independent of the driver when this costs nothing.
 
-1. **Promote** to a process-boundary scenario if user-visible. Candidates:
-research/01 G11, G12, G16, G17; `TRACES_CEILING_DIRS`; exit 130.
-2. **Leave as a unit test**, verified by mutation testing: `mise run
-   test:mutants -m <module>` (mutarust; `--all-targets`, baseline
-   `mutarust-baseline.json`, `--min-msi`, `--fail-on-escaped`). Ticket 11 sets
-   thresholds and scope after reading `mutarust.yml`. 3. **Retire or relabel**
-   incidental pins (mtime canary framing, misleading sort test names). Ticket 12
-   owns the how. 4. **Wrap in a `test-utils` contract: forbidden by default.**
-   Allowed only when an arch ticket creates a real user-visible projection (e.g.
-   arch ticket 25 item 5 for refresh reporting).
+### Decision (a): tiering rule
+
+A guarantee earns a scenario only if all six conditions are true:
+
+1. **Observable behavior.** The guarantee is a business-visible state transition
+   or an input-to-output mapping. Examples of mappings: grammar, sort, date
+   literals, escaping.
+2. **Observable channel.** The channel is one of these:
+   - the stdout payload
+   - the stderr diagnostic codes (never miette-wrapped text)
+   - the exit status
+   - the files under the project root
+
+   These are not channels: the `index.redb` contents, the hash-named trust and
+   tracked store entries, and `RefreshReport`, `DriftCause` and `InlinkMap`. The
+   last three are exported but are not user-visible.
+3. **Intent evidence and code agreement.** An ADR, glossary entry, doc claim or
+   workflow comment states the intent. The code matches it. Resolve a doc/code
+   contradiction with a recorded decision before you write the scenario. The
+   contradictions are in research/01 section 2, research/02 section 3,
+   research/03 section D and research/05 section 5. A documented known
+   limitation is allowed under a separate tag. Example: the same-size
+   mtime-restore canary.
+4. **No gate or algebra owner.** Exclude a guarantee only when a compile-time
+   gate, a lint or a proptest law owns it. Examples: `check:visibility`,
+   `check:layers`, the clippy denials and the 4 `temporal/` proptest blocks.
+   Overlap with other tests is allowed. Two independent test streams are an
+   advantage.
+5. **Hermetic.** The scenario runs under the sandbox default-deny env policy.
+   Set the time zone with `TZ` at each spawn. Time zone is not an exception.
+6. **Refactor-stable.** No open arch-design ticket will move the seam. The
+   provisional list is research/03 section C items 1 to 12 and research/02 G14
+   to G18. Ticket 09 owns the list and refines it. Ticket 07 blocks ticket 09.
+
+### Decision (b): policy for internal-seam guarantees
+
+Try these directions in order:
+
+1. **Promote.** Make the guarantee a process-boundary scenario if users can see
+   it. Candidates: research/01 G11, G12, G16 and G17, `TRACES_CEILING_DIRS` and
+   exit 130.
+2. **Keep as a unit test and check it with mutation testing.** Run
+   `mise run test:mutants -m <module>`. The task uses mutarust, `--all-targets`,
+   `mutarust-baseline.json`, `--min-msi` and `--fail-on-escaped`. Ticket 11 sets
+   the thresholds and the scope. Ticket 11 first reads `mutarust.yml`.
+3. **Remove or relabel incidental pins.** Examples: the mtime canary framing and
+   the misleading sort test names. Ticket 12 decides how.
+4. **Do not wrap the guarantee in a `test-utils` contract.** Make an exception
+   only when an arch ticket creates a real user-visible projection. Example:
+   arch ticket 25, item 5, for refresh reporting.
 
 ### Mechanical gate
 
-Adopting BDD must leave `public-api-default.txt`, `public-api-test-utils.txt`
-and `pub-tokens.txt` unchanged. A scenario needing a new `pub`/`pub(crate)` item
-fails. When the workspace splits, this applies per crate.
+BDD adoption must not change `public-api-default.txt`,
+`public-api-test-utils.txt` or `pub-tokens.txt`. A scenario that needs a new
+`pub` or `pub(crate)` item fails the gate. After the workspace split, the gate
+applies to each crate.
 
-### Exception classes (never plain scenarios; each names its alternative)
+### Exception classes
+
+These classes are never plain scenarios. Each class has an alternative.
 
 | Class | Alternative |
 |---|---|
-| Real-TTY rendering (inquire), research/01 H1 | unit test; no pty harness |
-| Exit 130 / SIGINT | one explicit spawned-signal regression case (Unix); in-process unit test stays |
-| `template` abort/cancel via `pub(super)` seam | in-process unit with injected provider (`init` abort is reachable via public `PresetDialogProvider`) |
-| Timing freshness (racy-timestamp gap, mtime) | unit/property; canary tagged known-limitation |
-| Byte-level store surgery, `syn` source scans | unit tests |
+| Real-TTY rendering (inquire), research/01 H1 | Unit test. Do not build a pty harness. |
+| Exit 130 (SIGINT) | One explicit spawned-signal regression case (Unix). The in-process unit test stays. |
+| `template` abort or cancel through the `pub(super)` seam | In-process unit test with an injected provider. The `init` abort is reachable through the public `PresetDialogProvider`. |
+| Timing freshness (racy-timestamp gap, mtime) | Unit test or property test. Tag the canary as a known limitation. |
+| Byte-level store surgery, `syn` source scans | Unit tests. |
 
-Ticket 11 takes this list as coverage-gap input.
+Ticket 11 uses this list as input for the coverage gaps.
 
-### Constraints passed on
+### Constraints for other tickets
 
-- Ticket 10: `check:layers` greps `tests/e2e/` for `traces` followed by `::`,
-  `{`, `;` or `as`; `.feature` text under that directory must avoid it.
-- Ticket 09: refine the moving-seam list in rule item 6.
-- Ticket 11: mutarust policy; exception list as gap input.
-- Ticket 12: retire/relabel incidental pins.
-- Ticket 13: agent policy (read-only specs, red-first) is out of 07's scope.
+- Ticket 09: refine the moving-seam list (rule 6).
+- Ticket 10: `check:layers` searches `tests/e2e/` for `traces` followed by `::`,
+  `{`, `;` or the word `as`. Keep the `.feature` text in that directory free of
+  these patterns.
+- Ticket 11: set the mutarust policy. Use the exception list as input for the
+  coverage gaps.
+- Ticket 12: retire or relabel the incidental pins.
+- Ticket 13: agent policy (read-only specs, red-first) is outside ticket 07.
