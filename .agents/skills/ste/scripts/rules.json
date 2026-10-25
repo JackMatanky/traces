@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "R1",
+      "doc": "RULES.md",
+      "name": "procedural-sentence-length",
+      "check": "sentence_words",
+      "severity": "error",
+      "params": {"max": 20, "scope": "procedural"},
+      "message": "Procedural sentence exceeds {max} words."
+    },
+    {
+      "id": "R2",
+      "doc": "RULES.md",
+      "name": "descriptive-sentence-length",
+      "check": "sentence_words",
+      "severity": "error",
+      "params": {"max": 25, "scope": "descriptive"},
+      "message": "Descriptive sentence exceeds {max} words."
+    },
+    {
+      "id": "R3",
+      "doc": "RULES.md",
+      "name": "compound-instruction",
+      "check": "compound_instruction",
+      "severity": "warn",
+      "params": {"patterns": [", and then", " and then ", "; "]},
+      "message": "Split this compound instruction into separate steps."
+    },
+    {
+      "id": "R4",
+      "doc": "RULES.md",
+      "name": "one-main-idea",
+      "check": "none",
+      "severity": "none",
+      "params": {"reason": "One main idea per sentence requires judgment."},
+      "message": "Use one main idea per sentence."
+    },
+    {
+      "id": "R5",
+      "doc": "RULES.md",
+      "name": "active-voice",
+      "check": "passive_voice",
+      "severity": "warn",
+      "params": {
+        "auxiliaries": ["be", "must be", "will be", "has been"],
+        "participle_heuristic": true
+      },
+      "message": "Possible passive voice; use active voice."
+    },
+    {
+      "id": "R6",
+      "doc": "RULES.md",
+      "name": "present-tense",
+      "check": "tense",
+      "severity": "warn",
+      "params": {
+        "past_auxiliaries": ["was", "were", "had", "did"],
+        "scope": ["imperative", "list"]
+      },
+      "message": "Possible past tense in an instruction or list item."
+    },
+    {
+      "id": "R7",
+      "doc": "RULES.md",
+      "name": "command-verb-start",
+      "check": "command_verb_start",
+      "severity": "warn",
+      "params": {
+        "scope": "instruction",
+        "verbs": ["do", "make", "check", "change", "remove", "start", "stop", "use", "put", "send", "open", "close", "read", "write", "wait", "tighten"]
+      },
+      "message": "Start the instruction with a command verb."
+    },
+    {
+      "id": "R8",
+      "doc": "RULES.md",
+      "name": "missing-article",
+      "check": "missing_article",
+      "severity": "warn",
+      "params": {
+        "command_verbs": ["do", "make", "check", "change", "remove", "start", "stop", "use", "put", "send", "open", "close", "read", "write", "wait", "tighten"],
+        "allowed_determiners": ["the", "a", "an", "your", "this", "that", "all", "any"],
+        "allow_numeric_values": true
+      },
+      "message": "Possible missing article before a noun phrase."
+    },
+    {
+      "id": "R9",
+      "doc": "RULES.md",
+      "name": "noun-as-verb",
+      "check": "none",
+      "severity": "none",
+      "params": {"reason": "Detecting nouns used as verbs needs a domain noun list."},
+      "message": "Do not use a noun as a verb."
+    },
+    {
+      "id": "R10",
+      "doc": "RULES.md",
+      "name": "gerund-start",
+      "check": "gerund_start",
+      "severity": "warn",
+      "params": {"scope": "instruction"},
+      "message": "Do not start an instruction with a gerund."
+    },
+    {
+      "id": "R11",
+      "doc": "RULES.md",
+      "name": "synonym-pair",
+      "check": "synonym_pair",
+      "severity": "warn",
+      "params": {
+        "pairs": [["begin", "start"], ["end", "stop"], ["close", "shut"], ["repair", "mend"]]
+      },
+      "message": "Use one word consistently; avoid synonym pairs."
+    },
+    {
+      "id": "R12",
+      "doc": "RULES.md",
+      "name": "one-meaning",
+      "check": "one_meaning",
+      "severity": "warn",
+      "params": {"source": "dictionary.json", "key": "one_meaning"},
+      "message": "Use this approved word with only its allowed meaning."
+    },
+    {
+      "id": "R13",
+      "doc": "RULES.md",
+      "name": "banned-word",
+      "check": "banned_word",
+      "severity": "error",
+      "params": {"source": "dictionary.json", "key": "substitutions"},
+      "message": "Use an approved replacement from the dictionary."
+    },
+    {
+      "id": "R14",
+      "doc": "RULES.md",
+      "name": "technical-terms",
+      "check": "none",
+      "severity": "none",
+      "params": {"reason": "Technical terms require a future --terms input."},
+      "message": "Define and use approved technical terms consistently."
+    },
+    {
+      "id": "R15",
+      "doc": "RULES.md",
+      "name": "one-topic-per-paragraph",
+      "check": "none",
+      "severity": "none",
+      "params": {"reason": "Topic boundaries and topic sentences require judgment."},
+      "message": "Use one topic per paragraph and put the topic sentence first."
+    },
+    {
+      "id": "R16",
+      "doc": "RULES.md",
+      "name": "procedural-paragraph-length",
+      "check": "paragraph_length",
+      "severity": "error",
+      "params": {"max": 6, "scope": "procedural"},
+      "message": "Procedural paragraph exceeds {max} sentences."
+    },
+    {
+      "id": "R17",
+      "doc": "RULES.md",
+      "name": "list-required",
+      "check": "list_required",
+      "severity": "error",
+      "params": {"min_steps": 4},
+      "message": "Use a vertical list for {min_steps} or more steps, parts, or conditions."
+    },
+    {
+      "id": "R18",
+      "doc": "RULES.md",
+      "name": "warning-block",
+      "check": "warning_block",
+      "severity": "error",
+      "params": {"terms": ["warning", "caution"], "requires_own_block": true},
+      "message": "Put each warning or caution in its own block before the affected step."
+    },
+    {
+      "id": "R19",
+      "doc": "RULES.md",
+      "name": "hedge",
+      "check": "hedge",
+      "severity": "warn",
+      "params": {
+        "default_severity": "warn",
+        "patterns": [
+          {"text": "basically", "severity": "error"},
+          {"text": "essentially", "severity": "error"},
+          {"text": "might", "severity": "warn"},
+          {"text": "could potentially", "severity": "warn"},
+          {"text": "in some cases", "severity": "warn"}
+        ]
+      },
+      "message": "Remove the hedge or state the actual uncertainty."
+    },
+    {
+      "id": "R20",
+      "doc": "RULES.md",
+      "name": "second-person",
+      "check": "second_person",
+      "severity": "warn",
+      "params": {
+        "scope": "instruction",
+        "third_person_actor_terms": ["the user", "user", "operator", "technician", "one"]
+      },
+      "message": "Write to the reader; use 'you' for the person who does the task."
+    },
+    {
+      "id": "F1",
+      "doc": "SKILL.md",
+      "name": "facts-preserved",
+      "check": "facts_preserved",
+      "severity": "error",
+      "params": {
+        "mode": "compare",
+        "protected": ["numbers", "inline_code", "fenced_code", "flags", "paths", "all_caps_identifiers"]
+      },
+      "message": "Comparison text changed a protected fact."
+    }
+  ]
+}

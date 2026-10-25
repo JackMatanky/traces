@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "substitutions": [
+    {
+      "common": ["follow"],
+      "approved": "obey",
+      "auto": true,
+      "condition": "\\b(rules?|procedures?|instructions?|guidelines?)\\b",
+      "note": "\"follow\" means \"come after\" only"
+    },
+    {
+      "common": ["ensure"],
+      "approved": "make sure",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["utilize", "leverage"],
+      "approved": "use",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["facilitate"],
+      "approved": "help",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["initiate"],
+      "approved": "start",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["terminate"],
+      "approved": ["stop", "end"],
+      "auto": false,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["approximately"],
+      "approved": "about",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["prior to"],
+      "approved": "before",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["subsequent to"],
+      "approved": "after",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["following"],
+      "approved": "after",
+      "auto": false,
+      "condition": null,
+      "note": "context dependent"
+    },
+    {
+      "common": ["in order to"],
+      "approved": "to",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["strip out", "get rid of"],
+      "approved": "remove",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["fix up"],
+      "approved": "repair",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["attempt"],
+      "approved": "try",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["additional"],
+      "approved": "more",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["commence"],
+      "approved": ["begin", "start"],
+      "auto": false,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["modify"],
+      "approved": "change",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["require"],
+      "approved": "need",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["verify"],
+      "approved": "check",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["obtain"],
+      "approved": "get",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["perform"],
+      "approved": ["do", "make"],
+      "auto": false,
+      "condition": null,
+      "note": "\"make a test,\" not \"perform a test\""
+    },
+    {
+      "common": ["via"],
+      "approved": ["with", "by", "through"],
+      "auto": false,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["due to the fact that"],
+      "approved": "because",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["in the event that"],
+      "approved": "if",
+      "auto": true,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["a number of"],
+      "approved": ["some", "many"],
+      "auto": false,
+      "condition": null,
+      "note": "state the number if you know it"
+    }
+  ],
+  "one_meaning": [
+    {
+      "word": "fall",
+      "forbidden_patterns": ["\\bin (the |this |last )?fall\\b"],
+      "note": "verb only - do not write \"in the fall\""
+    },
+    {
+      "word": "test",
+      "forbidden_patterns": ["\\bto test\\b"],
+      "note": "noun only - use \"make a test of\" instead"
+    },
+    {
+      "word": "close",
+      "forbidden_patterns": ["\\bclose to\\b"],
+      "note": "verb only - use \"near\" for distance"
+    }
+  ]
+}
