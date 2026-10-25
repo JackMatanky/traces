@@ -34,32 +34,31 @@ Type: HITL. Grill the user; do not answer for them.
 
 ### Decision
 
-The redesign must make the shared core ready for the LSP as the next major
-consumer and for MCP as a likely near-term consumer. It should make it easy to
-add MCP-specific seams and multi-workspace machinery, but does not require
-implementing MCP or multi-workspace support speculatively. The shared core owns
-domain semantics; protocol and host-specific behavior belongs at consumer seams.
+Make the shared core ready for the LSP as its next major consumer. Prepare
+for MCP as a likely near-term consumer. Make it easy to add MCP-specific
+seams and multi-workspace machinery. Do not implement MCP or multi-workspace
+support speculatively. The shared core owns domain semantics. Consumer seams
+own protocol and host-specific behavior.
 
-Editor-facing behavior must support source-aware features such as diagnostics,
-navigation, and completion. General note write-back is not a requirement of this
-redesign. The prior LSP decision to add spans to the shared `Note` AST and
-reject a parallel model is reopened: the design must compare a shared model
-against separate editor and indexing representations. The exact model and
-ownership of source spans belong to [What is the note document model: spans,
-facts, items, multi-value metadata?](23-note-document-model.md).
+Support editor features that need source positions: diagnostics, navigation
+and completion. General note write-back is not a requirement of this redesign.
+Reopen the prior LSP decision to add spans to the shared `Note` AST and reject
+a parallel model. Compare a shared model with separate editor and indexing
+representations. Ticket 23 decides the exact model and ownership of
+[source spans](23-note-document-model.md).
 
-Performance decisions must consider vault sizes of 50, 200, 1,000, 5,000,
-10,000, 20,000, and 50,000 notes. These are important measurement points, not a
-blanket requirement that every operation be optimized equally at every size.
-Select operation-specific ranges and algorithm break-even points based on
-evidence; vaults can exceed 50,000 notes.
+Consider vault sizes of 50, 200, 1,000, 5,000, 10,000, 20,000 and 50,000
+notes in performance decisions. Treat them as measurement points. Do not
+require equal optimization for every operation at every size. Select
+operation-specific ranges and algorithm break-even points from evidence.
+Vaults can exceed 50,000 notes.
 
-Keep analysis and domain logic synchronous by default. Async belongs at host or
+Keep analysis and domain logic synchronous by default. Put async at host or
 transport seams unless a concrete workload shows that the core needs it.
 
-Evaluate architectural proposals by independent changeability, low coupling,
-fast and reliable verification, failure isolation, and recoverability. These
-should reduce change complexity, lead time, regression risk, and recovery costs;
+Evaluate proposals by independent changeability, low coupling, fast and
+reliable verification, failure isolation and recoverability. These properties
+reduce change complexity, lead time, regression risk and recovery costs.
 DORA metrics are downstream outcomes, not direct architecture targets.
 
 ### Alternatives considered

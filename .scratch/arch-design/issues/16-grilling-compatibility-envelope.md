@@ -6,12 +6,43 @@ Blocked by: none
 
 ## Question
 
-The destination says "preserve externally observable capabilities and correctness". Which surfaces are frozen, and which may change shape?
+The destination says "preserve externally observable capabilities and correctness".
+Which surfaces are frozen? Which surfaces may change with a migration?
 
-Candidates to classify (frozen / may change with migration / free): CLI subcommands, flags, exit codes and stdout/stderr contract (`tests/e2e/`); template function API and minijinja object protocol users write against (`query`, `lists`, `tasks`, `schema`, `ui`, `file`, `date`, string helpers); query DSL syntax for `--from`/`--where` including heuristic string-to-date promotion; schema TOML format incl. external select-values files; config TOML shape and defaults; on-disk `.traces/index.redb` (derived cache, currently disposable); trust/tracking symlink layout under XDG dirs; diagnostic codes (~35 dotted codes) and message text; the Rust library surface (`pub` items in `src/lib.rs`, `traces::testing`, `tests/baselines/public-api-*.txt`).
+Classify these surfaces as frozen, migratable or free:
 
-Evidence already in hand (main @ `207cc3fb`): the merge that landed config-drift healing rewrote `RefreshReport` from a `Copy` struct into an enum, which changed `traces::testing`, added 2 re-exports (45 to 46 identifiers), and regenerated `tests/baselines/pub-tokens.txt` (1,528 to 1,550 lines) and `public-api-test-utils.txt` (4,306 to 4,444 lines): the Rust-library baselines behave as change detectors refreshed per commit, not as a consumer compatibility contract. The same merge also wiped legacy stores once (`cache_format` to `meta`) and made a config edit heal the index on the next query (new e2e canary), which is an observable behaviour change inside an envelope the user may call 'disposable cache'.
-Evidence to bring: `survey/cli.md`, `survey/cross-cutting.md` (visibility freeze), existing ADRs, `tests/e2e/*`. Include whether Obsidian/Dataview/Templater compatibility is a requirement or a historical influence (it explains much of the temporal and inline-field behavior). NOT evidence: the divergence register (now `.scratch/temporal-core/divergence-register.md`; formerly `docs/divergence-register.md`) (user ruling 2026-10-18: it belongs to the temporal-core design only, is not a project-wide change mechanism, and was meant to live under `.scratch/temporal-core/`; a shorter earlier copy already exists there).
+- CLI subcommands, flags, exit codes and the stdout/stderr contract (`tests/e2e/`).
+- Template functions and the minijinja object protocol (`query`, `lists`,
+  `tasks`, `schema`, `ui`, `file`, `date`, string helpers).
+- Query DSL syntax for `--from`/`--where`, including heuristic string-to-date promotion.
+- Schema TOML, including external select-values files; config TOML and defaults.
+- The on-disk `.traces/index.redb` derived cache, currently disposable.
+- The trust/tracking symlink layout under XDG directories.
+- Diagnostic codes (~35 dotted codes) and message text.
+- The Rust library surface (`pub` items in `src/lib.rs`, `traces::testing`,
+  `tests/baselines/public-api-*.txt`).
+
+Evidence already in hand (main @ `207cc3fb`): the config-drift healing merge
+changed `RefreshReport` from a `Copy` struct to an enum. It changed
+`traces::testing` and added 2 re-exports (45 to 46 identifiers). It also
+regenerated `tests/baselines/pub-tokens.txt` (1,528 to 1,550 lines) and
+`public-api-test-utils.txt` (4,306 to 4,444 lines). These Rust-library
+baselines detect changes per commit; they are not a consumer compatibility
+contract. The merge also wiped legacy stores once (`cache_format` to `meta`).
+A config edit now heals the index on the next query (new e2e canary).
+This is an observable behavior change within an envelope the user may call a
+"disposable cache".
+
+Use `survey/cli.md`, `survey/cross-cutting.md` (visibility freeze), existing
+ADRs and `tests/e2e/*` as evidence. Decide whether
+Obsidian/Dataview/Templater compatibility is required or only a historical
+influence on temporal and inline-field behavior. Do not use the divergence
+register as evidence. The register is now
+`.scratch/temporal-core/divergence-register.md`; it was formerly
+`docs/divergence-register.md`. The user ruled on 2026-10-18 that it belongs
+only to temporal-core. It is not a project-wide change mechanism. The user
+intended it to live under `.scratch/temporal-core/`, where a shorter earlier
+copy already exists.
 
 Why it is a decision: it bounds every redesign option (e.g. removing heuristic coercion, simplifying select values, changing diagnostic codes, splitting the crate).
 
@@ -19,11 +50,22 @@ Type: HITL. Grill the user; do not answer for them.
 
 ## Answer
 
-Resolved with the user (rounds 1-3, 2026-10-18). Tiers: **Frozen** = a change is a regression; **Migratable** = may change if recorded in the redesign spec's own change table with its migration (no standing register; the divergence register is temporal-core-only and is not an input); **Free** = may change without ceremony.
+The user resolved these tiers in rounds 1-3 on 2026-10-18:
 
-**Audience.** The user is the only consumer. No published release, no external Rust crate depends on the library. Every surface is therefore at most Migratable unless it would break the user's own vault files.
+- **Frozen:** A change is a regression.
+- **Migratable:** Record the change and its migration in the redesign spec's
+  own change table. Do not use a standing register. The divergence register
+  belongs only to temporal-core and is not an input.
+- **Free:** May change without ceremony.
 
-**Oracle and change record.** `tests/e2e/*` (the compiled binary) plus the tests that pin vault-format parsing are the oracle. The spec carries its own "behaviour changes" table (surface, tier, migration); any observable change not in it is a regression.
+**Audience.** The user is the only consumer. There is no published release.
+No external Rust crate depends on the library. A surface is at most
+Migratable unless changing it breaks the user's own vault files.
+
+**Oracle and change record.** Use `tests/e2e/*` with the compiled binary.
+Also use the tests that pin vault-format parsing. The spec has its own
+"behaviour changes" table with surface, tier and migration. An observable
+change absent from that table is a regression.
 
 | Surface | Tier | Note |
 | --- | --- | --- |
@@ -44,7 +86,13 @@ Resolved with the user (rounds 1-3, 2026-10-18). Tiers: **Frozen** = a change is
 | Known defects: closed-pipe panic, `i64` to `f64` loss at the note boundary, multi-valued inline fields read via `.first()` only | **Not preserved** | Fixing each is a change-table row, not a regression |
 | Rust library surface (`pub` items, `traces::testing`, `public-api-*.txt`, `pub-tokens.txt`) | **Free** | Baselines are change detectors, not a contract |
 
-**Visibility rule (user, round 3, corrected).** The primary rule is to reduce visibility whenever possible and to limit `pub` to outward-facing components. Widening is not banned as a rule: an item may be widened when it is genuinely outward-facing (for example a crate boundary after a workspace split), but the default direction is narrowing, and each `pub` item needs an outward-facing justification. "Library surface is Free" means nothing needs preserving; it does not mean visibility is unconstrained. This rule governs the crate-topology ticket and every boundary decision.
+**Visibility rule (user, round 3, corrected).** Reduce visibility whenever
+possible. Limit `pub` to outward-facing components. Widen an item only when
+it is genuinely outward-facing, such as at a crate boundary after a workspace
+split. Justify each `pub` item. The default direction is narrower visibility.
+"Library surface is Free" removes the preservation requirement; it does not
+remove the visibility rule. Apply this rule to crate topology and every
+boundary decision.
 
 **Consequences for the map.** Unblocks [path and capability model](./29-path-and-capability-model.md) and [value model](./18-value-model.md). The heuristic-coercion removal option in the coercion ticket no longer needs a further compat decision (Migratable). The crate-topology ticket evaluates every alternative (including the single-crate `#[doc(hidden)] pub` backdoor and the workspace split) against the visibility rule above.
 
