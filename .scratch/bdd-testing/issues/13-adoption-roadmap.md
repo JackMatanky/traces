@@ -25,6 +25,9 @@ is the last decision ticket. Its answer feeds `spec.md` directly.
 - (b) Write the pilot slice in enough detail that an implementing session starts
   cold. Name candidate domains, which existing tests it first interacts with,
   and its acceptance criteria.
+  Use only guarantees whose doc/code contradictions have a recorded disposition
+  from ticket 11, decision (f). Later slices resolve the contradictions that
+  they need as ordinary doc fixes inside the slice.
 - (c) Give the sequencing rationale: risk, value of guarantees pinned, and
   learning payback. Early slices should validate the framework verdict from 06
   in real conditions.
