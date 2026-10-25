@@ -6,40 +6,52 @@ Blocked by: 11, 17, 21, 23, 1, 12
 
 ## Question
 
-`QueryService` has two execution models: in-memory linear scan over
-`WorkspaceIndex` and redb secondary-table pushdown (`run_from_store`) that
-fabricates a partial `WorkspaceIndex` just to build rows; redb maintains four
-multimap tables solely for the latter. Decide: one execution path or two; the
-shape of the read model (immutable all-entries snapshot, lazy store-backed view,
-columnar facts); what a `QueryRow` borrows from; what the store persists (whole
-`Note` via postcard vs extracted facts); and whether `WorkspaceIndex` totality
-is a type-enforced invariant.
+`QueryService` has two execution models. The first is an in-memory linear scan
+over `WorkspaceIndex`. The second is the redb secondary-table pushdown
+(`run_from_store`). The pushdown fabricates a partial `WorkspaceIndex` just to
+build rows. redb maintains four multimap tables solely for the pushdown.
+
+Decide:
+
+- Decide whether to use one execution path or two.
+- Decide the shape of the read model (an immutable all-entries snapshot, a lazy
+  store-backed view, columnar facts).
+- Decide what a `QueryRow` borrows from.
+- Decide what the store persists (a whole `Note` via postcard vs extracted
+  facts).
+- Decide whether `WorkspaceIndex` totality is a type-enforced invariant.
 
 Facts: `survey/index.md` §2-3 + H1/H7, `survey/query.md` §3,
 `src/query/service.rs:129-169,323,395`, `src/index/entry.rs:80-103`,
 `SortedByPath::assumed_sorted` debug-only check (`src/index/sort.rs:48-57`),
 commit floor ~34ms.
 
-Alternatives: pure in-memory snapshot (drop 4 tables); keep dual path but
-formalise a pushdown trait; store-backed lazy rows; keep as is. Decide only
-after performance evidence.
+Alternatives:
 
-Measured (`research/11`, M4 Pro): 20k-note cold query 60 ms (store pushdown) vs
-74 ms (load-all); peak RSS 17 MB vs 39 MB; the redb ~25 ms commit floor is
-open/close lifecycle, not durability. Both paths are fast; the contested
-resource is memory and code (four tables + `SourceResolver` + fabricated partial
-index).
+- Use a pure in-memory snapshot (drop the 4 tables).
+- Keep the dual path but formalise a pushdown trait.
+- Use store-backed lazy rows.
+- Keep as is.
+
+Decide only after the performance evidence.
+
+Measured (`research/11`, M4 Pro): a 20k-note cold query takes 60 ms (store
+pushdown) vs 74 ms (load-all). Peak RSS is 17 MB vs 39 MB. The redb ~25 ms
+commit floor is open/close lifecycle, not durability. Both paths are fast. The
+contested resource is memory and code (four tables + `SourceResolver` +
+fabricated partial index).
 
 Re-verified (main @ `207cc3fb`): `src/query/` and `src/index/entry.rs` are
-untouched, so the fabricated partial `WorkspaceIndex` and `Not` full scan stand.
-The cold path now also reads the fingerprint in the plan's existing read
-transaction and, on drift, rebuilds fully in memory before serving.
+untouched. Therefore the fabricated partial `WorkspaceIndex` and the `Not` full
+scan stand. The cold path now also reads the fingerprint in the plan's existing
+read transaction. If the fingerprint drifts, the cold path rebuilds fully in
+memory before serving.
 
 Inputs: `research/11` (go/no-go evidence), `research/05`, `research/06`, note
 document model, forward-consumer decision (cold CLI vs long-lived host).
 
-Graduates fog: index internals (CandidateTrie/indextree, store engine/repository
-split).
+This ticket graduates these fog items: index internals (CandidateTrie/indextree,
+store engine/repository split).
 
 ## Inputs from the value model decision
 

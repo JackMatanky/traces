@@ -6,23 +6,26 @@ Blocked by: 21, 19, 22, 14
 
 ## Question
 
-Temporal is 10k LoC (3k production); scouts judged `DatePoint`,
-`DateValue`/`DateTimeValue`, `DurationValue` sound. Decide the boundary: whether
-the Moment.js dialect translator, ordinal formatting and calendar anchors in
-`template/engine/date.rs` (2.5k LoC) move into temporal (or a sibling `format`
-unit shared with schema `format` validation and CLI); where `Dataview`
-filename-day derivation lives (`src/file.rs:88-98`); the parsing stack
-(`speedate`/`winnow`/`logos`/`jiff` for four call sites) and what remains after
-the execution-context decision; whether Moment compatibility is a domain
-concept.
+Temporal is 10k LoC (3k production). Scouts judged `DatePoint`,
+`DateValue`/`DateTimeValue`, `DurationValue` sound. Decide the boundary:
+
+- Decide whether the Moment.js dialect translator, ordinal formatting and
+  calendar anchors in `template/engine/date.rs` (2.5k LoC) move into temporal.
+  Keep them in a sibling `format` unit instead. The unit is shared with schema
+  `format` validation and CLI.
+- Decide where `Dataview` filename-day derivation lives (`src/file.rs:88-98`).
+- Decide the parsing stack: `speedate`/`winnow`/`logos`/`jiff` for four call
+  sites.
+- Decide what remains after the execution-context decision.
+- Decide whether Moment compatibility is a domain concept.
 
 Facts: `survey/temporal.md`, `survey/template.md` H2,
 `survey/root-primitives.md` §3, `src/schema/fields/date.rs:12-14` (unvalidated
 format), `.scratch/temporal-core/divergence-register.md`.
 
-Alternatives: move dialects into temporal; keep in template as a compatibility
-adapter; drop Moment tokens in favour of strftime (needs compat decision).
-Include keep-as-is and say what withstood scrutiny.
+Alternatives: move dialects into temporal. Keep them in the template as a
+compatibility adapter. Drop Moment tokens in favour of strftime (needs compat
+decision). Include keep-as-is and say what withstood scrutiny.
 
 Inputs: `research/07`, execution-context decision, coercion policy, compat
 envelope.

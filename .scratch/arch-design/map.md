@@ -43,6 +43,15 @@ itself is not implemented here; the map ends at hand-off to specification.
 - Every decision ticket's resolution names: alternatives considered (incl.
   retain), invariant owner, what becomes removable, what remains unresolved, and
   affected downstream tickets.
+- Ticket prose (2026-10-25): the `Question` sections of the open tickets follow
+  ASD-STE100 Simplified Technical English (verb-first instructions, vertical
+  decision lists, sentences of 20 words or fewer). The `Inputs from …`
+  sections, `Facts:` evidence and research files stay outside STE. One word,
+  one meaning: `check` = inspect current code now; `verify`/`re-verify` =
+  adversarial claim testing; `validate` = schema validation; `audit` =
+  ticket 33's coverage sweep; `reconcile` = ticket 33's consistency pass;
+  `ratify` = accept the landed design unchanged; never swap `index`, `store`
+  (redb) or `cache`.
 - Breadth-first survey (per-subsystem, code-verified by scouts; claims NOT yet
   adversarially verified, see [Which scout claims survive adversarial
   verification?](./issues/01-research-verify-load-bearing-claims.md)):

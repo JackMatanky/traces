@@ -6,16 +6,22 @@ Blocked by: 7, 26, 27, 18, 16
 
 ## Question
 
-Decide how the template engine relates to the rest: typed host objects vs
-stringified values at the minijinja boundary
-(`src/template/engine/query.rs:604`); the `QuerySet` bridge (verified by
-`research/01`: chained methods clone only the `Arc<Vec<QueryRow>>` + plan, NOT
-the rows — the scout's "clones the row vec" claim is REFUTED; the question is
-only whether the bridge wrapper adds anything over the query layer's own lazy
-set); `Schema` access without the `State` temp-cache hack; schema loading eager
-vs lazy; render-scoped index caching; error-span preservation across callbacks;
-whether `engine/*` retains duplicated domain logic after temporal/query
-decisions; and the engine's relationship to the writer and dialog seams.
+Decide how the template engine relates to the rest:
+
+- Decide between typed host objects and stringified values at the minijinja
+  boundary (`src/template/engine/query.rs:604`).
+- Decide whether the `QuerySet` bridge wrapper adds anything over the query
+  layer's own lazy set. The question is only about the wrapper. `research/01`
+  verified the bridge: chained methods clone only the `Arc<Vec<QueryRow>>` +
+  plan, NOT the rows. The scout's "clones the row vec" claim is REFUTED.
+- Decide whether to drop the `State` temp-cache hack for `Schema` access.
+- Decide whether schema loading is eager or lazy.
+- Decide whether render-scoped index caching is needed.
+- Decide on error-span preservation across callbacks.
+- Decide whether `engine/*` retains duplicated domain logic after temporal/query
+  decisions.
+- Decide the engine's relationship to the writer and dialog seams.
+
 (Writer/path confinement is decided in the path and capability ticket.)
 
 Facts: `survey/template.md` (H3 refuted by `research/01` claim 7),
@@ -28,7 +34,8 @@ as is. Include template-visible API stability from the compat decision.
 Inputs: `research/07`, query core, temporal boundary, value model, compat
 envelope.
 
-Graduates fog: template micro-optimisations (AST cache, regex caches).
+This ticket graduates these fog items: template micro-optimisations (AST cache,
+regex caches).
 
 ## Inputs from the value model decision
 

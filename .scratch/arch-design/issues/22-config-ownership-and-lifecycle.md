@@ -6,36 +6,36 @@ Blocked by: 21, 12
 
 ## Question
 
-Resolve the config subsystem's boundary:
+Resolve the boundary of the config subsystem:
 
-- (a) why `task.rs`/`tag.rs`/`field.rs` live at crate root and whether
-  `TaskStatusMap`, tag filters and status/emoji parsing belong to config, note,
-  or a leaf;
-- (b) the upward `note -> config` edge (`src/note/parser/input.rs:9`) and
-  whether parsers take primitives or a typed parser-config;
-- (c) the residual `ConfigDigests` surface now that drift detection landed (main
-  @ `207cc3fb`): 10 of 15 per-setting digests feed the index-owned
-  `IndexFingerprint` (`src/index/fingerprint.rs:158`), but
-  `Config::hash`/`compose` (pinned `traces.config.v1` framing), the
-  root/templates/schema-directory digests (5 values computed and discarded at
-  every `IndexerService` construction) and the 380-line `syn` source-scan test
-  (`syn` dev-dep) still have no production consumer: retire, keep as a general
-  config fingerprint, or fold into the index;
-- (d) twin `TrustStore`/`TrackerStore` over `FilePathTracker` and the two-store
-  ordering invariant;
-- (e) `ConfigFile` phantom typestate vs a direct pipeline;
-- (f) where `file_tracker`/`dirs`/`env_vars` live;
-- (g) scaffolding (`cli::init`) ownership.
+- (a) Check why `task.rs`/`tag.rs`/`field.rs` live at the crate root. Decide
+  where `TaskStatusMap`, the tag filters and the status/emoji parsing belong to
+  config, note, or a leaf.
+- (b) Check the upward `note -> config` edge (`src/note/parser/input.rs:9`).
+  Decide whether the parsers take primitives or a typed parser-config.
+- (c) Decide the residual `ConfigDigests` surface now that drift detection
+  landed (main @ `207cc3fb`). 10 of 15 per-setting digests feed the index-owned
+  `IndexFingerprint` (`src/index/fingerprint.rs:158`). `Config::hash`/`compose`
+  (pinned `traces.config.v1` framing), the root/templates/schema-directory
+  digests, and the 380-line `syn` source-scan test (`syn` dev-dep) still have no
+  production consumer. Every `IndexerService` construction computes and discards
+  5 root/templates/schema-directory digest values. Choose one option: retire,
+  keep as a general config fingerprint, or fold into the index.
+- (d) Decide the design of the twin `TrustStore`/`TrackerStore` over
+  `FilePathTracker`. Decide the two-store ordering invariant.
+- (e) Choose between the `ConfigFile` phantom typestate and a direct pipeline.
+- (f) Decide where `file_tracker`/`dirs`/`env_vars` live.
+- (g) Decide the ownership of the scaffolding (`cli::init`).
 
 Facts: `survey/config-dialog.md`, `survey/root-primitives.md` §3-5,
 `survey/note.md` H4, `src/file_tracker.rs` has exactly two callers (verify in
 `research/01`), ADR-0002.
 
-Alternatives per sub-question including keep-as-is; note which are independent
-so the spec can sequence them.
+Alternatives: List the alternatives for each sub-question, including keep-as-is.
+Record which sub-questions are independent so the spec can sequence them.
 
 Inputs: execution-context decision, `research/04`, `research/05` (its
-digest-vs-fingerprint lesson was realized by `207cc3fb`; see
+digest-vs-fingerprint lesson; `207cc3fb` realized that lesson; see
 `reverification.md`), `research/01`.
 
 ## Inputs from the IWE research

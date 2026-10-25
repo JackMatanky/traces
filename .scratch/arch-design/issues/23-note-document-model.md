@@ -6,27 +6,40 @@ Blocked by: 18, 10, 17, 12
 
 ## Question
 
-Decide the shape of the parsed `Note` as the unit consumed by
-index/query/template and (maybe) edited: byte-span policy; whether list/task
-items remain children of `Note` or become separate indexed entities; the
-duplication of item fields/tags into note-level collections; multi-valued inline
-field semantics (store-all-read-first today); per-task status representation
-(owned String vs symbol/id into the status map); single vs dual markdown pass;
-how footnotes/callouts/slugs (claimed by the glossary, absent in code) enter the
-model; infallibility contract retained.
+Decide the shape of the parsed `Note`. The `Note` is the unit that the index,
+the query and the template consume. Open: whether the editor also edits this
+unit.
+
+Decide each topic:
+
+- Decide the byte-span policy.
+- Decide whether the list/task items remain children of `Note` or become
+  separate indexed entities.
+- Decide the duplication of item fields/tags into note-level collections.
+- Decide the multi-valued inline field semantics (store-all-read-first today).
+- Decide the per-task status representation (an owned String vs a symbol/id into
+  the status map).
+- Decide between a single and a dual markdown pass.
+- Decide how footnotes, callouts and slugs enter the model (the glossary claims
+  them, but the code has none).
+- Decide the retained infallibility contract.
 
 Facts: `survey/note.md` (all §3), `src/note/model.rs:24-33`,
-`src/note/parser.rs:108,121,488-498`, `src/note/lists.rs:41-50`, measured sizes
-(`research/11`), judged-sound pieces (MarkerAccumulator, Logos single pass, flat
-list hierarchy, infallible parser).
+`src/note/parser.rs:108,121,488-498`, `src/note/lists.rs:41-50`. Measured sizes
+come from `research/11`. The judged-sound pieces are MarkerAccumulator, Logos
+single pass, flat list hierarchy and infallible parser.
 
-Alternatives: keep zero-span read-mostly model; add compact spans; separate
-"facts table" model; lossless tree (expected to be rejected — attempt to refute
-that).
+Alternatives:
+
+- Keep the zero-span read-mostly model.
+- Add compact spans.
+- Use a separate "facts table" model.
+- Use the lossless tree (expect to reject it: attempt to refute that).
 
 Inputs: `research/10`, `research/11`, value model, forward-consumer decision.
 
-Graduates fog: note parser micro-optimisations (status interning, second pass).
+This ticket graduates these fog items: note parser micro-optimisations (status
+interning, second pass).
 
 ## Inputs from the value model decision
 
@@ -49,8 +62,8 @@ folded target, with `display` and `embedded` as attributes.
 See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). The schema
 check is span-blind and takes a field map; adapters need a span per field key
 (and per list element where known) from whichever editor shape is chosen.
-Merging inline fields into that map is app-layer business and is not promised
-by 20. An MCP agent that edits files directly is checked post hoc; it adds no
+Merging inline fields into that map is app-layer business and is not promised by
+20. An MCP agent that edits files directly is checked post hoc; it adds no
 write-back requirement here.
 
 Ticket 36 (body-section schemas) is blocked by this ticket: it needs to know
@@ -66,10 +79,10 @@ per block node only, with no byte offsets and none on inlines
 (`crates/liwe/src/graph.rs`, `model.rs`) [V], enough for its LSP, which uses
 full-document sync. Its writer re-synthesises markdown from the tree
 (`pulldown-cmark-to-cmark`); the CHANGELOGs record repeated text-loss
-regressions and two reversals: normalise-on-write clobbering external edits
-(iwe v0.26.0) and a normalise pass touching every file (diwe v0.24.1) [V].
-[H] This supports ticket 17's "no general write-back" and says any future writer
-must splice spans into the original bytes instead of re-rendering; it does not
-by itself refute the lossless-tree alternative. Fileclass has no body model
+regressions and two reversals: normalise-on-write clobbering external edits (iwe
+v0.26.0) and a normalise pass touching every file (diwe v0.24.1) [V]. [H] This
+supports ticket 17's "no general write-back" and says any future writer must
+splice spans into the original bytes instead of re-rendering; it does not by
+itself refute the lossless-tree alternative. Fileclass has no body model
 (frontmatter only, written through the host's `processFrontMatter`) and gives no
 input.
