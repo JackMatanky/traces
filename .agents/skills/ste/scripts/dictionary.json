@@ -114,7 +114,7 @@
     {
       "common": ["in order to"],
       "approved": "to",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
