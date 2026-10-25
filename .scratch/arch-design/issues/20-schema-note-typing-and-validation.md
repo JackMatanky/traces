@@ -49,14 +49,14 @@ gating.
 
 ## Answer
 
-**Decision:** schemas validate note data as an advisory, on-demand check. They
-never type values at parse time, never gate the read or index path, and never
-enter the index or its fingerprint. `schema` owns the rule "is this value valid
-for this declaration" as a pure, span-free function over resolved effective
-fields. `note` keeps classification (tickets 18 and 19). Gating is a host policy
-over stable violation codes, not a property of the check. Which schemas apply to
-a note is decided by a class-binding resolver (frontmatter class, tag and path
-bindings) plus a `global` layer, both specified below.
+**Decision:** Schemas check note data on demand and report advisory violations.
+They do not type values at parse time or gate reads and indexing. Schemas do
+not enter the index or its fingerprint. `schema` owns the pure, span-free rule
+for checking values against resolved effective fields. `note` keeps
+classification (tickets 18 and 19). Each host sets gating policy over stable
+violation codes; the check does not gate. The class-binding resolver selects
+schemas by frontmatter class, tag and path bindings. The `global` layer also
+applies, as specified below.
 
 **Roles of the schema:** (a) value and source provider for templates and LSP
 completion; (b) advisory frontmatter checker (LSP diagnostics, post-render
@@ -64,98 +64,109 @@ template check); (c) hover and go-to-definition metadata; (d) write-path
 guardrail for an MCP agent; (e) schema definitions never affect parsing, the
 index or the fingerprint (only the configured class-field name is shared).
 
-**Layering (standing principle, binds tickets 26, 28, 30 and 32):** consumers
-(cli, lsp, mcp) are thin hosts of `core`. `core` holds an app layer of use cases
-that composes domain modules (`note`, `schema`, `query`, `index`, `template`)
-over foundation types. Domain modules expose data and pure functions; the app
-layer composes them. No one-implementor trait exists to let one module call
-another. Use cases are functions with explicit inputs, not a held context
-object.
+**Layering (standing principle, binds tickets 26, 28, 30 and 32):** cli, lsp
+and mcp are thin hosts of `core`. `core` holds an app layer of use cases. The
+app layer composes domain modules (`note`, `schema`, `query`, `index`,
+`template`) over foundation types. Domain modules expose data and pure
+functions. No one-implementor trait lets one module call another. Use cases
+take explicit inputs; they do not hold a context object.
 
 **The check:**
 
-- `schema` resolves a class set into effective fields (pure function over a
-  schema snapshot; hosts replace the snapshot wholesale; no cache is mandated).
-  `ResolvedFields::check(&FieldMap) -> Vec<Violation>`, deterministic field
-  order, no span, no severity.
-- The runtime value type (today `NoteFieldValue`) must sit below both `schema`
-  and `note`; schema literals stay a separate type (ticket 18 holds). Its exact
-  placement is handed to ticket 32. Select values that name links are parsed
-  with the root `Link` wikilink parser at the check (ticket 18), then compared
-  using ticket 19's Link equality, not the query binder's adaptive-literal rule.
-  Do not re-implement link equality in the schema checker.
-- Kinds from `check`: kind mismatch, not in select set, out of range, `step`
-  mismatch, missing required, `multi` arity, and unknown field (always returned
-  with an optional `closest` match; hosts filter). Each violation carries its
-  layer (`class` or `global`), its `origin` and a `hint` taken from the field's
-  `description`, so an agent can self-correct. Class resolution adds unknown
-  class and `schema.class-conflict`; the app layer adds link target missing or
-  wrong class (next bullet). Expected sets are bounded (count, truncated flag,
-  closest few via `strsim`).
+- `schema` resolves a class set into effective fields. This is a pure function
+  over a schema snapshot. Hosts replace the snapshot wholesale; no cache is
+  mandated. `ResolvedFields::check(&FieldMap) -> Vec<Violation>` returns
+  violations in deterministic field order, without spans or severity.
+- The runtime value type (today `NoteFieldValue`) sits below both `schema` and
+  `note`. Schema literals remain a separate type (ticket 18). Ticket 32
+  decides its exact placement. At check time, parse select values that name
+  links with the root `Link` wikilink parser (ticket 18). Compare them with
+  ticket 19's Link equality, not the query binder's adaptive-literal rule. Do
+  not re-implement link equality in the schema checker.
+- `check` returns kind mismatch, not in select set, out of range, `step`
+  mismatch, missing required, `multi` arity and unknown field. It always
+  returns unknown fields with an optional `closest` match; hosts filter them.
+  Each violation carries its layer (`class` or `global`), `origin` and a `hint`
+  from the field's `description`. This lets an agent correct its input. Class
+  resolution adds unknown class and `schema.class-conflict`; the app layer
+  adds link target missing or wrong class. For expected sets, return the count
+  and a truncated flag, with only the closest few via `strsim`.
 - Tier-2 `file` checks: the check exposes folder, extension and class
-  constraints as data; the app layer performs index lookups. No oracle trait.
-- `required` is kept: missing means absent, `null`, blank string or empty list;
-  `false` and `0` are present. One code, `found` says absent or blank.
-- Several classes: inheritance resolves within each class by the existing
-  `extends` rule (multiple parents are kept; first-listed parent wins, a child
-  redefinition wins over its parents). The resolved class set is reduced to its
-  most-derived members, so an ancestor never conflicts with its own descendant.
-  Between unrelated classes the rule is order-independent: identical
-  declarations (for example through a shared `$ref`) are not a conflict;
-  differing declarations produce one `schema.class-conflict` per note and class
-  set, and value checks on that field are skipped, while `required` and `multi`
-  arity are still checked if either class declares them. Sibling parents that
-  collide with no child redefinition are reported the same way. Unknown classes
-  are skipped. First-listed wins does not decide class-versus- class conflicts.
-- Option semantics, with the principle that no declared option is silently
-  ignored: `min`/`max` checked; `step` checked (exact for integers, relative
-  tolerance for floats); `date.format` is a write-format hint and the check
-  accepts Date/DateTime, plus any scalar when the format has no date component;
-  that gap stays explicit until ticket 27 fixes the dialect.
-- Model additions: `origin`, `description` and `parent_order` now (the schema
-  format may still change freely; `description` is a new key accepted by every
-  field type). `suggest_class` waits for the LSP.
-- The check takes a field map; merging inline fields into it is the app layer's
-  business and is not promised here (ticket 23).
+  constraints as data. The app layer performs index lookups; no oracle trait
+  is needed.
+- `required` stays: absent, `null`, blank string and empty list mean missing.
+  `false` and `0` count as present. One code reports this violation; `found`
+  distinguishes absent from blank.
+- Several classes:
+  - Resolve inheritance within each class by the existing `extends` rule.
+    Keep multiple parents: the first-listed parent wins, and a child
+    redefinition wins over its parents.
+  - Reduce the resolved class set to its most-derived members. An ancestor
+    cannot conflict with its descendant.
+  - Compare unrelated classes without regard to order. Identical
+    declarations, including those shared through `$ref`, do not conflict.
+    Differing declarations produce one `schema.class-conflict` per note and
+    class set. Skip value checks on the conflicting field, but check `required`
+    and `multi` arity if either class declares them.
+  - Report colliding sibling parents without a child redefinition in the same
+    way. Skip unknown classes. First-listed wins does not settle
+    class-versus-class conflicts.
+- No declared option is silently ignored. Check `min` and `max`. Check `step`
+  exactly for integers and with relative tolerance for floats. `date.format`
+  is a write-format hint: the check accepts Date/DateTime and any scalar if
+  the format has no date component. This gap remains explicit until ticket 27
+  fixes the dialect.
+- Add `origin`, `description` and `parent_order` now. The schema format may
+  still change freely; every field type accepts the new `description` key.
+  `suggest_class` waits for the LSP.
+- The check takes a field map. The app layer owns any merge of inline fields
+  into that map; ticket 23 handles this, and no merge is promised here.
 
-**Global layer:** the reserved `global` schema stays a `$ref` pool and also
-becomes the lowest-precedence layer applied to the frontmatter of every note,
-classed or not. It is not a class (no `@global` query, never extended); a class
-declaration of the same field always wins; `required` in `global` still degrades
-to `false`; a class may opt out of a global field with `excludes`. Violations
-from this layer carry layer `global`, and the diagnostic adapter derives a
-distinct code family `schema.global.*`, so hosts can apply a different policy
-(for example hint-level in the LSP, ignored on unclassed notes). Default
-severities belong to ticket 31, which is asked to rank the `global` family below
-class violations. This changes the documented invariant in
-`src/schema/mod.rs:48-51`; the doc comment and the survey are updated with the
-specification.
+**Global layer:** The reserved `global` schema remains a `$ref` pool. It also
+becomes the lowest-precedence layer on the frontmatter of every note, classed
+or not. It is not a class: no `@global` query can name it, and no class extends
+it. A class declaration of the same field always wins. `required` in `global`
+still degrades to `false`. A class can exclude a global field with `excludes`.
+Violations from this layer carry layer `global`. The diagnostic adapter derives
+a separate `schema.global.*` code family so hosts can set a different policy
+(for example, hint-level in the LSP or ignored on unclassed notes). Ticket 31
+owns default severities and is asked to rank this family below class
+violations. This changes the documented invariant in
+`src/schema/mod.rs:48-51`; the doc comment and the survey are updated with
+the specification.
 
-**Class binding:** a note's class set has three sources: its frontmatter class
-field, `tags` (nested tags count, as in the existing `Tag` source atom) and
-`paths` (vault-relative globs in the existing glob dialect, with `!` exclusion
-patterns) declared in a strict, non-inherited `[binding]` table on the class
-schema. Bookmarks and Base views are not sources. Rule: a note with one or more
-known explicit classes uses only those; bindings are defaults for notes without
-a known explicit class (an empty or unknown class value does not suppress them,
-so a typo does not silently drop validation). Expansion happens at query time
-into the existing `Class`, `Tag` and `Path` atoms plus a "has a known explicit
-class" exclusion, so the index and its fingerprint never learn about bindings.
-One resolver answers both "which classes does note n have" and "which notes does
-class c claim" (with hierarchy expansion for `@book*`); equivalence between the
-two is a tested invariant, stated on the unreduced set. A move or a binding-tag
-edit changes the class set and is a class change (see the guardrail). Query cost
-of path bindings (the `Path` atom scans all paths today) is for ticket 26 to
-optimise and benchmark.
+**Class binding:** A note's class set has three sources:
+
+- The frontmatter class field.
+- `tags` in a strict, non-inherited `[binding]` table on the class schema.
+  Nested tags count, as in the existing `Tag` source atom.
+- `paths` in the same table: vault-relative globs in the existing dialect,
+  including `!` exclusion patterns.
+
+Bookmarks and Base views are not sources. A note with one or more known
+explicit classes uses only those classes. Bindings supply defaults only when
+there is no known explicit class. Empty or unknown class values do not
+suppress bindings, so a typo does not silently drop validation.
+
+Expand bindings at query time into the existing `Class`, `Tag` and `Path`
+atoms, plus a "has a known explicit class" exclusion. The index and its
+fingerprint remain unaware of bindings. One resolver answers both "which
+classes does note n have" and "which notes does class c claim". The latter
+includes hierarchy expansion for `@book*`. Equivalence between these two
+answers is a tested invariant on the unreduced class set. A move or a
+binding-tag edit changes the class set and counts as a class change (see the
+guardrail). Ticket 26 owns optimisation and benchmarking of path-binding
+queries; the `Path` atom scans all paths today.
 
 **Class hierarchy as data replaces `FileClassExpander`:** `schema` produces a
-plain hierarchy keyed by a single normalising `ClassName` (the index stores
-lowercase), and the app layer hands it to the query service. Unknown classes
-come back as data instead of a logging side effect. Hosts swap the snapshot
-wholesale when schemas change. Delete the trait, the crate-root
+plain hierarchy keyed by one normalising `ClassName` (the index stores
+lowercase). The app layer passes it to the query service. Return unknown
+classes as data, not as a logging side effect. Hosts replace the snapshot
+wholesale when schemas change. Delete the trait, crate-root
 `src/file_class_expander.rs`, the `&mut ClassExpansionMode` out-parameter and
-`Option<Arc<dyn FileClassExpander>>`. Verified smells: single implementation,
-consumer-defined trait, out-parameter mutation of the query AST, and the orphan
+`Option<Arc<dyn FileClassExpander>>`.
+Verified smells: single implementation, consumer-defined trait, out-parameter
+mutation of the query AST, and the orphan
 rule forbidding this impl in any third crate once `query` and `schema` are
 separate crates (reproduced: E0117 in a throwaway workspace; a newtype
 compiles). A latent hazard also exists: without an expander, store queries fall
@@ -164,22 +175,24 @@ attaches one, so it is not a current bug. 20 records the decision and the
 schema-side producer; ticket 26 owns the query-side change; the owning module of
 the hierarchy type is for tickets 26 and 32.
 
-**Template boundary:** an advisory post-render check in the app layer between
-`render()` and `write()`. It parses the rendered frontmatter with the note
-parser, resolves the class and runs the same check. It is skipped when the
-render has no frontmatter or class, warns on stderr in interactive use, runs
-under `--dry-run`, and returns structured output under MCP. Schema-driven
-prompts (ADR-0006 keeps the schema as a source of values) and static analysis of
-templates (frontmatter is raw text to the template AST) are rejected.
+**Template boundary:** The app layer checks the rendered note between
+`render()` and `write()` and reports advisory violations. It parses rendered
+frontmatter with the note parser, resolves the class and runs the same check.
+Skip the check if the render has no frontmatter or class. Warn on stderr in
+interactive use; run the check under `--dry-run`; return structured output
+under MCP. Reject schema-driven prompts (ADR-0006 still keeps the schema as a
+source of values) and static template analysis (frontmatter is raw text to
+the template AST).
 
-**Agent guardrail:** no design depends on harness hooks (several harnesses have
-none, and each defines its own). The portable guarantee is detect and feed back;
-prevention exists only where `traces` owns the write or the harness is
-configured to deny native writes. One contract, `check_note(before, after)`
-where each side is a path plus content, is exposed as `traces check` (paths,
-`--staged`, or `--before <file|->` `--after <file|->` with
-`--before-path`/`--after-path` for stdin; git optional) and as MCP tools.
-Channels by what the harness provides [P, `research/20-prep/round5/report.md`]:
+**Agent guardrail:** Do not depend on harness hooks; several harnesses lack
+them, and each defines its own. The portable guarantee is to detect and feed
+back. Prevention exists only where `traces` owns the write or the harness
+denies native writes. Expose one `check_note(before, after)` contract, where
+each side contains a path and content. Expose it through MCP tools and
+`traces check`: paths, `--staged`, or `--before <file|->`
+`--after <file|->` with `--before-path`/`--after-path` for stdin. Git is
+optional. Channels depend on what the harness provides
+[P, `research/20-prep/round5/report.md`]:
 
 - *Nothing:* an `AGENTS.md` snippet generated by `traces` (soft) and the exit
   code.
@@ -237,19 +250,20 @@ Channels by what the harness provides [P, `research/20-prep/round5/report.md`]:
   `[binding].paths` of each class steers writers where they work (loaded lazily
   by Claude Code [V], others unknown [S]); soft, never relied on.
 
-Constraints given up front: MCP tool input schemas and a schema resource (large
-enums and strftime formats are not projected and are checked after the call).
-The delta rule blocks only violations introduced by the edit, keyed `(field,
-code, hash(value))`, not by list position. A change of the class set, including
-one caused by a move or an edit of a binding tag, asks the user and denies when
-no confirmation channel exists; so does setting an unknown class. Host policy
-maps each code to ignore, warn or reject. The MCP crate renders JSON Schema and
-`isError` results; core has no protocol types. `traces check` exits with a
-distinct code for a broken schema (it never reads as "notes are fine") and
-another for note violations. Notes with no class, no binding and no global field
-are unvalidated; MCP create tools should require a class or a bound location.
-Under `--dry-run` the template check has no output path, so path bindings do not
-apply there. Rejected as a design basis or default: hook-based gating; a staging
+Give the agent MCP tool input schemas and a schema resource up front. Do not
+project large enums or strftime formats; check those after the call. The delta
+rule blocks only violations introduced by the edit. Key violations by
+`(field, code, hash(value))`, not list position. Ask the user before a class-set
+change, including one caused by a move or a binding-tag edit. Also ask before
+setting an unknown class. Deny either change if no confirmation channel
+exists. Host policy maps each code to ignore, warn or reject. The MCP crate
+renders JSON Schema and `isError` results; core has no protocol types.
+`traces check` uses separate exit codes for a broken schema and note
+violations. A broken schema must not read as "notes are fine". Notes with no
+class, no binding and no global field are unvalidated. MCP create tools
+should require a class or bound location. Under `--dry-run`, the template
+check has no output path, so path bindings do not apply.
+Rejected as a design basis or default: hook-based gating; a staging
 directory without a launch convention (an instruction); a watcher daemon as a
 standalone product (no channel to the agent; inside the MCP server it is a
 best-effort notice, above); auto-revert (destroys data); ACP, FUSE or WebDAV
@@ -262,10 +276,10 @@ writes (a shell `>` exits 0 while the server rejects), is bypassed through the
 backing directory, and hangs processes if the daemon dies; at most a documented
 recipe.
 
-**MCP edits:** how an MCP edit tool applies a change to a note (a lossless
-frontmatter edit) belongs to the MCP host, not core. 20 puts no write-back or
-span requirement on ticket 23 (ticket 17 holds); if MCP tools need edit ranges,
-that is raised when MCP is specified.
+**MCP edits:** The MCP host, not core, owns how an MCP edit tool applies a
+lossless frontmatter change to a note. Ticket 20 adds no write-back or span
+requirement to ticket 23 (ticket 17 holds). Raise edit-range needs when MCP
+is specified.
 
 **Date-shaped text:** no parse-time override, no quote convention. `input`
 accepts any scalar and consumers get a text view rendered from the typed value,

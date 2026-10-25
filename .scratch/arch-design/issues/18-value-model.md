@@ -444,10 +444,10 @@ capabilities, since the crate has end users and a public surface.
 
 ## Answer
 
-**Decision:** two owned value types and no borrowed mirror enum. A note
-runtime value (`NoteFieldValue`) for notes, queries and templates, and a
-schema-local literal type for schema options and values files. They share only
-the root-level `Link`.
+**Decision:** use two owned value types. `note::NoteFieldValue` serves notes,
+queries and templates. A schema-local literal type serves schema options and
+values files. They share only the root-level `Link`. Neither has a borrowed
+mirror enum.
 
 **Alternatives considered:**
 
@@ -468,72 +468,86 @@ the root-level `Link`.
   The compat config builds a `Value` AST and span tree anyway, and
   `Document::span_at(path)` is unsound for dotted keys, tags and block scalars.
 
-**Runtime value (`note::NoteFieldValue`):** `Null, Bool, Int(i64), Float(f64),
-String, Date, DateTime, Duration, Link(Link), List(Box<[Self]>),
-Object(IndexMap<String, Self>)`. It replaces `Number(f64)`. Derived tagged
-serde for the postcard cache; derived structural `PartialEq`; the 80-byte size
-test stays and nothing is boxed (`IndexMap` and `DurationValue` are both 72 B).
+**Runtime value (`note::NoteFieldValue`):** use these variants:
+`Null, Bool, Int(i64), Float(f64), String, Date, DateTime, Duration,
+Link(Link), List(Box<[Self]>), Object(IndexMap<String, Self>)`.
+Replace `Number(f64)`. Keep derived tagged serde for the postcard cache and
+derived structural `PartialEq`. Keep the 80-byte size test. Do not box
+additional variants (`IndexMap` and `DurationValue` are both 72 B).
 
-**Schema literal (schema module, tentatively `SchemaLiteral`):** the current
-`FieldValue` renamed and moved: `Null, Bool, Int, Float, String, List(Vec),
-Object`, natural serde, no `Date`/`DateTime`/`Duration`/`Link`. Native TOML
-datetimes are read as strings (today they silently become a bogus object).
-Select values that name links stay strings; ticket 20 interprets them at the
-consumer boundary with the shared wikilink parser.
+**Schema literal (schema module, tentatively `SchemaLiteral`):** move and
+rename the current `FieldValue`. Keep `Null, Bool, Int, Float, String,
+List(Vec), Object` and natural serde. Do not add `Date`, `DateTime`,
+`Duration` or `Link`. Read native TOML datetimes as strings; today they
+silently become a bogus object. Keep select values that name links as strings.
+Ticket 20 interprets them at the consumer boundary with the shared wikilink
+parser.
 
-**Root `Link`:** `Link { target, display: Option<String>, embedded: bool }`.
-`display` is `None` when the trimmed, unescaped display is absent, empty or
-equal to the trimmed, unescaped target (this removes the two current spellings
-of "no alias"). It owns a wikilink render and parse that round-trip for
-wikilinks only. Module name is chosen in the specification (ticket 32).
-`NoteLink` (syntax kind and source span) is the editor-side occurrence type and
-is defined by ticket 23.
+**Root `Link`:** use `Link { target, display: Option<String>, embedded: bool }`.
+Set `display` to `None` if the trimmed, unescaped display is absent, empty or
+equal to the trimmed, unescaped target. This removes the two current spellings
+of "no alias". Own wikilink rendering and parsing at the root; they
+round-trip for wikilinks only. Ticket 32 chooses the module name.
+`NoteLink` is the editor-side occurrence type with syntax kind and source
+span. Ticket 23 defines it.
 
-**Frontmatter conversion:** keep the Noyalib compat parser and convert its
-`Value` directly into `NoteFieldValue`. Use a frontmatter-specific copy of the
-compat config with `integer_overflow_errors` off, so an integer above
-`u64::MAX` becomes an approximate `Float` and does not discard the whole
-frontmatter block. Integers convert to `Int`; those above `i64::MAX` convert
-to `Float`. YAML tags are dropped and merge keys are ordinary keys, as
-intentional behavior. Keys failing `FieldKey` validation are still skipped.
+**Frontmatter conversion:** keep the Noyalib compat parser. Convert its
+`Value` directly into `NoteFieldValue`. Copy the compat config for
+frontmatter and turn off `integer_overflow_errors`. An integer above
+`u64::MAX` then becomes an approximate `Float` instead of dropping the whole
+frontmatter block. Convert integers to `Int`, but convert those above
+`i64::MAX` to `Float`. Intentionally drop YAML tags and treat merge keys as
+ordinary keys. Continue to skip keys that fail `FieldKey` validation.
 
-**Classification:** frontmatter and inline share the date, duration, link and
-blank parsers and one precedence order. Frontmatter classification is
-quote-insensitive (a link must be quoted in YAML); inline quotes remain the
-literal escape. Inline does not gain `DateTime`. Bool, null, number, list,
-`#tag`, `~` and `""` stay syntax-native and are recorded as intentional
-divergences (comparison table above).
+**Classification:** use the same date, duration, link and blank parsers for
+frontmatter and inline fields. Use one precedence order. Classify frontmatter
+without regard to quotes: a YAML link needs quotes. Keep inline quotes as the
+literal escape. Do not add inline `DateTime` (superseded by ticket 19 below).
+Keep Bool, null, number, list, `#tag`, `~` and `""` syntax-native. The
+comparison table above records these intentional divergences.
 
-**Numbers:** `Int(i64)` and `Float(f64)` everywhere. Inline integer-shaped text
-fitting `i64` becomes `Int`, else `Float`. The schema values-file visitor
-converts `u64` above `i64::MAX` to `Float` and no longer saturates. Computed
-query fields (`file.size`, `list.line`, `list.depth`, `list.parent`) use `Int`.
-`Int` and `Float` share one numeric rank and compare by value.
+**Numbers:** use `Int(i64)` and `Float(f64)` everywhere. Parse inline
+integer-shaped text as `Int` if it fits `i64`; otherwise, use `Float`. In the
+schema values-file visitor, convert `u64` above `i64::MAX` to `Float` instead
+of saturating. Use `Int` for computed query fields `file.size`, `list.line`,
+`list.depth` and `list.parent`. Give `Int` and `Float` one numeric rank and
+compare them by value.
 
-**Persistence and templates:** no independent wire format; cache serialization
-stays internal and a model change invalidates the cache. Two explicit
-template adapters remain: natural serde for schema literals and the
-hand-written runtime adapter (`Int` renders `5` instead of `5.0`).
+**Persistence and templates:** do not define an independent wire format.
+Keep cache serialization internal. Invalidate the cache when the model
+changes. Keep two explicit template adapters: natural serde for schema
+literals and the hand-written runtime adapter. Runtime `Int` renders `5`,
+not `5.0`.
 
-**Borrowed views:** the model exports `&NoteFieldValue` and no mirror enum. Any
-view enum is query-local. `NoteFieldValueRef` is not deleted until ticket 26
-benchmarks owned vs view over `file.name` sort and filter.
+**Borrowed views:** export `&NoteFieldValue`, not a mirror enum. Keep any view
+enum query-local. Do not remove `NoteFieldValueRef` before ticket 26
+benchmarks owned values against views for `file.name` sort and filter.
 
-**Invariant owners:** note-boundary classification rules (note parser, one
-precedence order); numeric identity (the runtime value's constructors); `Link`
-normalization and wikilink round-trip (root `Link`); literal-vs-link
-interpretation of schema strings (the schema consumer, ticket 20).
+**Invariant owners:**
 
-**Becomes removable:** `FieldValueRef`, its seed and visitor, `DateTimeCoercion`,
-`FieldStringValue`, both `From<FieldValueRef>` conversions, the
-`Number(f64)` variant, the values-file saturation test, and the double
-frontmatter conversion. `NoteFieldValueRef` is removable pending ticket 26.
+- The note parser owns note-boundary classification and its one precedence
+  order.
+- The runtime value's constructors own numeric identity.
+- The root `Link` owns normalization and wikilink round-trip.
+- The schema consumer owns literal-vs-link interpretation of schema strings
+  (ticket 20).
 
-**Deliberate behavior changes:** inline and frontmatter integers become `Int`;
-template numbers render `5`; values-file `u64` overflow converts; huge
-frontmatter integers no longer drop the block; `Link` display is normalized;
-native TOML dates in schema data are read as strings; computed query fields
-become `Int`. Quoted frontmatter values keep their current classification.
+**Becomes removable:** the cutover makes `FieldValueRef`, its seed and
+visitor, `DateTimeCoercion`, `FieldStringValue`, both `From<FieldValueRef>`
+conversions, `Number(f64)`, the values-file saturation test and the double
+frontmatter conversion removable. `NoteFieldValueRef` remains a removal
+candidate, pending ticket 26's benchmark gate.
+
+**Deliberate behavior changes:**
+
+- Inline and frontmatter integers become `Int`; computed query fields become
+  `Int`.
+- Template numbers render `5`.
+- Values-file `u64` overflow converts; huge frontmatter integers no longer
+  drop the block.
+- `Link` display is normalized.
+- Native TOML dates in schema data are read as strings.
+- Quoted frontmatter values keep their current classification.
 
 **Remains unresolved (handed off):**
 

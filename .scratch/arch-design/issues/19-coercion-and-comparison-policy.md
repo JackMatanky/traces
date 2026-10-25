@@ -52,11 +52,11 @@ decisions](../research/19-prep/d-prior-decisions.md).
 
 ## Answer
 
-**Decision:** one value-semantics module owns every comparison, with three
-separate relations instead of one overloaded `compare`. Note values are
-classified once at parse and never sniffed again; the only late typing is an
-operand-adaptive string literal in queries. No ambient zone or clock reaches any
-comparison.
+**Decision:** one value-semantics module owns all comparisons. It provides
+three separate relations, not one overloaded `compare`. Classify note values
+once at parse time. Do not sniff them again. Only query string literals can
+receive late typing, based on the other operand. No comparison reads an
+ambient zone or clock.
 
 **Alternatives considered:** keep as is (three equality evaluators, rank-leaking
 relational filters, three promotion seams); lexical storage with typing on
@@ -69,116 +69,128 @@ environmental failures are different, see ticket 21); a custom `PartialEq`
 equating `Int` and `Float` (breaks `Eq`/`Hash` coherence); comparison by
 resolved note identity (needs the index, impure).
 
-**Relations (owner: the value-semantics module; three relations):**
+**Relations (owner: the value-semantics module):**
 
-- `NoteFieldValue: PartialEq` stays structural, with no `Ord` and no `Hash`.
-- *Loose equality* and *bracketed order* serve filters. Brackets: Numeric
+- `NoteFieldValue: PartialEq` stays structural. It has no `Ord` or `Hash`.
+- Loose equality and bracketed order serve filters. The brackets are Numeric
   (`Int`, `Float`), Temporal (`Date`, `DateTime`, `CalendarPeriod`), Duration,
-  String, Bool, Link, List, Object, Null. Across brackets `==` is false, `!=` is
-  true and `<`, `<=`, `>`, `>=` do not match. `Null` never matches a relational
-  operator; `null == null` is true and a missing field equals `null`. `!=` is
-  the plain complement, so `not (x < 5)` also matches other kinds and nulls
-  (same as MongoDB); this is documented, not rewritten.
-- *Total sort order* (the third relation) serves `SortKey`, built with an
-  explicit context. Rank table kept as implemented: `Null < Bool < Number <
-  Duration < Temporal < Text < Link < List < Object`; nulls first (placement is
-  ticket 26's). The sort-time sniffing (`TextShape::classify` in `SortKey`) is
-  deleted, and `List`/`Object` stop being mapped to `Null`.
+  String, Bool, Link, List, Object and Null.
+- Across brackets, `==` is false and `!=` is true. `<`, `<=`, `>` and `>=` do
+  not match. `Null` never matches a relational operator. `null == null` is
+  true, and a missing field equals `null`.
+- `!=` is the plain complement. Thus `not (x < 5)` also matches other kinds
+  and nulls, as in MongoDB. Document this behavior; do not rewrite it.
+- Total sort order serves `SortKey` and uses an explicit context. Keep the
+  implemented rank table: `Null < Bool < Number < Duration < Temporal < Text <
+  Link < List < Object`. Nulls sort first; ticket 26 owns their placement.
+  Remove `TextShape::classify` sniffing from `SortKey`. Do not map `List` or
+  `Object` to `Null`.
 
-**Numbers:** an exact `Int`/`Float` comparator (compare on the number line,
-never `i64 as f64`), `-0.0 == 0.0`. `NaN` becomes `Null` at construction with a
-warning (only frontmatter `.nan` can produce it); `±inf` stays a valid `Float`
-and sorts at the ends of the range. Grouping uses the same equality.
+**Numbers:** compare `Int` and `Float` exactly on the number line; never use
+`i64 as f64`. Treat `-0.0 == 0.0`. Turn `NaN` into `Null` at construction and
+warn; only frontmatter `.nan` can produce it. Keep `±inf` as valid `Float`
+values at the ends of the sort range. Grouping uses the same equality.
 
-**Temporal:** naive datetimes are civil (zone-free) values; only input with `Z`
-or an offset is an instant. An ordinary `Date` **field versus** a civil
-`DateTime` field compares at civil midnight; a period-valued field or
-date-shaped literal instead uses the membership relation below. Comparing a
-civil value with an instant takes the pinned zone from the execution frame
-(ticket 21), never an ambient lookup inside ordering. The cache holds no machine
-zone. Inline fields may now yield `DateTime`, which revokes ticket 18's
-exclusion (its reason was the persisted zone shift).
+**Temporal:** naive datetimes are civil, zone-free values. Only input with `Z`
+or an offset is an instant. Compare an ordinary `Date` field with a civil
+`DateTime` field at civil midnight. A period-valued field or date-shaped
+literal uses the membership relation below instead.
 
-**Classification:** frontmatter classification stays quote-insensitive (links
-stay recognised when quoted); inline quotes remain the escape. No `string()`
-function is part of this decision. Ticket 20 rejects a schema override: an
-`input` consumer gets a text view of the typed value, not an escape that
-restores the original frontmatter lexeme.
+To compare a civil value with an instant, use the pinned zone from the
+execution frame (ticket 21). Do not look up an ambient zone in ordering. The
+cache holds no machine zone. Inline fields may now yield `DateTime`. This
+revokes ticket 18's exclusion, whose reason was the persisted zone shift.
+
+**Classification:** keep frontmatter classification quote-insensitive;
+quoted links remain recognised. Inline quotes remain the escape. This decision
+does not add `string()`. Ticket 20 rejects a schema override. An `input`
+consumer gets a text view of the typed value. It does not restore the
+original frontmatter lexeme.
 
 **Adaptive literals (replaces `classify_literal` sniffing):**
 
-- Applies to quoted string literals only; bare tokens are already typed.
-  Positions: either side of a comparison, the counterpart-typed operand in
-  arithmetic (`due - "2026-07-29"`, `due + "1d"`), and the `contains` target.
-  Never field vs field and never literal vs literal (both stay strings).
-- At query build, pre-parse a quoted literal once into candidates: DatePoint and
-  its validated CalendarPeriod, DateTime, Duration, Link target, Number (decimal
-  grammar of the bare number token: `"5"` is `Int`, `"5.0"` is `Float`, integers
-  beyond `i64` become `Float`; no hex, separators or non-finite), Bool, and
-  later a natural-language date. A date-shaped literal against a Date, DateTime
-  or CalendarPeriod row selects the period candidate *for comparison*; DatePoint
-  remains available to date arithmetic. Other rows select the candidate matching
-  their kind (Duration, Link, `Int` or `Float`, Bool). `String`, `List`,
-  `Object` and `Null` rows, and rows whose kind has no parsed candidate, take
-  the raw text, which then fails the bracket. No per-row parsing or allocation;
-  a row-dependent zone conversion still uses the pinned frame.
-- A `Link` row adopts a literal as its folded target; a literal such as
-  `[[Alpha|A]]` contributes only its target. This settles schema select string
-  vs `Link` matching for ticket 20.
-- Literal precision decides what it matches: `"2025-01"` is the whole month and
-  a day literal against a `DateTime` is the whole day. A civil period has a
-  first and last *civil date*: `==` matches a point whose civil date lies inside
-  it, `<` a date before it, `<=` a date before or inside it, `>` a date after
-  it, `>=` a date inside or after it; swap operands for the reversed relation.
-  For instants, obtain their civil dates in the pinned zone; equivalently, when
-  local date mapping is monotone, instant bounds are `[s, e)` with an
-  **exclusive** upper bound. Never include the next period's starting instant in
-  both periods. This applies to bare and quoted literals. Ordinary Date field
-  versus DateTime field retains the civil-midnight convention; a
-  `CalendarPeriod` field uses membership against a point. Two periods
-  filter-equal only on matching normalized start and unit; relational filters
-  compare their `(start, unit)` keys with a fixed unit tie-break, not interval
-  overlap. Their structural `PartialEq` and deterministic sort relation remain
-  separate.
-- Natural-language dates are a hook, not decided grammar: a deterministic,
-  closed English grammar resolved from the injected `today`, shared by filter
-  literals, `date()`, `date_add` and template filters. Grammar and crate choice
-  belong to ticket 27.
+- Adapt quoted string literals only. Bare tokens are already typed. Adapt either
+  side of a comparison, the counterpart-typed operand in arithmetic
+  (`due - "2026-07-29"`, `due + "1d"`), and the `contains` target. Do not adapt
+  field-versus-field or literal-versus-literal comparisons; both literals stay
+  strings in the latter case.
+- At query build, parse each quoted literal once into candidates: DatePoint and
+  its validated CalendarPeriod, DateTime, Duration, Link target, Number, Bool,
+  and later a natural-language date. Use the bare number token's decimal
+  grammar: `"5"` is `Int`, `"5.0"` is `Float`, and integers beyond `i64` become
+  `Float`. Do not accept hex, separators or non-finite numbers.
+- Against a Date, DateTime or CalendarPeriod row, select the period candidate
+  of a date-shaped literal *for comparison*. Keep DatePoint for date
+  arithmetic. Other rows select the candidate matching their kind (Duration,
+  Link, `Int` or `Float`, Bool). `String`, `List`, `Object` and `Null` rows use
+  raw text. So do rows whose kind has no parsed candidate; that text fails
+  the bracket. Do not parse or allocate per row. Use the pinned frame for any
+  row-dependent zone conversion.
+- A `Link` row adopts a literal as its folded target. In `[[Alpha|A]]`, only
+  the target contributes. This resolves schema select string versus `Link`
+  matching for ticket 20.
+- Literal precision controls matching. `"2025-01"` covers the whole month; a
+  day literal against a `DateTime` covers the whole day. A civil period has a
+  first and last *civil date*. For a point compared with a period:
+  - `==` matches when the point's civil date is inside the period.
+  - `<` matches a date before the period; `<=` matches one before or inside it.
+  - `>` matches a date after the period; `>=` matches one inside or after it.
+  Swap operands to reverse the relation.
+- For instants, get their civil dates in the pinned zone. When local date
+  mapping is monotone, the equivalent instant bounds are `[s, e)`, with an
+  **exclusive** upper bound. Do not put the next period's starting instant in
+  both periods. Apply this rule to bare and quoted literals.
+- Keep civil-midnight comparison for an ordinary Date field versus DateTime
+  field. A `CalendarPeriod` field uses membership against a point. Two periods
+  filter-equal only if their normalized starts and units match. Relational
+  filters compare their `(start, unit)` keys with a fixed unit tie-break, not
+  interval overlap. Keep structural `PartialEq` and deterministic sort
+  separate from these filter relations.
+- Natural-language dates remain a hook, not a decided grammar. The proposed
+  grammar is deterministic, closed and English. It resolves against injected
+  `today` and is shared by filter literals, `date()`, `date_add` and template
+  filters. Ticket 27 owns grammar and crate choice.
 
-**Links:** equality and order use the `ComparisonKey` of the target plus
-subpath; `display` and `embedded` stay queryable attributes. Link sorting uses
-the string collator on the target, not `ComparisonKey`. `date(link)` reads only
-the target's last path segment (folders, `#anchor` and `.md` stripped), never
-display text, with an optional pattern argument for non-ISO titles. A
-date-titled link stays in the Link bracket: `due == "2025-01-15"` still matches
-`[[2025-01-15]]` through link adoption, but range filters and sorts across mixed
-Date and Link rows use `date(field)`.
+**Links:** equality and order use the target-plus-subpath `ComparisonKey`.
+`display` and `embedded` remain queryable attributes. Sort Links with the
+string collator on the target, not with `ComparisonKey`.
+
+`date(link)` reads only the target's last path segment. Strip folders,
+`#anchor` and `.md`, but never read display text. It accepts an optional
+pattern argument for non-ISO titles. A date-titled link stays in the Link
+bracket. Link adoption lets `due == "2025-01-15"` match `[[2025-01-15]]`.
+For range filters and sorts across mixed Date and Link rows, use `date(field)`.
 
 **Durations:** nominal seconds (`1mo == 30d`, `1y == 365d`) stay the equality
 and order, provisionally; calendar arithmetic stays Jiff-based. Refinement
 belongs to ticket 27.
 
-**Strings:** `==`/`!=` stay byte-exact, except that link comparison folds case
-through `ComparisonKey`, so `project == "alpha"` matches `[[Alpha]]` while
-`title == "alpha"` stays case-sensitive. Sorting uses `icu_collator` with the
-CLDR root collation, tertiary strength, numeric ordering, punctuation treated as
-significant, and a raw-byte tiebreak, so `Chapter 2 < Chapter 10` and `apfel <
-Äpfel < apple < Zebra`. Never host-locale collation; sort keys are transient and
-never persisted. The scout's ~350 KB binary cost and that ICU4X is already in
+**Strings:** `==` and `!=` stay byte-exact for strings. Link comparison instead
+folds case through `ComparisonKey`: `project == "alpha"` matches `[[Alpha]]`,
+but `title == "alpha"` stays case-sensitive.
+
+Sort strings with `icu_collator`: CLDR root collation, tertiary strength,
+numeric ordering, significant punctuation and a raw-byte tiebreak. Thus
+`Chapter 2 < Chapter 10` and `apfel < Äpfel < apple < Zebra`. Do not use
+host-locale collation. Sort keys are transient; do not persist them.
+The scout's ~350 KB binary cost and that ICU4X is already in
 the tree through `textwrap` were not verified here; the specification must
 confirm them.
 
-**Error mode (principle, refined by ticket 21):** classification failure keeps
-the string; explicit casts (`date()`, `dur()`) fail to `Null`; *ordinary data
-mismatches* in filters never error at evaluation, and arithmetic on mismatched
-kinds is `Null`. A required zone, calendar resolution or presentation failure is
-instead a typed query/render error, including when it arises during lazy row
-materialization; never turn it into a nonmatch or a blank cell. Advisory stderr
-notices (the parse-time `NaN` warning plus two query notices) leave successful
-stdout and exit codes unchanged: a count of rows excluded by a bracket mismatch
-and a build-time warning for a quoted literal that is date-shaped but invalid
-(`"2025-02-30"`; it still runs as a string). A bare invalid date literal remains
-a syntax error. The diagnostic/error mechanism is ticket 31's.
+**Error mode (principle, refined by ticket 21):**
+
+- Classification failure keeps the string. Explicit casts (`date()`, `dur()`)
+  fail to `Null`. Ordinary data mismatches do not cause filter evaluation
+  errors. Arithmetic on mismatched kinds returns `Null`.
+- A failure of a required zone, calendar resolution or presentation produces
+  a typed query/render error. This also applies during lazy row
+  materialization. Do not turn such failures into nonmatches or blank cells.
+- Advisory stderr notices do not change successful stdout or exit codes.
+  These notices are the parse-time `NaN` warning, a count of rows excluded by
+  bracket mismatch, and a build-time warning for an invalid date-shaped
+  quoted literal. For example, `"2025-02-30"` still runs as a string.
+  A bare invalid date literal remains a syntax error.
+- Ticket 31 owns the diagnostic and error mechanism.
 
 **Invariant owners:** parse-time classification (note parser, one precedence
 order, ticket 18); numeric identity (the value's constructors); the three
