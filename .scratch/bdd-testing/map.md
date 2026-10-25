@@ -86,6 +86,15 @@ session could start slice 1 with zero open design questions.
   lint. A `build.rs` for new feature files costs a package rebuild (ticket 10
   decides). You can fold scenarios into the existing integration and e2e
   binaries (ticket 08 decides).
+- [07: Boundary tiering, b versus c](issues/07-boundary-tiering.md): option (b)
+  won, sharpened to "spawned process by default; facade only if already
+  baselined and a spawn cannot express it". Six-part rule (observable behavior,
+  named channels, intent plus code agreement, no gate or proptest owner,
+  hermetic, refactor-stable). Internal seams: promote, else mutation-verified
+  unit test (`mise run test:mutants`), else retire; `test-utils` wrapping
+  forbidden by default. Gate: zero delta to the three baselines. Planned
+  workspace (core/cli/lsp/mcp): each new shipped entry point is a new boundary
+  that reopens the rule. Evidence: [research/07](research/07-prior-art.md).
 
 ## Not yet specified
 
