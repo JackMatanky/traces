@@ -12,7 +12,7 @@
 
 ## Conventions (apply to every task)
 
-- **Order is load-bearing.** Execute tasks 1→16 exactly. Later tasks cite line numbers produced by earlier ones; `Task 6` deletes ~140 lines from `engine/date.rs` and `Task 10` rewrites `datetime.rs` regions, so **re-verify every line anchor by symbol name (grep) before editing**.
+- **Order is load-bearing.** Execute tasks 1→17 exactly. Later tasks cite line numbers produced by earlier ones; `Task 6` deletes ~140 lines from `engine/date.rs` and `Task 10` rewrites `datetime.rs` regions, so **re-verify every line anchor by symbol name (grep) before editing**.
 - **Line numbers** below were captured on 2026-10-23 against a clean tree (only `.scratch/arch-design/**` is dirty; do **not** touch those three paths).
 - **TDD:** write the failing test first, watch it fail, implement, watch it pass. Where a refactor is behavior-equivalent by construction, the plan says so and marks the pin (a new test or the existing tests that move with the code, green before and after) instead of a fake red (the note under the test says which it is).
 - **Gates:** end every task with `mise run verify` (runs `fmt`, then `check` + `lint --no-fix` + `test` in parallel; `check` includes `check:visibility`, which diffs both API baselines and the pub-token snapshot).
@@ -37,9 +37,9 @@
 | 3 | O2 | `UnitError` + `TimeUnit::parse_spelling` + hint↔registry sync test | +2, 1 line rewrite (mod.rs) |
 | 4 | O5 | `DateTimeValue::now()` / `DateValue::today()`, lazy-zone collapse | +3 |
 | 5 | O6 | `DatePoint::snap` replaces `start_of`/`end_of` (engine + query + tests) | −1 |
-| 6 | P1 | Pattern translator extracted to `src/temporal/pattern.rs` (+ spec/review amendments) | +3 |
+| 6 | P1 | Pattern translator extracted to `src/temporal/token.rs` (+ spec/review amendments) | +3 |
 | 7 | X4 | Run-based moment-token matching (`match_moment_run`) + exhaustive matrix | none |
-| 8 | X5 | Bracket-aware `%` detection, dead-branch delete, docs move here | none |
+| 8 | X5 | Bracket-aware `%` detection, dead-branch delete, docs move here | +1 |
 | 9 | H2 | `DateNamespace` → `DateOps`, stateless `register(env)` (Debug kept) | 2 lines rewrite |
 | 10 | X1a | `src/temporal/fmt.rs` canonical encoder; Display/Serialize rewrite; proptests | +2 |
 | 11 | X1b+X6 | Canonical shortcut in `format_strtime`, zoned-first reorder (Apia test) | none |
@@ -48,15 +48,16 @@
 | 14 | O4 | **Gated:** `DatePoint::format_in` + `DateError::InvalidFormat` (probe decides) | +1, public-api regen (Branch A only) |
 | 15 | H1 | `src/template/engine/duration.rs` + `DurationOps` + `engine.rs` doc truth | +2 |
 | 16 | D | Doc-only fixes (X3, X7a-d, D5, GLOSSARY "seven", H5 nits, X1c) | none |
+| 17 | F1 | Query unit rejections quote the `UnitError` hint (dynamic `expected`) | none |
 
-**Accepted behavior changes** (each is pinned by a test in its task): case-insensitive `date.*` keys (superset) · template zone/range messages adopt temporal `Display` wording (Task 13) · `[%Y]` renders literal `%Y` and unclosed `[…%` errors (Task 8) · runs longer than any real token now error instead of silently composing (Task 7) · negative years render round-trippably from `Display`/`Serialize` (Task 10) · miette gains a `Caused by:` line for range errors (Task 13).
+**Accepted behavior changes** (each is pinned by a test in its task): case-insensitive `date.*` keys (superset) · template zone/range messages adopt temporal `Display` wording (Task 13) · `[%Y]` renders literal `%Y` and unclosed `[…%` errors (Task 8) · runs longer than any real token now error instead of silently composing (Task 7) · negative years render round-trippably from `Display`/`Serialize` (Task 10) · miette gains a `Caused by:` line for range errors (Task 13) · query `date_add`/`date_diff` unit rejections quote the full unit hint instead of the static phrase (Task 17).
 
 ## File map
 
-- Modify: `src/template/engine/date.rs` (tasks 1-9, 11-16), `src/template/engine.rs` (9, 15), `src/temporal/{date,datetime,point,unit,error,mod,duration}.rs`, `src/temporal/GLOSSARY.md` (16), `src/query/grammar/filter.rs` (5), `src/lib.rs` (3)
-- Create: `src/temporal/pattern.rs` (6), `src/temporal/fmt.rs` (10), `src/template/engine/duration.rs` (15)
+- Modify: `src/template/engine/date.rs` (tasks 1-9, 11-16), `src/template/engine.rs` (9, 15), `src/temporal/{date,datetime,point,unit,error,mod,duration}.rs`, `src/temporal/GLOSSARY.md` (16), `src/delimiter.rs` (8), `src/lexer.rs` (17), `src/query/grammar/filter.rs` (5, 17), `src/query/error.rs` (17), `src/lib.rs` (3)
+- Create: `src/temporal/token.rs` (6), `src/temporal/fmt.rs` (10), `src/template/engine/duration.rs` (15)
 - Docs: `.scratch/temporal-core/{spec.md,review.md,divergence-register.md}`, `.scratch/temporal-core/issues/05-query-temporal-functions.md`
-- Baselines: `tests/baselines/pub-tokens.txt` (+1, +2, +3, −1, +3, +2, +1, +2), `tests/baselines/public-api-default.txt` (14 only), `tests/baselines/public-api-test-utils.txt` (14 only)
+- Baselines: `tests/baselines/pub-tokens.txt` (+1, +2, +3, −1, +3, +1, +2, +1, +2), `tests/baselines/public-api-default.txt` (14 only), `tests/baselines/public-api-test-utils.txt` (14 only)
 
 ---
 
@@ -522,7 +523,7 @@
 - Test: `src/temporal/unit.rs:499` (new `mod spelling_errors` between `mod lookup` and `mod accessors`), `src/template/engine/date.rs:2244` (message-shape pin inside `date_add_rejects_unknown_unit`)
 - Baseline: regen `tests/baselines/pub-tokens.txt`, expected delta `+2` added lines plus the one `mod.rs` line rewrite (the table's "+2, 1 line rewrite"); `public-api-default.txt` and `public-api-test-utils.txt` stay byte-identical
 
-**Context:** Rejecting a bad `unit="..."` kwarg is split over three places: `TimeUnit::from_spelling` (unit.rs:87-97) returns a bare `Option`; `unit_kwarg` (engine/date.rs:411-416) converts `None` through the date.rs-local `unknown_unit_error` (:1116-1129); and the message text comes from `UNIT_SPELLINGS_HINT` (unit.rs:357-363), re-exported through `temporal/mod.rs:54` and `lib.rs:172` solely so that one helper can reach it. O2 gives the rejection a type: `TimeUnit::parse_spelling(unit) -> Result<Self, UnitError>`; the thiserror format string reproduces the old `format!` byte for byte (`Box<str>` debug-prints exactly like the old `&str`); and `unit_kwarg` maps it with `invalid_operation(error.to_string(), error)` (engine/error.rs:48-56), which keeps the message verbatim and chains the cause. minijinja's `Display` prints only `"{kind}: {detail}"` (minijinja error.rs:183), never the source chain, so the user-visible string stays `invalid operation: unknown unit "..." (expected ...)`. The existing kind-only tests (`rejects_an_unknown_unit_instead_of_panicking` :2084, `date_add_rejects_unknown_unit` :2236) stay green; Step 5 adds a shape pin so Step 6 cannot silently rewrap the message. `filter.rs:322/669/685` keeps calling `from_spelling` (X4 rewires it later); `DurationError::UnknownUnit` (error.rs:119), the duration parser's hint-less sibling message, is untouched. Visibility: `UnitError` is declared `pub` inside the private `mod error` (mod.rs:36) and is not re-exported, so both public-api baselines stay byte-identical (`unnameable-types` and `unreachable-pub` are allow-by-default; `clippy::redundant_pub_crate` is nursery and not enabled here). GLOSSARY: **no edit**; the `UNIT_SPELLINGS_HINT`/`TEMPORAL_UNITS` sync contract at `src/GLOSSARY.md:49` stays true and is now machine-enforced by `unit_spellings_hint_matches_the_registry`.
+**Context:** Rejecting a bad `unit="..."` kwarg is split over three places: `TimeUnit::from_spelling` (unit.rs:87-97) returns a bare `Option`; `unit_kwarg` (engine/date.rs:411-416) converts `None` through the date.rs-local `unknown_unit_error` (:1116-1129); and the message text comes from `UNIT_SPELLINGS_HINT` (unit.rs:357-363), re-exported through `temporal/mod.rs:54` and `lib.rs:172` solely so that one helper can reach it. O2 gives the rejection a type: `TimeUnit::parse_spelling(unit) -> Result<Self, UnitError>`; the thiserror format string reproduces the old `format!` byte for byte (`Box<str>` debug-prints exactly like the old `&str`); and `unit_kwarg` maps it with `invalid_operation(error.to_string(), error)` (engine/error.rs:48-56), which keeps the message verbatim and chains the cause. minijinja's `Display` prints only `"{kind}: {detail}"` (minijinja error.rs:183), never the source chain, so the user-visible string stays `invalid operation: unknown unit "..." (expected ...)`. The existing kind-only tests (`rejects_an_unknown_unit_instead_of_panicking` :2084, `date_add_rejects_unknown_unit` :2236) stay green; Step 5 adds a shape pin so Step 6 cannot silently rewrap the message. `filter.rs:322/669/685` keeps calling `from_spelling` (query adoption of `parse_spelling` lands in Task 17; the evaluator sites stay on `from_spelling` by design); `DurationError::UnknownUnit` (error.rs:119), the duration parser's hint-less sibling message, is untouched. Visibility: `UnitError` is declared `pub` inside the private `mod error` (mod.rs:36) and is not re-exported, so both public-api baselines stay byte-identical (`unnameable-types` and `unreachable-pub` are allow-by-default; `clippy::redundant_pub_crate` is nursery and not enabled here). GLOSSARY: **no edit**; the `UNIT_SPELLINGS_HINT`/`TEMPORAL_UNITS` sync contract at `src/GLOSSARY.md:49` stays true and is now machine-enforced by `unit_spellings_hint_matches_the_registry`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1460,20 +1461,21 @@
 
 ---
 
-### Task 6 (P1): Move the moment-dialect translator to `temporal::pattern`
+### Task 6 (P1): Move the moment-dialect translator to `temporal::token`
 
 **Files:**
-- Create: `src/temporal/pattern.rs` (~155 lines: module doc, `MOMENT_TOKENS`, `ordinal_suffix`, `moment_to_strftime`, `pattern_to_strftime`, `PatternError`)
+- Create: `src/temporal/token.rs` (~150 lines: module doc, `MOMENT_TOKENS`, `ordinal_suffix`, `moment_to_strftime`, `pattern_to_strftime`)
+- Modify: `src/temporal/error.rs` (declare `TemporalTokenError` between `UnitError` and the tests mod, plus `use std::fmt;`)
 - Modify: `src/template/engine/date.rs` (delete `MOMENT_TOKENS` :498-520, `ordinal_suffix` :522-534, `moment_to_strftime` :536-623; replace `pattern_to_strftime` :482-496 with a thin wrapper; ~130 lines removed)
-- Modify: `src/temporal/mod.rs` (+2 lines: `mod pattern;`, `pub(crate) use pattern::pattern_to_strftime;`)
+- Modify: `src/temporal/mod.rs` (+2 lines: `mod token;`, `pub(crate) use token::pattern_to_strftime;`)
 - Modify: `.scratch/temporal-core/spec.md:105`, `.scratch/temporal-core/review.md:113`, `.scratch/temporal-core/review.md:449` (design-doc sync)
 - Baseline: `tests/baselines/pub-tokens.txt` (+3)
 
-**Context:** `engine/date.rs:482-623` holds a self-contained moment-dialect tokenizer: `pattern_to_strftime` (the `%`-contains dialect dispatch), `MOMENT_TOKENS` (a 21-entry table), `ordinal_suffix` (the `Do` ordinal, calendar knowledge), and `moment_to_strftime` (the ~90-line tokenizer). It is a pure `(&str, jiff::civil::DateTime) -> String` translation whose only minijinja contact is constructing `minijinja::Error` directly at its two failure sites (`engine/date.rs:558-565` unclosed bracket, `:598-606` unsupported token): a layering violation, since a template-library error is built inside what is otherwise date-domain logic. Task 6 moves the tokenizer into a new `temporal::pattern` module and gives it a temporal-native `PatternError`; the engine keeps a same-named thin wrapper that maps `PatternError` to the existing `minijinja::Error` message, so every engine call site (`:256`, `:476`, `:936`, `:1669`) and every test compiles unchanged and stays **green before and after**: the wrapper preserves the exact interface (`TemplateEngineResult<String>`), error kind (`InvalidOperation`), and message text that `rejects_unsupported_moment_token_with_token_and_dialect_name` (:1634) and `rejects_unclosed_bracket_literal_in_moment_dialect` (:1649) pin through the template seam. The `%`-contains dispatch moves with the tokenizer: it is the translator's own front door, and the engine wrapper delegates it wholesale. `Error`/`ErrorKind` imports stay in the engine (63 uses remain outside :482-623, in `render_date_error`/`render_calendar_error` and the other filters), so no import line changes there. Design-doc sync: the audit's Section C recorded this translator as "template-seam only" in three artifacts; moving it falsifies that, so `spec.md:105` (the formatting-seam decision), `review.md:113` (D-b "template seam only"), and `review.md:449` (D8's translator-error note) are amended in the same change; the remaining stale "template seam"/`format_with` mentions in `issues/06` and `spec.md:104`'s chrono-era `DelayedFormat` wording are left to the final doc-consistency pass (task D) since Task 6 does not touch `format_strtime`. Visibility: +3 pub tokens (two new `pub(crate)` items in `pattern.rs`, one re-export in `mod.rs`); both `cargo public-api` baselines stay byte-identical because every new item is `pub(crate)`. GLOSSARY: **no edit**; `PatternError`/`pattern_to_strftime` are internal implementation names, not domain vocabulary. The full moment-token matrix required by `spec.md:127` (Seam 3, "moment-token rendering (incl. the token-naming error)") and issue-06's AC ("the supported moment token set ... pinned by tests") is deferred to X4 (Task 7), which restructures this tokenizer's matching and is the natural home for it; `spec.md:136` is an out-of-scope line, not a test promise.
+**Context:** `engine/date.rs:482-623` holds a self-contained moment-dialect tokenizer: `pattern_to_strftime` (the `%`-contains dialect dispatch), `MOMENT_TOKENS` (a 21-entry table), `ordinal_suffix` (the `Do` ordinal, calendar knowledge), and `moment_to_strftime` (the ~90-line tokenizer). It is a pure `(&str, jiff::civil::DateTime) -> String` translation whose only minijinja contact is constructing `minijinja::Error` directly at its two failure sites (`engine/date.rs:558-565` unclosed bracket, `:598-606` unsupported token): a layering violation, since a template-library error is built inside what is otherwise date-domain logic. Task 6 moves the tokenizer into a new `temporal::token` module and declares a temporal-native `TemporalTokenError` in `error.rs` (error types live in error.rs); the engine keeps a same-named thin wrapper that maps `TemporalTokenError` to the existing `minijinja::Error` message, so every engine call site (`:256`, `:476`, `:936`, `:1669`) and every test compiles unchanged and stays **green before and after**: the wrapper preserves the exact interface (`TemplateEngineResult<String>`), error kind (`InvalidOperation`), and message text that `rejects_unsupported_moment_token_with_token_and_dialect_name` (:1634) and `rejects_unclosed_bracket_literal_in_moment_dialect` (:1649) pin through the template seam. The `%`-contains dispatch moves with the tokenizer: it is the translator's own front door, and the engine wrapper delegates it wholesale. `Error`/`ErrorKind` imports stay in the engine (63 uses remain outside :482-623, in `render_date_error`/`render_calendar_error` and the other filters), so no import line changes there. Design-doc sync: the audit's Section C recorded this translator as "template-seam only" in three artifacts; moving it falsifies that, so `spec.md:105` (the formatting-seam decision), `review.md:113` (D-b "template seam only"), and `review.md:449` (D8's translator-error note) are amended in the same change; the remaining stale "template seam"/`format_with` mentions in `issues/06` and `spec.md:104`'s chrono-era `DelayedFormat` wording are left to the final doc-consistency pass (task D) since Task 6 does not touch `format_strtime`. Visibility: +3 pub tokens (`pattern_to_strftime` in `token.rs`, `TemporalTokenError` in `error.rs`, one re-export in `mod.rs`); both `cargo public-api` baselines stay byte-identical: the `token.rs` item and the re-export are `pub(crate)`, and `TemporalTokenError` is `pub` inside the private `mod error`, unreachable from outside just like `UnitError`. GLOSSARY: **no edit**; `TemporalTokenError`/`pattern_to_strftime` are internal implementation names, not domain vocabulary. The full moment-token matrix required by `spec.md:127` (Seam 3, "moment-token rendering (incl. the token-naming error)") and issue-06's AC ("the supported moment token set ... pinned by tests") is deferred to X4 (Task 7), which restructures this tokenizer's matching and is the natural home for it; `spec.md:136` is an out-of-scope line, not a test promise.
 
-- [ ] **Step 1: Create `src/temporal/pattern.rs`**
+- [ ] **Step 1: Create `src/temporal/token.rs`**
 
-  Create the file with a module doc, the token table, the error type, and the two moved functions. `MOMENT_TOKENS`, `ordinal_suffix`, and the `moment_to_strftime` body move **verbatim** from `engine/date.rs:498-623`. The only edits inside `moment_to_strftime` are its two `Err(...)` sites (the `minijinja::Error` constructions become `PatternError` values) and its return type. Full content:
+  Create the file with a module doc, the token table, and the two moved functions. `MOMENT_TOKENS`, `ordinal_suffix`, and the `moment_to_strftime` body move **verbatim** from `engine/date.rs:498-623`. The only edits inside `moment_to_strftime` are its two `Err(...)` sites (the `minijinja::Error` constructions become `TemporalTokenError` values) and its return type. Full content:
 
   ```rust
   //! Translates moment-dialect date patterns to strftime patterns.
@@ -1481,11 +1483,12 @@
   //! The moment dialect is the template-facing token language (`YYYY-MM-DD`,
   //! `Do MMMM YYYY`, `[Daily]`) that the `date_format` filter accepts. This
   //! module owns the tokenizer that converts it to a strftime pattern jiff can
-  //! render, plus the [`PatternError`] type for patterns it cannot translate.
-  //! The engine's `pattern_to_strftime` wrapper performs the `%`-contains
-  //! dialect dispatch and maps [`PatternError`] to a template render error.
+  //! render; patterns it cannot translate fail with [`TemporalTokenError`]
+  //! (declared in `error.rs`). The engine's `pattern_to_strftime` wrapper
+  //! performs the `%`-contains dialect dispatch and maps the error to a
+  //! template render error.
 
-  use std::fmt;
+  use super::error::TemporalTokenError;
 
   /// The moment-dialect to strftime token table (scope 1).
   const MOMENT_TOKENS: &[(&str, &str)] = &[
@@ -1512,43 +1515,6 @@
       ("S", "%1f"),
   ];
 
-  /// An error translating a moment-dialect pattern to strftime.
-  #[derive(Debug, Clone, PartialEq, Eq)]
-  pub(crate) enum PatternError {
-      /// A bracket literal (`[...]`) was opened but never closed.
-      UnclosedBracket {
-          /// The pattern containing the unclosed bracket.
-          pattern: String,
-      },
-      /// A token has no moment-dialect to strftime mapping.
-      UnsupportedToken {
-          /// The offending token.
-          token: String,
-          /// The pattern containing the token.
-          pattern: String,
-      },
-  }
-
-  impl fmt::Display for PatternError {
-      fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-          match self {
-              Self::UnclosedBracket { pattern } => write!(
-                  f,
-                  "unclosed bracket literal in moment-dialect pattern `{pattern}`"
-              ),
-              Self::UnsupportedToken { token, pattern } => write!(
-                  f,
-                  "unsupported moment-dialect token `{token}` in pattern \
-                   `{pattern}`; supported tokens are YYYY, YY, MMMM, MMM, MM, M, \
-                   dddd, ddd, Do, DD, D, HH, H, hh, h, mm, m, ss, s, SSS, SS, S, \
-                   and [bracketed literals]"
-              ),
-          }
-      }
-  }
-
-  impl std::error::Error for PatternError {}
-
   /// Translates `pattern` to a strftime pattern.
   ///
   /// If `pattern` contains `%`, it is treated as a strftime pattern and passed
@@ -1558,13 +1524,13 @@
   ///
   /// # Errors
   ///
-  /// Returns [`PatternError::UnclosedBracket`] for an unterminated `[...]`
-  /// literal and [`PatternError::UnsupportedToken`] for a moment token with no
+  /// Returns [`TemporalTokenError::UnclosedBracket`] for an unterminated `[...]`
+  /// literal and [`TemporalTokenError::UnsupportedToken`] for a moment token with no
   /// strftime equivalent.
   pub(crate) fn pattern_to_strftime(
       pattern: &str,
       datetime: jiff::civil::DateTime,
-  ) -> Result<String, PatternError> {
+  ) -> Result<String, TemporalTokenError> {
       if pattern.contains('%') {
           return Ok(pattern.to_owned());
       }
@@ -1589,7 +1555,7 @@
   fn moment_to_strftime(
       pattern: &str,
       datetime: jiff::civil::DateTime,
-  ) -> Result<String, PatternError> {
+  ) -> Result<String, TemporalTokenError> {
       use std::fmt::Write as _;
 
       let mut result = String::with_capacity(pattern.len().saturating_mul(2));
@@ -1608,7 +1574,7 @@
                   i = i.saturating_add(1);
               }
               if bytes.get(i) != Some(&b']') {
-                  return Err(PatternError::UnclosedBracket {
+                  return Err(TemporalTokenError::UnclosedBracket {
                       pattern: pattern.to_owned(),
                   });
               }
@@ -1643,7 +1609,7 @@
                       i = i.saturating_add(1);
                   }
                   let token = pattern.get(start..i).unwrap_or_default();
-                  return Err(PatternError::UnsupportedToken {
+                  return Err(TemporalTokenError::UnsupportedToken {
                       token: token.to_owned(),
                       pattern: pattern.to_owned(),
                   });
@@ -1666,27 +1632,68 @@
   }
   ```
 
-  Notes: the two `Display` arms reproduce the engine's current messages **byte-for-byte**. The `\` continuations reflow the same joined strings the `format!` calls at engine `:561-564`/`:600-605` produce. The template-seam tests that assert on message substrings keep passing. `PatternError` carries `pattern: String` (and `token: String`) so `Display` can render the full context the messages include. Both fields are `Send + Sync`, satisfying `invalid_operation`'s source bound. The `use std::fmt::Write as _;` stays function-local inside `moment_to_strftime` as it is today.
+  Then declare the error type in `src/temporal/error.rs`. Add `use std::fmt;` after the module doc, and insert the enum between the `UnitError` enum (Task 3's addition) and the tests mod:
+
+  ```rust
+  /// An error translating a moment-dialect pattern to strftime.
+  #[derive(Debug, Clone, PartialEq, Eq)]
+  pub enum TemporalTokenError {
+      /// A bracket literal (`[...]`) was opened but never closed.
+      UnclosedBracket {
+          /// The pattern containing the unclosed bracket.
+          pattern: String,
+      },
+      /// A token has no moment-dialect to strftime mapping.
+      UnsupportedToken {
+          /// The offending token.
+          token: String,
+          /// The pattern containing the token.
+          pattern: String,
+      },
+  }
+
+  impl fmt::Display for TemporalTokenError {
+      fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+          match self {
+              Self::UnclosedBracket { pattern } => write!(
+                  f,
+                  "unclosed bracket literal in moment-dialect pattern `{pattern}`"
+              ),
+              Self::UnsupportedToken { token, pattern } => write!(
+                  f,
+                  "unsupported moment-dialect token `{token}` in pattern \
+                   `{pattern}`; supported tokens are YYYY, YY, MMMM, MMM, MM, M, \
+                   dddd, ddd, Do, DD, D, HH, H, hh, h, mm, m, ss, s, SSS, SS, S, \
+                   and [bracketed literals]"
+              ),
+          }
+      }
+  }
+
+  impl std::error::Error for TemporalTokenError {}
+  ```
+
+  Notes: the two `Display` arms reproduce the engine's current messages **byte-for-byte**. The `\` continuations reflow the same joined strings the `format!` calls at engine `:561-564`/`:600-605` produce. The template-seam tests that assert on message substrings keep passing. `TemporalTokenError` carries `pattern: String` (and `token: String`) so `Display` can render the full context the messages include. Both fields are `Send + Sync`, satisfying `invalid_operation`'s source bound. The `use std::fmt::Write as _;` stays function-local inside `moment_to_strftime` as it is today.
 
 - [ ] **Step 2: Register the module in `src/temporal/mod.rs`**
 
-  Two additions. First, add `mod pattern;` to the module declarations, alphabetically between `lexer` and `point`:
+  Two additions. First, add `mod token;` to the module declarations, alphabetically between `point` and `unit` (rustfmt also sorts these):
 
   ```rust
-  mod lexer;
-  mod pattern;
   mod point;
+  mod token;
+  mod unit;
   ```
 
-  Second, add the re-export to the `pub(crate) use` block, alphabetically between the `error` and `point` re-exports:
+  Second, add the re-export to the `pub(crate) use` block, alphabetically between the `point` and `unit` re-exports:
 
   ```rust
-  pub use error::{DateError, DurationError};
-  pub(crate) use pattern::pattern_to_strftime;
   pub(crate) use point::{DateDiff, DatePoint};
+  pub(crate) use token::pattern_to_strftime;
+  pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
   ```
 
-  Note: `mod pattern;` is private (the sibling module). `pub(crate) use pattern::pattern_to_strftime;` exposes the re-exported name at `crate::temporal::pattern_to_strftime` with `pub(crate)` visibility. That is the name the engine wrapper calls. `PatternError` is deliberately **not** re-exported: the engine maps it with type inference (`|source| invalid_operation(source.to_string(), source)`) and never names the type.
+  Note: `mod token;` is private (the sibling module). `pub(crate) use token::pattern_to_strftime;` exposes the re-exported name at `crate::temporal::pattern_to_strftime` with `pub(crate)` visibility. That is the name the engine wrapper calls. `TemporalTokenError` is deliberately **not** re-exported: the engine maps it with type inference (`|source| invalid_operation(source.to_string(), source)`) and never names the type.
 
 - [ ] **Step 3: Replace the engine's `pattern_to_strftime` with the thin wrapper**
 
@@ -1743,19 +1750,19 @@
   with:
 
   ```
-  - Moment→strftime translator lives in `temporal::pattern` (`src/temporal/pattern.rs`), scope 1: bracket literals, `YYYY MM DD HH mm ss` family, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`; everything else errors naming the token and dialect via `PatternError`. The engine keeps a thin `pattern_to_strftime` wrapper that delegates the `%`-contains dispatch to the translator and maps `PatternError` to a template render error. **(Amended by temporal-offload Task 6:** the translator moved from the template seam to `temporal::pattern`; the "template-seam only" claim is retired.**)**
+  - Moment→strftime translator lives in `temporal::token` (`src/temporal/token.rs`), scope 1: bracket literals, `YYYY MM DD HH mm ss` family, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`; everything else errors naming the token and dialect via `TemporalTokenError`. The engine keeps a thin `pattern_to_strftime` wrapper that delegates the `%`-contains dispatch to the translator and maps `TemporalTokenError` to a template render error. **(Amended by temporal-offload Task 6:** the translator moved from the template seam to `temporal::token`; the "template-seam only" claim is retired.**)**
   ```
 
   2. `.scratch/temporal-core/review.md:113`: the D-b decision line, located by its unique tail `is now true by deletion.)*`, gets this note appended on the line after it:
 
   ```
-  - *(2026-10-24, temporal-offload Task 6: the translator moved to `temporal::pattern`; the engine retains only a `pattern_to_strftime` wrapper that delegates dialect dispatch and maps `PatternError`. The "template seam only" location claim above is retired; the error-message and scope decisions stand.)*
+  - *(2026-10-24, temporal-offload Task 6: the translator moved to `temporal::token`; the engine retains only a `pattern_to_strftime` wrapper that delegates dialect dispatch and maps `TemporalTokenError`. The "template seam only" location claim above is retired; the error-message and scope decisions stand.)*
   ```
 
   3. `.scratch/temporal-core/review.md:449`: the D8 `**Observed:**` paragraph, append a sync note at its end (after "06's edge is 04 only."):
 
   ```
-   (2026-10-24, temporal-offload Task 6: the translator now lives in `temporal::pattern` and returns `PatternError`; the engine wrapper still maps it to a template-render error, so the "not a `DateError`" decision holds.)
+   (2026-10-24, temporal-offload Task 6: the translator now lives in `temporal::token` and returns `TemporalTokenError`; the engine wrapper still maps it to a template-render error, so the "not a `DateError`" decision holds.)
   ```
 
   Note: `spec.md:104`'s stale `format_with`/`DelayedFormat` wording and the remaining "template seam" mentions in `issues/06-template-format-dialects.md` are **not** touched here. Task 6 does not change `format_strtime` (the strftime renderer named there). Those references are swept by the final doc-consistency task (D).
@@ -1781,12 +1788,12 @@
   Expected: the diff adds exactly three lines:
 
   ```
-  src/temporal/mod.rs: pub(crate) use pattern::pattern_to_strftime;
-  src/temporal/pattern.rs: pub(crate) enum PatternError {
-  src/temporal/pattern.rs: pub(crate) fn pattern_to_strftime(
+  src/temporal/mod.rs: pub(crate) use token::pattern_to_strftime;
+  src/temporal/error.rs: pub enum TemporalTokenError {
+  src/temporal/token.rs: pub(crate) fn pattern_to_strftime(
   ```
 
-  and nothing else changes (`mod pattern;` is not a `pub` line, so it does not appear). Both `cargo public-api` baselines stay byte-identical: every new item is `pub(crate)`, outside the public surface.
+  and nothing else changes (`mod token;` is not a `pub` line, so it does not appear). Both `cargo public-api` baselines stay byte-identical: the `token.rs` item and the re-export are `pub(crate)`, and the `error.rs` enum is `pub` inside the private `mod error`, unreachable from outside the crate just like `UnitError`.
 
 - [ ] **Step 7: Run the full gate**
 
@@ -1796,8 +1803,8 @@
 - [ ] **Step 8: Commit**
 
   ```
-  git add src/temporal/pattern.rs src/temporal/mod.rs src/template/engine/date.rs tests/baselines/pub-tokens.txt .scratch/temporal-core/spec.md .scratch/temporal-core/review.md
-  git commit -m "refactor(temporal): move moment-dialect translator to temporal::pattern"
+  git add src/temporal/token.rs src/temporal/error.rs src/temporal/mod.rs src/template/engine/date.rs tests/baselines/pub-tokens.txt .scratch/temporal-core/spec.md .scratch/temporal-core/review.md
+  git commit -m "refactor(temporal): move moment-dialect translator to temporal::token"
   ```
 
 ---
@@ -1805,11 +1812,11 @@
 ### Task 7 (X4): Match moment tokens by the full letter-run
 
 **Files:**
-- Modify: `src/temporal/pattern.rs` (add `match_moment_run`; rewrite the alphabetic branch of `moment_to_strftime`)
+- Modify: `src/temporal/token.rs` (add `match_moment_run`; rewrite the alphabetic branch of `moment_to_strftime`)
 - Tests only: `src/template/engine/date.rs`
 - No baseline, doc, or GLOSSARY changes: `match_moment_run` is private, so the pub-token snapshot stays identical.
 
-**Context:** `moment_to_strftime` still matches tokens with a greedy prefix scan: at an alphabetic position it takes the remaining tail of the pattern and consumes the first `MOMENT_TOKENS` entry that prefixes it. A longer run of one letter therefore decomposes into adjacent shorter tokens instead of failing. Walking the current loop confirms ten silent compositions: `DDD` → `"%d%-d"` (renders `"2929"` for July 29), `DDDD` → `"%d%d"`, `MMMMM` → `"%B%-m"`, `HHH` → `"%H%-H"`, `hhh` → `"%I%-I"`, `mmm` → `"%M%-M"`, `sss` → `"%S%-S"`, `SSSS` → `"%3f%1f"`, `Y×6` → `"%Y%y"`, `Y×8` → `"%Y%Y"`; other lengths decompose too (`hhhh`, `mmmm`, `ssss`, `DDDDDD`, `MMMMMM`). None of these reach the unsupported-token error, which violates the recorded "never silently mistranslate" rule (`issues/06-template-format-dialects.md`). The fix keeps the `Do` special-case first (load-bearing: checked against `Dooo`, `DDo`, `MMDo`, `do`), then consumes the maximal run of the repeated byte and looks the whole run up with a new private `match_moment_run(ch, run_len)` helper that does exact equality against the table; an unknown run returns `PatternError::UnsupportedToken` naming the full run. The rule is total: every table entry except `Do` is a single-character repeat, so the token-bearing letters are exactly `{Y, M, d, D, H, h, m, s, S}` and any run either equals an entry or errors. Error contract: the `Display` token list stays untouched (the `Q` test stays byte-identical), `dd`/`d`/`yyy`/`do` report the same token name before and after, and only partial-consumption leftovers change name (`YYY` now names `YYY` where it named `Y`; `ddddd` now names `ddddd` where it named `d`); both deltas are pinned red-first below. Tests stay on the template seam next to `formats_moment_tokens`, as Seam 3 requires (`spec.md:127`); the matrix satisfies issue-06's AC "the supported moment token set ... pinned by tests". Task 8 (X5) rewrites the adjacent `%`-dispatch code in this same function; the task order keeps them serial.
+**Context:** `moment_to_strftime` still matches tokens with a greedy prefix scan: at an alphabetic position it takes the remaining tail of the pattern and consumes the first `MOMENT_TOKENS` entry that prefixes it. A longer run of one letter therefore decomposes into adjacent shorter tokens instead of failing. Walking the current loop confirms ten silent compositions: `DDD` → `"%d%-d"` (renders `"2929"` for July 29), `DDDD` → `"%d%d"`, `MMMMM` → `"%B%-m"`, `HHH` → `"%H%-H"`, `hhh` → `"%I%-I"`, `mmm` → `"%M%-M"`, `sss` → `"%S%-S"`, `SSSS` → `"%3f%1f"`, `Y×6` → `"%Y%y"`, `Y×8` → `"%Y%Y"`; other lengths decompose too (`hhhh`, `mmmm`, `ssss`, `DDDDDD`, `MMMMMM`). None of these reach the unsupported-token error, which violates the recorded "never silently mistranslate" rule (`issues/06-template-format-dialects.md`). The fix keeps the `Do` special-case first (load-bearing: checked against `Dooo`, `DDo`, `MMDo`, `do`), then consumes the maximal run of the repeated byte and looks the whole run up with a new private `match_moment_run(ch, run_len)` helper that does exact equality against the table; an unknown run returns `TemporalTokenError::UnsupportedToken` naming the full run. The rule is total: every table entry except `Do` is a single-character repeat, so the token-bearing letters are exactly `{Y, M, d, D, H, h, m, s, S}` and any run either equals an entry or errors. Error contract: the `Display` token list stays untouched (the `Q` test stays byte-identical), `dd`/`d`/`yyy`/`do` report the same token name before and after, and only partial-consumption leftovers change name (`YYY` now names `YYY` where it named `Y`; `ddddd` now names `ddddd` where it named `d`); both deltas are pinned red-first below. Tests stay on the template seam next to `formats_moment_tokens`, as Seam 3 requires (`spec.md:127`); the matrix satisfies issue-06's AC "the supported moment token set ... pinned by tests". Task 8 (X5) rewrites the adjacent `%`-dispatch code in this same function; the task order keeps them serial.
 
 - [ ] **Step 1: Add the full-table matrix test**
 
@@ -1915,7 +1922,7 @@
 
 - [ ] **Step 3: Rewrite the alphabetic branch and add the lookup helper**
 
-  In `src/temporal/pattern.rs`, leave the bracket branch and the `Do` branch above it unchanged. The `Do` check must stay first: it consumes `Do` before run consumption can see the `D`. Replace the whole `else if current_byte.is_ascii_alphabetic()` branch:
+  In `src/temporal/token.rs`, leave the bracket branch and the `Do` branch above it unchanged. The `Do` check must stay first: it consumes `Do` before run consumption can see the `D`. Replace the whole `else if current_byte.is_ascii_alphabetic()` branch:
 
   ```rust
           } else if current_byte.is_ascii_alphabetic() {
@@ -1936,7 +1943,7 @@
                       i = i.saturating_add(1);
                   }
                   let token = pattern.get(start..i).unwrap_or_default();
-                  return Err(PatternError::UnsupportedToken {
+                  return Err(TemporalTokenError::UnsupportedToken {
                       token: token.to_owned(),
                       pattern: pattern.to_owned(),
                   });
@@ -1958,7 +1965,7 @@
                   Some(spec) => result.push_str(spec),
                   None => {
                       let token = pattern.get(start..i).unwrap_or_default();
-                      return Err(PatternError::UnsupportedToken {
+                      return Err(TemporalTokenError::UnsupportedToken {
                           token: token.to_owned(),
                           pattern: pattern.to_owned(),
                       });
@@ -1983,7 +1990,7 @@
   }
   ```
 
-  Keep `match_moment_run` private. No other function changes. The bracket branch, the `Do` branch, the non-alphabetic fallback, `pattern_to_strftime`'s `%` dispatch, `ordinal_suffix`, `PatternError`, and its `Display` all stay as Task 6 wrote them.
+  Keep `match_moment_run` private. No other function changes. The bracket branch, the `Do` branch, the non-alphabetic fallback, `pattern_to_strftime`'s `%` dispatch, `ordinal_suffix`, `TemporalTokenError`, and its `Display` all stay as Task 6 wrote them.
 
 - [ ] **Step 4: Run the translator tests**
 
@@ -2001,7 +2008,7 @@
 - [ ] **Step 6: Commit**
 
   ```
-  git add src/temporal/pattern.rs src/template/engine/date.rs
+  git add src/temporal/token.rs src/template/engine/date.rs
   git commit -m "refactor(temporal): match moment tokens by full letter-run"
   ```
 
@@ -2010,11 +2017,13 @@
 ### Task 8 (X5): Detect the strftime dialect by % outside brackets
 
 **Files:**
-- Modify: `src/temporal/pattern.rs` (dialect dispatch, two new private helpers, one `Display` arm, two dead spots in `moment_to_strftime`, doc comments)
+- Modify: `src/temporal/token.rs` (dialect dispatch, two new helpers, one import, two dead spots in `moment_to_strftime`, doc comments)
+- Modify: `src/delimiter.rs` (add `find_closing_flat`, the flat sibling of `find_closing`, directly after it)
+- Modify: `src/temporal/error.rs` (the `UnclosedBracket` `Display` arm)
 - Modify: `src/template/engine/date.rs` (the `date_format` doc paragraphs and the wrapper doc line; tests)
-- No baseline or GLOSSARY changes: both new helpers are private.
+- Baseline: `tests/baselines/pub-tokens.txt` (+1); no GLOSSARY changes.
 
-**Context:** the dialect decision today is `pattern.contains('%')` anywhere in the pattern. Jiff has no bracket-literal syntax of its own, so every bracketed `%` runs as a real directive on the strftime path: `[%Y]` renders `[2026]`, `[Today's %Y]` renders `[Today's 2026]`, `[100%] and %H:%M` dies in jiff on `%]`, and unclosed `[Daily %H` silently renders `[Daily 14`. Meanwhile the moment path's bracket-escaping branches (copy literal content, double `%`) are unreachable for any pattern that contains `%`. The locked fix: the dialect is decided by `%` outside any bracket literal, and the bracket scan moves ahead of the decision so one function owns the unclosed-bracket error for both dialects. `pattern_to_strftime` becomes: `percent_outside_brackets(pattern)?` selects strftime (new `escape_bracket_percents` copies the pattern, drops the delimiters, doubles `%` inside brackets) or moment (tokenizer unchanged). Both scans use the flat toggle `'[' if !in_bracket => open`, `']' if in_bracket => close`, so a stray `]` stays literal content and an inner `[` stays inside the literal, matching what the moment scanner already produces. Two spots in `moment_to_strftime` die: its unclosed-bracket arm (the scan ran first, so the pattern is closed by then) and the bare-`%` push in the non-alphabetic fallback (the moment path only runs when no `%` sits outside brackets); Task 7 left both for this task, and the tasks run serially. Error-contract changes, all in the plan's accepted list: unclosed-bracket now precedes the token walk, so `Q [x` reports the unclosed bracket instead of the `Q` token (pinned red-first); the `UnclosedBracket` `Display` drops "moment-dialect" because the error is now dialect-neutral (the pin asserts only the `unclosed bracket literal` prefix, so it stays green after the rename below). Four doc spots are owned by this task and must not be re-touched by Task D: the `date_format` syntax paragraph, the `date_format` `# Errors` paragraph, the engine wrapper's `%`-contains wording, and `pattern_to_strftime`'s own doc in `pattern.rs`.
+**Context:** the dialect decision today is `pattern.contains('%')` anywhere in the pattern. Jiff has no bracket-literal syntax of its own, so every bracketed `%` runs as a real directive on the strftime path: `[%Y]` renders `[2026]`, `[Today's %Y]` renders `[Today's 2026]`, `[100%] and %H:%M` dies in jiff on `%]`, and unclosed `[Daily %H` silently renders `[Daily 14`. Meanwhile the moment path's bracket-escaping branches (copy literal content, double `%`) are unreachable for any pattern that contains `%`. The locked fix: the dialect is decided by `%` outside any bracket literal, and the bracket scan moves ahead of the decision so one function owns the unclosed-bracket error for both dialects. `pattern_to_strftime` becomes: `percent_outside_brackets(pattern)?` selects strftime (new `escape_bracket_percents` copies the pattern, drops the delimiters, doubles `%` inside brackets) or moment (tokenizer unchanged). Both scans jump bracket literals through a new `DelimiterType::find_closing_flat` in `src/delimiter.rs`, the flat sibling of `find_closing`: it returns the byte offset of the first closing character, with no quote, escape, or nesting tracking, so a stray `]` stays literal content and an inner `[` stays inside the literal, matching what the moment scanner already produces. Two spots in `moment_to_strftime` die: its unclosed-bracket arm (the scan ran first, so the pattern is closed by then) and the bare-`%` push in the non-alphabetic fallback (the moment path only runs when no `%` sits outside brackets); Task 7 left both for this task, and the tasks run serially. Error-contract changes, all in the plan's accepted list: unclosed-bracket now precedes the token walk, so `Q [x` reports the unclosed bracket instead of the `Q` token (pinned red-first); the `UnclosedBracket` `Display` drops "moment-dialect" because the error is now dialect-neutral (the pin asserts only the `unclosed bracket literal` prefix, so it stays green after the rename below). Four doc spots are owned by this task and must not be re-touched by Task D: the `date_format` syntax paragraph, the `date_format` `# Errors` paragraph, the engine wrapper's `%`-contains wording, and `pattern_to_strftime`'s own doc in `token.rs`.
 
 - [ ] **Step 1: Add the bracket-behavior tests (the intended red)**
 
@@ -2093,9 +2102,32 @@
 
   Green: `stray_close_bracket` and `plain_strftime`. This is the intended red.
 
-- [ ] **Step 2: Rewrite the dialect dispatch and add the two helpers**
+- [ ] **Step 2: Add `find_closing_flat`, rewrite the dialect dispatch, and add the two helpers**
 
-  In `src/temporal/pattern.rs`, replace the body of `pattern_to_strftime`:
+  In `src/delimiter.rs`, add `find_closing_flat` directly after `find_closing`:
+
+  ```rust
+      /// Finds the byte position of this delimiter's first closing character in
+      /// `input`, tracking no nesting, quotes, or escapes.
+      ///
+      /// `input` begins immediately after this opening delimiter was consumed.
+      /// Returns `Some(pos)` of the first closing character, or `None` if it
+      /// never appears (always `None` for [`Self::DoubleBracket`]). The flat
+      /// scan serves the bracket-literal dialect scans in `temporal::token`,
+      /// whose grammar treats every closing character as a close;
+      /// [`Self::find_closing`] keeps the nesting, quote, and escape tracking
+      /// for note link parsing.
+      #[must_use]
+      pub(crate) fn find_closing_flat(self, input: &str) -> Option<usize> {
+          let close = self.close_char()?;
+          input
+              .char_indices()
+              .find(|&(_, ch)| ch == close)
+              .map(|(pos, _)| pos)
+      }
+  ```
+
+  In `src/temporal/token.rs`, replace the body of `pattern_to_strftime`:
 
   ```rust
       if pattern.contains('%') {
@@ -2113,33 +2145,30 @@
       moment_to_strftime(pattern, datetime)
   ```
 
-  Then add the two helpers directly after `pattern_to_strftime`:
+  Then add `use crate::DelimiterType;` above `use super::error::TemporalTokenError;` in the imports, and add the two helpers directly after `pattern_to_strftime`:
 
   ```rust
   /// Returns `true` when `%` occurs outside any bracket literal.
   ///
   /// # Errors
   ///
-  /// Returns [`PatternError::UnclosedBracket`] when a bracket literal is
+  /// Returns [`TemporalTokenError::UnclosedBracket`] when a bracket literal is
   /// opened but never closed. This scan runs for both dialects, so the
   /// unclosed error takes precedence over every translation error.
-  fn percent_outside_brackets(pattern: &str) -> Result<bool, PatternError> {
-      let mut in_bracket = false;
+  fn percent_outside_brackets(pattern: &str) -> Result<bool, TemporalTokenError> {
       let mut percent = false;
-      for ch in pattern.chars() {
-          match ch {
-              '[' if !in_bracket => in_bracket = true,
-              ']' if in_bracket => in_bracket = false,
-              '%' if !in_bracket => percent = true,
-              _ => {}
-          }
+      let mut rest = pattern;
+      while let Some(open) = rest.find('[') {
+          percent |= rest[..open].contains('%');
+          let after = &rest[open + 1..];
+          let Some(close) = DelimiterType::Bracket.find_closing_flat(after) else {
+              return Err(TemporalTokenError::UnclosedBracket {
+                  pattern: pattern.to_owned(),
+              });
+          };
+          rest = &after[close + 1..];
       }
-      if in_bracket {
-          return Err(PatternError::UnclosedBracket {
-              pattern: pattern.to_owned(),
-          });
-      }
-      Ok(percent)
+      Ok(percent | rest.contains('%'))
   }
 
   /// Copies `pattern` for jiff in the strftime dialect, dropping bracket
@@ -2147,15 +2176,25 @@
   /// renders literally.
   fn escape_bracket_percents(pattern: &str) -> String {
       let mut out = String::with_capacity(pattern.len());
-      let mut in_bracket = false;
-      for ch in pattern.chars() {
-          match ch {
-              '[' if !in_bracket => in_bracket = true,
-              ']' if in_bracket => in_bracket = false,
-              '%' if in_bracket => out.push_str("%%"),
-              _ => out.push(ch),
+      let mut rest = pattern;
+      while let Some(open) = rest.find('[') {
+          out.push_str(&rest[..open]);
+          let after = &rest[open + 1..];
+          let (close, tail) = match DelimiterType::Bracket.find_closing_flat(after) {
+              Some(close) => (close, &after[close + 1..]),
+              // Unreachable: percent_outside_brackets already rejected.
+              None => (after.len(), ""),
+          };
+          for ch in after[..close].chars() {
+              if ch == '%' {
+                  out.push_str("%%");
+              } else {
+                  out.push(ch);
+              }
           }
+          rest = tail;
       }
+      out.push_str(rest);
       out
   }
   ```
@@ -2168,13 +2207,13 @@
 
   ```rust
               if bytes.get(i) != Some(&b']') {
-                  return Err(PatternError::UnclosedBracket {
+                  return Err(TemporalTokenError::UnclosedBracket {
                       pattern: pattern.to_owned(),
                   });
               }
   ```
 
-  The `while` loop above it and the `let literal = ...` line below it stay as they are. `PatternError::UnclosedBracket` is now constructed in exactly one place.
+  The `while` loop above it and the `let literal = ...` line below it stay as they are. `TemporalTokenError::UnclosedBracket` is now constructed in exactly one place.
 
   Then simplify the non-alphabetic fallback. The moment path only runs when no `%` sits outside brackets, so `ch == '%'` is unreachable there:
 
@@ -2198,7 +2237,7 @@
 
 - [ ] **Step 4: Update the message wording and the four doc spots**
 
-  `Display` for `UnclosedBracket` loses "moment-dialect" (the error is dialect-neutral now):
+  In `src/temporal/error.rs`, the `Display` arm for `UnclosedBracket` loses "moment-dialect" (the error is dialect-neutral now):
 
   ```rust
               Self::UnclosedBracket { pattern } => write!(
@@ -2216,7 +2255,7 @@
               ),
   ```
 
-  `pattern_to_strftime`'s doc in `src/temporal/pattern.rs`:
+  `pattern_to_strftime`'s doc in `src/temporal/token.rs`:
 
   ```rust
   /// Translates `pattern` to a strftime pattern.
@@ -2295,15 +2334,31 @@
   Run: `mise run test:unit moment`
   Expected: PASS with the full token matrix, the run-rejection table, the `Q` unsupported-token pin, and `format_bindings_never_emit_percent_plus`. The `%+` test's sample pattern has no bracketed `%`, so its premise is unchanged.
 
-- [ ] **Step 6: Run the full gate**
+- [ ] **Step 6: Regenerate the pub-token baseline**
 
-  Run: `mise run verify`
-  Expected: green (no baseline regen needed: no `pub` line changed).
-
-- [ ] **Step 7: Commit**
+  Run:
 
   ```
-  git add src/temporal/pattern.rs src/template/engine/date.rs
+  git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
+  ```
+
+  Expected: the diff adds exactly one line:
+
+  ```
+  src/delimiter.rs: pub(crate) fn find_closing_flat(self, input: &str) -> Option<usize> {
+  ```
+
+  and nothing else changes. Both `cargo public-api` baselines stay byte-identical: `find_closing_flat` is `pub(crate)` inside an already-public module, so no new reachable path appears.
+
+- [ ] **Step 7: Run the full gate**
+
+  Run: `mise run verify`
+  Expected: green (fmt, `check:visibility` included, lint, full test suite).
+
+- [ ] **Step 8: Commit**
+
+  ```
+  git add src/temporal/token.rs src/delimiter.rs src/temporal/error.rs src/template/engine/date.rs tests/baselines/pub-tokens.txt
   git commit -m "fix(temporal): decide the date dialect by % outside brackets"
   ```
 
@@ -2467,22 +2522,18 @@
         }
   ```
 
-  Add the full-range property inside `mod proptests` (:1842), beside the existing round-trip proptest.
+  Add the full-range property inside `mod proptests` (:1842), beside the existing round-trip proptest. The strategy sweeps seconds across jiff's whole supported range instead of building year/month/day dates: local midnight near the range edge can fall below `Timestamp::MIN`, and that arrange step must never panic.
 
   ```rust
         proptest! {
             #[test]
             fn display_reparses_for_every_supported_year(
-                year in -9999i32..=9999,
-                month in 1u32..=12,
-                day in 1u32..=28,
+                second in Timestamp::MIN.as_second()..=Timestamp::MAX.as_second(),
             ) {
                 // Arrange
                 ZoneGuard::set("UTC");
-                let date = DateValue::from_ymd(year, month, day)
-                    .expect("generated fields form a valid date");
-                let value = DateTimeValue::try_from(date)
-                    .expect("local midnight lies inside the timestamp range");
+                let value = DateTimeValue::from_unix_seconds(second)
+                    .expect("generated second lies inside the timestamp range");
 
                 // Act
                 let displayed = value.to_string();
@@ -4975,7 +5026,7 @@ Everything else, including both red tests' intent, is unchanged.
   assert text.count(old) == 1, "rules seam clause not found exactly once"
   text = text.replace(
       old,
-      "cargo test --doc`); translator is a pure function in `temporal::pattern`, "
+      "cargo test --doc`); translator is a pure function in `temporal::token`, "
       "reached through the template seam",
   )
 
@@ -4994,7 +5045,7 @@ Everything else, including both red tests' intent, is unchanged.
   text = text.replace(
       old,
       old + " **(Amended 2026-10-25, temporal-offload Task 16:** the translator "
-      "and its dialect dispatch live in `temporal::pattern` (Task 6) and "
+      "and its dialect dispatch live in `temporal::token` (Task 6) and "
       "strftime execution in `DatePoint::format_in` (Task 14); the engine "
       "keeps only a thin `pattern_to_strftime` wrapper.**)**",
   )
@@ -5232,4 +5283,127 @@ Everything else, including both red tests' intent, is unchanged.
   ```bash
   git add src/template/engine/date.rs src/temporal/GLOSSARY.md src/temporal/duration.rs src/temporal/error.rs .scratch/temporal-core/spec.md .scratch/temporal-core/divergence-register.md .scratch/temporal-core/issues/06-template-format-dialects.md
   git commit -m "docs(temporal): align stale claims with jiff-era behavior"
+  ```
+
+---
+
+### Task 17 (F1): Quote the unit hint in filter unit rejections
+
+**Files:**
+- Modify: `src/lexer.rs` (`LexError::UnexpectedEndOfInput.expected` becomes `String`; two construction sites, two test literals)
+- Modify: `src/query/error.rs` (`unexpected_end` takes `impl Into<String>`; one test literal)
+- Modify: `src/query/grammar/filter.rs` (the `date_add`/`date_diff` unit branches quote the hint; delete `is_unrecognized_unit`; one new test)
+- Baseline: none (`pub` first lines change nowhere, so both `cargo public-api` snapshots stay byte-identical). No GLOSSARY changes.
+
+**Context:** after Task 3, `UnitError` carries the full spelling hint (`unknown unit "mo3" (expected y, mo, ...)`), but filter's validation still rejects a bad unit with the static expectation `"recognized duration unit"`, so the query diagnostic never lists the valid spellings. The adoption is deliberately narrow: the two validation branches call `TimeUnit::parse_spelling` and feed `error.to_string()` into `QuerySyntaxError::unexpected_end`; the two `evaluate` sites keep `from_spelling` by design, because evaluation stays `Option`-shaped and never fails on a spellable unit. The dynamic text needs one field type change: `LexError::UnexpectedEndOfInput.expected` becomes `String`. `LexError` is `pub(crate)`, so no public surface moves, and `unexpected_end` takes `impl Into<String>`, so its literal call sites compile unchanged; `LexError::UnexpectedToken.expected` stays `&'static str`, since per-variant field types mean nothing forces that widening. No test pins the old static phrase, the field type, or the widened signature, so the only new assertion is this task's own. The carrier keeps its phrasing: the user sees `unexpected end of input, expected unknown unit "mo3" (expected ...)`, and the pre-existing double `expected` is accepted as the carrier's own wording. GLOSSARY: **no edit**; no new domain vocabulary.
+
+- [ ] **Step 1: Write the failing test**
+
+  Add this rstest beside `rejects_unquoted_date_shapes_that_are_not_dates` in the `filter.rs` test module:
+
+  ```rust
+        #[rstest]
+        #[case::date_add_unit("date_add(due, 17, \"mo3\") == \"2026-08-15\"")]
+        #[case::date_diff_unit("date_diff(due, \"2026-07-29\", \"mo3\") == 15")]
+        fn unit_rejections_quote_the_unit_hint(#[case] expr: &str) {
+            let QueryBuilderError::Syntax(syntax) = FilterExpr::parse(expr)
+                .expect_err("unknown unit rejects")
+            else {
+                panic!("expected a syntax error");
+            };
+
+            match &*syntax.lex_error {
+                LexError::UnexpectedEndOfInput { expected, .. } => assert!(
+                    expected.contains("unknown unit \"mo3\" (expected "),
+                    "expected the unit hint in {expected:?}"
+                ),
+                other => panic!("expected end of input, got {other:?}"),
+            }
+        }
+  ```
+
+  Run: `mise run test:unit unit_rejections_quote_the_unit_hint`
+  Expected: FAIL: both cases parse to the static expectation, so the assertion reports `expected="recognized duration unit"`. The test compiles on the untouched tree: `expected` is `&str` there and `&String` after Step 2, and `contains` works for both.
+
+- [ ] **Step 2: Make `LexError::UnexpectedEndOfInput.expected` a `String`**
+
+  In `src/lexer.rs`, change the field declaration:
+
+  ```rust
+      /// The input stream ended unexpectedly.
+      #[error("unexpected end of input, expected {expected}")]
+      UnexpectedEndOfInput {
+          /// The byte span at the end of input.
+          span: Range<usize>,
+          /// Description of the expected token.
+          expected: String,
+      },
+  ```
+
+  Then append `.into()` to the value of `expected` at the two `UnexpectedEndOfInput` construction sites (`expected: expected.desc` and `expected: expected_desc`) and at the two test literals (`expected: "a literal value"` and `expected: "y"`). The `UnexpectedToken` arms keep `expected: &'static str`.
+
+- [ ] **Step 3: Widen `unexpected_end`**
+
+  In `src/query/error.rs`, change the parameter type from `expected: &'static str` to `expected: impl Into<String>` and the body field from `expected,` to `expected: expected.into(),`.
+
+  In the `syntax_error_preserves_dialect_input_span_and_label` test, change the assertion's `expected: "a literal value",` to `expected: "a literal value".into(),`. The `"unexpected end of input, expected a literal value"` display pin stays unchanged: literals render byte-identically.
+
+- [ ] **Step 4: Quote the hint in the two validation branches**
+
+  In `src/query/grammar/filter.rs`, replace the `Self::DateAdd` unit branch:
+
+  ```rust
+                } else if args.len() == 3
+                    && args.get(2).is_some_and(ValueExpr::is_unrecognized_unit)
+                {
+                    Some("recognized duration unit")
+                } else {
+  ```
+
+  with:
+
+  ```rust
+                } else if let Some(ValueExpr::Literal(NoteFieldValue::String(unit))) =
+                    args.get(2)
+                {
+                    if let Err(error) = TimeUnit::parse_spelling(unit) {
+                        return Err(QuerySyntaxError::unexpected_end(
+                            QueryDialect::Filter,
+                            input,
+                            span,
+                            error.to_string(),
+                        )
+                        .into());
+                    }
+                    None
+                } else {
+  ```
+
+  Replace the `Self::DateDiff` unit branch, which has the same shape after `} else if args`, with the same block.
+
+  The `args.len() == 3` term goes: the first branch already rejects every length outside 2 and 3, so `get(2)` is `Some` only when the length is 3. A valid unit keeps the old path: the `if let` does not fire and the arm yields `None`.
+
+  Delete `is_unrecognized_unit` with its doc comment (`Whether this is a string literal that names no duration unit.`): the two branches were its only callers. `TimeUnit::from_spelling` stays: the evaluators and `parse_spelling` itself still call it.
+
+- [ ] **Step 5: Run the affected suites**
+
+  Run: `mise run test:unit unit_rejections_quote_the_unit_hint`
+  Expected: PASS: both cases report `unknown unit "mo3" (expected ...`.
+
+  Run: `mise run test:unit unexpected_end`
+  Expected: PASS: the lexer display pin and the query syntax-error pin stay byte-identical.
+
+  Run: `mise run test:unit date_add`
+  Expected: PASS: the engine's `date_add_rejects_unknown_unit` and the filter acceptance tests are untouched.
+
+- [ ] **Step 6: Run the full gate**
+
+  Run: `mise run verify`
+  Expected: green (fmt, `check:visibility` included, lint, full test suite).
+
+- [ ] **Step 7: Commit**
+
+  ```
+  git add src/lexer.rs src/query/error.rs src/query/grammar/filter.rs
+  git commit -m "feat(query): quote the full unit hint in filter unit rejections"
   ```
