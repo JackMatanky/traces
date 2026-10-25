@@ -44,28 +44,35 @@
     {
       "common": ["ensure"],
       "approved": "make sure",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
     {
-      "common": ["utilize", "leverage"],
+      "common": ["utilize"],
       "approved": "use",
       "auto": true,
       "condition": null,
       "note": ""
     },
     {
+      "common": ["leverage"],
+      "approved": "use",
+      "auto": false,
+      "condition": null,
+      "note": ""
+    },
+    {
       "common": ["facilitate"],
       "approved": "help",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
     {
       "common": ["initiate"],
       "approved": "start",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -112,7 +119,14 @@
       "note": ""
     },
     {
-      "common": ["strip out", "get rid of"],
+      "common": ["strip out"],
+      "approved": "remove",
+      "auto": false,
+      "condition": null,
+      "note": ""
+    },
+    {
+      "common": ["get rid of"],
       "approved": "remove",
       "auto": true,
       "condition": null,
@@ -121,7 +135,7 @@
     {
       "common": ["fix up"],
       "approved": "repair",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -135,7 +149,7 @@
     {
       "common": ["additional"],
       "approved": "more",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
@@ -156,7 +170,7 @@
     {
       "common": ["require"],
       "approved": "need",
-      "auto": true,
+      "auto": false,
       "condition": null,
       "note": ""
     },
