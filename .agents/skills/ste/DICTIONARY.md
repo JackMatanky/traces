@@ -4,6 +4,8 @@ ASD-STE100 gives each approved word one meaning and one part of speech. When you
 
 This is a starter list, not the full ASD-STE100 dictionary. It covers the words that appear most in software and agent output.
 
+Do not edit the marked table manually. Regenerate it with `.agents/skills/ste/scripts/check_ste.py render-dict`. Check for drift with `.agents/skills/ste/scripts/check_ste.py render-dict --check`.
+
 <!-- BEGIN GENERATED: substitutions (from scripts/dictionary.json) -->
 | Common word or phrase | Approved replacement | Automatic |
 | --- | --- | --- |

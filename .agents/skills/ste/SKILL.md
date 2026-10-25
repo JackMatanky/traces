@@ -49,5 +49,5 @@ Keep all facts, numbers, code, and commands exact. Change only the language. Do 
 
 1. Check the source before you rewrite it to scope the work.
 2. After rewriting, run `.agents/skills/ste/scripts/check_ste.py check <file>` and fix every error. Warnings are heuristics that need agent judgment.
-3. Compare before and after with `.agents/skills/ste/scripts/check_ste.py check --compare <before> <after>` to make sure facts survived.
-4. `fix <file> -w` applies only unambiguous substitutions.
+3. Compare before and after with `.agents/skills/ste/scripts/check_ste.py check --compare <before> <after>`. This detects protected facts and tokens: numbers, code, flags, paths, and all-caps identifiers. Compare meaning and steps manually too.
+4. `.agents/skills/ste/scripts/check_ste.py fix <file> -w` applies only unambiguous substitutions.
