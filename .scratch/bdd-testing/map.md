@@ -23,14 +23,16 @@ An implementation-ready **BDD adoption and implementation strategy** for this wo
 - [03: Index and note substrate, behavioral discovery](issues/03-index-note.md): refresh/freshness/fingerprint guarantees pinned; racy-timestamp gap unpinned; 12 refactor-hostile guarantees map onto open arch-design tickets; 7 doc contradictions incl. duplicate ADR 0009. Findings: [research/03](research/03-index-note.md).
 - [04: Schema and temporal, behavioral discovery](issues/04-schema-temporal.md): schema isolation/error contracts and DST/calendar rules pinned; cross-domain boundaries pinned 2-3 layers; proptests already own algebraic laws; "zero outer coverage" premise corrected. Findings: [research/04](research/04-schema-temporal.md).
 - [05: Cross-cutting contracts, behavioral discovery](issues/05-cross-cutting-contracts.md): `test-utils` = 47 not 46 (32 guarantees / 15 conveniences); exit/stream/layer contracts pinned; `Defect class:` taxonomy undocumented and drifting; ADR-0004 `Diagnostic` contradiction. Findings: [research/05](research/05-cross-cutting-contracts.md).
+- [06: Framework re-validation](issues/06-framework-revalidation.md): adopt `rstest-bdd` =0.6.0 with caveats; no `clippy.toml` change; one `#[expect(clippy::disallowed_methods)]` on each `mod bdd` (catch_unwind in step wrappers), revisit on upstream fix; bare `{name}` placeholders avoid a lint; `build.rs` for new feature files costs a package rebuild (deferred to ticket 10); fold into existing integration/e2e binaries is viable (ticket 08 decides).
 
 ## Not yet specified
 
 - BDD and quality gates beyond layer placement: mutation testing (`mutarust`), coverage (`llvm-cov nextest`).
+- Upstream `rstest-bdd` fix for the `catch_unwind` lint: revisit the `mod bdd` `#[expect(clippy::disallowed_methods)]` exception (decided in [06](issues/06-framework-revalidation.md)) on each `rstest-bdd` upgrade; the `#[expect]` fails when the lint stops firing. Not filed upstream yet.
+- In-repo prototype of the 06 caveats that were only inferred (`check:layers`, e2e binary without `test-utils`, Linux/Windows CI, whether feature edits rebuild the whole package under a `build.rs`); sharpens once ticket 08 fixes where scenarios run.
 - Fate of the existing `//! Proves` and `Defect class:` documentation style: absorbed into Gherkin, kept alongside, or replaced.
 - Scenario density and verbosity norms (how much behavior per scenario, when a Scenario Outline beats a rule).
 - Fit (or non-fit) of Gherkin for `dialog` interactive and TTY behavior; may sharpen once ticket 01 reports.
-- Whether `docs/refs/cucumber_bdd_rust.md` needs revision; depends on ticket 06's outcome.
 
 ## Out of scope
 
