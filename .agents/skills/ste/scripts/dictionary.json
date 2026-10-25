@@ -7,12 +7,29 @@
       "common_phrases": "re.IGNORECASE",
       "condition_regexes": "re.IGNORECASE"
     },
+    "replacement_case": {
+      "match_classification": {
+        "all_uppercase": "matched_text.isupper()",
+        "initial_uppercase": "matched_text[:1].isupper() and not matched_text.isupper()",
+        "other": "otherwise"
+      },
+      "all_uppercase_match": "replacement.upper()",
+      "initial_uppercase_match": "replacement[:1].upper() + replacement[1:]",
+      "other_match": "replacement"
+    },
     "longest_common_phrase_first": true,
     "condition_evaluation": "candidate_and_condition_must_share_sentence",
     "sentence_segmentation": {
       "boundary_requires_terminal_punctuation": true,
       "terminal_punctuation": [".", "!", "?"],
       "protected_token_classes": ["inline_code", "url", "decimal", "version", "abbreviation"],
+      "protected_token_regexes": {
+        "inline_code": "`[^`\\n]*`",
+        "url": "https?://[^\\s`<>]+",
+        "decimal": "\\b\\d+\\.\\d+\\b",
+        "version": "\\bv?\\d+(?:\\.\\d+){1,3}\\b",
+        "abbreviation": "\\b(?:e\\.g\\.|i\\.e\\.|etc\\.|vs\\.)"
+      },
       "protected_tokens_do_not_form_sentence_boundaries": true
     }
   },
@@ -20,7 +37,7 @@
     {
       "common": ["follow"],
       "approved": "obey",
-      "auto": true,
+      "auto": false,
       "condition": "\\b(rules?|procedures?|instructions?|guidelines?)\\b",
       "note": "\"follow\" means \"come after\" only"
     },
@@ -196,17 +213,17 @@
   "one_meaning": [
     {
       "word": "fall",
-      "forbidden_patterns": ["\\bin (the |this |last )?fall\\b"],
+      "forbidden_phrases": ["in fall", "in the fall", "in this fall", "in last fall"],
       "note": "verb only - do not write \"in the fall\""
     },
     {
       "word": "test",
-      "forbidden_patterns": ["\\bto test\\b"],
+      "forbidden_phrases": ["to test"],
       "note": "noun only - use \"make a test of\" instead"
     },
     {
       "word": "close",
-      "forbidden_patterns": ["\\bclose to\\b"],
+      "forbidden_phrases": ["close to"],
       "note": "verb only - use \"near\" for distance"
     }
   ]

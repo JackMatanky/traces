@@ -142,8 +142,13 @@
       "name": "one-meaning",
       "check": "one_meaning",
       "severity": "warn",
-      "params": {"source": "dictionary.json", "key": "one_meaning"},
-      "message": "Use this approved word with only its allowed meaning."
+      "params": {
+        "source": "dictionary.json",
+        "key": "one_meaning",
+        "phrase_key": "forbidden_phrases",
+        "matching_policy_ref": "dictionary.json#matching"
+      },
+      "message": "Use this approved word with only its allowed meaning; match forbidden phrases with the dictionary policy."
     },
     {
       "id": "R13",
