@@ -190,7 +190,7 @@ def markdown_blocks(text: str) -> list[Block]:
     def flush() -> None:
         nonlocal paragraph
         if paragraph:
-            joined = " ".join(part.strip() for part in paragraph)
+            joined = "\n".join(part.strip() for part in paragraph)
             blocks.append(Block(joined, paragraph_line, "paragraph"))
             paragraph = []
 
@@ -251,7 +251,6 @@ def split_sentences(
     """Split terminal-punctuation sentences while preserving configured protected tokens."""
     dictionary = dictionary or load_config(None, None)[1]
     token = protected_pattern(dictionary)
-    placeholders: list[str] = []
 
     def hide(match: re.Match[str]) -> str:
         value = match.group(0)
@@ -259,35 +258,41 @@ def split_sentences(
         # URL regexes intentionally include punctuation; prose punctuation still ends a sentence.
         if value.startswith(("http://", "https://")) and value[-1:] in ".!?":
             value, trailing = value[:-1], value[-1]
-        placeholders.append(value)
-        return f"\x00{len(placeholders) - 1}\x00{trailing}"
+        marker = "\x00\x00"
+        return marker + "\x00" * (len(value) - len(marker)) + trailing
 
     hidden = token.sub(hide, text)
     result: list[Sentence] = []
     start = 0
     for match in re.finditer(r"[.!?]+(?=\s|$)", hidden):
-        value = hidden[start : match.end()].strip()
+        raw = text[start : match.end()]
+        leading = len(raw) - len(raw.lstrip())
+        value = raw.strip()
         if value:
-            restored = re.sub(
-                r"\x00(\d+)\x00", lambda item: placeholders[int(item.group(1))], value
-            )
-            offset = text.find(value.split()[0]) if value.split() else 0
+            offset = start + leading
+            preceding = text[:offset]
             result.append(
                 Sentence(
-                    restored,
-                    line,
-                    max(1, offset + 1),
+                    value,
+                    line + preceding.count("\n"),
+                    offset - preceding.rfind("\n"),
                     block or Block(text, line, "paragraph"),
                 )
             )
         start = match.end()
-    trailing = hidden[start:].strip()
+    raw = text[start:]
+    leading = len(raw) - len(raw.lstrip())
+    trailing = raw.strip()
     if trailing:
-        restored = re.sub(
-            r"\x00(\d+)\x00", lambda item: placeholders[int(item.group(1))], trailing
-        )
+        offset = start + leading
+        preceding = text[:offset]
         result.append(
-            Sentence(restored, line, 1, block or Block(text, line, "paragraph"))
+            Sentence(
+                trailing,
+                line + preceding.count("\n"),
+                offset - preceding.rfind("\n"),
+                block or Block(text, line, "paragraph"),
+            )
         )
     return result
 
@@ -412,9 +417,13 @@ def check_sentence_words(
 ) -> list[Finding]:
     params = object_dict(rule["params"], "params")
     max_words = int(str(params["max"]))
+    verbs = {
+        str(item) for item in object_list(params.get("command_verbs", []), "verbs")
+    }
+    is_procedural = procedural(sentence, verbs)
     scope = str(params["scope"])
-    applies = (scope == "procedural" and sentence.block.kind == "list") or (
-        scope == "descriptive" and sentence.block.kind != "list"
+    applies = (scope == "procedural" and is_procedural) or (
+        scope == "descriptive" and not is_procedural
     )
     return (
         [finding(rule, file, sentence, str(rule["message"]).format(max=max_words))]
@@ -641,9 +650,24 @@ def check_text(
         if block.prose
         for sentence in split_sentences(block.text, block.line, dictionary, block)
     ]
+    command_verbs: set[str] = set()
+    for candidate in rule_entries(rules, None, None):
+        if candidate["check"] == "command_verb_start":
+            command_verbs = {
+                str(item)
+                for item in object_list(
+                    object_dict(candidate["params"], "params")["verbs"], "verbs"
+                )
+            }
+            break
     for rule in selected:
         checker = CHECKS.get(str(rule["check"]))
         if checker:
+            if rule["check"] == "sentence_words":
+                params = object_dict(rule["params"], "params") | {
+                    "command_verbs": list(command_verbs)
+                }
+                rule = rule | {"params": params}
             findings.extend(
                 item
                 for sentence in sentences
@@ -652,11 +676,16 @@ def check_text(
         if rule["check"] == "paragraph_length":
             max_sentences = int(str(object_dict(rule["params"], "params")["max"]))
             for block in blocks:
+                block_sentences = split_sentences(
+                    block.text, block.line, dictionary, block
+                )
                 if (
                     block.prose
-                    and block.kind != "list"
-                    and len(split_sentences(block.text, block.line, dictionary, block))
-                    > max_sentences
+                    and any(
+                        procedural(sentence, command_verbs)
+                        for sentence in block_sentences
+                    )
+                    and len(block_sentences) > max_sentences
                 ):
                     findings.append(
                         finding(
@@ -737,17 +766,19 @@ def replace_auto(text: str, dictionary: dict[str, object]) -> str:
 
 
 # 6. F1 fact extraction/compare
-def facts(text: str) -> Counter[str]:
-    patterns = [
-        r"`[^`\n]+`",
-        r"```[\s\S]*?```",
-        r"\b\d+(?:\.\d+)*\b",
-        r"--[A-Za-z][\w-]*",
-        r"(?:[\w.-]+/)+[\w.-]+|\b[\w.-]+\.[A-Za-z]{1,8}\b",
-        r"\b[A-Z][A-Z0-9_]{1,}\b",
-    ]
+def facts(text: str, protected: Iterable[str]) -> Counter[str]:
+    patterns = {
+        "inline_code": r"`[^`\n]+`",
+        "fenced_code": r"```[\s\S]*?```",
+        "numbers": r"\b\d+(?:\.\d+)*\b",
+        "flags": r"--[A-Za-z][\w-]*",
+        "paths": r"(?:[\w.-]+/)+[\w.-]+|\b[\w.-]+\.[A-Za-z]{1,8}\b",
+        "all_caps_identifiers": r"\b[A-Z][A-Z0-9_]{1,}\b",
+    }
     return Counter(
-        match.group(0) for pattern in patterns for match in re.finditer(pattern, text)
+        match.group(0)
+        for category in protected
+        for match in re.finditer(patterns.get(category, r"(?!)"), text)
     )
 
 
@@ -763,7 +794,12 @@ def compare_facts(
         for item in object_list(rules["rules"], "rules")
         if object_dict(item, "rule")["id"] == "F1"
     )
-    changed = facts(before) != facts(after)
+    protected = object_list(
+        object_dict(rule["params"], "params")["protected"], "protected"
+    )
+    changed = facts(before, (str(item) for item in protected)) != facts(
+        after, (str(item) for item in protected)
+    )
     return (
         [
             Finding(

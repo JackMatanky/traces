@@ -62,6 +62,30 @@ def test_error_rules_detect_and_allow_minimal_cases(
     assert rule_id not in findings_for(compliant, rule_id)
 
 
+def test_r1_applies_to_command_sentences_outside_lists() -> None:
+    violating = "Use " + "word " * 20 + "."
+    compliant = "Use " + "word " * 19 + "."
+    assert "R1" in findings_for(violating, "R1")
+    assert "R1" not in findings_for(compliant, "R1")
+
+
+def test_r16_applies_only_to_procedural_paragraphs() -> None:
+    assert "R16" not in findings_for("This is descriptive. " * 7, "R16")
+    assert "R16" in findings_for("Use the tool. " * 7, "R16")
+
+
+def test_findings_preserve_multiline_and_repeated_sentence_locations() -> None:
+    rules, dictionary = config()
+    text = "First sentence.\nUtilize the tool.\nUtilize the tool."
+    findings = [
+        finding
+        for finding in check_ste.check_text(
+            text, "test.md", rules, dictionary, only={"R13"}
+        )
+    ]
+    assert [(finding.line, finding.column) for finding in findings] == [(2, 1), (3, 1)]
+
+
 @pytest.mark.parametrize(
     ("rule_id", "text"),
     [
@@ -183,6 +207,34 @@ def test_compare_is_order_independent_and_detects_number_change() -> None:
     assert check_ste.compare_facts("Use 2 flags.", "Use 3 flags.", rules)
 
 
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("Use `one`.", "Use `two`."),
+        ("```text\nONE\n```", "```text\nTWO\n```"),
+        ("Use --fast.", "Use --safe."),
+        ("Use config.toml and src/main.py.", "Use config.json and src/lib.py."),
+        ("Set TOKEN.", "Set SECRET."),
+        ("Use --fast and --fast.", "Use --fast once."),
+    ],
+)
+def test_f1_detects_every_configured_fact_class(before: str, after: str) -> None:
+    rules, dictionary = config()
+    assert check_ste.compare_facts(before, after, rules, dictionary)
+
+
+def test_f1_obeys_protected_categories_in_temporary_config() -> None:
+    rules, dictionary = config()
+    configured = deepcopy(rules)
+    for rule in configured["rules"]:
+        if rule["id"] == "F1":
+            rule["params"]["protected"] = ["numbers"]
+    assert not check_ste.compare_facts(
+        "Use --fast.", "Use --safe.", configured, dictionary
+    )
+    assert check_ste.compare_facts("Use 2.", "Use 3.", configured, dictionary)
+
+
 def test_render_dictionary(tmp_path: Path) -> None:
     document = tmp_path / "DICTIONARY.md"
     document.write_text(
@@ -207,6 +259,38 @@ def test_config_failures_return_exit_two(tmp_path: Path, failure: str) -> None:
         base_rules["rules"].append(deepcopy(base_rules["rules"][0]))
     else:
         base_dictionary["substitutions"][0]["condition"] = "["
+    rules = tmp_path / "rules.json"
+    dictionary = tmp_path / "dictionary.json"
+    rules.write_text(json.dumps(base_rules))
+    dictionary.write_text(json.dumps(base_dictionary))
+    assert (
+        check_ste.main(
+            ["check", "-", "--rules", str(rules), "--dictionary", str(dictionary)]
+        )
+        == 2
+    )
+
+
+@pytest.mark.parametrize(
+    "failure", ["required", "check", "boundary_regex", "protected_regex"]
+)
+def test_additional_config_failures_return_exit_two(
+    tmp_path: Path, failure: str
+) -> None:
+    base_rules = json.loads((Path(__file__).parents[1] / "rules.json").read_text())
+    base_dictionary = json.loads(
+        (Path(__file__).parents[1] / "dictionary.json").read_text()
+    )
+    if failure == "required":
+        del base_rules["rules"][0]["message"]
+    elif failure == "check":
+        base_rules["rules"][0]["check"] = "unknown"
+    elif failure == "boundary_regex":
+        base_dictionary["matching"]["phrase_boundary_regex_template"] = "["
+    else:
+        base_dictionary["matching"]["sentence_segmentation"]["protected_token_regexes"][
+            "url"
+        ] = "["
     rules = tmp_path / "rules.json"
     dictionary = tmp_path / "dictionary.json"
     rules.write_text(json.dumps(base_rules))
