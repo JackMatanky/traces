@@ -1,10 +1,20 @@
 {
   "version": 1,
   "matching": {
-    "case_sensitive": false,
-    "boundary": "word_or_phrase",
-    "longest_phrase_wins": true,
-    "condition_scope": "same_sentence"
+    "phrase_boundary_regex_template": "(?<![A-Za-z0-9_'-]){phrase}(?![A-Za-z0-9_'-])",
+    "phrase_interpolation": "re.escape(common_phrase)",
+    "case_behavior": {
+      "common_phrases": "re.IGNORECASE",
+      "condition_regexes": "re.IGNORECASE"
+    },
+    "longest_common_phrase_first": true,
+    "condition_evaluation": "candidate_and_condition_must_share_sentence",
+    "sentence_segmentation": {
+      "boundary_requires_terminal_punctuation": true,
+      "terminal_punctuation": [".", "!", "?"],
+      "protected_token_classes": ["inline_code", "url", "decimal", "version", "abbreviation"],
+      "protected_tokens_do_not_form_sentence_boundaries": true
+    }
   },
   "substitutions": [
     {

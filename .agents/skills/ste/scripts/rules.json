@@ -1,10 +1,22 @@
 {
   "version": 1,
-  "matching": {
-    "case_sensitive": false,
-    "boundary": "word_or_phrase",
-    "longest_phrase_wins": true,
-    "condition_scope": "same_sentence"
+  "matching_policy": {
+    "source": "dictionary.json",
+    "key": "matching",
+    "applies_to_checks": [
+      "compound_instruction",
+      "passive_voice",
+      "tense",
+      "command_verb_start",
+      "missing_article",
+      "gerund_start",
+      "synonym_pair",
+      "one_meaning",
+      "banned_word",
+      "warning_block",
+      "hedge",
+      "second_person"
+    ]
   },
   "rules": [
     {
