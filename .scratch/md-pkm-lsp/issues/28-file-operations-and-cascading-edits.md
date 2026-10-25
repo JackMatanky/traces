@@ -1,7 +1,9 @@
 # File operations: note rename/move/delete cascading link updates
 
 Type: grilling
+Status: open
 Blocked by: 13, 26
+Assigned: agent
 
 ## Question
 

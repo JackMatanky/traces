@@ -1,7 +1,9 @@
 # Occurrence-span persistence: persist `Spanned<T>` spans through redb (amending ticket 11 §8), or keep them transient behind `Option<ByteSpan>`?
 
 Type: grilling
+Status: open
 Blocked by: (resolved) 26, 27
+Assigned: agent
 
 ## Question
 

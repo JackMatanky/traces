@@ -1,7 +1,9 @@
 # Multi-root / multi-workspace behavior vs the single Project Root model
 
 Type: grilling
+Status: open
 Blocked by: 10
+Assigned: agent
 
 ## Question
 

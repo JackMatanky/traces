@@ -1,7 +1,9 @@
 # Crate/binary packaging & integration into the Traces build
 
 Type: grilling
+Status: open
 Blocked by: 09, 10
+Assigned: agent
 
 ## Question
 

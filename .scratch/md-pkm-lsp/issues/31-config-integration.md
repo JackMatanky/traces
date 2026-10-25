@@ -1,7 +1,9 @@
 # Config integration: .traces/config.toml vs LSP initializationOptions/workspace configuration
 
 Type: grilling
+Status: open
 Blocked by: 09
+Assigned: agent
 
 ## Question
 

@@ -1,7 +1,9 @@
 # Client capability negotiation & graceful degradation
 
 Type: grilling
+Status: open
 Blocked by: 09
+Assigned: agent
 
 ## Question
 

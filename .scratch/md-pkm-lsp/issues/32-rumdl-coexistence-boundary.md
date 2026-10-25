@@ -1,7 +1,9 @@
 # rumdl coexistence: explicit capability-ownership boundary
 
 Type: grilling
+Status: open
 Blocked by: 03, 25, 27
+Assigned: agent
 
 ## Question
 
