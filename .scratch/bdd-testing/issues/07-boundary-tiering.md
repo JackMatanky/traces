@@ -31,7 +31,7 @@ and consolidated evidence:
 - (c) Give an explicit answer on which option won. Give the reasons.
 
 Consider the goal this whole map serves: behavioral stability with
-implementation flexibility, where specs must survive the refactor of ticket 09's
+implementation flexibility, where specs must survive the refactor of ticket 10's
 stress case. A seam that the planned refactor would move is a bad scenario
 target, at any tier.
 
@@ -107,7 +107,7 @@ A guarantee earns a scenario only if all six conditions are true:
    Set the time zone with `TZ` at each spawn. Time zone is not an exception.
 6. **Refactor-stable.** No open arch-design ticket will move the seam. The
    provisional list is research/03 section C items 1 to 12 and research/02 G14
-   to G18. Ticket 09 owns the list and refines it. Ticket 07 blocks ticket 09.
+   to G18. Ticket 10 owns the list and refines it. Ticket 07 blocks ticket 10.
 
 ### Decision (b): policy for internal-seam guarantees
 
@@ -118,10 +118,10 @@ Try these directions in order:
    exit 130.
 2. **Keep as a unit test and check it with mutation testing.** Run
    `mise run test:mutants -m <module>`. The task uses mutarust, `--all-targets`,
-   `mutarust-baseline.json`, `--min-msi` and `--fail-on-escaped`. Ticket 11 sets
-   the thresholds and the scope. Ticket 11 first reads `mutarust.yml`.
+   `mutarust-baseline.json`, `--min-msi` and `--fail-on-escaped`. Ticket 12 sets
+   the thresholds and the scope. Ticket 12 first reads `mutarust.yml`.
 3. **Remove or relabel incidental pins.** Examples: the mtime canary framing and
-   the misleading sort test names. Ticket 12 decides how.
+   the misleading sort test names. Ticket 13 decides how.
 4. **Do not wrap the guarantee in a `test-utils` contract.** Make an exception
    only when an arch ticket creates a real user-visible projection. Example:
    arch ticket 25, item 5, for refresh reporting.
@@ -145,15 +145,15 @@ These classes are never plain scenarios. Each class has an alternative.
 | Timing freshness (racy-timestamp gap, mtime) | Unit test or property test. Tag the canary as a known limitation. |
 | Byte-level store surgery, `syn` source scans | Unit tests. |
 
-Ticket 11 uses this list as input for the coverage gaps.
+Ticket 12 uses this list as input for the coverage gaps.
 
 ### Constraints for other tickets
 
-- Ticket 09: refine the moving-seam list (rule 6).
-- Ticket 10: `check:layers` searches `tests/e2e/` for `traces` followed by `::`,
+- Ticket 10: refine the moving-seam list (rule 6).
+- Ticket 11: `check:layers` searches `tests/e2e/` for `traces` followed by `::`,
   `{`, `;` or the word `as`. Keep the `.feature` text in that directory free of
   these patterns.
-- Ticket 11: set the mutarust policy. Use the exception list as input for the
+- Ticket 12: set the mutarust policy. Use the exception list as input for the
   coverage gaps.
-- Ticket 12: retire or relabel the incidental pins.
-- Ticket 13: agent policy (read-only specs, red-first) is outside ticket 07.
+- Ticket 13: retire or relabel the incidental pins.
+- Ticket 14: agent policy (read-only specs, red-first) is outside ticket 07.

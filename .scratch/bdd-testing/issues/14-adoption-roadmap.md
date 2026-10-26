@@ -1,8 +1,8 @@
-# 13: Adoption roadmap
+# 14: Adoption roadmap
 
 Type: grilling
 Status: open
-Blocked by: 09, 11, 12
+Blocked by: 10, 12, 13
 
 ## Question
 
@@ -12,8 +12,9 @@ is the last decision ticket. Its answer feeds `spec.md` directly.
 **Inputs**:
 
 - tickets 06 (framework verdict and caveats), 07 (tiering rule), 08 (layer
-  architecture), 09 (invariance list), 10 (organization and authoring
-  conventions), 11 (quality/gap method), and 12 (migration rules)
+  architecture), 09 (e2e prototype results), 10 (invariance list), 11
+  (organization and authoring conventions), 12 (quality/gap method), and 13
+  (migration rules)
 - the five inventories (which domains carry the highest-value, least-pinned
   guarantees)
 
@@ -26,7 +27,7 @@ is the last decision ticket. Its answer feeds `spec.md` directly.
   cold. Name candidate domains, which existing tests it first interacts with,
   and its acceptance criteria.
   Use only guarantees whose doc/code contradictions have a recorded disposition
-  from ticket 11, decision (f). Later slices resolve the contradictions that
+  from ticket 12, decision (f). Later slices resolve the contradictions that
   they need as ordinary doc fixes inside the slice.
 - (c) Give the sequencing rationale: risk, value of guarantees pinned, and
   learning payback. Early slices should validate the framework verdict from 06

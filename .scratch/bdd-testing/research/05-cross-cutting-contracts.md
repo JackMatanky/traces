@@ -27,7 +27,7 @@ identifiers" figure from the ticket were treated as claims and re-counted (§0).
 ## 1. Cross-cutting guarantees (highest value first)
 
 Observable contracts that span modules or the process boundary. Ticket 08's
-layer boundaries and ticket 11's coverage method inherit these.
+layer boundaries and ticket 12's coverage method inherit these.
 
 ### G1. Numeric exit-code contract
 - **Contract**: any invocation resolves to exactly one of: `0` on success *and*
@@ -174,7 +174,7 @@ layer boundaries and ticket 11's coverage method inherit these.
 - **pinned**: n/a (documentation convention); map.md:24 explicitly lists its
   fate as an open decision for this BDD effort.
 - **Gherkin**: the convention is the closest existing thing to
-  Scenario/coverage annotations; ticket 13 should decide absorb vs keep.
+  Scenario/coverage annotations; ticket 14 should decide absorb vs keep.
 
 ### G10. No panic crosses the process boundary ("never 101")
 - **Contract**: production code never panics/exits/prints to stdout, so a
@@ -390,8 +390,8 @@ module's own tests. 278 inline `#[test]`s total (§0).
 - Ticket 07/08: G5-G6 are the already-machine-enforced layer gates
   (`check:visibility`, `check:layers`, `required-features`); BDD's tiering
   must slot inside them, not around them.
-- Ticket 11: coverage gaps worth scenarios first: `TRACES_CEILING_DIRS`
+- Ticket 12: coverage gaps worth scenarios first: `TRACES_CEILING_DIRS`
   (untested env seam), delimiter depth overflow, yaml.rs's four unpinned
   quirks, the exit-130 process test, and the hash TOCTOU caveat.
-- Ticket 13: decide fate of `Proves` / `Executes vs asserts` / `Defect class`
+- Ticket 14: decide fate of `Proves` / `Executes vs asserts` / `Defect class`
   (map.md:24); if kept, fix the taxonomy drift first (§5.7).

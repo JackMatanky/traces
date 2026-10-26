@@ -1,8 +1,8 @@
-# 10: Feature and step organization
+# 11: Feature and step organization
 
 Type: grilling
 Status: open
-Blocked by: 06, 07, 08, 14
+Blocked by: 06, 07, 08, 09
 
 ## Question
 
@@ -39,4 +39,4 @@ abstraction?
   (this map's standing preference is minimal abstraction).
 
 **Answer records**: the layout, the step/fixture rules, and a short
-authoring-convention summary that ticket 13's roadmap can quote verbatim.
+authoring-convention summary that ticket 14's roadmap can quote verbatim.

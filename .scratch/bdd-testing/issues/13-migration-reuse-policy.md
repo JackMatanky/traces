@@ -1,4 +1,4 @@
-# 12: Migration and reuse policy
+# 13: Migration and reuse policy
 
 Type: grilling
 Status: open
@@ -32,7 +32,7 @@ which stay as-is, and which are redundant and die?
 - (d) Give the coverage-preservation guarantee during migration: at no point
   does the suite prove less than before. Say how the session checks this.
 - (e) Decide the scope of migration: migrate everything at once, or only tests
-  touched by adoption waves? This informs ticket 13.
+  touched by adoption waves? This informs ticket 14.
 
 **Answer records**: the three rules (convert/keep/die), the
 coverage-preservation check, and the migration scope decision.

@@ -55,5 +55,5 @@ Findings:
 - **Doc contradictions**: lib.rs count off-by-one; root-module test count is 278
   not ~269; ADR-0004 promises a nonexistent Ctrl-C process test; four `yaml.rs`
   doc claims untested.
-- Feeds tickets 07 (seam = `test-utils`), 08 (layer gates evidence), 10 (fixture
-  design), 11 (taxonomy feeds quality rubric), fog item (`Defect class` fate).
+- Feeds tickets 07 (seam = `test-utils`), 08 (layer gates evidence), 11 (fixture
+  design), 12 (taxonomy feeds quality rubric), fog item (`Defect class` fate).

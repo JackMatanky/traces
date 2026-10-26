@@ -58,5 +58,5 @@ lines, source-cited; spot-verified during resolution).
 - **Gherkin-hostile**: TTY tests self-skip under TTY, process-global env/cwd
   (one process per env value), miette line-wrapping (assert codes not text),
   timing-based watchdog, canonicalization `/tmp`→`/private/tmp`.
-- Feeds tickets 07 (suitability), 08 (seam visibility), 10 (env fixture design),
-  12 (which tests stay).
+- Feeds tickets 07 (suitability), 08 (seam visibility), 11 (env fixture design),
+  13 (which tests stay).

@@ -159,7 +159,7 @@ rejected (`store.rs:2760`); unwritable parent = IO error (`store.rs:2777`); rows
 production.
 - workflow · intentional (documented) · `src/cli/mod.rs:344`, `src/index/service.rs:397-403`,
   `src/index/mod.rs:11-17` · Gherkin: design constraint, prefer spawned-command scenarios for visible behavior
-  (ticket 10).
+  (ticket 11).
 
 **P25 · `index` populates the tracked-config store.** `tracked list` / `tracked clean` only see entries after a
 load-triggering command such as `index`.
@@ -269,7 +269,7 @@ classification; `embedded` flag for `![[...]]`; escaped pipe in wikilink target;
 decoding; the test notes cached postcard indexes carry **no automatic format marker**, making it the tripwire for
 field add/remove/reorder on the serialization path.
 - invariant · intentional · **pinned**: `src/note/lists.rs:1014-1065` · Gherkin: poor fit (byte fixture),
-  migration material (ticket 12).
+  migration material (ticket 13).
 
 ---
 
@@ -348,7 +348,7 @@ fingerprint exclusions (project move does not rebuild, `fingerprint.rs:313`), Fo
 
 ---
 
-## E. Behaviors hostile to Gherkin (constraints for tickets 09-11)
+## E. Behaviors hostile to Gherkin (constraints for tickets 10-12)
 
 - **Timing/mtime**: P06 racy gap, the 15 ms sleep workaround (`service.rs:1471-1490`), mtime-restore fixtures;
   unit/integration material.
@@ -359,4 +359,4 @@ fingerprint exclusions (project move does not rebuild, `fingerprint.rs:313`), Fo
   drift at `info!`, changes at `debug!`; count accessors `dead_code` outside test facades, `refresh.rs:52-59`). No
   user-visible projection exists today; arch ticket 25 item 5 would create one.
 - **Process-spawn e2e as the production seam** (P01, P08, P14): slow, but the only place `refresh_store()` is
-  exercised; scenario cost must be accepted under nextest (feeds ticket 10).
+  exercised; scenario cost must be accepted under nextest (feeds ticket 11).

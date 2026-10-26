@@ -1,6 +1,6 @@
-# 14: Prototype BDD inside the e2e binary
+# 09: Prototype BDD inside the e2e binary
 
-Type: prototype
+Type: research (empirical: runs a throwaway spike in the repo; results only)
 Status: open
 Blocked by: 08
 
@@ -33,6 +33,6 @@ Ticket 08 adds two requirements for `check:layers`:
 - Use one pilot scenario from the process-contract class (exit codes or stream
   split). Spawn through `Sandbox` only.
 - Do not merge the spike. Record the results and any proposed `mise.toml` diff
-  in `research/14-prototype.md`.
+  in `research/09-prototype.md`.
 - Ticket 06 sets the pins. It also sets one `#[expect]` on each `mod bdd`
   declaration.

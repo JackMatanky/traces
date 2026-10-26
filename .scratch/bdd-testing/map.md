@@ -54,7 +54,7 @@ fresh session can start slice 1 with zero open design questions.
   ticket. No throwaway branches: concurrent agents share one worktree; this
   matches the `arch-design` precedent.
 - **Coordination**: [`.scratch/arch-design/`](../arch-design/map.md) is the
-  named refactor stress case (ticket 09).
+  named refactor stress case (ticket 10).
   [`.scratch/integration-e2e-suite/`](../integration-e2e-suite/spec.md) is
   read-only input; its spec and audit inform this map and its execution is out
   of scope.
@@ -92,7 +92,7 @@ fresh session can start slice 1 with zero open design questions.
   `rstest-bdd` =0.6.0 with caveats. Do not change `clippy.toml`. Put one
   `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration, because
   the step wrappers call `catch_unwind`. Bare `{name}` placeholders avoid a
-  lint. A `build.rs` for new feature files costs a package rebuild (ticket 10
+  lint. A `build.rs` for new feature files costs a package rebuild (ticket 11
   decides). Ticket 08 decided: fold scenarios into the e2e binary only.
 - [07: Boundary tiering, b versus c](issues/07-boundary-tiering.md): option (b)
   wins, with a sharper boundary. Scenarios address the spawned process by
@@ -115,20 +115,20 @@ fresh session can start slice 1 with zero open design questions.
 - [08: Layer responsibilities](issues/08-layer-responsibilities.md): a six-step
   classification rule (gate, proptest, scenario, e2e, integration, unit).
   Scenarios fold into the e2e binary only. Prototype
-  [14](issues/14-prototype-bdd-in-e2e.md) must confirm this. `check:layers` must
+  [09](issues/09-bdd-e2e-prototype.md) must confirm this. `check:layers` must
   fail when `git grep` exits with code 2 or higher. Proptests stay inline;
-  growth waits for ticket 09. The `integration-e2e-suite` is partially adopted:
+  growth waits for ticket 10. The `integration-e2e-suite` is partially adopted:
   its invariants and gates bind, its per-test classification does not. The
-  audits feed ticket 12. Ticket 08 sets six anti-goals. Evidence:
+  audits feed ticket 13. Ticket 08 sets six anti-goals. Evidence:
   [research/08-prior-art](research/08-prior-art.md),
   [audits](research/08-audit-e2e.md).
 
 ## Not yet specified
 
 - Policy for BDD and quality gates beyond layer placement. The tools exist:
-  mutarust (`mise run test:mutants`) and `llvm-cov nextest`. Ticket 11 sets the
+  mutarust (`mise run test:mutants`) and `llvm-cov nextest`. Ticket 12 sets the
   thresholds and the scope.
-- Result of ticket 14 for the 06 caveats that are only inferred (`check:layers`,
+- Result of ticket 09 for the 06 caveats that are only inferred (`check:layers`,
   Linux and Windows CI, `build.rs` rebuild cost).
 - Fate of the existing `//! Proves` and `Defect class:` documentation style:
   absorbed into Gherkin, kept alongside, or replaced.

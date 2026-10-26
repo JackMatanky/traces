@@ -20,7 +20,7 @@ duplicate-numbered 0009; note the collision). Use
 `.scratch/arch-design/research/05-freshness-fingerprint-precedent.md` as prior
 evidence. Note that `.scratch/arch-design/` has open tickets touching
 incrementality and fingerprinting. Record which guarantees those changes would
-stress (feeds ticket 09).
+stress (feeds ticket 10).
 
 **Deliverable**: candidate-guarantee inventory in
 `.scratch/bdd-testing/research/03-index-note.md`, same entry format and citation
@@ -47,5 +47,5 @@ lines, source-cited; test counts re-verified exact: index 208, note 304).
 - **Doc contradictions (7)**: slug/callout/footnote glossary specs with zero
   implementing code; ADR-0009 drift-vs-wipe mismatch; duplicate ADR number 0009
   (ambiguous citations); ADR-0009 `proposed` while landed.
-- Feeds tickets 07 (invariance classification), 09 (core input: which guarantees
+- Feeds tickets 07 (invariance classification), 10 (core input: which guarantees
   the planned refactor stresses).

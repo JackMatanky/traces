@@ -71,7 +71,7 @@ The five inventories record about 144 candidate guarantees across 34 classes.
 | Architectural gates | 1 | ~3 | 3 (`check:visibility`, `check:layers`, clippy) | 0 (all gates active in `mise run check`) |
 
 *Duplication risk:* about 70 scenario-eligible guarantees already have an e2e or
-integration test. Writing scenarios without a retirement plan (ticket 12)
+integration test. Writing scenarios without a retirement plan (ticket 13)
 duplicates coverage.
 
 ## 3. Property tests today and growth candidates
@@ -125,7 +125,7 @@ instances in `tests/`, and four blocks in `src/temporal/`:
 | Unit (`src/**/*.rs`) | Very rare `Proves` (4 sites in `store.rs`, `ui.rs`); 1 `Defect class:` (`src/cli/mod.rs:1492`) | Standard Rust doc comments; inline `// Arrange`, `// Act`, `// Assert` | Behavior-driven snake_case (`parses_a_schema_...`) | Heavy `#[rstest] #[case(...)]` tables (`field.rs`, `file.rs`, `config/`, `index/`, `note/`) | Direct function invocation; mutation testing with mutarust |
 | Property (`src/temporal/*.rs`) | None | None | Law-driven (`..._round_trips_...`, `..._is_idempotent`) | Proptest generators (`proptest!` macro blocks) | `prop_assert_eq!`, `ZoneGuard::set("UTC")` |
 
-## 5. Architectural redesign impact (flag only; ticket 09 resolves)
+## 5. Architectural redesign impact (flag only; ticket 10 resolves)
 
 Arch-design tickets 22 to 36 in `.scratch/arch-design/map.md` plan structural
 changes. The following guarantee classes sit on seams that the redesign may
@@ -176,7 +176,7 @@ suite from these changes.
   - When new host boundaries appear (LSP stdio, MCP), does the scenario
     definition expand to cover them?
   - Does ticket 08 ratify the deprecation of `Defect class:` in favor of Gherkin
-    scenario tags (ticket 13)? *[Ticket 08 decision: Classification rule (a)
+    scenario tags (ticket 14)? *[Ticket 08 decision: Classification rule (a)
     adopted Option 1 questions in order. Diagnostic codes on stderr are asserted
     directly.]*
 

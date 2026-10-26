@@ -51,7 +51,7 @@ make it a follow-up of the prototype type.
 
 **Answer records**: the verdict, the evidence table for each constraint, the
 exact versions and feature flags, and all design constraints that block or
-change tickets 07, 08, and 10.
+change tickets 07, 08, and 11.
 
 ## Answer
 
@@ -139,7 +139,7 @@ ran on macOS arm64 only. The record is in
    still parses through `FromStr`.
    - Type hints narrow the match regex and raise specificity.
    - Bare placeholders match loosely and fail at parse time.
-   - Ticket 10, decision (b), decides the placeholder style.
+   - Ticket 11, decision (b), decides the placeholder style.
 3. **Incremental builds do not notice new `.feature` files.** They track edits
    to existing files (`include_bytes!`, ADR-010). Added files need a `build.rs`
    with `println!("cargo::rerun-if-changed=tests/features");`. This is the
@@ -150,7 +150,7 @@ ran on macOS arm64 only. The record is in
      library again.
    - [INFERENCE, not tested]: in `traces` this is probably a full-package
      rebuild. Edits to existing files probably cause it too.
-   - Deferred to ticket 10 (or ticket 08 if it affects phase wiring). Accept the
+   - Deferred to ticket 11 (or ticket 08 if it affects phase wiring). Accept the
      rebuild cost, or document `touch tests/integration/bdd.rs` for when you add
      a feature file. Cold CI builds are not affected.
 4. **Compile-time step validation exists only for `#[scenario]`.** A missing
@@ -172,7 +172,7 @@ ran on macOS arm64 only. The record is in
    `unused_braces`. Multi-line bodies are clean. This is a quirk of `rstest` and
    clippy, not of `rstest-bdd`.
 
-### Constraints on tickets 07, 08 and 10
+### Constraints on tickets 07, 08 and 11
 
 - **Ticket 08 (b):** you can fold scenarios into the existing `integration`
   binary (and later `e2e`). This needs no phase, CI or nextest edits
@@ -180,9 +180,9 @@ ran on macOS arm64 only. The record is in
   `[[test]]` entry and a phase line.
 - **Ticket 07:** scenarios are ordinary libtest tests. The framework does not
   limit the tier that they address.
-- **Ticket 10:**
+- **Ticket 11:**
   - Keep the feature directories inside the path that the `build.rs` recipe
-    watches (caveat 3). Ticket 10, decision (a), decides the layout.
+    watches (caveat 3). Ticket 11, decision (a), decides the layout.
   - Put steps under the layer directories, so `check:layers` applies.
   - Use fixtures for each concept, with no World.
   - Placeholder style: see caveat 2.

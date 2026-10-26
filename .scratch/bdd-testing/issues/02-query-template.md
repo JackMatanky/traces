@@ -50,5 +50,5 @@ Findings: [../research/02-query-template.md](../research/02-query-template.md)
 - **Gherkin-hostile**: perf claims unobservable, plan internals
   refactor-sensitive, miette wrapping, injected-timezone requirement,
   platform-specific paths.
-- Feeds tickets 07 (language surface vs internals), 09 (plan/memoization
-  refactor-sensitive), 11 (unpinned = gap candidates).
+- Feeds tickets 07 (language surface vs internals), 10 (plan/memoization
+  refactor-sensitive), 12 (unpinned = gap candidates).
