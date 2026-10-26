@@ -349,6 +349,19 @@ itself is not implemented here; the map ends at hand-off to specification.
   [errors](./issues/31-error-and-diagnostic-architecture.md),
   [topology](./issues/32-crate-topology-and-public-surface.md),
   [reconciliation](./issues/33-reconcile-decisions-and-audit-coverage.md).
+- [Who owns config-derived types, trust/tracking state, and the config
+  lifecycle?](./issues/22-config-ownership-and-lifecycle.md): Keep the root
+  types `task`, `tag` and `field` as shared vocabulary. Make `note` own its
+  parser input, so `note` no longer imports `config`. Delete `ConfigDigests`.
+  Make `index` own `IndexPolicy`, the only source of the fingerprint. One
+  exhaustive projection builds it from `Config`. Ticket 25 keeps the content and
+  the granularity. Keep two trust and tracker stores. `ConfigService` is the
+  only writer. Remove root-only grants and `MissingBaseline`. Keep the
+  `ConfigFile` typestate with a store-level trust check. Adapters build
+  `HostInputs`. `ConfigService` owns its locator. A relative path variable is an
+  error. `init` is a core use case. It trusts only a workspace that it created.
+  `Config` carries a stamp. `ConfigService::admit` is the admission primitive.
+  Core holds no workspace object (ticket 30).
 
 ## Not yet specified
 

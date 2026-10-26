@@ -1,8 +1,10 @@
 # Tactical findings ledger (outside the map's destination)
 
-Scout findings that are local defects or mechanical cleanups: fixable without an architectural decision. They are
-NOT on the route. Status is **scout-reported, unverified** until `research/01` runs; fix them through ordinary issues.
-Anything that turns out to depend on a map decision is promoted back into the owning ticket.
+Scout findings that are local defects or mechanical cleanups: fixable without an
+architectural decision. They are NOT on the route. Status is **scout-reported,
+unverified** until `research/01` runs; fix them through ordinary issues.
+Anything that turns out to depend on a map decision is promoted back into the
+owning ticket.
 
 | Finding | Evidence (scout) | Notes |
 | --- | --- | --- |
@@ -24,3 +26,8 @@ Anything that turns out to depend on a map decision is promoted back into the ow
 | Divergence register (417 lines, R1-R18) is temporal-core-only by user ruling; it lived in `docs/` beside an older 128-line copy under `.scratch/temporal-core/` | `.scratch/temporal-core/divergence-register.md` | Resolved: the newer docs copy replaced the scratch copy; citations repointed (line numbers unchanged) |
 | Without an attached `FileClassExpander`, store queries fall back to exact class match but in-memory filters match nothing; production always attaches one, so it is latent | `src/query/service.rs:402-406`; `src/query/grammar/source.rs:228-229`; `src/cli/mod.rs:478-480` | Replaced by plain class-hierarchy data (ticket 20 Answer); query-side change in the query-core ticket |
 | The CLI decides whether to load schemas for a query (`has_classes`), i.e. composition lives in `cli` | `src/cli/mod.rs:474-480` | Asked in the workspace-host ticket (30) |
+| `FilePathTracker::record` calls `exists()`, which follows symlinks, and then `symlink()`. A dangling entry fails with `EEXIST`. The code writes companion files non-atomically. | `src/file_tracker.rs:62-84,206-227` | Use `symlink_metadata` and a temporary file with a rename. Ticket 22 prep `i-fact-audit.md` reproduced the fault on paper. |
+| The code reads `TRACES_IGNORED_DIRS` with `env::var`. A non-Unicode value is silently dropped. | `src/env_vars.rs:29` | Ticket 22 fixes this with OS-string `HostInputs`. |
+| The code accepts a relative `TRACES_STATE_DIR` or `XDG_*` value and resolves it against the current directory. The trust store location then depends on the current directory. | `src/dirs.rs:191-197` | Ticket 22 makes this an error (change-table row 3). |
+| `src/task.rs` (1,911 lines) mixes status types with emoji and date code that belongs to notes. `src/field.rs` holds two unrelated hierarchies. | `src/task.rs`, `src/field.rs` | Split the files. Move no owner (ticket 22, decision a). |
+| `traces trust --show` prints `Trusted` for a root-only grant. That grant can never load, because load returns `MissingBaseline`. | `src/config/trust.rs:220-222`, `src/config/file.rs:470-478` | Ticket 22 removes root-only grants (decision d). |
