@@ -14,17 +14,18 @@ tier in
   16 lines 84 and 85 give this split for query and template guarantees.
 - **D**: arch ticket 16 does not list the surface. Its line 67 says that an
   observable change absent from the change table is a regression. Treat D as
-  Frozen until arch-design records a row.
-- **Free**: arch ticket 16 line 75 or 83 frees the mechanism. Only the
-  observable half of such a guarantee appears below.
+  Frozen.
+- **Free**: arch ticket 16 line 75 or 83 frees the mechanism. No Free item
+  appears in the list. The class-level map holds them.
 
 Ticket 07 conditions 3 to 6 apply when an author writes a scenario. This map does
 not apply them.
 
 A scenario never pins a known defect (ticket 10 decision (b)):
 
-- The closed-pipe panic. It sits under 01 G1 and G6.
-- `i64` to `f64` loss at the note boundary. It sits under 03 N07 and N15.
+- The closed-pipe panic. It sits under 01 G1 and G6. G6 is class-level.
+- `i64` to `f64` loss at the note boundary. It sits under 03 N07 and N15. N15 is
+  class-level.
 - Multi-valued inline fields that the code reads with `.first()`. It sits under
   03 N05 and N16.
 

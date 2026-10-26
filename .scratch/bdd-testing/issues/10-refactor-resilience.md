@@ -11,7 +11,7 @@ Which guarantees can scenarios pin without anchoring to a seam that
 
 ## Scope
 
-- The user implements BDD first. Scenarios pin current behavior.
+- BDD implementation comes first. Scenarios pin current behavior.
 - Arch-design runs later. It finds and edits the affected scenarios and tests.
 - This ticket gives arch-design no bookkeeping. It adds no tag, no row id, no
   revisit marker and no note in the arch map.
@@ -33,8 +33,9 @@ Which guarantees can scenarios pin without anchoring to a seam that
 
 HITL, grilling. Do not answer for the user. Reach these decisions:
 
-- (a) Write the invariance list. It holds the Frozen guarantees, and the
-  Migratable guarantees, that pass ticket 07 conditions 1 and 2. Each entry
+- (a) Write the invariance list. It holds the Frozen and Migratable guarantees
+  that pass ticket 07 conditions 1 and 2. It also holds the guarantees that arch
+  ticket 16 does not list. Each entry
   cites its inventory item and its arch ticket 16 tier. Map the other guarantees
   at class level.
 - (b) Say that a scenario never pins a known defect. Arch ticket 16 names three:
@@ -47,14 +48,6 @@ HITL, grilling. Do not answer for the user. Reach these decisions:
   wire format, `NoteFieldValue` order, table escaping and tag containment.
 - (e) Confirm the facade seams from ticket 08: `RefreshReport`, `DriftCause`,
   `InlinkMap` and `load()`.
-
-## Decisions so far
-
-Round 1 and the user's scope cut settled these items:
-
-- Scenarios pin current behavior. Arch-design edits them later.
-- The invariance list is one list. It has no "changing" or "at risk" sublists.
-- Scenarios are spawn-only. No scenario uses the `traces::testing` facade.
 
 ## Boundaries
 
@@ -81,17 +74,17 @@ The full lists are in [research/10-invariance-map.md](../research/10-invariance-
 
 - **(a) Invariance list.** The map has 88 rows for guarantees that pass ticket 07
   conditions 1 and 2. Three rows repeat items across inventories. Each row has
-  its inventory citation and its arch ticket 16 tier: F, M, F+M, D or Free. D
-  means that arch ticket 16 does not list the surface. Treat D as Frozen. The
-  map holds the other guarantees at class level.
+  its inventory citation and its arch ticket 16 tier: F, M, F+M or D. D means
+  that arch ticket 16 does not list the surface. Treat D as Frozen. The map
+  holds the other guarantees at class level.
 - **(b) Known defects.** A scenario never pins the closed-pipe panic, the `i64`
   to `f64` loss, or the `.first()`-only multi-valued inline fields.
 - **(c) Seam dispositions.** The map gives one disposition for each of the 12
   seams in `research/03` section C and for G14 to G18. Each is a scenario at the
   higher boundary, or no scenario.
 - **(d) Proptests.** Add table escaping, tag containment and `NoteFieldValue`
-  order now. Keep path codec and note wire format on the list. Drop the schema
-  DAG sort. Query-plan idempotence stays excluded.
+  order now. Keep path codec and note wire format on the list. Do not add the
+  schema DAG sort. Query-plan idempotence stays excluded.
 - **(e) Facade seams.** `RefreshReport`, `DriftCause`, `InlinkMap` and `load()`
   get no scenario. They stay integration-test seams.
 - **Flagged contradictions.** Five contradictions touch the list. Ticket 12
