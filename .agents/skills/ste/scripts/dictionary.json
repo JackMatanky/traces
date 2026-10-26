@@ -22,7 +22,13 @@
     "sentence_segmentation": {
       "boundary_requires_terminal_punctuation": true,
       "terminal_punctuation": [".", "!", "?"],
-      "protected_token_classes": ["inline_code", "url", "decimal", "version", "abbreviation"],
+      "protected_token_classes": [
+        "inline_code",
+        "url",
+        "decimal",
+        "version",
+        "abbreviation"
+      ],
       "protected_token_regexes": {
         "inline_code": "`[^`\\n]*`",
         "url": "https?://[^\\s`<>]+",
@@ -227,7 +233,12 @@
   "one_meaning": [
     {
       "word": "fall",
-      "forbidden_phrases": ["in fall", "in the fall", "in this fall", "in last fall"],
+      "forbidden_phrases": [
+        "in fall",
+        "in the fall",
+        "in this fall",
+        "in last fall"
+      ],
       "note": "verb only - do not write \"in the fall\""
     },
     {

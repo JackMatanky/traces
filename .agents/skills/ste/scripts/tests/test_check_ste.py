@@ -102,6 +102,14 @@ def test_findings_preserve_markdown_source_columns() -> None:
     ]
 
 
+def test_findings_preserve_indented_atx_heading_source_columns() -> None:
+    rules, dictionary = config()
+    findings = check_ste.check_text(
+        "  ## Utilize the tool.", "test.md", rules, dictionary, only={"R13"}
+    )
+    assert [(finding.line, finding.column) for finding in findings] == [(1, 6)]
+
+
 @pytest.mark.parametrize(
     ("rule_id", "text"),
     [
@@ -206,6 +214,94 @@ def test_fixer_changes_only_auto_entries_and_preserves_code(
     assert "```text\nutilize prior to\n```" in updated
 
 
+def test_fixer_preserves_nested_link_destinations_and_changes_prose(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "input.md"
+    document.write_text("[Utilize](foo/(x)/utilize) Utilize.\n")
+
+    assert check_ste.main(["fix", str(document), "--write"]) == 0
+
+    assert document.read_text() == "[Use](foo/(x)/utilize) Use.\n"
+
+
+def test_fixer_preserves_escaped_parenthesis_destinations_and_changes_labels(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "input.md"
+    document.write_text(r"[Utilize](foo\)utilize) Utilize." + "\n")
+
+    assert check_ste.main(["fix", str(document), "--write"]) == 0
+
+    assert document.read_text() == r"[Use](foo\)utilize) Use." + "\n"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("https://example.test/utilize", "https://example.test/utilize"),
+        (
+            "[Read this](https://example.test/utilize)",
+            "[Read this](https://example.test/utilize)",
+        ),
+        (
+            "[Utilize this](https://example.test/reference)",
+            "[Use this](https://example.test/reference)",
+        ),
+    ],
+)
+def test_dictionary_check_and_fix_only_markdown_prose(text: str, expected: str) -> None:
+    rules, dictionary = config()
+    findings = check_ste.check_text(text, "test.md", rules, dictionary, only={"R13"})
+
+    assert bool(findings) is (text != expected)
+    assert check_ste.replace_auto(text, dictionary) == expected
+
+
+def test_lexical_rules_ignore_urls_and_destinations_but_check_link_labels() -> None:
+    rules, dictionary = config()
+    raw_url = "https://example.test/basically"
+    destination = "[Read this](https://example.test/basically)"
+    label = "[Basically read this](https://example.test/reference)"
+
+    assert not check_ste.check_text(raw_url, "test.md", rules, dictionary, only={"R19"})
+    assert not check_ste.check_text(
+        destination, "test.md", rules, dictionary, only={"R19"}
+    )
+    assert check_ste.check_text(label, "test.md", rules, dictionary, only={"R19"})
+
+
+def test_word_count_treats_url_as_one_word_and_link_destination_as_zero() -> None:
+    assert check_ste.word_count("https://example.test/basically") == 1
+    assert check_ste.word_count("[Read this](https://example.test/basically)") == 2
+
+
+def test_nested_link_destination_is_not_prose() -> None:
+    rules, dictionary = config()
+    text = "[Read this](https://example.test/(basically)/utilize)"
+
+    assert not check_ste.check_text(text, "test.md", rules, dictionary, only={"R13"})
+    assert not check_ste.check_text(text, "test.md", rules, dictionary, only={"R19"})
+    assert check_ste.word_count(text) == 2
+
+
+def test_escaped_parenthesis_link_destination_is_not_prose() -> None:
+    rules, dictionary = config()
+    text = r"[Utilize](foo\)utilize)"
+
+    assert check_ste.check_text(text, "test.md", rules, dictionary, only={"R13"})
+    assert check_ste.word_count(text) == 1
+
+
+def test_escaped_parenthesis_destination_does_not_trigger_r13() -> None:
+    rules, dictionary = config()
+    findings = check_ste.check_text(
+        r"[Read](foo\)utilize)", "test.md", rules, dictionary, only={"R13"}
+    )
+
+    assert not findings
+
+
 def test_core_rules_and_unknown_domain_verb() -> None:
     assert {"R13", "R19", "R12"} <= ids(
         "Utilize this. Basically test it. Work in the fall."
@@ -261,8 +357,34 @@ def test_render_dictionary(tmp_path: Path) -> None:
     _, dictionary = config()
     assert check_ste.render_dictionary(document, dictionary, check=True) == 1
     assert check_ste.render_dictionary(document, dictionary, check=False) == 0
-    assert "utilize" in document.read_text()
+    rendered = document.read_text()
+    assert "| Common word / phrase | Use instead | Note |" in rendered
+    assert '| follow | obey | "follow" means "come after" only |' in rendered
+    assert "| following | after | context dependent |" in rendered
     assert check_ste.render_dictionary(document, dictionary, check=True) == 0
+
+
+def test_dictionary_table_escapes_all_cell_values() -> None:
+    _, dictionary = config()
+    fixture = deepcopy(dictionary)
+    fixture["substitutions"] = [
+        {
+            "common": ["common \\| phrase | plain\r\nnext C:\\docs"],
+            "approved": "approved \\| replacement | plain\nnext C:\\docs",
+            "auto": False,
+            "condition": None,
+            "note": "note \\| context | plain\rnext C:\\docs",
+        }
+    ]
+    escaped_preescaped_pipe = "\\" * 3 + "|"
+    escaped_plain_pipe = r"\|"
+    escaped_path = r"C:\\docs"
+    expected = (
+        f"| common {escaped_preescaped_pipe} phrase {escaped_plain_pipe} plain next {escaped_path} | "
+        f"approved {escaped_preescaped_pipe} replacement {escaped_plain_pipe} plain next {escaped_path} | "
+        f"note {escaped_preescaped_pipe} context {escaped_plain_pipe} plain next {escaped_path} |"
+    )
+    assert expected in check_ste.dictionary_table(fixture)
 
 
 @pytest.mark.parametrize("failure", ["severity", "duplicate", "regex"])
@@ -364,6 +486,141 @@ def test_non_string_rule_fields_return_exit_two(
         )
         == 2
     )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "r7_missing_verbs",
+        "f1_malformed_protected",
+        "substitution_malformed_approved",
+        "substitution_malformed_common",
+        "substitution_malformed_auto",
+        "one_meaning_malformed_phrases",
+        "hedge_malformed_pattern_severity",
+        "hedge_null_pattern_severity",
+    ],
+)
+def test_nested_config_failures_return_exit_two_even_when_filtered(
+    tmp_path: Path, failure: str
+) -> None:
+    base_rules = json.loads((Path(__file__).parents[1] / "rules.json").read_text())
+    base_dictionary = json.loads(
+        (Path(__file__).parents[1] / "dictionary.json").read_text()
+    )
+    if failure == "r7_missing_verbs":
+        next(rule for rule in base_rules["rules"] if rule["id"] == "R7")["params"] = {}
+    elif failure == "f1_malformed_protected":
+        next(rule for rule in base_rules["rules"] if rule["id"] == "F1")["params"][
+            "protected"
+        ] = "numbers"
+    elif failure == "substitution_malformed_approved":
+        base_dictionary["substitutions"][0]["approved"] = ["obey", 1]
+    elif failure == "substitution_malformed_common":
+        base_dictionary["substitutions"][0]["common"] = ["follow", 1]
+    elif failure == "substitution_malformed_auto":
+        base_dictionary["substitutions"][0]["auto"] = "false"
+    elif failure == "one_meaning_malformed_phrases":
+        base_dictionary["one_meaning"][0]["forbidden_phrases"] = "in fall"
+    elif failure == "hedge_malformed_pattern_severity":
+        next(rule for rule in base_rules["rules"] if rule["id"] == "R19")["params"][
+            "patterns"
+        ][0]["severity"] = "invalid"
+    else:
+        next(rule for rule in base_rules["rules"] if rule["id"] == "R19")["params"][
+            "patterns"
+        ][0]["severity"] = None
+    rules = tmp_path / "rules.json"
+    dictionary = tmp_path / "dictionary.json"
+    document = tmp_path / "input.md"
+    rules.write_text(json.dumps(base_rules))
+    dictionary.write_text(json.dumps(base_dictionary))
+    document.write_text("Utilize the tool.")
+    assert (
+        check_ste.main(
+            [
+                "check",
+                str(document),
+                "--only",
+                "R13",
+                "--rules",
+                str(rules),
+                "--dictionary",
+                str(dictionary),
+            ]
+        )
+        == 2
+    )
+
+
+@pytest.mark.parametrize("config_name", ["rules", "dictionary"])
+@pytest.mark.parametrize(
+    "version",
+    [
+        pytest.param(None, id="missing"),
+        pytest.param(2, id="unsupported"),
+        pytest.param(True, id="bool"),
+    ],
+)
+def test_config_version_failures_return_exit_two(
+    tmp_path: Path, config_name: str, version: int | bool | None
+) -> None:
+    base_rules = json.loads((Path(__file__).parents[1] / "rules.json").read_text())
+    base_dictionary = json.loads(
+        (Path(__file__).parents[1] / "dictionary.json").read_text()
+    )
+    config = base_rules if config_name == "rules" else base_dictionary
+    if version is None:
+        del config["version"]
+    else:
+        config["version"] = version
+    rules = tmp_path / "rules.json"
+    dictionary = tmp_path / "dictionary.json"
+    document = tmp_path / "input.md"
+    rules.write_text(json.dumps(base_rules))
+    dictionary.write_text(json.dumps(base_dictionary))
+    document.write_text("Use the tool.")
+
+    assert (
+        check_ste.main(
+            [
+                "check",
+                str(document),
+                "--rules",
+                str(rules),
+                "--dictionary",
+                str(dictionary),
+            ]
+        )
+        == 2
+    )
+
+
+def test_baseline_fixture_reports_expected_seasonal_noun_violation() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    expected = json.loads((fixture_dir / "expected_bad.json").read_text())
+    rules, dictionary = config()
+
+    findings = check_ste.check_text(
+        (fixture_dir / "bad.md").read_text(), "bad.md", rules, dictionary
+    )
+
+    assert {finding.rule_id for finding in findings} == set(expected["rule_ids"])
+    assert "R12" in expected["rule_ids"]
+    assert any(finding.rule_id == "R12" for finding in findings)
+
+
+def test_verified_rewrite_fixture_has_no_error_or_warning_findings() -> None:
+    fixture_dir = Path(__file__).parent / "fixtures"
+    rules, dictionary = config()
+
+    findings = check_ste.check_text(
+        (fixture_dir / "verified.md").read_text(), "verified.md", rules, dictionary
+    )
+
+    assert not [
+        finding for finding in findings if finding.severity in {"error", "warn"}
+    ]
 
 
 def test_cli_json_text_strict_only_and_ignore(

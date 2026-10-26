@@ -25,7 +25,7 @@
       "name": "procedural-sentence-length",
       "check": "sentence_words",
       "severity": "error",
-      "params": {"max": 20, "scope": "procedural"},
+      "params": { "max": 20, "scope": "procedural" },
       "message": "Procedural sentence exceeds {max} words."
     },
     {
@@ -34,7 +34,7 @@
       "name": "descriptive-sentence-length",
       "check": "sentence_words",
       "severity": "error",
-      "params": {"max": 25, "scope": "descriptive"},
+      "params": { "max": 25, "scope": "descriptive" },
       "message": "Descriptive sentence exceeds {max} words."
     },
     {
@@ -43,7 +43,7 @@
       "name": "compound-instruction",
       "check": "compound_instruction",
       "severity": "warn",
-      "params": {"patterns": [", and then", " and then ", "; "]},
+      "params": { "patterns": [", and then", " and then ", "; "] },
       "message": "Split this compound instruction into separate steps."
     },
     {
@@ -52,7 +52,7 @@
       "name": "one-main-idea",
       "check": "none",
       "severity": "none",
-      "params": {"reason": "One main idea per sentence requires judgment."},
+      "params": { "reason": "One main idea per sentence requires judgment." },
       "message": "Use one main idea per sentence."
     },
     {
@@ -87,7 +87,24 @@
       "severity": "warn",
       "params": {
         "scope": "instruction",
-        "verbs": ["do", "make", "check", "change", "remove", "start", "stop", "use", "put", "send", "open", "close", "read", "write", "wait", "tighten"],
+        "verbs": [
+          "do",
+          "make",
+          "check",
+          "change",
+          "remove",
+          "start",
+          "stop",
+          "use",
+          "put",
+          "send",
+          "open",
+          "close",
+          "read",
+          "write",
+          "wait",
+          "tighten"
+        ],
         "verbs_role": "known_imperative_seed",
         "flag_unlisted_leading_verb": false,
         "allow_caller_domain_verbs": true
@@ -101,8 +118,34 @@
       "check": "missing_article",
       "severity": "warn",
       "params": {
-        "command_verbs": ["do", "make", "check", "change", "remove", "start", "stop", "use", "put", "send", "open", "close", "read", "write", "wait", "tighten"],
-        "allowed_determiners": ["the", "a", "an", "your", "this", "that", "all", "any"],
+        "command_verbs": [
+          "do",
+          "make",
+          "check",
+          "change",
+          "remove",
+          "start",
+          "stop",
+          "use",
+          "put",
+          "send",
+          "open",
+          "close",
+          "read",
+          "write",
+          "wait",
+          "tighten"
+        ],
+        "allowed_determiners": [
+          "the",
+          "a",
+          "an",
+          "your",
+          "this",
+          "that",
+          "all",
+          "any"
+        ],
         "allow_numeric_values": true
       },
       "message": "Possible missing article before a noun phrase."
@@ -113,7 +156,9 @@
       "name": "noun-as-verb",
       "check": "none",
       "severity": "none",
-      "params": {"reason": "Detecting nouns used as verbs needs a domain noun list."},
+      "params": {
+        "reason": "Detecting nouns used as verbs needs a domain noun list."
+      },
       "message": "Do not use a noun as a verb."
     },
     {
@@ -122,7 +167,7 @@
       "name": "gerund-start",
       "check": "gerund_start",
       "severity": "warn",
-      "params": {"scope": "instruction"},
+      "params": { "scope": "instruction" },
       "message": "Do not start an instruction with a gerund."
     },
     {
@@ -132,7 +177,12 @@
       "check": "synonym_pair",
       "severity": "warn",
       "params": {
-        "pairs": [["begin", "start"], ["end", "stop"], ["close", "shut"], ["repair", "mend"]]
+        "pairs": [
+          ["begin", "start"],
+          ["end", "stop"],
+          ["close", "shut"],
+          ["repair", "mend"]
+        ]
       },
       "message": "Use one word consistently; avoid synonym pairs."
     },
@@ -156,7 +206,7 @@
       "name": "banned-word",
       "check": "banned_word",
       "severity": "error",
-      "params": {"source": "dictionary.json", "key": "substitutions"},
+      "params": { "source": "dictionary.json", "key": "substitutions" },
       "message": "Use an approved replacement from the dictionary."
     },
     {
@@ -165,7 +215,7 @@
       "name": "technical-terms",
       "check": "none",
       "severity": "none",
-      "params": {"reason": "Technical terms require a future --terms input."},
+      "params": { "reason": "Technical terms require a future --terms input." },
       "message": "Define and use approved technical terms consistently."
     },
     {
@@ -174,7 +224,9 @@
       "name": "one-topic-per-paragraph",
       "check": "none",
       "severity": "none",
-      "params": {"reason": "Topic boundaries and topic sentences require judgment."},
+      "params": {
+        "reason": "Topic boundaries and topic sentences require judgment."
+      },
       "message": "Use one topic per paragraph and put the topic sentence first."
     },
     {
@@ -183,7 +235,7 @@
       "name": "procedural-paragraph-length",
       "check": "paragraph_length",
       "severity": "error",
-      "params": {"max": 6, "scope": "procedural"},
+      "params": { "max": 6, "scope": "procedural" },
       "message": "Procedural paragraph exceeds {max} sentences."
     },
     {
@@ -192,7 +244,7 @@
       "name": "list-required",
       "check": "list_required",
       "severity": "error",
-      "params": {"min_steps": 4},
+      "params": { "min_steps": 4 },
       "message": "Use a vertical list for {min_steps} or more steps, parts, or conditions."
     },
     {
@@ -218,11 +270,11 @@
       "params": {
         "default_severity": "warn",
         "patterns": [
-          {"text": "basically", "severity": "error"},
-          {"text": "essentially", "severity": "error"},
-          {"text": "might", "severity": "warn"},
-          {"text": "could potentially", "severity": "warn"},
-          {"text": "in some cases", "severity": "warn"}
+          { "text": "basically", "severity": "error" },
+          { "text": "essentially", "severity": "error" },
+          { "text": "might", "severity": "warn" },
+          { "text": "could potentially", "severity": "warn" },
+          { "text": "in some cases", "severity": "warn" }
         ]
       },
       "message": "Remove the hedge or state the actual uncertainty."
@@ -235,7 +287,13 @@
       "severity": "warn",
       "params": {
         "scope": "instruction",
-        "third_person_actor_terms": ["the user", "user", "operator", "technician", "one"]
+        "third_person_actor_terms": [
+          "the user",
+          "user",
+          "operator",
+          "technician",
+          "one"
+        ]
       },
       "message": "Write to the reader; use 'you' for the person who does the task."
     },
@@ -247,7 +305,14 @@
       "severity": "error",
       "params": {
         "mode": "compare",
-        "protected": ["numbers", "inline_code", "fenced_code", "flags", "paths", "all_caps_identifiers"]
+        "protected": [
+          "numbers",
+          "inline_code",
+          "fenced_code",
+          "flags",
+          "paths",
+          "all_caps_identifiers"
+        ]
       },
       "message": "Comparison text changed a protected fact."
     }
