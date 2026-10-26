@@ -129,6 +129,14 @@ fresh session can start slice 1 with zero open design questions.
   `"Zlib"` to `deny.toml`. `check:layers` is not proved: untracked spike files
   were not scanned, and `|| true` hides `git grep` errors. Findings:
   [research/09](research/09-prototype.md).
+- [10: Refactor resilience against arch-design](issues/10-refactor-resilience.md):
+  [research/10](research/10-invariance-map.md) lists 88 guarantees that pass
+  conditions 1 and 2 of ticket 07, each with its arch ticket 16 tier. Scenarios
+  pin current behavior. Arch-design edits them later, so this map carries no
+  arch bookkeeping. A scenario never pins a known defect. Each moving seam gets a
+  scenario at the higher boundary, or none. Add table escaping, tag containment
+  and `NoteFieldValue` order as proptests. The invariance list sets the order of
+  the first slices.
 
 ## Not yet specified
 

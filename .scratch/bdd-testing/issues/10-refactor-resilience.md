@@ -1,96 +1,100 @@
 # 10: Refactor resilience against arch-design
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 01, 02, 03, 04, 05, 07, 08
 
 ## Question
 
-Which behavioral guarantees must stay invariant across the refactors that
-`.scratch/arch-design/` plans? Where can scenarios anchor as a result?
+Which guarantees can scenarios pin without anchoring to a seam that
+`.scratch/arch-design/` plans to rebuild?
 
-## State of arch-design
+## Scope
 
-Arch-design is still moving. Do not wait for it to finish.
-
-- Arch tickets 01 to 22 are resolved. Their decisions bind this ticket.
-- Arch tickets 23 to 36 are open. They can still move seams.
-- For each seam that an open arch ticket can move, record that ticket.
-- For each such seam, record a trigger to revisit the decision.
+- The user implements BDD first. Scenarios pin current behavior.
+- Arch-design runs later. It finds and edits the affected scenarios and tests.
+- This ticket gives arch-design no bookkeeping. It adds no tag, no row id, no
+  revisit marker and no note in the arch map.
+- The ticket only keeps scenarios off moving seams, so that they stay stable.
 
 ## Inputs
 
-- [`.scratch/arch-design/map.md`](../../arch-design/map.md) and its tickets.
-  The map lists decisions for tickets 01 to 22.
 - [Arch ticket 16](../../arch-design/issues/16-grilling-compatibility-envelope.md).
-  It sorts each surface into Frozen, Migratable, Free or Not preserved. Use its
-  table as the oracle for decision (a).
-- Arch tickets 18 to 22. They change behavior on purpose. Read each ticket
-  itself. Do not rely on the map gist.
+  It sorts each surface into Frozen, Migratable, Free or Not preserved.
 - The five inventories from tickets 01 to 05: `research/01` to `research/05`.
-  Use their pinned flags, their intent verdicts and their contradiction lists.
-- Ticket 07: the six-condition rule, the exception classes and the internal-seam
-  policy. Rule 6 lists the moving seams. This ticket owns that list.
+- Ticket 07: the six-condition rule. Condition 6 lists the moving seams. This
+  ticket owns that list.
 - Ticket 08: the six-step classification rule and its constraints for this
-  ticket. Decision (c) lists the proptest growth candidates.
+  ticket.
 - `research/03` section C (items 1 to 12) and `research/02` G14 to G18. Both
   are the provisional list of moving seams.
-- Run `git diff 207cc3fb..main -- src tests docs` before you start. Arch-design
-  recorded that baseline. Report any drift that touches a guarantee here.
 
 ## Decisions to reach
 
 HITL, grilling. Do not answer for the user. Reach these decisions:
 
-- (a) Map every guarantee in the five inventories to a tier of arch ticket 16.
-  Say which guarantees the refactor promises to keep. Say which guarantees no
-  arch ticket states. These guarantees are at risk.
-- (b) Define the equivalence boundaries. These are the Frozen contracts that
-  ticket 07's channels can observe. They are the highest-value scenario targets.
-  Examples: exit codes, payload shapes, trust gate, vault parsing, index
-  equivalence with a fresh parse.
-- (c) Decide how scenarios hold Migratable surfaces. Examples: diagnostic codes,
-  flag spellings, template and query spelling. Arch ticket 16 allows a change
-  through the spec's change table. Ticket 07 makes diagnostic codes a channel.
-  State whether such a scenario is allowed. State the tag that marks it. Ticket
-  11 uses this tag.
-- (d) List each resolved arch decision that changes behavior on purpose. Examples
-  are tickets 18, 19, 20, 21 and 22, and the three known defects. Name each
-  scenario candidate or pinned guarantee that the change inverts or removes.
-  Record the open ticket 25 item 4 canary inversion.
-- (e) Refine ticket 07's moving-seam list. For each seam, name the arch ticket
-  that moves it. Then choose one disposition under ticket 07's rule: a higher
-  boundary, a different layer under ticket 08's rule, or drop from the spec.
-- (f) Settle the constraints from ticket 08 and the workspace split:
-  - Confirm or change the proptest growth list: path codec, note wire format,
-    `NoteFieldValue` order, table escaping and tag containment.
-  - Confirm or change the facade seams: `RefreshReport`, `DriftCause`,
-    `InlinkMap` and `load()`. Arch tickets 25 and 32 can re-home them.
-  - State what the workspace split does to ticket 07's gate. The gate applies to
-    each crate after the split.
-- (g) Write the note that arch-design's map must carry back. Add it to their
-  map as a one-line cross-reference, not a rewrite. Record the note in the
-  Answer. The note names the owner who checks the invariance list when an arch
-  ticket resolves.
+- (a) Write the invariance list. It holds the Frozen guarantees, and the
+  Migratable guarantees, that pass ticket 07 conditions 1 and 2. Each entry
+  cites its inventory item and its arch ticket 16 tier. Map the other guarantees
+  at class level.
+- (b) Say that a scenario never pins a known defect. Arch ticket 16 names three:
+  the closed-pipe panic, `i64` to `f64` loss, and `.first()`-only multi-valued
+  inline fields.
+- (c) Refine ticket 07's moving-seam list. For each seam, choose one
+  disposition: a scenario at the higher boundary that the seam feeds, or no
+  scenario.
+- (d) Confirm or change the proptest growth list from ticket 08: path codec, note
+  wire format, `NoteFieldValue` order, table escaping and tag containment.
+- (e) Confirm the facade seams from ticket 08: `RefreshReport`, `DriftCause`,
+  `InlinkMap` and `load()`.
+
+## Decisions so far
+
+Round 1 and the user's scope cut settled these items:
+
+- Scenarios pin current behavior. Arch-design edits them later.
+- The invariance list is one list. It has no "changing" or "at risk" sublists.
+- Scenarios are spawn-only. No scenario uses the `traces::testing` facade.
 
 ## Boundaries
 
 - Do not resolve a doc/code contradiction here. Ticket 12 decision (f) owns each
-  disposition.
-- Flag each contradiction that touches an invariance guarantee. Examples:
-  ADR-0002 trust, ADR-0008 `SourceAtom`, and ADR-0009 format version.
+  disposition. Flag each contradiction that touches the invariance list.
 - Do not write scenarios. Do not choose the layout of feature files. Ticket 11
   owns both.
 - Do not decide which existing tests convert. Ticket 13 owns that decision.
+- Do not decide the migration scope. Tickets 13 and 14 own it.
 
 ## Answer records
 
-- The invariance list: each must-hold guarantee, its arch ticket 16 tier, and its
-  inventory citation.
-- The reclassified guarantees, with the disposition and the moving arch ticket
-  for each.
-- The list of deliberate behavior changes and the guarantees that they affect.
-- The tag rule for scenarios on Migratable surfaces.
-- The confirmed proptest list and the confirmed facade seams.
-- The reciprocity note for arch-design.
-- Constraints for tickets 11, 12, 13 and 14.
+- The invariance list, with inventory citations and arch ticket 16 tiers.
+- The seam dispositions.
+- The confirmed proptest list and facade seams.
+- Constraint for ticket 14: the invariance list sets the order of the first
+  slices.
+
+## Answer
+
+Resolved. The user confirmed this text.
+
+The full lists are in [research/10-invariance-map.md](../research/10-invariance-map.md).
+
+- **(a) Invariance list.** The map has 88 rows for guarantees that pass ticket 07
+  conditions 1 and 2. Three rows repeat items across inventories. Each row has
+  its inventory citation and its arch ticket 16 tier: F, M, F+M, D or Free. D
+  means that arch ticket 16 does not list the surface. Treat D as Frozen. The
+  map holds the other guarantees at class level.
+- **(b) Known defects.** A scenario never pins the closed-pipe panic, the `i64`
+  to `f64` loss, or the `.first()`-only multi-valued inline fields.
+- **(c) Seam dispositions.** The map gives one disposition for each of the 12
+  seams in `research/03` section C and for G14 to G18. Each is a scenario at the
+  higher boundary, or no scenario.
+- **(d) Proptests.** Add table escaping, tag containment and `NoteFieldValue`
+  order now. Keep path codec and note wire format on the list. Drop the schema
+  DAG sort. Query-plan idempotence stays excluded.
+- **(e) Facade seams.** `RefreshReport`, `DriftCause`, `InlinkMap` and `load()`
+  get no scenario. They stay integration-test seams.
+- **Flagged contradictions.** Five contradictions touch the list. Ticket 12
+  decision (f) owns them. They are in the map.
+- **Constraint for ticket 14.** The invariance list sets the order of the first
+  slices.
