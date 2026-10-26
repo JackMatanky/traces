@@ -6,47 +6,141 @@ Status: resolved
 
 ## Question
 
-Standing constraints: "Filesystem Markdown is the authoritative persistent source of truth" AND "Unsaved editor buffers must be reflected in live language intelligence without requiring writes to disk." These two constraints are in tension and need a precise reconciliation model, informed by ticket 10's host design and the rust-analyzer VFS precedent (ticket 06).
+Standing constraints: "Filesystem Markdown is the authoritative persistent
+source of truth". The second constraint: "Unsaved editor buffers must be
+reflected in live language intelligence without requiring writes to disk."
+These two constraints are in tension. They need a precise reconciliation
+model. Base it on ticket 10's host design and the rust-analyzer VFS
+precedent (ticket 06).
 
 Decide:
 
-- The overlay data structure: an in-memory map from URI to unsaved buffer content (+ version) that LSP requests consult *instead of* the persisted `WorkspaceIndex`'s view of that file, falling back to persisted/on-disk content for every other file.
-- Whether an open-with-unsaved-changes file gets fully re-parsed into a transient `Note` (via the existing `src/note/parser.rs` entry point directly, bypassing `IndexerService`/redb entirely) on every `didChange`, or debounced.
-- How cross-file features (backlinks, unresolved-reference diagnostics, rename cascades) reconcile a stale-on-disk view of file A with a live-buffer view of file B that references A — e.g. does the derived Inlink graph (`src/index/inlinks.rs`, currently eagerly computed `HashMap<PathBuf, Vec<PathBuf>>`) get a transient per-request overlay merge, or does every affected derived structure get recomputed against a synthetic combined view.
-- What happens on `didClose` without save (discard overlay, revert to persisted view) vs `didSave` (write already happened by the client; persisted index refresh picks it up through the normal `IndexerService::refresh` path).
-- Whether buffers for files *not yet indexed* (a brand-new untitled/unsaved note, or a note outside any currently-scanned root) are supported at all, and if so how they participate in link resolution before they exist on disk.
+- The overlay data structure: an in-memory map from URI to unsaved buffer
+  content (+ version). LSP requests consult it *instead of* the persisted
+  `WorkspaceIndex`'s view of that file. It falls back to persisted/on-disk
+  content for every other file.
+- Whether an open-with-unsaved-changes file gets fully re-parsed into a
+  transient `Note` on every `didChange`, or debounced. The re-parse uses the
+  existing `src/note/parser.rs` entry point directly, bypassing
+  `IndexerService`/redb entirely.
+- How cross-file features (backlinks, unresolved-reference diagnostics, rename
+  cascades) reconcile a stale-on-disk view of file A with a live-buffer view of
+  file B that references A. For example: does the derived Inlink graph
+  (`src/index/inlinks.rs`, currently an eagerly computed `HashMap<PathBuf,
+  Vec<PathBuf>>`) get a transient per-request overlay merge? Or does every
+  affected derived structure get recomputed against a synthetic combined view?
+- What happens on `didClose` without save (discard overlay, revert to persisted
+  view) versus `didSave` (the write already happened by the client; persisted
+  index refresh picks it up through the normal `IndexerService::refresh` path).
+- Whether buffers for files *not yet indexed* are supported at all (a brand-new
+  untitled/unsaved note, or a note outside any currently-scanned root). If they
+  are, decide how they participate in link resolution before they exist on disk.
 
 ## Answer
 
-**Resolution model: transient replacement, not layered overlay.** All three studied markdown PKM LSPs (Marksman, rumdl, markdown-oxide) use the same pattern: editor content replaces disk content while the file is open. There is no layered overlay with fallback. For Traces, the "overlay" is a transient replacement map — the persisted `WorkspaceIndex` is the baseline; open files temporarily override entries in it. [Full research](../research/14-buffer-overlay-model.md).
+**Resolution model: transient replacement, not layered overlay.** All three
+studied markdown PKM LSPs (Marksman, rumdl, markdown-oxide) use the same
+pattern. Editor content replaces disk content while the file is open. There is
+no layered overlay with fallback. For Traces, the "overlay" is a transient
+replacement map: the persisted `WorkspaceIndex` is the baseline, and open files
+temporarily override entries in it. [Full
+research](../research/14-buffer-overlay-model.md).
 
-**1. Buffer storage: `RwLock<HashMap<Url, BufferState>>`.** `BufferState { content: String, version: i32 }`. No `parsed_note` field (computed on-demand — pulldown-cmark is fast at ~0.02ms/10KB, eliminates staleness vector). No DashMap (unnecessary with `concurrency_level(1)` sequential dispatch). No LRU eviction (typical PKM vaults have <100 open files, ~1MB total). Version guards reject stale `didChange` updates; `didClose` unconditionally removes regardless of version.
+**1. Buffer storage: `RwLock<HashMap<Url, BufferState>>`.** `BufferState {
+content: String, version: i32 }`. No `parsed_note` field: it is computed
+on-demand (pulldown-cmark is fast at ~0.02ms/10KB, which eliminates the
+staleness vector). No DashMap (unnecessary with `concurrency_level(1)`
+sequential dispatch). No LRU eviction (typical PKM vaults have <100 open files,
+~1MB total). Version guards reject stale `didChange` updates; `didClose`
+unconditionally removes regardless of version.
 
-**2. Re-parse: debounced full re-parse.** 150ms debounce for content updates, 300ms for diagnostics publication (both provisional — ticket 25 owns the final debounce model; reconciled 2026-09-23). Full re-parse via `parse_markdown` on each debounced tick — no incremental parsing (pulldown-cmark's pull-parser design makes full re-parse cheaper than maintaining an incremental parse tree). Debounce implemented as `tokio::time::sleep` within the handler flow, preserving `concurrency_level(1)` sequential dispatch guarantees.
+**2. Re-parse: debounced full re-parse.** 150ms debounce for content updates,
+300ms for diagnostics publication (both provisional: ticket 25 owns the final
+debounce model; reconciled 2026-09-23). Full re-parse via `parse_markdown` on
+each debounced tick, with no incremental parsing (pulldown-cmark's pull-parser
+design makes full re-parse cheaper than maintaining an incremental parse tree).
+The debounce is implemented as `tokio::time::sleep` within the handler flow,
+preserving `concurrency_level(1)` sequential dispatch guarantees.
 
-**3. Content resolution: `ContentResolver` facade.** Holds `&'a WorkspaceIndex`. Methods: `fn note_of(&self, uri: &Url) -> Cow<'a, Note>` (overlay `BufferState` content parsed on-demand, or `WorkspaceIndex`'s persisted `Note`), `fn text_of(&self, uri: &Url) -> Cow<'a, str>` (overlay content or disk content). Lifetime chain explicit: Cow borrows from `WorkspaceIndex` interior through the resolver's borrow. Analysis-host delegates to ContentResolver for content access; no duplication.
+**3. Content resolution: `ContentResolver` facade.** It holds `&'a
+WorkspaceIndex`. Methods: `fn note_of(&self, url: &Url) -> Cow<'a, Note>`
+(overlay `BufferState` content parsed on-demand, or `WorkspaceIndex`'s persisted
+`Note`) and `fn text_of(&self, url: &Url) -> Cow<'a, str>` (overlay content or
+disk content). The lifetime chain is explicit: the Cow borrows from
+`WorkspaceIndex` interior through the resolver's borrow. The analysis-host
+delegates to ContentResolver for content access, with no duplication.
 
-**4. Inlink reconciliation: per-request adjustment with cached LinkResolver.** Uses existing `patch_links` pattern (`src/index/refresh.rs:400`). When a handler needs inlinks for target T: (a) start with `FileEntry.inlinks()` from disk baseline, (b) for each overlay file O, resolve O's current outlinks via `LinkResolver`, (c) add/remove O as source. `LinkResolver` cached between requests, rebuilt only on `didOpen`/`didClose`. Cost: `O(files)` for resolver build (amortized) + `O(overlay_count × outlinks_per_overlay)` per request. **Requires two API additions**: `WorkspaceIndex::files() -> &[FileBase]` and a method to reconstruct mutable inlink data from `FileEntry.inlinks()`. Overlay layer maintains its own `LinkResolver` over `(WorkspaceIndex files ∪ DocumentStore overlay files)` for cross-overlay link resolution (two unsaved files referencing each other).
+**4. Inlink reconciliation: per-request adjustment with cached LinkResolver.**
+Uses the existing `patch_links` pattern (`src/index/refresh.rs:400`). When a
+handler needs inlinks for target T: (a) start with `FileEntry.inlinks()` from
+the disk baseline. (b) for each overlay file O, resolve O's current outlinks via
+`LinkResolver`. (c) add or remove O as source. `LinkResolver` is cached between
+requests and rebuilt only on `didOpen`/`didClose`. Cost: `O(files)` for resolver
+build (amortized) + `O(overlay_count × outlinks_per_overlay)` per request.
+**This needs two API additions**: `WorkspaceIndex::files() -> &[FileBase]` and a
+method to reconstruct mutable inlink data from `FileEntry.inlinks()`. The
+overlay layer maintains its own `LinkResolver` over `(WorkspaceIndex files ∪
+DocumentStore overlay files)` for cross-overlay link resolution (two unsaved
+files referencing each other).
 
-**5. Lifecycle.** `didClose` → remove `DocumentStore` entry, publish cleared diagnostics (synchronous, no debounce). `didSave` → integrate into the refresh typestate (`IndexerService::refresh`'s `plan_pass`/`RefreshPass` flow; reconciled 2026-09-23) rather than a bespoke call path (not via `didChangeWatchedFiles` — that's a client-to-server notification the server cannot inject). `didChangeWatchedFiles` reserved for client-detected external file changes. `WorkspaceIndex` is never mutated; overlay awareness is additive to the facade and query layer.
+**5. Lifecycle.** `didClose` removes the `DocumentStore` entry and publishes
+cleared diagnostics (synchronous, no debounce). `didSave` integrates into the
+refresh typestate (`IndexerService::refresh`'s `plan_pass`/`RefreshPass` flow;
+reconciled 2026-09-23) rather than a bespoke call path (not via
+`didChangeWatchedFiles`: that is a client-to-server notification the server
+cannot inject). `didChangeWatchedFiles` is reserved for client-detected external
+file changes. `WorkspaceIndex` is never mutated; overlay awareness is additive
+to the facade and query layer.
 
-**6. Unsaved/new files: `DocumentStore`-only entries.** Supported via `FileBase::new_buffer(path, size)` constructor (public, not test-gated). Synthetic entries participate in outlink resolution and inlink computation but don't persist to redb. On `didClose` without save: discard. On `didSave`: file hits disk, `IndexerService::refresh` picks it up, becomes normal indexed file. Links between two overlay-only files resolve via the overlay layer's own `LinkResolver`.
+**6. Unsaved/new files: `DocumentStore`-only entries.** Support them via the
+`FileBase::new_buffer(path, size)` constructor (public, not test-gated).
+Synthetic entries participate in outlink resolution and inlink computation, but
+they do not persist to redb. On `didClose` without save: discard. On `didSave`:
+the file hits disk, `IndexerService::refresh` picks it up, and it becomes a
+normal indexed file. Links between two overlay-only files resolve via the
+overlay layer's own `LinkResolver`.
 
-**Key API additions required:**
-- `WorkspaceIndex::files() -> &[FileBase]` (trivial — entries are sorted by path)
+**Key API additions needed:**
+
+- `WorkspaceIndex::files() -> &[FileBase]` (trivial: entries are sorted by path)
 - `FileBase::new_buffer(path, size)` constructor (public, not test-gated)
-- Mutable inlink reconstruction from `FileEntry.inlinks()` for per-request patching
+- Mutable inlink reconstruction from `FileEntry.inlinks()` for per-request
+  patching
 
 ### Amended by 25 (2026-10-15)
 
-- **§2 (re-parse debounce) superseded — not scope-limited** (25 supersedes 22's original "Amends 14 §2 scope-limited" wording): no `tokio::time::sleep` in any handler flow. Debounce = spawn a timer task + generation counter. T1 content/index re-parse = **100ms** (was 150ms); T2 diagnostics publish = **~50ms** adaptive clamp `[50ms, measured compute, 500ms]` (was 300ms). The β single-lane publisher (22:Q19, generalized by 25) is the publication path for *all* diagnostics. Rest of 14 (transient replacement, `BufferState`, `ContentResolver`, inlink reconciliation, lifecycle) unchanged.
+- **§2 (re-parse debounce) superseded, not scope-limited** (25 supersedes 22's
+  original "Amends 14 §2 scope-limited" wording): no `tokio::time::sleep` in any
+  handler flow. Debounce = spawn a timer task + generation counter. T1
+  content/index re-parse = **100ms** (was 150ms); T2 diagnostics publish =
+  **~50ms** adaptive clamp `[50ms, measured compute, 500ms]` (was 300ms). The β
+  single-lane publisher (22:Q19, generalized by 25) is the publication path for
+  *all* diagnostics. The rest of 14 (transient replacement, `BufferState`,
+  `ContentResolver`, inlink reconciliation, lifecycle) is unchanged.
 
 ### Amended by 26 (2026-10-18)
 
-- **Overlay keys move `Url` -> `Uri`** (ls-types' fluent-uri `Uri` from tower-lsp-server 0.23), or through one explicit edge-owned conversion helper, so overlay and WorkspaceEdit keying share one identity type. The edge resolves `PathBuf` -> `Uri` by consulting the open-document map for the client's spelling first; `from_file_path` only for never-named docs (never round-trip a client-named document: Windows canonical form does not match editor-spelled strings; percent-encoding/drive-letter/symlink variants stay distinct keys).
-- **Ropey reconciliation**: `BufferState` being String-backed (no rope) is the stated reason 11's two-function disk/ropey split collapses into one LineIndex-backed helper; see 11's Amended-by-26 block.
+- **Overlay keys move `Url` -> `Uri`** (ls-types' fluent-uri `Uri` from
+  tower-lsp-server 0.23), or move through one explicit edge-owned conversion
+  helper. Overlay and WorkspaceEdit keying share one identity type. The edge
+  resolves `PathBuf` -> `Uri` by consulting the open-document map for the
+  client's spelling first; use `from_file_path` only for never-named docs (never
+  round-trip a client-named document: Windows canonical form does not match
+  editor-spelled strings. These percent-encoding/drive-letter/symlink variants
+  stay distinct keys).
+- **Ropey reconciliation**: `BufferState` being String-backed (no rope) is the
+  stated reason 11's two-function disk/ropey split collapses into one
+  LineIndex-backed helper; see 11's Amended-by-26 block.
 
 ### Amended by iwe and fileclass research (2026-10-21)
 
-- iwe's overlay contract is identical (open buffer wins over disk, close-time reconcile, watcher-as-disk-truth) with one recorded nuance: its didSave-as-no-op works only because it owns a server-side watcher — Traces' didSave→refresh remains correct under client-side watching (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 2).
-- fileclass's production-measured `processFrontMatter` write-clobbering incident (user data loss, full-fidelity read→edit→write roundtrip) is the first external example of the write-side hazard Traces' write path must avoid (amended 2026-10-21 by iwe/fileclass research, [tool-fileclass](../research/tool-fileclass.md) §7).
+- iwe's overlay contract is identical (open buffer wins over disk, close-time
+  reconcile, watcher-as-disk-truth) with one recorded nuance. Its
+  didSave-as-no-op works only because it owns a server-side watcher. Traces'
+  didSave→refresh remains correct under client-side watching (amended 2026-10-21
+  by iwe/fileclass research, [tool-iwe](../research/tool-iwe.md) Part 2).
+- fileclass's production-measured `processFrontMatter` write-clobbering incident
+  (user data loss, full-fidelity read→edit→write roundtrip). It is the first
+  external example of the write-side hazard Traces' write path must avoid
+  (amended 2026-10-21 by iwe/fileclass research,
+  [tool-fileclass](../research/tool-fileclass.md) §7).

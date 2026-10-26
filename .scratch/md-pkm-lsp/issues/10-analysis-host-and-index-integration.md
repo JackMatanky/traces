@@ -6,28 +6,116 @@ Status: resolved
 
 ## Question
 
-Decide how the LSP process wraps and reuses the existing synchronous services rather than building parallel models, per the standing constraint "Reuse existing Traces semantics and services rather than building parallel LSP-only models."
+Decide how the LSP process wraps and reuses the existing synchronous services
+instead of building parallel models. Follow the standing constraint: "Reuse
+existing Traces semantics and services rather than building parallel LSP-only
+models."
 
 Grounding facts already gathered:
-- `WorkspaceIndex` (`src/index/entry.rs:23`) is an immutable, single-owned (not `Arc`-shared today), `Clone`-able snapshot: `entries: Box<[FileEntry]>` + `delta: IndexDelta`. `IndexerService` (`src/index/service.rs`) exposes `build`/`refresh`/`persist`/`load`, all synchronous, all manually triggered (no filesystem watcher exists anywhere in the codebase today).
-- `QueryService::execute(&self, index: &Arc<WorkspaceIndex>, builder: QueryBuilder) -> QuerySet` (`src/query/service.rs:84`) already expects an `Arc<WorkspaceIndex>` at the call boundary, even though `IndexerService` itself doesn't produce one internally — note this seam.
-- `SchemaService` (`src/schema/service.rs`) is a load-once, in-memory-cached registry (`IndexMap<SchemaName, Arc<Schema>>`), resolved once at startup, not re-resolved per query.
-- Indexing/refresh today is a manual whole-tree diff: metadata scan and note parsing are already `rayon`-parallel (`src/index/service.rs`); the merge-join delta itself is single-threaded (reconciled 2026-09-23).
+
+- `WorkspaceIndex` (`src/index/entry.rs:23`) is an immutable, single-owned (not
+  `Arc`-shared today), `Clone`-able snapshot: `entries: Box<[FileEntry]>` +
+  `delta: IndexDelta`. The `IndexerService` (`src/index/service.rs`) exposes
+  `build`/`refresh`/`persist`/`load`, all synchronous, all manually triggered
+  (no filesystem watcher exists anywhere in the codebase today).
+- `QueryService::execute(&self, index: &Arc<WorkspaceIndex>, builder:
+  QueryBuilder) -> QuerySet` (`src/query/service.rs:84`) already expects an
+  `Arc<WorkspaceIndex>` at the call boundary. The gap is that `IndexerService`
+  itself does not produce one internally. Note this seam.
+- `SchemaService` (`src/schema/service.rs`) is a load-once, in-memory-cached
+  registry (`IndexMap<SchemaName, Arc<Schema>>`), resolved once at startup, not
+  re-resolved per query.
+- Indexing/refresh today is a manual whole-tree diff: metadata scan and note
+  parsing are already `rayon`-parallel (`src/index/service.rs`); the merge-join
+  delta itself is single-threaded (reconciled 2026-09-23).
 
 Decide:
-- Whether the LSP host wraps a single `Arc<WorkspaceIndex>` behind a swap-on-refresh cell (à la prior "immutable/queryable snapshots" hypothesis) shared read-only across concurrent request handlers, versus some other sharing strategy.
-- What triggers an index refresh in LSP mode: `didSave`, `didChangeWatchedFiles` (LSP file-watching capability — consult `docs/refs/lsp_spec.md`), a debounced timer, or something else — given there's no existing filesystem-watcher crate/dependency in Traces today, decide whether one gets added (and which — check via rust-docs-mcp if not already covered by the chosen LSP framework) or whether LSP-side didChange/didOpen/didSave notifications are sufficient without OS-level file watching.
-- Whether `QueryService`/`SchemaService` get wrapped by a thin analysis-host facade or invoked directly per-request.
-- How this interacts with the rust-analyzer host/snapshot precedent (ticket 06) — confirm, refine, or reject that hypothesis for Traces, including whether Traces adopts an incremental query engine (salsa-style or otherwise) alongside the host/snapshot split, or whether a coarser whole-file-invalidation model is sufficient; don't presume the answer either way before weighing it against ticket 33's performance targets.
 
-Blocks: 12(concurrency), 13(persistence/caching), 14(live-buffer overlay), 30(multi-root), 34(packaging).
+- Whether the LSP host wraps a single `Arc<WorkspaceIndex>` behind a
+  swap-on-refresh cell (per the prior "immutable/queryable snapshots"
+  hypothesis). Whether it shares the cell read-only across concurrent request
+  handlers, versus some other sharing strategy.
+- What triggers an index refresh in LSP mode: `didSave`; `didChangeWatchedFiles`
+  (the LSP file-watching capability; consult `docs/refs/lsp_spec.md`); a
+  debounced timer; or something else. Traces has no existing filesystem-watcher
+  crate/dependency today. Decide whether one gets added (and which: check via
+  rust-docs-mcp if the chosen LSP framework does not already cover it). Or
+  decide whether LSP-side didChange/didOpen/didSave notifications are
+  sufficient without OS-level file watching.
+- Whether `QueryService`/`SchemaService` get wrapped by a thin analysis-host
+  facade, or invoked directly per request.
+- How this interacts with the rust-analyzer host/snapshot precedent (ticket 06):
+  confirm, refine, or reject that hypothesis for Traces. Include whether Traces
+  adopts an incremental query engine (salsa-style or otherwise) alongside the
+  host/snapshot split. Or consider whether a coarser whole-file-invalidation
+  model is sufficient. Do not presume the answer either way before weighing it
+  against ticket 33's performance targets.
+
+Blocks: 12(concurrency), 13(persistence/caching), 14(live-buffer overlay),
+30(multi-root), 34(packaging).
 
 ## Answer
 
-**Sharing strategy**: a single `Arc<WorkspaceIndex>` behind a swap-on-refresh cell (e.g. `RwLock<Arc<WorkspaceIndex>>` or equivalent — the exact primitive is an implementation-spec detail, not decided here), shared read-only across concurrent request handlers. Matches the already-grounded seam (`QueryService::execute` already expects `Arc<WorkspaceIndex>` at its call boundary) and rust-analyzer's Host/Snapshot precedent (ticket 06). An actor/message-passing alternative was researched thoroughly (ticket 36, prompted by wanting to keep a future MCP server easy to add) and rejected: it provides zero unique benefit for "one coordinator, N protocol frontends" — an `Arc`-swap facade already gives that for free via ordinary method calls — while actively serializing what should be concurrent lock-free reads. Zero precedent among performant Rust LSPs (rust-analyzer, Biome, `ty`, `ruff server`) for an actor-model index core.
+**Sharing strategy**: a single `Arc<WorkspaceIndex>` behind a swap-on-refresh
+cell. (For example `RwLock<Arc<WorkspaceIndex>>` or equivalent; the exact
+primitive is an implementation-spec detail, not decided here.) It is shared
+read-only across concurrent request handlers. This matches the already-grounded seam
+(`QueryService::execute` already expects `Arc<WorkspaceIndex>` at its call
+boundary) and rust-analyzer's Host/Snapshot precedent (ticket 06). An
+actor/message-passing alternative was researched thoroughly (ticket 36, prompted
+by wanting to keep a future MCP server easy to add) and rejected. It provides
+zero unique benefit for "one coordinator, N protocol frontends": an `Arc`-swap
+facade already gives that for free via ordinary method calls. It also actively
+serializes what should be concurrent lock-free reads. There is zero precedent
+among performant Rust LSPs (rust-analyzer, Biome, `ty`, `ruff server`) for an
+actor-model index core.
 
-**Refresh trigger**: `workspace/didChangeWatchedFiles` (server registers glob patterns via dynamic registration; the *client* does OS-level watching and notifies the server — confirmed against the primary LSP spec, since the local `docs/refs/lsp_spec.md` copy is an unresolved include-skeleton for this fragment) is the primary mechanism, requiring no new Rust dependency. `didOpen`/`didChange`/`didSave` continue to cover the open-buffer editing lifecycle incidentally. A Traces-owned filesystem watcher (`notify`+`notify-debouncer-full`, researched in ticket 37) was considered for broader codebase benefit and explicitly **not adopted here** — no precedent among the studied tools for bundling one alongside LSP-provided watching (amended 2026-10-21 by iwe/fileclass research: iwe is a shipped counterexample — bundled notify-based watcher, accepts client `didChangeWatchedFiles` without dynamic registration with DELETED-only handling, [tool-iwe](../research/tool-iwe.md) Part 2), and no concrete non-LSP consumer exists yet to justify it for Traces; decision unchanged. Real future gaps identified: a `traces watch` CLI mode (no daemon/watch mode exists today) and the future MCP server if its clients turn out not to offer file-watching capability — neither in scope for this ticket; revisit as a distinct ticket if/when either is actually being built.
+**Refresh trigger**: `workspace/didChangeWatchedFiles` is the primary mechanism,
+and it needs no new Rust dependency. The server registers glob patterns via
+dynamic registration, and the *client* does OS-level watching and notifies the
+server. This was confirmed against the primary LSP spec, since the local
+`docs/refs/lsp_spec.md` copy is an unresolved include-skeleton for this
+fragment. The `didOpen`/`didChange`/`didSave` continue to cover the open-buffer
+editing lifecycle incidentally. A Traces-owned filesystem watcher
+(`notify`+`notify-debouncer-full`, researched in ticket 37) was considered for
+broader codebase benefit and explicitly **not adopted here**. There is no
+precedent among the studied tools for bundling one alongside LSP-provided
+watching. (amended 2026-10-21 by iwe/fileclass research: iwe is a shipped
+counterexample with a bundled notify-based watcher; it accepts client
+`didChangeWatchedFiles` without dynamic registration and uses DELETED-only
+handling, [tool-iwe](../research/tool-iwe.md) Part 2). No concrete non-LSP
+consumer exists yet to justify it for Traces. The decision is unchanged. Real
+future gaps identified: a `traces watch` CLI mode (no daemon/watch mode exists
+today). The other gap is the future MCP server if its clients turn out not to
+offer file-watching capability. Neither is in scope for this ticket; revisit each as a
+distinct ticket if or when either is actually being built.
 
-**Facade**: a thin analysis-host facade wraps `QueryService`/`SchemaService`, owning the `Arc<WorkspaceIndex>` swap point and the cached `SchemaService`, handed to every request handler — rather than handlers instantiating/calling those services directly. Gives tickets 13 (persistence/caching) and 14 (live-buffer overlay) one integration point instead of scattered access, and matches rust-analyzer's `AnalysisHost` shape. Stays a thin composition point (services + swap cell), not a place to grow independent logic.
+**Facade**: a thin analysis-host facade wraps `QueryService`/`SchemaService`. It
+owns the `Arc<WorkspaceIndex>` swap point and the cached `SchemaService`, and
+every request handler receives it, instead of handlers instantiating/calling
+those services directly. This gives tickets 13 (persistence/caching) and 14
+(live-buffer overlay) one integration point instead of scattered access, and it
+matches rust-analyzer's `AnalysisHost` shape. It stays a thin composition point
+(services + swap cell), not a place to grow independent logic.
 
-**Incremental query engine (salsa) timing**: confirmed as (a) — defer to ticket 33 (performance targets & strategy), do not adopt salsa now. Architecturally this costs nothing: rust-analyzer's own source confirms `AnalysisHost`/`Analysis` (the shape just adopted above) is the exact shell that houses a `salsa::Database` — nothing here forecloses adding salsa later without rearchitecting the LSP request-routing boundary. More importantly (ticket 38's research, prompted by the user's stated motivation — Obsidian and Markdown Oxide both failing on their large vault): **salsa is very likely not the actual fix for that pain.** Obsidian's core handles 10k+ notes fine; its slowness/crashes trace to Dataview running unindexed O(N) scans across the whole vault on every render. Markdown Oxide's failure is unbounded in-memory growth from zero persistence, not missing incrementality. Neither is "recomputation isn't memoized" — both are "no index, no bound." **Load-bearing flag for ticket 33**: `QueryService::execute`'s source resolution is *already* a linear scan over every `WorkspaceIndex` entry (`src/query/service.rs:132-139`) — structurally the same failure shape just found in Dataview. Salsa would not fix that scan (it memoizes results across edits, it doesn't index or parallelize a scan's first execution); if that scan is what chokes at target vault scale, the fix is indexing/parallelizing it, evidenced with real numbers — ticket 33's job.
+**Incremental query engine (salsa) timing**: confirmed as (a): defer to ticket
+33 (performance targets & strategy), and do not adopt salsa now. Architecturally
+this costs nothing: rust-analyzer's own source confirms that
+`AnalysisHost`/`Analysis` (the shape just adopted above) is the exact shell that
+houses a `salsa::Database`. Nothing here forecloses adding salsa later
+without rearchitecting the LSP request-routing boundary. More important (ticket
+38's research, prompted by the user's stated motivation: Obsidian and Markdown
+Oxide both failing on their large vault). Salsa **is very likely not the actual
+fix for that pain.** Obsidian's core handles 10k+ notes fine. Its
+slowness/crashes trace to Dataview running unindexed O(N) scans across the whole
+vault on every render. Markdown Oxide's failure is unbounded in-memory growth
+from zero persistence, not missing incrementality. Neither case is
+"recomputation is not memoized". Both are "no index, no bound". The
+**Load-bearing flag for ticket 33**: `QueryService::execute`'s source resolution
+is *already* a linear scan over every `WorkspaceIndex` entry
+(`src/query/service.rs:132-139`). It is structurally the same failure shape just
+found in Dataview. Salsa would not fix
+that scan: it memoizes results across edits, and it does not index or
+parallelize a scan's first execution. If that scan is what chokes at target
+vault scale, the fix is indexing/parallelizing it, evidenced with real numbers.
+That is ticket 33's job.
