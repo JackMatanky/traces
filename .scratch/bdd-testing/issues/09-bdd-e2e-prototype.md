@@ -1,7 +1,7 @@
 # 09: Prototype BDD inside the e2e binary
 
 Type: research (empirical: runs a throwaway spike in the repo; results only)
-Status: open
+Status: resolved
 Blocked by: 08
 
 ## Question
@@ -30,9 +30,52 @@ Ticket 08 adds two requirements for `check:layers`:
 
 ## Rules
 
-- Use one pilot scenario from the process-contract class (exit codes or stream
-  split). Spawn through `Sandbox` only.
-- Do not merge the spike. Record the results and any proposed `mise.toml` diff
-  in `research/09-prototype.md`.
-- Ticket 06 sets the pins. It also sets one `#[expect]` on each `mod bdd`
+- Use one pilot scenario from the process-contract class. Spawn the scenario
+  through the `Sandbox` helper only.
+- Do not merge the spike code. Record the results and any proposed `mise.toml`
+  diff in `research/09-prototype.md`.
+- Ticket 06 sets the crate pins. Put one `#[expect]` on each `mod bdd`
   declaration.
+
+## Answer
+
+Empirical findings live in
+[research/09-prototype.md](../research/09-prototype.md).
+
+### Decisions
+
+1. **Local placement works (pilot in `tests/e2e.rs`):**
+   - The task `mise run verify` passed on macOS.
+   - The `e2e` phase found the scenario. You do not need to edit
+     `.mise/tasks/test/_default`, `nextest.toml`, or `ci.yml`.
+   - The `e2e` target compiles with `--no-default-features`. It does not need
+     `test-utils`.
+   - No public API or token baseline changed.
+   - Linux and Windows CI did not run. Ticket 08's three-OS condition stays
+     open. The first adoption CI run must check it.
+   - You do not need a separate `bdd` test binary.
+
+2. **Reject `build.rs` (document `touch`):**
+   - A `build.rs` script marks the crate dirty on each `.feature` edit. This
+     caused a full package rebuild (6.94s, one warm run).
+   - Without `build.rs`, rustc tracks edits to existing `.feature` files
+     through `include_str!`. Only `tests/e2e.rs` recompiled (0.87s).
+   - Without `build.rs`, Cargo did not find a new `.feature` file. Run
+     `touch tests/e2e/bdd.rs` after you add one (1.26s). Clean builds and CI
+     find all files.
+
+3. **New caveat (license policy):**
+   - The crate `rstest-bdd 0.6.0` pulls in `foldhash 0.2.0` through `hashbrown
+     0.17.1`.
+   - `foldhash` uses the Zlib license.
+   - The task `cargo deny check licenses` failed. Adoption must add `"Zlib"` to
+     `[licenses].allow` in `deny.toml`.
+
+4. **`check:layers` is not proved:**
+   - The task passed. The spike files were untracked, so `git grep` did not
+     read them.
+   - The `|| true` calls still hide `git grep` errors. Ticket 08's
+     exit-code requirement is not implemented.
+   - No `mise.toml` change was made. See section 4 of
+     `research/09-prototype.md`. The adoption slice must write and test the
+     change.
