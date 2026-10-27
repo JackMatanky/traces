@@ -45,7 +45,7 @@ use crate::{
     UNIT_SPELLINGS_HINT,
     temporal::{
         CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
-        DateUnit, PeriodEdge, weekday_from_number,
+        DateUnit, DateValue, PeriodEdge, weekday_from_number,
     },
 };
 const NAMESPACE_METHODS: &[&str] = &[
@@ -1042,17 +1042,13 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
 /// civil-date range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
     let year = if let Some(year) = value.as_i64() {
-        i16::try_from(year).map_err(|_| leap_year_input_error(value))?
+        i32::try_from(year).map_err(|_| leap_year_input_error(value))?
     } else if let Some(s) = value.as_str() {
-        parse_local_datetime(s)?.year()
+        i32::from(parse_local_datetime(s)?.year())
     } else {
         return Err(leap_year_input_error(value));
     };
-    if jiff::civil::Date::new(year, 1, 1).is_err() {
-        return Err(leap_year_input_error(value));
-    }
-    let year = i32::from(year);
-    Ok(year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))
+    DateValue::in_leap_year(year).map_err(|_| leap_year_input_error(value))
 }
 
 /// Builds the `is_leap_year` error for an argument that's neither a
@@ -2400,6 +2396,18 @@ mod tests {
             let error = env()
                 .render_str("{{ [] is is_leap_year }}", minijinja::context!())
                 .expect_err("a list argument fails cleanly");
+
+            assert_eq!(error.kind(), ErrorKind::InvalidOperation);
+        }
+
+        #[test]
+        fn rejects_a_year_outside_the_representable_range() {
+            let error = env()
+                .render_str(
+                    "{{ 40000 is is_leap_year }}",
+                    minijinja::context!(),
+                )
+                .expect_err("an out-of-range year fails cleanly");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
         }

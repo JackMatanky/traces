@@ -1429,6 +1429,7 @@ src/temporal/date.rs: pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
 src/temporal/date.rs: pub(crate) const fn civil_date(self) -> civil::Date {
 src/temporal/date.rs: pub(crate) const fn from_civil_date(date: civil::Date) -> Self {
 src/temporal/date.rs: pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
+src/temporal/date.rs: pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {
 src/temporal/date.rs: pub(crate) fn parse_any(
 src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/date.rs: pub(super) enum DateShape {
