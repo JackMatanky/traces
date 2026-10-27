@@ -337,37 +337,21 @@ impl DatePoint {
         self.advance_span(duration.span(), zone)
     }
 
-    /// Returns the first day of the period, preserving written precision and
-    /// time.
+    /// Returns the first or last day of the period selected by `period_edge`,
+    /// preserving written precision and time.
     ///
     /// # Errors
     ///
     /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
     ///   supported range.
-    pub(crate) fn start_of(
+    pub(crate) fn snap(
         self,
         calendar_period: CalendarPeriod,
+        period_edge: PeriodEdge,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_in(zone).date();
-        let target = calendar_period.snap_date(PeriodEdge::Start, date);
-        self.with_date(target, zone)
-    }
-
-    /// Returns the last day of the period, preserving written precision and
-    /// time.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
-    ///   supported range.
-    pub(crate) fn end_of(
-        self,
-        calendar_period: CalendarPeriod,
-        zone: &TimeZone,
-    ) -> Result<Self, CalendarError> {
-        let date = self.local_datetime_in(zone).date();
-        let target = calendar_period.snap_date(PeriodEdge::End, date);
+        let target = calendar_period.snap_date(period_edge, date);
         self.with_date(target, zone)
     }
 
@@ -2321,8 +2305,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let start = base.start_of(
+            let start = base.snap(
                 period,
+                PeriodEdge::Start,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2350,8 +2335,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let start = base.start_of(
+            let start = base.snap(
                 period,
+                PeriodEdge::Start,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2379,8 +2365,9 @@ mod tests {
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
-            let start = base.start_of(
+            let start = base.snap(
                 period,
+                PeriodEdge::Start,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2437,8 +2424,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let end = base.end_of(
+            let end = base.snap(
                 period,
+                PeriodEdge::End,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2466,8 +2454,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let end = base.end_of(
+            let end = base.snap(
                 period,
+                PeriodEdge::End,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2495,8 +2484,9 @@ mod tests {
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
-            let end = base.end_of(
+            let end = base.snap(
                 period,
+                PeriodEdge::End,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -3182,10 +3172,10 @@ mod tests {
                 let point = DatePoint::from(ymd(year, month, day));
                 // Act
                 let start = point
-                    .start_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::Start, &local_zone().expect("system time zone available"))
                     .expect("a valid in-range date has a period start");
                 let repeated = start
-                    .start_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::Start, &local_zone().expect("system time zone available"))
                     .expect("a period start remains in range");
 
                 // Assert
@@ -3207,10 +3197,10 @@ mod tests {
                 let point = DatePoint::from(ymd(year, month, day));
                 // Act
                 let start = point
-                    .start_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::Start, &local_zone().expect("system time zone available"))
                     .expect("a valid in-range date has a period start");
                 let end = point
-                    .end_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::End, &local_zone().expect("system time zone available"))
                     .expect("a valid in-range date has a period end");
 
                 // Assert

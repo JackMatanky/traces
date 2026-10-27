@@ -186,10 +186,10 @@ impl Anchor {
                 .shift(-1, TimeUnit::Day, &zone()?)
                 .map_err(render_calendar_error),
             Self::StartOf(calendar_period) => date_point
-                .start_of(calendar_period, &zone()?)
+                .snap(calendar_period, PeriodEdge::Start, &zone()?)
                 .map_err(render_calendar_error),
             Self::EndOf(calendar_period) => date_point
-                .end_of(calendar_period, &zone()?)
+                .snap(calendar_period, PeriodEdge::End, &zone()?)
                 .map_err(render_calendar_error),
             Self::Weekday(target) => date_point
                 .with_weekday(target, &zone()?)
@@ -687,11 +687,9 @@ fn render_period_edge(
 ) -> TemplateEngineResult<String> {
     let date_point = parse_date_point(value)?;
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
-    let shifted = match period_edge {
-        PeriodEdge::Start => date_point.start_of(calendar_period, &zone),
-        PeriodEdge::End => date_point.end_of(calendar_period, &zone),
-    }
-    .map_err(render_calendar_error)?;
+    let shifted = date_point
+        .snap(calendar_period, period_edge, &zone)
+        .map_err(render_calendar_error)?;
     let pat = shifted.canonical_pattern();
     format_strtime(
         &shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?,

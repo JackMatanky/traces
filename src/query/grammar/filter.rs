@@ -639,13 +639,13 @@ impl QueryFunction {
             Self::StartOf(calendar_period) => {
                 let zone = crate::temporal::local_zone().ok()?;
                 Self::date_boundary(args, |date_point| {
-                    date_point.start_of(calendar_period, &zone)
+                    date_point.snap(calendar_period, PeriodEdge::Start, &zone)
                 })
             }
             Self::EndOf(calendar_period) => {
                 let zone = crate::temporal::local_zone().ok()?;
                 Self::date_boundary(args, |date_point| {
-                    date_point.end_of(calendar_period, &zone)
+                    date_point.snap(calendar_period, PeriodEdge::End, &zone)
                 })
             }
             Self::Date => Self::date(args),
