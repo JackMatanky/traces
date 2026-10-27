@@ -1,5 +1,11 @@
 # Alternative designs and critique for ticket 23
 
+**Superseded in part.** The ticket's `## Answer` rejects the `BodyExtras`
+wrapper in section 2. It also replaces the shared stored-span design in
+section 4 and the derived-view advice in section 1.4 (the stored duplicate stays).
+The unified `ListItem` sketch in section 1 stands, with the box decided by a
+measurement.
+
 This document analyses alternative designs for the note document model. It
 deepens the decisions from round 1.
 

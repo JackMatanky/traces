@@ -146,12 +146,11 @@ Spanned<Value>>`:
 
 ## Not measured
 
-- The cost of an on-demand reparse of one editor buffer (ticket 34).
-- A prototype of a span-bearing `Note` in the parser. The size numbers use a
-  proxy.
+- The cost of an on-demand reparse of one editor buffer (ticket 34). The final
+  round measured a prototype scan of the whole corpus only.
 - Key spans from Noyalib.
-- The memory use of notes in RAM for each candidate design.
 - A repeat run on a personal vault.
+- The real `NoteDoc` builder and the real task payload types.
 
 ## Final stress round (probes 5 to 7)
 

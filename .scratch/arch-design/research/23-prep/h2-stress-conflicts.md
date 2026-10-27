@@ -1,5 +1,10 @@
 # Stress test and conflict report for ticket 23
 
+**Superseded in part.** This round-1 report predates the final design. Its Q2
+advice to keep stored tags stands. Its "memory needs lazy loading" finding stands
+for ticket 24. Its Q1 to Q7 numbering and its verdicts on the shared stored-span
+design are history. See the ticket's `## Answer` and `h5`.
+
 This document stress tests decisions Q1 through Q7 against all tickets. It
 compares decisions against tickets 16 to 22 and 24 to 36 [V]. It also checks the
 redesign map [V: .scratch/arch-design/map.md:1-405]. Every claim has a tag: [V]

@@ -1,9 +1,12 @@
 # Grilling guide for ticket 23
 
-This guide helps the grilling of `issues/23-note-document-model.md`. It decides
-nothing. The user decides. Each recommendation is a proposal [P]. Each fact has
-a source. `g-probe-results.md` holds the measurements. The brief lists known
-problems in the other prep files.
+**Superseded.** This guide came before the final decision. Its candidates S1 to
+S6 and its recommendations are history. The ticket's `## Answer`, `h4` and `h5`
+hold the final design. The "Corrections to the evidence" section stays valid.
+
+This guide helped the grilling of `issues/23-note-document-model.md`. Each
+recommendation is a proposal [P]. Each fact has a source. `g-probe-results.md`
+holds the measurements. The brief lists known problems in the other prep files.
 
 ## Corrections to the evidence
 

@@ -72,7 +72,7 @@ The agent reviews `h-arch-design-note-split-review.md`, section 3.2 (lines
 
 | Candidate | Description | Verdict | Reason |
 |-----------|-------------|---------|--------|
-| A | One shared `Note` with spans in the `NOTES` table. | Wrong [H] | Note deserialization is 97.3% of the in-memory refresh cost (18.48 ms for 5k notes, `research/11:91-95`). Spans add bytes. The agent says it also mixes editor layout into stored data. |
+| A | One shared `Note` with spans in the `NOTES` table. | Wrong [H] | Note deserialization is 97.3% of the sum of decoding and link resolution (18.48 ms and 0.52 ms for 5k notes, `research/11:91-95`). A whole path-set change takes 32 ms to 35 ms. Spans add bytes. The agent says it also mixes editor layout into stored data. |
 | B | `NoteFacts` for the index and `NoteDocument` for the editor. | Partly overturned [H] | Ticket 20 says the validator takes a `&FieldMap`, not a `&NoteDocument`. The editor needs a document only for spans. The agent adds that two models need two hierarchies and projection code. |
 | C | Lossless tree (Rowan) and facts. | Rightly rejected [H] | A Rowan tree is heavy and hard to persist (`research/10:53,98-99`). The Noyalib CST costs +59% parse time (`issues/18:201-224`). |
 | D | Span-free `Note`. Reparse the buffer when the editor needs spans. | Undervalued [H] | The `h` file rejected D because it assumed the schema check works on raw text. Ticket 20 made the check take a field map. The agent says D is now a strong candidate. Taplo and rumdl use this pattern. |

@@ -1,5 +1,9 @@
 # Precedent Analysis: rumdl, IWE, Markdown Oxide, and Marksman
 
+**Unreliable verdicts.** Do not cite the "supports Q1" verdicts in section 2 as
+support for stored spans. No tool persists positions. `h4` corrects this. The
+line facts in section 1 are sound.
+
 This document analyzes precedent from four Language Server Protocol (LSP) tools:
 rumdl, IWE, Markdown Oxide, and Marksman. The analysis uses local digests to
 evaluate design questions Q1, Q5, and Q6.

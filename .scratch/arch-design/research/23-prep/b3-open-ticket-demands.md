@@ -46,7 +46,7 @@ them.
 | Ticket | Demand on ticket 23 | Topic |
 |---|---|---|
 | 24 | Whole `Note` blob or extracted facts. Lazy decode or a snapshot in memory. | A |
-| 25 | Parser version and format version. The 97% cost of note deserialization. | A, D |
+| 25 | Parser version and format version. Note deserialization is about half of a path-set change. | A, D |
 | 26 | Row identity for multi-row notes. First value or all values of a field. | C |
 | 28 | `NoteFieldValue` at the template boundary without stringification. | C, D |
 | 30 | Borrowed or owned parser input. Single or dual pass. | D |
@@ -112,10 +112,10 @@ them.
 
 ## Lessons for ticket 23
 
-- C12: Keep the index record lean. Research 11 says note deserialization is
-  97.3% of the cost of a path-set change (18.5 ms against 0.52 ms for link
-  resolution). The probe shows the text, not the spans, is the bulk of the
-  bytes.
+- C12: Keep the index record lean. Research 11 says note decoding takes 97.3% of
+  the sum of decoding (18.48 ms) and link resolution (0.52 ms). A whole
+  path-set change takes 32 ms to 35 ms. The probe shows the text, not the
+  spans, is the bulk of the bytes.
 - C1: Spans serve the LSP, the diagnostics (ticket 31) and the schema adapters
   (ticket 20). None of these runs on the cold query path [P].
 - C7: Interning the status removes allocations and shrinks `ListItem`.

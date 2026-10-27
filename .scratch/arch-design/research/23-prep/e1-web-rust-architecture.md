@@ -160,8 +160,8 @@ the ticket.
 - C7: [P] Interning a small string to a `u32` symbol or a `char` removes
   allocations. Research 11 says this shrinks `ListItem` from 160 B to about 128
   B. The probe confirms 160 B (`g-probe-results.md`). I did not check 128 B.
-- C12: [P] The 97% decode cost (research 11) is the main argument for a lean
-  record.
+- C12: [P] Decoding is about half of a path-set change (research 11: 18.48 ms of
+  32 ms to 35 ms). It is still the main argument for a lean record.
 - C13: [P] The agent says a full reparse of one note takes less than 1 ms. The
   probe supports this for a mean 11 KB note: 217 µs for the full parse. A
   10,000-line note is not tested (`g-probe-results.md`).

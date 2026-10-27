@@ -117,8 +117,9 @@ Do not reopen these decisions.
 
 - Vault-format parsing is Frozen (ticket 16). The parser stays infallible.
 - The Noyalib compat parser stays. The Noyalib CST is rejected for values.
-- `Link` and `NoteLink` are separate types. `Link` holds `target`, `display` and
-  `embedded`.
+- `Link` and `NoteLink` are separate types. Ticket 18 says that `Link` holds
+  `target`, `display` and `embedded`. The code also keeps the syntax kind in
+  `Link`. The Answer keeps the kind.
 - `NoteFieldValue` keeps its 80 B size test.
 - The schema check is span-free (ticket 20). Adapters attach spans.
 - The editor needs no general write-back. A future writer splices spans into the
@@ -401,6 +402,10 @@ Alternatives considered, with the reason to reject each:
 - Block-id resolution, and whether `NoteDoc` records images.
 - Whether any template reads external links (ticket 28).
 - Host memory at 50,000 notes and a two-process store open.
+- The final place of `TaskStatus*` and `TaskListItem`. The grilling did not
+  settle it. Proposal [P]: keep the root `task` types, as ticket 22 says.
+- The final field set of the parser input, and the `IndexPolicy` keys for each
+  index-time read. The grilling did not list them.
 
 ### Downstream tickets
 
@@ -429,6 +434,7 @@ Alternatives considered, with the reason to reject each:
 - Ticket 19: each element of a multi-value field gets parse-time classification.
 - Ticket 20: replace "the app layer owns any merge" with the note-owned
   effective accessor. Keep the frontmatter-only check.
-- Ticket 22: this ticket decides the final place of `TaskStatus*` and
-  `TaskListItem`. The task stores the symbol and the kind. The status map and
-  the tag filters stay in the parser input.
+- Ticket 22: `TaskListItem` holds the symbol and the kind. The status map and
+  the tag filters stay in the parser input. The final place of `TaskStatus*` and
+  `TaskListItem` and the final field set of the parser input stay unresolved
+  (see above).
