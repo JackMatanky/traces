@@ -362,16 +362,38 @@ itself is not implemented here; the map ends at hand-off to specification.
   error. `init` is a core use case. It trusts only a workspace that it created.
   `Config` carries a stamp. `ConfigService::admit` is the admission primitive.
   Core holds no workspace object (ticket 30).
+- [What is the note document model: spans, facts, items, multi-value
+  metadata?](./issues/23-note-document-model.md): Persist one facts type, `Note`,
+  with no byte span, footnote or callout. `Note` is an assembled view of
+  independent facets: meta, headings, links and items. Add `NoteDoc`: a flat set
+  of ranges plus a line index, built by a separate scan from bytes in hand and
+  never persisted. Both builders call one rules module. The host owns the text
+  and the version. A stored position never drives an edit. A task is a kind of
+  list item. It stores the status symbol and kind, not the name. Keep the stored
+  note-level tags and inline fields. Two maps and one note-owned effective
+  accessor. Several values form a list; ticket 26 adds membership. External URLs
+  leave the stored links. The math pass runs only for a heading with `$`.
+  Notices return beside the `Note`. Handoffs:
+  [read model](./issues/24-index-read-model-and-query-execution.md),
+  [freshness](./issues/25-index-freshness-and-invalidation.md),
+  [query](./issues/26-query-core-and-plan.md),
+  [template](./issues/28-template-engine-boundary.md),
+  [host](./issues/30-workspace-host-and-composition.md),
+  [errors](./issues/31-error-and-diagnostic-architecture.md),
+  [topology](./issues/32-crate-topology-and-public-surface.md),
+  [live buffer](./issues/34-live-buffer-and-persisted-index-consistency.md),
+  [schema](./issues/35-schema-internals-simplification.md),
+  [body sections](./issues/36-body-section-schemas.md).
 
 ## Not yet specified
 
 - **Schema internals**: graduated to [What schema internals survive now that
   schema produces a checker and a class
   hierarchy?](./issues/35-schema-internals-simplification.md).
-- **Note parser internals**: status interning, second pulldown-cmark pass,
-  `ListItem` footprint, footnote/callout/slug modelling. Sharpen after [What is
-  the note document model: spans, facts, items, multi-value
-  metadata?](./issues/23-note-document-model.md).
+- **Note parser internals**: graduated. [Ticket
+  23](./issues/23-note-document-model.md) decides status interning, the second
+  pass, the footprint, and footnote, callout and slug modelling. Only the
+  measurements it lists remain.
 - **Index internals**: `CandidateTrie`/`indextree` retention, store engine vs
   repository split, inline-field class extraction. Sharpen after [What is the
   index read model, and is there one query execution path or

@@ -152,3 +152,52 @@ Spanned<Value>>`:
 - Key spans from Noyalib.
 - The memory use of notes in RAM for each candidate design.
 - A repeat run on a personal vault.
+
+## Final stress round (probes 5 to 7)
+
+These probes ran on the same 2,718-file documentation corpus. It is not a
+personal vault. All 50,000-note numbers are linear extrapolations [H].
+
+### Prototype `NoteDoc` scan (design H2)
+
+- [V] A separate scan over the bytes took 168.6 ms for the corpus. The full
+  parse took 587.3 ms. The scan is 29% of the parse time, or 62 microseconds for
+  each note.
+- [V] The scan used the same Markdown options as the facts parser. It found
+  exactly the same count of links (32,084), headings (31,494) and list items
+  (76,800) in all 2,718 files.
+- [V] A naive tag scan found 12,304 tags. The facts parser found 205. A `#`
+  sign in headings and code explains the gap. The document scan must call the
+  shared tag grammar, not its own pattern.
+- [V] The scan builds frontmatter key spans, heading ranges, link parts, item
+  and checkbox spans, footnotes, callout starts, code ranges, tag and field
+  occurrences. The tag and field parts are approximate.
+- [H] A host builds its range index from files without a facts parse, because
+  the facts come from the index. The scan alone costs about 3.4 s on one thread
+  for 50,000 notes. On 12 threads it costs about 0.6 s.
+
+### Memory
+
+- [V] The decoded facts of the corpus use 31.08 MB of heap in 199,462
+  allocations. The encoded size is 15.89 MB. Decoded facts are about 2 times the
+  encoded bytes.
+- [H] At 50,000 notes the decoded facts use about 570 MB.
+- [V] The prototype documents of the corpus use 12.11 MB of heap. This is about
+  223 MB at 50,000 notes if a host holds every document [H].
+- [V] Decoding all facts takes 15.5 ms for the corpus. This is about 0.28 s at
+  50,000 notes [H].
+- [H] A host that holds every decoded note at 50,000 notes can use about 800 MB.
+  It should not. Item text is 93% of the item bytes, so ticket 24 can cut the
+  decoded size with lazy decoding or text outside the main record.
+
+### Other measurements
+
+- [V] The share of external URLs among outlinks is 72.9% (23,378 of 32,079).
+- [V] The inline-field duplicate is at most 325,737 bytes, about 2.1% of the
+  stored record. This is the whole remainder after lists, outlinks, headings,
+  frontmatter and tags.
+- [H] Size arithmetic for the task payload. After the name `String` leaves,
+  `ListItemType` is about 48 bytes unboxed and 16 bytes boxed. `ListItem` is then
+  about 136 bytes unboxed and about 104 bytes boxed. Only 4.9% of items are
+  tasks, so boxing saves about 3 MB for 76,800 items and adds about 3,800
+  allocations. Measure the real types before the choice.

@@ -1,6 +1,8 @@
 # What is the note document model: spans, facts, items, multi-value metadata?
 
-Type: grilling Status: open Blocked by: 18, 10, 17, 12
+Type: grilling
+Status: resolved
+Blocked by: 18, 10, 17, 12
 
 ## Question
 
@@ -241,3 +243,192 @@ See [research 12](../research/12-iwe-core-and-hosts-architecture.md) and
 - [H] This does not refute the lossless-tree alternative.
 - Fileclass has no body model. It has frontmatter only. It writes through the
   host's `processFrontMatter`. It gives no input.
+
+## Answer
+
+A grilling session resolved this ticket on main @ `fc721f86`. The evidence is in
+[h4-note-shapes-lessons-and-designs.md](../research/23-prep/h4-note-shapes-lessons-and-designs.md),
+[h5-round2-review.md](../research/23-prep/h5-round2-review.md),
+[g-probe-results.md](../research/23-prep/g-probe-results.md) and
+[z-grilling-guide.md](../research/23-prep/z-grilling-guide.md). Do not cite the
+agent files `h1`, `h2` and `h3` in `23-prep/`. Their verdicts are too strong or
+unchecked. All probe numbers come from this repository's documentation, not from
+a personal vault. Every 50,000-note number is a linear extrapolation [H].
+
+### Decision: the split (topic A)
+
+- Persist one facts type. Keep the name `Note`. It holds no byte span, no
+  footnote and no callout. It keeps the `line` fields that it has today.
+- Add `NoteDoc`. It is a flat set of ranges plus a line index. It has no tree.
+  The index never stores it. The editor, the schema adapters and the body checks
+  use it.
+- Build `NoteDoc` with a separate scan, `NoteDoc::scan(src, settings)`. The
+  facts parser stays as it is. Its tests stay the Frozen contract.
+- Put the event options, the link classifier, the tag grammar, the field lexer
+  and the slug rule in one rules module. Both builders call it. A differential
+  test checks full ranges against the source bytes. It does not check counts
+  only.
+- `parse` returns the `Note` and the notices. `parse_with_doc` serves an open
+  buffer. The unsaved-buffer constructor is public (ticket 34).
+- `Link` stays the stored internal-link fact. It holds the target, the display
+  text, the embed flag and the syntax kind. `NoteLink` is the document
+  occurrence type. It holds the ranges.
+- A stored position never drives an edit. An edit reads the current bytes.
+- `Note` is an assembled view of independent facets: meta (frontmatter, tags and
+  rolled-up fields), headings, links and items. No facet needs another facet's
+  storage. Ticket 24 chooses the physical split and what loads when. No
+  consumer needs all facts of all notes in memory.
+
+Alternatives considered, with the reason to reject each:
+
+- Keep the span-free `Note` for everything. It fails the editor needs of ticket
+  17 and the span needs of ticket 20.
+- One shared `Note` with stored spans. No precedent persists spans. A stored
+  span can go stale against an unsaved buffer. It adds 4.3% to the record.
+- A span-free `Note` plus a sidecar span table. It is close to this design. The
+  separate `NoteDoc` has a clearer owner for the ranges.
+- One event loop with a hook that feeds both builders. The parser works on
+  transformed buffers, so tag, field and link-part ranges do not exist inside
+  it. A hook needs an offset map that touches the Frozen parser.
+- A document that the LSP host owns. Tickets 20 and 36 need spans outside the
+  LSP. A core document keeps them testable now.
+- A lossless tree. It adds 59% to the parse time. No consumer needs it.
+
+### Decision: spans and `NoteDoc` contents (topic B)
+
+- `NoteDoc` holds per-kind vectors:
+  - frontmatter key and element spans;
+  - heading ranges and section extents;
+  - link occurrences with full, target, fragment and title ranges, the syntax
+    kind and the embed flag;
+  - tag and inline-field occurrences;
+  - item and checkbox spans;
+  - one `footnotes` collection for definitions and references;
+  - callouts (kind, title, fold state and range);
+  - code ranges.
+- A span is a checked `u32` byte span. `NoteDoc` has no range for input of 4 GiB
+  or more. The line index gives the line. The host converts to UTF-16.
+- `NoteDoc` has no lifetime parameter. The host owns the text as an `Arc<str>`
+  with a version.
+- A small scanner reads the frontmatter keys. It scans only the metadata event
+  range. It prefers an absent span to a false span. Noyalib `Spanned` is not the
+  only source.
+- Ticket 36 reads section extents from the heading lines. It reads text slices
+  from the source. The `Note` stores no paragraph, code block or table.
+
+### Decision: items and fields (topic C)
+
+- A task is a kind of list item over a shared core. `ListItem` holds the text,
+  the depth, the line, the parent, the order flag, the fields, the tags and a
+  kind: plain, checkbox or task.
+- Keep the stored note-level tags. `QueryFieldValueRef::Tags` needs a borrowed
+  slice.
+- Keep the stored note-level inline fields. The duplicate is at most 2.1% of the
+  record. A derived view loses the document order that the parser gives.
+- Keep two maps: the frontmatter fields and the inline fields. The note model
+  owns one effective accessor. A frontmatter value wins over an inline value of
+  the same key. A frontmatter `null` still wins.
+- One value is a scalar. Several values are a list. This rule covers note fields
+  and item fields. Each element is classified once at parse time (ticket 19).
+- Ticket 26 adds a list-membership operation. Equality across a list and a
+  scalar stays false (ticket 19).
+- The effective accessor does not feed the schema check. The check stays
+  frontmatter-only (ticket 20).
+- The note model owns the merge of inline fields into the effective view. The
+  note keeps no raw lexeme.
+- Internal links store the syntax kind, the embed flag, the path, the heading
+  anchor and the display text. External URLs are not stored in `Note`. A block
+  reference (`^id`) is not modelled.
+- A task stores no heading link. A query derives the heading above a task from
+  the parser's heading ranges. A heading inside a quote or a list does not count.
+
+### Decision: the parser (topic D)
+
+- A task stores the status symbol and the status kind. It does not store the name.
+  The status map resolves the name. An unknown symbol keeps its symbol and
+  resolves as `Todo`. The parser keeps the map to decide the kind and
+  `fully_complete`.
+- Decide between a boxed and an unboxed task payload with a measured size and
+  allocation count. The arithmetic estimate is 136 B unboxed and 104 B boxed for
+  a `ListItem` [H].
+- Collect the heading text in pass 1. Run the math pass only when the source
+  range of a heading holds `$`. Keep a permanent differential test with setext,
+  escaped and empty headings. The probe found 0 mismatches in 2,688 notes. It
+  found 5 differences in the 23 notes that have `$` in a heading.
+- Store no slug. Derive it on demand from the heading text. Duplicates get `-1`,
+  `-2`. One function serves the facts and the document.
+- Footnotes and callouts live in `NoteDoc` only.
+- The parser stays infallible. It returns notices beside the `Note`. The `Note`
+  stores none. The bulk index path collects notices with their paths. Ticket 31
+  owns how they show.
+- The parser borrows its settings for one call. A long-lived host owns them in an
+  `Arc`. A fact-changing setting enters `IndexPolicy` (ticket 22).
+- A change of the stored `Note` bumps `META_VERSION`. Index results must equal a
+  fresh parse.
+
+### Change table (ticket 16)
+
+| Change | Tier | Migration |
+|--------|------|-----------|
+| `key = value` does not match a field with several values | Frozen change | Use the membership operation (ticket 26) |
+| Item fields follow the same multi-value rule | Frozen change | Same |
+| `NaN` becomes `Null` with a notice | Frozen change | Read the notice |
+| External URLs leave the stored outlinks | None observable today | None |
+
+### Invariant owners
+
+- `note` owns the facts shape, the effective accessor and the rules module.
+- `NoteDoc` owns every range and its relation to the source bytes.
+- The host owns the text, the version, the debounce, the revision gate and the
+  UTF-16 conversion.
+- `index` owns persistence, `META_VERSION` and `IndexPolicy`.
+
+### What becomes removable
+
+- The second markdown pass on notes without `$` in a heading.
+- The task status name `String` in the stored item.
+- The footnote, callout and slug entries in the glossary. Add the first two back
+  as `NoteDoc` entries.
+- The wrong doc comment at `src/note/parser.rs:77-78`.
+- The stale comment about `NoteFieldValue::Number` in `src/note/lists.rs`.
+
+### What remains unresolved
+
+- Boxed or unboxed task payload (a measurement).
+- The cost of the real `NoteDoc` builder. The prototype scan took 29% of the
+  parse time.
+- The end-to-end gain of the guarded heading pass.
+- Block-id resolution, and whether `NoteDoc` records images.
+- Whether any template reads external links (ticket 28).
+- Host memory at 50,000 notes and a two-process store open.
+
+### Downstream tickets
+
+- Ticket 24: persist one facts-only `Note`. Decoded facts take about twice the
+  encoded size. Choose the facet split, lazy decode, secondary indexes and item
+  text outside the main record. The link edges are about 4% of the record.
+- Ticket 25: the format version rule. The first run after a bump wipes the
+  store. The two-process open of the store is open.
+- Ticket 26: item order and `item_idx`, the membership operation, and the
+  multi-value rule for item fields.
+- Ticket 28: check if a template reads external links or outlinks.
+- Ticket 30: the host keeps a compact link and heading range index and documents
+  only for open buffers. It tags range sets with a source revision.
+- Ticket 31: the parser notice channel and the bulk-index notice path.
+- Ticket 32: visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the
+  buffer parser.
+- Ticket 34: the open buffer wins over disk and over background work. A
+  closed-file edit compares the full source snapshot at commit.
+- Ticket 35: the effective accessor is not the schema field resolution.
+- Ticket 36: section extents from heading lines, and source slices for budgets.
+
+### Amendments to resolved tickets
+
+- Ticket 18: add the stored internal-link fact `Link` beside the editor-side
+  `NoteLink`.
+- Ticket 19: each element of a multi-value field gets parse-time classification.
+- Ticket 20: replace "the app layer owns any merge" with the note-owned
+  effective accessor. Keep the frontmatter-only check.
+- Ticket 22: this ticket decides the final place of `TaskStatus*` and
+  `TaskListItem`. The task stores the symbol and the kind. The status map and
+  the tag filters stay in the parser input.
