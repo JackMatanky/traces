@@ -45,7 +45,8 @@ use crate::{
     UNIT_SPELLINGS_HINT,
     temporal::{
         CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
-        DateUnit, DateValue, PeriodEdge, weekday_from_number,
+        DateUnit, DateValue, PeriodEdge, resolve_period_edge,
+        weekday_from_number,
     },
 };
 const NAMESPACE_METHODS: &[&str] = &[
@@ -291,29 +292,21 @@ fn weekday_or_error(n: i64) -> TemplateEngineResult<jiff::civil::Weekday> {
 
 impl Object for DateNamespace {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        match key.as_str()? {
+        let key = key.as_str()?;
+        let mut buf = [0u8; 16];
+        let lower = if key.len() <= buf.len() {
+            for (dst, byte) in buf.iter_mut().zip(key.as_bytes()) {
+                *dst = byte.to_ascii_lowercase();
+            }
+            std::str::from_utf8(buf.get(..key.len())?).ok()?
+        } else {
+            key
+        };
+        match lower {
             "now" => Some(shorthand(Anchor::Now)),
             "today" => Some(shorthand(Anchor::Today)),
             "tomorrow" => Some(shorthand(Anchor::Tomorrow)),
             "yesterday" => Some(shorthand(Anchor::Yesterday)),
-            "start_of_week" | "sow" => {
-                Some(shorthand(Anchor::StartOf(CalendarPeriod::Week)))
-            }
-            "end_of_week" | "eow" => {
-                Some(shorthand(Anchor::EndOf(CalendarPeriod::Week)))
-            }
-            "start_of_month" | "som" => {
-                Some(shorthand(Anchor::StartOf(CalendarPeriod::Month)))
-            }
-            "end_of_month" | "eom" => {
-                Some(shorthand(Anchor::EndOf(CalendarPeriod::Month)))
-            }
-            "start_of_year" | "soy" => {
-                Some(shorthand(Anchor::StartOf(CalendarPeriod::Year)))
-            }
-            "end_of_year" | "eoy" => {
-                Some(shorthand(Anchor::EndOf(CalendarPeriod::Year)))
-            }
             "weekday" => Some(Value::from_function(
                 |n: i64,
                  format: Option<&str>,
@@ -351,7 +344,14 @@ impl Object for DateNamespace {
                     format_strtime(&zoned, format, format)
                 },
             )),
-            _ => None,
+            edge_name => {
+                let (period, edge) = resolve_period_edge(edge_name)?;
+                let anchor = match edge {
+                    PeriodEdge::Start => Anchor::StartOf(period),
+                    PeriodEdge::End => Anchor::EndOf(period),
+                };
+                Some(shorthand(anchor))
+            }
         }
     }
 
@@ -1166,6 +1166,27 @@ mod tests {
             let ops = Arc::new(DateNamespace);
 
             assert!(ops.get_value(&Value::from(1)).is_none());
+        }
+
+        #[test]
+        fn get_value_accepts_uppercase_method_names() {
+            let ops = Arc::new(DateNamespace);
+
+            for method in NAMESPACE_METHODS {
+                let upper = method.to_ascii_uppercase();
+                assert!(
+                    ops.get_value(&Value::from(upper.as_str())).is_some(),
+                    "{upper:?} (uppercase of {method:?}) does not resolve"
+                );
+            }
+        }
+
+        #[test]
+        fn get_value_resolves_mixed_case_period_edges() {
+            let ops = Arc::new(DateNamespace);
+
+            assert!(ops.get_value(&Value::from("Start_Of_Week")).is_some());
+            assert!(ops.get_value(&Value::from("End_Of_Month")).is_some());
         }
     }
 
