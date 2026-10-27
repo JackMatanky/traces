@@ -17,7 +17,7 @@
 
 use jiff::{Span, civil};
 
-use super::error::CalendarError;
+use super::error::{CalendarError, UnitError};
 
 /// Identifies a recognized duration unit.
 ///
@@ -94,6 +94,23 @@ impl TimeUnit {
         }
         let lower = std::str::from_utf8(buf.get(..unit.len())?).ok()?;
         UNIT_LOOKUP.get(lower).copied()
+    }
+
+    /// Resolves a unit spelling or reports why it was rejected.
+    ///
+    /// The [`UnitError`] message quotes [`UNIT_SPELLINGS_HINT`], so a
+    /// rejected `unit="..."` kwarg names every accepted spelling without a
+    /// second copy of the list beside the caller.
+    ///
+    /// # Errors
+    ///
+    /// - [`UnitError::UnknownSpelling`] if `unit` matches no registered
+    ///   spelling; matching is ASCII case-insensitive (via
+    ///   [`Self::from_spelling`]).
+    pub(crate) fn parse_spelling(unit: &str) -> Result<Self, UnitError> {
+        Self::from_spelling(unit).ok_or_else(|| UnitError::UnknownSpelling {
+            unit: unit.into(),
+        })
     }
 
     /// Returns this unit's [`UnitSpec`] row.
@@ -494,6 +511,81 @@ mod tests {
                 actual, None,
                 "`{input}` is not an accepted unit spelling and must return \
                  None"
+            );
+        }
+    }
+
+    mod spelling_errors {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        /// The `UnitError` message quotes [`UNIT_SPELLINGS_HINT`] verbatim,
+        /// so the hint may only advertise spellings the registry accepts
+        /// under its own plural name.
+        #[test]
+        fn unit_spellings_hint_matches_the_registry() {
+            // Arrange: the hint is one `"plural"/"short"` pair per row.
+            let row_units = [
+                TimeUnit::Year,
+                TimeUnit::Month,
+                TimeUnit::Week,
+                TimeUnit::Day,
+                TimeUnit::Hour,
+                TimeUnit::Minute,
+                TimeUnit::Second,
+            ];
+            let entries: Vec<&str> = UNIT_SPELLINGS_HINT
+                .split(", ")
+                .map(|entry| entry.trim_start_matches("or "))
+                .collect();
+
+            // Act & Assert: every pair parses to the row that owns it.
+            assert_eq!(
+                entries.len(),
+                row_units.len(),
+                "the hint must name one pair per registry row"
+            );
+            for (&entry, unit) in entries.iter().zip(row_units) {
+                let (plural, short) = entry
+                    .split_once("\"/\"")
+                    .expect("hint pairs are `\"plural\"/\"short\"`");
+                let plural = plural.trim_matches('"');
+                let short = short.trim_matches('"');
+
+                assert_eq!(
+                    plural,
+                    unit.human_names().1,
+                    "the hint's plural must be the registry's own plural"
+                );
+                assert_eq!(
+                    TimeUnit::parse_spelling(plural),
+                    Ok(unit),
+                    "`{plural}` must parse from the hint"
+                );
+                assert_eq!(
+                    TimeUnit::parse_spelling(short),
+                    Ok(unit),
+                    "`{short}` must parse from the hint"
+                );
+            }
+        }
+
+        #[test]
+        fn unknown_spelling_error_names_the_unit_and_the_hint() {
+            // Arrange
+            let error = TimeUnit::parse_spelling("decades")
+                .expect_err("`decades` is not an accepted unit spelling");
+
+            // Act
+            let rendered = error.to_string();
+
+            // Assert
+            assert_eq!(
+                rendered,
+                format!(
+                    "unknown unit \"decades\" (expected {UNIT_SPELLINGS_HINT})"
+                )
             );
         }
     }

@@ -42,7 +42,6 @@ use minijinja::{
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::{
     DEFAULT_DATE_PATTERN, DateTimeValue, DurationValue, TimeUnit,
-    UNIT_SPELLINGS_HINT,
     temporal::{
         CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
         DateUnit, DateValue, PeriodEdge, resolve_period_edge,
@@ -404,15 +403,15 @@ fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `unit` is not one of [`TimeUnit::from_spelling`]'s accepted unit names or
+/// `unit` is not one of [`TimeUnit::parse_spelling`]'s accepted unit names or
 /// abbreviations, or
 /// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments)
 /// if `kwargs` carries any key besides `unit`.
 fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
     let unit_str = kwargs.get::<Option<&str>>("unit")?.unwrap_or("days");
     kwargs.assert_all_used()?;
-    TimeUnit::from_spelling(unit_str)
-        .ok_or_else(|| unknown_unit_error(unit_str))
+    TimeUnit::parse_spelling(unit_str)
+        .map_err(|error| invalid_operation(error.to_string(), error))
 }
 
 /// Formats a zoned date-time with Jiff's strict strftime implementation.
@@ -963,7 +962,7 @@ fn weekday(
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// `value` or `other` is not a parseable date/time string (see
 /// [`parse_date_point`]), or if `unit` is not one of
-/// [`TimeUnit::from_spelling`]'s accepted names (see [`unit_kwarg`]). Returns
+/// [`TimeUnit::parse_spelling`]'s accepted names (see [`unit_kwarg`]). Returns
 /// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments)
 /// if `kwargs` carries any key besides `unit`.
 #[expect(
@@ -1107,21 +1106,6 @@ fn render_calendar_error(error: CalendarError) -> Error {
             },
         ),
     }
-}
-
-/// Builds the error for a `unit="..."` kwarg naming anything outside
-/// [`TimeUnit::from_spelling`]'s accepted unit names.
-///
-/// The expected-spellings hint comes from [`UNIT_SPELLINGS_HINT`], kept beside
-/// the unit registry so the message cannot drift from what [`unit_kwarg`]
-/// actually accepts.
-///
-/// Shared by [`date_add`], [`date_sub`], and [`date_diff`] via [`unit_kwarg`].
-fn unknown_unit_error(unit: &str) -> Error {
-    Error::new(
-        ErrorKind::InvalidOperation,
-        format!("unknown unit {unit:?} (expected {UNIT_SPELLINGS_HINT})"),
-    )
 }
 
 #[cfg(test)]
@@ -2259,6 +2243,12 @@ mod tests {
                 .expect_err("unknown unit fails");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
+            assert!(
+                error
+                    .to_string()
+                    .contains("unknown unit \"fortnight\" (expected "),
+                "the unknown-unit message must keep its shape, got: {error}"
+            );
         }
 
         /// Regression: `1e16` seconds fits `i64` (so the `checked_mul` guard

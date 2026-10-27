@@ -167,6 +167,21 @@ impl CalendarError {
     }
 }
 
+/// Reports a unit spelling outside the registered unit set.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum UnitError {
+    /// Reports that a `unit="..."` kwarg matched no registered unit; the
+    /// message quotes every accepted spelling.
+    #[error(
+        "unknown unit {unit:?} (expected {})",
+        super::unit::UNIT_SPELLINGS_HINT
+    )]
+    UnknownSpelling {
+        /// Stores the rejected spelling.
+        unit: Box<str>,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

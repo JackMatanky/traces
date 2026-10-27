@@ -51,7 +51,7 @@ pub use duration::DurationValue;
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
 pub(crate) use point::{DateDiff, DatePoint};
-pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
+pub(crate) use unit::{DateUnit, TimeUnit};
 pub(crate) use zone::local_zone;
 
 #[cfg(any(test, feature = "test-utils"))]

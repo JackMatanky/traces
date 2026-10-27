@@ -1477,6 +1477,7 @@ src/temporal/duration.rs: pub(crate) unit: TimeUnit,
 src/temporal/duration.rs: pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
+src/temporal/error.rs: pub enum UnitError {
 src/temporal/error.rs: pub(crate) enum CalendarError {
 src/temporal/error.rs: pub(crate) fn into_date_error(self, input: &str) -> DateError {
 src/temporal/lexer.rs: pub(crate) fn starts_like_date(bytes: &[u8]) -> bool {
@@ -1507,7 +1508,7 @@ src/temporal/mod.rs: pub(crate) use date::DEFAULT_DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use point::{DateDiff, DatePoint};
-src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
+src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit};
 src/temporal/mod.rs: pub(crate) use zone::local_zone;
 src/temporal/mod.rs: pub(super) fn current_override() -> Option<TimeZone> {
 src/temporal/point.rs: pub(crate) const fn has_time(self) -> bool {
@@ -1545,6 +1546,7 @@ src/temporal/unit.rs: pub(crate) fn decompose(
 src/temporal/unit.rs: pub(crate) fn from_name(name: &str) -> Option<Self> {
 src/temporal/unit.rs: pub(crate) fn from_spelling(unit: &str) -> Option<Self> {
 src/temporal/unit.rs: pub(crate) fn of(self, local_datetime: civil::DateTime) -> i64 {
+src/temporal/unit.rs: pub(crate) fn parse_spelling(unit: &str) -> Result<Self, UnitError> {
 src/temporal/unit.rs: pub(crate) struct DecomposedPart {
 src/temporal/unit.rs: pub(super) fn to_span(self, n: i64) -> Result<Span, CalendarError> {
 src/temporal/zone.rs: pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
