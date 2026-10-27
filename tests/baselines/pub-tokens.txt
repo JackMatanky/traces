@@ -1432,6 +1432,7 @@ src/temporal/date.rs: pub(crate) fn has_padded_date_prefix(s: &str) -> bool {
 src/temporal/date.rs: pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {
 src/temporal/date.rs: pub(crate) fn parse_any(
 src/temporal/date.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
+src/temporal/date.rs: pub(crate) fn today() -> Result<Self, CalendarError> {
 src/temporal/date.rs: pub(super) enum DateShape {
 src/temporal/date.rs: pub(super) fn advance_span(
 src/temporal/datetime.rs: pub fn from_unix_seconds(seconds: i64) -> Result<Self, DateError> {
@@ -1446,6 +1447,7 @@ src/temporal/datetime.rs: pub(crate) fn is_midnight_of(self, date: DateValue) ->
 src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, DateError> {
 src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Result<civil::DateTime, DateError> {
 src/temporal/datetime.rs: pub(crate) fn local_datetime_in(self, zone: &TimeZone) -> civil::DateTime {
+src/temporal/datetime.rs: pub(crate) fn now() -> Self {
 src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
 src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub(crate) fn resolve(
@@ -1533,6 +1535,7 @@ src/temporal/point.rs: pub(crate) fn to_f64(self) -> Option<f64> {
 src/temporal/point.rs: pub(crate) fn with_weekday(
 src/temporal/point.rs: pub(crate) fn zoned_datetime_in(
 src/temporal/point.rs: pub(super) fn from_date_shape(date: civil::Date, shape: DateShape) -> Self {
+src/temporal/point.rs: pub(super) fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
 src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
 src/temporal/unit.rs: pub(crate) const fn count(&self) -> u64 {
 src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {

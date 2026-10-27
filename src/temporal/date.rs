@@ -135,6 +135,17 @@ impl DateValue {
     pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {
         Ok(Self::from_ymd(year, 1, 1)?.civil_date().in_leap_year())
     }
+
+    /// Returns the calendar date of the current instant in the
+    /// process-local zone.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::Zone`] if process-local time-zone discovery fails.
+    pub(crate) fn today() -> Result<Self, CalendarError> {
+        let zone = super::point::local_zone_for_calendar()?;
+        Ok(DateTimeValue::now().local_datetime_in(&zone).date().into())
+    }
 }
 
 /// Renders as a four-digit year with a leading minus sign for negative years.
@@ -582,6 +593,28 @@ mod tests {
             let result = DateValue::in_leap_year(year);
             // Assert
             assert!(matches!(result, Err(DateError::InvalidValue { .. })));
+        }
+    }
+
+    mod today {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn today_is_the_local_calendar_date_of_the_instant() {
+            // Arrange: pin a fixed-offset zone so both reads share a date.
+            ZoneGuard::with("Etc/GMT+5", || {
+                let zone = jiff::tz::TimeZone::get("Etc/GMT+5")
+                    .expect("test zone exists");
+                // Act: the oracle is raw jiff, independent of this crate's
+                // local-zone plumbing.
+                let expected = jiff::Timestamp::now().to_zoned(zone).date();
+                let today = DateValue::today().expect("pinned zone resolves");
+                // Assert: a local-midnight crossing between the two clock
+                // reads is a microseconds-per-day race, accepted here.
+                assert_eq!(today.civil_date(), expected);
+            });
         }
     }
 

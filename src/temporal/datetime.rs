@@ -112,6 +112,12 @@ impl DateTimeValue {
         Self(timestamp)
     }
 
+    /// Reads the current instant from the system clock.
+    #[inline]
+    pub(crate) fn now() -> Self {
+        Self(Timestamp::now())
+    }
+
     /// Resolves a naive local clock time under Jiff's compatible DST policy.
     ///
     /// Ambiguous fall-back times choose their earlier occurrence;
@@ -624,6 +630,33 @@ mod tests {
 
     // ZoneGuard pins a Jiff time zone to the test thread without changing the
     // process TZ environment variable; repeated sets replace the override.
+
+    mod clock {
+        use super::*;
+
+        #[test]
+        fn now_falls_between_two_bracketing_clock_reads() {
+            // Arrange
+            let before = Timestamp::now();
+            // Act
+            let now = DateTimeValue::now();
+            let after = Timestamp::now();
+            // Assert
+            assert!(now.utc() >= before, "{now:?} must not predate {before:?}");
+            assert!(now.utc() <= after, "{now:?} must not postdate {after:?}");
+        }
+
+        #[test]
+        fn now_is_after_a_fixed_timestamp_from_2025() {
+            // Arrange: an instant fixed at 2025-10-09.
+            let earlier = DateTimeValue::from_unix_seconds(1_760_000_000)
+                .expect("valid timestamp");
+            // Act
+            let now = DateTimeValue::now();
+            // Assert
+            assert!(now > earlier, "now must postdate the fixed instant");
+        }
+    }
 
     mod constructor {
         use std::time::Duration;

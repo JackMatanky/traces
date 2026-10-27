@@ -158,17 +158,14 @@ enum Anchor {
 impl Anchor {
     /// The date point a shorthand starts from when no reference is given.
     fn base(self) -> Result<DatePoint, CalendarError> {
-        let now = DatePoint::from(DateTimeValue::from_timestamp(
-            jiff::Timestamp::now(),
-        ));
         match self {
-            Self::Now => Ok(now),
+            Self::Now => Ok(DatePoint::from(DateTimeValue::now())),
             Self::Today
             | Self::Tomorrow
             | Self::Yesterday
             | Self::StartOf(_)
             | Self::EndOf(_)
-            | Self::Weekday(_) => Ok(DatePoint::from(now.date()?)),
+            | Self::Weekday(_) => Ok(DatePoint::from(DateValue::today()?)),
         }
     }
 
@@ -177,30 +174,26 @@ impl Anchor {
         self,
         date_point: DatePoint,
     ) -> TemplateEngineResult<DatePoint> {
+        // Lazy: Now/Today must never resolve the zone (date.now() cannot fail
+        // on lookup).
+        let zone = || crate::temporal::local_zone().map_err(render_date_error);
         match self {
             Self::Now | Self::Today => Ok(date_point),
-            anchor => {
-                let zone =
-                    crate::temporal::local_zone().map_err(render_date_error)?;
-                match anchor {
-                    Self::Now | Self::Today => Ok(date_point),
-                    Self::Tomorrow => date_point
-                        .shift(1, TimeUnit::Day, &zone)
-                        .map_err(render_calendar_error),
-                    Self::Yesterday => date_point
-                        .shift(-1, TimeUnit::Day, &zone)
-                        .map_err(render_calendar_error),
-                    Self::StartOf(calendar_period) => date_point
-                        .start_of(calendar_period, &zone)
-                        .map_err(render_calendar_error),
-                    Self::EndOf(calendar_period) => date_point
-                        .end_of(calendar_period, &zone)
-                        .map_err(render_calendar_error),
-                    Self::Weekday(target) => date_point
-                        .with_weekday(target, &zone)
-                        .map_err(render_calendar_error),
-                }
-            }
+            Self::Tomorrow => date_point
+                .shift(1, TimeUnit::Day, &zone()?)
+                .map_err(render_calendar_error),
+            Self::Yesterday => date_point
+                .shift(-1, TimeUnit::Day, &zone()?)
+                .map_err(render_calendar_error),
+            Self::StartOf(calendar_period) => date_point
+                .start_of(calendar_period, &zone()?)
+                .map_err(render_calendar_error),
+            Self::EndOf(calendar_period) => date_point
+                .end_of(calendar_period, &zone()?)
+                .map_err(render_calendar_error),
+            Self::Weekday(target) => date_point
+                .with_weekday(target, &zone()?)
+                .map_err(render_calendar_error),
         }
     }
 
@@ -1006,6 +999,7 @@ fn date_diff(
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
     let instant =
         parse_date_point(value)?.instant().map_err(render_calendar_error)?;
+    // Instant comparison, not point construction: no zone or date point.
     Ok(instant < jiff::Timestamp::now())
 }
 
@@ -1022,6 +1016,7 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
     let instant =
         parse_date_point(value)?.instant().map_err(render_calendar_error)?;
+    // Instant comparison, not point construction: no zone or date point.
     Ok(instant > jiff::Timestamp::now())
 }
 
