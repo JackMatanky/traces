@@ -303,7 +303,7 @@
 - Test: `src/template/engine/date.rs:1158-1174` (`mod get_value`)
 - Baseline: none (no visibility change)
 
-**Context:** Twelve `get_value` arms (`start_of_week`/`sow`/…/`eoy`) hand-map names that `temporal::calendar::resolve_period_edge` (calendar.rs:101-116) already resolves, ASCII-case-insensitively, from one `PERIOD_EDGE_LOOKUP` table. Three-way maintenance (namespace const, match arms, lookup) collapses to one. The key is folded to lowercase once in a 16-byte buffer (mirroring `resolve_period_edge` itself), which makes the whole `date` namespace case-insensitive: a deliberate superset matching the query layer (`filter.rs:514` already resolves case-insensitively). Longest real key is `from_timestamp` (14 bytes) so the 16-byte fold never truncates a real name; longer unknown keys fall through raw and resolve to `None` as before.
+**Context:** Twelve `get_value` arms (`start_of_week`/`sow`/…/`eoy`) hand-map names that `temporal::calendar::resolve_period_edge` (calendar.rs:101-116) already resolves, ASCII-case-insensitively, from one `PERIOD_EDGE_LOOKUP` table. Three-way maintenance (namespace const, match arms, lookup) collapses to one. The key is folded to lowercase once in a 16-byte buffer (mirroring `resolve_period_edge` itself), which makes the whole `date` namespace case-insensitive: a deliberate superset matching the query layer (`filter.rs:514` already resolves case-insensitively). Longest real key is `start_of_month` (15 bytes) so the 16-byte fold never truncates a real name; longer unknown keys fall through raw and resolve to `None` as before.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -328,7 +328,7 @@
               let ops = Arc::new(DateNamespace);
 
               assert!(ops.get_value(&Value::from("Start_Of_Week")).is_some());
-              assert!(ops.get_value(&Value::from("End_OfMonth")).is_some());
+              assert!(ops.get_value(&Value::from("End_Of_Month")).is_some());
           }
   ```
 
