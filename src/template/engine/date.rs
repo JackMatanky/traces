@@ -83,8 +83,6 @@ impl DateOps {
     #[inline]
     pub(super) fn register(env: &mut Environment<'static>) {
         env.add_filter("date_format", date_format);
-        env.add_filter("duration_format", duration_format);
-        env.add_filter("durationformat", duration_format);
         env.add_filter("timestamp", timestamp);
         env.add_filter("date_add", date_add);
         env.add_filter("date_sub", date_sub);
@@ -471,37 +469,6 @@ fn pattern_to_strftime(
 ) -> TemplateEngineResult<String> {
     crate::temporal::pattern_to_strftime(pattern, datetime)
         .map_err(|source| invalid_operation(source.to_string(), source))
-}
-
-/// Renders a duration value or string in human-readable compound format.
-///
-/// Syntax: `{{ value | duration_format }}` or `{{ value | durationformat }}`
-/// (e.g. `"3 days, 4 hours"`).
-///
-/// # Errors
-///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` cannot be parsed or converted into a [`DurationValue`].
-fn duration_format(value: Value) -> TemplateEngineResult<String> {
-    let dv = if let Some(s) = value.as_str() {
-        DurationValue::parse(s).map_err(|source| {
-            invalid_operation(format!("invalid duration {s:?}"), source)
-        })?
-    } else if let Ok(f) = f64::try_from(value) {
-        DurationValue::from_nominal_seconds(f).map_err(|source| {
-            invalid_operation(
-                format!("out-of-range duration seconds {f}"),
-                source,
-            )
-        })?
-    } else {
-        return Err(Error::new(
-            ErrorKind::InvalidOperation,
-            "durationformat expects a duration string or number",
-        ));
-    };
-    Ok(dv.to_compound_string())
 }
 
 /// Converts a piped date/time string to Unix seconds.
@@ -1726,72 +1693,6 @@ mod tests {
                 "the pattern error must lose to the range error: {msg}"
             );
             assert!(msg.contains("range"), "expected a range error: {msg}");
-        }
-    }
-
-    mod durationformat {
-        use pretty_assertions::assert_eq;
-        use rstest::rstest;
-
-        use super::*;
-
-        #[rstest]
-        #[case::compound_days_hours("3d 4h", "3 days, 4 hours")]
-        #[case::single_day("1d", "1 day")]
-        #[case::single_hour("1h", "1 hour")]
-        #[case::minutes_seconds("1m 30s", "1 minute, 30 seconds")]
-        #[case::zero_duration("0s", "0 seconds")]
-        #[case::negative_duration("-3d 4h", "-3 days, 4 hours")]
-        #[case::fractional_seconds("1.5s", "2 seconds")]
-        #[case::negative_fractional_seconds("-1.5s", "-2 seconds")]
-        fn formats_compound_durations(
-            #[case] input: &str,
-            #[case] expected: &str,
-        ) {
-            let rendered = env()
-                .render_str(
-                    &format!(r#"{{{{ "{input}" | durationformat }}}}"#),
-                    minijinja::context!(),
-                )
-                .expect("render succeeds");
-
-            assert_eq!(rendered, expected);
-        }
-
-        #[test]
-        fn formats_duration_from_numeric_seconds() {
-            let rendered = env()
-                .render_str(
-                    r"{{ 86400 | durationformat }}",
-                    minijinja::context!(),
-                )
-                .expect("render succeeds");
-
-            assert_eq!(rendered, "1 day");
-        }
-
-        #[test]
-        fn duration_format_is_an_alias_of_durationformat() {
-            let rendered = env()
-                .render_str(
-                    r"{{ 90 | duration_format }}|{{ 90 | durationformat }}",
-                    minijinja::context!(),
-                )
-                .expect("render succeeds");
-
-            assert_eq!(rendered, "1 minute, 30 seconds|1 minute, 30 seconds");
-        }
-
-        #[test]
-        fn rejects_invalid_duration_value() {
-            let error = env()
-                .render_str(
-                    r#"{{ "not a duration" | durationformat }}"#,
-                    minijinja::context!(),
-                )
-                .expect_err("invalid duration fails");
-
-            assert_eq!(error.kind(), ErrorKind::InvalidOperation);
         }
     }
 
