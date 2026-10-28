@@ -132,7 +132,7 @@ impl QuerySyntaxError {
         dialect: QueryDialect,
         input: &str,
         span: std::ops::Range<usize>,
-        expected: &'static str,
+        expected: impl Into<String>,
     ) -> Self {
         let source_span = SourceSpan::from((span.start, span.len()));
         Self {
@@ -141,7 +141,7 @@ impl QuerySyntaxError {
             span: source_span,
             lex_error: Box::new(LexError::UnexpectedEndOfInput {
                 span,
-                expected,
+                expected: expected.into(),
             }),
         }
     }
@@ -244,7 +244,7 @@ mod tests {
             assert_eq!(error.span, SourceSpan::from((7, 0)));
             assert_eq!(*error.lex_error, LexError::UnexpectedEndOfInput {
                 span: 7..7,
-                expected: "a literal value",
+                expected: "a literal value".into(),
             });
             assert_eq!(
                 error

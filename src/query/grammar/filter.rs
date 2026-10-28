@@ -314,13 +314,12 @@ impl ValueExpr {
         }
     }
 
-    /// Whether this is a string literal that names no duration unit.
-    fn is_unrecognized_unit(&self) -> bool {
-        matches!(
-            self,
-            Self::Literal(NoteFieldValue::String(unit))
-                if TimeUnit::from_spelling(unit).is_none()
-        )
+    /// Returns the unit spelling when `arg` is a string-literal argument.
+    fn unit_arg(arg: Option<&Self>) -> Option<&str> {
+        match arg? {
+            Self::Literal(NoteFieldValue::String(unit)) => Some(unit),
+            _ => None,
+        }
     }
 
     /// Whether this is a string literal that is not a valid duration.
@@ -555,10 +554,17 @@ impl QueryFunction {
                         .is_some_and(ValueExpr::is_invalid_duration_literal)
                 {
                     Some("valid duration")
-                } else if args.len() == 3
-                    && args.get(2).is_some_and(ValueExpr::is_unrecognized_unit)
-                {
-                    Some("recognized duration unit")
+                } else if let Some(unit) = ValueExpr::unit_arg(args.get(2)) {
+                    if let Err(error) = TimeUnit::parse_spelling(unit) {
+                        return Err(QuerySyntaxError::unexpected_end(
+                            QueryDialect::Filter,
+                            input,
+                            span,
+                            error.to_string(),
+                        )
+                        .into());
+                    }
+                    None
                 } else {
                     None
                 }
@@ -566,11 +572,17 @@ impl QueryFunction {
             Self::DateDiff => {
                 if !matches!(args.len(), 2 | 3) {
                     Some("2 or 3 arguments for date_diff()")
-                } else if args
-                    .get(2)
-                    .is_some_and(ValueExpr::is_unrecognized_unit)
-                {
-                    Some("recognized duration unit")
+                } else if let Some(unit) = ValueExpr::unit_arg(args.get(2)) {
+                    if let Err(error) = TimeUnit::parse_spelling(unit) {
+                        return Err(QuerySyntaxError::unexpected_end(
+                            QueryDialect::Filter,
+                            input,
+                            span,
+                            error.to_string(),
+                        )
+                        .into());
+                    }
+                    None
                 } else {
                     None
                 }
@@ -1337,7 +1349,7 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::temporal::test_support::ZoneGuard;
+        use crate::{LexError, temporal::test_support::ZoneGuard};
 
         #[rstest]
         #[case::greater_than("rating > 5", &["high"])]
@@ -1495,6 +1507,34 @@ mod tests {
             let err = FilterExpr::parse(expr).expect_err("not a date");
 
             assert!(matches!(err, QueryBuilderError::Syntax(_)), "{err}");
+        }
+
+        #[test]
+        #[expect(clippy::panic, reason = "test assertion on error variants")]
+        fn unit_rejections_quote_the_unit_hint() {
+            for expr in [
+                "date_add(due, 17, \"mo3\") == \"2026-08-15\"",
+                "date_diff(due, \"2026-07-29\", \"mo3\") == 15",
+            ] {
+                let QueryBuilderError::Syntax(syntax) =
+                    FilterExpr::parse(expr).expect_err("unknown unit rejects")
+                else {
+                    panic!("expected a syntax error for {expr}");
+                };
+
+                match &*syntax.lex_error {
+                    LexError::UnexpectedEndOfInput {
+                        expected,
+                        ..
+                    } => assert!(
+                        expected.contains("unknown unit \"mo3\" (expected "),
+                        "expected the unit hint in {expected:?} for {expr}"
+                    ),
+                    other @ LexError::UnexpectedToken {
+                        ..
+                    } => panic!("expected end of input, got {other:?}"),
+                }
+            }
         }
 
         #[rstest]

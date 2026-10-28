@@ -208,8 +208,9 @@ impl CalendarError {
 /// Reports a unit spelling outside the registered unit set.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum UnitError {
-    /// Reports that a `unit="..."` kwarg matched no registered unit; the
-    /// message quotes every accepted spelling.
+    /// Carries the rejected input spelling and quotes the catalog's full
+    /// expected-list: `Display` renders
+    /// `unknown unit "<input>" (expected <list>)`.
     #[error(
         "unknown unit {unit:?} (expected {})",
         super::unit::UNIT_SPELLINGS_HINT
