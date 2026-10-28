@@ -259,8 +259,78 @@ by owner-module tests.
   `DurationValue::from_nominal_seconds(f64)`. The public type gains `Copy`
   and checked operator impls (`Add`/`Sub`/`Mul`/`Neg`); public-API baselines
   and `pub-tokens.txt` were regenerated at `7ac2c6cc`. Sub-millisecond
-  decimals remain valid inputs (`0.0001s` = 100 µs) while Jiff's `us`/`ns`
-  unit spellings stay excluded, matching the `R3` row.
+decimals remain valid inputs (`0.0001s` = 100 µs) while Jiff's `us`/`ns`
+unit spellings stay excluded, matching the `R3` row.
+
+## Temporal Offload Audit Amendments (2026-10-28)
+
+Recorded at branch finalization of `temporal-offload` (HEAD `38374ad2`,
+merging after commit `38374ad2`). The plan-conformance audit (two independent
+auditors over the full branch diff `5acc45f6..38374ad2`) classified 24 strays;
+the user ratified the five entries below. The remaining audit strays were
+plan-forced fixes, lint-forced test shapes, or rustfmt-level mechanical
+adaptations with no record required.
+
+### Amendment 1: `DateError::OutOfRange` Is Public (Commit `58cb776a`)
+
+- **Relation**: refines `R11`, `R14`, and Refinement 1; amends the offload
+  plan's Task-14-only public-API reservation.
+- **Change**: `DateError` gains `OutOfRange { input: Box<str> }`, produced by
+  `into_date_error` when a resolved-zone local time leaves Jiff's
+  representable timestamp range. Both public-api baselines gain the variant
+  and its `input` field.
+- **Rationale**: the pre-amendment mapping rendered a recognized value as a
+  parse rejection ("is not a recognized date/time: date/time is outside the
+  representable range"), reachable via `date_start_of_year` with an extreme
+  date under a far-offset zone. No existing variant can state "recognized but
+  out of range"; rewording in the engine is forbidden by the Task 13 origin
+  rule (renderers collapse onto temporal `Display`).
+- **Pins**: range and miette source-chain tests in
+  `src/template/engine/date.rs`; the rewired midnight-range test in
+  `src/temporal/datetime.rs`.
+
+### Amendment 2: Shared Canonical Render Helper (Commit `58cb776a`)
+
+- **Relation**: refines the Task 10 renderer step (X1a).
+- **Change**: `DATETIME_{MILLIS,MICROS,NANOS}_PATTERN` consts and
+  `render_pattern` in `src/temporal/fmt.rs` replace three inline
+  table-then-jiff matches; the `temporal::mod` re-export line tracks the
+  helper instead of `render_canonical_pattern` (the function itself remains).
+  All `pub(crate)`; behavior-equivalent to the plan's inline blocks.
+- **Rationale**: single source for the canonical-pattern table lookup;
+  surfaced by the T10-T14 quality review alongside amendment 1.
+
+### Amendment 3: Sign+4-Digit Years Parse (Task 10)
+
+- **Relation**: refines `R14`'s four-digit rule at the parse seam.
+- **Change**: `expand_signed_year` widens datetime parsing so
+  `-0009-01-01T00:00:00Z` parses; `Display`/`Serialize` still emit
+  four-digit zero-padded years.
+- **Rationale**: plan-forced. Jiff demands six digits after a sign, so the
+  Task 10 red tests and the Display-reparse proptest cannot arrange without
+  the widening; the plan's string fixtures are unparseable on the base tree.
+- **Pins**: `the_parser_accepts_wider_year_forms_than_the_renderer_emits` in
+  `src/temporal/fmt.rs`; the negative-year Display/Serialize tests in
+  `src/temporal/datetime.rs`.
+
+### Amendment 4: `TemporalTokenError` Uses `thiserror` (Task 6)
+
+- **Relation**: refines `R11` (variant surface unchanged; rendering modernized).
+- **Change**: the enum derives `thiserror::Error` with `Box<str>` fields
+  instead of the plan's hand-written `Display`/`String` sketch. Display text
+  is byte-identical to the plan's arms; the shape matches `UnitError`
+  (Task 3).
+- **Rationale**: the plan's snippet was the internal outlier; controller
+  sanctioned at Task 6 review, recorded here for the first time.
+
+### Amendment 5: Token-Module Invariant Test (Task 7)
+
+- **Relation**: amends the Task 7 test-placement rule (template seam only).
+- **Change**: `every_moment_token_is_a_single_byte_repeat` lives in
+  `src/temporal/token.rs`.
+- **Rationale**: pins the single-byte-repeat invariant of `MOMENT_TOKENS`
+  that `match_moment_run` correctness depends on; behavior-neutral; kept by
+  user decision at audit close.
 
 ## Divergences from External Systems
 
