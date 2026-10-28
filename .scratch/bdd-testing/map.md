@@ -122,33 +122,30 @@ fresh session can start slice 1 with zero open design questions.
   audits feed ticket 13. Ticket 08 sets six anti-goals. Evidence:
   [research/08-prior-art](research/08-prior-art.md),
   [audits](research/08-audit-e2e.md).
-- [09: Prototype BDD inside the e2e binary](issues/09-bdd-e2e-prototype.md):
-  the pilot works in `tests/e2e.rs` on macOS with no runner edits. Linux and
-  Windows CI stay unverified. Reject `build.rs`: it caused a package rebuild on
-  each feature edit. Document `touch` for new feature files. Adoption must add
+- [09: Prototype BDD inside the e2e binary](issues/09-bdd-e2e-prototype.md): the
+  pilot works in `tests/e2e.rs` on macOS with no runner edits. Linux and Windows
+  CI stay unverified. Reject `build.rs`: it caused a package rebuild on each
+  feature edit. Document `touch` for new feature files. Adoption must add
   `"Zlib"` to `deny.toml`. `check:layers` is not proved: untracked spike files
   were not scanned, and `|| true` hides `git grep` errors. Findings:
   [research/09](research/09-prototype.md).
-- [10: Refactor resilience against arch-design](issues/10-refactor-resilience.md):
+- [10: Refactor resilience against
+  arch-design](issues/10-refactor-resilience.md):
   [research/10](research/10-invariance-map.md) lists 88 guarantees that pass
   conditions 1 and 2 of ticket 07, each with its arch ticket 16 tier. Scenarios
   pin current behavior. Arch-design edits them later, so this map carries no
-  arch bookkeeping. A scenario never pins a known defect. Each moving seam gets a
-  scenario at the higher boundary, or none. Add table escaping, tag containment
-  and `NoteFieldValue` order as proptests. The invariance list sets the order of
-  the first slices.
+  arch bookkeeping. A scenario never pins a known defect. Each moving seam gets
+  a scenario at the higher boundary, or none. Add table escaping, tag
+  containment and `NoteFieldValue` order as proptests. The invariance list sets
+  the order of the first slices.
 
 ## Not yet specified
 
 - Policy for BDD and quality gates beyond layer placement. The tools exist:
   mutarust (`mise run test:mutants`) and `llvm-cov nextest`. Ticket 12 sets the
   thresholds and the scope.
-- Fate of the existing `//! Proves` and `Defect class:` documentation style:
-  absorbed into Gherkin, kept alongside, or replaced.
 - Linux and Windows CI result for the e2e placement. Only the first adoption
   slice can check it.
-- Scenario density and verbosity norms (how much behavior per scenario, when a
-  Scenario Outline beats a rule).
 
 ## Out of scope
 
