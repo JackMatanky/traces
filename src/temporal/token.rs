@@ -35,6 +35,22 @@ const MOMENT_TOKENS: &[(&str, &str)] = &[
     ("S", "%1f"),
 ];
 
+/// Returns the strftime spec for a maximal run of `ch` with length
+/// `run_len`, or `None` when the run is not a moment-dialect token.
+///
+/// Correct only because every `MOMENT_TOKENS` entry is a repeat of a
+/// single byte; multi-character tokens such as `Do` are dispatched
+/// before the run lookup and are not table entries.
+fn match_moment_run(ch: u8, run_len: usize) -> Option<&'static str> {
+    MOMENT_TOKENS
+        .iter()
+        .copied()
+        .find(|(tok, _)| {
+            tok.len() == run_len && tok.bytes().all(|byte| byte == ch)
+        })
+        .map(|(_, spec)| spec)
+}
+
 /// Translates `pattern` to a strftime pattern.
 ///
 /// If `pattern` contains `%`, it is treated as a strftime pattern and passed
@@ -112,22 +128,15 @@ fn moment_to_strftime(
             let day = datetime.day();
             let _ = write!(result, "{day}{}", ordinal_suffix(day));
         } else if current_byte.is_ascii_alphabetic() {
-            let mut matched = false;
-            let tail = pattern.get(i..).unwrap_or_default();
-            for &(tok, spec) in MOMENT_TOKENS {
-                if tail.starts_with(tok) {
-                    result.push_str(spec);
-                    i = i.saturating_add(tok.len());
-                    matched = true;
-                    break;
-                }
+            let start = i;
+            let ch = current_byte;
+            while i < len && bytes.get(i) == Some(&ch) {
+                i = i.saturating_add(1);
             }
-            if !matched {
-                let start = i;
-                let ch = current_byte;
-                while i < len && bytes.get(i) == Some(&ch) {
-                    i = i.saturating_add(1);
-                }
+            let run_len = i.saturating_sub(start);
+            if let Some(spec) = match_moment_run(ch, run_len) {
+                result.push_str(spec);
+            } else {
                 let token = pattern.get(start..i).unwrap_or_default();
                 return Err(TemporalTokenError::UnsupportedToken {
                     token: token.into(),
@@ -149,4 +158,25 @@ fn moment_to_strftime(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_moment_token_is_a_single_byte_repeat() {
+        for (token, _) in MOMENT_TOKENS {
+            let first = token
+                .as_bytes()
+                .first()
+                .copied()
+                .expect("table tokens are non-empty");
+            assert!(
+                token.bytes().all(|byte| byte == first),
+                "`{token}` is not a run of one byte; `match_moment_run` \
+                 cannot match it"
+            );
+        }
+    }
 }

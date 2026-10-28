@@ -1502,6 +1502,110 @@ mod tests {
             assert_eq!(rendered, expected);
         }
 
+        #[rstest]
+        #[case::year_full("YYYY", "2026")]
+        #[case::year_short("YY", "26")]
+        #[case::month_full("MMMM", "July")]
+        #[case::month_abbr("MMM", "Jul")]
+        #[case::month_padded("MM", "07")]
+        #[case::month_short("M", "7")]
+        #[case::weekday_full("dddd", "Sunday")]
+        #[case::weekday_abbr("ddd", "Sun")]
+        #[case::day_padded("DD", "05")]
+        #[case::day_short("D", "5")]
+        #[case::hour24_padded("HH", "04")]
+        #[case::hour24_short("H", "4")]
+        #[case::hour12_padded("hh", "04")]
+        #[case::hour12_short("h", "4")]
+        #[case::minute_padded("mm", "05")]
+        #[case::minute_short("m", "5")]
+        #[case::second_padded("ss", "03")]
+        #[case::second_short("s", "3")]
+        #[case::fraction_3("SSS", "123")]
+        #[case::fraction_2("SS", "12")]
+        #[case::fraction_1("S", "1")]
+        #[case::ordinal_day("Do", "5th")]
+        #[case::bracket_literal("[Daily]", "Daily")]
+        fn covers_the_full_moment_token_table(
+            #[case] format: &str,
+            #[case] expected: &str,
+        ) {
+            ZoneGuard::set("UTC");
+
+            let rendered = env()
+                .render_str(
+                    &format!(r#"{{{{ value | date_format("{format}") }}}}"#),
+                    minijinja::context! { value => "2026-07-05T04:05:03.123" },
+                )
+                .expect("render succeeds");
+
+            assert_eq!(rendered, expected);
+        }
+
+        #[rstest]
+        #[case::triple_d("DDD", "DDD")]
+        #[case::quadruple_d("DDDD", "DDDD")]
+        #[case::five_m("MMMMM", "MMMMM")]
+        #[case::triple_upper_h("HHH", "HHH")]
+        #[case::triple_lower_h("hhh", "hhh")]
+        #[case::triple_lower_m("mmm", "mmm")]
+        #[case::triple_lower_s("sss", "sss")]
+        #[case::four_upper_s("SSSS", "SSSS")]
+        #[case::six_y("YYYYYY", "YYYYYY")]
+        #[case::eight_y("YYYYYYYY", "YYYYYYYY")]
+        #[case::triple_y("YYY", "YYY")]
+        #[case::five_d("ddddd", "ddddd")]
+        #[case::two_lower_d("dd", "dd")]
+        #[case::one_lower_d("d", "d")]
+        #[case::three_lower_y("yyy", "yyy")]
+        #[case::lowercase_do_reports_d_run("do", "d")]
+        fn rejects_runs_that_are_not_moment_tokens(
+            #[case] format: &str,
+            #[case] token: &str,
+        ) {
+            ZoneGuard::set("UTC");
+
+            let error = env()
+                .render_str(
+                    &format!(r#"{{{{ value | date_format("{format}") }}}}"#),
+                    minijinja::context! { value => "2026-07-05" },
+                )
+                .expect_err("a non-token run fails cleanly");
+
+            assert_eq!(error.kind(), ErrorKind::InvalidOperation);
+            let msg = error.to_string();
+            assert!(
+                msg.contains(&format!(
+                    "unsupported moment-dialect token `{token}`"
+                )),
+                "expected token `{token}` in: {msg}"
+            );
+        }
+
+        #[rstest]
+        #[case::first("2026-07-01", "1st")]
+        #[case::second("2026-07-02", "2nd")]
+        #[case::third("2026-07-03", "3rd")]
+        #[case::eleventh("2026-07-11", "11th")]
+        #[case::twelfth("2026-07-12", "12th")]
+        #[case::thirteenth("2026-07-13", "13th")]
+        #[case::twenty_first("2026-07-21", "21st")]
+        fn covers_ordinal_suffix_edges(
+            #[case] date: &str,
+            #[case] expected: &str,
+        ) {
+            ZoneGuard::set("UTC");
+
+            let rendered = env()
+                .render_str(
+                    r#"{{ value | date_format("Do") }}"#,
+                    minijinja::context! { value => date },
+                )
+                .expect("render succeeds");
+
+            assert_eq!(rendered, expected);
+        }
+
         #[test]
         fn rejects_unsupported_moment_token_with_token_and_dialect_name() {
             let error = env()
