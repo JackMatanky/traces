@@ -942,10 +942,12 @@ fn leap_year_input_error(value: &Value) -> Error {
     )
 }
 
-/// Builds the error for calendar arithmetic that exceeds the supported Jiff
-/// date or time range.
+/// Builds the error for an argument-plane overflow: `checked_neg` on
+/// `i64::MIN` and `u64` to `i64` conversions fail here, before any calendar
+/// arithmetic runs.
 ///
-/// Checked operations return this instead of producing an invalid value.
+/// Calendar failures discovered during arithmetic report through
+/// [`render_calendar_error`] with temporal's own display text.
 fn date_out_of_range_error() -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
@@ -955,34 +957,12 @@ fn date_out_of_range_error() -> Error {
 
 /// Translates a core parse error into a render error.
 fn render_date_error(error: DateError) -> Error {
-    match error {
-        DateError::LocalZoneLookup {
-            input,
-        } => invalid_operation(
-            format!("local timezone lookup failed for {input:?}"),
-            DateError::LocalZoneLookup {
-                input,
-            },
-        ),
-        DateError::InvalidValue {
-            ..
-        }
-        | DateError::YearNotFourDigits {
-            ..
-        } => invalid_operation(error.to_string(), error),
-    }
+    invalid_operation(error.to_string(), error)
 }
 
 /// Translates a computed calendar failure into a render error.
 fn render_calendar_error(error: CalendarError) -> Error {
-    match error {
-        CalendarError::OutOfRange => date_out_of_range_error(),
-        CalendarError::Zone {
-            source,
-        } => invalid_operation(source.to_string(), CalendarError::Zone {
-            source,
-        }),
-    }
+    invalid_operation(error.to_string(), error)
 }
 
 #[cfg(test)]
@@ -2531,9 +2511,16 @@ mod tests {
                 input: "2026-03-08 02:30:00".into(),
             });
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
+            let message = error.to_string();
+            assert_eq!(
+                message.matches("local zone lookup failed").count(),
+                1,
+                "one zone diagnosis without a doubled prefix, got {message}"
+            );
             assert!(
-                error.to_string().contains("local timezone lookup failed"),
-                "expected the zone diagnosis, got {error}"
+                !message.contains("local timezone lookup failed"),
+                "temporal's Display replaces the engine rewording, got \
+                 {message}"
             );
 
             // The typed DateError survives in the source chain for callers
@@ -2569,13 +2556,20 @@ mod tests {
         }
 
         #[test]
-        fn keeps_the_range_message_for_an_overflow() {
+        fn reports_range_failures_with_temporal_display_and_a_source() {
             let error = render_calendar_error(CalendarError::OutOfRange);
+            assert_eq!(
+                error.to_string(),
+                "invalid operation: date/time value is out of range"
+            );
+
+            // The CalendarError rides in the source chain, so miette prints
+            // a `Caused by:` line for range failures now.
             assert!(
-                error
-                    .to_string()
-                    .contains("date arithmetic overflowed the supported range"),
-                "unexpected detail: {error}"
+                std::error::Error::source(&error).is_some_and(|source| {
+                    source.downcast_ref::<CalendarError>().is_some()
+                }),
+                "CalendarError preserved as source"
             );
         }
 
