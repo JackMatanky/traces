@@ -978,13 +978,10 @@ fn render_calendar_error(error: CalendarError) -> Error {
     match error {
         CalendarError::OutOfRange => date_out_of_range_error(),
         CalendarError::Zone {
-            input,
-        } => invalid_operation(
-            format!("local timezone lookup failed for {input:?}"),
-            CalendarError::Zone {
-                input,
-            },
-        ),
+            source,
+        } => invalid_operation(source.to_string(), CalendarError::Zone {
+            source,
+        }),
     }
 }
 
@@ -2547,6 +2544,28 @@ mod tests {
                 .downcast_ref::<DateError>()
                 .expect("DateError preserved as source");
             assert!(matches!(source, DateError::LocalZoneLookup { .. }));
+        }
+
+        #[test]
+        fn renders_a_zone_failure_with_one_lookup_prefix() {
+            // Arrange: mirror today's constructor, which stores DateError's
+            // Display text; the assertion is the single diagnosis we want.
+            let inner = DateError::LocalZoneLookup {
+                input: "system zone: clock unavailable".into(),
+            };
+            let error = render_calendar_error(CalendarError::Zone {
+                source: inner,
+            });
+
+            // Act
+            let message = error.to_string();
+
+            // Assert
+            assert_eq!(
+                message,
+                "invalid operation: local zone lookup failed for `system \
+                 zone: clock unavailable`"
+            );
         }
 
         #[test]

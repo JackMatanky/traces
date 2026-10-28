@@ -51,13 +51,14 @@ pub enum DateError {
         /// Stores the raw input that failed to parse.
         input: Box<str>,
     },
-    /// Reports that the process-local zone could not resolve a naive input.
+    /// Reports that system time-zone discovery failed.
     ///
-    /// DST ambiguities and gaps never produce this error; they resolve
-    /// deterministically.
+    /// `input` carries the zone-discovery failure detail, not a clock time:
+    /// the zone layer builds it as `system zone: {detail}`. DST ambiguities
+    /// and gaps never produce this error; they resolve deterministically.
     #[error("local zone lookup failed for `{input}`")]
     LocalZoneLookup {
-        /// Stores the naive clock-time input that could not be resolved.
+        /// Stores the zone-discovery failure detail.
         input: Box<str>,
     },
 }
@@ -140,12 +141,17 @@ pub(crate) enum CalendarError {
     /// Reports that calendar arithmetic exceeds the representable range.
     #[error("date/time value is out of range")]
     OutOfRange,
-    /// Reports that local-zone resolution failed for a computed local clock
-    /// time.
-    #[error("local zone lookup failed for {input}")]
+    /// Reports that system time-zone discovery failed while resolving a
+    /// computed local clock time.
+    ///
+    /// Forwards its text to the inner [`DateError`] and reports it as the
+    /// error source, so the lookup failure carries one diagnosis instead
+    /// of stacking two.
+    #[error("{source}")]
     Zone {
-        /// Stores the local clock time that could not be resolved.
-        input: Box<str>,
+        /// Stores the zone-lookup failure this variant reports.
+        #[source]
+        source: DateError,
     },
 }
 
@@ -159,10 +165,8 @@ impl CalendarError {
                 reason: "date/time is outside the representable range",
             },
             Self::Zone {
-                input: zone_input,
-            } => DateError::LocalZoneLookup {
-                input: zone_input,
-            },
+                source,
+            } => source,
         }
     }
 }
@@ -323,13 +327,35 @@ mod tests {
         fn renders_the_zone_calendar_error() {
             // Arrange
             let error = CalendarError::Zone {
-                input: "2026-03-08 02:30:00".into(),
+                source: DateError::LocalZoneLookup {
+                    input: "system zone: clock unavailable".into(),
+                },
             };
-            let expected = "local zone lookup failed for 2026-03-08 02:30:00";
+            let expected =
+                "local zone lookup failed for `system zone: clock unavailable`";
             // Act
             let rendered = error.to_string();
             // Assert
             assert_eq!(rendered, expected);
+        }
+
+        #[test]
+        fn exposes_the_date_error_as_the_source() {
+            // Arrange
+            let error = CalendarError::Zone {
+                source: DateError::LocalZoneLookup {
+                    input: "system zone: clock unavailable".into(),
+                },
+            };
+
+            // Act
+            let source = std::error::Error::source(&error);
+
+            // Assert
+            assert!(
+                source.is_some_and(|s| s.downcast_ref::<DateError>().is_some()),
+                "Zone must expose its DateError as the source"
+            );
         }
 
         #[rstest]
@@ -386,7 +412,9 @@ mod tests {
             // Arrange
             let input = "2026-03-08 02:30:00";
             let error = CalendarError::Zone {
-                input: input.into(),
+                source: DateError::LocalZoneLookup {
+                    input: input.into(),
+                },
             };
             // Act
             let actual = error.into_date_error(input);

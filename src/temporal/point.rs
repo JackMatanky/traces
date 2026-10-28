@@ -761,8 +761,8 @@ fn pattern_value_error(text: &str, source: &jiff::Error) -> DateError {
 ///
 /// - [`CalendarError::Zone`] if system time-zone discovery fails.
 pub(super) fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
-    local_zone().map_err(|error| CalendarError::Zone {
-        input: error.to_string().into(),
+    local_zone().map_err(|source| CalendarError::Zone {
+        source,
     })
 }
 

@@ -132,8 +132,8 @@ impl DateTimeValue {
     pub(super) fn from_local(
         local_datetime: civil::DateTime,
     ) -> Result<Self, CalendarError> {
-        let zone = local_zone().map_err(|error| CalendarError::Zone {
-            input: error.to_string().into(),
+        let zone = local_zone().map_err(|source| CalendarError::Zone {
+            source,
         })?;
         Self::from_local_in(local_datetime, &zone)
     }
