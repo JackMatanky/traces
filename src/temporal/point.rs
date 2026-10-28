@@ -243,6 +243,37 @@ impl DatePoint {
         }
     }
 
+    /// Renders this date point in `zone` with the strftime `pattern`.
+    ///
+    /// Canonical patterns render through the crate's encoder, so the sign
+    /// stays outside the year width. Other patterns render through Jiff.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::InvalidValue`] if `zone` resolves this point outside the
+    ///   supported range.
+    /// - [`DateError::InvalidFormat`] if Jiff cannot render `pattern`.
+    pub(crate) fn format_in(
+        self,
+        pattern: &str,
+        zone: &TimeZone,
+    ) -> Result<String, DateError> {
+        let zoned = self.zoned_datetime_in(zone).map_err(|error| {
+            error.into_date_error(&self.local_datetime_in(zone).to_string())
+        })?;
+        if let Some(rendered) =
+            crate::temporal::render_canonical_pattern(zoned.datetime(), pattern)
+        {
+            return Ok(rendered);
+        }
+        jiff::fmt::strtime::format(pattern, &zoned).map_err(|error| {
+            DateError::InvalidFormat {
+                pattern: pattern.into(),
+                reason: error.to_string().into(),
+            }
+        })
+    }
+
     /// Returns the UTC-stored Date-Time equivalent of this date point.
     ///
     /// # Errors
@@ -778,6 +809,44 @@ mod tests {
     // process TZ environment variable; repeated sets replace the override.
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
+    }
+
+    mod format_in {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn renders_a_canonical_pattern_with_the_sign_outside_the_width() {
+            let point = point_at("-0009-01-01");
+
+            let rendered = point
+                .format_in("%Y-%m-%d", &TimeZone::UTC)
+                .expect("canonical patterns render");
+
+            assert_eq!(rendered, "-0009-01-01");
+        }
+
+        #[test]
+        #[expect(clippy::panic, reason = "test assertion on enum variant")]
+        fn reports_an_invalid_pattern_with_the_pattern_and_the_reason() {
+            let point = point_at("2026-07-23");
+
+            let error = point
+                .format_in("%J", &TimeZone::UTC)
+                .expect_err("%J is not a Jiff specifier");
+
+            match error {
+                DateError::InvalidFormat {
+                    pattern,
+                    reason,
+                } => {
+                    assert_eq!(pattern.as_ref(), "%J");
+                    assert!(!reason.is_empty(), "Jiff supplies a reason");
+                }
+                other => panic!("expected InvalidFormat, got {other:?}"),
+            }
+        }
     }
 
     mod parse {

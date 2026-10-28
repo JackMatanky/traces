@@ -251,7 +251,7 @@ impl Anchor {
             .map_err(render_calendar_error)?;
         let local_datetime = zoned.datetime();
         let pat = pattern_to_strftime(format, local_datetime)?;
-        format_strtime(&zoned, &pat, format)
+        date_point.format_in(&pat, &zone).map_err(render_date_error)
     }
 }
 
@@ -331,10 +331,9 @@ impl Object for DateOps {
                         })?;
                     let zone = crate::temporal::local_zone()
                         .map_err(render_date_error)?;
-                    let zoned = DateTimeValue::from_timestamp(timestamp)
-                        .utc()
-                        .to_zoned(zone);
-                    format_strtime(&zoned, format, format)
+                    DatePoint::from(DateTimeValue::from_timestamp(timestamp))
+                        .format_in(format, &zone)
+                        .map_err(render_date_error)
                 },
             )),
             edge_name => {
@@ -408,33 +407,6 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
         .map_err(|error| invalid_operation(error.to_string(), error))
 }
 
-/// Formats a zoned date-time, preferring the canonical temporal renderer for
-/// the pattern shapes the crate renders itself.
-///
-/// # Errors
-///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `strftime` is neither a canonical pattern nor a strftime specifier
-/// `datetime` can render.
-fn format_strtime(
-    datetime: &jiff::Zoned,
-    strftime: &str,
-    source_pattern: &str,
-) -> TemplateEngineResult<String> {
-    if let Some(rendered) =
-        crate::temporal::render_canonical_pattern(datetime.datetime(), strftime)
-    {
-        return Ok(rendered);
-    }
-    jiff::fmt::strtime::format(strftime, datetime).map_err(|source| {
-        invalid_operation(
-            format!("invalid date format {source_pattern:?}"),
-            source,
-        )
-    })
-}
-
 /// The shared date/time string parser for filters that work on the human clock
 /// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
 /// parse via [`parse_date_point`] directly.
@@ -478,7 +450,7 @@ fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
         point.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
     let datetime = zoned.datetime();
     let translated = pattern_to_strftime(pattern, datetime)?;
-    format_strtime(&zoned, &translated, pattern)
+    point.format_in(&translated, &zone).map_err(render_date_error)
 }
 
 /// Translates `pattern` to a strftime pattern.
@@ -578,11 +550,7 @@ fn render_period_edge(
         .snap(calendar_period, period_edge, &zone)
         .map_err(render_calendar_error)?;
     let pat = shifted.canonical_pattern();
-    format_strtime(
-        &shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?,
-        pat,
-        pat,
-    )
+    shifted.format_in(pat, &zone).map_err(render_date_error)
 }
 
 /// Adds `n` units to a piped date/time string.
@@ -678,13 +646,7 @@ fn shift_by_unit(
         .shift(n, unit, &zone)
         .map_err(render_calendar_error)?;
     let pat = shifted_date_point.canonical_pattern();
-    format_strtime(
-        &shifted_date_point
-            .zoned_datetime_in(&zone)
-            .map_err(render_calendar_error)?,
-        pat,
-        pat,
-    )
+    shifted_date_point.format_in(pat, &zone).map_err(render_date_error)
 }
 
 /// Adds `n` days to a piped date/time string.
@@ -813,7 +775,9 @@ fn weekday(
             shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
         let local_datetime = zoned.datetime();
         let pat = pattern_to_strftime(format, local_datetime)?;
-        Ok(Value::from(format_strtime(&zoned, &pat, format)?))
+        Ok(Value::from(
+            shifted.format_in(&pat, &zone).map_err(render_date_error)?,
+        ))
     } else {
         kwargs.assert_all_used()?;
         Ok(Value::from(date_point.component(DateUnit::Weekday, &zone)))
@@ -1461,6 +1425,21 @@ mod tests {
                 .expect_err("invalid format specifier fails cleanly");
 
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
+            let message = error.to_string();
+            assert!(
+                message.contains("invalid date format \"%J\":"),
+                "the message names the pattern and Jiff's reason: {message}"
+            );
+            let source = std::error::Error::source(&error)
+                .expect("a temporal source rides along");
+            assert!(
+                matches!(
+                    source.downcast_ref::<DateError>(),
+                    Some(DateError::InvalidFormat { pattern, .. })
+                        if pattern.as_ref() == "%J"
+                ),
+                "the source is DateError::InvalidFormat, got {source:?}"
+            );
         }
         #[rstest]
         #[case::moment_iso_date("2026-07-29", "YYYY-MM-DD", "2026-07-29")]

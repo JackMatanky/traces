@@ -1,12 +1,14 @@
 //! Defines public parsing errors and internal temporal arithmetic errors.
 //!
-//! [`DateError`] reports date and date-time parsing or local-zone resolution
-//! failures. Internal calendar arithmetic uses a separate error type.
+//! [`DateError`] reports date and date-time parsing, local-zone resolution,
+//! or rendering failures. Internal calendar arithmetic uses a separate error
+//! type.
 //! [`DurationError`] reports duration parsing, validation, and conversion
 //! failures. The [`Display`](std::fmt::Display) text of each variant is the
 //! message shown by the CLI and is part of the crate's contract.
 
-/// Reports date/date-time parsing and local-zone resolution failures.
+/// Reports date/date-time parsing, local-zone resolution, or rendering
+/// failures.
 ///
 /// Typed [`DateValue`] and [`DateTimeValue`] parsers return this error.
 /// Calendar arithmetic failures use a separate internal error type.
@@ -60,6 +62,17 @@ pub enum DateError {
     LocalZoneLookup {
         /// Stores the zone-discovery failure detail.
         input: Box<str>,
+    },
+    /// Reports that a strftime pattern failed to render a resolved value.
+    ///
+    /// The pattern is the caller's spelling. The reason carries Jiff's
+    /// diagnosis of the failure.
+    #[error("invalid date format {pattern:?}: {reason}")]
+    InvalidFormat {
+        /// Stores the pattern that failed to render.
+        pattern: Box<str>,
+        /// Stores Jiff's diagnosis of the failure.
+        reason: Box<str>,
     },
 }
 
@@ -234,6 +247,13 @@ mod tests {
         #[case::local_zone_lookup(
             DateError::LocalZoneLookup { input: "2026-07-29 14:30".into() },
             "local zone lookup failed for `2026-07-29 14:30`"
+        )]
+        #[case::invalid_format(
+            DateError::InvalidFormat {
+                pattern: "%J".into(),
+                reason: "unknown conversion `%J`".into(),
+            },
+            "invalid date format \"%J\": unknown conversion `%J`"
         )]
         fn renders_exact_display_text_for_date_errors(
             #[case] error: DateError,
