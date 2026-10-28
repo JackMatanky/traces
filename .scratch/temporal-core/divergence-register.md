@@ -335,7 +335,7 @@ register are not present in this worktree.
 
 ### Entry 10: Strftime Dialect with Scoped Moment-Token Translation
 
-- **Divergence**: Core formatting uses `chrono::format::strftime` syntax, while template date filters accept `moment.js` tokens via a scoped translation layer (bracket literals, `YYYY MM DD HH mm ss`, `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`). Unsupported moment tokens fail with an explicit diagnostic naming the token.
+- **Divergence**: Core formatting uses jiff `strtime` syntax, while template date filters accept `moment.js` tokens via a scoped translation layer (bracket literals, `YYYY MM DD HH mm ss`, `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`). Unsupported moment tokens fail with an explicit diagnostic naming the token.
 - **External Behavior**: `Templater` uses `moment.js` strings with no validation; Dataview uses `Luxon` tokens.
 - **Rationale**: Maintains a single robust formatting engine while allowing templates copied from `Templater` recipes to render accurately.
 - **Specification**: Spec Story 8–9, Decision `D-b`.

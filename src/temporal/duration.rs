@@ -217,8 +217,6 @@ impl DurationValue {
     ///   number.
     /// - [`DurationError::MisplacedSign`] if a sign appears in an invalid
     ///   position.
-    /// - [`DurationError::MalformedNumber`] if a component has invalid number
-    ///   syntax.
     /// - [`DurationError::MissingUnit`] if a number appears without a following
     ///   unit.
     /// - [`DurationError::UnknownUnit`] if a component names an unrecognized

@@ -132,6 +132,7 @@ impl DateValue {
     /// # Errors
     ///
     /// - [`DateError::InvalidValue`] if `year` is outside `-9999..=9999`.
+    #[inline]
     pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {
         Ok(Self::from_ymd(year, 1, 1)?.civil_date().in_leap_year())
     }
@@ -576,7 +577,6 @@ mod tests {
             #[case] year: i32,
             #[case] expected: bool,
         ) {
-            // Arrange: `year` is the input.
             // Act
             let result = DateValue::in_leap_year(year);
             // Assert

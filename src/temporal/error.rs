@@ -127,7 +127,8 @@ pub enum DurationError {
     MisplacedSign,
 
     /// Reports that the number portion is not valid float syntax (e.g., a bare
-    /// `"."`).
+    /// `"."`). No production path constructs this variant; it stays as public
+    /// contract.
     #[error("invalid number syntax: {source}")]
     MalformedNumber {
         /// Stores the underlying float-parse failure.

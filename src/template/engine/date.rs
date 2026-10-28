@@ -11,16 +11,19 @@
 //!   strings from the current instant, current date, or a Unix timestamp.
 //! - Filters: `date_format`, `timestamp`, `date_add`, `date_sub`, `add_days`,
 //!   `sub_days`, `add_months`, `sub_months`, `add_years`, `sub_years`,
-//!   `start_of_month`, `end_of_month`, `weekday`, and `date_diff` transform a
-//!   piped date/time string. `date_format` is prefixed to avoid minijinja's
-//!   built-in `format` filter.
+//!   `weekday`, and `date_diff` transform a piped date/time string; every
+//!   period-edge shorthand (`sow`/`eom`-style long and short spellings)
+//!   registers from the shared
+//!   [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP) table.
+//!   `date_format` is prefixed to avoid minijinja's built-in `format` filter.
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
 //! Date/time string parsing funnels through [`DatePoint::parse`] via
-//! [`parse_local_datetime`]. A full datetime is tried first, falling back to a
-//! bare ISO date (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) at midnight.
-//! Arithmetic filters re-serialize at the input's original precision via the
-//! calendar owner.
+//! [`parse_local_datetime`], which dispatches once on the input's shape: a
+//! full date-time shape parses as a date-time, and a bare ISO date shape
+//! (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) parses as a calendar date
+//! at midnight. Arithmetic filters re-serialize at the input's original
+//! precision via the calendar owner.
 //!
 //! # Clock doctrine
 //!
@@ -105,6 +108,75 @@ impl DateOps {
         env.add_test("is_future", is_future);
         env.add_test("is_leap_year", is_leap_year);
         env.add_global("date", Value::from_object(Self));
+    }
+}
+
+impl Object for DateOps {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let key = key.as_str()?;
+        let mut buf = [0u8; 16];
+        let lower = if key.len() <= buf.len() {
+            for (dst, byte) in buf.iter_mut().zip(key.as_bytes()) {
+                *dst = byte.to_ascii_lowercase();
+            }
+            std::str::from_utf8(buf.get(..key.len())?).ok()?
+        } else {
+            key
+        };
+        match lower {
+            "now" => Some(shorthand(Anchor::Now)),
+            "today" => Some(shorthand(Anchor::Today)),
+            "tomorrow" => Some(shorthand(Anchor::Tomorrow)),
+            "yesterday" => Some(shorthand(Anchor::Yesterday)),
+            "weekday" => Some(Value::from_function(
+                |n: i64,
+                 format: Option<&str>,
+                 reference: Option<&str>,
+                 reference_format: Option<&str>,
+                 kwargs: Kwargs|
+                 -> TemplateEngineResult<String> {
+                    let target = weekday_or_error(n)?;
+                    Anchor::Weekday(target).render(
+                        format,
+                        None,
+                        reference,
+                        reference_format,
+                        &kwargs,
+                    )
+                },
+            )),
+            "from_timestamp" => Some(Value::from_function(
+                |unix_ts: i64,
+                 kwargs: Kwargs|
+                 -> TemplateEngineResult<String> {
+                    let format = format_kwarg(&kwargs)?;
+                    let timestamp =
+                        jiff::Timestamp::new(unix_ts, 0).map_err(|_| {
+                            Error::new(
+                                ErrorKind::InvalidOperation,
+                                format!("timestamp {unix_ts} is out of range"),
+                            )
+                        })?;
+                    let zone = crate::temporal::local_zone()
+                        .map_err(render_date_error)?;
+                    DatePoint::from(DateTimeValue::from_timestamp(timestamp))
+                        .format_in(format, &zone)
+                        .map_err(render_date_error)
+                },
+            )),
+            edge_name => {
+                let (period, edge) = resolve_period_edge(edge_name)?;
+                let anchor = match edge {
+                    PeriodEdge::Start => Anchor::StartOf(period),
+                    PeriodEdge::End => Anchor::EndOf(period),
+                };
+                Some(shorthand(anchor))
+            }
+        }
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(METHODS)
     }
 }
 
@@ -281,75 +353,6 @@ fn weekday_or_error(n: i64) -> TemplateEngineResult<jiff::civil::Weekday> {
     })
 }
 
-impl Object for DateOps {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        let key = key.as_str()?;
-        let mut buf = [0u8; 16];
-        let lower = if key.len() <= buf.len() {
-            for (dst, byte) in buf.iter_mut().zip(key.as_bytes()) {
-                *dst = byte.to_ascii_lowercase();
-            }
-            std::str::from_utf8(buf.get(..key.len())?).ok()?
-        } else {
-            key
-        };
-        match lower {
-            "now" => Some(shorthand(Anchor::Now)),
-            "today" => Some(shorthand(Anchor::Today)),
-            "tomorrow" => Some(shorthand(Anchor::Tomorrow)),
-            "yesterday" => Some(shorthand(Anchor::Yesterday)),
-            "weekday" => Some(Value::from_function(
-                |n: i64,
-                 format: Option<&str>,
-                 reference: Option<&str>,
-                 reference_format: Option<&str>,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    let target = weekday_or_error(n)?;
-                    Anchor::Weekday(target).render(
-                        format,
-                        None,
-                        reference,
-                        reference_format,
-                        &kwargs,
-                    )
-                },
-            )),
-            "from_timestamp" => Some(Value::from_function(
-                |unix_ts: i64,
-                 kwargs: Kwargs|
-                 -> TemplateEngineResult<String> {
-                    let format = format_kwarg(&kwargs)?;
-                    let timestamp =
-                        jiff::Timestamp::new(unix_ts, 0).map_err(|_| {
-                            Error::new(
-                                ErrorKind::InvalidOperation,
-                                format!("timestamp {unix_ts} is out of range"),
-                            )
-                        })?;
-                    let zone = crate::temporal::local_zone()
-                        .map_err(render_date_error)?;
-                    DatePoint::from(DateTimeValue::from_timestamp(timestamp))
-                        .format_in(format, &zone)
-                        .map_err(render_date_error)
-                },
-            )),
-            edge_name => {
-                let (period, edge) = resolve_period_edge(edge_name)?;
-                let anchor = match edge {
-                    PeriodEdge::Start => Anchor::StartOf(period),
-                    PeriodEdge::End => Anchor::EndOf(period),
-                };
-                Some(shorthand(anchor))
-            }
-        }
-    }
-
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(METHODS)
-    }
-}
-
 /// Parses `s` as a date or date-time expression via [`DatePoint::parse`].
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
@@ -432,6 +435,12 @@ fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
 /// Jiff [`fmt::strtime`] formats a zoned date-time, so `%Z` reflects the
 /// resolved local zone even on either side of a DST fold. Leap seconds are
 /// not representable. Week numbers use ISO `%V`/`%G`, never `%U` or `%W`.
+///
+/// Explicit `%Y` is display-only for negative years: jiff counts the sign
+/// inside the four-digit width, so year `-9` renders as `-009`, which the
+/// crate's four-digit-year rule rejects on reparse. The canonical
+/// round-trip forms (`%Y-%m-%d`, `%Y-%m`, `%F`, and the canonical datetime
+/// patterns) keep the sign outside the year digits and reparse exactly.
 ///
 /// # Errors
 ///
@@ -525,7 +534,7 @@ fn render_period_edge(
 /// Syntax: `{{ value | date_add(n, unit="days") }}`.
 /// `unit` defaults to `"days"` and accepts any [`TimeUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
-/// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
+/// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`).
 /// A sub-day shift of a date-only value moves the date only when it crosses
 /// midnight (`25h` moves it one day; `5h` does not).
 ///
@@ -559,7 +568,7 @@ fn date_add(
 /// Syntax: `{{ value | date_sub(n, unit="days") }}`.
 /// `unit` defaults to `"days"` and accepts any [`TimeUnit`] spelling
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
-/// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`, or `"ms"`).
+/// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`).
 /// A sub-day shift of a date-only value moves the date only when it crosses
 /// midnight (`25h` moves it one day; `5h` does not).
 ///
@@ -757,11 +766,11 @@ fn weekday(
 /// when `other` is later.
 ///
 /// The `unit` kwarg defaults to `"days"` and accepts `"years"`, `"months"`,
-/// `"weeks"`, `"hours"`, `"minutes"`, `"seconds"`, or `"ms"`.
+/// `"weeks"`, `"hours"`, `"minutes"`, or `"seconds"`.
 /// `"years"`/`"months"` are calendar counts: whole units elapsed, day-of-month
-/// aware (see `DateValue::whole_months_until`),
+/// aware (see `DatePoint::diff`),
 /// always an `i64` regardless of input precision. The remaining units,
-/// including `"weeks"`, `"ms"`, and the default `"days"`, are fixed-duration:
+/// including `"weeks"` and the default `"days"`, are fixed-duration:
 /// `f64` when both inputs carry a time component, otherwise an `i64` whole-unit
 /// count.
 ///
@@ -959,6 +968,14 @@ mod tests {
 
             assert!(ops.get_value(&Value::from("Start_Of_Week")).is_some());
             assert!(ops.get_value(&Value::from("End_Of_Month")).is_some());
+        }
+
+        #[test]
+        fn get_value_returns_none_for_a_long_unknown_key() {
+            let ops = Arc::new(DateOps);
+            let long_key = "this_key_is_deliberately_longer_than_16_bytes";
+
+            assert!(ops.get_value(&Value::from(long_key)).is_none());
         }
     }
 
@@ -1979,7 +1996,6 @@ mod tests {
         use rstest::rstest;
 
         use super::*;
-        use crate::temporal::test_support::ZoneGuard;
 
         #[test]
         fn returns_an_integer_day_count_when_neither_input_has_time() {
@@ -2274,6 +2290,7 @@ mod tests {
             assert_eq!(rendered, "2026-03-08T17:00:00-2026-03-08T18:00:00");
         }
     }
+
     mod is_past_and_is_future {
         use pretty_assertions::assert_eq;
 
