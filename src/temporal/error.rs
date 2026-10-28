@@ -182,6 +182,29 @@ pub enum UnitError {
     },
 }
 
+/// An error translating a moment-dialect pattern to strftime.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum TemporalTokenError {
+    /// A bracket literal (`[...]`) was opened but never closed.
+    #[error("unclosed bracket literal in moment-dialect pattern `{pattern}`")]
+    UnclosedBracket {
+        /// The pattern containing the unclosed bracket.
+        pattern: Box<str>,
+    },
+    /// A token has no moment-dialect to strftime mapping.
+    #[error(
+        "unsupported moment-dialect token `{token}` in pattern `{pattern}`; \
+         supported tokens are YYYY, YY, MMMM, MMM, MM, M, dddd, ddd, Do, DD, \
+         D, HH, H, hh, h, mm, m, ss, s, SSS, SS, S, and [bracketed literals]"
+    )]
+    UnsupportedToken {
+        /// The offending token.
+        token: Box<str>,
+        /// The pattern containing the token.
+        pattern: Box<str>,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307,6 +330,37 @@ mod tests {
             let rendered = error.to_string();
             // Assert
             assert_eq!(rendered, expected);
+        }
+
+        #[rstest]
+        #[case::unclosed_bracket(
+            TemporalTokenError::UnclosedBracket {
+                pattern: "[Daily".into(),
+            },
+            "unclosed bracket literal in moment-dialect pattern `[Daily`"
+        )]
+        #[case::unsupported_token(
+            TemporalTokenError::UnsupportedToken {
+                token: "YYYYY".into(),
+                pattern: "YYYYY".into(),
+            },
+            "unsupported moment-dialect token `YYYYY` in pattern \
+             `YYYYY`; supported tokens are YYYY, YY, MMMM, MMM, MM, \
+             M, dddd, ddd, Do, DD, D, HH, H, hh, h, mm, m, ss, s, SSS, \
+             SS, S, and [bracketed literals]"
+        )]
+        fn renders_exact_display_text_for_temporal_token_errors(
+            #[case] error: TemporalTokenError,
+            #[case] expected: &str,
+        ) {
+            // Arrange: `error` and `expected` are the case literals.
+            // Act
+            let rendered = error.to_string();
+            // Assert
+            assert_eq!(
+                rendered, expected,
+                "Display text of {error:?} is the CLI contract"
+            );
         }
     }
 

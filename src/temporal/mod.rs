@@ -36,6 +36,7 @@ mod duration;
 mod error;
 mod lexer;
 mod point;
+mod token;
 mod unit;
 mod zone;
 
@@ -51,6 +52,7 @@ pub use duration::DurationValue;
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
 pub(crate) use point::{DateDiff, DatePoint};
+pub(crate) use token::pattern_to_strftime;
 pub(crate) use unit::{DateUnit, TimeUnit};
 pub(crate) use zone::local_zone;
 

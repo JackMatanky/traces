@@ -1479,6 +1479,7 @@ src/temporal/duration.rs: pub(crate) unit: TimeUnit,
 src/temporal/duration.rs: pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
 src/temporal/error.rs: pub enum DateError {
 src/temporal/error.rs: pub enum DurationError {
+src/temporal/error.rs: pub enum TemporalTokenError {
 src/temporal/error.rs: pub enum UnitError {
 src/temporal/error.rs: pub(crate) enum CalendarError {
 src/temporal/error.rs: pub(crate) fn into_date_error(self, input: &str) -> DateError {
@@ -1510,6 +1511,7 @@ src/temporal/mod.rs: pub(crate) use date::DEFAULT_DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use point::{DateDiff, DatePoint};
+src/temporal/mod.rs: pub(crate) use token::pattern_to_strftime;
 src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit};
 src/temporal/mod.rs: pub(crate) use zone::local_zone;
 src/temporal/mod.rs: pub(super) fn current_override() -> Option<TimeZone> {
@@ -1535,6 +1537,7 @@ src/temporal/point.rs: pub(crate) fn with_weekday(
 src/temporal/point.rs: pub(crate) fn zoned_datetime_in(
 src/temporal/point.rs: pub(super) fn from_date_shape(date: civil::Date, shape: DateShape) -> Self {
 src/temporal/point.rs: pub(super) fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
+src/temporal/token.rs: pub(crate) fn pattern_to_strftime(
 src/temporal/unit.rs: pub(crate) const UNIT_SPELLINGS_HINT: &str =
 src/temporal/unit.rs: pub(crate) const fn count(&self) -> u64 {
 src/temporal/unit.rs: pub(crate) const fn human_names(self) -> (&'static str, &'static str) {
