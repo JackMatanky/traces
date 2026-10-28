@@ -1,6 +1,6 @@
 //! Registers date and time helpers for templates.
 //!
-//! [`DateNamespace`] provides the `date` namespace object registered as a
+//! [`DateOps`] provides the `date` namespace object registered as a
 //! minijinja global by [`super::TemplateEngine`]. It also registers the flat
 //! `date_*` filters and `is_*` tests used in pipelines.
 //!
@@ -48,7 +48,8 @@ use crate::{
         weekday_from_number,
     },
 };
-const NAMESPACE_METHODS: &[&str] = &[
+/// Method names `date` exposes, for [`DateOps::enumerate`].
+const METHODS: &[&str] = &[
     "now",
     "today",
     "tomorrow",
@@ -70,17 +71,17 @@ const NAMESPACE_METHODS: &[&str] = &[
 ];
 /// Backs the `date` namespace object.
 #[derive(Debug)]
-pub(super) struct DateNamespace;
+pub(super) struct DateOps;
 
-impl DateNamespace {
+impl DateOps {
     /// Registers the `date` global plus every flat `date_*` filter and `is_*`
     /// test this module owns.
     ///
-    /// Filters/tests are added first because they are zero-capture free
-    /// functions and need no `self`; then `self` is consumed registering the
-    /// `date` namespace object last.
+    /// This is an associated function because [`DateOps`] carries no state:
+    /// filters and tests are added first as free functions, then the `date`
+    /// namespace object is registered last.
     #[inline]
-    pub(super) fn register(self, env: &mut Environment<'static>) {
+    pub(super) fn register(env: &mut Environment<'static>) {
         env.add_filter("date_format", date_format);
         env.add_filter("duration_format", duration_format);
         env.add_filter("durationformat", duration_format);
@@ -105,7 +106,7 @@ impl DateNamespace {
         env.add_test("is_past", is_past);
         env.add_test("is_future", is_future);
         env.add_test("is_leap_year", is_leap_year);
-        env.add_global("date", Value::from_object(self));
+        env.add_global("date", Value::from_object(Self));
     }
 }
 
@@ -282,7 +283,7 @@ fn weekday_or_error(n: i64) -> TemplateEngineResult<jiff::civil::Weekday> {
     })
 }
 
-impl Object for DateNamespace {
+impl Object for DateOps {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
         let mut buf = [0u8; 16];
@@ -348,7 +349,7 @@ impl Object for DateNamespace {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(NAMESPACE_METHODS)
+        Enumerator::Str(METHODS)
     }
 }
 
@@ -989,7 +990,7 @@ mod tests {
         // Date filters read the thread-local zone, so no serialization is
         // needed against concurrent tests.
         let mut env = Environment::new();
-        DateNamespace.register(&mut env);
+        DateOps::register(&mut env);
         env
     }
 
@@ -1012,23 +1013,23 @@ mod tests {
 
         #[test]
         fn get_value_returns_none_for_an_unknown_key() {
-            let ops = Arc::new(DateNamespace);
+            let ops = Arc::new(DateOps);
 
             assert!(ops.get_value(&Value::from("later")).is_none());
         }
 
         #[test]
         fn get_value_returns_none_for_a_non_string_key() {
-            let ops = Arc::new(DateNamespace);
+            let ops = Arc::new(DateOps);
 
             assert!(ops.get_value(&Value::from(1)).is_none());
         }
 
         #[test]
         fn get_value_accepts_uppercase_method_names() {
-            let ops = Arc::new(DateNamespace);
+            let ops = Arc::new(DateOps);
 
-            for method in NAMESPACE_METHODS {
+            for method in METHODS {
                 let upper = method.to_ascii_uppercase();
                 assert!(
                     ops.get_value(&Value::from(upper.as_str())).is_some(),
@@ -1039,7 +1040,7 @@ mod tests {
 
         #[test]
         fn get_value_resolves_mixed_case_period_edges() {
-            let ops = Arc::new(DateNamespace);
+            let ops = Arc::new(DateOps);
 
             assert!(ops.get_value(&Value::from("Start_Of_Week")).is_some());
             assert!(ops.get_value(&Value::from("End_Of_Month")).is_some());
@@ -1274,19 +1275,16 @@ mod tests {
 
         #[test]
         fn enumerate_lists_every_method() {
-            let ops = Arc::new(DateNamespace);
+            let ops = Arc::new(DateOps);
 
-            assert!(matches!(
-                ops.enumerate(),
-                Enumerator::Str(NAMESPACE_METHODS)
-            ));
+            assert!(matches!(ops.enumerate(), Enumerator::Str(METHODS)));
         }
 
         #[test]
         fn every_enumerated_method_resolves_via_get_value() {
-            let ops = Arc::new(DateNamespace);
+            let ops = Arc::new(DateOps);
 
-            for method in NAMESPACE_METHODS {
+            for method in METHODS {
                 assert!(
                     ops.get_value(&Value::from(*method)).is_some(),
                     "{method:?} is enumerated but get_value has no matching \
