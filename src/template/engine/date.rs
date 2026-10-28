@@ -2013,6 +2013,37 @@ mod tests {
         }
     }
 
+    mod period_edge_errors {
+        use super::*;
+
+        #[test]
+        fn start_of_year_reports_a_range_failure_not_a_parse_failure() {
+            // Arrange: under UTC+14 the snapped year-start local midnight
+            // sits before Jiff's earliest instant, and `format_in` is the
+            // first resolution this filter performs.
+            ZoneGuard::set("Etc/GMT-14");
+
+            // Act
+            let error = env()
+                .render_str(
+                    "{{ value | start_of_year }}",
+                    minijinja::context! { value => "-9999-02-15" },
+                )
+                .expect_err("year-start midnight falls outside the range");
+
+            // Assert
+            let message = error.to_string();
+            assert!(
+                message.contains("is out of the supported date/time range"),
+                "expected range-truthful wording, got {message}"
+            );
+            assert!(
+                !message.contains("not a recognized"),
+                "a computed value must not read as a parse failure: {message}"
+            );
+        }
+    }
+
     mod weekday {
         use pretty_assertions::assert_eq;
         use rstest::rstest;

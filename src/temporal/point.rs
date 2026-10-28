@@ -250,7 +250,7 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if `zone` resolves this point outside the
+    /// - [`DateError::OutOfRange`] if `zone` resolves this point outside the
     ///   supported range.
     /// - [`DateError::InvalidFormat`] if Jiff cannot render `pattern`.
     pub(crate) fn format_in(
@@ -261,17 +261,11 @@ impl DatePoint {
         let zoned = self.zoned_datetime_in(zone).map_err(|error| {
             error.into_date_error(&self.local_datetime_in(zone).to_string())
         })?;
-        if let Some(rendered) =
-            crate::temporal::render_canonical_pattern(zoned.datetime(), pattern)
-        {
-            return Ok(rendered);
-        }
-        jiff::fmt::strtime::format(pattern, &zoned).map_err(|error| {
-            DateError::InvalidFormat {
+        crate::temporal::render_pattern(zoned.datetime(), pattern, &zoned)
+            .map_err(|error| DateError::InvalidFormat {
                 pattern: pattern.into(),
                 reason: error.to_string().into(),
-            }
-        })
+            })
     }
 
     /// Returns the UTC-stored Date-Time equivalent of this date point.

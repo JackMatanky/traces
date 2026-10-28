@@ -10,6 +10,15 @@ use jiff::civil;
 
 use super::{DEFAULT_DATE_PATTERN, DEFAULT_DATETIME_PATTERN};
 
+/// Canonical date-time pattern with millisecond precision.
+pub(crate) const DATETIME_MILLIS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.3f";
+
+/// Canonical date-time pattern with microsecond precision.
+pub(crate) const DATETIME_MICROS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.6f";
+
+/// Canonical date-time pattern with nanosecond precision.
+pub(crate) const DATETIME_NANOS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.9f";
+
 /// One canonical output shape and the yearless pattern for each of its
 /// halves.
 enum CanonicalForm {
@@ -31,9 +40,9 @@ static CANONICAL_PATTERNS: &[(&str, CanonicalForm)] = &[
     (DEFAULT_DATE_PATTERN, CanonicalForm::Date),
     ("%Y-%m", CanonicalForm::Month),
     (DEFAULT_DATETIME_PATTERN, CanonicalForm::DateTime("%H:%M:%S")),
-    ("%Y-%m-%dT%H:%M:%S%.3f", CanonicalForm::DateTime("%H:%M:%S%.3f")),
-    ("%Y-%m-%dT%H:%M:%S%.6f", CanonicalForm::DateTime("%H:%M:%S%.6f")),
-    ("%Y-%m-%dT%H:%M:%S%.9f", CanonicalForm::DateTime("%H:%M:%S%.9f")),
+    (DATETIME_MILLIS_PATTERN, CanonicalForm::DateTime("%H:%M:%S%.3f")),
+    (DATETIME_MICROS_PATTERN, CanonicalForm::DateTime("%H:%M:%S%.6f")),
+    (DATETIME_NANOS_PATTERN, CanonicalForm::DateTime("%H:%M:%S%.9f")),
     ("%F", CanonicalForm::Date),
 ];
 
@@ -47,7 +56,7 @@ static CANONICAL_PATTERNS: &[(&str, CanonicalForm)] = &[
 /// # Returns
 ///
 /// The rendered spelling, or `None` when `pattern` is not canonical.
-/// Callers keep their jiff-native path for non-canonical patterns.
+/// [`render_pattern`] applies the Jiff fallback for those patterns.
 pub(crate) fn render_canonical_pattern(
     datetime: civil::DateTime,
     pattern: &str,
@@ -69,6 +78,45 @@ pub(crate) fn render_canonical_pattern(
         );
     }
     Some(rendered)
+}
+
+/// Renders `pattern` over `datetime` through the canonical table first.
+///
+/// Canonical patterns render through [`render_canonical_pattern`] so the
+/// sign stays outside the year width; a miss falls back to Jiff's own
+/// strtime over `fallback`. The miss arm is unreachable for
+/// `DateTimeValue::canonical_pattern` shapes (pinned by
+/// `canonical_pattern_is_in_the_render_table`) and stays live for user
+/// patterns such as `%d %B %Y`, which only Jiff can render.
+///
+/// # Arguments
+///
+/// * `datetime` - civil fields the canonical table renders
+/// * `pattern` - the caller's strftime pattern
+/// * `fallback` - the value Jiff renders on a canonical miss; a `&Zoned` keeps
+///   zone-dependent directives such as `%Z` working
+///
+/// # Returns
+///
+/// The rendered spelling, from the canonical table when `pattern` is one of
+/// its entries and from Jiff otherwise.
+///
+/// # Errors
+///
+/// Returns Jiff's strtime failure when `pattern` is neither canonical nor
+/// renderable by Jiff.
+pub(crate) fn render_pattern<T>(
+    datetime: civil::DateTime,
+    pattern: &str,
+    fallback: T,
+) -> Result<String, jiff::Error>
+where
+    T: Into<jiff::fmt::strtime::BrokenDownTime>,
+{
+    match render_canonical_pattern(datetime, pattern) {
+        Some(rendered) => Ok(rendered),
+        None => jiff::fmt::strtime::format(pattern, fallback),
+    }
 }
 
 /// Writes the year with the sign outside its four-digit width.
@@ -115,9 +163,9 @@ mod tests {
             DEFAULT_DATE_PATTERN,
             "%Y-%m",
             DEFAULT_DATETIME_PATTERN,
-            "%Y-%m-%dT%H:%M:%S%.3f",
-            "%Y-%m-%dT%H:%M:%S%.6f",
-            "%Y-%m-%dT%H:%M:%S%.9f",
+            DATETIME_MILLIS_PATTERN,
+            DATETIME_MICROS_PATTERN,
+            DATETIME_NANOS_PATTERN,
             "%F",
         ] {
             assert!(

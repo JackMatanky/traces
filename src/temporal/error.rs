@@ -1,14 +1,14 @@
 //! Defines public parsing errors and internal temporal arithmetic errors.
 //!
 //! [`DateError`] reports date and date-time parsing, local-zone resolution,
-//! or rendering failures. Internal calendar arithmetic uses a separate error
-//! type.
+//! rendering, or representable-range failures. Internal calendar arithmetic
+//! uses a separate error type.
 //! [`DurationError`] reports duration parsing, validation, and conversion
 //! failures. The [`Display`](std::fmt::Display) text of each variant is the
 //! message shown by the CLI and is part of the crate's contract.
 
-/// Reports date/date-time parsing, local-zone resolution, or rendering
-/// failures.
+/// Reports date/date-time parsing, local-zone resolution, rendering, or
+/// representable-range failures.
 ///
 /// Typed [`DateValue`] and [`DateTimeValue`] parsers return this error.
 /// Calendar arithmetic failures use a separate internal error type.
@@ -73,6 +73,17 @@ pub enum DateError {
         pattern: Box<str>,
         /// Stores Jiff's diagnosis of the failure.
         reason: Box<str>,
+    },
+    /// Reports that a recognized date/time value lies outside the supported
+    /// range.
+    ///
+    /// The value was understood; it just cannot be represented. Local
+    /// midnight on `-9999-01-01` under `Etc/GMT-14`, for example, precedes
+    /// Jiff's earliest instant.
+    #[error("`{input}` is out of the supported date/time range")]
+    OutOfRange {
+        /// Stores the value that resolved outside the supported range.
+        input: Box<str>,
     },
 }
 
@@ -169,13 +180,22 @@ pub(crate) enum CalendarError {
 }
 
 impl CalendarError {
-    /// Maps a calendar failure to the parse error exposed by typed date
-    /// parsers.
+    /// Maps a calendar failure to the public error exposed by typed date
+    /// parsers and by pattern rendering.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - the value the calendar failure was reached through
+    ///
+    /// # Returns
+    ///
+    /// The [`DateError`] carrying the same diagnosis: out-of-range failures
+    /// become [`DateError::OutOfRange`], zone failures forward their inner
+    /// [`DateError`] unchanged.
     pub(crate) fn into_date_error(self, input: &str) -> DateError {
         match self {
-            Self::OutOfRange => DateError::InvalidValue {
+            Self::OutOfRange => DateError::OutOfRange {
                 input: input.into(),
-                reason: "date/time is outside the representable range",
             },
             Self::Zone {
                 source,
@@ -254,6 +274,12 @@ mod tests {
                 reason: "unknown conversion `%J`".into(),
             },
             "invalid date format \"%J\": unknown conversion `%J`"
+        )]
+        #[case::out_of_range(
+            DateError::OutOfRange {
+                input: "-009999-01-01T00:00:00".into(),
+            },
+            "`-009999-01-01T00:00:00` is out of the supported date/time range"
         )]
         fn renders_exact_display_text_for_date_errors(
             #[case] error: DateError,
@@ -421,9 +447,8 @@ mod tests {
             // Act
             let actual = CalendarError::OutOfRange.into_date_error(input);
             // Assert
-            assert_eq!(actual, DateError::InvalidValue {
+            assert_eq!(actual, DateError::OutOfRange {
                 input: input.into(),
-                reason: "date/time is outside the representable range",
             });
         }
 

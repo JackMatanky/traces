@@ -281,6 +281,8 @@ pub traces::DateError::InvalidValue::input: alloc::boxed::Box<str>
 pub traces::DateError::InvalidValue::reason: &'static str
 pub traces::DateError::LocalZoneLookup
 pub traces::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
+pub traces::DateError::OutOfRange
+pub traces::DateError::OutOfRange::input: alloc::boxed::Box<str>
 pub traces::DateError::YearNotFourDigits
 pub traces::DateError::YearNotFourDigits::input: alloc::boxed::Box<str>
 impl core::clone::Clone for traces::DateError

@@ -52,7 +52,10 @@ pub use datetime::DateTimeValue;
 pub use duration::DurationValue;
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
-pub(crate) use fmt::render_canonical_pattern;
+pub(crate) use fmt::{
+    DATETIME_MICROS_PATTERN, DATETIME_MILLIS_PATTERN, DATETIME_NANOS_PATTERN,
+    render_pattern,
+};
 pub(crate) use point::{DateDiff, DatePoint};
 pub(crate) use token::pattern_to_strftime;
 pub(crate) use unit::{DateUnit, TimeUnit};

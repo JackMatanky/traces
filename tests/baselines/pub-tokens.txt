@@ -1484,7 +1484,11 @@ src/temporal/error.rs: pub enum TemporalTokenError {
 src/temporal/error.rs: pub enum UnitError {
 src/temporal/error.rs: pub(crate) enum CalendarError {
 src/temporal/error.rs: pub(crate) fn into_date_error(self, input: &str) -> DateError {
+src/temporal/fmt.rs: pub(crate) const DATETIME_MICROS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.6f";
+src/temporal/fmt.rs: pub(crate) const DATETIME_MILLIS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.3f";
+src/temporal/fmt.rs: pub(crate) const DATETIME_NANOS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.9f";
 src/temporal/fmt.rs: pub(crate) fn render_canonical_pattern(
+src/temporal/fmt.rs: pub(crate) fn render_pattern<T>(
 src/temporal/lexer.rs: pub(crate) fn starts_like_date(bytes: &[u8]) -> bool {
 src/temporal/lexer.rs: pub(crate) fn starts_with_year(s: &str) -> bool {
 src/temporal/lexer.rs: pub(super) enum TemporalShapeToken {
@@ -1512,7 +1516,7 @@ src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DEFAULT_DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
-src/temporal/mod.rs: pub(crate) use fmt::render_canonical_pattern;
+src/temporal/mod.rs: pub(crate) use fmt::{
 src/temporal/mod.rs: pub(crate) use point::{DateDiff, DatePoint};
 src/temporal/mod.rs: pub(crate) use token::pattern_to_strftime;
 src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit};

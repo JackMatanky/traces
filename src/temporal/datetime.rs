@@ -16,11 +16,12 @@ use logos::Logos;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    CalendarError, DateValue, TimeUnit,
+    CalendarError, DATETIME_MICROS_PATTERN, DATETIME_MILLIS_PATTERN,
+    DATETIME_NANOS_PATTERN, DateValue, TimeUnit,
     date::has_padded_date_prefix,
     error::DateError,
     lexer::{TemporalShapeToken, starts_with_year},
-    render_canonical_pattern,
+    render_pattern,
     zone::local_zone,
 };
 
@@ -288,11 +289,11 @@ impl DateTimeValue {
         if nanoseconds == 0 {
             DEFAULT_DATETIME_PATTERN
         } else if nanoseconds % 1_000_000 == 0 {
-            "%Y-%m-%dT%H:%M:%S%.3f"
+            DATETIME_MILLIS_PATTERN
         } else if nanoseconds % 1_000 == 0 {
-            "%Y-%m-%dT%H:%M:%S%.6f"
+            DATETIME_MICROS_PATTERN
         } else {
-            "%Y-%m-%dT%H:%M:%S%.9f"
+            DATETIME_NANOS_PATTERN
         }
     }
 }
@@ -306,16 +307,9 @@ impl fmt::Display for DateTimeValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let local = self.local_datetime().map_err(|_| fmt::Error)?;
-        if let Some(rendered) =
-            render_canonical_pattern(local, self.canonical_pattern())
-        {
-            f.write_str(&rendered)
-        } else {
-            let rendered =
-                jiff::fmt::strtime::format(self.canonical_pattern(), local)
-                    .map_err(|_| fmt::Error)?;
-            f.write_str(&rendered)
-        }
+        let rendered = render_pattern(local, self.canonical_pattern(), local)
+            .map_err(|_| fmt::Error)?;
+        f.write_str(&rendered)
     }
 }
 
@@ -347,8 +341,7 @@ impl TryFrom<DateValue> for DateTimeValue {
     /// # Errors
     ///
     /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
-    /// - [`DateError::InvalidValue`] if midnight is outside the supported
-    ///   range.
+    /// - [`DateError::OutOfRange`] if midnight is outside the supported range.
     #[inline]
     fn try_from(date: DateValue) -> Result<Self, Self::Error> {
         let midnight = date.civil_date().at(0, 0, 0, 0);
@@ -376,14 +369,8 @@ impl Serialize for DateTimeValue {
         S: Serializer,
     {
         let utc = self.utc().to_zoned(TimeZone::UTC).datetime();
-        let mut rendered =
-            match render_canonical_pattern(utc, self.canonical_pattern()) {
-                Some(rendered) => rendered,
-                None => {
-                    jiff::fmt::strtime::format(self.canonical_pattern(), utc)
-                        .map_err(serde::ser::Error::custom)?
-                }
-            };
+        let mut rendered = render_pattern(utc, self.canonical_pattern(), utc)
+            .map_err(serde::ser::Error::custom)?;
         rendered.push('Z');
         serializer.serialize_str(&rendered)
     }
@@ -605,7 +592,7 @@ impl DateTimeInput {
     ///
     /// - [`DateError::LocalZoneLookup`] if the system time zone cannot resolve
     ///   a local-clock input.
-    /// - [`DateError::InvalidValue`] if the local-clock input cannot be
+    /// - [`DateError::OutOfRange`] if the local-clock input cannot be
     ///   represented as a timestamp in the selected zone.
     pub(crate) fn resolve(
         self,
@@ -1604,7 +1591,7 @@ mod tests {
                 let value = DateTimeValue::parse_iso(text)
                     .expect("fixture value parses");
                 assert!(
-                    render_canonical_pattern(
+                    crate::temporal::fmt::render_canonical_pattern(
                         fixture,
                         value.canonical_pattern()
                     )
@@ -1769,9 +1756,8 @@ mod tests {
             // Assert
             assert!(matches!(
                 error,
-                DateError::InvalidValue { input, reason }
+                DateError::OutOfRange { input }
                     if input.as_ref() == "-009999-01-01T00:00:00"
-                        && reason == "date/time is outside the representable range"
             ));
         }
 
