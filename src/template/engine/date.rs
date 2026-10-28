@@ -246,11 +246,11 @@ impl Anchor {
         }
 
         let zone = crate::temporal::local_zone().map_err(render_date_error)?;
-        let local_datetime = date_point.local_datetime_in(&zone);
-        let pat = pattern_to_strftime(format, local_datetime)?;
         let zoned = date_point
             .zoned_datetime_in(&zone)
             .map_err(render_calendar_error)?;
+        let local_datetime = zoned.datetime();
+        let pat = pattern_to_strftime(format, local_datetime)?;
         format_strtime(&zoned, &pat, format)
     }
 }
@@ -408,18 +408,25 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
         .map_err(|error| invalid_operation(error.to_string(), error))
 }
 
-/// Formats a zoned date-time with Jiff's strict strftime implementation.
+/// Formats a zoned date-time, preferring the canonical temporal renderer for
+/// the pattern shapes the crate renders itself.
 ///
 /// # Errors
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `strftime` is not a strftime specifier `datetime` can render.
+/// `strftime` is neither a canonical pattern nor a strftime specifier
+/// `datetime` can render.
 fn format_strtime(
     datetime: &jiff::Zoned,
     strftime: &str,
     source_pattern: &str,
 ) -> TemplateEngineResult<String> {
+    if let Some(rendered) =
+        crate::temporal::render_canonical_pattern(datetime.datetime(), strftime)
+    {
+        return Ok(rendered);
+    }
     jiff::fmt::strtime::format(strftime, datetime).map_err(|source| {
         invalid_operation(
             format!("invalid date format {source_pattern:?}"),
@@ -467,10 +474,10 @@ fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
     let point = parse_date_point(value)?;
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
-    let datetime = point.local_datetime_in(&zone);
-    let translated = pattern_to_strftime(pattern, datetime)?;
     let zoned =
         point.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
+    let datetime = zoned.datetime();
+    let translated = pattern_to_strftime(pattern, datetime)?;
     format_strtime(&zoned, &translated, pattern)
 }
 
@@ -802,10 +809,10 @@ fn weekday(
         let shifted = date_point
             .with_weekday(target_weekday, &zone)
             .map_err(render_calendar_error)?;
-        let local_datetime = shifted.local_datetime_in(&zone);
-        let pat = pattern_to_strftime(format, local_datetime)?;
         let zoned =
             shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
+        let local_datetime = zoned.datetime();
+        let pat = pattern_to_strftime(format, local_datetime)?;
         Ok(Value::from(format_strtime(&zoned, &pat, format)?))
     } else {
         kwargs.assert_all_used()?;
@@ -1125,6 +1132,23 @@ mod tests {
                 .expect_err("unknown kwarg fails");
 
             assert_eq!(error.kind(), ErrorKind::TooManyArguments);
+        }
+
+        #[test]
+        fn now_formats_a_negative_year_reference_sign_outside_the_width() {
+            // Arrange
+            ZoneGuard::set("UTC");
+
+            // Act
+            let rendered = env()
+                .render_str(
+                    r#"{{ date.now(reference="-0009-01-01", reference_format="%Y-%m-%d", format="%Y-%m-%d") }}"#,
+                    minijinja::context!(),
+                )
+                .expect("render succeeds");
+
+            // Assert
+            assert_eq!(rendered, "-0009-01-01");
         }
     }
 
@@ -1688,6 +1712,64 @@ mod tests {
 
             let translated = pattern_to_strftime(sample_pattern, dt).unwrap();
             assert!(!translated.contains("%+"));
+        }
+
+        #[test]
+        fn renders_a_negative_year_with_the_sign_outside_the_width() {
+            // Arrange
+            ZoneGuard::set("UTC");
+
+            // Act
+            let rendered = env()
+                .render_str(
+                    r#"{{ value | date_format("%Y-%m-%d") }}"#,
+                    minijinja::context! { value => "-0009-01-01" },
+                )
+                .expect("render succeeds");
+
+            // Assert
+            assert_eq!(rendered, "-0009-01-01");
+        }
+
+        #[test]
+        fn skipped_local_days_render_one_day_in_both_dialects() {
+            // Arrange: 2011-12-30 did not exist in Samoa; midnight shifts to
+            // 2011-12-31, and both dialects must render that day.
+            ZoneGuard::set("Pacific/Apia");
+
+            // Act
+            let rendered = env()
+                .render_str(
+                    r#"{{ value | date_format("Do") }}|{{ value | date_format("%d") }}"#,
+                    minijinja::context! { value => "2011-12-30" },
+                )
+                .expect("render succeeds");
+
+            // Assert
+            assert_eq!(rendered, "31st|31");
+        }
+
+        #[test]
+        fn zone_resolution_errors_precede_pattern_errors() {
+            // Arrange: local midnight sits before jiff's minimum instant, and
+            // the pattern is also invalid, so both layers could fail.
+            ZoneGuard::set("Etc/GMT-14");
+
+            // Act
+            let error = env()
+                .render_str(
+                    r#"{{ value | date_format("Q") }}"#,
+                    minijinja::context! { value => "-9999-01-01" },
+                )
+                .expect_err("local midnight falls outside the range");
+
+            // Assert
+            let msg = error.to_string();
+            assert!(
+                !msg.contains("moment-dialect"),
+                "the pattern error must lose to the range error: {msg}"
+            );
+            assert!(msg.contains("range"), "expected a range error: {msg}");
         }
     }
 
