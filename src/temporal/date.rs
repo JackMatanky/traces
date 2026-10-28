@@ -126,6 +126,27 @@ impl DateValue {
             .map(Self)
             .map_err(|_| CalendarError::OutOfRange)
     }
+
+    /// Returns `true` if `year` falls on a proleptic Gregorian leap year.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::InvalidValue`] if `year` is outside `-9999..=9999`.
+    #[inline]
+    pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {
+        Ok(Self::from_ymd(year, 1, 1)?.civil_date().in_leap_year())
+    }
+
+    /// Returns the calendar date of the current instant in the
+    /// process-local zone.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::Zone`] if process-local time-zone discovery fails.
+    pub(crate) fn today() -> Result<Self, CalendarError> {
+        let zone = super::point::local_zone_for_calendar()?;
+        Ok(DateTimeValue::now().local_datetime_in(&zone).date().into())
+    }
 }
 
 /// Renders as a four-digit year with a leading minus sign for negative years.
@@ -533,6 +554,67 @@ mod tests {
                     input: input.into()
                 })
             );
+        }
+    }
+
+    mod in_leap_year {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::divisible_by_4(2024, true)]
+        #[case::not_divisible_by_4(2023, false)]
+        #[case::divisible_by_100_not_400(1900, false)]
+        #[case::divisible_by_400(2000, true)]
+        #[case::negative_four(-4, true)]
+        #[case::negative_one(-1, false)]
+        #[case::year_zero(0, true)]
+        #[case::maximum_year(9999, false)]
+        #[case::minimum_year(-9999, false)]
+        fn computes_the_proleptic_gregorian_rule(
+            #[case] year: i32,
+            #[case] expected: bool,
+        ) {
+            // Act
+            let result = DateValue::in_leap_year(year);
+            // Assert
+            assert_eq!(result, Ok(expected));
+        }
+
+        #[rstest]
+        #[case::above_range(10_000)]
+        #[case::below_range(-10_000)]
+        #[case::i32_max(i32::MAX)]
+        fn rejects_years_outside_the_representable_range(#[case] year: i32) {
+            // Arrange: `year` cannot name a representable civil date.
+            // Act
+            let result = DateValue::in_leap_year(year);
+            // Assert
+            assert!(matches!(result, Err(DateError::InvalidValue { .. })));
+        }
+    }
+
+    mod today {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn today_is_the_local_calendar_date_of_the_instant() {
+            // Arrange: pin a fixed-offset zone so both reads share a date.
+            ZoneGuard::with("Etc/GMT+5", || {
+                let zone = jiff::tz::TimeZone::get("Etc/GMT+5")
+                    .expect("test zone exists");
+                // Act: the oracle is raw jiff, independent of this crate's
+                // local-zone plumbing.
+                let expected = jiff::Timestamp::now().to_zoned(zone).date();
+                let today = DateValue::today().expect("pinned zone resolves");
+                // Assert: a local-midnight crossing between the two clock
+                // reads is a microseconds-per-day race, accepted here.
+                assert_eq!(today.civil_date(), expected);
+            });
         }
     }
 
@@ -1138,7 +1220,7 @@ mod tests {
         proptest! {
             #[test]
             fn iso_display_round_trips_supported_dates(
-                year in 0_i32..=9999,
+                year in -9999_i32..=9999,
                 month in 1_u32..=12,
                 day in 1_u32..=28,
             ) {

@@ -291,6 +291,22 @@ impl DelimiterType {
         None
     }
 
+    /// Finds the byte position of this delimiter's first closing character in
+    /// `input`, tracking no nesting, quotes, or escapes.
+    ///
+    /// `input` begins immediately after this opening delimiter was consumed.
+    /// Returns `Some(pos)` of the first closing character, or `None` if it
+    /// never appears (always `None` for [`Self::DoubleBracket`]). The flat
+    /// scan serves the bracket-literal dialect scans in `temporal::token`,
+    /// whose grammar treats every closing character as a close;
+    /// [`Self::find_closing`] keeps the nesting, quote, and escape tracking
+    /// for note link parsing.
+    #[must_use]
+    pub(crate) fn find_closing_flat(self, input: &str) -> Option<usize> {
+        let close = self.close_char()?;
+        input.char_indices().find(|&(_, ch)| ch == close).map(|(pos, _)| pos)
+    }
+
     /// Advances the backslash escape state on seeing `ch`.
     ///
     /// Returns `true` if `ch` was consumed by escape processing.

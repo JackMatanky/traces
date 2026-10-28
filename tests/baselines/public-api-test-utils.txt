@@ -2158,11 +2158,16 @@ pub fn traces::testing::write_schema<P: core::convert::AsRef<std::path::Path>>(&
 pub fn traces::testing::write_template<P: core::convert::AsRef<std::path::Path>>(&std::path::Path, P, &str) -> std::path::PathBuf
 pub type traces::testing::QueryResult<T> = core::result::Result<T, traces::query::error::QueryError>
 #[non_exhaustive] pub enum traces::DateError
+pub traces::DateError::InvalidFormat
+pub traces::DateError::InvalidFormat::pattern: alloc::boxed::Box<str>
+pub traces::DateError::InvalidFormat::reason: alloc::boxed::Box<str>
 pub traces::DateError::InvalidValue
 pub traces::DateError::InvalidValue::input: alloc::boxed::Box<str>
 pub traces::DateError::InvalidValue::reason: &'static str
 pub traces::DateError::LocalZoneLookup
 pub traces::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
+pub traces::DateError::OutOfRange
+pub traces::DateError::OutOfRange::input: alloc::boxed::Box<str>
 pub traces::DateError::YearNotFourDigits
 pub traces::DateError::YearNotFourDigits::input: alloc::boxed::Box<str>
 impl core::clone::Clone for traces::DateError

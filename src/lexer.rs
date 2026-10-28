@@ -151,7 +151,7 @@ impl<T> LexTokenStream<Spanned<T>> {
             }),
             None => Err(LexError::UnexpectedEndOfInput {
                 span: input.len()..input.len(),
-                expected: expected.desc,
+                expected: expected.desc.into(),
             }),
         }
     }
@@ -190,7 +190,7 @@ impl<T> LexTokenStream<Spanned<T>> {
             }
             None => Err(LexError::UnexpectedEndOfInput {
                 span: input.len()..input.len(),
-                expected: expected_desc,
+                expected: expected_desc.into(),
             }),
         }
     }
@@ -286,7 +286,7 @@ pub(crate) enum LexError {
         /// The byte span at the end of input.
         span: Range<usize>,
         /// Description of the expected token.
-        expected: &'static str,
+        expected: String,
     },
 }
 
@@ -371,7 +371,7 @@ mod tests {
         fn display_unexpected_end_of_input_includes_expected() {
             let error = LexError::UnexpectedEndOfInput {
                 span: 5..5,
-                expected: "a literal value",
+                expected: "a literal value".into(),
             };
             assert_eq!(
                 error.to_string(),
@@ -391,7 +391,7 @@ mod tests {
 
             let err_eoi = LexError::UnexpectedEndOfInput {
                 span: span.clone(),
-                expected: "y",
+                expected: "y".into(),
             };
             assert_eq!(err_eoi.span(), span);
         }

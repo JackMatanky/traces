@@ -273,11 +273,16 @@ impl<T> yoke::erased::ErasedDestructor for traces::cli::UserAbort where T: 'stat
 pub fn traces::cli::run() -> core::result::Result<traces::cli::CommandOutcome, traces::cli::CliError>
 pub type traces::cli::CliResult = core::result::Result<(), traces::cli::CliError>
 #[non_exhaustive] pub enum traces::DateError
+pub traces::DateError::InvalidFormat
+pub traces::DateError::InvalidFormat::pattern: alloc::boxed::Box<str>
+pub traces::DateError::InvalidFormat::reason: alloc::boxed::Box<str>
 pub traces::DateError::InvalidValue
 pub traces::DateError::InvalidValue::input: alloc::boxed::Box<str>
 pub traces::DateError::InvalidValue::reason: &'static str
 pub traces::DateError::LocalZoneLookup
 pub traces::DateError::LocalZoneLookup::input: alloc::boxed::Box<str>
+pub traces::DateError::OutOfRange
+pub traces::DateError::OutOfRange::input: alloc::boxed::Box<str>
 pub traces::DateError::YearNotFourDigits
 pub traces::DateError::YearNotFourDigits::input: alloc::boxed::Box<str>
 impl core::clone::Clone for traces::DateError

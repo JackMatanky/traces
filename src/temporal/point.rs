@@ -243,6 +243,31 @@ impl DatePoint {
         }
     }
 
+    /// Renders this date point in `zone` with the strftime `pattern`.
+    ///
+    /// Canonical patterns render through the crate's encoder, so the sign
+    /// stays outside the year width. Other patterns render through Jiff.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::OutOfRange`] if `zone` resolves this point outside the
+    ///   supported range.
+    /// - [`DateError::InvalidFormat`] if Jiff cannot render `pattern`.
+    pub(crate) fn format_in(
+        self,
+        pattern: &str,
+        zone: &TimeZone,
+    ) -> Result<String, DateError> {
+        let zoned = self.zoned_datetime_in(zone).map_err(|error| {
+            error.into_date_error(&self.local_datetime_in(zone).to_string())
+        })?;
+        crate::temporal::render_pattern(zoned.datetime(), pattern, &zoned)
+            .map_err(|error| DateError::InvalidFormat {
+                pattern: pattern.into(),
+                reason: error.to_string().into(),
+            })
+    }
+
     /// Returns the UTC-stored Date-Time equivalent of this date point.
     ///
     /// # Errors
@@ -337,37 +362,21 @@ impl DatePoint {
         self.advance_span(duration.span(), zone)
     }
 
-    /// Returns the first day of the period, preserving written precision and
-    /// time.
+    /// Returns the first or last day of the period selected by `period_edge`,
+    /// preserving written precision and time.
     ///
     /// # Errors
     ///
     /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
     ///   supported range.
-    pub(crate) fn start_of(
+    pub(crate) fn snap(
         self,
         calendar_period: CalendarPeriod,
+        period_edge: PeriodEdge,
         zone: &TimeZone,
     ) -> Result<Self, CalendarError> {
         let date = self.local_datetime_in(zone).date();
-        let target = calendar_period.snap_date(PeriodEdge::Start, date);
-        self.with_date(target, zone)
-    }
-
-    /// Returns the last day of the period, preserving written precision and
-    /// time.
-    ///
-    /// # Errors
-    ///
-    /// - [`CalendarError::OutOfRange`] if the boundary date is outside the
-    ///   supported range.
-    pub(crate) fn end_of(
-        self,
-        calendar_period: CalendarPeriod,
-        zone: &TimeZone,
-    ) -> Result<Self, CalendarError> {
-        let date = self.local_datetime_in(zone).date();
-        let target = calendar_period.snap_date(PeriodEdge::End, date);
+        let target = calendar_period.snap_date(period_edge, date);
         self.with_date(target, zone)
     }
 
@@ -776,9 +785,9 @@ fn pattern_value_error(text: &str, source: &jiff::Error) -> DateError {
 /// # Errors
 ///
 /// - [`CalendarError::Zone`] if system time-zone discovery fails.
-fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
-    local_zone().map_err(|error| CalendarError::Zone {
-        input: error.to_string().into(),
+pub(super) fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
+    local_zone().map_err(|source| CalendarError::Zone {
+        source,
     })
 }
 
@@ -794,6 +803,44 @@ mod tests {
     // process TZ environment variable; repeated sets replace the override.
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
+    }
+
+    mod format_in {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn renders_a_canonical_pattern_with_the_sign_outside_the_width() {
+            let point = point_at("-0009-01-01");
+
+            let rendered = point
+                .format_in("%Y-%m-%d", &TimeZone::UTC)
+                .expect("canonical patterns render");
+
+            assert_eq!(rendered, "-0009-01-01");
+        }
+
+        #[test]
+        #[expect(clippy::panic, reason = "test assertion on enum variant")]
+        fn reports_an_invalid_pattern_with_the_pattern_and_the_reason() {
+            let point = point_at("2026-07-23");
+
+            let error = point
+                .format_in("%J", &TimeZone::UTC)
+                .expect_err("%J is not a Jiff specifier");
+
+            match error {
+                DateError::InvalidFormat {
+                    pattern,
+                    reason,
+                } => {
+                    assert_eq!(pattern.as_ref(), "%J");
+                    assert!(!reason.is_empty(), "Jiff supplies a reason");
+                }
+                other => panic!("expected InvalidFormat, got {other:?}"),
+            }
+        }
     }
 
     mod parse {
@@ -2321,8 +2368,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let start = base.start_of(
+            let start = base.snap(
                 period,
+                PeriodEdge::Start,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2350,8 +2398,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let start = base.start_of(
+            let start = base.snap(
                 period,
+                PeriodEdge::Start,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2379,8 +2428,9 @@ mod tests {
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
-            let start = base.start_of(
+            let start = base.snap(
                 period,
+                PeriodEdge::Start,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2437,8 +2487,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let end = base.end_of(
+            let end = base.snap(
                 period,
+                PeriodEdge::End,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2466,8 +2517,9 @@ mod tests {
             let base = point_at(text);
 
             // Act
-            let end = base.end_of(
+            let end = base.snap(
                 period,
+                PeriodEdge::End,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -2495,8 +2547,9 @@ mod tests {
             let base = point_at("2026-07-29 14:30:05");
 
             // Act
-            let end = base.end_of(
+            let end = base.snap(
                 period,
+                PeriodEdge::End,
                 &local_zone().expect("system time zone available"),
             );
 
@@ -3182,10 +3235,10 @@ mod tests {
                 let point = DatePoint::from(ymd(year, month, day));
                 // Act
                 let start = point
-                    .start_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::Start, &local_zone().expect("system time zone available"))
                     .expect("a valid in-range date has a period start");
                 let repeated = start
-                    .start_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::Start, &local_zone().expect("system time zone available"))
                     .expect("a period start remains in range");
 
                 // Assert
@@ -3207,10 +3260,10 @@ mod tests {
                 let point = DatePoint::from(ymd(year, month, day));
                 // Act
                 let start = point
-                    .start_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::Start, &local_zone().expect("system time zone available"))
                     .expect("a valid in-range date has a period start");
                 let end = point
-                    .end_of(period, &local_zone().expect("system time zone available"))
+                    .snap(period, PeriodEdge::End, &local_zone().expect("system time zone available"))
                     .expect("a valid in-range date has a period end");
 
                 // Assert

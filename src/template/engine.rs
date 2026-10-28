@@ -7,6 +7,7 @@
 //! Helper modules:
 //!
 //! - [`date`] registers date generators, date filters, and date tests.
+//! - [`duration`] registers duration rendering filters.
 //! - [`mod@file`] registers `file.write_to()` and `file.include()`.
 //! - [`path`] registers path tests and path-component filters.
 //! - [`num`] registers numeric filters.
@@ -26,6 +27,7 @@
 
 mod cache;
 mod date;
+mod duration;
 mod error;
 mod file;
 mod num;
@@ -42,7 +44,8 @@ use minijinja::{Environment, Error};
 use uuid::Uuid;
 
 use self::{
-    date::DateNamespace,
+    date::DateOps,
+    duration::DurationOps,
     file::{FileOps, WRITE_TO_KEY},
     num::NumOps,
     path::PathOps,
@@ -79,10 +82,11 @@ impl TemplateEngine {
     /// Builds a [`TemplateEngine`] backed by `loader`, registering all custom
     /// submodule functions and the standalone [`uuid`] function.
     ///
-    /// Registers functions from the [`date`], [`mod@file`], [`path`], [`num`],
-    /// [`query`], [`mod@schema`], [`string`], and [`ui`] submodules. Enables
-    /// debug mode on the underlying minijinja environment to support line and
-    /// column diagnostic locations on render errors.
+    /// Registers functions from the [`date`], [`duration`], [`mod@file`],
+    /// [`path`], [`num`], [`query`], [`mod@schema`], [`string`], [`ui`], and
+    /// [`mod@yaml`] submodules. Enables debug mode on the underlying minijinja
+    /// environment to support line and column diagnostic locations on render
+    /// errors.
     ///
     /// # Arguments
     ///
@@ -156,7 +160,8 @@ impl TemplateEngine {
         QueryOps::register_terminal_filters(&mut env);
         PathOps::new(Arc::clone(&root)).register(&mut env);
         UiOps::new(provider).register(&mut env);
-        DateNamespace.register(&mut env);
+        DateOps::register(&mut env);
+        DurationOps::register(&mut env);
         StrOps::register(&mut env);
         NumOps::register(&mut env);
         YamlOps::register(&mut env);

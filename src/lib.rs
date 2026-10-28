@@ -169,7 +169,6 @@ pub use task::{
 pub(crate) use template::TemplateService;
 pub(crate) use temporal::{
     DEFAULT_DATE_PATTERN, DEFAULT_DATETIME_PATTERN, TimeUnit,
-    UNIT_SPELLINGS_HINT,
 };
 pub use temporal::{
     DateError, DateTimeValue, DateValue, DurationError, DurationValue,

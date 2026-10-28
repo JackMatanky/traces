@@ -34,8 +34,10 @@ mod date;
 mod datetime;
 mod duration;
 mod error;
+mod fmt;
 mod lexer;
 mod point;
+mod token;
 mod unit;
 mod zone;
 
@@ -50,8 +52,13 @@ pub use datetime::DateTimeValue;
 pub use duration::DurationValue;
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};
+pub(crate) use fmt::{
+    DATETIME_MICROS_PATTERN, DATETIME_MILLIS_PATTERN, DATETIME_NANOS_PATTERN,
+    render_pattern,
+};
 pub(crate) use point::{DateDiff, DatePoint};
-pub(crate) use unit::{DateUnit, TimeUnit, UNIT_SPELLINGS_HINT};
+pub(crate) use token::pattern_to_strftime;
+pub(crate) use unit::{DateUnit, TimeUnit};
 pub(crate) use zone::local_zone;
 
 #[cfg(any(test, feature = "test-utils"))]

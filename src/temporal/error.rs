@@ -1,12 +1,14 @@
 //! Defines public parsing errors and internal temporal arithmetic errors.
 //!
-//! [`DateError`] reports date and date-time parsing or local-zone resolution
-//! failures. Internal calendar arithmetic uses a separate error type.
+//! [`DateError`] reports date and date-time parsing, local-zone resolution,
+//! rendering, or representable-range failures. Internal calendar arithmetic
+//! uses a separate error type.
 //! [`DurationError`] reports duration parsing, validation, and conversion
 //! failures. The [`Display`](std::fmt::Display) text of each variant is the
 //! message shown by the CLI and is part of the crate's contract.
 
-/// Reports date/date-time parsing and local-zone resolution failures.
+/// Reports date/date-time parsing, local-zone resolution, rendering, or
+/// representable-range failures.
 ///
 /// Typed [`DateValue`] and [`DateTimeValue`] parsers return this error.
 /// Calendar arithmetic failures use a separate internal error type.
@@ -51,13 +53,36 @@ pub enum DateError {
         /// Stores the raw input that failed to parse.
         input: Box<str>,
     },
-    /// Reports that the process-local zone could not resolve a naive input.
+    /// Reports that system time-zone discovery failed.
     ///
-    /// DST ambiguities and gaps never produce this error; they resolve
-    /// deterministically.
+    /// `input` carries the zone-discovery failure detail, not a clock time:
+    /// the zone layer builds it as `system zone: {detail}`. DST ambiguities
+    /// and gaps never produce this error; they resolve deterministically.
     #[error("local zone lookup failed for `{input}`")]
     LocalZoneLookup {
-        /// Stores the naive clock-time input that could not be resolved.
+        /// Stores the zone-discovery failure detail.
+        input: Box<str>,
+    },
+    /// Reports that a strftime pattern failed to render a resolved value.
+    ///
+    /// The pattern is the caller's spelling. The reason carries Jiff's
+    /// diagnosis of the failure.
+    #[error("invalid date format {pattern:?}: {reason}")]
+    InvalidFormat {
+        /// Stores the pattern that failed to render.
+        pattern: Box<str>,
+        /// Stores Jiff's diagnosis of the failure.
+        reason: Box<str>,
+    },
+    /// Reports that a recognized date/time value lies outside the supported
+    /// range.
+    ///
+    /// The value was understood; it just cannot be represented. Local
+    /// midnight on `-9999-01-01` under `Etc/GMT-14`, for example, precedes
+    /// Jiff's earliest instant.
+    #[error("`{input}` is out of the supported date/time range")]
+    OutOfRange {
+        /// Stores the value that resolved outside the supported range.
         input: Box<str>,
     },
 }
@@ -102,7 +127,8 @@ pub enum DurationError {
     MisplacedSign,
 
     /// Reports that the number portion is not valid float syntax (e.g., a bare
-    /// `"."`).
+    /// `"."`). No production path constructs this variant; it stays as public
+    /// contract.
     #[error("invalid number syntax: {source}")]
     MalformedNumber {
         /// Stores the underlying float-parse failure.
@@ -140,31 +166,82 @@ pub(crate) enum CalendarError {
     /// Reports that calendar arithmetic exceeds the representable range.
     #[error("date/time value is out of range")]
     OutOfRange,
-    /// Reports that local-zone resolution failed for a computed local clock
-    /// time.
-    #[error("local zone lookup failed for {input}")]
+    /// Reports that system time-zone discovery failed while resolving a
+    /// computed local clock time.
+    ///
+    /// Forwards its text to the inner [`DateError`] and reports it as the
+    /// error source, so the lookup failure carries one diagnosis instead
+    /// of stacking two.
+    #[error("{source}")]
     Zone {
-        /// Stores the local clock time that could not be resolved.
-        input: Box<str>,
+        /// Stores the zone-lookup failure this variant reports.
+        #[source]
+        source: DateError,
     },
 }
 
 impl CalendarError {
-    /// Maps a calendar failure to the parse error exposed by typed date
-    /// parsers.
+    /// Maps a calendar failure to the public error exposed by typed date
+    /// parsers and by pattern rendering.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - the value the calendar failure was reached through
+    ///
+    /// # Returns
+    ///
+    /// The [`DateError`] carrying the same diagnosis: out-of-range failures
+    /// become [`DateError::OutOfRange`], zone failures forward their inner
+    /// [`DateError`] unchanged.
     pub(crate) fn into_date_error(self, input: &str) -> DateError {
         match self {
-            Self::OutOfRange => DateError::InvalidValue {
+            Self::OutOfRange => DateError::OutOfRange {
                 input: input.into(),
-                reason: "date/time is outside the representable range",
             },
             Self::Zone {
-                input: zone_input,
-            } => DateError::LocalZoneLookup {
-                input: zone_input,
-            },
+                source,
+            } => source,
         }
     }
+}
+
+/// Reports a unit spelling outside the registered unit set.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum UnitError {
+    /// Carries the rejected input spelling and quotes the catalog's full
+    /// expected-list: `Display` renders
+    /// `unknown unit "<input>" (expected <list>)`.
+    #[error(
+        "unknown unit {unit:?} (expected {})",
+        super::unit::UNIT_SPELLINGS_HINT
+    )]
+    UnknownSpelling {
+        /// Stores the rejected spelling.
+        unit: Box<str>,
+    },
+}
+
+/// An error translating a date pattern to strftime.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum TemporalTokenError {
+    /// A bracket literal (`[...]`) was opened but never closed.
+    #[error("unclosed bracket literal in pattern `{pattern}`")]
+    UnclosedBracket {
+        /// The pattern containing the unclosed bracket.
+        pattern: Box<str>,
+    },
+    /// A token has no moment-dialect to strftime mapping.
+    #[error(
+        "unsupported moment-dialect token `{token}` in pattern `{pattern}`; \
+         supported tokens are YYYY, YY, MMMM, MMM, MM, M, dddd, ddd, Do, DD, \
+         D, HH, H, hh, h, mm, m, ss, s, SSS, SS, S, and [bracketed literals]"
+    )]
+    UnsupportedToken {
+        /// The offending token.
+        token: Box<str>,
+        /// The pattern containing the token.
+        pattern: Box<str>,
+    },
 }
 
 #[cfg(test)]
@@ -192,6 +269,19 @@ mod tests {
         #[case::local_zone_lookup(
             DateError::LocalZoneLookup { input: "2026-07-29 14:30".into() },
             "local zone lookup failed for `2026-07-29 14:30`"
+        )]
+        #[case::invalid_format(
+            DateError::InvalidFormat {
+                pattern: "%J".into(),
+                reason: "unknown conversion `%J`".into(),
+            },
+            "invalid date format \"%J\": unknown conversion `%J`"
+        )]
+        #[case::out_of_range(
+            DateError::OutOfRange {
+                input: "-009999-01-01T00:00:00".into(),
+            },
+            "`-009999-01-01T00:00:00` is out of the supported date/time range"
         )]
         fn renders_exact_display_text_for_date_errors(
             #[case] error: DateError,
@@ -285,13 +375,66 @@ mod tests {
         fn renders_the_zone_calendar_error() {
             // Arrange
             let error = CalendarError::Zone {
-                input: "2026-03-08 02:30:00".into(),
+                source: DateError::LocalZoneLookup {
+                    input: "system zone: clock unavailable".into(),
+                },
             };
-            let expected = "local zone lookup failed for 2026-03-08 02:30:00";
+            let expected =
+                "local zone lookup failed for `system zone: clock unavailable`";
             // Act
             let rendered = error.to_string();
             // Assert
             assert_eq!(rendered, expected);
+        }
+
+        #[test]
+        fn exposes_the_date_error_as_the_source() {
+            // Arrange
+            let error = CalendarError::Zone {
+                source: DateError::LocalZoneLookup {
+                    input: "system zone: clock unavailable".into(),
+                },
+            };
+
+            // Act
+            let source = std::error::Error::source(&error);
+
+            // Assert
+            assert!(
+                source.is_some_and(|s| s.downcast_ref::<DateError>().is_some()),
+                "Zone must expose its DateError as the source"
+            );
+        }
+
+        #[rstest]
+        #[case::unclosed_bracket(
+            TemporalTokenError::UnclosedBracket {
+                pattern: "[Daily".into(),
+            },
+            "unclosed bracket literal in pattern `[Daily`"
+        )]
+        #[case::unsupported_token(
+            TemporalTokenError::UnsupportedToken {
+                token: "YYYYY".into(),
+                pattern: "YYYYY".into(),
+            },
+            "unsupported moment-dialect token `YYYYY` in pattern \
+             `YYYYY`; supported tokens are YYYY, YY, MMMM, MMM, MM, \
+             M, dddd, ddd, Do, DD, D, HH, H, hh, h, mm, m, ss, s, SSS, \
+             SS, S, and [bracketed literals]"
+        )]
+        fn renders_exact_display_text_for_temporal_token_errors(
+            #[case] error: TemporalTokenError,
+            #[case] expected: &str,
+        ) {
+            // Arrange: `error` and `expected` are the case literals.
+            // Act
+            let rendered = error.to_string();
+            // Assert
+            assert_eq!(
+                rendered, expected,
+                "Display text of {error:?} is the CLI contract"
+            );
         }
     }
 
@@ -306,9 +449,8 @@ mod tests {
             // Act
             let actual = CalendarError::OutOfRange.into_date_error(input);
             // Assert
-            assert_eq!(actual, DateError::InvalidValue {
+            assert_eq!(actual, DateError::OutOfRange {
                 input: input.into(),
-                reason: "date/time is outside the representable range",
             });
         }
 
@@ -317,7 +459,9 @@ mod tests {
             // Arrange
             let input = "2026-03-08 02:30:00";
             let error = CalendarError::Zone {
-                input: input.into(),
+                source: DateError::LocalZoneLookup {
+                    input: input.into(),
+                },
             };
             // Act
             let actual = error.into_date_error(input);

@@ -49,7 +49,7 @@ as `DateError::LocalZoneLookup`.
 
 #### Time unit
 
-`TimeUnit` is one of the eight accepted duration quantities. Its shared
+`TimeUnit` is one of the seven accepted duration quantities. Its shared
 registry defines spellings, nominal length, calendar-versus-elapsed application,
 and English names. A week here is a seven-day calendar amount.
 
