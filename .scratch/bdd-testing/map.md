@@ -139,14 +139,19 @@ fresh session can start slice 1 with zero open design questions.
   containment and `NoteFieldValue` order as proptests. The invariance list sets
   the order of the first slices.
 - [11: Feature and step organization](issues/11-feature-step-organization.md):
-  features in flat `tests/features/<capability>.feature`. Steps in
-  `tests/e2e/bdd/mod.rs` and domain-concept files, never one file per feature.
-  Use `#[path = "e2e/bdd/mod.rs"]`, because the `bdd.rs` form picks up sibling
-  e2e files. Use bare `{name}` placeholders with quotes in the pattern. Two
-  plain fixtures, `Sandbox` and `LastRun`, with no World. Prefer 3 to 5 steps.
-  Ban `Rule:`, `skip!()` and `@ignore`, each with a gate. `check:layers` scans
-  Rust paths for Rust symbols. It does not scan feature text, which narrows
-  ticket 08's rule. Findings: [research/11](research/11-conventions.md).
+  features in flat `tests/features/<capability>.feature`.
+  - Steps live in `tests/e2e/bdd/mod.rs` and domain-concept files, never one
+    file per feature.
+  - Use `#[path = "e2e/bdd/mod.rs"]`. The `bdd.rs` form picks up sibling e2e
+    files.
+  - Use bare `{name}` placeholders with quotes in the pattern.
+  - Use two plain fixtures, `Sandbox` and `LastRun`, with no World.
+  - Prefer 3 to 5 steps.
+  - Ban `Rule:`, `skip!()` and `@ignore`, each with a gate.
+  - `check:layers` scans Rust paths for Rust symbols. It does not scan feature
+    text, which narrows ticket 08's rule.
+
+  Findings: [research/11](research/11-conventions.md).
 
 ## Not yet specified
 

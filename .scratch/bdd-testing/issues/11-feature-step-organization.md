@@ -309,14 +309,16 @@ The user confirmed every decision below in this session. Evidence:
   or `process` before `{`, `;`, `::` or the word `as`. Avoid such step
   patterns. Example: `the process {outcome}`.
 
-### Answer records
+### Records for other tickets
 
-- **Authoring summary (for ticket 14 to quote).** Features are in
-  `tests/features/`, one file for each behavioral area. Steps are in
-  `tests/e2e/bdd/`, one file for each domain concept. Use bare `{name}`
-  placeholders with the quotes in the pattern. Write 3 to 5 steps and one
-  principal `When`. Never use `Rule:`, `skip!()` or `@ignore`. Keep scenario
-  titles unique. The `Feature` description links the intent source.
+- **Authoring summary (for ticket 14 to quote).**
+  - Features are in `tests/features/`, one file for each behavioral area.
+  - Steps are in `tests/e2e/bdd/`, one file for each domain concept.
+  - Use bare `{name}` placeholders with the quotes in the pattern.
+  - Write 3 to 5 steps and one principal `When`.
+  - Never use `Rule:`, `skip!()` or `@ignore`.
+  - Keep scenario titles unique.
+  - The `Feature` description links the intent source.
 - **Paths for the `check:layers` change.** Rust-symbol patterns scan
   `tests/e2e.rs` and `tests/e2e/`, which include `tests/e2e/bdd/`. Feature-text
   checks scan `tests/features/`.
