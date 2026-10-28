@@ -11,7 +11,8 @@ over `WorkspaceIndex`. The second is the redb secondary-table pushdown
 (`run_from_store`). The pushdown builds a partial `WorkspaceIndex` only to make
 rows. redb keeps four multimap tables only for the pushdown.
 
-Decide the topics in this order. Topic A frames the other topics.
+Topic A frames the other topics. The plan of topic A depends on the facet split
+of topic D. Decide the facet split first.
 
 ### A. Consumers and execution paths
 
@@ -62,8 +63,8 @@ Decide the topics in this order. Topic A frames the other topics.
   at query time (tickets 21 and 27).
 - Decide the encoding of temporal values. Today the store keeps text and parses
   it on every load. A compact binary form is an option.
-- Decide if the store keeps the parser notices. The bulk index path collects
-  them (tickets 23 and 31).
+- Decide if the store keeps the parser notices. Ticket 23 decided that the bulk
+  index path collects them. No code does so today (tickets 23 and 31).
 - Decide where the lookup "has a known explicit class" lives (ticket 20).
 - Decide if the class axes index inline fields. Today they index frontmatter
   values only.
@@ -87,7 +88,8 @@ Decide the topics in this order. Topic A frames the other topics.
 - Ticket 25 decides the format version rule, the parser identity, the racy
   timestamps and the visibility of heals. This ticket decides the facet split
   and the lazy decode. Ticket 25 decides if a refresh keeps an in-memory note
-  cache.
+  cache. The facet split also sets what a path-set change decodes. One added
+  file costs 499 ms and 395 MB at 50,000 notes today.
 - Ticket 26 decides the row type, the view enum, the pushdown protocol and the
   membership operation.
 - Ticket 29 decides the persisted path form and the identity of a root.
@@ -129,13 +131,17 @@ four tables, `SourceResolver` and the partial index.
 Measure these before you decide:
 
 - The seven vault sizes of ticket 17: 50, 200, 1,000, 5,000, 10,000, 20,000
-  and 50,000 notes. Research 11 covers 1,000, 5,000 and 20,000. Mark each
-  50,000-note number as an extrapolation [H].
-- The query shapes of topic A. Research 11 measured one rare tag only.
+  and 50,000 notes. Research 11 covers 1,000, 5,000 and 20,000. The prep probe
+  covers 1,000 to 50,000 on a synthetic vault. Repeat it on a real vault.
+- The query shapes of topic A. Research 11 measured one rare tag only. The prep
+  probe measured every shape except `Class`.
 - The decode cost and the encoded size of each facet. Ticket 23 estimates that
-  a decoded note takes about twice its encoded size.
+  a decoded note takes about twice its encoded size. The prep probe suggests
+  about 7 KB for a note of 2.1 KB. A scan of 50,000 stand-in meta values
+  takes 21 ms. Decode the real meta and outlinks facets at 50,000 notes.
 - The host memory at 50,000 notes (ticket 23).
-- A second process that opens a held store.
+- A writer in each of two processes. The prep probe measured a second reader
+  and a second opener on macOS only.
 - The compact temporal encoding (ticket 18).
 - The boxed and the unboxed task payload (ticket 23).
 
@@ -148,8 +154,9 @@ Do not reopen these decisions.
 
 - Index results equal a fresh parse (ticket 16).
 - The store is a derived cache. A lost or corrupt store heals by a rebuild.
-- The store persists one facts-only `Note`. It has no byte span, footnote,
-  callout, slug or external URL. `NoteDoc` never enters the store (ticket 23).
+- The persisted content is the facts-only `Note`. It has no byte span,
+  footnote, callout, slug or external URL. `NoteDoc` never enters the store
+  (ticket 23). Topic D decides the physical layout.
 - The schema never enters the index or the fingerprint. Class binding expands
   at query time (ticket 20).
 - The store never holds a collation sort key (ticket 19).
@@ -182,14 +189,20 @@ Do not reopen these decisions.
 - `SourceResolver` reads the path list of the whole store for source `All`, for
   `Not`, for an empty `And` and for each `Path` atom (`src/query/service.rs:353,
   370, 389, 418`) [V]. A query with no source therefore decodes every note on
-  the store path. Only `Tag` and `Class` atoms use a secondary table [H]. No
-  one measured the query shapes outside the rare tag.
+  the store path. Only `Tag` and `Class` atoms use a secondary table [V]. The
+  prep probe measured the shapes (see below).
 - `refresh` logs a persist failure and returns the in-memory index.
   `refresh_store` returns `IndexError::Store` (`src/index/service.rs:259-264,
   285-293`) [V]. The two paths fail in different ways.
 - `IndexStore::create_db` has no special case for a store that another process
   holds. Every redb error that is not corruption becomes `StoreError::Redb`
-  (`src/index/store.rs:894-921`) [V]. The redb lock behavior is unchecked [H].
+  (`src/index/store.rs:894-921`) [V]. A second process fails at once with
+  `DatabaseAlreadyOpen`. The real CLI exits with code 1 and prints "Database
+  already open. Cannot acquire lock." [V: prep probe]. `ReadOnlyDatabase` does
+  not open beside a writer. The redb `experimental-multiprocess` mode lets a
+  second process read and write. It refuses `Durability::None`. Research 11
+  advises that a host holds an open `IndexStore`. A held store makes every CLI
+  call fail.
 - `FileMeta` persists `created_at`, `modified_at`, `size` and `day`
   (`src/file.rs:45-53`) [V]. `FileMeta::derive_day` falls back to `created_at`.
   `DateValue::try_from(SystemTime)` converts it in the current local zone
@@ -198,7 +211,28 @@ Do not reopen these decisions.
 - The store path and the memory path disagree when no class expander is
   attached. The store path matches the exact class. The memory path matches
   nothing (`src/query/service.rs:402-406`, `src/query/grammar/source.rs:228-229`)
-  [V]. Two paths cost one more place to keep the same rule.
+  [V]. Ticket 20 says that production always attaches an expander. Two paths
+  still cost one more place to keep the same rule.
+- Two of the four multimap tables have no query reader. `tags_by_path` and
+  `classes_by_path` serve the incremental writer only
+  [V: `research/24-prep/a1-index-query-code.md`, section D].
+- `IndexerService::load` has no production caller. The CLI calls
+  `refresh_store`. The template engine calls `refresh` [V].
+- Prep probe on a synthetic vault of 2.1 KB notes
+  (`research/24-prep/g-probe-results.md`) [V]:
+  - At 50,000 notes, a query with a `Tag` or `Path` source takes 117 ms to
+    127 ms and 35 MB to 52 MB.
+  - At 50,000 notes, a query with no source, a `Not` source or a filter only
+    takes 245 ms to 259 ms and 389 MB to 393 MB.
+  - The memory ratio between these two groups is 9 to 1 at 20,000 notes. The
+    ratio depends on the note content.
+  - One added file makes the next query take 499 ms and 395 MB at 50,000
+    notes, even for a rare tag.
+- Research 11 measured `CandidateTrie` for 8 to 512 same-stem candidates. It
+  recommends removal. A prep probe used 5,000 same-stem candidates. A flat scan
+  adds about 200 ms to a full build on 12 cores
+  [V: `research/24-prep/h1-stress-test-designs.md`, section 10]. The trie serves
+  link resolution by basename. It does not serve a source lookup.
 
 ### Alternatives
 
@@ -208,6 +242,9 @@ Do not reopen these decisions.
 - Keep the dual path. Formalise a pushdown trait.
 - Use store-backed lazy rows.
 - Split the stored `Note` into facets. Load a facet on demand.
+- Use one plan over a facet store. The facet scan replaces the multimap tables.
+- Keep two forward tables as `Inexact` pruning over a facet store. Drop the two
+  reverse tables.
 - Keep as is.
 
 ### Resolution must name
@@ -223,12 +260,15 @@ This ticket graduates these fog items: `CandidateTrie` and `indextree`
 retention, the store engine and repository split, and inline-field class
 extraction.
 
-Re-verified (main @ `16f67ef0`). Since `207cc3fb`, the only code change in
-`src/index/` and `src/query/` is the `DirTree` walk seam in `scan`, plus one
-test. The rest is doc-comment reflow. Therefore the fabricated partial
-`WorkspaceIndex` and the `Not` full scan stand. The cold path reads the
+Re-verified (main @ `39e96041`). `src/` equals `16f67ef0`. Since `207cc3fb`, the
+only code change in `src/index/` and `src/query/` is the `DirTree` walk seam in
+`scan`, plus one test. The rest is doc-comment reflow. Therefore the fabricated
+partial `WorkspaceIndex` and the `Not` full scan stand. The cold path reads the
 fingerprint in the plan's existing read transaction. If the fingerprint
 drifts, the cold path rebuilds fully in memory before it serves.
+
+Prep: `research/24-prep/`. The grilling guide is `z-grilling-guide.md`. The
+probe numbers come from a synthetic vault.
 
 ## Inputs from the value model decision
 
