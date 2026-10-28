@@ -5,10 +5,11 @@
 //! module owns the tokenizer that converts it to a strftime pattern jiff can
 //! render; patterns it cannot translate fail with [`TemporalTokenError`]
 //! (declared in `error.rs`). This module's `pattern_to_strftime` owns
-//! the `%`-contains dialect dispatch; the engine's same-named wrapper
+//! the bracket-aware dialect dispatch; the engine's same-named wrapper
 //! calls it and maps the error to a template render error.
 
 use super::error::TemporalTokenError;
+use crate::DelimiterType;
 
 /// The moment-dialect to strftime token table (scope 1).
 const MOMENT_TOKENS: &[(&str, &str)] = &[
@@ -51,12 +52,13 @@ fn match_moment_run(ch: u8, run_len: usize) -> Option<&'static str> {
         .map(|(_, spec)| spec)
 }
 
-/// Translates `pattern` to a strftime pattern.
+/// Selects the dialect for `pattern` and translates it to a strftime pattern.
 ///
-/// If `pattern` contains `%`, it is treated as a strftime pattern and passed
-/// through. Otherwise, it is translated from common moment-dialect tokens:
-/// bracket literals (`[Daily]`), `YYYY MM DD HH mm ss` family, `Do`/`S`
-/// ordinals, and `dddd`/`ddd`/`MMM`/`MMMM`.
+/// A `%` directive outside any bracket literal selects the strftime dialect:
+/// the pattern is copied with `%` doubled inside bracket literals, so
+/// bracketed text renders literally. Otherwise the moment dialect applies
+/// and tokens (`YYYY MM DD HH mm ss`, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`,
+/// bracket literals like `[Daily]`) are translated.
 ///
 /// # Errors
 ///
@@ -67,10 +69,65 @@ pub(crate) fn pattern_to_strftime(
     pattern: &str,
     datetime: jiff::civil::DateTime,
 ) -> Result<String, TemporalTokenError> {
-    if pattern.contains('%') {
-        return Ok(pattern.to_owned());
+    if percent_outside_brackets(pattern)? {
+        return Ok(escape_bracket_percents(pattern));
     }
     moment_to_strftime(pattern, datetime)
+}
+
+/// Returns `true` when `%` occurs outside any bracket literal.
+///
+/// # Errors
+///
+/// Returns [`TemporalTokenError::UnclosedBracket`] when a bracket literal is
+/// opened but never closed. This scan runs for both dialects, so the
+/// unclosed error takes precedence over every translation error.
+fn percent_outside_brackets(pattern: &str) -> Result<bool, TemporalTokenError> {
+    let mut percent = false;
+    let mut rest = pattern;
+    while let Some(open) = rest.find('[') {
+        percent |= rest.get(..open).unwrap_or_default().contains('%');
+        let after = rest.get(open.saturating_add(1)..).unwrap_or_default();
+        let Some(close) = DelimiterType::Bracket.find_closing_flat(after)
+        else {
+            return Err(TemporalTokenError::UnclosedBracket {
+                pattern: pattern.into(),
+            });
+        };
+        rest = after.get(close.saturating_add(1)..).unwrap_or_default();
+    }
+    Ok(percent | rest.contains('%'))
+}
+
+/// Copies `pattern` for jiff in the strftime dialect, dropping bracket
+/// delimiters and doubling `%` inside bracket literals so bracketed text
+/// renders literally.
+fn escape_bracket_percents(pattern: &str) -> String {
+    let mut out = String::with_capacity(pattern.len());
+    let mut rest = pattern;
+    while let Some(open) = rest.find('[') {
+        out.push_str(rest.get(..open).unwrap_or_default());
+        let after = rest.get(open.saturating_add(1)..).unwrap_or_default();
+        let (close, tail) =
+            match DelimiterType::Bracket.find_closing_flat(after) {
+                Some(close) => (
+                    close,
+                    after.get(close.saturating_add(1)..).unwrap_or_default(),
+                ),
+                // Unreachable: percent_outside_brackets already rejected.
+                None => (after.len(), ""),
+            };
+        for ch in after.get(..close).unwrap_or_default().chars() {
+            if ch == '%' {
+                out.push_str("%%");
+            } else {
+                out.push(ch);
+            }
+        }
+        rest = tail;
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Returns the English ordinal suffix (`"st"`, `"nd"`, `"rd"`, `"th"`) for
@@ -109,11 +166,6 @@ fn moment_to_strftime(
             while i < len && bytes.get(i) != Some(&b']') {
                 i = i.saturating_add(1);
             }
-            if bytes.get(i) != Some(&b']') {
-                return Err(TemporalTokenError::UnclosedBracket {
-                    pattern: pattern.into(),
-                });
-            }
             let literal = pattern.get(start..i).unwrap_or_default();
             i = i.saturating_add(1);
             for ch in literal.chars() {
@@ -149,11 +201,7 @@ fn moment_to_strftime(
                 .and_then(|tail| tail.chars().next())
                 .unwrap_or(' ');
             i = i.saturating_add(ch.len_utf8());
-            if ch == '%' {
-                result.push_str("%%");
-            } else {
-                result.push(ch);
-            }
+            result.push(ch);
         }
     }
 

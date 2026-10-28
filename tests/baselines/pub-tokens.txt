@@ -298,6 +298,7 @@ src/delimiter.rs: pub(crate) const fn matches_char_close(self, ch: char) -> bool
 src/delimiter.rs: pub(crate) const fn open_char(self) -> Option<char> {
 src/delimiter.rs: pub(crate) enum DelimiterType {
 src/delimiter.rs: pub(crate) fn find_closing(self, input: &str) -> Option<usize> {
+src/delimiter.rs: pub(crate) fn find_closing_flat(self, input: &str) -> Option<usize> {
 src/dialog/error.rs: pub enum DialogError {
 src/dialog/error.rs: pub type DialogResult<T> = std::result::Result<T, DialogError>;
 src/dialog/mod.rs: pub trait DialogProvider: Send + Sync {

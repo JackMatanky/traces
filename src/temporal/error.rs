@@ -182,11 +182,11 @@ pub enum UnitError {
     },
 }
 
-/// An error translating a moment-dialect pattern to strftime.
+/// An error translating a date pattern to strftime.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum TemporalTokenError {
     /// A bracket literal (`[...]`) was opened but never closed.
-    #[error("unclosed bracket literal in moment-dialect pattern `{pattern}`")]
+    #[error("unclosed bracket literal in pattern `{pattern}`")]
     UnclosedBracket {
         /// The pattern containing the unclosed bracket.
         pattern: Box<str>,
@@ -337,7 +337,7 @@ mod tests {
             TemporalTokenError::UnclosedBracket {
                 pattern: "[Daily".into(),
             },
-            "unclosed bracket literal in moment-dialect pattern `[Daily`"
+            "unclosed bracket literal in pattern `[Daily`"
         )]
         #[case::unsupported_token(
             TemporalTokenError::UnsupportedToken {

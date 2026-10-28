@@ -446,9 +446,10 @@ fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
 /// moment-dialect tokens.
 ///
 /// Syntax: `{{ value | date_format(format_string) }}`.
-/// Formats according to either a strftime pattern (containing `%`) or common
-/// moment-dialect tokens (`YYYY MM DD HH mm ss`, `Do`/`S`,
-/// `dddd`/`ddd`/`MMM`/`MMMM`, bracket literals like `[Daily]`).
+/// Formats according to a strftime pattern (any `%` directive outside a
+/// bracket literal) or moment-dialect tokens (`YYYY MM DD HH mm ss`,
+/// `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`). Bracket literals like `[Daily]`
+/// render as literal text in both dialects.
 ///
 /// Jiff [`fmt::strtime`] formats a zoned date-time, so `%Z` reflects the
 /// resolved local zone even on either side of a DST fold. Leap seconds are
@@ -459,8 +460,9 @@ fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// `value` is not a parseable date/time string or the local zone cannot be
-/// resolved (see [`parse_date_point`]), or if `pattern` is an invalid strftime
-/// pattern or contains an unsupported moment token.
+/// resolved (see [`parse_date_point`]), or if `pattern` has an unclosed
+/// bracket literal, is an invalid strftime pattern, or contains an
+/// unsupported moment token.
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
     let point = parse_date_point(value)?;
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
@@ -475,7 +477,7 @@ fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
 ///
 /// Delegates to the temporal pattern translator and maps its error to a
 /// template render error, preserving the engine's error contract. The
-/// temporal side owns the `%`-contains dialect dispatch and the
+/// temporal side owns the bracket-aware dialect dispatch and the
 /// moment-dialect tokenizer.
 ///
 /// # Errors
@@ -1620,14 +1622,59 @@ mod tests {
             assert!(msg.contains("unsupported moment-dialect token `Q`"));
             assert!(msg.contains("supported tokens are"));
         }
+        #[rstest]
+        #[case::bracket_percent_year("[%Y]", "%Y")]
+        #[case::bracket_percent_day("[%d] YYYY", "%d 2026")]
+        #[case::bracket_apostrophe("[Today's %Y]", "Today's %Y")]
+        #[case::mixed_percent_bracket_and_directive(
+            "[100%] and %H:%M",
+            "100% and 14:30"
+        )]
+        #[case::stray_close_bracket("1]2", "1]2")]
+        #[case::multiple_brackets_with_percents(
+            "%H [a] %b [c%]",
+            "14 a Jun c%"
+        )]
+        #[case::nested_looking_bracket("[a[b]", "a[b")]
+        #[case::plain_strftime("%H:%M", "14:30")]
+        fn renders_bracket_literals_as_text_in_both_dialects(
+            #[case] format: &str,
+            #[case] expected: &str,
+        ) {
+            ZoneGuard::set("UTC");
+
+            let rendered = env()
+                .render_str(
+                    &format!(r#"{{{{ value | date_format("{format}") }}}}"#),
+                    minijinja::context! { value => "2026-06-05T14:30:00" },
+                )
+                .expect("render succeeds");
+
+            assert_eq!(rendered, expected);
+        }
+
         #[test]
-        fn rejects_unclosed_bracket_literal_in_moment_dialect() {
+        fn rejects_unclosed_bracket_literal_in_any_dialect() {
             let error = env()
                 .render_str(
-                    r#"{{ "2026-07-29" | date_format("[Daily YYYY-MM-DD") }}"#,
+                    r#"{{ "2026-06-05T14:30:00" | date_format("[Daily %H") }}"#,
                     minijinja::context!(),
                 )
                 .expect_err("unclosed bracket must fail");
+            assert!(
+                error.to_string().contains("unclosed bracket literal"),
+                "expected unclosed bracket error, got: {error}"
+            );
+        }
+
+        #[test]
+        fn unclosed_bracket_takes_precedence_over_unsupported_token() {
+            let error = env()
+                .render_str(
+                    r#"{{ "2026-06-05" | date_format("Q [x") }}"#,
+                    minijinja::context!(),
+                )
+                .expect_err("unclosed bracket must fail first");
             assert!(
                 error.to_string().contains("unclosed bracket literal"),
                 "expected unclosed bracket error, got: {error}"
