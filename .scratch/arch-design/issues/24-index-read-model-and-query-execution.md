@@ -69,6 +69,10 @@ of topic D. Decide the facet split first.
 - Decide if the class axes index inline fields. Today they index frontmatter
   values only.
 - State the constraint on the persisted path form. Ticket 29 owns the form.
+- Decide if any field gets an order-preserving key table for a native range
+  filter or sort. Name the query and the measured gain. Ticket 19 forbids
+  collation keys, so string sorts stay in memory. Each candidate set must
+  agree with the filter relation.
 
 ### E. Totality
 
@@ -82,6 +86,8 @@ of topic D. Decide the facet split first.
 
 - Decide if `CandidateTrie` and `indextree` stay.
 - Decide if the store engine and the repository split into two types.
+- Decide the redb settings that the store sets: the cache size, the page size
+  and the durability. The default cache is 1 GiB. `create_db` keeps it.
 
 ### Boundaries with other tickets
 

@@ -164,6 +164,25 @@ documentation corpus [V]. They are not from the synthetic vault.
 - The inbound link graph needs the outlinks of every note. It does not need the
   items.
 
+## redb cache size
+
+A throwaway copy of the store code set the redb cache size from an environment
+variable. The default is 1 GiB. The table shows peak memory in MB at 50,000
+notes (wall time in ms).
+
+| Query | Default | 8 MB | 1 MB | 0 |
+|-------|---------|------|------|---|
+| rare tag | 35.5 (115) | 35.1 (112) | 31.4 (111) | 29.9 (113) |
+| no source | 391.6 (224) | 326.3 (217) | 318.7 (271) | 307.7 (696) |
+
+- A small cache saves at most about 17% on a full decode. Decoded notes use
+  about 310 MB. No redb setting changes this.
+- A cache of 0 makes the full decode 3 times slower.
+- An 8 MB cache costs no time here and saves about 65 MB on the worst shape [H].
+- Order keys: redb has no filter or sort engine. It gives key order, range
+  reads and multimap lookups. Sort by a field in memory after the facet scan is
+  not measured.
+
 ## Not measured
 
 - A real personal vault.
