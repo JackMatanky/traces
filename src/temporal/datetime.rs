@@ -20,6 +20,7 @@ use super::{
     date::has_padded_date_prefix,
     error::DateError,
     lexer::{TemporalShapeToken, starts_with_year},
+    render_canonical_pattern,
     zone::local_zone,
 };
 
@@ -305,10 +306,16 @@ impl fmt::Display for DateTimeValue {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let local = self.local_datetime().map_err(|_| fmt::Error)?;
-        let rendered =
-            jiff::fmt::strtime::format(self.canonical_pattern(), local)
-                .map_err(|_| fmt::Error)?;
-        f.write_str(&rendered)
+        if let Some(rendered) =
+            render_canonical_pattern(local, self.canonical_pattern())
+        {
+            f.write_str(&rendered)
+        } else {
+            let rendered =
+                jiff::fmt::strtime::format(self.canonical_pattern(), local)
+                    .map_err(|_| fmt::Error)?;
+            f.write_str(&rendered)
+        }
     }
 }
 
@@ -368,11 +375,15 @@ impl Serialize for DateTimeValue {
     where
         S: Serializer,
     {
-        let mut rendered = jiff::fmt::strtime::format(
-            self.canonical_pattern(),
-            self.utc().to_zoned(TimeZone::UTC).datetime(),
-        )
-        .map_err(serde::ser::Error::custom)?;
+        let utc = self.utc().to_zoned(TimeZone::UTC).datetime();
+        let mut rendered =
+            match render_canonical_pattern(utc, self.canonical_pattern()) {
+                Some(rendered) => rendered,
+                None => {
+                    jiff::fmt::strtime::format(self.canonical_pattern(), utc)
+                        .map_err(serde::ser::Error::custom)?
+                }
+            };
         rendered.push('Z');
         serializer.serialize_str(&rendered)
     }
@@ -437,8 +448,9 @@ impl DateTimeShape {
         if shape == Self::Rfc3339 && !numeric_rfc3339_offset_is_valid(input) {
             return Err("invalid input");
         }
+        let expanded = expand_signed_year(input);
         let pieces = DATETIME_PARSER
-            .parse_pieces(input.as_bytes())
+            .parse_pieces(expanded.as_bytes())
             .map_err(|_| "invalid input")?;
         let time = pieces.time().ok_or("invalid input")?;
         let datetime = pieces.date().to_datetime(time);
@@ -539,6 +551,39 @@ impl DateTimeShape {
         Cow::Owned(format!("{prefix} {time}"))
     }
 }
+
+/// Rewrites a leading sign+4-digit year into Jiff's six-digit expanded form.
+///
+/// Jiff's Temporal parser rejects a four-digit year after a sign (it wants six
+/// digits, `-000009`), while the crate's own grammar validates the sign+4
+/// spelling (`-0009`). [`DateTimeShape::parse_any`] applies this only after
+/// the four-digit checks have passed, immediately before handing the text to
+/// Jiff, so the stricter parser sees a year form it accepts.
+///
+/// # Arguments
+///
+/// * `input` - date-time text already validated against the crate's grammar
+///
+/// # Returns
+///
+/// A borrowed copy when `input` has no sign or not exactly four ASCII year
+/// digits; otherwise the six-digit-expanded spelling.
+fn expand_signed_year(input: &str) -> Cow<'_, str> {
+    if !input.starts_with('-') {
+        return Cow::Borrowed(input);
+    }
+    let year = match input.get(1..5) {
+        Some(year) if year.bytes().all(|byte| byte.is_ascii_digit()) => year,
+        _ => return Cow::Borrowed(input),
+    };
+    match input.get(5..) {
+        Some(rest) if rest.starts_with('-') => {
+            Cow::Owned(format!("-00{year}{rest}"))
+        }
+        _ => Cow::Borrowed(input),
+    }
+}
+
 /// Stores the parsed date-time shape before local-zone resolution.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum DateTimeInput {
@@ -1512,6 +1557,63 @@ mod tests {
                 "JSON round trips must be lossless"
             );
         }
+
+        #[test]
+        fn displays_negative_years_with_the_sign_outside_the_width() {
+            // Arrange
+            ZoneGuard::set("UTC");
+            let value = DateTimeValue::parse_iso("-0009-01-01T00:00:00Z")
+                .expect("four-digit negative year parses");
+
+            // Act
+            let rendered = value.to_string();
+
+            // Assert
+            assert_eq!(rendered, "-0009-01-01T00:00:00");
+        }
+
+        #[test]
+        fn serializes_negative_years_with_the_sign_outside_the_width() {
+            // Arrange
+            let value = DateTimeValue::parse_iso("-0009-01-01T00:00:00Z")
+                .expect("four-digit negative year parses");
+
+            // Act
+            let json =
+                serde_json::to_string(&value).expect("serialize succeeds");
+
+            // Assert
+            assert_eq!(json, "\"-0009-01-01T00:00:00Z\"");
+        }
+
+        #[test]
+        fn canonical_pattern_is_in_the_render_table() {
+            // Arrange
+            ZoneGuard::set("UTC");
+            let fixture: jiff::civil::DateTime =
+                "2026-07-05T04:05:03".parse().expect("fixture datetime parses");
+            let values = [
+                "2026-07-05T04:05:03Z",
+                "2026-07-05T04:05:03.001Z",
+                "2026-07-05T04:05:03.000001Z",
+                "2026-07-05T04:05:03.000000001Z",
+            ];
+
+            // Act + Assert: each precision branch's pattern renders.
+            for text in values {
+                let value = DateTimeValue::parse_iso(text)
+                    .expect("fixture value parses");
+                assert!(
+                    render_canonical_pattern(
+                        fixture,
+                        value.canonical_pattern()
+                    )
+                    .is_some(),
+                    "{} must be canonical",
+                    value.canonical_pattern()
+                );
+            }
+        }
     }
 
     mod deserialization {
@@ -1889,6 +1991,25 @@ mod tests {
                     .expect("generated timestamp fits SystemTime");
                 let value = DateTimeValue::try_from(system_time)
                     .expect("generated timestamp fits DateTimeValue");
+
+                // Act
+                let displayed = value.to_string();
+                let parsed = DateTimeValue::parse_iso(&displayed);
+
+                // Assert
+                prop_assert_eq!(parsed, Ok(value));
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn display_reparses_for_every_supported_year(
+                second in Timestamp::MIN.as_second()..=Timestamp::MAX.as_second(),
+            ) {
+                // Arrange
+                ZoneGuard::set("UTC");
+                let value = DateTimeValue::from_unix_seconds(second)
+                    .expect("generated second lies inside the timestamp range");
 
                 // Act
                 let displayed = value.to_string();
