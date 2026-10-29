@@ -1,7 +1,7 @@
 # What is the index read model, and is there one query execution path or two?
 
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: 11, 17, 21, 23, 1, 12
 
 ## Question
@@ -172,6 +172,7 @@ Do not reopen these decisions.
 - `NoteFieldValue` keeps derived tagged serde and the 80 B size test
   (ticket 18).
 - The core stays synchronous by default (ticket 17).
+- Store crates are Rust-native only. C and C++ engines are out of scope.
 
 ### Facts
 
@@ -275,6 +276,37 @@ drifts, the cold path rebuilds fully in memory before it serves.
 
 Prep: `research/24-prep/`. The grilling guide is `z-grilling-guide.md`. The
 probe numbers come from a synthetic vault.
+
+### Decisions recorded in the grilling session (2026-10-29)
+
+The ticket is still open. These decisions are confirmed. The evidence is in
+`research/24-prep/g-probe-results.md` and `i1-store-candidates-and-designs.md`.
+
+- Store crates are Rust-native only. The maintainer rejects C and C++ engines
+  (SQLite, LMDB, DuckDB). This is a Fixed input.
+- The index owns a domain-level port to the store. It names operations such as
+  candidate paths for a source, facets for a set of paths, an apply of changes
+  and the meta values. Query code never names an engine. This resolves topic F
+  for the store engine and the repository.
+- Five rules keep the port portable:
+  1. No engine type crosses the store boundary. This includes errors. The error
+     wraps the engine error as an opaque source.
+  2. The persisted bytes are engine-neutral: postcard facets and plain byte
+     keys.
+  3. The fingerprint names the engine and the format. A change of either
+     triggers a rebuild. Ticket 25 owns the rule.
+  4. A conformance suite checks that every adapter returns the same rows as a
+     fresh parse. The probe check is its seed.
+  5. Open cost, durability and locking stay inside the adapter.
+- The engine choice is reversible. The first adapter is redb, because the
+  repository uses it. The store is a derived cache, so a switch needs a rebuild
+  and no data migration.
+- Facet names are `fields`, `tags`, `headings`, `outlinks` and `lists`. The name
+  `meta` stays for the table of the version and the fingerprint. The `tags`
+  table holds the merged set of body and frontmatter tags.
+- Still open: the range tables against scan tables, a separate `tasks` table,
+  the generation model and the row source, the failed-persist rule, the
+  second-process rule, totality, `CandidateTrie` and the change-table rows.
 
 ## Inputs from the value model decision
 
