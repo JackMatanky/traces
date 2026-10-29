@@ -58,6 +58,7 @@ docs/digests/
 .claude/
 CLAUDE.md
 .omp/
+.habit-hooks/
 
 # --------- Architecture Design Skill Deliverables ------------ #
 .design/
