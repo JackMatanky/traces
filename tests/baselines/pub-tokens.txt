@@ -1451,6 +1451,7 @@ src/temporal/datetime.rs: pub(crate) fn local_date(self) -> Result<DateValue, Da
 src/temporal/datetime.rs: pub(crate) fn local_datetime(self) -> Result<civil::DateTime, DateError> {
 src/temporal/datetime.rs: pub(crate) fn local_datetime_in(self, zone: &TimeZone) -> civil::DateTime {
 src/temporal/datetime.rs: pub(crate) fn now() -> Self {
+src/temporal/datetime.rs: pub(crate) fn now_instant() -> Timestamp {
 src/temporal/datetime.rs: pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
 src/temporal/datetime.rs: pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
 src/temporal/datetime.rs: pub(crate) fn resolve(
@@ -1516,7 +1517,7 @@ src/temporal/mod.rs: pub(crate) mod fixtures {
 src/temporal/mod.rs: pub(crate) mod test_support {
 src/temporal/mod.rs: pub(crate) use calendar::{
 src/temporal/mod.rs: pub(crate) use date::DEFAULT_DATE_PATTERN;
-src/temporal/mod.rs: pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
+src/temporal/mod.rs: pub(crate) use datetime::{DEFAULT_DATETIME_PATTERN, now_instant};
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use fmt::{
 src/temporal/mod.rs: pub(crate) use point::{DateDiff, DatePoint};
@@ -1543,6 +1544,7 @@ src/temporal/point.rs: pub(crate) fn parse_with_pattern(
 src/temporal/point.rs: pub(crate) fn shift(
 src/temporal/point.rs: pub(crate) fn snap(
 src/temporal/point.rs: pub(crate) fn to_f64(self) -> Option<f64> {
+src/temporal/point.rs: pub(crate) fn unix_seconds(self) -> Result<i64, CalendarError> {
 src/temporal/point.rs: pub(crate) fn with_weekday(
 src/temporal/point.rs: pub(crate) fn zoned_datetime_in(
 src/temporal/point.rs: pub(super) fn from_date_shape(date: civil::Date, shape: DateShape) -> Self {

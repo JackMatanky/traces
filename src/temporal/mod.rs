@@ -47,8 +47,8 @@ pub(crate) use calendar::{
 };
 pub(crate) use date::DEFAULT_DATE_PATTERN;
 pub use date::DateValue;
-pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;
 pub use datetime::DateTimeValue;
+pub(crate) use datetime::{DEFAULT_DATETIME_PATTERN, now_instant};
 pub use duration::DurationValue;
 pub(crate) use error::CalendarError;
 pub use error::{DateError, DurationError};

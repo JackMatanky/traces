@@ -19,7 +19,7 @@
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
 //! Date/time string parsing funnels through [`DatePoint::parse`] via
-//! [`parse_local_datetime`], which dispatches once on the input's shape: a
+//! [`parse_date_point`], which dispatches once on the input's shape: a
 //! full date-time shape parses as a date-time, and a bare ISO date shape
 //! (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) parses as a calendar date
 //! at midnight. Arithmetic filters re-serialize at the input's original
@@ -47,8 +47,8 @@ use crate::{
     DEFAULT_DATE_PATTERN, DateTimeValue, DurationValue, TimeUnit,
     temporal::{
         CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
-        DateUnit, DateValue, PeriodEdge, resolve_period_edge,
-        weekday_from_number,
+        DateUnit, DateValue, PeriodEdge, pattern_to_strftime,
+        resolve_period_edge, weekday_from_number,
     },
 };
 /// Method names `date` exposes, for [`DateOps::enumerate`].
@@ -135,8 +135,7 @@ impl Object for DateOps {
                  reference_format: Option<&str>,
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
-                    let target = weekday_or_error(n)?;
-                    Anchor::Weekday(target).render(
+                    Anchor::Weekday(n).render(
                         format,
                         None,
                         reference,
@@ -150,16 +149,16 @@ impl Object for DateOps {
                  kwargs: Kwargs|
                  -> TemplateEngineResult<String> {
                     let format = format_kwarg(&kwargs)?;
-                    let timestamp =
-                        jiff::Timestamp::new(unix_ts, 0).map_err(|_| {
-                            Error::new(
-                                ErrorKind::InvalidOperation,
+                    let value = DateTimeValue::from_unix_seconds(unix_ts)
+                        .map_err(|source| {
+                            invalid_operation(
                                 format!("timestamp {unix_ts} is out of range"),
+                                source,
                             )
                         })?;
                     let zone = crate::temporal::local_zone()
                         .map_err(render_date_error)?;
-                    DatePoint::from(DateTimeValue::from_timestamp(timestamp))
+                    DatePoint::from(value)
                         .format_in(format, &zone)
                         .map_err(render_date_error)
                 },
@@ -223,7 +222,7 @@ enum Anchor {
     Yesterday,
     StartOf(CalendarPeriod),
     EndOf(CalendarPeriod),
-    Weekday(jiff::civil::Weekday),
+    Weekday(i64),
 }
 
 impl Anchor {
@@ -262,9 +261,13 @@ impl Anchor {
             Self::EndOf(calendar_period) => date_point
                 .snap(calendar_period, PeriodEdge::End, &zone()?)
                 .map_err(render_calendar_error),
-            Self::Weekday(target) => date_point
-                .with_weekday(target, &zone()?)
-                .map_err(render_calendar_error),
+            Self::Weekday(target) => {
+                let target_weekday = weekday_from_number(target)
+                    .ok_or_else(|| weekday_index_error(target))?;
+                date_point
+                    .with_weekday(target_weekday, &zone()?)
+                    .map_err(render_calendar_error)
+            }
         }
     }
 
@@ -320,7 +323,8 @@ impl Anchor {
             .zoned_datetime_in(&zone)
             .map_err(render_calendar_error)?;
         let local_datetime = zoned.datetime();
-        let pat = pattern_to_strftime(format, local_datetime)?;
+        let pat = pattern_to_strftime(format, local_datetime)
+            .map_err(|source| invalid_operation(source.to_string(), source))?;
         date_point.format_in(&pat, &zone).map_err(render_date_error)
     }
 }
@@ -340,17 +344,15 @@ fn shorthand(anchor: Anchor) -> Value {
     )
 }
 
-/// Maps an ISO weekday number (`1` Monday through `7` Sunday) to a weekday.
-fn weekday_or_error(n: i64) -> TemplateEngineResult<jiff::civil::Weekday> {
-    weekday_from_number(n).ok_or_else(|| {
-        Error::new(
-            ErrorKind::InvalidOperation,
-            format!(
-                "weekday index {n} is out of range (expected 1..=7, Monday = \
-                 1 through Sunday = 7)"
-            ),
-        )
-    })
+/// Builds the error for a weekday number outside `1..=7`.
+fn weekday_index_error(n: i64) -> Error {
+    Error::new(
+        ErrorKind::InvalidOperation,
+        format!(
+            "weekday index {n} is out of range (expected 1..=7, Monday = 1 \
+             through Sunday = 7)"
+        ),
+    )
 }
 
 /// Parses `s` as a date or date-time expression via [`DatePoint::parse`].
@@ -408,19 +410,17 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
         .map_err(|error| invalid_operation(error.to_string(), error))
 }
 
-/// The shared date/time string parser for filters that work on the human clock
-/// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
-/// parse via [`parse_date_point`] directly.
+/// Extracts the calendar year of `s` resolved in the reader's local zone.
 ///
 /// # Errors
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// `s` is not a parseable date or datetime string.
-fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
+fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
     let point = parse_date_point(s)?;
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
-    Ok(point.local_datetime_in(&zone))
+    Ok(i32::from(point.local_datetime_in(&zone).year()))
 }
 
 /// Formats a piped date/time string according to a strftime pattern or
@@ -456,28 +456,9 @@ fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
     let zoned =
         point.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
     let datetime = zoned.datetime();
-    let translated = pattern_to_strftime(pattern, datetime)?;
+    let translated = pattern_to_strftime(pattern, datetime)
+        .map_err(|source| invalid_operation(source.to_string(), source))?;
     point.format_in(&translated, &zone).map_err(render_date_error)
-}
-
-/// Translates `pattern` to a strftime pattern.
-///
-/// Delegates to the temporal pattern translator and maps its error to a
-/// template render error, preserving the engine's error contract. The
-/// temporal side owns the bracket-aware dialect dispatch and the
-/// moment-dialect tokenizer.
-///
-/// # Errors
-///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// the pattern cannot be translated.
-fn pattern_to_strftime(
-    pattern: &str,
-    datetime: jiff::civil::DateTime,
-) -> TemplateEngineResult<String> {
-    crate::temporal::pattern_to_strftime(pattern, datetime)
-        .map_err(|source| invalid_operation(source.to_string(), source))
 }
 
 /// Converts a piped date/time string to Unix seconds.
@@ -493,10 +474,7 @@ fn pattern_to_strftime(
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// `value` is not a parseable date/time string; see [`parse_date_point`].
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
-    parse_date_point(value)?
-        .instant()
-        .map(jiff::Timestamp::as_second)
-        .map_err(render_calendar_error)
+    parse_date_point(value)?.unix_seconds().map_err(render_calendar_error)
 }
 
 /// Returns the first or last day of the input's `calendar_period` at its
@@ -743,14 +721,16 @@ fn weekday(
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
     if let Some(target_num) = n {
         let format = format_kwarg(&kwargs)?;
-        let target_weekday = weekday_or_error(target_num)?;
+        let target_weekday = weekday_from_number(target_num)
+            .ok_or_else(|| weekday_index_error(target_num))?;
         let shifted = date_point
             .with_weekday(target_weekday, &zone)
             .map_err(render_calendar_error)?;
         let zoned =
             shifted.zoned_datetime_in(&zone).map_err(render_calendar_error)?;
         let local_datetime = zoned.datetime();
-        let pat = pattern_to_strftime(format, local_datetime)?;
+        let pat = pattern_to_strftime(format, local_datetime)
+            .map_err(|source| invalid_operation(source.to_string(), source))?;
         Ok(Value::from(
             shifted.format_in(&pat, &zone).map_err(render_date_error)?,
         ))
@@ -825,7 +805,7 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
     let instant =
         parse_date_point(value)?.instant().map_err(render_calendar_error)?;
     // Instant comparison, not point construction: no zone or date point.
-    Ok(instant < jiff::Timestamp::now())
+    Ok(instant < crate::temporal::now_instant())
 }
 
 /// Evaluates whether the piped date/time string is after now.
@@ -842,14 +822,14 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
     let instant =
         parse_date_point(value)?.instant().map_err(render_calendar_error)?;
     // Instant comparison, not point construction: no zone or date point.
-    Ok(instant > jiff::Timestamp::now())
+    Ok(instant > crate::temporal::now_instant())
 }
 
 /// Evaluates whether the given year or date/time string falls in a leap year.
 ///
 /// Syntax: `{% if value is is_leap_year %}`. Accepts either an integer year
 /// (`2024 is is_leap_year`) or a date/time string checked through
-/// [`parse_local_datetime`].
+/// [`parse_local_year`].
 ///
 /// # Errors
 ///
@@ -857,13 +837,13 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) (via
 /// [`leap_year_input_error`]) if `value` is neither an integer year
 /// representable as [`i32`] nor a parseable date/time string (see
-/// [`parse_local_datetime`]), or if the year is outside the Jiff-supported
+/// [`parse_local_year`]), or if the year is outside the Jiff-supported
 /// civil-date range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
     let year = if let Some(year) = value.as_i64() {
         i32::try_from(year).map_err(|_| leap_year_input_error(value))?
     } else if let Some(s) = value.as_str() {
-        i32::from(parse_local_datetime(s)?.year())
+        parse_local_year(s)?
     } else {
         return Err(leap_year_input_error(value));
     };

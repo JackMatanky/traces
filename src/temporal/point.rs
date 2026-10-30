@@ -286,6 +286,16 @@ impl DatePoint {
         }
     }
 
+    /// Returns this point's instant as Unix epoch seconds.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if converting this point to an instant
+    ///   exceeds the supported range.
+    pub(crate) fn unix_seconds(self) -> Result<i64, CalendarError> {
+        self.instant().map(Timestamp::as_second)
+    }
+
     /// Returns the canonical strftime pattern preserving written precision.
     #[must_use]
     pub(crate) fn canonical_pattern(self) -> &'static str {

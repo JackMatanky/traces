@@ -298,6 +298,12 @@ impl DateTimeValue {
     }
 }
 
+/// Reads the raw current instant from the system clock.
+#[inline]
+pub(crate) fn now_instant() -> Timestamp {
+    Timestamp::now()
+}
+
 /// Renders the local clock time without a UTC offset, so a date or time
 /// component reads as the reader's own clock.
 ///
