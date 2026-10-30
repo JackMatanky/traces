@@ -384,6 +384,19 @@ itself is not implemented here; the map ends at hand-off to specification.
   [live buffer](./issues/34-live-buffer-and-persisted-index-consistency.md),
   [schema](./issues/35-schema-internals-simplification.md),
   [body sections](./issues/36-body-section-schemas.md).
+- [What is the index read model, and is there one query execution path or
+  two?](./issues/24-index-read-model-and-query-execution.md): one query
+  plan over a facet store and immutable host generations. Cold queries
+  load only selected entries; `WorkspaceIndex` stays total. The index
+  owns an engine-neutral port, with redb as the first Rust-native
+  adapter. Store snapshots and writer-transaction base checks prevent
+  mixed generations. `lists` keeps tasks; `tasks` duplicates them in
+  one atomic write. Note-level scalar range keys and task date/status
+  keys need semantic proof and end-to-end measurement. Sorts stay in
+  the query plan. An unusable derived cache falls back to a trusted
+  fresh parse for read queries, while `traces index` fails closed.
+  Ticket 25 owns freshness and crash recovery; tickets 26, 29, 30
+  and 31 own rows, paths, writer admission and notices.
 
 ## Not yet specified
 
@@ -394,10 +407,10 @@ itself is not implemented here; the map ends at hand-off to specification.
   23](./issues/23-note-document-model.md) decides status interning, the second
   pass, the footprint, and footnote, callout and slug modelling. Only the
   measurements it lists remain.
-- **Index internals**: `CandidateTrie`/`indextree` retention, store engine vs
-  repository split, inline-field class extraction. Sharpen after [What is the
-  index read model, and is there one query execution path or
-  two?](./issues/24-index-read-model-and-query-execution.md).
+- **Index internals**: graduated to [the index read model
+  decision](./issues/24-index-read-model-and-query-execution.md).
+  Exact key encoding, task-heavy and real-vault measurements, and
+  cross-platform locking remain evidence gates.
 - **Template internals**: compiled-AST and regex caches, lazy schema load.
   Sharpen after [What is the template engine boundary with query, schema,
   temporal, and the host?](./issues/28-template-engine-boundary.md).

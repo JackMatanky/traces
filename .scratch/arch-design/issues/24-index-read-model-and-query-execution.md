@@ -1,7 +1,7 @@
 # What is the index read model, and is there one query execution path or two?
 
 Type: grilling
-Status: claimed
+Status: resolved
 Blocked by: 11, 17, 21, 23, 1, 12
 
 ## Question
@@ -277,22 +277,25 @@ drifts, the cold path rebuilds fully in memory before it serves.
 Prep: `research/24-prep/`. The grilling guide is `z-grilling-guide.md`. The
 probe numbers come from a synthetic vault.
 
+## Answer
+
 ### Decisions recorded in the grilling session (2026-10-29)
 
-The ticket is still open. These decisions are confirmed. The evidence is in
-`research/24-prep/g-probe-results.md` and `i1-store-candidates-and-designs.md`.
+The maintainer confirmed this design after the adversarial review.
+The evidence is in `research/24-prep/g-probe-results.md` and
+`i1-store-candidates-and-designs.md`.
 
-- Store crates are Rust-native only. The maintainer rejects C and C++ engines
-  (SQLite, LMDB, DuckDB). This is a Fixed input.
 - The index owns a domain-level port to the store. It names operations such as
   candidate paths for a source, facets for a set of paths, an apply of changes
-  and the meta values. Query code never names an engine. This resolves topic F
-  for the store engine and the repository.
+  and the meta values. A cold query uses one read snapshot for candidate
+  selection, all selected facets and fingerprint validation. Query code
+  never names an engine. This resolves topic F for the store engine and
+  the repository.
 - Five rules keep the port portable:
   1. No engine type crosses the store boundary. This includes errors. The error
      wraps the engine error as an opaque source.
   2. The persisted bytes are engine-neutral: postcard facets and plain byte
-     keys.
+     keys. Ticket 29 still owns portable path identity and key ordering.
   3. The fingerprint names the engine and the format. A change of either
      triggers a rebuild. Ticket 25 owns the rule.
   4. A conformance suite checks that every adapter returns the same rows as a
@@ -301,12 +304,201 @@ The ticket is still open. These decisions are confirmed. The evidence is in
 - The engine choice is reversible. The first adapter is redb, because the
   repository uses it. The store is a derived cache, so a switch needs a rebuild
   and no data migration.
-- Facet names are `fields`, `tags`, `headings`, `outlinks` and `lists`. The name
-  `meta` stays for the table of the version and the fingerprint. The `tags`
-  table holds the merged set of body and frontmatter tags.
-- Still open: the range tables against scan tables, a separate `tasks` table,
-  the generation model and the row source, the failed-persist rule, the
-  second-process rule, totality, `CandidateTrie` and the change-table rows.
+- Facet names are `files`, `fields`, `tags`, `classes`, `headings`,
+  `outlinks`, `links`, `tasks`, `lists`, `notices` and `meta`. The `meta`
+  table keeps the format version and fingerprint. The `tags` table merges
+  body and frontmatter tags.
+- Query latency takes priority over write cost. Persist range keys for
+  eligible effective note-level scalar fields, not a fixed list of field
+  names. Frontmatter wins over inline, including frontmatter `null`.
+  Several inline values become a list, not several scalar keys (ticket 23).
+  Keep task-item metadata in a separate scope. Index supported task
+  dates and status; scan other task-item fields until keys have a
+  proved and measured benefit (Q21). Keep the original `Note::lists`
+  index as `item_idx` in each task candidate. A candidate lookup only
+  narrows. The plan still evaluates the source and full filter on each
+  survivor, then runs ordered transforms at their original positions.
+  Only push a predicate before `limit`, `flatten` or another transform if
+  equivalence is proved for that row mode (ticket 26).
+- The planner may use a range key only if its candidate set contains
+  every row matching the filter (ticket 19). Prove this for each
+  operator, row kind, temporal frame and field precedence. Unsupported
+  mappings scan the relevant facet. Examples include complements,
+  missing or null values, and adaptive or period comparisons.
+  Ticket 26 owns the pushdown capability protocol.
+- Also prove exact `Int`/`Float` comparisons above 2^53, signed zero,
+  infinity, adaptive quoted literals and Link target matching
+  (ticket 19). Do not cast `i64` to `f64` or treat a raw string key
+  as a Link comparison key. Unsupported operations scan.
+- Range keys serve only proved candidate filtering (Q22). Keep sorts
+  in the ordered query plan, including its tie and missing-value
+  rules. Ticket 19 forbids persisted string collation keys. Numeric
+  or temporal sort pushdown needs full-row parity and a measured gain.
+- The probe measured tag keys and one status-plus-rating key at 50,000 notes.
+  It did not measure generic field keys, task keys or full row materialization.
+  The maintainer kept broad scalar keys as a goal in Q18, conditional on
+  proved candidate soundness and measured full-query benefit over facet
+  scans. Measure a real vault and a task-heavy shape, cache bytes, and
+  one-note replacement with stale-key deletion. If broad keys lose, revisit
+  their scope instead of shipping them for their own sake.
+- Use one execution plan for the cold CLI and each long-lived host. The
+  CLI reads store-backed candidates. A host reads its pinned generation.
+  Candidate access may differ, but source, filter and transform rules do
+  not.
+- For `All`, `Not` and a source-less query, enumerate `files` paths,
+  then narrow with safe predicates when available. A folder `Path` uses a
+  path range; other path patterns scan paths. `Tag` uses tag keys.
+  `Class` checks explicit class keys or the bound tag and path atoms
+  from ticket 20. A query that returns every full note still reads every
+  selected note; indexing cannot avoid the output cost.
+- Keep `lists` as the complete ordered sequence, including tasks. The
+  `tasks` facet is a derived duplicate subset keyed by the original
+  `Note::lists` index. Update both in one transaction. Task-only scans
+  need not decode plain items; full task rows still load any list
+  context and note facets they use. The synthetic 50,000-note probe
+  scanned tasks in 12 ms, versus 54-55 ms for all list items.
+  Neither run built query rows. Confirm the choice on assembled rows,
+  task-heavy input and one-note replacement before fixing the layout.
+- A host publishes an immutable generation of shared entries. A refresh
+  replaces entries if their note, file metadata or inlinks change. Each
+  request pins one generation. A row owns its matching `Arc<FileEntry>`, not
+  the whole index. The cold CLI builds entries only for survivors. Ticket 26
+  owns the final row API.
+- `WorkspaceIndex` remains total and sorted, with one entry per indexed
+  file. The cold CLI builds selected `FileEntry` rows directly, not a
+  partial `WorkspaceIndex`. The CLI crate consumes the index-owned
+  domain port. It never imports a storage engine.
+- Keep item text with each task or list record. The selective two-stage probe
+  saved about 1 ms by splitting core and text. Revisit the split if task
+  range keys fail to narrow broad reads.
+- Treat an unusable derived cache (locked, corrupt or unwritable) as
+  a miss under these rules:
+  - Do not bypass config trust or root validation. The CLI loads
+    trusted config before a query (`src/cli/mod.rs:190-204,248-253`).
+  - A read query parses source files and prints one stderr cache notice.
+    It succeeds only if the fresh parse and query succeed.
+  - A host may publish a coherent updated in-memory generation after
+    failed persistence only from a validated pinned base. It must not
+    fetch unchanged rows from a store that may have changed.
+  - `traces index` fails closed. A held store can now serve a fresh
+    query and exit 0 instead of 1. Record the change under ticket 16.
+- A host opens the store only to commit a write batch, then closes it. Host
+  reads come from the pinned generation and do not touch the store. A CLI
+  process in another terminal can query if it can parse the source files.
+  Each batch pays one store open (about 13 ms measured). This supersedes
+  research 11 advice 8, which held an open store in the host.
+- Check path ordering in release at every index build and store load, with
+  `OsStr` comparison (about 0.12 ms at 50,000 paths). Keep
+  `SortedByPath::assumed_sorted` for callers that reorder in memory; the
+  boundary checks then witness the order that binary search needs.
+- Keep `CandidateTrie` and `indextree`. They resolve links by basename. At
+  5,000 same-stem candidates the trie build took 224 ms and a flat scan took
+  412 to 436 ms. Extend the `index_inlinks` benchmark to 5,000 candidates.
+- Persist inbound links for cold `file.inlinks` reads, including targets
+  that are not Markdown. A refresh updates links with affected outlinks in
+  one generation.
+- Persist only parse-time notices with their file facts. The store
+  offers a path-scoped notice read for check, CLI and host diagnostics.
+  Query-time notices are computed for each query and are not persisted.
+  Ticket 31 owns how consumers show both kinds. Keep temporal values
+  as text until a compact encoding shows a measured gain.
+- Persist the source `FileMeta` timestamps and size, but not the hybrid
+  `day` field (ticket 21). Derive a filename period at query time.
+  `classes` holds explicit classes only. Class binding stays outside the
+  index and inline fields do not supply a class axis (ticket 20).
+- For the first redb adapter, keep `Durability::None` and the default
+  page size. The store is a rebuildable cache, not crash-durable data.
+  On reopen, validate the format, policy and source freshness, and
+  rebuild an unusable or stale cache. Ticket 25 must cover a crash
+  that loses the last commit and a same-mtime content edit; format
+  validity alone does not establish freshness. Measure cache size on
+  the new layout before fixing it. An earlier 8 MB cache saved 65 MB
+  on a worst-shape synthetic query without a measured time cost; that
+  probe predates the range tables.
+- Still open: the precise range-key encoding and measured write and
+  read costs.
+
+### Adversarial review and required corrections
+
+- [V] `RefreshPlan::collect` reads the store fingerprint and scans source
+  files before it builds a delta (`src/index/refresh.rs:337-358`). The
+  proposed host releases the store between write batches. [H] Another
+  policy can rebuild the store after planning but before commit. An
+  incremental apply could then label mixed-policy rows as current.
+  Use a writer-transaction check of the plan's base generation and
+  fingerprint. A failed check needs a complete replan, not an
+  incremental apply.
+- The maintainer chose the writer-transaction base check in Q16.
+  Give each store incarnation a unique identity; do not reset a token
+  to a reusable value after a rebuild. Every commit advances its
+  revision, even under the same policy. An incremental plan carries
+  the base identity, revision and fingerprint. Compare them inside
+  the write transaction before replacing any row. On mismatch,
+  discard the delta and replan against the new base or rebuild.
+  Never retag unchanged rows from a different policy.
+- [V] The current store has separate read transactions for file and
+  fingerprint reads and for other facet reads (`src/index/store.rs:486-545`).
+  A cold query must pin one read transaction through candidate selection,
+  facet reads and fingerprint validation. A host snapshot cannot lazily
+  read facets from a newer store generation.
+- [V] `read_notes_batch` can skip corrupt rows after logging a message
+  (`src/index/store.rs:201-209`). Define which facets have required
+  rows and how an empty optional facet is represented. A missing or
+  corrupt required facet must cause a complete cache miss, not a
+  silently incomplete result. On fail-open, parse fresh or reuse a
+  validated pinned host generation. Do not mix fresh rows with
+  unverified store rows.
+- [V] The 1.8 s figure in the prior prep includes a full build with
+  persistence (`research/24-prep/h1-stress-test-designs.md:98-100`).
+  It is not a measured parse-only fallback latency.
+- [V] A task-row metadata field can override its note's value
+  (`src/query/results.rs:320-333`). Indexing only note fields cannot
+  safely prune task-row filters. The Q21 decision scans non-date and
+  non-status task-item fields. Current `Note::fields()` enumerates
+  inline values while `Note::get()` reads only the first
+  (`src/note/model.rs:142-173`). Ticket 23 changes several inline
+  values to one list. The key writer must use that future effective
+  accessor, not the current iterator.
+- [V] `limit` and `flatten` are ordered lazy transforms
+  (`src/query/plan.rs:38-58,238-277`). Moving a filter before either can
+  change the result. A source `Not` also needs the `files` universe,
+  including non-note entries (`src/query/service.rs:348-390`).
+- [V] An unknown explicit class does not suppress tag-bound class
+  membership (ticket 20). The class source checks a known explicit
+  class, the hierarchy and binding exclusions, not merely any
+  `classes` key. Source tags describe note membership; task-row tags
+  describe an item, so they need distinct candidate scopes.
+- [V] Today list queries include task items in the same document order
+  (`src/query/service.rs:246-263,280-305`). The split does not yet say if
+  `lists` duplicates tasks. Disjoint facets need an `item_idx` merge;
+  duplication needs atomic updates to both. The task-only scan did not
+  build rows (`research/24-prep/g-probe-results.md:250-274`).
+- [V] Two prototype range tables grew the redb file from 67 MB to
+  135 MB (`research/24-prep/g-probe-results.md:345-350`). This does not
+  measure indexing every scalar field. Compare full-row queries and
+  replacement costs before treating generic keys as a read-speed win.
+- [V] The existing reverse tag and class tables let writes remove old
+  keys (`src/index/store.rs:1445-1484`). Before removing them, read
+  the old values from stored facets inside the write transaction, or
+  provide another path-based deletion strategy. One transaction must
+  replace facets, task copies, range keys, link edges, notices, meta
+  and the store revision. Delete every old derived key first.
+- [V] The notice facet initially lacked a named reader. The path-scoped
+  read above limits persisted notices to parse-time facts. Ticket 29
+  owns portable path identity and sort order; postcard data alone
+  does not make range keys portable.
+- [V] The task-only probe has 37,500 tasks among 487,500 items
+  (`research/24-prep/g-probe-results.md:284-285`). It measured the
+  task subset without full row assembly. If `lists` retains all items,
+  a task-heavy vault can duplicate most item bytes in `tasks`.
+  Both copies must change in the same write transaction.
+  If `lists` excludes tasks, `Lists` must merge both facets by original
+  `item_idx`, including parents and nested order. No task-only result
+  may renumber the index or omit its parent when a reader asks for it.
+  Neither layout avoids loading a full note for a result that needs
+  `file.lists` or list-parent context. Measure both on task-heavy input
+  and assembled rows; the 12 ms scan proves neither end-to-end speed
+  nor a size advantage.
 
 ## Inputs from the value model decision
 
@@ -461,3 +653,50 @@ See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
   it and when a query parses it.
 - Ticket 21 removes the `file.day` name and its hybrid of filename and creation
   time. The persisted `FileMeta.day` still holds this hybrid.
+
+## Resolution and handoffs
+
+The answer above settles the design. These handoffs keep the open
+evidence and implementation work explicit.
+
+Alternatives considered: a dual path, a full in-memory load, whole-note
+records, and a core/text item split. Other options: selected-field
+indexes, scan-only tables, a held store handle, removing the trie, and
+debug-only order checks. See `research/24-prep/h1-stress-test-designs.md`
+and `research/24-prep/g-probe-results.md`.
+
+Invariant owners:
+
+- Index and store: a coherent generation, atomic facet writes, sound
+  candidate sets, and the path-order check at load and build boundaries.
+- Ticket 25: engine identity, format version and freshness fingerprint.
+- Ticket 26: row type, residual filter, pushdown protocol and membership.
+- Ticket 29: the persisted path form and root identity.
+- Ticket 30: host writer admission.
+- Ticket 31: how parser notices show.
+- Ticket 32: visibility of the index and store port.
+- Ticket 34: buffer overlay on a pinned generation.
+
+Remove the four multimap tables after implementation:
+`paths_by_tag`, `paths_by_file_class`, `tags_by_path` and `classes_by_path`.
+Remove the `SourceResolver` full-store read path, the partial
+`WorkspaceIndex`, and the split failure rules for read queries.
+
+Measure the generic field and task range-key layout, including write and
+replace costs, before implementation. Measure full row materialization
+on a real vault. Check Linux and Windows locking. A compact temporal
+encoding needs a measured read gain. Ticket 21 already removes the
+hybrid `FileMeta.day`. Ticket 20 keeps inline fields out of class axes.
+
+Change table (ticket 16): on a successful fresh-parse fallback, a held
+store query exits 0 rather than 1. The query prints one cache notice on
+stderr and keeps query results on stdout. The 1.8 s synthetic build
+included persistence, so it is not a measured fallback latency.
+The store layout and format version change within the Free envelope.
+
+Downstream tickets: 25 (freshness and format), 26 (plan and rows),
+28 (index-facing consumer), and 29 (path form). Also 30 (writer
+admission), 31 (notice display), 32 (visibility), and 34 (buffer overlay).
+
+Fog: keep `CandidateTrie` and `indextree`; split the store engine from the
+repository at the domain port; class axes stay frontmatter-only.
