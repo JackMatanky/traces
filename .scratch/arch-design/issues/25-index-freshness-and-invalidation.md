@@ -1,4 +1,4 @@
-# Does the landed freshness model stand: config drift, path-set change, parser/format version?
+# Does the landed index freshness model stand?
 
 Type: grilling
 Status: open
@@ -6,112 +6,183 @@ Blocked by: 5, 22, 24, 12
 
 ## Question
 
-Config drift detection **has landed** (main @ `207cc3fb`, merged after the map
-was charted; see `reverification.md`). Treat it as the "keep as is" baseline and
-decide whether the freshness model as a whole stands, and what completes it:
+The index must return the same results as a fresh parse of trusted files and
+config. Config drift detection landed at `207cc3fb`.
+Use that design as the keep-as-is baseline.
+Use [config ownership](./22-config-ownership-and-lifecycle.md) and
+[the index read model](./24-index-read-model-and-query-execution.md).
+Do not reopen their ownership or store-shape decisions.
 
-1. **Ratify or revise the landed drift design.** Inputs enumerated by
-exhaustively destructuring `ConfigDigests` into an index-owned
-`IndexFingerprint` (10 of 15 settings; `src/index/fingerprint.rs:158-201`),
-stored raw in the redb `meta` table (renamed from `cache_format`) in the same
-write transaction as the rows (`src/index/store.rs` `write_meta`,
-`read_files_and_fingerprint`), compared at every refresh; drift wins over
-staleness and heals by full in-memory rebuild reusing the plan's scan and store
-(`src/index/service.rs` `prepare_pass`, `Drifted` arm); unreadable fingerprint
-fails closed as `DriftCause::Unrecorded`; a failed heal is logged and retried
-next refresh. Alternatives to weigh against it: per-axis invalidation (only
-`class_field` touches the class axes; `tasks`/`frontmatter` need a reparse),
-whole-cache rebuild (landed), keep the old manual `traces index`.
+### A. Config drift
 
-2. **Parser/format-version policy.** The fingerprint covers config only.
-Persisted `Note` rows also depend on parser behaviour, guarded solely by the
-hand-bumped `META_VERSION = b"1"` (`src/index/store.rs:41`); a version mismatch
-wipes the store at `IndexStore::open`, not through `Drifted` as ADR-0009 text
-implies. [H] a parser change shipped without a manual bump serves stale `Note`
-rows. Decide whether a parser/schema identity enters the fingerprint or the
-version is derived.
+- Check the landed `IndexFingerprint` and the full rebuild on drift.
+- Compare the full rebuild with per-axis invalidation and manual
+  `traces index`.
+- Decide which invalidation granularity gives correct results for each
+  index-time input.
+- Keep `IndexPolicy::fingerprint()` as the only fingerprint source.
+  Ticket 22 decided this.
+- Include the effective ignore policy. A changed ignore set needs a rescan
+  and a rebuild.
+- Exclude `title`, `aliases` and the date keys that the index does not read.
+- Include a new config field only if an index-time read uses it.
+- Exclude the host time zone and schema files from the fingerprint.
+- Keep ticket 24's fresh-parse or validated-generation read fallback.
+  Decide how to avoid repeated rebuilds on an unwritable store.
 
-3. **Path-set change cliff.** Unchanged by the merge ([V]
-`reconcile`/`is_paths_unchanged`/`merge_refreshed_notes` untouched, now
-`src/index/refresh.rs:410,475,555`). `research/11` shows 97% of the cost is note
-deserialization, not link re-resolution; decide note caching/laziness vs
-accepting it. The inverted unresolved-stem index suggested by `research/05`
-attacks the wrong cost.
+The landed code builds the fingerprint from 10 of 15 `ConfigDigests`
+settings. It writes the fingerprint and rows in one redb transaction.
+See `src/index/fingerprint.rs:158-201` and `src/index/store.rs`.
+The drift check runs at each refresh. Drift has priority over file staleness.
+`src/index/service.rs` rebuilds on drift. An unreadable fingerprint produces
+`DriftCause::Unrecorded`.
 
-4. **Racy-timestamp guard.** [V] still absent: `delta.rs` untouched and no
-`racy` handling anywhere in `src/index`; a same-length edit within one mtime
-tick is missed (`service.rs` tests sleep to let mtime advance). Decide whether a
-content-hash fallback belongs in the model.
+Ticket 22 removes `ConfigDigests`. One exhaustive projection builds
+`IndexPolicy`. Do not retain the old probe that treats `title`, `aliases`
+and date keys as necessary fingerprint inputs.
 
-5. **Observability of heals.** [V] `RefreshReport` is only logged in production
-(`tracing::info!` for drift, `debug!` for file changes; count accessors are
-test-only). Decide whether a heal is user-visible (links to the host and
-error/diagnostic decisions).
+### B. Engine, parser and store format
 
-Facts: `docs/adr/0009-index-refresh.md` (status still `proposed`),
-`src/index/fingerprint.rs`, `src/index/refresh.rs`, `src/index/service.rs`,
-`src/index/store.rs`, `tests/e2e/index.rs`
-(`config_edit_heals_the_index_on_the_next_query`), `survey/index.md` H2/H3 (H3
-is what landed), `research/05`.
+- Decide how the fingerprint identifies the store engine and format.
+  Ticket 24 needs this identity.
+- Decide when stored facts, parser rules, value serialization or facets
+  invalidate the store.
+- Compare a manual `META_VERSION` bump, a derived version and a separate
+  parser identity.
+- Decide how a missing, unreadable or incompatible meta value triggers a
+  rebuild.
+- Rebuild the index once after an incompatible format change.
+- Keep the schema `[binding]` and `global` rules outside the store identity.
+  Queries resolve those rules at read time.
 
-Adversarial probes [H]: fingerprint is deliberately wider than consumed
-(`title`, `aliases`, date keys) so harmless edits trigger a full rebuild; a
-drift on a cold query blocks that query behind a full parse; an unwritable store
-re-heals on every query.
+Today `META_VERSION = b"1"` changes by hand (`src/index/store.rs:41`).
+`IndexStore::open` wipes the store after a version mismatch.
+It does not use the `Drifted` path that ADR-0009 describes.
+[H] A parser change without a version bump can serve stale facts.
+Tickets 18, 19 and 23 change stored values, civil dates and the `Note` shape.
+Ticket 24 changes the store to independent facets, task copies and secondary
+keys. These changes must invalidate old bytes, parser notices and derived
+keys.
 
-Measured (`research/11`): at 5k notes the path-change cliff is 97% note
-deserialization (18.5 ms) and 2.7% link re-resolution (0.5 ms).
+### C. Source freshness and crash recovery
 
-Inputs: `research/05`, `research/11` (#2), config-ownership decision (residual
-digest surface), read-model decision.
+- Detect same-size edits even when file size and mtime do not change.
+- Compare a racy-timestamp content check, a full content check and the
+  existing stat shortcut.
+- Define the scan and commit checks when a source file changes during a
+  refresh.
+- Decide how to check source freshness after a crash loses the last
+  `Durability::None` commit.
+- Check the format, policy and source freshness on reopen.
+  A matching fingerprint alone is insufficient.
+- Keep the source snapshot coherent with the committed facets and meta
+  values.
+- Treat a missing or corrupt required facet as a cache miss.
+  Ticket 24 decided this.
+- Use a fresh parse for a read query after a cache miss.
+  Make `traces index` fail closed.
 
-## Inputs from the value model decision
+The current delta has no racy-timestamp guard (`src/index/delta.rs`).
+The existing `service.rs` tests sleep to let mtime advance.
+Research 05 describes Git's guard for a file whose mtime reaches the index
+timestamp. IWE avoids needless mtime changes with `write_file_if_changed`
+(diwe v0.24.1). Do not rewrite unchanged source bytes to refresh a host
+view. Ticket 23 requires a full source-snapshot comparison at commit for a
+closed-file edit.
 
-See [ticket 18's Answer](./18-value-model.md). The runtime value's serde shape
-changes (`Number` becomes `Int`/`Float`, `Link` gains `embedded` and normalized
-display), so the cache format and parser version must invalidate existing
-indexes.
+### D. Store generations and concurrent policies
 
-## Inputs from the coercion and comparison decision
+- Apply ticket 24's writer-transaction check of the plan's base identity,
+  revision and fingerprint.
+- Discard the delta and replan or rebuild on a base mismatch.
+  Never retag rows from another policy.
+- Decide how a refresh checks source freshness before it publishes a new
+  generation.
+- Check the two-process store-open and lock behavior on Linux and Windows.
+- Decide which invariant controls workspaces with different policies
+  at one canonical root.
+- Leave host writer admission to
+  [the workspace-host ticket](./30-workspace-host-and-composition.md).
+- Leave canonical root identity to
+  [the path ticket](./29-path-and-capability-model.md).
 
-See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). The cache
-format change (civil datetimes, `Int`/`Float`, normalized `Link`) must
-invalidate existing indexes. A host zone change need not invalidate the index,
-since naive datetimes no longer embed it.
+Ticket 24 requires one read snapshot for candidates, facets and fingerprint
+validation. Its host reads a pinned immutable generation.
+Do not mix fresh rows with unverified store rows.
+Do not assume that a redb file lock enforces policy consistency.
+Leave open-buffer overlays and save/close transitions to
+[the buffer ticket](./34-live-buffer-and-persisted-index-consistency.md).
 
-## Inputs from the schema typing decision
+### E. Path-set change cost
 
-See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Schema
-files, including their class `[binding]` tables and the `global` layer, stay out
-of the fingerprint: bindings are expanded at query time.
+- Decide whether the facet split removes enough decoding cost on add,
+  delete and rename.
+- Compare on-demand facet reads, a host note cache and the remaining
+  full-decode path.
+- Decide whether to accept the remaining cost instead of adding a cache.
+- Measure assembled results and memory at the target vault sizes before
+  selecting an optimization.
+- Keep `CandidateTrie` and `indextree`, as ticket 24 decided.
 
-If a "notes changed since the last check" notice is adopted (20, agent
-guardrail), refresh already knows the changed set; a check watermark and the
-violation keys at the last check would live in a derived store outside the index
-and its fingerprint. Whether that store exists, and its cost, is open.
+Research 11 measured 18.5 ms of note deserialization on a 5,000-note path
+change. That is 97% of the measured work.
+Link re-resolution took 0.5 ms, or 2.7%.
+Ticket 24 replaces whole-note rows with facets. It keeps the trie for large
+same-stem candidate sets. The inverted unresolved-stem index from research
+05 targets link work, not the measured decoding cost.
 
-## Inputs from the IWE research
+### F. Heal visibility and check state
 
-See [research 12](../research/12-iwe-core-and-hosts-architecture.md). IWE has no
-staleness model for the CLI (it rebuilds); its servers feed `notify` events
-(poll fallback) into the live graph. Its CHANGELOGs add one invariant relevant
-to item 4: `write_file_if_changed` exists because a normalise pass that rewrote
-identical bytes touched every file's mtime (diwe v0.24.1) [V]. Any Traces write
-path that rewrites unchanged bytes would defeat an mtime-based delta, so "a host
-never rewrites unchanged content" belongs with the freshness model.
+- Decide if users see successful drift heals.
+- Keep ticket 24's single stderr cache notice for a fresh-parse fallback.
+- Decide how to report repeated failed heals without hiding a stale or
+  failed index.
+- Give notice presentation to
+  [the diagnostic ticket](./31-error-and-diagnostic-architecture.md).
+- Keep any check watermark and prior violation keys outside the index and
+  its fingerprint.
+- Leave the decision to create that optional check store to the check
+  and host owners.
 
-## Inputs from the execution-context decision
+Today production only logs `RefreshReport`: `tracing::info!` for drift and
+`debug!` for file changes. Count accessors are test-only.
+The cost of a drift heal has not been measured.
+A cold query can wait for a full rebuild [H].
+An unwritable store can repeat that work [H].
 
-See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
-Include effective ignore policy and any persisted filename-period parsing policy
-(recognized formats, week rules, bare-year opt-in) in the index-affecting
-fingerprint, or rederive those fields without relying on persisted parsed
-values. A host's entire policy identity is not the cache key: zone and schema
-changes do not rewrite stored civil note values or filename periods.
-Timestamp-derived civil `cdate`/`mdate` are computed in the pinned zone at
-evaluation, never persisted under a zone-free fingerprint. Preserve a coherent
-index generation per query, and decide how an index writer is admitted when two
-workspaces or processes address the same canonical root with differing policies.
-Do not assume a storage engine's file lock proves policy consistency without
-checking its semantics. Snapshot creation timestamps only when available; never
-substitute mtime for `cdate`.
+### Evidence and handoffs
+
+Read `docs/adr/0009-index-refresh.md`, `reverification.md`, `research/05`
+and `research/11`.
+Check `src/index/fingerprint.rs`, `src/index/refresh.rs`,
+`src/index/service.rs` and `src/index/store.rs`.
+Use `tests/e2e/index.rs`
+(`config_edit_heals_the_index_on_the_next_query`) as a behavior check.
+Do not treat ADR-0009 as unimplemented. It has landed and remains `proposed`.
+
+- [Ticket 18](./18-value-model.md) changes `Number` to `Int`/`Float`
+  and changes `Link` serialization.
+- [Ticket 19](./19-coercion-and-comparison-policy.md) stores naive
+  datetimes as civil values without a host zone.
+- [Ticket 20](./20-schema-note-typing-and-validation.md) keeps schema
+  binding and validation out of the index.
+- [Ticket 21](./21-ambient-environment-and-execution-context.md) keeps
+  zone-derived `cdate` and `mdate` out of persisted facts.
+- [Ticket 22](./22-config-ownership-and-lifecycle.md) owns the exhaustive
+  `IndexPolicy` projection and removes unused digests.
+- [Ticket 23](./23-note-document-model.md) requires a `META_VERSION`
+  change when stored `Note` facts change.
+- [Ticket 24](./24-index-read-model-and-query-execution.md) owns facet
+  atomicity, read snapshots and the writer base check.
+
+Ticket 24 derives filename periods at query time.
+Do not fingerprint filename-period parsing rules for fields the store
+does not persist. Persist source creation timestamps only when available.
+Never substitute mtime for `cdate`.
+If another persisted fact starts to use filename-period rules, include
+those rules in `IndexPolicy`.
+
+Record the alternatives, invariant owner, removable code, unresolved
+questions and downstream handoffs in the answer.
+Record each observable change in the specification's change table
+(ticket 16).
