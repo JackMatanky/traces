@@ -12,8 +12,8 @@
 
 ## Conventions (apply to every task)
 
-- **Order is load-bearing.** Execute tasks 1→17 exactly. Later tasks cite line numbers produced by earlier ones; `Task 6` deletes ~130 lines from `engine/date.rs` and `Task 10` rewrites `datetime.rs` regions, so **re-verify every line anchor by symbol name (grep) before editing**.
-- **Line numbers** below were captured on 2026-10-23 against a clean tree (only `.scratch/arch-design/**` is dirty; do **not** touch those three paths).
+- **Order is load-bearing.** Execute tasks 1→19 exactly. Later tasks cite line numbers produced by earlier ones; `Task 6` deletes ~130 lines from `engine/date.rs` and `Task 10` rewrites `datetime.rs` regions, so **re-verify every line anchor by symbol name (grep) before editing**.
+- **Line numbers** for tasks 1-17 were captured on 2026-10-23 against a clean tree (only `.scratch/arch-design/**` is dirty; do **not** touch those three paths); Part 2 (tasks 18-19) anchors were captured on 2026-10-28 against merged `main`.
 - **TDD:** write the failing test first, watch it fail, implement, watch it pass. Where a refactor is behavior-equivalent by construction, the plan says so and marks the pin (a new test or the existing tests that move with the code, green before and after) instead of a fake red (the note under the test says which it is).
 - **Gates:** end every task with `mise run verify` (runs `fmt`, then `check` + `lint --no-fix` + `test` in parallel; `check` includes `check:visibility`, which diffs both API baselines and the pub-token snapshot).
 - **Baseline regen** (visibility-changing tasks only; the regen form of the snapshot check at `mise.toml:143`, produces a sorted snapshot; expect exactly the listed line delta):
@@ -49,6 +49,8 @@
 | 15 | H1 | `src/template/engine/duration.rs` + `DurationOps` + `engine.rs` doc truth | +2 |
 | 16 | D | Doc-only fixes (X3, X7a-d, D5, GLOSSARY "seven", H5 nits, X1c) | none |
 | 17 | F1 | Query unit rejections quote the `UnitError` hint (dynamic `expected`) | none |
+| 18 | J1 | Confine `jiff` code to `src/temporal/`: engine swaps to temporal seams (`from_unix_seconds`, `now_instant`, `unix_seconds`, weekday `i64`, `parse_local_year`), wrapper deleted | +2 |
+| 19 | J2 | Strip `jiff` names from date-engine rustdoc prose (non-test) | none |
 
 **Accepted behavior changes** (each is pinned by a test in its task): case-insensitive `date.*` keys (superset, Task 2) · template zone/range messages adopt temporal `Display` wording (Task 13) · `[%Y]` renders literal `%Y`, unclosed `[…%` errors, the unclosed-bracket error precedes the token walk, and `UnclosedBracket`'s Display drops `moment-dialect` (Task 8) · runs longer than any real token now error instead of silently composing (Task 7) · zone resolution runs before pattern translation, so a range failure wins over an invalid pattern (Task 11) · a zone failure renders its `DateError` once instead of stacking two lookups (Task 12) · negative years render round-trippably from `Display`/`Serialize` (Task 10) · miette gains a `Caused by:` line for range errors (Task 13) · an unrenderable pattern's message gains `: <Jiff's reason>`, Jiff's error leaves the source chain, and the unreachable range edge behind sites 4-5 reports `DateError::OutOfRange` through `into_date_error` instead of `CalendarError::OutOfRange` (Task 14; see amendment 1) · query `date_add`/`date_diff` unit rejections quote the full unit hint instead of the static phrase (Task 17) · datetime parsing accepts sign+4-digit years such as `-0009-01-01T00:00:00Z` (Task 10; `Display`/`Serialize` stay four-digit zero-padded; see amendment 3).
 
@@ -64,10 +66,10 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 ## File map
 
-- Modify: `src/template/engine/date.rs` (tasks 1-9, 11-16), `src/template/engine.rs` (9, 15), `src/temporal/{date,datetime,point,unit,error,mod,duration}.rs`, `src/temporal/GLOSSARY.md` (16), `src/delimiter.rs` (8), `src/lexer.rs` (17), `src/query/grammar/filter.rs` (5, 17), `src/query/error.rs` (17), `src/lib.rs` (3)
+- Modify: `src/template/engine/date.rs` (tasks 1-9, 11-16, 18-19), `src/template/engine.rs` (9, 15), `src/temporal/{date,datetime,point,unit,error,mod,duration}.rs`, `src/temporal/GLOSSARY.md` (16), `src/delimiter.rs` (8), `src/lexer.rs` (17), `src/query/grammar/filter.rs` (5, 17), `src/query/error.rs` (17), `src/lib.rs` (3)
 - Create: `src/temporal/token.rs` (6, modified in 7, 8), `src/temporal/fmt.rs` (10), `src/template/engine/duration.rs` (15)
 - Docs: `.scratch/temporal-core/{spec.md,review.md,divergence-register.md}`, `.scratch/temporal-core/issues/05-query-temporal-functions.md`, `.scratch/temporal-core/issues/06-template-format-dialects.md` (16)
-- Baselines: `tests/baselines/pub-tokens.txt` (+1, +2, +3, −1, +3, +1, +2, +1, +2 for tasks 1, 3, 4, 5, 6, 8, 10, 14, 15; tasks 9, 11, 12, 13 regen with zero net change), `tests/baselines/public-api-default.txt` (14 only), `tests/baselines/public-api-test-utils.txt` (14 only)
+- Baselines: `tests/baselines/pub-tokens.txt` (+1, +2, +3, −1, +3, +1, +2, +1, +2, +2 for tasks 1, 3, 4, 5, 6, 8, 10, 14, 15, 18; tasks 9, 11, 12, 13 regen with zero net change), `tests/baselines/public-api-default.txt` (14 only), `tests/baselines/public-api-test-utils.txt` (14 only)
 
 ---
 
@@ -5436,4 +5438,354 @@ Everything else, including both red tests' intent, is unchanged.
   ```
   git add src/lexer.rs src/query/error.rs src/query/grammar/filter.rs
   git commit -m "feat(query): quote the full unit hint in filter unit rejections"
+  ```
+
+---
+
+## Part 2: Jiff confinement (2026-10-28)
+
+**Context (part-level):** Tasks 1-17 moved every calendar decision behind `src/temporal/` seams, but the engine still *names* jiff: eight executable sites and twelve rustdoc lines in `src/template/engine/date.rs` carry `jiff`/`Jiff` tokens. Part 2 removes every one of them, so a future refactor cannot drift back into date internals by copying an engine line, and the boundary "no `jiff` outside `src/temporal/`" becomes checkable with one grep. Part 2 runs on merged `main` (the `temporal-offload` branch is merged and deleted).
+
+**Scope:** IN: all of `src/` except `src/temporal/` and except `#[cfg(test)]` regions (raw-jiff oracles are deliberate; Task 4 pinned that independence). OUT: `.scratch/**`, `docs/**`, the `jiff = "=0.2.38"` pin in `Cargo.toml`, and everything inside `src/temporal/` including `src/temporal/GLOSSARY.md`. Anchors below were captured 2026-10-28 on merged `main`; re-verify each by symbol or content before editing.
+
+**Boundary enforcement is execution-time only:** each task ends with a grep whose Expected state is stated inline. There is no committed boundary test and no ADR: once the grep comes back clean, the property is self-evident in the tree.
+
+**Inventory at capture (all in `src/template/engine/date.rs`):** code: `jiff::Timestamp::new` (:154), `Weekday(jiff::civil::Weekday)` (:226), `weekday_or_error` (:344), `parse_local_datetime` (:420), the `pattern_to_strftime` wrapper's parameter (:477), `.map(jiff::Timestamp::as_second)` (:498), `jiff::Timestamp::now` (:828, :845); prose: twelve `///` lines (:435, :439, :551, :580, :613, :636, :651, :667, :681, :697, :711, :860).
+
+**Design notes (researched 2026-10-28):**
+
+- **Range parity.** jiff's `Timestamp::new(secs, 0)` and `Timestamp::from_second(secs)` both reduce to `UnixEpochSeconds::checkc(secs)` plus `new_unchecked(secs, 0)`; the nanosecond-balancing and minimum-guard branches are unreachable at nanos = 0, so `DateTimeValue::from_unix_seconds` accepts exactly the range `Timestamp::new(unix_ts, 0)` accepted. The engine keeps its message byte-identical via `invalid_operation` (the shape every other error map in this file already uses); the `DateError` joins the source chain, so miette gains a `Caused by:` line on this path, the same class of change Task 13 accepted for range failures. The only pin is `rejects_a_timestamp_out_of_range_instead_of_panicking`, which asserts `ErrorKind::InvalidOperation` only. The chain-discarding `Error::new` alternative was rejected: it would preserve the chain byte-for-byte but breaks this file's source-preserving convention.
+- **Weekday.** `Anchor::Weekday` stores a validated `i64`; no `src/temporal/` signature changes (the typed-enum alternative was rejected earlier: about 40-50 lines of temporal churn for the same confinement). `weekday_or_error` is deleted; `weekday_index_error` carries the identical message; each application site validates exactly once through `weekday_from_number`. Observable delta, unpinned: when a shorthand `date.weekday(n, ...)` call has *other* invalid arguments too, the reference/kwargs error now precedes the weekday-index error; single-invalid inputs are unchanged and no test pins multi-error precedence.
+- **Wrapper.** The `pattern_to_strftime` wrapper is deleted, not re-signed: its parameter type *is* the jiff type. `crate::temporal::pattern_to_strftime` is imported instead, each of the three call sites inlines the one-line error map the wrapper held, and the `format_bindings_never_emit_percent_plus` test compiles unchanged through the import.
+- **Closure trap at :498.** `.map(|ts| ts.as_second())` is not an option: `lint` runs with `-D warnings` over pedantic (`Cargo.toml:180`), and its default fix registry contains `redundant_closure_for_method_calls`, so a fix run would rewrite the closure back onto a `jiff::` path. A `DatePoint::unix_seconds()` accessor is added instead (`.map(Timestamp::as_second)` path form, matching `point.rs:283` style).
+- **Clock reads.** `now_instant()` sits beside `DateTimeValue::now()` and returns the raw instant, so `is_past`/`is_future` keep their nanosecond-exact comparison; second truncation would change sub-second results.
+- **Baselines.** pub-tokens +2 (`now_instant`, `unix_seconds`); both public-api baselines unchanged (every new item is `pub(crate)`); zero test files edited; zero message or `ErrorKind` changes.
+
+**Pins (existing tests, green before and after, no fake red):** `rejects_a_timestamp_out_of_range_instead_of_panicking`, `converts_a_piped_date_to_unix_seconds`, temporal `constructs_unix_seconds_at_both_supported_edges` and `rejects_unix_seconds_one_past_each_supported_edge` (pin the seam's range edges), `template_weekday_rejects_out_of_range_day_index` (integration), `returns_the_iso_weekday_number`, `format_bindings_never_emit_percent_plus`, temporal `in_leap_year` cases, `a_far_past_date_is_past_but_not_future`, `a_far_future_date_is_future_but_not_past`, `current_timestamp_is_neither_past_nor_future`.
+
+---
+
+### Task 18 (J1): Confine `jiff` code to `src/temporal/`
+
+**Files:**
+- Modify: `src/temporal/datetime.rs` (insert `now_instant` after `now()`, which ends at :121)
+- Modify: `src/temporal/point.rs` (insert `unix_seconds` after `instant()`, which ends at :287)
+- Modify: `src/temporal/mod.rs` (line 50 re-export)
+- Modify: `src/template/engine/date.rs` (import list :46-53; code at :138, :153-162, :226, :265-267, :323, :343-354, :411-424, :459, :463-481 delete, :495-499, :746, :828, :845; doc links at :22, :852, :860; call at :866)
+- Baseline: `tests/baselines/pub-tokens.txt` (+2)
+
+**Context:** The engine swaps each jiff touchpoint for the temporal seam proven in the part-level notes: `from_unix_seconds`, `now_instant`, `unix_seconds`, a validated `i64` weekday, and `parse_local_year`. Behavior-equivalent by construction, pinned by the existing suite listed above; no new tests. The task ends with the execution-time boundary grep (code state), the pub-token regen, and the full gate.
+
+- [ ] **Step 1: Add the two temporal seams**
+
+  In `src/temporal/datetime.rs`, insert immediately after `now()` (the method whose body ends at :121):
+
+  ```rust
+      /// Reads the raw current instant from the system clock.
+      #[inline]
+      pub(crate) fn now_instant() -> Timestamp {
+          Timestamp::now()
+      }
+  ```
+
+  In `src/temporal/mod.rs`, replace line 50 `pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;` with:
+
+  ```rust
+  pub(crate) use datetime::{DEFAULT_DATETIME_PATTERN, now_instant};
+  ```
+
+  In `src/temporal/point.rs`, insert immediately after `instant()` (the method whose body ends at :287):
+
+  ```rust
+      /// Returns this point's instant as Unix epoch seconds.
+      ///
+      /// # Errors
+      ///
+      /// - [`CalendarError::OutOfRange`] if converting this point to an instant
+      ///   exceeds the supported range.
+      pub(crate) fn unix_seconds(self) -> Result<i64, CalendarError> {
+          self.instant().map(Timestamp::as_second)
+      }
+  ```
+
+- [ ] **Step 2: Import the temporal pattern translator in the engine**
+
+  In `src/template/engine/date.rs`, add `pattern_to_strftime,` to the `crate::temporal::{...}` use list (:48-52), between `PeriodEdge,` and `resolve_period_edge,`:
+
+  ```rust
+          CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
+          DateUnit, DateValue, PeriodEdge, pattern_to_strftime,
+          resolve_period_edge, weekday_from_number,
+  ```
+
+  `cargo fmt` may reflow the list; only the added name matters.
+
+- [ ] **Step 3: Swap the `from_timestamp` construction**
+
+  In `src/template/engine/date.rs`, replace the block from `let timestamp =` through the `})?;` (:153-159) and the `DatePoint::from(...)` line (:162). Before:
+
+  ```rust
+                      let timestamp =
+                          jiff::Timestamp::new(unix_ts, 0).map_err(|_| {
+                              Error::new(
+                                  ErrorKind::InvalidOperation,
+                                  format!("timestamp {unix_ts} is out of range"),
+                              )
+                          })?;
+                      let zone = crate::temporal::local_zone()
+                          .map_err(render_date_error)?;
+                      DatePoint::from(DateTimeValue::from_timestamp(timestamp))
+                          .format_in(format, &zone)
+                          .map_err(render_date_error)
+  ```
+
+  After:
+
+  ```rust
+                      let value = DateTimeValue::from_unix_seconds(unix_ts)
+                          .map_err(|source| {
+                              invalid_operation(
+                                  format!("timestamp {unix_ts} is out of range"),
+                                  source,
+                              )
+                          })?;
+                      let zone = crate::temporal::local_zone()
+                          .map_err(render_date_error)?;
+                      DatePoint::from(value)
+                          .format_in(format, &zone)
+                          .map_err(render_date_error)
+  ```
+
+  The message string stays byte-identical; only the source chain gains the `DateError`.
+
+- [ ] **Step 4: Store the weekday as a validated `i64`**
+
+  Four edits in `src/template/engine/date.rs`:
+
+  1. In `enum Anchor` (:226), replace `Weekday(jiff::civil::Weekday),` with `Weekday(i64),`.
+  2. Replace `weekday_or_error` (:343-354, doc line plus whole function) with:
+
+     ```rust
+     /// Builds the error for a weekday number outside `1..=7`.
+     fn weekday_index_error(n: i64) -> Error {
+         Error::new(
+             ErrorKind::InvalidOperation,
+             format!(
+                 "weekday index {n} is out of range (expected 1..=7, Monday = \
+                  1 through Sunday = 7)"
+             ),
+         )
+     }
+     ```
+
+  3. In the `date.weekday` shorthand (:138-139), replace:
+
+     ```rust
+                     let target = weekday_or_error(n)?;
+                     Anchor::Weekday(target).render(
+     ```
+
+     with:
+
+     ```rust
+                     Anchor::Weekday(n).render(
+     ```
+
+     and in `Anchor::transform` (:265-267), replace:
+
+     ```rust
+                 Self::Weekday(target) => date_point
+                     .with_weekday(target, &zone()?)
+                     .map_err(render_calendar_error),
+     ```
+
+     with:
+
+     ```rust
+                 Self::Weekday(target) => {
+                     let target_weekday = weekday_from_number(target)
+                         .ok_or_else(|| weekday_index_error(target))?;
+                     date_point
+                         .with_weekday(target_weekday, &zone()?)
+                         .map_err(render_calendar_error)
+                 }
+     ```
+
+  4. In the `weekday` filter (:746), replace `let target_weekday = weekday_or_error(target_num)?;` with:
+
+     ```rust
+             let target_weekday = weekday_from_number(target_num)
+                 .ok_or_else(|| weekday_index_error(target_num))?;
+     ```
+
+  The error message text is unchanged; `weekday_from_number` is already imported (:51).
+
+- [ ] **Step 5: Rename `parse_local_datetime` to `parse_local_year`**
+
+  In `src/template/engine/date.rs`:
+
+  1. Replace the function and its doc (:411-424). Before:
+
+     ```rust
+     /// The shared date/time string parser for filters that work on the human clock
+     /// time (`date_format`, `weekday`, `is_leap_year`); instant-facing filters
+     /// parse via [`parse_date_point`] directly.
+     ///
+     /// # Errors
+     ///
+     /// Returns a [`minijinja::Error`] with kind
+     /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+     /// `s` is not a parseable date or datetime string.
+     fn parse_local_datetime(s: &str) -> Result<jiff::civil::DateTime, Error> {
+         let point = parse_date_point(s)?;
+         let zone = crate::temporal::local_zone().map_err(render_date_error)?;
+         Ok(point.local_datetime_in(&zone))
+     }
+     ```
+
+     After:
+
+     ```rust
+     /// Extracts the calendar year of `s` resolved in the reader's local zone.
+     ///
+     /// # Errors
+     ///
+     /// Returns a [`minijinja::Error`] with kind
+     /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+     /// `s` is not a parseable date or datetime string.
+     fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
+         let point = parse_date_point(s)?;
+         let zone = crate::temporal::local_zone().map_err(render_date_error)?;
+         Ok(i32::from(point.local_datetime_in(&zone).year()))
+     }
+     ```
+
+  2. In `is_leap_year` (:866), replace `i32::from(parse_local_datetime(s)?.year())` with `parse_local_year(s)?`.
+  3. Fix the three doc links: module header :22 `[`parse_local_datetime`]` becomes `[`parse_date_point`]` (it describes the funnel every parse takes); `is_leap_year` docs :852 and :860 `[`parse_local_datetime`]` become `[`parse_local_year`]`. Leave the words `Jiff-supported` at :860 for Task 19.
+
+- [ ] **Step 6: Delete the wrapper and inline its error map**
+
+  In `src/template/engine/date.rs`:
+
+  1. Delete the wrapper's doc comment and function, :463-481 (from `/// Translates `pattern` to a strftime pattern.` through the closing brace of `fn pattern_to_strftime`).
+  2. Replace each of the three call sites. The two `let pat = ...` lines (:323 and :753, identical text, indent 8) become:
+
+     ```rust
+             let pat = pattern_to_strftime(format, local_datetime)
+                 .map_err(|source| invalid_operation(source.to_string(), source))?;
+     ```
+
+     The `let translated = ...` line (:459, indent 4) becomes:
+
+     ```rust
+         let translated = pattern_to_strftime(pattern, datetime)
+             .map_err(|source| invalid_operation(source.to_string(), source))?;
+     ```
+
+  3. The test `format_bindings_never_emit_percent_plus` (:1653) needs no edit: `use super::*` picks up the Step 2 import.
+
+- [ ] **Step 7: Route `timestamp()` through `unix_seconds`**
+
+  Replace the body of `fn timestamp` (:495-499). Before:
+
+  ```rust
+  fn timestamp(value: &str) -> TemplateEngineResult<i64> {
+      parse_date_point(value)?
+          .instant()
+          .map(jiff::Timestamp::as_second)
+          .map_err(render_calendar_error)
+  }
+  ```
+
+  After:
+
+  ```rust
+  fn timestamp(value: &str) -> TemplateEngineResult<i64> {
+      parse_date_point(value)?
+          .unix_seconds()
+          .map_err(render_calendar_error)
+  }
+  ```
+
+- [ ] **Step 8: Read the clock through `now_instant`**
+
+  In `is_past` (:828), replace `Ok(instant < jiff::Timestamp::now())` with `Ok(instant < crate::temporal::now_instant())`. In `is_future` (:845), replace `Ok(instant > jiff::Timestamp::now())` with `Ok(instant > crate::temporal::now_instant())`. Keep the `// Instant comparison, not point construction` comments.
+
+- [ ] **Step 9: Run the boundary grep (code state)**
+
+  Run: `rg -n "jiff|Jiff" src/ --glob '!src/temporal/**'`
+
+  Expected: every remaining hit is either a `///` prose line in `src/template/engine/date.rs` (twelve of them, cleared by Task 19) or a line after that file's `#[cfg(test)]`. No executable code outside the test region names `jiff`.
+
+- [ ] **Step 10: Run the affected suites**
+
+  Run: `mise run test:unit rejects_a_timestamp`: PASS (kind pin on the swapped constructor).
+  Run: `mise run test:unit unix_seconds`: PASS (engine filter + temporal edge pins).
+  Run: `mise run test:unit weekday`: PASS (shorthand, filter, and integration paths).
+  Run: `mise run test:unit format_bindings`: PASS (wrapper call site via the import).
+  Run: `mise run test:unit past`: PASS (`is_past`/`is_future`).
+  Run: `mise run test:unit in_leap_year`: PASS (`parse_local_year` path).
+
+- [ ] **Step 11: Regen the pub-token snapshot and run the full gate**
+
+  Run the regen command from Conventions. Expected: exactly two added lines (`now_instant`, `unix_seconds`) and one rewritten line (the `pub(crate) use datetime::...` entry); nothing removed.
+
+  Run: `mise run verify`
+  Expected: green (fmt, `check:visibility` against the regened snapshot, lint with `-D warnings`, full test suite).
+
+- [ ] **Step 12: Commit**
+
+  ```
+  git add src/template/engine/date.rs src/temporal/datetime.rs src/temporal/point.rs src/temporal/mod.rs tests/baselines/pub-tokens.txt
+  git commit -m "refactor(template): remove direct jiff usage from the date engine"
+  ```
+
+---
+
+### Task 19 (J2): Strip `jiff` names from date-engine prose
+
+**Files:**
+- Modify: `src/template/engine/date.rs` (twelve `///` lines)
+
+**Context:** After Task 18 the engine's executable code is jiff-free, but twelve rustdoc lines still say `Jiff`/`jiff`. This task rewords them so the boundary grep comes back with test-region hits only. The edits touch prose, not links: `[`fmt::strtime`]` keeps its brackets and target, only the word in front of it goes, so link resolution (and the green `mise run doc` status quo) is untouched. Enforcement stays execution-time: inventory grep in, boundary grep out, no committed test.
+
+- [ ] **Step 1: Inventory the prose**
+
+  Run: `rg -n "jiff|Jiff" src/ --glob '!src/temporal/**'`
+
+  Expected: twelve `///` hits, all in `src/template/engine/date.rs`, matching these content anchors (line numbers have shifted since capture): `Jiff [`fmt::strtime`]`, `jiff counts the sign`, `overflows Jiff's representable` (2 hits), `exceeds the Jiff representable` (7 hits), `Jiff-supported`, plus the test-region hits from Task 18.
+
+- [ ] **Step 2: Apply the replacements**
+
+  In `src/template/engine/date.rs`, apply these five replacements (counts include the test-region-free inventory above; use replace-all for the multi-hit anchors):
+
+  | # | Find | Replace | Hits |
+  |---|------|---------|------|
+  | A | `Jiff [`fmt::strtime`]` | `[`fmt::strtime`]` | 1 |
+  | B | `jiff counts the sign` | `strtime counts the sign` | 1 |
+  | C | `overflows Jiff's representable` | `overflows the representable` | 2 |
+  | D | `exceeds the Jiff representable` | `exceeds the representable` | 7 |
+  | E | `Jiff-supported` | `representable` | 1 |
+
+  Read each edited line after the change: the sentences must still parse (for E the line break before `civil-date range.` stays, yielding `outside the representable` + `civil-date range.`).
+
+- [ ] **Step 3: Re-run the boundary grep**
+
+  Run: `rg -n "jiff|Jiff" src/ --glob '!src/temporal/**'`
+
+  Expected: every remaining hit lies after `#[cfg(test)]` in `src/template/engine/date.rs`; no other file outside `src/temporal/` has a hit.
+
+- [ ] **Step 4: Run the doc gate and the full gate**
+
+  Run: `mise run doc`
+  Expected: clean (`RUSTDOCFLAGS=-D warnings`; no broken intra-doc links from the reworded lines).
+
+  Run: `mise run verify`
+  Expected: green.
+
+- [ ] **Step 5: Commit**
+
+  ```
+  git add src/template/engine/date.rs
+  git commit -m "docs(template): drop jiff names from date engine prose"
   ```
