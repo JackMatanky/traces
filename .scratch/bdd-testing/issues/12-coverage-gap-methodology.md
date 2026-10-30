@@ -1,7 +1,7 @@
 # 12: Coverage-gap methodology
 
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: 08
 
 ## Question
@@ -50,3 +50,12 @@ goal).
 
 **Answer records**: the coverage definition, the gap-detection procedure, the
 quality rubric, the anti-metrics list, and the contradiction dispositions.
+
+## Comments
+
+- 2026-10-29: Pre-grilling research dossier consolidated from five parallel
+  subagent passes (machinery survey, contradiction verification, and external
+  best-practices reviews): [research/12-coverage-gap-methodology.md](../research/12-coverage-gap-methodology.md).
+  Section 0 maps the evidence to decisions (a)-(f) and lists the open
+  empirical questions. Status stays `claimed`; the grilling itself has not
+  been held.
