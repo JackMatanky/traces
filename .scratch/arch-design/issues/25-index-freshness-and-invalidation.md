@@ -54,6 +54,9 @@ and date keys as necessary fingerprint inputs.
 - Rebuild the index once after an incompatible format change.
 - Keep the schema `[binding]` and `global` rules outside the store identity.
   Queries resolve those rules at read time.
+- If an engine uses a different cache filename, exclude that file from
+  the source scan. Today the scan excludes only `.traces/index.redb`.
+  Check how the new engine handles an old engine's unreadable bytes.
 
 Today `META_VERSION = b"1"` changes by hand (`src/index/store.rs:41`).
 `IndexStore::open` wipes the store after a version mismatch.
@@ -69,6 +72,9 @@ keys.
 - Detect same-size edits even when file size and mtime do not change.
 - Compare a racy-timestamp content check, a full content check and the
   existing stat shortcut.
+- Compare Markdown content where parsing supplies stored facts.
+  Check path membership and query-relevant metadata for all scanned files.
+  Do not hash attachments that supply no parsed facts.
 - Define the scan and commit checks when a source file changes during a
   refresh.
 - Decide how to check source freshness after a crash loses the last
@@ -122,6 +128,8 @@ Leave open-buffer overlays and save/close transitions to
 - Decide whether to accept the remaining cost instead of adding a cache.
 - Measure assembled results and memory at the target vault sizes before
   selecting an optimization.
+- Distinguish facet scans from assembled `QueryService` results.
+  The earlier 50,000-note facet probe did not build result rows.
 - Keep `CandidateTrie` and `indextree`, as ticket 24 decided.
 
 Research 11 measured 18.5 ms of note deserialization on a 5,000-note path
@@ -158,6 +166,7 @@ Check `src/index/fingerprint.rs`, `src/index/refresh.rs`,
 `src/index/service.rs` and `src/index/store.rs`.
 Use `tests/e2e/index.rs`
 (`config_edit_heals_the_index_on_the_next_query`) as a behavior check.
+Preparatory research: [Index freshness evidence and open proof](../research/25-index-freshness-prep.md).
 Do not treat ADR-0009 as unimplemented. It has landed and remains `proposed`.
 
 - [Ticket 18](./18-value-model.md) changes `Number` to `Int`/`Float`
