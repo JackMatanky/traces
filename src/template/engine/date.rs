@@ -222,6 +222,9 @@ enum Anchor {
     Yesterday,
     StartOf(CalendarPeriod),
     EndOf(CalendarPeriod),
+    /// Moves to the ISO weekday `n` (`1..=7`, Monday = 1); each
+    /// application site validates `n` through `weekday_from_number`
+    /// before rendering, so an index error surfaces there.
     Weekday(i64),
 }
 
