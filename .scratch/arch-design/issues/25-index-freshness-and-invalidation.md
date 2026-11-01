@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 5, 22, 24, 12
+Blocked by: 5, 22, 24, 12, 37
 
 ## Question
 
@@ -195,3 +195,44 @@ Record the alternatives, invariant owner, removable code, unresolved
 questions and downstream handoffs in the answer.
 Record each observable change in the specification's change table
 (ticket 16).
+
+## Comments
+
+### Grilling round: freshness and recovery
+
+These answers are provisional. Do not resolve this ticket before the journal
+measurement.
+
+- Use per-axis repair only when every dependent facet and key has a complete,
+  atomic rewrite. Otherwise, rebuild.
+- Rescan and rebuild after an ignore-policy change.
+- Keep `IndexPolicy::fingerprint()` as the policy fingerprint source.
+- Use one explicit application-format version for parser facts,
+  serialization, facets and derived keys.
+- Keep the engine identity separate from the policy fingerprint.
+  Use one cache file per engine.
+- Exclude every recognized engine cache file from source scans.
+- Compare parsed Markdown content even when size and mtime match.
+- Compare path membership and query-relevant metadata for all scanned files.
+  Do not hash attachment content without parsed facts.
+- Check the complete source snapshot before commit and before each host query.
+- Do not claim an atomic filesystem snapshot while external editors write files.
+- Validate the format, policy, required facets and source snapshot on reopen.
+- Keep one policy-bound disk generation per canonical root.
+  Do not retag rows from another policy.
+- Repair class keys from stored frontmatter only when that source is complete.
+  Reparse notes for parser-dependent policy changes.
+- Recheck the store incarnation and revision after an uncertain commit result.
+- Use fresh parsing or a revalidated host generation after a cache failure.
+  Make `traces index` fail closed.
+- Do not add a host note cache before assembled-query and memory measurements.
+- Keep successful automatic heals quiet.
+  Give one stderr notice for each read fallback.
+- Keep the current host failure state visible.
+  Leave notice presentation to the diagnostic ticket.
+
+The durable recovery journal remains open. Measure it in
+[What does a durable index repair journal cost and
+save?](./37-measure-index-recovery-journal.md).
+Compare it with a validated incremental replan and an in-memory host retry
+before deciding.
