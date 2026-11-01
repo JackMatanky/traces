@@ -299,6 +299,10 @@ impl DateTimeValue {
 }
 
 /// Reads the raw current instant from the system clock.
+///
+/// Sits beside [`DateTimeValue::now`] for instant-to-instant comparisons
+/// (`is_past`/`is_future` in the template engine): no zone or calendar
+/// value is constructed, and the comparison stays nanosecond-exact.
 #[inline]
 pub(crate) fn now_instant() -> Timestamp {
     Timestamp::now()

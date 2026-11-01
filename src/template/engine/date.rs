@@ -222,6 +222,9 @@ enum Anchor {
     Yesterday,
     StartOf(CalendarPeriod),
     EndOf(CalendarPeriod),
+    /// Moves to the ISO weekday `n` (`1..=7`, Monday = 1); each
+    /// application site validates `n` through `weekday_from_number`
+    /// before rendering, so an index error surfaces there.
     Weekday(i64),
 }
 
@@ -432,11 +435,11 @@ fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
 /// `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`). Bracket literals like `[Daily]`
 /// render as literal text in both dialects.
 ///
-/// Jiff [`fmt::strtime`] formats a zoned date-time, so `%Z` reflects the
+/// [`fmt::strtime`] formats a zoned date-time, so `%Z` reflects the
 /// resolved local zone even on either side of a DST fold. Leap seconds are
 /// not representable. Week numbers use ISO `%V`/`%G`, never `%U` or `%W`.
 ///
-/// Explicit `%Y` is display-only for negative years: jiff counts the sign
+/// Explicit `%Y` is display-only for negative years: strtime counts the sign
 /// inside the four-digit width, so year `-9` renders as `-009`, which the
 /// crate's four-digit-year rule rejects on reparse. The canonical
 /// round-trip forms (`%Y-%m-%d`, `%Y-%m`, `%F`, and the canonical datetime
@@ -526,7 +529,7 @@ fn render_period_edge(
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// `value` is not a parseable date/time string, `unit` is not an accepted unit
-/// name, or the shift overflows Jiff's representable range.
+/// name, or the shift overflows the representable range.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -555,7 +558,7 @@ fn date_add(
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
 /// `value` is not a parseable date/time string, `unit` is not an accepted unit
-/// name, `n` is [`i64::MIN`], or the shift overflows Jiff's representable
+/// name, `n` is [`i64::MIN`], or the shift overflows the representable
 /// range.
 #[expect(
     clippy::needless_pass_by_value,
@@ -588,7 +591,7 @@ fn date_sub(
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or the shift exceeds the Jiff representable range
+/// `value` is not parseable or the shift exceeds the representable range
 /// (see the calendar error mapping).
 fn shift_by_unit(
     value: &str,
@@ -611,7 +614,7 @@ fn shift_by_unit(
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the Jiff representable
+/// `value` is not parseable or arithmetic exceeds the representable
 /// range.
 fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
@@ -626,7 +629,7 @@ fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the Jiff representable
+/// `value` is not parseable or arithmetic exceeds the representable
 /// range.
 fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
@@ -642,7 +645,7 @@ fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the Jiff representable
+/// `value` is not parseable or arithmetic exceeds the representable
 /// range.
 fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, i64::from(n), TimeUnit::Month)
@@ -656,7 +659,7 @@ fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the Jiff representable
+/// `value` is not parseable or arithmetic exceeds the representable
 /// range.
 fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
@@ -672,7 +675,7 @@ fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the Jiff representable
+/// `value` is not parseable or arithmetic exceeds the representable
 /// range.
 fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, i64::from(n), TimeUnit::Year)
@@ -686,7 +689,7 @@ fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 ///
 /// Returns a [`minijinja::Error`] with kind
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the Jiff representable
+/// `value` is not parseable or arithmetic exceeds the representable
 /// range.
 fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
@@ -837,7 +840,7 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
 /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) (via
 /// [`leap_year_input_error`]) if `value` is neither an integer year
 /// representable as [`i32`] nor a parseable date/time string (see
-/// [`parse_local_year`]), or if the year is outside the Jiff-supported
+/// [`parse_local_year`]), or if the year is outside the representable
 /// civil-date range.
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
     let year = if let Some(year) = value.as_i64() {
