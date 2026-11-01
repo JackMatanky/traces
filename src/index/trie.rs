@@ -1,11 +1,11 @@
 //! Resolves nearest-candidate files for wikilink basenames based on folder
 //! distance.
 //!
-//! [`BaseNameIndex`] selects a [`ResolutionType`] once in
-//! [`BaseNameIndex::build`] — a linear scan below [`TRIE_THRESHOLD`]
-//! candidates, a folder trie at or above it — and answers nearest-by-folder-
-//! distance queries through [`BaseNameIndex::nearest`]. Equidistant nearest
-//! candidates resolve to `None`.
+//! [`BaseNameIndex::build`] selects a [`ResolutionType`] once for each
+//! basename. It uses a linear scan below [`TRIE_THRESHOLD`] candidates and a
+//! folder trie at or above the threshold. [`BaseNameIndex::nearest`] returns
+//! the nearest candidate by folder distance. It returns `None` when candidates
+//! tie.
 
 use std::path::Path;
 
@@ -14,21 +14,18 @@ use rustc_hash::FxHashMap;
 
 use crate::path::FolderRef;
 
-/// Dispatches per-basename candidate lookups to either a flat scan or a folder
-/// trie.
+/// Selects a flat scan or folder trie for each basename lookup.
 ///
-/// Opaque over its [`ResolutionType`]: callers see one query surface and
-/// never the representation.
+/// Callers use one query method and do not see the selected representation.
 pub(super) struct BaseNameIndex<'a>(ResolutionType<'a>);
 
-/// Represents the candidate-count strategy selected once at
-/// [`BaseNameIndex::build`].
+/// Holds the strategy that [`BaseNameIndex::build`] selects by candidate count.
 enum ResolutionType<'a> {
     Flat(Vec<&'a Path>),
     Trie(Box<CandidateTrie<'a>>),
 }
 
-/// Defines the candidate count at which [`BaseNameIndex::build`] switches to
+/// Sets the candidate count at which [`BaseNameIndex::build`] selects
 /// [`CandidateTrie`].
 pub(super) const TRIE_THRESHOLD: usize = 64;
 
@@ -95,12 +92,12 @@ impl<'a> BaseNameIndex<'a> {
     }
 }
 
-/// Implements a folder-component trie for one wikilink basename's candidates.
+/// Indexes candidates for one Wikilink basename by folder.
 ///
-/// Answers nearest-candidate queries in `O(depth(from))` by precomputing each
-/// folder's nearest same-basename candidate inside its subtree. The trie's
-/// lifetime and mutability shape keeps [`super::inlinks::InlinkMap::new`]'s
-/// parallel path `Sync`.
+/// Precomputes each folder's nearest same-basename candidate in its subtree.
+/// This supports nearest-candidate queries in `O(depth(from))`. Its lifetime
+/// and mutability keep the parallel path in [`super::inlinks::InlinkMap::new`]
+/// `Sync`.
 struct CandidateTrie<'a> {
     arena: Arena<TrieNode<'a>>,
     by_folder: FxHashMap<&'a Path, NodeId>,
@@ -139,9 +136,8 @@ impl<'a> CandidateTrie<'a> {
     ) -> Option<&'a Path> {
         let from_folder = FolderRef::of(from).as_path();
 
-        // Walk from `from`'s folder to the nearest trie node. `extra_up` counts
-        // skipped source-only folders; the linking note's folder is rarely a
-        // candidate folder.
+        // Find the nearest trie node above `from`'s folder. `extra_up` counts
+        // skipped folders. A linking note's folder rarely contains a candidate.
         let mut extra_up = 0_usize;
         let mut probe = from_folder;
         let start_node = loop {
@@ -222,11 +218,11 @@ impl<'a> CandidateTrie<'a> {
         id
     }
 
-    /// Computes every node's aggregates in one bottom-up pass.
+    /// Computes every node's aggregates in one pass from leaves to root.
     ///
-    /// `Arena::iter_node_ids` yields nodes in insertion (storage) order, and
-    /// [`Self::ensure_folder_node`] always creates a parent before any of its
-    /// children; reversing that order visits every child before its parent.
+    /// `Arena::iter_node_ids` returns nodes in insertion order.
+    /// [`Self::ensure_folder_node`] creates each parent before its children.
+    /// Reversing insertion order therefore visits children before parents.
     fn aggregate(arena: &mut Arena<TrieNode<'a>>) {
         let insertion_order: Vec<NodeId> = arena.iter_node_ids().collect();
         for &id in insertion_order.iter().rev() {
@@ -258,11 +254,12 @@ impl<'a> CandidateTrie<'a> {
         }
     }
 
-    /// Computes per-child exclusion aggregates with one prefix/suffix sweep.
+    /// Computes exclusion aggregates for each child with prefix and suffix
+    /// sweeps.
     ///
-    /// This avoids re-merging all siblings for each child (`O(children^2)`).
-    /// Prefix and suffix vectors are sized to `children.len() + 1`; fallback
-    /// reads are defensive only.
+    /// The sweeps avoid merging every sibling for every child
+    /// (`O(children^2)`). The vectors have `children.len() + 1` entries.
+    /// Fallback reads handle invalid indexes defensively.
     fn excluding_per_child(
         local_agg: &SubtreeAggregate<'a>,
         children: &[NodeId],
@@ -305,20 +302,19 @@ impl<'a> CandidateTrie<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if `id` was removed from `arena`. This arena never removes nodes
-    /// after construction, so every `id` it hands out stays valid.
+    /// Panics if `arena` does not contain `id`. This arena does not remove
+    /// nodes after construction, so every node ID it creates remains valid.
     #[expect(
         clippy::expect_used,
-        reason = "indextree NodeId always valid: this arena never removes \
-                  nodes after construction"
+        reason = "this arena never removes nodes after construction"
     )]
     fn node_data<'n>(
         arena: &'n Arena<TrieNode<'a>>,
         id: NodeId,
     ) -> &'n TrieNode<'a> {
-        arena
-            .get_data(id)
-            .expect("indextree NodeId always valid: arena never removes nodes")
+        arena.get_data(id).expect(
+            "arena node ID remains valid because nodes are never removed",
+        )
     }
 
     /// Returns the mutable data of the node with the given id.
@@ -328,45 +324,48 @@ impl<'a> CandidateTrie<'a> {
     /// Panics under the same invalid-id condition as [`Self::node_data`].
     #[expect(
         clippy::expect_used,
-        reason = "indextree NodeId always valid: this arena never removes \
-                  nodes after construction; see Self::node_data"
+        reason = "this arena never removes nodes after construction; see \
+                  Self::node_data"
     )]
     fn node_data_mut<'n>(
         arena: &'n mut Arena<TrieNode<'a>>,
         id: NodeId,
     ) -> &'n mut TrieNode<'a> {
-        arena
-            .get_data_mut(id)
-            .expect("indextree NodeId always valid: arena never removes nodes")
+        arena.get_data_mut(id).expect(
+            "arena node ID remains valid because nodes are never removed",
+        )
     }
 }
 
 /// Stores local candidates and precomputed subtree aggregates for a folder trie
 /// node.
 struct TrieNode<'a> {
+    /// Stores this folder's depth from the trie root.
     depth: usize,
-    /// Candidates whose containing folder is this node.
+    /// Stores candidates whose containing folder is this node.
     ///
-    /// Multiple entries imply the same folder and basename with distinct
+    /// Multiple entries have the same folder and basename, with different
     /// extensions.
     locals: Vec<(Option<&'a str>, &'a Path)>,
-    /// Aggregate for this node's locals and every descendant.
+    /// Stores aggregates for this node's candidates and all descendants.
     full: SubtreeAggregate<'a>,
-    /// Per-child aggregate excluding that child's subtree.
+    /// Stores each child aggregate without that child's subtree.
     ///
-    /// Queries walking up through child `c` use this instead of `full` to
-    /// avoid counting shallower candidates twice. Stored in a small `Vec`
-    /// because same-basename subfolders are usually few.
+    /// Queries that walk up through child `c` use this aggregate instead of
+    /// `full`. This avoids counting shallower candidates twice. A small `Vec`
+    /// stores the usually few subfolders.
     excluding: Vec<(NodeId, SubtreeAggregate<'a>)>,
 }
 
-/// Tracks subtree aggregates with optional per-extension buckets.
+/// Tracks subtree aggregates and optional extension buckets.
 ///
-/// `by_ext` is a `Vec`, not a `HashMap`: same-basename candidates rarely span
-/// enough extensions for hashing and per-node allocation to win.
+/// `by_ext` uses a `Vec`. Same-basename candidates rarely span enough
+/// extensions for a `HashMap` and its per-node allocation to be worthwhile.
 #[derive(Clone, Debug, Default)]
 struct SubtreeAggregate<'a> {
+    /// Holds the nearest candidate across all extensions.
     combined: NearestCandidate<'a>,
+    /// Holds the nearest candidate for each extension.
     by_ext: Vec<(&'a str, NearestCandidate<'a>)>,
 }
 
@@ -412,8 +411,11 @@ impl<'a> SubtreeAggregate<'a> {
 /// [`Self::EMPTY`] is the merge identity and represents no candidate.
 #[derive(Copy, Clone, Debug)]
 struct NearestCandidate<'a> {
+    /// Stores the nearest candidate's folder depth.
     min_depth: usize,
+    /// Counts candidates at that depth.
     count: usize,
+    /// Holds one candidate path at that depth.
     sample: Option<&'a Path>,
 }
 
@@ -599,10 +601,10 @@ mod tests {
 
             use super::*;
 
-            /// Deterministic Linear Congruential Generator (LCG):
-            /// `state = state * a + c` mod 2^64. One multiply and one add per
-            /// draw, with no dependency on `rand`, reproducible across runs so
-            /// a failure is always replayable from the fixed seed.
+            /// Uses a deterministic linear congruential generator (LCG).
+            /// Each draw calculates `state = state * a + c` modulo `2^64` with
+            /// one multiply and one addition. The fixed seed
+            /// reproduces failures across runs without `rand`.
             fn lcg_next(state: &mut u64) -> u64 {
                 *state = state
                     .wrapping_mul(6_364_136_223_846_793_005)
@@ -610,8 +612,8 @@ mod tests {
                 *state
             }
 
-            /// Draws one folder component from the four-entry pool this
-            /// generator indexes with two bits per draw.
+            /// Draws one of four folder components. Two state bits select the
+            /// component.
             fn draw_component<'a>(
                 components: &[&'a str],
                 state: &mut u64,
@@ -627,8 +629,8 @@ mod tests {
                     .unwrap_or_default()
             }
 
-            /// Builds one randomized folder-prefixed path: a `1..=4`
-            /// component folder prefix plus `file_name`.
+            /// Builds a path with `1..=4` folder components followed by
+            /// `file_name`.
             fn draw_folder_prefixed_path(
                 components: &[&str],
                 state: &mut u64,
@@ -643,8 +645,8 @@ mod tests {
                 path
             }
 
-            /// Checks one randomized candidate set against the oracle from
-            /// four randomized query points.
+            /// Checks one candidate set against the oracle at four random query
+            /// paths.
             fn assert_random_set_agrees_with_oracle(
                 components: &[&str],
                 state: &mut u64,

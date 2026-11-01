@@ -1,13 +1,11 @@
 //! Plans incremental index refreshes and applies typed updates to the index
 //! store.
 //!
-//! [`RefreshState`] models the refresh lifecycle: fresh scans can materialize
-//! directly from the store, stale scans must pass through [`PendingApply`]
-//! before callers can receive a persisted store, and drifted scans, whose store
-//! was built under different config, are rebuilt in full. Drift wins over
-//! staleness. A [`PersistFailed`] keeps the pending state so
-//! [`IndexerService::refresh`] can still materialize a fail-open in-memory
-//! index from the same reconciliation.
+//! [`RefreshState`] models refresh outcomes. Fresh scans use the store as-is.
+//! Stale scans use [`PendingApply`] before they return a persisted store.
+//! Drifted scans rebuild the index. Drift takes priority over staleness.
+//! [`PersistFailed`] keeps the pending data so [`IndexerService::refresh`] can
+//! still build an in-memory index after a write fails.
 //!
 //! [`IndexerService::refresh`]: super::service::IndexerService::refresh
 
@@ -24,25 +22,25 @@ use super::{
 };
 use crate::{FileMeta, Note};
 
-/// Reports what one refresh found and healed.
+/// Reports the changes found and handled by one refresh.
 ///
-/// Count accessors return zero for every variant that does not carry counts: a
-/// config drift heal reports its cause, not row counts.
+/// Count accessors return zero for variants without counts. A config drift
+/// report gives its cause instead of row counts.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum RefreshReport {
-    /// Nothing changed: the persisted index served as it was.
+    /// Nothing changed, so the refresh used the persisted index as-is.
     #[default]
     Unchanged,
-    /// File metadata changed and the affected rows were updated.
+    /// The refresh found changed files and updated their rows.
     FilesChanged {
         /// Counts files inserted or updated.
         upserted: usize,
         /// Counts files deleted from the index.
         deleted: usize,
-        /// Counts inbound link edges updated.
+        /// Counts added and removed inbound link edges.
         links_modified: usize,
     },
-    /// The index was built under different config and was rebuilt in full.
+    /// The config changed, so the refresh rebuilt the index.
     ConfigDrift {
         /// Explains why the stored index no longer matched the config.
         cause: DriftCause,
@@ -110,25 +108,24 @@ impl RefreshReport {
     }
 }
 
-/// Represents the refresh state produced by one scan before optional
-/// persistence.
+/// Holds the refresh state from one scan before persistence.
 pub(super) enum RefreshState {
-    /// No file metadata changed; the opened store remains current.
+    /// No file metadata changed. The opened store remains current.
     Fresh {
         store: IndexStore,
         files: SortedByPath<FileMeta>,
     },
-    /// File metadata changed and is reconciled but not yet persisted.
+    /// File metadata changed. The refresh has reconciled the changes but has
+    /// not persisted them.
     Stale(Box<PendingApply>),
-    /// The store was built under different config. The index is rebuilt in
-    /// memory from the plan's own scan, and `store` is the plan's handle, ready
-    /// for the heal to rewrite.
+    /// The store used a different config. The plan rebuilt the index from its
+    /// scan and keeps its store handle for the rebuild write.
     Drifted {
         /// Explains why the stored index no longer matched the config.
         cause: DriftCause,
         /// Holds the index rebuilt from the plan's scan.
         index: WorkspaceIndex,
-        /// Holds the plan's open store, the only handle redb allows.
+        /// Holds the plan's open store. redb allows only one open handle.
         store: IndexStore,
     },
 }
@@ -149,8 +146,13 @@ impl PendingApply {
     /// Persists this pending update through [`IndexStore::persist`].
     ///
     /// The update remains owned by the returned state in both success and error
-    /// cases, so a failed apply can still materialize an in-memory index from
-    /// exactly the rows that failed to persist.
+    /// cases. A failed apply can still build an in-memory index from the same
+    /// rows.
+    ///
+    /// # Errors
+    ///
+    /// - [`PersistFailed`] if the store write fails. The error retains the
+    ///   pending update.
     pub(super) fn apply(
         self,
         dimensions: &IndexDimensions,
@@ -181,8 +183,7 @@ impl PendingApply {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if content-only materialization cannot read
-    ///   persisted notes.
+    /// - [`IndexError::Store`] if the store cannot read unchanged notes.
     pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
         let Self {
             store,
@@ -208,19 +209,16 @@ impl Persisted {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if content-only materialization cannot read
-    ///   persisted notes.
+    /// - [`IndexError::Store`] if the store cannot read unchanged notes.
     #[inline]
     pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
         self.pass.into_index()
     }
 }
 
-/// Encapsulates failed persistence along with the pass needed for fail-open
-/// materialization.
+/// Holds a persistence error and the data needed for in-memory materialization.
 ///
-/// The pass is boxed to keep this error type small: it is returned through
-/// [`PendingApply::apply`]'s `Result`, and refresh call sites handle it inline.
+/// The type boxes the pending update to keep the returned error small.
 pub(super) struct PersistFailed {
     source: IndexError,
     pass: Box<PendingApply>,
@@ -243,36 +241,34 @@ impl PersistFailed {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if content-only materialization cannot read
-    ///   persisted notes.
+    /// - [`IndexError::Store`] if the store cannot read unchanged notes.
     #[inline]
     pub(super) fn into_index(self) -> IndexResult<WorkspaceIndex> {
         (*self.pass).into_index()
     }
 }
 
-/// Tracks which notes are authoritative for the reconciled inlink map.
+/// Tracks the notes used to build the reconciled inlink map.
 pub(super) struct InlinkReconciliation {
     links: InlinkMap,
     notes: NoteScope,
 }
 
-/// Designates the note scope needed to persist and materialize the refresh
-/// state.
+/// Names the note set needed to persist and materialize refresh state.
 pub(super) enum NoteScope {
-    /// Only modified notes were parsed; unchanged notes still live in the
-    /// store.
+    /// Holds only parsed notes from changed files. Unchanged notes remain in
+    /// the store.
     Modified(Vec<Note>),
-    /// The complete note set has already been rebuilt and path-sorted.
+    /// Holds the complete, path-sorted note set.
     Complete(Vec<Note>),
 }
 
 impl NoteScope {
     /// Returns note rows to upsert for this scope.
     ///
-    /// `Modified` returns every parsed note because all of them came from
-    /// changed files. `Complete` searches the rebuilt, path-sorted set and
-    /// returns only the files identified by the file delta.
+    /// `Modified` returns every parsed note because each came from a changed
+    /// file. `Complete` searches the rebuilt set and returns notes named by the
+    /// file delta.
     #[must_use]
     pub(super) fn to_upsert(&self, upserted: &[FileMeta]) -> Vec<&Note> {
         match self {
@@ -293,8 +289,7 @@ impl NoteScope {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if modified-only materialization cannot read
-    ///   persisted notes.
+    /// - [`IndexError::Store`] if the store cannot read unchanged notes.
     pub(super) fn resolve(
         self,
         store: &IndexStore,
@@ -307,7 +302,7 @@ impl NoteScope {
     }
 }
 
-/// Holds the scanned and diffed state of one index root before note parsing.
+/// Holds the scanned and diffed state for one index root before note parsing.
 pub(super) struct RefreshPlan {
     store: IndexStore,
     current_files: SortedByPath<FileMeta>,
@@ -317,23 +312,23 @@ pub(super) struct RefreshPlan {
 }
 
 impl RefreshPlan {
-    /// Opens [`IndexStore`], scans the filesystem, and reads persisted files
-    /// and the fingerprint recorded with them.
+    /// Opens [`IndexStore`], scans the filesystem, and reads stored files and
+    /// their fingerprint.
     ///
-    /// The filesystem walk runs concurrently with [`IndexStore::open`] and the
-    /// store read. This state does not decode link rows; reconciliation or
-    /// final index materialization loads them only when needed. A virgin store
-    /// never drifts: its first build is an ordinary file change.
+    /// The filesystem walk runs alongside [`IndexStore::open`] and the store
+    /// read. This method does not decode link rows. Reconciliation or index
+    /// materialization loads them as needed. A virgin store has no drift; its
+    /// first build is a file change.
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
-    ///   included.
-    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
-    ///   record.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
-    ///   project-relative path.
-    /// - [`IndexError::Store`] if opening or reading the store fails.
+    /// - [`IndexError::Scan`] if the scan cannot read a directory, node, or
+    ///   metadata.
+    /// - [`IndexError::Inspect`] if the scan cannot convert file metadata into
+    ///   a record.
+    /// - [`IndexError::Path`] if the scan cannot make a safe project-relative
+    ///   path.
+    /// - [`IndexError::Store`] if the store cannot open or read its tables.
     pub(super) fn collect(
         root: &Path,
         expected: &IndexFingerprint,
@@ -407,7 +402,7 @@ impl RefreshPlan {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if a path-set rebuild cannot read persisted
+    /// - [`IndexError::Store`] if the path-set rebuild cannot read stored
     ///   notes.
     pub(super) fn reconcile(
         self,
@@ -470,10 +465,10 @@ impl RefreshPlan {
         })
     }
 
-    /// Reports whether `delta` changed only content at previously indexed
+    /// Reports whether `delta` changed content only at previously indexed
     /// paths.
     ///
-    /// Only this case leaves link resolution for unedited notes invariant.
+    /// Link resolution for unedited notes stays unchanged only in this case.
     fn is_paths_unchanged(
         delta: &FileDelta,
         persisted_files: &SortedByPath<FileMeta>,
@@ -485,7 +480,7 @@ impl RefreshPlan {
     }
 }
 
-/// Represents the computed facts from one reconciliation before persistence.
+/// Holds the results of one reconciliation before persistence.
 pub(super) struct IndexUpdate {
     current_files: SortedByPath<FileMeta>,
     delta: FileDelta,
@@ -526,8 +521,7 @@ impl IndexUpdate {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if content-only materialization cannot read
-    ///   persisted notes.
+    /// - [`IndexError::Store`] if the store cannot read unchanged notes.
     pub(super) fn into_index(
         self,
         store: &IndexStore,
@@ -541,19 +535,17 @@ impl IndexUpdate {
     }
 }
 
-/// Merges persisted notes with deletions and reparsed notes for a full
-/// recompute.
+/// Merges stored notes with deletions and reparsed notes for a full recompute.
 ///
-/// Consumes `modified_notes`, moving rather than cloning each note.
+/// Moves `modified_notes` into the result without cloning notes.
 ///
-/// Bulk-reads all persisted notes because this fallback needs the full note
-/// set. Deleted paths are filtered first, then one merge pass over the two
-/// path-ascending inputs folds modified notes in place of persisted rows, so
-/// the result is born sorted.
+/// Reads all stored notes because this fallback needs the complete set. It
+/// removes deleted paths, then merges the two path-sorted inputs. Modified
+/// notes replace stored rows, and the result remains sorted.
 ///
 /// # Errors
 ///
-/// - [`IndexError::Store`] if persisted notes cannot be read or decoded.
+/// - [`IndexError::Store`] if the store cannot read or decode notes.
 fn merge_refreshed_notes(
     store: &IndexStore,
     delta: &FileDelta,

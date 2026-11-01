@@ -1,5 +1,4 @@
-//! Defines error types and result aliases for index scanning, persistence, and
-//! loading.
+//! Defines errors and result aliases for index scans, persistence, and loads.
 
 use std::{io, path::PathBuf};
 
@@ -7,11 +6,13 @@ use thiserror::Error;
 
 use crate::{DirTreeError, path::PathError};
 
+/// Holds an index operation's value or its [`IndexError`].
 pub type IndexResult<T> = std::result::Result<T, IndexError>;
+/// Holds a store operation's value or its [`StoreError`].
 pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
 
-/// Represents failures returned by [`super::IndexerService`] and workspace
-/// index operations.
+/// Reports failures from [`super::IndexerService`] and workspace index
+/// operations.
 #[derive(Debug, Error)]
 #[expect(
     private_interfaces,
@@ -19,60 +20,73 @@ pub(crate) type StoreResult<T> = std::result::Result<T, StoreError>;
               IndexError is pub"
 )]
 pub enum IndexError {
-    /// Indicates that database access or row serialization failed.
+    /// Reports a database access or row encoding/decoding failure.
     #[error(transparent)]
     Store(#[from] StoreError),
-    /// Indicates that directory traversal failed during a filesystem scan.
+    /// Reports a directory traversal failure during a filesystem scan.
     #[error(transparent)]
     Scan(#[from] DirTreeError),
-    /// Indicates that lexical confinement validation rejected a path.
+    /// Reports that path validation rejected a non-relative or unsafe path.
     #[error(transparent)]
     Path(#[from] PathError),
-    /// Indicates that a Markdown note could not be read or decoded as UTF-8.
+    /// Reports when the index cannot read a Markdown note or decode it as
+    /// UTF-8.
     #[error("failed to parse note {path}")]
     NoteParse {
+        /// Names the note that the index could not read or parse.
         path: PathBuf,
+        /// Holds the underlying read error.
         #[source]
         source: io::Error,
     },
-    /// Indicates that file metadata could not be inspected during a scan.
+    /// Reports when a scan cannot inspect file metadata.
     #[error("failed to inspect {path}")]
     Inspect {
+        /// Names the file whose metadata the scan could not inspect.
         path: PathBuf,
+        /// Holds the underlying metadata error.
         #[source]
         source: io::Error,
     },
 }
 
-/// Represents low-level index persistence failures.
+/// Reports low-level failures while persisting the index.
 #[derive(Debug, Error)]
 pub(crate) enum StoreError {
-    /// Indicates that filesystem access failed.
+    /// Reports a filesystem access failure.
     #[error("failed to access {path}")]
     Io {
+        /// Names the path that the store could not access.
         path: PathBuf,
+        /// Holds the underlying filesystem error.
         #[source]
         source: io::Error,
     },
-    /// Indicates that opening, reading, or writing the redb-backed database
-    /// failed.
+    /// Reports a failure when the index opens, reads, or writes the redb
+    /// database.
     #[error("failed to access the database at {path}")]
     Redb {
+        /// Names the database file.
         path: PathBuf,
+        /// Holds the underlying redb error.
         #[source]
         source: Box<redb::Error>,
     },
-    /// Indicates that row serialization failed.
+    /// Reports a row serialization failure.
     #[error("failed to serialize the row for {path}")]
     Serialize {
+        /// Names the row's path.
         path: PathBuf,
+        /// Holds the underlying serialization error.
         #[source]
         source: postcard::Error,
     },
-    /// Indicates that stored row deserialization failed.
+    /// Reports a failure when the index decodes a stored row.
     #[error("failed to deserialize the row for {path}")]
     Deserialize {
+        /// Names the row's path.
         path: PathBuf,
+        /// Holds the underlying deserialization error.
         #[source]
         source: postcard::Error,
     },

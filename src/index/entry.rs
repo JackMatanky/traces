@@ -1,21 +1,20 @@
-//! Defines the file entries and in-memory index structures persisted by the
-//! index.
+//! Defines file entries and in-memory index structures for the persisted index.
 //!
-//! [`super::service::IndexerService`] is the only producer; construction flows
-//! through its `build`, `load`, or `refresh` methods.
+//! [`super::service::IndexerService`] creates these structures through its
+//! build, load, and refresh methods.
 
 use std::path::{Path, PathBuf};
 
 use super::{inlinks::InlinkMap, sort::SortedByPath};
 use crate::{FileMeta, Note};
 
-/// Represents an in-memory snapshot of persisted file entries, parsed note
-/// metadata, and inbound links.
+/// Holds an in-memory snapshot of file entries, parsed note metadata, and
+/// inbound links.
 ///
-/// Every regular file under the project root contributes one [`FileEntry`].
-/// Markdown files include a parsed [`Note`]; all entries may carry inlinks.
-/// [`IndexerService`] produces, persists, and loads it; `WorkspaceIndex` itself
-/// carries no `&Path`.
+/// Each regular file under the project root has one [`FileEntry`]. Markdown
+/// entries hold a parsed [`Note`], and every entry can hold inbound links.
+/// [`IndexerService`] creates, persists, and loads the index. The index does
+/// not store a root [`Path`].
 ///
 /// [`IndexerService`]: super::service::IndexerService
 #[derive(Clone, Debug)]
@@ -30,10 +29,11 @@ impl WorkspaceIndex {
         }
     }
 
-    /// Assembles an index from sorted `files`, sorted `notes`, and `inlinks`.
+    /// Assembles an index from path-sorted `files`, path-sorted `notes`, and
+    /// `inlinks`.
     ///
-    /// Both slices must be path-ascending; [`SortedByPath`] carries that
-    /// invariant so only in-crate producers can call this.
+    /// Both inputs must be path-sorted. [`SortedByPath`] carries this
+    /// invariant, so only crate code can call this method.
     #[inline]
     #[must_use]
     pub(crate) fn assemble(
@@ -44,11 +44,10 @@ impl WorkspaceIndex {
         Self::assemble_internal(files, notes, inlinks)
     }
 
-    /// Builds an in-memory index from `(path, markdown_source)` pairs for test
-    /// fixtures.
+    /// Builds an in-memory index from `(path, markdown_source)` test fixtures.
     ///
     /// Available in unit tests and under the `test-utils` feature for
-    /// integration tests/benches.
+    /// integration tests and benches.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -130,8 +129,8 @@ impl WorkspaceIndex {
 
 /// Stores parsed note metadata and inbound links for one indexed file.
 ///
-/// Notes stay boxed to keep [`FileEntry`]'s stack footprint small (~96 bytes).
-/// Inlinks also apply to non-Markdown attachments such as images and PDFs.
+/// The entry boxes notes to keep its stack footprint small (about 96 bytes).
+/// Inbound links also apply to attachments such as images and PDFs.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FileEntry {
     file: FileMeta,
@@ -180,8 +179,7 @@ impl crate::path::HasPath for FileEntry {
     }
 }
 
-/// Represents the position of a [`FileEntry`] within
-/// [`WorkspaceIndex::entries`].
+/// Names a [`FileEntry`] position within [`WorkspaceIndex::entries`].
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct RowIndex(usize);
 
@@ -201,9 +199,9 @@ impl RowIndex {
 
 /// Moves inlink sources into their matching [`FileEntry`]s.
 ///
-/// `entries` is a typed path-sorted view, so each lookup is a binary search
-/// against the same order the index stores rows in; a miss means a genuinely
-/// unknown target, not an unsorted slice.
+/// The typed view sorts `entries` by path. Each lookup uses binary search with
+/// that order. A miss therefore means the target is unknown, not that the slice
+/// is unsorted.
 #[cfg(test)]
 fn attach_inlinks(entries: &mut SortedByPath<FileEntry>, inlinks: InlinkMap) {
     for (target, sources) in inlinks.into_entries() {
@@ -356,8 +354,8 @@ mod tests {
         }
         #[test]
         fn creates_no_files_on_disk() {
-            // The cwd is process-global state; hold CWD_TEST_LOCK so another
-            // test's CwdGuard-mediated change cannot be observed mid-walk.
+            // The current directory is process-wide state. Hold CWD_TEST_LOCK
+            // so another test cannot change it during this walk.
             let _cwd = crate::cli::CwdGuard::same_dir();
             let count_entries =
                 || std::fs::read_dir(".").map_or(0, std::iter::Iterator::count);

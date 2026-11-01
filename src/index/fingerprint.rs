@@ -1,23 +1,21 @@
 //! Fingerprints the config settings that shape persisted index rows.
 //!
-//! The store records an [`IndexFingerprint`] beside the rows it protects. A
-//! refresh compares it with the fingerprint of the running config; a mismatch
-//! is config drift, healed by a full rebuild.
+//! The store records an [`IndexFingerprint`] beside its rows. Refresh compares
+//! it with the running config and rebuilds the index when the fingerprints
+//! differ.
 //!
-//! The fingerprint is deliberately wider than what index-time code reads today:
-//! `title`, `aliases`, and the date keys are included on purpose. Matching too
-//! much costs one harmless rebuild per edit, while matching too little serves
-//! stale rows.
+//! The fingerprint includes `title`, `aliases`, and date keys, although
+//! index-time code does not read them today. Extra settings can cause harmless
+//! rebuilds. Missing settings can leave stale rows.
 //!
 //! # Exhaustive destructuring
 //!
 //! [`IndexFingerprint::new`] destructures every config digest bundle without
-//! `..`. Adding a config setting then fails to compile until the setting is
-//! either fingerprinted or explicitly ignored here. A source-scanning test pins
-//! the convention because the compiler cannot tell a rest pattern from an
-//! exhaustive one.
+//! `..`. A new setting then causes a compile error until this code fingerprints
+//! or ignores it. A source test checks this rule because the compiler does not
+//! reject rest patterns.
 //!
-//! # Key Types
+//! # Main Types
 //!
 //! - [`IndexFingerprint`]: one digest per index-relevant setting.
 //! - [`IndexSetting`]: names one such setting for diagnosis.
@@ -39,8 +37,8 @@ pub(super) const SETTING_COUNT: usize = 10;
 
 /// Names one config setting that shapes persisted index rows.
 ///
-/// Variants are named after their keys in the config file, and [`Display`] adds
-/// the section. The type serves diagnosis only: config never learns of it.
+/// Each variant names a config key. [`Display`] adds the section. The config
+/// does not use this type; it only helps diagnose drift.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IndexSetting {
     /// The `[frontmatter] title` key.
@@ -104,14 +102,13 @@ impl Display for IndexSetting {
     }
 }
 
-/// Explains why a stored index no longer matches the running config.
+/// Explains why a stored index differs from the running config.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DriftCause {
-    /// These settings differ from the recorded fingerprint, in fingerprint
-    /// order.
+    /// Lists changed settings in fingerprint order.
     Settings(Box<[IndexSetting]>),
-    /// The store holds rows but no readable fingerprint, so no setting can be
-    /// blamed.
+    /// The store has rows but no readable fingerprint, so no setting can be
+    /// named.
     Unrecorded,
 }
 
@@ -133,21 +130,21 @@ impl Display for DriftCause {
     }
 }
 
-/// Holds one framed digest per index-relevant setting, in [`IndexSetting`]
+/// Holds one framed digest for each index-relevant setting, in [`IndexSetting`]
 /// order.
 ///
-/// The persisted form is the digests' raw bytes concatenated. Root, template
-/// directories, and the schema directory are excluded, so moving a project does
-/// not rebuild its index.
+/// The store concatenates the raw digest bytes. The fingerprint excludes the
+/// root, template directories, and schema directory. Moving a project therefore
+/// does not rebuild its index.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) struct IndexFingerprint([Blake3Digest; SETTING_COUNT]);
 
-/// Holds what a store records about the fingerprint of its rows.
+/// Describes the fingerprint state recorded with stored rows.
 #[derive(Debug, Eq, PartialEq)]
 pub(super) enum StoredFingerprint {
-    /// The store has never held an index, so there is nothing to diff.
+    /// The store has no index rows to compare.
     Virgin,
-    /// The store holds rows but no readable fingerprint beside them.
+    /// The store has rows but no readable fingerprint.
     Unreadable,
     /// The fingerprint recorded with the rows.
     Recorded(Box<IndexFingerprint>),
@@ -217,12 +214,11 @@ impl IndexFingerprint {
         Some(Self((*digests).map(Blake3Digest::from_bytes)))
     }
 
-    /// Explains why `stored` no longer protects the running config.
+    /// Explains why `stored` does not match the running config.
     ///
-    /// Returns `None` when nothing drifted. A virgin store has no rows to
-    /// protect, so it never drifts. Rows without a readable fingerprint drift
-    /// with [`DriftCause::Unrecorded`]: with nothing to diff, failing closed is
-    /// the only safe answer, and no setting can honestly be blamed.
+    /// Returns `None` when the fingerprints match. A virgin store has no rows,
+    /// so it cannot drift. Rows without a readable fingerprint produce
+    /// [`DriftCause::Unrecorded`].
     pub(super) fn drift(
         &self,
         stored: &StoredFingerprint,

@@ -1,9 +1,8 @@
 //! Provides a path-sorted slice wrapper over stored index rows.
 //!
-//! Every producer that loads rows from disk or the store returns rows sorted by
-//! [`HasPath::path`]. Keeping that ordering in the type lets binary searches
-//! replace linear scans and turns "keep it sorted" from a comment into an
-//! invariant the constructor enforces.
+//! Every producer returns rows sorted by [`HasPath::path`]. The constructor
+//! enforces this order, so lookups can use binary search instead of a linear
+//! scan.
 
 use std::path::Path;
 
@@ -11,9 +10,9 @@ use crate::path::HasPath;
 
 /// Enforces that rows are sorted in ascending order by [`HasPath::path`].
 ///
-/// Construct through [`SortedByPath::sorted`] (sorts) or
-/// [`SortedByPath::assumed_sorted`] (debug-asserts); lookup methods rely on
-/// that order.
+/// Use [`SortedByPath::sorted`] to sort rows or
+/// [`SortedByPath::assumed_sorted`] to check rows in debug builds. Lookup
+/// methods rely on this order.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SortedByPath<T>(Vec<T>);
 
@@ -65,8 +64,8 @@ impl<T: HasPath> SortedByPath<T> {
 
     /// Returns the row stored at `path` for in-place payload mutation.
     ///
-    /// The returned row's path must stay unchanged: replacing it would break
-    /// the sorted invariant [`SortedByPath`] witnesses.
+    /// Keep the returned row's path unchanged. A path change would break the
+    /// sorted invariant that [`SortedByPath`] guarantees.
     #[inline]
     #[cfg(test)]
     pub(crate) fn get_mut_by_path(&mut self, path: &Path) -> Option<&mut T> {

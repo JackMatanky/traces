@@ -6,12 +6,10 @@ use std::path::PathBuf;
 use super::{inlinks::InlinkMap, sort::SortedByPath};
 use crate::FileMeta;
 
-/// Represents the difference between scanned filesystem entries and persisted
-/// index metadata.
+/// Tracks differences between scanned files and persisted index metadata.
 ///
-/// Both result slices remain ascending by path: [`Self::compute`] performs a
-/// single merge over its path-sorted inputs, so upserted and deleted rows
-/// inherit that order.
+/// [`Self::compute`] merges path-sorted inputs in one pass. The returned
+/// upserted and deleted slices stay sorted by path.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct FileDelta {
     upserted: Box<[FileMeta]>,
@@ -85,8 +83,7 @@ impl FileDelta {
     }
 }
 
-/// Represents the computed difference in inbound link edges between index
-/// snapshots.
+/// Tracks added and removed inbound link edges between index snapshots.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct InlinkDelta {
     upserted: Box<[(PathBuf, PathBuf)]>,

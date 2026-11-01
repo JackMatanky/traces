@@ -1,36 +1,30 @@
-//! Computes and manages the derived inbound link graph from indexed note
-//! outlinks.
+//! Builds and manages inbound links from indexed note outlinks.
 //!
-//! [`InlinkMap`] stores deduplicated source paths keyed by each indexed target.
+//! [`InlinkMap`] maps each indexed target to its deduplicated source paths.
 //! [`super::IndexerService::build`] and [`super::IndexerService::refresh`]
-//! construct and persist it; query execution reads inlinks from
-//! [`super::FileEntry`] through [`super::WorkspaceIndex`].
+//! build and persist this map. Queries read it through [`super::FileEntry`] and
+//! [`super::WorkspaceIndex`].
 //!
 //! # Link resolution
 //!
-//! [`LinkResolver`] resolves each [`Note`] outlink by trying an exact path, the
-//! same path with an implied `.md` extension, then the nearest indexed file
-//! sharing a basename-only Wikilink target. Equal-distance basename matches
-//! remain unresolved.
+//! [`LinkResolver`] tries an exact path first. It then tries the same path with
+//! an implied `.md` extension. For basename-only Wikilinks, it selects the
+//! nearest indexed file. Equal-distance matches remain unresolved.
 //!
 //! # Basename index design
 //!
-//! Most file basenames are unique, so a flat linear scan is fastest for the
-//! common case. When a basename has many candidates (≥
-//! [`crate::index::trie::TRIE_THRESHOLD`]), a `CandidateTrie` precomputes
-//! per-folder subtree aggregates so nearest-candidate queries run in
-//! `O(depth)` instead of `O(candidates)`. The trie models folder containment as
-//! a tree, where `FolderRef::of(a).distance_to(FolderRef::of(b)) = depth(a) +
-//! depth(b) - 2 * depth(LCA(a, b))`.
+//! Most basenames have one candidate, so the resolver scans them directly. At
+//! [`crate::index::trie::TRIE_THRESHOLD`] candidates, `CandidateTrie` uses
+//! folder aggregates. This changes nearest-candidate lookup from
+//! `O(candidates)` to `O(depth)`. Folder distance equals `depth(a) + depth(b) -
+//! 2 * depth(LCA(a, b))`.
 //!
 //! # Hash map choice
 //!
-//! [`FxHashMap`] is used instead of [`HashMap`] for internal indexes. The keys
-//! are project-internal file paths, not attacker-controlled input, so
-//! `SipHash`'s denial-of-service resistance is unnecessary. [`FxHashMap`] uses
-//! a simpler, non-cryptographic hash function that avoids the per-entry
-//! computational overhead of `SipHash`, yielding measurable gains at the
-//! thousand-entry scale typical of project path indexes.
+//! Internal indexes use [`FxHashMap`] instead of [`HashMap`]. Their keys are
+//! project paths, not attacker-controlled input, so they do not need `SipHash`
+//! denial-of-service protection. [`FxHashMap`] has lower per-entry hashing
+//! cost. Benchmarks show gains for indexes with thousands of paths.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -46,10 +40,10 @@ use crate::{
     note::{LinkTarget, Note},
 };
 
-/// Stores a target-keyed inbound link graph mapping targets to source paths.
+/// Maps each indexed target to the paths of notes that link to it.
 ///
-/// Each target path maps to its deduplicated, canonically sorted inbound source
-/// paths. Construction through [`InlinkMap::new`] enforces:
+/// Each target maps to deduplicated source paths in ascending path order.
+/// [`InlinkMap::new`] enforces these rules:
 ///
 /// 1. Every target key has at least one inbound source.
 /// 2. Sources for each target are strictly deduplicated.
@@ -60,9 +54,8 @@ pub struct InlinkMap(HashMap<PathBuf, Box<[PathBuf]>>);
 impl InlinkMap {
     /// Builds a canonical, validated inlink graph.
     ///
-    /// Resolves note outlinks and non-note attachment targets. Multiple
-    /// outlinks from the same source note to the same target collapse into one
-    /// edge.
+    /// Resolves note outlinks and attachment targets. Repeated links from one
+    /// note to one target produce one edge.
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
         expect(
@@ -205,13 +198,12 @@ impl InlinkMap {
         Self::from(edges)
     }
 
-    /// Patches inbound edges sourced by `edited_sources` and computes the
-    /// exact `InlinkDelta` in one pass.
+    /// Patches inbound edges sourced by `edited_sources` and computes the exact
+    /// `InlinkDelta` in one pass.
     ///
-    /// Operates in-place on the consumed map, touching only edited targets and
-    /// sources. Untouched targets and sources are moved, never copied. This
-    /// avoids both the map-wide clone of a manual `without_sources` call and
-    /// the full-vault scan of [`InlinkDelta::compute`].
+    /// Changes only edited targets and sources in the consumed map. It moves
+    /// untouched paths without copying them. This avoids cloning the full map
+    /// or scanning all notes with [`InlinkDelta::compute`].
     #[must_use]
     pub(super) fn patch_and_diff(
         mut self,
@@ -246,9 +238,8 @@ impl InlinkMap {
             *slot = sources.into_boxed_slice();
         }
 
-        // Edges that were removed and then re-inserted by `new_edges` are pure
-        // no-ops relative to the persisted graph, so they must not appear in
-        // the delta (which compares the final state to the original).
+        // A removed edge can appear again in `new_edges`. Such an edge does not
+        // change the persisted graph, so omit it from the delta.
         upserted.retain(|edge| {
             if let Some(pos) = deleted.iter().position(|d| d == edge) {
                 deleted.swap_remove(pos);
@@ -296,8 +287,7 @@ impl From<HashMap<PathBuf, Box<[PathBuf]>>> for InlinkMap {
 
 /// Resolves notes into edge pairs for [`InlinkMap::with_edges`].
 ///
-/// Shares one [`LinkResolver`] so batch refresh pays basename-index
-/// construction once.
+/// Shares one [`LinkResolver`] so a batch builds the basename index only once.
 pub(super) fn resolve_edges_for(
     notes: &[Note],
     files: &[FileMeta],
@@ -342,10 +332,10 @@ impl<'a> LinkResolver<'a> {
         }
     }
 
-    /// Resolves one note's outlinks to deduplicated target paths.
+    /// Resolves one note's outlinks to unique target paths.
     ///
-    /// Pure and I/O-free; callers can share one resolver across many notes
-    /// instead of rebuilding the basename index per note.
+    /// This method performs no I/O. Callers can share one resolver across notes
+    /// instead of rebuilding its basename index for each note.
     fn resolve_note(&self, note: &Note) -> Vec<Target<'a>> {
         let mut targets: Vec<Target<'a>> = note
             .outlinks()
@@ -361,8 +351,9 @@ impl<'a> LinkResolver<'a> {
 
     /// Resolves a split [`LinkTarget`] to an indexed file path.
     ///
-    /// Tries exact path, missing-`.md` path, then nearest basename match for
-    /// Obsidian-style Wikilinks. Equal-distance basename ties stay unresolved.
+    /// Tries the exact path, then a path with an implied `.md` extension. For
+    /// basename-only Wikilinks, it selects the nearest match. Equal-distance
+    /// matches stay unresolved.
     fn resolve(
         &self,
         from: &Path,
@@ -415,7 +406,7 @@ impl<'a> LinkResolver<'a> {
     }
 }
 
-/// Represents a resolved link target: the file path pointed to by an outlink.
+/// Holds the indexed file path that an outlink targets.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Target<'a>(&'a Path);
 
@@ -425,8 +416,7 @@ impl Target<'_> {
     }
 }
 
-/// Represents a [`Note`] that links to a [`Target`]: the path recorded as an
-/// inbound edge.
+/// Holds the path of a [`Note`] that links to a [`Target`].
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Source<'a>(&'a Path);
 
@@ -586,9 +576,9 @@ mod tests {
                 #[test]
                 fn resolves_to_a_distant_shallow_sibling_over_a_close_deep_nesting()
                  {
-                    // The shallow root sibling is nearer (2) than the deeply
-                    // nested shared-ancestor candidate (3), even though the
-                    // latter shares a non-root ancestor with `from`.
+                    // The root sibling has distance 2. The deeply nested
+                    // candidate has distance 3, even though
+                    // it shares an ancestor with `from`.
                     let files = files_from_notes(&[
                         "shared/deep/nested/sub/note.md",
                         "far/note.md",
@@ -624,11 +614,10 @@ mod tests {
                 #[test]
                 fn resolves_none_for_a_tie_spanning_an_ancestor_and_a_descendant_branch()
                  {
-                    // Exercises an asymmetric tie: one candidate below
-                    // `from`'s ancestor, one below a disjoint root folder.
-                    // Both are true distance 2, so the exclusion aggregate
-                    // must combine shallow and newly visible candidates
-                    // without double-counting either.
+                    // One candidate is below an ancestor of `from`; the other
+                    // is under a separate root folder. Both
+                    // have distance 2. The exclusion aggregate
+                    // must include both without counting either twice.
                     let files = files_from_notes(&[
                         "shared/a/b/note.md",
                         "other/note.md",

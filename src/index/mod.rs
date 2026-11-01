@@ -2,19 +2,19 @@
 //! for a project root.
 //!
 //! [`IndexerService`] scans the filesystem, parses Markdown notes, derives
-//! inbound links, and stores the resulting [`WorkspaceIndex`] through the
-//! redb-backed [`store`] module.
+//! inbound links, and stores the resulting [`WorkspaceIndex`] in redb through
+//! the [`store`] module.
 //!
-//! [`WorkspaceIndex`] is an in-memory snapshot of file entries, parsed
-//! metadata, and link data. It carries no root path; callers inspect its sorted
-//! [`WorkspaceIndex::entries`] view and use [`crate::query::QueryService`] for
-//! evaluation.
+//! [`WorkspaceIndex`] holds file entries, parsed metadata, and link data in
+//! memory. It stores no root path. Callers inspect its sorted
+//! [`WorkspaceIndex::entries`] view and use [`crate::query::QueryService`] to
+//! evaluate queries.
 //!
-//! Fresh builds run through [`IndexerService::build`]; cold CLI reads use
+//! Fresh builds use [`IndexerService::build`]. Cold CLI reads use
 //! [`IndexerService::refresh_store`](service::IndexerService::refresh_store) to
-//! load and refresh an existing store. A refresh also compares the store's
-//! recorded [`fingerprint`] of index-relevant config settings with the running
-//! config and rebuilds in full when they differ.
+//! load and refresh an existing store. Refresh compares the stored
+//! [`fingerprint`] with the running config and rebuilds the index when they
+//! differ.
 //!
 //! [`fingerprint`]: mod@fingerprint
 //! [`store`]: mod@store
@@ -44,11 +44,11 @@ pub use service::IndexerService;
 pub(crate) use sort::SortedByPath;
 pub(crate) use store::IndexStore;
 
-/// Project-relative index database path.
+/// Names the project-relative index database path.
 const INDEX_FILE: &str = ".traces/index.redb";
 
-/// Materializes a stale pass from the store or its retained in-memory update
-/// into a [`WorkspaceIndex`].
+/// Builds a [`WorkspaceIndex`] from the stored pass or its retained in-memory
+/// update.
 ///
 /// # Errors
 ///
@@ -70,12 +70,12 @@ fn materialize_apply(
 
 #[cfg(test)]
 mod tests {
-    /// Shared fixtures imported by `service.rs` and `store.rs` tests.
+    /// Holds fixtures shared by the `service.rs` and `store.rs` tests.
     pub(crate) mod fixtures {
         use std::{fs, path::Path};
 
-        /// Restores locked directory permissions on drop so tempdir cleanup
-        /// works.
+        /// Restores directory permissions on drop so the temporary directory
+        /// can be removed.
         #[cfg(unix)]
         pub struct PermissionsGuard<'a>(pub &'a Path);
 

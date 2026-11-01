@@ -1,13 +1,11 @@
-//! Coordinates the index lifecycle including scanning, parsing, persistence,
-//! and refresh.
+//! Manages index scanning, parsing, persistence, and refresh.
 //!
-//! [`IndexerService`] scans, parses, persists, loads, refreshes, and opens one
-//! project root's [`WorkspaceIndex`] through [`IndexStore`].
-//! `refresh` and `refresh_store` share one incremental core: content-only
-//! deltas patch inbound links from touched notes, while path-set changes force
-//! a full recompute because wikilink resolution depends on every indexed path.
-//! A store built under different index-relevant config is rebuilt in full
-//! instead, reusing the refresh's own scan and store handle.
+//! [`IndexerService`] manages one project's [`WorkspaceIndex`] and
+//! [`IndexStore`]. [`IndexerService::refresh`] and
+//! [`IndexerService::refresh_store`] share one incremental path. Content
+//! changes update links from changed notes. Path changes rebuild all links
+//! because Wikilink resolution depends on every indexed path. Config drift also
+//! rebuilds the index and reuses the refresh scan and store handle.
 
 use std::path::{Path, PathBuf};
 
@@ -29,12 +27,12 @@ use crate::{
     path::RelativePath,
 };
 
-/// Drives the file-index lifecycle for one project root.
+/// Manages the file index for one project root.
 ///
-/// `refresh` returns a full [`WorkspaceIndex`] and logs persist failures;
-/// `refresh_store` keeps only the persisted store current and propagates
-/// persist failures because it has no in-memory fallback. Both rebuild the
-/// index when the config it was built under has drifted.
+/// [`Self::refresh`] returns a full [`WorkspaceIndex`] and logs write failures.
+/// `refresh_store` updates only the store and returns write failures because it
+/// has no in-memory fallback. Both methods rebuild the index when its config
+/// fingerprint has drifted.
 #[derive(Clone, Debug)]
 pub struct IndexerService {
     root: PathBuf,
@@ -72,14 +70,14 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
-    ///   included.
-    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    ///   including metadata.
+    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
     ///   record.
-    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
-    ///   as UTF-8.
-    /// - `IndexError::Path` if a walked file cannot be derived as a safe
-    ///   project-relative path.
+    /// - `IndexError::NoteParse` if the parser cannot read a Markdown file or
+    ///   decode UTF-8.
+    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    ///   path.
     #[inline]
     pub fn build(&self) -> IndexResult<WorkspaceIndex> {
         self.build_from(SortedByPath::assumed_sorted(Self::scan(&self.root)?))
@@ -89,8 +87,8 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
-    ///   as UTF-8.
+    /// - `IndexError::NoteParse` if the parser cannot read a Markdown file or
+    ///   decode UTF-8.
     fn build_from(
         &self,
         files: SortedByPath<FileMeta>,
@@ -107,30 +105,30 @@ impl IndexerService {
     /// Refreshes the persisted index and returns a full in-memory
     /// [`WorkspaceIndex`].
     ///
-    /// Unchanged Markdown notes reuse persisted parses; changed notes are
-    /// parsed from disk; deleted files vanish with the fresh scan. Persist
-    /// failures are logged and the refreshed in-memory index is still returned.
+    /// The refresh reuses stored parses for unchanged Markdown notes. It parses
+    /// changed notes from disk and removes deleted files. It logs write
+    /// failures and still returns the index.
     ///
-    /// An index built under different index-relevant config is rebuilt in full,
-    /// so a config edit heals on the next refresh. A failed heal is logged and
-    /// leaves the stored fingerprint stale, so the next refresh heals again.
+    /// A config fingerprint mismatch triggers a full rebuild. If the rebuild
+    /// write fails, the method logs the error and leaves the stored fingerprint
+    /// unchanged. The next refresh tries the rebuild again.
     ///
-    /// Inlinks are patched only for content-only deltas. Any added, deleted, or
-    /// renamed path forces a full recompute because an unedited note's resolved
-    /// wikilink target can change when candidate paths change.
+    /// The refresh patches links only for content changes. It rebuilds all
+    /// links after a path is added, deleted, or renamed because those changes
+    /// can alter Wikilink targets.
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
-    ///   included.
-    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    ///   including metadata.
+    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
     ///   record.
-    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
-    ///   as UTF-8.
-    /// - `IndexError::Path` if a walked file cannot be derived as a safe
-    ///   project-relative path.
-    /// - `IndexError::Store` if the persisted index cannot be opened or read,
-    ///   including when unchanged notes cannot be recalled.
+    /// - `IndexError::NoteParse` if the parser cannot read a Markdown file or
+    ///   decode UTF-8.
+    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    ///   path.
+    /// - `IndexError::Store` if the store cannot open or read the index or
+    ///   unchanged notes.
     #[inline]
     pub fn refresh(&self) -> IndexResult<WorkspaceIndex> {
         let (index, _) = self.refresh_with_report()?;
@@ -141,16 +139,16 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if a directory or node cannot be read, metadata
-    ///   included.
-    /// - `IndexError::Inspect` if file metadata cannot be converted into a
+    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    ///   including metadata.
+    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
     ///   record.
-    /// - `IndexError::NoteParse` if a Markdown file cannot be read or decoded
-    ///   as UTF-8.
-    /// - `IndexError::Path` if a walked file cannot be derived as a safe
-    ///   project-relative path.
-    /// - `IndexError::Store` if the persisted index cannot be opened or read,
-    ///   including when unchanged notes cannot be recalled.
+    /// - `IndexError::NoteParse` if the parser cannot read a Markdown file or
+    ///   decode UTF-8.
+    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    ///   path.
+    /// - `IndexError::Store` if the store cannot open or read the index or
+    ///   unchanged notes.
     #[inline]
     pub fn refresh_with_report(
         &self,
@@ -231,50 +229,45 @@ impl IndexerService {
 
     /// Rebuilds and persists the index from scratch, returning it.
     ///
-    /// Private helper for the `traces index` command, factored so this crate
-    /// owns the rebuild policy and the CLI handler stays a single forwarding
-    /// call.
+    /// Supports the `traces index` command. This method keeps rebuild policy in
+    /// the crate and leaves the CLI handler to forward the call.
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
-    ///   included.
-    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    ///   including metadata.
+    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
     ///   record.
-    /// - [`IndexError::NoteParse`] if a note cannot be read or decoded as
+    /// - `IndexError::NoteParse` if the parser cannot read a note or decode
     ///   UTF-8.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
-    ///   project-relative path.
-    /// - [`IndexError::Store`] if persisting the rebuilt index fails.
+    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    ///   path.
+    /// - `IndexError::Store` if persisting the rebuilt index fails.
     pub(crate) fn rebuild(&self) -> IndexResult<WorkspaceIndex> {
         let index = self.build()?;
         self.persist(&index)?;
         Ok(index)
     }
 
-    /// Synchronizes the persisted index without materializing a
-    /// [`WorkspaceIndex`].
+    /// Synchronizes the persisted index without building a [`WorkspaceIndex`].
     ///
-    /// Cold empty deltas return the opened store without decoding notes or
-    /// writing rows. A store built under different index-relevant config is
-    /// rebuilt in full first. Unlike [`Self::refresh`] (which absorbs persist
-    /// failures by logging a warning and falling back to an in-memory index),
-    /// persist failures are propagated directly as [`IndexError::Store`]
-    /// because callers read from the returned persisted store and have no
-    /// in-memory fallback.
+    /// An empty delta returns the opened store without decoding notes or
+    /// writing rows. A config fingerprint mismatch triggers a full rebuild.
+    /// Unlike [`Self::refresh`], this method returns write errors because
+    /// callers have no in-memory fallback.
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
-    ///   included.
-    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    ///   including metadata.
+    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
     ///   record.
-    /// - [`IndexError::NoteParse`] if a Markdown file cannot be read or decoded
-    ///   as UTF-8.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
-    ///   project-relative path.
-    /// - [`IndexError::Store`] if the database cannot be opened or read,
-    ///   required note bodies cannot be read, or incremental persistence fails.
+    /// - `IndexError::NoteParse` if the parser cannot read a Markdown file or
+    ///   decode UTF-8.
+    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    ///   path.
+    /// - `IndexError::Store` if the database cannot open or read, required
+    ///   notes cannot be read, or incremental persistence fails.
     #[inline]
     pub(crate) fn refresh_store(&self) -> IndexResult<IndexStore> {
         match self.prepare_pass()? {
@@ -325,8 +318,13 @@ impl IndexerService {
         }
     }
 
-    /// Parses every Markdown-classified file in `files` in parallel, stopping
-    /// at the first parse failure.
+    /// Parses every Markdown file in `files` in parallel and returns the parsed
+    /// notes.
+    ///
+    /// # Errors
+    ///
+    /// - `IndexError::NoteParse` if the parser cannot read a file or decode
+    ///   UTF-8.
     fn parse_notes(&self, files: &[FileMeta]) -> IndexResult<Vec<Note>> {
         files
             .par_iter()
@@ -335,8 +333,12 @@ impl IndexerService {
             .collect::<IndexResult<Vec<Note>>>()
     }
 
-    /// Reads and parses the Markdown file at `file`'s path, resolved relative
-    /// to this service's root.
+    /// Reads and parses the Markdown file at `file`'s path under this service's
+    /// root.
+    ///
+    /// # Errors
+    ///
+    /// - `IndexError::NoteParse` if reading the file fails.
     fn parse_note(&self, file: &FileMeta) -> IndexResult<Note> {
         let full_path = self.root.join(file.path());
         let content =
@@ -359,8 +361,8 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if the database's parent directory cannot be
-    ///   created, the transaction fails, or a row cannot be encoded.
+    /// - `IndexError::Store` if the database directory cannot be created, the
+    ///   transaction fails, or a row cannot be encoded.
     #[inline]
     pub fn persist(&self, index: &WorkspaceIndex) -> IndexResult<()> {
         self.persist_into(&IndexStore::open(&self.root)?, index)
@@ -370,7 +372,7 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Store`] if the transaction fails or a row cannot be
+    /// - `IndexError::Store` if the transaction fails or a row cannot be
     ///   encoded.
     fn persist_into(
         &self,
@@ -389,8 +391,8 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if the index store cannot be opened or recovered,
-    ///   or persisted rows cannot be read or decoded.
+    /// - `IndexError::Store` if the index store cannot open or recover, or
+    ///   stored rows cannot be read or decoded.
     #[inline]
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
@@ -406,18 +408,19 @@ impl IndexerService {
         Ok(WorkspaceIndex::assemble(files, notes, inlinks))
     }
 
-    /// Recursively scans `root` for regular files, skipping `.git` directories,
-    /// the index database, and symlinks. Metadata reads run in parallel via
-    /// `rayon` because each is an independent syscall; results are path-sorted.
+    /// Recursively scans `root` for regular files and returns them in path
+    /// order. The scan skips `.git` directories, the index database, and
+    /// symlinks. It reads file metadata in parallel because each read is an
+    /// independent system call.
     ///
     /// # Errors
     ///
-    /// - [`IndexError::Scan`] if a directory or node cannot be read, metadata
-    ///   included.
-    /// - [`IndexError::Inspect`] if file metadata cannot be converted into a
+    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    ///   including metadata.
+    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
     ///   record.
-    /// - [`IndexError::Path`] if a walked file cannot be derived as a safe
-    ///   project-relative path.
+    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    ///   path.
     pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
         let index_db = root.join(INDEX_FILE);
         let entries = DirTree::descendants(root)

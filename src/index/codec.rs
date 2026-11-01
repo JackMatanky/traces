@@ -1,8 +1,8 @@
 //! Implements row encoding and decoding for redb payloads in the index store.
 //!
-//! Rows use postcard with [`StoreError`] context, and [`path_from_bytes`] has a
-//! lossy fallback for non-Unicode paths read from byte-oriented stores. The
-//! bytes-of-a-path codec for serde fields lives at [`crate::path::codec`].
+//! Rows use postcard and include [`StoreError`] context. [`path_from_bytes`]
+//! decodes invalid UTF-8 lossily. The path codec for serde fields lives at
+//! [`crate::path::codec`].
 
 use std::{
     mem,
@@ -22,8 +22,6 @@ use super::error::{StoreError, StoreResult};
 /// # Errors
 ///
 /// - [`StoreError::Serialize`] if postcard serialization fails.
-///
-/// [`StoreError::Serialize`]: StoreError::Serialize
 pub(super) fn encode_row<'a, T: Serialize>(
     path: &Path,
     value: &T,
@@ -39,7 +37,7 @@ pub(super) fn encode_row<'a, T: Serialize>(
     Ok(buf)
 }
 
-/// Deserializes `bytes`, capturing `path` in any storage error.
+/// Deserializes `bytes` and records `path` in any storage error.
 ///
 /// # Errors
 ///
@@ -54,16 +52,14 @@ pub(super) fn decode_row<T: DeserializeOwned>(
     })
 }
 
-/// Wraps a borrowed project-relative path to expose its native bytes as a redb
-/// key.
+/// Exposes a borrowed project-relative path's native bytes as a redb key.
 ///
-/// Keys are written with [`Path::as_encoded_bytes`] and read back through the
-/// lossy [`path_from_bytes`] fallback; serde row payloads go through
-/// [`crate::path::codec`] instead.
+/// The store writes keys with [`Path::as_encoded_bytes`] and reads them through
+/// [`path_from_bytes`]. Serde row payloads use [`crate::path::codec`].
 ///
-/// Wraps the path rather than the encoded bytes: error construction and row
-/// payloads borrow the same `&Path`, and converting bytes back to an `OsStr`
-/// would require the unsafe `from_encoded_bytes_unchecked`.
+/// The wrapper keeps the borrowed path for error construction and row payloads.
+/// Converting the bytes back to an [`std::ffi::OsStr`] would require
+/// [`std::ffi::OsStr::from_encoded_bytes_unchecked`].
 #[derive(Copy, Clone)]
 pub(super) struct PathKey<'a>(&'a Path);
 

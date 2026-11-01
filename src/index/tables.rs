@@ -1,9 +1,8 @@
 //! Defines redb table schemas and rebuild deletion policies for the index
 //! store.
 //!
-//! [`IndexStore`] owns connections and row payloads; this module owns the
-//! static schema: eight `TableSpec` entries pairing each table's definition
-//! with its rebuild wipe policy.
+//! [`IndexStore`] owns connections and row payloads. This module defines eight
+//! `TableSpec` entries, each with a table definition and rebuild policy.
 //!
 //! [`IndexStore`]: super::store::IndexStore
 
@@ -15,22 +14,25 @@ use super::{error::StoreResult, store::IndexStore};
 
 /// Defines the file metadata table.
 ///
-/// Key: project-relative path as UTF-8 bytes
-/// Value: serialized [`crate::FileMeta`]
+/// Stores file metadata by project-relative path.
+///
+/// The key is the path's encoded bytes. The value is serialized
+/// [`crate::FileMeta`].
 pub(super) const FILES: TableDefinition<'static, &'static [u8], &'static [u8]> =
     TableDefinition::new("files");
 
 /// Defines the parsed note metadata table.
 ///
-/// Key: project-relative path as UTF-8 bytes
-/// Value: serialized [`crate::Note`]
+/// Stores parsed note metadata by project-relative path.
+///
+/// The key is the path's encoded bytes. The value is serialized
+/// [`crate::Note`].
 pub(super) const NOTES: TableDefinition<'static, &'static [u8], &'static [u8]> =
     TableDefinition::new("notes");
 
-/// Defines the inbound link multimap table.
+/// Defines the table that maps target paths to source paths.
 ///
-/// Key: target note path as UTF-8 bytes
-/// Value: one source note path per entry
+/// Each key is a target path's encoded bytes. Each value is one source path.
 pub(super) const LINKS: MultimapTableDefinition<
     'static,
     &'static [u8],
@@ -51,29 +53,27 @@ pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("paths_by_file_class");
 
-/// Defines the reverse tag index mapping paths to current normalized tags.
+/// Defines the reverse tag index from paths to normalized tags.
 ///
-/// Lets incremental upserts and deletes touch O(path tag count) entries instead
-/// of scanning [`PATHS_BY_TAG`].
+/// Incremental updates touch O(path tag count) entries instead of scanning
+/// [`PATHS_BY_TAG`].
 pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("tags_by_path");
 
-/// Defines the reverse file-class index mapping paths to current normalized
-/// classes.
+/// Defines the reverse file-class index from paths to normalized classes.
 pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("classes_by_path");
 
-/// Defines the store's single metadata table.
+/// Defines the store's metadata table.
 ///
-/// Key `version`: the cache format version identifying persisted row semantics.
-/// Key `fingerprint`: the raw digests of the index-relevant config settings
-/// that produced the rows, as written by
+/// The `version` key identifies the persisted row format. The `fingerprint` key
+/// stores digests for the config settings that produced the rows, as written by
 /// [`super::fingerprint::IndexFingerprint`].
 pub(super) const META: TableDefinition<'static, &'static [u8], &'static [u8]> =
     TableDefinition::new("meta");
@@ -89,7 +89,7 @@ enum TableDef {
 enum DeletePolicy {
     /// A delete error fails the rebuild.
     Required,
-    /// Only a missing table is tolerated; other errors propagate.
+    /// Tolerates a missing table. Returns every other error.
     BestEffort,
 }
 
@@ -150,8 +150,8 @@ impl TableSpec {
     ///
     /// # Errors
     ///
-    /// - [`redb::TableError`] if the table definition cannot be opened or does
-    ///   not match.
+    /// - [`redb::TableError`] if redb cannot open the table or its definition
+    ///   does not match.
     pub(super) fn probe(
         &self,
         txn: &ReadTransaction,
@@ -161,9 +161,9 @@ impl TableSpec {
 
     /// Creates this table in `txn` when it does not exist yet.
     ///
-    /// Incremental writes only open the tables whose rows they touch, so
-    /// without this a first build into a virgin store could leave a partial
-    /// schema that the next open wipes.
+    /// Incremental writes open only tables with changed rows. This method
+    /// creates all tables so the first write does not leave a partial schema
+    /// for the next open to remove.
     ///
     /// # Errors
     ///
@@ -185,8 +185,8 @@ impl TableSpec {
 
     /// Deletes this table's contents per its [`DeletePolicy`].
     ///
-    /// `Required` propagates every storage error; `BestEffort` tolerates only a
-    /// missing table (the fresh-database case) and propagates the rest.
+    /// `Required` returns every storage error. `BestEffort` ignores a missing
+    /// table and returns every other error.
     ///
     /// # Errors
     ///
