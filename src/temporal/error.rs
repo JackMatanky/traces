@@ -3,6 +3,7 @@
 //! [`DateError`] reports date and date-time parsing, local-zone resolution,
 //! rendering, or representable-range failures. Internal calendar arithmetic
 //! uses a separate error type.
+//!
 //! [`DurationError`] reports duration parsing, validation, and conversion
 //! failures. The [`Display`](std::fmt::Display) text of each variant is the
 //! message shown by the CLI and is part of the crate's contract.
@@ -55,9 +56,9 @@ pub enum DateError {
     },
     /// Reports that system time-zone discovery failed.
     ///
-    /// `input` carries the zone-discovery failure detail, not a clock time:
-    /// the zone layer builds it as `system zone: {detail}`. DST ambiguities
-    /// and gaps never produce this error; they resolve deterministically.
+    /// `input` carries the zone-discovery failure detail, not a clock time. The
+    /// zone layer builds it as `system zone: {detail}`. DST ambiguities and
+    /// gaps resolve deterministically and never produce this error.
     #[error("local zone lookup failed for `{input}`")]
     LocalZoneLookup {
         /// Stores the zone-discovery failure detail.
@@ -77,7 +78,7 @@ pub enum DateError {
     /// Reports that a recognized date/time value lies outside the supported
     /// range.
     ///
-    /// The value was understood; it just cannot be represented. Local
+    /// The parser understood the value, but Jiff cannot represent it. Local
     /// midnight on `-9999-01-01` under `Etc/GMT-14`, for example, precedes
     /// Jiff's earliest instant.
     #[error("`{input}` is out of the supported date/time range")]
@@ -91,9 +92,9 @@ pub enum DateError {
 ///
 /// Covers three failure domains:
 ///
-/// - Parsing human-readable duration text.
-/// - Validating raw seconds.
-/// - Converting nominal seconds to a Jiff span.
+/// - Human-readable duration parsing.
+/// - Raw-seconds validation.
+/// - Nominal-seconds conversion to a Jiff span.
 ///
 /// Parse failures carry no copy of the input: the caller already holds it.
 ///
@@ -127,7 +128,7 @@ pub enum DurationError {
     MisplacedSign,
 
     /// Reports that the number portion is not valid float syntax (e.g., a bare
-    /// `"."`). No production path constructs this variant; it stays as public
+    /// `"."`). No production path constructs this variant. It stays as public
     /// contract.
     #[error("invalid number syntax: {source}")]
     MalformedNumber {
@@ -169,9 +170,9 @@ pub(crate) enum CalendarError {
     /// Reports that system time-zone discovery failed while resolving a
     /// computed local clock time.
     ///
-    /// Forwards its text to the inner [`DateError`] and reports it as the
-    /// error source, so the lookup failure carries one diagnosis instead
-    /// of stacking two.
+    /// Forwards its text to the inner [`DateError`] and reports it as the error
+    /// source, so the lookup failure carries one diagnosis instead of stacking
+    /// two.
     #[error("{source}")]
     Zone {
         /// Stores the zone-lookup failure this variant reports.
@@ -184,14 +185,9 @@ impl CalendarError {
     /// Maps a calendar failure to the public error exposed by typed date
     /// parsers and by pattern rendering.
     ///
-    /// # Arguments
-    ///
-    /// * `input` - the value the calendar failure was reached through
-    ///
-    /// # Returns
-    ///
-    /// The [`DateError`] carrying the same diagnosis: out-of-range failures
-    /// become [`DateError::OutOfRange`], zone failures forward their inner
+    /// Uses `input` to identify the value associated with the calendar failure.
+    /// Returns a [`DateError`] with the same diagnosis: out-of-range errors
+    /// become [`DateError::OutOfRange`], while zone errors forward their inner
     /// [`DateError`] unchanged.
     pub(crate) fn into_date_error(self, input: &str) -> DateError {
         match self {
@@ -209,8 +205,8 @@ impl CalendarError {
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum UnitError {
     /// Carries the rejected input spelling and quotes the catalog's full
-    /// expected-list: `Display` renders
-    /// `unknown unit "<input>" (expected <list>)`.
+    /// expected-list: `Display` renders `unknown unit "<input>" (expected
+    /// <list>)`.
     #[error(
         "unknown unit {unit:?} (expected {})",
         super::unit::UNIT_SPELLINGS_HINT

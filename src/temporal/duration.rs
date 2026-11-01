@@ -3,7 +3,7 @@
 //!
 //! Owns [`DurationValue`], the nominal identity measure, and the written
 //! components that witness the regime. Every duration-shaped string in the
-//! crate is recognized here; callers hold a validated [`DurationValue`] or
+//! crate is recognized here. Callers hold a validated [`DurationValue`] or
 //! receive a [`DurationError`].
 //!
 //! # Identity and application
@@ -93,8 +93,13 @@ fn nominal_seconds(span: Span) -> i64 {
 /// Adds each written unit independently, preserving the calendar regime.
 ///
 /// Jiff's `checked_add` balances calendar units relative to a date instead of
-/// adding fields. `None` denotes mixed signs, which must be decomposed by
-/// nominal identity.
+/// adding fields. `None` denotes mixed signs. Callers decompose those by
+/// nominal identity instead.
+///
+/// # Errors
+///
+/// - [`DurationError::SecondsOutOfRange`] if a field sum overflows or the
+///   combined fields do not fit a Jiff span.
 fn add_fields(lhs: Span, rhs: Span) -> Result<Option<Span>, DurationError> {
     macro_rules! sum {
         ($getter:ident) => {
@@ -174,8 +179,8 @@ impl DurationValue {
     /// # Errors
     ///
     /// - [`DurationError::NonFiniteSeconds`] if `seconds` is not finite.
-    /// - [`DurationError::SecondsOutOfRange`] if `seconds` exceeds Jiff's
-    ///   representable span range.
+    /// - [`DurationError::SecondsOutOfRange`] if `seconds` exceeds the
+    ///   supported nominal range or Jiff cannot represent the rounded span.
     #[inline]
     #[expect(
         clippy::as_conversions,
@@ -217,16 +222,15 @@ impl DurationValue {
     ///   number.
     /// - [`DurationError::MisplacedSign`] if a sign appears in an invalid
     ///   position.
-    /// - [`DurationError::MissingUnit`] if a number appears without a following
-    ///   unit.
+    /// - [`DurationError::MissingUnit`] if a number has no unit after it, a
+    ///   comma is followed by a non-whitespace character, or `input` is not
+    ///   ASCII.
     /// - [`DurationError::UnknownUnit`] if a component names an unrecognized
     ///   unit.
-    /// - [`DurationError::NumberOverflow`] if a component magnitude overflows
-    ///   to infinity.
-    /// - [`DurationError::NonFiniteSeconds`] if the combined magnitude is not
-    ///   finite.
-    /// - [`DurationError::SecondsOutOfRange`] if the duration exceeds Jiff's
-    ///   representable span range.
+    /// - [`DurationError::NumberOverflow`] if a component has more than 300
+    ///   leading digits.
+    /// - [`DurationError::SecondsOutOfRange`] if the duration exceeds the
+    ///   supported nominal range or Jiff cannot represent its span.
     pub(crate) fn parse(input: &str) -> Result<Self, DurationError> {
         let trimmed = input.trim();
         if trimmed.is_empty() {
@@ -272,8 +276,8 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// - [`DurationError::SecondsOutOfRange`] if the sum exceeds Jiff's
-    ///   representable span range.
+    /// - [`DurationError::SecondsOutOfRange`] if the sum exceeds the supported
+    ///   nominal range or Jiff cannot represent its span.
     #[inline]
     #[expect(
         clippy::as_conversions,
@@ -299,8 +303,8 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// - [`DurationError::SecondsOutOfRange`] if the difference exceeds Jiff's
-    ///   representable span range.
+    /// - [`DurationError::SecondsOutOfRange`] if the difference exceeds the
+    ///   supported nominal range or Jiff cannot represent its span.
     #[inline]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -314,9 +318,10 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// - [`DurationError::NonFiniteSeconds`] if `factor` is not finite.
+    /// - [`DurationError::NonFiniteSeconds`] if `factor` or its product with
+    ///   the duration's nominal seconds is not finite.
     /// - [`DurationError::SecondsOutOfRange`] if the scaled duration exceeds
-    ///   Jiff's representable span range.
+    ///   the supported nominal range or Jiff cannot represent its span.
     #[inline]
     pub fn checked_mul(self, factor: f64) -> Result<Self, DurationError> {
         if !factor.is_finite() {
@@ -358,12 +363,11 @@ impl DurationValue {
         }
     }
 
-    /// Negates a duration.
+    /// Negates a duration and returns it as `Ok`.
     ///
     /// # Errors
     ///
-    /// - [`DurationError::SecondsOutOfRange`] if the negated duration exceeds
-    ///   Jiff's representable span range.
+    /// This method always returns `Ok`.
     #[inline]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -530,6 +534,22 @@ impl fmt::Display for DurationValue {
 impl FromStr for DurationValue {
     type Err = DurationError;
 
+    /// Parses a human-readable or ISO 8601 duration string.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::Empty`] if `s` is empty or contains only whitespace.
+    /// - [`DurationError::MissingNumber`] if a unit has no preceding number.
+    /// - [`DurationError::MisplacedSign`] if a sign appears in an invalid
+    ///   position.
+    /// - [`DurationError::MissingUnit`] if a number has no unit after it, a
+    ///   comma is followed by a non-whitespace character, or `s` is not ASCII.
+    /// - [`DurationError::UnknownUnit`] if a component uses an unrecognized
+    ///   unit.
+    /// - [`DurationError::NumberOverflow`] if a component has more than 300
+    ///   leading digits.
+    /// - [`DurationError::SecondsOutOfRange`] if the duration exceeds the
+    ///   supported nominal range or Jiff cannot represent its span.
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
@@ -617,6 +637,12 @@ impl Neg for DurationValue {
 }
 
 impl Serialize for DurationValue {
+    /// Serializes this duration as its display string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if formatting fails or the serializer rejects string
+    /// values.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -627,6 +653,12 @@ impl Serialize for DurationValue {
 }
 
 impl<'de> Deserialize<'de> for DurationValue {
+    /// Parses a duration string during deserialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deserialization error if the input is not a string or does
+    /// not satisfy the duration grammar.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -660,6 +692,18 @@ impl DurationComponent {
     }
 }
 
+/// Validates a friendly-format duration before it reaches Jiff.
+///
+/// # Errors
+///
+/// - [`DurationError::NumberOverflow`] if a component has more than 300 digits.
+/// - [`DurationError::MissingNumber`] if input starts with a letter.
+/// - [`DurationError::MisplacedSign`] if a sign leads a letter or follows
+///   whitespace.
+/// - [`DurationError::MissingUnit`] if a number has no unit, a comma is not
+///   followed by whitespace, or input is not ASCII.
+/// - [`DurationError::UnknownUnit`] if input names an unsupported unit or uses
+///   scientific notation.
 #[expect(
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
@@ -675,8 +719,8 @@ fn validate_friendly_input(input: &str) -> Result<(), DurationError> {
         if digits_len > 300 {
             return Err(DurationError::NumberOverflow);
         }
-        // The closed unit vocabulary stops at seconds; Jiff's own `ms`, `us`
-        // and `ns` spellings must not leak through.
+        // The closed unit vocabulary stops at seconds. Reject Jiff's `ms`,
+        // `us`, and `ns` spellings.
         let unit = word.trim_start_matches(|c: char| {
             c.is_ascii_digit() || matches!(c, '.' | '+' | '-')
         });

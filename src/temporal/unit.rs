@@ -5,7 +5,7 @@
 //! human names. [`UNIT_LOOKUP`] stores accepted spellings. Callers read these
 //! facts from [`TimeUnit`] instead of keeping private copies. Calendar units
 //! ([`TimeUnit::Day`], [`TimeUnit::Week`], [`TimeUnit::Month`],
-//! [`TimeUnit::Year`]) take effect on the local clock; exact units
+//! [`TimeUnit::Year`]) take effect on the local clock. Exact units
 //! ([`TimeUnit::Hour`] and smaller) are exact elapsed time.
 //!
 //! [`DateUnit`] identifies calendar or clock components of a date reading and
@@ -33,13 +33,13 @@ pub(crate) enum TimeUnit {
     Minute,
     /// Hours (`"h"`, `"hr(s)"`, `"hour(s)"`).
     Hour,
-    /// Days (`"d"`, `"day(s)"`); a calendar unit.
+    /// Days (`"d"`, `"day(s)"`). A calendar unit.
     Day,
-    /// Weeks (`"w"`, `"wk(s)"`, `"week(s)"`); a calendar unit.
+    /// Weeks (`"w"`, `"wk(s)"`, `"week(s)"`). A calendar unit.
     Week,
-    /// Months (`"mo(s)"`, `"month(s)"`); a calendar unit.
+    /// Months (`"mo(s)"`, `"month(s)"`). A calendar unit.
     Month,
-    /// Years (`"y"`, `"yr(s)"`, `"year(s)"`); a calendar unit.
+    /// Years (`"y"`, `"yr(s)"`, `"year(s)"`). A calendar unit.
     Year,
 }
 
@@ -105,8 +105,7 @@ impl TimeUnit {
     /// # Errors
     ///
     /// - [`UnitError::UnknownSpelling`] if `unit` matches no registered
-    ///   spelling; matching is ASCII case-insensitive (via
-    ///   [`Self::from_spelling`]).
+    ///   spelling. [`Self::from_spelling`] ignores ASCII case.
     pub(crate) fn parse_spelling(unit: &str) -> Result<Self, UnitError> {
         Self::from_spelling(unit).ok_or_else(|| UnitError::UnknownSpelling {
             unit: unit.into(),
@@ -169,7 +168,7 @@ impl TimeUnit {
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if `n` cannot be represented as a
+    /// - [`CalendarError::OutOfRange`] if Jiff cannot represent `n` as a
     ///   [`Span`].
     pub(super) fn to_span(self, n: i64) -> Result<Span, CalendarError> {
         let span = match self {
@@ -248,7 +247,7 @@ static TEMPORAL_UNITS: [UnitSpec; 7] = [
 pub(crate) struct DecomposedPart {
     /// Identifies the unit being counted.
     unit: TimeUnit,
-    /// Stores the whole-unit count; it is always at least 1.
+    /// Stores the whole-unit count. It is always at least 1.
     count: u64,
 }
 
@@ -269,8 +268,8 @@ impl DecomposedPart {
 /// Greedily decomposes a non-negative magnitude in whole seconds into
 /// whole-unit counts.
 ///
-/// `total_secs` is a magnitude in whole seconds and `units` must be ordered
-/// largest first, as [`TEMPORAL_UNITS`] and duration composition sets are.
+/// `total_secs` is a magnitude in whole seconds. Order `units` largest first,
+/// as [`TEMPORAL_UNITS`] and duration composition sets are.
 /// Unit sizes are [`TimeUnit::nominal_seconds`], so the registry stays the
 /// sole ratio table. Units larger than the remaining magnitude contribute no
 /// row. Returns the rows and the sub-unit remainder in seconds.

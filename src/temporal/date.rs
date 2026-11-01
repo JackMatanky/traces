@@ -21,11 +21,11 @@ pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
 /// Represents a zone-free calendar date with no time of day.
 ///
 /// Carries a validated proleptic Gregorian date: no zone and no clock time.
-/// Full dates require zero-padded month and day fields; `YYYY-MM` input
-/// defaults its day to 1. Years use exactly four ASCII digits, with a leading
-/// minus sign for negative years in `-YYYY-MM-DD` form. Deserialization runs
-/// the same parser as [`FromStr`](std::str::FromStr), so inline and
-/// deserialized dates follow one grammar.
+/// Full dates need zero-padded month and day fields. `YYYY-MM` input defaults
+/// its day to 1. Years use exactly four ASCII digits, with a leading minus sign
+/// for negative years in `-YYYY-MM-DD` form. Deserialization runs the same
+/// parser as [`FromStr`](std::str::FromStr), so inline and deserialized dates
+/// follow one grammar.
 ///
 /// # Examples
 ///
@@ -137,8 +137,8 @@ impl DateValue {
         Ok(Self::from_ymd(year, 1, 1)?.civil_date().in_leap_year())
     }
 
-    /// Returns the calendar date of the current instant in the
-    /// process-local zone.
+    /// Returns the calendar date of the current instant in the process-local
+    /// zone.
     ///
     /// # Errors
     ///
@@ -184,6 +184,13 @@ impl From<civil::Date> for DateValue {
 impl FromStr for DateValue {
     type Err = DateError;
 
+    /// Parses an ISO-8601 date string through the recognition layer.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with four ASCII
+    ///   digits or a minus sign followed by four ASCII digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse_iso(s)
@@ -193,9 +200,9 @@ impl FromStr for DateValue {
 /// Converts to the calendar day `time` falls on in the local zone, not the UTC
 /// calendar day.
 ///
-/// A file's date means the reader's local day, the same doctrine that reads
-/// unzoned date-time input on the local clock: a time in the final hours of
-/// December 31 locally can already be January 1 in UTC, or the reverse.
+/// A file's date means the reader's local day. This follows the doctrine that
+/// reads unzoned date-time input on the local clock. A time in the final hours
+/// of December 31 locally can already be January 1 in UTC, or the reverse.
 impl TryFrom<SystemTime> for DateValue {
     type Error = DateError;
 
@@ -212,8 +219,12 @@ impl TryFrom<SystemTime> for DateValue {
     }
 }
 
-/// Serializes as the canonical `YYYY-MM-DD` display string.
 impl Serialize for DateValue {
+    /// Serializes as the canonical `YYYY-MM-DD` display string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only if the serializer rejects string values.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -227,6 +238,12 @@ impl Serialize for DateValue {
 /// the four-digit-year rule and `YYYY-MM` acceptance apply identically to
 /// inline and deserialized dates.
 impl<'de> Deserialize<'de> for DateValue {
+    /// Deserializes a string with the same grammar as `FromStr`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deserialization error if the input is not a string, has a
+    /// malformed year, or does not match an accepted date shape.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -251,10 +268,22 @@ pub(super) enum DateShape {
 impl DateShape {
     /// Parses `s` as a full date, falling back to a year-month.
     ///
+    /// Returns the year-month parser's reason for 7-byte input. For other
+    /// lengths, it returns the full-date parser's reason. The parsers use these
+    /// reason strings:
+    ///
+    /// - `"input is too short"` when a short full-date prefix has a valid year.
+    /// - `"unexpected trailing input"` when a padded full-date prefix has extra
+    ///   bytes.
+    /// - `"not enough input"` when a 7-byte year-month input has an invalid
+    ///   separator or month.
+    /// - `"invalid input"` when the selected parser rejects the shape or a
+    ///   field.
+    /// - `"a field is out of range"` when the fields do not name a valid date.
+    ///
     /// # Errors
     ///
-    /// Returns a static reason from the best-fitting shape: the year-month
-    /// reason for 7-byte input (`YYYY-MM`), or the full-date reason otherwise.
+    /// Returns `Err` if neither accepted shape parses.
     pub(crate) fn parse_any(
         s: &str,
     ) -> Result<(civil::Date, Self), &'static str> {
@@ -277,9 +306,20 @@ impl DateShape {
 
     /// Parses `s` according to this shape.
     ///
+    /// Returns a reason string from the parser for `self`:
+    ///
+    /// - `"input is too short"` or `"unexpected trailing input"` for a full
+    ///   date with a short or padded prefix.
+    /// - `"not enough input"` for a year-month with an invalid length,
+    ///   separator, or month.
+    /// - `"invalid input"` when the selected parser rejects the shape or
+    ///   fields.
+    /// - `"a field is out of range"` when the parsed date is not representable.
+    ///
     /// # Errors
     ///
-    /// Returns a static reason if `s` does not match this shape.
+    /// Returns `Err` if `s` does not match `self`'s shape or names a date
+    /// outside the supported calendar range.
     fn parse_date(self, s: &str) -> Result<civil::Date, &'static str> {
         match self {
             Self::YearMonthDay => Self::parse_year_month_day(s),
@@ -289,9 +329,18 @@ impl DateShape {
 
     /// Parses `YYYY-MM-DD` or `-YYYY-MM-DD`.
     ///
+    /// Returns one of these reason strings when parsing fails:
+    ///
+    /// - `"input is too short"` for a short input with a valid year prefix.
+    /// - `"unexpected trailing input"` for a padded date prefix with extra
+    ///   bytes.
+    /// - `"invalid input"` for an invalid date shape or field syntax.
+    /// - `"a field is out of range"` for fields outside the calendar range.
+    ///
     /// # Errors
     ///
-    /// Returns a static reason if `s` is not a valid full date string.
+    /// Returns `Err` if `s` is not a full date or its fields are outside the
+    /// supported calendar range.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "the input has exactly four year digits and a fixed \
@@ -348,9 +397,16 @@ impl DateShape {
 
     /// Parses `YYYY-MM` or `-YYYY-MM`, defaulting the day to 1.
     ///
+    /// Returns one of these reason strings when parsing fails:
+    ///
+    /// - `"not enough input"` for a wrong length, separator, or month syntax.
+    /// - `"invalid input"` when the year or month does not parse.
+    /// - `"a field is out of range"` when the month is outside `1..=12`.
+    ///
     /// # Errors
     ///
-    /// Returns a static reason if `s` is not a valid year-month string.
+    /// Returns `Err` if `s` is not a year-month shape or its month is outside
+    /// the supported range.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "year length is 4 or 5 bytes"
@@ -769,7 +825,7 @@ mod tests {
         #[case::empty("")]
         #[case::blank("   ")]
         fn rejects_empty_or_blank_input(#[case] input: &str) {
-            // Arrange: `input` is the case literal; blank input trims to "".
+            // Arrange: `input` is the case literal. Blank input trims to "".
             // Act
             let result = input.parse::<DateValue>();
             // Assert
@@ -1074,7 +1130,7 @@ mod tests {
         #[test]
         fn accepts_an_unquoted_iso_date_scalar() {
             // Arrange: a bare `2026-07-29` is a specially typed scalar in
-            // YAML 1.1; noyalib yields the plain string the parser accepts.
+            // YAML 1.1. noyalib yields the plain string the parser accepts.
             let yaml = "date: 2026-07-29\n";
 
             // Act
@@ -1110,8 +1166,9 @@ mod tests {
 
         #[test]
         fn converts_a_system_time_to_the_local_calendar_day() {
-            // Arrange: UTC-05:00 has no DST; 1000 seconds after the epoch is
-            // 00:16:40Z on January 1, which is 19:16:40 on December 31 local.
+            // Arrange: UTC-05:00 has no DST. 1000 seconds after the epoch
+            // is 00:16:40Z on January 1, which is 19:16:40 on December 31
+            // local.
             ZoneGuard::set("Etc/GMT+5");
             let system_time =
                 SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);

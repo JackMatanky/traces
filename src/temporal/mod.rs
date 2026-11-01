@@ -2,16 +2,16 @@
 //! relates them.
 //!
 //! This module owns recognition, parsing, formatting, and value semantics for
-//! date-shaped and duration-shaped input. Callers use validated values; parse
+//! date-shaped and duration-shaped input. Callers use validated values. Parse
 //! failures are public errors, while arithmetic failures stay internal and map
 //! at the query and template boundaries.
 //!
 //! # Clock doctrine
 //!
 //! Naive Date-Time input resolves in the process-local zone and is stored as
-//! UTC; explicit-offset input is normalized to UTC. A Date remains zone-free.
+//! UTC. Explicit-offset input is normalized to UTC. A Date remains zone-free.
 //! Date-Time display uses the local clock. Repeated local times resolve to the
-//! earlier occurrence; skipped local times shift forward by the gap length.
+//! earlier occurrence. Skipped local times shift forward by the gap length.
 //!
 //! # Calendar arithmetic
 //!
@@ -65,14 +65,13 @@ pub(crate) use zone::local_zone;
 pub(crate) mod test_support {
     use jiff::tz::TimeZone;
 
-    /// Installs a thread-local local-zone override for the current test
-    /// thread and restores the previous override when dropped. Overrides do
-    /// not cross thread boundaries, so parallel tests cannot observe each
-    /// other's zones.
+    /// Installs a thread-local local-zone override for the current test thread
+    /// and restores the previous override when dropped. Overrides do not cross
+    /// thread boundaries, so parallel tests cannot observe each other's zones.
     ///
     /// Repeated calls to [`Self::set`] replace the active override while
     /// retaining the original zone. Use [`Self::with`] for nested scoped
-    /// changes; each scope restores its immediate parent even during unwind.
+    /// changes. Each scope restores its immediate parent during unwind.
     ///
     /// # Examples
     ///
@@ -104,13 +103,13 @@ pub(crate) mod test_support {
         /// Sets the thread-local zone override for the current test thread.
         ///
         /// Readers on other threads observe their own zone. Repeated calls
-        /// replace it; the original value is restored when the parked guard
-        /// is cleared by [`Self::reset`] or the thread exits. Use
+        /// replace the override. The original value returns when the parked
+        /// guard is cleared by [`Self::reset`] or the thread exits. Use
         /// [`Self::with`] for scoped overrides.
         ///
         /// # Panics
         ///
-        /// Panics if `zone` is not a recognized time-zone name.
+        /// - If `zone` is not a recognized time-zone name.
         #[inline]
         #[expect(
             clippy::panic,
@@ -124,12 +123,12 @@ pub(crate) mod test_support {
 
         /// Runs `action` with a thread-local zone override.
         ///
-        /// Nested calls restore the immediately enclosing zone. The override
-        /// is restored during normal return and panic unwinding.
+        /// Nested calls restore the immediately enclosing zone. The override is
+        /// restored during normal return and panic unwinding.
         ///
         /// # Panics
         ///
-        /// Panics if `zone` is not a recognized time-zone name.
+        /// - If `zone` is not a recognized time-zone name.
         #[inline]
         #[expect(
             clippy::panic,
@@ -144,8 +143,8 @@ pub(crate) mod test_support {
             result
         }
 
-        /// Clears any override parked on the current thread, restoring the
-        /// zone that was active before the parked guard was installed.
+        /// Clears any override parked on the current thread, restoring the zone
+        /// that was active before the parked guard was installed.
         #[inline]
         pub fn reset() {
             let guard = ZONE_GUARD.with(|slot| slot.borrow_mut().take());
@@ -154,8 +153,8 @@ pub(crate) mod test_support {
 
         /// Sets the thread-local override to a previously resolved zone.
         ///
-        /// Repeated calls replace the active override; the original value is
-        /// restored when the parked guard is cleared or the thread exits.
+        /// Repeated calls replace the active override. The original value
+        /// returns when the parked guard is cleared or the thread exits.
         pub(crate) fn set_timezone(zone: TimeZone) {
             let parked = ZONE_GUARD.with(|slot| slot.borrow().is_some());
             if parked {
@@ -189,8 +188,8 @@ pub(crate) mod test_support {
         #[inline]
         fn drop(&mut self) {
             let previous = self.previous.take();
-            // At thread exit the override cell may already be destroyed, in
-            // which case there is nothing left to restore.
+            // The thread may destroy the override cell before guard cleanup. If
+            // so, nothing remains to restore.
             let _ = ZONE_OVERRIDE.try_with(|cell| {
                 *cell.borrow_mut() = previous;
             });
@@ -213,7 +212,7 @@ pub(crate) mod test_support {
     pub(crate) mod fixtures {
         //! Defines shared builders for the temporal test suites.
         //!
-        //! Contains only value builders; assertions live in the owning test
+        //! Contains only value builders. Assertions live in the owning test
         //! modules.
 
         use jiff::tz::{Offset, TimeZone};
@@ -225,7 +224,7 @@ pub(crate) mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if `seconds` is outside Jiff's supported offset range.
+        /// - If `seconds` is outside Jiff's supported offset range.
         pub(crate) fn fixed_offset_zone(seconds: i32) -> TimeZone {
             let offset = Offset::from_seconds(seconds)
                 .expect("fixture offset is within Jiff's supported range");
@@ -263,8 +262,7 @@ pub(crate) mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if `year`, `month`, and `day` do not form a valid calendar
-        /// date; fixtures state dates that are valid by construction.
+        /// - If `year`, `month`, and `day` do not form a valid calendar date.
         pub(crate) fn ymd(year: i32, month: u32, day: u32) -> DateValue {
             DateValue::from_ymd(year, month, day)
                 .expect("fixture fields form a valid calendar date")
@@ -274,8 +272,8 @@ pub(crate) mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics only if the constant fixture ceases to be a valid date-time;
-        /// the literal is unambiguous (UTC carries no fold or gap).
+        /// - If the fixed timestamp is no longer a valid date-time. The UTC
+        ///   literal has no fold or gap.
         pub(crate) fn fixed_datetime() -> DateTimeValue {
             DateTimeValue::parse_iso("2026-07-29T14:30:05Z")
                 .expect("fixture timestamp is valid and in Jiff's range")
@@ -469,7 +467,7 @@ pub(crate) mod test_support {
             held_rx.recv().expect("first guard is installed");
 
             // Act: the second thread installs its own override while the
-            // first guard is still live; no lock blocks it.
+            // first guard is still live. No lock blocks it.
             let second = std::thread::spawn(move || {
                 ZoneGuard::set("Etc/GMT-2");
                 let expected =

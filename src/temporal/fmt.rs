@@ -1,10 +1,10 @@
 //! Renders canonical date-time patterns with one year convention.
 //!
 //! The sign always sits outside the four-digit year width (`-0009-01-01`),
-//! matching `DateValue`'s display and jiff's own `%F`. Jiff's `%Y` counts
-//! the sign inside the width (`-009-01-01`), which the four-digit parse
-//! rule rejects, so canonical output renders through
-//! [`render_canonical_pattern`] instead of `%Y`.
+//! matching `DateValue`'s display and jiff's own `%F`. Jiff's `%Y` counts the
+//! sign inside the width (`-009-01-01`), which the four-digit parse rule
+//! rejects, so canonical output renders through [`render_canonical_pattern`]
+//! instead of `%Y`.
 
 use jiff::civil;
 
@@ -26,15 +26,15 @@ enum CanonicalForm {
     Date,
     /// `YYYY-MM`: reduced year-month precision.
     Month,
-    /// A full date-time; the payload renders the time half after `T`.
-    /// Time carries no year, so it cannot reintroduce a sign convention.
+    /// A full date-time. The payload renders the time half after `T`. Time
+    /// carries no year, so it cannot reintroduce a sign convention.
     DateTime(&'static str),
 }
 
 /// Every pattern the crate renders canonically, paired with its form.
 ///
-/// Entry one is the date pattern, entry two is month precision, the next
-/// four are `DateTimeValue::canonical_pattern`'s shapes, and `"%F"` is the
+/// Entry one is the date pattern, entry two is month precision, the next four
+/// are `DateTimeValue::canonical_pattern`'s shapes, and `"%F"` is the
 /// user-facing ISO date.
 static CANONICAL_PATTERNS: &[(&str, CanonicalForm)] = &[
     (DEFAULT_DATE_PATTERN, CanonicalForm::Date),
@@ -46,16 +46,8 @@ static CANONICAL_PATTERNS: &[(&str, CanonicalForm)] = &[
     ("%F", CanonicalForm::Date),
 ];
 
-/// Renders `pattern` over `datetime` with the sign outside the year width.
-///
-/// # Arguments
-///
-/// * `datetime` - civil fields to render
-/// * `pattern` - a pattern from [`CANONICAL_PATTERNS`]
-///
-/// # Returns
-///
-/// The rendered spelling, or `None` when `pattern` is not canonical.
+/// Renders `datetime` with a canonical `pattern`, keeping the sign outside the
+/// year width. Returns `None` when `pattern` is not canonical.
 /// [`render_pattern`] applies the Jiff fallback for those patterns.
 pub(crate) fn render_canonical_pattern(
     datetime: civil::DateTime,
@@ -80,26 +72,18 @@ pub(crate) fn render_canonical_pattern(
     Some(rendered)
 }
 
-/// Renders `pattern` over `datetime` through the canonical table first.
+/// Renders `datetime` with `pattern` through the canonical table first.
 ///
-/// Canonical patterns render through [`render_canonical_pattern`] so the
-/// sign stays outside the year width; a miss falls back to Jiff's own
-/// strtime over `fallback`. The miss arm is unreachable for
+/// Canonical patterns render through [`render_canonical_pattern`] so the sign
+/// stays outside the year width. A miss falls back to Jiff's own strtime over
+/// `fallback`. The miss arm is unreachable for
 /// `DateTimeValue::canonical_pattern` shapes (pinned by
-/// `canonical_pattern_is_in_the_render_table`) and stays live for user
-/// patterns such as `%d %B %Y`, which only Jiff can render.
+/// `canonical_pattern_is_in_the_render_table`) and stays live for user patterns
+/// such as `%d %B %Y`, which only Jiff can render.
 ///
-/// # Arguments
-///
-/// * `datetime` - civil fields the canonical table renders
-/// * `pattern` - the caller's strftime pattern
-/// * `fallback` - the value Jiff renders on a canonical miss; a `&Zoned` keeps
-///   zone-dependent directives such as `%Z` working
-///
-/// # Returns
-///
-/// The rendered spelling, from the canonical table when `pattern` is one of
-/// its entries and from Jiff otherwise.
+/// Uses `fallback` when the pattern is not canonical. A `&Zoned` fallback keeps
+/// zone-dependent directives such as `%Z` working. Returns the rendered
+/// spelling.
 ///
 /// # Errors
 ///
@@ -225,7 +209,7 @@ mod tests {
     #[test]
     fn the_parser_accepts_wider_year_forms_than_the_renderer_emits() {
         // Arrange: jiff's strtime parser reads a sign plus up to four
-        // digits; the crate's four-digit-year rule is stricter.
+        // digits. The crate's four-digit-year rule is stricter.
 
         // Act
         let strtime_accepts =

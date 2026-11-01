@@ -1,7 +1,7 @@
 //! Date shape recognition and byte-exact duration prefix parsing.
 //!
-//! Logos classifies date shapes; winnow locates duration boundaries before
-//! Jiff validates the complete duration.
+//! Logos classifies date shapes. winnow locates duration boundaries before Jiff
+//! validates the complete duration.
 
 use logos::Logos;
 use winnow::{
@@ -113,7 +113,7 @@ pub(super) fn scan_date_prefix(input: &str) -> Option<(DatePoint, usize)> {
 /// Parses a duration prefix, returning its validated value and consumed bytes.
 ///
 /// Jiff's `SpanParser::parse_span` consumes complete input but does not report
-/// a prefix length; winnow locates the candidate without interpreting units.
+/// a prefix length. winnow locates the candidate without interpreting units.
 #[must_use]
 pub(super) fn parse_duration_prefix(
     input: &str,

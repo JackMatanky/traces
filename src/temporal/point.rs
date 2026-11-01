@@ -2,7 +2,7 @@
 //!
 //! Owns [`DatePoint`], a Date written at a month or day [`DatePrecision`], or a
 //! Date-Time stored as UTC that renders as the local clock. Parsing retains the
-//! written precision; month precision denotes the first of the month.
+//! written precision. Month precision denotes the first of the month.
 //! Arithmetic applies calendar units on the local clock and exact units as
 //! elapsed time. Differences preserve whole versus fractional measurements.
 //! Callers hold the validated date point or receive a [`DateError`].
@@ -34,15 +34,15 @@ pub(crate) enum DatePrecision {
 /// Represents a date at its written precision or a Date-Time.
 ///
 /// Calendar points are zone-free and carry the written [`DatePrecision`].
-/// Date-Time points store UTC and resolve naive input in the process-local zone
-/// (a repeated local time takes the earlier occurrence; a skipped local time
-/// shifts forward by the gap length).
+/// Date-Time points store UTC and resolve naive input in the process-local
+/// zone. A repeated local time takes the earlier occurrence. A skipped local
+/// time shifts forward by the gap length.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DatePoint {
     /// Stores a zone-free Date at its written precision.
     Calendar {
-        /// Stores the calendar date; month precision stores the first of the
-        /// month.
+        /// Stores the calendar date. Month precision stores the first day of
+        /// the month.
         date: DateValue,
         /// Records how much of `date` the input specified.
         date_precision: DatePrecision,
@@ -67,13 +67,15 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`DateError::InvalidValue`] if the input does not begin with an
+    /// - [`DateError::InvalidValue`] if the input does not start with an
     ///   unsigned two- or four-digit year, or a signed four-digit year,
     ///   followed by `-`, or if no accepted shape matches.
     /// - [`DateError::YearNotFourDigits`] if an unsigned two-digit year prefix
     ///   matches but does not contain four ASCII digits.
-    /// - [`DateError::LocalZoneLookup`] if a naive date-time cannot be resolved
-    ///   in the local zone.
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails
+    ///   while resolving a naive date-time.
+    /// - [`DateError::OutOfRange`] if a naive date-time resolves outside Jiff's
+    ///   supported timestamp range.
     pub(crate) fn parse(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_like_date(trimmed.as_bytes()) {
@@ -153,8 +155,10 @@ impl DatePoint {
     ///
     /// - [`DateError::InvalidValue`] if `text` matches `pattern` neither as an
     ///   offset date-time, a naive date-time, nor a date.
-    /// - [`DateError::LocalZoneLookup`] if a naive date-time match cannot be
-    ///   resolved in the local zone.
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails
+    ///   while resolving a naive date-time match.
+    /// - [`DateError::OutOfRange`] if a naive date-time resolves outside Jiff's
+    ///   supported timestamp range.
     pub(crate) fn parse_with_pattern(
         text: &str,
         pattern: &str,
@@ -272,8 +276,8 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if converting a calendar date to a UTC
-    ///   instant exceeds the supported range.
+    /// - [`CalendarError::OutOfRange`] if the process-local zone cannot be
+    ///   discovered or the calendar date's local midnight is out of range.
     pub(crate) fn instant(self) -> Result<Timestamp, CalendarError> {
         match self {
             Self::Calendar {
@@ -290,8 +294,8 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if converting this point to an instant
-    ///   exceeds the supported range.
+    /// - [`CalendarError::OutOfRange`] if the process-local zone cannot be
+    ///   discovered or the calendar date's local midnight is out of range.
     pub(crate) fn unix_seconds(self) -> Result<i64, CalendarError> {
         self.instant().map(Timestamp::as_second)
     }
@@ -312,14 +316,14 @@ impl DatePoint {
         }
     }
 
-    /// Shifts by `n` whole units: calendar units move the local clock, exact
-    /// units move the exact time (calendar dates move only when the shift
-    /// crosses midnight).
+    /// Shifts by `n` whole units. Calendar units move the local clock. Exact
+    /// units move elapsed time. Calendar dates change only when a shift crosses
+    /// midnight.
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if the shift exceeds the supported date
-    ///   range.
+    /// - [`CalendarError::OutOfRange`] if the shifted date or date-time is
+    ///   outside the supported range.
     pub(crate) fn shift(
         self,
         n: i64,
@@ -362,8 +366,8 @@ impl DatePoint {
     ///
     /// # Errors
     ///
-    /// - [`CalendarError::OutOfRange`] if the span exceeds the supported
-    ///   date-time range.
+    /// - [`CalendarError::OutOfRange`] if the shifted date or date-time is
+    ///   outside the supported range.
     pub(crate) fn apply(
         self,
         duration: &DurationValue,
@@ -413,10 +417,11 @@ impl DatePoint {
 
     /// Measures the difference to another date point in the requested unit.
     ///
-    /// Calendar days and weeks count local civil-clock time: a 23- or 25-hour
-    /// DST day is one day, with sub-day clock remainders retained when both
-    /// points have a time. Date-only differences return whole units, truncated
-    /// toward zero. Hours and smaller measure elapsed time for two date-times.
+    /// Calendar days and weeks count local civil-clock time. A 23- or 25-hour
+    /// DST day counts as one day. When both points have a time, the result
+    /// retains sub-day clock remainders. Date-only differences return whole
+    /// units, truncated toward zero. Hours and smaller measure elapsed time
+    /// for two date-times.
     /// Reversing the operands negates the result.
     ///
     /// # Errors
@@ -470,6 +475,11 @@ impl DatePoint {
     }
 
     /// Applies one Jiff span, preserving the point's date/time kind.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if the resulting date or date-time is
+    ///   outside the supported range.
     fn advance_span(
         self,
         span: Span,
@@ -554,8 +564,8 @@ pub(crate) enum DateDiff {
 impl DateDiff {
     /// Projects the measured difference as an `f64`.
     ///
-    /// Whole magnitudes convert through the standard integer-to-floating
-    /// conversion; finite fractional magnitudes pass through unchanged.
+    /// Converts whole magnitudes with the standard integer-to-floating
+    /// conversion. Finite fractional magnitudes pass through unchanged.
     #[inline]
     #[must_use]
     pub(crate) fn to_f64(self) -> Option<f64> {
@@ -574,6 +584,11 @@ struct DifferenceEngine;
 impl DifferenceEngine {
     /// Computes discrete whole calendar differences (years, months, weeks,
     /// days).
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if Jiff cannot compute the calendar
+    ///   difference or `unit` is not a calendar unit.
     fn calendar_diff(
         from: civil::Date,
         to: civil::Date,
@@ -629,6 +644,11 @@ impl DifferenceEngine {
     }
 
     /// Computes whole-unit differences using civil delta seconds.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::OutOfRange`] if `unit` is not an hour, minute, or
+    ///   second.
     fn whole_unit_diff(
         from: civil::DateTime,
         to: civil::DateTime,
@@ -719,6 +739,14 @@ fn pattern_kind(fields: u8) -> PatternKind {
     }
 }
 
+/// Parses broken-down pattern fields into a date point.
+///
+/// # Errors
+///
+/// - [`DateError::InvalidValue`] if the fields do not form a valid date-time.
+/// - [`DateError::LocalZoneLookup`] if local-zone lookup fails for naive input.
+/// - [`DateError::OutOfRange`] if naive input resolves outside Jiff's supported
+///   timestamp range.
 fn parse_pattern_value(
     text: &str,
     pattern: &str,
@@ -757,6 +785,14 @@ fn parse_pattern_value(
     }
 }
 
+/// Parses pattern fields as a local date-time.
+///
+/// # Errors
+///
+/// - [`DateError::InvalidValue`] if the fields do not form a valid date-time.
+/// - [`DateError::LocalZoneLookup`] if local-zone lookup fails.
+/// - [`DateError::OutOfRange`] if local input resolves outside Jiff's supported
+///   timestamp range.
 fn parse_local_pattern_value(
     text: &str,
     pattern: &str,
@@ -771,6 +807,11 @@ fn parse_local_pattern_value(
         })
 }
 
+/// Parses `text` into broken-down fields with `pattern`.
+///
+/// # Errors
+///
+/// - [`DateError::InvalidValue`] if Jiff cannot parse the pattern or fields.
 fn parse_pattern_fields(
     text: &str,
     pattern: &str,
@@ -810,7 +851,7 @@ mod tests {
     };
 
     // ZoneGuard pins a Jiff time zone to the test thread without changing the
-    // process TZ environment variable; repeated sets replace the override.
+    // process TZ environment variable. Repeated sets replace the override.
     fn point_at(text: &str) -> DatePoint {
         DatePoint::parse(text).expect("valid date point")
     }
@@ -1733,7 +1774,7 @@ mod tests {
 
         #[test]
         fn keeps_the_local_clock_time_across_a_spring_forward_gap() {
-            // Arrange: Saturday 2026-03-07 12:00 EST; the gap begins Sunday.
+            // Arrange: Saturday 2026-03-07 12:00 EST. The gap begins Sunday.
             ZoneGuard::set_timezone(new_york_zone());
             let base = point_at("2026-03-07 12:00:00");
             let clock = |point: Result<DatePoint, CalendarError>| {
@@ -1797,7 +1838,7 @@ mod tests {
 
         #[test]
         fn keeps_the_local_clock_time_across_a_fall_back_fold() {
-            // Arrange: Saturday 2026-10-31 12:00 EDT; the fold begins Sunday.
+            // Arrange: Saturday 2026-10-31 12:00 EDT. The fold begins Sunday.
             ZoneGuard::set_timezone(new_york_zone());
             let base = point_at("2026-10-31 12:00:00");
 
@@ -2233,7 +2274,7 @@ mod tests {
         #[test]
         fn applies_the_fractional_part_of_a_calendar_unit_on_the_local_clock() {
             // Arrange: a calendar day plus an exact 12-hour remainder spans
-            // the spring gap; 36 exact hours does not.
+            // the spring gap. 36 exact hours does not.
             ZoneGuard::set_timezone(new_york_zone());
             let base = point_at("2026-03-07 06:00:00");
             let written_order =
@@ -3208,8 +3249,8 @@ mod tests {
             fn rejects_non_finite_fractional_differences(
                 #[case] magnitude: f64,
             ) {
-                // Arrange: non-finite fractional values cannot be represented
-                // as `f64` output.
+                // Arrange: `f64` output cannot represent non-finite fractional
+                // values.
                 let difference = DateDiff::Fractional(magnitude);
 
                 // Act

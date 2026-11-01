@@ -3,7 +3,7 @@
 //! Owns [`DateTimeValue`] and the recognition shapes ([`DateTimeShape`],
 //! [`DateTimeInput`]) that turn written RFC 3339 and naive clock times into it.
 //! Written input without an offset resolves in the process's local zone and
-//! stores as UTC; every human-facing rendering converts back to the local
+//! stores as UTC. Every human-facing rendering converts back to the local
 //! clock. Callers hold the validated date-time or receive a [`DateError`].
 
 use std::{borrow::Cow, fmt, str::FromStr, time::SystemTime};
@@ -34,9 +34,9 @@ pub(crate) const DEFAULT_DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 /// Stores a Date-Time in UTC and renders it as the local clock.
 ///
 /// Accepts RFC 3339 input with an explicit offset, except leap seconds, which
-/// Jiff cannot represent. ISO date portions require zero-padded month and day
+/// Jiff cannot represent. ISO date portions need zero-padded month and day
 /// fields. Naive input in the five accepted shapes resolves in the
-/// process-local zone. Folds take the earlier occurrence; gaps shift forward by
+/// process-local zone. Folds take the earlier occurrence. Gaps shift forward by
 /// their length. Pattern-based parsing uses a separate strftime grammar and
 /// retains its pattern-driven padding rules.
 ///
@@ -80,7 +80,7 @@ pub struct DateTimeValue(Timestamp);
 impl DateTimeValue {
     /// Constructs a UTC date-time from whole seconds since the UTC epoch.
     ///
-    /// The input is a number of seconds from `1970-01-01T00:00:00Z`.
+    /// The input counts seconds from `1970-01-01T00:00:00Z`.
     ///
     /// # Errors
     ///
@@ -157,16 +157,18 @@ impl DateTimeValue {
     /// Parses an RFC 3339 or ISO-8601 date-time string with Jiff's Temporal
     /// parser after applying the accepted application grammar.
     ///
-    /// Surrounding whitespace is ignored. Accepted whitespace runs between
-    /// date and time normalize to one separator before parsing.
+    /// Surrounding whitespace is ignored. Accepted whitespace runs between date
+    /// and time normalize to one separator before parsing.
     ///
     /// # Errors
     ///
-    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with 4 ASCII
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with four ASCII
     ///   digits.
     /// - [`DateError::InvalidValue`] if no accepted shape matches.
     /// - [`DateError::LocalZoneLookup`] if local-zone lookup fails while
     ///   resolving naive input.
+    /// - [`DateError::OutOfRange`] if naive input resolves outside Jiff's
+    ///   supported timestamp range.
     pub(crate) fn parse_iso(s: &str) -> Result<Self, DateError> {
         let trimmed = s.trim();
         if !starts_with_year(trimmed) {
@@ -207,8 +209,6 @@ impl DateTimeValue {
         zone.to_datetime(self.0)
     }
 
-    /// Returns the local clock time of this date-time.
-    ///
     /// Returns the local calendar date of this date-time, discarding
     /// time-of-day.
     ///
@@ -301,8 +301,8 @@ impl DateTimeValue {
 /// Reads the raw current instant from the system clock.
 ///
 /// Sits beside [`DateTimeValue::now`] for instant-to-instant comparisons
-/// (`is_past`/`is_future` in the template engine): no zone or calendar
-/// value is constructed, and the comparison stays nanosecond-exact.
+/// (`is_past`/`is_future` in the template engine): no zone or calendar value is
+/// constructed, and the comparison stays nanosecond-exact.
 #[inline]
 pub(crate) fn now_instant() -> Timestamp {
     Timestamp::now()
@@ -364,15 +364,31 @@ impl TryFrom<DateValue> for DateTimeValue {
 impl FromStr for DateTimeValue {
     type Err = DateError;
 
+    /// Parses an RFC 3339 or ISO-8601 date-time string.
+    ///
+    /// # Errors
+    ///
+    /// - [`DateError::YearNotFourDigits`] if `s` does not begin with four ASCII
+    ///   digits.
+    /// - [`DateError::InvalidValue`] if no accepted shape matches.
+    /// - [`DateError::LocalZoneLookup`] if local-zone lookup fails while
+    ///   resolving naive input.
+    /// - [`DateError::OutOfRange`] if naive input resolves outside Jiff's
+    ///   supported timestamp range.
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse_iso(s)
     }
 }
 
-/// Serializes as an explicit RFC 3339 `…Z` interop spelling, independent of the
-/// local-clock rendering [`Display`](fmt::Display) performs.
 impl Serialize for DateTimeValue {
+    /// Serializes as explicit RFC 3339 `…Z`, independent of local-clock
+    /// [`Display`](fmt::Display) output.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if pattern rendering fails or the serializer rejects
+    /// the string value.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -386,10 +402,17 @@ impl Serialize for DateTimeValue {
     }
 }
 
-/// Deserializes via the crate-internal `parse_iso` parser, so the
-/// four-digit-year rule and every accepted shape (including the `…Z` interop
-/// spelling) apply identically to inline and deserialized date-times.
+/// Deserializes with the crate-internal `parse_iso` parser. The four-digit-year
+/// rule and every accepted shape (including the `…Z` interop spelling) apply
+/// identically to inline and deserialized date-times.
 impl<'de> Deserialize<'de> for DateTimeValue {
+    /// Deserializes a string with the same grammar as `FromStr`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deserialization error if the input is not a string or does not
+    /// match an accepted shape. Naive input also fails if local-zone lookup
+    /// fails or its timestamp is outside Jiff's supported range.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -418,9 +441,19 @@ pub(super) enum DateTimeShape {
 impl DateTimeShape {
     /// Parses a strict application date-time shape with Jiff's Temporal parser.
     ///
+    /// The parser uses these reason strings:
+    ///
+    /// - `"input is too short"` when the date portion is too short or lacks a
+    ///   padded date prefix.
+    /// - `"invalid input"` when fields, leap-second syntax, or an offset fail
+    ///   validation.
+    /// - `"input does not match RFC 3339"` when an RFC 3339 shape has no
+    ///   numeric offset.
+    ///
     /// # Errors
     ///
-    /// Returns a static reason if no accepted date-time shape matches `s`.
+    /// Returns `Err` if the input does not match an accepted date-time shape or
+    /// contains invalid fields or an offset.
     pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
         let normalized = Self::normalize_separator(normalized);
@@ -470,6 +503,15 @@ impl DateTimeShape {
         }
     }
 
+    /// Recognizes the date-time shape of a fully bounded `input`.
+    ///
+    /// Returns `"invalid input"` when the lexer rejects `input`, the token does
+    /// not span all of it, or the token describes a date without a time.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the lexer does not identify one supported date-time
+    /// shape that spans all of `input`.
     fn recognize(input: &str) -> Result<Self, &'static str> {
         let mut lexer = TemporalShapeToken::lexer(input);
         let Some(Ok(token)) = lexer.next() else {
@@ -551,20 +593,14 @@ impl DateTimeShape {
 
 /// Rewrites a leading sign+4-digit year into Jiff's six-digit expanded form.
 ///
-/// Jiff's Temporal parser rejects a four-digit year after a sign (it wants six
-/// digits, `-000009`), while the crate's own grammar validates the sign+4
-/// spelling (`-0009`). [`DateTimeShape::parse_any`] applies this only after
-/// the four-digit checks have passed, immediately before handing the text to
-/// Jiff, so the stricter parser sees a year form it accepts.
+/// Jiff's Temporal parser rejects a four-digit year after a sign: it wants six
+/// digits (`-000009`). The crate's own grammar validates the sign+4 spelling
+/// (`-0009`). [`DateTimeShape::parse_any`] applies this rewrite only once the
+/// four-digit checks pass, so the stricter parser sees a year form it accepts.
 ///
-/// # Arguments
-///
-/// * `input` - date-time text already validated against the crate's grammar
-///
-/// # Returns
-///
-/// A borrowed copy when `input` has no sign or not exactly four ASCII year
-/// digits; otherwise the six-digit-expanded spelling.
+/// `input` is date-time text already validated against the crate's grammar.
+/// Returns a borrowed copy when `input` has no sign or not exactly four ASCII
+/// year digits. Otherwise returns the six-digit-expanded spelling.
 fn expand_signed_year(input: &str) -> Cow<'_, str> {
     if !input.starts_with('-') {
         return Cow::Borrowed(input);
@@ -594,14 +630,14 @@ pub(super) enum DateTimeInput {
 impl DateTimeInput {
     /// Resolves parsed date-time input into a UTC-stored [`DateTimeValue`].
     ///
-    /// For [`Self::Absolute`], the timestamp is stored directly.
-    /// For [`Self::LocalClock`], resolution runs through
+    /// For [`Self::Absolute`], the timestamp is stored directly. For
+    /// [`Self::LocalClock`], resolution runs through
     /// [`DateTimeValue::from_local`] in the process-local time zone.
     ///
     /// # Errors
     ///
-    /// - [`DateError::LocalZoneLookup`] if the system time zone cannot resolve
-    ///   a local-clock input.
+    /// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails
+    ///   while resolving a local-clock input.
     /// - [`DateError::OutOfRange`] if the local-clock input cannot be
     ///   represented as a timestamp in the selected zone.
     pub(crate) fn resolve(
@@ -671,8 +707,7 @@ mod tests {
     };
 
     // ZoneGuard pins a Jiff time zone to the test thread without changing the
-    // process TZ environment variable; repeated sets replace the override.
-
+    // process TZ environment variable. Repeated sets replace the override.
     mod clock {
         use super::*;
 
@@ -884,7 +919,7 @@ mod tests {
 
         #[test]
         fn resolves_the_london_fold_to_the_earlier_occurrence() {
-            // Arrange: one zone per test; London falls back on 2026-10-25.
+            // Arrange: one zone per test. London falls back on 2026-10-25.
             ZoneGuard::set_timezone(
                 crate::temporal::test_support::fixtures::london_zone(),
             );
@@ -1656,7 +1691,7 @@ mod tests {
                 datetime: DateTimeValue,
             }
 
-            // Arrange: YAML strings share the serde string path; the "Z"
+            // Arrange: YAML strings share the serde string path. The "Z"
             // spelling must not mean the local zone.
             let yaml = "datetime: \"2026-07-29T14:30:00Z\"\n";
             let expected =
