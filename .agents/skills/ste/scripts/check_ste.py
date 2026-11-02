@@ -1455,6 +1455,11 @@ def parser() -> argparse.ArgumentParser:
     check.add_argument("--strict", action="store_true")
     check.add_argument("--only")
     check.add_argument("--ignore")
+    check.add_argument(
+        "--language",
+        choices=sorted(LANGUAGES),
+        help="source language for comment mode; only valid with stdin input",
+    )
     fix = sub.add_parser("fix")
     fix.add_argument("file")
     fix.add_argument("-w", "--write", action="store_true")
@@ -1485,11 +1490,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 file = str(after_path)
             else:
+                if args.language and args.file != "-":
+                    raise ConfigError("--language is only valid with stdin input")
+                language = args.language or (
+                    language_for_suffix(Path(args.file).suffix.lower())
+                    if args.file != "-"
+                    else None
+                )
                 text = (
                     sys.stdin.read()
                     if args.file == "-"
                     else Path(args.file).read_text(encoding="utf-8")
                 )
+                if language:
+                    text = mask_to_prose(text, LANGUAGES[language])
                 file = args.file
                 findings = check_text(text, file, rules, dictionary, only, ignore)
             print(

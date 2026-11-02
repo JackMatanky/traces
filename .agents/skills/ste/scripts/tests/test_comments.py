@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import sys
 from pathlib import Path
 
-import pytest  # noqa: F401  (fixtures arrive with later comment-mode tasks)
+import pytest
 
 SCRIPT = Path(__file__).parents[1] / "check_ste.py"
 SPEC = importlib.util.spec_from_file_location("check_ste", SCRIPT)
@@ -286,3 +288,70 @@ def test_docstring_interior_is_never_glyph_cleaned() -> None:
     assert "not-a-py-comment marker" in masked
     assert "#" in masked
     assert "'''" not in masked
+
+
+RUST_SAMPLE = (
+    "fn main() {\n    // Please utilize the tool.\n    let utilize_buffer = 1;\n}\n"
+)
+
+
+def test_check_source_file_reports_comment_findings_at_real_coordinates(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    document = tmp_path / "sample.rs"
+    document.write_text(RUST_SAMPLE)
+
+    assert check_ste.main(["check", str(document), "--format", "json"]) == 1
+
+    output = json.loads(capsys.readouterr().out)
+    assert [finding["rule_id"] for finding in output["findings"]] == ["R13"]
+    assert output["findings"][0]["line"] == 2
+    assert output["findings"][0]["column"] == 8
+
+
+def test_check_empty_comment_prose_is_clean(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    document = tmp_path / "sample.go"
+    document.write_text("func main() { x := 1 }\n")
+    assert check_ste.main(["check", str(document), "--format", "json"]) == 0
+    assert json.loads(capsys.readouterr().out)["clean"] is True
+
+
+def test_check_unknown_suffix_falls_back_to_markdown(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    document = tmp_path / "notes.baz"
+    document.write_text("Utilize the tool.\n")
+    assert check_ste.main(["check", str(document), "--format", "json"]) == 1
+    output = json.loads(capsys.readouterr().out)
+    assert [finding["rule_id"] for finding in output["findings"]] == ["R13"]
+
+
+def test_check_stdin_language_and_misuse(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sys.stdin, previous = io.StringIO(RUST_SAMPLE), sys.stdin
+    try:
+        assert (
+            check_ste.main(["check", "-", "--language", "rust", "--format", "json"])
+            == 1
+        )
+        output = json.loads(capsys.readouterr().out)
+        assert output["findings"][0]["line"] == 2
+    finally:
+        sys.stdin = previous
+
+
+def test_language_only_with_file_returns_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    document = tmp_path / "notes.md"
+    document.write_text("Utilize the tool.\n")
+    assert (
+        check_ste.main(
+            ["check", str(document), "--language", "rust", "--format", "json"]
+        )
+        == 2
+    )
+    assert "only valid with stdin" in capsys.readouterr().err
