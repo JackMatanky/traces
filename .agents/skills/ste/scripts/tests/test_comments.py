@@ -419,3 +419,9 @@ def test_fix_markdown_suffix_behavior_unchanged(tmp_path: Path) -> None:
     assert check_ste.main(["fix", str(document), "--write"]) == 0
 
     assert document.read_text() == "Use the tool.\n"
+
+
+def test_fix_comments_rejects_misaligned_mask() -> None:
+    with pytest.raises(ValueError, match="same length"):
+        dictionary = check_ste.load_config(None, None)[1]
+        check_ste.fix_comments("let utilize = 1", "utilize", dictionary)

@@ -1317,6 +1317,8 @@ def fix_comments(original: str, masked: str, dictionary: dict[str, object]) -> s
     match can be applied at the same span. Markdown code protection (backticks,
     fences, URLs) still applies because matching happens per prose segment.
     """
+    if len(original) != len(masked):
+        raise ValueError("original and masked text must have the same length")
     result = original
     for segment, segment_offset in reversed(prose_segments(masked)):
         for match in reversed(dictionary_matches(segment, dictionary)):
