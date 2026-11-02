@@ -58,7 +58,7 @@ Decide the topics in this order. Topic A frames the other topics.
 
 - Decide the representation of the task status: an owned `String`, or a symbol
   or id. State if the parser still needs the status map.
-- Decide the final place of `TaskStatus*` and `TaskListItem` (ticket 22).
+- `TaskStatus*` stays in `task.rs` at the crate root (maintainer, ticket 22).
 - Decide the final field set of the parser input (ticket 22). Add each
   index-time read to `IndexPolicy`. Include the title, aliases and date keys.
 - Decide if the parser input is borrowed or owned. Check the decision against a
@@ -217,8 +217,8 @@ See [ticket 22's Answer](./22-config-ownership-and-lifecycle.md).
   Do not clone it for each file.
 - The parser-input fields are provisional. This ticket decides the final field
   set.
-- Ticket 22 does not move `TaskStatus`. This ticket decides the final place of
-  `TaskStatus*` and `TaskListItem`.
+- Ticket 22 does not move `TaskStatus`. `TaskStatus*` stays in `task.rs` at the
+  crate root. `TaskListItem` stays in `note`.
 - `index` owns `IndexPolicy`. `IndexPolicy::fingerprint()` is the only source of
   the fingerprint. Ticket 22 removed `title`, `aliases` and the date keys from
   the fingerprint, because no production code reads them.
@@ -404,8 +404,8 @@ Alternatives considered, with the reason to reject each:
 - Block-id resolution, and whether `NoteDoc` records images.
 - Whether any template reads external links (ticket 30).
 - Host memory at 50,000 notes and a two-process store open.
-- The final place of `TaskStatus*` and `TaskListItem`. The grilling did not
-  settle it. Proposal [P]: keep the root `task` types, as ticket 22 says.
+- The place of `TaskStatus*` is settled: `task.rs` at the crate root. What
+  remains is the split of the item payload into symbol and kind.
 - The final field set of the parser input, and the `IndexPolicy` keys for each
   index-time read. The grilling did not list them.
 
@@ -438,9 +438,8 @@ Alternatives considered, with the reason to reject each:
 - Ticket 20: replace "the app layer owns any merge" with the note-owned
   effective accessor. Keep the frontmatter-only check.
 - Ticket 22: `TaskListItem` holds the symbol and the kind. The status map and
-  the tag filters stay in the parser input. The final place of `TaskStatus*` and
-  `TaskListItem` and the final field set of the parser input stay unresolved
-  (see above).
+  the tag filters stay in the parser input. `TaskStatus*` stays at the crate
+  root. The final field set of the parser input stays unresolved (see above).
 
 ## Code delta
 
@@ -472,5 +471,4 @@ Not in code:
 Unclear in the ticket:
 
 - "Decide between a boxed and an unboxed task payload with a measured size and allocation count".
-- "The final place of `TaskStatus*` and `TaskListItem`. The grilling did not settle it".
-- "The final field set of the parser input, and the `IndexPolicy` keys for each index-time read. The grilling did not list them".
+- "The final field set of the parser input is open. The code reads three values: the tags field name, the tag filters and the status map".

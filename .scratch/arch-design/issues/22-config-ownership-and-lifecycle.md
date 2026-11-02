@@ -82,15 +82,16 @@ not cite these agent files in `22-prep/`: `n1-conflicts-resolved-tickets.md`,
   use it.
 - Keep `FieldName` as a leaf. `config` and `schema` both use it.
 - Put the file splits in the findings ledger. They change no owner.
-- Ticket 23 did not settle the final place of `TaskStatus*` with
-  `TaskListItem`. Its proposal [P] keeps the root `task` types.
+- `TaskStatus*` stays in `task.rs` at the crate root. The maintainer expects
+  this. `TaskListItem` stays in `note` and uses it.
 - Make `note` define its own parser-input type. It holds the status map, the tag
   filters and the tags field name.
 - Make `note` import nothing from `config`.
 - Build the parser input one time for each indexing run. The parser borrows it.
   Do not clone it for each file.
-- Ticket 23 did not list the final field set. Decide it when the index-time
-  reads are listed.
+- The parser input needs three config reads [V]: the tags field name, the tag
+  filters and the status map (`src/note/parser.rs:381,527,528`). Confirm the
+  list when ticket 23 lists the index-time reads.
 
 ### Decision: index policy and digests (c)
 
