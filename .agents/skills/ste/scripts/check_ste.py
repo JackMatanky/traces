@@ -1284,21 +1284,49 @@ def check_text(
 
 
 # 5. safe fixer
+def prose_segments(text: str) -> list[tuple[str, int]]:
+    """Return non-Markdown-code segments with their start offsets."""
+    parts = re.split(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)", text)
+    segments: list[tuple[str, int]] = []
+    offset = 0
+    for index, part in enumerate(parts):
+        if index % 2 == 0:
+            segments.append((part, offset))
+        offset += len(part)
+    return segments
+
+
 def replace_auto(text: str, dictionary: dict[str, object]) -> str:
     """Replace only auto-approved substitutions outside Markdown code spans and fences."""
-    parts = re.split(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)", text)
-    for index in range(0, len(parts), 2):
-        segment = parts[index]
-        matches = dictionary_matches(segment, dictionary)
-        for match in reversed(matches):
+    result = text
+    for segment, segment_offset in reversed(prose_segments(text)):
+        for match in reversed(dictionary_matches(segment, dictionary)):
             if match.auto and isinstance(match.approved, str):
-                segment = (
-                    segment[: match.start]
+                result = (
+                    result[: segment_offset + match.start]
                     + replacement_case(match.common, match.approved)
-                    + segment[match.end :]
+                    + result[segment_offset + match.end :]
                 )
-        parts[index] = segment
-    return "".join(parts)
+    return result
+
+
+def fix_comments(original: str, masked: str, dictionary: dict[str, object]) -> str:
+    """Splice auto substitutions from masked comment prose into the original.
+
+    Coordinates in the masked text equal coordinates in the original, so each
+    match can be applied at the same span. Markdown code protection (backticks,
+    fences, URLs) still applies because matching happens per prose segment.
+    """
+    result = original
+    for segment, segment_offset in reversed(prose_segments(masked)):
+        for match in reversed(dictionary_matches(segment, dictionary)):
+            if match.auto and isinstance(match.approved, str):
+                result = (
+                    result[: segment_offset + match.start]
+                    + replacement_case(match.common, match.approved)
+                    + result[segment_offset + match.end :]
+                )
+    return result
 
 
 # 6. F1 fact extraction/compare
@@ -1523,7 +1551,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "fix":
             path = Path(args.file)
             before = path.read_text(encoding="utf-8")
-            after = replace_auto(before, dictionary)
+            language = language_for_suffix(path.suffix.lower())
+            if language is None:
+                after = replace_auto(before, dictionary)
+            else:
+                masked = mask_to_prose(before, LANGUAGES[language])
+                after = fix_comments(before, masked, dictionary)
             if args.write:
                 path.write_text(after, encoding="utf-8")
                 print(f"applied {before != after}; deferred manual substitutions")

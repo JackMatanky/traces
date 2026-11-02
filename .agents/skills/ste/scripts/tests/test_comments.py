@@ -380,3 +380,42 @@ def test_compare_with_language_is_misuse(
         == 2
     )
     assert "only valid with stdin" in capsys.readouterr().err
+
+
+def test_fix_comment_mode_splices_only_comments(tmp_path: Path) -> None:
+    document = tmp_path / "lib.rs"
+    original = (
+        "fn main() {\n"
+        "    // Read the docs prior to each run.\n"
+        "    let utilize_buffer = 1;\n"
+        '    let s = "utilize prior to this";\n'
+        "}\n"
+    )
+    document.write_text(original)
+
+    assert check_ste.main(["fix", str(document), "--write"]) == 0
+
+    expected = original.replace("prior to each run", "before each run")
+    assert document.read_text() == expected
+
+
+def test_fix_source_file_preserves_code_bytes(tmp_path: Path) -> None:
+    document = tmp_path / "lib.rs"
+    original = "fn main() {\n    // Please utilize the tool.\n    let s = 1;\n}\n"
+    document.write_text(original)
+
+    assert check_ste.main(["fix", str(document), "--write"]) == 0
+
+    assert document.read_text() == original.replace(
+        "// Please utilize the tool.", "// Please use the tool."
+    )
+
+
+def test_fix_markdown_suffix_behavior_unchanged(tmp_path: Path) -> None:
+    document = tmp_path / "notes.md"
+    original = "Utilize the tool.\n"
+    document.write_text(original)
+
+    assert check_ste.main(["fix", str(document), "--write"]) == 0
+
+    assert document.read_text() == "Use the tool.\n"

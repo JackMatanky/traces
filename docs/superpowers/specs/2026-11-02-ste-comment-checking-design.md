@@ -20,8 +20,9 @@ Comment support must become a designed capability.
    inputs. Stdin (`check -`) stays Markdown mode unless `--language` is passed;
    `--language` is only valid together with stdin.
 2. **Languages first class:** Rust (`.rs`), Python (`.py`), TS/JS (`.ts .tsx .js
-   .mjs .cjs`), Go (`.go`), C (`.c .h .cc .cpp .hpp`). Unknown extension for comment
-   checking: exit 2 with the supported list.
+   .mjs .cjs`), Go (`.go`), C (`.c .h .cc .cpp .hpp`). Unknown file extensions fall
+   back to Markdown mode per automatic mode selection; explicit stdin `--language`
+   values are argparse-restricted and reject unknown language names (exit 2).
 3. **Mechanism: mask to whitespace.** A string-aware scanner converts every byte
    outside comment prose to spaces (newlines preserved, length identical to the
    original). The masked text is then checked by the unchanged Markdown pipeline:
@@ -106,4 +107,4 @@ lines unchecked). RULES.md and DICTIONARY.md unchanged; parity tests still hold.
 - End-to-end RED/GREEN: a real `src/` file renders comment-only findings with
   correct coordinates; garbage findings from direct-code checking disappear.
 - Fix positive and negative controls as above.
-- Unknown extension and stdin-without-language return 2.
+- Unknown file extensions fall back to Markdown mode; stdin-without-language returns 2.
