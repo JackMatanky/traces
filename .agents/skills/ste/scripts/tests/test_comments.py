@@ -189,11 +189,15 @@ def test_ts_unterminated_regex_candidate_falls_through() -> None:
     assert "use fallthrough" in masked
 
 
+# Even inner-quote count made the old 6-char-window implementation coincide by
+# quote parity, so this pins one direction only: a mis-parsed >=5-hash raw
+# string must not hide the trailing comment line.
 def test_rust_raw_string_with_five_hashes_is_delimiter_extensible() -> None:
     code = 'let r = r#####"a"b"c"#####;\n// comment: utilize it\n'
     masked = mask(code)
     layout_of(code, masked)
     assert "comment: utilize it" in masked
+    assert 'b"c' not in masked
 
 
 def test_rust_raw_string_odd_quotes_blanks_only_raw_string() -> None:
