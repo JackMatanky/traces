@@ -258,3 +258,31 @@ def test_c_unterminated_block_comment_keeps_to_eof() -> None:
     masked = mask(code, "c")
     layout_of(code, masked)
     assert "still prose." in masked
+
+
+def test_rust_doc_prefixes_left_no_glyph_residue() -> None:
+    code = "/// Parses Markdown event streams.\n//! Header note.\nlet x = 1;\n"
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "Parses Markdown event streams." in masked
+    assert "Header note." in masked
+    assert "/" not in "".join(masked.split("\n", 3)[:3]).strip(" ")
+
+
+def test_block_doc_continuation_star_is_blank() -> None:
+    code = "/** Text\n * Continuation.\n */\n"
+    masked = mask(code, "ts")
+    layout_of(code, masked)
+    assert "Continuation." in masked
+    assert "Text" in masked
+    starred = [line for line in masked.splitlines() if line.strip()]
+    assert all(not line.strip().startswith("* ") for line in starred)
+
+
+def test_docstring_interior_is_never_glyph_cleaned() -> None:
+    code = "'''\n# not-a-py-comment marker\n'''\n"
+    masked = mask(code, "python")
+    layout_of(code, masked)
+    assert "not-a-py-comment marker" in masked
+    assert "#" in masked
+    assert "'''" not in masked

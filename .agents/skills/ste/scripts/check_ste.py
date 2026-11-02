@@ -660,8 +660,28 @@ def _regex_end(text: str, start: int) -> int | None:
 def mask_line_prefixes(
     text: str, out: list[str], language: Language, spans: list[tuple[int, int, str]]
 ) -> None:
-    """Placeholder for per-line doc/continuation prefix blanking."""
-    return
+    """Blank doc-comment and continuation glyphs at line starts inside spans.
+
+    ``///`` leaves a stray ``/``, ``//!`` a ``!``, and block-doc continuation
+    lines a ``*``; these residues would reclassify comment lines as Markdown
+    blocks. Docstring interiors are arbitrary content and are never cleaned.
+    """
+    if not language.line_prefix_chars:
+        return
+    for start, end, kind in spans:
+        if kind != _COMMENT:
+            continue
+        line_start = text.rfind("\n", 0, start) + 1
+        region_end = text.find("\n", end)
+        limit = region_end + 1 if region_end != -1 else len(text)
+        while line_start < limit:
+            line_end = text.find("\n", line_start, limit)
+            line_end = limit if line_end == -1 else line_end
+            pos = line_start
+            while pos < line_end and text[pos] in language.line_prefix_chars:
+                pos += 1
+            out[line_start:pos] = [" "] * (pos - line_start)
+            line_start = line_end + 1
 
 
 def mask_to_prose(text: str, language: Language) -> str:
