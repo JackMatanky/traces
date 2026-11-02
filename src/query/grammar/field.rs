@@ -49,7 +49,7 @@ pub(crate) enum FieldPath {
 impl FieldPath {
     /// Parses a query field path string into a [`FieldPath`].
     ///
-    /// Leading and trailing whitespace is trimmed.
+    /// The parser trims leading and trailing whitespace.
     ///
     /// # Errors
     ///
@@ -143,8 +143,8 @@ impl FieldPath {
 /// Represents a `file.<field>` accessor backed by [`FileMeta`](crate::FileMeta)
 /// metadata.
 ///
-/// Accepted accessor names, including aliases such as `ctime` for `created_at`,
-/// are listed in [`ACCESSOR_NAMES`](Self::ACCESSOR_NAMES).
+/// [`ACCESSOR_NAMES`](Self::ACCESSOR_NAMES) lists the accepted accessor names,
+/// including aliases such as `ctime` for `created_at`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FileField {
     /// Accesses the file's project-relative path.

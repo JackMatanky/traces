@@ -346,7 +346,7 @@ impl ClassExpansionMode {
 /// Resolves File Class names against the Schema domain.
 ///
 /// The `Send + Sync` bounds let `QueryOps` store this trait object in
-/// [`std::sync::Arc`]. The [`minijinja::Object`] trait also requires these
+/// [`std::sync::Arc`]. The [`minijinja::Object`] trait also needs these
 /// bounds.
 pub(crate) trait FileClassExpander: Send + Sync {
     /// Adds names from `classes` to the match set in `mode`.
@@ -1077,7 +1077,7 @@ mod tests {
             let index = IndexerService::for_tests(temp.path())
                 .build()
                 .expect("build index");
-            // `covers/**/*.md` requires an intermediate path segment.
+            // `covers/**/*.md` needs an intermediate path segment.
             // This checks that `**` crosses `/` boundaries.
             let expression =
                 SourceExpr::parse("covers/**/*.md").expect("valid source");

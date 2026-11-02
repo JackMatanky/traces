@@ -217,9 +217,9 @@ impl ComparisonExpr {
 
     /// Converts quoted strings to typed date, date-time, or duration values.
     ///
-    /// Runs once when the query is built. Bare date literals and other typed
-    /// literals need no conversion. Uses [`TextShape::classify`], the same
-    /// classifier as sort keys.
+    /// Runs once during query construction. Bare date literals and other
+    /// typed literals need no conversion. Uses [`TextShape::classify`], the
+    /// same classifier as sort keys.
     pub(super) fn classify_literal(literal: NoteFieldValue) -> NoteFieldValue {
         let NoteFieldValue::String(text) = &literal else {
             return literal;
@@ -854,7 +854,7 @@ impl TryFrom<&str> for CompareOp {
 struct FilterGrammar;
 
 impl FilterGrammar {
-    /// Parses a literal where a comparison or function argument requires a
+    /// Parses a literal where a comparison or function argument needs a
     /// value.
     fn parse_literal_arg(
         input: &str,

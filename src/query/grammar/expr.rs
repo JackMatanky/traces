@@ -264,7 +264,7 @@ impl<'input, G: AtomParser> BooleanExprParser<'input, G> {
 
 /// Parses a complete boolean expression with `not` > `and` > `or` precedence.
 ///
-/// Atom recognition is delegated to the supplied [`AtomParser`].
+/// The supplied [`AtomParser`] parses atoms.
 ///
 /// # Errors
 ///
