@@ -425,3 +425,21 @@ def test_fix_comments_rejects_misaligned_mask() -> None:
     with pytest.raises(ValueError, match="same length"):
         dictionary = check_ste.load_config(None, None)[1]
         check_ste.fix_comments("let utilize = 1", "utilize", dictionary)
+
+
+def test_fix_source_file_preserves_crlf_line_endings(tmp_path: Path) -> None:
+    document = tmp_path / "lib.rs"
+    original = (
+        b"fn main() {\r\n"
+        b"    // Please utilize the tool.\r\n"
+        b'    let s = "utilize prior to";\r\n'
+        b"}\r\n"
+    )
+    document.write_bytes(original)
+
+    assert check_ste.main(["fix", str(document), "--write"]) == 0
+
+    expected = original.replace(
+        b"// Please utilize the tool.", b"// Please use the tool."
+    )
+    assert document.read_bytes() == expected

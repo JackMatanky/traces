@@ -128,7 +128,11 @@ LANGUAGES: dict[str, Language] = {
         backtick_delim=True,
     ),
     "go": Language(
-        (".go",), ("//",), ("/*", "*/"), line_prefix_chars=" \t/*", backtick_delim=True
+        (".go",),
+        ("//",),
+        ("/*", "*/"),
+        line_prefix_chars=" \t/*",
+        backtick_delim=True,
     ),
     "c": Language(
         (".c", ".h", ".cc", ".cpp", ".hpp"),
@@ -195,8 +199,12 @@ def validate_rule_params(
     elif check == "compound_instruction":
         string_list(required(params, "patterns", label), f"{label}.patterns")
     elif check == "passive_voice":
-        string_list(required(params, "auxiliaries", label), f"{label}.auxiliaries")
-        if not isinstance(required(params, "participle_heuristic", label), bool):
+        string_list(
+            required(params, "auxiliaries", label), f"{label}.auxiliaries"
+        )
+        if not isinstance(
+            required(params, "participle_heuristic", label), bool
+        ):
             raise ConfigError(f"{label}.participle_heuristic must be a boolean")
     elif check == "tense":
         string_list(
@@ -215,15 +223,21 @@ def validate_rule_params(
     elif check == "missing_article":
         for key in ("command_verbs", "allowed_determiners"):
             string_list(required(params, key, label), f"{label}.{key}")
-        if not isinstance(required(params, "allow_numeric_values", label), bool):
+        if not isinstance(
+            required(params, "allow_numeric_values", label), bool
+        ):
             raise ConfigError(f"{label}.allow_numeric_values must be a boolean")
     elif check == "gerund_start":
         if not isinstance(required(params, "scope", label), str):
             raise ConfigError(f"{label}.scope must be a string")
     elif check == "synonym_pair":
-        for pair in object_list(required(params, "pairs", label), f"{label}.pairs"):
+        for pair in object_list(
+            required(params, "pairs", label), f"{label}.pairs"
+        ):
             if len(string_list(pair, f"{label}.pairs entry")) != 2:
-                raise ConfigError(f"{label}.pairs entries must contain two strings")
+                raise ConfigError(
+                    f"{label}.pairs entries must contain two strings"
+                )
     elif check == "one_meaning":
         for key in ("source", "key", "phrase_key", "matching_policy_ref"):
             if not isinstance(required(params, key, label), str):
@@ -246,7 +260,9 @@ def validate_rule_params(
     elif check == "hedge":
         severity = required(params, "default_severity", label)
         if not isinstance(severity, str) or severity not in VALID_SEVERITIES:
-            raise ConfigError(f"{label}.default_severity must be a valid severity")
+            raise ConfigError(
+                f"{label}.default_severity must be a valid severity"
+            )
         for raw in object_list(
             required(params, "patterns", label), f"{label}.patterns"
         ):
@@ -254,10 +270,13 @@ def validate_rule_params(
             if not isinstance(
                 required(pattern, "text", f"{label}.patterns entry"), str
             ):
-                raise ConfigError(f"{label}.patterns entry.text must be a string")
+                raise ConfigError(
+                    f"{label}.patterns entry.text must be a string"
+                )
             severity = pattern.get("severity")
             if "severity" in pattern and (
-                not isinstance(severity, str) or severity not in VALID_SEVERITIES
+                not isinstance(severity, str)
+                or severity not in VALID_SEVERITIES
             ):
                 raise ConfigError(
                     f"{label}.patterns entry.severity must be a valid severity"
@@ -278,18 +297,26 @@ def validate_rule_params(
 def read_json(path: Path) -> dict[str, object]:
     """Read one JSON object from ``path``."""
     try:
-        return object_dict(json.loads(path.read_text(encoding="utf-8")), str(path))
+        return object_dict(
+            json.loads(path.read_text(encoding="utf-8")), str(path)
+        )
     except OSError as error:
         raise ConfigError(f"cannot read {path}: {error}") from error
     except json.JSONDecodeError as error:
         raise ConfigError(f"invalid JSON in {path}: {error}") from error
 
 
-def validate_config(rules: dict[str, object], dictionary: dict[str, object]) -> None:
+def validate_config(
+    rules: dict[str, object], dictionary: dict[str, object]
+) -> None:
     """Validate the deliberately small, versioned configuration contract."""
     for config, label in ((rules, "rules"), (dictionary, "dictionary")):
         version = required(config, "version", label)
-        if isinstance(version, bool) or not isinstance(version, int) or version != 1:
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or version != 1
+        ):
             raise ConfigError(f"{label}.version must be integer 1")
     entries = object_list(rules.get("rules"), "rules.rules")
     seen: set[str] = set()
@@ -304,11 +331,15 @@ def validate_config(rules: dict[str, object], dictionary: dict[str, object]) -> 
         if not isinstance(identifier, str) or identifier in seen:
             raise ConfigError(f"duplicate or invalid rule id: {identifier!r}")
         if not isinstance(severity, str):
-            raise ConfigError(f"invalid severity for {identifier}: {severity!r}")
+            raise ConfigError(
+                f"invalid severity for {identifier}: {severity!r}"
+            )
         if not isinstance(checker, str):
             raise ConfigError(f"invalid checker for {identifier}: {checker!r}")
         if severity not in VALID_SEVERITIES:
-            raise ConfigError(f"invalid severity for {identifier}: {severity!r}")
+            raise ConfigError(
+                f"invalid severity for {identifier}: {severity!r}"
+            )
         if checker not in CHECK_NAMES:
             raise ConfigError(f"unknown checker for {identifier}: {checker!r}")
         validate_rule_params(
@@ -336,20 +367,28 @@ def validate_config(rules: dict[str, object], dictionary: dict[str, object]) -> 
             isinstance(approved, list)
             and all(isinstance(value, str) for value in approved)
         ):
-            raise ConfigError("substitution approved must be a string or string array")
+            raise ConfigError(
+                "substitution approved must be a string or string array"
+            )
         if not isinstance(required(item, "auto", "substitution"), bool):
             raise ConfigError("substitution auto must be a boolean")
         condition = required(item, "condition", "substitution")
         if condition is not None:
             if not isinstance(condition, str):
-                raise ConfigError("substitution condition must be a string or null")
+                raise ConfigError(
+                    "substitution condition must be a string or null"
+                )
             try:
                 re.compile(condition, re.IGNORECASE)
             except re.error as error:
-                raise ConfigError(f"invalid condition regex: {error}") from error
+                raise ConfigError(
+                    f"invalid condition regex: {error}"
+                ) from error
         if not isinstance(required(item, "note", "substitution"), str):
             raise ConfigError("substitution note must be a string")
-    for raw in object_list(dictionary.get("one_meaning"), "dictionary.one_meaning"):
+    for raw in object_list(
+        dictionary.get("one_meaning"), "dictionary.one_meaning"
+    ):
         item = object_dict(raw, "one meaning entry")
         for key in ("word", "note"):
             if not isinstance(required(item, key, "one meaning entry"), str):
@@ -452,10 +491,18 @@ def markdown_blocks(text: str) -> list[Block]:
 # 3. sentence and word utilities
 def protected_pattern(dictionary: dict[str, object]) -> re.Pattern[str]:
     matching = object_dict(dictionary["matching"], "matching")
-    segmentation = object_dict(matching["sentence_segmentation"], "segmentation")
-    patterns = object_dict(segmentation["protected_token_regexes"], "protected regexes")
+    segmentation = object_dict(
+        matching["sentence_segmentation"], "segmentation"
+    )
+    patterns = object_dict(
+        segmentation["protected_token_regexes"], "protected regexes"
+    )
     return re.compile(
-        "|".join(f"({value})" for value in patterns.values() if isinstance(value, str))
+        "|".join(
+            f"({value})"
+            for value in patterns.values()
+            if isinstance(value, str)
+        )
     )
 
 
@@ -533,7 +580,9 @@ def markdown_links(text: str) -> list[tuple[int, int, int, int]]:
         depth = 1
         destination_end = destination_start
         while destination_end < len(text) and depth:
-            if text[destination_end] == "\\" and destination_end + 1 < len(text):
+            if text[destination_end] == "\\" and destination_end + 1 < len(
+                text
+            ):
                 destination_end += 2
                 continue
             if text[destination_end] == "(":
@@ -543,14 +592,12 @@ def markdown_links(text: str) -> list[tuple[int, int, int, int]]:
             destination_end += 1
         if depth:
             break
-        links.append(
-            (
-                label_start,
-                label_end,
-                destination_start,
-                destination_end,
-            )
-        )
+        links.append((
+            label_start,
+            label_end,
+            destination_start,
+            destination_end,
+        ))
         cursor = destination_end
     return links
 
@@ -570,12 +617,10 @@ def markdown_link_labels(text: str) -> str:
             if label_start > start and text[label_start - 1] == "!"
             else label_start
         )
-        parts.extend(
-            (
-                text[start:image_start],
-                text[label_start + 1 : label_end],
-            )
-        )
+        parts.extend((
+            text[start:image_start],
+            text[label_start + 1 : label_end],
+        ))
         start = destination_end
     return "".join((*parts, text[start:]))
 
@@ -588,7 +633,9 @@ def markdown_prose(text: str) -> str:
 
 
 def prose_words(text: str) -> list[str]:
-    return re.findall(r"[A-Za-z0-9]+(?:[.'’-][A-Za-z0-9]+)*", markdown_prose(text))
+    return re.findall(
+        r"[A-Za-z0-9]+(?:[.'’-][A-Za-z0-9]+)*", markdown_prose(text)
+    )
 
 
 def word_count(text: str) -> int:
@@ -604,7 +651,9 @@ def phrase_regex(phrase: str, dictionary: dict[str, object]) -> re.Pattern[str]:
 
 def markdown_non_prose_ranges(text: str) -> list[tuple[int, int]]:
     """Return raw URL and link-destination spans excluded from substitutions."""
-    ranges = [match.span() for match in re.finditer(r"https?://[^\s`<>]+", text)]
+    ranges = [
+        match.span() for match in re.finditer(r"https?://[^\s`<>]+", text)
+    ]
     ranges.extend(
         (destination_start, destination_end - 1)
         for _label_start, _label_end, destination_start, destination_end in markdown_links(
@@ -658,7 +707,10 @@ def _regex_end(text: str, start: int) -> int | None:
 
 
 def mask_line_prefixes(
-    text: str, out: list[str], language: Language, spans: list[tuple[int, int, str]]
+    text: str,
+    out: list[str],
+    language: Language,
+    spans: list[tuple[int, int, str]],
 ) -> None:
     """Blank doc-comment and continuation glyphs at line starts inside spans.
 
@@ -694,7 +746,9 @@ def mask_to_prose(text: str, language: Language) -> str:
     spans: list[tuple[int, int, str]] = []
     i, size = 0, len(text)
     prev_nonblank = ""
-    raw_strings = re.compile(language.raw_strings) if language.raw_strings else None
+    raw_strings = (
+        re.compile(language.raw_strings) if language.raw_strings else None
+    )
 
     def blank(start: int, end: int) -> None:
         out[start:end] = ["\n" if ch == "\n" else " " for ch in text[start:end]]
@@ -822,7 +876,9 @@ def mask_to_prose(text: str, language: Language) -> str:
     return "".join(out)
 
 
-def dictionary_matches(sentence: str, dictionary: dict[str, object]) -> list[Match]:
+def dictionary_matches(
+    sentence: str, dictionary: dict[str, object]
+) -> list[Match]:
     """Return longest-first canonical dictionary substitutions in one sentence."""
     entries = object_list(dictionary["substitutions"], "substitutions")
     candidates: list[tuple[str, dict[str, object]]] = []
@@ -843,11 +899,13 @@ def dictionary_matches(sentence: str, dictionary: dict[str, object]) -> list[Mat
             continue
         for match in phrase_regex(common, dictionary).finditer(sentence):
             if any(
-                match.start() < end and start < match.end() for start, end in non_prose
+                match.start() < end and start < match.end()
+                for start, end in non_prose
             ):
                 continue
             if any(
-                match.start() < end and start < match.end() for start, end in occupied
+                match.start() < end and start < match.end()
+                for start, end in occupied
             ):
                 continue
             approved = entry["approved"]
@@ -926,7 +984,8 @@ def check_sentence_words(
     params = object_dict(rule["params"], "params")
     max_words = int(str(params["max"]))
     verbs = {
-        str(item) for item in object_list(params.get("command_verbs", []), "verbs")
+        str(item)
+        for item in object_list(params.get("command_verbs", []), "verbs")
     }
     is_procedural = procedural(sentence, verbs)
     scope = str(params["scope"])
@@ -934,7 +993,11 @@ def check_sentence_words(
         scope == "descriptive" and not is_procedural
     )
     return (
-        [finding(rule, file, sentence, str(rule["message"]).format(max=max_words))]
+        [
+            finding(
+                rule, file, sentence, str(rule["message"]).format(max=max_words)
+            )
+        ]
         if applies and word_count(sentence.text) > max_words
         else []
     )
@@ -945,7 +1008,8 @@ def check_pattern(
 ) -> list[Finding]:
     params = object_dict(rule["params"], "params")
     patterns = [
-        str(value) for value in object_list(params.get("patterns", []), "patterns")
+        str(value)
+        for value in object_list(params.get("patterns", []), "patterns")
     ]
     return (
         [finding(rule, file, sentence)]
@@ -984,7 +1048,9 @@ def check_tense(
     return (
         [finding(rule, file, sentence)]
         if any(
-            re.search(rf"\b{re.escape(str(word))}\b", sentence.text, re.IGNORECASE)
+            re.search(
+                rf"\b{re.escape(str(word))}\b", sentence.text, re.IGNORECASE
+            )
             for word in words
         )
         else []
@@ -999,7 +1065,11 @@ def check_command(
     params = object_dict(rule["params"], "params")
     words = prose_words(sentence.text.lower())
     verbs = {str(item) for item in object_list(params["verbs"], "verbs")}
-    if not words or words[0] in verbs or bool(params.get("allow_caller_domain_verbs")):
+    if (
+        not words
+        or words[0] in verbs
+        or bool(params.get("allow_caller_domain_verbs"))
+    ):
         return []
     return (
         [finding(rule, file, sentence)]
@@ -1013,9 +1083,12 @@ def check_missing_article(
 ) -> list[Finding]:
     words = prose_words(sentence.text.lower())
     params = object_dict(rule["params"], "params")
-    verbs = {str(item) for item in object_list(params["command_verbs"], "verbs")}
+    verbs = {
+        str(item) for item in object_list(params["command_verbs"], "verbs")
+    }
     determiners = {
-        str(item) for item in object_list(params["allowed_determiners"], "determiners")
+        str(item)
+        for item in object_list(params["allowed_determiners"], "determiners")
     }
     if (
         sentence.block.kind == "list"
@@ -1034,7 +1107,9 @@ def check_gerund(
     words = prose_words(sentence.text)
     return (
         [finding(rule, file, sentence)]
-        if sentence.block.kind == "list" and words and words[0].lower().endswith("ing")
+        if sentence.block.kind == "list"
+        and words
+        and words[0].lower().endswith("ing")
         else []
     )
 
@@ -1055,10 +1130,12 @@ def check_one_meaning(
     results: list[Finding] = []
     for raw in object_list(dictionary["one_meaning"], "one meaning"):
         entry = object_dict(raw, "one meaning entry")
-        for phrase in object_list(entry["forbidden_phrases"], "forbidden phrases"):
-            if isinstance(phrase, str) and phrase_regex(phrase, dictionary).search(
-                sentence.text
-            ):
+        for phrase in object_list(
+            entry["forbidden_phrases"], "forbidden phrases"
+        ):
+            if isinstance(phrase, str) and phrase_regex(
+                phrase, dictionary
+            ).search(sentence.text):
                 results.append(
                     finding(
                         rule,
@@ -1104,7 +1181,9 @@ def check_hedge(
                     rule,
                     file,
                     sentence,
-                    severity=str(item.get("severity", params["default_severity"])),
+                    severity=str(
+                        item.get("severity", params["default_severity"])
+                    ),
                 )
             )
     return results
@@ -1122,7 +1201,9 @@ def check_second_person(
     return (
         [finding(rule, file, sentence)]
         if any(
-            re.search(rf"\b{re.escape(str(term))}\b", sentence.text, re.IGNORECASE)
+            re.search(
+                rf"\b{re.escape(str(term))}\b", sentence.text, re.IGNORECASE
+            )
             for term in terms
         )
         else []
@@ -1131,7 +1212,9 @@ def check_second_person(
 
 CHECKS: dict[
     str,
-    Callable[[dict[str, object], Sentence, str, dict[str, object]], list[Finding]],
+    Callable[
+        [dict[str, object], Sentence, str, dict[str, object]], list[Finding]
+    ],
 ] = {
     "sentence_words": check_sentence_words,
     "compound_instruction": check_pattern,
@@ -1169,7 +1252,9 @@ def check_text(
         )
         for block in blocks
         if block.prose
-        for sentence in split_sentences(block.text, block.line, dictionary, block)
+        for sentence in split_sentences(
+            block.text, block.line, dictionary, block
+        )
     ]
     command_verbs: set[str] = set()
     for candidate in rule_entries(rules, None, None):
@@ -1195,7 +1280,9 @@ def check_text(
                 for item in checker(rule, sentence, file, dictionary)
             )
         if rule["check"] == "paragraph_length":
-            max_sentences = int(str(object_dict(rule["params"], "params")["max"]))
+            max_sentences = int(
+                str(object_dict(rule["params"], "params")["max"])
+            )
             for block in blocks:
                 block_sentences = [
                     Sentence(
@@ -1225,12 +1312,15 @@ def check_text(
                         )
                     )
         if rule["check"] == "list_required":
-            min_steps = int(str(object_dict(rule["params"], "params")["min_steps"]))
+            min_steps = int(
+                str(object_dict(rule["params"], "params")["min_steps"])
+            )
             for block in blocks:
                 words = prose_words(markdown_prose(block.text).lower())
                 if (
                     block.kind == "paragraph"
-                    and sum(word in {"then", "next", "after"} for word in words) + 1
+                    and sum(word in {"then", "next", "after"} for word in words)
+                    + 1
                     >= min_steps
                 ):
                     findings.append(
@@ -1264,23 +1354,30 @@ def check_text(
                     )
         if rule["check"] == "synonym_pair":
             lowered = "\n".join(
-                markdown_prose(block.text).lower() for block in blocks if block.prose
+                markdown_prose(block.text).lower()
+                for block in blocks
+                if block.prose
             )
             for pair in object_list(
                 object_dict(rule["params"], "params")["pairs"], "pairs"
             ):
                 terms = object_list(pair, "synonym pair")
                 if len(terms) == 2 and all(
-                    re.search(rf"\b{re.escape(str(term))}\b", lowered) for term in terms
+                    re.search(rf"\b{re.escape(str(term))}\b", lowered)
+                    for term in terms
                 ):
                     findings.append(
                         finding(
                             rule,
                             file,
-                            Sentence(str(terms[0]), 1, 1, Block("", 1, "document")),
+                            Sentence(
+                                str(terms[0]), 1, 1, Block("", 1, "document")
+                            ),
                         )
                     )
-    return sorted(findings, key=lambda item: (item.line, item.column, item.rule_id))
+    return sorted(
+        findings, key=lambda item: (item.line, item.column, item.rule_id)
+    )
 
 
 # 5. safe fixer
@@ -1310,7 +1407,9 @@ def replace_auto(text: str, dictionary: dict[str, object]) -> str:
     return result
 
 
-def fix_comments(original: str, masked: str, dictionary: dict[str, object]) -> str:
+def fix_comments(
+    original: str, masked: str, dictionary: dict[str, object]
+) -> str:
     """Splice auto substitutions from masked comment prose into the original.
 
     Coordinates in the masked text equal coordinates in the original, so each
@@ -1409,7 +1508,8 @@ def result_json(file: str, findings: Sequence[Finding]) -> str:
 def markdown_cell(value: str) -> str:
     """Escape Markdown table separators in a cell value."""
     return (
-        value.replace("\\", r"\\")
+        value
+        .replace("\\", r"\\")
         .replace("|", r"\|")
         .replace("\r\n", " ")
         .replace("\r", " ")
@@ -1425,7 +1525,9 @@ def dictionary_table(dictionary: dict[str, object]) -> str:
     for raw in object_list(dictionary["substitutions"], "substitutions"):
         entry = object_dict(raw, "substitution")
         approved = entry["approved"]
-        common = ", ".join(str(item) for item in object_list(entry["common"], "common"))
+        common = ", ".join(
+            str(item) for item in object_list(entry["common"], "common")
+        )
         approved_text = (
             " / ".join(str(item) for item in approved)
             if isinstance(approved, list)
@@ -1438,9 +1540,13 @@ def dictionary_table(dictionary: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def render_dictionary(path: Path, dictionary: dict[str, object], check: bool) -> int:
+def render_dictionary(
+    path: Path, dictionary: dict[str, object], check: bool
+) -> int:
     """Render the marked generated substitutions table, or check for drift."""
-    begin = "<!-- BEGIN GENERATED: substitutions (from scripts/dictionary.json) -->"
+    begin = (
+        "<!-- BEGIN GENERATED: substitutions (from scripts/dictionary.json) -->"
+    )
     end = "<!-- END GENERATED -->"
     try:
         content = path.read_text(encoding="utf-8")
@@ -1470,7 +1576,9 @@ def render_dictionary(path: Path, dictionary: dict[str, object], check: bool) ->
 # 8. CLI
 def parse_ids(value: str | None) -> set[str] | None:
     return (
-        {item.strip() for item in value.split(",") if item.strip()} if value else None
+        {item.strip() for item in value.split(",") if item.strip()}
+        if value
+        else None
     )
 
 
@@ -1535,7 +1643,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if language:
                     text = mask_to_prose(text, LANGUAGES[language])
                 file = args.file
-                findings = check_text(text, file, rules, dictionary, only, ignore)
+                findings = check_text(
+                    text, file, rules, dictionary, only, ignore
+                )
             print(
                 result_json(file, findings)
                 if args.format == "json"
@@ -1552,7 +1662,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         if args.command == "fix":
             path = Path(args.file)
-            before = path.read_text(encoding="utf-8")
+            with path.open("r", encoding="utf-8", newline="") as source:
+                before = source.read()
             language = language_for_suffix(path.suffix.lower())
             if language is None:
                 after = replace_auto(before, dictionary)
@@ -1560,8 +1671,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 masked = mask_to_prose(before, LANGUAGES[language])
                 after = fix_comments(before, masked, dictionary)
             if args.write:
-                path.write_text(after, encoding="utf-8")
-                print(f"applied {before != after}; deferred manual substitutions")
+                with path.open(
+                    "w", encoding="utf-8", newline=""
+                ) as destination:
+                    destination.write(after)
+                print(
+                    f"applied {before != after}; deferred manual substitutions"
+                )
             else:
                 print(
                     "".join(
@@ -1586,7 +1702,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not matches:
                 print("not in the starter substitution list")
             return 0
-        return render_dictionary(ROOT.parent / "DICTIONARY.md", dictionary, args.check)
+        return render_dictionary(
+            ROOT.parent / "DICTIONARY.md", dictionary, args.check
+        )
     except (ConfigError, OSError, UnicodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
