@@ -167,9 +167,9 @@ the gate.
 
 ## 6. Version notes
 
-- `mutarust 0.1.10` (pinned in `mise.toml`; bump deliberately — the config
-  schema is `docs/refs/mutarust/schema/mutarust.schema.json` and unknown fields
-  fail fast).
+- `mutarust` 0.2.1 (installed on 2026-11-02). `mise.toml` tracks `latest`.
+  The config schema is `docs/refs/mutarust/schema/mutarust.schema.json`,
+  and unknown fields fail fast.
 - Schema/report drift notes and the full flag inventory live in
   `docs/refs/quality_gates_mutarust.md` (§8–§9); migration decisions for this
   repo are in `docs/refs/quality_gates_mise_adoption.md`.
