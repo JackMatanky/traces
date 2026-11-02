@@ -22,14 +22,19 @@ def test_extension_language_table_covers_all_configured_languages() -> None:
     rust = check_ste.LANGUAGES["rust"]
     assert rust.extensions == (".rs",)
     assert rust.block_nests is True and rust.line_splice is False
+    assert rust.raw_strings is not None and rust.char_literals is True
     py = check_ste.LANGUAGES["python"]
     assert py.docstring is True and py.block is None
+    assert py.backtick_delim is False and py.raw_strings is None
     ts = check_ste.LANGUAGES["ts"]
     assert ts.regex_start_prev is not None
+    assert ts.backtick_delim is True
     go = check_ste.LANGUAGES["go"]
     assert go.line_splice is False and go.block_nests is False
+    assert go.backtick_delim is True
     c = check_ste.LANGUAGES["c"]
     assert c.line_splice is True and c.block_nests is False
+    assert c.backtick_delim is False and c.raw_strings is None
     assert set(check_ste.EXTENSION_LANGUAGE) == {
         ".rs",
         ".py",
@@ -182,3 +187,26 @@ def test_ts_regex_guard_division_counterexample() -> None:
 def test_ts_unterminated_regex_candidate_falls_through() -> None:
     masked = mask("const q = (a) / b;\n// use fallthrough\n", "ts")
     assert "use fallthrough" in masked
+
+
+def test_rust_raw_string_with_five_hashes_is_delimiter_extensible() -> None:
+    code = 'let r = r#####"a"b"c"#####;\n// comment: utilize it\n'
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "comment: utilize it" in masked
+
+
+def test_rust_raw_string_with_even_inner_quotes_is_delimiter_extensible() -> None:
+    code = 'let s = r#####"a"b"#####;\n// comment: utilize it\n'
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "comment: utilize it" in masked
+    assert '"a"b"' not in masked
+
+
+def test_rust_raw_string_odd_quotes_blanks_only_raw_string() -> None:
+    code = 'let s = r#####"a"b"#####;\n// comment: utilize it\n'
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "comment: utilize it" in masked
+    assert '"a"b"' not in masked

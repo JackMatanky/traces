@@ -103,6 +103,9 @@ class Language:
     regex_start_prev: str | None = None
     docstring: bool = False
     line_prefix_chars: str = ""
+    raw_strings: str | None = None
+    char_literals: bool = False
+    backtick_delim: bool = False
 
 
 LANGUAGES: dict[str, Language] = {
@@ -112,6 +115,8 @@ LANGUAGES: dict[str, Language] = {
         ("/*", "*/"),
         block_nests=True,
         line_prefix_chars=" \t/*!",
+        raw_strings=r'(?:b)?r(#*)"',
+        char_literals=True,
     ),
     "python": Language((".py",), ("#",), None, docstring=True),
     "ts": Language(
@@ -120,8 +125,11 @@ LANGUAGES: dict[str, Language] = {
         ("/*", "*/"),
         regex_start_prev="=(,:[!&|?+;{~^",
         line_prefix_chars=" \t/*",
+        backtick_delim=True,
     ),
-    "go": Language((".go",), ("//",), ("/*", "*/"), line_prefix_chars=" \t/*"),
+    "go": Language(
+        (".go",), ("//",), ("/*", "*/"), line_prefix_chars=" \t/*", backtick_delim=True
+    ),
     "c": Language(
         (".c", ".h", ".cc", ".cpp", ".hpp"),
         ("//",),
@@ -666,6 +674,7 @@ def mask_to_prose(text: str, language: Language) -> str:
     spans: list[tuple[int, int, str]] = []
     i, size = 0, len(text)
     prev_nonblank = ""
+    raw_strings = re.compile(language.raw_strings) if language.raw_strings else None
 
     def blank(start: int, end: int) -> None:
         out[start:end] = ["\n" if ch == "\n" else " " for ch in text[start:end]]
@@ -699,18 +708,16 @@ def mask_to_prose(text: str, language: Language) -> str:
             spans.append((i, end + 3, _DOCSTRING))
             i = end + 3
             continue
-        if language is LANGUAGES["rust"] and (
-            match := re.match(r"(?:b)?r(#*)\"", text[i : i + 6])
-        ):
+        if raw_strings and (match := raw_strings.match(text, i)):
             hashes = match.group(1)
-            end = text.find(f'"{hashes}', i + len(match.group(0)))
+            end = text.find(f'"{hashes}', match.end())
             if end == -1:
                 blank(i, size)
                 break
             blank(i, end + 1 + len(hashes))
             i = end + 1 + len(hashes)
             continue
-        if char == "'" and language is LANGUAGES["rust"]:
+        if char == "'" and language.char_literals:
             j = i + 1
             if j < size and text[j] == "\\":
                 j += 2
@@ -734,7 +741,7 @@ def mask_to_prose(text: str, language: Language) -> str:
                 continue
             blank(i, size)
             break
-        if char == "`" and language is not LANGUAGES["rust"]:
+        if char == "`" and language.backtick_delim:
             j = text.find("`", i + 1)
             if j == -1:
                 blank(i, size)
