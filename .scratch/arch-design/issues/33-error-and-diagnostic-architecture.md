@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 8, 20, 30, 12, 13
+Blocked by: 8, 20, 32, 12, 13
 
 ## Question
 
@@ -27,11 +27,13 @@ Inputs: `research/08`, schema validation decision, workspace host decision.
 
 ## Inputs from the coercion and comparison decision
 
-See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Two advisory
-stderr notices need a mechanism (stdout and exit codes unchanged): a count of
-rows excluded by a bracket mismatch, and a build-time warning for a date-shaped
-but invalid quoted literal. A parse-time `NaN`-to-`Null` warning is a third.
-Ordinary type mismatches in filters do not error at evaluation; a bare invalid
+See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Three
+advisory stderr notices need a mechanism while stdout and exit codes stay
+unchanged. The first is a count of rows excluded by a bracket mismatch. The
+second is a build-time notice for a date-shaped but invalid quoted literal. A
+parse-time `NaN`-to-`Null` notice is the third.
+
+Ordinary type mismatches in filters do not error at evaluation. A bare invalid
 date literal stays a syntax error. Ticket 21 requires typed
 environmental/materialization errors instead of blanket no-error semantics.
 
@@ -43,33 +45,36 @@ span-free, severity-free `Violation` records with stable codes and a bounded
 overrides and the registry (md-pkm-lsp 25 is a fallible input). Type problems
 are never `Error` by default (ticket 19). Gating is a host policy over codes.
 
-Violations carry a layer (`class` or `global`) and an `origin`; the adapter
-derives a distinct code family `schema.global.*`, which this ticket is asked to
-rank below class violations by default. A violation also carries a `hint` from
-the field's `description`. A broken schema is reported separately from note
-violations.
+Violations carry a layer (`class` or `global`) and an `origin`. The adapter
+derives a distinct code family `schema.global.*`. This ticket ranks that family
+below class violations by default. A violation also carries a `hint` from the
+field's `description`. Report a broken schema separately from note violations.
 
 Guardrail channels (20, agent guardrail) reuse one violation envelope across the
-lint exit code, the MCP `isError` result, the LSP and the notice on read. Open:
-whether a stored "violation keys at last check" baseline (for a delta without
-git) is a diagnostic concern or a read-model concern, and the behaviour of a
-gate when the schema is broken (fail closed, distinct code).
+lint exit code, the MCP `isError` result, the LSP and the notice on read. An
+open item asks whether a stored baseline of violation keys is a diagnostic or
+read-model concern. Another open item decides gate behavior when the schema is
+broken (fail closed, distinct code).
 
 ## Inputs from the IWE and Fileclass research
 
 See [research 12](../research/12-iwe-core-and-hosts-architecture.md),
 [13](../research/13-iwe-query-schema-and-agent-write-gating.md) and
 [14](../research/14-fileclass-model-binding-and-validation.md). IWE has no
-central error type: narrow enums in `liwe` (`OperationError`) and plain
-`Result<T, String>` in `diwe`, adapted per host (LSP `ResponseError`, CLI
-strings) [V]; the string results lose structure, so it is no model for the
-library error type. Its violation record is richer: header breadcrumb, message,
-`hint` from the nearest `description`, JSON-Pointer `schemaPath` and failing
-keyword, with exit 0, 1 and 2 for clean, violations and a broken schema (an
-unreachable schema entry is a load-time exit 2) [V]. It has no severities and no
-code registry. Fileclass violations are `{ ok, message }` only, shown as a
-coloured indicator (`src/fields/validate.ts`) [V], so ticket 20's coded
-violations and this ticket's registry go beyond both.
+central error type. It uses narrow enums in `liwe` (`OperationError`) and plain
+`Result<T, String>` in `diwe`. Hosts adapt them to LSP `ResponseError` or CLI
+strings [V]. String results lose structure, so IWE provides no model for
+library errors.
+
+Its violation record is richer: header breadcrumb, message, `hint` from the
+nearest `description`, JSON-Pointer `schemaPath` and failing keyword [V]. Exit
+codes are 0, 1 and 2 for clean, violations and a broken schema. An unreachable
+schema entry is a load-time exit 2 [V]. IWE has no severities and no code
+registry.
+
+Fileclass violations are `{ ok, message }` only, shown as a coloured indicator
+(`src/fields/validate.ts`) [V]. Ticket 20's coded violations and this ticket's
+registry go beyond both models.
 
 ## Inputs from the execution-context decision
 
@@ -82,3 +87,12 @@ silently dropping rows or emitting partial success. Keep the frozen CLI exit
 codes and successful stdout payloads; update the redesign change table and
 asserted diagnostics for new failure paths. A memoized failure on a lazy result
 must remain observable on every terminal accessor.
+
+## Inputs from the freshness decision
+
+See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
+
+- A read that meets a store with a higher format epoch parses fresh, gives one stderr notice, and exits 0. Make the notice travel as a notice and not as an error.
+- A rebuild heal gives no notice. Report its cause in the refresh report only.
+- Ticket 25 renames `RefreshReport::ConfigDrift` and `DriftCause` and adds identity causes: engine, platform, epoch, extractor and damaged `META`. This ticket gives the cause texts.
+- `traces index` from an older binary replaces a newer store. It gives one stderr notice first.

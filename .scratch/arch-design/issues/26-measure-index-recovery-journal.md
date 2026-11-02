@@ -2,13 +2,14 @@
 
 Type: task
 Status: open
+Blocked by: 24
 
 ## Question
 
-Measure the recovery journal before
+Measure the recovery journal. Ticket
 [Does the landed index freshness model
-stand?](./25-index-freshness-and-invalidation.md)
-decides whether to keep one.
+stand?](./25-index-freshness-and-invalidation.md) is resolved. It no longer
+waits for this measurement. This task decides whether to add a journal later.
 
 Use the decided facet layout and writer base checks.
 See [What is the index read model, and is there one query execution path or
@@ -34,8 +35,8 @@ Apply the same source-snapshot checks to every recovery path.
 
 Test these failure points:
 
-- Stop the process before the journal sync. Stop it after the sync.
-- Stop the process before the store commit. Stop it after the commit.
+- Stop the process before the journal sync. Stop the process after the sync.
+- Stop the process before the store commit. Stop the process after the commit.
 - Stop the process before journal removal.
 - Lose the last `Durability::None` store commit.
 - Change a source file or the policy before replay.
@@ -60,4 +61,4 @@ write cost. Do not assume that failures are common.
 
 Remove the throwaway prototype after the measurements.
 Do not choose a journal in this task.
-Return the measured trade-offs to the freshness grilling.
+Return the measured trade-offs to the maintainer and record them in ticket 25.

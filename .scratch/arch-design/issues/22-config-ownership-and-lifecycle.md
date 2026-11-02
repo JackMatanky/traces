@@ -28,41 +28,42 @@ Resolve the boundary of the config subsystem:
 - (g) Decide the ownership of the scaffolding (`cli::init`).
 
 Facts: `survey/config-dialog.md`, `survey/root-primitives.md` §3-5,
-`survey/note.md` H4, `src/file_tracker.rs` has exactly two callers (verify in
+`survey/note.md` H4, `src/file_tracker.rs` has exactly two callers (check in
 `research/01`), ADR-0002.
 
 Alternatives: List the alternatives for each sub-question, including keep-as-is.
 Record which sub-questions are independent so the spec can sequence them.
 
 Inputs: execution-context decision, `research/04`, `research/05` (its
-digest-vs-fingerprint lesson; `207cc3fb` realized that lesson; see
+digest-vs-fingerprint lesson, which `207cc3fb` realized; see
 `reverification.md`), `research/01`.
 
 ## Inputs from the IWE research
 
 See [research 12](../research/12-iwe-core-and-hosts-architecture.md). IWE keeps
 one `.iwe/config.toml` with `deny_unknown_fields`, a `version` key and in-place
-migrations through `toml_edit` that preserve user comments
-(`crates/diwe/src/config.rs`, `migrate`) [V]; it still had to rename a whole
-table (`[library]` to `[workspace]`, v0.25.0). Schema binding lives in this host
-config (`[schemas.<name>].match`), not in the schema files; [ticket
+migrations through `toml_edit`. These migrations preserve user comments
+(`crates/diwe/src/config.rs`, `migrate`) [V]. IWE still renamed a whole table
+(`[library]` to `[workspace]`, v0.25.0). Schema binding lives in this host
+config (`[schemas.<name>].match`), not in the schema files. [Ticket
 20](./20-schema-note-typing-and-validation.md) chose class-owned `[binding]`.
-The only transferable point for this ticket is the comment-preserving migration
-technique if the config format ever changes.
+The only transferable point for this ticket is comment-preserving migration
+if the config format changes.
 
 ## Inputs from the execution-context decision
 
-See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). The
-adapter snapshots typed OS paths, discovery inputs and overrides at workspace
-open; specify precedence, an explicit base for relative paths (or reject
+See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). At
+workspace open, the adapter snapshots typed OS paths, discovery inputs and
+overrides. Specify precedence, an explicit base for relative paths (or reject
 relative overrides), and where config-derived policy lives. Do not use a
-Unicode-only environment map for paths. Hash-verify local config before parsing
-and revalidate trust/content at each new held-workspace request; admitted
-requests retain their immutable generation. Global config freshness is separate.
-Supply one workspace's policy to its services, not a process-global value, so
-different roots can coexist. The config surface also owns `DateConfig`
-integration (zone source, week rules and opt-in bare-year filenames); decide its
-syntax with ticket 27, not here.
+Unicode-only environment map for paths.
+
+Hash-verify local config before parsing. Revalidate trust/content at each
+new held-workspace request. Admitted requests retain their immutable
+generation. Global config freshness is separate. Supply one workspace policy to
+its services, not a process-global value, so different roots can coexist. The
+config surface also owns `DateConfig` integration (zone source, week rules and
+opt-in bare-year filenames). Decide its syntax with ticket 29, not here.
 
 ## Answer
 
@@ -108,8 +109,8 @@ not cite these agent files in `22-prep/`: `n1-conflicts-resolved-tickets.md`,
 - Keep one `syn` scan test. It guards the single destructure against a rest
   pattern.
 - Do not put the time zone in the fingerprint.
-- This decision sets ownership and direction only. Ticket 25 decides the
-  content, the granularity, the parser version, the format version and the racy
+- This decision sets ownership and direction only. Ticket 25 resolves the
+  content, the granularity, the parser version, the format epoch and the racy
   timestamps.
 - The next run after the format change rebuilds the index one time. The rebuild
   is automatic.
@@ -175,7 +176,7 @@ not cite these agent files in `22-prep/`: `n1-conflicts-resolved-tickets.md`,
 
 ### Decision: admission, global config and path variables
 
-- Do not hold a workspace object in core. Ticket 30 owns it.
+- Do not hold a workspace object in core. Ticket 32 owns it.
 - Make `Config` carry a stamp. The stamp holds the local digest and an optional
   global digest.
 - Name the admission function `ConfigService::admit(&Config)`. Do not name it
@@ -220,7 +221,7 @@ prints the `traces trust` command.
 
 - Keep `deny_unknown_fields`. Add no `version` key until the first breaking
   change. Then use a migration that keeps comments, as IWE does.
-- Make `config` own and parse the `[date]` table into `DateConfig`. Ticket 27
+- Make `config` own and parse the `[date]` table into `DateConfig`. Ticket 29
   decides the syntax.
 - Use this precedence for the time zone: host override, then config, then
   system.
@@ -235,7 +236,7 @@ prints the `traces trust` command.
 Each sub-question kept "keep as is" as an option.
 
 - Root types: move the status types into `note` or `config`. Reject: it adds an
-  edge or pre-empts ticket 23. Put the types in a core crate. Reject: ticket 32
+  edge or pre-empts ticket 23. Put the types in a core crate. Reject: ticket 34
   decides it.
 - Parser input: pass primitives, or pass `&Config`. Reject both.
 - Digests: trim the dead digests only (the fallback). Let `config` own an
@@ -295,37 +296,37 @@ The Trust Store layout does not change. Existing grants stay valid.
 - [Index read model](./24-index-read-model-and-query-execution.md) and
   [freshness](./25-index-freshness-and-invalidation.md): Ticket 22 fixed only
   the owner of `IndexPolicy` and the source of the fingerprint. Ticket 25
-  decides the content, the granularity, the parser version, the format version
+  resolves the content, the granularity, the parser version, the format epoch
   and the racy timestamps. Ticket 25 also decides if a period-policy field
   exists. The "fingerprint wider than consumed" probe in ticket 25 no longer
   applies. A changed ignore set needs a rescan and a rebuild.
-- [Temporal](./27-temporal-boundary-and-dialects.md): Decide the `[date]`
+- [Temporal](./29-temporal-boundary-and-dialects.md): Decide the `[date]`
   syntax. The filename-period subset enters `IndexPolicy` if the index stores
   periods.
-- [Template boundary](./28-template-engine-boundary.md): `TemplateService` holds
+- [Template boundary](./30-template-engine-boundary.md): `TemplateService` holds
   `&Config`, and the template engine builds an indexer
   (`template/engine.rs:125-135`). `Config` no longer holds the ignore and period
   policy. The composition root builds `IndexPolicy` one time for the CLI and the
   template engine.
-- [Paths](./29-path-and-capability-model.md): The host rejects relative path
+- [Paths](./31-path-and-capability-model.md): The host rejects relative path
   variables. Do not assume a base. Decide if `.traces` can be a symlink. Decide
   how a root alias gets an identity.
-- [Host](./30-workspace-host-and-composition.md): Decide the held workspace, the
+- [Host](./32-workspace-host-and-composition.md): Decide the held workspace, the
   watcher, the debounce, the composition of `IndexPolicy`, the dialog threading
   and who applies trust after init. `ConfigService::admit` is the admission
   primitive.
-- [Errors](./31-error-and-diagnostic-architecture.md): Decide the new error sets
+- [Errors](./33-error-and-diagnostic-architecture.md): Decide the new error sets
   for config, trust and init. Decide the error for `traces trust` without a
   config.
-- [Crate topology](./32-crate-topology-and-public-surface.md): Ticket 22 fixes
-  the logical owners and the module graph. Ticket 32 decides the crate cuts and
+- [Crate topology](./34-crate-topology-and-public-surface.md): Ticket 22 fixes
+  the logical owners and the module graph. Ticket 34 decides the crate cuts and
   the `pub` items. After a CLI split, `ConfigService`, `HostInputs`, `admit` and
   the init use case are the first outward-facing surface. The constructor that
   reads the OS belongs with the adapters.
-- [Schema internals](./35-schema-internals-simplification.md) and [body
-  sections](./36-body-section-schemas.md): The schema files own class
+- [Schema internals](./36-schema-internals-simplification.md) and [body
+  sections](./37-body-section-schemas.md): The schema files own class
   `[binding]` (ticket 20). Ticket 22 adds no config key for it. `FieldName`
   stays a leaf.
-- [Reconciliation](./33-reconcile-decisions-and-audit-coverage.md): Test the
+- [Reconciliation](./35-reconcile-decisions-and-audit-coverage.md): Test the
   `IndexPolicy` boundary again. Test the shared ignore value between trust
   discovery and the index walker.

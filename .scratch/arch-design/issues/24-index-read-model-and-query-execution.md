@@ -41,10 +41,10 @@ of topic D. Decide the facet split first.
 
 ### C. Rows
 
-- Decide what a `QueryRow` borrows from. Ticket 26 owns the row shape. This
+- Decide what a `QueryRow` borrows from. Ticket 28 owns the row shape. This
   ticket owns the source of the borrow.
 - State what a row needs: the `Note` facets, the `FileMeta`, the inlinks, the
-  item identity `item_idx` and the document order (ticket 26).
+  item identity `item_idx` and the document order (ticket 28).
 
 ### D. What the store persists
 
@@ -60,15 +60,15 @@ of topic D. Decide the facet split first.
   the graph, or the refresh can compute it in memory.
 - Decide the `FileMeta` fields. Keep the source timestamps `created_at` and
   `modified_at`. Decide if the store persists the filename period or derives it
-  at query time (tickets 21 and 27).
+  at query time (tickets 21 and 29).
 - Decide the encoding of temporal values. Today the store keeps text and parses
   it on every load. A compact binary form is an option.
 - Decide if the store keeps the parser notices. Ticket 23 decided that the bulk
-  index path collects them. No code does so today (tickets 23 and 31).
+  index path collects them. No code does so today (tickets 23 and 33).
 - Decide where the lookup "has a known explicit class" lives (ticket 20).
 - Decide if the class axes index inline fields. Today they index frontmatter
   values only.
-- State the constraint on the persisted path form. Ticket 29 owns the form.
+- State the constraint on the persisted path form. Ticket 31 owns the form.
 - Decide if any field gets an order-preserving key table for a native range
   filter or sort. Name the query and the measured gain. Ticket 19 forbids
   collation keys, so string sorts stay in memory. Each candidate set must
@@ -96,13 +96,13 @@ of topic D. Decide the facet split first.
   and the lazy decode. Ticket 25 decides if a refresh keeps an in-memory note
   cache. The facet split also sets what a path-set change decodes. One added
   file costs 499 ms and 395 MB at 50,000 notes today.
-- Ticket 26 decides the row type, the view enum, the pushdown protocol and the
+- Ticket 28 decides the row type, the view enum, the pushdown protocol and the
   membership operation.
-- Ticket 29 decides the persisted path form and the identity of a root.
-- Ticket 30 decides the held workspace and the writer admission for a root.
-- Ticket 34 decides how an open buffer overlays the persisted generation.
-- Ticket 31 decides how a notice shows.
-- Ticket 32 decides the visibility of `IndexStore` and `WorkspaceIndex`.
+- Ticket 31 decides the persisted path form and the identity of a root.
+- Ticket 32 decides the held workspace and the writer admission for a root.
+- Ticket 27 decides how an open buffer overlays the persisted generation.
+- Ticket 33 decides how a notice shows.
+- Ticket 34 decides the visibility of `IndexStore` and `WorkspaceIndex`.
 
 ### Compatibility rules
 
@@ -261,7 +261,7 @@ Do not reopen these decisions.
 - What becomes removable.
 - What remains unresolved.
 - The change-table rows (ticket 16).
-- The downstream tickets that change: 25, 26, 28, 29, 30, 31, 32 and 34.
+- The downstream tickets that change: 25, 26, 27, 28, 30, 31, 32, 33 and 34.
 
 This ticket graduates these fog items: `CandidateTrie` and `indextree`
 retention, the store engine and repository split, and inline-field class
@@ -295,9 +295,10 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   1. No engine type crosses the store boundary. This includes errors. The error
      wraps the engine error as an opaque source.
   2. The persisted bytes are engine-neutral: postcard facets and plain byte
-     keys. Ticket 29 still owns portable path identity and key ordering.
-  3. The fingerprint names the engine and the format. A change of either
-     triggers a rebuild. Ticket 25 owns the rule.
+     keys. Ticket 31 still owns portable path identity and key ordering.
+  3. Store identity records the engine tag, platform family, format epoch,
+     extractor fingerprint and policy fingerprint (ticket 25). Ticket 25 owns
+     the store identity and invalidation rules.
   4. A conformance suite checks that every adapter returns the same rows as a
      fresh parse. The probe check is its seed.
   5. Open cost, durability and locking stay inside the adapter.
@@ -306,26 +307,27 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   and no data migration.
 - Facet names are `files`, `fields`, `tags`, `classes`, `headings`,
   `outlinks`, `links`, `tasks`, `lists`, `notices` and `meta`. The `meta`
-  table keeps the format version and fingerprint. The `tags` table merges
-  body and frontmatter tags.
+  table keeps the format epoch, extractor fingerprint, policy fingerprint,
+  engine tag, platform family, written-by version, store incarnation and
+  revision (ticket 25). The `tags` table merges body and frontmatter tags.
 - Query latency takes priority over write cost. Persist range keys for
   eligible effective note-level scalar fields, not a fixed list of field
   names. Frontmatter wins over inline, including frontmatter `null`.
   Several inline values become a list, not several scalar keys (ticket 23).
   Keep task-item metadata in a separate scope. Index supported task
-  dates and status; scan other task-item fields until keys have a
+  dates and status. Scan other task-item fields until keys have a
   proved and measured benefit (Q21). Keep the original `Note::lists`
   index as `item_idx` in each task candidate. A candidate lookup only
   narrows. The plan still evaluates the source and full filter on each
   survivor, then runs ordered transforms at their original positions.
   Only push a predicate before `limit`, `flatten` or another transform if
-  equivalence is proved for that row mode (ticket 26).
+  equivalence is proved for that row mode (ticket 28).
 - The planner may use a range key only if its candidate set contains
   every row matching the filter (ticket 19). Prove this for each
   operator, row kind, temporal frame and field precedence. Unsupported
   mappings scan the relevant facet. Examples include complements,
   missing or null values, and adaptive or period comparisons.
-  Ticket 26 owns the pushdown capability protocol.
+  Ticket 28 owns the pushdown capability protocol.
 - Also prove exact `Int`/`Float` comparisons above 2^53, signed zero,
   infinity, adaptive quoted literals and Link target matching
   (ticket 19). Do not cast `i64` to `f64` or treat a raw string key
@@ -347,22 +349,21 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   not.
 - For `All`, `Not` and a source-less query, enumerate `files` paths,
   then narrow with safe predicates when available. A folder `Path` uses a
-  path range; other path patterns scan paths. `Tag` uses tag keys.
+  path range. Other path patterns scan paths. `Tag` uses tag keys.
   `Class` checks explicit class keys or the bound tag and path atoms
   from ticket 20. A query that returns every full note still reads every
-  selected note; indexing cannot avoid the output cost.
+  selected note. Indexing cannot avoid the output cost.
 - Keep `lists` as the complete ordered sequence, including tasks. The
   `tasks` facet is a derived duplicate subset keyed by the original
-  `Note::lists` index. Update both in one transaction. Task-only scans
-  need not decode plain items; full task rows still load any list
-  context and note facets they use. The synthetic 50,000-note probe
-  scanned tasks in 12 ms, versus 54-55 ms for all list items.
-  Neither run built query rows. Confirm the choice on assembled rows,
-  task-heavy input and one-note replacement before fixing the layout.
-- A host publishes an immutable generation of shared entries. A refresh
+  `Note::lists` index. Update both in one transaction. Task-only scans do not
+  need to decode plain items. Full task rows still load any list context and
+  note facets that they use. The synthetic 50,000-note probe scanned tasks in
+  12 ms, versus 54-55 ms for all list items. Neither run built query rows.
+  Confirm the choice on assembled rows, task-heavy input and one-note
+  replacement before fixing the layout.
   replaces entries if their note, file metadata or inlinks change. Each
   request pins one generation. A row owns its matching `Arc<FileEntry>`, not
-  the whole index. The cold CLI builds entries only for survivors. Ticket 26
+  the whole index. The cold CLI builds entries only for survivors. Ticket 28
   owns the final row API.
 - `WorkspaceIndex` remains total and sorted, with one entry per indexed
   file. The cold CLI builds selected `FileEntry` rows directly, not a
@@ -389,7 +390,7 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   research 11 advice 8, which held an open store in the host.
 - Check path ordering in release at every index build and store load, with
   `OsStr` comparison (about 0.12 ms at 50,000 paths). Keep
-  `SortedByPath::assumed_sorted` for callers that reorder in memory; the
+  `SortedByPath::assumed_sorted` for callers that reorder in memory. The
   boundary checks then witness the order that binary search needs.
 - Keep `CandidateTrie` and `indextree`. They resolve links by basename. At
   5,000 same-stem candidates the trie build took 224 ms and a flat scan took
@@ -400,7 +401,7 @@ The evidence is in `research/24-prep/g-probe-results.md` and
 - Persist only parse-time notices with their file facts. The store
   offers a path-scoped notice read for check, CLI and host diagnostics.
   Query-time notices are computed for each query and are not persisted.
-  Ticket 31 owns how consumers show both kinds. Keep temporal values
+  Ticket 33 owns how consumers show both kinds. Keep temporal values
   as text until a compact encoding shows a measured gain.
 - Persist the source `FileMeta` timestamps and size, but not the hybrid
   `day` field (ticket 21). Derive a filename period at query time.
@@ -409,12 +410,11 @@ The evidence is in `research/24-prep/g-probe-results.md` and
 - For the first redb adapter, keep `Durability::None` and the default
   page size. The store is a rebuildable cache, not crash-durable data.
   On reopen, validate the format, policy and source freshness, and
-  rebuild an unusable or stale cache. Ticket 25 must cover a crash
-  that loses the last commit and a same-mtime content edit; format
-  validity alone does not establish freshness. Measure cache size on
-  the new layout before fixing it. An earlier 8 MB cache saved 65 MB
-  on a worst-shape synthetic query without a measured time cost; that
-  probe predates the range tables.
+  rebuild an unusable or stale cache. Ticket 25 must cover a crash that loses
+  the last commit and a same-mtime content edit. Format validity alone does not
+  establish freshness. Measure cache size on the new layout before fixing it. An
+  earlier 8 MB cache saved 65 MB on a worst-shape synthetic query without a
+  measured time cost. That probe predates the range tables.
 - Still open: the precise range-key encoding and measured write and
   read costs.
 
@@ -427,14 +427,14 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   incremental apply could then label mixed-policy rows as current.
   Use a writer-transaction check of the plan's base generation and
   fingerprint. A failed check needs a complete replan, not an
-  incremental apply.
 - The maintainer chose the writer-transaction base check in Q16.
-  Give each store incarnation a unique identity; do not reset a token
-  to a reusable value after a rebuild. Every commit advances its
-  revision, even under the same policy. An incremental plan carries
-  the base identity, revision and fingerprint. Compare them inside
-  the write transaction before replacing any row. On mismatch,
-  discard the delta and replan against the new base or rebuild.
+  Give each store incarnation a unique identity. Do not reset a token to a
+  reusable value after a rebuild. Every commit advances its revision, even
+  under the same policy.
+
+  An incremental plan carries the base identity, revision and fingerprint.
+  Compare them inside the write transaction before replacing any row. On
+  mismatch, discard the delta and replan against the new base or rebuild.
   Never retag unchanged rows from a different policy.
 - [V] The current store has separate read transactions for file and
   fingerprint reads and for other facet reads (`src/index/store.rs:486-545`).
@@ -466,8 +466,8 @@ The evidence is in `research/24-prep/g-probe-results.md` and
 - [V] An unknown explicit class does not suppress tag-bound class
   membership (ticket 20). The class source checks a known explicit
   class, the hierarchy and binding exclusions, not merely any
-  `classes` key. Source tags describe note membership; task-row tags
-  describe an item, so they need distinct candidate scopes.
+  `classes` key. Source tags describe note membership. Task-row tags describe an
+  item, so they need distinct candidate scopes.
 - [V] Today list queries include task items in the same document order
   (`src/query/service.rs:246-263,280-305`). The split does not yet say if
   `lists` duplicates tasks. Disjoint facets need an `item_idx` merge;
@@ -484,9 +484,9 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   replace facets, task copies, range keys, link edges, notices, meta
   and the store revision. Delete every old derived key first.
 - [V] The notice facet initially lacked a named reader. The path-scoped
-  read above limits persisted notices to parse-time facts. Ticket 29
-  owns portable path identity and sort order; postcard data alone
-  does not make range keys portable.
+  read above limits persisted notices to parse-time facts. Ticket 31 owns
+  portable path identity and sort order. Postcard data alone does not make range
+  keys portable.
 - [V] The task-only probe has 37,500 tasks among 487,500 items
   (`research/24-prep/g-probe-results.md:284-285`). It measured the
   task subset without full row assembly. If `lists` retains all items,
@@ -496,9 +496,9 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   `item_idx`, including parents and nested order. No task-only result
   may renumber the index or omit its parent when a reader asks for it.
   Neither layout avoids loading a full note for a result that needs
-  `file.lists` or list-parent context. Measure both on task-heavy input
-  and assembled rows; the 12 ms scan proves neither end-to-end speed
-  nor a size advantage.
+  `file.lists` or list-parent context. Measure both on task-heavy input and
+  assembled rows. The 12 ms scan proves neither end-to-end speed nor a size
+  advantage.
 
 ## Inputs from the value model decision
 
@@ -529,11 +529,11 @@ See [ticket 20's Answer](./20-schema-note-typing-and-validation.md).
   schemas.
 - Source selection needs an exclusion for "has a known explicit class". A
   secondary lookup for it avoids the `Not` full scan.
-- Ticket 26 optimises a folder glob such as `folder/**` to `paths_in_folder`.
+- Ticket 28 optimises a folder glob such as `folder/**` to `paths_in_folder`.
   The remaining `Path` scan is linear.
 - A "notes changed since the last check" notice (ticket 20, agent guardrail)
   reads the changed set that the refresh computes. A baseline store sits
-  outside the index and its fingerprint. Tickets 25 and 31 share the open
+  outside the index and its fingerprint. Tickets 25 and 33 share the open
   ownership question.
 
 ## Inputs from the note document model decision
@@ -550,14 +550,14 @@ See [ticket 23's Answer](./23-note-document-model.md).
   task stores no heading link. A query derives the heading above a task from
   the heading ranges.
 - The store keeps no external URL, byte span, footnote, callout or slug.
-- A change of the stored `Note` bumps `META_VERSION`. Index results must equal a
-  fresh parse.
-- Ticket 26 needs the item identity `item_idx`, the `list.*` fields and the
+- A change of the stored `Note` changes the extractor fingerprint or bumps the
+  format epoch (ticket 25). Index results must equal a fresh parse.
+- Ticket 28 needs the item identity `item_idx`, the `list.*` fields and the
   document order.
-- The bulk index path collects parser notices with their paths. Ticket 31 owns
+- The bulk index path collects parser notices with their paths. Ticket 33 owns
   how they show.
-- Ticket 30 keeps a compact link and heading range index for open buffers. It
-  tags the range sets with a source revision. Ticket 34 decides the rest.
+- Ticket 32 keeps a compact link and heading range index for open buffers. It
+  tags the range sets with a source revision. Ticket 27 decides the rest.
 - Ticket 23 left these items open: the boxed or unboxed task payload, host
   memory at 50,000 notes, and a two-process open of the store.
 
@@ -567,8 +567,9 @@ See [ticket 22's Answer](./22-config-ownership-and-lifecycle.md).
 
 - `index` owns `IndexPolicy`. `IndexPolicy::fingerprint()` is the only source of
   the fingerprint.
-- Ticket 25 decides the content, the granularity, the parser version, the
-  format version and the racy timestamps.
+- Ticket 25 (resolved) decides the store identity (engine tag, platform family,
+  format epoch, extractor fingerprint, policy fingerprint), invalidation rules
+  and racy timestamps.
 - A changed ignore set needs a rescan and a rebuild.
 - The composition root builds `IndexPolicy` one time for the CLI and for the
   template engine. Both consumers use the same policy.
@@ -584,7 +585,7 @@ See [ticket 17's Answer](./17-grilling-forward-consumers-and-design-pressure.md)
 - Vaults can exceed 50,000 notes.
 - Evaluate each proposal by independent changeability, low coupling, fast
   verification, failure isolation and recoverability.
-- Ticket 34 owns the consistency of an open buffer and the persisted index.
+- Ticket 27 owns the consistency of an open buffer and the persisted index.
 
 ## Inputs from the precedent research
 
@@ -603,7 +604,7 @@ See [ticket 17's Answer](./17-grilling-forward-consumers-and-design-pressure.md)
   note decoding. Ticket 25 owns the racy-timestamp guard.
 - [Research 09](../research/09-capability-path-precedent.md): Carry a portable
   UTF-8 relative path with `/` in persistent structs. Confine at the I/O
-  boundary. Ticket 29 decides the persisted path form and the portability of
+  boundary. Ticket 31 decides the persisted path form and the portability of
   the cache.
 
 ## Inputs from the findings ledger
@@ -669,13 +670,14 @@ Invariant owners:
 
 - Index and store: a coherent generation, atomic facet writes, sound
   candidate sets, and the path-order check at load and build boundaries.
-- Ticket 25: engine identity, format version and freshness fingerprint.
-- Ticket 26: row type, residual filter, pushdown protocol and membership.
-- Ticket 29: the persisted path form and root identity.
-- Ticket 30: host writer admission.
-- Ticket 31: how parser notices show.
-- Ticket 32: visibility of the index and store port.
-- Ticket 34: buffer overlay on a pinned generation.
+- Ticket 25: store identity (engine tag, platform family, format epoch,
+  extractor fingerprint, policy fingerprint) and freshness invalidation.
+- Ticket 28: row type, residual filter, pushdown protocol and membership.
+- Ticket 31: the persisted path form and root identity.
+- Ticket 32: host writer admission.
+- Ticket 33: how parser notices show.
+- Ticket 34: visibility of the index and store port.
+- Ticket 27: buffer overlay on a pinned generation.
 
 Remove the four multimap tables after implementation:
 `paths_by_tag`, `paths_by_file_class`, `tags_by_path` and `classes_by_path`.
@@ -694,9 +696,10 @@ stderr and keeps query results on stdout. The 1.8 s synthetic build
 included persistence, so it is not a measured fallback latency.
 The store layout and format version change within the Free envelope.
 
-Downstream tickets: 25 (freshness and format), 26 (plan and rows),
-28 (index-facing consumer), and 29 (path form). Also 30 (writer
-admission), 31 (notice display), 32 (visibility), and 34 (buffer overlay).
+Downstream tickets: 25 (freshness and format), 28 (plan and rows),
+30 (index-facing consumer), and 31 (path form). Also 32 (writer
+admission), 33 (notice display), 34 (visibility), 27 (buffer overlay), and
+26 (recovery journal).
 
-Fog: keep `CandidateTrie` and `indextree`; split the store engine from the
-repository at the domain port; class axes stay frontmatter-only.
+Fog: keep `CandidateTrie` and `indextree`. Split the store engine from the
+repository at the domain port. Class axes stay frontmatter-only.

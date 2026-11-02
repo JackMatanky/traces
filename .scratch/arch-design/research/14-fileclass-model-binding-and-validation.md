@@ -1,9 +1,10 @@
 # Research: Fileclass Model, Binding, and Validation
 
 - Ticket: 14-research-fileclass-model-binding-and-validation.md
-- Repo: `mdelobelle/fileclass` (TypeScript Obsidian plugin; Metadata Menu successor)
+- Repo: `mdelobelle/fileclass` (TypeScript Obsidian plugin; Metadata Menu
+  successor)
 - Sources: `/tmp/fc/` (src, tests, docs/content, demo/ROADMAP.md, CLAUDE.md)
-- Context: Informs Traces schema redesign (tickets 18, 19, 20, 27, 34, 35, 36)
+- Context: Informs Traces schema redesign (tickets 18, 19, 20, 29, 27, 36, 37)
 - Tags: [V] verified from source/tests, [H] architectural interpretation
 
 ---
@@ -18,20 +19,20 @@ configuration lives entirely in YAML frontmatter [V: docs/content/schema.md:13]:
 
 - `extends`: Single inheritance link to parent class [V:
   src/schema/inheritance.ts:13]. Multiple parents are unsupported [V:
-  src/schema/inheritance.ts:19]. Ancestor chains are cycle-guarded via a
+  src/schema/inheritance.ts:19]. Ancestor chains are cycle-guarded with a
   visited set in `computeAncestors`, terminating on cycles or missing parents
   [V: src/schema/inheritance.ts:20].
 - `excludes`: String array of inherited field names dropped down the chain;
   exclusions accumulate walking towards ancestors in `resolveInheritedFields`
   [V: src/schema/inheritance.ts:54].
 - `fields`: Array of `{ name, id, type, options, path }` [V:
-  src/schema/field.ts:53]. Nested fields encode ancestry via `____` separated
+  src/schema/field.ts:53]. Nested fields encode ancestry with `____` separated
   IDs in `path` [V: src/schema/field.ts:8,59].
 - Field resolution runs root-to-leaf: ancestors first, child last [V:
   src/schema/inheritance.ts:64]. Redefinitions override ancestor definitions in
-  place, keeping the ancestor's sequence slot [V:
-  src/schema/inheritance.ts:80]. Identity key is `${field.path}\0${field.name}`
-  [V: src/schema/inheritance.ts:99].
+  place, keeping the ancestor's sequence slot [V: src/schema/inheritance.ts:80].
+  Identity key is `${field.path}\0${field.name}` [V:
+  src/schema/inheritance.ts:99].
 - `fieldsOrder`: Explicit ordering list stored on the class note [V:
   src/schema/fieldOrder.ts:10]. Supports level-qualified names
   (`editions.format`) and falls back to legacy field IDs for Metadata Menu
@@ -57,38 +58,41 @@ src/schema/resolver.ts:200].
   src/schema/resolver.ts:172-180]. Last encountered class overwrites earlier
   ones [V: src/schema/resolver.ts:163]. Winner takes loser's position [V:
   src/schema/resolver.ts:169].
-- Discrepancy between documentation and code [V by code reading; not pinned
-  by any test]: docs say sources "are combined in this priority order"
+- Discrepancy between documentation and code [V by code reading; not pinned by
+  any test]: docs say sources "are combined in this priority order"
   (`frontmatter > tag > path > bookmark > base view > preset`)
   [docs/content/schema.md:134-152; src/schema/resolver.ts:103-106].
-  `collectBoundNames` pushes every match into `names` in that order, with no
-  suppression [src/schema/resolver.ts:119-145], and `mergeFields` lets the
-  last name win a shared key [src/schema/resolver.ts:172-180]. So on a
-  collision the lowest-ranked source (a base view, then bookmark, path, tag)
-  overrides a frontmatter class. Whether that is intended ("priority" as a
-  label order only) is unknown [H]; `tests/unit/resolver.test.ts:49-58` pins
-  the order and de-duplication but declares no contested key, and `:71-78`
-  pins last-wins only within a frontmatter list.
+  `collectBoundNames` pushes every match into `names` in that order without
+  suppression [src/schema/resolver.ts:119-145]. `mergeFields` lets the last name
+  win a shared key [src/schema/resolver.ts:172-180]. On a collision, the
+  lowest-ranked source (a base view, then bookmark, path, tag) overrides a
+  frontmatter class. Whether this priority order is intended is unknown [H].
+  The test `tests/unit/resolver.test.ts:49-58` pins order and de-duplication
+  without a contested key. Lines `:71-78` pin last-wins only within a
+  frontmatter list.
 
 ### Typed Field Model & Options
 
 AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
 
-- 22 supported input types (`SUPPORTED_INPUT_TYPES`) [V:
-  src/fields/support.ts:18-38]: `Input`, `Number`, `Date`, `DateTime`, `Time`,
-  `Boolean`, `Select`, `Cycle`, `Multi`, `MultiInput`, `Duration`,
-  `CycleDuration`, `Location`, `Icon`, `Color`, `File`, `MultiFile`, `Media`,
-  `MultiMedia`, `Object`, `ObjectList`, `JSON`, `YAML`.
-- 3 canvas types: `Canvas`, `CanvasGroup`, `CanvasGroupLink` (read-only AST
-  sync from `.canvas` files, no input modals) [V:
+- Supported input types (`SUPPORTED_INPUT_TYPES`) [V:
+  src/fields/support.ts:18-38]: 22 types exist. Scalars include `Input`,
+  `Number`, `Date`, `DateTime`, `Time`, and `Boolean`. Options include
+  `Select`, `Cycle`, `Multi`, and `MultiInput`. Durations and assets include
+  `Duration`, `CycleDuration`, `Location`, `Icon`, `Color`, `File`,
+  `MultiFile`, `Media`, and `MultiMedia`. Structures include `Object`,
+  `ObjectList`, `JSON`, and `YAML`.
+- 3 canvas types: `Canvas`, `CanvasGroup`, `CanvasGroupLink` (read-only AST sync
+  from `.canvas` files, no input modals) [V:
   src/fields/canvas/canvasEngine.ts:1-20].
-- 2 dead stubs: `Formula`, `Lookup` (unsupported, delegated to Bases; retained
-  only to parse legacy Metadata Menu files without error) [V:
-  demo/ROADMAP.md:15; docs/content/positioning.md:42].
+- 2 dead stubs: `Formula` and `Lookup`. They are unsupported and delegated
+  to Bases. They are retained only to parse legacy Metadata Menu files without
+  error [V: demo/ROADMAP.md:15; docs/content/positioning.md:42].
 - Thin types: `Cycle` is identical to `Select` in storage and validation [V:
-  src/fields/validate.ts:150]; `CycleDuration` is array of `Duration` strings
-  [V: src/fields/validate.ts:183]; `DateTime`/`Time` differ from `Date` only by
-  regex/format defaults [V: src/fields/dateFormats.ts:23-25].
+  src/fields/validate.ts:150]. `CycleDuration` is an array of `Duration`
+  strings [V: src/fields/validate.ts:183]. `DateTime` and `Time` differ from
+  `Date` only by regex/format defaults [V:
+  src/fields/dateFormats.ts:23-25].
 - Value sources: `ValuesList` (inline array or index map), `ValuesListNotePath`
   (line-by-line note read), `ValuesFromBase` (rows from `.base` view),
   `ValuesFromDVQuery` (ignored legacy Dataview stub) [V:
@@ -106,7 +110,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   `[]` evaluate to `isEmpty([]) === false` and pass `isRequired` [V:
   src/fields/validate.ts:58, 125].
 - Number: validates `min` and `max` [V: src/fields/validate.ts:71-73]. `step` is
-  NOT validated; `stepNumber` is exclusively a UI increment helper in modals [V:
+  NOT validated. `stepNumber` is exclusively a UI increment helper in modals [V:
   src/fields/numberStep.ts:51-61].
 - Dates: Custom format bypasses format validation (any non-empty string is
   valid) [V: src/fields/validate.ts:97-99]. Wikilinks accepted [V:
@@ -117,7 +121,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   src/fields/duration.ts:20,46]. Years and months forbidden [V:
   src/fields/duration.ts:5].
 - Coercion: Scalars accepted for `MultiInput` and `Multi` [V:
-  src/fields/validate.ts:133,153]; `MultiFile` strictly requires array to
+  src/fields/validate.ts:133,153]. `MultiFile` strictly requires an array to
   satisfy Bases reverse-link queries [V: src/fields/validate.ts:175].
 - Gating: UI is advisory (red indicator, tooltip) [V: docs/content/ui.md:120].
   API `setValue` hard gates (`!result.ok` aborts write) [V:
@@ -126,7 +130,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
 
 ### Write Safety, Cache & Invalidation
 
-- Frontmatter-only: reads via `metadataCache`, writes exclusively via
+- Frontmatter-only: reads through `metadataCache`, writes exclusively through
   `processFrontMatter` [V: CLAUDE.md:15]. Never modifies markdown body text [V].
 - In-place mutation: `objectPath.ts` mutates JS object in place, preserving
   unmapped keys [V: src/engine/objectPath.ts:11-13].
@@ -138,12 +142,12 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   and reassigns in target order, leaving values by reference [V:
   src/io/reorderFrontmatter.ts:45-58]. Integer-like keys (`2024`) cannot be
   positioned due to YAML parser sorting [V: src/schema/reorder.ts:26,95].
-- Rename migration: `migrateRenamedField` scans vault via `notesCarrying`, opens
+- Rename migration: `migrateRenamedField` scans vault with `notesCarrying`, opens
   confirmation modal, updates frontmatter across notes, and rewrites
   `fieldsOrder` in declaring and descendant classes [V:
   src/commands/renameFieldMigration.ts:37-87,119].
 - Query cache: `queryCache.ts` memoizes promise-based Base scans keyed by
-  `(basePath, subKey)`, invalidated on vault modify events for `.base` files [V:
+  `(basePath, subKey)`, invalidated on vault change events for `.base` files [V:
   src/engine/queryCache.ts:21-52].
 
 ---
@@ -158,12 +162,12 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   src/schema/inheritance.ts:20].
 - Identity by Name and Level: Collisions and overrides are keyed by
   `${field.path}\0${field.name}`, ensuring nested fields (`editions.publisher`)
-  never collide with root fields (`publisher`) [V:
-  src/schema/inheritance.ts:99; src/schema/resolver.ts:157].
+  never collide with root fields (`publisher`) [V: src/schema/inheritance.ts:99;
+  src/schema/resolver.ts:157].
 - Write Isolation: All writes happen through single `processFrontMatter` calls,
   preserving unknown frontmatter properties [V: src/io/write.ts:2-6].
-- Template Sequence Order: Templates apply first via raw modify/Templater; class
-  frontmatter fields merge second via `processFrontMatter` [V:
+- Template Sequence Order: Templates apply first through `modify/Templater`.
+  Class frontmatter fields merge second through `processFrontMatter` [V:
   docs/content/schema.md:261-265].
 
 ---
@@ -173,11 +177,11 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
 - External View Delegation: Delegating queries and candidate lists to Obsidian
   Bases eliminated Dataview baggage but coupled relationship resolution to
   Obsidian UI runtime [V: docs/content/positioning.md:23-31].
-- Binding order versus override order: see section 1; the code lets a lower
-  ranked binding source override a frontmatter class on a collision, and no
-  test covers it [V for code, H for intent].
-- Weak Validation for Custom Dates: Deferring to custom Moment formats forces the
-  validator to accept any non-empty string, degrading schema validation to a
+- Binding order versus override order: see section 1. The code lets a lower
+  ranked binding source override a frontmatter class on a collision, and no test
+  covers it [V for code, H for intent].
+- Weak Validation for Custom Dates: Deferring to custom Moment formats forces
+  the validator to accept any non-empty string, degrading schema validation to a
   presence check [V: src/fields/validate.ts:97-99].
 - Incomplete Required Check: `isEmpty` does not test array length, permitting
   empty lists `[]` on required multi-fields [V: src/fields/validate.ts:58].
@@ -195,9 +199,9 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
 - In-Place Inheritance Override: Overriding fields at the ancestor's position
   rather than appending to the end preserves logical document layout [V/H:
   src/schema/inheritance.ts:80].
-- In-Write Missing Field Check: Deciding missing fields inside the write callback
-  against live frontmatter prevents race conditions with template expansion
-  [V/H: src/commands/insertMissingFields.ts:51].
+- In-Write Missing Field Check: Deciding missing fields inside the write
+  callback against live frontmatter prevents race conditions with template
+  expansion [V/H: src/commands/insertMissingFields.ts:51].
 - Level-Qualified Keys: Qualifying field identity by nesting level
   (`path\0name`) avoids false collisions between object properties and root
   properties [V/H: src/schema/inheritance.ts:99].
@@ -218,7 +222,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   safer [H].
 - Unchecked Custom Date Formats: Fileclass abandons date validation when custom
   formats are used. Traces can parse and validate structured temporal formats
-  using a dedicated parser crate [H: ticket 27].
+  using a dedicated parser crate [H: ticket 29].
 - Delegation to Host GUI: Fileclass relies on Obsidian Bases for foreign keys,
   lookups, and reverse relations. Traces must own relationship queries within
   its core query engine [H].
@@ -226,7 +230,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   for comparison (`equals`, `contains`). Traces uses a typed `NoteFieldValue`
   and strict adaptive equality [H: tickets 18, 19].
 - Frontmatter-Only Restriction: While frontmatter isolation simplifies write
-  safety, Traces requires body section schemas (ticket 36) for structured notes
+  safety, Traces requires body section schemas (ticket 37) for structured notes
   [H].
 
 ---
@@ -246,11 +250,11 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   multi-text fields (`MultiInput`) but forbids them for relational multi-links
   (`MultiFile`). Traces should retain explicit list types in AST while allowing
   scalar coercion in queries.
-- Ticket 35 (Schema Internals): Prune thin/redundant types. Of Fileclass's 28
-  types, only ~10 represent unique structural data types; `Cycle`,
+- Ticket 36 (Schema Internals): Prune thin/redundant types. Of Fileclass's 28
+  types, only ~10 represent unique structural data types. `Cycle`,
   `CycleDuration`, `Location`, `Icon`, `Color` are UI presentation concerns.
-- Ticket 34 & 36 (Live Buffers & Body Schemas): Fileclass has zero live buffer
-  synchronization or body validation; provides no precedent for tickets 34/36.
+- Ticket 27 & 37 (Live Buffers & Body Schemas): Fileclass has zero live buffer
+  synchronization or body validation. It provides no precedent for tickets 27/37.
 
 ### Round-4 Claims Verification Ledger
 

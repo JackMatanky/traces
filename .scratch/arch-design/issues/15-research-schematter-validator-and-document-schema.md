@@ -6,70 +6,86 @@ Blocked by: 13
 
 ## Question
 
-[Ticket 13's research](../research/13-iwe-query-schema-and-agent-write-gating.md)
-found that IWE delegates schema parsing, compilation and validation (frontmatter
-as JSON Schema 2020-12, body as an ordered section matcher with token budgets)
-to an external crate, `schematter-validator = "0.2.0"` (`Cargo.toml:20` of
-`iwe-org/iwe`), implementing a published spec
+[Ticket 13's
+research](../research/13-iwe-query-schema-and-agent-write-gating.md) showed an
+external crate for schemas. IWE delegates schema parsing, compilation and
+validation to `schematter-validator = "0.2.0"` (`Cargo.toml:20` of
+`iwe-org/iwe`). Frontmatter uses JSON Schema 2020-12. The body uses an ordered
+section matcher with token budgets. The crate implements a published spec
 (`https://document-schema.org/draft/2026-06/schema`). The IWE digests contain
 only its callers (`crates/liwe/src/schema.rs`, `schema/document.rs`,
 `crates/diwe/src/schema.rs`), not the crate.
 
-[Body-section schemas](./36-body-section-schemas.md) and [schema
-internals](./35-schema-internals-simplification.md) cannot weigh "adopt a crate
-for the body matcher" against "write a small heading matcher over persisted
-`Note` headings" without knowing the crate. Find out, from primary sources
-(crates.io / docs.rs page text, the source repository, the spec text):
+[Body-section schemas](./37-body-section-schemas.md) and [schema
+internals](./36-schema-internals-simplification.md) need crate details. They
+compare two choices: adopt a crate for the body matcher, or write a small
+heading matcher over persisted `Note` headings.
 
-- who maintains it, repository, licence, release history, downloads, MSRV,
-  edition, whether it is the same author or organisation as IWE;
-- size (LoC), direct and transitive dependencies, compile-time weight, whether
-  it pulls `serde_yaml`/`serde_json`, a regex engine, `jsonschema`, a tokenizer;
-- its input model: does it validate a generic value tree (serde_json::Value?),
-  a document tree built by the caller (as `liwe::schema::document` does), or
-  both; could Traces feed it `NoteFieldValue`-shaped data and a heading list
-  without converting through YAML;
-- semantics the spec fixes: section matcher (ordered, greedy, non-backtracking),
-  `minContains`/`maxContains`, `additionalSections`, terminal wildcards, token
-  budgets (how tokens are counted; is the tokenizer pluggable or a hard
-  dependency), error and violation structure (breadcrumb, `schemaPath`,
-  keyword, hint), schema-error versus violation separation;
-- spec maturity and stability (draft status, version policy, independent
-  implementations, conformance suite);
-- what it would cost Traces to vendor, wrap or reimplement the section matcher
-  alone, measured against the heading data already persisted in `Note`.
+Find out these facts from primary sources (crates.io or docs.rs page text, the
+source repository, the spec text):
 
-Informs: [ticket 36](./36-body-section-schemas.md) (primary),
-[ticket 35](./35-schema-internals-simplification.md), reconciliation ticket 33.
+- Maintainer, repository, licence, release history, downloads, MSRV, edition.
+- Identity: confirm if the author or organisation is the same as IWE.
+- Size in lines of code, direct and transitive dependencies, and compile-time
+  weight.
+- Dependencies: check if it pulls `serde_yaml`/`serde_json`, a regex engine,
+  `jsonschema`, or a tokenizer.
+- Input model: does it validate a generic tree (serde_json::Value), a caller
+  document tree (`liwe::schema::document`), or both.
+- Data input: could Traces feed it `NoteFieldValue`-shaped data and a heading
+  list without conversion through YAML.
+- Spec section matcher semantics: ordered, greedy, and non-backtracking.
+- Spec rules: `minContains`/`maxContains`, `additionalSections`, and terminal
+  wildcards.
+- Token budgets: how tokens are counted. Is the tokenizer pluggable or a hard
+  dependency.
+- Error and violation structure: breadcrumb, `schemaPath`, keyword, and hint.
+- Separation: check separation between schema errors and document violations.
+- Spec maturity and stability: draft status, version policy, independent
+  implementations, and conformance suite.
+- Reimplementation cost: what it would cost Traces to vendor, wrap or
+  reimplement the section matcher alone. Measure this against heading data in
+  `Note`.
 
-Deliverable: `.scratch/arch-design/research/15-schematter-validator-and-document-schema.md`
-(<= 200 lines). Cite URLs and file paths for every claim; mark [V], [H], [S].
-Do not decide; state fit, cost and risk.
+Informs: [ticket 37](./37-body-section-schemas.md) (primary), [ticket
+36](./36-schema-internals-simplification.md), reconciliation ticket 35.
+
+Deliverable:
+`.scratch/arch-design/research/15-schematter-validator-and-document-schema.md`
+(<= 200 lines).
+
+Instructions:
+
+- Cite URLs and file paths for every claim.
+- Mark [V], [H], and [S].
+- Do not decide. State fit, cost and risk.
 
 ## Answer
 
-Deliverable: [research 15](../research/15-schematter-validator-and-document-schema.md),
-from docs.rs, the spec site and the `iwe-org/schematter` repository (crate
-internals are [S]: read by the research agent, not re-read by the owner).
+Deliverable: [research
+15](../research/15-schematter-validator-and-document-schema.md). Sources are
+docs.rs, the spec site, and the `iwe-org/schematter` repository. Crate internals
+are [S] (read by the research agent, not re-read by the owner).
 
-- `schematter-validator` 0.2.0: Apache-2.0, same author and organisation as
-  IWE, split out of IWE in 2026-07; two releases, about 2,600 downloads, one
-  implementation, a draft spec (`draft/2026-06`). About 1,200 lines; depends on
-  `jsonschema` 0.47, `serde_json`, `serde_yaml_ng` and `regex`; no markdown
-  parser and no tokenizer (token counts are caller-supplied integers).
-- Input: frontmatter as `serde_json::Value`, body as a caller-built recursive
-  `Document { sections, blocks, token counts }`. Violations carry string
-  breadcrumbs, a JSON-Pointer `schemaPath`, keyword and `hint`; no source lines.
-  Schema errors are separated from violations.
+- The crate `schematter-validator` 0.2.0 uses Apache-2.0 and shares IWE's
+  author and organization. The author split it from IWE in 2026-07. It has two
+  releases, about 2,600 downloads, one implementation, and a draft spec
+  (`draft/2026-06`). The crate has about 1,200 lines and depends on
+  `jsonschema` 0.47, `serde_json`, `serde_yaml_ng` and `regex`. It lacks a
+  markdown parser and a tokenizer. Caller-supplied integers provide token
+  counts.
+- Input: frontmatter as `serde_json::Value`. The body is a caller-built
+  recursive `Document { sections, blocks, token counts }`. Violations carry
+  string breadcrumbs, a JSON-Pointer `schemaPath`, keyword and `hint`.
+  Violations carry no source lines. Schema errors are separated from violations.
 - Fit: poor for Traces. It brings a second schema dialect (JSON Schema 2020-12
-  in YAML) next to ticket 20's strict TOML, a recursive section tree that
-  Traces would rebuild from its flat `Heading { level, text, line }` slice, and
-  no spans for diagnostics. A native flat heading matcher is estimated at
-  150 to 250 lines [H] and can report the heading line directly. Reusing the
-  spec's matcher semantics (ordered, greedy, `minContains`/`maxContains`,
-  `additionalSections`, terminal wildcard, schema error for duplicate entries)
-  does not require the crate.
+  in YAML) next to ticket 20's strict TOML. Traces would rebuild a recursive
+  section tree from its flat `Heading { level, text, line }` slice. Diagnostics
+  lack spans. A native flat heading matcher needs 150 to 250 lines [H] and
+  reports the heading line directly. The spec's matcher semantics (ordered,
+  greedy, `minContains`/`maxContains`, `additionalSections`, terminal wildcard,
+  duplicate-entry schema error) do not need the crate.
 
-Unresolved: none for ticket 36 to wait on. Downstream: [body-section
-schemas](./36-body-section-schemas.md) (the "adopt a crate" alternative is
-answered), [schema internals](./35-schema-internals-simplification.md).
+Unresolved: none for ticket 37 to wait on. Downstream: [body-section
+schemas](./37-body-section-schemas.md) (the "adopt a crate" alternative is
+answered), [schema internals](./36-schema-internals-simplification.md).

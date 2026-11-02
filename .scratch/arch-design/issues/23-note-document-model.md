@@ -23,7 +23,7 @@ Decide the topics in this order. Topic A frames the other topics.
 - Define `NoteLink` (syntax kind and source span). Decide which type `outlinks`
   holds.
 - Decide how the editor shape builds from an unsaved buffer in memory (ticket
-  34). Do not promise an incremental reparse.
+  27). Do not promise an incremental reparse.
 
 ### B. Spans
 
@@ -33,14 +33,14 @@ Decide the topics in this order. Topic A frames the other topics.
   Decide how they get a span for each list element where known.
 - Measure the cost of frontmatter spans against the span-free fast path. The
   Noyalib CST is rejected (+59% parse time).
-- Decide which body facts and spans the model keeps for ticket 36. Include the
+- Decide which body facts and spans the model keeps for ticket 37. Include the
   extent of each heading section. Include the body text slices for token
   budgets.
 
 ### C. Items and fields
 
 - Decide if list items and task items stay children of `Note` or become separate
-  indexed entities. State the row identity that ticket 26 needs: `item_idx`, the
+  indexed entities. State the row identity that ticket 28 needs: `item_idx`, the
   `list.*` fields and document order.
 - Decide if item fields and item tags stay duplicated in the note-level
   collections. Today the parser copies the fields and tags of task items and of
@@ -62,13 +62,13 @@ Decide the topics in this order. Topic A frames the other topics.
 - Decide the final field set of the parser input (ticket 22). Add each
   index-time read to `IndexPolicy`. Include the title, aliases and date keys.
 - Decide if the parser input is borrowed or owned. Check the decision against a
-  long-lived host (ticket 30).
+  long-lived host (ticket 32).
 - Decide between a single markdown pass and a dual markdown pass.
 - Decide how footnotes, callouts and slugs enter the model. Decide by consumer
   need, not by the glossary. Consumers are LSP navigation and heading-link
   resolution. The code has none of them today.
 - Decide the infallibility contract. State how the parser reports a notice, for
-  example when `NaN` becomes `Null` (ticket 19). Ticket 31 owns the mechanism
+  example when `NaN` becomes `Null` (ticket 19). Ticket 33 owns the mechanism
   that shows the notice.
 
 ### Compatibility rules
@@ -203,7 +203,7 @@ See [ticket 20's Answer](./20-schema-note-typing-and-validation.md).
 - An MCP agent that edits files directly is checked after the edit. It adds no
   write-back requirement here.
 - Class binding reads the tags and the path of a note. Both are available.
-- Ticket 36 (body-section schemas) is blocked by this ticket. It needs to know
+- Ticket 37 (body-section schemas) is blocked by this ticket. It needs to know
   which body facts and spans the note model keeps.
 
 ## Inputs from the config ownership decision
@@ -270,7 +270,7 @@ a personal vault. Every 50,000-note number is a linear extrapolation [H].
   test checks full ranges against the source bytes. It does not check counts
   only.
 - `parse` returns the `Note` and the notices. `parse_with_doc` serves an open
-  buffer. The unsaved-buffer constructor is public (ticket 34).
+  buffer. The unsaved-buffer constructor is public (ticket 27).
 - `Link` stays the stored internal-link fact. It holds the target, the display
   text, the embed flag and the syntax kind. `NoteLink` is the document
   occurrence type. It holds the ranges.
@@ -286,12 +286,12 @@ Alternatives considered, with the reason to reject each:
   17 and the span needs of ticket 20.
 - One shared `Note` with stored spans. No precedent persists spans. A stored
   span can go stale against an unsaved buffer. It adds 4.3% to the record.
-- A span-free `Note` plus a sidecar span table. It is close to this design. The
+- A span-free `Note` plus a sidecar span table. It is near this design. The
   separate `NoteDoc` has a clearer owner for the ranges.
 - One event loop with a hook that feeds both builders. The parser works on
   transformed buffers, so tag, field and link-part ranges do not exist inside
   it. A hook needs an offset map that touches the Frozen parser.
-- A document that the LSP host owns. Tickets 20 and 36 need spans outside the
+- A document that the LSP host owns. Tickets 20 and 37 need spans outside the
   LSP. A core document keeps them testable now.
 - A lossless tree. It adds 59% to the parse time. No consumer needs it.
 
@@ -314,7 +314,7 @@ Alternatives considered, with the reason to reject each:
 - A small scanner reads the frontmatter keys. It scans only the metadata event
   range. It prefers an absent span to a false span. Noyalib `Spanned` is not the
   only source.
-- Ticket 36 reads section extents from the heading lines. It reads text slices
+- Ticket 37 reads section extents from the heading lines. It reads text slices
   from the source. The `Note` stores no paragraph, code block or table.
 
 ### Decision: items and fields (topic C)
@@ -331,7 +331,7 @@ Alternatives considered, with the reason to reject each:
   the same key. A frontmatter `null` still wins.
 - One value is a scalar. Several values are a list. This rule covers note fields
   and item fields. Each element is classified once at parse time (ticket 19).
-- Ticket 26 adds a list-membership operation. Equality across a list and a
+- Ticket 28 adds a list-membership operation. Equality across a list and a
   scalar stays false (ticket 19).
 - The effective accessor does not feed the schema check. The check stays
   frontmatter-only (ticket 20).
@@ -360,18 +360,18 @@ Alternatives considered, with the reason to reject each:
   `-2`. One function serves the facts and the document.
 - Footnotes and callouts live in `NoteDoc` only.
 - The parser stays infallible. It returns notices beside the `Note`. The `Note`
-  stores none. The bulk index path collects notices with their paths. Ticket 31
+  stores none. The bulk index path collects notices with their paths. Ticket 33
   owns how they show.
 - The parser borrows its settings for one call. A long-lived host owns them in an
   `Arc`. A fact-changing setting enters `IndexPolicy` (ticket 22).
-- A change of the stored `Note` bumps `META_VERSION`. Index results must equal a
-  fresh parse.
+- A change of the stored `Note` changes the extractor fingerprint or bumps the
+  format epoch (ticket 25). Index results must equal a fresh parse.
 
 ### Change table (ticket 16)
 
 | Change | Tier | Migration |
 |--------|------|-----------|
-| `key = value` does not match a field with several values | Frozen change | Use the membership operation (ticket 26) |
+| `key = value` does not match a field with several values | Frozen change | Use the membership operation (ticket 28) |
 | Item fields follow the same multi-value rule | Frozen change | Same |
 | `NaN` becomes `Null` with a notice | Frozen change | Read the notice |
 | External URLs leave the stored outlinks | None observable today | None |
@@ -382,7 +382,7 @@ Alternatives considered, with the reason to reject each:
 - `NoteDoc` owns every range and its relation to the source bytes.
 - The host owns the text, the version, the debounce, the revision gate and the
   UTF-16 conversion.
-- `index` owns persistence, `META_VERSION` and `IndexPolicy`.
+- `index` owns persistence, the format epoch and `IndexPolicy` (ticket 25).
 
 ### What becomes removable
 
@@ -400,7 +400,7 @@ Alternatives considered, with the reason to reject each:
   parse time.
 - The end-to-end gain of the guarded heading pass.
 - Block-id resolution, and whether `NoteDoc` records images.
-- Whether any template reads external links (ticket 28).
+- Whether any template reads external links (ticket 30).
 - Host memory at 50,000 notes and a two-process store open.
 - The final place of `TaskStatus*` and `TaskListItem`. The grilling did not
   settle it. Proposal [P]: keep the root `task` types, as ticket 22 says.
@@ -412,20 +412,21 @@ Alternatives considered, with the reason to reject each:
 - Ticket 24: persist one facts-only `Note`. Decoded facts take about twice the
   encoded size. Choose the facet split, lazy decode, secondary indexes and item
   text outside the main record. The link edges are about 4% of the record.
-- Ticket 25: the format version rule. The first run after a bump wipes the
-  store. The two-process open of the store is open.
-- Ticket 26: item order and `item_idx`, the membership operation, and the
+- Ticket 25 (resolved): the store identity and format epoch. A lower epoch or
+  changed fingerprint rebuilds the store. A higher epoch is a read miss with a
+  stderr notice. The host opens the store only during refresh and persist.
+- Ticket 28: item order and `item_idx`, the membership operation, and the
   multi-value rule for item fields.
-- Ticket 28: check if a template reads external links or outlinks.
-- Ticket 30: the host keeps a compact link and heading range index and documents
+- Ticket 30: check if a template reads external links or outlinks.
+- Ticket 32: the host keeps a compact link and heading range index and documents
   only for open buffers. It tags range sets with a source revision.
-- Ticket 31: the parser notice channel and the bulk-index notice path.
-- Ticket 32: visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the
+- Ticket 33: the parser notice channel and the bulk-index notice path.
+- Ticket 34: visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the
   buffer parser.
-- Ticket 34: the open buffer wins over disk and over background work. A
+- Ticket 27: the open buffer wins over disk and over background work. A
   closed-file edit compares the full source snapshot at commit.
-- Ticket 35: the effective accessor is not the schema field resolution.
-- Ticket 36: section extents from heading lines, and source slices for budgets.
+- Ticket 36: the effective accessor is not the schema field resolution.
+- Ticket 37: section extents from heading lines, and source slices for budgets.
 
 ### Amendments to resolved tickets
 

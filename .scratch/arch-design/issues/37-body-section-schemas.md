@@ -44,19 +44,21 @@ Inputs: ticket 20 Answer, `research/20-prep/round4/report.md` and
 ## Inputs from the IWE research
 
 See [research 13](../research/13-iwe-query-schema-and-agent-write-gating.md)
-(sections 1.3 to 1.4). IWE's body schema is an ordered, greedy, non-backtracking
-walk over sections with per-entry `const`, `enum`, `pattern`, length and
-`maxTokens`, occurrence bounds `minContains`/`maxContains` (counted across the
-node, not by run), `additionalSections` (open, forbidden or a subschema) and
-terminal-only wildcards (a non-terminal wildcard is a schema error, exit 2) [V:
-`docs/document-schema.md`]. Violations locate by header breadcrumb. Token
-budgets count with `tiktoken_rs` `o200k_base` (`crates/diwe/src/tokens.rs`) [V],
-a model-specific tokenizer and dependency. IWE has no inheritance: schemas bind
-by path glob, so body rules never compose across a class hierarchy; Traces would
-have to decide that. Fileclass has no body validation. The implementation lives
-in an external crate; ticket 15 investigates it.
+(sections 1.3 to 1.4). IWE validates body schemas through an ordered, greedy,
+non-backtracking walk over sections. Per-entry constraints include `const`,
+`enum`, `pattern`, length and `maxTokens`. Occurrence bounds include
+`minContains` and `maxContains` across the node. The walk supports
+`additionalSections` and terminal-only wildcards (a non-terminal wildcard is a
+schema error, exit 2) [V: `docs/document-schema.md`].
 
-Ticket 15 result: the crate is a poor fit (second dialect, recursive section
-tree, no spans); the matcher semantics are reusable as a design, about 150 to
-250 lines over the flat heading slice [H]. No dependency decision is left for
+Violations locate by header breadcrumb. Token budgets count with `tiktoken_rs`
+`o200k_base` (`crates/diwe/src/tokens.rs`) [V], a model-specific tokenizer and
+dependency. IWE has no inheritance. Schemas bind by path glob, so body rules
+never compose across a class hierarchy. Traces must decide how body rules
+compose. Fileclass has no body validation. The implementation lives in an
+external crate; ticket 15 investigates it.
+
+Ticket 15 found the external crate is a poor fit (second dialect, recursive
+tree, no spans). The matcher semantics are reusable as a design over the flat
+heading slice (about 150 to 250 lines) [H]. No dependency decision is left for
 this ticket.

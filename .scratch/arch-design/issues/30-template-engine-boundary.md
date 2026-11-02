@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 7, 26, 27, 18, 16
+Blocked by: 7, 28, 29, 18, 16
 
 ## Question
 
@@ -47,17 +47,17 @@ serde for schema literals and the hand-written runtime adapter. `Int` renders
 
 See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Template
 comparisons and date handling use the shared relation module, not minijinja's
-own comparison. The natural-language date grammar (ticket 27) is shared with
+own comparison. The natural-language date grammar (ticket 29) is shared with
 `date()` and `date_add` filters. `now`/`today` come from the execution context.
 
 ## Inputs from the schema typing decision
 
 See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). The
 template service stays free of `note`. An app-layer use case runs an advisory
-check between `render()` and `write()` (parse rendered frontmatter, resolve
-class, call the schema check); it is skipped without frontmatter or class and
-also runs under `--dry-run`. The schema stays a source of values, not of prompts
-(ADR-0006).
+check between `render()` and `write()`. The check parses rendered frontmatter,
+resolves the class, and calls the schema check. The check skips execution
+without frontmatter or class. The check also runs under `--dry-run`. The schema
+stays a source of values, not of prompts (ADR-0006).
 
 Under `--dry-run` no output path is computed, so the post-render check cannot
 apply path bindings (frontmatter and tag bindings still apply).
@@ -65,13 +65,16 @@ apply path bindings (frontmatter and tag bindings still apply).
 ## Inputs from the execution-context decision
 
 See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). A
-render samples one temporal frame; nested queries and any lazy results keep it
-after the render state expires. Do not let minijinja's display, iteration, `len`
-or indexing callbacks convert a typed materialization or zone error into a
-missing value or a blank cell; render/write is all-or-nothing. A template escape
-set that survives rendering retains the same frame. Civil `file.cdate`/`mdate`
-presentation uses the render's pinned zone; filename-derived `file.date` does
-not need one. `DialogProvider` receives an adapter-selected mode and honors
-authored defaults unattended but cannot invent answers; an exhausted preset is
-an error. Random UUID creation remains an explicit separate entropy capability,
-not a hidden request-global service.
+render samples one temporal frame. Nested queries and any lazy results keep this
+frame after the render state expires. Never let minijinja callbacks convert a
+typed materialization or zone error into a missing value or blank cell.
+Iteration, display, `len` and indexing callbacks must fail closed. The
+render/write operation is all-or-nothing. A template escape set that survives
+rendering retains the same frame.
+
+Civil `file.cdate`/`mdate` presentation uses the pinned zone of the render.
+Filename-derived `file.date` does not need one. `DialogProvider` receives an
+adapter-selected mode and honors authored defaults unattended. `DialogProvider`
+cannot invent answers, and an exhausted preset is an error. Random UUID
+creation remains an explicit separate entropy capability, not a hidden
+request-global service.
