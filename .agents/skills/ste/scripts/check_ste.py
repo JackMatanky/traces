@@ -625,7 +625,27 @@ def line_comment_end(text: str, start: int, splice: bool) -> int:
 
 
 def _regex_end(text: str, start: int) -> int | None:
-    """Return the end of a guarded regex literal opening at start, or None."""
+    """Return the exclusive end of a guarded regex literal, or None.
+
+    The literal must terminate with an unescaped ``/`` on the same line, with
+    ``[...]`` character classes honored. An unterminated candidate is not a
+    regex and must fall through to plain code.
+    """
+    i, size = start + 1, len(text)
+    in_class = False
+    while i < size and text[i] != "\n":
+        if text[i] == "\\":
+            if i + 1 < size and text[i + 1] == "\n":
+                return None
+            i += 2
+            continue
+        if text[i] == "[":
+            in_class = True
+        elif text[i] == "]":
+            in_class = False
+        elif text[i] == "/" and not in_class:
+            return i + 1
+        i += 1
     return None
 
 
@@ -645,6 +665,7 @@ def mask_to_prose(text: str, language: Language) -> str:
     out: list[str] = list(text)
     spans: list[tuple[int, int, str]] = []
     i, size = 0, len(text)
+    prev_nonblank = ""
 
     def blank(start: int, end: int) -> None:
         out[start:end] = ["\n" if ch == "\n" else " " for ch in text[start:end]]
@@ -708,6 +729,7 @@ def mask_to_prose(text: str, language: Language) -> str:
                 j += 2 if text[j] == "\\" else 1
             if j < size:
                 blank(i, j + 1)
+                prev_nonblank = '"' if char == '"' else "'"
                 i = j + 1
                 continue
             blank(i, size)
@@ -718,6 +740,7 @@ def mask_to_prose(text: str, language: Language) -> str:
                 blank(i, size)
                 break
             blank(i, j + 1)
+            prev_nonblank = "`"
             i = j + 1
             continue
         if language.block and text[i : i + 2] == language.block[0]:
@@ -753,12 +776,16 @@ def mask_to_prose(text: str, language: Language) -> str:
                 and char == "/"
                 and i + 1 < size
                 and text[i + 1] not in "/*"
+                and prev_nonblank in language.regex_start_prev
                 and (candidate := _regex_end(text, i)) is not None
             ):
                 blank(i, candidate)
+                prev_nonblank = "/"
                 i = candidate
                 continue
             blank(i, i + 1)
+            if char != " ":
+                prev_nonblank = char
             i += 1
     mask_line_prefixes(text, out, language, spans)
     return "".join(out)

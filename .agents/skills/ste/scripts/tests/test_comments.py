@@ -155,3 +155,30 @@ def test_python_docstring_escape_sequence_not_false_terminator() -> None:
     assert " she said " in masked
     assert "then # note" in masked
     assert "note" in masked
+
+
+def test_ts_template_and_regex_masking() -> None:
+    code = (
+        'const u = "utilize prior to x";  // use this instead\n'
+        'const t = `subsequent to ${"utilize"}`;\n'
+        "const r = /a\\/*two/;  // end comment\n"
+        "const q = a / b;  // division: not regex\n"
+    )
+    masked = mask(code, "ts")
+    layout_of(code, masked)
+    assert "use this instead" in masked
+    assert "end comment" in masked
+    assert "division: not regex" in masked
+    assert "utilize prior to x" not in masked
+    assert "subsequent to" not in masked
+
+
+def test_ts_regex_guard_division_counterexample() -> None:
+    masked = mask("const q = a / b; // use division\n", "ts")
+    layout_of("const q = a / b; // use division\n", masked)
+    assert "use division" in masked
+
+
+def test_ts_unterminated_regex_candidate_falls_through() -> None:
+    masked = mask("const q = (a) / b;\n// use fallthrough\n", "ts")
+    assert "use fallthrough" in masked
