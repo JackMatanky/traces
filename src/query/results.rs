@@ -543,7 +543,7 @@ impl QuerySet {
     }
 
     /// Sorts rows by `path` for tests.
-    /// This aliases the template engine's sort filter and [`Self::sort_field`].
+    /// Aliases the template engine's sort filter and [`Self::sort_field`].
     ///
     /// # Errors
     ///
@@ -577,7 +577,7 @@ impl QuerySet {
     }
 
     /// Appends a composite sort order transform for tests.
-    /// This matches the pre-fetch
+    /// Matches the pre-fetch
     /// [`QueryBuilder::order`](super::QueryBuilder::order) path.
     #[inline]
     #[cfg(test)]

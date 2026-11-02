@@ -765,17 +765,17 @@ impl QueryFunction {
 /// Comparison operator parsed from filter syntax.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum CompareOp {
-    /// `==`
+    /// Matches when the two operands are equal.
     Eq,
-    /// `!=`
+    /// Matches when the two operands differ.
     Ne,
-    /// `<`
+    /// Matches when the left operand orders before the right.
     Lt,
-    /// `<=`
+    /// Matches when the left operand orders before, or equal to, the right.
     Le,
-    /// `>`
+    /// Matches when the left operand orders after the right.
     Gt,
-    /// `>=`
+    /// Matches when the left operand orders after, or equal to, the right.
     Ge,
 }
 
@@ -856,6 +856,12 @@ struct FilterGrammar;
 impl FilterGrammar {
     /// Parses a literal where a comparison or function argument needs a
     /// value.
+    ///
+    /// # Errors
+    ///
+    /// - [`Syntax`] if the next token is not a literal value.
+    ///
+    /// [`Syntax`]: QueryBuilderError::Syntax
     fn parse_literal_arg(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
@@ -875,6 +881,14 @@ impl FilterGrammar {
     }
 
     /// Parses a call argument list after the function name.
+    ///
+    /// # Errors
+    ///
+    /// - [`Syntax`] if the tokens do not form `name(field, <literal>)`.
+    /// - [`FieldPath`] if the field path is invalid.
+    ///
+    /// [`Syntax`]: QueryBuilderError::Syntax
+    /// [`FieldPath`]: QueryBuilderError::FieldPath
     fn parse_function_call(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
@@ -1058,6 +1072,15 @@ impl FilterGrammar {
 
     /// Folds arithmetic in written order.
     /// Stops when it reaches a comparison or logical token.
+    ///
+    /// # Errors
+    ///
+    /// - [`Syntax`] if `parse_primary` rejects an operand, or both operands are
+    ///   plain numbers.
+    /// - [`FieldPath`] if `parse_primary` rejects a field path.
+    ///
+    /// [`Syntax`]: QueryBuilderError::Syntax
+    /// [`FieldPath`]: QueryBuilderError::FieldPath
     fn parse_value_expr(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
@@ -1120,6 +1143,14 @@ impl AtomParser for FilterGrammar {
     }
 
     /// Parses a `contains` predicate or compares two value expressions.
+    ///
+    /// # Errors
+    ///
+    /// - [`Syntax`] if token parsing fails or an operand is invalid.
+    /// - [`FieldPath`] if a field path is invalid.
+    ///
+    /// [`Syntax`]: QueryBuilderError::Syntax
+    /// [`FieldPath`]: QueryBuilderError::FieldPath
     fn parse_atom(
         &self,
         input: &str,

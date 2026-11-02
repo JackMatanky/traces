@@ -656,13 +656,14 @@ enum SourceToken {
 /// Parses a `#tag`-shaped token starting at the already-consumed leading `#`.
 ///
 /// Uses [`Tag::prefix_len`], the scanner used by the Markdown body lexer.
-/// This accepts the same tag shapes as notes, including one-letter tags.
+/// The scanner accepts the same tag shapes as notes, including one-letter
+/// tags.
 /// Returns [`LexError::UnexpectedToken`](crate::LexError::UnexpectedToken) if
 /// `#` is not followed by a valid tag body.
 ///
 /// # Errors
 ///
-/// Returns an error if no valid tag body follows `#`.
+/// - An error if `#` is not followed by a valid tag body.
 fn tag_callback(lex: &mut Lexer<'_, SourceToken>) -> Result<String, ()> {
     let tag_start = lex.span().start;
     let tail = lex.source().get(tag_start..).ok_or(())?;

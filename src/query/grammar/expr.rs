@@ -176,6 +176,14 @@ impl<'input, G: AtomParser> BooleanExprParser<'input, G> {
     }
 
     /// Parses a left-associative `operator` chain, preserving a lone term.
+    ///
+    /// # Errors
+    ///
+    /// - [`Syntax`] if `parse_term` cannot parse a term.
+    /// - [`FieldPath`] if `parse_term` rejects a field path.
+    ///
+    /// [`Syntax`]: QueryBuilderError::Syntax
+    /// [`FieldPath`]: QueryBuilderError::FieldPath
     fn parse_logical_chain(
         &mut self,
         operator: LogicalOp,
