@@ -48,6 +48,58 @@ def test_extension_language_table_covers_all_configured_languages() -> None:
     assert check_ste.EXTENSION_LANGUAGE[".tsx"] == "ts"
 
 
+def layout_of(original: str, masked: str) -> None:
+    """Assert the masker preserved length, newlines, and blank-only code."""
+    assert len(original) == len(masked)
+    for index, (original_char, masked_char) in enumerate(zip(original, masked)):
+        if original_char == "\n":
+            assert masked_char == "\n", f"newline moved at {index}"
+        else:
+            assert masked_char in (original_char, " "), (
+                f"non-space code changed at {index}: {original_char!r}->{masked_char!r}"
+            )
+
+
+def mask(code: str, name: str = "rust") -> str:
+    return check_ste.mask_to_prose(code, check_ste.LANGUAGES[name])
+
+
+def test_rust_mask_keeps_comments_and_blanks_code() -> None:
+    code = (
+        "fn main() {\n"
+        "    // Please utilize the tool.\n"
+        '    let s = "prior to x // not comment /* no */";\n'
+        "    let c = '/';\n"
+        '    let raw = r#"utilize /* no */ "#;\n'
+        "    let rx = '\\\\n';\n"
+        "}\n"
+    )
+    masked = mask(code)
+    layout_of(code, masked)
+    kept = [line for line in masked.splitlines() if line.strip()]
+    assert kept == ["       Please utilize the tool."]
+
+
+def test_rust_nested_block_comment_is_prose() -> None:
+    code = (
+        '/* start\n/* nested\n*/ inner\n* STILL? */\nlet s = "str /* not comment */";\n'
+    )
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "start" in masked
+    assert "nested" in masked
+    assert "inner" in masked
+    assert "STILL?" in masked
+    assert "str /* not comment */" not in masked
+
+
+def test_rust_unterminated_raw_string_blanks_remainder() -> None:
+    code = 'let r = r#"gone;\n// comment should vanish\n'
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "comment should vanish" not in masked
+
+
 def test_line_prefix_policies_are_language_specific() -> None:
     assert check_ste.LANGUAGES["rust"].line_prefix_chars == " \t/*!"
     assert check_ste.LANGUAGES["python"].line_prefix_chars == ""

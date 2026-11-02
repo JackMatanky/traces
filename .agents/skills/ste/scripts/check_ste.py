@@ -606,6 +606,156 @@ def markdown_non_prose_ranges(text: str) -> list[tuple[int, int]]:
     return ranges
 
 
+# 3b. language-aware comment masking
+_COMMENT = "comment"
+_DOCSTRING = "docstring"
+
+
+def line_comment_end(text: str, start: int, splice: bool) -> int:
+    """Return the index after one line comment, honoring C line splicing."""
+    end = text.find("\n", start)
+    if end == -1:
+        return len(text)
+    if not splice:
+        return end
+    while text[end - 1] == "\\" and end + 1 < len(text):
+        following = text.find("\n", end + 1)
+        end = following if following != -1 else len(text)
+    return end
+
+
+def _regex_end(text: str, start: int) -> int | None:
+    """Return the end of a guarded regex literal opening at start, or None."""
+    return None
+
+
+def mask_line_prefixes(
+    text: str, out: list[str], language: Language, spans: list[tuple[int, int, str]]
+) -> None:
+    """Placeholder for per-line doc/continuation prefix blanking."""
+    return
+
+
+def mask_to_prose(text: str, language: Language) -> str:
+    """Return text with every byte outside comment prose blanked to a space.
+
+    Length, byte positions, and newline positions are preserved, so Markdown
+    checks on the masked text report the original file line and column.
+    """
+    out: list[str] = list(text)
+    spans: list[tuple[int, int, str]] = []
+    i, size = 0, len(text)
+
+    def blank(start: int, end: int) -> None:
+        out[start:end] = ["\n" if ch == "\n" else " " for ch in text[start:end]]
+
+    def keep(start: int, end: int, head: int, tail: int) -> None:
+        blank(start, start + head)
+        blank(end - tail, end)
+        spans.append((start, end, _COMMENT))
+
+    while i < size:
+        char = text[i]
+        if char == "\n":
+            i += 1
+            continue
+        if language.docstring and text[i : i + 3] in ("'''", '"""'):
+            quote = text[i : i + 3]
+            end = text.find(quote, i + 3)
+            if end == -1:
+                blank(i, size)
+                break
+            blank(i, i + 3)
+            blank(end, end + 3)
+            spans.append((i, end + 3, _DOCSTRING))
+            i = end + 3
+            continue
+        if language is LANGUAGES["rust"] and (
+            match := re.match(r"(?:b)?r(#*)\"", text[i : i + 6])
+        ):
+            hashes = match.group(1)
+            end = text.find(f'"{hashes}', i + len(match.group(0)))
+            if end == -1:
+                blank(i, size)
+                break
+            blank(i, end + 1 + len(hashes))
+            i = end + 1 + len(hashes)
+            continue
+        if char == "'" and language is LANGUAGES["rust"]:
+            j = i + 1
+            if j < size and text[j] == "\\":
+                j += 2
+            elif j < size:
+                j += 1
+            if j < size and text[j] == "'":
+                blank(i, j + 1)
+                i = j + 1
+                continue
+            blank(i, i + 1)
+            i += 1
+            continue
+        if char in ('"', "'"):
+            j = i + 1
+            while j < size and text[j] != char:
+                j += 2 if text[j] == "\\" else 1
+            if j < size:
+                blank(i, j + 1)
+                i = j + 1
+                continue
+            blank(i, size)
+            break
+        if char == "`" and language is not LANGUAGES["rust"]:
+            j = text.find("`", i + 1)
+            if j == -1:
+                blank(i, size)
+                break
+            blank(i, j + 1)
+            i = j + 1
+            continue
+        if language.block and text[i : i + 2] == language.block[0]:
+            closer = language.block[1]
+            if language.block_nests:
+                depth, j = 1, i + 2
+                while j < size and depth:
+                    if text[j : j + 2] == closer:
+                        depth, j = depth - 1, j + 2
+                    elif text[j : j + 2] == language.block[0]:
+                        depth, j = depth + 1, j + 2
+                    else:
+                        j += 1
+            else:
+                j = text.find(closer, i + 2)
+                j = j + 2 if j != -1 else size
+            if j >= size and language.block_nests:
+                keep(i, size, len(language.block[0]), 0)
+                i = size
+                continue
+            keep(i, j, len(language.block[0]), len(closer))
+            i = j
+            continue
+        for prefix in language.line_comments:
+            if text.startswith(prefix, i):
+                end = line_comment_end(text, i, language.line_splice)
+                keep(i, min(end, size), len(prefix), 0)
+                i = end
+                break
+        else:
+            if (
+                language.regex_start_prev is not None
+                and char == "/"
+                and i + 1 < size
+                and text[i + 1] not in "/*"
+                and (candidate := _regex_end(text, i)) is not None
+            ):
+                blank(i, candidate)
+                i = candidate
+                continue
+            blank(i, i + 1)
+            i += 1
+    mask_line_prefixes(text, out, language, spans)
+    return "".join(out)
+
+
 def dictionary_matches(sentence: str, dictionary: dict[str, object]) -> list[Match]:
     """Return longest-first canonical dictionary substitutions in one sentence."""
     entries = object_list(dictionary["substitutions"], "substitutions")
