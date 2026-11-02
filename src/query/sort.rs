@@ -1,15 +1,12 @@
 //! Generates sort keys, evaluates total order comparisons, and sorts query
 //! rows.
 //!
-//! This module implements ordering semantics across diverse metadata types,
-//! mapping dynamically typed [`NoteFieldValue`] and borrowed
-//! [`QueryFieldValueRef`] variants into comparable [`SortKey`] values. It
-//! defines canonical cross-type ranking, case-insensitive text normalization,
-//! date and duration ordering, and configurable null placement.
+//! The module converts metadata into [`SortKey`] values for comparison.
+//! Sort keys have type ranks. They also normalize text, order dates and
+//! durations, and place null values.
 //!
-//! Complex, multi-column orderings are represented via [`SortOrder`], which
-//! combines multiple [`SortTerm`] clauses into an efficient row-major key
-//! matrix.
+//! A [`SortOrder`] combines [`SortTerm`] clauses into a row-major key matrix
+//! for multi-column sorts.
 use std::{borrow::Cow, cmp::Ordering, num::NonZeroUsize};
 
 use super::{
@@ -54,8 +51,8 @@ impl SortOrder {
     ///
     /// # Panics
     ///
-    /// - Panics if `self.terms` is empty; callers must guard non-empty terms
-    ///   before calling (`sort` does this).
+    /// Panics if `self.terms` is empty. Callers must check that terms exist
+    /// before this call.
     #[expect(
         clippy::expect_used,
         reason = "caller guarantees non-empty terms via sort guard"
@@ -76,11 +73,9 @@ impl SortOrder {
         }
     }
 
-    /// Computes one row's sort key for one term.
+    /// Computes the sort key for one row and one term.
     ///
-    /// `list.priority` materializes a numeric [`SortKey::Number`] from the
-    /// task's severity rank instead of the generic name-string path, so
-    /// `list.priority` sorts by severity, not alphabetically.
+    /// For `list.priority`, the key uses the task severity rank, not its name.
     #[must_use]
     fn key_for_term<'a>(row: &'a QueryRow, term: &SortTerm) -> SortKey<'a> {
         if matches!(
@@ -94,11 +89,10 @@ impl SortOrder {
         }
     }
 
-    /// Compares key slices term-by-term.
+    /// Compares key slices one term at a time.
     ///
-    /// Applies each term's direction and null placement. Shared by full sorting
-    /// and top-k selection so both execution paths keep identical ordering
-    /// semantics.
+    /// Applies each term's direction and null placement.
+    /// Full sorting and top-k selection use the same comparison.
     #[must_use]
     pub(super) fn compare_keys(
         &self,
@@ -146,16 +140,8 @@ impl SortOrder {
 
         let mut opt_rows: Vec<Option<QueryRow>> =
             rows.into_iter().map(Some).collect();
-        // `order`'s length is `opt_rows.len()` by construction and every index
-        // is unique and taken exactly once, so the output length is exactly
-        // `order.len()` - but `filter_map`'s `size_hint` lower bound is
-        // conservatively 0 (the compiler can't know the closure always
-        // succeeds), so a bare `.collect()` can't preallocate exactly and falls
-        // back to `Vec`'s amortized growth. Unlike a `Copy` element type,
-        // `QueryRow`'s `Arc` field and non-trivial drop glue block the
-        // size-matched-reuse optimization that (for Copy types) makes this
-        // normally free - measured via temporary instrumentation (reverted): 5
-        // reallocations at n=100, 8 at n=1000 without this pre-sizing.
+        // Every index appears once, so the output length equals `order.len()`.
+        // `filter_map` reports a zero lower bound. Reserve the exact size here.
         let mut sorted = Vec::with_capacity(order.len());
         sorted.extend(
             order
@@ -188,14 +174,14 @@ impl SortOrder {
 
     /// Parses a comma-separated sort clause.
     ///
-    /// Segments may carry `+` or `-`; unprefixed segments use
-    /// `default_direction`. Blank segments are skipped, so blank input returns
-    /// `Ok(None)`.
+    /// A `+` or `-` sets a segment's direction. Other segments use
+    /// `default_direction`. The parser skips blank segments.
+    /// It returns `Ok(None)` when the input is blank.
     ///
     /// # Errors
     ///
-    /// - [`QueryBuilderError::FieldPath`] if any nonblank segment is not a
-    ///   valid field path after prefix stripping.
+    /// - [`QueryBuilderError::FieldPath`] if a segment with text is not a valid
+    ///   field path after prefix stripping.
     pub(crate) fn parse(
         input: &str,
         default_direction: SortDirection,
@@ -261,13 +247,13 @@ impl SortTerm {
 
 /// Controls whether a term keeps or reverses its comparison result.
 ///
-/// Defaults to [`Self::Descending`] to match unprefixed CLI and template terms.
+/// Uses [`Self::Descending`] when a CLI or template term has no direction.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) enum SortDirection {
     /// Sorts smallest value first.
     Ascending,
-    /// Sorts largest value first (default, matching unprefixed CLI/template
-    /// terms).
+    /// Sorts largest value first, the default for CLI and template terms
+    /// without a direction.
     #[default]
     Descending,
 }
@@ -280,13 +266,12 @@ impl SortDirection {
     }
 }
 
-/// Controls where a missing (null) field value lands in sort order.
+/// Controls where an absent (null) field value lands in sort order.
 ///
-/// Dataview treats `null` unconditionally as the smallest value, which
-/// [`Self::Auto`] reproduces (first ascending, last descending). No current
-/// query syntax constructs [`Self::First`] or [`Self::Last`]; this is a seam
-/// for a future `sort field asc nulls last` grammar addition, wired through
-/// [`SortOrder::compare_keys`] with zero behavior change today.
+/// Dataview treats `null` as the smallest value. [`Self::Auto`] puts it first
+/// when sorting ascending and last when sorting descending. Query syntax does
+/// not select [`Self::First`] or [`Self::Last`] yet. They support a future
+/// grammar change, and [`SortOrder::compare_keys`] handles them today.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[cfg_attr(
     not(test),
@@ -297,12 +282,12 @@ impl SortDirection {
     )
 )]
 pub(crate) enum NullPlacement {
-    /// Sorts null first ascending, last descending (the Dataview default).
+    /// Places null first ascending and last descending, as Dataview does.
     #[default]
     Auto,
-    /// Always sorts null before every non-null value.
+    /// Always places null before every non-null value.
     First,
-    /// Always sorts null after every non-null value.
+    /// Always places null after every non-null value.
     Last,
 }
 
@@ -327,13 +312,13 @@ impl<'a> SortKeys<'a> {
 
 /// Represents a normalized scalar used for row-order comparisons.
 ///
-/// Reduced projection of [`NoteFieldValueRef`]'s rank order for cheap,
-/// precomputed sort comparisons: `List` and `Object` collapse to `Null`, `Link`
-/// collapses to `Text` by its target. Values needing full fidelity compare via
-/// [`NoteFieldValueRef::compare`] directly, not through `SortKey`.
+/// Projects [`NoteFieldValueRef`] into a scalar for precomputed comparisons.
+/// Lists and objects become null. Links become text from their targets. Use
+/// [`NoteFieldValueRef::compare`] when comparisons need full value detail.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum SortKey<'a> {
-    /// Missing or unindexable value; sorts below every other kind.
+    /// Represents a missing or non-indexed value.
+    /// It sorts below every other kind.
     Null,
     /// Boolean value.
     Bool(bool),
@@ -348,11 +333,10 @@ pub(super) enum SortKey<'a> {
 }
 
 impl<'a> SortKey<'a> {
-    /// Normalizes a resolved field value into a comparable scalar. Takes `val`
-    /// by value (not by reference) so the rare `Owned` fallback can move its
-    /// already-allocated `String` into `Text` with no extra clone, and so the
-    /// common case can copy out `&'a str`/`&'a Link` fields tied to the
-    /// caller's own `'a`, not a shorter local borrow.
+    /// Normalizes a field value into a scalar for sorting.
+    ///
+    /// Takes ownership so an owned string moves into `Text` without a clone.
+    /// Borrowed values keep the caller's `'a` lifetime.
     pub(super) fn from_value_ref(val: QueryFieldValueRef<'a>) -> Self {
         match val {
             QueryFieldValueRef::Note(note_ref) => Self::from_note_ref(note_ref),
@@ -385,10 +369,8 @@ impl<'a> SortKey<'a> {
         }
     }
 
-    /// Opportunistically classifies free text as a date-time, date, or
-    /// duration, falling back to text. Takes `Cow` so the common borrowed path
-    /// and the rare owned fallback share one classification instead of two
-    /// copies of the same match.
+    /// Classifies free text as a date-time, date, or duration.
+    /// It keeps other text as text. [`Cow`] stores borrowed or owned input.
     fn from_text(s: Cow<'a, str>) -> Self {
         match TextShape::classify(&s) {
             TextShape::DateTime(value) => Self::DateTime(value),
@@ -410,17 +392,16 @@ impl<'a> SortKey<'a> {
         }
     }
 
-    /// Rank via the same [`NoteFieldType`] table [`NoteFieldValueRef::compare`]
-    /// uses, so this can never diverge from its ordering for the kinds they
-    /// share.
+    /// Returns the rank from the table that [`NoteFieldValueRef::compare`]
+    /// uses.
     const fn rank(&self) -> u8 {
         self.kind().rank()
     }
 
     /// Compares two normalized sort keys.
     ///
-    /// Null sorts below all values; like kinds compare by value; unlike
-    /// non-null kinds order by rank.
+    /// Null sorts below all values. Like kinds compare by value.
+    /// Unlike non-null kinds sort by rank.
     pub(super) fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Self::Null, Self::Null) => Ordering::Equal,
@@ -438,10 +419,9 @@ impl<'a> SortKey<'a> {
     }
 }
 
-/// Represents the result of inspecting free text for a date, date-time, or
-/// duration shape. Shared by [`SortKey::from_text`] and
-/// `filter::ComparisonExpr::classify_literal` so both call one classifier, not
-/// two copies of the same date/duration heuristic.
+/// Holds the date, date-time, duration, or plain-text result of classification.
+/// [`SortKey`] and [`super::grammar::filter::ComparisonExpr::classify_literal`]
+/// use this classifier.
 pub(super) enum TextShape {
     /// Text parsed as an ISO date-time.
     DateTime(DateTimeValue),
@@ -449,7 +429,7 @@ pub(super) enum TextShape {
     Date(DateValue),
     /// Text parsed as a duration such as `1h30m`.
     Duration(crate::DurationValue),
-    /// Text with none of the above shape; kept as plain text.
+    /// Holds text with no date, date-time, or duration shape.
     Plain,
 }
 
@@ -532,8 +512,8 @@ mod tests {
                 rows.clone().sort("rating", false).expect("valid sort");
             let descending = rows.sort("rating", true).expect("valid sort");
 
-            // Dataview treats null as the minimum value: first ascending, last
-            // descending.
+            // Dataview sorts null first in ascending order and last in
+            // descending order.
             assert_eq!(names(&ascending), ["unrated", "rated"]);
             assert_eq!(names(&descending), ["rated", "unrated"]);
         }
@@ -775,7 +755,7 @@ mod tests {
             let null_key = [SortKey::Null];
             let num_key = [SortKey::Number(5.0)];
 
-            // Null on the left.
+            // Check null on the left.
             assert_eq!(
                 first_order.compare_keys(&null_key, &num_key),
                 Ordering::Less
@@ -785,7 +765,7 @@ mod tests {
                 Ordering::Greater
             );
 
-            // Null on the right (symmetric).
+            // Check the symmetric case with null on the right.
             assert_eq!(
                 first_order.compare_keys(&num_key, &null_key),
                 Ordering::Greater
@@ -795,7 +775,7 @@ mod tests {
                 Ordering::Less
             );
 
-            // Null on both sides is always Equal, regardless of placement.
+            // Null values compare equal for every placement.
             assert_eq!(
                 first_order.compare_keys(&null_key, &null_key),
                 Ordering::Equal
@@ -826,12 +806,12 @@ mod tests {
             let null_key = [SortKey::Null];
             let num_key = [SortKey::Number(5.0)];
 
-            // Ascending: Null sorts first (Less).
+            // Ascending order places null first.
             assert_eq!(
                 asc_order.compare_keys(&null_key, &num_key),
                 Ordering::Less
             );
-            // Descending: Null sorts last (Less before reversal -> Greater).
+            // Descending order places null last.
             assert_eq!(
                 desc_order.compare_keys(&null_key, &num_key),
                 Ordering::Greater
@@ -1042,7 +1022,7 @@ mod tests {
                     NoteFieldValueRef::String("a"),
                     NoteFieldValueRef::String("b"),
                 ),
-                // Cross-kind pairs across each adjacent shared rank boundary.
+                // Check each adjacent rank boundary with unlike value kinds.
                 (NoteFieldValueRef::Bool(true), NoteFieldValueRef::Number(0.0)),
                 (
                     NoteFieldValueRef::Number(100.0),

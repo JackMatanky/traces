@@ -1,16 +1,9 @@
-//! Defines domain-specific query languages for source selection, record
-//! filtering, and field access.
+//! Defines query languages for source selection, row filtering, and field
+//! access.
 //!
-//! This module encapsulates the lexing, grammar parsing, and abstract syntax
-//! trees for user-supplied query strings:
-//! - [`source`]: Parses `--from` source selection expressions into a
-//!   [`SourceSelector`].
-//! - [`filter`]: Parses `--where` filter expressions into executable
-//!   [`FilterExpr`] trees.
-//! - [`expr`]: Supplies the shared boolean algebra parser (`not` > `and` >
-//!   `or`).
-//! - [`field`]: Resolves and validates dotted field paths into structured
-//!   [`FieldPath`] accessors.
+//! The [`source`] and [`filter`] modules parse query expressions.
+//! The [`expr`] module parses their shared boolean operators.
+//! The [`field`] module parses and validates field paths.
 mod expr;
 mod field;
 mod filter;

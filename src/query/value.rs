@@ -1,12 +1,8 @@
 //! Represents zero-copy borrowed field values and conversions for query
 //! evaluation.
 //!
-//! This module provides [`QueryFieldValueRef`], an ephemeral enum that borrows
-//! directly from parsed note metadata, tag lists, and incoming link tables
-//! without heap allocation. It acts as the bridge between low-level note memory
-//! and query operations (such as filter predicate evaluation and sort-key
-//! generation), falling back to an owned variant only for non-UTF8 paths or
-//! dynamically calculated values.
+//! [`QueryFieldValueRef`] borrows note metadata, tags, and inbound links.
+//! It uses owned values for non-UTF-8 paths and calculated values.
 use std::path::PathBuf;
 
 use crate::{
@@ -18,8 +14,7 @@ use crate::{
 pub(super) enum QueryFieldValueRef<'a> {
     /// Borrowed metadata field from note-domain storage.
     Note(NoteFieldValueRef<'a>),
-    /// Freshly allocated fallback for non-UTF8 paths, which have no long-lived
-    /// backing store to borrow from.
+    /// Stores an owned value when a path contains bytes outside UTF-8.
     Owned(NoteFieldValue),
     /// Borrowed note tags.
     Tags(&'a [Tag]),
@@ -51,8 +46,7 @@ impl QueryFieldValueRef<'_> {
         }
     }
 
-    /// Appends the shared query-display text used by list joins, table cells,
-    /// and text output.
+    /// Appends this value's display text to `out`.
     pub(super) fn append_text(&self, out: &mut String) {
         match self {
             Self::Note(note_ref) => note_ref.append_text(out),
@@ -92,8 +86,7 @@ impl QueryFieldValueRef<'_> {
         }
     }
 
-    /// Borrows this value as a [`NoteFieldValueRef`], when it resolves to
-    /// note-domain metadata rather than a query-only `Tags`/`Inlinks` list.
+    /// Borrows this value as [`NoteFieldValueRef`] when it holds note metadata.
     pub(super) fn as_note_ref(&self) -> Option<NoteFieldValueRef<'_>> {
         match self {
             Self::Note(note_ref) => Some(*note_ref),
@@ -136,8 +129,8 @@ impl QueryFieldValueRef<'_> {
 
     /// Evaluates `contains(field_val, target)`.
     ///
-    /// Lists match by exact value or descendant tags; string-like fields use
-    /// substring containment.
+    /// Lists match exact values or descendant tags.
+    /// String-like fields match substrings.
     pub(super) fn is_containing(&self, target: &NoteFieldValue) -> bool {
         match self {
             Self::Note(note_ref) => note_ref.is_containing(target),
@@ -373,8 +366,8 @@ mod tests {
 
         #[test]
         fn matches_identically_for_borrowed_and_owned_list_values() {
-            // Regression: Owned(List) must delegate to the same list
-            // containment logic as borrowed lists.
+            // Owned lists must use the same containment rules as borrowed
+            // lists.
             let items =
                 vec![NoteFieldValue::String("#book/fiction".to_owned())];
             let target = NoteFieldValue::String("#book".to_owned());

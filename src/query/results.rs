@@ -1,16 +1,9 @@
 //! Provides positional result rows and lazy, memoized query result sets.
 //!
-//! This module implements the runtime data representations produced by query
-//! execution:
-//! - [`QueryRow`]: A lightweight, zero-allocation view over an indexed note or
-//!   list item. It pairs a [`WorkspaceIndex`] handle with a row position and an
-//!   optional positional list item offset (`item_idx: u32`). Field resolution
-//!   borrows directly from in-memory note storage without string or status
-//!   allocations.
-//! - [`QuerySet`]: A lazy, memoized wrapper over a collection of [`QueryRow`]
-//!   items. Transformation methods append to an unexecuted [`ExecutionPlan`],
-//!   deferring execution until terminal renderers or read methods materialize
-//!   and cache the final rows.
+//! [`QueryRow`] represents an indexed note or list item by position. It borrows
+//! field values from the [`WorkspaceIndex`] where possible.
+//! [`QuerySet`] holds rows and pending [`ExecutionPlan`] transforms. It runs
+//! and caches those transforms when a caller reads or formats the rows.
 use std::{path::PathBuf, sync::Arc};
 
 use super::{
@@ -39,7 +32,7 @@ enum RowType {
 /// Provides a query-visible view of one indexed [`FileEntry`].
 ///
 /// Carries row type and flattened field overrides used to resolve `file.*`,
-/// `list.*`, frontmatter, inline fields, `tags`, and inlinks.
+/// `list.*`, frontmatter, inline fields, tags, and inbound links.
 #[derive(Clone)]
 pub struct QueryRow {
     index: Arc<WorkspaceIndex>,
@@ -84,9 +77,10 @@ impl QueryRow {
         self.note()?.lists().get(usize::try_from(item_idx).ok()?)
     }
 
-    /// Returns task completion for task rows.
+    /// Returns task completion for a task row.
     ///
-    /// Page-level rows and cancelled tasks resolve to `None`.
+    /// Page rows and tasks with [`crate::TaskStatusType::Cancelled`] return
+    /// `None`.
     #[inline]
     #[must_use]
     pub fn task_completed(&self) -> Option<bool> {
@@ -177,9 +171,8 @@ impl QueryRow {
     ///
     /// # Errors
     ///
-    /// - [`FieldPath`] if `path` cannot be parsed as a valid field path.
-    ///
-    /// [`FieldPath`]: super::QueryError::FieldPath
+    /// - [`FieldPath`](super::QueryError::FieldPath) if `path` is not a valid
+    ///   field path.
     #[inline]
     pub(crate) fn field(&self, path: &str) -> QueryResult<NoteFieldValue> {
         Ok(self.resolve_owned(&FieldPath::parse(path)?))
@@ -418,10 +411,10 @@ impl QueryRow {
         }
     }
 
-    /// Orders two rows by their position in the underlying [`WorkspaceIndex`]:
-    /// document order for note rows, and item order within their note for list
-    /// and task rows. This is the total order behind minijinja's row
-    /// comparisons and `sort` filter.
+    /// Orders rows by position in the [`WorkspaceIndex`].
+    /// Note rows use document order. List and task rows use item order within
+    /// each note. The template engine uses this order for row comparisons and
+    /// its `sort` filter.
     #[inline]
     #[must_use]
     pub(crate) fn cmp_document_order(
@@ -453,12 +446,10 @@ impl std::fmt::Debug for QueryRow {
     }
 }
 
-/// Wraps a lazily transformed, memoized collection of [`QueryRow`] rows.
+/// Wraps a lazily transformed, memoized collection of [`QueryRow`] values.
 ///
-/// Transform methods append to a pending plan in `O(1)` time. Reads
-/// ([`Self::len`], [`Self::get`], [`Self::iter`], and terminal renderers)
-/// materialize and cache the result for subsequent reads and branch
-/// evaluations.
+/// Transform methods append to the pending plan in `O(1)` time.
+/// Reads and terminal renderers run the plan once and cache its result.
 #[must_use]
 #[derive(Clone, Default)]
 pub struct QuerySet {
@@ -532,9 +523,8 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `expr` is an invalid filter expression.
-    ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// - [`Builder`](super::QueryError::Builder) if `expr` is not a valid
+    ///   filter expression.
     #[inline]
     pub(crate) fn filter(self, expr: &str) -> QueryResult<Self> {
         Ok(self.push(QueryTransform::filter(expr)?))
@@ -544,23 +534,21 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `expr` is an invalid filter expression.
-    ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// - [`Builder`](super::QueryError::Builder) if `expr` is not a valid
+    ///   filter expression.
     #[inline]
     #[cfg(test)]
     pub(super) fn r#where(self, expr: &str) -> QueryResult<Self> {
         self.filter(expr)
     }
 
-    /// Sorts rows by `path`; test-only alias for the template engine's `sort`
-    /// verb and [`Self::sort_field`].
+    /// Sorts rows by `path` for tests.
+    /// This aliases the template engine's sort filter and [`Self::sort_field`].
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `path` cannot be parsed as a valid field path.
-    ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// - [`Builder`](super::QueryError::Builder) if `path` is not a valid field
+    ///   path.
     #[inline]
     #[cfg(test)]
     pub(crate) fn sort(
@@ -575,9 +563,8 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`FieldPath`] if `path` cannot be parsed as a valid field path.
-    ///
-    /// [`FieldPath`]: super::QueryError::FieldPath
+    /// - [`FieldPath`](super::QueryError::FieldPath) if the parser rejects
+    ///   `path`.
     #[inline]
     pub(crate) fn sort_field(
         self,
@@ -589,8 +576,9 @@ impl QuerySet {
         Ok(self.push(QueryTransform::order(order)))
     }
 
-    /// Appends a composite sort order transform; test-only counterpart to the
-    /// pre-fetch [`QueryBuilder::order`](super::QueryBuilder::order) path.
+    /// Appends a composite sort order transform for tests.
+    /// This matches the pre-fetch
+    /// [`QueryBuilder::order`](super::QueryBuilder::order) path.
     #[inline]
     #[cfg(test)]
     pub(crate) fn order(self, by: SortOrder) -> Self {
@@ -601,10 +589,8 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `n` is negative or exceeds platform pointer-width
-    ///   limits ([`usize::MAX`]).
-    ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// - [`Builder`](super::QueryError::Builder) if `n` is negative or exceeds
+    ///   platform pointer-width limits ([`usize::MAX`]).
     #[inline]
     pub(crate) fn limit(self, n: i64) -> QueryResult<Self> {
         Ok(self.push(QueryTransform::limit(n)?))
@@ -614,9 +600,8 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `path` cannot be parsed as a valid field path.
-    ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// - [`Builder`](super::QueryError::Builder) if `path` is not a valid field
+    ///   path.
     #[inline]
     pub(crate) fn group_by(self, path: &str) -> QueryResult<Self> {
         Ok(self.push(QueryTransform::group_by(path)?))
@@ -626,9 +611,8 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`Builder`] if `path` cannot be parsed as a valid field path.
-    ///
-    /// [`Builder`]: super::QueryError::Builder
+    /// - [`Builder`](super::QueryError::Builder) if `path` is not a valid field
+    ///   path.
     pub(crate) fn flatten(self, path: &str) -> QueryResult<Self> {
         Ok(self.push(QueryTransform::flatten(path)?))
     }
@@ -652,12 +636,11 @@ impl QuerySet {
         self.format(&QueryDisplayFormat::table(headers, columns))
     }
 
-    /// Renders rows as a Markdown bullet list formatting the resolved field
-    /// value at `path`.
+    /// Renders the resolved value at `path` as a Markdown bullet.
     ///
     /// # Errors
     ///
-    /// - [`FieldPath`] if `path` cannot be parsed as a valid field path.
+    /// - [`FieldPath`] if the parser rejects `path`.
     ///
     /// [`FieldPath`]: super::QueryError::FieldPath
     pub(crate) fn list(&self, path: &str) -> QueryResult<String> {
@@ -666,13 +649,12 @@ impl QuerySet {
 
     /// Renders task-level rows as a Markdown task list.
     ///
-    /// [`TaskPathStyle::Suffix`] appends each row's file path for `traces
-    /// task`; templates use [`TaskPathStyle::None`].
+    /// [`TaskPathStyle::Suffix`] adds each task row's path to `traces task`
+    /// output. Templates use [`TaskPathStyle::None`].
     ///
     /// # Errors
     ///
-    /// - [`TaskListRequiresTaskRows`] if any row is a page-level row rather
-    ///   than a task row.
+    /// - [`TaskListRequiresTaskRows`] if any row is a page row, not a task row.
     ///
     /// [`TaskListRequiresTaskRows`]: super::QueryError::TaskListRequiresTaskRows
     pub(crate) fn task_list(
@@ -686,11 +668,11 @@ impl QuerySet {
     ///
     /// # Errors
     ///
-    /// - [`FieldPath`] if a field path cannot be resolved.
+    /// - [`FieldPath`] if the formatter rejects a field path.
     /// - [`TableColumnCountMismatch`] if table headers and columns differ in
     ///   length.
-    /// - [`TaskListRequiresTaskRows`] if task-list formatting runs on
-    ///   page-level rows.
+    /// - [`TaskListRequiresTaskRows`] if task-list formatting receives page
+    ///   rows.
     ///
     /// [`FieldPath`]: super::QueryError::FieldPath
     /// [`TableColumnCountMismatch`]: super::QueryError::TableColumnCountMismatch
@@ -1351,7 +1333,7 @@ rating: note
                 NoteFieldValue::String("Alice".to_owned()),
                 NoteFieldValue::String("Bob".to_owned()),
             ]);
-            // Every other field still resolves from the original row.
+            // Other fields still resolve from the original row.
             for row in &flattened {
                 assert_eq!(
                     row.field("title"),
@@ -1531,8 +1513,8 @@ rating: note
             let table =
                 rows.table(&["Notes"], &["notes"]).expect("valid table");
 
-            // A literal newline inside the cell value must not split into a
-            // second table row: header + separator + exactly one data row.
+            // A newline in a cell must not create another table row.
+            // The output has one header, one separator, and one data row.
             assert_eq!(table.lines().count(), 3);
         }
 

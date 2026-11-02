@@ -1,21 +1,18 @@
 //! Optimizes and executes query transformation plans.
 //!
-//! This module provides [`ExecutionPlan`], an ordered sequence of
-//! transformation steps applied to query rows. Operations such as filtering,
-//! sorting, limiting, grouping, and flattening are scheduled as declarative
-//! [`QueryTransform`] steps.
+//! [`ExecutionPlan`] stores ordered [`QueryTransform`] steps for query rows.
+//! Steps filter, sort, limit, group, or flatten the rows.
 //!
 //! # Algebraic Optimizations
 //!
-//! Before row execution, [`ExecutionPlan::run`] applies idempotent optimization
-//! passes:
-//! - **Filter Fusion**: Combines adjacent filter predicates into a single
-//!   boolean `And` tree, eliminating intermediate row buffers.
-//! - **Sort Fusion**: Merges consecutive sort transforms into a single
-//!   composite [`SortOrder`].
-//! - **Sort-Limit Fusion**: Rewrites sort followed by limit into a bounded
-//!   `TopK` selection, replacing an $O(n \log n)$ full sort with an $O(n)$
-//!   quickselect partition.
+//! Before it processes rows, [`ExecutionPlan::run`] applies three
+//! optimizations:
+//! - **Filter fusion** combines adjacent predicates and removes an intermediate
+//!   row buffer.
+//! - **Sort fusion** combines adjacent sort steps into one [`SortOrder`].
+//! - **Sort-limit fusion** replaces a sort and limit with bounded
+//!   [`QueryTransform::TopK`] selection. This uses an $O(n)$ partition instead
+//!   of an $O(n \log n)$ sort.
 #[cfg(test)]
 use super::sort::SortTerm;
 use super::{
@@ -25,10 +22,10 @@ use super::{
 };
 use crate::note::NoteFieldValue;
 
-/// Manages an ordered, optimizable transformation pipeline over query rows.
+/// Stores an ordered list of transforms for query rows.
 ///
-/// Optimizations are algebraic and idempotent: running them again on an
-/// optimized plan leaves the plan unchanged.
+/// The optimizations are idempotent. Running them again leaves the plan
+/// unchanged.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct ExecutionPlan {
     ops: Vec<QueryTransform>,
@@ -148,8 +145,7 @@ pub(super) enum QueryTransform {
     Limit(usize),
     GroupBy(FieldPath),
     Flatten(FieldPath),
-    /// Optimizer-produced sort-then-limit step; callers construct `Sort` plus
-    /// `Limit`.
+    /// The optimizer creates this step after callers add `Sort` and `Limit`.
     TopK {
         order: SortOrder,
         n: usize,
@@ -191,7 +187,7 @@ impl QueryTransform {
         })
     }
 
-    /// Builds a sort transform from an existing [`SortOrder`].
+    /// Builds a sort transform from [`SortOrder`].
     pub(super) fn order(by: SortOrder) -> Self {
         Self::Sort {
             order: by,

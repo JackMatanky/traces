@@ -1,14 +1,9 @@
 //! Parses recursive descent boolean algebra shared by source and filter
 //! languages.
 //!
-//! This module provides a generic, precedence-climbing boolean expression
-//! parser implementing standard operator precedence (`not` > `and` > `or`) and
-//! nested parenthesized sub-expressions.
-//!
-//! Domain-specific leaf parsing is abstracted behind the [`AtomParser`] trait,
-//! allowing source selection ([`SourceAtom`](super::SourceAtom)) and row
-//! filtering ([`FilterAtom`](super::filter::FilterAtom)) to reuse identical
-//! operator semantics, associativity, and diagnostic span reporting.
+//! The parser applies `not` before `and`, then `or`.
+//! Parentheses group expressions. [`AtomParser`] supplies domain-specific
+//! atoms.
 use crate::{
     Spanned, SpannedTokenStream,
     query::error::{QueryBuilderError, QuerySyntaxError},
@@ -71,6 +66,12 @@ pub(super) trait AtomParser {
     fn control(&self, token: &Self::Token) -> Option<LogicalControl>;
 
     /// Consumes the next domain-local atom.
+    ///
+    /// # Errors
+    ///
+    /// - [`QueryBuilderError::Syntax`] if the input does not contain a valid
+    ///   atom.
+    /// - [`QueryBuilderError::FieldPath`] if a field path is invalid.
     fn parse_atom(
         &self,
         input: &str,
@@ -99,7 +100,7 @@ type ParseTerm<'input, G> =
     ) -> Result<BooleanExpr<<G as AtomParser>::Atom>, QueryBuilderError>;
 
 impl<A> BooleanExpr<A> {
-    /// Evaluates the tree, short-circuiting `And` and `Or`.
+    /// Evaluates the tree and stops when `And` or `Or` determines the result.
     pub(super) fn is_satisfied_by(
         &self,
         atom_matches: impl Fn(&A) -> bool,
@@ -269,8 +270,10 @@ impl<'input, G: AtomParser> BooleanExprParser<'input, G> {
 ///
 /// - [`Syntax`] if the token stream is empty, contains unexpected tokens, has
 ///   unbalanced parentheses, or the domain [`AtomParser`] rejects an atom.
+/// - [`FieldPath`] if the domain parser rejects a field path.
 ///
 /// [`Syntax`]: QueryBuilderError::Syntax
+/// [`FieldPath`]: QueryBuilderError::FieldPath
 pub(super) fn parse_boolean_expr<G>(
     input: &str,
     tokens: SpannedTokenStream<G::Token>,

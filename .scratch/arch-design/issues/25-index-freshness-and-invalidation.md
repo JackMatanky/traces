@@ -236,3 +236,32 @@ The durable recovery journal remains open. Measure it in
 save?](./37-measure-index-recovery-journal.md).
 Compare it with a validated incremental replan and an in-memory host retry
 before deciding.
+
+### Stress test, round two
+
+Five reviewers attacked the answers above. The details are in
+[Index freshness evidence and open proof](../research/25-index-freshness-prep.md),
+section G. These changes replace the matching answers above. They stay provisional.
+
+- Replace "Exclude every recognized engine cache file from source scans".
+  Remove the dead `path != index_db` check. Test that nothing under `.traces/` enters the scan.
+- Replace the single racy rule. Store a `racy` bit in each file row.
+  Set it when `mtime >= scan_start - 2 s`.
+- Read each changed file from one open handle. Stat the handle before and after the read.
+- After `NotFound` during a refresh, rescan once. A second failure is a classified error.
+- Drop the 128-bit `commit_nonce`. After an uncertain commit, drop the handle and the plan.
+- Remove the unwritable latch. Try the write-open at each persist.
+- Treat a failed store replacement as a cache miss for reads.
+- Classify late `META` corruption errors as a rebuild.
+- Split the store identity into an engine tag, an ordered `FORMAT_VERSION`,
+  a `ParserIdentity` hash and the policy fingerprint.
+- Make a store with a higher `FORMAT_VERSION` a cache miss. Do not wipe it.
+- Hold the store in a host only during refresh and persist.
+
+Open questions from the same round:
+
+- Choose how a host validates sources: before each query, or within a staleness bound.
+- Choose how to cover a restored-mtime edit on Windows.
+- Choose the `ParserIdentity` source: manual only, or manual plus a dependency hash.
+- Choose the policy-alternation rule: last writer rebuilds, one file per identity, or config policy only.
+- Choose whether per-axis repair stays or full rebuild is the only path.

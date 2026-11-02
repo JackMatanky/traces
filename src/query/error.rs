@@ -1,9 +1,6 @@
-//! Defines error types for query specification, syntax parsing, and result
-//! evaluation.
+//! Defines typed errors for query construction, parsing, and evaluation.
 //!
-//! This module defines the error domain for the query subsystem, providing
-//! typed diagnostics with source spans, friendly suggestions, and formatted
-//! error messages.
+//! Query errors include source spans, labels, and field-path suggestions.
 //!
 //! # Primary Error Types
 //!
@@ -42,23 +39,23 @@ pub enum QueryError {
     /// Indicates a field-path parse or accessor failure.
     #[error(transparent)]
     FieldPath(#[from] FieldPathError),
-    /// Indicates that [`super::QuerySet::task_list`] received page-level
-    /// records instead of task rows.
+    /// Indicates that [`super::QuerySet::task_list`] received page rows instead
+    /// of task rows.
     #[error(
         "task_list requires task-level records from the `tasks` namespace; \
          got page-level records with no task fields"
     )]
     TaskListRequiresTaskRows,
-    /// Indicates that [`super::QuerySet::table`] received mismatched header and
-    /// column counts.
+    /// Indicates that [`super::QuerySet::table`] received different numbers of
+    /// headers and columns.
     #[error(
         "table headers ({headers}) and columns ({columns}) must have the same \
          length"
     )]
     TableColumnCountMismatch {
-        /// Header count.
+        /// Stores the number of headers.
         headers: usize,
-        /// Column count.
+        /// Stores the number of columns.
         columns: usize,
     },
 }
@@ -113,21 +110,23 @@ pub enum QueryBuilderError {
 pub struct QuerySyntaxError {
     /// The query language that rejected the expression.
     pub(crate) dialect: QueryDialect,
-    /// The complete input expression.
+    /// Stores the complete input expression.
     #[source_code]
     pub(crate) input: String,
-    /// The invalid token range, or the end of input when a token is missing.
+    /// Stores the invalid token range, or the input end when a token is
+    /// missing.
     #[label("{lex_error}")]
     pub(crate) span: SourceSpan,
-    /// Lexer error rendered in the diagnostic label.
+    /// Stores the lexer error shown in the diagnostic label.
     #[source]
     pub(crate) lex_error: Box<LexError>,
 }
 
 impl QuerySyntaxError {
-    /// Builds an `unexpected_end` diagnostic for `span`.
+    /// Builds an unexpected-end diagnostic for `span`.
     ///
-    /// Always constructs `LexError::UnexpectedEndOfInput` with `expected`.
+    /// Sets the diagnostic span from `span` and the expected text from
+    /// `expected`.
     pub(crate) fn unexpected_end(
         dialect: QueryDialect,
         input: &str,
@@ -146,7 +145,7 @@ impl QuerySyntaxError {
         }
     }
 
-    /// Wraps `lex_error`, preserving its span as the diagnostic label.
+    /// Wraps `lex_error` and preserves its span as the diagnostic label.
     pub(crate) fn from_lex(
         dialect: QueryDialect,
         input: &str,
@@ -177,15 +176,14 @@ impl QuerySyntaxError {
     ))
 )]
 pub struct FieldPathError {
-    /// Original field path string.
+    /// Stores the original field path.
     pub(crate) path: String,
-    /// Closest matching accessor for typo hints.
+    /// Stores the closest accessor for a typo hint, if one exists.
     pub(crate) suggestion: Option<String>,
 }
 
 impl FieldPathError {
-    /// Creates a new field path error for `path` with an optional typo
-    /// `suggestion`.
+    /// Creates a field-path error for `path` with an optional `suggestion`.
     #[must_use]
     pub(in crate::query) fn new(path: &str, suggestion: Option<&str>) -> Self {
         Self {

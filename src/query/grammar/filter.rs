@@ -1,19 +1,9 @@
 //! Parses and evaluates record filter expressions for `--where` queries.
 //!
-//! This module parses and evaluates row-level filter expressions. Expressions
-//! support:
-//! - Dotted and bare field path lookups resolved via [`FieldPath`].
-//! - Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) with type
-//!   coercion.
-//! - Function calls (for example, contains(field, target)) support tag-prefix
-//!   matching.
-//! - Value expressions: date ± duration, date − date (duration result),
-//!   duration ± duration and duration × number, plus `dur`, `date_add`,
-//!   `date_diff`, and `date_component` calls. Arithmetic groups left-to-right
-//!   without precedence; null and invalid row values do not satisfy ordered
-//!   comparisons. Static invalid function arguments fail at parse time.
-//! - Boolean combinators (`and`, `or`, `not`, parentheses) parsed via the
-//!   shared boolean expression grammar.
+//! Filter expressions support field paths, comparisons, and function calls.
+//! They also support date and duration arithmetic and boolean operators.
+//! Arithmetic runs from left to right and has no precedence rules.
+//! Invalid static function arguments fail during parsing.
 use logos::{Lexer, Logos};
 
 use super::{
@@ -156,8 +146,8 @@ impl FilterAtom {
 pub(crate) enum FilterFunction {
     /// `contains(field, target)` predicate.
     ///
-    /// Lists match by exact value or tag prefix, such as `#book` matching
-    /// `#book/fiction`; other field kinds fall back to substring containment.
+    /// Lists match exact values or tag prefixes, such as `#book` matching
+    /// `#book/fiction`. Other fields use substring matching.
     Contains {
         field: FieldPath,
         target: NoteFieldValue,
@@ -225,16 +215,11 @@ impl ComparisonExpr {
         self.op.is_satisfied_by_values(&lhs_val, &rhs_val)
     }
 
-    /// Promotes a quoted filter literal's `String` payload to `Date`/
-    /// `DateTime`/`Duration` when its text has that shape, once, at query-build
-    /// time (not per row).
+    /// Converts quoted strings to typed date, date-time, or duration values.
     ///
-    /// Only `NoteFieldValue::String` needs inspection: bare date literals are
-    /// promoted while tokenizing, and the grammar's other literal shapes
-    /// (`Null`, `Bool`, `Number`) are already typed. Reuses
-    /// [`TextShape::classify`] (the same heuristic `SortKey::from_text` uses),
-    /// so filter literals and sort-key text classify identically, not via a
-    /// duplicate implementation.
+    /// Runs once when the query is built. Bare date literals and other typed
+    /// literals need no conversion. Uses [`TextShape::classify`], the same
+    /// classifier as sort keys.
     pub(super) fn classify_literal(literal: NoteFieldValue) -> NoteFieldValue {
         let NoteFieldValue::String(text) = &literal else {
             return literal;
@@ -270,8 +255,8 @@ pub(crate) enum ValueExpr {
 }
 
 impl ValueExpr {
-    /// Evaluates a value expression; an invalid row value cannot satisfy a
-    /// comparison.
+    /// Evaluates a value expression.
+    /// Returns `None` when a row value cannot satisfy a comparison.
     fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
         match self {
             Self::Field(path) => Some(row.resolve_ref(path).to_owned_value()),
@@ -346,9 +331,9 @@ pub(crate) enum ArithOp {
 impl ArithOp {
     /// Applies the operator to two evaluated values.
     ///
-    /// Returns `Null` when either operand is `Null` or the operand types do not
-    /// support the operator, and `None` when a date or duration result is not
-    /// representable.
+    /// Returns `Null` when an operand is `Null` or its type does not support
+    /// the operator. Returns `None` when a date or duration result exceeds
+    /// its range.
     fn evaluate(
         self,
         left: &NoteFieldValue,
@@ -865,7 +850,7 @@ impl TryFrom<&str> for CompareOp {
     }
 }
 
-/// Filter grammar adapter for [`parse_boolean_expr`].
+/// Adapts filter tokens for [`super::expr::parse_boolean_expr`].
 struct FilterGrammar;
 
 impl FilterGrammar {
@@ -1071,7 +1056,8 @@ impl FilterGrammar {
         }
     }
 
-    /// Folds arithmetic in written order; comparison and logical tokens end it.
+    /// Folds arithmetic in written order.
+    /// Stops when it reaches a comparison or logical token.
     fn parse_value_expr(
         input: &str,
         tokens: &mut SpannedTokenStream<FilterToken>,
@@ -1393,12 +1379,12 @@ mod tests {
         fn cross_kind_ordering_follows_canonical_rank() {
             let rows = rated_rows();
 
-            // Text (rank 5) is greater than Number 5 (rank 2).
+            // Text has rank 5, which is greater than Number's rank 2.
             let filtered =
                 rows.clone().filter("status > 5").expect("valid filter");
             assert_eq!(names(&filtered), ["high", "low", "unrated"]);
 
-            // Number 5 is not greater than Text, so status < 5 matches nothing.
+            // Number 5 is less than Text, so `status < 5` matches nothing.
             let below = rows.filter("status < 5").expect("valid filter");
             assert!(below.is_empty());
         }
@@ -1411,15 +1397,13 @@ mod tests {
                 ("text.md", "---\nrating: gold\n---"),
             ]);
 
-            // In canonical rank: Number < Text.
-            // Rating > 5 matches the numeric row (7 > 5) and the text row
-            // ("gold" > 5 by rank).
+            // Canonical rank places Number before Text.
+            // `rating > 5` matches 7 and the higher-ranked text value "gold".
             let filtered =
                 rows.clone().filter("rating > 5").expect("valid filter");
             assert_eq!(names(&filtered), ["num_high", "text"]);
 
-            // Sorting rating ascending yields the numeric rows (3, 7), then
-            // text ("gold").
+            // Ascending sort returns 3, 7, then the text value "gold".
             let sorted = rows.sort("rating", false).expect("valid sort");
             assert_eq!(names(&sorted), ["num_low", "num_high", "text"]);
         }
@@ -1595,9 +1579,9 @@ mod tests {
 
         #[test]
         fn evaluates_a_date_only_literal_at_local_midnight() {
-            // A naive literal uses the reader's zone. In the pinned UTC+2 zone,
-            // local midnight falls at December 31 at 22:00 UTC through January
-            // 1 at 22:00 UTC, which still separates the fixture instants.
+            // A date literal uses the reader's time zone.
+            // In UTC+2, local midnight spans 22:00 UTC on each adjacent day.
+            // The fixture instants still fall on separate dates.
             ZoneGuard::set("Etc/GMT-2");
 
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -1643,9 +1627,8 @@ mod tests {
 
         #[test]
         fn matches_calendar_days_via_mdate() {
-            // This field is a local calendar date derived from file
-            // modification time, so the expectation only holds in
-            // the pinned zone.
+            // This field uses the local date from the file modification time.
+            // The expected date therefore depends on the pinned time zone.
             ZoneGuard::set("UTC");
 
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -1772,8 +1755,7 @@ mod tests {
                 .expect("valid filter: lowercase or");
             assert_eq!(lower_or.len(), 1);
 
-            // Regression: fields named `order`/`andrew` must stay whole
-            // identifiers, not logical-op prefixes.
+            // Names such as `order` and `andrew` must remain whole identifiers.
             let ident_prefix =
                 rows.filter("order == 5").expect("valid filter: bare field");
             assert_eq!(ident_prefix.len(), 1);

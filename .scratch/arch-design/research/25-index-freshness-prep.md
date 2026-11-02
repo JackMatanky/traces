@@ -104,3 +104,121 @@ These experiments remain before an optimization decision:
 5. Check the cache version whenever parser facts, keys or required facets change.
 
 The open ticket must settle the correctness policy in the grilling. Missing measurements do not justify a claimed speed gain. They also do not turn an unavailable platform experiment into a verified fact.
+
+## G. Stress test, round two
+
+Five independent reviewers attacked the provisional answers. The parent checked each claim against the code.
+[V] marks a checked fact. [H] marks an inference. [P] marks a proposal. No Rust code ran and no benchmark ran.
+
+### G1. Corrections accepted
+
+| ID | Weakness | Evidence | Revised answer |
+| --- | --- | --- | --- |
+| C1 | One global commit time un-races rows that no one rechecked. | [H] An incremental commit moves a global time forward. | [P] Store a `racy` bit in each file row. See section G2. |
+| C2 | The scan stat and the file read are two separate steps. | [V] `scan_file_metadata` stats at `src/index/service.rs:448-461`. `parse_note` reads later at lines 342-350. | [P] Read from one open handle. Stat that handle before and after the read. |
+| C3 | One vanished file fails the whole refresh. | [V] `parse_notes` collects one `IndexResult` (`service.rs:328-334`). | [P] Rescan once after `NotFound`. A second failure is a classified error. |
+| C4 | The engine-file scan exclusion is dead code. | [V] `scan` prunes `.traces` through `is_ignored_dir` (`service.rs:427`). | [P] Remove `path != index_db` (`service.rs:435`). Test that nothing under `.traces/` enters the scan. |
+| C5 | The 128-bit `commit_nonce` adds a recovery protocol with no gain. | [H] Every refresh compares stored rows with current files. | [P] Drop the nonce. After an uncertain commit, drop the handle and the plan. |
+| C6 | The in-process unwritable latch never clears. | [H] A failed open is cheap. A held store refused the open in 171 microseconds (`24-prep/g-probe-results.md:113`). | [P] Remove the latch. Try the write-open at each persist. Print a notice on a state change only. |
+| C7 | Store replacement can fail between two steps. | [V] `open` drops the handle, then removes the file (`src/index/store.rs:174-183`). | [P] A replacement failure is a cache miss for reads. `traces index` reports the error. |
+| C8 | A late corruption error in `META` skips the rebuild path. | [V] `rebuild_needed` classifies corruption at `begin_read` and the table probes (`store.rs:937-967`). | [P] Classify corruption from `open_table(META)` and `get` as a rebuild (`store.rs:974-983`). |
+| C9 | A derived hash has no order. The "never wipe a newer store" rule needs an order. | [H] Two binaries can carry different dependency sets. | [P] Split the identity. See section G9. |
+
+### G2. Racy check, exact rule
+
+- [P] Sample `scan_start` from the wall clock before the directory walk.
+- [P] Use a margin of 2 seconds. That margin covers FAT and exFAT timestamps.
+- [P] A committed row gets `racy = true` when `mtime >= scan_start - 2 s`.
+- [P] The next refresh reads and hashes each racy row.
+- [P] A racy row becomes clean only when its mtime is older than the new `scan_start - 2 s`.
+- [H] A file with an mtime far in the future stays racy. It costs one hash per refresh.
+- [H] A network filesystem with a skewed server clock can defeat the margin.
+  Measure this case before you claim support.
+
+### G9. Store identity, revised
+
+- [P] Store four parts in `meta`: an engine tag, an ordered `FORMAT_VERSION`
+  integer, a `ParserIdentity` hash and the policy fingerprint.
+- [P] `ParserIdentity` is a BLAKE3 hash of the sorted `name@version` pairs of
+  normal dependencies in `Cargo.lock`. A `build.rs` step computes it.
+- [P] A dependency bump then rebuilds the store. This closes the escape where
+  `pulldown-cmark` changes its output and no test fails.
+- [P] A higher `FORMAT_VERSION` than the binary knows is a cache miss.
+  Do not wipe it. A fresh parse serves the read.
+- [P] A lower integer, or an equal integer with a different `ParserIdentity`,
+  replaces the store at the next persist.
+- [P] Keep a golden-corpus test. Build one note with every field filled. Pin its serialized bytes. A field reorder then fails the test.
+- [H] The dependency hash over-invalidates. Each unrelated dependency bump costs one rebuild. Measure the rebuild rate over one month of bumps.
+
+### G10. Host validation cost
+
+[V] The no-op refresh takes 12.0 ms at 50 notes, 24.0 ms at 5,000 and 65.7 ms at 20,000. See section E.
+[V] A full stat check before each host query pays that cost on every query.
+[P] Replace "check before each host query" with bounded staleness. A host
+validates after a watcher event, or when the last check is older than a set
+time.
+[P] Each query result carries the generation it read. The buffer ticket and the host owner set the time bound.
+
+### G11. Lock-hold rule for hosts
+
+[V] A second process receives `DatabaseAlreadyOpen` and the CLI exits 1 today (`24-prep/g-probe-results.md:106-123`).
+[V] A cold store query with a tag or path source takes 117 to 127 ms at
+50,000 notes. A fresh parse takes 1,801 ms
+(`g-probe-results.md:11-14,67-68`).
+[H] A host that holds the store open between queries makes every CLI call 14 times slower at 50,000 notes.
+[P] A host opens the store only to refresh and persist. It serves queries from its pinned in-memory generation.
+[P] The workspace-host owner must meet this rule. Record the exit code change from 1 to 0 in the change table.
+
+### G12. Policy alternation
+
+[V] A fingerprint mismatch rebuilds the whole store. Two policies at one root rebuild the store at each switch.
+[H] Realistic triggers are `TRACES_IGNORED_DIRS` set in one shell, and a debug binary next to an installed binary.
+[H] One switch costs a fresh parse plus a facet write. The parse took 797 ms at 20,000 notes. The write took 520 to 587 ms at 50,000 notes.
+
+| Option | Benefit | Cost |
+| --- | --- | --- |
+| A. One store, last writer rebuilds (landed) | No new code | Repeated rebuilds on alternation |
+| B. One file per identity, with cleanup | No thrash | Disk growth and a cleanup rule |
+| C. Only the config policy persists | No thrash | Overrides parse fresh on every call |
+
+[P] Keep A until a measured alternation cost justifies B or C.
+
+### G13. Per-axis repair
+
+[H] Per-axis repair adds a second invalidation state machine. No measurement shows a need for it.
+[P] Rebuild fully on any fingerprint change. Allow per-axis repair only after a measured rebuild cost exceeds a stated limit.
+
+### G14. Windows change time
+
+[H] Stable Rust `std` exposes no change time on Windows. A same-size edit with a restored mtime then passes the stat check.
+[P] Option a: accept this gap and add `traces index --verify`, which hashes every Markdown file. Option b: read `ChangeTime` through the Win32 API. Option c: hash every Markdown file on each refresh.
+[H] Option c costs one hash per file. The hash of 1 KiB took 15.8 microseconds and 1 MiB took 757 microseconds. No vault-wide time exists.
+
+### G15. Journal scope
+
+[H] Every refresh derives rows from sources. A lost commit loses only the redo work.
+[P] Measure the journal against that redo cost in [the journal measurement ticket](../issues/37-measure-index-recovery-journal.md).
+
+### G16. Claims rejected or contained
+
+| Claim | Verdict | Reason |
+| --- | --- | --- |
+| Validate only candidate notes (lazy hint) | Rejected | A newly tagged note is not in the stored candidate set. |
+| Directory digests skip clean subtrees | Rejected | An in-place edit leaves the directory mtime unchanged. |
+| No stored facts, parse on every query | Rejected | The fresh parse took 797 ms at 20,000 notes (`g-probe-results.md:67`). |
+| Watcher journal | Rejected | It adds a daemon and drops events under load. |
+| A second process holds the store during replacement | Contradicted | `ExclusiveWriter` refuses the second open. Only the gap in G7 remains. |
+| `Durability::None` rollback serves stale rows | Contained | Facets and `meta` commit in one transaction. Older rows carry older stats and reparse. |
+| NFC and NFD names churn the delta | Rejected | A changed name is a rename. Path identity belongs to the path ticket. |
+| Evicted cloud files hang the refresh | Contained | Only rows with a changed stat are read. A fresh parse reads the same files. |
+| Persisted range keys store civil dates for `file.mdate` | Handoff | The read-model decision persists keys for note-level fields only. Keep timestamp keys as UTC instants. |
+| The same-size edit canary asserts stale output | Accepted | Record it as a change-table row. Flip the assertion to the new text. |
+
+### G17. Missing before resolution
+
+| Item | Status |
+| --- | --- |
+| Invariant owners | [P] Stat guard in `src/index/delta.rs`. Identity in `src/index/store.rs`. Replan in `src/index/service.rs`. Host admission and unlatch rule go to the host ticket. |
+| Removable code | [V] `path != index_db` (`service.rs:435`). [P] `ConfigDigests` destructuring after the config cutover. [P] The unconditional wipe in `open`. |
+| Change-table rows | Same-size edit with restored mtime. Exit code 1 to 0 on a held store. Fallback notice. Newer store: wipe becomes fresh parse. `NotFound` retry. |
+| Handoffs | Query ticket: candidate-set freshness signal. Path ticket: path form in keys. Host ticket: lock-hold rule and unlatch. Diagnostics ticket: reason codes for notices. Buffer ticket: generation pair. Journal ticket: redo-cost comparison. |

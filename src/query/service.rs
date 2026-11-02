@@ -1,14 +1,8 @@
 //! Executes queries over in-memory indexes and persisted key-value storage.
 //!
-//! This module provides [`QueryService`], the central coordination engine that
-//! executes queries against either an in-memory [`WorkspaceIndex`] or directly
-//! against on-disk [`IndexStore`] tables without loading the full index into
-//! memory.
-//!
-//! It resolves candidate paths from [`SourceSelector`] expressions, expands
-//! File Class inheritance trees via [`FileClassExpander`], instantiates
-//! [`QueryRow`] items, and applies the optimized
-//! [`super::plan::ExecutionPlan`].
+//! [`QueryService`] runs queries against a [`WorkspaceIndex`] or stored
+//! records. It selects candidate paths, expands File Classes, creates
+//! [`QueryRow`] values, and applies an [`super::plan::ExecutionPlan`].
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -88,9 +82,8 @@ impl QueryService {
         self
     }
 
-    /// Expands `source`'s File Class atoms through this service's expander, if
-    /// one is attached. Both execution paths call this before row generation so
-    /// class matching shares one implementation.
+    /// Expands File Class atoms in `source` when the service has an expander.
+    /// Both execution paths expand classes before they create rows.
     fn resolve_source_classes(&self, source: &mut SourceSelector) {
         if source.has_classes()
             && let Some(expander) = self.class_expander.as_deref()
@@ -116,8 +109,8 @@ impl QueryService {
     /// Runs `builder` against persisted records without building a full
     /// [`WorkspaceIndex`].
     ///
-    /// Resolves candidate paths, reads only matching notes/files/inlinks,
-    /// assembles a temporary index, and applies the execution plan.
+    /// Resolves candidate paths, reads matching notes, files, and inbound
+    /// links, assembles a temporary index, and applies the execution plan.
     ///
     /// # Errors
     ///
@@ -176,13 +169,11 @@ impl QueryService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if database access or row serialization fails.
-    /// - `IndexError::Scan` if directory traversal or node access fails during
-    ///   index refresh.
+    /// - `IndexError::Store` if storage access or row serialization fails.
+    /// - `IndexError::Scan` if a directory scan or node access fails.
     /// - `IndexError::Path` if path validation fails.
-    /// - `IndexError::NoteParse` if reading or parsing a note fails.
-    /// - `IndexError::Inspect` if file metadata cannot be converted into a
-    ///   record.
+    /// - `IndexError::NoteParse` if note reading or parsing fails.
+    /// - `IndexError::Inspect` if metadata inspection fails.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn sync_and_run(
@@ -194,7 +185,7 @@ impl QueryService {
         self.run_from_store(&store, builder)
     }
 
-    /// Instantiates rows at `mode`'s granularity for notes matching `source`.
+    /// Creates rows at the requested granularity for notes that match `source`.
     fn rows_for(
         &self,
         mode: QueryMode,
@@ -208,19 +199,13 @@ impl QueryService {
         }
     }
 
-    /// Materializes [`Self::matched_file_rows`] into a `Vec`, pre-sized exactly
-    /// when `source` is [`SourceSelector::All`] (every entry matches, so the
-    /// output length is `index.entries().len()`, known upfront) and left to
-    /// `Vec`'s default growth otherwise, since a selective filter's true output
-    /// length isn't knowable ahead of time and pre-sizing to the full entry
-    /// count there would be the opposite mistake.
+    /// Collects matching rows and reserves exact capacity for
+    /// [`SourceSelector::All`].
     ///
-    /// `Filter`'s `size_hint` lower bound is always 0 (any entry could fail the
-    /// predicate), so a bare `.collect()` can't know the exact output length
-    /// upfront and falls back to `Vec`'s amortized power-of-two growth, which
-    /// can overshoot the real length by up to ~2x depending on where it lands
-    /// (empirically: 28% waste at n=100, 64% at n=10000, only 2.4% at n=1000 -
-    /// pure luck of the draw, not a fixable-by-input-shape coincidence).
+    /// Selective sources keep the default vector growth because their result
+    /// count is not known before matching.
+    /// Prior measurements showed 28% excess capacity at 100 rows, 64% at
+    /// 10,000 rows, and 2.4% at 1,000 rows.
     fn collect_matched_file_rows(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -265,18 +250,13 @@ impl QueryService {
     /// Expands matching notes into one [`QueryRow`] per list item whose kind
     /// satisfies `is_wanted`, in document order.
     ///
-    /// Reserves exact capacity by counting matching items with `is_wanted`
-    /// before building rows, avoiding the reallocation-copy cost that
-    /// [`QueryRow`]'s `Arc<WorkspaceIndex>` field makes non-trivial: unlike a
-    /// `Copy` type, growing this `Vec` without a hint cannot reuse the old
-    /// buffer in place, so every regrowth copies live `Arc` clones one by one.
-    /// Counting via `is_wanted` itself (rather than reserving every matched
-    /// note's total list-item count as an upper bound) matters for sparse
-    /// predicates like `tasks()`: a vault with many list-heavy but task-free
-    /// notes would otherwise reserve megabytes for a handful of actual rows.
-    /// `base_rows` itself goes through [`Self::collect_matched_file_rows`] for
-    /// the same reason: a bare `.collect()` here would reintroduce the exact
-    /// overshoot this method exists to avoid, one level up.
+    /// Counts matching items before it builds rows, then reserves exact
+    /// capacity. This avoids vector growth and prevents sparse task queries
+    /// from reserving space for every list item. It also collects base rows
+    /// through [`Self::collect_matched_file_rows`] to avoid excess
+    /// capacity.
+    /// Reserving for every item would waste space when many notes have lists
+    /// but few tasks.
     fn item_rows(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -307,8 +287,7 @@ impl QueryService {
     }
 
     /// Creates one row per indexed file matching `source`, at note granularity.
-    /// List and task modes expand these base rows into per-item rows via
-    /// [`Self::item_rows`].
+    /// List and task modes expand these base rows with [`Self::item_rows`].
     fn matched_file_rows<'b>(
         &'b self,
         index: &'b Arc<WorkspaceIndex>,
@@ -333,7 +312,7 @@ impl std::fmt::Debug for QueryService {
     }
 }
 
-/// Store-backed resolver for source selector candidate paths.
+/// Resolves source selector candidate paths from the store.
 struct SourceResolver<'a> {
     store: &'a IndexStore,
 }
@@ -355,9 +334,9 @@ impl<'a> SourceResolver<'a> {
         }
     }
 
-    /// Recursively resolves a boolean source expression, intersecting `And`
-    /// branches and unioning `Or` branches. `Not` is unsupported at the
-    /// store-scoped resolution level and falls back to every indexed path.
+    /// Resolves a boolean source expression recursively.
+    /// It intersects `And` branches and combines `Or` branches.
+    /// It resolves `Not` by returning every indexed path.
     fn resolve_expr(
         &self,
         expr: &BooleanExpr<SourceAtom>,
@@ -1159,8 +1138,7 @@ mod tests {
                 .filter("list.completed == true")
                 .expect("valid filter");
 
-            // Filtering must keep only matching task rows, not every row from a
-            // note with one match.
+            // Keep only matching task rows, not all tasks from a matching note.
             assert_eq!(task_states(&rows), [(Some(true), "pay rent")]);
         }
     }
@@ -1179,8 +1157,8 @@ mod tests {
                 "- plain bullet\n- [ ] checkbox\n- [x] done #task\n",
             )
             .expect("write note");
-            // Default classification would promote every status-marked item
-            // to a Task; the tag filter keeps the bare checkbox a checkbox.
+            // Without the tag filter, every status-marked item becomes a task.
+            // The filter keeps the bare checkbox as a checkbox.
             let config = crate::Config::test_default(temp.path().to_path_buf())
                 .with_tasks(crate::TaskConfig::from_tags(&["#task"]));
             let index = Arc::new(
@@ -1259,13 +1237,10 @@ mod tests {
             let in_memory =
                 service.run(&index, QueryBuilder::lists(SourceSelector::All));
 
-            // Persisted list items must reconstruct rows structurally
-            // identical to the in-memory path without reparsing Markdown.
-            // FileMeta stat fields (mtime, created_at) are captured by two
-            // independent filesystem scans and may differ in sub-second
-            // precision or birth-time availability under parallel I/O, so
-            // the assertion covers the seam contract — row structure and
-            // list content — not incidental stat captures.
+            // Persisted rows must match in-memory rows without reading Markdown
+            // again. Separate scans can capture different
+            // sub-second or birth times. Compare row structure and
+            // list content, not file metadata times.
             assert_eq!(from_store.len(), in_memory.len(), "row count");
             for (row_index, (from_store_row, in_memory_row)) in
                 from_store.iter().zip(in_memory.iter()).enumerate()

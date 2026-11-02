@@ -1,49 +1,39 @@
 //! Evaluates declarative queries over indexed Markdown notes and flat list
 //! items.
 //!
-//! The query subsystem evaluates queries over notes and list items stored in a
-//! [`WorkspaceIndex`]. It provides a query planning and execution engine
-//! supporting filtering, sorting, limiting, grouping, flattening, and
-//! formatting into Markdown tables and lists.
+//! The query subsystem reads notes and list items from a [`WorkspaceIndex`].
+//! It filters, sorts, limits, groups, flattens, and formats query rows.
 //!
 //! # Architecture and Pipeline
 //!
-//! 1. **Specification**: Callers construct a [`QueryBuilder`] in page, list, or
-//!    task row granularity using a [`SourceSelector`].
-//! 2. **Evaluation**: [`QueryService::run`] evaluates the source expression
-//!    against a [`WorkspaceIndex`], optionally expanding File Class hierarchies
-//!    via a [`FileClassExpander`].
-//! 3. **Row Instantiation**: Matching notes generate [`QueryRow`] items. For
-//!    page queries, each note forms one row. For list and task queries, each
-//!    list item (or task item) within matching notes forms a zero-allocation
-//!    positional list row.
-//! 4. **Transformation**: The query planner optimizes operations by fusing
-//!    adjacent filters, merging consecutive sort terms, and rewriting
-//!    sort-limit pairs into bounded top-k selections.
-//! 5. **Materialization**: Results are exposed lazily via [`QuerySet`], caching
-//!    intermediate representations across repeat reads and formatting requests.
+//! 1. **Build**: Create a [`QueryBuilder`] with a [`SourceSelector`] and row
+//!    type.
+//! 2. **Select**: [`QueryService::run`] matches notes and can expand File
+//!    Classes through a [`FileClassExpander`].
+//! 3. **Create rows**: Matching notes produce [`QueryRow`] values. List and
+//!    task queries produce one positional row for each matching list item.
+//! 4. **Transform**: The planner combines filters and sorts. It can also
+//!    replace a sort followed by a limit with a bounded top-k selection.
+//! 5. **Read**: A [`QuerySet`] runs pending transforms on the first read. It
+//!    caches rows for later reads and formatting.
 //!
 //! # Query Expressions
 //!
-//! - **Source Selectors (`--from`)**: Filter notes by `#tag` patterns,
-//!   directory paths, file paths, glob patterns, and `@Class` hierarchies
-//!   combined with boolean operators (`and`, `or`, `not`, parentheses).
-//! - **Filter Expressions (`--where`)**: Filter individual rows using
-//!   comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) and
-//!   `contains(...)` calls.
-//! - **Field Resolution**: Access fields across `file.<field>` metadata,
-//!   canonical `list.<field>` properties, note tags, project-relative
-//!   `inlinks`, and frontmatter or inline metadata keys.
+//! - **Source selectors (`--from`)** match tags, paths, globs, and File
+//!   Classes. Combine terms with `and`, `or`, `not`, and parentheses.
+//! - **Filter expressions (`--where`)** compare row fields or call
+//!   `contains(...)`.
+//! - **Fields** include `file.<field>`, `list.<field>`, tags, inbound links,
+//!   frontmatter, and inline metadata.
 //!
 //! # Key Types
 //!
 //! - [`QueryBuilder`]: Declarative builder for query configuration.
-//! - [`QueryService`]: Evaluation service executing plans against an index.
-//! - [`QuerySet`]: Lazily transformed collection of query result rows.
-//! - [`QueryRow`]: Positional record view over an indexed file or list item.
-//! - [`SourceSelector`]: Source filter specifying target documents.
-//! - [`QueryError`]: Top-level error covering syntax, field path, and execution
-//!   errors.
+//! - [`QueryService`]: Executes query plans against an index.
+//! - [`QuerySet`]: Holds query rows and pending transforms.
+//! - [`QueryRow`]: Represents one indexed file or list item.
+//! - [`SourceSelector`]: Selects source documents.
+//! - [`QueryError`]: Reports query construction, parsing, and rendering errors.
 //!
 //! # Examples
 //!
@@ -72,10 +62,8 @@
 //! # }
 //! ```
 //!
-//! [`FileMeta`]: crate::file::FileMeta
 //! [`WorkspaceIndex`]: crate::index::WorkspaceIndex
 //! [`FileClassExpander`]: crate::query::grammar::FileClassExpander
-//! [`Note`]: crate::note::Note
 mod builder;
 mod error;
 mod format;
@@ -107,8 +95,8 @@ pub(super) mod test_support {
     use std::path::Path;
 
     use super::*;
-    /// Builds an in-memory index over `files` and returns an all-notes page
-    /// query.
+    /// Builds an in-memory index over `files` and returns a query for all
+    /// notes.
     pub(super) fn rows_for_files(files: &[(&str, &str)]) -> QuerySet {
         let index = crate::test_support::build_test_index(files);
         QueryService::new("class")

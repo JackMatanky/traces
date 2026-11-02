@@ -1,10 +1,7 @@
 //! Formats and renders query result collections into Markdown.
 //!
-//! This module converts transformed [`QueryRow`] items into user-facing
-//! Markdown formats, including GitHub-flavored Markdown tables, bulleted lists,
-//! and task checkbox lists. It supports optional file-path parenthetical
-//! suffixes via [`TaskPathStyle`] to disambiguate task origin in CLI task
-//! aggregation.
+//! The formatter converts [`QueryRow`] items into Markdown tables, bullet
+//! lists, and task lists. [`TaskPathStyle`] adds file paths to task output.
 use std::borrow::Cow;
 
 use unicode_width::UnicodeWidthStr as _;
@@ -17,11 +14,10 @@ pub(crate) enum TaskPathStyle {
     /// Omits paths for template rendering.
     #[default]
     None,
-    /// Appends paths in parentheses for `traces task` and 1-indexed source line
-    /// coordinates for `traces task -l`.
+    /// Adds each row's path to `traces task` output.
+    /// Adds source line numbers in `traces task -l` output.
     Suffix,
-    /// Append file path and 1-indexed source line coordinates for
-    /// `traces task -l`.
+    /// Adds file paths and 1-indexed source line numbers for `traces task -l`.
     Coordinates,
 }
 
@@ -36,8 +32,7 @@ pub(super) enum QueryDisplayFormat {
     List {
         field: String,
     },
-    /// Renders a Markdown task list from task rows, optionally suffixed with
-    /// each row's file path.
+    /// Renders a Markdown task list. It can add the path for each row.
     TaskList {
         path_style: TaskPathStyle,
     },
@@ -76,11 +71,11 @@ impl QueryDisplayFormat {
     ///
     /// # Errors
     ///
-    /// - [`FieldPath`] if a column or list field path is malformed.
+    /// - [`FieldPath`] if parsing a column or list field path fails.
     /// - [`TableColumnCountMismatch`] if table headers and columns differ in
     ///   length.
-    /// - [`TaskListRequiresTaskRows`] if task-list formatting runs on
-    ///   page-level rows.
+    /// - [`TaskListRequiresTaskRows`] if task-list formatting receives page
+    ///   rows.
     ///
     /// [`FieldPath`]: QueryError::FieldPath
     /// [`TableColumnCountMismatch`]: QueryError::TableColumnCountMismatch
@@ -102,18 +97,18 @@ impl QueryDisplayFormat {
 
     /// Renders a Markdown table with resolved, escaped cells.
     ///
-    /// Hand-rolls the `comfy-table` crate's `ASCII_MARKDOWN` preset layout
-    /// (left-aligned cells, space-padded to each column's max [`unicode_width`]
-    /// across header and data, `| cell | cell |` rows, dash separator matching
-    /// each column's padded width) directly via `String` writes. `comfy-table`
-    /// computes the same layout through a general-purpose
-    /// table-building/wrapping pipeline (column constraints, dynamic width
-    /// arrangement, ANSI styling) that this call site never uses (no wrapping:
-    /// `Table::new()` defaults to `ContentArrangement::Disabled`, confirmed
-    /// empirically with an 80-plus-character cell producing no wrap) - the
-    /// fixed single-preset, no-styling use here needs only the width-then-pad
-    /// computation, not the general machinery. Measured ~30x faster (1.1ms ->
-    /// ~35us at n=1000 rows).
+    /// Builds the `ASCII_MARKDOWN` layout with [`String`] operations.
+    ///
+    /// The formatter pads each column to its widest cell and uses
+    /// [`unicode_width`] to measure text. This avoids unused table features.
+    /// At 1,000 rows, this formatter took 35 microseconds. `comfy-table` took
+    /// 1.1 milliseconds.
+    ///
+    /// # Errors
+    ///
+    /// - [`QueryError::TableColumnCountMismatch`] if the header and column
+    ///   counts differ.
+    /// - [`QueryError::FieldPath`] if a column path is invalid.
     fn render_table(
         headers: &[String],
         columns: &[String],
@@ -125,13 +120,8 @@ impl QueryDisplayFormat {
                 columns: columns.len(),
             });
         }
-        // A zero-column table has nothing to pad or separate; `comfy-table`
-        // (the prior implementation) collapsed this degenerate case to a bare
-        // `||` border regardless of row count, since there's no per-column
-        // width to draw a header/separator/data distinction from. No real
-        // caller produces a 0-column table (the CLI/template surface always
-        // requires at least one header); preserved only so this edge case still
-        // can't panic and stays byte-compatible.
+        // Keep the prior `comfy-table` output for a table with no columns.
+        // No caller creates one, but this branch preserves its output.
         if headers.is_empty() {
             return Ok("||\n".to_owned());
         }
@@ -200,6 +190,10 @@ impl QueryDisplayFormat {
     }
 
     /// Renders resolved `field` values as Markdown bullets.
+    ///
+    /// # Errors
+    ///
+    /// - [`QueryError::FieldPath`] if `field` is not a valid field path.
     fn render_list(field: &str, rows: &[QueryRow]) -> QueryResult<String> {
         let field_path = FieldPath::parse(field)?;
         let mut out = String::new();
@@ -271,14 +265,10 @@ impl QueryDisplayFormat {
         Ok(out)
     }
 
-    /// Escapes Markdown table cell text by replacing newlines with spaces and
-    /// escaping pipes. Short-circuits to a plain copy when neither character is
-    /// present, avoiding the two intermediate allocations a chained
-    /// `.replace().replace()` would otherwise cost every cell. Accepts an owned
-    /// `String` (the common case: `row.resolve_ref(path).text()` already
-    /// allocates one) so the no-escape-needed fast path returns it directly
-    /// with zero extra allocation, instead of re-copying into a second `String`
-    /// the way a `&str -> String` signature would force.
+    /// Replaces newlines with spaces and escapes pipes in table cells.
+    ///
+    /// Returns plain text without another allocation when no escaping is
+    /// needed.
     fn escape_table_cell<'a>(text: impl Into<Cow<'a, str>>) -> String {
         let text = text.into();
         if !text.contains(['\n', '|']) {

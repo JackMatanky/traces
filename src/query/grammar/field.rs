@@ -1,21 +1,18 @@
 //! Parses, validates, and represents typed query field paths.
 //!
-//! Field paths appear in filter expressions, sort specifications, and
-//! table/list output configurations. This module parses string paths into a
-//! structured [`FieldPath`], validating accessor names, verifying dot syntax,
-//! and providing typo suggestions.
+//! Field paths select values in filters, sort clauses, tables, and lists.
+//! The parser validates accessor names and dot syntax. It also suggests fixes
+//! for misspelled accessors.
 //!
 //! # Supported Accessor Namespaces
 //!
-//! - `file.<field>`: Maps to [`FileField`] variants backed by [`FileMeta`]
-//!   metadata (such as `file.name`, `file.folder`, `file.mtime`, `file.tags`).
-//! - `list.<field>`: Maps to [`ListField`] variants valid on list rows,
-//!   including universal properties (`list.text`, `list.line`, `list.depth`)
-//!   and embedded [`TaskField`] properties (`list.status`, `list.completed`,
-//!   `list.due`).
-//! - `tags`: Document tags on page rows, or item tags on list rows.
-//! - `inlinks`: Project-relative paths of Notes linking to the target note.
-//! - Bare keys: User-defined frontmatter or inline metadata field names.
+//! - `file.<field>` selects [`FileField`] values from [`FileMeta`].
+//! - `list.<field>` selects [`ListField`] values, including [`TaskField`]
+//!   fields.
+//! - `tags` selects note tags or list-item tags.
+//! - `inlinks` selects project-relative paths of notes that link to the row's
+//!   note.
+//! - Bare keys select frontmatter or inline metadata fields.
 //!
 //! [`NoteFieldValue`]: crate::NoteFieldValue
 //! [`FileMeta`]: crate::FileMeta
@@ -26,10 +23,10 @@ use crate::{
 
 /// Represents a resolved query field path.
 ///
-/// Parsed once per [`crate::query::QuerySet`] transformation, then applied to
-/// each [`crate::query::QueryRow`] to extract a [`NoteFieldValue`].
+/// Parses once for a [`crate::query::QuerySet`] transform, then resolves for
+/// each [`crate::query::QueryRow`] to return a [`NoteFieldValue`].
 ///
-/// Unknown `file.*` or `list.*` accessors produce a [`FieldPathError`] with an
+/// Unknown `file.*` and `list.*` accessors produce a [`FieldPathError`] with an
 /// optional suggestion.
 ///
 /// [`NoteFieldValue`]: crate::NoteFieldValue
@@ -43,9 +40,9 @@ pub(crate) enum FieldPath {
     Metadata(String),
     /// Accesses document tags on page rows, or list-item tags on list rows.
     Tags,
-    /// Project-relative paths of Notes linking to this Note.
+    /// Holds project-relative paths of notes that link to this note.
     ///
-    /// Derived dynamically by `InlinkMap` rather than stored on the Note.
+    /// The query derives these paths from [`InlinkMap`], not from the note.
     Inlinks,
 }
 
@@ -56,13 +53,8 @@ impl FieldPath {
     ///
     /// # Errors
     ///
-    /// - [`FieldPathError`] if `path` is empty or contains an invalid
-    ///   identifier.
-    /// - [`FieldPathError`] if `path` has invalid `.` structure (for example,
-    ///   `file.`, `a.b`, or more than two segments).
-    /// - [`FieldPathError`] if `path` uses obsolete `task.<field>` syntax.
-    /// - [`FieldPathError`] if `path` names an unknown `file.<field>` or
-    ///   `list.<field>` accessor.
+    /// - [`FieldPathError`] if `path` is empty, has an invalid identifier or
+    ///   dot structure, uses `task.<field>`, or names an unknown accessor.
     ///
     /// [`FieldPathError`]: crate::query::error::FieldPathError
     pub(crate) fn parse(path: &str) -> Result<Self, FieldPathError> {
@@ -157,7 +149,7 @@ impl FieldPath {
 pub(crate) enum FileField {
     /// Accesses the file's project-relative path.
     Path,
-    /// Accesses the file's base name without directory components or extension.
+    /// Accesses the file's base name without a directory or extension.
     Name,
     /// Accesses the project-relative folder containing the file.
     Folder,
@@ -174,7 +166,7 @@ pub(crate) enum FileField {
     /// Accesses [`crate::FileMeta::modified_at`] as a datetime without a UTC
     /// offset.
     ModifiedDateTime,
-    /// Accesses the file's calendar day, with filename winning over
+    /// Accesses the file's calendar day. The filename takes precedence over
     /// `created_at`.
     Day,
     /// Accesses note-level tags from the row's file.
@@ -223,8 +215,8 @@ impl FileField {
 
 /// Represents a task-specific list field.
 ///
-/// These fields resolve to [`crate::NoteFieldValue::Null`] on plain bullets and
-/// non-task checkboxes.
+/// These fields resolve to [`crate::NoteFieldValue::Null`] for plain bullets
+/// and non-task checkboxes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum TaskField {
     /// Accesses the task status name string.
@@ -482,8 +474,7 @@ mod tests {
 
         #[test]
         fn closest_accessor_rejects_a_match_past_the_threshold() {
-            // "na" has threshold 1, but distance 2 from "name": too far to
-            // suggest.
+            // The input is too far from the only candidate for a suggestion.
             let candidates: &[&str] = &["name"];
             assert_eq!(FieldPath::closest_accessor(candidates, "na"), None);
         }
@@ -495,7 +486,8 @@ mod tests {
 
         #[test]
         fn closest_accessor_breaks_ties_by_iteration_order() {
-            // Both candidates are distance 1 from "mat"; iteration order wins.
+            // Both candidates have distance 1 from "mat".
+            // The parser chooses the first candidate.
             let candidates: &[&str] = &["cat", "bat"];
             assert_eq!(
                 FieldPath::closest_accessor(candidates, "mat"),

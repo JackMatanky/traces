@@ -1,15 +1,12 @@
 //! Builds declarative queries for source selection, row granularity, and
 //! transformations.
 //!
-//! This module provides [`QueryBuilder`], the primary user-facing builder for
-//! constructing index queries. A query combines a [`SourceSelector`], a
-//! [`QueryMode`] governing row granularity ([`QueryBuilder::pages`] vs.
-//! [`QueryBuilder::tasks`]), and a sequence of pending transformations
-//! including filters, sorts, and limits.
+//! [`QueryBuilder`] combines a [`SourceSelector`], row granularity, and
+//! transformations such as filters, sorts, and limits.
 //!
-//! Plans remain inert specifications until passed to
 //! [`QueryService::run`](super::QueryService::run) or
-//! [`QueryService::run_from_store`](super::QueryService::run_from_store).
+//! [`QueryService::run_from_store`](super::QueryService::run_from_store)
+//! evaluates each plan.
 
 use super::{
     ExecutionPlan, QueryBuilderError, QueryTransform, grammar::SourceSelector,
@@ -93,9 +90,7 @@ impl QueryBuilder {
         }
     }
 
-    /// Builds a query for `mode`, dispatching to the mode-specific constructor
-    /// so callers can hold a bare [`QueryMode`] without knowing which
-    /// constructor it selects.
+    /// Builds the query selected by `mode`.
     #[inline]
     #[must_use]
     pub(crate) fn from_mode(mode: QueryMode, source: SourceSelector) -> Self {
@@ -108,15 +103,15 @@ impl QueryBuilder {
 
     /// Appends a filter expression to the query transform plan.
     ///
-    /// Evaluates `expr` against candidate note frontmatter, task metadata,
-    /// tags, and file properties when the query executes.
+    /// Evaluates `expr` against note fields, list fields, tags, and file fields
+    /// when the query runs.
     ///
     /// # Errors
     ///
-    /// - [`QueryBuilderError::Syntax`] if `expr` cannot be parsed as a valid
+    /// - [`QueryBuilderError::Syntax`] if the parser rejects `expr` as a
     ///   boolean filter expression.
-    /// - [`QueryBuilderError::FieldPath`] if `expr` references an invalid or
-    ///   malformed field path.
+    /// - [`QueryBuilderError::FieldPath`] if field-path parsing rejects a path
+    ///   in `expr`.
     #[inline]
     pub fn filter(mut self, expr: &str) -> Result<Self, QueryBuilderError> {
         self.plan.push(QueryTransform::filter(expr)?);
@@ -125,12 +120,11 @@ impl QueryBuilder {
 
     /// Appends a sort transform on `field`.
     ///
-    /// Set `descending` to reverse natural ascending order.
+    /// Set `descending` to sort from largest to smallest.
     ///
     /// # Errors
     ///
-    /// - [`QueryBuilderError::FieldPath`] if `field` cannot be parsed as a
-    ///   valid field path.
+    /// - [`QueryBuilderError::FieldPath`] if `field` is not a valid field path.
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
         expect(
@@ -269,8 +263,8 @@ mod tests {
         #[test]
         fn top_k_matches_full_sort_order_for_tied_keys() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            // Low-cardinality keys force ties through top-k partitioning,
-            // catching accidental reliance on small-slice or stable behavior.
+            // Four possible ratings create many ties in top-k partitioning.
+            // This catches reliance on small slices or stable sorting.
             for i in 0..200 {
                 fs::write(
                     temp.path().join(format!("note-{i:03}.md")),
@@ -348,8 +342,8 @@ mod tests {
                     .build()
                     .expect("build index"),
             );
-            // Fusing sort+limit across the filter would return only [b].
-            // Correct order leaves [b, e].
+            // The filter must run before the limit. Otherwise, only [b]
+            // remains. The correct order returns [b, e].
             let request = QueryBuilder::pages(SourceSelector::All)
                 .sort("rating", true)
                 .expect("valid sort")
