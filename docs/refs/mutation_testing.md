@@ -1,9 +1,9 @@
 # Mutation Testing Setup
 
 Mutation testing evaluates a test suite by injecting small artificial defects
-("mutants") into the source and checking whether the tests detect them.
-Unlike line coverage — which only says code was *executed* — mutation testing
-measures whether assertions would *notice* the change.
+("mutants") into the source and checking whether the tests detect them. Unlike
+line coverage — which only says code was *executed* — mutation testing measures
+whether assertions would *notice* the change.
 
 ---
 
@@ -15,32 +15,32 @@ measures whether assertions would *notice* the change.
 - **escaped (survived)**: the suite passed despite the bug — a coverage or
   assertion gap.
 - **errored**: the mutant ran but the test command failed or timed out.
-- **skipped**: never run — the mutation does not compile, no tests reference
-  it, it is cfg-gated, or type-proof machinery declined it. Skipped mutants
-  count toward the score — they are not evidence of test strength.
-- **MSI**: mutation score = (killed + errored + skipped) / total, reported as
-  a 0–1 ratio in JSON and accepted as 0–100 on `--min-msi`.
+- **skipped**: never run — the mutation does not compile, no tests reference it,
+  it is cfg-gated, or type-proof machinery declined it. Skipped mutants count
+  toward the score — they are not evidence of test strength.
+- **MSI**: mutation score = (killed + errored + skipped) / total, reported as a
+  0–1 ratio in JSON and accepted as 0–100 on `--min-msi`.
 
 ---
 
 ## 2. Tooling: `mutarust` (+ `cargo-nextest` for the test task)
 
-1. **`mutarust`** — the mutation engine. Installed via `mise` in
-   `mise.toml` `[tools]` (`"cargo:mutarust" = "0.1.10"`), wrapped by the
-   **tool-agnostic `test:mutants` task** (`.mise/tasks/test/mutants`) — the
-   entrypoint name predates the engine and outlives it.
-2. **`cargo-nextest`** — still used by the `mise run test` task for its
-   parallel runner. Mutation runs themselves use plain
-   `cargo test` (mutarust's default); the custom `--exec` nextest path is
-   serial and silently skips type-proof mutators, so it is not used.
+1. **`mutarust`** — the mutation engine. Installed via `mise` in `mise.toml`
+   `[tools]` (`"cargo:mutarust" = "latest"`), wrapped by the **tool-agnostic
+   `test:mutants` task** (`.mise/tasks/test/mutants`) — the entrypoint name
+   predates the engine and outlives it.
+2. **`cargo-nextest`** — still used by the `mise run test` task for its parallel
+   runner. Mutation runs themselves use plain `cargo test` (mutarust's default);
+   the custom `--exec` nextest path is serial and silently skips type-proof
+   mutators, so it is not used.
 
 Config lives in two committed files (per-tool convention, like
 `clippy.toml`/`deny.toml`):
 
-- `mutarust.yml` — policy (exclusions, mutators, outputs, score gate).
-  mutarust has **no config auto-discovery**: mutation runs always pass
-  `--config mutarust.yml`; inspect runs (`--list-mutators`, `--list-files`,
-  `--print-ast` — declared task flags, no `--` needed) run without it.
+- `mutarust.yml` — policy (exclusions, mutators, outputs, score gate). mutarust
+  has **no config auto-discovery**: mutation runs always pass `--config
+  mutarust.yml`; inspect runs (`--list-mutators`, `--list-files`, `--print-ast`
+  — declared task flags, no `--` needed) run without it.
 - `mutarust-baseline.json` — the accepted-escapes baseline, written by
   `--update-baseline` and meant to be committed like a lockfile.
 
@@ -56,7 +56,8 @@ mise run test:mutants --dry-run       # count mutants, no test runs
 mise run test:mutants --git-diff      # only changed tracked lines (stage new files!)
 ```
 
-Selected declared flags (the task declares mutarust's full surface minus its owned flags — see `mise run test:mutants --help` for the complete contract):
+Selected declared flags (the task declares mutarust's full surface minus its
+owned flags — see `mise run test:mutants --help` for the complete contract):
 
 | Flag | Meaning |
 | --- | --- |
@@ -72,21 +73,20 @@ Selected declared flags (the task declares mutarust's full surface minus its own
 Static behavior of the task: `--config mutarust.yml --logger-agentic-json
 --test-flags "--features test-utils --all-targets --profile mutants"
 --timeout-coefficient 5`, `depends = ["test"]`, 1 h template timeout.
-Conflicting flag combinations (e.g. `--update-baseline --dry-run`) are
-rejected by usage validation with exit 1 and a `mise ERROR` message; refused
-(`--config`, `--test-flags`, `--exec`/`--no-exec`, `--features`) or unknown
-flag-like tokens in target position are rejected by the task's target scan
-with exit 2 and a `mutants:` message.
+Conflicting flag combinations (e.g. `--update-baseline --dry-run`) are rejected
+by usage validation with exit 1 and a `mise ERROR` message; refused (`--config`,
+`--test-flags`, `--exec`/`--no-exec`, `--features`) or unknown flag-like tokens
+in target position are rejected by the task's target scan with exit 2 and a
+`mutants:` message.
 
-**Exit codes:** task argument-validation errors exit `1`, task
-scope/target-scan errors exit `2`. mutarust itself: `0` pass ·
-`1` tool error · `2` bash completion (not a run) · `3` config/parse/
-annotation error · `4` quality gate red (`min_msi`, `min_covered_msi`, or
-`--fail-on-escaped`; `--run-mutant-id` bypasses gates). **Four is the only
-failure worth retrying with a narrower scope.** Any zero-mutant scope with
-`--min-msi` exits 4 (score 0); only `--git-diff` auto-pairs
-`--ignore-msi-with-no-mutations` — it only takes effect paired with
-`--min-msi` (the task pairs them).
+**Exit codes:** task argument-validation errors exit `1`, task scope/target-scan
+errors exit `2`. mutarust itself: `0` pass · `1` tool error · `2` bash
+completion (not a run) · `3` config/parse/ annotation error · `4` quality gate
+red (`min_msi`, `min_covered_msi`, or `--fail-on-escaped`; `--run-mutant-id`
+bypasses gates). **Four is the only failure worth retrying with a narrower
+scope.** Any zero-mutant scope with `--min-msi` exits 4 (score 0); only
+`--git-diff` auto-pairs `--ignore-msi-with-no-mutations` — it only takes effect
+paired with `--min-msi` (the task pairs them).
 
 ### Scoping / performance knobs
 
@@ -95,9 +95,10 @@ mise run test:mutants --git-diff          # cheapest meaningful local run
 mise run test:mutants -m query            # bounded scope while iterating
 mise run test:mutants --workers 4        # cap parallel workers
 ```
-Workers × cargo `-j` share the CPUs; results always print in plan order.
-There is no `--iterate`: rerun cost is controlled by *scoping*, and the
-baseline only changes what **fails**, not what runs.
+
+Workers × cargo `-j` share the CPUs; results always print in plan order. There
+is no `--iterate`: rerun cost is controlled by *scoping*, and the baseline only
+changes what **fails**, not what runs.
 
 ---
 
@@ -124,17 +125,21 @@ mise run test:mutants --run-mutant-id <id>  # re-run just that mutant → killed
 mise run test:mutants --update-baseline
 ```
 
-`mutarust-agentic.json` (written by every scored run; `--update-baseline`
-writes no reports) is the structured successor of the old
-`mutants-report.md` "Instructions for Next Agent Session" output (from the
-deleted `.mise/tasks/mutants/report` task): per escape it carries the
-mutation diff, context lines, nearby test files, and a kill hint. Human
-triage: stdout table, `report.json`, and `mutarust-report.html`.
+Before step 5, record each accepted escape: mutant id, the reason no test should
+assert it, and the date. Keep the record in the commit message or in a
+`mutants-accepted.md` row.
+
+`mutarust-agentic.json` (written by every scored run; `--update-baseline` writes
+no reports) is the structured successor of the old `mutants-report.md`
+"Instructions for Next Agent Session" output (from the deleted
+`.mise/tasks/mutants/report` task): per escape it carries the mutation diff,
+context lines, nearby test files, and a kill hint. Human triage: stdout table,
+`report.json`, and `mutarust-report.html`.
 
 Report files (all gitignored, written to CWD after a completed run):
-`report.json`, `mutarust-agentic.json`, `mutarust-report.html`. Every run
-that produces reports — including `--dry-run` — overwrites them: read
-stats right after the run you care about.
+`report.json`, `mutarust-agentic.json`, `mutarust-report.html`. Every run that
+produces reports — including `--dry-run` — overwrites them: read stats right
+after the run you care about.
 
 ---
 
@@ -150,20 +155,23 @@ If a mutation job is ever added, scope it to the change set:
   run: mise run test:mutants --git-diff --min-msi 60 --fail-on-escaped
 ```
 
-Caveats that make this safe: untracked files are invisible to
-`--git-diff-lines` (stage new files first); an empty change-set exits 0 —
-the task pairs `--ignore-msi-with-no-mutations` with `--min-msi` so an
-empty diff cannot fail the gate.
+This example does not adopt `--min-msi`. Ticket 12 declined the `min_msi` gate;
+see `.scratch/bdd-testing/issues/12-coverage-gap-methodology.md`.
+
+Caveats that make this safe: untracked files are invisible to `--git-diff-lines`
+(stage new files first); an empty change-set exits 0 — the task pairs
+`--ignore-msi-with-no-mutations` with `--min-msi` so an empty diff cannot fail
+the gate.
 
 ---
 
 ## 6. Version notes
 
 - `mutarust 0.1.10` (pinned in `mise.toml`; bump deliberately — the config
-  schema is `docs/refs/mutarust/schema/mutarust.schema.json` and unknown
-  fields fail fast).
+  schema is `docs/refs/mutarust/schema/mutarust.schema.json` and unknown fields
+  fail fast).
 - Schema/report drift notes and the full flag inventory live in
-  `docs/refs/quality_gates_mutarust.md` (§8–§9); migration decisions for
-  this repo are in `docs/refs/quality_gates_mise_adoption.md`.
-- Replaces `cargo-mutants` (retired 2026-09-28); the historical
-  cargo-mutants research remains in `docs/refs/quality_gates_*.md`.
+  `docs/refs/quality_gates_mutarust.md` (§8–§9); migration decisions for this
+  repo are in `docs/refs/quality_gates_mise_adoption.md`.
+- Replaces `cargo-mutants` (retired 2026-09-28); the historical cargo-mutants
+  research remains in `docs/refs/quality_gates_*.md`.

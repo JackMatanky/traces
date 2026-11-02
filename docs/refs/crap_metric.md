@@ -8,24 +8,24 @@ risky to modify.
 
 ## 1. The CRAP Formula
 
-For any given function or method $m$:
+For any given function or method m:
 
-$$\text{CRAP}(m) = \text{comp}(m)^2 \times (1 - \text{cov}(m)/100)^3 + \text{comp}(m)$$
+```tex
+CRAP(m) = comp(m)² × (1 − cov(m)/100)³ + comp(m)
+```
 
 Where:
 
-- **$\text{comp}(m)$**: The **cyclomatic complexity** of the function.
-- **$\text{cov}(m)$**: The **test coverage** percentage of the function
-  (between $0$ and $100$).
+- **comp(m)**: The **cyclomatic complexity** of the function.
+- **cov(m)**: The **test coverage** percentage of the function (between 0 and
+  100).
 
 ### Interpretation
 
-- **$\text{CRAP} < 5$**: Low risk. Well-tested or extremely simple.
-- **$\text{CRAP} \in [5, 20]$**: Medium risk. Acceptable, but monitor for
-  complex parts.
-- **$\text{CRAP} \in (20, \infty)$**: High risk. Danger zone; requires
-  refactoring to reduce complexity or adding targeted unit tests to increase
-  coverage.
+- **CRAP < 5**: Low risk. Well-tested or extremely simple.
+- **CRAP ∈ [5, 20]**: Medium risk. Acceptable, but monitor for complex parts.
+- **CRAP ∈ (20, ∞)**: High risk. Danger zone; requires refactoring to reduce
+  complexity or adding targeted unit tests to increase coverage.
 
 ---
 
@@ -51,7 +51,7 @@ A `.cargo-crap.toml` file is located at the project root:
 
 ```toml
 # .cargo-crap.toml
-threshold = 20.0
+threshold = 15.0
 fail-above = false      # Set to true to enforce gating in CI
 missing = "pessimistic" # Treat missing coverage as 0%
 exclude = [
@@ -97,6 +97,7 @@ default ignores apply on top.
 To gate pull requests based on the CRAP score, add a step to the GitHub Actions
 workflow. Since tools are managed by `mise`, use the `mise` action or command
 runner:
+
 ```yaml
 - name: Install tools via mise
   uses: jdx/mise-action@v2

@@ -152,12 +152,20 @@ fresh session can start slice 1 with zero open design questions.
     text, which narrows ticket 08's rule.
 
   Findings: [research/11](research/11-conventions.md).
+- [12: Coverage-gap methodology](issues/12-coverage-gap-methodology.md):
+  covered = enforcement by the assigned test class; five-state gap list
+  rides research/10 Status columns (ticket 14 adds them).
+  - Anti-metrics bar coverage percentages and counts as targets.
+  - Mutation and coverage stay unchanged; min_msi declined.
+  - Ten contradiction dispositions recorded; ADR-0002/0008 corrected.
+
+  Findings: [research/12](research/12-coverage-gap-methodology.md).
 
 ## Not yet specified
 
-- Policy for BDD and quality gates beyond layer placement. The tools exist:
-  mutarust (`mise run test:mutants`) and `llvm-cov nextest`. Ticket 12 sets the
-  thresholds and the scope.
+- Quality-gates policy: resolved by ticket 12. No score gates or coverage
+  targets (anti-metrics); mutation and coverage tooling stay unchanged;
+  min_msi declined. Scope: [ticket 12](issues/12-coverage-gap-methodology.md).
 - Linux and Windows CI result for the e2e placement. Only the first adoption
   slice can check it.
 
