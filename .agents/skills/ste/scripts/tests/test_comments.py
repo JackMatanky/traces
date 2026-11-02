@@ -257,4 +257,4 @@ def test_c_unterminated_block_comment_keeps_to_eof() -> None:
     code = "/* unterminated\nstill prose.\n"
     masked = mask(code, "c")
     layout_of(code, masked)
-    assert "still prose" in masked
+    assert "still prose." in masked

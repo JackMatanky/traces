@@ -767,7 +767,11 @@ def mask_to_prose(text: str, language: Language) -> str:
                     continue
             else:
                 j = text.find(closer, i + 2)
-                j = j + 2 if j != -1 else size
+                if j == -1:
+                    keep(i, size, len(language.block[0]), 0)
+                    i = size
+                    continue
+                j = j + 2
             keep(i, j, len(language.block[0]), len(closer))
             i = j
             continue
