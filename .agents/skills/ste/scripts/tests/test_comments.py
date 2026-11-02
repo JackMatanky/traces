@@ -206,3 +206,46 @@ def test_rust_raw_string_odd_quotes_blanks_only_raw_string() -> None:
     layout_of(code, masked)
     assert "comment: utilize it" in masked
     assert '"a"b"' not in masked
+
+
+def test_go_mask_keeps_comments_and_masks_backtick_raw_string() -> None:
+    code = (
+        "s := `raw /* utilize */ string`\n"
+        "r := '/*'\n"
+        'c := "prior to"\n'
+        "// comment: utilize it\n"
+    )
+    masked = mask(code, "go")
+    layout_of(code, masked)
+    assert "comment: utilize it" in masked
+    assert "raw /* utilize */ string" not in masked
+    assert "prior to" not in masked
+
+
+def test_c_masks_strings_and_blocks_then_keeps_line_comment() -> None:
+    code = (
+        'char *s = "/* string */ utilize prior to";\n'
+        "// line continue\n"
+        "/* real block\n   still */\n"
+        "char c = '/';\n"
+    )
+    masked = mask(code, "c")
+    layout_of(code, masked)
+    assert "real block" in masked
+    assert "still" in masked
+    assert "char *s" not in masked
+    assert "utilize prior to" not in masked
+
+
+def test_c_line_comment_frontslash_splice_marks_next_line() -> None:
+    code = "// first \\\n  continued comment: utilize it\n"
+    masked = mask(code, "c")
+    layout_of(code, masked)
+    assert "continued comment: utilize it" in masked
+
+
+def test_c_line_comment_backslash_splice_masks_next_line() -> None:
+    code = "// line\\\n  still comment: utilize it\n"
+    masked = mask(code, "c")
+    layout_of(code, masked)
+    assert "still comment: utilize it" in masked
