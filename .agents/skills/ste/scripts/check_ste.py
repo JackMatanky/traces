@@ -723,13 +723,13 @@ def mask_to_prose(text: str, language: Language) -> str:
                         depth, j = depth + 1, j + 2
                     else:
                         j += 1
+                if depth:
+                    keep(i, size, len(language.block[0]), 0)
+                    i = size
+                    continue
             else:
                 j = text.find(closer, i + 2)
                 j = j + 2 if j != -1 else size
-            if j >= size and language.block_nests:
-                keep(i, size, len(language.block[0]), 0)
-                i = size
-                continue
             keep(i, j, len(language.block[0]), len(closer))
             i = j
             continue

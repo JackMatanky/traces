@@ -104,3 +104,11 @@ def test_line_prefix_policies_are_language_specific() -> None:
     assert check_ste.LANGUAGES["rust"].line_prefix_chars == " \t/*!"
     assert check_ste.LANGUAGES["python"].line_prefix_chars == ""
     assert check_ste.LANGUAGES["ts"].line_prefix_chars == " \t/*"
+
+
+def test_block_comment_terminating_at_eof_blanks_closer() -> None:
+    code = "/* x */"
+    masked = mask(code)
+    layout_of(code, masked)
+    assert "x" in masked
+    assert "/" not in masked
