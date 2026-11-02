@@ -44,3 +44,13 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 - A host holds the store only during a refresh and a persist.
 - Each query result names the generation that it read. Use the incarnation and the revision as the generation pair.
 - A host that meets a store with a higher format epoch never writes it. It serves from its in-memory generation, or it parses fresh if it has none.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- `note` gets `NoteDoc::scan` and a public `parse_with_doc` for an unsaved buffer. Ticket 23 promises no incremental reparse.
+- The open buffer wins over disk and over background work.
+- A closed-file edit compares the full source snapshot at commit.
+- The host owns the text, the version, the debounce, the revision gate and the UTF-16 conversion.
+- This ticket owns the buffer overlay on a pinned generation. Ticket 24 owns the generation.

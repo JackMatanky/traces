@@ -96,3 +96,12 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 - A rebuild heal gives no notice. Report its cause in the refresh report only.
 - Ticket 25 renames `RefreshReport::ConfigDrift` and `DriftCause` and adds identity causes: engine, platform, epoch, extractor and damaged `META`. This ticket gives the cause texts.
 - `traces index` from an older binary replaces a newer store. It gives one stderr notice first.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- `parse_markdown` returns notices beside `Note`. A parse-time `NaN` becomes `Null` with a notice.
+- This ticket owns how parser notices show. It also owns the bulk-index notice path.
+- Ticket 24 stores parser notices in the `notices` facet.
+- A cache failure on a read is one stderr notice and exit 0. See ticket 24 and the freshness inputs above.

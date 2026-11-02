@@ -62,3 +62,10 @@ Ticket 15 found the external crate is a poor fit (second dialect, recursive
 tree, no spans). The matcher semantics are reusable as a design over the flat
 heading slice (about 150 to 250 lines) [H]. No dependency decision is left for
 this ticket.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md).
+
+- Section extents come from heading lines. Source slices serve token budgets.
+- `NoteDoc` owns every range. The schema check is span-free. Adapters attach spans.

@@ -66,3 +66,11 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 - Unix and Windows write different path bytes into the store (`src/path.rs:349-391`). Until this ticket gives one portable form, the store identity holds a platform family. A store does not move between families. Remove the platform family when the form is portable.
 - This ticket has no Unicode normalization rule. Until it has one, NFC and NFD names are different files.
 - The store keeps the persisted path form from this ticket. A change of the form changes the stored rows and needs a new format epoch.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- Ticket 24 gives this ticket the persisted path form and the root identity.
+- A folder `Path` query uses a path range over the `files` facet. The persisted bytes must sort in the order that the range needs.
+- Check the path order at index build and at store load, in release builds too.

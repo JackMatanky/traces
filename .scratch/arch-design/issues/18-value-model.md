@@ -378,7 +378,9 @@ capabilities, since the crate has end users and a public surface.
   `kind`, `embedded`, and optionally a span. The user wants these
   distinguishable in queries, and `NoteLink` is also needed for splitting note
   types. Which type a runtime `FieldValue::Link` carries is open (Open
-  question 1). Equality and order stay with ticket 19.
+  question 1). Equality and order stay with ticket 19. Ticket 23 amends the
+  payload: `Link` holds the target, the display text, the embed flag and the
+  syntax kind. `NoteLink` holds the ranges. See ticket 23's Answer.
 - **Borrowed views (refines the "no mirror" line above):** the model exports
   `&FieldValue` and no mirror enum. Any view enum is query-local. Ticket 28
   benchmarks owned vs view over `file.name` sort and filter before deleting

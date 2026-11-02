@@ -122,8 +122,9 @@ inputs, and they do not hold a context object.
 - Add `origin`, `description` and `parent_order` now. The schema format may
   still change freely. Every field type accepts the new `description` key.
   `suggest_class` waits for the LSP.
-- The check takes a field map. The app layer owns any merge of inline fields
-  into that map. Ticket 23 handles this, and no merge is promised here.
+- The check takes a field map. Ticket 23 gives the note an effective accessor
+  that merges inline fields. The accessor does not feed this check. The check
+  stays frontmatter-only.
 
 **Global layer:** The reserved `global` schema remains a `$ref` pool. It also
 becomes the lowest-precedence layer on the frontmatter of every note, classed or

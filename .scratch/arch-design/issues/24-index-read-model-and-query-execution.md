@@ -91,7 +91,7 @@ of topic D. Decide the facet split first.
 
 ### Boundaries with other tickets
 
-- Ticket 25 decides the format version rule, the parser identity, the racy
+- Ticket 25 decides the format epoch, the extractor fingerprint, the racy
   timestamps and the visibility of heals. This ticket decides the facet split
   and the lazy decode. Ticket 25 decides if a refresh keeps an in-memory note
   cache. The facet split also sets what a path-set change decodes. One added
@@ -688,14 +688,14 @@ Remove the `SourceResolver` full-store read path, the partial
 Measure the generic field and task range-key layout, including write and
 replace costs, before implementation. Measure full row materialization
 on a real vault. Check Linux and Windows locking. A compact temporal
-encoding needs a measured read gain. Ticket 21 already removes the
+encoding needs a measured read gain. Ticket 21 will remove the
 hybrid `FileMeta.day`. Ticket 20 keeps inline fields out of class axes.
 
 Change table (ticket 16): on a successful fresh-parse fallback, a held
 store query exits 0 rather than 1. The query prints one cache notice on
 stderr and keeps query results on stdout. The 1.8 s synthetic build
 included persistence, so it is not a measured fallback latency.
-The store layout and format version change within the Free envelope.
+The store layout and format epoch change within the Free envelope.
 
 Downstream tickets: 25 (freshness and format), 28 (plan and rows),
 30 (index-facing consumer), and 31 (path form). Also 32 (writer

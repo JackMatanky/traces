@@ -141,3 +141,13 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 - A host that starts against a store with a higher format epoch never writes it. It parses fresh if it has no generation.
 - A rebuild heal is quiet. A read that meets a higher epoch gives one stderr notice.
 - Memory is the cost of serving from a pinned generation: 467 MB at 50,000 notes (`research/24-prep/g-probe-results.md:67`).
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- A host keeps a compact link and heading range index. It keeps a document only for an open buffer. It tags each range set with a source revision.
+- A host publishes an immutable generation of shared entries. A request pins one generation.
+- This ticket owns host writer admission.
+- A long-lived host keeps parser settings in an `Arc`. The cold CLI borrows them for one call.
+- Ticket 23 leaves the host memory at 50,000 notes and a two-process store open unmeasured.

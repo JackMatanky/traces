@@ -67,3 +67,15 @@ Also: `update` and `delete` are all-or-nothing across documents, need `expect` c
 See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md). The service acquires a new frame per standalone query. A render/request supplies its shared frame. Resolve relative expressions and constant temporal operands once, but keep one pinned calendar capability in a plan where row-dependent coercion needs it. No evaluator clock or ambient zone.
 
 `QuerySet` retains its creator's plan and frame. Terminal access (including template iteration, indexing and formatting) returns or propagates a memoized error instead of silently returning no rows. Keep period membership predicates distinct from field equality and the total sort key. The period/instant comparison uses the instant's local civil date, so a skipped next day cannot invalidate a real prior day.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- This ticket owns the row type, the residual filter, the pushdown protocol and membership. A row owns its matching `Arc<FileEntry>`, not the whole index.
+- Ticket 24 removes `SourceResolver`. `All`, `Not` and a source-less query enumerate `files` paths, then narrow with safe predicates.
+- A folder `Path` uses a path range. `Tag` uses tag keys. `Class` uses explicit class keys or the bound tag and path atoms.
+- Ticket 24 removes the four multimap tables. Pushdown uses facet scans and range keys. The range-key encoding is still unmeasured.
+- Ticket 24 keeps one execution plan for the CLI and for hosts.
+- Ticket 23 asks this ticket for the item order, `item_idx` and the membership operation.
+- One value is a scalar and several values are a list. This rule covers note fields and item fields.

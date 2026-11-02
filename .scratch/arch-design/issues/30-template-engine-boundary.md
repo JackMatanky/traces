@@ -78,3 +78,10 @@ adapter-selected mode and honors authored defaults unattended. `DialogProvider`
 cannot invent answers, and an exhausted preset is an error. Random UUID
 creation remains an explicit separate entropy capability, not a hidden
 request-global service.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- Check whether a template reads external links or outlinks. Ticket 23 removes external URLs from the stored `Note::outlinks`.
+- Ticket 24 names this ticket as an index-facing consumer. Use the index-owned domain port. Do not import a storage engine.

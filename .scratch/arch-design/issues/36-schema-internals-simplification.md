@@ -77,3 +77,10 @@ order-free [V]. Both tools check bindings that can never bind at design time
 entries [V]. These provide candidates for `traces check` schema errors. IWE
 delegates validation to an external crate (`schematter-validator` 0.2.0); see
 [ticket 15](./15-research-schematter-validator-and-document-schema.md).
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md).
+
+- The note-owned effective accessor is not the schema field resolution. A frontmatter value wins over an inline value of the same key.
+- The effective accessor does not feed the schema check. The check stays frontmatter-only.

@@ -514,9 +514,10 @@ Findings logged for other tickets, not adopted here:
 - Ticket 32: a host that serves from memory pays 467 MB of RSS at 50,000 notes.
 - Ticket 33: a notice channel that does not travel as an error. A higher epoch
   exits 0.
-- Ticket 26: the measurement plan is large. Earlier data (`research/11`)
-  suggests a journal adds more fixed latency than it saves. The maintainer
-  decides whether to shrink it.
+- Ticket 26: a reviewer called the measurement plan large. The maintainer
+  decided to keep the range of 50 to 50,000 notes. The range comes from the
+  maintainer's vaults and from other Obsidian vaults. Earlier data
+  (`research/11`) suggests a journal adds more fixed latency than it saves.
 - Ticket 38: a reviewer calls it dead weight. It no longer gates this ticket.
   The maintainer asked for it.
 

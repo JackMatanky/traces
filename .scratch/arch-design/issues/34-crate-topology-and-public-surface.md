@@ -133,3 +133,12 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 - `build.rs` reads `Cargo.lock` to hash the resolved versions of `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard`. After a workspace split, the lock file is at the workspace root. Decide how `build.rs` finds it.
 - The `check:boundaries` mise task confines `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. It confines `redb` and `postcard` to `src/index/`. It is provisional. Replace it with crate boundaries if this ticket splits the crates.
 - Remove `META_VERSION` and `META_VERSION_KEY` from `src/index/store.rs`. The store identity replaces them.
+
+## Inputs from the note document and index read model decisions
+
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+
+- Decide the visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the buffer parser.
+- Decide where `NoteDoc` lives. Ticket 23 keeps `Note` as the facts type.
+- Decide the visibility of the index and the store port. No engine type crosses the port.
+- Ticket 24 asks for a domain-level store port with an adapter boundary.

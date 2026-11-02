@@ -11,7 +11,7 @@ Measure the recovery journal. Ticket
 stand?](./25-index-freshness-and-invalidation.md) is resolved. It no longer
 waits for this measurement. This task decides whether to add a journal later.
 
-Use the decided facet layout and writer base checks.
+Use the decided facet layout and the writer base check of ticket 24.
 See [What is the index read model, and is there one query execution path or
 two?](./24-index-read-model-and-query-execution.md).
 Use a throwaway prototype if that layout has not landed.
@@ -61,4 +61,5 @@ write cost. Do not assume that failures are common.
 
 Remove the throwaway prototype after the measurements.
 Do not choose a journal in this task.
-Return the measured trade-offs to the maintainer and record them in ticket 25.
+Return the measured trade-offs to the maintainer. Record them in this ticket
+and link them from ticket 25.
