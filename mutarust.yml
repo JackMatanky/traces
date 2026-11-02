@@ -5,47 +5,78 @@
 # -----------------------------------------------------------------------------
 
 ---
-# Reports land in CWD (all gitignored): report.json (triage) and
-# mutarust-report.html (human). mutarust-agentic.json comes from the task's
-# --logger-agentic-json. NOTE: report.json is clobbered by every run,
-# including --dry-run — read stats immediately after a scored run.
+# The json_output key writes report.json, and the html_output key writes
+# mutarust-report.html. mutarust writes both files to the directory where the
+# run starts. Both files are in .gitignore, so do not commit them. report.json
+# holds results for tools, and mutarust-report.html shows the same results for
+# people. Every run overwrites report.json, and a dry run is no exception. A dry
+# run counts the mutants without running the tests. The only run that writes no
+# reports is --update-baseline. Check report.json right after each run.
 json_output: true
 html_output: true
+
+# The silent_mode key hides the status line of each mutant. The test:mutants
+# task passes --no-silent, so runs through that task ignore this setting.
 silent_mode: false
 
-# Port of .cargo/mutants.toml exclude_globs "src/cli/**" (path prefix).
-# Accepted gaps (no file-level exclude exists): src/main.rs and the 8 non-cli
-# src/**/error.rs files ARE mutated, and exclude_re has no port, so impl-body
-# mutants appear that cargo-mutants skipped (noisier than the old baseline).
-# Absorbed by the committed baseline; revisit with `// mutator-disable-func`
-# annotations only if escape noise demands it.
+# exclude_dirs lists path prefixes. mutarust does not mutate files that live
+# under a listed prefix. The prefix src/cli comes from the exclude list of the
+# old cargo-mutants tool, which this repository retired. This replacement has
+# gaps. mutarust cannot exclude a single file and has no exclude_re patterns, so
+# src/main.rs and the non-cli src/**/error.rs files receive mutants. The bodies
+# of trait implementations also receive mutants. The old tool skipped those
+# bodies with exclude_re patterns. As a result, mutarust produces more mutants
+# than the old tool did.
+#
+# An escaped mutant is a mutant that the tests do not detect.
+# mutarust-baseline.json in the repository root lists the escaped mutants that
+# this repository accepts. With --fail-on-escaped, mutarust exits with code 4
+# only on escapes that the baseline does not list. Add a `//
+# mutator-disable-func` comment in the source code only when the accepted list
+# grows too large.
 exclude_dirs:
   - src/cli
 
-# Zero-yield operator group for this repo (no tokio-style select! sites in
-# src/; see quality_gates_mutarust.md §9.17) — drops mutants that only burn
-# build time.
+# disable_mutators switches off mutator groups. The group select/* changes only
+# tokio-style select! code. This repository has no select! code in src/, so the
+# group produces no mutants. Keep the entry in place. If select! code appears in
+# the future, the group stays switched off and saves build time.
 disable_mutators:
   - "select/*"
 
-# Do NOT enable without a --dry-run A/B: this repo gates many items with
-# #[cfg(any(test, feature = "test-utils"))] and the docs never classify
-# `any(test, …)` (§9.3) — enabling could suppress active test-support
-# mutants.
+# skip_without_test and skip_with_cfg decide which mutants mutarust skips. Keep
+# both keys false. skip_without_test: true excludes production files that have
+# no #[cfg(test)] unit tests. skip_with_cfg: true excludes mutations inside
+# production items with a non-test #[cfg(...)] attribute. mutarust reads only
+# #[cfg(test)] as test code. This repository uses #[cfg(any(test, feature =
+# "test-utils"))] on many production items, and mutarust reads that attribute as
+# non-test code. With skip_with_cfg: true, those items lose their mutants.
+# Change a key only after a trial run that compares the mutant count with the
+# key on and off.
 skip_without_test: false
 skip_with_cfg: false
 
-# Score gate: declined as a gate (ticket 12). Do not enable min_msi without
-# a new recorded decision. Measurement stays optional; the full-project run
-# stays deferred under the no-multi-hour-runs constraint.
-# min_msi unit: integer percent 0-100 (config.md; cli.md `--min-msi PERCENT`).
-# The ci.md companion 75 is min_covered_msi, which we do NOT set: without
-# --coverage a positive min_covered_msi exits 4.
-# Historical scoped measurement (evidence, not a target): MSI =
-#   0.8333333333333334 on strsim, 2026-09-28.
+# This repository does not use a score gate. Do not add min_msi until a
+# new decision is written down.
+#
+# min_msi sets a minimum mutation score from 0 to 100. The mutation score is the
+# share of mutants that the tests detect. A score below min_msi makes mutarust
+# exit with code 4.
+#
+# Do not add min_covered_msi. A min_covered_msi of 1 or more without the
+# --coverage flag makes mutarust exit with code 4. A full-project run can take
+# hours, so this repository measures small parts of the codebase at a time. On
+# 2026-09-28, a run over the strsim module measured a mutation score of
+# 0.8333333333333334 as a ratio from 0 to 1. That number is evidence, not a
+# goal.
+#
 # min_msi: 60
 
-# Empty allowlist = all mutators enabled (config.md: "An empty mutator
-# list, or `*`, means all mutators"), minus disable_mutators above.
+# enable_mutators lists the mutator groups to switch on. An empty list or `*`
+# switches on every group. The disable_mutators entry above switches its group
+# off again.
 enable_mutators: []
+# ignore_source_lines lists regular expressions. mutarust does not create a
+# mutant when the mutant touches a line that matches an expression. The list is
+# empty, so no line matches.
 ignore_source_lines: []
