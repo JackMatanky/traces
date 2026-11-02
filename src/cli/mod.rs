@@ -51,8 +51,10 @@ use crate::{
 /// Top-level result of a successful CLI command.
 ///
 /// Returned by [`run`] to distinguish normal completion from deliberate user
-/// cancellation or interruption. The process exit code is `0` for both
-/// variants; callers that need different behavior can match on the variant.
+/// cancellation or interruption. The process exit code is `0` for `Completed`
+/// and for `Aborted(UserAbort::Cancelled)`; `Aborted(UserAbort::Interrupted)`
+/// exits with `130`. Callers that need different behavior can match on the
+/// variant.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum CommandOutcome {
     /// The command completed its work without interruption.

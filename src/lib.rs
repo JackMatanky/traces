@@ -178,7 +178,7 @@ pub use temporal::{
 pub mod testing {
     //! Test-only exports for integration tests and benchmarks.
     //!
-    //! The membership of this module is frozen: exactly the 46 identifiers
+    //! The membership of this module is frozen: exactly the 47 identifiers
     //! required by external test targets under the `test-utils` feature.
 
     pub use crate::{
