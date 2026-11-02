@@ -107,4 +107,4 @@ lines unchecked). RULES.md and DICTIONARY.md unchanged; parity tests still hold.
 - End-to-end RED/GREEN: a real `src/` file renders comment-only findings with
   correct coordinates; garbage findings from direct-code checking disappear.
 - Fix positive and negative controls as above.
-- Unknown file extensions fall back to Markdown mode; stdin-without-language returns 2.
+- Unknown file extensions fall back to Markdown mode; --language on a file or with --compare, and invalid language names, return 2.
