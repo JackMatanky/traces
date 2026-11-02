@@ -196,14 +196,6 @@ def test_rust_raw_string_with_five_hashes_is_delimiter_extensible() -> None:
     assert "comment: utilize it" in masked
 
 
-def test_rust_raw_string_with_even_inner_quotes_is_delimiter_extensible() -> None:
-    code = 'let s = r#####"a"b"#####;\n// comment: utilize it\n'
-    masked = mask(code)
-    layout_of(code, masked)
-    assert "comment: utilize it" in masked
-    assert '"a"b"' not in masked
-
-
 def test_rust_raw_string_odd_quotes_blanks_only_raw_string() -> None:
     code = 'let s = r#####"a"b"#####;\n// comment: utilize it\n'
     masked = mask(code)
