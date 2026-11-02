@@ -24,11 +24,17 @@ Standing checks added by re-verification (main @ `207cc3fb`):
 1. Re-run the drift check before reconciling:
    `git diff 207cc3fb..main -- src tests docs` and any divergence from
    `reverification.md`.
-2. Confirm the freshness decision (ticket 25) ratified the landed fingerprint
-   design. Confirm the config-lifecycle decision (ticket 22) accounted for the
-   residual digest surface.
+2. Confirm that the freshness decision (ticket 25) replaced the landed
+   fingerprint design with a store identity. Confirm that the config-lifecycle
+   decision (ticket 22) accounted for the residual digest surface.
 3. State in the specification which existing ADRs it supersedes, including
-   ADR-0009 (implemented, still `proposed`).
+   ADR-0009 (implemented, still `proposed`) and the stale glossary entry
+   "Index Fingerprint".
+4. Collect the "Code delta" section of each resolved ticket. Order the deltas
+   by dependency. This order is the refactor sequence. Report every
+   ticket-to-ticket conflict that you find. Do not report a ticket-to-code
+   gap as a conflict.
+
 Output: the list of specification-ready decisions with their dependency order
 and the explicit non-decisions.
 

@@ -75,7 +75,7 @@ from that table is a regression.
 | --- | --- | --- |
 | Vault-format parsing (frontmatter, `Key:: Value` inline fields, wikilinks, tasks, tags) | **Frozen** | Same files parse to the same meaning |
 | Dataview / Templater semantic parity | **Free** | Historical influence only |
-| Index result equivalence with a fresh parse of files and config | **Frozen** | |
+| Index result equivalence with a fresh parse, for a source whose size, mtime and (on Unix) ctime changed, outside the racy window; `traces index --verify` checks the rest ([ticket 25](./25-index-freshness-and-invalidation.md)) | **Frozen** | A same-size edit with a restored mtime stays stale. The canary `tests/e2e/index.rs:129-180` pins this. Record the Windows ctime gap in the change table |
 | `index.redb` layout, versioning, refresh and drift strategy, heal-on-next-query | **Free** | `207cc3fb` already wiped stores once |
 | Exit codes 0/1/2/130; stdout = payload only, stderr = diagnostics, mutating commands print nothing to stdout | **Frozen** | |
 | Stdout payload shapes: `list` as `- <path>` lines, `table` as Markdown tables, `task` as checkbox lines with the original status char | **Frozen** | Header naming inside them is Migratable; a new `--format` option is an addition |

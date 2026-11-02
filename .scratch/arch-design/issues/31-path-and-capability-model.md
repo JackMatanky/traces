@@ -25,8 +25,9 @@ Alternatives: capability `ProjectRoot` handle; newtype propagation;
 boundary-only validation with a single audited fs facade; keep as is. Include
 Windows reality from `research/09`.
 
-Inputs: `research/09`, compat envelope (cache portability irrelevant if the
-cache is disposable).
+Inputs: `research/09`, compat envelope. Cache portability is irrelevant if the
+cache is disposable. Until this ticket gives one portable path form, ticket 25
+binds the store to a platform family.
 
 ## Inputs from the schema typing decision
 

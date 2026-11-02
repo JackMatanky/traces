@@ -519,3 +519,32 @@ Findings logged for other tickets, not adopted here:
   decides whether to shrink it.
 - Ticket 38: a reviewer calls it dead weight. It no longer gates this ticket.
   The maintainer asked for it.
+
+## Code delta
+
+The code does not implement this ticket. This table lists what the refactor changes. Locations are the working tree on 2026-10-30.
+
+| Area | Today | Target | Depends on |
+| --- | --- | --- | --- |
+| Format marker | `META_VERSION = b"1"` and `META_VERSION_KEY` (`src/index/store.rs:39-41`). A mismatch makes `open` clear the store | Remove both. `META` holds the engine tag, platform family, format epoch, extractor fingerprint, policy fingerprint and written-by version | Ticket 24 `meta` table |
+| Store open | `create_db` deletes the file before `rebuild_needed` decides (`src/index/store.rs:903-931`). `rebuild_needed` compares one version value (`src/index/store.rs:936-988`) | Reads never delete. Only a writer that decided to rebuild deletes. Lower epoch, other platform, other fingerprint, damaged `META` or undecodable rows: rebuild. Higher epoch: read miss with one stderr notice, exit 0 | Ticket 24 |
+| Policy fingerprint | `IndexFingerprint` built from `ConfigDigests` (`src/index/fingerprint.rs`, `src/config/model/digest.rs`) | `IndexPolicy::fingerprint()`. Delete `ConfigDigests` | Ticket 22 |
+| Refresh report | `RefreshReport::ConfigDrift` and `DriftCause` (`src/index/refresh.rs:44`, `src/index/service.rs:177,294,315`) | Rename. Add identity causes: engine, platform, epoch, extractor, damaged `META`. Rebuild heals stay quiet | Ticket 33 |
+| Extractor fingerprint | None | New `build.rs` reads resolved versions of `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard` from `Cargo.lock`. New probe builder and embedded corpus in `src/index/`, computed once on first open | Tickets 19, 29 for the civil datetime |
+| Identity file | None | A committed identity file. A test fails on drift. New task `mise run index:bless` rewrites it and adds 1 to the epoch | None |
+| Boundary check | `check:layers` only (`mise.toml:148`) | New `check:boundaries` task. Use `git grep`. Confine `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. Confine `redb` and `postcard` to `src/index/` | Ticket 34 may replace it |
+| Cache file name | `.traces/index.redb` (`src/index/mod.rs:48`) | The name carries the engine tag | Ticket 24 |
+| Source scan | `scan` compares `path != index_db` (`src/index/service.rs:424-435`) | Remove the dead check. A test shows that nothing under `.traces/` enters the scan | None |
+| Change detection | `FileDelta::compute` compares `FileMeta` (`src/index/delta.rs:21`). The landed canary pins stale output for a restored mtime (`tests/e2e/index.rs:129-180`) | Add a `racy` bit per file row. Set it when `mtime >= scan_start - 2 s`. Add `ctime` on Unix. Read each changed file from one handle with a stat before and after. Retry the scan once on `NotFound` | Ticket 24 file rows |
+| Verify command | None | New `traces index --verify` hashes every file | Ticket 33 for the exit codes |
+| Host store use | A held store fails a read with exit 1 | A read falls back to a fresh parse with one stderr notice and exit 0. A host holds the store only during refresh and persist | Tickets 27, 32 |
+| Commit recovery | No `commit_nonce` and no unwritable latch exist in `src/index/`. The research brief (C5, C6) says they were proposed and drops them | Do not add them. After an uncertain commit, drop the handle and the plan. Try the write-open at each persist | Ticket 24 |
+| Replacement failure | The store open and replacement path is `create_db` (`src/index/store.rs:903`) | A failed store replacement is a cache miss for reads | None |
+| ADR and glossary | ADR-0009 `proposed`. The glossary "Index Fingerprint" entry is stale | Replace both when the code lands | Ticket 35 |
+| Ticket 16 table | Row 78 holds the corrected contract | Add the change-table rows listed above to the redesign spec | Ticket 35 |
+
+Not in code:
+
+- The staleness bound (tickets 27 and 32).
+- The release process and the `--locked` install rule (ticket 38).
+- The journal decision (ticket 26).

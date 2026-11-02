@@ -439,3 +439,35 @@ Alternatives considered, with the reason to reject each:
   the tag filters stay in the parser input. The final place of `TaskStatus*` and
   `TaskListItem` and the final field set of the parser input stay unresolved
   (see above).
+
+## Code delta
+
+The code does not implement this ticket. This table lists what the refactor changes. Locations are the working tree on 2026-11-02.
+
+| Area | Today (path:line) | Target (ticket decision) | Depends on |
+| --- | --- | --- | --- |
+| Document representation | `Note` in `src/note/model.rs:24-33` stores parsed facts without byte spans. No document type exists | Keep `Note` as the facts type. Add `NoteDoc` with flat range vectors and a line index. The index never stores `NoteDoc` | Ticket 34 |
+| Document builder | No `NoteDoc` scanner exists. `parse_markdown` in `src/note/parser.rs:106` builds `Note` | Add `NoteDoc::scan(src, settings)`. Add `parse_with_doc` for an open buffer. Put shared rules in a new rules module | Ticket 27 |
+| Link occurrence type | `Link` in `src/note/links.rs:28-34` is the only link type | Keep `Link` for stored facts. Add `NoteLink` for document occurrences with byte ranges | Ticket 18, Ticket 34 |
+| Heading parsing | Two Markdown passes run for every note in `src/note/parser.rs:108-114,118-122` | Collect heading text in pass 1. Run the math pass only when a heading source range holds `$` | None |
+| Heading slugs | Heading slugs are not stored or derived in `src/note/model.rs:29` or `src/note/parser.rs:118-162` | Derive slugs on demand from heading text. Deduplicate identical slugs with numeric suffixes | None |
+| Task item payload | `TaskStatus` in `src/task.rs:51-55` holds an owned `name: String`. `TaskListItem` in `src/note/lists.rs:348-352` stores `TaskStatus` | Store only status symbol and status kind in the item. Resolve status names from the status map | Ticket 22 |
+| Multi-value inline fields | `Note::get` in `src/note/model.rs:164-173` returns `.first()` of inline field values | Multi-valued inline fields yield a list value. Single values yield a scalar. Classify each element at parse time | Ticket 19, Ticket 28 |
+| Effective field accessor | `QueryResultRow` in `src/query/results.rs:313-326` merges frontmatter and inline fields | `Note` owns the effective field accessor. Frontmatter fields take precedence over inline fields | Ticket 36 |
+| External links | `ParserContext::end_link` in `src/note/parser.rs:430-441` pushes all URLs into `outlinks` | Exclude external URLs from stored `Note::outlinks` | Ticket 30 |
+| Parser diagnostics | `parse_markdown` in `src/note/parser.rs:106` returns only `Note` and logs warnings via `tracing` | `parse_markdown` returns notices beside `Note`. `NaN` values become `Null` with a notice | Ticket 19, Ticket 33 |
+| Section extents | `Heading` in `src/note/model.rs` holds level, text and start line only | Compute section extents from heading lines for token budgets and body checks | Ticket 37 |
+| Parser settings lifecycle | `MarkdownParserInput` in `src/note/parser/input.rs:25-34` borrows configuration | Borrows settings for one call. A long-lived host stores settings in an `Arc` | Ticket 22, Ticket 32 |
+
+Not in code:
+
+- Footnotes and callouts remain glossary terms for `NoteDoc` and stay out of the index.
+- The status map stays in the parser input to resolve status kinds and completeness.
+- The stored note format epoch bumps when stored note facts change (ticket 25).
+- The schema checker remains span-blind and validates only frontmatter fields (ticket 20).
+
+Unclear in the ticket:
+
+- "Decide between a boxed and an unboxed task payload with a measured size and allocation count".
+- "The final place of `TaskStatus*` and `TaskListItem`. The grilling did not settle it".
+- "The final field set of the parser input, and the `IndexPolicy` keys for each index-time read. The grilling did not list them".

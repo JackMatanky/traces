@@ -22,6 +22,11 @@ not implement the redesign. It ends at hand-off to specification.
   markdown vaults. Read `GLOSSARY-MAP.md` and the per-module `GLOSSARY.md` for
   vocabulary. Existing ADRs are in `docs/adr/` and are fallible context
   (ADR-0009 appears twice).
+- Code and tickets disagree by design. The tickets describe the target. The
+  code is not yet refactored. Each resolved ticket ends with a "Code delta"
+  section that lists the change. Ticket 35 orders those deltas. `path:line`
+  citations in tickets refer to the working tree near `cb15b21c`. Ticket-to-ticket
+  conflicts are defects. Ticket-to-code gaps are not.
 - Ticket renumbering (2026-10-30): the journal measurement and the live-buffer
   ticket moved next to the index tickets. The `research/*-prep/` files and git
   history use the old numbers. The old-to-new map follows.

@@ -361,6 +361,7 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   12 ms, versus 54-55 ms for all list items. Neither run built query rows.
   Confirm the choice on assembled rows, task-heavy input and one-note
   replacement before fixing the layout.
+- A host publishes an immutable generation of shared entries. A refresh
   replaces entries if their note, file metadata or inlinks change. Each
   request pins one generation. A row owns its matching `Arc<FileEntry>`, not
   the whole index. The cold CLI builds entries only for survivors. Ticket 28
@@ -703,3 +704,38 @@ admission), 33 (notice display), 34 (visibility), 27 (buffer overlay), and
 
 Fog: keep `CandidateTrie` and `indextree`. Split the store engine from the
 repository at the domain port. Class axes stay frontmatter-only.
+
+## Code delta
+
+The code does not implement this ticket. This table lists what the refactor changes. Locations are the working tree on 2026-11-02.
+
+| Area | Today (path:line) | Target (ticket decision) | Depends on |
+| --- | --- | --- | --- |
+| Store abstraction port | Concrete `IndexStore` in `src/index/store.rs:145` and `src/query/service.rs:125` | Domain-level store port with an adapter boundary; no engine type crosses the boundary | Ticket 34 |
+| Persisted facet tables | Single serialized `notes` and `files` tables in `src/index/tables.rs:21,30` | Eleven stored facets: `files`, `fields`, `tags`, `classes`, `headings`, `outlinks`, `links`, `tasks`, `lists`, `notices`, `meta` | Ticket 23, Ticket 25 |
+| Redb secondary tables | Four multimap tables `PATHS_BY_TAG`, `PATHS_BY_FILE_CLASS`, `TAGS_BY_PATH`, `FILE_CLASSES_BY_PATH` in `src/index/tables.rs:43-70` | Remove the four multimap tables; query execution uses facet scans and proved range-key lookups | Ticket 28 |
+| Query execution paths | Dual path: memory scan in `src/query/service.rs:98` and `run_from_store` in `src/query/service.rs:123` | Single execution plan for CLI and hosts; CLI reads store candidates and hosts read a pinned generation | Ticket 28 |
+| Source resolution | `SourceResolver` in `src/query/service.rs:316-406` does full-store scans for `All`, `Not`, and empty expressions | Remove `SourceResolver`; enumerate `files` paths and narrow with safe predicates | Ticket 28 |
+| Query row borrow model | `QueryRow` borrows whole `Arc<WorkspaceIndex>` in `src/query/results.rs:38` | Row owns matching `Arc<FileEntry>` rather than the entire index | Ticket 28 |
+| Totality of WorkspaceIndex | `WorkspaceIndex::assemble` in `src/index/entry.rs:39` builds partial index for `run_from_store` in `src/query/service.rs:156` | `WorkspaceIndex` stays total and sorted; cold CLI constructs `FileEntry` rows directly | Ticket 28 |
+| Release path-order check | Debug-only assertion in `SortedByPath::assumed_sorted` in `src/index/sort.rs:48-54` | Check path order in release builds at index build and store load boundaries | None |
+| Store transaction pinning | `read_batch` and `read_files_and_fingerprint` open separate read transactions in `src/index/store.rs:550,1004` | Pin one read transaction across candidate selection, facet reads, and fingerprint verification | Ticket 25 |
+| Cache failure handling | `refresh` logs an alert in `src/index/mod.rs:62`; `refresh_store` returns `IndexError::Store` in `src/index/service.rs:285` | Unified cache miss: fallback to fresh parse and print one stderr notice; exit 0 on success | Ticket 16, Ticket 33 |
+| Store lock lifecycle | `IndexStore::open` holds open database in `src/index/service.rs:338,407` | Host opens store only to commit write batches; reads come from pinned generation | Ticket 27, Ticket 32 |
+| Base generation check | `RefreshPlan::collect` reads fingerprint before scan without writer verification in `src/index/refresh.rs:336-354` | Transactional check compares base identity, revision, and fingerprint before committing delta | Ticket 25 |
+| Corrupted row policy | `read_batch` skips corrupt rows in `src/index/store.rs:1018-1026` | Corrupted or missing required facet triggers a complete cache miss rather than partial results | Ticket 25 |
+| Inbound links persistence | `read_all_links` reads `LINKS` table in `src/index/store.rs:588` | Persist inbound links graph in `links` facet; refresh updates edges atomically | Ticket 25 |
+| FileMeta day field | `FileMeta.day` derives timezone-dependent day in `src/file.rs:52,88-98` | Remove persisted `day` field; derive filename period at query time | Ticket 21 |
+| Benchmark candidate scale | `SAME_STEM_CANDIDATE_COUNTS` caps at 128 in `benches/index_inlinks.rs:60` | Extend `index_inlinks` benchmark to 5,000 same-stem candidates to monitor trie scale | None |
+
+Not in code:
+
+- Conformance test suite verifying that every store adapter matches fresh-parse rows.
+- Measurement of generic scalar field and task range-key encoding performance on real vaults.
+- Measurement of full row materialization against facet scans on large vaults.
+- Linux and Windows file lock validation for host-CLI concurrency.
+
+Unclear in the ticket:
+
+- "The precise range-key encoding and measured write and read costs".
+- "Confirm the choice on assembled rows, task-heavy input and one-note replacement before fixing the layout".
