@@ -49,6 +49,7 @@ tarpaulin-report.html
 .rumdl_cache/
 __pycache__/
 .pytest_cache/
+.ryl_cache/
 
 # --------------------- Gitingest Digests --------------------- #
 *digest.txt
