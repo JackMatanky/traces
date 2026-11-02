@@ -182,10 +182,15 @@ The session checked these on 2026-11-02.
 | Two e2e tests carry `#[ignore]` and run only from a parent test. | `tests/e2e/env_policy.rs` lines 148 and 204 | A plain run skips them. An inventory diff needs `--run-ignored` or a rule for them. |
 | The repository has no `proptest-regressions/` directory. | glob, no match | The seed-orphan risk is zero today. Check again when a proptest fails and persists a seed. |
 | `mise run test:mutants` offers `-m`, `-f`, `--git-diff`, `--per-test`, `--update-baseline`, `--fail-on-escaped`. | `.mise/tasks/test/mutants` | Module scope is available. |
+| `mutarust.yml` sets `exclude_dirs: src/cli`. The file `mutarust-baseline.json` is tracked. | `mutarust.yml`; `git ls-files` | Mutation never mutates the CLI layer. A mutation proof is blind there. `--fail-on-escaped` compares with the tracked file, not with a run before the change. |
+| Nextest 0.9.150 offers `--stress-count` and `--run-ignored all`. | `cargo nextest run --help` | A repeat run can replace a calendar dual-run window. An inventory can include ignored tests. |
 
 ## 4. Input to each decision of ticket 13
 
-These rows are inputs. Ticket 13 is a grilling ticket. The user decides.
+These rows are inputs. Ticket 13 is a grilling ticket. The user decides. Where a
+row differs from the Answer of ticket 13, the Answer wins. The Answer replaced
+the dual-run window with a stress run. It added a kill demonstration, because
+the mutation proof is blind in `src/cli`.
 
 | Decision | What the evidence supports | Open choice for the user |
 |---|---|---|

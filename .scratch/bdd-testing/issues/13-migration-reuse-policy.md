@@ -1,7 +1,7 @@
 # 13: Migration and reuse policy
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 07, 08, 10, 11, 12
 
 ## Question
@@ -185,3 +185,176 @@ HITL, grilling. Do not answer for the user.
 - The action and owner for each move, strengthen and condemned class.
 - The decisions on headers, the mtime canary, the sort-test rename and the
   yaml.rs pins.
+
+## Answer
+
+Resolved in a grilling session on 2026-11-02. Evidence:
+[research/13](../research/13-migration-evidence.md) and
+[the candidate table](../research/13-candidate-table.md). The user confirmed
+each rule below. Arch-design owns every later test update that its own changes
+cause. This map carries no arch bookkeeping beyond the successor note in the
+ledger.
+
+### Convert rule (a)
+
+- Only e2e Rust tests convert. Integration and unit tests never convert here.
+  A scenario spawns the process (ticket 07). Ticket 07 also allows a facade
+  seam when a frozen baseline holds the symbol. This ticket does not use that
+  exception. A later slice needs a new decision to use it.
+- An e2e test converts only when all of these hold:
+  - A slice owns a research/10 row that the test covers.
+  - The six conditions of ticket 07 hold.
+  - The scenario fits one principal `When` and 3 to 5 steps.
+  - The scenario asserts codes, never miette text.
+  - The scenario proves all guarantees of the old test.
+- A `needs-split` test becomes several key-example scenarios. It never becomes
+  an outline.
+- The 27 candidates: [the candidate table](../research/13-candidate-table.md)
+  gives an eligibility list, not a decision. It shows 22 `convert-eligible`, 3
+  `needs-split`, 1 `keep` (the workflow chain below) and 1 `blocked-by-seam`
+  (`FileClassExpander`). The table is a
+  static agent judgment, so the verdicts are an upper bound. Its condition
+  checks are not proof. The slice author re-verifies conditions 3 to 6 before a
+  conversion.
+- `workflow.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`
+  (9 rows) stays as the one Rust composition smoke test. No single scenario
+  proves the state that its seven commands carry.
+
+### Keep rule (b)
+
+- These tests stay, and migration never deletes them:
+  - exception-class tests (ticket 07)
+  - tests that a proptest law owns
+  - unit tests for internal behavior
+  - the two `#[ignore]` child tests in `tests/e2e/env_policy.rs`
+  - the H1 TTY tests
+- The H1 tests never count as proof of the interactive branch. CI has no TTY, so
+  they run there. A change to them needs a production seam, so it is outside
+  migration.
+
+### Die rule and proof (c)
+
+- A same-layer twin moves. A scenario and an e2e Rust test use the same
+  `Sandbox` helpers, so they are not independent streams. Two copies double the
+  edit surface for arch-design. The Rust test dies after the proof below.
+- A cross-layer pin is never deleted only because a scenario exists. Ticket 07,
+  condition 4, stands.
+- A test with several rows dies only when every row has a survivor. Each
+  assertion that the survivor does not cover is covered elsewhere, or the
+  ledger records it as incidental and retired, with a reason.
+- Every deletion needs all of these:
+  - **Assertion comparison.** The survivor asserts the same exit code, the same
+    exact stdout and the same exact stderr, empty ones included. A `contains`
+    step never replaces an equality assertion.
+  - **Kill demonstration.** Break the production code that the old test guards.
+    Use the "defect caught" sentence of the ledger row. Run the break on the
+    first commit, before the deletion. The old test and the survivor both fail.
+    The ledger records the break in one line. This works in
+    `src/cli`, which `mutarust.yml` excludes from mutation. The author picks
+    the break, so the reviewer re-checks it.
+  - **Mutation baseline compare**, only when the guarded code is outside
+    `src/cli`. The module must pass `--fail-on-escaped` on the base commit
+    first. Scope the run with `-m` or `-f`. Never use `--git-diff` or
+    `--per-test` for the proof. A new escape means a lost guarantee.
+  - **Twin re-read.** The session reads the twin test again. An audit "twin"
+    claim is a lead only.
+  - **Ledger row.** See decision (d).
+  - **Review.** Review checks that the change records each item. CI has no
+    mutation job.
+- The same proof applies to duplicates, weak tests, misplaced tests and
+  condemned tests. It names the surviving twin test.
+- Reason: in one study, 20 percent of deletions of "redundant" tests lost
+  coverage or mutation score (research/13, Bhatta et al.).
+
+### Coverage preservation (d)
+
+- **Ledger home:** `.scratch/bdd-testing/ledger.md`. It is append-only, with
+  one section per slice. Update it in the same change as the deletion.
+- **Ledger row:** one row per old test. Columns:
+  - the research/10 namespaced row IDs of the test
+  - the behavior
+  - the former test (`binary-id::path`)
+  - the former layer
+  - the defect caught, as one plain sentence with no taxonomy
+  - the survivor test or scenario title
+  - the proof (the kill break, the mutation result)
+  - a successor note for arch-design
+- A row records no commit SHA. A recovery uses `git log -S '<test name>'`.
+- A converted guarantee re-earns "covered" at the deletion step (ticket 12).
+  Update each `pinned-elsewhere` pointer in the same change.
+- **Step order:** one slice PR with two commits. The first commit adds the
+  scenario. The second deletes the old test. The proof is
+  `cargo nextest run --stress-count 100` on the scenario, and a green
+  three-OS run on the PR head. The count is an unsourced heuristic. A flaky
+  scenario fails CI loudly, so the risk is noise, not silent loss.
+- **Inventory:** each PR records the name diff of
+  `cargo nextest list --all-features --run-ignored all`, before and after.
+  Each removed name needs a ledger row. Doctests are outside this check.
+- A guarantee check never counts tests. Ticket 12 anti-metrics bind. A
+  ratchet on the count of unmigrated tests is banned.
+
+### Scope and preconditions (e)
+
+- Scope is per slice. A slice owns the research/10 rows it names. Only tests
+  that cover those rows convert or die. The other candidates stay as they are.
+  Editing a file does not make its tests eligible.
+- Two preconditions for any deletion:
+  - Slice 1 gets one green three-OS run of the e2e placement. The result
+    holds after that.
+  - The `check:layers` exit-code fix has landed.
+- If slice 1 fails on any OS, no deletion happens anywhere until the placement
+  decision (ticket 08) is reopened. Adding scenarios stays allowed.
+- There is no precondition on the state of open arch-design tickets. A ledger
+  row names the successor of a moved or deleted test, so arch tables can find
+  it. Arch tickets 22 and 25 already name e2e tests.
+
+### Move, strengthen and condemned tests (f)
+
+- A test under a slice's rows rides that slice with the proof of decision (c).
+- Duplicates, misplaced tests and weak assertions outside a slice's rows are
+  hygiene work outside this map. The `integration-e2e-suite` or a new issue
+  owns them. They use the same proof and the same ledger. Ticket 14's roadmap
+  names the owner of this backlog.
+- A move out of e2e keeps one e2e smoke test per row. This applies only when
+  the row's assigned class is e2e or scenario and no other e2e or scenario
+  test pins it. A move drops macOS and Windows runs.
+- The condemned `FileClassExpander` test stays. Arch-design updates it.
+
+### Headers, canary, sort tests and yaml.rs (g)
+
+- Existing `//! Proves` and `Defect class:` headers stay as they are. There is
+  no mass edit and there are no new tag values. A deleted test takes its header
+  with it. Scenarios get none (ticket 11).
+- The mtime canary `same_size_mtime_restored_edit_reads_the_store_not_a_rebuild`
+  stays in Rust. Relabel its header as a known limitation. The header says
+  that arch-design ticket 25 owns the change. Never convert it.
+- The two sort tests named `..._ascending_by_default` get a name that says
+  "explicit ascending". The ledger records a rename with no coverage change.
+  Gap 02-G6 stays a gap. The slice that covers the flags half closes it.
+- The four yaml.rs claims: ticket 14's roadmap lists one non-scenario
+  unit-test item. The first step verifies each claim against the code. If the
+  code disagrees with the doc comment, code wins (ticket 12, decision f).
+
+### Constraints for ticket 14
+
+- Slice 1 carries: the three-OS check, the `check:layers` fix, the first
+  ledger file and a probe of `mutarust` behavior on a test-only diff.
+- The sixth gate check of ticket 12 also verifies that each ledger survivor
+  exists.
+- The step vocabulary needs exact-equality steps for stdout and stderr, empty
+  ones included. Slice 1 checks docstring comparison on Windows. Add
+  `*.feature text eol=lf` to `.gitattributes` if CRLF appears. The repository
+  has no `.gitattributes` today.
+- The roadmap lists the hygiene backlog with an owner and the yaml.rs unit item.
+- The roadmap lists each test that an arch ticket names and a slice could move.
+
+### Open and unverified
+
+- Whether `mutarust --git-diff` ignores a test-only diff is `[INFERENCE]`.
+  The proof never uses `--git-diff`, so the answer does not block.
+- The Linux and Windows result for the e2e placement stays unverified until
+  slice 1.
+- The kill demonstration is manual and costs time for each deletion.
+- The 100-run stress count is an arithmetic heuristic, not a source.
+- The candidate table is a static agent judgment. Its condition checks are
+  not proof.

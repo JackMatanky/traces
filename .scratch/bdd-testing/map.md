@@ -160,6 +160,17 @@ fresh session can start slice 1 with zero open design questions.
   - Ten contradiction dispositions recorded; ADR-0002/0008 corrected.
 
   Findings: [research/12](research/12-coverage-gap-methodology.md).
+- [13: Migration and reuse policy](issues/13-migration-reuse-policy.md):
+  migration is per slice, on research/10 rows. Only e2e tests convert.
+  - A same-layer twin moves; cross-layer pins stay.
+  - Every deletion needs a kill demonstration, an exact-assertion comparison and
+    a ledger row. A mutation compare adds a second net outside `src/cli`.
+  - Ledger: `.scratch/bdd-testing/ledger.md`.
+  - Preconditions: one green three-OS run in slice 1 and the `check:layers` fix.
+  - Arch-design owns later test updates.
+
+  Findings: [research/13](research/13-migration-evidence.md),
+  [candidate table](research/13-candidate-table.md).
 
 ## Not yet specified
 
