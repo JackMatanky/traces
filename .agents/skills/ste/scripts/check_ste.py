@@ -1480,6 +1480,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         rules, dictionary = load_config(args.rules, args.dictionary)
         if args.command == "check":
             only, ignore = parse_ids(args.only), parse_ids(args.ignore)
+            if args.language and (args.compare or args.file != "-"):
+                raise ConfigError("--language is only valid with stdin input")
             if args.compare:
                 before_path, after_path = (Path(item) for item in args.compare)
                 findings = compare_facts(
@@ -1490,8 +1492,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 file = str(after_path)
             else:
-                if args.language and args.file != "-":
-                    raise ConfigError("--language is only valid with stdin input")
                 language = args.language or (
                     language_for_suffix(Path(args.file).suffix.lower())
                     if args.file != "-"

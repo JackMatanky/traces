@@ -355,3 +355,28 @@ def test_language_only_with_file_returns_two(
         == 2
     )
     assert "only valid with stdin" in capsys.readouterr().err
+
+
+def test_compare_with_language_is_misuse(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    before, after = tmp_path / "before.md", tmp_path / "after.md"
+    before.write_text("Utilize the tool.\n")
+    after.write_text("Use the tool.\n")
+    assert (
+        check_ste.main(
+            [
+                "check",
+                str(after),
+                "--compare",
+                str(before),
+                str(after),
+                "--language",
+                "rust",
+                "--format",
+                "json",
+            ]
+        )
+        == 2
+    )
+    assert "only valid with stdin" in capsys.readouterr().err
