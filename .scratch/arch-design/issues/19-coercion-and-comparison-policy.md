@@ -264,6 +264,20 @@ The request frame makes environmental failures typed.
 Ordinary bracket mismatches remain nonmatches.
 These refinements override the earlier inclusive `[s, e]` wording and blanket principle that filters never error.
 
+## Refined by the field-value link decision
+
+Frontmatter and inline fields handle every link type: wikilink, Markdown link and embed.
+This ticket's link rules cover only wikilink targets.
+Define the Markdown link case before the specification:
+
+- A Markdown target keeps its extension and may be percent-encoded. A wikilink target does not.
+- Decide whether `[[b]]` and `[b](b.md)` fold to one `ComparisonKey`.
+- Decide how `date(link)` reads a Markdown target.
+- External URLs in a Markdown link are not note targets.
+
+Link equality still ignores `display` and `embedded`.
+The syntax kind is part of the value and renders back, but it does not decide equality.
+
 ## TODOs
 
 Glossary updates deferred until the specification is written.

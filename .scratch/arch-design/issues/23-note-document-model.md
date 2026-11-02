@@ -117,9 +117,10 @@ Do not reopen these decisions.
 
 - Vault-format parsing is Frozen (ticket 16). The parser stays infallible.
 - The Noyalib compat parser stays. The Noyalib CST is rejected for values.
-- `Link` and `NoteLink` are separate types. Ticket 18 says that `Link` holds
-  `target`, `display` and `embedded`. The code also keeps the syntax kind in
-  `Link`. The Answer keeps the kind.
+- `Link` and `NoteLink` are separate types. `Link` is the root value. It holds
+  `target`, `display`, `kind` and `embedded`. `NoteLink` holds a `Link` and
+  the ranges. Frontmatter and inline fields handle every link type, so `kind`
+  varies in a field value.
 - `NoteFieldValue` keeps its 80 B size test.
 - The schema check is span-free (ticket 20). Adapters attach spans.
 - The editor needs no general write-back. A future writer splices spans into the
@@ -171,9 +172,9 @@ second pass, `ListItem` footprint, and footnote, callout and slug modelling).
 ## Inputs from the value model decision
 
 See [ticket 18's Answer](./18-value-model.md). The note type can split into an
-index shape and an editor shape. The root `Link` holds `target`, `display` and
-`embedded`. `NoteLink` holds the syntax kind and the source span. Ticket 18
-calls `NoteLink` the editor-side occurrence type. This ticket defines
+index shape and an editor shape. The root `Link` holds `target`, `display`,
+`kind` and `embedded`. `NoteLink` holds a `Link` and the source ranges. Ticket
+18 calls `NoteLink` the editor-side occurrence type. This ticket defines
 `NoteLink`.
 
 Ticket 18 assumes the split. Topic A has not chosen the split. Decide topic A
@@ -273,7 +274,8 @@ a personal vault. Every 50,000-note number is a linear extrapolation [H].
   buffer. The unsaved-buffer constructor is public (ticket 27).
 - `Link` stays the stored internal-link fact. It holds the target, the display
   text, the embed flag and the syntax kind. `NoteLink` is the document
-  occurrence type. It holds the ranges.
+  occurrence type. It holds a `Link` and the ranges. The index stores `Link`
+  and never stores ranges. `Link` lives at the crate root as shared vocabulary.
 - A stored position never drives an edit. An edit reads the current bytes.
 - `Note` is an assembled view of independent facets: meta (frontmatter, tags and
   rolled-up fields), headings, links and items. No facet needs another facet's
@@ -430,8 +432,8 @@ Alternatives considered, with the reason to reject each:
 
 ### Amendments to resolved tickets
 
-- Ticket 18: add the stored internal-link fact `Link` beside the editor-side
-  `NoteLink`.
+- Ticket 18: one root `Link` holds `target`, `display`, `kind` and `embedded`.
+  `NoteLink` holds a `Link` and the ranges. See ticket 18's revised Link entry.
 - Ticket 19: each element of a multi-value field gets parse-time classification.
 - Ticket 20: replace "the app layer owns any merge" with the note-owned
   effective accessor. Keep the frontmatter-only check.
@@ -448,7 +450,8 @@ The code does not implement this ticket. This table lists what the refactor chan
 | --- | --- | --- | --- |
 | Document representation | `Note` in `src/note/model.rs:24-33` stores parsed facts without byte spans. No document type exists | Keep `Note` as the facts type. Add `NoteDoc` with flat range vectors and a line index. The index never stores `NoteDoc` | Ticket 34 |
 | Document builder | No `NoteDoc` scanner exists. `parse_markdown` in `src/note/parser.rs:106` builds `Note` | Add `NoteDoc::scan(src, settings)`. Add `parse_with_doc` for an open buffer. Put shared rules in a new rules module | Ticket 27 |
-| Link occurrence type | `Link` in `src/note/links.rs:28-34` is the only link type | Keep `Link` for stored facts. Add `NoteLink` for document occurrences with byte ranges | Ticket 18, Ticket 34 |
+| Link occurrence type | `Link` in `src/note/links.rs:28-34` is the only link type. It holds `kind` and `embedded`. It lives in `note` | Move `Link` to the crate root as shared vocabulary. Keep `kind` and `embedded`. Add `NoteLink` in `note`. It holds a `Link` and byte ranges. The index stores `Link` only | Ticket 18, Ticket 34 |
+| Field-value links | Field values recognize wikilinks only (`src/field.rs:769-797`, `src/note/metadata.rs:67-73`) | Frontmatter and inline fields recognize wikilinks, Markdown links and embeds. The recognizer does not use `pulldown-cmark` | Ticket 16, Ticket 19 |
 | Heading parsing | Two Markdown passes run for every note in `src/note/parser.rs:108-114,118-122` | Collect heading text in pass 1. Run the math pass only when a heading source range holds `$` | None |
 | Heading slugs | Heading slugs are not stored or derived in `src/note/model.rs:29` or `src/note/parser.rs:118-162` | Derive slugs on demand from heading text. Deduplicate identical slugs with numeric suffixes | None |
 | Task item payload | `TaskStatus` in `src/task.rs:51-55` holds an owned `name: String`. `TaskListItem` in `src/note/lists.rs:348-352` stores `TaskStatus` | Store only status symbol and status kind in the item. Resolve status names from the status map | Ticket 22 |

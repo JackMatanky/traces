@@ -138,7 +138,7 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
 See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
 
-- Decide the visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the buffer parser.
+- Decide the visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the buffer parser. Ticket 23 puts `Link` at the crate root as shared vocabulary. `NoteLink` stays in `note`.
 - Decide where `NoteDoc` lives. Ticket 23 keeps `Note` as the facts type.
 - Decide the visibility of the index and the store port. No engine type crosses the port.
 - Ticket 24 asks for a domain-level store port with an adapter boundary.

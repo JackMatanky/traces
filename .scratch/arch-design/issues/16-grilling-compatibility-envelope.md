@@ -74,6 +74,7 @@ from that table is a regression.
 | Surface | Tier | Note |
 | --- | --- | --- |
 | Vault-format parsing (frontmatter, `Key:: Value` inline fields, wikilinks, tasks, tags) | **Frozen** | Same files parse to the same meaning |
+| Frontmatter and inline-field links of every type (wikilink, Markdown link, embed) become `Link` values. Today only wikilinks do ([ticket 18](./18-value-model.md)) | **Migratable** | A frontmatter string like `[a](b.md)` changes from `String` to `Link`. Add a change-table row with the migration. A query that compared it as text changes result |
 | Dataview / Templater semantic parity | **Free** | Historical influence only |
 | Index result equivalence with a fresh parse, for a source whose size, mtime and (on Unix) ctime changed, outside the racy window; `traces index --verify` checks the rest ([ticket 25](./25-index-freshness-and-invalidation.md)) | **Frozen** | A same-size edit with a restored mtime stays stale. The canary `tests/e2e/index.rs:129-180` pins this. Record the Windows ctime gap in the change table |
 | `index.redb` layout, versioning, refresh and drift strategy, heal-on-next-query | **Free** | `207cc3fb` already wiped stores once |

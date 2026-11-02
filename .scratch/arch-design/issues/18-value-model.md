@@ -87,11 +87,11 @@ model, query core, template boundary.
   from runtime values. Reuse shared literal variants only where the data has
   identical semantics. Avoid conversion machinery unless actual schema fields
   need it.
-- **Agreed direction — Link split:** use distinct `Link` and `NoteLink` types
-  with fields belonging to each type. The base semantic `Link` carries the
-  destination and optional display text. Occurrence-specific syntax and embed
-  state belong to `NoteLink`. Source spans depend on the note source-retention
-  decision. Equality/order semantics remain open for the comparison decision.
+- **Agreed direction — Link split (revised):** use one root `Link` for the
+  semantic value. It holds the destination, the optional display text, the
+  syntax kind and the embed flag. `NoteLink` holds a `Link` and the source
+  ranges. Ranges stay out of the index. Equality and order semantics remain
+  with the comparison decision.
 - **Schema evidence:** the reviewed [Metadata Menu source
   digest](../../../docs/digests/obsidian_mdelobelle-metadatamenu-src-digest.txt)
   treats field kinds such as Date and File as editing/acceptance behavior with
@@ -372,15 +372,15 @@ capabilities, since the crate has end users and a public surface.
   Computed query fields (`file.size`, `list.line`, `list.depth`, `list.parent`)
   use `Int`. Template number rendering changes from `5.0` to `5` (confirmed
   below).
-- **Link (payload still open):** root-level `Link { target, display:
-  Option<String> }` with `None` when the trimmed, unescaped display is absent,
-  empty or equal to the trimmed, unescaped target. `NoteLink` wraps `Link` with
-  `kind`, `embedded`, and optionally a span. The user wants these
-  distinguishable in queries, and `NoteLink` is also needed for splitting note
-  types. Which type a runtime `FieldValue::Link` carries is open (Open
-  question 1). Equality and order stay with ticket 19. Ticket 23 amends the
-  payload: `Link` holds the target, the display text, the embed flag and the
-  syntax kind. `NoteLink` holds the ranges. See ticket 23's Answer.
+- **Link (revised by the field-value link decision):** one root-level `Link`
+  holds `target`, `display: Option<String>`, `kind` and `embedded`. `display`
+  is `None` when the trimmed, unescaped display is absent, empty or equal to
+  the trimmed, unescaped target. Frontmatter and inline fields handle every
+  link type: wikilink, Markdown link and embed. A value must keep its `kind`
+  to render and to round-trip. `NoteLink` is the document occurrence. It
+  wraps a `Link` and adds the source ranges. Equality and order stay with
+  ticket 19. Which type a runtime `FieldValue::Link` carries is now the root
+  `Link` (Open question 1).
 - **Borrowed views (refines the "no mirror" line above):** the model exports
   `&FieldValue` and no mirror enum. Any view enum is query-local. Ticket 28
   benchmarks owned vs view over `file.name` sort and filter before deleting
