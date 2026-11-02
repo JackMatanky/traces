@@ -45,6 +45,9 @@ audit tables as dated input.
 - `.scratch/integration-e2e-suite/spec.md`: read-only input. Its issues 15 and
   16 give the ledger method. Its "implemented" claims and per-test
   classification do not bind (ticket 08, decision d).
+- [research/13](../research/13-migration-evidence.md): external evidence on
+  retiring, moving and converting tests. It lists corrections to the raw
+  reviews. Cite a claim from it only with its tag.
 
 ## Rules that earlier tickets already fixed
 
@@ -87,6 +90,27 @@ Do not reopen these rules. Apply them.
     deletes or converts the test it names. Record a mutation baseline update in
     the mutation docs, not in this ledger.
 
+## Facts from the evidence review
+
+[Research 13](../research/13-migration-evidence.md) checked these facts. Use
+them in the decisions.
+
+1. Overlap in coverage or mutation score is weak proof of redundancy. In one
+   study, 20 percent of deletions of "redundant" tests lost coverage or
+   mutation score.
+2. A mutation proof for a deletion compares the escapes before and after the
+   change. Scope it with `-m` or `-f`. A `--git-diff` run mutates only changed
+   production lines, and a deletion changes none. Confirm this for `mutarust`
+   with a probe in the first slice.
+3. CI runs e2e tests on three operating systems. It runs unit and integration
+   tests on Linux only. A move from e2e to a lower layer drops two systems.
+4. CI has no mutation job and no coverage job. A mutation proof is a local
+   step. Review must check that the change records it.
+5. Two e2e tests carry `#[ignore]` and run only from a parent test. A plain
+   inventory diff misses them.
+6. The repository has no `proptest-regressions/` directory. Proptest seeds
+   follow the source file path. A moved source file loses its seeds.
+
 ## Decisions to reach
 
 HITL, grilling. Do not answer for the user.
@@ -105,13 +129,18 @@ HITL, grilling. Do not answer for the user.
   how a session re-checks a "twin" claim from the audits before it deletes. State
   whether a mutation run on the module is part of the proof for a unit test
   (`mise run test:mutants -m <module>`). Ticket 12 sets the mutation posture: no
-  threshold, a review of each new survivor.
+  threshold, a review of each new survivor. Decide who checks the mutation
+  record, because CI has none.
 - (d) **Coverage preservation.** At no point does the suite prove less than
-  before. State the check at guarantee level, not by test count. Use ticket 12's
-  recompute and this ticket's ledger. Decide the ledger format: the four columns
-  (behavior, layer, defect class, surviving test) plus the research/10 row ID.
-  Decide where it lives. Decide the order of steps in one change: the scenario
-  lands and passes, then the old test goes.
+  before. Decide these items:
+  - The check, at guarantee level and not by test count. Use ticket 12's
+    recompute and this ticket's ledger.
+  - The ledger format: the four columns (behavior, layer, defect class,
+    surviving test) plus the research/10 row ID.
+  - Where the ledger lives.
+  - The order of steps in one change: the scenario lands and passes, then the
+    old test goes.
+  - How the check treats `#[ignore]` tests.
 - (e) **Scope and preconditions.** Decide whether to migrate everything at once
   or only the tests that an adoption wave touches. Name each precondition for
   deletion: the three-OS CI run, the `check:layers` fix, and the state of open
@@ -125,6 +154,7 @@ HITL, grilling. Do not answer for the user.
 
   Decide the action for each class and its owner. Decide whether these actions
   belong to the adoption slices or to a separate hygiene change outside this map.
+  State whether a move from e2e keeps one e2e smoke test.
 - (g) **Headers, pins and inherited duties.** Decide these items:
   - The fate of the `//! Proves` and `Defect class:` headers of existing tests.
     Ticket 11 gives scenarios no `Defect class:` tag. Research/05 (G9) found that
