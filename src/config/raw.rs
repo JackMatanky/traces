@@ -1,17 +1,17 @@
-//! Deserializes Config File TOML into strict serde types.
+//! Parses Config File TOML into strict Serde types.
 //!
-//! [`RawConfig`] retains configured values before
-//! [`super::builder::ConfigBuilder`] applies Configuration Scope precedence and
-//! resolves paths.
+//! [`RawConfig`] holds configured values before
+//! [`super::builder::ConfigBuilder`] applies Configuration Scope precedence.
+//! The builder also resolves paths.
 
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Holds Config File values before merging and path resolution.
+/// Holds Config File values before merge and path resolution.
 ///
-/// Local and global Config Files share these raw tables and reject unknown
-/// keys.
+/// Local and global Config Files use these tables.
+/// Serde rejects unknown keys.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawConfig {
@@ -29,53 +29,53 @@ pub(crate) struct RawConfig {
     pub(crate) tasks: RawTaskConfig,
 }
 
-/// Holds the unmerged `[templates]` table from a Config File.
+/// Holds the `[templates]` table before the builder merges values.
 ///
-/// Serialization omits absent fields when scaffolding a Config File.
+/// Serialization omits absent fields when it creates a Config File scaffold.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTemplateConfig {
-    /// Names the Template Directory before resolution against its Config File
+    /// Names the Template Directory before resolution against the Config File
     /// root.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) directory: Option<PathBuf>,
-    /// Names the rendered-template output directory.
+    /// Names the directory for rendered templates.
     ///
     /// [`super::builder::ConfigBuilder`] resolves relative values against the
-    /// project root and uses that root when this field is absent.
+    /// project root. It uses that root when this field is absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) output_dir: Option<PathBuf>,
 }
 
-/// Holds the unmerged `[schemas]` table from a Config File.
+/// Holds the `[schemas]` table before the builder merges values.
 ///
-/// Serialization omits absent fields when scaffolding a Config File.
+/// Serialization omits absent fields when it creates a Config File scaffold.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchemasConfig {
-    /// Names the frontmatter key for a Note's File Class(es), before applying
-    /// the `class` default.
+    /// Names the frontmatter key for a Note's File Class before the builder
+    /// applies the `class` default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) class_field: Option<String>,
-    /// Names the schema directory before applying the `.traces/schemas/`
-    /// default.
+    /// Names the schema directory before the builder applies the
+    /// `.traces/schemas/` default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) directory: Option<PathBuf>,
 }
 
-/// Holds the unmerged `[frontmatter]` table from a Config File.
+/// Holds the `[frontmatter]` table before the builder merges values.
 ///
-/// Serialization omits absent fields when scaffolding a Config File.
+/// Serialization omits absent fields when it creates a Config File scaffold.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawFrontmatterConfig {
-    /// Names the frontmatter key holding a Note's display title.
+    /// Names the frontmatter key for a Note's display title.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) title: Option<String>,
-    /// Names the frontmatter key holding a Note's aliases.
+    /// Names the frontmatter key for a Note's aliases.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) aliases: Option<String>,
-    /// Names the frontmatter key holding a Note's tags.
+    /// Names the frontmatter key for a Note's tags.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tags: Option<String>,
     /// Holds the creation timestamp's frontmatter key and date format.
@@ -88,34 +88,35 @@ pub(crate) struct RawFrontmatterConfig {
 
 /// Holds an optional frontmatter key and format for a date field.
 ///
-/// [`super::model::DateFieldConfig`] supplies role-specific defaults for
-/// missing values. Serialization omits absent fields when scaffolding a Config
-/// File.
+/// [`super::model::DateFieldConfig`] supplies role-specific defaults when
+/// values are missing. Serialization omits absent fields when it creates a
+/// Config File scaffold.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDateFieldConfig {
     /// Names the frontmatter date key when configured.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) name: Option<String>,
-    /// Specifies the date format for the key's value when configured.
+    /// Specifies the date format for the key's value.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) format: Option<String>,
 }
 
-/// Holds the unmerged `[tasks]` table for Task Configuration.
+/// Holds the `[tasks]` table before the builder merges values.
 ///
-/// Serialization omits empty fields when scaffolding a Config File.
+/// Serialization omits empty fields when it creates a Config File scaffold.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTaskConfig {
-    /// Lists tags that classify status-marked items as Tasks.
+    /// Lists tags that mark status-marked items as Tasks.
     ///
-    /// Entries may omit `#`; [`super::builder::ConfigBuilder`] normalizes them
-    /// before constructing a [`crate::Tag`]. An empty list falls back to
-    /// global filters, or accepts every status-marked item if none exist.
+    /// An entry can omit `#`. [`super::builder::ConfigBuilder`] adds it before
+    /// it creates a [`crate::Tag`]. An empty list uses global filters. If no
+    /// global filters exist, every status-marked item is a Task.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) tag_filters: Vec<String>,
-    /// Lists task statuses that augment or override defaults by symbol.
+    /// Lists task statuses that add to or replace defaults with the same
+    /// symbol.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) statuses: Vec<RawTaskStatus>,
 }

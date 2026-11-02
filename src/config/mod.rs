@@ -1,34 +1,34 @@
-//! Loads configuration files into a resolved [`Config`].
+//! Loads configuration files and returns resolved values in [`Config`].
 //!
-//! The discovery, read, trust, and value stages separate failure types. Loading
-//! follows this order:
+//! The discovery, read, trust, and value stages report separate failures.
+//! Loading uses these stages in order:
 //!
 //! 1. [`discovery::ConfigLocator`] finds the nearest local Config File and an
-//!    optional global Config File without reading TOML.
+//!    optional global Config File. It does not read TOML.
 //! 2. [`file::LocalConfigFile::into_trusted`] records the local Tracked Config
-//!    Path in the Tracker Store on a best-effort basis, then runs Trust
-//!    Verification against the Trust Store before parsing local TOML.
-//! 3. [`mod@file`] parses the trusted local content and reads the global file
-//!    without a trust gate, producing [`raw::RawConfig`] values.
-//! 4. [`ConfigBuilder`] merges global defaults before local values, validates
-//!    them and resolves paths into [`Config`].
+//!    Path in the Tracker Store. It then checks Trust Status before it parses
+//!    local TOML. A tracking failure does not stop loading.
+//! 3. [`mod@file`] parses trusted local content and reads the global file
+//!    without a trust check. It returns [`raw::RawConfig`] values.
+//! 4. [`ConfigBuilder`] applies global defaults before local values. It checks
+//!    each value and resolves paths. It returns [`Config`].
 //!
-//! A grant records the local Tracked Config Path before it grants trust;
-//! revoking trust leaves that path tracked. [`crate::dirs`] supplies OS paths
+//! A trust grant records the local Tracked Config Path before it grants trust.
+//! Revoking trust leaves the path tracked. [`crate::dirs`] supplies OS paths
 //! for both stores.
 //!
 //! # Config Digests
 //!
-//! `Config::digests` hashes every resolved setting on its own under a
-//! section-qualified label, so each stored digest names the setting it covers.
-//! `Config::hash` composes them under `b"traces.config.v1"` into the Config
-//! Fingerprint. That is the only live encoding.
+//! [`Config::digests`] hashes each resolved setting under a section-qualified
+//! label. Each stored digest names its setting. [`Config::hash`] combines the
+//! digests under `b"traces.config.v1"` to make the Config Fingerprint. This is
+//! the only encoding in use.
 //!
-//! Every digest constructor and bundle destructures its type exhaustively and
-//! never with `..`. Adding a setting to a config type then fails to compile
-//! until the setting gets a label and a place in the encoding. A `syn` scan of
-//! the digest source pins the convention, because the compiler cannot tell a
-//! rest pattern from an exhaustive one.
+//! Every digest constructor and bundle destructures its type without `..`.
+//! Adding a setting to a configuration type then causes a compile error until
+//! the code gives it a label and a place in the encoding. A `syn` scan checks
+//! this rule because Rust cannot distinguish a rest pattern from a full
+//! pattern.
 //!
 //! # Key Types
 //!

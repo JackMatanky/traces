@@ -1,8 +1,8 @@
-//! Holds resolved configuration values after loading and validation.
+//! Holds resolved configuration values after the loader checks them.
 //!
-//! Consumers read merged values through [`Config`]. Each settings section lives
-//! in its own submodule beside its config digests, and `Config` stays here.
-//! Separate local and global template directories preserve lookup precedence.
+//! Consumers read merged values through [`Config`]. Each settings section and
+//! its digests live in a separate submodule. [`Config`] stays in this file.
+//! Separate local and global Template Directories preserve lookup precedence.
 //!
 //! # Key Types
 //!
@@ -40,11 +40,11 @@ use crate::{
     path::{PathError, RelativePath, SafeRelativePath},
 };
 
-/// Labels the workspace root setting in the configuration fingerprint.
+/// Labels the workspace root setting in the Config Fingerprint.
 const ROOT: &[u8] = b"root";
 
-/// Holds resolved Config File values after the discovery, read, trust, and
-/// value stages.
+/// Holds resolved Config File values after discovery, read, trust, and value
+/// checks.
 #[derive(Clone, Debug)]
 pub struct Config {
     root: Arc<Path>,
@@ -55,7 +55,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Assembles resolved values from builder-owned parts.
+    /// Assembles resolved values from the builder's parts.
     #[inline]
     #[must_use]
     pub(super) fn new(
@@ -81,24 +81,25 @@ impl Config {
         &self.root
     }
 
-    /// Returns the local Template Directory, if configured.
+    /// Returns the local Template Directory, if one is configured.
     #[inline]
     #[must_use]
     pub fn local_template_dir(&self) -> Option<&Path> {
         self.templates.local()
     }
 
-    /// Returns the global Template Directory, if configured.
+    /// Returns the global Template Directory, if one is configured.
     #[inline]
     #[must_use]
     pub fn global_template_dir(&self) -> Option<&Path> {
         self.templates.global()
     }
 
-    /// Returns the resolved output directory, defaulting to [`Self::root`].
+    /// Returns the resolved output directory or [`Self::root`] when none is
+    /// set.
     ///
-    /// Resolves relative configured paths against the workspace root and
-    /// preserves absolute paths.
+    /// Resolves relative paths against the workspace root.
+    /// It returns absolute paths unchanged.
     #[inline]
     #[must_use]
     pub fn output_dir(&self) -> &Path {
@@ -141,12 +142,12 @@ impl Config {
         Arc::from(self.schemas().class_field_name())
     }
 
-    /// Computes the Config Fingerprint: every setting digest of
-    /// [`Config::digests`] composed under `b"traces.config.v1"`.
+    /// Computes the Config Fingerprint from every setting digest under
+    /// `b"traces.config.v1"`.
     ///
-    /// The index does not persist this digest.
-    /// It stores a subset of the per-setting digests instead.
-    /// Tests pin the encoding. See the `digest` module for the framing.
+    /// The index does not store this digest.
+    /// It stores a subset of the setting digests.
+    /// Tests check the encoding. The `digest` module defines the framing.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -163,9 +164,9 @@ impl Config {
 
     /// Digests every resolved setting separately.
     ///
-    /// Each digest starts with its constant, section-qualified label, so a
-    /// stored digest names the setting it covers. [`ConfigDigests::compose`]
-    /// folds them into the Config Fingerprint.
+    /// Each digest starts with its section-qualified label.
+    /// The label identifies the setting. [`ConfigDigests::compose`] combines
+    /// the digests into the Config Fingerprint.
     #[inline]
     #[must_use]
     pub(crate) fn digests(&self) -> ConfigDigests {
@@ -185,10 +186,11 @@ impl Config {
         )
     }
 
-    /// Builds a resolved configuration without Config File discovery for tests.
+    /// Builds resolved configuration values for tests without finding Config
+    /// Files.
     ///
     /// Use [`super::service::ConfigService::for_test`] with TOML fixtures to
-    /// test the real loading pipeline.
+    /// check the loading pipeline.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -209,7 +211,7 @@ impl Config {
         }
     }
 
-    /// Builds a test configuration with default paths under `root`.
+    /// Builds test configuration with default paths under `root`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -227,7 +229,7 @@ impl Config {
         }
     }
 
-    /// Sets the local Template Directory to `root/templates` for tests.
+    /// Sets the test Template Directory to `root/templates`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -240,7 +242,7 @@ impl Config {
         self
     }
 
-    /// Overrides canonical metadata key names in a test configuration.
+    /// Overrides canonical metadata key names in test configuration.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -249,7 +251,7 @@ impl Config {
         self
     }
 
-    /// Overrides Task Configuration in a test configuration.
+    /// Overrides Task Configuration in test configuration.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -258,7 +260,7 @@ impl Config {
         self
     }
 
-    /// Overrides schema settings in a test configuration.
+    /// Overrides schema settings in test configuration.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -268,27 +270,27 @@ impl Config {
     }
 }
 
-/// Holds a nonempty, lexically safe workspace-relative subdirectory.
+/// Holds a non-empty, safe subdirectory relative to the workspace.
 ///
-/// Rejects absolute paths, parent components, and paths with no named component
-/// before any filesystem checks.
+/// It rejects absolute paths, parent components, and paths with no named
+/// component before it checks the file system.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigSubDir(RelativePath);
 
 impl ConfigSubDir {
-    /// Returns the subdirectory as a relative [`Path`].
+    /// Returns the subdirectory as a workspace-relative [`Path`].
     #[inline]
     #[must_use]
     pub fn as_path(&self) -> &Path {
         self.0.as_ref()
     }
 
-    /// Resolves this subdirectory within `root`.
+    /// Resolves this subdirectory under `root`.
     ///
     /// # Errors
     ///
-    /// - [`InvalidSubDir`] if the path escapes `root` or filesystem checks
-    ///   fail.
+    /// - [`InvalidSubDir`] if the path escapes `root` or a file system check
+    ///   fails.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve_against(
@@ -303,12 +305,12 @@ impl ConfigSubDir {
             })
     }
 
-    /// Validates `dir` and resolves it within `root`.
+    /// Checks `dir` and resolves it under `root`.
     ///
     /// # Errors
     ///
-    /// - [`InvalidSubDir`] if `dir` is lexically unsafe, escapes `root`, or
-    ///   fails filesystem checks.
+    /// - [`InvalidSubDir`] if `dir` has an unsafe component, escapes `root`, or
+    ///   fails a file system check.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve(
@@ -328,7 +330,7 @@ impl ConfigSubDir {
     /// # Errors
     ///
     /// - [`Absolute`] if the selected path is absolute.
-    /// - [`UnsafeComponent`] if it has `..` or no named component.
+    /// - [`UnsafeComponent`] if it has a `..` component or no named component.
     ///
     /// [`Absolute`]: PathError::Absolute
     /// [`UnsafeComponent`]: PathError::UnsafeComponent
@@ -346,12 +348,13 @@ impl ConfigSubDir {
 impl TryFrom<PathBuf> for ConfigSubDir {
     type Error = PathError;
 
-    /// Parses an owned, lexically safe relative subdirectory.
+    /// Parses an owned, safe relative subdirectory.
     ///
     /// # Errors
     ///
     /// - [`Absolute`] if `path` is absolute.
-    /// - [`UnsafeComponent`] if `path` has `..` or no named component.
+    /// - [`UnsafeComponent`] if `path` has a `..` component or no named
+    ///   component.
     ///
     /// [`Absolute`]: PathError::Absolute
     /// [`UnsafeComponent`]: PathError::UnsafeComponent
@@ -364,12 +367,12 @@ impl TryFrom<PathBuf> for ConfigSubDir {
 impl TryFrom<&str> for ConfigSubDir {
     type Error = PathError;
 
-    /// Parses a borrowed, lexically safe relative subdirectory.
+    /// Parses a borrowed, safe relative subdirectory.
     ///
     /// # Errors
     ///
     /// - [`Absolute`] if `s` is absolute.
-    /// - [`UnsafeComponent`] if `s` has `..` or no named component.
+    /// - [`UnsafeComponent`] if `s` has a `..` component or no named component.
     ///
     /// [`Absolute`]: PathError::Absolute
     /// [`UnsafeComponent`]: PathError::UnsafeComponent
@@ -442,10 +445,9 @@ mod tests {
 
         #[test]
         fn matches_the_pinned_digest_for_a_fixed_config() {
-            // Persisted Config Fingerprints must survive releases.
-            // This test pins the per-setting encoding, labels, and compose
-            // order. One re-pin followed the switch from the
-            // aggregate chain to compose-all.
+            // Configuration fingerprints persist across releases. This test
+            // pins the encoding, labels, and compose order for each setting.
+            // One re-pin followed the switch to compose-all.
             let digest = base().hash().to_hex();
 
             assert_eq!(

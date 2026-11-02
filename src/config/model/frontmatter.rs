@@ -1,4 +1,4 @@
-//! Holds canonical metadata key names, date fields, and their config digests.
+//! Holds canonical metadata key names, date fields, and their digests.
 
 use super::digest::setting;
 use crate::{
@@ -35,21 +35,21 @@ pub struct FrontmatterConfig {
 }
 
 impl FrontmatterConfig {
-    /// Returns the frontmatter key for a note's display title.
+    /// Returns the frontmatter key for a Note's display title.
     #[inline]
     #[must_use]
     pub fn title_name(&self) -> &str {
         self.title.as_str()
     }
 
-    /// Returns the frontmatter key for a note's aliases.
+    /// Returns the frontmatter key for a Note's aliases.
     #[inline]
     #[must_use]
     pub fn aliases_name(&self) -> &str {
         self.aliases.as_str()
     }
 
-    /// Returns the frontmatter key for a note's tags.
+    /// Returns the frontmatter key for a Note's tags.
     #[inline]
     #[must_use]
     pub fn tags_name(&self) -> &str {
@@ -88,11 +88,12 @@ impl FrontmatterConfig {
         }
     }
 
-    /// Builds test metadata settings with custom title and aliases keys.
+    /// Builds test metadata settings with the given title and aliases keys.
     ///
     /// # Panics
     ///
-    /// - `title` or `aliases` is empty, whitespace-only, or contains `/`.
+    /// - Panics if `title` or `aliases` is empty, has only spaces, or contains
+    ///   `/`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -114,11 +115,11 @@ impl FrontmatterConfig {
         }
     }
 
-    /// Overrides the tags key in test metadata settings.
+    /// Sets the tags key in test metadata settings.
     ///
     /// # Panics
     ///
-    /// - `tags` is empty, whitespace-only, or contains `/`.
+    /// - Panics if `tags` is empty, has only spaces, or contains `/`.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -135,13 +136,11 @@ impl FrontmatterConfig {
 }
 
 impl Default for FrontmatterConfig {
-    /// Builds canonical metadata defaults from hardcoded field names.
+    /// Builds canonical metadata defaults from fixed field names.
     ///
     /// # Panics
     ///
-    /// - [`DEFAULT_TITLE_FIELD`], [`DEFAULT_ALIASES_FIELD`],
-    ///   [`DEFAULT_TAGS_FIELD`], [`DEFAULT_DATE_CREATED_FIELD`], or
-    ///   [`DEFAULT_DATE_MODIFIED_FIELD`] stops being a valid field key.
+    /// - Panics if a default field name is not a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -176,7 +175,8 @@ impl TryFrom<RawFrontmatterConfig> for FrontmatterConfig {
     /// # Errors
     ///
     /// - [`InvalidFieldKey`] if a configured title, aliases, tags, creation
-    ///   date, or modification date key is empty or contains `/`.
+    ///   date, or modification date key is empty, whitespace-only, or contains
+    ///   `/`.
     ///
     /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
     #[inline]
@@ -225,14 +225,14 @@ impl DateFieldConfig {
         self.name.as_str()
     }
 
-    /// Returns the date format used for this field's value.
+    /// Returns the format for this field's value.
     #[inline]
     #[must_use]
     pub fn format(&self) -> &str {
         &self.format
     }
 
-    /// Resolves a date field from raw values or role-specific defaults.
+    /// Resolves a date field from raw values or its role-specific defaults.
     ///
     /// # Errors
     ///
@@ -244,7 +244,8 @@ impl DateFieldConfig {
     ///
     /// # Panics
     ///
-    /// - `default_name` is invalid when `raw` is absent.
+    /// - Panics if `default_name` is not a valid field key and the raw
+    ///   configuration has no name.
     #[inline]
     fn from_raw_or_default(
         raw: Option<RawDateFieldConfig>,
@@ -263,7 +264,7 @@ impl DateFieldConfig {
         })
     }
 
-    /// Digests the date key name and format under `labels`.
+    /// Digests the date key name and format with `labels`.
     fn digests(&self, labels: &DateLabels) -> DateFieldDigests {
         let Self {
             name,
@@ -275,11 +276,11 @@ impl DateFieldConfig {
         }
     }
 
-    /// Builds a date field from a hardcoded role name and default format.
+    /// Builds a date field from a fixed role name and default format.
     ///
     /// # Panics
     ///
-    /// - `name` is not a valid field key; callers pass only
+    /// - Panics if `name` is not a valid field key. Callers pass only
     ///   [`DEFAULT_DATE_CREATED_FIELD`] or [`DEFAULT_DATE_MODIFIED_FIELD`].
     #[inline]
     #[expect(

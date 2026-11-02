@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use super::digest::setting;
 use crate::{Blake3Digest, Blake3Hasher, FieldName};
 
-/// Names the default local schemas directory.
+/// Names the default local schema directory.
 pub(in crate::config) const DEFAULT_LOCAL_SCHEMAS_DIR: &str =
     ".traces/schemas/";
 
 /// Names the default schema class field.
 pub(in crate::config) const DEFAULT_CLASS_FIELD: &str = "class";
 
-/// Holds the schema registry directory and class field name.
+/// Holds the schema registry directory and the class field name.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SchemasConfig {
     directory: PathBuf,
@@ -23,16 +23,17 @@ impl SchemasConfig {
     /// Returns the schema registry directory.
     ///
     /// Config File loading resolves a configured directory against its
-    /// Configuration Scope root, or the workspace root when unconfigured.
-    /// [`SchemasConfig::default`] retains a relative directory because it has
-    /// no workspace root.
+    /// Configuration Scope root.
+    /// If no directory is configured, loading uses the workspace root.
+    /// [`SchemasConfig::default`] keeps a relative directory because it has no
+    /// workspace root.
     #[inline]
     #[must_use]
     pub fn directory(&self) -> &Path {
         &self.directory
     }
 
-    /// Returns the frontmatter key for a note's file class.
+    /// Returns the frontmatter key for a Note's File Class.
     ///
     /// Defaults to `class` when unconfigured.
     #[inline]
@@ -41,10 +42,10 @@ impl SchemasConfig {
         self.class_field.as_str()
     }
 
-    /// Assembles validated schema settings from resolved values.
+    /// Assembles checked schema settings from resolved values.
     ///
-    /// Needs `directory` resolved against its Configuration Scope root.
-    /// This constructor does no further validation.
+    /// The caller must resolve `directory` against its Configuration Scope
+    /// root. This constructor does not check the values.
     #[inline]
     #[must_use]
     pub(in crate::config) const fn new(
@@ -57,7 +58,7 @@ impl SchemasConfig {
         }
     }
 
-    /// Digests the schema registry directory and the class field.
+    /// Digests the schema registry directory and class field.
     pub(super) fn digests(&self) -> SchemaDigests {
         let Self {
             directory,
@@ -71,11 +72,11 @@ impl SchemasConfig {
         }
     }
 
-    /// Builds test schema settings with a validated class field.
+    /// Builds test schema settings with a checked class field.
     ///
     /// # Panics
     ///
-    /// - `class_field` is not a valid field key.
+    /// - Panics if `class_field` is not a valid field key.
     #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     #[expect(
@@ -107,7 +108,7 @@ impl Default for SchemasConfig {
     ///
     /// # Panics
     ///
-    /// - [`DEFAULT_CLASS_FIELD`] stops being a valid field key.
+    /// - Panics if [`DEFAULT_CLASS_FIELD`] is not a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,

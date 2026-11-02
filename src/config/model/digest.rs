@@ -1,18 +1,18 @@
-//! Encodes resolved settings as per-section digests.
+//! Encodes resolved settings as digests grouped by section.
 //!
-//! Every setting digests on its own under a section-qualified label, so a
-//! stored digest says which setting it covers and cannot collide with a
-//! sibling. [`super::Config::hash`] composes all of them under one version
+//! Each setting has a digest under a section-qualified label.
+//! The label identifies the setting and prevents collisions with other
+//! settings. [`super::Config::hash`] combines all digests under one version
 //! label.
 //!
 //! # Exhaustive destructuring
 //!
 //! Each `digests` constructor, each bundle's `feed_into`, and
-//! [`ConfigDigests::compose`] destructure their type without `..`. Add a
-//! setting to a config type, or a bundle to [`ConfigDigests`], and compilation
-//! fails. It succeeds again only after the addition gets a label and a place in
-//! the encoding. A source-scanning test pins the convention because the
-//! compiler cannot tell a rest pattern from an exhaustive one.
+//! [`ConfigDigests::compose`] destructure their type without `..`.
+//! Adding a setting or bundle then causes a compile error.
+//! The code compiles again after the new item gets a label and a place in the
+//! encoding. A source scan checks this rule because Rust cannot distinguish a
+//! rest pattern from a full pattern.
 //!
 //! # Key Types
 //!
@@ -42,12 +42,12 @@ pub(crate) struct ConfigDigests {
     expect(dead_code, reason = "compose is reached only through Config::hash")
 )]
 impl ConfigDigests {
-    /// Composes every setting digest into one digest under
-    /// `b"traces.config.v1"`.
+    /// Combines every setting digest under `b"traces.config.v1"`.
     ///
-    /// Settings enter in declaration order, so the result is the Config
-    /// Fingerprint. Changing the order, the labels, or the version label
-    /// invalidates every persisted fingerprint.
+    /// Settings enter in declaration order.
+    /// The result is the Config Fingerprint.
+    /// A change to the order, labels, or version label invalidates stored
+    /// fingerprints.
     pub(crate) fn compose(&self) -> Blake3Digest {
         let Self {
             root,
@@ -84,11 +84,10 @@ impl ConfigDigests {
     }
 }
 
-/// Digests one setting: the label's length-prefixed bytes, then the value bytes
-/// `feed` adds.
+/// Digests one setting from its label and the value bytes that `feed` adds.
 ///
-/// The label frame lives here rather than in [`Blake3Hasher`], whose value
-/// methods stay label-agnostic.
+/// This function adds the label frame.
+/// [`Blake3Hasher`] value methods do not add labels.
 pub(super) fn setting<F>(label: &[u8], feed: F) -> Blake3Digest
 where
     F: FnOnce(&mut Blake3Hasher),
@@ -218,8 +217,8 @@ mod tests {
             }
 
             fn visit_pat_rest(&mut self, _: &'ast PatRest) {
-                // Other code (error matching in tests, `Raw*` parsing) may use
-                // rest patterns freely. Only the digest encoders must not.
+                // Other code can use rest patterns for error matching and
+                // `Raw*` parsing. Digest encoders cannot use them.
                 if matches!(
                     self.current_fn.as_str(),
                     "digests" | "feed_into" | "compose"
@@ -254,7 +253,7 @@ mod tests {
             )]);
         }
 
-        /// Every file that defines a digest constructor or a bundle encoder.
+        /// Lists each file that defines a digest constructor or bundle encoder.
         const SOURCES: [&str; 6] = [
             include_str!("../model.rs"),
             include_str!("digest.rs"),
@@ -347,7 +346,7 @@ mod tests {
             )
         }
 
-        /// Lists every setting digest in [`NAMES`] order.
+        /// Lists every setting digest in the order in [`NAMES`].
         pub(in super::super) fn ordered(
             digests: &ConfigDigests,
         ) -> [Blake3Digest; 15] {

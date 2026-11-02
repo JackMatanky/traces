@@ -1,9 +1,9 @@
-//! Locates Config Files on disk without reading their TOML.
+//! Finds Config Files on disk without reading their TOML.
 //!
-//! [`ConfigLocator`] uses walk ceilings and the global config directory. It
-//! finds the nearest local Config File, its optional global counterpart, or
-//! local Config Files within a subtree. The Config Locator runs no Trust
-//! Verification and writes nothing to the Tracker Store.
+//! [`ConfigLocator`] uses walk ceilings and the global Config File directory.
+//! It finds the nearest local Config File, its optional global counterpart, or
+//! local Config Files in a subtree. It does not check trust or write to the
+//! Tracker Store.
 
 use std::{
     io,
@@ -16,22 +16,24 @@ use super::{
 };
 use crate::{DirTree, dirs, env_vars};
 
-/// Names the OS config home subdirectory holding the global Config File.
+/// Names the subdirectory for the global Config File under the OS config home.
 const GLOBAL_CONFIG_DIR: &str = "traces";
 
-/// Holds the Config Files discovered for one project load.
+/// Holds the Config Files found for one project load.
 #[derive(Debug)]
 pub(super) struct DiscoveredConfigs {
-    /// Holds the nearest local Config File, merged after [`Self::global`].
+    /// Holds the nearest local Config File. The builder applies it after
+    /// [`Self::global`].
     pub(super) local: LocalConfigFile<Discovered>,
-    /// Holds the optional global Config File, merged before [`Self::local`].
+    /// Holds the optional global Config File. The builder applies it before
+    /// [`Self::local`].
     pub(super) global: Option<GlobalConfigFile<Discovered>>,
 }
 
-/// Finds Config Files relative to the ambient environment.
+/// Finds Config Files from the environment and the given directory.
 #[derive(Clone, Debug)]
 pub(super) struct ConfigLocator {
-    /// Holds directories that an upward walk stops at without inspecting.
+    /// Holds directories where an upward walk stops without a check.
     ceilings: Vec<PathBuf>,
     /// Holds the directory containing the global Config File.
     global_dir: PathBuf,
@@ -47,7 +49,7 @@ impl ConfigLocator {
         }
     }
 
-    /// Builds a Config Locator from explicit inputs for deterministic tests.
+    /// Builds a Config Locator from explicit test inputs.
     #[cfg(test)]
     #[must_use]
     pub(super) const fn new(
@@ -60,13 +62,14 @@ impl ConfigLocator {
         }
     }
 
-    /// Finds the nearest local and optional global Config Files for `cwd`.
+    /// Finds the nearest local and optional global Config Files for `cwd` and
+    /// returns them.
     ///
     /// # Errors
     ///
-    /// - [`NotFound`] if no local Config File exists at or above `cwd` before a
+    /// - [`NotFound`] if no local Config File exists between `cwd` and a walk
     ///   ceiling.
-    /// - [`Inaccessible`] if inspecting a candidate path fails.
+    /// - [`Inaccessible`] if the file system cannot inspect a candidate path.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -83,15 +86,15 @@ impl ConfigLocator {
         })
     }
 
-    /// Finds the nearest local Config File at or above `dir`.
+    /// Finds and returns the nearest local Config File at or above `dir`.
     ///
-    /// Ceilings are exclusive: the walk never inspects a ceiling directory,
-    /// even when `dir` is itself a ceiling.
+    /// The walk stops before it checks a ceiling directory.
+    /// It also stops when `dir` is itself a ceiling.
     ///
     /// # Errors
     ///
-    /// - [`NotFound`] if no local Config File exists before a ceiling.
-    /// - [`Inaccessible`] if inspecting a candidate path fails.
+    /// - [`NotFound`] if no local Config File exists before a walk ceiling.
+    /// - [`Inaccessible`] if the file system cannot inspect a candidate path.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -113,15 +116,15 @@ impl ConfigLocator {
         })
     }
 
-    /// Finds local Config Files at or below `dir`, ordered by root.
+    /// Finds local Config Files at or below `dir` and orders them by root.
     ///
-    /// Falls back to [`Self::nearest_local`] when the subtree has none.
+    /// Uses [`Self::nearest_local`] if the subtree has no local Config File.
     ///
     /// # Errors
     ///
-    /// - [`NotFound`] if neither the subtree nor its ancestors contain a local
-    ///   Config File before a ceiling.
-    /// - [`Inaccessible`] if inspecting a path fails.
+    /// - [`NotFound`] if no local Config File exists in the subtree or above it
+    ///   before a walk ceiling.
+    /// - [`Inaccessible`] if the file system cannot inspect a path.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -138,16 +141,18 @@ impl ConfigLocator {
     }
 }
 
-/// Collects local Config Files at or below `dir`.
+/// Collects and returns local Config Files at or below `dir`.
 ///
-/// Skips subtrees named by [`env_vars::is_ignored_dir`]. The walk root `dir` is
-/// exempt from pruning. [`DirTree::filter`] never consults the predicate for
-/// it. An ignored name on `dir` itself therefore does not empty the scan.
-/// Propagates traversal failures instead of treating them as an empty subtree.
+/// It skips subtrees named by [`env_vars::is_ignored_dir`].
+/// It does not prune the walk root `dir`.
+/// [`DirTree::filter`] does not check the predicate for the root.
+/// A root with an ignored name is still scanned.
+/// It returns traversal failures instead of treating them as an empty subtree.
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if the root vanishes or inspecting a path fails.
+/// - [`Inaccessible`] if the root is removed or the file system cannot inspect
+///   a path.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn collect_descendant_configs(
@@ -175,13 +180,14 @@ fn collect_descendant_configs(
     Ok(configs)
 }
 
-/// Reports whether `path` is a regular file.
+/// Returns whether `path` is a regular file.
 ///
-/// Treats a missing path as absent rather than as an error.
+/// Returns `false` when the path does not exist.
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if inspecting the path fails for another reason.
+/// - [`Inaccessible`] if the file system cannot inspect the path for another
+///   reason.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn is_config_file(path: &Path) -> ConfigDiscoveryResult<bool> {

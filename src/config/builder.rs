@@ -1,8 +1,8 @@
-//! Resolves local and global Config Files into one [`Config`].
+//! Resolves local and global Config Files into [`Config`].
 //!
-//! [`ConfigBuilder`] applies Configuration Scope precedence field by field.
-//! It resolves each Template Directory against its own Config File root before
-//! merging values, so a global directory never uses the local project root.
+//! [`ConfigBuilder`] applies Configuration Scope precedence to each field.
+//! It resolves each Template Directory against its Config File root before it
+//! merges values. A global directory never uses the local project root.
 
 use std::path::PathBuf;
 
@@ -18,10 +18,11 @@ use super::{
 };
 use crate::FieldName;
 
-/// Merges local and optional global Config Files into a resolved [`Config`].
+/// Merges local and optional global Config Files into [`Config`].
 ///
-/// Applies Configuration Scope precedence to unset values, resolves each
-/// Template Directory against its Config File root, and validates values.
+/// It applies Configuration Scope precedence to unset values.
+/// It resolves each Template Directory against its Config File root.
+/// It checks each value.
 pub(crate) struct ConfigBuilder {
     root: PathBuf,
     local: LocalConfigFile<Parsed>,
@@ -29,7 +30,8 @@ pub(crate) struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    /// Creates a builder for the project root and its Config Files.
+    /// Creates a builder for the project root and its local and global Config
+    /// Files.
     #[inline]
     #[must_use]
     pub(crate) fn new(
@@ -44,16 +46,16 @@ impl ConfigBuilder {
         }
     }
 
-    /// Builds the resolved [`Config`] using Configuration Scope precedence.
+    /// Builds [`Config`] with Configuration Scope precedence.
     ///
     /// # Errors
     ///
-    /// - [`InvalidSubDir`] if a Template Directory or schema directory is
-    ///   invalid or escapes its root.
-    /// - [`InvalidFieldKey`] if a `[frontmatter]` or `[schemas]` key is
+    /// - [`InvalidSubDir`] if a Template Directory or schema directory has an
+    ///   unsafe path or escapes its root.
+    /// - [`InvalidFieldKey`] if a `[frontmatter]` or `[schemas]` field key is
     ///   invalid.
-    /// - [`InvalidTagFilter`] if a `[tasks] tag_filters` entry is invalid.
-    /// - [`Task`] if a configured task status symbol is invalid.
+    /// - [`InvalidTagFilter`] if a `[tasks] tag filter` entry is invalid.
+    /// - [`Task`] if a task status symbol is not allowed.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
@@ -241,8 +243,7 @@ mod tests {
         mod fixtures {
             use super::*;
 
-            /// Creates an existing directory for path-confined Config File
-            /// resolution.
+            /// Creates a directory for Config File path checks.
             pub(super) fn temp_root(
                 temp: &tempfile::TempDir,
                 name: &str,

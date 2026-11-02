@@ -1,4 +1,4 @@
-//! Holds Task Configuration and its config digests.
+//! Holds Task Configuration and its digests.
 
 use super::digest::setting;
 use crate::{
@@ -20,14 +20,14 @@ pub struct TaskConfig {
 impl TaskConfig {
     /// Returns the configured task tag filters.
     ///
-    /// An empty list accepts every status-marked list item as a task.
+    /// An empty list treats every status-marked list item as a Task.
     #[inline]
     #[must_use]
     pub fn tag_filters(&self) -> &[Tag] {
         &self.tag_filters
     }
 
-    /// Returns the task status lookup map used by the parser.
+    /// Returns the task status map that the parser uses.
     #[inline]
     #[must_use]
     pub(crate) const fn statuses(&self) -> &TaskStatusMap {
@@ -36,8 +36,7 @@ impl TaskConfig {
 
     /// Digests the task statuses and tag filters.
     ///
-    /// Statuses enter in symbol order so map iteration order never leaks;
-    /// filters enter in configured order.
+    /// Statuses enter in symbol order. Filters enter in configured order.
     pub(super) fn digests(&self) -> TaskDigests {
         let Self {
             statuses,
@@ -71,7 +70,7 @@ impl TaskConfig {
         }
     }
 
-    /// Builds test Task Configuration with custom tag filters.
+    /// Builds test Task Configuration with the given tag filters.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     #[must_use]
@@ -82,11 +81,11 @@ impl TaskConfig {
         }
     }
 
-    /// Parses tag filters from string slices for test Task Configuration.
+    /// Parses tag filters from strings for test Task Configuration.
     ///
     /// # Panics
     ///
-    /// - Any tag does not parse as a [`Tag`].
+    /// - Panics if a string does not parse as a [`Tag`].
     #[cfg(any(test, feature = "test-utils"))]
     #[expect(
         clippy::expect_used,
@@ -121,7 +120,7 @@ impl TryFrom<RawTaskConfig> for TaskConfig {
     ///
     /// - [`ConfigValueError::Task`] if a status symbol is `(`, `)`, `[`, `]`,
     ///   `{`, or `}`.
-    /// - [`ConfigValueError::InvalidTagFilter`] if a tag filter cannot form a
+    /// - [`ConfigValueError::InvalidTagFilter`] if a tag filter does not form a
     ///   valid [`Tag`].
     #[inline]
     fn try_from(raw: RawTaskConfig) -> Result<Self, Self::Error> {

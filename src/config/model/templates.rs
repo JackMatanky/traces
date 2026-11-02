@@ -1,4 +1,4 @@
-//! Holds Template Directory settings and their config digests.
+//! Holds Template Directory settings and their digests.
 
 use std::path::{Path, PathBuf};
 
@@ -19,7 +19,7 @@ pub(in crate::config) struct TemplateConfig {
 }
 
 impl TemplateConfig {
-    /// Assembles resolved template directories and the output directory.
+    /// Assembles resolved Template Directories and the output directory.
     #[inline]
     #[must_use]
     pub(in crate::config) const fn new(
@@ -34,14 +34,14 @@ impl TemplateConfig {
         }
     }
 
-    /// Returns the local Template Directory, if present.
+    /// Returns the local Template Directory, if one is set.
     #[inline]
     #[must_use]
     pub(super) fn local(&self) -> Option<&Path> {
         self.local.as_deref()
     }
 
-    /// Returns the global Template Directory, if present.
+    /// Returns the global Template Directory, if one is set.
     #[inline]
     #[must_use]
     pub(super) fn global(&self) -> Option<&Path> {
@@ -55,7 +55,7 @@ impl TemplateConfig {
         &self.output
     }
 
-    /// Digests the Template Directories and the output directory.
+    /// Digests the Template Directories and output directory.
     pub(super) fn digests(&self) -> TemplateDigests {
         let Self {
             local,
@@ -91,21 +91,21 @@ pub(crate) struct TemplateDigests {
     expect(dead_code, reason = "the index ignores template directories")
 )]
 impl TemplateDigests {
-    /// Returns the digest of the local Template Directory setting.
+    /// Returns the digest for the local Template Directory setting.
     #[inline]
     #[must_use]
     pub(crate) const fn local(&self) -> Blake3Digest {
         self.local
     }
 
-    /// Returns the digest of the global Template Directory setting.
+    /// Returns the digest for the global Template Directory setting.
     #[inline]
     #[must_use]
     pub(crate) const fn global(&self) -> Blake3Digest {
         self.global
     }
 
-    /// Returns the digest of the output directory setting.
+    /// Returns the digest for the output directory setting.
     #[inline]
     #[must_use]
     pub(crate) const fn output(&self) -> Blake3Digest {

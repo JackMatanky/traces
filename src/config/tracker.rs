@@ -1,7 +1,8 @@
-//! Records Tracked Config Paths independently of Trust Verification.
+//! Records Tracked Config Paths separately from Trust Verification.
 //!
-//! [`TrackerStore`] records local Config Files seen during loading or trust
-//! grants. Loading treats recording as best effort. Grants need success.
+//! [`TrackerStore`] records local Config Files during loading and trust grants.
+//! Loading continues if recording fails. A trust grant needs a successful
+//! record.
 
 use std::path::{Path, PathBuf};
 
@@ -10,22 +11,23 @@ use crate::{CleanMode, FilePathTracker, dirs};
 
 /// Stores Tracked Config Paths separately from [`super::trust::TrustStore`].
 ///
-/// Loading records paths on a best-effort basis.
-/// Trust grants need a successful record before they add a trusted root.
+/// Loading continues if path recording fails.
+/// A trust grant records a path before it adds a trusted root.
 #[derive(Clone, Debug)]
 pub(crate) struct TrackerStore {
     store: FilePathTracker,
 }
 
 impl TrackerStore {
-    /// Records a Tracked Config Path, failing if the store cannot persist it.
+    /// Records a Tracked Config Path and returns an error if the store cannot
+    /// save it.
     ///
     /// Trust grants use this method.
     /// Configuration loading uses [`Self::record_best_effort`].
     ///
     /// # Errors
     ///
-    /// - [`Tracker`] if path canonicalization or store persistence fails.
+    /// - [`Tracker`] if path canonicalization or store write fails.
     ///
     /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
@@ -33,7 +35,7 @@ impl TrackerStore {
         self.store.record(path).map_err(Into::into)
     }
 
-    /// Records a Tracked Config Path without failing configuration loading.
+    /// Records a Tracked Config Path and does not fail configuration loading.
     ///
     /// Logs at warn level if [`Self::record`] fails.
     #[inline]
@@ -47,11 +49,11 @@ impl TrackerStore {
         }
     }
 
-    /// Lists the canonical paths of live Tracked Config Paths.
+    /// Lists and returns the canonical paths of Tracked Config Paths.
     ///
     /// # Errors
     ///
-    /// - [`Tracker`] if the Tracker Store cannot be read.
+    /// - [`Tracker`] if the Tracker Store read fails.
     ///
     /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
@@ -59,11 +61,12 @@ impl TrackerStore {
         self.store.list_all(&[]).map_err(Into::into)
     }
 
-    /// Removes dangling Tracked Config Paths and returns the number removed.
+    /// Removes Tracked Config Paths whose files no longer exist and returns the
+    /// number removed.
     ///
     /// # Errors
     ///
-    /// - [`Tracker`] if the Tracker Store cannot be read or cleaned.
+    /// - [`Tracker`] if the Tracker Store read or cleanup fails.
     ///
     /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
@@ -71,8 +74,7 @@ impl TrackerStore {
         self.store.clean(CleanMode::EntriesOnly).map_err(Into::into)
     }
 
-    /// Creates a Tracker Store at an explicit root instead of the OS
-    /// tracked-config directory.
+    /// Creates a Tracker Store at the given root instead of the OS directory.
     #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     #[inline]
@@ -102,7 +104,7 @@ mod tests {
     mod fixtures {
         use super::*;
 
-        /// Holds an isolated Tracker Store and project directories for tests.
+        /// Holds an isolated Tracker Store and test project directories.
         pub(super) struct Fixture {
             temp: tempfile::TempDir,
             pub(super) store: TrackerStore,
