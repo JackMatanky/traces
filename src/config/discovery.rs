@@ -1,9 +1,9 @@
 //! Locates Config Files on disk without reading their TOML.
 //!
-//! [`ConfigLocator`] uses walk ceilings and the global config directory to find
-//! the nearest local Config File, its optional global counterpart, or local
-//! Config Files within a subtree. The Config Locator does not perform Trust
-//! Verification or write to the Tracker Store.
+//! [`ConfigLocator`] uses walk ceilings and the global config directory. It
+//! finds the nearest local Config File, its optional global counterpart, or
+//! local Config Files within a subtree. The Config Locator runs no Trust
+//! Verification and writes nothing to the Tracker Store.
 
 use std::{
     io,
@@ -66,7 +66,7 @@ impl ConfigLocator {
     ///
     /// - [`NotFound`] if no local Config File exists at or above `cwd` before a
     ///   ceiling.
-    /// - [`Inaccessible`] if a candidate path cannot be inspected.
+    /// - [`Inaccessible`] if inspecting a candidate path fails.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -91,7 +91,7 @@ impl ConfigLocator {
     /// # Errors
     ///
     /// - [`NotFound`] if no local Config File exists before a ceiling.
-    /// - [`Inaccessible`] if a candidate path cannot be inspected.
+    /// - [`Inaccessible`] if inspecting a candidate path fails.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -121,7 +121,7 @@ impl ConfigLocator {
     ///
     /// - [`NotFound`] if neither the subtree nor its ancestors contain a local
     ///   Config File before a ceiling.
-    /// - [`Inaccessible`] if a path cannot be inspected.
+    /// - [`Inaccessible`] if inspecting a path fails.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -140,14 +140,14 @@ impl ConfigLocator {
 
 /// Collects local Config Files at or below `dir`.
 ///
-/// Skips subtrees named by [`env_vars::is_ignored_dir`]. The walk root `dir`
-/// is exempt from pruning ([`DirTree::filter`] never consults the predicate
-/// for it), so an ignored name on `dir` itself does not empty the scan.
+/// Skips subtrees named by [`env_vars::is_ignored_dir`]. The walk root `dir` is
+/// exempt from pruning. [`DirTree::filter`] never consults the predicate for
+/// it. An ignored name on `dir` itself therefore does not empty the scan.
 /// Propagates traversal failures instead of treating them as an empty subtree.
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if the root vanishes or a path cannot be inspected.
+/// - [`Inaccessible`] if the root vanishes or inspecting a path fails.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn collect_descendant_configs(
@@ -181,7 +181,7 @@ fn collect_descendant_configs(
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if a path cannot be inspected for another reason.
+/// - [`Inaccessible`] if inspecting the path fails for another reason.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn is_config_file(path: &Path) -> ConfigDiscoveryResult<bool> {

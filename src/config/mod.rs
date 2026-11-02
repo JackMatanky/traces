@@ -1,19 +1,19 @@
 //! Loads configuration files into a resolved [`Config`].
 //!
-//! The discovery, read, trust and value stages separate failure types. Loading
+//! The discovery, read, trust, and value stages separate failure types. Loading
 //! follows this order:
 //!
 //! 1. [`discovery::ConfigLocator`] finds the nearest local Config File and an
 //!    optional global Config File without reading TOML.
 //! 2. [`file::LocalConfigFile::into_trusted`] records the local Tracked Config
-//!    Path in the Tracker Store on a best-effort basis, then performs Trust
+//!    Path in the Tracker Store on a best-effort basis, then runs Trust
 //!    Verification against the Trust Store before parsing local TOML.
 //! 3. [`mod@file`] parses the trusted local content and reads the global file
 //!    without a trust gate, producing [`raw::RawConfig`] values.
 //! 4. [`ConfigBuilder`] merges global defaults before local values, validates
 //!    them and resolves paths into [`Config`].
 //!
-//! Granting trust records a local Tracked Config Path before granting trust;
+//! A grant records the local Tracked Config Path before it grants trust;
 //! revoking trust leaves that path tracked. [`crate::dirs`] supplies OS paths
 //! for both stores.
 //!
@@ -22,7 +22,7 @@
 //! `Config::digests` hashes every resolved setting on its own under a
 //! section-qualified label, so each stored digest names the setting it covers.
 //! `Config::hash` composes them under `b"traces.config.v1"` into the Config
-//! Fingerprint; that is the only live encoding.
+//! Fingerprint. That is the only live encoding.
 //!
 //! Every digest constructor and bundle destructures its type exhaustively and
 //! never with `..`. Adding a setting to a config type then fails to compile

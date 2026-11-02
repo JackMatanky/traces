@@ -1,12 +1,12 @@
 //! Orchestrates Config File loading and trust administration.
 //!
-//! [`ConfigService`] discovers Config Files, verifies Trust Status before
-//! reading local content, and builds the effective Configuration Scope. It
-//! records each local Tracked Config Path in the [`TrackerStore`] on a
-//! best-effort basis. Granting trust records that path before writing to the
-//! [`TrustStore`], so every trusted root with a local Config File has its path
-//! tracked. [`ConfigService::trust_subjects`] resolves user-supplied paths into
-//! trust requests.
+//! [`ConfigService`] discovers Config Files, checks Trust Status before reading
+//! local content, and builds the effective Configuration Scope. It records each
+//! local Tracked Config Path in the [`TrackerStore`] on a best-effort basis.
+//! Granting trust records that path before writing to the [`TrustStore`], so
+//! every trusted root with a local Config File has its path tracked.
+//! [`ConfigService::trust_subjects`] resolves user-supplied paths into trust
+//! requests.
 
 use std::{
     io,
@@ -30,10 +30,11 @@ use super::{
 
 /// Coordinates Config File loading and trust administration.
 ///
-/// Loading uses discovery, read, trust and value stages. Trust Verification
-/// precedes parsing local content; global Config Files need no trust check. The
-/// Tracker Store records Tracked Config Paths, while the Trust Store records
-/// workspace roots and Companion Hashes.
+/// Loading uses discovery, read, trust, and value stages.
+/// Trust Verification precedes parsing local content.
+/// Global Config Files need no trust check.
+/// The Tracker Store records Tracked Config Paths.
+/// The Trust Store records workspace roots and Companion Hashes.
 #[derive(Clone, Debug)]
 pub struct ConfigService {
     tracked: TrackerStore,
@@ -62,8 +63,8 @@ impl ConfigService {
     /// - [`Discovery`] if discovery finds no local Config File or cannot
     ///   inspect a path.
     /// - [`Read`] if reading or parsing a selected Config File fails.
-    /// - [`Trust`] if Trust Verification rejects the local Config File or
-    ///   reading the Trust Store or Config File for verification fails.
+    /// - [`Trust`] if Trust Verification rejects the local Config File or a
+    ///   Trust Store or Config File read fails.
     /// - [`Value`] if validation rejects a parsed value.
     ///
     /// [`Discovery`]: ConfigError::Discovery
@@ -79,13 +80,13 @@ impl ConfigService {
     /// Builds a [`Config`] from discovered Config Files.
     ///
     /// Merges global values before local values. Records the local Tracked
-    /// Config Path on a best-effort basis, then performs Trust Verification
-    /// before parsing local content.
+    /// Config Path on a best-effort basis, then runs Trust Verification before
+    /// parsing local content.
     ///
     /// # Errors
     ///
-    /// - [`Trust`] if Trust Verification rejects the local Config File or
-    ///   reading the Trust Store or Config File for verification fails.
+    /// - [`Trust`] if Trust Verification rejects the local Config File or a
+    ///   Trust Store or Config File read fails.
     /// - [`Read`] if reading or parsing a selected Config File fails.
     /// - [`Value`] if validation rejects a parsed value.
     ///
@@ -151,10 +152,12 @@ impl ConfigService {
 
     /// Resolves a user-supplied path into trust requests.
     ///
-    /// Canonical paths identify workspaces; missing paths retain their given
-    /// spelling. A Config File path identifies that file, while another file
-    /// resolves through its parent. [`TrustScope::NearestLocal`] chooses the
-    /// nearest enclosing local Config File or a root-only request;
+    /// Canonical paths identify workspaces.
+    /// Missing paths retain their given spelling.
+    /// A Config File path identifies that file.
+    /// Another file resolves through its parent.
+    /// [`TrustScope::NearestLocal`] chooses the nearest enclosing local Config
+    /// File or a root-only request.
     /// [`TrustScope::LocalSubtree`] collects Config Files at or below the
     /// directory, or the enclosing Config File.
     ///
@@ -178,8 +181,9 @@ impl ConfigService {
     /// Creates a service backed by explicit Tracker Store and Trust Store roots
     /// instead of the OS state directories.
     ///
-    /// Tests use isolated stores; production code uses
-    /// [`ConfigService::default`] for the OS-backed stores.
+    /// Tests use isolated stores.
+    /// Production code uses [`ConfigService::default`] for the OS-backed
+    /// stores.
     #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     #[inline]
@@ -356,8 +360,8 @@ mod tests {
         ///
         /// - [`Discovery`] if discovery finds no local Config File or cannot
         ///   inspect a path.
-        /// - [`Trust`] if Trust Verification rejects the local Config File or
-        ///   reading the Trust Store or Config File for verification fails.
+        /// - [`Trust`] if Trust Verification rejects the local Config File or a
+        ///   Trust Store or Config File read fails.
         /// - [`Read`] if reading or parsing a Config File fails.
         /// - [`Value`] if validation rejects a parsed value.
         ///
@@ -761,8 +765,8 @@ mod tests {
             )
             .expect("resolve");
 
-            // Retain the given root spelling when the missing path cannot
-            // be canonicalized.
+            // Retain the given root spelling when canonicalization fails
+            // because the path is missing.
             let expected =
                 TrustRequest::from(&Fixture::discovered_config(&child_config));
             assert_eq!(requests, vec![expected]);

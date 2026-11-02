@@ -1,4 +1,4 @@
-//! Separates errors across discovery, read, trust and value stages.
+//! Separates errors across discovery, read, trust, and value stages.
 //!
 //! [`ConfigError`] composes [`ConfigDiscoveryError`], [`ConfigReadError`],
 //! [`ConfigTrustError`] and [`ConfigValueError`] for callers such as
@@ -14,7 +14,7 @@ use crate::{
     task::TaskError,
 };
 
-/// Combines failures from the discovery, read, trust and value stages.
+/// Combines failures from the discovery, read, trust, and value stages.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigError {
     /// Reports a discovery-stage failure before reading a Config File.
@@ -37,7 +37,7 @@ pub(crate) type ConfigDiscoveryResult<T> =
 
 /// Reports failures while discovering candidate Config Files on disk.
 ///
-/// Discovery does not read TOML or perform Trust Verification.
+/// Discovery reads no TOML and runs no Trust Verification.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigDiscoveryError {
     /// Reports the absence of a local Config File in the ancestor walk.
@@ -49,7 +49,7 @@ pub(crate) enum ConfigDiscoveryError {
     /// Reports a filesystem inspection failure during discovery.
     #[error("failed to access path {path} during discovery")]
     Inaccessible {
-        /// Holds the path that could not be inspected.
+        /// Holds the path whose inspection failed.
         path: PathBuf,
         /// Holds the underlying I/O failure.
         #[source]
@@ -59,7 +59,7 @@ pub(crate) enum ConfigDiscoveryError {
 
 /// Reports failures while reading or deserializing a Config File.
 ///
-/// Parsing an in-memory buffer does not discover paths or verify trust.
+/// Parsing an in-memory buffer discovers no paths and checks no trust.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigReadError {
     /// Reports a failed Config File read from disk.
@@ -87,14 +87,14 @@ pub(crate) enum ConfigReadError {
 /// Uses [`crate::FilePathTracker`] for the Trust Store and Tracker Store.
 #[derive(Debug, Error)]
 pub enum ConfigTrustError {
-    /// Reports a Trust Status that requires user action before loading.
+    /// Reports a Trust Status that needs user action before loading.
     #[error(
         "config file {path} (workspace root {root}) is untrusted: {status}"
     )]
     Untrusted {
-        /// Holds the workspace root requiring Trust Verification.
+        /// Holds the workspace root that needs Trust Verification.
         root: PathBuf,
-        /// Holds the local Config File that could not be trusted.
+        /// Holds the local Config File that Trust Verification refused.
         path: PathBuf,
         /// Holds the Trust Status that stopped loading.
         status: ConfigTrustStatus,
@@ -109,7 +109,7 @@ pub enum ConfigTrustError {
 
 /// Reports failures while validating parsed configuration values.
 ///
-/// In-memory validation does not read files or perform Trust Verification.
+/// In-memory validation reads no files and runs no Trust Verification.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigValueError {
     /// Reports a Template Directory or schema path that fails confinement.

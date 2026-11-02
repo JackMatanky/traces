@@ -1,7 +1,7 @@
 //! Records Tracked Config Paths independently of Trust Verification.
 //!
 //! [`TrackerStore`] records local Config Files seen during loading or trust
-//! grants. Loading treats recording as best effort; grants require success.
+//! grants. Loading treats recording as best effort. Grants need success.
 
 use std::path::{Path, PathBuf};
 
@@ -10,8 +10,8 @@ use crate::{CleanMode, FilePathTracker, dirs};
 
 /// Stores Tracked Config Paths separately from [`super::trust::TrustStore`].
 ///
-/// Loading records paths on a best-effort basis; trust grants require a
-/// successful record before they add a trusted root.
+/// Loading records paths on a best-effort basis.
+/// Trust grants need a successful record before they add a trusted root.
 #[derive(Clone, Debug)]
 pub(crate) struct TrackerStore {
     store: FilePathTracker,
@@ -20,13 +20,12 @@ pub(crate) struct TrackerStore {
 impl TrackerStore {
     /// Records a Tracked Config Path, failing if the store cannot persist it.
     ///
-    /// Trust grants use this method; configuration loading uses
-    /// [`Self::record_best_effort`].
+    /// Trust grants use this method.
+    /// Configuration loading uses [`Self::record_best_effort`].
     ///
     /// # Errors
     ///
-    /// - [`Tracker`] if the path cannot be canonicalized or the store cannot be
-    ///   written.
+    /// - [`Tracker`] if path canonicalization or store persistence fails.
     ///
     /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
@@ -36,7 +35,7 @@ impl TrackerStore {
 
     /// Records a Tracked Config Path without failing configuration loading.
     ///
-    /// Logs a warning if [`Self::record`] fails.
+    /// Logs at warn level if [`Self::record`] fails.
     #[inline]
     pub(crate) fn record_best_effort(&self, path: &Path) {
         if let Err(error) = self.record(path) {

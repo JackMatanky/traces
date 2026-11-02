@@ -8,15 +8,15 @@
 //! # Exhaustive destructuring
 //!
 //! Each `digests` constructor, each bundle's `feed_into`, and
-//! [`ConfigDigests::compose`] destructure their type without `..`. Adding a
-//! setting to a config type, or a bundle to [`ConfigDigests`], then fails to
-//! compile until it gets a label and a place in the encoding. A source-scanning
-//! test pins the convention because the compiler cannot tell a rest pattern
-//! from an exhaustive one.
+//! [`ConfigDigests::compose`] destructure their type without `..`. Add a
+//! setting to a config type, or a bundle to [`ConfigDigests`], and compilation
+//! fails. It succeeds again only after the addition gets a label and a place in
+//! the encoding. A source-scanning test pins the convention because the
+//! compiler cannot tell a rest pattern from an exhaustive one.
 //!
 //! # Key Types
 //!
-//! - [`ConfigDigests`]: one digest per setting, grouped by section.
+//! - [`ConfigDigests`]: per-setting digests grouped by section.
 
 use super::{
     frontmatter::FrontmatterDigests, schemas::SchemaDigests,
@@ -219,7 +219,7 @@ mod tests {
 
             fn visit_pat_rest(&mut self, _: &'ast PatRest) {
                 // Other code (error matching in tests, `Raw*` parsing) may use
-                // rest patterns freely; only the digest encoders must not.
+                // rest patterns freely. Only the digest encoders must not.
                 if matches!(
                     self.current_fn.as_str(),
                     "digests" | "feed_into" | "compose"

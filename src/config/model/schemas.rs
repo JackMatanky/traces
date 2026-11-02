@@ -43,8 +43,8 @@ impl SchemasConfig {
 
     /// Assembles validated schema settings from resolved values.
     ///
-    /// Requires `directory` to have been resolved against its Configuration
-    /// Scope root; this constructor performs no further validation.
+    /// Needs `directory` resolved against its Configuration Scope root.
+    /// This constructor does no further validation.
     #[inline]
     #[must_use]
     pub(in crate::config) const fn new(

@@ -43,8 +43,8 @@ use crate::{
 /// Labels the workspace root setting in the configuration fingerprint.
 const ROOT: &[u8] = b"root";
 
-/// Holds resolved Config File values after the discovery, read, trust and value
-/// stages.
+/// Holds resolved Config File values after the discovery, read, trust, and
+/// value stages.
 #[derive(Clone, Debug)]
 pub struct Config {
     root: Arc<Path>,
@@ -144,9 +144,9 @@ impl Config {
     /// Computes the Config Fingerprint: every setting digest of
     /// [`Config::digests`] composed under `b"traces.config.v1"`.
     ///
-    /// The index does not persist this digest; it stores a subset of the
-    /// per-setting digests instead. The encoding is pinned by tests; see the
-    /// `digest` module for the framing.
+    /// The index does not persist this digest.
+    /// It stores a subset of the per-setting digests instead.
+    /// Tests pin the encoding. See the `digest` module for the framing.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -287,8 +287,8 @@ impl ConfigSubDir {
     ///
     /// # Errors
     ///
-    /// - [`InvalidSubDir`] if the path escapes `root` or filesystem
-    ///   verification fails.
+    /// - [`InvalidSubDir`] if the path escapes `root` or filesystem checks
+    ///   fail.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve_against(
@@ -308,7 +308,7 @@ impl ConfigSubDir {
     /// # Errors
     ///
     /// - [`InvalidSubDir`] if `dir` is lexically unsafe, escapes `root`, or
-    ///   fails filesystem verification.
+    ///   fails filesystem checks.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve(
@@ -442,9 +442,10 @@ mod tests {
 
         #[test]
         fn matches_the_pinned_digest_for_a_fixed_config() {
-            // Persisted Config Fingerprints must survive releases; this pins
-            // the per-setting encoding, labels, and compose order. Re-pinned
-            // once when the aggregate chain became compose-all.
+            // Persisted Config Fingerprints must survive releases.
+            // This test pins the per-setting encoding, labels, and compose
+            // order. One re-pin followed the switch from the
+            // aggregate chain to compose-all.
             let digest = base().hash().to_hex();
 
             assert_eq!(

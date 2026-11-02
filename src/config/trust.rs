@@ -120,7 +120,7 @@ pub(crate) enum ConfigTrustCheck {
     MissingBaseline,
     /// Holds verified content matching the Companion Hash.
     ///
-    /// Reuses the bytes read for verification during parsing.
+    /// Reuses the bytes that the trust check read during parsing.
     Trusted(String),
 }
 
@@ -168,8 +168,9 @@ pub(crate) struct TrustStore {
 impl TrustStore {
     /// Grants trust for a [`TrustRequest`]'s workspace root.
     ///
-    /// For a Config File request, records its Companion Hash before trusting
-    /// the root; reading or recording failures prevent the trust grant.
+    /// For a request for a Config File, records its Companion Hash before
+    /// trusting the root. Reading or recording failures prevent the trust
+    /// grant.
     ///
     /// # Errors
     ///
@@ -198,8 +199,8 @@ impl TrustStore {
 
     /// Returns the Trust Status for a [`TrustRequest`].
     ///
-    /// Checks the Companion Hash for a Config File request; checks only root
-    /// presence for a root-only request.
+    /// Checks the Companion Hash for a request for a Config File.
+    /// Checks only root presence for a root-only request.
     ///
     /// # Errors
     ///
@@ -261,8 +262,8 @@ impl TrustStore {
 
     /// Revokes trust for a [`TrustRequest`]'s workspace root.
     ///
-    /// Removes the root and its Companion Hash; returns the number of root
-    /// entries removed.
+    /// Removes the root and its Companion Hash.
+    /// Returns the number of root entries removed.
     ///
     /// # Errors
     ///
