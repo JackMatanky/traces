@@ -112,3 +112,46 @@ def test_block_comment_terminating_at_eof_blanks_closer() -> None:
     layout_of(code, masked)
     assert "x" in masked
     assert "/" not in masked
+
+
+def test_python_mask_keeps_docstrings_and_hash_comments_as_prose() -> None:
+    code = (
+        'url = "https://example.test/utilize" /* */  # use this site prior to exit\n'
+        'x = "prior to"  # ok\n'
+        "'''\n"
+        "Docstring prose. Utilize it.\n"
+        "'''\n"
+        "# comment with apostrophe and /* block-ish */\n"
+    )
+    masked = mask(code, "python")
+    layout_of(code, masked)
+    assert "use this site prior to exit" in masked
+    assert "Docstring prose. Utilize it." in masked
+    assert "Docstring prose. Utilize it." in masked.replace("'", "")
+    assert "comment with apostrophe and /* block-ish */" in masked
+    assert "url =" not in masked
+    assert "https://example.test" not in masked
+
+
+def test_python_unterminated_docstring_blanks_remainder() -> None:
+    code = '"""unterminated\nstill looks like code\nlet prior_to_var = 1\n'
+    masked = mask(code, "python")
+    layout_of(code, masked)
+    assert "still looks like code" not in masked
+
+
+def test_python_hash_inside_string_is_not_comment() -> None:
+    code = 'x = f"color {y:#x}"  # comment: utilize it\n'
+    masked = mask(code, "python")
+    layout_of(code, masked)
+    assert "comment: utilize it" in masked
+    assert "color" not in masked
+
+
+def test_python_docstring_escape_sequence_not_false_terminator() -> None:
+    code = '""" she said \\""" then # note\n"""\n'
+    masked = mask(code, "python")
+    layout_of(code, masked)
+    assert " she said " in masked
+    assert "then # note" in masked
+    assert "note" in masked

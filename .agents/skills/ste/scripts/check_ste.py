@@ -661,7 +661,15 @@ def mask_to_prose(text: str, language: Language) -> str:
             continue
         if language.docstring and text[i : i + 3] in ("'''", '"""'):
             quote = text[i : i + 3]
-            end = text.find(quote, i + 3)
+            j = i + 3
+            while j < size:
+                if text[j] == "\\":
+                    j += 2
+                elif text[j : j + 3] == quote:
+                    break
+                else:
+                    j += 1
+            end = j if text[j : j + 3] == quote else -1
             if end == -1:
                 blank(i, size)
                 break
