@@ -15,7 +15,7 @@ datetime, duration, point parsing; zone and calendar arithmetic).
 **Method**: read source and inline tests breadth-first (311 and 176 `#[test]`s,
 plus the repo's only 4 `proptest!` blocks in `temporal/`). Read
 `src/schema/GLOSSARY.md`, `src/temporal/GLOSSARY.md`, `docs/adr/0006`,
-`docs/adr/0007`, `docs/adr/0009-filter-date-literals`, and the
+`docs/adr/0007`, `docs/adr/0010-filter-date-literals`, and the
 `.scratch/temporal-core/` spec and divergence-register as prior evidence. Note:
 neither domain is referenced from `tests/` today (zero outer-layer coverage), so
 the discovery must judge from source, inline tests, and docs alone. Also record

@@ -73,16 +73,16 @@ descendant classes when the schema hierarchy has child classes — a query for
 extends book.
 
 `SourceSelector` enum: `All | Expr(SourceExpr)` in src/query/grammar/source.rs.
-The `SourceExpr` wraps a `BooleanExpr<SourceAtom>` where `SourceAtom` is `Tag`,
-`Folder`, `Class`, or `Glob`.
+The `SourceExpr` wraps a `BooleanExpr<SourceAtom>` where `SourceAtom` variants
+are `Tag(String)`, `Path(GlobPattern)`, and `Class { names: Vec<String>, mode:
+ClassExpansionMode }`. Path patterns and folder prefixes compile to
+`Path(GlobPattern)`.
 
-**Update: the real SourceAtom variants are Tag, Path and Class.** (Ticket 12.)
-The list above names `Folder` and `Glob`. The enum in
-src/query/grammar/source.rs has no such variants. The variants are
-`Tag(String)`, `Path(GlobPattern)`, and `Class { names: Vec<String>, mode:
-ClassExpansionMode }`. Path patterns use `Path`. Glob patterns are part of
-`GlobPattern` inside `Path`. The grammar section above keeps its user-facing
-syntax. Only the type names were wrong.
+**Update: the real SourceAtom variants are Tag, Path and Class.** (Ticket 12, ticket 16.)
+The enum in src/query/grammar/source.rs defines `Tag(String)`,
+`Path(GlobPattern)`, and `Class { names: Vec<String>, mode: ClassExpansionMode }`.
+Path patterns use `Path`. Glob patterns are part of `GlobPattern` inside `Path`.
+The grammar section above keeps its user-facing syntax.
 
 ## Consequences
 

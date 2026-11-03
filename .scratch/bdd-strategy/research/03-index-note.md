@@ -7,7 +7,7 @@ edge case), verdict with evidence, pinned today (an existing test enforces it), 
 
 **Sources**: `src/index/*` and `src/note/*` (`//!` docs and inline tests), `tests/integration/{persistence,refresh}.rs`,
 `tests/e2e/{index,tracked}.rs`, `src/index/GLOSSARY.md`, `src/note/GLOSSARY.md`, `docs/adr/0009-index-refresh.md`,
-`docs/adr/0009-filter-date-literals.md`, `docs/adr/0005-template-query.md`,
+`docs/adr/0010-filter-date-literals.md`, `docs/adr/0005-template-query.md`,
 `.scratch/arch-design/research/05-freshness-fingerprint-precedent.md`, open arch-design tickets 23/24/25/32/34/35/36.
 Citation: `file:line`, this repo.
 
@@ -334,7 +334,7 @@ freshness and invalidation, **32** crate topology, **34** live buffer vs persist
    `ConfigDrift`. Arch ticket 25 item 2 flags the same gap.
 5. **ADR status vs landed behavior.** ADR-0009 is `proposed` (`docs/adr/0009-index-refresh.md:5,17`) while
    implemented (`research/05`; arch ticket 25 "has landed"). Do not cite it as accepted authority.
-6. **Duplicate ADR number 9.** `docs/adr/0009-filter-date-literals.md` and `docs/adr/0009-index-refresh.md` both
+6. **Duplicate ADR number 9.** `docs/adr/0010-filter-date-literals.md` and `docs/adr/0009-index-refresh.md` both
    carry `number: 9`; `map.md` notes "duplicate-numbered 0009s". "ADR-0009" alone is ambiguous (index refresh is
    the file-named one).
 7. **Filename/title drift on ADR-0005.** File `0005-template-query.md` has

@@ -1,5 +1,5 @@
 ---
-number: 9
+number: 10
 title: Filter date literals
 status: proposed
 date: 2026-10-11
