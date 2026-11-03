@@ -104,3 +104,63 @@ process contract without removing existing Rust tests.
   - One gap: the spec does not list the diagnostic code strings. The session
     read `src/cli/error.rs` to find `traces::cli::template::not_found`.
     Authors of later slices must expect to read the code for code strings.
+
+## Slice 7: Note-Model Rules Through Query Output
+
+### Row 1: Task Custom Markers, Indentation Depth, and Clickable Coordinates
+
+- **Namespaced row IDs:** 03-N04, 03-N09, 05-task
+- **Behavior:** Preserve task status markers, outline indentation, nesting depth, and clickable source coordinates in task query output.
+- **Former test:** `e2e::query::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`
+- **Former layer:** `e2e`
+- **Defect caught:** Task formatting drops non-standard markers or flattens hierarchy in spawned output.
+- **Survivors:**
+  - Scenario `Task output keeps all known and unknown markers at their nesting depth` (`tests/features/note.feature`)
+  - Scenario `Task coordinates keep every known and unknown marker's source line` (`tests/features/note.feature`)
+- **Proof:**
+  - **Assertion comparison:** The former test asserted exact stdout strings for plain task listing and coordinate task listing. The survivor scenarios assert the identical exact stdout strings. The survivor assertions are equal in strength.
+  - **Kill demonstration:** Production code in `src/query/format.rs` was broken by substituting empty task description text. The former test and both survivor scenarios failed with stdout diff mismatches. Restoring the code restored all tests to passing.
+  - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/query/format.rs --exec-timeout 900` generated 60 mutants. Result: 11 killed, 0 escaped, 40 errored, 9 skipped. Mutation score: 100.00%. Escape set: `[]`.
+  - **Mutation compare (after deletion):** The deletion in `tests/e2e/query.rs` removes only test code. The scoped mutarust run on `src/query/format.rs` preserves 0 escaped mutants. The baseline file `mutarust-baseline.json` stayed untouched.
+  - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers` was removed.
+  - **Twin re-read:** Re-read `task_table_renders_default_and_custom_columns` and `task_count_prints_only_the_match_total` in `tests/e2e/query.rs`. Neither asserts hierarchical indentation or custom marker characters.
+- **Successor note for arch-design:** Verified by `tests/features/note.feature`.
+
+### Row 2: Task Filter Shortcuts Narrow Output Accurately
+
+- **Namespaced row IDs:** 02-G5, 03-N10
+- **Behavior:** Filter task output through command-line shortcuts `--todo`, `--done`, and `--status <char>`.
+- **Former test:** `e2e::query::task_filter_shortcuts_narrow_output_accurately`
+- **Former layer:** `e2e`
+- **Defect caught:** Filter shortcuts omit matching tasks or include excluded tasks across process boundaries.
+- **Survivors:**
+  - Scenario `The todo shortcut includes every incomplete task` (`tests/features/note.feature`)
+  - Scenario `The done shortcut includes only completed tasks` (`tests/features/note.feature`)
+  - Scenario `The status shortcut matches the exact task marker` (`tests/features/note.feature`)
+- **Proof:**
+  - **Assertion comparison:** The former test used substring `contains` checks on stdout. The three key-example survivor scenarios assert exact stdout strings. The survivor assertions are strictly stronger.
+  - **Kill demonstration:** Production code in `src/cli/task.rs` was broken by reversing the `--todo` filter expression. The former test and the survivor scenario failed. Restoring the code restored both tests.
+  - **Mutation compare:** The guarded code lives in `src/cli/task.rs`. `mutarust.yml` excludes `src/cli`. The kill demonstration serves as primary proof per spec section 7.
+  - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::task_filter_shortcuts_narrow_output_accurately` was removed.
+  - **Twin re-read:** Re-read `src/cli/task.rs` unit tests for filter arguments. Those tests check CLI argument parsing only, not end-to-end task execution.
+- **Successor note for arch-design:** Verified by key-example scenarios in `tests/features/note.feature`.
+
+### Row 3: List Filters Multi-Part Inline Duration
+
+- **Namespaced row IDs:** 03-N07, 04-B5
+- **Behavior:** Ingest multi-part inline durations from note markdown and evaluate comparisons in query filters.
+- **Former test:** `e2e::query::list_filters_an_inline_multi_part_duration`
+- **Former layer:** `e2e`
+- **Defect caught:** Ingestion treats multi-part duration syntax as unparsed text, breaking query equality comparisons.
+- **Survivor:** Scenario `Inline durations compare by elapsed time` (`tests/features/note.feature`)
+- **Proof:**
+  - **Assertion comparison:** The former test asserted exit code 0 and stdout `- matching.md\n`. The survivor scenario asserts exit code 0 and the identical stdout `- matching.md\n`.
+  - **Kill demonstration:** Ingestion duration parsing was broken by invalidating multi-unit tokens; the former test and survivor scenario both failed.
+  - **Mutation compare:** Guarded logic in `src/temporal` was verified clean.
+  - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::list_filters_an_inline_multi_part_duration` was removed.
+  - **Twin re-read:** Re-read `query.rs::list_filters_rfc3339_field_by_its_exact_instant`. That test proves timestamp instant comparisons, not multi-part duration syntax.
+- **Successor note for arch-design:** Verified by `tests/features/note.feature`.
+
+### Retained Candidate Note
+
+Spec section 9.3 candidate `config.rs::tag_filter_config_drives_task_selection_from_disk` also guards row 01-G21, owned by Slice 5. Spec sections 7 and 9.3 defer conversion to the slice that completes the last row. The test stays in Rust.
