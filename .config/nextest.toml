@@ -17,3 +17,9 @@ global-timeout = "20m"
 # Never replay captured stdout of passing tests (failure output unaffected:
 # failure-output defaults to immediate).
 success-output = "never"
+
+[profile.ci]
+# CI profile: fail immediately on test failures (no retries) and emit JUnit XML
+# for artifact collection across test matrix jobs.
+retries = 0
+junit = { path = "junit.xml" }
