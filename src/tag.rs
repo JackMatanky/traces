@@ -501,6 +501,80 @@ mod tests {
         }
     }
 
+    mod proptests {
+        use proptest::prelude::*;
+
+        use super::*;
+
+        fn tag_segments_strategy() -> impl Strategy<Value = Vec<String>> {
+            prop::collection::vec("[a-z][a-z0-9_-]{0,8}", 1..=6)
+        }
+
+        proptest! {
+            /// Proves tag prefix hierarchy laws:
+            /// 1. Reflexivity: every valid tag contains itself as a prefix (`tag.is_contained_in(tag.as_str())`).
+            /// 2. Prefix hierarchy & transitivity: given segment hierarchy `[s0, s1, ..., sn]`,
+            ///    every prefix path `s[0..=i]` contains the longer path `s[0..=j]` for `i <= j`.
+            ///    Equivalently, if `A.is_contained_in(B)` and `B.is_contained_in(C)`, then `A.is_contained_in(C)`.
+            /// 3. Boundary & segment-boundary safety: a partial string prefix that does not
+            ///    end at a segment boundary (e.g. `foo` vs `foobar`) never reports containment.
+            #[test]
+            fn preserves_containment_hierarchy_and_transitivity(
+                segments in tag_segments_strategy(),
+            ) {
+                let mut cumulative = Vec::with_capacity(segments.len());
+                let mut tags = Vec::with_capacity(segments.len());
+
+                for seg in &segments {
+                    cumulative.push(seg.as_str());
+                    let raw = format!("#{}", cumulative.join("/"));
+                    let parsed = Tag::parse(&raw).expect("valid generated tag");
+                    tags.push(parsed);
+                }
+
+                // Reflexivity: tag is contained in its own string.
+                for tag in &tags {
+                    prop_assert!(tag.is_contained_in(tag.as_str()));
+                }
+
+                // Prefix hierarchy: longer tag is contained in shorter tag's string representation.
+                for (i, ancestor) in tags.iter().enumerate() {
+                    for descendant in tags.iter().skip(i) {
+                        let ancestor_prefix = ancestor.as_str();
+                        prop_assert!(
+                            descendant.is_contained_in(ancestor_prefix),
+                            "descendant {:?} must be contained in ancestor prefix {:?}",
+                            descendant.as_str(),
+                            ancestor_prefix
+                        );
+                    }
+                }
+
+                // Transitivity check across arbitrary triples (i <= j <= k).
+                for (i, ancestor_c) in tags.iter().enumerate() {
+                    for middle_b in tags.iter().skip(i) {
+                        for descendant_a in tags.iter().skip(i) {
+                            if descendant_a.is_contained_in(middle_b.as_str())
+                                && middle_b.is_contained_in(ancestor_c.as_str())
+                            {
+                                prop_assert!(
+                                    descendant_a
+                                        .is_contained_in(ancestor_c.as_str())
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Strict segment boundary: appending partial alphanumeric chars to ancestor prefix fails.
+                if let (Some(first), Some(last)) = (tags.first(), tags.last()) {
+                    let false_prefix = format!("{}extra", first.as_str());
+                    prop_assert!(!last.is_contained_in(&false_prefix));
+                }
+            }
+        }
+    }
+
     mod is_exact_match {
         use super::*;
 

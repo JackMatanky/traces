@@ -10,12 +10,13 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Each law has one proptest inline with its source.
-- [ ] The `proptest-regressions` files are committed.
-- [ ] `mise run verify` passes.
+- [x] Each law has one proptest inline with its source.
+- [x] The `proptest-regressions` files are committed.
+- [x] `mise run verify` passes.
 
 **Out of scope:**
+
 - Other laws.
 - Changes to product code.
