@@ -15,15 +15,15 @@
 - [x] Every row the slice owns has a scenario of the class that spec section 4 assigns.
 - [x] The Status of each owned row in the invariance map reads `covered`.
 - [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
-- [ ] A second cold session writes one further scenario from the spec alone, with no framework-source read. Rubric question 3 is answered for the user on that scenario.
-- [ ] A converted test is deleted only when this slice completes its last row.
-- [ ] Each deletion has the proof of spec section 7.
+- [x] A second cold session writes one further scenario from the spec alone, with no framework-source read. Rubric question 3 is answered for the user on that scenario. Scenario `Missing template exits with code one and reports template not found diagnostic`: YES, green on the first attempt (see ledger, slice 2).
+- [x] A converted test is deleted only when this slice completes its last row. No test was deleted: spec section 9.3 lists no candidate test for slice 2.
+- [x] Each deletion has the proof of spec section 7. No deletion happened.
 - [x] `mise run verify` passes.
 - [x] The ledger section is complete.
 - [x] The gap recompute line is in the adoption map.
-- [ ] The due rubric questions are answered.
+- [x] The due rubric questions are answered. Question 3 is in the ledger, slice 2 section.
 - [x] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] The slice branch is merged locally. The integration branch `bdd-testing` holds the slice.
 
 **Out of scope:**
 

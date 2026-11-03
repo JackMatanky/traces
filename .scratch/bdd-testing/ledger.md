@@ -89,3 +89,18 @@ tests for slice 2. Existing e2e tests in `tests/e2e/process_contract.rs` and
 `tests/e2e/workflow.rs` stay in place. All seven scenarios added in
 `tests/features/process.feature` supply new BDD executable specifications for the
 process contract without removing existing Rust tests.
+
+### Pilot Rubric Answer (Slice 2 Close)
+
+- **Question 3: Can a second cold session write one more scenario from this
+  spec alone, with no framework-source read and no fixture beyond `Sandbox` and
+  `LastRun`?**
+  **Answer: Yes.**
+  - **Evidence:** A fresh session wrote the scenario `Missing template exits
+    with code one and reports template not found diagnostic` in
+    `tests/features/process.feature`. It passed on the first run.
+  - The session read no `rstest-bdd` source. It used only `Sandbox` and
+    `LastRun`.
+  - One gap: the spec does not list the diagnostic code strings. The session
+    read `src/cli/error.rs` to find `traces::cli::template::not_found`.
+    Authors of later slices must expect to read the code for code strings.
