@@ -21,8 +21,6 @@ mod config;
 mod env_policy;
 #[path = "e2e/index.rs"]
 mod index;
-#[path = "e2e/init.rs"]
-mod init;
 #[path = "e2e/process_contract.rs"]
 mod process_contract;
 #[path = "e2e/query.rs"]

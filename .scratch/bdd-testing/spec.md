@@ -761,6 +761,8 @@ change.
   in tests/features/process.feature passed 100 of 100 stress iterations locally.
   Exact-equality stdout and stderr steps and count summary step added. No test
   deletions.
+- 2026-11-03: the user confirmed the section 9.3 row placement for slice 5.
+  The rows placed by domain affinity remain in slice 5.
 - 2026-11-03: slice 3 closed. Query scenarios cover the owned rows in
   `tests/features/query.feature`. Four e2e tests moved to scenarios after
   paired failure checks. Two unit test names now say `explicit ascending`.
@@ -787,3 +789,22 @@ change.
   No process-level 130 case exists. No rustix feature is added. Spec sections
   9.3, 9.7 and 9.9 are amended. The class-level 130 row reads
   `pinned: src/main.rs::ctrl_c_abort_exits_130` in research/10.
+- 2026-11-03: slice 5 closed. The configuration, tracking and template rows
+  (01-G7, 01-G11, 01-G13, 01-G14, 01-G15, 01-G18, 01-G21, 01-G22, 01-G25,
+  01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-env_vars and
+  05-file_tracker) are covered. Honest exceptions: 01-G12 and 01-G16 stay
+  pinned to their unit tests (the non-TTY providers agree, and no portable
+  mid-scaffold CLI failure exists), 05-G7 stays a gap (the universal
+  every-path claim contradicts the accepted absolute config-derived output
+  path; template runtime confinement is covered under 02-G11), and 05-dirtree
+  is pinned (no portable CLI channel distinguishes root versus node walk
+  errors). Four feature files cover the slice:
+  `configuration.feature`, `template.feature`, `tracking.feature` plus the
+  pilot files. One deletion: `init.rs::default_path_init_spawns_and_scaffolds_workspace`
+  (row 1 of the ledger slice 5 section; full seven-item proof).
+  `tracked.rs::list_prints_every_tracked_config_path` and
+  `tracked.rs::clean_removes_a_stale_tracked_entry_and_reports_the_count` were
+  retained rather than deleted: the candidate table also maps
+  03-P25 (slice 4), and their row coverage by the new scenarios does not clear
+  the dual-ownership rule of section 7 for this slice. 46 scenarios passed
+  100 of 100 stress iterations locally.

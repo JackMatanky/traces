@@ -39,22 +39,22 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
 | 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
 | 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
-| 01-G7 | Non-TTY fallback values (the non-TTY half) | D | gap |
-| 01-G11 | The template picker refuses to run non-interactively | D | gap |
-| 01-G12 | `--no-input` swaps the provider wholesale | D | gap |
-| 01-G13 | Output collision: refuse without a prompt when non-interactive | D | gap |
-| 01-G14 | `--dry-run` never touches disk | D | gap |
-| 01-G15 | Non-TTY `init` scaffolds with defaults | D | gap |
-| 01-G16 | `init` is transactional | D | gap |
+| 01-G7 | Non-TTY fallback values (the non-TTY half) | D | covered: Non-TTY template prompts use their defined fallback answers (reviewed 2026-11-03) |
+| 01-G11 | The template picker refuses to run non-interactively | D | covered: The template picker refuses to run without an interactive terminal (reviewed 2026-11-03) |
+| 01-G12 | `--no-input` swaps the provider wholesale | D | pinned: src/cli/template.rs::tests::no_input_ignores_the_injected_provider_and_uses_defaults (the non-TTY providers produce identical answers) |
+| 01-G13 | Output collision: refuse without a prompt when non-interactive | D | covered: A non-interactive output collision preserves the existing file (reviewed 2026-11-03) |
+| 01-G14 | `--dry-run` never touches disk | D | covered: Dry-run previews rendered content without writing a file (reviewed 2026-11-03) |
+| 01-G15 | Non-TTY `init` scaffolds with defaults | D | covered: Non-interactive initialization scaffolds the default configuration (reviewed 2026-11-03) |
+| 01-G16 | `init` is transactional | D | pinned: src/cli/init.rs::tests::run::cleans_up_after_a_mid_run_failure (the non-TTY CLI cannot induce a portable mid-run failure) |
 | 01-G17 | `init` does not grant trust | F (trust gate) | covered: Init does not grant trust (reviewed 2026-11-03) |
-| 01-G18 | Nearest-local discovery, global alongside | D | gap |
-| 01-G21 | Two-level configuration scope, merged field by field | M (config TOML) | gap |
-| 01-G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) | gap |
+| 01-G18 | Nearest-local discovery, global alongside | D | covered: Nearest local configuration is discovered alongside global configuration (reviewed 2026-11-03) |
+| 01-G21 | Two-level configuration scope, merged field by field | M (config TOML) | covered: Local and global configuration fields combine independently (reviewed 2026-11-03) |
+| 01-G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) | covered: Changed trusted configuration fails before its malformed content is parsed (reviewed 2026-11-03) |
 | 01-G23 | Four trust statuses with distinct meaning | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
 | 01-G24 | No config loads without trust, across processes | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
-| 01-G25 | The global config layer is never trust-gated | F | gap |
-| 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | gap |
-| 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | gap |
+| 01-G25 | The global config layer is never trust-gated | F | covered: A malformed global configuration fails without global trust (reviewed 2026-11-03) |
+| 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | covered: Trust grant fails before trusting when tracking cannot save (reviewed 2026-11-03) |
+| 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | covered: Cleaning a stale tracked path reports its removal (reviewed 2026-11-03) |
 | 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | gap |
 | 01-G30 | Query output shapes are stable Markdown | F | covered: A page table renders one Markdown row per note (reviewed 2026-11-03) |
 
@@ -71,13 +71,13 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 02-G7 | Null placement | D | covered: Default descending sort places missing ratings last (reviewed 2026-11-03) |
 | 02-G8 | Terminal renderers: method form, pipeline form, parity | F | covered: A template query renders method and pipeline tables alike (reviewed 2026-11-03) |
 | 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | covered: Unknown sort fields report a stable diagnostic code (reviewed 2026-11-03) |
-| 02-G10 | Template resolution order; validation before search | D | gap |
-| 02-G11 | Output-path precedence and root confinement | D | gap |
-| 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | gap |
+| 02-G10 | Template resolution order; validation before search | D | covered: An unsafe template identifier fails before lookup (reviewed 2026-11-03) |
+| 02-G11 | Output-path precedence and root confinement | D | covered: A template output path cannot escape the project root (reviewed 2026-11-03) |
+| 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | covered: Dry-run previews over an existing file without replacing it (reviewed 2026-11-03) |
 | 02-G13 | CLI stream contract; index freshness round-trips | F | gap |
 | 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | covered: Chained sort and limit preserve the order of equal-rated pages (reviewed 2026-11-03) |
 | 02-G16 | Task and list rows keep document order (order only) | F | covered: List rows include plain items and checkboxes in document order (reviewed 2026-11-03) |
-| 02-G18 | Include loader: missing include is soft, other errors are hard | D | gap |
+| 02-G18 | Include loader: missing include is soft, other errors are hard | D | covered: An unsafe include remains an error when marked ignore missing (reviewed 2026-11-03) |
 
 ### Index and note (`research/03`)
 
@@ -139,10 +139,10 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | gap |
 | 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | gap |
 | 05-task | Unknown status symbol gives an incomplete task | F | gap |
-| 05-file_tracker | `clean` removes stale entries, never live ones | D | gap |
-| 05-dirtree | Traversal errors classified by where they occur | D | gap |
+| 05-file_tracker | `clean` removes stale entries, never live ones | D | covered: Cleaning preserves a live tracked configuration path (reviewed 2026-11-03) |
+| 05-dirtree | Traversal errors classified by where they occur | D | pinned: src/dirtree.rs::tests (no portable CLI channel distinguishes root versus node errors) |
 | 05-tag | Containment by segment prefix | F | gap |
-| 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | gap |
+| 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | covered: A discovery ceiling stops the upward configuration search (reviewed 2026-11-03) |
 
 ## Class-level map
 

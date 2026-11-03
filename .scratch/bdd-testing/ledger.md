@@ -105,6 +105,49 @@ process contract without removing existing Rust tests.
     read `src/cli/error.rs` to find `traces::cli::template::not_found`.
     Authors of later slices must expect to read the code for code strings.
 
+## Slice 5: Configuration, tracking and templates
+
+### Row 1: Non-interactive initialization
+
+- **Namespaced row IDs:** 01-G15
+- **Behavior:** An `init` command on a non-interactive terminal creates the
+  default local configuration and template directory.
+- **Former test:** `e2e::init::default_path_init_spawns_and_scaffolds_workspace`
+- **Former layer:** `e2e`
+- **Defect caught:** Initialization can report success without creating the
+  local configuration.
+- **Survivor:** Scenario `Non-interactive initialization scaffolds the default
+  configuration` in `tests/features/configuration.feature`.
+- **Proof:**
+  - **Assertion comparison:** The old test asserted success, a stderr
+    fragment, the `.traces` directory and the config file. The survivor
+    asserts exit zero and the complete stderr path line. It also asserts both
+    paths and the default template directory in the config file. It asserts
+    the default output directory too.
+  - **Kill demonstration:** On the first commit, `Init::run` skipped
+    `scaffold_directories` and `write_config_file` while returning success.
+    The old test failed because `.traces` did not exist. The scenario failed
+    at the same missing-directory assertion. The original production calls
+    were restored before the deletion.
+  - **Mutation compare:** Not required: the guarded dispatch code is in
+    `src/cli/init.rs`. An exploratory scoped run `-f src/config/tracker.rs`
+    escaped one `branch/if` mutant that no current test kills, including the
+    retained Rust `tracked.rs` pair. That file keeps both of its tests, so the
+    deletion rules of section 7 are not engaged. The escape is pre-existing and
+    not created by this slice.
+  - **Twin re-read:** The retained
+    `e2e::workflow::init_trust_index_list_table_task_and_template_chain_through_one_project`
+    checks a successful first-run chain. It does not assert the default
+    scaffold files or the exact init status line. The `src/cli/init.rs` unit
+    tests cover the default config and rollback separately.
+  - **Name diff:** Verified
+    `cargo nextest list --all-features --run-ignored all` before and after
+    deletion. The run removed one test:
+    `traces::e2e init::default_path_init_spawns_and_scaffolds_workspace`.
+    No other name changed.
+- **Successor note for arch-design:** The CLI scaffold contract lives in
+  `tests/features/configuration.feature` under the scenario named above.
+
 ## Slice 3: Query Surface
 
 ### Row 1: Page Table Columns
