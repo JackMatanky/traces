@@ -35,10 +35,10 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | gap |
-| 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | gap |
-| 01-G3 | Count summaries go to stderr | F (channel) | gap |
-| 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
+| 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
+| 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
 | 01-G7 | Non-TTY fallback values (the non-TTY half) | D | gap |
 | 01-G11 | The template picker refuses to run non-interactively | D | gap |
 | 01-G12 | `--no-input` swaps the provider wholesale | D | gap |
@@ -132,9 +132,9 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 05-G1 | Numeric exit-code contract | F | gap |
-| 05-G2 | Stream split | F | gap |
-| 05-G3 | Stable diagnostic codes | M | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 05-G1 | Numeric exit-code contract | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 05-G2 | Stream split | F | covered: Listing templates exits with code zero and writes payload to stdout (reviewed 2026-11-03) |
+| 05-G3 | Stable diagnostic codes | M | covered: Missing project configuration exits with code one and reports discovery diagnostic (reviewed 2026-11-03) |
 | 05-G7 | Root confinement of every filesystem path | D | gap |
 | 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | gap |
 | 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | gap |

@@ -79,3 +79,13 @@ Each slice adds one section.
     and after deletion.
   - The sixth gate check resolves all pilot pointers (01-G4, 01-G17, 01-G23,
     01-G24, 05-G3) against `tests/features/`.
+
+## Slice 2: Process Contract
+
+### Deletions Note
+
+No existing tests were deleted in this slice. Spec section 9.3 lists no candidate
+tests for slice 2. Existing e2e tests in `tests/e2e/process_contract.rs` and
+`tests/e2e/workflow.rs` stay in place. All seven scenarios added in
+`tests/features/process.feature` supply new BDD executable specifications for the
+process contract without removing existing Rust tests.

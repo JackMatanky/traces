@@ -10,22 +10,23 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every row the slice owns has a scenario of the class that spec section 4 assigns.
-- [ ] The Status of each owned row in the invariance map reads `covered`.
-- [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
+- [x] Every row the slice owns has a scenario of the class that spec section 4 assigns.
+- [x] The Status of each owned row in the invariance map reads `covered`.
+- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
 - [ ] A second cold session writes one further scenario from the spec alone, with no framework-source read. Rubric question 3 is answered for the user on that scenario.
 - [ ] A converted test is deleted only when this slice completes its last row.
 - [ ] Each deletion has the proof of spec section 7.
-- [ ] `mise run verify` passes.
-- [ ] The ledger section is complete.
-- [ ] The gap recompute line is in the adoption map.
+- [x] `mise run verify` passes.
+- [x] The ledger section is complete.
+- [x] The gap recompute line is in the adoption map.
 - [ ] The due rubric questions are answered.
-- [ ] The amendment log has an entry.
+- [x] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
 
 **Out of scope:**
+
 - Rows that another slice owns.
 - Known defects (spec section 3.3).
 - Facade-seam scenarios and Scenario Outlines.
