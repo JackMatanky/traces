@@ -24,7 +24,7 @@
 - [x] The gap recompute line is in the adoption map.
 - [x] The due rubric questions are answered.
 - [x] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] The slice branch is merged locally. The integration branch `bdd-testing` holds the slice.
 
 **Out of scope:**
 - Rows of later slices, except to mark them `gap`.
