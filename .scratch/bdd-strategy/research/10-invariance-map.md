@@ -35,7 +35,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03); the 130 part reads `pinned: src/main.rs::ctrl_c_abort_exits_130` (slice 8 dropped, decided 2026-11-03) |
 | 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
 | 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
 | 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
@@ -152,7 +152,7 @@ one disposition. Ticket 12 uses this list as input.
 | Class | Members | Disposition |
 |---|---|---|
 | Real-TTY and abort | 01-G5, 01-G8, 01-G9, 01-G10 | Exception class (ticket 07). Unit test. |
-| Exit 130 | 01-G1 (the 130 part), 01-G5 | One spawned-signal case on Unix. The unit test stays. |
+| Exit 130 | 01-G1 (the 130 part), 01-G5 | The unit test stays. Slice 8 was dropped (2026-11-03): numeric 130 needs a real-TTY prompt and the scenario would need a PTY harness, which spec section 4 bans. Known limitation; the pin is `pinned: src/main.rs::ctrl_c_abort_exits_130`. |
 | Test harness | 01-G28 | Not a product guarantee. |
 | Gate-owned | 05-G4, 05-G5, 05-G6 | Compile-time gates and lints own them. |
 | Doc convention | 05-G9 | Ticket 12 and ticket 13. |

@@ -414,7 +414,7 @@ racy timestamps are the flake risk.
 | 5 | Config scope, tracking and template | 01-G7, 01-G11, 01-G12, 01-G13, 01-G14, 01-G15, 01-G16, 01-G18, 01-G21, 01-G22, 01-G25, 01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-G7, 05-dirtree, 05-env_vars, 05-file_tracker | None |
 | 6 | Schema and temporal at the boundary | 04-S3, 04-S4, 04-S7, 04-T2, 04-T4, 04-T6, 04-T7, 04-T8, 04-B1 to 04-B7 | Entry condition 9.7 |
 | 7 | Note-model rules through query output | 03-N01 to 03-N04, 03-N06, 03-N08 to 03-N12, 03-N14, 03-N17, 03-N05, 03-N07 and 03-N16 (defect parts excluded), 05-G8, 05-field, 05-task, 05-tag | None |
-| 8 | Spawned-signal exit 130 (Unix) | The class-level 130 case of 01-G1 | Entry condition 9.7 |
+| 8 | Spawned-signal exit 130 (Unix) | ~~The class-level 130 case of 01-G1~~ Dropped 2026-11-03: exit 130 needs a real-TTY prompt, which conflicts with the PTY ban. Known limitation; the unit pins stay (section 9.9, item 13). | ~~Entry condition 9.7~~ |
 
 The grilling session named only some rows in its accepted list. The roadmap
 placed the other rows by domain affinity. They are:
@@ -626,10 +626,8 @@ and records the result in section 12.
 - **Slice 6:** a scenario for another time zone uses
   `When I run "..." in time zone "..."` through `run_with_envs`. Check that
   Windows honors an IANA `TZ` value [INFERENCE].
-- **Slice 8:** the tag set is closed and `@ignore` is banned, so a Unix-only
-  scenario has no way to skip on Windows. Run a platform-gating spike first. It
-  also needs a signal-sending dev-dependency decision. `Cargo.toml` has none
-  (`rustix` has only the `fs` feature).
+- **Slice 8:** resolved 2026-11-03 by dropping the slice; see section 12 and
+  section 9.9 item 13.
 
 ### 9.8 Items outside the slices
 
@@ -687,6 +685,13 @@ Each item has a reason and an owner.
     API. Every other item joins the hygiene backlog. `AGENTS.md` asks for a
     changelog update on permanent fixes. No `CHANGELOG.md` exists, so the duty has
     no target until ticket 38 decides.
+13. The process-level exit 130 case (01-G1, the 130 part): known limitation.
+    Numeric 130 requires a real-TTY interactive prompt, and the scenario would
+    need a pseudoterminal harness, which section 4 bans. The unit pins stay:
+    `src/main.rs::ctrl_c_abort_exits_130` and
+    `src/cli/mod.rs::user_interrupted_during_template_picker_returns_aborted_interrupted`.
+    No process-level case exists. A PTY ban reversal or an ADR-level decision
+    reopens it.
 
 ## 10. Obligations register
 
@@ -711,7 +716,7 @@ slice, and where it lands:
 | `test:unit --no-tests fail` | 12 | Slice 1, commit 1 |
 | Coverage `--all-features` divergence | 12 | Slice 1, commit 1 |
 | `proptest-regressions/` | 12, 08 | U2 |
-| Unix spawned-signal exit 130 case | 12 | Slice 8 |
+| Unix spawned-signal exit 130 case | 12 | Dropped 2026-11-03; known limitation (section 9.9, item 13) |
 | Rename of the two sort tests | 13 | Slice 3 |
 | yaml.rs unit pins | 12, 13 | U1 |
 | Hygiene backlog owner | 13 | Section 9.8 |
@@ -756,3 +761,25 @@ change.
   in tests/features/process.feature passed 100 of 100 stress iterations locally.
   Exact-equality stdout and stderr steps and count summary step added. No test
   deletions.
+- 2026-11-03: slice 8 entry-condition spike ran. Platform gate: `scenarios!`
+  generates one test for every feature file it finds. A flat feature file
+  without Unix-only steps would fail at run time on Windows ("Step not
+  found"). The only clean gate without `@ignore`, `skip!()` or a new tag is a
+  separate `#[cfg(unix)] scenarios!("tests/features/unix", ...)` call over a
+  `tests/features/unix/` directory. The layer gate's feature-text checks scan
+  all of `tests/features/` recursively. The sixth gate check does too. The
+  nested directory stays visible to them [INFERENCE for Windows]. Behavior
+  spike: `src/main.rs` emits numeric 130 only when the dialog layer returns
+  `DialogError::UserInterrupted`. `inquire` reports that error only when
+  stdin is a real TTY. `src/dialog/terminal.rs` guards every prompt with
+  `stdin_is_tty`. A piped-stdin child that receives SIGINT dies by signal.
+  Then `ExitStatus::code()` is `None`, never `Some(130)`. A deterministic
+  prompt readiness observable needs a pseudoterminal. Spec section 4 bans a
+  PTY harness (`rustix` offers the `pty` feature, which would make the e2e
+  harness build one). The user decided (2026-11-03) to drop slice 8. The
+  exit 130 case stays a known limitation owned by the existing unit tests
+  (`src/main.rs::ctrl_c_abort_exits_130` and
+  `src/cli/mod.rs::user_interrupted_during_template_picker_returns_aborted_interrupted`).
+  No process-level 130 case exists. No rustix feature is added. Spec sections
+  9.3, 9.7 and 9.9 are amended. The class-level 130 row reads
+  `pinned: src/main.rs::ctrl_c_abort_exits_130` in research/10.
