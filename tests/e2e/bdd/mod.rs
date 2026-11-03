@@ -32,6 +32,7 @@ fn last_run() -> LastRun {
 
 mod configuration;
 mod process;
+mod query;
 mod template;
 mod tracking;
 mod trust;

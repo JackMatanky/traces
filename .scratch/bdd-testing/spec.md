@@ -758,6 +758,10 @@ change.
   deletions.
 - 2026-11-03: the user confirmed the section 9.3 row placement for slice 5.
   The rows placed by domain affinity remain in slice 5.
+- 2026-11-03: slice 3 closed. Query scenarios cover the owned rows in
+  `tests/features/query.feature`. Four e2e tests moved to scenarios after
+  paired failure checks. Two unit test names now say `explicit ascending`.
+  The slice 3 ledger records the deletion proof and name inventory.
 - 2026-11-03: slice 5 closed. The configuration, tracking and template rows
   (01-G7, 01-G11, 01-G13, 01-G14, 01-G15, 01-G18, 01-G21, 01-G22, 01-G25,
   01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-env_vars and
