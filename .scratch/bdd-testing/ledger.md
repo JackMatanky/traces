@@ -238,3 +238,44 @@ Each scenario states one process-level result with one principal `When` and
 three to five steps. The notes, tasks, fields and paths are concrete. The
 assertions check exact output, exit codes or diagnostic codes. The title of
 each scenario identifies the behavior if an assertion fails.
+
+## Slice 8: Spawned-Signal Exit 130 (Dropped)
+
+No scenario was written and no test was deleted. The user decided
+(2026-11-03) to drop the slice before the signal dev-dependency landed.
+
+### Spike Results (Entry Condition 9.7)
+
+- **Platform gating.** `scenarios!` generates one test for every feature file
+  in the directory it scans, and a missing step fails at run time with
+  `Step not found` (spec section 2). Cfg-gating the step definitions alone
+  would leave Windows generating a test whose steps do not exist. The clean
+  gate is a second `#[cfg(unix)] scenarios!("tests/features/unix", ...)`
+  call over a separate `tests/features/unix/` directory. The `check:layers`
+  feature-text checks and the sixth gate check scan `tests/features/`
+  recursively, so the nested directory stays visible to them. Windows
+  behavior is [INFERENCE]; CI was never run for this layout.
+- **Exit 130 mechanics.** `src/main.rs` returns `ExitCode::from(130)` only
+  for `CommandOutcome::Aborted(UserAbort::Interrupted)`. That outcome is
+  produced only when a dialog error chain holds
+  `DialogError::UserInterrupted`. `inquire` reports that error
+  (`OperationInterrupted`) only when the prompt runs on a real TTY.
+  `src/dialog/terminal.rs` guards every prompt with `stdin_is_tty` and
+  answers from a fallback table otherwise. A piped-stdin child that receives
+  SIGINT dies by signal, so `ExitStatus::code()` is `None`, and no assertion
+  of a numeric 130 is possible without a pseudoterminal.
+- **Readiness.** Deterministic prompt readiness (poll an observable, never
+  `sleep`) requires reading the prompt output, which again needs a
+  pseudoterminal. Spec section 4 bans a PTY harness.
+- **Dependency.** `rustix` is a dev-dependency (1.1.5, `fs` feature). Its
+  `process` feature would cover `kill`; its `pty` feature would cover the
+  pseudoterminal. Both stay unadded.
+
+### Decision
+
+Known limitation. The 130 pin stays in the unit layer:
+`src/main.rs::ctrl_c_abort_exits_130` (outcome to exit-code mapping) and
+`src/cli/mod.rs::user_interrupted_during_template_picker_returns_aborted_interrupted`
+(interrupt mapping through `CliError::user_abort`). Spec sections 9.3, 9.7,
+9.9 item 13, 10 and 12 record the decision. Research/10 row 01-G1 notes the
+130 part as pinned; the class-level map row names the same pin.
