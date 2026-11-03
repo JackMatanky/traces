@@ -227,7 +227,11 @@ impl Sandbox {
 
     /// Passthrough allowlist entries copied from this test process.
     fn passthrough_env() -> Vec<(&'static str, OsString)> {
-        let base = vec![("PATH", std::env::var_os("PATH").unwrap_or_default())];
+        let mut base =
+            vec![("PATH", std::env::var_os("PATH").unwrap_or_default())];
+        if let Some(value) = std::env::var_os("LLVM_PROFILE_FILE") {
+            base.push(("LLVM_PROFILE_FILE", value));
+        }
         #[cfg(windows)]
         {
             let mut passthrough = base;

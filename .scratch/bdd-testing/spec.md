@@ -556,8 +556,14 @@ ticket 08 reopens. The user decides whether to reopen.
   states by the method of section 6.
 - Add the sixth gate check. It wakes when the Status columns exist.
 - Record the first gap recompute: `gap recompute: slice 1, DATE` in the adoption map.
-- Run the profraw empirical check: do llvm-cov numbers see scenario-executed
-  source? Until then, treat coverage numbers as blind to it (ticket 12).
+- Profraw empirical check: do llvm-cov numbers see scenario-executed source?
+  Settled on 2026-11-03: `cargo-llvm-cov` sees scenario-executed source when
+  `tests/e2e/support.rs` passes `LLVM_PROFILE_FILE` through the sandbox
+  environment allowlist. Spawned binary runs produce `.profraw` files with
+  process identifiers and merge without collision. Line coverage is visible in
+  the merged report (for example, `src/cli/init.rs` has 61.4% line coverage).
+  Without this passthrough, coverage is blind (0.00% across all files) and
+  leaves stray `.profraw` files in the sandbox workspace.
 - Fix the candidate table row for `init.rs::default_path_init_spawns_and_scaffolds_workspace`
   (01-G17 does not apply).
 
@@ -740,3 +746,8 @@ change.
   and windows, including audit: https://github.com/JackMatanky/traces/actions/runs/41626080102.
   The scenarios S1 and S2 passed 100 of 100 stress iterations locally. Deletions are
   allowed.
+- 2026-11-03: slice 1 closed. Pilot rows (01-G4, 01-G17, 01-G23, 01-G24, 05-G3)
+  are marked covered in the invariance map. The sixth gate check is active. The
+  first gap recompute is recorded. The profraw check confirmed coverage numbers
+  see scenario runs. The candidate table row for init is fixed. The hygiene
+  backlog is created. Rubric questions 1 and 2 are answered affirmative.
