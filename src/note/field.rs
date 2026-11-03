@@ -1250,6 +1250,114 @@ mod tests {
         }
     }
 
+    mod proptests {
+        use std::cmp::Ordering;
+
+        use proptest::prelude::*;
+
+        use super::*;
+
+        fn leaf_field_value_strategy() -> impl Strategy<Value = NoteFieldValue>
+        {
+            prop_oneof![
+                Just(NoteFieldValue::Null),
+                any::<bool>().prop_map(NoteFieldValue::Bool),
+                prop_oneof![
+                    Just(0.0),
+                    Just(-0.0),
+                    Just(f64::NAN),
+                    Just(f64::INFINITY),
+                    Just(f64::NEG_INFINITY),
+                    (-10_000.0..10_000.0),
+                ]
+                .prop_map(NoteFieldValue::Number),
+                (-100_000.0..=100_000.0).prop_map(|sec| {
+                    NoteFieldValue::Duration(
+                        DurationValue::from_nominal_seconds(sec)
+                            .expect("finite duration seconds"),
+                    )
+                }),
+                (1970..=2040, 1u32..=12, 1u32..=28).prop_map(|(y, m, d)| {
+                    NoteFieldValue::Date(
+                        DateValue::from_ymd(y, m, d).expect("valid test date"),
+                    )
+                }),
+                (-1_000_000_000i64..=1_000_000_000i64).prop_map(|ts| {
+                    NoteFieldValue::DateTime(
+                        DateTimeValue::from_unix_seconds(ts)
+                            .expect("valid unix seconds"),
+                    )
+                }),
+                "[a-zA-Z0-9 _-]{0,20}".prop_map(NoteFieldValue::String),
+                ("[a-z0-9/_-]{1,15}", "[a-z0-9 ]{0,10}").prop_map(
+                    |(target, text)| {
+                        NoteFieldValue::Link(Link::new(
+                            target,
+                            text,
+                            crate::note::LinkType::Markdown,
+                        ))
+                    },
+                ),
+            ]
+        }
+
+        fn any_field_value_strategy() -> impl Strategy<Value = NoteFieldValue> {
+            leaf_field_value_strategy().prop_recursive(2, 8, 3, |inner| {
+                prop_oneof![prop::collection::vec(inner, 0..=3).prop_map(|v| {
+                    NoteFieldValue::List(v.into_boxed_slice())
+                }),]
+            })
+        }
+
+        proptest! {
+            /// Proves total order laws for `NoteFieldValueRef::compare` (03:N15):
+            /// 1. Reflexivity: `a.compare(a) == Equal` (including `NaN == NaN` and `-0.0 == 0.0`).
+            /// 2. Antisymmetry: `a.compare(b) == b.compare(a).reverse()`.
+            /// 3. Transitivity: if `a.compare(b) == ord1` and `b.compare(c) == ord2`
+            ///    and `ord1 == ord2`, then `a.compare(c) == ord1`.
+            /// 4. Totality: for all `a` and `b`, `a.compare(b)` yields a definite `Ordering` (never indeterminate).
+            #[test]
+            fn satisfies_total_order_laws(
+                a in any_field_value_strategy(),
+                b in any_field_value_strategy(),
+                c in any_field_value_strategy(),
+            ) {
+                let ref_a = a.as_ref();
+                let ref_b = b.as_ref();
+                let ref_c = c.as_ref();
+
+                // 1. Reflexivity
+                prop_assert_eq!(ref_a.compare(&ref_a), Ordering::Equal);
+                prop_assert_eq!(ref_b.compare(&ref_b), Ordering::Equal);
+                prop_assert_eq!(ref_c.compare(&ref_c), Ordering::Equal);
+
+                // 2. Antisymmetry
+                let ab = ref_a.compare(&ref_b);
+                let ba = ref_b.compare(&ref_a);
+                prop_assert_eq!(ab, ba.reverse());
+
+                // 3. Transitivity
+                let bc = ref_b.compare(&ref_c);
+                let ac = ref_a.compare(&ref_c);
+                if ab == bc {
+                    prop_assert_eq!(ac, ab);
+                }
+                if ab == Ordering::Less && bc == Ordering::Less {
+                    prop_assert_eq!(ac, Ordering::Less);
+                }
+                if ab == Ordering::Greater && bc == Ordering::Greater {
+                    prop_assert_eq!(ac, Ordering::Greater);
+                }
+                if ab == Ordering::Equal && bc == Ordering::Equal {
+                    prop_assert_eq!(ac, Ordering::Equal);
+                }
+
+                // 4. Totality
+                prop_assert!(matches!(ab, Ordering::Less | Ordering::Equal | Ordering::Greater));
+            }
+        }
+    }
+
     mod formatting {
         use pretty_assertions::assert_eq;
 

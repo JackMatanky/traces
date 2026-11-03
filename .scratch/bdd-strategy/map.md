@@ -203,4 +203,8 @@ Nothing. The fog items graduated into [spec.md](../bdd-testing/spec.md):
 
 - gap recompute: slice 1, 2026-11-03
 - gap recompute: slice 2, 2026-11-03
+- gap recompute: slice 3, 2026-11-03
+- gap recompute: slice 8 dropped, 2026-11-03. The exit 130 class-level case is a
+  known limitation (`pinned: src/main.rs::ctrl_c_abort_exits_130`); see
+  [spec.md](../bdd-testing/spec.md) sections 9.3, 9.7, 9.9 item 13 and 12.
 - gap recompute: slice 4, 2026-11-03

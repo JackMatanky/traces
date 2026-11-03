@@ -35,7 +35,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03); the 130 part reads `pinned: src/main.rs::ctrl_c_abort_exits_130` (slice 8 dropped, decided 2026-11-03) |
 | 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
 | 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
 | 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
@@ -56,27 +56,27 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | gap |
 | 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | gap |
 | 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | covered: An edited task appears in the next query (reviewed 2026-11-03) |
-| 01-G30 | Query output shapes are stable Markdown | F | gap |
+| 01-G30 | Query output shapes are stable Markdown | F | covered: A page table renders one Markdown row per note (reviewed 2026-11-03) |
 
 ### Query and template (`research/02`)
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 02-G1 | Source-expression grammar: atoms, boolean operators, precedence | F+M | gap |
-| 02-G2 | `from()` input dispatch | F+M | gap |
-| 02-G3 | An unknown class selector gives an empty result, with no error | F+M | gap |
-| 02-G4 | Row granularity for `pages`, `lists` and `tasks` | F | gap |
-| 02-G5 | Filter semantics: comparisons, `contains`, temporal functions | F+M | gap |
-| 02-G6 | Sort default direction and CLI sort flags | D (default order), M (flags) | gap |
-| 02-G7 | Null placement | D | gap |
-| 02-G8 | Terminal renderers: method form, pipeline form, parity | F | gap |
-| 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | gap |
+| 02-G1 | Source-expression grammar: atoms, boolean operators, precedence | F+M | covered: Source expressions respect not and and before or (reviewed 2026-11-03) |
+| 02-G2 | `from()` input dispatch | F+M | covered: A bare Markdown path selects only tasks from that note (reviewed 2026-11-03) |
+| 02-G3 | An unknown class selector gives an empty result, with no error | F+M | covered: An unknown class selector returns no pages (reviewed 2026-11-03) |
+| 02-G4 | Row granularity for `pages`, `lists` and `tasks` | F | covered: Tasks exclude plain list items from their row count (reviewed 2026-11-03) |
+| 02-G5 | Filter semantics: comparisons, `contains`, temporal functions | F+M | covered: A date function filters notes by their computed due date (reviewed 2026-11-03) |
+| 02-G6 | Sort default direction and CLI sort flags | D (default order), M (flags) | covered: An explicit ascending sort places missing ratings first (reviewed 2026-11-03) |
+| 02-G7 | Null placement | D | covered: Default descending sort places missing ratings last (reviewed 2026-11-03) |
+| 02-G8 | Terminal renderers: method form, pipeline form, parity | F | covered: A template query renders method and pipeline tables alike (reviewed 2026-11-03) |
+| 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | covered: Unknown sort fields report a stable diagnostic code (reviewed 2026-11-03) |
 | 02-G10 | Template resolution order; validation before search | D | gap |
 | 02-G11 | Output-path precedence and root confinement | D | gap |
 | 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | gap |
 | 02-G13 | CLI stream contract; index freshness round-trips | F | covered: A rendered note appears in the next list query (reviewed 2026-11-03) |
-| 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | gap |
-| 02-G16 | Task and list rows keep document order (order only) | F | gap |
+| 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | covered: Chained sort and limit preserve the order of equal-rated pages (reviewed 2026-11-03) |
+| 02-G16 | Task and list rows keep document order (order only) | F | covered: List rows include plain items and checkboxes in document order (reviewed 2026-11-03) |
 | 02-G18 | Include loader: missing include is soft, other errors are hard | D | gap |
 
 ### Index and note (`research/03`)
@@ -152,7 +152,7 @@ one disposition. Ticket 12 uses this list as input.
 | Class | Members | Disposition |
 |---|---|---|
 | Real-TTY and abort | 01-G5, 01-G8, 01-G9, 01-G10 | Exception class (ticket 07). Unit test. |
-| Exit 130 | 01-G1 (the 130 part), 01-G5 | One spawned-signal case on Unix. The unit test stays. |
+| Exit 130 | 01-G1 (the 130 part), 01-G5 | The unit test stays. Slice 8 was dropped (2026-11-03): numeric 130 needs a real-TTY prompt and the scenario would need a PTY harness, which spec section 4 bans. Known limitation; the pin is `pinned: src/main.rs::ctrl_c_abort_exits_130`. |
 | Test harness | 01-G28 | Not a product guarantee. |
 | Gate-owned | 05-G4, 05-G5, 05-G6 | Compile-time gates and lints own them. |
 | Doc convention | 05-G9 | Ticket 12 and ticket 13. |
