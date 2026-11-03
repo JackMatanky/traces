@@ -92,21 +92,21 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | covered: Exact and implied paths resolve before a nearby basename (reviewed 2026-11-03) |
 | 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | covered: Hidden Git files and symlink notes are absent from queries (reviewed 2026-11-03) |
 | 03-P25 | `index` populates the tracked-config store | D | covered: Indexing records the project configuration as tracked (reviewed 2026-11-03) |
-| 03-N01 | Parsing never fails; malformed frontmatter still queries | F | gap |
-| 03-N02 | Frontmatter mapping semantics | F | gap |
-| 03-N03 | Headings: ATX and setext, in document order | F | gap |
-| 03-N04 | Lists: pre-order, depth, parent chain | F | gap |
-| 03-N05 | Inline fields: extraction and scope | F | gap |
-| 03-N06 | Inline-field syntax forms | F | gap |
-| 03-N07 | Typed inline values (the visible subset) | F | gap |
-| 03-N08 | Tags: body and list-item extraction, hierarchy | F | gap |
-| 03-N09 | Task markers (marker cases) | F | gap |
-| 03-N10 | Task versus checkbox through `tag_filters` | F | gap |
-| 03-N11 | `fully_complete` subtree semantics | F | gap |
-| 03-N12 | Task text normalization | F | gap |
-| 03-N14 | Emoji shorthands are task-item-only | F | gap |
-| 03-N16 | Field collection: frontmatter wins on duplicate keys | F | gap |
-| 03-N17 | Link shape: first `#` splits path and anchor | F | gap |
+| 03-N01 | Parsing never fails; malformed frontmatter still queries | F | covered: Malformed frontmatter does not prevent a note from appearing (reviewed 2026-11-03) |
+| 03-N02 | Frontmatter mapping semantics | F | covered: Duplicate frontmatter fields use the last value (reviewed 2026-11-03) |
+| 03-N03 | Headings: ATX and setext, in document order | F | pinned: src/note/parser.rs::collects_atx_heading_with_its_level_text_and_source_line and collects_setext_display_text_from_first_source_line |
+| 03-N04 | Lists: pre-order, depth, parent chain | F | covered: Nested tasks retain their document order and parent coordinates (reviewed 2026-11-03) |
+| 03-N05 | Inline fields: extraction and scope | F | covered: A task's inline field does not leak to its sibling (reviewed 2026-11-03) |
+| 03-N06 | Inline-field syntax forms | F | covered: Bare bracketed and parenthesized inline fields select notes (reviewed 2026-11-03) |
+| 03-N07 | Typed inline values (the visible subset) | F | covered: Inline durations compare by elapsed time (reviewed 2026-11-03) |
+| 03-N08 | Tags: body and list-item extraction, hierarchy | F | covered: A parent tag selects notes carrying its descendant tag (reviewed 2026-11-03) |
+| 03-N09 | Task markers (marker cases) | F | covered: Task output keeps all known and unknown markers at their nesting depth (reviewed 2026-11-03) |
+| 03-N10 | Task versus checkbox through `tag_filters` | F | covered: Configured tag filters exclude untagged checklist items from tasks (reviewed 2026-11-03) |
+| 03-N11 | `fully_complete` subtree semantics | F | covered: A parent task is not fully complete while a descendant remains open (reviewed 2026-11-03) |
+| 03-N12 | Task text normalization | F | covered: Task output removes date priority and inline field annotations (reviewed 2026-11-03) |
+| 03-N14 | Emoji shorthands are task-item-only | F | covered: Date shorthand in a plain list item is not a task date (reviewed 2026-11-03) |
+| 03-N16 | Field collection: frontmatter wins on duplicate keys | F | covered: Frontmatter takes priority over a duplicate inline field (reviewed 2026-11-03) |
+| 03-N17 | Link shape: first `#` splits path and anchor | F | covered: Wikilink anchors do not change the linked note's path (reviewed 2026-11-03) |
 
 ### Schema and temporal (`research/04`)
 
@@ -136,12 +136,12 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 05-G2 | Stream split | F | covered: Listing templates exits with code zero and writes payload to stdout (reviewed 2026-11-03) |
 | 05-G3 | Stable diagnostic codes | M | covered: Missing project configuration exits with code one and reports discovery diagnostic (reviewed 2026-11-03) |
 | 05-G7 | Root confinement of every filesystem path | D | gap |
-| 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | gap |
-| 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | gap |
-| 05-task | Unknown status symbol gives an incomplete task | F | gap |
+| 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | covered: Frontmatter and template YAML interpret leading zero values alike (reviewed 2026-11-03) |
+| 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | pinned: src/field.rs::is_name_match_requires_exact_raw_text; Field keys match without regard to casing or punctuation covers the query half |
+| 05-task | Unknown status symbol gives an incomplete task | F | covered: Task output keeps all known and unknown markers at their nesting depth (reviewed 2026-11-03) |
 | 05-file_tracker | `clean` removes stale entries, never live ones | D | covered: Cleaning preserves a live tracked configuration path (reviewed 2026-11-03) |
 | 05-dirtree | Traversal errors classified by where they occur | D | pinned: src/dirtree.rs::tests (no portable CLI channel distinguishes root versus node errors) |
-| 05-tag | Containment by segment prefix | F | gap |
+| 05-tag | Containment by segment prefix | F | covered: A parent tag selects notes carrying its descendant tag (reviewed 2026-11-03) |
 | 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | covered: A discovery ceiling stops the upward configuration search (reviewed 2026-11-03) |
 
 ## Class-level map

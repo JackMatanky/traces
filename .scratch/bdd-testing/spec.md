@@ -818,3 +818,14 @@ change.
   `TimeZone::try_system` calls Jiff 0.2.38's `get_env_tz` before the platform
   lookup. The Jiff source says that IANA `TZ` should work on Windows.
   A Windows CI result is pending the orchestrator's branch run.
+- 2026-11-03: slice 7 closed. Note-model rows 03-N01, 03-N02, 03-N04 to 03-N12,
+  03-N14, 03-N16, 03-N17, 05-G8, 05-task and 05-tag are marked covered in the
+  invariance map. Rows 03-N03 and the exact-name half of 05-field are pinned to
+  unit tests; no observable CLI channel exists for them.
+  31 scenarios in tests/features/note.feature passed 100 of 100 stress
+  iterations locally. Three candidate tests were deleted with the section 7
+  proofs (see ledger.md):
+  - task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers
+  - task_filter_shortcuts_narrow_output_accurately
+  - list_filters_an_inline_multi_part_duration
+  The tag-filter config test stays until slice 5 completes row 01-G21.

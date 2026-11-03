@@ -32,6 +32,7 @@ fn last_run() -> LastRun {
 
 mod configuration;
 mod index;
+mod note;
 mod process;
 mod query;
 mod schema_temporal;

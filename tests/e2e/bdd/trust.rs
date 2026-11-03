@@ -44,11 +44,7 @@ fn a_trusted_project_with_note_containing(
     docstring: String,
 ) {
     sandbox.write_config();
-    let content = if docstring.ends_with('\n') {
-        docstring
-    } else {
-        format!("{docstring}\n")
-    };
+    let content = format!("{}\n", docstring.trim_matches('\n'));
     sandbox.write_note(&path, &content);
     let trust = sandbox.run(&["trust"]);
     trust.assert_success();
