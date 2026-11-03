@@ -55,7 +55,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 01-G25 | The global config layer is never trust-gated | F | gap |
 | 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | gap |
 | 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | gap |
-| 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | gap |
+| 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | covered: An edited task appears in the next query (reviewed 2026-11-03) |
 | 01-G30 | Query output shapes are stable Markdown | F | gap |
 
 ### Query and template (`research/02`)
@@ -74,7 +74,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 02-G10 | Template resolution order; validation before search | D | gap |
 | 02-G11 | Output-path precedence and root confinement | D | gap |
 | 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | gap |
-| 02-G13 | CLI stream contract; index freshness round-trips | F | gap |
+| 02-G13 | CLI stream contract; index freshness round-trips | F | covered: A rendered note appears in the next list query (reviewed 2026-11-03) |
 | 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | gap |
 | 02-G16 | Task and list rows keep document order (order only) | F | gap |
 | 02-G18 | Include loader: missing include is soft, other errors are hard | D | gap |
@@ -83,15 +83,15 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 03-P01 | A query after an edit, delete or rename shows the change | F (equivalence) | gap |
-| 03-P02 | The query shows the delta: new tag, removed tag, rewritten task text | F | gap |
-| 03-P03 | An added, deleted or renamed file updates every link resolution | F | gap |
-| 03-P05 | A size or mtime change makes the index fresh (observable half) | F (equivalence) | gap |
-| 03-P08 | A changed index-relevant setting shows in the next query | F (equivalence) | gap |
-| 03-P20 | Inlinks: deduplicated, sorted, no empty sources | F | gap |
-| 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | gap |
-| 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | gap |
-| 03-P25 | `index` populates the tracked-config store | D | gap |
+| 03-P01 | A query after an edit, delete or rename shows the change | F (equivalence) | covered: Renaming a note removes the former path and resolves its link (reviewed 2026-11-03) |
+| 03-P02 | The query shows the delta: new tag, removed tag, rewritten task text | F | covered: An edited task appears in the next query (reviewed 2026-11-03) |
+| 03-P03 | An added, deleted or renamed file updates every link resolution | F | covered: Adding a link target resolves its inlink on the next query (reviewed 2026-11-03) |
+| 03-P05 | A size or mtime change makes the index fresh (observable half) | F (equivalence) | covered: An edited task appears in the next query (reviewed 2026-11-03) |
+| 03-P08 | A changed index-relevant setting shows in the next query | F (equivalence) | covered: An index setting edit changes the next query without changing notes (reviewed 2026-11-03) |
+| 03-P20 | Inlinks: deduplicated, sorted, no empty sources | F | covered: Inlinks are sorted and deduplicated with empty sources omitted (reviewed 2026-11-03) |
+| 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | covered: Exact and implied paths resolve before a nearby basename (reviewed 2026-11-03) |
+| 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | covered: Hidden Git files and symlink notes are absent from queries (reviewed 2026-11-03) |
+| 03-P25 | `index` populates the tracked-config store | D | covered: Indexing records the project configuration as tracked (reviewed 2026-11-03) |
 | 03-N01 | Parsing never fails; malformed frontmatter still queries | F | gap |
 | 03-N02 | Frontmatter mapping semantics | F | gap |
 | 03-N03 | Headings: ATX and setext, in document order | F | gap |

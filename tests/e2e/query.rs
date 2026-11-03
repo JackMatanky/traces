@@ -55,41 +55,6 @@ fn class_descendant_selector_expands_through_the_schema_graph() {
     unknown.assert_stdout_eq("");
 }
 
-/// Verifies inlinks render in a spawned `table` query after a separate
-/// `index` invocation. The `table` command may refresh links before
-/// rendering; this does not establish that the links were read from the store.
-///
-/// The integration differential compares complete rows, including inlinks;
-/// this test separately checks their rendering across the CLI process boundary.
-///
-/// Executes vs asserts:
-/// - Executes: linked notes, `traces trust`, `traces index`, then `traces table
-///   --column file.name --column inlinks`.
-/// - Asserts: the target row's `inlinks` cell carries the linker path.
-///
-/// Defect class: silent-wrong-answers (inlinks omitted from the rendered row).
-#[test]
-fn inlinks_render_across_spawned_queries() {
-    let sandbox = Sandbox::trusted_via_cli();
-    sandbox.write_note("notes/foo.md", "# Foo\n");
-    sandbox.write_note("a.md", "see [[notes/foo]]\n");
-    sandbox.run(&["index"]).assert_success();
-
-    let table =
-        sandbox.run(&["table", "--column", "file.name", "--column", "inlinks"]);
-    table.assert_success();
-    table.assert_never_exit_101();
-    let foo_row = table
-        .stdout
-        .lines()
-        .find(|line| line.starts_with("| foo"))
-        .expect("foo row present");
-    assert!(
-        foo_row.contains("a.md"),
-        "inlinks must render the linker; row: {foo_row}"
-    );
-}
-
 /// Sorts by a misspelled field and checks the "did you mean" suggestion
 /// reaches captured stderr.
 ///

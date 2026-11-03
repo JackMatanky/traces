@@ -756,3 +756,6 @@ change.
   in tests/features/process.feature passed 100 of 100 stress iterations locally.
   Exact-equality stdout and stderr steps and count summary step added. No test
   deletions.
+- 2026-11-03: slice 4 added index-freshness scenarios for edits, paths, links,
+  config drift, rendered notes, scan scope and the tracked-config store. The
+  same-size mtime canary stays in Rust as a known limit for arch ticket 25.
