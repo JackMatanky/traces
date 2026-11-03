@@ -118,7 +118,7 @@ main() {
   resolve_module_filter
   parse_passthrough_tokens
 
-  cargo nextest run "${unit_args[@]}"
+  cargo nextest run --no-tests fail "${unit_args[@]}"
 }
 
 main "$@"
