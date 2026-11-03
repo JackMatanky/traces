@@ -30,6 +30,7 @@ fn last_run() -> LastRun {
     LastRun(None)
 }
 
+mod index;
 mod process;
 mod trust;
 

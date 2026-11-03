@@ -126,14 +126,10 @@ fn newly_created_link_target_resolves_inlinks_after_spawned_refresh() {
     );
 }
 
-/// Divergence canary: a same-size content edit with the mtime restored is
-/// invisible to a spawned query (metadata fingerprints match, so the store
-/// is reloaded) but visible after an explicit `traces index` rebuild —
-/// proving the first query genuinely read the store instead of silently
-/// rebuilding.
-///
-/// This recipe stays about metadata freshness; config drift has its own canary,
-/// [`config_edit_heals_the_index_on_the_next_query`].
+/// Known limitation (arch-design ticket 25): a same-size content edit with
+/// the mtime restored is invisible to a spawned query while metadata
+/// fingerprints match. An explicit `traces index` rebuild sees the edit.
+/// This timing canary remains a Rust e2e test, not a BDD scenario.
 ///
 /// Executes vs asserts:
 /// - Executes: `traces index`, `traces task`, a same-length note edit with the
