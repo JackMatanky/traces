@@ -27,6 +27,8 @@ mod process_contract;
 mod query;
 #[path = "e2e/template.rs"]
 mod template;
+#[path = "e2e/tracked.rs"]
+mod tracked;
 #[path = "e2e/trust.rs"]
 mod trust;
 #[path = "e2e/workflow.rs"]

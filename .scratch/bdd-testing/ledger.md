@@ -406,10 +406,10 @@ work is complete and passing. The deletion proofs are not complete:
 the scoped mutation compares did not finish in this run.
 
 - `config.rs::class_field_config_drives_class_selection_from_disk`
-  stays: slice 5 has since covered 01-G21 (2026-11-03), so the die-rule
-  blocker is gone, but its deletion conversion still waits for a scoped
-  mutation compare like the other two tests. Spec section 7: a test
-  whose rows span slices dies in the slice that completes its last row.
+  stays in this run. Slice 5 has since covered 01-G21 (2026-11-03), so the
+  die-rule blocker is gone. Its deletion still waits for a scoped mutation
+  compare, like the other two tests. Spec section 7: a test whose rows span
+  slices dies in the slice that completes its last row.
 - `query.rs::list_filters_rfc3339_field_by_its_exact_instant` and
   `template.rs::renders_file_sourced_select_field_in_e2e_template` stay
   because their required mutation compares (before and after deletion,
@@ -526,6 +526,7 @@ Not recorded for deletion because no test was deleted.
 before the planned deletion at
 `/tmp/nextest-names-before-slice6.txt` (3978 names). A later conversion
 run must diff this list after deleting the two tests.
+
 ## Slice 7: Note-Model Rules Through Query Output
 
 ### Row 1: Task Custom Markers, Indentation Depth, and Clickable Coordinates
@@ -585,3 +586,117 @@ run must diff this list after deleting the two tests.
 ### Retained Candidate Note
 
 Spec section 9.3 candidate `config.rs::tag_filter_config_drives_task_selection_from_disk` also guards row 01-G21, owned by Slice 5. Spec sections 7 and 9.3 defer conversion to the slice that completes the last row. The test stays in Rust.
+
+## Deletion Wave (slices 5, 6 and 7 leftovers)
+
+Date: 2026-11-04. This wave finishes the deletions that earlier slices
+deferred. The proof of spec section 7 applies to each test. Kill
+demonstrations ran on a commit before the deletion commit. The name list
+before and after the deletion shows exactly the five names below removed.
+The two `tracked.rs` tests are not removed (see Retained Tests).
+
+### Mutation Compare
+
+Scoped runs used `-f <file>`, `--timeout 1200`, `--workers 2` and
+`--no-diffs`. The before-run used the tree before the deletion. The after-run
+used the tree after the deletion. `mutarust-baseline.json` stayed untouched.
+
+| File | Before | After | Result |
+|---|---|---|---|
+| `src/temporal/datetime.rs` | 89 killed, 49 escaped, 27 skipped | 89 killed, 49 escaped, 27 skipped | Same escape IDs. No new escape. |
+| `src/template/engine/schema.rs` | 14 killed, 2 escaped, 9 skipped | 14 killed, 2 escaped, 9 skipped | Same escape IDs. No new escape. |
+| `src/config/model/tasks.rs` | 10 killed, 3 escaped, 6 skipped | 10 killed, 3 escaped, 6 skipped | Same escape IDs. No new escape. |
+| `src/config/model/schemas.rs` | 3 killed, 0 escaped | 3 killed, 0 escaped | No escape. |
+| `src/config/tracker.rs` | 1 killed, 0 escaped | 0 killed, 1 escaped | New escape: mutant `1bc082ba551c7449b7fa4cea638f0ec3` (`branch/if`). The proof fails. |
+
+The `tracker.rs` run executed after the deletion of the two `tracked.rs`
+tests. Mutant `1bc082ba...` was killed before and escaped after. No scenario
+kills it. The two `tracked.rs` tests stay (see Retained Tests).
+
+### Row 1: Configured Task Tag Filters From Disk
+
+- **Namespaced row IDs:** 01-G21, 03-N10.
+- **Behavior:** `[tasks] tag_filters` in the on-disk config selects only the
+  tagged checklist items as tasks.
+- **Former test:** `e2e::config::tag_filter_config_drives_task_selection_from_disk`.
+- **Former layer:** `e2e`.
+- **Defect caught:** The configured tag filter is not applied, so an untagged
+  checklist item reads as a task.
+- **Survivor:** `Configured tag filters exclude untagged checklist items from tasks`
+  in `tests/features/note.feature`. Slice 5 covers 01-G21 with
+  `Local and global configuration fields combine independently`.
+- **Proof:** Assertion comparison: the old test asserted exit 0 and the exact
+  stdout `- [ ] one (a.md)\n`. The scenario asserts exit 0 and the same exact
+  stdout, with an extra `#todo/active` note. Kill demonstration:
+  `TaskConfig::tag_filters` returned an empty list. The old test and the
+  scenario both failed. Mutation compare: `src/config/model/tasks.rs`, no new
+  escape. Twin re-read: the parser unit tests pin the filter in process and
+  never read a config file from disk.
+- **Successor note for arch-design:** None.
+
+### Row 2: Configured File Class Field
+
+- **Namespaced row IDs:** 04-B2, 01-G21.
+- **Behavior:** `[schemas] class_field` in the on-disk config selects the
+  notes that carry that field.
+- **Former test:** `e2e::config::class_field_config_drives_class_selection_from_disk`.
+- **Former layer:** `e2e`.
+- **Defect caught:** The class field name is ignored, so `@Novel` matches
+  nothing.
+- **Survivors:** `A configured file class field selects the matching note` and
+  `A configured file class field does not invent another class` in
+  `tests/features/schema-temporal.feature`.
+- **Proof:** Assertion comparison: the old test asserted exact stdout
+  `- a.md\n` for `@Novel` and empty stdout for `@Book`. The two scenarios
+  assert the same, as separate key examples. Kill demonstration:
+  `class_field_name()` returned a fixed `"hardcoded_class"`. The old test and
+  the scenario both failed. Mutation compare: `src/config/model/schemas.rs`,
+  3 killed before and after. Twin re-read: slice 6 section above.
+- **Successor note for arch-design:** None.
+
+### Row 3: Exact Instant Filtering Through Ingestion
+
+- **Namespaced row IDs:** 04-T2, 04-B5.
+- **Behavior:** An RFC 3339 value with a `+02:00` offset matches a
+  `Z`-spelled filter literal to the nanosecond.
+- **Former test:** `e2e::query::list_filters_rfc3339_field_by_its_exact_instant`.
+- **Former layer:** `e2e`.
+- **Defect caught:** Offset normalization or nanosecond precision is lost
+  between ingestion and filter comparison.
+- **Survivor:** `An offset-dated note matches the same instant to a nanosecond`
+  in `tests/features/schema-temporal.feature`.
+- **Proof:** Assertion comparison and twin re-read: slice 6 section above,
+  Row 1. Kill demonstration: `parse_any` used `Offset::UTC`. Both failed.
+  Mutation compare: `src/temporal/datetime.rs`, same 49 escapes before and
+  after.
+- **Successor note for arch-design:** None.
+
+### Row 4: File-Sourced Select Field in a Spawned Template Render
+
+- **Namespaced row IDs:** 04-B3.
+- **Behavior:** A `select` field with values from a file exposes `value` and
+  `label` to the template.
+- **Former test:** `e2e::template::renders_file_sourced_select_field_in_e2e_template`.
+- **Former layer:** `e2e`.
+- **Defect caught:** The values file is not read or the label is lost.
+- **Survivor:** `A template reads the labels and values of a file-sourced select field`
+  in `tests/features/schema-temporal.feature`.
+- **Proof:** Assertion comparison and twin re-read: slice 6 section above,
+  Row 2. Kill demonstration: `select_entry_value` always returned the plain
+  value. Both failed. Mutation compare: `src/template/engine/schema.rs`, same
+  2 escapes before and after.
+- **Successor note for arch-design:** None.
+
+### Retained Tests
+
+- `e2e::tracked::list_prints_every_tracked_config_path` and
+  `e2e::tracked::clean_removes_a_stale_tracked_entry_and_reports_the_count`
+  are restored and stay. The kill demonstration passed: breaking
+  `TrackerStore::list` or `TrackerStore::clean` fails the old test and the
+  scenario. The mutation compare did not pass. After the deletion, mutant
+  `1bc082ba551c7449b7fa4cea638f0ec3` in `src/config/tracker.rs` escaped. The
+  scenario Givens run `trust`, which already records the path, so no scenario
+  pins that `index` records the configuration as a tracked path. Spec
+  section 7 says a new escape fails the proof. Row 03-P25 stays at its
+  current Status. A later change can add a scenario that kills the mutant.
+  Then the two tests can die.
