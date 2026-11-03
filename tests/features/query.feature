@@ -522,3 +522,80 @@ Feature: Query results select and render notes through the command line
       - notes/high.md
       - notes/high.md
       """
+
+  Scenario: A page list renders the same output as a pipeline
+    Given a trusted project with a note "notes/dune.md" containing:
+      """
+      # Dune
+      """
+    And a template "report.md" containing:
+      """
+      {{ query.from("notes/").list("file.name") }}{{ query.from("notes/") | list("file.name") }}
+      """
+    When I run "traces template -i report --dry-run --no-input"
+    Then the exit code is 0
+    And stdout is:
+      """
+      - dune
+      - dune
+      """
+
+  Scenario: A page count renders the same value as a pipeline
+    Given a trusted project with a note "notes/dune.md" containing:
+      """
+      # Dune
+      """
+    And a template "report.md" containing:
+      """
+      {{ query.from("notes/").count() }} page(s), {{ query.from("notes/") | count }} page(s)
+      """
+    When I run "traces template -i report --dry-run --no-input"
+    Then the exit code is 0
+    And stdout is "1 page(s), 1 page(s)"
+
+  Scenario: An ascending flag without a sort field is rejected
+    Given a trusted project
+    When I run "traces list --asc"
+    Then the exit code is 2
+    And stdout is empty
+
+  Scenario: A schema file field selects notes through a template query
+    Given a trusted project with a note "covers/dune.md" containing:
+      """
+      ---
+      class: book
+      ---
+      """
+    And a schema "book" containing:
+      """
+      [fields.cover]
+      type = "file"
+      folders = ["covers"]
+      ext = "md"
+      class = ["book"]
+      """
+    And a template "report.md" containing:
+      """
+      {{ query.from(schema.get("book").field("cover")).list("file.path") }}
+      """
+    When I run "traces template -i report --dry-run --no-input"
+    Then stdout is:
+      """
+      - covers/dune.md
+      """
+
+  Scenario: An obsolete task field reports a stable diagnostic code
+    Given a trusted project with a note "todo.md" containing:
+      """
+      - [ ] Review the draft
+      """
+    When I filter tasks where:
+      """
+      task.completed == true
+      """
+    Then the exit code is 1
+    And the first line of stderr is:
+      """
+      traces::cli::query::failed
+      """
+    And stdout is empty
