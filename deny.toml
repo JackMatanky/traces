@@ -12,6 +12,12 @@ allow = [
   "ISC",
   "Unicode-3.0",
   "CC0-1.0",
+  "Zlib",
+]
+
+[advisories]
+ignore = [
+  "RUSTSEC-2026-0374",  # basic-toml is unmaintained, transitive dep of rstest-bdd -> i18n-embed -> i18n-config
 ]
 
 [[bans.skip]]
