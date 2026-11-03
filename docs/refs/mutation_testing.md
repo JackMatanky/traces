@@ -156,7 +156,7 @@ If a mutation job is ever added, scope it to the change set:
 ```
 
 This example does not adopt `--min-msi`. Ticket 12 declined the `min_msi` gate;
-see `.scratch/bdd-testing/issues/12-coverage-gap-methodology.md`.
+see `.scratch/bdd-strategy/issues/12-coverage-gap-methodology.md`.
 
 Caveats that make this safe: untracked files are invisible to `--git-diff-lines`
 (stage new files first); an empty change-set exits 0 — the task pairs

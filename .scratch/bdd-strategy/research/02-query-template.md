@@ -6,7 +6,7 @@ namespaces, confined writes, render errors). Method: breadth-first reading of al
 32 source files, inline test modules, the four integration/e2e suites, both
 GLOSSARYs, ADR-0001/0005/0008/0009.
 
-**Citation convention** (matches `.scratch/bdd-testing/` style): `file:line` = repo
+**Citation convention** (matches `.scratch/bdd-strategy/` style): `file:line` = repo
 source; `ADR-000N:Lx-Ly` = `docs/adr/000N-*.md` line range; test names are cited
 as `fn_name @ file:line`. Verdicts are `intentional` (documented/glossary'd/ADR'd
 **and** test-shaped), `incidental` (nothing specifies it), `uncertain` (docs claim

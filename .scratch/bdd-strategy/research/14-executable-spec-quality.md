@@ -195,7 +195,7 @@ each source text directly.
   blocking I/O, < 1 minute, typically < 100ms), Medium (single host, localhost
   network/processes, < 5 minutes), Large (multi-host or system-level,
   unconstrained).
-- `[F19]` (Source: `.scratch/bdd-testing/map.md` lines 97-124, Date: 2026-11-03,
+- `[F19]` (Source: `.scratch/bdd-strategy/map.md` lines 97-124, Date: 2026-11-03,
   Type: primary, Confidence: high): Ticket 07 and 08 place scenarios in the e2e
   binary (`tests/e2e.rs`). Scenarios spawn the compiled CLI binary in a
   temporary sandbox. Under Google classification, these tests are "Medium" size

@@ -22,7 +22,7 @@ behaviors are specified guarantees (documented, glossary'd, ADR'd) versus
 whatever the parser happens to do. Flag contradictions between docs and code.
 
 **Deliverable**: candidate-guarantee inventory in
-`.scratch/bdd-testing/research/02-query-template.md`. Use the same entry format
+`.scratch/bdd-strategy/research/02-query-template.md`. Use the same entry format
 and citation convention as ticket 01: guarantee as observable contract, class,
 intentional/incidental/uncertain with evidence, pinned/unpinned,
 Gherkin-suitability. Note especially which query semantics are *user-visible

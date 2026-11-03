@@ -23,7 +23,7 @@ which temporal guarantees are already well covered by property tests and
 therefore may not need Gherkin.
 
 **Deliverable**: candidate-guarantee inventory in
-`.scratch/bdd-testing/research/04-schema-temporal.md`, same entry format and
+`.scratch/bdd-strategy/research/04-schema-temporal.md`, same entry format and
 citation convention as ticket 01. Highlight cross-domain contracts (schema
 values that flow into query/template; temporal literals inside filters) since
 those boundary guarantees are prime scenario candidates. Max ~400 lines.

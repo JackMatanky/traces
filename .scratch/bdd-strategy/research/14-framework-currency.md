@@ -66,10 +66,10 @@ Primary sources:
     `https://api.github.com/repos/cucumber-rs/cucumber/issues/370/comments`
 26. Crates.io API for `foldhash`: `https://crates.io/api/v1/crates/foldhash`
 27. Local comparison note:
-    `.scratch/bdd-testing/research/rust-bdd-crate-comparison.md`
-28. Local crate note: `.scratch/bdd-testing/research/rstest-bdd.md`
+    `.scratch/bdd-strategy/research/rust-bdd-crate-comparison.md`
+28. Local crate note: `.scratch/bdd-strategy/research/rstest-bdd.md`
 29. Framework decision ticket:
-    `.scratch/bdd-testing/issues/06-framework-revalidation.md`
+    `.scratch/bdd-strategy/issues/06-framework-revalidation.md`
 30. Cucumber Gherkin reference specification:
     `https://cucumber.io/docs/gherkin/reference/`
 
@@ -183,7 +183,7 @@ Sources tried and found useless:
 - `[G19]` Step function definitions differ across frameworks. `rstest-bdd`
   injects arguments directly into step functions. `cucumber-rs` requires a
   shared `&mut World` argument. Plain tests call helper functions directly.
-  Source: `.scratch/bdd-testing/research/rust-bdd-crate-comparison.md` (accessed
+  Source: `.scratch/bdd-strategy/research/rust-bdd-crate-comparison.md` (accessed
   2026-11-03, primary, confidence: high).
 
 ## 4. Disagreements

@@ -65,7 +65,7 @@ Notes on the inventory:
 ## 2. Optimality verdict (set vs omit, per unset key)
 
 **`min_msi`: OMIT. Optimal.** Ticket 12 declined it as a gate
-(`.scratch/bdd-testing/issues/12-coverage-gap-methodology.md`, decision (e):
+(`.scratch/bdd-strategy/issues/12-coverage-gap-methodology.md`, decision (e):
 "No universal MSI threshold"), and the local comment now records the decline.
 Upstream treats an absent `min_msi` as no gate (`src/main.rs:964-967`), so
 omitting it is exactly the declined-gate posture. The commented-out
@@ -261,7 +261,7 @@ TRUE / FALSE / STALE with its citation.
 
 - "declined as a gate (ticket 12)": **TRUE**. Ticket 12 decision (e):
   "No universal MSI threshold. No primary source supports one."
-  (`.scratch/bdd-testing/issues/12-coverage-gap-methodology.md`); the ticket
+  (`.scratch/bdd-strategy/issues/12-coverage-gap-methodology.md`); the ticket
   also records "mutarust.yml: the min_msi comment now records the decline."
 - "min_msi unit: integer percent 0-100 (config.md; cli.md `--min-msi PERCENT`)"
  : **TRUE**. `docs/config.md` field table: "Integer, 0 to 100";
@@ -433,7 +433,7 @@ Compared against live upstream `main` on 2026-11-02.
 **Local primary/first-party evidence:** `mutarust.yml`,
 `docs/refs/mutation_testing.md`, `docs/refs/quality_gates_mutarust.md`,
 `docs/refs/quality_gates_mise_adoption.md:924-946`,
-`.scratch/bdd-testing/issues/12-coverage-gap-methodology.md`,
+`.scratch/bdd-strategy/issues/12-coverage-gap-methodology.md`,
 `.mise/tasks/test/mutants`, `mise.toml:36`, `.gitignore:29-33`,
 `mutarust-baseline.json` (commit `8a2b3ba7`),
 deleted `.cargo/mutants.toml` (last content via

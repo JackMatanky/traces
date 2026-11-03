@@ -22,7 +22,7 @@ discovery, trust verification, config tracking).
 to interrogate, not authority.
 
 **Deliverable**: a candidate-guarantee inventory in
-`.scratch/bdd-testing/research/01-surface-workflows.md`, following the citation
+`.scratch/bdd-strategy/research/01-surface-workflows.md`, following the citation
 convention of the existing files in this directory. One entry per guarantee:
 
 - guarantee stated as an observable contract (inputs, observable outcomes, error

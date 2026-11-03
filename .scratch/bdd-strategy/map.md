@@ -3,7 +3,7 @@
 ## Destination
 
 An implementation-ready **BDD adoption and implementation strategy** for this
-workspace, delivered as [`spec.md`](./spec.md). The strategy contains:
+workspace, delivered as [`spec.md`](../bdd-testing/spec.md). The strategy contains:
 
 - the behavioral domains and contracts that earn executable specifications
 - the testing architecture that they live in (BDD vs
@@ -50,7 +50,7 @@ fresh session can start slice 1 with zero open design questions.
   conventions, `.mise/tasks/test/` phase definitions. The file
   `docs/refs/cucumber_bdd_rust.md` no longer exists (commit `fa95f85f`).
 - **Research findings convention**: findings land in
-  `.scratch/bdd-testing/research/` alongside this map, one file per research
+  `.scratch/bdd-strategy/research/` alongside this map, one file per research
   ticket. No throwaway branches: concurrent agents share one worktree; this
   matches the `arch-design` precedent.
 - **Coordination**: [`.scratch/arch-design/`](../arch-design/map.md) is the
@@ -165,20 +165,32 @@ fresh session can start slice 1 with zero open design questions.
   - A same-layer twin moves; cross-layer pins stay.
   - Every deletion needs a kill demonstration, an exact-assertion comparison and
     a ledger row. A mutation compare adds a second net outside `src/cli`.
-  - Ledger: `.scratch/bdd-testing/ledger.md`.
+  - Ledger: `.scratch/bdd-testing/ledger.md`, in the implementation folder.
   - Preconditions: one green three-OS run in slice 1 and the `check:layers` fix.
   - Arch-design owns later test updates.
 
   Findings: [research/13](research/13-migration-evidence.md),
   [candidate table](research/13-candidate-table.md).
+- [14: Adoption roadmap](issues/14-adoption-roadmap.md): eight ordered slices.
+  Slice 1 is the trust and init lifecycle pilot, in two commits with a
+  three-OS gate between them.
+  - One worktree and one branch per slice. A draft PR triggers CI. Merge
+    locally.
+  - Agent policy: feature files are a human-owned contract.
+  - Rubric: three yes or no questions, no numbers.
+  - Twelve not-now items, with owners. Unit items U1 and U2, a doc pass and a
+    hygiene backlog sit outside the slices.
+
+  Findings: [research/14](research/14-framework-currency.md) and seven sibling
+  files. Destination: [spec.md](../bdd-testing/spec.md).
 
 ## Not yet specified
 
-- Quality-gates policy: resolved by ticket 12. No score gates or coverage
-  targets (anti-metrics); mutation and coverage tooling stay unchanged;
-  min_msi declined. Scope: [ticket 12](issues/12-coverage-gap-methodology.md).
-- Linux and Windows CI result for the e2e placement. Only the first adoption
-  slice can check it.
+Nothing. The fog items graduated into [spec.md](../bdd-testing/spec.md):
+
+- The quality-gates policy was resolved by ticket 12 (section 6.5).
+- The Linux and Windows CI result for the e2e placement is the slice 1 gate
+  (section 9.4). Remaining unknowns are in section 11.
 
 ## Out of scope
 
