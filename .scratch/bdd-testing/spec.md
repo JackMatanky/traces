@@ -197,9 +197,8 @@ Each row has one state:
   another layer. The target is mandatory.
 
 When you change a scenario, bump the date of every row that cites it. During a
-migration, the ledger (section 7) is authoritative. Gate-owned rows read as
-covered only after the `check:layers` exit-code fix lands. Flip that global note
-when the fix lands.
+migration, the ledger (section 7) is authoritative. The `check:layers`
+exit-code fix has landed. Gate-owned rows read as covered.
 
 ### 6.3 Procedure
 

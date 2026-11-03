@@ -153,39 +153,86 @@ run = '''
 set -euo pipefail
 
 echo "==> Verifying layer discipline boundaries..."
+check_grep() {
+    local status=0
+    local output
+    output=$(git grep "$@" 2>&1) || status=$?
+    if (( status >= 2 )); then
+        echo "ERROR: git grep failed with exit code ${status}:" >&2
+        echo "${output}" >&2
+        exit "${status}"
+    fi
+    if (( status == 0 )); then
+        printf '%s\n' "${output}"
+    fi
+}
 
 common_paths=()
 if [[ -d tests/common ]]; then
     common_paths+=(tests/common/)
 fi
 
-if git grep -n -E '(^|[^[:alnum:]_])traces[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ ${common_paths[@]+"${common_paths[@]}"} \
-    | grep -v -E '["`].*traces[[:space:]]*::|^[[:space:]]*//' >&2; then
-    echo "ERROR: E2E tests must not reference traces" >&2
-    exit 1
+e2e_traces_raw=$(check_grep -n -E '(^|[^[:alnum:]_])traces[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' -- tests/e2e.rs tests/e2e/ tests/e2e/bdd/ ${common_paths[@]+"${common_paths[@]}"})
+if [[ -n "${e2e_traces_raw}" ]]; then
+    e2e_traces_refs=$(printf '%s\n' "${e2e_traces_raw}" | grep -v -E '["`].*traces[[:space:]]*::|^[[:space:]]*//' || true)
+    if [[ -n "${e2e_traces_refs}" ]]; then
+        echo "ERROR: E2E tests must not reference traces" >&2
+        echo "${e2e_traces_refs}" >&2
+        exit 1
+    fi
 fi
 
-e2e_process_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' tests/e2e.rs tests/e2e/ ${common_paths[@]+"${common_paths[@]}"} ':!tests/e2e/support.rs' || true)
+e2e_process_refs=$(check_grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' -- tests/e2e.rs tests/e2e/ tests/e2e/bdd/ ${common_paths[@]+"${common_paths[@]}"} ':!tests/e2e/support.rs')
 if [[ -n "${e2e_process_refs}" ]]; then
     echo "ERROR: tests/e2e/ must not use std::process outside support.rs" >&2
     echo "${e2e_process_refs}" >&2
     exit 1
 fi
 
-int_cmd_refs=$(git grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])|CARGO_BIN_EXE' tests/integration.rs tests/integration/ ${common_paths[@]+"${common_paths[@]}"} || true)
+int_cmd_refs=$(check_grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])|CARGO_BIN_EXE' -- tests/integration.rs tests/integration/ ${common_paths[@]+"${common_paths[@]}"})
 if [[ -n "${int_cmd_refs}" ]]; then
     echo "ERROR: tests/integration/ must not spawn child processes or reference CARGO_BIN_EXE" >&2
     echo "${int_cmd_refs}" >&2
     exit 1
 fi
 
-cwd_refs=$(git grep -n -E 'set_current_dir' tests/ || true)
+cwd_refs=$(check_grep -n -E 'set_current_dir' -- tests/)
 if [[ -n "${cwd_refs}" ]]; then
     echo "ERROR: env::set_current_dir is forbidden in tests/" >&2
     echo "${cwd_refs}" >&2
     exit 1
 fi
 
+rule_refs=$(check_grep -n -E '^[[:space:]]*Rule:' -- tests/features/ tests/e2e/bdd/)
+if [[ -n "${rule_refs}" ]]; then
+    echo "ERROR: Rule: is forbidden in feature files and steps" >&2
+    echo "${rule_refs}" >&2
+    exit 1
+fi
+
+skip_refs=$(check_grep -n -E 'skip!' -- tests/features/ tests/e2e/bdd/)
+if [[ -n "${skip_refs}" ]]; then
+    echo "ERROR: skip! is forbidden in scenario steps and features" >&2
+    echo "${skip_refs}" >&2
+    exit 1
+fi
+
+ignore_refs=$(check_grep -n -E '@ignore' -- tests/features/ tests/e2e/bdd/)
+if [[ -n "${ignore_refs}" ]]; then
+    echo "ERROR: @ignore is forbidden in feature files and steps" >&2
+    echo "${ignore_refs}" >&2
+    exit 1
+fi
+
+scenario_titles=$(check_grep -h -E '^[[:space:]]*Scenario:' -- tests/features/)
+if [[ -n "${scenario_titles}" ]]; then
+    duplicates=$(printf '%s\n' "${scenario_titles}" | sed -E -e 's/^[[:space:]]*Scenario:[[:space:]]*//' -e 's/[[:space:]]+$//' | sort | uniq -d || true)
+    if [[ -n "${duplicates}" ]]; then
+        echo "ERROR: Duplicate Scenario title across feature files:" >&2
+        echo "${duplicates}" >&2
+        exit 1
+    fi
+fi
 echo "==> Layer discipline checks passed."
 '''
 

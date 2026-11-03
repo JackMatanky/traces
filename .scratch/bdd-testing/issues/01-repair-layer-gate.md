@@ -10,17 +10,17 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The layer gate fails when its search command exits with code 2 or higher.
-- [ ] No search in the layer gate hides an error.
-- [ ] The layer gate scans the scenario step files as well as the existing e2e files.
-- [ ] The five feature-text checks exist. They reject a `Rule:` line, `skip!`, `@ignore`, a duplicate `Scenario:` title across feature files, and a search error.
-- [ ] Each check fails on a deliberate bad input and then passes.
-- [ ] The unit-test task fails when it runs zero tests.
-- [ ] The coverage task and CI run e2e with the same feature set.
-- [ ] The gate-owned note of the coverage-gap method (spec section 6.2) is flipped.
-- [ ] `mise run verify` passes.
+- [x] The layer gate fails when its search command exits with code 2 or higher.
+- [x] No search in the layer gate hides an error.
+- [x] The layer gate scans the scenario step files as well as the existing e2e files.
+- [x] The five feature-text checks exist. They reject a `Rule:` line, `skip!`, `@ignore`, a duplicate `Scenario:` title across feature files, and a search error.
+- [x] Each check fails on a deliberate bad input and then passes.
+- [x] The unit-test task fails when it runs zero tests.
+- [x] The coverage task and CI run e2e with the same feature set.
+- [x] The gate-owned note of the coverage-gap method (spec section 6.2) is flipped.
+- [x] `mise run verify` passes.
 
 **Out of scope:**
 - Changes to product code or to the public API baselines.

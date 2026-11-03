@@ -137,7 +137,7 @@ jobs:
           shared-key: "test-e2e-${{ matrix.os }}"
       - run: mise install --locked cargo-binstall github:nextest-rs/nextest
       - run: >-
-          cargo nextest run -p traces --no-default-features
+          cargo nextest run -p traces --all-features
           --no-tests fail -E 'binary(e2e)'
 
   test-doctests:
