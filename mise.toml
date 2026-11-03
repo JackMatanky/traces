@@ -233,6 +233,35 @@ if [[ -n "${scenario_titles}" ]]; then
         exit 1
     fi
 fi
+
+if [[ -f .scratch/bdd-strategy/research/10-invariance-map.md ]]; then
+    while IFS= read -r line; do
+        if [[ "${line}" =~ ^\|[[:space:]]*([0-9]{2}-[0-9A-Za-z_-]+)[[:space:]]*\|.*\|[[:space:]]*covered:[[:space:]]*(.*)[[:space:]]+\(reviewed[[:space:]]+[0-9]{4}-[0-9]{2}-[0-9]{2}\)[[:space:]]*\|$ ]]; then
+            row_id="${BASH_REMATCH[1]}"
+            scenario_title="${BASH_REMATCH[2]}"
+            scenario_title="${scenario_title%"${scenario_title##*[![:space:]]}"}"
+            hit=$(grep -r -h -F "Scenario: ${scenario_title}" tests/features/ 2>/dev/null || true)
+            if [[ -z "${hit}" ]]; then
+                hit=$(grep -r -h -F "Scenario Outline: ${scenario_title}" tests/features/ 2>/dev/null || true)
+            fi
+            found=0
+            if [[ -n "${hit}" ]]; then
+                while IFS= read -r match_line || [[ -n "${match_line}" ]]; do
+                    t="${match_line#"${match_line%%[![:space:]]*}"}"
+                    t="${t%"${t##*[![:space:]]}"}"
+                    if [[ "${t}" == "Scenario: ${scenario_title}" || "${t}" == "Scenario Outline: ${scenario_title}" ]]; then
+                        found=1
+                        break
+                    fi
+                done <<< "${hit}"
+            fi
+            if (( found == 0 )); then
+                echo "ERROR: Research 10 row ${row_id} points to missing scenario: '${scenario_title}'" >&2
+                exit 1
+            fi
+        fi
+    done < .scratch/bdd-strategy/research/10-invariance-map.md
+fi
 echo "==> Layer discipline checks passed."
 '''
 

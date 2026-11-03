@@ -58,3 +58,24 @@ Each slice adds one section.
   test:mutants --git-diff --dry-run` with a diff limited to `tests/e2e/trust.rs`.
   The task generated 0 mutants (`Total: 0 mutation(s) would be generated`).
   Labelled as evidence only; never used as proof.
+
+## Pilot Rubric Answers (Slice 1 Close)
+
+- **Question 1: Does the BDD framework execute across all target operating
+  systems in CI and local stress testing?**
+  **Answer: Yes.**
+  - **Evidence:** Draft PR 3 CI run
+    (<https://github.com/JackMatanky/traces/actions/runs/41626080102>) passed
+    across all three operating systems (Ubuntu, macOS, Windows).
+  - Scenarios S1 (`Init does not grant trust`) and S2 (`Untrust revokes trust for
+    later runs`) passed 100 of 100 iterations under local stress testing.
+
+- **Question 2: Does the deletion and replacement procedure preserve coverage
+  and prove that scenarios catch defects?**
+  **Answer: Yes.**
+  - **Evidence:** The kill demonstration in `src/cli/untrust.rs` broke both the
+    former test and scenario S2 (`expected exit code 1, got Some(0)`).
+  - The mutation compare on `src/config/trust.rs` produced 0 new escapes before
+    and after deletion.
+  - The sixth gate check resolves all pilot pointers (01-G4, 01-G17, 01-G23,
+    01-G24, 05-G3) against `tests/features/`.

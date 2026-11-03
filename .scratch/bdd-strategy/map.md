@@ -198,3 +198,7 @@ Nothing. The fog items graduated into [spec.md](../bdd-testing/spec.md):
 - Work belonging to `.scratch/integration-e2e-suite/`; read-only input here, its
   tickets are not this map's route.
 - Building custom framework or infrastructure beyond adopting an existing crate.
+
+## Gap recomputes
+
+- gap recompute: slice 1, 2026-11-03

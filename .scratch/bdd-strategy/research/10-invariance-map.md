@@ -23,126 +23,126 @@ not apply them.
 
 A scenario never pins a known defect (ticket 10 decision (b)):
 
-- The closed-pipe panic. It sits under 01 G1 and G6. G6 is class-level.
-- `i64` to `f64` loss at the note boundary. It sits under 03 N07 and N15. N15 is
+- The closed-pipe panic. It sits under 01-G1 and 01-G6. G6 is class-level.
+- `i64` to `f64` loss at the note boundary. It sits under 03-N07 and 03-N15. N15 is
   class-level.
 - Multi-valued inline fields that the code reads with `.first()`. It sits under
-  03 N05 and N16.
+  03-N05 and 03-N16.
 
 ## Invariance list
 
 ### Process and surface (`research/01`)
 
-| ID | Guarantee | Tier |
-|---|---|---|
-| G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F |
-| G2 | Stdout holds the payload only. Stderr holds diagnostics. | F |
-| G3 | Count summaries go to stderr | F (channel) |
-| G4 | Stable diagnostic codes with per-stage help | M |
-| G7 | Non-TTY fallback values (the non-TTY half) | D |
-| G11 | The template picker refuses to run non-interactively | D |
-| G12 | `--no-input` swaps the provider wholesale | D |
-| G13 | Output collision: refuse without a prompt when non-interactive | D |
-| G14 | `--dry-run` never touches disk | D |
-| G15 | Non-TTY `init` scaffolds with defaults | D |
-| G16 | `init` is transactional | D |
-| G17 | `init` does not grant trust | F (trust gate) |
-| G18 | Nearest-local discovery, global alongside | D |
-| G21 | Two-level configuration scope, merged field by field | M (config TOML) |
-| G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) |
-| G23 | Four trust statuses with distinct meaning | F |
-| G24 | No config loads without trust, across processes | F |
-| G25 | The global config layer is never trust-gated | F |
-| G26 | Grant tracks before it trusts; untrust keeps the track | F |
-| G27 | `clean` reports counts. The store layout is Free and not listed. | D |
-| G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) |
-| G30 | Query output shapes are stable Markdown | F |
+| ID | Guarantee | Tier | Status |
+|---|---|---|---|
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | gap |
+| 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | gap |
+| 01-G3 | Count summaries go to stderr | F (channel) | gap |
+| 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 01-G7 | Non-TTY fallback values (the non-TTY half) | D | gap |
+| 01-G11 | The template picker refuses to run non-interactively | D | gap |
+| 01-G12 | `--no-input` swaps the provider wholesale | D | gap |
+| 01-G13 | Output collision: refuse without a prompt when non-interactive | D | gap |
+| 01-G14 | `--dry-run` never touches disk | D | gap |
+| 01-G15 | Non-TTY `init` scaffolds with defaults | D | gap |
+| 01-G16 | `init` is transactional | D | gap |
+| 01-G17 | `init` does not grant trust | F (trust gate) | covered: Init does not grant trust (reviewed 2026-11-03) |
+| 01-G18 | Nearest-local discovery, global alongside | D | gap |
+| 01-G21 | Two-level configuration scope, merged field by field | M (config TOML) | gap |
+| 01-G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) | gap |
+| 01-G23 | Four trust statuses with distinct meaning | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 01-G24 | No config loads without trust, across processes | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 01-G25 | The global config layer is never trust-gated | F | gap |
+| 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | gap |
+| 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | gap |
+| 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | gap |
+| 01-G30 | Query output shapes are stable Markdown | F | gap |
 
 ### Query and template (`research/02`)
 
-| ID | Guarantee | Tier |
-|---|---|---|
-| G1 | Source-expression grammar: atoms, boolean operators, precedence | F+M |
-| G2 | `from()` input dispatch | F+M |
-| G3 | An unknown class selector gives an empty result, with no error | F+M |
-| G4 | Row granularity for `pages`, `lists` and `tasks` | F |
-| G5 | Filter semantics: comparisons, `contains`, temporal functions | F+M |
-| G6 | Sort default direction and CLI sort flags | D (default order), M (flags) |
-| G7 | Null placement | D |
-| G8 | Terminal renderers: method form, pipeline form, parity | F |
-| G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M |
-| G10 | Template resolution order; validation before search | D |
-| G11 | Output-path precedence and root confinement | D |
-| G12 | Write mode and prompts are independent axes; overwrite policy | D |
-| G13 | CLI stream contract; index freshness round-trips | F |
-| G14 | Chained and single-call queries give identical output (equivalence only) | F |
-| G16 | Task and list rows keep document order (order only) | F |
-| G18 | Include loader: missing include is soft, other errors are hard | D |
+| ID | Guarantee | Tier | Status |
+|---|---|---|---|
+| 02-G1 | Source-expression grammar: atoms, boolean operators, precedence | F+M | gap |
+| 02-G2 | `from()` input dispatch | F+M | gap |
+| 02-G3 | An unknown class selector gives an empty result, with no error | F+M | gap |
+| 02-G4 | Row granularity for `pages`, `lists` and `tasks` | F | gap |
+| 02-G5 | Filter semantics: comparisons, `contains`, temporal functions | F+M | gap |
+| 02-G6 | Sort default direction and CLI sort flags | D (default order), M (flags) | gap |
+| 02-G7 | Null placement | D | gap |
+| 02-G8 | Terminal renderers: method form, pipeline form, parity | F | gap |
+| 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | gap |
+| 02-G10 | Template resolution order; validation before search | D | gap |
+| 02-G11 | Output-path precedence and root confinement | D | gap |
+| 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | gap |
+| 02-G13 | CLI stream contract; index freshness round-trips | F | gap |
+| 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | gap |
+| 02-G16 | Task and list rows keep document order (order only) | F | gap |
+| 02-G18 | Include loader: missing include is soft, other errors are hard | D | gap |
 
 ### Index and note (`research/03`)
 
-| ID | Guarantee | Tier |
-|---|---|---|
-| P01 | A query after an edit, delete or rename shows the change | F (equivalence) |
-| P02 | The query shows the delta: new tag, removed tag, rewritten task text | F |
-| P03 | An added, deleted or renamed file updates every link resolution | F |
-| P05 | A size or mtime change makes the index fresh (observable half) | F (equivalence) |
-| P08 | A changed index-relevant setting shows in the next query | F (equivalence) |
-| P20 | Inlinks: deduplicated, sorted, no empty sources | F |
-| P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F |
-| P22 | Scan scope: `.git`, symlinks and the store skipped | D |
-| P25 | `index` populates the tracked-config store | D |
-| N01 | Parsing never fails; malformed frontmatter still queries | F |
-| N02 | Frontmatter mapping semantics | F |
-| N03 | Headings: ATX and setext, in document order | F |
-| N04 | Lists: pre-order, depth, parent chain | F |
-| N05 | Inline fields: extraction and scope | F |
-| N06 | Inline-field syntax forms | F |
-| N07 | Typed inline values (the visible subset) | F |
-| N08 | Tags: body and list-item extraction, hierarchy | F |
-| N09 | Task markers (marker cases) | F |
-| N10 | Task versus checkbox through `tag_filters` | F |
-| N11 | `fully_complete` subtree semantics | F |
-| N12 | Task text normalization | F |
-| N14 | Emoji shorthands are task-item-only | F |
-| N16 | Field collection: frontmatter wins on duplicate keys | F |
-| N17 | Link shape: first `#` splits path and anchor | F |
+| ID | Guarantee | Tier | Status |
+|---|---|---|---|
+| 03-P01 | A query after an edit, delete or rename shows the change | F (equivalence) | gap |
+| 03-P02 | The query shows the delta: new tag, removed tag, rewritten task text | F | gap |
+| 03-P03 | An added, deleted or renamed file updates every link resolution | F | gap |
+| 03-P05 | A size or mtime change makes the index fresh (observable half) | F (equivalence) | gap |
+| 03-P08 | A changed index-relevant setting shows in the next query | F (equivalence) | gap |
+| 03-P20 | Inlinks: deduplicated, sorted, no empty sources | F | gap |
+| 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | gap |
+| 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | gap |
+| 03-P25 | `index` populates the tracked-config store | D | gap |
+| 03-N01 | Parsing never fails; malformed frontmatter still queries | F | gap |
+| 03-N02 | Frontmatter mapping semantics | F | gap |
+| 03-N03 | Headings: ATX and setext, in document order | F | gap |
+| 03-N04 | Lists: pre-order, depth, parent chain | F | gap |
+| 03-N05 | Inline fields: extraction and scope | F | gap |
+| 03-N06 | Inline-field syntax forms | F | gap |
+| 03-N07 | Typed inline values (the visible subset) | F | gap |
+| 03-N08 | Tags: body and list-item extraction, hierarchy | F | gap |
+| 03-N09 | Task markers (marker cases) | F | gap |
+| 03-N10 | Task versus checkbox through `tag_filters` | F | gap |
+| 03-N11 | `fully_complete` subtree semantics | F | gap |
+| 03-N12 | Task text normalization | F | gap |
+| 03-N14 | Emoji shorthands are task-item-only | F | gap |
+| 03-N16 | Field collection: frontmatter wins on duplicate keys | F | gap |
+| 03-N17 | Link shape: first `#` splits path and anchor | F | gap |
 
 ### Schema and temporal (`research/04`)
 
-| ID | Guarantee | Tier |
-|---|---|---|
-| S3 | A cycle in `extends` is a hard error (one case in a broken-vault story) | M (schema TOML) |
-| S4 | One malformed schema excludes only itself | M (schema TOML) |
-| S7 | Structural and predicate references: the user-facing error split | M |
-| T2 | Naive input uses the local zone; storage is UTC | M (coercion) |
-| T4 | Equality versus shift across DST (the pair) | F |
-| T6 | A month-end clamp in a compound apply (one case) | F |
-| T7 | Calendar diff counts local boundaries | F |
-| T8 | A Date equals the midnight DateTime in filters | M (coercion) |
-| B1 | Schema to query source expansion | F |
-| B2 | Schema to query and template through `class_field` | M |
-| B3 | Schema to the template `schema` namespace | M |
-| B4 | Temporal literals in filters | M |
-| B5 | RFC3339 offsets through ingestion to a CLI filter | F |
-| B6 | One calendar rule for query and template | F |
-| B7 | Temporal registry functions over indexed notes | M |
+| ID | Guarantee | Tier | Status |
+|---|---|---|---|
+| 04-S3 | A cycle in `extends` is a hard error (one case in a broken-vault story) | M (schema TOML) | gap |
+| 04-S4 | One malformed schema excludes only itself | M (schema TOML) | gap |
+| 04-S7 | Structural and predicate references: the user-facing error split | M | gap |
+| 04-T2 | Naive input uses the local zone; storage is UTC | M (coercion) | gap |
+| 04-T4 | Equality versus shift across DST (the pair) | F | gap |
+| 04-T6 | A month-end clamp in a compound apply (one case) | F | gap |
+| 04-T7 | Calendar diff counts local boundaries | F | gap |
+| 04-T8 | A Date equals the midnight DateTime in filters | M (coercion) | gap |
+| 04-B1 | Schema to query source expansion | F | gap |
+| 04-B2 | Schema to query and template through `class_field` | M | gap |
+| 04-B3 | Schema to the template `schema` namespace | M | gap |
+| 04-B4 | Temporal literals in filters | M | gap |
+| 04-B5 | RFC3339 offsets through ingestion to a CLI filter | F | gap |
+| 04-B6 | One calendar rule for query and template | F | gap |
+| 04-B7 | Temporal registry functions over indexed notes | M | gap |
 
 ### Cross-cutting (`research/05`)
 
-| ID | Guarantee | Tier |
-|---|---|---|
-| G1 | Numeric exit-code contract | F |
-| G2 | Stream split | F |
-| G3 | Stable diagnostic codes | M |
-| G7 | Root confinement of every filesystem path | D |
-| G8 | One YAML config for frontmatter and template filters (the parity rule) | D |
-| field | `FieldKey` matches forgivingly; `FieldName` stays exact | D |
-| task | Unknown status symbol gives an incomplete task | F |
-| file_tracker | `clean` removes stale entries, never live ones | D |
-| dirtree | Traversal errors classified by where they occur | D |
-| tag | Containment by segment prefix | F |
-| env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D |
+| ID | Guarantee | Tier | Status |
+|---|---|---|---|
+| 05-G1 | Numeric exit-code contract | F | gap |
+| 05-G2 | Stream split | F | gap |
+| 05-G3 | Stable diagnostic codes | M | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 05-G7 | Root confinement of every filesystem path | D | gap |
+| 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | gap |
+| 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | gap |
+| 05-task | Unknown status symbol gives an incomplete task | F | gap |
+| 05-file_tracker | `clean` removes stale entries, never live ones | D | gap |
+| 05-dirtree | Traversal errors classified by where they occur | D | gap |
+| 05-tag | Containment by segment prefix | F | gap |
+| 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | gap |
 
 ## Class-level map
 
@@ -151,18 +151,18 @@ one disposition. Ticket 12 uses this list as input.
 
 | Class | Members | Disposition |
 |---|---|---|
-| Real-TTY and abort | 01 G5, G8, G9, G10 | Exception class (ticket 07). Unit test. |
-| Exit 130 | 01 G1 (the 130 part), 01 G5 | One spawned-signal case on Unix. The unit test stays. |
-| Test harness | 01 G28 | Not a product guarantee. |
-| Gate-owned | 05 G4, G5, G6 | Compile-time gates and lints own them. |
-| Doc convention | 05 G9 | Ticket 12 and ticket 13. |
-| Never 101 | 05 G10 | A Then-clause default, not its own scenario. |
-| Internal mechanism | 02 G14 (plan shape), G15, G16 (size), G17, G18 (symlink) | No scenario. |
-| Store internals | 03 P04, P06, P07, P09, P10, P12, P13, P16, P18, P19, P23, P24 | Unit or integration test. |
-| Free strategy | 03 P11, P14, P15, P17 | Free (arch ticket 16 line 75). |
-| Parser tables | 03 N09 (chunk splits), N13, N15, N18 | Unit or proptest. |
-| Pure tables | 04 S1, S2, S5, S6, S8, S9, S10, S11, S12, T1, T3, T5, T9, T10 | Unit test. |
-| Root-module helpers | 05 section 3: delimiter, hash, lexer, position, strsim, `file_class_expander`, `path` codec | Unit test. |
+| Real-TTY and abort | 01-G5, 01-G8, 01-G9, 01-G10 | Exception class (ticket 07). Unit test. |
+| Exit 130 | 01-G1 (the 130 part), 01-G5 | One spawned-signal case on Unix. The unit test stays. |
+| Test harness | 01-G28 | Not a product guarantee. |
+| Gate-owned | 05-G4, 05-G5, 05-G6 | Compile-time gates and lints own them. |
+| Doc convention | 05-G9 | Ticket 12 and ticket 13. |
+| Never 101 | 05-G10 | A Then-clause default, not its own scenario. |
+| Internal mechanism | 02-G14 (plan shape), 02-G15, 02-G16 (size), 02-G17, 02-G18 (symlink) | No scenario. |
+| Store internals | 03-P04, 03-P06, 03-P07, 03-P09, 03-P10, 03-P12, 03-P13, 03-P16, 03-P18, 03-P19, 03-P23, 03-P24 | Unit or integration test. |
+| Free strategy | 03-P11, 03-P14, 03-P15, 03-P17 | Free (arch ticket 16 line 75). |
+| Parser tables | 03-N09 (chunk splits), 03-N13, 03-N15, 03-N18 | Unit or proptest. |
+| Pure tables | 04-S1, 04-S2, 04-S5, 04-S6, 04-S8, 04-S9, 04-S10, 04-S11, 04-S12, 04-T1, 04-T3, 04-T5, 04-T9, 04-T10 | Unit test. |
+| Root-module helpers | 05: delimiter, hash, lexer, position, strsim, `file_class_expander`, `path` codec | Unit test. |
 
 ## Seam dispositions (decision (c))
 
@@ -184,11 +184,11 @@ G18 refer to `research/02`.
 | 10 YAML crate behavior | Scenario only for outcomes with intent evidence (ticket 07 condition 3). |
 | 11 `traces::testing` facade | No scenario. See the facade seams below. |
 | 12 Disk-is-truth refresh | Keep the scenarios. The CLI has no editor buffers. |
-| G14 Plan fusion | Scenario for equivalence, including tie order. None for plan shape. |
-| G15 Memoization | No scenario. `QuerySet` is a library API. |
-| G16 Row layout | Scenario for document order. None for the size budget. |
-| G17 Store versus memory | No scenario. It stays an integration test. |
-| G18 Include loader | Scenario for the soft and hard split. The symlink quirk stays a unit test. |
+| 02-G14 Plan fusion | Scenario for equivalence, including tie order. None for plan shape. |
+| 02-G15 Memoization | No scenario. `QuerySet` is a library API. |
+| 02-G16 Row layout | Scenario for document order. None for the size budget. |
+| 02-G17 Store versus memory | No scenario. It stays an integration test. |
+| 02-G18 Include loader | Scenario for the soft and hard split. The symlink quirk stays a unit test. |
 
 ## Proptest list and facade seams (decisions (d) and (e))
 
@@ -203,9 +203,9 @@ G18 refer to `research/02`.
 
 Ticket 12 decision (f) owns each disposition. These touch the invariance list:
 
-- `src/cli/mod.rs:54` claims exit 0 for an abort. The code exits 130. (01 G1)
-- ADR-0002 on trust: 01 G17 and G23 to G26.
-- ADR-0009 on format version: 03 P15 (class-level) and 04 B4.
-- ADR-0008 names `SourceAtom` variants that do not exist (02 C1): 02 G1.
+- `src/cli/mod.rs:54` claims exit 0 for an abort. The code exits 130. (01-G1)
+- ADR-0002 on trust: 01-G17 and 01-G23 to 01-G26.
+- ADR-0009 on format version: 03-P15 (class-level) and 04-B4.
+- ADR-0008 names `SourceAtom` variants that do not exist (02 C1): 02-G1.
 - The slug, callout and footnote glossary claims have no code (03 section D).
   They get no scenario.
