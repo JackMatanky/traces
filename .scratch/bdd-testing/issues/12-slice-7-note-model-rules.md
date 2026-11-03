@@ -19,7 +19,7 @@
 - [x] The two tests that spec section 9.3 marks needs-split become key-example scenarios, never an outline.
 - [x] A converted test is deleted only when this slice completes its last row (tag_filter_config test deferred to slice 5; see ledger).
 - [x] Each deletion has the proof of spec section 7.
-- [ ] `mise run verify` passes.
+- [x] `mise run verify` passes.
 - [x] The ledger section is complete.
 - [x] The gap recompute line is in the adoption map.
 - [x] The due rubric questions are answered (none due for this slice; rubric questions 1-3 evaluated at slices 1 and 2 closes).
