@@ -15,6 +15,32 @@ fn run_command(sandbox: &Sandbox, last_run: &mut LastRun, cmd: String) {
     last_run.0 = Some(sandbox.run(&args));
 }
 
+#[when(r#"I run "{cmd}" in time zone "{zone}""#)]
+fn run_command_in_time_zone(
+    sandbox: &Sandbox,
+    last_run: &mut LastRun,
+    cmd: String,
+    zone: String,
+) {
+    let raw_args = cmd
+        .strip_prefix("traces ")
+        .or_else(|| cmd.strip_prefix("traces"))
+        .unwrap_or(&cmd);
+    let args: Vec<&str> = raw_args.split_whitespace().collect();
+    last_run.0 = Some(
+        sandbox.run_with_envs(&args, &[("TZ", std::ffi::OsStr::new(&zone))]),
+    );
+}
+
+#[when("I list notes with filter:")]
+fn list_notes_with_filter(
+    sandbox: &Sandbox,
+    last_run: &mut LastRun,
+    docstring: String,
+) {
+    last_run.0 = Some(sandbox.run(&["list", "--where", docstring.trim()]));
+}
+
 #[then("the exit code is {code}")]
 fn exit_code_is(last_run: &LastRun, code: i32) {
     let run = last_run.0.as_ref().expect("a prior command must have run");

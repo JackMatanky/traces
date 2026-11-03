@@ -34,6 +34,7 @@ mod configuration;
 mod index;
 mod process;
 mod query;
+mod schema_temporal;
 mod template;
 mod tracking;
 mod trust;

@@ -811,3 +811,10 @@ change.
 - 2026-11-03: slice 4 added index-freshness scenarios for edits, paths, links,
   config drift, rendered notes, scan scope and the tracked-config store. The
   same-size mtime canary stays in Rust as a known limit for arch ticket 25.
+- 2026-11-03: slice 6 entry condition passed on macOS. The scenario "A local
+  clock field matches its UTC instant in another time zone" runs with
+  `TZ=America/New_York` through `Sandbox::run_with_envs`; it selected the note.
+  [INFERENCE] Windows should honor this IANA `TZ` value because
+  `TimeZone::try_system` calls Jiff 0.2.38's `get_env_tz` before the platform
+  lookup. The Jiff source says that IANA `TZ` should work on Windows.
+  A Windows CI result is pending the orchestrator's branch run.
