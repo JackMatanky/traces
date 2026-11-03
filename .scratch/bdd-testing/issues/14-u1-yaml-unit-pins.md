@@ -10,14 +10,14 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] For each of the four claims the code is read first. When the code and the documentation disagree, the code wins and the documentation is corrected.
-- [ ] A unit test pins that binary literals read as integers.
-- [ ] A unit test pins that an overflowing float stays a string.
-- [ ] A unit test pins that `u64::MAX` is an error.
-- [ ] A unit test pins that a non-scalar key is an error.
-- [ ] `mise run verify` passes.
+- [x] For each of the four claims the code is read first. When the code and the documentation disagree, the code wins and the documentation is corrected.
+- [x] A unit test pins that binary literals read as integers.
+- [x] A unit test pins that an overflowing float stays a string.
+- [x] A unit test pins that `u64::MAX` is an error.
+- [x] A unit test pins that a non-scalar key is an error.
+- [x] `mise run verify` passes.
 
 **Out of scope:**
 - Changes to product code. When a claim is wrong, the documentation changes.
