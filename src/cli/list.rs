@@ -136,7 +136,7 @@ mod tests {
         }
 
         #[test]
-        fn sort_orders_by_the_named_field_ascending_by_default() {
+        fn sort_orders_by_the_named_field_with_explicit_ascending() {
             let temp = tempfile::tempdir().expect("create temp dir");
             fs::write(temp.path().join("a.md"), "---\nrating: 3\n---\n")
                 .expect("write a.md");

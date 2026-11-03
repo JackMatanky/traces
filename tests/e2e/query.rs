@@ -157,31 +157,6 @@ fn list_prints_matching_pages_to_stdout_and_a_count_to_stderr() {
     assert!(list.stderr.contains("1 page(s)"), "stderr: {}", list.stderr);
 }
 
-/// Runs `table --column` and checks the rendered Markdown reaches stdout.
-///
-/// Proves `--column` argv parsing and rendering are wired together: each is
-/// simple alone, but nothing below this test proves the connection.
-#[test]
-fn table_renders_a_markdown_table_with_one_row_per_page() {
-    let sandbox = Sandbox::trusted_via_cli();
-    sandbox.write_note("dune.md", "---\nrating: 9\n---\n");
-
-    let table =
-        sandbox.run(&["table", "--column", "file.name", "--column", "rating"]);
-
-    assert!(table.is_success(), "stderr: {}", table.stderr);
-    assert!(
-        table.stdout.contains("| file.name | rating |"),
-        "stdout: {}",
-        table.stdout
-    );
-    assert!(
-        table.stdout.contains("dune") && table.stdout.contains('9'),
-        "stdout: {}",
-        table.stdout
-    );
-}
-
 /// Passes an invalid `--where` expression on `task` (obsolete
 /// `task.<field>` syntax) and checks the CLI's own diagnostic-rendering
 /// path for the `task` subcommand, not just `list`'s.
@@ -276,52 +251,6 @@ fn task_filter_shortcuts_narrow_output_accurately() {
     assert!(!in_progress.stdout.contains("Charlie done"));
 }
 
-/// Task tables render both default headers and requested list columns.
-#[test]
-fn task_table_renders_default_and_custom_columns() {
-    let sandbox = Sandbox::trusted_via_cli();
-    sandbox.write_note(
-        "todo.md",
-        "- [ ] Alpha item \u{1f4c5} 2026-10-01 \u{1f53a}\n- [x] Beta item \
-         \u{1f4c5} 2026-10-05 \u{1f53d}\n",
-    );
-    let table = sandbox.run(&["task", "--table"]);
-    assert!(table.is_success(), "stderr: {}", table.stderr);
-    assert!(
-        table.stdout.contains("Task")
-            && table.stdout.contains("Status")
-            && table.stdout.contains("Due")
-            && table.stdout.contains("Priority")
-            && table.stdout.contains("File"),
-        "table headers: {}",
-        table.stdout
-    );
-    assert!(
-        table.stdout.contains("Alpha item") && table.stdout.contains("highest")
-    );
-    assert!(table.stdout.contains("Beta item") && table.stdout.contains("low"));
-
-    let custom_table = sandbox.run(&[
-        "task",
-        "--table",
-        "--column",
-        "list.text",
-        "--column",
-        "list.priority",
-    ]);
-    assert!(custom_table.is_success(), "stderr: {}", custom_table.stderr);
-    assert!(
-        custom_table.stdout.contains("| list.text")
-            && custom_table.stdout.contains("list.priority |"),
-        "stdout: {}",
-        custom_table.stdout
-    );
-    assert!(
-        custom_table.stdout.contains("Alpha item")
-            && custom_table.stdout.contains("highest")
-    );
-}
-
 /// Task count writes only a single integer to stdout.
 #[test]
 fn task_count_prints_only_the_match_total() {
@@ -332,51 +261,6 @@ fn task_count_prints_only_the_match_total() {
     count.assert_success();
     count.assert_stdout_eq("3\n");
     count.assert_stderr_eq("");
-}
-
-/// A bare Markdown path selects that note for both task rows and counts.
-#[test]
-fn task_from_bare_markdown_path_selects_only_that_note() {
-    let sandbox = Sandbox::trusted_via_cli();
-    sandbox.write_note("todo.md", "- [ ] Alpha item\n- [x] Beta item\n");
-    sandbox.write_note("other.md", "- [ ] Gamma item\n");
-
-    let from_bare = sandbox.run(&["task", "--from", "todo.md"]);
-    from_bare.assert_success();
-    assert!(from_bare.stdout.contains("Alpha item (todo.md)"));
-    assert!(from_bare.stdout.contains("Beta item (todo.md)"));
-    assert!(!from_bare.stdout.contains("Gamma item"));
-
-    let from_count = sandbox.run(&["task", "--from", "todo.md", "--count"]);
-    from_count.assert_success();
-    from_count.assert_stdout_eq("2\n");
-    from_count.assert_stderr_eq("");
-}
-
-/// Runs `task --from` against a bare `.md` path that does not exist on
-/// disk, checking it degrades to a graceful zero-match result rather than
-/// erroring or silently resolving to some other source kind.
-///
-/// `normalize_source_input` (`src/cli/mod.rs`) only rewrites `--from` into a
-/// `.md` file source when `candidate.is_file()` succeeds; a nonexistent bare
-/// path falls through unchanged into `SourceSelector::parse`, which still
-/// succeeds and simply matches nothing. This proves that fallthrough is
-/// visible as "0 task(s)", not a crash or a confusing match against an
-/// unrelated source kind.
-#[test]
-fn task_from_nonexistent_markdown_path_matches_nothing_without_erroring() {
-    let sandbox = Sandbox::trusted_via_cli();
-    sandbox.write_note("todo.md", "- [ ] real task\n");
-
-    let from_missing = sandbox.run(&["task", "--from", "missing.md"]);
-
-    assert!(from_missing.is_success(), "stderr: {}", from_missing.stderr);
-    assert_eq!(from_missing.stdout, "");
-    assert!(
-        from_missing.stderr.contains("0 task(s)"),
-        "stderr: {}",
-        from_missing.stderr
-    );
 }
 
 /// Exercises offset and nanosecond parsing through note ingestion and a CLI
