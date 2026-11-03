@@ -129,36 +129,6 @@ fn non_tty_dialog_short_circuits_to_defaults_without_hanging() {
     );
 }
 
-/// Verifies the feedback loop: a rendered note written into the project is
-/// picked up by the next spawned query (writer → fs → refresh → query).
-/// Write units test path resolution only; index units read pre-existing
-/// files — this closes the loop at process level.
-///
-/// Executes vs asserts:
-/// - Executes: `traces template -i daily --no-input` writing a tagged note into
-///   the project root, then `traces list --from "#fromtemplate"`.
-/// - Asserts: the rendered file is query-visible through its tag.
-///
-/// Defect class: untested-feedback-loop.
-#[test]
-fn rendered_output_reenters_the_index() {
-    let sandbox = Sandbox::trusted_via_cli();
-    // The tag is assembled dynamically so the template file itself does not
-    // carry the literal `#fromtemplate` tag (it is inside the project and
-    // indexed too); only the rendered output does.
-    sandbox.write_template(
-        "daily.md",
-        "# Rendered\n\n- [ ] from template #from{{ \"template\" }}",
-    );
-
-    let template = sandbox.run(&["template", "-i", "daily", "--no-input"]);
-    template.assert_success();
-    template.assert_never_exit_101();
-
-    let listed = sandbox.run(&["list", "--from", "#fromtemplate"]);
-    listed.assert_success();
-    listed.assert_stdout_eq("- daily.md\n");
-}
 #[test]
 fn renders_file_sourced_select_field_in_e2e_template() {
     let sandbox = Sandbox::trusted_via_cli();

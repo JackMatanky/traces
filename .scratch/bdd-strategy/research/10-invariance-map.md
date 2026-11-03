@@ -35,27 +35,27 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03); the 130 part reads `pinned: src/main.rs::ctrl_c_abort_exits_130` (slice 8 dropped, decided 2026-11-03) |
 | 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
 | 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
 | 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
-| 01-G7 | Non-TTY fallback values (the non-TTY half) | D | gap |
-| 01-G11 | The template picker refuses to run non-interactively | D | gap |
-| 01-G12 | `--no-input` swaps the provider wholesale | D | gap |
-| 01-G13 | Output collision: refuse without a prompt when non-interactive | D | gap |
-| 01-G14 | `--dry-run` never touches disk | D | gap |
-| 01-G15 | Non-TTY `init` scaffolds with defaults | D | gap |
-| 01-G16 | `init` is transactional | D | gap |
+| 01-G7 | Non-TTY fallback values (the non-TTY half) | D | covered: Non-TTY template prompts use their defined fallback answers (reviewed 2026-11-03) |
+| 01-G11 | The template picker refuses to run non-interactively | D | covered: The template picker refuses to run without an interactive terminal (reviewed 2026-11-03) |
+| 01-G12 | `--no-input` swaps the provider wholesale | D | pinned: src/cli/template.rs::tests::no_input_ignores_the_injected_provider_and_uses_defaults (the non-TTY providers produce identical answers) |
+| 01-G13 | Output collision: refuse without a prompt when non-interactive | D | covered: A non-interactive output collision preserves the existing file (reviewed 2026-11-03) |
+| 01-G14 | `--dry-run` never touches disk | D | covered: Dry-run previews rendered content without writing a file (reviewed 2026-11-03) |
+| 01-G15 | Non-TTY `init` scaffolds with defaults | D | covered: Non-interactive initialization scaffolds the default configuration (reviewed 2026-11-03) |
+| 01-G16 | `init` is transactional | D | pinned: src/cli/init.rs::tests::run::cleans_up_after_a_mid_run_failure (the non-TTY CLI cannot induce a portable mid-run failure) |
 | 01-G17 | `init` does not grant trust | F (trust gate) | covered: Init does not grant trust (reviewed 2026-11-03) |
-| 01-G18 | Nearest-local discovery, global alongside | D | gap |
-| 01-G21 | Two-level configuration scope, merged field by field | M (config TOML) | gap |
-| 01-G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) | gap |
+| 01-G18 | Nearest-local discovery, global alongside | D | covered: Nearest local configuration is discovered alongside global configuration (reviewed 2026-11-03) |
+| 01-G21 | Two-level configuration scope, merged field by field | M (config TOML) | covered: Local and global configuration fields combine independently (reviewed 2026-11-03) |
+| 01-G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) | covered: Changed trusted configuration fails before its malformed content is parsed (reviewed 2026-11-03) |
 | 01-G23 | Four trust statuses with distinct meaning | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
 | 01-G24 | No config loads without trust, across processes | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
-| 01-G25 | The global config layer is never trust-gated | F | gap |
-| 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | gap |
-| 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | gap |
-| 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | gap |
+| 01-G25 | The global config layer is never trust-gated | F | covered: A malformed global configuration fails without global trust (reviewed 2026-11-03) |
+| 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | covered: Trust grant fails before trusting when tracking cannot save (reviewed 2026-11-03) |
+| 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | covered: Cleaning a stale tracked path reports its removal (reviewed 2026-11-03) |
+| 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | covered: An edited task appears in the next query (reviewed 2026-11-03) |
 | 01-G30 | Query output shapes are stable Markdown | F | covered: A page table renders one Markdown row per note (reviewed 2026-11-03) |
 
 ### Query and template (`research/02`)
@@ -71,27 +71,27 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 02-G7 | Null placement | D | covered: Default descending sort places missing ratings last (reviewed 2026-11-03) |
 | 02-G8 | Terminal renderers: method form, pipeline form, parity | F | covered: A template query renders method and pipeline tables alike (reviewed 2026-11-03) |
 | 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | covered: Unknown sort fields report a stable diagnostic code (reviewed 2026-11-03) |
-| 02-G10 | Template resolution order; validation before search | D | gap |
-| 02-G11 | Output-path precedence and root confinement | D | gap |
-| 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | gap |
-| 02-G13 | CLI stream contract; index freshness round-trips | F | gap |
+| 02-G10 | Template resolution order; validation before search | D | covered: An unsafe template identifier fails before lookup (reviewed 2026-11-03) |
+| 02-G11 | Output-path precedence and root confinement | D | covered: A template output path cannot escape the project root (reviewed 2026-11-03) |
+| 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | covered: Dry-run previews over an existing file without replacing it (reviewed 2026-11-03) |
+| 02-G13 | CLI stream contract; index freshness round-trips | F | covered: A rendered note appears in the next list query (reviewed 2026-11-03) |
 | 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | covered: Chained sort and limit preserve the order of equal-rated pages (reviewed 2026-11-03) |
 | 02-G16 | Task and list rows keep document order (order only) | F | covered: List rows include plain items and checkboxes in document order (reviewed 2026-11-03) |
-| 02-G18 | Include loader: missing include is soft, other errors are hard | D | gap |
+| 02-G18 | Include loader: missing include is soft, other errors are hard | D | covered: An unsafe include remains an error when marked ignore missing (reviewed 2026-11-03) |
 
 ### Index and note (`research/03`)
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 03-P01 | A query after an edit, delete or rename shows the change | F (equivalence) | gap |
-| 03-P02 | The query shows the delta: new tag, removed tag, rewritten task text | F | gap |
-| 03-P03 | An added, deleted or renamed file updates every link resolution | F | gap |
-| 03-P05 | A size or mtime change makes the index fresh (observable half) | F (equivalence) | gap |
-| 03-P08 | A changed index-relevant setting shows in the next query | F (equivalence) | gap |
-| 03-P20 | Inlinks: deduplicated, sorted, no empty sources | F | gap |
-| 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | gap |
-| 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | gap |
-| 03-P25 | `index` populates the tracked-config store | D | gap |
+| 03-P01 | A query after an edit, delete or rename shows the change | F (equivalence) | covered: Renaming a note removes the former path and resolves its link (reviewed 2026-11-03) |
+| 03-P02 | The query shows the delta: new tag, removed tag, rewritten task text | F | covered: An edited task appears in the next query (reviewed 2026-11-03) |
+| 03-P03 | An added, deleted or renamed file updates every link resolution | F | covered: Adding a link target resolves its inlink on the next query (reviewed 2026-11-03) |
+| 03-P05 | A size or mtime change makes the index fresh (observable half) | F (equivalence) | covered: An edited task appears in the next query (reviewed 2026-11-03) |
+| 03-P08 | A changed index-relevant setting shows in the next query | F (equivalence) | covered: An index setting edit changes the next query without changing notes (reviewed 2026-11-03) |
+| 03-P20 | Inlinks: deduplicated, sorted, no empty sources | F | covered: Inlinks are sorted and deduplicated with empty sources omitted (reviewed 2026-11-03) |
+| 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | covered: Exact and implied paths resolve before a nearby basename (reviewed 2026-11-03) |
+| 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | covered: Hidden Git files and symlink notes are absent from queries (reviewed 2026-11-03) |
+| 03-P25 | `index` populates the tracked-config store | D | covered: Indexing records the project configuration as tracked (reviewed 2026-11-03) |
 | 03-N01 | Parsing never fails; malformed frontmatter still queries | F | gap |
 | 03-N02 | Frontmatter mapping semantics | F | gap |
 | 03-N03 | Headings: ATX and setext, in document order | F | gap |
@@ -139,10 +139,10 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | gap |
 | 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | gap |
 | 05-task | Unknown status symbol gives an incomplete task | F | gap |
-| 05-file_tracker | `clean` removes stale entries, never live ones | D | gap |
-| 05-dirtree | Traversal errors classified by where they occur | D | gap |
+| 05-file_tracker | `clean` removes stale entries, never live ones | D | covered: Cleaning preserves a live tracked configuration path (reviewed 2026-11-03) |
+| 05-dirtree | Traversal errors classified by where they occur | D | pinned: src/dirtree.rs::tests (no portable CLI channel distinguishes root versus node errors) |
 | 05-tag | Containment by segment prefix | F | gap |
-| 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | gap |
+| 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | covered: A discovery ceiling stops the upward configuration search (reviewed 2026-11-03) |
 
 ## Class-level map
 
@@ -152,7 +152,7 @@ one disposition. Ticket 12 uses this list as input.
 | Class | Members | Disposition |
 |---|---|---|
 | Real-TTY and abort | 01-G5, 01-G8, 01-G9, 01-G10 | Exception class (ticket 07). Unit test. |
-| Exit 130 | 01-G1 (the 130 part), 01-G5 | One spawned-signal case on Unix. The unit test stays. |
+| Exit 130 | 01-G1 (the 130 part), 01-G5 | The unit test stays. Slice 8 was dropped (2026-11-03): numeric 130 needs a real-TTY prompt and the scenario would need a PTY harness, which spec section 4 bans. Known limitation; the pin is `pinned: src/main.rs::ctrl_c_abort_exits_130`. |
 | Test harness | 01-G28 | Not a product guarantee. |
 | Gate-owned | 05-G4, 05-G5, 05-G6 | Compile-time gates and lints own them. |
 | Doc convention | 05-G9 | Ticket 12 and ticket 13. |

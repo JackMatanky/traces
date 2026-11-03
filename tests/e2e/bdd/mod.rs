@@ -30,9 +30,13 @@ fn last_run() -> LastRun {
     LastRun(None)
 }
 
+mod configuration;
+mod index;
 mod process;
 mod query;
 mod schema_temporal;
+mod template;
+mod tracking;
 mod trust;
 
 scenarios!("tests/features", fixtures = [sandbox: Sandbox, last_run: LastRun]);

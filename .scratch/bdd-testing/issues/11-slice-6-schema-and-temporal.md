@@ -19,6 +19,8 @@
 - [x] A check shows whether Windows honors an IANA `TZ` value.
 - [x] The descendant-selector Rust test stays (spec section 7). A new scenario covers 04-B1 beside it.
 - [x] A converted test is deleted only when this slice completes its last row.
+  - `class_field_config_drives_class_selection_from_disk` stayed while
+    01-G21 was slice 5's row; slice 5 has since covered 01-G21.
 - [ ] Each deletion has the proof of spec section 7.
   - Not met this run: `class_field_config_drives_class_selection_from_disk`
     must stay until slice 5 covers 01-G21 (die rule, its other row). The

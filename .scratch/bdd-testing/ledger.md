@@ -105,6 +105,49 @@ process contract without removing existing Rust tests.
     read `src/cli/error.rs` to find `traces::cli::template::not_found`.
     Authors of later slices must expect to read the code for code strings.
 
+## Slice 5: Configuration, tracking and templates
+
+### Row 1: Non-interactive initialization
+
+- **Namespaced row IDs:** 01-G15
+- **Behavior:** An `init` command on a non-interactive terminal creates the
+  default local configuration and template directory.
+- **Former test:** `e2e::init::default_path_init_spawns_and_scaffolds_workspace`
+- **Former layer:** `e2e`
+- **Defect caught:** Initialization can report success without creating the
+  local configuration.
+- **Survivor:** Scenario `Non-interactive initialization scaffolds the default
+  configuration` in `tests/features/configuration.feature`.
+- **Proof:**
+  - **Assertion comparison:** The old test asserted success, a stderr
+    fragment, the `.traces` directory and the config file. The survivor
+    asserts exit zero and the complete stderr path line. It also asserts both
+    paths and the default template directory in the config file. It asserts
+    the default output directory too.
+  - **Kill demonstration:** On the first commit, `Init::run` skipped
+    `scaffold_directories` and `write_config_file` while returning success.
+    The old test failed because `.traces` did not exist. The scenario failed
+    at the same missing-directory assertion. The original production calls
+    were restored before the deletion.
+  - **Mutation compare:** Not required: the guarded dispatch code is in
+    `src/cli/init.rs`. An exploratory scoped run `-f src/config/tracker.rs`
+    escaped one `branch/if` mutant that no current test kills, including the
+    retained Rust `tracked.rs` pair. That file keeps both of its tests, so the
+    deletion rules of section 7 are not engaged. The escape is pre-existing and
+    not created by this slice.
+  - **Twin re-read:** The retained
+    `e2e::workflow::init_trust_index_list_table_task_and_template_chain_through_one_project`
+    checks a successful first-run chain. It does not assert the default
+    scaffold files or the exact init status line. The `src/cli/init.rs` unit
+    tests cover the default config and rollback separately.
+  - **Name diff:** Verified
+    `cargo nextest list --all-features --run-ignored all` before and after
+    deletion. The run removed one test:
+    `traces::e2e init::default_path_init_spawns_and_scaffolds_workspace`.
+    No other name changed.
+- **Successor note for arch-design:** The CLI scaffold contract lives in
+  `tests/features/configuration.feature` under the scenario named above.
+
 ## Slice 3: Query Surface
 
 ### Row 1: Page Table Columns
@@ -239,6 +282,102 @@ three to five steps. The notes, tasks, fields and paths are concrete. The
 assertions check exact output, exit codes or diagnostic codes. The title of
 each scenario identifies the behavior if an assertion fails.
 
+## Slice 4: Index Freshness
+
+### Rows Covered
+
+- **Namespaced row IDs:** 01-G29, 02-G13, 03-P01, 03-P02, 03-P03, 03-P05 (observable half), 03-P08, 03-P20, 03-P21, 03-P22, 03-P25; seams 2, 4, 5
+- **Behavior:** Query execution observes filesystem mutations, path set changes, and config drift across spawned CLI invocations.
+- **Former tests deleted:**
+  1. `e2e::index::content_edit_between_spawns_is_query_visible`
+  2. `e2e::index::path_set_changes_between_spawns_prune_ghosts_and_resolve_links` (needs-split)
+  3. `e2e::index::newly_created_link_target_resolves_inlinks_after_spawned_refresh`
+  4. `e2e::index::list_creates_an_index_store_without_an_explicit_index_command`
+  5. `e2e::index::config_edit_heals_the_index_on_the_next_query`
+  6. `e2e::query::inlinks_render_across_spawned_queries`
+  7. `e2e::template::rendered_output_reenters_the_index`
+- **Former layer:** `e2e`
+- **Retained Rust tests (not deleted):**
+  - `e2e::index::same_size_mtime_restored_edit_reads_the_store_not_a_rebuild` (timing canary; known limitation owned by arch-design ticket 25)
+  - `e2e::index::fully_corrupted_index_self_heals_on_the_next_query` (corruption self-heal; out of candidate list)
+- **Survivors:** Scenarios in `tests/features/index-freshness.feature`:
+  - `An edited task appears in the next query` (replaces `content_edit_between_spawns_is_query_visible`)
+  - `Deleting a sibling path resolves an ambiguous wikilink` (replaces deletion half of `path_set_changes_between_spawns_prune_ghosts_and_resolve_links`)
+  - `Renaming a note removes the former path and resolves its link` (replaces rename half of `path_set_changes_between_spawns_prune_ghosts_and_resolve_links`)
+  - `Adding a link target resolves its inlink on the next query` (replaces `newly_created_link_target_resolves_inlinks_after_spawned_refresh`)
+  - `A list query creates the index store when none exists` (replaces `list_creates_an_index_store_without_an_explicit_index_command`)
+  - `An index setting edit changes the next query without changing notes` (replaces `config_edit_heals_the_index_on_the_next_query`)
+  - `Inlinks render the referencing note path across spawned queries` (replaces `inlinks_render_across_spawned_queries`)
+  - `A rendered note appears in the next list query` (replaces `rendered_output_reenters_the_index`)
+- Scenarios also cover 03-P20, 03-P21, 03-P22, and 03-P25.
+- **Proof:**
+  - **Assertion comparison:**
+    - `content_edit_between_spawns_is_query_visible`: Asserted `task` output `- [ ] old task (a.md)\n` then `- [ ] new task (a.md)\n` and never exit 101. Survivor `An edited task appears in the next query` asserts exact exit codes 0 and exact stdout strings `- [ ] old task (a.md)\n` and `- [ ] new task (a.md)\n`.
+    - `index.rs::path_set_changes_between_spawns_prune_ghosts_and_resolve_links` (needs-split): The old test asserted list and inlink rows across a deletion and a rename. Survivors `Deleting a sibling path resolves an ambiguous wikilink` and `Renaming a note removes the former path and resolves its link` assert the same exact outputs.
+    - `newly_created_link_target_resolves_inlinks_after_spawned_refresh`: Asserted table inlinks contain `a.md`. Survivor `Adding a link target resolves its inlink on the next query` asserts table row for `new` contains inlink `a.md`.
+    - `list_creates_an_index_store_without_an_explicit_index_command`: Asserted list success, stdout `- a.md\n`, and `.traces/index.redb` exists. Survivor `A list query creates the index store when none exists` asserts exit code 0, exact stdout `- a.md\n`, and index store file exists.
+    - `config_edit_heals_the_index_on_the_next_query`: The old test asserted `@Book` before the edit and `@Novel` after the edit. Survivor `An index setting edit changes the next query without changing notes` asserts `- a.md\n` for `@Book`. After the edit and re-trust, it asserts `- a.md\n` for `@Novel` and empty stdout for `@Book`.
+    - `inlinks_render_across_spawned_queries`: Asserted table inlink for foo contains `a.md`. Survivor `Inlinks render the referencing note path across spawned queries` asserts table row for `foo` contains inlink `a.md`.
+    - `rendered_output_reenters_the_index`: Asserted template run success, list by `#fromtemplate` outputs `- daily.md\n`. Survivor `A rendered note appears in the next list query` asserts exit code 0 for template execution and exact stdout `- daily.md\n` for list.
+  - **Kill demonstration:** Production code in `src/index/fingerprint.rs::drift` was modified to return `None`. The former test and the survivor scenario both failed against the broken code. Restoration of the code made both tests pass.
+  - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%.
+  - **Mutation compare (after deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%. No new escape appeared. Baseline file `mutarust-baseline.json` stayed untouched.
+  - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. Exactly 7 tests were removed:
+    - `traces::e2e index::config_edit_heals_the_index_on_the_next_query`
+    - `traces::e2e index::content_edit_between_spawns_is_query_visible`
+    - `traces::e2e index::list_creates_an_index_store_without_an_explicit_index_command`
+    - `traces::e2e index::newly_created_link_target_resolves_inlinks_after_spawned_refresh`
+    - `traces::e2e index::path_set_changes_between_spawns_prune_ghosts_and_resolve_links`
+    - `traces::e2e query::inlinks_render_across_spawned_queries`
+    - `traces::e2e template::rendered_output_reenters_the_index`
+  - **Twin re-read:**
+    - Re-read all tests in `tests/e2e/index.rs`, `tests/e2e/query.rs`, `tests/e2e/template.rs`, `tests/integration/refresh.rs`, and `tests/integration/inlinks.rs`.
+    - Integration tests in `tests/integration/refresh.rs` exercise in-process `IndexerService` APIs directly and remain in place.
+    - `tests/e2e/index.rs::same_size_mtime_restored_edit_reads_the_store_not_a_rebuild` remains in place as the arch ticket 25 timing canary.
+    - No twin duplicate remains across e2e or integration suites for the deleted process-level freshness and drift checks.
+- **Successor note for arch-design:** Scenarios in `tests/features/index-freshness.feature` check index freshness, link updates, and drift recovery.
+
+## Slice 8: Spawned-Signal Exit 130 (Dropped)
+
+No scenario was written and no test was deleted. The user decided
+(2026-11-03) to drop the slice before the signal dev-dependency landed.
+
+### Spike Results (Entry Condition 9.7)
+
+- **Platform gating.** `scenarios!` generates one test for every feature file
+  in the directory it scans, and a missing step fails at run time with
+  `Step not found` (spec section 2). Cfg-gating the step definitions alone
+  would leave Windows generating a test whose steps do not exist. The clean
+  gate is a second `#[cfg(unix)] scenarios!("tests/features/unix", ...)`
+  call over a separate `tests/features/unix/` directory. The `check:layers`
+  feature-text checks and the sixth gate check scan `tests/features/`
+  recursively, so the nested directory stays visible to them. Windows
+  behavior is [INFERENCE]; CI was never run for this layout.
+- **Exit 130 mechanics.** `src/main.rs` returns `ExitCode::from(130)` only
+  for `CommandOutcome::Aborted(UserAbort::Interrupted)`. That outcome is
+  produced only when a dialog error chain holds
+  `DialogError::UserInterrupted`. `inquire` reports that error
+  (`OperationInterrupted`) only when the prompt runs on a real TTY.
+  `src/dialog/terminal.rs` guards every prompt with `stdin_is_tty` and
+  answers from a fallback table otherwise. A piped-stdin child that receives
+  SIGINT dies by signal, so `ExitStatus::code()` is `None`, and no assertion
+  of a numeric 130 is possible without a pseudoterminal.
+- **Readiness.** Deterministic prompt readiness (poll an observable, never
+  `sleep`) requires reading the prompt output, which again needs a
+  pseudoterminal. Spec section 4 bans a PTY harness.
+- **Dependency.** `rustix` is a dev-dependency (1.1.5, `fs` feature). Its
+  `process` feature would cover `kill`; its `pty` feature would cover the
+  pseudoterminal. Both stay unadded.
+
+### Decision
+
+Known limitation. The 130 pin stays in the unit layer:
+`src/main.rs::ctrl_c_abort_exits_130` (outcome to exit-code mapping) and
+`src/cli/mod.rs::user_interrupted_during_template_picker_returns_aborted_interrupted`
+(interrupt mapping through `CliError::user_abort`). Spec sections 9.3, 9.7,
+9.9 item 13, 10 and 12 record the decision. Research/10 row 01-G1 notes the
+130 part as pinned; the class-level map row names the same pin.
+
 ## Slice 6: Schema and Temporal at the Boundary
 
 ### Scenarios Added
@@ -267,8 +406,9 @@ work is complete and passing. The deletion proofs are not complete:
 the scoped mutation compares did not finish in this run.
 
 - `config.rs::class_field_config_drives_class_selection_from_disk`
-  stays for a die-rule reason: the candidate table maps it to 01-G21
-  (slice 5, still `gap`) and 04-B2 (this slice). Spec section 7: a test
+  stays: slice 5 has since covered 01-G21 (2026-11-03), so the die-rule
+  blocker is gone, but its deletion conversion still waits for a scoped
+  mutation compare like the other two tests. Spec section 7: a test
   whose rows span slices dies in the slice that completes its last row.
 - `query.rs::list_filters_rfc3339_field_by_its_exact_instant` and
   `template.rs::renders_file_sourced_select_field_in_e2e_template` stay
