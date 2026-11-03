@@ -10,17 +10,20 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Both framework crates use the exact version of spec section 2.
-- [ ] The licence check allows the one new licence that they need.
-- [ ] The feature file, the step files and the `touch` doc comment follow spec section 5. The single `#[expect]` is proven to fire.
-- [ ] S1 and S2 assert the exit code, the first stderr line (diagnostic code) and an empty stdout, using exact-equality steps. S2 proves every guarantee of the old test.
-- [ ] A line-ending rule keeps feature files LF on all platforms.
-- [ ] One docstring step exercises docstring comparison.
-- [ ] The break demonstration for S1 is recorded: make `init` write a trust grant and S1 fails.
-- [ ] The old trust test is not deleted.
-- [ ] `mise run verify` passes.
+**Break demonstration:** When init writes a trust grant, S1 fails because the
+exit code is 0 instead of 1.
+
+- [x] Both framework crates use the exact version of spec section 2.
+- [x] The licence check allows the one new licence that they need.
+- [x] The feature file, the step files and the `touch` doc comment follow spec section 5. The single `#[expect]` is proven to fire.
+- [x] S1 and S2 assert the exit code, the first stderr line (diagnostic code) and an empty stdout, using exact-equality steps. S2 proves every guarantee of the old test.
+- [x] A line-ending rule keeps feature files LF on all platforms.
+- [x] One docstring step exercises docstring comparison.
+- [x] The break demonstration for S1 is recorded: make `init` write a trust grant and S1 fails.
+- [x] The old trust test is not deleted.
+- [x] `mise run verify` passes.
 
 **Out of scope:**
 - Deleting the old test (implementation ticket 05).
