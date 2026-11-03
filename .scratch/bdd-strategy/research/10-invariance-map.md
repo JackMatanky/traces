@@ -112,21 +112,21 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 04-S3 | A cycle in `extends` is a hard error (one case in a broken-vault story) | M (schema TOML) | gap |
-| 04-S4 | One malformed schema excludes only itself | M (schema TOML) | gap |
-| 04-S7 | Structural and predicate references: the user-facing error split | M | gap |
-| 04-T2 | Naive input uses the local zone; storage is UTC | M (coercion) | gap |
-| 04-T4 | Equality versus shift across DST (the pair) | F | gap |
-| 04-T6 | A month-end clamp in a compound apply (one case) | F | gap |
-| 04-T7 | Calendar diff counts local boundaries | F | gap |
-| 04-T8 | A Date equals the midnight DateTime in filters | M (coercion) | gap |
-| 04-B1 | Schema to query source expansion | F | gap |
-| 04-B2 | Schema to query and template through `class_field` | M | gap |
-| 04-B3 | Schema to the template `schema` namespace | M | gap |
-| 04-B4 | Temporal literals in filters | M | gap |
-| 04-B5 | RFC3339 offsets through ingestion to a CLI filter | F | gap |
-| 04-B6 | One calendar rule for query and template | F | gap |
-| 04-B7 | Temporal registry functions over indexed notes | M | gap |
+| 04-S3 | A cycle in `extends` is a hard error (one case in a broken-vault story) | M (schema TOML) | covered: A cycle in file class inheritance stops selection (reviewed 2026-11-03) |
+| 04-S4 | One malformed schema excludes only itself | M (schema TOML) | covered: An invalid file class does not block a valid file class (reviewed 2026-11-03) |
+| 04-S7 | Structural and predicate references: the user-facing error split | M | covered: An unknown schema in a template fails with a diagnostic (reviewed 2026-11-03) |
+| 04-T2 | Naive input uses the local zone; storage is UTC | M (coercion) | covered: An offset-dated note matches the same instant to a nanosecond (reviewed 2026-11-03) |
+| 04-T4 | Equality versus shift across DST (the pair) | F | covered: Equal durations shift differently over the spring clock change (reviewed 2026-11-03) |
+| 04-T6 | A month-end clamp in a compound apply (one case) | F | covered: Adding one month to January's final day clamps to February's final day (reviewed 2026-11-03) |
+| 04-T7 | Calendar diff counts local boundaries | F | covered: Calendar differences count the local day and elapsed hours separately (reviewed 2026-11-03) |
+| 04-T8 | A Date equals the midnight DateTime in filters | M (coercion) | covered: A date equals the midnight clock value in a filter (reviewed 2026-11-03) |
+| 04-B1 | Schema to query source expansion | F | covered: A descendant file class selects notes from later generations (reviewed 2026-11-03) |
+| 04-B2 | Schema to query and template through `class_field` | M | covered: A configured file class field selects the matching note (reviewed 2026-11-03) |
+| 04-B3 | Schema to the template `schema` namespace | M | covered: A template reads the labels and values of a file-sourced select field (reviewed 2026-11-03) |
+| 04-B4 | Temporal literals in filters | M | covered: A bare date filter selects only the due note (reviewed 2026-11-03) |
+| 04-B5 | RFC3339 offsets through ingestion to a CLI filter | F | covered: An offset-dated note matches the same instant to a nanosecond (reviewed 2026-11-03) |
+| 04-B6 | One calendar rule for query and template | F | covered: A query and a template agree on the same month-end clamp (reviewed 2026-11-03) |
+| 04-B7 | Temporal registry functions over indexed notes | M | covered: Calendar functions filter notes from indexed dates (reviewed 2026-11-03) |
 
 ### Cross-cutting (`research/05`)
 

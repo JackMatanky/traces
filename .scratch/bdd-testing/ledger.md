@@ -104,3 +104,33 @@ process contract without removing existing Rust tests.
   - One gap: the spec does not list the diagnostic code strings. The session
     read `src/cli/error.rs` to find `traces::cli::template::not_found`.
     Authors of later slices must expect to read the code for code strings.
+
+## Slice 6: Schema and Temporal at the Boundary
+
+### Scenarios Added
+
+The slice adds 18 scenarios in `tests/features/schema-temporal.feature`:
+one per owned row of the invariance map (04-S3, 04-S4, 04-S7, 04-T2, 04-T4,
+04-T6, 04-T7, 04-T8, 04-B1, 04-B2, 04-B3, 04-B4, 04-B5, 04-B6, 04-B7).
+
+- 04-T2 shares "An offset-dated note matches the same instant to a
+  nanosecond" with 04-B5; the scenario also pins 04-T2 because the note value
+  carries a `+02:00` offset that must normalize to UTC.
+- 04-B1 has one new scenario beside the Rust test
+  `tests/e2e/query.rs::class_descendant_selector_expands_through_the_schema_graph`,
+  which stays (spec section 7).
+- 04-B6 shares one scenario: query filter and template `date_add` agree on the
+  same month-end clamp (`1|2026-02-28`).
+
+New step definitions live in `tests/e2e/bdd/process.rs` (`in time zone`,
+`I list notes with filter:`) and `tests/e2e/bdd/schema_temporal.rs`
+(project fixtures and `file "{path}" contains:`).
+
+### Deletions Note
+
+All three candidate tests of spec section 9.3 convert in this slice:
+
+- `config.rs::class_field_config_drives_class_selection_from_disk`
+  (01-G21, 04-B2)
+- `query.rs::list_filters_rfc3339_field_by_its_exact_instant` (04-T2, 04-B5)
+- `template.rs::renders_file_sourced_select_field_in_e2e_template` (04-B3)

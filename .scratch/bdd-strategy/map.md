@@ -203,3 +203,4 @@ Nothing. The fog items graduated into [spec.md](../bdd-testing/spec.md):
 
 - gap recompute: slice 1, 2026-11-03
 - gap recompute: slice 2, 2026-11-03
+- gap recompute: slice 6, 2026-11-03
