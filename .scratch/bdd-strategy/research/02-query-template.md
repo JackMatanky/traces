@@ -340,7 +340,7 @@ it, code status unverified or weakly implemented). Entry format: Contract
   ADR-0009:3 status `proposed`, yet its behavior is implemented
   (`filter.rs:54-115` date-lexing, `filter.rs:1081-1090` number-only rejection)
   and integration-pinned (`integration/query.rs:486`). Also **duplicate ADR
-  number**: `docs/adr/0009-filter-date-literals.md` and `docs/adr/0009-index-refresh.md`.
+  number**: `docs/adr/0010-filter-date-literals.md` and `docs/adr/0009-index-refresh.md`.
 - **C6 (checked, no contradiction)**: registration table ADR-0001:63-74 matches
   actual modules (`file/query/tasks/ui/date/schema` objects + `uuid` @
   `engine.rs:164` + `string/num/yaml` filters); ui's four functions ADR-0001:33

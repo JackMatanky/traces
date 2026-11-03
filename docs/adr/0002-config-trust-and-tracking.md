@@ -97,12 +97,12 @@ the tracking store.
 Granting trust to a missing config now fails with a tracker error where it
 previously failed with a hash error.
 
-**Update: moved directories are refused, and trust checks read and hash.**
-(Ticket 12.) Two claims in the Consequences section do not match the code. A
-moved directory does not become "stale": the loader refuses the config as
-untrusted. The hot path does not use "just a file existence check": it reads the
-config and checks its BLAKE3 hash before trust (trust-before-parse). The
-Consequences bullets keep their historical wording.
+**Update: moved directories are refused as untrusted, and trust checks read and hash.**
+(Ticket 12, ticket 16.) The Consequences and Confirmation sections have been
+updated to match the code: a moved directory does not become "stale": the loader
+refuses the config as untrusted until re-trusted. The hot path does not use an
+existence check only: it reads the config and checks its companion BLAKE3 hash
+before trust (trust-before-parse).
 
 ### Consequences
 
@@ -111,10 +111,11 @@ Good, because:
 - Symlinks are trivially auditable — list
   `~/.local/state/traces/trusted-configs/` (or `tracked-configs/`) to see all
   entries
-- The hash-based filename survives directory moves (trust entry becomes stale,
-  tool warns and suggests re-trust)
-- No config file parsing needed at the trust-check hot path — just a file
-  existence check
+- The hash-based filename anchors to canonical paths (a moved directory is
+  refused as untrusted; the tool requires re-trust)
+- Trust-before-parse reads and verifies the config's companion BLAKE3 hash
+  before parsing, preventing execution of modified configs (not an existence
+  check only)
 - Cleanup (`traces trust clean`) removes dangling symlinks to deleted
   directories; the same clean logic applies to the tracking store
 - Trust (a security decision) and tracking (bookkeeping) are physically
@@ -136,13 +137,14 @@ Bad, because:
 
 ### Confirmation
 
-The trust check is enforced in the config-loading path: before a local config
-candidate is read, the tool checks for a symlink at
-`~/.local/state/traces/trusted-configs/<hash>` keyed by its project root —
-template rendering never checks trust on its own, it only ever runs against
-config that has already loaded successfully, so gating config loading is
-sufficient to gate templates too. Unit tests verify that trusted workspaces
-pass, untrusted workspaces are rejected with the correct error, and `traces
+The trust check is enforced in the config-loading path: the tool reads the
+local config candidate and verifies its companion BLAKE3 content hash against
+the symlink at `~/.local/state/traces/trusted-configs/<hash>` keyed by its
+project root before parsing — template rendering never checks trust on its own,
+it only ever runs against config that has already loaded successfully, so
+gating config loading is sufficient to gate templates too. Unit tests verify
+that trusted workspaces pass, untrusted workspaces are rejected with the
+correct error, and `traces
 trust` creates the symlink correctly. Tracking is confirmed separately: loading
 a config writes a symlink into `tracked-configs/`, and the cross-project list
 reflects it. Both stores are injectable (test point at a temp state dir).

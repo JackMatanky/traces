@@ -10,14 +10,15 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] One of the two ADR-0009 files is renumbered to 0010 and every reference follows. Neither is marked superseded.
-- [ ] In-tree markers state that slugs, callouts and footnotes have no code.
-- [ ] The template glossary states the real loader order.
-- [ ] The ADR corrections of spec section 6.7 (items 1, 2 and 6) are applied.
-- [ ] `mise run verify` passes.
+- [x] One of the two ADR-0009 files is renumbered to 0010 and every reference follows. Neither is marked superseded.
+- [x] In-tree markers state that slugs, callouts and footnotes have no code.
+- [x] The template glossary states the real loader order.
+- [x] The ADR corrections of spec section 6.7 (items 1, 2 and 6) are applied.
+- [x] `mise run verify` passes.
 
 **Out of scope:**
+
 - Marking either ADR superseded.
 - Implementing slugs, callouts or footnotes.
