@@ -756,3 +756,5 @@ change.
   in tests/features/process.feature passed 100 of 100 stress iterations locally.
   Exact-equality stdout and stderr steps and count summary step added. No test
   deletions.
+- 2026-11-03: the user confirmed the section 9.3 row placement for slice 5.
+  The rows placed by domain affinity remain in slice 5.
