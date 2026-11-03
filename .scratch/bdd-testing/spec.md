@@ -743,7 +743,7 @@ change.
 - 2026-11-03: implementation tickets 01 to 16 written in `issues/`. Slices 3 to 8
   wait for slice 2. No ticket waits for arch-design.
 - 2026-11-03: slice 1 gate passed. Draft PR 3 run, all jobs green on ubuntu, macos
-  and windows, including audit: https://github.com/JackMatanky/traces/actions/runs/41626080102.
+  and windows, including audit: <https://github.com/JackMatanky/traces/actions/runs/41626080102>.
   The scenarios S1 and S2 passed 100 of 100 stress iterations locally. Deletions are
   allowed.
 - 2026-11-03: slice 1 closed. Pilot rows (01-G4, 01-G17, 01-G23, 01-G24, 05-G3)
@@ -751,3 +751,8 @@ change.
   first gap recompute is recorded. The profraw check confirmed coverage numbers
   see scenario runs. The candidate table row for init is fixed. The hygiene
   backlog is created. Rubric questions 1 and 2 are answered affirmative.
+- 2026-11-03: slice 2 closed. Process contract rows (01-G1, 01-G2, 01-G3, 01-G4,
+  05-G1, 05-G2, 05-G3) are marked covered in the invariance map. Seven scenarios
+  in tests/features/process.feature passed 100 of 100 stress iterations locally.
+  Exact-equality stdout and stderr steps and count summary step added. No test
+  deletions.
