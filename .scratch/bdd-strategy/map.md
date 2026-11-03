@@ -208,3 +208,4 @@ Nothing. The fog items graduated into [spec.md](../bdd-testing/spec.md):
   known limitation (`pinned: src/main.rs::ctrl_c_abort_exits_130`); see
   [spec.md](../bdd-testing/spec.md) sections 9.3, 9.7, 9.9 item 13 and 12.
 - gap recompute: slice 5, 2026-11-03
+- gap recompute: slice 4, 2026-11-03

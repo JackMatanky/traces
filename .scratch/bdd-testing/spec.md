@@ -808,3 +808,6 @@ change.
   03-P25 (slice 4), and their row coverage by the new scenarios does not clear
   the dual-ownership rule of section 7 for this slice. 46 scenarios passed
   100 of 100 stress iterations locally.
+- 2026-11-03: slice 4 added index-freshness scenarios for edits, paths, links,
+  config drift, rendered notes, scan scope and the tracked-config store. The
+  same-size mtime canary stays in Rust as a known limit for arch ticket 25.

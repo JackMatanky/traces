@@ -10,24 +10,25 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every row the slice owns has a scenario of the class that spec section 4 assigns.
-- [ ] The Status of each owned row in the invariance map reads `covered`.
-- [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
-- [ ] The mtime canary stays in Rust, relabelled as a known limitation owned by arch-design ticket 25, and is never converted.
-- [ ] The config-edit heal test that arch-design ticket 25 names converts here.
-- [ ] A stress run of 100 shows no scenario flakes from racy timestamps.
-- [ ] A converted test is deleted only when this slice completes its last row.
-- [ ] Each deletion has the proof of spec section 7.
-- [ ] `mise run verify` passes.
-- [ ] The ledger section is complete.
-- [ ] The gap recompute line is in the adoption map.
-- [ ] The due rubric questions are answered.
-- [ ] The amendment log has an entry.
+- [x] Every row the slice owns has a scenario of the class that spec section 4 assigns.
+- [x] The Status of each owned row in the invariance map reads `covered`.
+- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
+- [x] The mtime canary stays in Rust as an arch ticket 25 known limit and is never converted.
+- [x] The config-edit heal test that arch-design ticket 25 names converts here.
+- [x] A stress run of 100 shows no scenario flakes from racy timestamps.
+- [x] A converted test is deleted only when this slice completes its last row.
+- [x] Each deletion has the proof of spec section 7.
+- [x] `mise run verify` passes.
+- [x] The ledger section is complete.
+- [x] The gap recompute line is in the adoption map.
+- [x] The due rubric questions are answered (none due for this slice).
+- [x] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
 
 **Out of scope:**
+
 - Rows that another slice owns.
 - Known defects (spec section 3.3).
 - Facade-seam scenarios and Scenario Outlines.

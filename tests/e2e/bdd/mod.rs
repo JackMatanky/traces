@@ -31,6 +31,7 @@ fn last_run() -> LastRun {
 }
 
 mod configuration;
+mod index;
 mod process;
 mod query;
 mod template;
