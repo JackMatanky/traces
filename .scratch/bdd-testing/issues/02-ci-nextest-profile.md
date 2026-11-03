@@ -14,7 +14,7 @@
 
 - [x] A nextest `ci` profile exists with JUnit output and no retries.
 - [x] Each CI nextest job selects the profile and uploads its JUnit file as an artifact.
-- [ ] A pull-request run shows the artifact on every operating system in the matrix.
+- [x] A pull-request run shows the artifact on every operating system in the matrix. Run 41626080102 (PR 3) published `junit-test-e2e-{ubuntu,macos,windows}-latest`, `junit-test-unit` and `junit-test-integration`.
 - [x] `mise run verify` passes.
 
 **Out of scope:**

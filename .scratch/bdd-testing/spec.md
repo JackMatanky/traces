@@ -736,3 +736,7 @@ change.
 - 2026-11-03: spec written. Slice 1 is ready to start.
 - 2026-11-03: implementation tickets 01 to 16 written in `issues/`. Slices 3 to 8
   wait for slice 2. No ticket waits for arch-design.
+- 2026-11-03: slice 1 gate passed. Draft PR 3 run, all jobs green on ubuntu, macos
+  and windows, including audit: https://github.com/JackMatanky/traces/actions/runs/41626080102.
+  The scenarios S1 and S2 passed 100 of 100 stress iterations locally. Deletions are
+  allowed.
