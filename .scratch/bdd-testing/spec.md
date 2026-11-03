@@ -1,14 +1,12 @@
 # BDD adoption and implementation strategy
 
-Status: ready for slice 1. Date: 2026-11-03. The implementation tickets are in
-`.scratch/bdd-testing/issues/`.
+Status: slices 1 to 7 are on the `bdd-testing` integration branch. Slice 8 was dropped. The deletion wave is done except for the two retained `tracked.rs` tests. Date: 2026-11-04. The implementation tickets are in `.scratch/bdd-testing/issues/`.
 
 This document is the destination of the [BDD adoption map](../bdd-strategy/map.md).
 The decision tickets and research live in `.scratch/bdd-strategy/`. This folder
-holds the spec, the ledger and the implementation tickets. A fresh
-session starts slice 1 from section 9 with no open design question. Every
-section names the ticket that decided it. Open questions that belong to later
-slices are "entry conditions" in section 9.7.
+holds the spec, the ledger and the implementation tickets. Sections 9 and 9.7
+record the original slice order and entry conditions. Every section names
+the ticket that decided it.
 
 ## 1. Purpose and rules
 

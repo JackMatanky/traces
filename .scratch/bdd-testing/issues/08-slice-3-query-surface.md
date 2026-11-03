@@ -23,7 +23,7 @@
 - [x] The gap recompute line is in the adoption map.
 - [x] The due rubric questions are answered. (none due for this slice)
 - [x] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] The slice branch is merged locally.
 
 **Out of scope:**
 
