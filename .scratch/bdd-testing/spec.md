@@ -792,21 +792,24 @@ change.
 - 2026-11-03: slice 5 closed. The configuration, tracking and template rows
   (01-G7, 01-G11, 01-G13, 01-G14, 01-G15, 01-G18, 01-G21, 01-G22, 01-G25,
   01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-env_vars and
-  05-file_tracker) are covered. Honest exceptions: 01-G12 and 01-G16 stay
-  pinned to their unit tests (the non-TTY providers agree, and no portable
-  mid-scaffold CLI failure exists), 05-G7 stays a gap (the universal
-  every-path claim contradicts the accepted absolute config-derived output
-  path; template runtime confinement is covered under 02-G11), and 05-dirtree
-  is pinned (no portable CLI channel distinguishes root versus node walk
-  errors). Four feature files cover the slice:
+  05-file_tracker) are covered. There are four honest exceptions:
+  - 01-G12 and 01-G16 stay pinned to their unit tests. The non-TTY providers
+    agree, and no portable mid-scaffold CLI failure exists.
+  - 05-G7 stays a gap. The universal every-path claim contradicts the accepted
+    absolute config-derived output path. Template runtime confinement is
+    covered under 02-G11.
+  - 05-dirtree is pinned. No portable CLI channel distinguishes root from node
+    walk errors.
+
+  Four feature files cover the slice:
   `configuration.feature`, `template.feature`, `tracking.feature` plus the
   pilot files. One deletion: `init.rs::default_path_init_spawns_and_scaffolds_workspace`
   (row 1 of the ledger slice 5 section; full seven-item proof).
   `tracked.rs::list_prints_every_tracked_config_path` and
   `tracked.rs::clean_removes_a_stale_tracked_entry_and_reports_the_count` were
-  retained rather than deleted: the candidate table also maps
-  03-P25 (slice 4), and their row coverage by the new scenarios does not clear
-  the dual-ownership rule of section 7 for this slice. 46 scenarios passed
+  retained rather than deleted. The candidate table also maps 03-P25
+  (slice 4). Their row coverage by the new scenarios does not clear the
+  dual-ownership rule of section 7 for this slice. 46 scenarios passed
   100 of 100 stress iterations locally.
 - 2026-11-03: slice 4 added index-freshness scenarios for edits, paths, links,
   config drift, rendered notes, scan scope and the tracked-config store. The
@@ -829,3 +832,8 @@ change.
   - task_filter_shortcuts_narrow_output_accurately
   - list_filters_an_inline_multi_part_duration
   The tag-filter config test stays until slice 5 completes row 01-G21.
+- 2026-11-04: deletion wave. Four deferred tests die with full proof: the tag
+  filter, class field, exact instant and file-sourced select tests. The two
+  `tracked.rs` tests stay. The after-run on `src/config/tracker.rs` shows a new
+  escape (mutant `1bc082ba551c7449b7fa4cea638f0ec3`), so the section 7 proof
+  fails for them. See the ledger section "Deletion Wave".

@@ -129,45 +129,6 @@ fn non_tty_dialog_short_circuits_to_defaults_without_hanging() {
     );
 }
 
-#[test]
-fn renders_file_sourced_select_field_in_e2e_template() {
-    let sandbox = Sandbox::trusted_via_cli();
-
-    // Write values file DTO
-    sandbox.write_schema_value(
-        "categories.toml",
-        "[[entries]]\nid = \"rust\"\ntitle = \"Rust Programming\"\n",
-    );
-
-    // Write schema file referencing values file
-    sandbox.write_schema(
-        "topic",
-        r#"
-        [fields.category]
-        type = "select"
-        values = { path = "values/categories.toml", value = "id", label = "title" }
-        "#,
-    );
-
-    // Write template referencing the schema select field
-    sandbox.write_template(
-        "topic_note.md",
-        "Category: {{ schema.get('topic').field('category')[0].label }} ({{ \
-         schema.get('topic').field('category')[0].value }})",
-    );
-
-    // Run the template generation command
-    let run = sandbox.run(&["template", "-i", "topic_note", "--no-input"]);
-
-    assert!(run.is_success(), "stderr: {}", run.stderr);
-    let written = sandbox.root().join("topic_note.md");
-    assert!(written.is_file());
-    assert_eq!(
-        std::fs::read_to_string(written).expect("read topic note"),
-        "Category: Rust Programming (rust)"
-    );
-}
-
 // Relocated from the dissolved `dispatch.rs` (ticket 19): dry-run and
 // render-error contracts join the write-path capability file.
 
