@@ -63,7 +63,7 @@ fn stderr_is(last_run: &LastRun, expected: String) {
 #[then("stdout is:")]
 fn stdout_is_docstring(last_run: &LastRun, docstring: String) {
     let run = last_run.0.as_ref().expect("a prior command must have run");
-    run.assert_stdout_eq(&format!("{}\n", docstring.trim()));
+    run.assert_stdout_eq(&format!("{}\n", docstring.trim_matches('\n')));
 }
 
 #[then("stderr is:")]
