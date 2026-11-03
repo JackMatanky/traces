@@ -83,6 +83,8 @@ jobs:
   test-unit:
     name: test (unit, production config)
     runs-on: ubuntu-latest
+    env:
+      NEXTEST_PROFILE: ci
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
@@ -99,10 +101,16 @@ jobs:
       - run: >-
           cargo nextest run -p traces --no-default-features
           --no-tests fail -E 'binary(traces)'
-
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: junit-test-unit
+          path: target/nextest/ci/junit.xml
   test-integration:
     name: test (integration, test-utils)
     runs-on: ubuntu-latest
+    env:
+      NEXTEST_PROFILE: ci
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
@@ -116,7 +124,11 @@ jobs:
       - run: >-
           cargo nextest run -p traces --features test-utils
           --no-tests fail -E 'binary(integration)'
-
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: junit-test-integration
+          path: target/nextest/ci/junit.xml
   test-e2e:
     name: test (e2e, ${{ matrix.os }})
     strategy:
@@ -126,6 +138,8 @@ jobs:
         # (default-deny table + platform passthrough list).
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      NEXTEST_PROFILE: ci
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
@@ -139,7 +153,11 @@ jobs:
       - run: >-
           cargo nextest run -p traces --no-default-features
           --no-tests fail -E 'binary(e2e)'
-
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: junit-test-e2e-${{ matrix.os }}
+          path: target/nextest/ci/junit.xml
   test-doctests:
     name: test (doctests, all-features)
     runs-on: ubuntu-latest
