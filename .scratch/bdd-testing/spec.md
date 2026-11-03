@@ -1,6 +1,7 @@
 # BDD adoption and implementation strategy
 
-Status: ready for slice 1. Date: 2026-11-03.
+Status: ready for slice 1. Date: 2026-11-03. The implementation tickets are in
+`.scratch/bdd-testing/issues/`.
 
 This document is the destination of the [BDD adoption map](../bdd-strategy/map.md).
 The decision tickets and research live in `.scratch/bdd-strategy/`. This folder
@@ -21,8 +22,10 @@ slices are "entry conditions" in section 9.7.
 - No coverage or test-count target exists, ever (section 6.5).
 - A scenario never pins a known defect (section 3.3).
 - Files under `.scratch/bdd-strategy/` and `.scratch/bdd-testing/` use
-  ASD-STE100 style. Cite external
-  evidence by its tag only.
+  ASD-STE100 style. Cite external evidence by its tag only.
+- "Ticket NN" in this spec means a decision ticket in `.scratch/bdd-strategy/issues/`.
+  "Arch ticket NN" means an arch-design ticket. The implementation tickets in
+  `.scratch/bdd-testing/issues/` are "implementation ticket NN".
 
 ## 2. Framework (ticket 06)
 
@@ -81,9 +84,13 @@ A guarantee earns a scenario only when all six hold:
 5. Hermetic: the scenario runs under the sandbox default-deny env policy.
 6. Refactor-stable: no open arch-design ticket moves the seam.
 
-Exception classes never become plain scenarios: real-TTY dialogs, exit 130
-(one Unix spawned-signal case), timing freshness (the mtime canary), byte-level
-store surgery and `syn` scans, and the `template` abort seam.
+These exception classes never become plain scenarios:
+
+- real-TTY dialogs
+- exit 130 (one Unix spawned-signal case)
+- timing freshness (the mtime canary)
+- byte-level store surgery and `syn` scans
+- the `template` abort seam
 
 ### 3.3 Invariance list and defects (ticket 10)
 
@@ -204,7 +211,7 @@ when the fix lands.
 5. Apply the review checklist (section 6.4) to every scenario file in review.
 
 A gap recompute re-derives every row from current facts. It is not a recount.
-Record it in one `map.md` line: `gap recompute: slice N, DATE`. A row whose date
+Record it in one line of `.scratch/bdd-strategy/map.md`: `gap recompute: slice N, DATE`. A row whose date
 is older than the last recompute line reads as stale. A new mutation escape in a
 module that owns a covered row triggers a re-review of that row.
 
@@ -221,11 +228,16 @@ columns exist.
 
 ### 6.4 Review rubric and checklist
 
-Rubric, six criteria: the scenario states behavior and not implementation; it has
-3 to 5 steps and one business rule; its example data is concrete and realistic;
-its assertions check observable outcomes and diagnostic codes; a failure names
-the business rule without a source read; review produces quality, authoring
-does not. Checklist for every scenario file:
+The rubric has six criteria:
+
+- The scenario states behavior and not implementation.
+- It has 3 to 5 steps and one business rule.
+- Its example data is concrete and realistic.
+- Its assertions check observable outcomes and diagnostic codes.
+- A failure names the business rule without a source read.
+- Review produces quality. Authoring does not.
+
+Checklist for every scenario file:
 
 - Does the scenario state behavior that survives an implementation change?
 - Does it hold 3 to 5 steps and one business rule?
@@ -237,9 +249,9 @@ When the rubric and the authoring rules differ, the authoring rule wins.
 
 ### 6.5 Anti-metrics
 
-These are barred as targets, gates or scores: coverage percentage, scenario
-counts, test counts, pass rate, and any metric that fails Kaner and Bond's
-foreseeable-side-effect question. Line coverage stays a bare diagnostic. The
+Never use these as targets, gates or scores: coverage percentage, scenario
+counts, test counts and pass rate. Never use any metric that fails Kaner and
+Bond's foreseeable-side-effect question. Line coverage stays a bare diagnostic. The
 `--fail-on-escaped` baseline is a per-survivor review trigger, not a score.
 Mutation and coverage tooling stay unchanged. `min_msi` is declined. Updating
 `mutarust-baseline.json` needs a written burden in the mutation docs: the mutant
@@ -270,9 +282,12 @@ the sixth gate check.
 - Only e2e Rust tests convert. A slice owns the research/10 rows it names. Only
   tests that cover those rows convert or die. Editing a file does not make its
   tests eligible.
-- A test converts only when a slice owns a row it covers, the six conditions hold,
-  the scenario fits one principal `When` and 3 to 5 steps, it asserts codes and
-  never miette text, and it proves all guarantees of the old test.
+- A test converts only when all of these hold:
+  - A slice owns a row that the test covers.
+  - The six conditions hold.
+  - The scenario fits one principal `When` and 3 to 5 steps.
+  - The scenario asserts codes and never miette text.
+  - The scenario proves all guarantees of the old test.
 - A needs-split test becomes several key-example scenarios, never an outline.
 - A test whose rows span slices dies in the slice that completes its last row.
 - The workflow chain test `workflow.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`
@@ -304,11 +319,19 @@ Every deletion needs all of these:
 5. **Ledger row** in `.scratch/bdd-testing/ledger.md`.
 6. **Review** checks that the change records each item. CI has no mutation job.
 
-Ledger: append-only, one section per slice, updated in the same change as the
-deletion. One row per old test: the namespaced row IDs, the behavior, the former
-test (`binary-id::path`), the former layer, the defect caught (one plain
-sentence), the survivor, the proof, and a successor note for arch-design. A row
-records no commit SHA. Recovery uses `git log -S '<test name>'`.
+The ledger is append-only, with one section per slice. Update it in the same
+change as the deletion. It has one row per old test. A row holds:
+
+- the namespaced row IDs
+- the behavior
+- the former test (`binary-id::path`)
+- the former layer
+- the defect caught (one plain sentence)
+- the survivor
+- the proof
+- a successor note for arch-design
+
+A row records no commit SHA. Recovery uses `git log -S '<test name>'`.
 
 Other rules:
 
@@ -355,6 +378,8 @@ Feature files are a human-owned contract.
 ### 9.1 Mechanics
 
 - One worktree and one branch per slice. Merge locally when the slice closes.
+- Slice 2 starts after slice 1 closes. Slices 3 to 8 start after slice 2 closes, so
+  that rubric question 3 is answered before the volume work starts.
 - CI runs only on push to `main` and on `pull_request`. Push the slice branch and
   open a draft PR as a CI trigger only. Then merge locally and push `main`. In
   ticket 13, "PR" reads "slice branch with its draft PR".
@@ -368,11 +393,16 @@ Feature files are a human-owned contract.
 
 ### 9.2 Order rule
 
-Learn on stable, high-value rows first. Then take volume. Then take timing-sensitive
-rows after the three-OS result is known. Then take host-dependent rows. No arch
-ticket is near implementation, so no refactor deadline puts a moving domain
-first. Index freshness waits for slice 4 because racy timestamps are the flake
-risk.
+Take the slices in this order:
+
+1. Stable, high-value rows first, to learn.
+2. Volume rows.
+3. Timing-sensitive rows, after the three-OS result is known.
+4. Host-dependent rows.
+
+No arch ticket is near implementation, so no refactor deadline puts a moving
+domain first. Index freshness is slice 4, after the three-OS result, because
+racy timestamps are the flake risk.
 
 ### 9.3 Slices
 
@@ -387,12 +417,19 @@ risk.
 | 7 | Note-model rules through query output | 03-N01 to 03-N04, 03-N06, 03-N08 to 03-N12, 03-N14, 03-N17, 03-N05, 03-N07 and 03-N16 (defect parts excluded), 05-G8, 05-field, 05-task, 05-tag | None |
 | 8 | Spawned-signal exit 130 (Unix) | The class-level 130 case of 01-G1 | Entry condition 9.7 |
 
-The grilling session named only some rows in its accepted list. The roadmap placed
-the other rows by domain affinity: 01-G7, 01-G15, 01-G16, 01-G26, 01-G27,
-01-G29, 02-G5, 02-G7, 02-G9, 02-G13, 02-G14, 02-G18, 03-P22, 03-P25, 04-S3,
-04-S4, 04-S7, 04-T6, 04-T8, 04-B1, 05-G7, 05-G8, 05-field, 05-task, 05-tag,
-05-file_tracker, 05-dirtree and 05-env_vars. The user may reassign them. Slice 5
-is large. It may split at entry (section 9.1).
+The grilling session named only some rows in its accepted list. The roadmap
+placed the other rows by domain affinity. They are:
+
+- 01-G7, 01-G15, 01-G16, 01-G26, 01-G27 and 01-G29
+- 02-G5, 02-G7, 02-G9, 02-G13, 02-G14 and 02-G18
+- 03-P22 and 03-P25
+- 04-S3, 04-S4, 04-S7, 04-T6, 04-T8 and 04-B1
+- 05-G7, 05-G8, 05-field, 05-task, 05-tag, 05-file_tracker, 05-dirtree and
+  05-env_vars
+
+The user may reassign them. Slice 5 is large. It may split at entry
+(section 9.1). Implementation ticket 12 holds 04-B1, because it waits for arch
+ticket 20.
 
 Test conversion by slice, from the static
 [candidate table](../bdd-strategy/research/13-candidate-table.md). The slice that completes the
@@ -517,7 +554,7 @@ ticket 08 reopens. The user decides whether to reopen.
   ID rule to every row, in one pass. Mark pilot rows `covered` and set the other
   states by the method of section 6.
 - Add the sixth gate check. It wakes when the Status columns exist.
-- Record the first gap recompute: `gap recompute: slice 1, DATE` in `map.md`.
+- Record the first gap recompute: `gap recompute: slice 1, DATE` in the adoption map.
 - Run the profraw empirical check: do llvm-cov numbers see scenario-executed
   source? Until then, treat coverage numbers as blind to it (ticket 12).
 - Fix the candidate table row for `init.rs::default_path_init_spawns_and_scaffolds_workspace`
@@ -565,9 +602,14 @@ slice.
 
 ### 9.6 Slice-close protocol
 
-At every slice close: `mise run verify` passes, the ledger section is complete,
-the gap recompute line is in `map.md`, the rubric questions that fall due are
-answered, and section 12 records the close. Then merge locally.
+At every slice close, do these steps in order:
+
+1. `mise run verify` passes.
+2. The ledger section is complete.
+3. The gap recompute line is in `.scratch/bdd-strategy/map.md`.
+4. The rubric questions that fall due are answered.
+5. Section 12 records the close.
+6. Merge locally.
 
 ### 9.7 Entry conditions of later slices
 
@@ -589,7 +631,7 @@ Any session may take these after slice 1. None blocks a slice.
 
 - **U1.** Pin the four yaml.rs claims as unit tests: binary literals as integers,
   an overflowing float stays a string, `u64::MAX` errors, a non-scalar key
-  errors. Verify each claim against the code first. When code and doc disagree,
+  errors. Check each claim against the code first. When code and doc disagree,
   code wins.
 - **U2.** Add three proptests: table escaping, tag containment and the
   `NoteFieldValue` total order. Commit `proptest-regressions/` files. This closes
@@ -691,3 +733,5 @@ Append one line for each slice close, split, entry-condition result and spec
 change.
 
 - 2026-11-03: spec written. Slice 1 is ready to start.
+- 2026-11-03: implementation tickets 01 to 17 written in `issues/`. Slices 3 to 8
+  wait for slice 2. Row 04-B1 moved to implementation ticket 12.
