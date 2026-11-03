@@ -10,15 +10,15 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The kill demonstration is recorded: make `untrust` keep the grant, and the old test and S2 both fail.
-- [ ] The relative mutation compare on the trust module is run before and after the deletion in the background. Both escape sets are in the ledger. No new escape appears. The mutation baseline file is untouched.
-- [ ] The twin test is re-read and recorded.
-- [ ] The old untrust test is deleted and the nextest name list before and after shows exactly that name removed.
-- [ ] The ledger has its first section and one complete row, as spec section 7 defines it.
-- [ ] A `mutarust` probe on a test-only diff is recorded, and the result is labelled as evidence.
-- [ ] `mise run verify` passes.
+- [x] The kill demonstration is recorded: make `untrust` keep the grant, and the old test and S2 both fail.
+- [x] The relative mutation compare on the trust module is run before and after the deletion in the background. Both escape sets are in the ledger. No new escape appears. The mutation baseline file is untouched.
+- [x] The twin test is re-read and recorded.
+- [x] The old untrust test is deleted and the nextest name list before and after shows exactly that name removed.
+- [x] The ledger has its first section and one complete row, as spec section 7 defines it.
+- [x] A `mutarust` probe on a test-only diff is recorded, and the result is labelled as evidence.
+- [x] `mise run verify` passes.
 
 **Out of scope:**
 - Other test deletions.
