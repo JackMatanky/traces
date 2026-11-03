@@ -31,6 +31,7 @@ fn last_run() -> LastRun {
 }
 
 mod process;
+mod query;
 mod schema_temporal;
 mod trust;
 

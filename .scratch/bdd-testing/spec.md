@@ -756,6 +756,10 @@ change.
   in tests/features/process.feature passed 100 of 100 stress iterations locally.
   Exact-equality stdout and stderr steps and count summary step added. No test
   deletions.
+- 2026-11-03: slice 3 closed. Query scenarios cover the owned rows in
+  `tests/features/query.feature`. Four e2e tests moved to scenarios after
+  paired failure checks. Two unit test names now say `explicit ascending`.
+  The slice 3 ledger records the deletion proof and name inventory.
 - 2026-11-03: slice 6 entry condition passed on macOS. The scenario "A local
   clock field matches its UTC instant in another time zone" runs with
   `TZ=America/New_York` through `Sandbox::run_with_envs`; it selected the note.
