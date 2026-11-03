@@ -2,6 +2,10 @@
 
 **What to build:** The e2e test binary adopts the `rstest-bdd` framework. It gets two scenarios for the trust and init lifecycle. S1: init does not grant trust (new coverage). S2: untrust revokes trust (a conversion of the old Rust test). The old test stays. Read spec sections 2, 5 and 9.4 (commit 1). Slice 1 owns 01-G17, 01-G23, 01-G24, and 01-G4 and 05-G3 for the untrusted diagnostic code only.
 
+**Current state:** No scenario framework, feature file or step file exists. The old Rust test is the only test of the untrust diagnostic.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 01 Repair the layer gate and test-task gaps
 
 **Category:** enhancement
@@ -17,3 +21,8 @@
 - [ ] The break demonstration for S1 is recorded: make `init` write a trust grant and S1 fails.
 - [ ] The old trust test is not deleted.
 - [ ] `mise run verify` passes.
+
+**Out of scope:**
+- Deleting the old test (implementation ticket 05).
+- Scenarios outside the trust and init lifecycle.
+- A World type, a CLI DSL or step-generating macros.

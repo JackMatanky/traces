@@ -1,6 +1,10 @@
-# 14: Slice 8: spawned-signal exit 130 (Unix)
+# 13: Slice 8: spawned-signal exit 130 (Unix)
 
 **What to build:** A Unix-only scenario shows that an interrupted run exits with code 130. Row: the class-level 130 case of 01-G1.
+
+**Current state:** No test sends a signal to a spawned `traces` process. No signal dev-dependency exists.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
 
 **Blocked by:** 07 Slice 2: process contract
 
@@ -17,3 +21,7 @@
 - [ ] The due rubric questions are answered.
 - [ ] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
+
+**Out of scope:**
+- Windows signal behavior.
+- Exit codes other than 130.

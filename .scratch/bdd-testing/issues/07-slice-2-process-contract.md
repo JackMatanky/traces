@@ -2,6 +2,10 @@
 
 **What to build:** The process contract is a set of scenarios: exit codes 0, 1 and 2, diagnostic output and stream contracts. Rows: 01-G1 (codes 0, 1 and 2, no closed-pipe case), 01-G2, 01-G3, 01-G4 (other codes), 05-G1, 05-G2, 05-G3 (other codes). Follow spec section 9.3 for the rows and the converted tests, section 7 for each deletion, and section 6.4 for review.
 
+**Current state:** The guarantees of the owned rows have no scenario. Some Rust e2e tests cover part of them.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 06 Coverage-gap bookkeeping and slice 1 close
 
 **Category:** enhancement
@@ -20,3 +24,8 @@
 - [ ] The due rubric questions are answered.
 - [ ] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
+
+**Out of scope:**
+- Rows that another slice owns.
+- Known defects (spec section 3.3).
+- Facade-seam scenarios and Scenario Outlines.

@@ -2,6 +2,10 @@
 
 **What to build:** The invariance map becomes a working coverage-gap ledger and slice 1 closes. Read spec sections 6, 9.4 (commit 2), 9.5, 9.6 and 9.8.
 
+**Current state:** The invariance map has no Status column. The sixth gate check has nothing to read.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 05 First deletion with proof and ledger
 
 **Category:** enhancement
@@ -21,3 +25,7 @@
 - [ ] The due rubric questions are answered.
 - [ ] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
+
+**Out of scope:**
+- Rows of later slices, except to mark them `gap`.
+- Numeric targets of any kind.

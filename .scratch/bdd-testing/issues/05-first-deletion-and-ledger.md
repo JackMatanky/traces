@@ -2,6 +2,10 @@
 
 **What to build:** The first old Rust test is deleted with the full proof of spec section 7, and the migration ledger starts. Read spec sections 7 and 9.4 (commit 2).
 
+**Current state:** The old untrust test and S2 both guard the guarantee. No ledger exists.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 04 Three-OS pilot gate
 
 **Category:** enhancement
@@ -15,3 +19,8 @@
 - [ ] The ledger has its first section and one complete row, as spec section 7 defines it.
 - [ ] A `mutarust` probe on a test-only diff is recorded, and the result is labelled as evidence.
 - [ ] `mise run verify` passes.
+
+**Out of scope:**
+- Other test deletions.
+- A change to the mutation baseline file.
+- Mutation runs with a diff or per-test mode.

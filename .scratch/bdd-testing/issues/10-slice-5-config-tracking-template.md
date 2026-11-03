@@ -2,6 +2,10 @@
 
 **What to build:** Config scope, tracked paths and template rendering are scenarios. Rows: 01-G7, 01-G11 to 01-G16, 01-G18, 01-G21, 01-G22, 01-G25 to 01-G27, 02-G10 to 02-G12, 02-G18, 05-G7, and the 05 directory-tree, env-var and file-tracker rows. This is the largest slice. If it will not finish in one branch, split it and record the split in the amendment log. Follow spec section 9.3 for the rows and the converted tests, section 7 for each deletion, and section 6.4 for review.
 
+**Current state:** The guarantees of the owned rows have no scenario. Some Rust e2e tests cover part of them.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 07 Slice 2: process contract
 
 **Category:** enhancement
@@ -20,3 +24,8 @@
 - [ ] The due rubric questions are answered.
 - [ ] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
+
+**Out of scope:**
+- Rows that another slice owns.
+- Known defects (spec section 3.3).
+- Facade-seam scenarios and Scenario Outlines.

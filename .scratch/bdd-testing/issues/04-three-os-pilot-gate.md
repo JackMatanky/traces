@@ -2,6 +2,10 @@
 
 **What to build:** One green run on ubuntu, macos and windows decides whether the e2e placement works. A framework-caused red stops all deletions. Read spec sections 9.4 (the gate) and 9.5.
 
+**Current state:** No scenario has run on Linux or Windows. The audit job failed on 2026-10-29 at a tool install, not on code.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 02 CI nextest profile with JUnit output and 03 Trust lifecycle pilot scenarios
 
 **Category:** enhancement
@@ -14,3 +18,7 @@
 - [ ] S1 and S2 pass 100 runs in a row locally with the nextest stress count.
 - [ ] The run URLs are recorded in the amendment log.
 - [ ] If an operating system fails for a framework cause, stop and make no deletion. Ask the user whether to reopen decision tickets 06 and 08 of the adoption map. Adding scenarios stays allowed.
+
+**Out of scope:**
+- Any deletion.
+- A change to the framework verdict. The user decides it.

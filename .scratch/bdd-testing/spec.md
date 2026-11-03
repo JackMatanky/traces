@@ -413,7 +413,7 @@ racy timestamps are the flake risk.
 | 3 | Query surface | 02-G1, 02-G2, 02-G3 (unknown selector only), 02-G4, 02-G5, 02-G6 (flags half), 02-G7, 02-G8, 02-G9, 02-G14 (equivalence and tie order), 02-G16, 01-G30 | Rename of the two sort tests |
 | 4 | Index freshness | 01-G29, 02-G13, 03-P01, 03-P02, 03-P03, 03-P05 (observable half), 03-P08, 03-P20, 03-P21, 03-P22, 03-P25, and seams 2, 4 and 5 | Slice 1 three-OS result |
 | 5 | Config scope, tracking and template | 01-G7, 01-G11, 01-G12, 01-G13, 01-G14, 01-G15, 01-G16, 01-G18, 01-G21, 01-G22, 01-G25, 01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-G7, 05-dirtree, 05-env_vars, 05-file_tracker | None |
-| 6 | Schema and temporal at the boundary | 04-S3, 04-S4, 04-S7, 04-T2, 04-T4, 04-T6, 04-T7, 04-T8, 04-B2 to 04-B7, and 04-B1 after arch ticket 20 | Entry condition 9.7 |
+| 6 | Schema and temporal at the boundary | 04-S3, 04-S4, 04-S7, 04-T2, 04-T4, 04-T6, 04-T7, 04-T8, 04-B1 to 04-B7 | Entry condition 9.7 |
 | 7 | Note-model rules through query output | 03-N01 to 03-N04, 03-N06, 03-N08 to 03-N12, 03-N14, 03-N17, 03-N05, 03-N07 and 03-N16 (defect parts excluded), 05-G8, 05-field, 05-task, 05-tag | None |
 | 8 | Spawned-signal exit 130 (Unix) | The class-level 130 case of 01-G1 | Entry condition 9.7 |
 
@@ -428,8 +428,7 @@ placed the other rows by domain affinity. They are:
   05-env_vars
 
 The user may reassign them. Slice 5 is large. It may split at entry
-(section 9.1). Implementation ticket 12 holds 04-B1, because it waits for arch
-ticket 20.
+(section 9.1).
 
 Test conversion by slice, from the static
 [candidate table](../bdd-strategy/research/13-candidate-table.md). The slice that completes the
@@ -441,8 +440,11 @@ last row converts the test:
 | 3 | `query.rs::table_renders_a_markdown_table_with_one_row_per_page`; `query.rs::task_table_renders_default_and_custom_columns` (needs-split); `query.rs::task_from_bare_markdown_path_selects_only_that_note`; `query.rs::task_from_nonexistent_markdown_path_matches_nothing_without_erroring` |
 | 4 | `index.rs::content_edit_between_spawns_is_query_visible`; `index.rs::path_set_changes_between_spawns_prune_ghosts_and_resolve_links` (needs-split); `index.rs::newly_created_link_target_resolves_inlinks_after_spawned_refresh`; `index.rs::list_creates_an_index_store_without_an_explicit_index_command`; `index.rs::config_edit_heals_the_index_on_the_next_query`; `query.rs::inlinks_render_across_spawned_queries`; `template.rs::rendered_output_reenters_the_index` |
 | 5 | `config.rs::templates_directory_config_drives_template_listing_from_disk`; `config.rs::global_templates_directory_changes_template_listing`; `init.rs::default_path_init_spawns_and_scaffolds_workspace`; `template.rs::writes_the_rendered_file_to_the_default_output_path`; `tracked.rs::list_prints_every_tracked_config_path`; `tracked.rs::clean_removes_a_stale_tracked_entry_and_reports_the_count` |
-| 6 | `config.rs::class_field_config_drives_class_selection_from_disk`; `query.rs::list_filters_rfc3339_field_by_its_exact_instant`; `template.rs::renders_file_sourced_select_field_in_e2e_template`; `query.rs::class_descendant_selector_expands_through_the_schema_graph` (blocked until arch ticket 20 is implemented) |
+| 6 | `config.rs::class_field_config_drives_class_selection_from_disk`; `query.rs::list_filters_rfc3339_field_by_its_exact_instant`; `template.rs::renders_file_sourced_select_field_in_e2e_template` |
 | 7 | `config.rs::tag_filter_config_drives_task_selection_from_disk`; `query.rs::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`; `query.rs::task_filter_shortcuts_narrow_output_accurately` (needs-split); `query.rs::list_filters_an_inline_multi_part_duration` |
+
+The `FileClassExpander` test `query.rs::class_descendant_selector_expands_through_the_schema_graph`
+stays in Rust (section 7). Slice 6 adds a scenario for 04-B1 beside it.
 
 The candidate table maps `init.rs::default_path_init_spawns_and_scaffolds_workspace`
 to 01-G17. That test never touches trust. It pins 01-G15 only. Slice 5 owns its
@@ -618,8 +620,7 @@ and records the result in section 12.
 
 - **Slice 6:** a scenario for another time zone uses
   `When I run "..." in time zone "..."` through `run_with_envs`. Check that
-  Windows honors an IANA `TZ` value [INFERENCE]. 04-B1 waits for the arch ticket
-  20 class hierarchy implementation.
+  Windows honors an IANA `TZ` value [INFERENCE].
 - **Slice 8:** the tag set is closed and `@ignore` is banned, so a Unix-only
   scenario has no way to skip on Windows. Run a platform-gating spike first. It
   also needs a signal-sending dev-dependency decision. `Cargo.toml` has none
@@ -661,8 +662,9 @@ Each item has a reason and an owner.
 5. Glossary-only claims (slugs, callouts, footnotes): dropped (ticket 12).
 6. Known defects (closed-pipe panic, `i64` to `f64` loss, multi-value `.first()`):
    no scenario until fixed (ticket 10).
-7. 04-B1 until arch ticket 20 is implemented (`FileClassExpander`): blocked by
-   seam. It sits inside slice 6.
+7. Class-hierarchy internals (`FileClassExpander`): the Rust test stays
+   (section 7). Arch ticket 20 owns the refactor. The 04-B1 scenario states
+   only the selection result that the CLI shows.
 8. Facade-seam scenarios and Scenario Outlines for needs-split tests: need a new
    decision (tickets 07, 13).
 9. New workspace entry points (core, cli, lsp, mcp): each reopens the tiering
@@ -733,5 +735,5 @@ Append one line for each slice close, split, entry-condition result and spec
 change.
 
 - 2026-11-03: spec written. Slice 1 is ready to start.
-- 2026-11-03: implementation tickets 01 to 17 written in `issues/`. Slices 3 to 8
-  wait for slice 2. Row 04-B1 moved to implementation ticket 12.
+- 2026-11-03: implementation tickets 01 to 16 written in `issues/`. Slices 3 to 8
+  wait for slice 2. No ticket waits for arch-design.

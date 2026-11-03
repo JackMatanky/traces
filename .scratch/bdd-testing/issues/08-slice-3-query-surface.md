@@ -2,6 +2,10 @@
 
 **What to build:** The query surface is a set of scenarios. Rows: 02-G1 to 02-G5, 02-G6 (flags half), 02-G7 to 02-G9, 02-G14 (equivalence and tie order), 02-G16, 01-G30, and 02-G3 for the unknown selector only. Follow spec section 9.3 for the rows and the converted tests, section 7 for each deletion, and section 6.4 for review.
 
+**Current state:** The guarantees of the owned rows have no scenario. Some Rust e2e tests cover part of them.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
+
 **Blocked by:** 07 Slice 2: process contract
 
 **Category:** enhancement
@@ -20,3 +24,8 @@
 - [ ] The due rubric questions are answered.
 - [ ] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
+
+**Out of scope:**
+- Rows that another slice owns.
+- Known defects (spec section 3.3).
+- Facade-seam scenarios and Scenario Outlines.

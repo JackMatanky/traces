@@ -1,6 +1,10 @@
-# 13: Slice 7: note-model rules through query output
+# 12: Slice 7: note-model rules through query output
 
 **What to build:** The note-model rules are scenarios that observe query output. Rows: 03-N01 to 03-N12, 03-N14, 03-N16 and 03-N17 (defect parts of 03-N05, 03-N07 and 03-N16 excluded), 05-G8, and the 05 field, task and tag rows. Follow spec section 9.3 for the rows and the converted tests, section 7 for each deletion, and section 6.4 for review.
+
+**Current state:** The guarantees of the owned rows have no scenario. Some Rust e2e tests cover part of them.
+
+**Spec:** `.scratch/bdd-testing/spec.md`
 
 **Blocked by:** 07 Slice 2: process contract
 
@@ -21,3 +25,8 @@
 - [ ] The due rubric questions are answered.
 - [ ] The amendment log has an entry.
 - [ ] The slice branch is merged locally.
+
+**Out of scope:**
+- Rows that another slice owns.
+- Known defects (spec section 3.3).
+- Facade-seam scenarios and Scenario Outlines.
