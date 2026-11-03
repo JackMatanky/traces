@@ -105,6 +105,140 @@ process contract without removing existing Rust tests.
     read `src/cli/error.rs` to find `traces::cli::template::not_found`.
     Authors of later slices must expect to read the code for code strings.
 
+## Slice 3: Query Surface
+
+### Row 1: Page Table Columns
+
+- **Namespaced row IDs:** 01-G30, 02-G4, 02-G8.
+- **Behavior:** The table command renders one Markdown row for each page.
+- **Former test:** `e2e::query::table_renders_a_markdown_table_with_one_row_per_page`.
+- **Former layer:** `e2e`.
+- **Defect caught:** The table command can ignore requested columns.
+- **Survivor:** `A page table renders one Markdown row per note` in
+  `tests/features/query.feature`.
+- **Proof:**
+  - **Assertion comparison:** The old test checked exit success. It checked
+    that stdout contained the header, `dune` and `9`. The scenario checks
+    exit code 0 and the exact Markdown table on stdout.
+  - **Kill demonstration:** A change to `src/cli/table.rs` made both requested
+    columns read `file.path`. The old test failed because stdout had no `9`.
+    The scenario failed because its table cells changed. Both tests ran
+    against the changed code before this test was removed. The change was
+    undone.
+  - **Mutation compare:** Not required. The guarded connection between CLI
+    columns and table output is in `src/cli/table.rs`.
+  - **Twin re-read:** `tests/e2e/query.rs` still has the list output test.
+    `src/cli/table.rs` still has unit tests for table output and columns.
+    These tests do not check two CLI column flags through a spawned process.
+- **Successor note for arch-design:** The scenario is the CLI table contract.
+  Keep the in-process tests for field validation and escaping.
+
+### Row 2: Default and Requested Task Table Columns
+
+- **Namespaced row IDs:** 01-G30, 02-G4, 02-G8.
+- **Behavior:** The task command renders the default task table or the
+  requested task columns.
+- **Former test:** `e2e::query::task_table_renders_default_and_custom_columns`.
+- **Former layer:** `e2e`.
+- **Defect caught:** The task table flag can render a task list instead.
+- **Survivors:** `A task table displays the default columns and task states`
+  and `A task table displays requested columns` in `tests/features/query.feature`.
+- **Proof:**
+  - **Assertion comparison:** The old test checked exit success for both
+    commands. It checked that stdout contained five default headers, both
+    tasks, `highest` and `low`. It checked that the requested table contained
+    both field headers, `Alpha item` and `highest`. The two scenarios check
+    exit code 0 and the exact stdout for each table.
+  - **Kill demonstration:** A change to `src/cli/task.rs` reversed the table
+    selection condition. The old test failed because stdout had no table
+    header. Both scenarios failed because stdout was a task list. All three
+    ran against the changed code before this test was removed. The change
+    was undone.
+  - **Mutation compare:** Not required. The guarded table flag and column
+    selection are in `src/cli/task.rs`.
+  - **Twin re-read:** `tests/e2e/query.rs` still has the task count test.
+    `src/cli/task.rs` has unit tests for the table arguments. Neither checks
+    both task table forms through a spawned process.
+- **Successor note for arch-design:** Both scenarios pin the CLI table
+  output. Keep the in-process tests for task fields and format errors.
+
+### Row 3: Existing Markdown Path
+
+- **Namespaced row IDs:** 02-G1, 02-G2.
+- **Behavior:** An existing Markdown path selects the tasks and the count
+  from only that note.
+- **Former test:** `e2e::query::task_from_bare_markdown_path_selects_only_that_note`.
+- **Former layer:** `e2e`.
+- **Defect caught:** A task query can ignore the given source path.
+- **Survivors:** `A bare Markdown path selects only tasks from that note`
+  and `A bare Markdown path limits task counts to one note` in
+  `tests/features/query.feature`.
+- **Proof:**
+  - **Assertion comparison:** The old test checked exit success and that
+    stdout contained both selected tasks but no task from `other.md`.
+    It also checked exit success, exact stdout `2\n` and empty stderr for
+    the count command. The first scenario checks exit code 0 and exact
+    task stdout. The second checks exact count stdout and empty stderr.
+  - **Kill demonstration:** A change to `src/cli/mod.rs` ignored the CLI
+    source argument. The old test and both scenarios failed: the result
+    included the task from `other.md`. All three ran against the changed
+    code before this test was removed. The change was undone.
+  - **Mutation compare:** Not required. The guarded CLI source argument
+    is parsed in `src/cli/mod.rs`.
+  - **Twin re-read:** The task count test in `tests/e2e/query.rs` selects
+    all notes. It does not check an existing source path.
+- **Successor note for arch-design:** The scenarios pin the CLI path and
+  count behavior. Keep source grammar tests in `src/query/`.
+
+### Row 4: Missing Markdown Path
+
+- **Namespaced row IDs:** 02-G1, 02-G2.
+- **Behavior:** A missing Markdown path matches no task and does not
+  cause an error.
+- **Former test:** `e2e::query::task_from_nonexistent_markdown_path_matches_nothing_without_erroring`.
+- **Former layer:** `e2e`.
+- **Defect caught:** A missing source path can select an unrelated task.
+- **Survivor:** `A missing Markdown path gives no task rows` in
+  `tests/features/query.feature`.
+- **Proof:**
+  - **Assertion comparison:** The old test checked exit success, empty
+    stdout and a `0 task(s)` substring in stderr. The scenario checks
+    exit code 0, exact empty stdout and the exact count prefix with the
+    project root path in stderr.
+  - **Kill demonstration:** The same change to `src/cli/mod.rs` ignored
+    the CLI source argument. Both the old test and the scenario failed
+    because stdout had a task from `todo.md`. They ran against the changed
+    code before this test was removed. The change was undone.
+  - **Mutation compare:** Not required. The guarded CLI source argument
+    is parsed in `src/cli/mod.rs`.
+  - **Twin re-read:** The task count test in `tests/e2e/query.rs` selects
+    all notes. It does not check a missing source path.
+- **Successor note for arch-design:** The scenario pins the empty-result
+  CLI contract. The source parser remains covered by in-process tests.
+
+### Name Inventory
+
+The `cargo nextest list --all-features --run-ignored all` list was read
+before and after deletion. The four former `traces::e2e query::` names above
+were removed. No other old e2e name was removed. The two renamed unit tests
+in `src/cli/list.rs` and `src/cli/table.rs` now say `with_explicit_ascending`.
+The rename does not close 02-G6. The sort flag scenarios close the gap.
+
+### Retained Tests and Review
+
+`tests/e2e/query.rs::class_descendant_selector_expands_through_the_schema_graph`
+remains. It also tests schema graph expansion, which this slice does not
+replace. The e2e tests for typo suggestions and source spans remain. The
+scenarios check stable diagnostic codes. They do not check Miette text.
+The list and task count e2e tests remain because they check distinct stream
+and count behavior.
+
+The review of `tests/features/query.feature` used the section 6.4 checklist.
+Each scenario states one process-level result with one principal `When` and
+three to five steps. The notes, tasks, fields and paths are concrete. The
+assertions check exact output, exit codes or diagnostic codes. The title of
+each scenario identifies the behavior if an assertion fails.
+
 ## Slice 8: Spawned-Signal Exit 130 (Dropped)
 
 No scenario was written and no test was deleted. The user decided

@@ -56,27 +56,27 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | gap |
 | 01-G27 | `clean` reports counts. The store layout is Free and not listed. | D | gap |
 | 01-G29 | Queries re-sync the index; `index` rebuilds | F (equivalence) | gap |
-| 01-G30 | Query output shapes are stable Markdown | F | gap |
+| 01-G30 | Query output shapes are stable Markdown | F | covered: A page table renders one Markdown row per note (reviewed 2026-11-03) |
 
 ### Query and template (`research/02`)
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 02-G1 | Source-expression grammar: atoms, boolean operators, precedence | F+M | gap |
-| 02-G2 | `from()` input dispatch | F+M | gap |
-| 02-G3 | An unknown class selector gives an empty result, with no error | F+M | gap |
-| 02-G4 | Row granularity for `pages`, `lists` and `tasks` | F | gap |
-| 02-G5 | Filter semantics: comparisons, `contains`, temporal functions | F+M | gap |
-| 02-G6 | Sort default direction and CLI sort flags | D (default order), M (flags) | gap |
-| 02-G7 | Null placement | D | gap |
-| 02-G8 | Terminal renderers: method form, pipeline form, parity | F | gap |
-| 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | gap |
+| 02-G1 | Source-expression grammar: atoms, boolean operators, precedence | F+M | covered: Source expressions respect not and and before or (reviewed 2026-11-03) |
+| 02-G2 | `from()` input dispatch | F+M | covered: A bare Markdown path selects only tasks from that note (reviewed 2026-11-03) |
+| 02-G3 | An unknown class selector gives an empty result, with no error | F+M | covered: An unknown class selector returns no pages (reviewed 2026-11-03) |
+| 02-G4 | Row granularity for `pages`, `lists` and `tasks` | F | covered: Tasks exclude plain list items from their row count (reviewed 2026-11-03) |
+| 02-G5 | Filter semantics: comparisons, `contains`, temporal functions | F+M | covered: A date function filters notes by their computed due date (reviewed 2026-11-03) |
+| 02-G6 | Sort default direction and CLI sort flags | D (default order), M (flags) | covered: An explicit ascending sort places missing ratings first (reviewed 2026-11-03) |
+| 02-G7 | Null placement | D | covered: Default descending sort places missing ratings last (reviewed 2026-11-03) |
+| 02-G8 | Terminal renderers: method form, pipeline form, parity | F | covered: A template query renders method and pipeline tables alike (reviewed 2026-11-03) |
+| 02-G9 | Diagnostics: spans, typo suggestions, stable CLI codes | M | covered: Unknown sort fields report a stable diagnostic code (reviewed 2026-11-03) |
 | 02-G10 | Template resolution order; validation before search | D | gap |
 | 02-G11 | Output-path precedence and root confinement | D | gap |
 | 02-G12 | Write mode and prompts are independent axes; overwrite policy | D | gap |
 | 02-G13 | CLI stream contract; index freshness round-trips | F | gap |
-| 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | gap |
-| 02-G16 | Task and list rows keep document order (order only) | F | gap |
+| 02-G14 | Chained and single-call queries give identical output (equivalence only) | F | covered: Chained sort and limit preserve the order of equal-rated pages (reviewed 2026-11-03) |
+| 02-G16 | Task and list rows keep document order (order only) | F | covered: List rows include plain items and checkboxes in document order (reviewed 2026-11-03) |
 | 02-G18 | Include loader: missing include is soft, other errors are hard | D | gap |
 
 ### Index and note (`research/03`)

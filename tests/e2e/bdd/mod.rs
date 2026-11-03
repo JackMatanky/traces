@@ -31,6 +31,7 @@ fn last_run() -> LastRun {
 }
 
 mod process;
+mod query;
 mod trust;
 
 scenarios!("tests/features", fixtures = [sandbox: Sandbox, last_run: LastRun]);
