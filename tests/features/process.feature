@@ -74,3 +74,13 @@ Feature: Spawned process contracts for exit codes and streams
       1
       """
     And stderr is empty
+
+  Scenario: Missing template exits with code one and reports template not found diagnostic
+    Given a trusted project
+    When I run "traces template nonexistent"
+    Then the exit code is 1
+    And the first line of stderr is:
+      """
+      traces::cli::template::not_found
+      """
+    And stdout is empty
