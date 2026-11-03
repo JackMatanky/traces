@@ -238,13 +238,14 @@ Each scenario states one process-level result with one principal `When` and
 three to five steps. The notes, tasks, fields and paths are concrete. The
 assertions check exact output, exit codes or diagnostic codes. The title of
 each scenario identifies the behavior if an assertion fails.
+
 ## Slice 6: Schema and Temporal at the Boundary
 
 ### Scenarios Added
 
-The slice adds 18 scenarios in `tests/features/schema-temporal.feature`:
-one per owned row of the invariance map (04-S3, 04-S4, 04-S7, 04-T2, 04-T4,
-04-T6, 04-T7, 04-T8, 04-B1, 04-B2, 04-B3, 04-B4, 04-B5, 04-B6, 04-B7).
+The slice adds 18 scenarios in `tests/features/schema-temporal.feature`.
+The rows are 04-S3, 04-S4, 04-S7, 04-T2, 04-T4, 04-T6 to 04-T8, and
+04-B1 to 04-B7.
 
 - 04-T2 shares "An offset-dated note matches the same instant to a
   nanosecond" with 04-B5; the scenario also pins 04-T2 because the note value
@@ -261,9 +262,127 @@ New step definitions live in `tests/e2e/bdd/process.rs` (`in time zone`,
 
 ### Deletions Note
 
-All three candidate tests of spec section 9.3 convert in this slice:
+No candidate test was deleted in this run of slice 6. The slice's scenario
+work is complete and passing. The deletion proofs are not complete:
+the scoped mutation compares did not finish in this run.
 
 - `config.rs::class_field_config_drives_class_selection_from_disk`
-  (01-G21, 04-B2)
-- `query.rs::list_filters_rfc3339_field_by_its_exact_instant` (04-T2, 04-B5)
-- `template.rs::renders_file_sourced_select_field_in_e2e_template` (04-B3)
+  stays for a die-rule reason: the candidate table maps it to 01-G21
+  (slice 5, still `gap`) and 04-B2 (this slice). Spec section 7: a test
+  whose rows span slices dies in the slice that completes its last row.
+- `query.rs::list_filters_rfc3339_field_by_its_exact_instant` and
+  `template.rs::renders_file_sourced_select_field_in_e2e_template` stay
+  because their required mutation compares (before and after deletion,
+  `-f src/temporal/datetime.rs` and
+  `-f src/template/engine/schema.rs`) are unfinished. One before-run
+  (`src/temporal/datetime.rs`) was started and stopped mid-run; the
+  `src/template/engine/schema.rs` before-run never started. Spec section 7:
+  if a proof cannot be completed, do not delete; record why. A later run
+  must do the two before-runs, the deletions, the two after-runs, the name
+  diff, and then complete the ledger rows below.
+
+### Kill Demonstrations (recorded pre-deletion, changes reverted)
+
+- `src/config/model/schemas.rs:42` `class_field_name()` returned the
+  hardcoded `"hardcoded_class"`. The old test
+  `class_field_config_drives_class_selection_from_disk` and the scenario
+  `A configured file class field selects the matching note` both failed
+  with empty stdout where `- a.md\n` / `- novel.md` were expected.
+- `src/template/engine/schema.rs:264` `select_entry_value` inserted the
+  key `"unmatched_label"` instead of `"label"`. The old test
+  `renders_file_sourced_select_field_in_e2e_template` and the scenario
+  `A template reads the labels and values of a file-sourced select field`
+  both failed with `Category:  (rust)` versus
+  `Category: Rust Programming (rust)`.
+- `src/temporal/datetime.rs:492` `DateTimeShape::parse_any` used
+  `Offset::UTC` instead of the parsed offset for RFC 3339 input. The old
+  test `list_filters_rfc3339_field_by_its_exact_instant` and the scenario
+  `An offset-dated note matches the same instant to a nanosecond` both
+  failed with empty stdout where `- matching.md\n` was expected.
+
+All three demonstrations ran on the pre-deletion tree (commit `102253b8`),
+where the old tests were still present, and were then reverted.
+
+### Mutation Compare Ledger (slice 6)
+
+Scoped runs used `-f <file>` with `--timeout 1200 --workers 2
+--no-diffs`. One compare completed. The `src/config/model/schemas.rs`
+before-run ran at commit `102253b8`. It produced 3 mutants, 3 killed,
+0 escaped, 0 errored. The compare is moot for deletion while
+`class_field_config` stays. It records a clean escape set for slice 5's
+later die. The `datetime.rs` before-run was stopped mid-run. The
+`schema.rs` before-run and the after-runs did not start.
+`mutarust-baseline.json` stayed untouched.
+
+| File | Before | After |
+|---|---|---|
+| `src/config/model/schemas.rs` | 0 escapes (done) | n/a, test retained |
+| `src/temporal/datetime.rs` | not completed | not started |
+| `src/template/engine/schema.rs` | not started | not started |
+
+The assertion comparisons and twin re-reads below stay valid for the
+later conversion run; they were checked against the old tests at
+commit `102253b8`.
+
+### Row 1: Exact Instant Filtering Through Ingestion (conversion pending)
+
+- **Namespaced row IDs:** 04-T2, 04-B5.
+- **Behavior:** An RFC3339 note value with a `+02:00` offset normalizes
+  to UTC at ingestion and matches a `Z`-spelled filter literal to the
+  nanosecond in a spawned `list --where`.
+- **Former test (planned):** `traces::e2e
+  query::list_filters_rfc3339_field_by_its_exact_instant`.
+- **Former layer:** `e2e`.
+- **Defect caught:** Offset normalization or nanosecond precision could
+  be lost between note ingestion and filter comparison.
+- **Survivor:** `An offset-dated note matches the same instant to a
+  nanosecond` in `tests/features/schema-temporal.feature`.
+- **Proof status:** Kill demonstration done (above). Assertion
+  comparison done. The old test asserted exit success and exact stdout
+  `- matching.md\n` for the filter
+  `due == "2026-07-29T12:30:00.123456789Z"`. It used two `+02:00` notes
+  one nanosecond apart. The scenario states the same Given notes, the
+  same filter, exit code 0 and the exact stdout docstring. The survivor
+  asserts everything the old test asserted. Twin re-read done: the
+  datetime unit tests pin the parser directly and
+  `tests/integration/query.rs::filters_pages_using_unquoted_iso_date_literals`
+  filters in-process. Neither twin runs a `+02:00` note value against a
+  `Z` literal through a spawned process. Mutation compare not done, so
+  the deletion is deferred.
+- **Successor note for arch-design:** The scenario is the offset-to-UTC
+  ingestion contract at the CLI boundary. Parser shapes stay
+  unit-pinned.
+
+### Row 2: File-Sourced Select Field in a Spawned Template Render (conversion pending)
+
+- **Namespaced row IDs:** 04-B3.
+- **Behavior:** A `select` field whose values come from a
+  `values/*.toml` file resolves `{value, label}` objects through the
+  template `schema` namespace and renders the label and value.
+- **Former test (planned):** `traces::e2e
+  template::renders_file_sourced_select_field_in_e2e_template`.
+- **Former layer:** `e2e`.
+- **Defect caught:** The values file could fail to confine, parse, or
+  expose `value`/`label` through `schema.get(...).field(...)`.
+- **Survivor:** `A template reads the labels and values of a file-sourced
+  select field` in `tests/features/schema-temporal.feature`.
+- **Proof status:** Kill demonstration done (above). Assertion
+  comparison done. The old test asserted success and that the written
+  `topic_note.md` equals `Category: Rust Programming (rust)`. The
+  scenario states the same Given, command, exit code 0. It asserts the
+  written file content exactly through `And file "topic_note.md"
+  contains:` (equality, not substring). Twin re-read done:
+  `tests/integration/template_render.rs::renders_a_file_sourced_select_field_in_template_rendering`
+  pins the same fixture and rendered string in-process.
+  `src/schema/fields/select.rs` unit tests keep the confinement pins.
+  Mutation compare not done, so the deletion is deferred.
+- **Successor note for arch-design:** The scenario is the CLI template
+  contract for file-sourced select fields. In-process pins stay.
+
+### Slice 6 Name Inventory
+
+Not recorded for deletion because no test was deleted.
+`cargo nextest list --all-features --run-ignored all` was captured
+before the planned deletion at
+`/tmp/nextest-names-before-slice6.txt` (3978 names). A later conversion
+run must diff this list after deleting the two tests.
