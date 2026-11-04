@@ -128,6 +128,8 @@ mod tests {
     use crate::test_support::{TestProject, fixture_service};
 
     mod script {
+        use rstest::rstest;
+
         use super::*;
 
         #[test]
@@ -149,6 +151,104 @@ mod tests {
             let output = Completions::script(Shell::Fish);
 
             assert!(output.contains("-c traces"));
+        }
+
+        /// Every non-hidden subcommand name on the root `Cli`.
+        fn cli_subcommand_names() -> Vec<String> {
+            let command = crate::cli::Cli::command();
+            command
+                .get_subcommands()
+                .filter(|sub| !sub.is_hide_set())
+                .map(|sub| sub.get_name().to_owned())
+                .collect()
+        }
+
+        /// Every long flag declared by the named subcommand, derived from
+        /// the same `Cli` tree `Completions::script` renders, so this test
+        /// tracks the CLI definition instead of a hand-written list.
+        fn cli_long_flags(subcommand: &str) -> Vec<String> {
+            let command = crate::cli::Cli::command();
+            let sub = command
+                .find_subcommand(subcommand)
+                .expect("subcommand exists on Cli");
+            sub.get_arguments()
+                .filter_map(|arg| arg.get_long())
+                .map(ToOwned::to_owned)
+                .collect()
+        }
+
+        /// How `shell` spells the long flag `long` in its script: fish
+        /// declares it as `-l long`, the others keep `--long`.
+        fn flag_token(shell: Shell, long: &str) -> String {
+            match shell {
+                Shell::Fish => format!("-l {long}"),
+                _ => format!("--{long}"),
+            }
+        }
+
+        #[rstest]
+        #[case::bash(Shell::Bash)]
+        #[case::elvish(Shell::Elvish)]
+        #[case::fish(Shell::Fish)]
+        #[case::powershell(Shell::PowerShell)]
+        #[case::zsh(Shell::Zsh)]
+        fn mentions_every_subcommand_in_the_generated_script(
+            #[case] shell: Shell,
+        ) {
+            let output = Completions::script(shell);
+
+            for name in cli_subcommand_names() {
+                assert!(
+                    output.contains(&name),
+                    "{shell:?} script lacks subcommand {name:?}"
+                );
+            }
+        }
+
+        #[rstest]
+        #[case::bash(Shell::Bash)]
+        #[case::elvish(Shell::Elvish)]
+        #[case::fish(Shell::Fish)]
+        #[case::powershell(Shell::PowerShell)]
+        #[case::zsh(Shell::Zsh)]
+        fn mentions_the_long_flags_of_list_task_and_template(
+            #[case] shell: Shell,
+        ) {
+            let output = Completions::script(shell);
+
+            for subcommand in ["list", "task", "template"] {
+                for long in cli_long_flags(subcommand) {
+                    let flag = flag_token(shell, &long);
+                    assert!(
+                        output.contains(&flag),
+                        "{shell:?} script lacks {flag:?} of {subcommand:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    mod parse {
+        use clap::Parser as _;
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use crate::cli::Cli;
+
+        #[rstest]
+        #[case::neither(&["traces", "completions"][..], clap::error::ErrorKind::MissingRequiredArgument)]
+        #[case::both(
+            &["traces", "completions", "--shell", "bash", "--list-templates"][..],
+            clap::error::ErrorKind::ArgumentConflict
+        )]
+        fn rejects_anything_but_exactly_one_of_shell_and_list_templates(
+            #[case] argv: &[&str],
+            #[case] kind: clap::error::ErrorKind,
+        ) {
+            let error = Cli::try_parse_from(argv)
+                .expect_err("exactly one of --shell/--list-templates");
+
+            assert_eq!(error.kind(), kind);
         }
     }
 

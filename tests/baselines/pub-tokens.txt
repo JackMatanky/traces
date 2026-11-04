@@ -17,7 +17,11 @@ src/cli/init.rs: pub fn run(self, provider: &dyn DialogProvider) -> CliResult {
 src/cli/init.rs: pub struct Init;
 src/cli/init.rs: pub(crate) enum ConfigScaffoldError {
 src/cli/init.rs: pub(super) struct CancellingDialogProvider;
+src/cli/list.rs: pub(super) filter: Vec<String>,
+src/cli/list.rs: pub(super) fn render(
 src/cli/list.rs: pub(super) fn run(&self, config: &Config) -> CliResult {
+src/cli/list.rs: pub(super) from: Option<String>,
+src/cli/list.rs: pub(super) sort: SortArgs,
 src/cli/list.rs: pub(super) struct List {
 src/cli/mod.rs: pub enum CommandOutcome {
 src/cli/mod.rs: pub enum UserAbort {
@@ -29,7 +33,12 @@ src/cli/mod.rs: pub(crate) use cwd::CwdGuard;
 src/cli/mod.rs: pub(super) fn dispatch_argv_and_read_output(
 src/cli/mod.rs: pub(super) struct CancellingSelect;
 src/cli/mod.rs: pub(super) struct SortArgs {
+src/cli/table.rs: pub(super) columns: Vec<String>,
+src/cli/table.rs: pub(super) filter: Vec<String>,
+src/cli/table.rs: pub(super) fn render(
 src/cli/table.rs: pub(super) fn run(&self, config: &Config) -> Result<(), CliError> {
+src/cli/table.rs: pub(super) from: Option<String>,
+src/cli/table.rs: pub(super) sort: SortArgs,
 src/cli/table.rs: pub(super) struct Table {
 src/cli/task.rs: pub(super) fn run(&self, config: &Config) -> CliResult {
 src/cli/task.rs: pub(super) struct Task {
@@ -51,7 +60,6 @@ src/cli/template.rs: pub(super) no_input: bool,
 src/cli/template.rs: pub(super) output: Option<PathBuf>,
 src/cli/template.rs: pub(super) struct CancellingDialogProvider;
 src/cli/template.rs: pub(super) struct Template {
-src/cli/tracked.rs: pub(super) fn action_args(action: TrackedAction) -> Tracked {
 src/cli/tracked.rs: pub(super) fn parse(args: &[&str]) -> Tracked {
 src/cli/tracked.rs: pub(super) fn run(self, tracked: &TrackerStore) -> CliResult {
 src/cli/tracked.rs: pub(super) struct TestCli {

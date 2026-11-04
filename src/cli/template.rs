@@ -752,20 +752,45 @@ mod tests {
 
     mod parse {
         use clap::Parser as _;
+        use pretty_assertions::assert_eq;
 
+        use super::*;
         use crate::cli::Cli;
 
         #[test]
-        fn dry_run_and_output_flags_conflict() {
-            let result = Cli::try_parse_from([
+        fn rejects_dry_run_and_output_flags_together() {
+            let error = Cli::try_parse_from([
                 "traces",
                 "template",
                 "daily",
                 "--dry-run",
                 "-o",
                 "out.md",
-            ]);
-            assert!(result.is_err());
+            ])
+            .expect_err("dry run conflicts with output");
+            assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
+        }
+
+        #[test]
+        fn prefers_dry_run_over_force_when_both_flags_are_set() {
+            let cli = Cli::try_parse_from([
+                "traces",
+                "template",
+                "daily",
+                "--dry-run",
+                "--force",
+            ])
+            .expect("parse combined dry-run and force flags");
+            let args = match cli.command {
+                Some(crate::cli::Commands::Template(args)) => Some(args),
+                _ => None,
+            }
+            .expect("expected the Template subcommand");
+
+            assert_eq!(
+                WriteMode::from_flags(args.dry_run, args.force),
+                WriteMode::DryRun
+            );
         }
     }
 }

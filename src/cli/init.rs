@@ -303,6 +303,9 @@ mod tests {
     use fixtures::*;
 
     mod run {
+        use miette::Diagnostic as _;
+        use pretty_assertions::assert_eq;
+
         use super::*;
         use crate::cli::{CwdGuard, UserAbort};
 
@@ -387,6 +390,10 @@ mod tests {
                 .expect_err("invalid template directory fails init");
 
             assert!(matches!(error, CliError::InitInvalidTemplateDir { .. }));
+            assert_eq!(
+                error.code().map(|code| code.to_string()),
+                Some("traces::cli::init::invalid_template_dir".to_owned())
+            );
             assert!(!root.path().join(".traces").exists());
         }
 

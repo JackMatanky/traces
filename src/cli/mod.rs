@@ -19,6 +19,8 @@ mod error;
 mod index;
 pub mod init;
 mod list;
+#[cfg(test)]
+mod query_pipeline_tests;
 mod table;
 mod task;
 mod template;
@@ -783,9 +785,12 @@ mod tests {
 
         #[test]
         fn rejects_input_alongside_a_subcommand() {
-            let result = Cli::try_parse_from(["traces", "init", "-i", "daily"]);
+            let error = Cli::try_parse_from(["traces", "init", "-i", "daily"])
+                .expect_err("top-level input conflicts with subcommand");
 
-            assert!(result.is_err());
+            // `-i` after a subcommand is not that subcommand's flag, so clap
+            // reports an unknown argument rather than an ArgumentConflict.
+            assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
         }
 
         #[test]
@@ -802,11 +807,12 @@ mod tests {
 
         #[test]
         fn template_list_flag_conflicts_with_input_name() {
-            let result = Cli::try_parse_from([
+            let error = Cli::try_parse_from([
                 "traces", "template", "-i", "daily", "--list",
-            ]);
+            ])
+            .expect_err("template input conflicts with list");
 
-            assert!(result.is_err());
+            assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
         }
     }
 
@@ -891,7 +897,15 @@ mod tests {
                 asc: false,
                 desc: false,
             };
-            assert!(args.resolve(Path::new("")).is_err());
+            assert!(matches!(
+                args.resolve(Path::new("")),
+                Err(CliError::Query {
+                    source: QueryError::Builder(
+                        crate::query::QueryBuilderError::FieldPath(_)
+                    ),
+                    ..
+                })
+            ));
         }
     }
 

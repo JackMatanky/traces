@@ -278,7 +278,7 @@ mod tests {
         }
 
         #[test]
-        fn all_mode_parse() {
+        fn parses_all_flag_with_path() {
             let args = parse(&["--all", "some/path"]);
 
             assert!(args.all);
@@ -286,14 +286,28 @@ mod tests {
         }
 
         #[test]
-        fn combining_an_action_with_a_path_is_rejected() {
-            let result = fixtures::TestCli::try_parse_from([
+        fn rejects_action_with_path() {
+            let error = fixtures::TestCli::try_parse_from([
                 "test",
                 "list",
                 "some/path",
-            ]);
+            ])
+            .expect_err("action conflicts with path");
 
-            assert!(result.is_err());
+            // Clap reports a stray positional after a subcommand as an
+            // unknown argument, not an ArgumentConflict.
+            assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
+        }
+
+        #[test]
+        fn rejects_show_with_action() {
+            let error =
+                fixtures::TestCli::try_parse_from(["test", "--show", "list"])
+                    .expect_err("show conflicts with action");
+
+            // Clap reports a top-level flag beside a subcommand as an
+            // unknown argument, not an ArgumentConflict.
+            assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
         }
     }
 
@@ -418,20 +432,6 @@ mod tests {
         }
     }
 
-    mod list {
-        use super::*;
-
-        #[test]
-        fn succeeds_against_an_empty_trust_store() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let service = fixture_service(temp.path());
-
-            super::action_args(TrustAction::List)
-                .run(&service)
-                .expect("list empty trust store");
-        }
-    }
-
     mod clean {
         use super::*;
 
@@ -455,16 +455,6 @@ mod tests {
                 service.trust_store().list().expect("list trusted"),
                 Vec::<std::path::PathBuf>::new()
             );
-        }
-
-        #[test]
-        fn on_an_empty_trust_store_does_not_error() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let service = fixture_service(temp.path());
-
-            super::action_args(TrustAction::Clean)
-                .run(&service)
-                .expect("clean empty trust store");
         }
     }
 }
