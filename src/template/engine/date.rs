@@ -180,6 +180,18 @@ impl Object for DateOps {
     }
 }
 
+/// Applies an integer-day or duration-string offset to `date_point`.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `offset_val` is neither an integer nor
+///   a duration string.
+/// - [`ErrorKind::InvalidOperation`] if `offset_val` doesn't parse as a
+///   duration string.
+/// - [`ErrorKind::InvalidOperation`] if the local zone lookup fails (see
+///   [`render_date_error`]).
+/// - [`ErrorKind::InvalidOperation`] if the shift leaves the representable
+///   range (see [`render_calendar_error`]).
 fn apply_offset(
     date_point: DatePoint,
     offset_val: &Value,
@@ -232,6 +244,10 @@ enum Anchor {
 impl Anchor {
     /// Returns the date point that a shorthand starts from when no reference
     /// is present.
+    ///
+    /// # Errors
+    ///
+    /// - [`CalendarError::Zone`] if process-local time-zone discovery fails.
     fn base(self) -> Result<DatePoint, CalendarError> {
         match self {
             Self::Now => Ok(DatePoint::from(DateTimeValue::now())),
@@ -245,6 +261,15 @@ impl Anchor {
     }
 
     /// Moves the date point as this anchor requires.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorKind::InvalidOperation`] if the local zone lookup fails (see
+    ///   [`render_date_error`]).
+    /// - [`ErrorKind::InvalidOperation`] if the `Weekday` target is outside
+    ///   `1..=7` (see [`weekday_index_error`]).
+    /// - [`ErrorKind::InvalidOperation`] if the shift, snap, or weekday move
+    ///   leaves the representable range (see [`render_calendar_error`]).
     fn transform(
         self,
         date_point: DatePoint,
@@ -699,8 +724,8 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// the formatted date of a given weekday in the week.
 ///
 /// Syntax: `{{ value | weekday }}` returns `1` for Monday through `7` for
-/// Sunday. When you supply `n`, returns the formatted date of that weekday in
-/// `value`'s week.
+/// Sunday. When you supply `n`, the filter returns the formatted date of that
+/// weekday in `value`'s week.
 ///
 /// # Errors
 ///

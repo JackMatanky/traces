@@ -460,6 +460,13 @@ impl Object for QuerySet {
 ///   value: minijinja reports "type conversion is not legal in this situation
 ///   (implicit borrow)". Both entry points build owned `Vec<String>` first and
 ///   borrow from that.
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `headers` and `columns` differ in
+///   length or a column field path is malformed (see [`QuerySet::table`]).
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait dictates the by-value Vec<String> \
@@ -477,12 +484,26 @@ fn table_filter(
 
 /// Renders a markdown list for the `rows | list(path)` filter. See
 /// [`QuerySet::list`].
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if `path` is not a valid field path (see
+///   [`QuerySet::list`]).
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn list_filter(rows: &QuerySet, path: &str) -> TemplateEngineResult<String> {
     rows.list(path).map_err(query_error)
 }
 
 /// Renders a markdown task list for the `rows | task_list` filter. See
 /// [`QuerySet::task_list`].
+///
+/// # Errors
+///
+/// - [`ErrorKind::InvalidOperation`] if any row is a page row, not a task row
+///   (see [`QuerySet::task_list`]).
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn task_list_filter(rows: &QuerySet) -> TemplateEngineResult<String> {
     rows.task_list(TaskPathStyle::default()).map_err(query_error)
 }
