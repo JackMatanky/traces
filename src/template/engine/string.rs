@@ -1,4 +1,4 @@
-//! Registers string filters for templates.
+//! Registers the string filters for templates.
 //!
 //! [`StrOps`] adds thirteen stateless filters:
 //!
@@ -15,7 +15,7 @@
 //! Case conversion delegates to [`convert_case`]'s [`Casing::to_case`]. The
 //! stdlib-backed filters wrap `str::strip_prefix`, `str::strip_suffix`,
 //! `str::repeat`, and [`str::split_whitespace`] directly. `regex_replace` and
-//! `regex_match` compile their pattern fresh on every call via [`Regex::new`].
+//! `regex_match` compile their pattern fresh on every call with [`Regex::new`].
 //!
 //! [`Object`]: minijinja::value::Object
 //! [`Casing::to_case`]: convert_case::Casing::to_case
@@ -26,7 +26,7 @@ use regex::Regex;
 
 use super::error::TemplateEngineResult;
 
-/// Registration namespace for the stateless string filters.
+/// A registration namespace for the stateless string filters.
 pub(super) struct StrOps;
 
 impl StrOps {
@@ -79,10 +79,10 @@ fn trim_suffix(value: &str, suffix: &str) -> String {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-/// not a string, or [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has
-/// any key besides `ellipsis`.
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
+///   not a string.
+/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
+///   `ellipsis`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Kwargs::assert_all_used consumes self by value; &Kwargs \
@@ -100,7 +100,7 @@ fn truncate(
     }
 
     // The ellipsis alone doesn't fit within `length`, leaving no room for
-    // `value`; return the ellipsis itself truncated to `length` rather than
+    // `value`. Return the ellipsis itself truncated to `length` rather than
     // underflowing `length - ellipsis_len`.
     let ellipsis_len = ellipsis.chars().count();
     if ellipsis_len >= length {
@@ -114,18 +114,18 @@ fn truncate(
 
 /// Truncates `value` to a maximum word count.
 ///
-/// Truncates by whitespace-separated word count rather than character count;
-/// see [`truncate`] for the character-count variant. Uses a single pass over
-/// [`str::split_whitespace`]: the same iterator both builds the kept words and,
-/// via one trailing `next()`, checks whether a word was left out. No
+/// Truncates by whitespace-separated word count rather than character count.
+/// See [`truncate`] for the character-count variant. Uses a single pass over
+/// [`str::split_whitespace`]. The same iterator both builds the kept words
+/// and, with one trailing `next()`, checks whether a word was left out. No
 /// intermediate [`Vec`] is collected just to measure the word count.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-/// not a string, or [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has
-/// any key besides `ellipsis`.
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
+///   not a string.
+/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
+///   `ellipsis`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Kwargs::assert_all_used consumes self by value; &Kwargs \
@@ -147,9 +147,9 @@ fn truncate_words(
         kept.push_str(word);
     }
 
-    // `words` already yielded its first `count` items above; if it's now
-    // exhausted, every word fit within `count` and no truncation happened, so
-    // return `value` unchanged, preserving its original whitespace rather than
+    // `words` already yielded its first `count` items above. If it's now
+    // exhausted, every word fit within `count` and no truncation happened.
+    // Return `value` unchanged to preserve its original whitespace rather than
     // the single-space-joined `kept` buffer.
     if words.next().is_none() {
         return Ok(value.to_owned());
@@ -164,15 +164,15 @@ fn truncate_words(
 
 /// Extracts the `ellipsis` kwarg for truncation filters.
 ///
-/// Defaults to `"..."` and rejects any other kwarg via
+/// Defaults to `"..."` and rejects any other kwarg with
 /// [`Kwargs::assert_all_used`].
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-/// not a string, or [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has
-/// any key besides `ellipsis`.
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
+///   not a string.
+/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
+///   `ellipsis`.
 fn ellipsis_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
     let ellipsis = kwargs.get::<Option<&str>>("ellipsis")?.unwrap_or("...");
     kwargs.assert_all_used()?;
@@ -183,14 +183,13 @@ fn ellipsis_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 ///
 /// Replaces every non-overlapping match of `pattern` with `replacement`, which
 /// may reference capture groups as `$1`/`$2` using [`Regex::replace_all`]'s
-/// replacement syntax. The pattern is compiled fresh on every call via
+/// replacement syntax. The pattern is compiled fresh on every call with
 /// [`Regex::new`] rather than cached.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
-/// regex; see [`regex_compile_error`].
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
+///   regex (see [`regex_compile_error`]).
 fn regex_replace(
     value: &str,
     pattern: &str,
@@ -207,9 +206,8 @@ fn regex_replace(
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
-/// regex; see [`regex_compile_error`].
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `pattern` is not a valid
+///   regex (see [`regex_compile_error`]).
 fn regex_match(value: &str, pattern: &str) -> TemplateEngineResult<bool> {
     let re = Regex::new(pattern)
         .map_err(|source| regex_compile_error(pattern, source))?;
@@ -242,8 +240,12 @@ mod tests {
 
     /// Renders `template` against a single `value` binding.
     ///
-    /// Used by filters whose only dynamic input is the piped string; literal
+    /// Used by filters whose only dynamic input is the piped string. Literal
     /// filter arguments stay embedded in `template`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the template fails to render.
     fn render(
         env: &Environment<'static>,
         template: &str,
@@ -255,6 +257,10 @@ mod tests {
 
     /// Renders `template` against `value` and returns the expected render
     /// error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the template renders successfully.
     fn render_err(
         env: &Environment<'static>,
         template: &str,
@@ -306,11 +312,11 @@ mod tests {
 
     /// Boundary rows the two behavior tables above do not reach.
     ///
-    /// Covers an empty string across all five filters, the input most likely to
-    /// expose a panic, plus a single word with no delimiter, Unicode input,
-    /// digits, and punctuation. One representative filter per non-empty
-    /// boundary kind is enough because `convert_case`'s splitting logic is
-    /// shared across all five [`Case`] targets.
+    /// Covers an empty string across all five filters. That input is the one
+    /// most likely to expose a panic. It also covers a single word with no
+    /// delimiter, Unicode input, digits, and punctuation. One representative
+    /// filter per non-empty boundary kind is enough because `convert_case`'s
+    /// splitting logic is shared across all five [`Case`] targets.
     #[rstest]
     #[case::snake_case_with_empty_input("snake_case", "", "")]
     #[case::kebab_case_with_empty_input("kebab_case", "", "")]

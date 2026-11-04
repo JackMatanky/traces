@@ -23,47 +23,51 @@
 //!
 //! `query` returns one row per Note. `lists` returns one row per list item
 //! (plain bullets, checkboxes, and tasks). `tasks` returns one row per task
-//! item. Universal and task-specific properties are exposed via the canonical
-//! `record.list.<field>` namespace wrapped by [`ListFields`], alongside the
-//! parent Note's `file.*`, frontmatter, inline-field, and tag metadata.
+//! item. Universal and task-specific properties are exposed through the
+//! canonical `record.list.<field>` namespace wrapped by [`ListFields`],
+//! alongside the parent Note's `file.*`, frontmatter, inline-field, and tag
+//! metadata.
 //!
 //! # Chaining and Terminal Methods
 //!
 //! Template callers chain `.where(...)`/`.filter(...)`, `.sort(...)`,
 //! `.limit(...)`, `.group_by(...)`, and `.flatten(...)`. The transformation
-//! logic lives on [`QuerySet`] itself; this module only supplies the minijinja
-//! [`Object`] wiring.
+//! logic lives on [`QuerySet`] itself. This module only supplies the
+//! minijinja [`Object`] wiring.
 //!
-//! [`QuerySet::table`], [`QuerySet::list`], [`QuerySet::task_list`], and
-//! `count` (an alias for [`QuerySet::len`]) are terminal instead: they render
-//! final markdown/scalar output and end a chain rather than continue it. Each
-//! is reachable both as a `call_method` (`rows.table(["Name"], ["file.name"])`)
-//! and as a pipeline filter, registered once by
-//! [`QueryOps::register_terminal_filters`] (`rows | table(["Name"],
-//! ["file.name"])`). Both forms call the same [`QuerySet`] method.
+//! The terminal methods [`QuerySet::table`], [`QuerySet::list`],
+//! [`QuerySet::task_list`], and `count` (an alias for [`QuerySet::len`]) end
+//! a chain instead of continuing it. They render final markdown or scalar
+//! output. Each is reachable both as a `call_method`
+//! (`rows.table(["Name"], ["file.name"])`) and as a pipeline filter,
+//! registered once by [`QueryOps::register_terminal_filters`]
+//! (`rows | table(["Name"], ["file.name"])`). Both forms call the same
+//! [`QuerySet`] method.
 //!
 //! # Object Wiring
 //!
 //! [`QuerySet`] and [`QueryRow`] get their [`Object`] impls here instead of in
-//! [`crate::index`], keeping that module independent from minijinja so `traces
-//! task` can reuse [`WorkspaceIndex`], [`QuerySet`], and [`QueryRow`] without
-//! pulling in rendering concerns.
+//! [`crate::index`]. This keeps [`crate::index`] independent from minijinja,
+//! so `traces task` can reuse [`WorkspaceIndex`], [`QuerySet`], and
+//! [`QueryRow`] without pulling in rendering concerns.
 //!
 //! `record` attributes other than `file` and `list` forward to
 //! [`QueryRow::field`], the same resolver `.where()` and `.sort()` use.
 //! `record.file.*` and `record.list.*` use forwarding wrappers ([`FileFields`]
-//! and [`ListFields`]) instead: minijinja resolves a dotted attribute path one
+//! and [`ListFields`]) instead. Minijinja resolves a dotted attribute path one
 //! segment at a time, so the wrappers call [`FileField::parse`] and
-//! [`ListField::parse`] directly, skipping the string-prefix handling
+//! [`ListField::parse`] directly. They skip the string-prefix handling that
 //! [`QueryRow::field`] needs once the `file`/`list` segment is already known.
 //!
 //! # Errors
 //!
-//! [`IndexerService::refresh`] and [`QueryError`] failures become
-//! [`minijinja::Error`] values with stable messages and the original error
-//! preserved as [`std::error::Error::source`], mirroring [`super::ui`]'s
-//! `dialog_error` and [`super::error::confine_error`]. Query failures carry
-//! template name, line, and column context like every other namespace.
+//! - [`IndexerService::refresh`] and [`QueryError`] failures become
+//!   [`minijinja::Error`] values with stable messages. They keep the original
+//!   error as [`std::error::Error::source`].
+//!
+//! The mapping mirrors [`super::ui`]'s `dialog_error` and
+//! [`super::error::confine_error`]. Query failures carry template name,
+//! line, and column context like every other namespace.
 
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 
@@ -84,30 +88,31 @@ use crate::{
     schema::SchemaService,
 };
 
-/// Method names `query`, `lists`, and `tasks` each expose, for
+/// Lists the method names that `query`, `lists`, and `tasks` each expose for
 /// [`QueryOps::enumerate`].
 const METHODS: &[&str] = &["from"];
 
-/// Backs the `query`, `lists`, and `tasks` minijinja namespace objects: one
-/// instance per namespace, differing only in which global it registers as and
-/// which [`QueryBuilder`] mode it executes.
+/// Backs the `query`, `lists`, and `tasks` minijinja namespace objects. One
+/// instance serves each namespace, and it differs only in the global it
+/// registers as and the [`QueryBuilder`] mode it executes.
 #[derive(Debug)]
 pub(super) struct QueryOps {
-    /// The minijinja global this instance registers as.
+    /// Stores the minijinja global name that this instance registers as.
     name: &'static str,
     indexer: Arc<IndexerService>,
-    /// Pre-configured once at construction instead of being rebuilt on every
-    /// `.from()` call.
+    /// The constructor pre-configures this service once. Every `.from()` call
+    /// reuses it instead of rebuilding it.
     service: QueryService,
-    /// Row granularity this namespace dispatches to [`QueryBuilder`].
+    /// Holds the row granularity that this namespace dispatches to
+    /// [`QueryBuilder`].
     mode: QueryMode,
 }
 
 impl QueryOps {
-    /// Wires the shared pipeline every namespace dispatches through: one
-    /// [`QueryService`] pre-configured with `class_field` and the File Class
-    /// `schemas` expander, for registration as the `name` global at `mode`'s
-    /// row granularity.
+    /// Wires the shared pipeline that every namespace dispatches through. The
+    /// constructor pre-configures one [`QueryService`] with `class_field` and
+    /// the File Class `schemas` expander, built for registration as the
+    /// `name` global at `mode`'s row granularity.
     fn new(
         name: &'static str,
         mode: QueryMode,
@@ -149,7 +154,7 @@ impl QueryOps {
     }
 
     /// Builds task-level dispatch around the configured indexer under `tasks`.
-    /// Each row is one task item instead of one Note; see the module docs.
+    /// Each row is one task item instead of one Note. See the module docs.
     #[inline]
     #[must_use]
     pub(super) fn task(
@@ -169,11 +174,11 @@ impl QueryOps {
     }
 
     /// Registers `table`, `list`, `task_list`, and `count` as pipeline filters.
-    /// `rows | table(["Name"], ["file.name"])`, mirroring the call-method form
-    /// `rows.table(["Name"], ["file.name"])` documented on
-    /// [`Object::call_method`] for [`QuerySet`]. Registered once, not per
-    /// instance: these filters carry no state and apply to any [`QuerySet`]
-    /// regardless of which namespace produced it.
+    /// The filter form `rows | table(["Name"], ["file.name"])` mirrors the
+    /// call-method form `rows.table(["Name"], ["file.name"])`, documented on
+    /// [`Object::call_method`] for [`QuerySet`]. These filters carry no state,
+    /// so they register once and apply to any [`QuerySet`], whatever namespace
+    /// produced it.
     pub(super) fn register_terminal_filters(env: &mut Environment<'static>) {
         env.add_filter("table", table_filter);
         env.add_filter("list", list_filter);
@@ -189,9 +194,9 @@ impl QueryOps {
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] with kind
-    /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation)
-    /// if refreshing the index fails.
+    /// - [`ErrorKind::InvalidOperation`] if refreshing the index fails.
+    ///
+    /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
     fn run(
         &self,
         state: &mut State,
@@ -204,21 +209,24 @@ impl QueryOps {
 
     /// Returns this render's cached [`WorkspaceIndex`], refreshing and caching
     /// it first if not already cached this render. The cache lives in `state`'s
-    /// render-local typed extensions, shared by the `query`, `lists`, and
-    /// `tasks` namespaces (all dispatch through [`QueryOps::run`]) so a render
-    /// calling into multiple pays for one [`IndexerService::refresh`] instead
-    /// of one per query call. Extensions are scoped to one render, including
-    /// `{% include %}`s, and reset for the next. A cache field on [`QueryOps`]
-    /// itself would wrongly persist across independent renders on a reused
+    /// render-local typed extensions. The `query`, `lists`, and `tasks`
+    /// namespaces share it because all dispatch through [`QueryOps::run`]. A
+    /// render that calls into multiple namespaces pays for one
+    /// [`IndexerService::refresh`] instead of one per query call. Extensions
+    /// are scoped to one render, including `{% include %}`s, and reset for the
+    /// next. A cache field on [`QueryOps`] itself would wrongly persist across
+    /// independent renders on a reused
     /// [`Environment`]/[`super::TemplateEngine`]. See
     /// [`super::cache::cached`].
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] with kind
-    /// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation)
-    /// if refreshing the index fails. The original error is preserved as
-    /// [`source`]. [`source`]: `std::error::Error::source`
+    /// - [`ErrorKind::InvalidOperation`] if refreshing the index fails.
+    ///
+    /// The returned error keeps the original failure as [`source`].
+    ///
+    /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
+    /// [`source`]: `std::error::Error::source`
     fn cached_index(
         &self,
         state: &mut State,
@@ -259,24 +267,28 @@ impl Object for QueryOps {
 
 /// Maps a [`QueryError`] into a [`minijinja::Error`].
 ///
-/// Keeps the original error as [`source`].
+/// It keeps the original error as [`source`].
 ///
 /// [`source`]: std::error::Error::source
 fn query_error(source: QueryError) -> Error {
     super::error::invalid_operation("query failed", source)
 }
 
-/// Resolves `.from()`'s optional argument into a [`SourceSelector`]: `None`
-/// selects every indexed file; a bound `SourceSelector` `Value` (a Schema
-/// `file` field, possibly widened by `with_children`/`with_descendants`) is
-/// used as-is; any other value must be a DSL source-expression string.
+/// Resolves `.from()`'s optional argument into a [`SourceSelector`].
+///
+/// - `None` selects every indexed file.
+/// - A bound [`SourceSelector`] `Value` (a Schema `file` field, possibly
+///   widened by `with_children`/`with_descendants`) passes through unchanged.
+/// - Any other value must be a DSL source-expression string.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `expr` is neither a [`SourceSelector`] nor a string, or if `expr` fails to
-/// parse as a valid source expression.
+/// - [`ErrorKind::InvalidOperation`] if `expr` is neither a [`SourceSelector`]
+///   nor a string.
+/// - [`ErrorKind::InvalidOperation`] if `expr` fails to parse as a valid source
+///   expression.
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn resolve_from_arg(
     expr: Option<&Value>,
 ) -> TemplateEngineResult<SourceSelector> {
@@ -295,11 +307,13 @@ fn resolve_from_arg(
     SourceSelector::parse(text).map_err(query_error)
 }
 
-/// Lets `.field()` hand a [`SourceSelector`] filter across the minijinja
+/// Lets `.field()` hand a [`SourceSelector`] filter through the minijinja
 /// boundary: `.from()` and the `with_children`/`with_descendants` filters
-/// downcast it back via [`Value::downcast_object_ref`]. No method overrides;
-/// the only bare `impl Object` in this crate used purely to smuggle a typed
-/// value through a `Value`.
+/// downcast it back with [`Value::downcast_object_ref`].
+///
+/// This `impl` has no method overrides. It is the only bare `impl Object` in
+/// this crate, and its only job is to smuggle a typed value through a
+/// `Value`.
 impl Object for SourceSelector {}
 
 impl Object for QuerySet {
@@ -343,17 +357,24 @@ impl Object for QuerySet {
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] with kind
-    /// [`ErrorKind::UnknownMethod`](minijinja::ErrorKind::UnknownMethod) for
-    /// any unrecognized method name, [`ErrorKind::TooManyArguments`] or
-    /// [`ErrorKind::MissingArgument`] if a method's arguments don't match its
-    /// expected shape, or [`ErrorKind::InvalidOperation`] if a field path or
-    /// filter expression is unparsable, `.limit(...)` is negative, or
-    /// `.task_list()` runs on records with no `list.*` fields.
+    /// - [`ErrorKind::UnknownMethod`] if the method name is unrecognized.
+    /// - [`ErrorKind::TooManyArguments`] if `args` holds more values than the
+    ///   method accepts.
+    /// - [`ErrorKind::MissingArgument`] if `args` lacks a required value.
+    /// - [`ErrorKind::InvalidOperation`] if an argument has the wrong type.
+    /// - [`ErrorKind::InvalidOperation`] if a field path or filter expression
+    ///   is unparsable.
+    /// - [`ErrorKind::InvalidOperation`] if `table` gets headers and columns of
+    ///   different lengths.
+    /// - [`ErrorKind::InvalidOperation`] if `.limit(...)` gets a negative
+    ///   value.
+    /// - [`ErrorKind::InvalidOperation`] if `.task_list()` runs on records with
+    ///   no `list.*` fields.
     ///
     /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
     /// [`ErrorKind::MissingArgument`]: minijinja::ErrorKind::MissingArgument
     /// [`ErrorKind::TooManyArguments`]: minijinja::ErrorKind::TooManyArguments
+    /// [`ErrorKind::UnknownMethod`]: minijinja::ErrorKind::UnknownMethod
     #[inline]
     fn call_method(
         self: &Arc<Self>,
@@ -428,12 +449,12 @@ impl Object for QuerySet {
 /// Renders a markdown table for the `rows | table(...)` filter. See
 /// [`QuerySet::table`].
 ///
-/// Takes owned `Vec<String>` for `headers`/`columns` rather than borrowed
-/// `Vec<&str>`. Two reasons stack here:
+/// The filter takes owned `Vec<String>` for `headers`/`columns` rather than
+/// borrowed `Vec<&str>`. Two reasons stack here:
 ///
-/// - minijinja's `Function` trait (backing filters) requires each parameter
-///   type to implement `ArgType` for every lifetime, which a borrowed
-///   `Vec<&str>` cannot satisfy; only its owned `String` form can.
+/// - minijinja's `Function` trait (backing filters) needs each parameter type
+///   to implement `ArgType` for every lifetime. A borrowed `Vec<&str>` cannot
+///   satisfy this. Only its owned `String` form can.
 /// - Even [`Object::call_method`]'s [`from_args`], which has no such
 ///   constraint, cannot borrow a `Vec<&str>` out of a list-literal argument
 ///   value: minijinja reports "type conversion is not legal in this situation
@@ -490,8 +511,8 @@ fn with_descendants_filter(source: &SourceSelector) -> Value {
 }
 
 /// Replaces every `Class` atom's [`ClassExpansionMode`] in `source` with
-/// `mode`, keeping each atom's match set empty: the selector stays unresolved,
-/// and `resolve_classes` fills the match sets in at query time.
+/// `mode`. Each atom's match set stays empty, so the selector stays
+/// unresolved. `resolve_classes` fills the match sets in at query time.
 fn set_class_depth(
     mut source: SourceSelector,
     mode: impl Fn(BTreeSet<String>) -> ClassExpansionMode,
@@ -518,9 +539,9 @@ impl Object for QueryRow {
     /// lookup, the same frontmatter, inline-field, and tag lookup used by
     /// `.where()` and `.sort()`.
     ///
-    /// A rejected key, such as a dotted, empty, or unknown `file.*`/`list.*`
-    /// accessor, resolves to `None` like any other missing attribute instead of
-    /// surfacing `QueryError::FieldPath` as a render error.
+    /// The lookup rejects a dotted, empty, or unknown `file.*`/`list.*`
+    /// accessor. A rejected key resolves to `None` like any other missing
+    /// attribute, so `QueryError::FieldPath` never surfaces as a render error.
     #[inline]
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
@@ -539,13 +560,15 @@ impl Object for QueryRow {
 
 /// Forwards `record.file.<field>` to [`FileField::parse`].
 ///
-/// A thin wrapper rather than a second lookup path, needed only because
-/// minijinja resolves a dotted attribute path one segment at a time:
-/// `record.file` must itself resolve to *something* before `.name` can be
-/// looked up on it. Calls the same [`FileField`] accessor pair
-/// [`QueryRow::field`] uses for its `file.*` branch, skipping that method's
-/// string-based `file.` prefix handling, which doesn't apply here: `key` is
-/// already a single attribute segment, never a dotted path.
+/// This is a thin wrapper, not a second lookup path. It exists because
+/// minijinja resolves a dotted attribute path one segment at a time.
+/// `record.file` must itself resolve to *something* before minijinja looks
+/// up `.name` on it.
+///
+/// It calls the same [`FileField`] accessor pair that [`QueryRow::field`]
+/// uses for its `file.*` branch. It skips that method's string-based `file.`
+/// prefix handling, which does not apply here: `key` is already a single
+/// attribute segment, never a dotted path.
 #[derive(Debug)]
 struct FileFields(Arc<QueryRow>);
 
@@ -562,13 +585,15 @@ impl Object for FileFields {
 
 /// Forwards `record.list.<field>` to [`ListField::parse`].
 ///
-/// A thin wrapper rather than a second lookup path, needed only because
-/// minijinja resolves a dotted attribute path one segment at a time:
-/// `record.list` must itself resolve to *something* before `.<field>` can be
-/// looked up on it. Calls the same [`ListField`] accessor pair
-/// [`QueryRow::field`] uses for its `list.*` branch, skipping that method's
-/// string-based `list.` prefix handling, which doesn't apply here: `key` is
-/// already a single attribute segment, never a dotted path.
+/// This is a thin wrapper, not a second lookup path. It exists because
+/// minijinja resolves a dotted attribute path one segment at a time.
+/// `record.list` must itself resolve to *something* before minijinja looks
+/// up `.<field>` on it.
+///
+/// It calls the same [`ListField`] accessor pair that [`QueryRow::field`]
+/// uses for its `list.*` branch. It skips that method's string-based `list.`
+/// prefix handling, which does not apply here: `key` is already a single
+/// attribute segment, never a dotted path.
 #[derive(Debug)]
 struct ListFields(Arc<QueryRow>);
 
@@ -589,7 +614,7 @@ impl Object for ListFields {
 ///   `undefined`: [`QueryRow`]'s own docs note that a well-formed path with no
 ///   value resolves to `Null`, not an error. That's a defined empty value, not
 ///   a missing attribute.
-/// - [`NoteFieldValue::Link`] renders as its target path; Traces has no
+/// - [`NoteFieldValue::Link`] renders as its target path. Traces has no
 ///   minijinja-facing link type yet.
 fn field_value(value: NoteFieldValue) -> Value {
     match value {
@@ -661,8 +686,8 @@ mod tests {
         )
     }
 
-    /// A minimal [`Environment`] with `query`, `lists`, and `tasks` registered
-    /// against `root`, plus terminal query filters.
+    /// Builds a minimal [`Environment`] with `query`, `lists`, and `tasks`
+    /// registered against `root`, plus terminal query filters.
     fn env(root: &Path) -> Environment<'static> {
         let mut env = Environment::new();
         page_ops(root).register(&mut env);
@@ -945,9 +970,9 @@ mod tests {
             )
             .expect("render succeeds");
 
-            // The Note has one complete and one incomplete task: filtering
-            // must keep only the matching task row, not both of the one
-            // Note that has at least one match.
+            // The Note has one complete and one incomplete task. The filter
+            // must keep only the matching task row, not both task rows from
+            // the Note that has at least one match.
             assert_eq!(rendered, "pay rent");
         }
 
@@ -1089,8 +1114,9 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             write_note(temp.path(), "note.md", "# Note");
 
-            // Chaining `{% for %}` after a terminal renderer is meaningless;
-            // this only proves empty headers/columns lists do not panic.
+            // Chaining `{% for %}` after a terminal renderer is meaningless.
+            // This test only proves that empty headers/columns lists do not
+            // panic.
             let rendered =
                 render(temp.path(), "{{ query.from().table([], []) }}")
                     .expect("render succeeds");
@@ -1184,11 +1210,11 @@ mod tests {
         use super::*;
 
         /// `table`/`list` accept field path strings, not minijinja
-        /// expressions (spec: "Terminal table/list helpers accept field path
-        /// strings, not arbitrary minijinja expression strings"), so
-        /// `file.name | upper` has no terminal-renderer form. A `{% for %}`
-        /// loop remains the escape hatch that gives template authors the
-        /// full filter pipeline per value.
+        /// expressions. The spec says "Terminal table/list helpers accept
+        /// field path strings, not arbitrary minijinja expression strings".
+        /// So `file.name | upper` has no terminal-renderer form. A
+        /// `{% for %}` loop remains the escape hatch that gives template
+        /// authors the full filter pipeline per value.
         #[test]
         fn for_loop_applies_a_minijinja_filter_terminal_renderers_cannot_express()
          {
@@ -1729,11 +1755,11 @@ mod tests {
             let env = Environment::new();
             let mut state = env.empty_state();
 
-            // Populates the render's cached WorkspaceIndex; both namespaces
+            // Populates the render's cached WorkspaceIndex. Both namespaces
             // share the same cached extension.
             page_from.call(&mut state, &[]).expect("query.from succeeds");
-            // Written after the index was cached: a cache-sharing tasks.from()
-            // call must not observe this new task.
+            // The test writes this note after it caches the index. A
+            // cache-sharing tasks.from() call must not observe this new task.
             write_note(temp.path(), "todo.md", "- [ ] buy milk\n");
             let tasks =
                 task_from.call(&mut state, &[]).expect("tasks.from succeeds");
@@ -1778,8 +1804,8 @@ mod tests {
                 "- [ ] buy milk\n- [x] pay rent\n",
             );
 
-            // A page-level query over the same Note returns exactly one row;
-            // the task-level query must not collapse back to it.
+            // A page-level query over the same Note returns exactly one row.
+            // The task-level query must not collapse back to it.
             let pages = render(temp.path(), "{{ query.from() | length }}")
                 .expect("render succeeds");
             let tasks = render(temp.path(), "{{ tasks.from() | length }}")

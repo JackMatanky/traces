@@ -30,7 +30,7 @@ use minijinja::{
 use super::error::TemplateEngineResult;
 use crate::{DialogError, DialogProvider};
 
-/// Method names `ui` exposes, for [`UiOps::enumerate`].
+/// The method names `ui` exposes, for [`UiOps::enumerate`].
 const METHODS: &[&str] = &["text_input", "select", "confirm", "multi_select"];
 
 /// The attribute path used to derive a display label when `select` or
@@ -63,10 +63,10 @@ impl UiOps {
     }
 }
 
-/// Hand-written rather than `#[derive(Debug)]`: deriving would require
-/// `DialogProvider: Debug`, widening that public trait's contract for every
-/// implementor just to satisfy this one internal consumer (minijinja's
-/// [`Object`] trait requires `Self: Debug`). There's nothing useful to print
+/// Hand-written rather than `#[derive(Debug)]`: deriving would need
+/// `DialogProvider: Debug`. That widens the public trait's contract for every
+/// implementor just to satisfy this one internal consumer. The minijinja
+/// [`Object`] trait requires `Self: Debug`. There is nothing useful to print
 /// for an opaque `dyn DialogProvider` anyway.
 impl std::fmt::Debug for UiOps {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -151,23 +151,27 @@ impl SelectOptions {
     /// [`DialogProvider::select`] and [`DialogProvider::multi_select`] can map
     /// an index result back to the item the user picked.
     ///
-    /// Labels come from `kwargs`, following minijinja's `map`/`sort`/`groupby`
-    /// convention:
+    /// Labels come from `kwargs`. The `kwargs` obey minijinja's
+    /// `map`/`sort`/`groupby` convention:
     ///
     /// - `attribute` (optional string, default [`DEFAULT_ATTRIBUTE`]): dotted
-    ///   path such as `"address.city"`, walked via [`get_path`]. Numeric
-    ///   segments index by position; other segments read attributes.
+    ///   path such as `"address.city"`, walked through [`get_path`]. Numeric
+    ///   segments index by position. Other segments read attributes.
     /// - `default` (optional [`Value`]): stringified when an item's attribute
     ///   is undefined. Without it, missing attributes fall back to
     ///   `item.to_string()`, which lets plain arrays such as `["a", "b"]` work
     ///   without `attribute=`.
-    /// - Any other kwarg is rejected via [`Kwargs::assert_all_used`].
+    /// - [`Kwargs::assert_all_used`] rejects any other kwarg.
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] if `items.try_iter()` cannot iterate
-    /// `items`, if [`get_path`] fails while reading an `attribute=` path, or
-    /// if `kwargs` contains an unknown key or invalid argument type.
+    /// - [`ErrorKind::InvalidOperation`] if `items.try_iter()` cannot iterate
+    ///   `items`.
+    /// - [`ErrorKind::UndefinedError`] if [`get_path`] fails while reading an
+    ///   `attribute=` path.
+    /// - [`ErrorKind::TooManyArguments`] if `kwargs` contains an unknown key.
+    /// - [`ErrorKind::InvalidOperation`] if `kwargs` contains an invalid
+    ///   argument type.
     fn extract(items: &Value, kwargs: &Kwargs) -> TemplateEngineResult<Self> {
         let attribute = kwargs.get::<Option<&str>>("attribute")?;
         let default = kwargs.get::<Option<Value>>("default")?;
@@ -209,8 +213,7 @@ impl SelectOptions {
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`]
-    /// if `index` is out of bounds.
+    /// - [`ErrorKind::InvalidOperation`] if `index` is out of bounds.
     fn recover(&self, index: usize) -> TemplateEngineResult<Value> {
         self.values.get(index).cloned().ok_or_else(|| {
             Error::new(
@@ -234,21 +237,21 @@ fn dialog_error(source: DialogError) -> Error {
 
 /// Walks a dot-separated attribute path on `item`.
 ///
-/// Numeric segments index by position via [`Value::get_item_by_index`]; other
-/// segments read attributes via [`Value::get_attr`]. This mirrors minijinja's
-/// crate-private `Value::get_path`, which backs the `attribute=` kwarg on its
-/// `map`, `sort`, and `groupby` filters.
+/// Numeric segments index by position with [`Value::get_item_by_index`].
+/// Other segments read attributes with [`Value::get_attr`]. This mirrors
+/// minijinja's crate-private `Value::get_path`, which backs the `attribute=`
+/// kwarg on its `map`, `sort`, and `groupby` filters.
 ///
 /// Missing attributes are not errors. They resolve to [`Value::UNDEFINED`], the
 /// same value minijinja returns for a missing attribute lookup. Once a segment
-/// is undefined, later segments are skipped instead of looked up, so a missing
-/// intermediate segment such as `"address.city"` falls through to
+/// is undefined, later segments are skipped instead of looked up. A missing
+/// intermediate segment such as `"address.city"` therefore falls through to
 /// [`SelectOptions::extract`]'s `default` handling.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] if [`Value::get_attr`] or
-/// [`Value::get_item_by_index`] fails for a defined intermediate value.
+/// - [`ErrorKind::UndefinedError`] if [`Value::get_attr`] or
+///   [`Value::get_item_by_index`] returns an error.
 fn get_path(item: &Value, path: &str) -> TemplateEngineResult<Value> {
     let mut current = item.clone();
     for part in path.split('.') {
@@ -278,7 +281,7 @@ mod tests {
         Environment::new()
     }
 
-    /// Shared test-only fixtures. No assertions live here; see
+    /// Shared test-only fixtures. No assertions live here. See
     /// `code-quality.md`'s guidance against hidden assertions in helpers.
     mod fixtures {
         use super::*;

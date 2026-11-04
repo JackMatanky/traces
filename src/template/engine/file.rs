@@ -8,13 +8,13 @@
 //!   inlines its contents.
 //!
 //! `write_to` stores its argument in minijinja's per-render
-//! [`State::set_temp`]; [`super::TemplateEngine::render`] reads that value once
-//! rendering completes.
+//! [`State::set_temp`]. [`super::TemplateEngine::render`] reads that value
+//! once rendering completes.
 //!
-//! `file.include()` confines its `path` argument to `root` via
+//! `file.include()` confines its `path` argument to `root` by calling
 //! [`SafeRelativePath::parse`], the same seam [`TemplateWriteTarget`] uses for
-//! `-o` and `file.write_to()` candidates. Symlink escapes are rejected the same
-//! way on the read and write sides.
+//! `-o` and `file.write_to()` candidates. The read and write sides reject
+//! symlink escapes the same way.
 //!
 //! [`Config::root`]: crate::config::Config::root
 //! [`SafeRelativePath::parse`]: crate::path::SafeRelativePath::parse
@@ -36,7 +36,7 @@ use crate::path::SafeRelativePath;
 /// render completes.
 pub(super) const WRITE_TO_KEY: &str = "file.write_to";
 
-/// Method names `file` exposes, for [`FileOps::enumerate`].
+/// The method names `file` exposes, for [`FileOps::enumerate`].
 const METHODS: &[&str] = &["write_to", "include"];
 
 /// Backs the `file` namespace object.

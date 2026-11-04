@@ -2,43 +2,47 @@
 //! storage.
 //!
 //! [`cached`] backs `query.rs`'s
-//! [`WorkspaceIndex`](crate::index::WorkspaceIndex) cache: it stashes a load
-//! result in a typed extension so a render calling into a namespace several
-//! times pays for one load, instead of hand-rolling its own get-or-load body
-//! per resource. `schema.rs` seeds its render's
-//! [`SchemaService`](crate::schema::SchemaService) the same way (via a typed
-//! newtype of its own, no load step) so [`Schema`](crate::schema::Schema)'s
-//! own minijinja `Object` impl can reach it without holding a reference
+//! [`WorkspaceIndex`](crate::index::WorkspaceIndex) cache. It stashes a load
+//! result in a typed extension. A render that calls into a namespace several
+//! times then pays for one load instead of hand-rolling its own get-or-load
+//! body per resource. `schema.rs` seeds its render's
+//! [`SchemaService`](crate::schema::SchemaService) the same way, with a typed
+//! newtype of its own and no load step. [`Schema`](crate::schema::Schema)'s
+//! own minijinja `Object` impl can then reach it without holding a reference
 //! itself.
 //!
 //! minijinja 3's extensions replace the string-keyed temp pattern for typed
-//! state: keyed by `TypeId` instead of a `&'static str`, no
-//! [`Value`](minijinja::value::Value) [`Object`](minijinja::value::Object)
-//! wrapper, and no interior mutability
-//! (they require `&mut State`). Like temps, extensions are render-local:
-//! preserved across includes/blocks/macros, dropped with the render's state.
+//! state. Each extension uses a `TypeId` key instead of a `&'static str`. It
+//! needs no [`Value`](minijinja::value::Value)
+//! [`Object`](minijinja::value::Object) wrapper and no interior mutability
+//! because it needs `&mut State`. Like temps, extensions are render-local.
+//! They persist across includes, blocks, and macros. They drop with the
+//! render's state.
 
 use minijinja::State;
 
 /// Wraps a render-scoped cacheable value in its own extension type, keeping
-/// the cache slot isolated from any raw `T` extension elsewhere. The slot is
-/// selected by `T` alone: a second `cached()` call site instantiating the same
-/// `T` in one render reuses the first call's value. Never exposed to templates.
+/// the cache slot isolated from any raw `T` extension elsewhere. `T` alone
+/// selects the slot. A second `cached()` call site that instantiates the same
+/// `T` in one render reuses the first call's value. Templates never see this
+/// type.
 #[derive(Debug)]
 struct Cached<T>(T);
 
-/// Returns the render-scoped value cached in `state`'s extensions, loading
-/// it via `load` and caching the result first if not already cached this
-/// render.
+/// Returns the render-scoped value cached in `state`'s extensions.
 ///
-/// `T` should be cheap to clone (an `Arc<_>` or similarly shared type): every
-/// call clones the cached value out of the extension rather than handing back
-/// a reference tied to its lifetime.
+/// The function runs `load` when this render has no cached value. It caches
+/// the load result before it returns the value.
+///
+/// `T` should be cheap to clone (an `Arc<_>` or similarly shared type).
+/// Every call clones the cached value out of the extension rather than
+/// handing back a reference tied to its lifetime.
+///
+/// A failed load caches nothing, so the next call retries `load`.
 ///
 /// # Errors
 ///
-/// Returns any error returned by `load`. Nothing is cached on failure, so the
-/// next call retries the load.
+/// - `E` if `load` returns an error.
 pub(super) fn cached<T, E>(
     state: &mut State,
     load: impl FnOnce() -> Result<T, E>,

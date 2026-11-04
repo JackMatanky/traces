@@ -1,4 +1,4 @@
-//! Registers YAML serialization and deserialization filters for templates.
+//! Registers the YAML serialization and deserialization filters for templates.
 //!
 //! [`YamlOps`] adds two stateless filters:
 //!
@@ -16,7 +16,7 @@ use minijinja::{Environment, Value, value::Serde};
 
 use super::error::{TemplateEngineResult, invalid_operation};
 
-/// Registration namespace for the stateless YAML filters.
+/// A registration namespace for the stateless YAML filters.
 #[derive(Debug)]
 pub(super) struct YamlOps;
 
@@ -35,15 +35,14 @@ impl YamlOps {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// the value cannot be serialized into YAML.
+/// - [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+///   `noyalib` cannot serialize the value into YAML.
 pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
     let mut yaml = noyalib::to_string(value).map_err(|err| {
         invalid_operation("to_yaml: failed to serialize value to YAML", err)
     })?;
     // noyalib omits the document-terminating newline the previous
-    // serializer emitted; a block scalar for a trailing-newline string
+    // serializer emitted. A block scalar for a trailing-newline string
     // already ends in one.
     if !yaml.ends_with('\n') {
         yaml.push('\n');
@@ -57,9 +56,8 @@ pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// the input cannot be parsed as valid YAML.
+/// - [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
+///   the input fails to parse as valid YAML.
 pub(super) fn from_yaml(text: &str) -> TemplateEngineResult<Value> {
     if text.trim().is_empty() {
         return Ok(Value::from(()));

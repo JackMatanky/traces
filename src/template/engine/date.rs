@@ -11,26 +11,27 @@
 //!   strings from the current instant, current date, or a Unix timestamp.
 //! - Filters: `date_format`, `timestamp`, `date_add`, `date_sub`, `add_days`,
 //!   `sub_days`, `add_months`, `sub_months`, `add_years`, `sub_years`,
-//!   `weekday`, and `date_diff` transform a piped date/time string; every
+//!   `weekday`, and `date_diff` transform a piped date/time string. Every
 //!   period-edge shorthand (`sow`/`eom`-style long and short spellings)
 //!   registers from the shared
 //!   [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP) table.
-//!   `date_format` is prefixed to avoid minijinja's built-in `format` filter.
+//!   `date_format` carries a `date_` prefix to avoid minijinja's built-in
+//!   `format` filter.
 //! - Tests: `is_past`, `is_future`, and `is_leap_year` inspect a piped value.
 //!
-//! Date/time string parsing funnels through [`DatePoint::parse`] via
-//! [`parse_date_point`], which dispatches once on the input's shape: a
-//! full date-time shape parses as a date-time, and a bare ISO date shape
+//! [`parse_date_point`] sends every date/time string through
+//! [`DatePoint::parse`]. The parse dispatches once on the input's shape. A
+//! full date-time shape parses as a date-time. A bare ISO date shape
 //! (`YYYY-MM-DD` or reduced-precision `YYYY-MM`) parses as a calendar date
 //! at midnight. Arithmetic filters re-serialize at the input's original
-//! precision via the calendar owner.
+//! precision with the calendar owner.
 //!
 //! # Clock doctrine
 //!
 //! A naive datetime input means the reader's local clock time: it parses to a
-//! UTC instant through the core date module's DST resolver, while a date-only
-//! input stays a zone-free calendar date. Human-facing filters render the local
-//! clock time; `timestamp`, `is_past`, `is_future`, and fixed-unit
+//! UTC instant through the core date module's DST resolver. A date-only input
+//! stays a zone-free calendar date. Human-facing filters render the local
+//! clock time. `timestamp`, `is_past`, `is_future`, and fixed-unit
 //! [`date_diff`] measure the stored UTC instant. `date.now()`,
 //! `date.today()`, `date.tomorrow()`, `date.yesterday()`, and
 //! `date.from_timestamp()` read or render the local clock for display.
@@ -51,7 +52,7 @@ use crate::{
         resolve_period_edge, weekday_from_number,
     },
 };
-/// Method names `date` exposes, for [`DateOps::enumerate`].
+/// Lists the method names that `date` exposes for [`DateOps::enumerate`].
 const METHODS: &[&str] = &[
     "now",
     "today",
@@ -80,9 +81,9 @@ impl DateOps {
     /// Registers the `date` global plus every flat `date_*` filter and `is_*`
     /// test this module owns.
     ///
-    /// This is an associated function because [`DateOps`] carries no state:
-    /// filters and tests are added first as free functions, then the `date`
-    /// namespace object is registered last.
+    /// This is an associated function because [`DateOps`] carries no state.
+    /// It adds the filters and tests first as free functions. It adds the
+    /// `date` namespace object last.
     #[inline]
     pub(super) fn register(env: &mut Environment<'static>) {
         env.add_filter("date_format", date_format);
@@ -213,7 +214,7 @@ fn apply_offset(
 }
 
 /// A named anchor for the `date.*` shorthands: where the value starts and how
-/// it is moved before the offset applies.
+/// the anchor moves it before the offset applies.
 #[derive(Copy, Clone)]
 enum Anchor {
     Now,
@@ -222,14 +223,15 @@ enum Anchor {
     Yesterday,
     StartOf(CalendarPeriod),
     EndOf(CalendarPeriod),
-    /// Moves to the ISO weekday `n` (`1..=7`, Monday = 1); each
-    /// application site validates `n` through `weekday_from_number`
-    /// before rendering, so an index error surfaces there.
+    /// Moves to the ISO weekday `n` (`1..=7`, Monday = 1). Each application
+    /// site validates `n` through `weekday_from_number` before rendering, so
+    /// an index error surfaces there.
     Weekday(i64),
 }
 
 impl Anchor {
-    /// The date point a shorthand starts from when no reference is given.
+    /// Returns the date point that a shorthand starts from when no reference
+    /// is present.
     fn base(self) -> Result<DatePoint, CalendarError> {
         match self {
             Self::Now => Ok(DatePoint::from(DateTimeValue::now())),
@@ -280,7 +282,9 @@ impl Anchor {
     /// # Errors
     ///
     /// - [`ErrorKind::InvalidOperation`] if the reference, offset, or format is
-    ///   invalid, or the anchored date point is out of range.
+    ///   invalid.
+    /// - [`ErrorKind::InvalidOperation`] if the anchored date point is out of
+    ///   range.
     /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides
     ///   `format`, `offset`, `reference`, or `reference_format`.
     #[expect(
@@ -333,7 +337,7 @@ impl Anchor {
 }
 
 /// Builds the shared `(format, offset, reference, reference_format, **kwargs)`
-/// template function for one anchor.
+/// template helper for one anchor.
 fn shorthand(anchor: Anchor) -> Value {
     Value::from_function(
         move |format: Option<&str>,
@@ -358,16 +362,15 @@ fn weekday_index_error(n: i64) -> Error {
     )
 }
 
-/// Parses `s` as a date or date-time expression via [`DatePoint::parse`].
+/// Parses `s` as a date or date-time expression with [`DatePoint::parse`].
 ///
 /// Attaches [`DateError`] as the underlying source so render diagnostics keep
 /// the full parse-failure chain.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `s` cannot be parsed as a recognized date or datetime.
+/// - [`ErrorKind::InvalidOperation`] if `s` doesn't parse as a recognized date
+///   or datetime.
 fn parse_date_point(s: &str) -> TemplateEngineResult<DatePoint> {
     DatePoint::parse(s)
         .map_err(|err| invalid_operation(format!("invalid date {s:?}"), err))
@@ -375,16 +378,15 @@ fn parse_date_point(s: &str) -> TemplateEngineResult<DatePoint> {
 
 /// Extracts the shared `format="..."` kwarg used by `date.*` namespace methods.
 ///
-/// Defaults to [`DEFAULT_DATE_PATTERN`] and rejects any other kwarg via
+/// Defaults to [`DEFAULT_DATE_PATTERN`] and rejects any other kwarg with
 /// [`Kwargs::assert_all_used`].
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `format` is present but is not a string, or
-/// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments) if
-/// `kwargs` carries any key besides `format`.
+/// - [`ErrorKind::InvalidOperation`] if `format` is present but is not a
+///   string.
+/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides
+///   `format`.
 fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
     let format =
         kwargs.get::<Option<&str>>("format")?.unwrap_or(DEFAULT_DATE_PATTERN);
@@ -395,17 +397,14 @@ fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 /// Extracts the shared `unit="..."` kwarg used by [`date_add`], [`date_sub`],
 /// and [`date_diff`].
 ///
-/// Defaults to `"days"` and rejects any other kwarg via
+/// Defaults to `"days"` and rejects any other kwarg with
 /// [`Kwargs::assert_all_used`].
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `unit` is not one of [`TimeUnit::parse_spelling`]'s accepted unit names or
-/// abbreviations, or
-/// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments)
-/// if `kwargs` carries any key besides `unit`.
+/// - [`ErrorKind::InvalidOperation`] if `unit` doesn't match
+///   [`TimeUnit::parse_spelling`]'s accepted unit names or abbreviations.
+/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides `unit`.
 fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
     let unit_str = kwargs.get::<Option<&str>>("unit")?.unwrap_or("days");
     kwargs.assert_all_used()?;
@@ -417,9 +416,8 @@ fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `s` is not a parseable date or datetime string.
+/// - [`ErrorKind::InvalidOperation`] if `s` doesn't parse as a date or datetime
+///   string.
 fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
     let point = parse_date_point(s)?;
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
@@ -440,19 +438,22 @@ fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
 /// not representable. Week numbers use ISO `%V`/`%G`, never `%U` or `%W`.
 ///
 /// Explicit `%Y` is display-only for negative years: strtime counts the sign
-/// inside the four-digit width, so year `-9` renders as `-009`, which the
-/// crate's four-digit-year rule rejects on reparse. The canonical
+/// inside the four-digit width, so year `-9` renders as `-009`. The crate's
+/// four-digit-year rule rejects that value on reparse. The canonical
 /// round-trip forms (`%Y-%m-%d`, `%Y-%m`, `%F`, and the canonical datetime
 /// patterns) keep the sign outside the year digits and reparse exactly.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string or the local zone cannot be
-/// resolved (see [`parse_date_point`]), or if `pattern` has an unclosed
-/// bracket literal, is an invalid strftime pattern, or contains an
-/// unsupported moment token.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string (see [`parse_date_point`]).
+/// - [`ErrorKind::InvalidOperation`] if the local zone lookup fails.
+/// - [`ErrorKind::InvalidOperation`] if `pattern` has an unclosed bracket
+///   literal.
+/// - [`ErrorKind::InvalidOperation`] if `pattern` is an invalid strftime
+///   pattern.
+/// - [`ErrorKind::InvalidOperation`] if `pattern` contains an unsupported
+///   moment token.
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
     let point = parse_date_point(value)?;
     let zone = crate::temporal::local_zone().map_err(render_date_error)?;
@@ -468,14 +469,13 @@ fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
 ///
 /// Syntax: `{{ value | timestamp }}`.
 /// A naive input means the reader's local zone, so it compares correctly
-/// against file timestamps; an explicit-offset input converts directly; a
+/// against file timestamps. An explicit-offset input converts directly. A
 /// date-only input resolves at local-zone midnight.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string (see [`parse_date_point`]).
 fn timestamp(value: &str) -> TemplateEngineResult<i64> {
     parse_date_point(value)?.unix_seconds().map_err(render_calendar_error)
 }
@@ -486,16 +486,17 @@ fn timestamp(value: &str) -> TemplateEngineResult<i64> {
 /// Backs every name in
 /// [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP): the
 /// `start_of_week`/`sow` filter returns the first day (Monday) of the ISO
-/// week, `end_of_week`/`eow` the last (Sunday), and the month and year
-/// spellings behave the same on their period.
+/// week. The `end_of_week`/`eow` filter returns the last (Sunday). The
+/// month and year spellings behave the same on their period.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string (see [`parse_date_point`]) or if
-/// the boundary is outside the supported range or its local time cannot be
-/// resolved (see [`render_calendar_error`]).
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string (see [`parse_date_point`]).
+/// - [`ErrorKind::InvalidOperation`] if the boundary is outside the supported
+///   range.
+/// - [`ErrorKind::InvalidOperation`] if the boundary's local time fails to
+///   resolve (see [`render_calendar_error`]).
 fn render_period_edge(
     value: &str,
     calendar_period: CalendarPeriod,
@@ -517,19 +518,21 @@ fn render_period_edge(
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`).
 /// A sub-day shift of a date-only value moves the date only when it crosses
-/// midnight (`25h` moves it one day; `5h` does not).
+/// midnight. A `25h` shift moves it one day. A `5h` shift does not move it.
 ///
 /// `"years"`, `"months"`, `"weeks"`, and `"days"` preserve the local clock
-/// time across a DST transition; the remaining units shift the exact
+/// time across a DST transition. The remaining units shift the exact
 /// instant, so the clock time can land earlier or later than a naive `n`-unit
 /// shift (see [`shift_by_unit`]).
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string, `unit` is not an accepted unit
-/// name, or the shift overflows the representable range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string.
+/// - [`ErrorKind::InvalidOperation`] if `unit` is not an accepted unit name.
+/// - [`ErrorKind::InvalidOperation`] if the shift overflows the representable
+///   range.
+/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides `unit`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -551,15 +554,17 @@ fn date_add(
 /// (e.g. `"years"`/`"y"`, `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`,
 /// `"hours"`/`"h"`, `"minutes"`/`"m"`, `"seconds"`/`"s"`).
 /// A sub-day shift of a date-only value moves the date only when it crosses
-/// midnight (`25h` moves it one day; `5h` does not).
+/// midnight. A `25h` shift moves it one day. A `5h` shift does not move it.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string, `unit` is not an accepted unit
-/// name, `n` is [`i64::MIN`], or the shift overflows the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string.
+/// - [`ErrorKind::InvalidOperation`] if `unit` is not an accepted unit name.
+/// - [`ErrorKind::InvalidOperation`] if `n` is [`i64::MIN`].
+/// - [`ErrorKind::InvalidOperation`] if the shift overflows the representable
+///   range.
+/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides `unit`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -578,21 +583,20 @@ fn date_sub(
     )
 }
 
-/// Shifts `value` by `n` `unit`s, applying calendar or fixed-duration
-/// semantics per `unit`.
+/// Shifts `value` by `n` `unit`s with calendar or fixed-duration semantics
+/// per `unit`.
 /// - Date-Time inputs ([`DatePoint::DateTime`]) shift calendar units on the
 ///   local clock time (preserving clock-time hour across DST) and sub-day units
 ///   exactly on the Date-Time.
 /// - Calendar inputs ([`DatePoint::Calendar`]) shift on the local datetime at
-///   midnight. A sub-day shift moves the date only when it crosses midnight
-///   (`25h` moves it one day; `5h` does not).
+///   midnight. A sub-day shift moves the date only when it crosses midnight. A
+///   `25h` shift moves it one day. A `5h` shift does not move it.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or the shift exceeds the representable range
-/// (see the calendar error mapping).
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if the shift exceeds the representable
+///   range (see the calendar error mapping).
 fn shift_by_unit(
     value: &str,
     n: i64,
@@ -612,10 +616,9 @@ fn shift_by_unit(
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if arithmetic exceeds the representable
+///   range.
 fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     shift_by_unit(value, n_i64, TimeUnit::Day)
@@ -627,10 +630,9 @@ fn add_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if arithmetic exceeds the representable
+///   range.
 fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
     let n_i64 = i64::try_from(n).map_err(|_| date_out_of_range_error())?;
     let n_i64 = n_i64.checked_neg().ok_or_else(date_out_of_range_error)?;
@@ -643,10 +645,9 @@ fn sub_days(value: &str, n: u64) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if arithmetic exceeds the representable
+///   range.
 fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, i64::from(n), TimeUnit::Month)
 }
@@ -657,10 +658,9 @@ fn add_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if arithmetic exceeds the representable
+///   range.
 fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
@@ -673,10 +673,9 @@ fn sub_months(value: &str, n: u32) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if arithmetic exceeds the representable
+///   range.
 fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     shift_by_unit(value, i64::from(n), TimeUnit::Year)
 }
@@ -687,10 +686,9 @@ fn add_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not parseable or arithmetic exceeds the representable
-/// range.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse.
+/// - [`ErrorKind::InvalidOperation`] if arithmetic exceeds the representable
+///   range.
 fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
     let n_i64 =
         i64::from(n).checked_neg().ok_or_else(date_out_of_range_error)?;
@@ -701,15 +699,17 @@ fn sub_years(value: &str, n: u32) -> TemplateEngineResult<String> {
 /// the formatted date of a given weekday in the week.
 ///
 /// Syntax: `{{ value | weekday }}` returns `1` for Monday through `7` for
-/// Sunday. When `n` is supplied, returns the formatted date of that weekday in
+/// Sunday. When you supply `n`, returns the formatted date of that weekday in
 /// `value`'s week.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string, `n` is out of range 1..=7, or
-/// `format` is invalid.
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string.
+/// - [`ErrorKind::InvalidOperation`] if `n` is out of range 1..=7.
+/// - [`ErrorKind::InvalidOperation`] if `format` is invalid.
+/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides
+///   `format`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja Function trait extracts trailing Kwargs argument by \
@@ -759,13 +759,11 @@ fn weekday(
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` or `other` is not a parseable date/time string (see
-/// [`parse_date_point`]), or if `unit` is not one of
-/// [`TimeUnit::parse_spelling`]'s accepted names (see [`unit_kwarg`]). Returns
-/// [`ErrorKind::TooManyArguments`](minijinja::ErrorKind::TooManyArguments)
-/// if `kwargs` carries any key besides `unit`.
+/// - [`ErrorKind::InvalidOperation`] if `value` or `other` doesn't parse as a
+///   date/time string (see [`parse_date_point`]).
+/// - [`ErrorKind::InvalidOperation`] if `unit` doesn't match
+///   [`TimeUnit::parse_spelling`]'s accepted names (see [`unit_kwarg`]).
+/// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides `unit`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "minijinja's Function trait extracts a filter's trailing Kwargs \
@@ -796,14 +794,13 @@ fn date_diff(
 /// Evaluates whether the piped date/time string is before now.
 ///
 /// Syntax: `{% if value is is_past %}`.
-/// A naive input is interpreted in the reader's local zone, so it compares
-/// correctly against file timestamps.
+/// A naive input means the reader's local zone, so it compares correctly
+/// against file timestamps.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string (see [`parse_date_point`]).
 fn is_past(value: &str) -> TemplateEngineResult<bool> {
     let instant =
         parse_date_point(value)?.instant().map_err(render_calendar_error)?;
@@ -818,9 +815,8 @@ fn is_past(value: &str) -> TemplateEngineResult<bool> {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-/// `value` is not a parseable date/time string; see [`parse_date_point`].
+/// - [`ErrorKind::InvalidOperation`] if `value` doesn't parse as a date/time
+///   string (see [`parse_date_point`]).
 fn is_future(value: &str) -> TemplateEngineResult<bool> {
     let instant =
         parse_date_point(value)?.instant().map_err(render_calendar_error)?;
@@ -831,17 +827,16 @@ fn is_future(value: &str) -> TemplateEngineResult<bool> {
 /// Evaluates whether the given year or date/time string falls in a leap year.
 ///
 /// Syntax: `{% if value is is_leap_year %}`. Accepts either an integer year
-/// (`2024 is is_leap_year`) or a date/time string checked through
-/// [`parse_local_year`].
+/// (`2024 is is_leap_year`) or a date/time string that [`parse_local_year`]
+/// checks.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind
-/// [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) (via
-/// [`leap_year_input_error`]) if `value` is neither an integer year
-/// representable as [`i32`] nor a parseable date/time string (see
-/// [`parse_local_year`]), or if the year is outside the representable
-/// civil-date range.
+/// - [`ErrorKind::InvalidOperation`] if `value` is neither an integer year
+///   representable as [`i32`] nor a parseable date/time string (see
+///   [`parse_local_year`]).
+/// - [`ErrorKind::InvalidOperation`] if the year is outside the representable
+///   civil-date range (see [`leap_year_input_error`]).
 fn is_leap_year(value: &Value) -> TemplateEngineResult<bool> {
     let year = if let Some(year) = value.as_i64() {
         i32::try_from(year).map_err(|_| leap_year_input_error(value))?
@@ -904,7 +899,7 @@ mod tests {
     /// Renders `{{ value | <filter_call> }}` under the registered
     /// environment and asserts the exact output.
     ///
-    /// Shared by the per-filter `shifts_a_piped_date` tables.
+    /// The per-filter `shifts_a_piped_date` tables share this helper.
     fn assert_filter_render(input: &str, filter_call: &str, expected: &str) {
         let rendered = env()
             .render_str(
@@ -1064,7 +1059,7 @@ mod tests {
     /// but their relative dates are deterministic within one render window.
     ///
     /// All three render inside one template so they read the clock in a
-    /// single evaluation; a local-midnight crossing between separate renders
+    /// single evaluation. A local-midnight crossing between separate renders
     /// would otherwise flake the one-day-apart assertions.
     mod today_tomorrow_yesterday {
         use pretty_assertions::assert_eq;
@@ -1355,7 +1350,7 @@ mod tests {
 
         /// Regression: for a datetime-shaped input that fails for a
         /// datetime-specific reason, the old parser discarded the datetime
-        /// error and surfaced an unrelated date-only shape mismatch instead
+        /// error. It surfaced an unrelated date-only shape mismatch instead
         /// (spec N4).
         #[test]
         fn surfaces_the_datetime_parsers_error_not_the_date_only_fallbacks() {
@@ -1656,7 +1651,7 @@ mod tests {
 
         #[test]
         fn skipped_local_days_render_one_day_in_both_dialects() {
-            // Arrange: 2011-12-30 did not exist in Samoa; midnight shifts to
+            // Arrange: 2011-12-30 did not exist in Samoa. Midnight shifts to
             // 2011-12-31, and both dialects must render that day.
             ZoneGuard::set("Pacific/Apia");
 
@@ -1758,7 +1753,7 @@ mod tests {
                 crate::temporal::test_support::fixtures::new_york_zone(),
             );
 
-            // 02:30 does not exist on 2026-03-08; the adopted 'compatible'
+            // 02:30 does not exist on 2026-03-08. The adopted 'compatible'
             // policy shifts it forward by the gap to 03:30 EDT (07:30Z).
             let rendered = env()
                 .render_str(
@@ -2164,11 +2159,11 @@ mod tests {
 
             // Regression: the mixed-precision branch previously subtracted
             // whichever naive representations the two parsers happened to
-            // produce; it must subtract calendar clocks under the pinned
-            // zone instead. A naive 14:30 local input and its 12:30Z
-            // explicit-offset equivalent both resolve to the same 14:30
-            // local clock time, so both land on the same 14-hour truncated
-            // difference (the mixed branch is i64, not f64).
+            // produce. It must subtract calendar clocks under the pinned zone
+            // instead. A naive 14:30 local input and its 12:30Z
+            // explicit-offset equivalent both resolve to the same 14:30 local
+            // clock time. Both land on the same 14-hour truncated difference
+            // (the mixed branch is i64, not f64).
             let rendered = env()
                 .render_str(
                     r#"{{ "2026-07-29" | date_diff(other, unit="hours") }}"#,
@@ -2254,8 +2249,8 @@ mod tests {
         }
 
         /// Pins the declared split between calendar and exact units: a day unit
-        /// shifts the calendar clock across the 2026-03-08 gap, while 24
-        /// hours shifts the instant and lands an hour later on the clock.
+        /// shifts the calendar clock across the 2026-03-08 gap. A 24-hour
+        /// shift moves the instant and lands an hour later on the clock.
         #[test]
         fn a_day_unit_preserves_the_clock_time_across_a_dst_gap_while_hours_do_not()
          {
@@ -2447,7 +2442,7 @@ mod tests {
         #[test]
         fn renders_a_zone_failure_with_one_lookup_prefix() {
             // Arrange: mirror today's constructor, which stores DateError's
-            // Display text; the assertion is the single diagnosis we want.
+            // Display text. The assertion is the single diagnosis we want.
             let inner = DateError::LocalZoneLookup {
                 input: "system zone: clock unavailable".into(),
             };

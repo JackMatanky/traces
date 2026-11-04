@@ -46,8 +46,7 @@ impl NumOps {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`] if
-/// `value` is negative.
+/// - [`ErrorKind::InvalidOperation`] if `value` is negative.
 fn sqrt(value: f64) -> TemplateEngineResult<f64> {
     if value < 0.0 {
         return Err(Error::new(

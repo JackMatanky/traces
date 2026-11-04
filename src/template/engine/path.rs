@@ -1,4 +1,4 @@
-//! Registers path tests and filters for templates.
+//! Registers the path tests and the filters for templates.
 //!
 //! [`PathOps`] adds three minijinja [`Environment::add_test`] tests:
 //!
@@ -38,7 +38,7 @@ use crate::{
     path::{PathError, SafeRelativePath},
 };
 
-/// Filesystem fact selected by a path I/O test.
+/// A filesystem fact selected by a path I/O test.
 #[derive(Copy, Clone)]
 enum PathQuery {
     Exists,
@@ -65,7 +65,7 @@ impl PathOps {
         }
     }
 
-    /// Registers the path tests and filters.
+    /// Registers the path tests and the filters.
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         self.register_test(env, "path_exists", PathQuery::Exists);
@@ -81,7 +81,7 @@ impl PathOps {
     ///
     /// The closure calls [`inspect`], the shared implementation behind
     /// `path_exists`, `is_file_path`, and `is_dir_path`. It clones `root`
-    /// because [`Value::from_function`] requires a `Send + Sync + 'static`
+    /// because [`Value::from_function`] needs a `Send + Sync + 'static`
     /// closure.
     ///
     /// [`Value::from_function`]: minijinja::value::Value::from_function
@@ -98,16 +98,16 @@ impl PathOps {
     }
 }
 
-/// Resolves `path` against `root` via [`InspectTarget::resolve`], then answers
+/// Resolves `path` against `root` with [`InspectTarget::resolve`], then answers
 /// `query` against the resolved target. A missing target answers `false` for
 /// every query.
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`] if
-/// a relative `path` traverses outside `root` (through `..` or a symlink
-/// escape) or if reading the resolved target's metadata fails for any reason
-/// other than "not found".
+/// - [`ErrorKind::InvalidOperation`] if a relative `path` traverses outside
+///   `root` (through `..` or a symlink escape).
+/// - [`ErrorKind::InvalidOperation`] if reading the resolved target's metadata
+///   fails for any reason other than "not found".
 ///
 /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn inspect(
@@ -134,25 +134,25 @@ fn inspect(
 /// A `path` test's argument, resolved against `root` and proven safe for
 /// [`std::fs::metadata`].
 ///
-/// Constructible only through [`Self::resolve`], so [`inspect`] can never
-/// accidentally stat an unconfined candidate.
+/// Only [`Self::resolve`] constructs it, so [`inspect`] cannot accidentally
+/// check metadata for an unconfined candidate.
 struct InspectTarget(PathBuf);
 
 impl InspectTarget {
     /// Resolves `path` against `root`.
     ///
-    /// Absolute paths are used as-is. A path naming `root` itself
+    /// The resolver uses absolute paths as-is. A path naming `root` itself
     /// ([`Self::is_root_reference`]) resolves directly to it. Every other
-    /// relative path is confined via [`SafeRelativePath::parse`], the same seam
-    /// [`super::file`] uses for `file.include()` and `file.write_to()` paths.
-    /// Parent traversals and symlink escapes are therefore rejected
-    /// consistently across template primitives.
+    /// relative path uses [`SafeRelativePath::parse`] for confinement, the same
+    /// seam [`super::file`] uses for `file.include()` and `file.write_to()`
+    /// paths. The resolver therefore rejects parent traversals and symlink
+    /// escapes consistently across template primitives.
     ///
     /// # Errors
     ///
     /// - [`OutsideRoot`] or [`UnsafeComponent`] if a relative `path` resolves
     ///   outside `root`.
-    /// - [`StrictPath`] if containment cannot be confirmed.
+    /// - [`StrictPath`] if the resolver cannot confirm containment.
     ///
     /// [`OutsideRoot`]: PathError::OutsideRoot
     /// [`UnsafeComponent`]: PathError::UnsafeComponent
@@ -175,7 +175,7 @@ impl InspectTarget {
     /// That means every component is [`Component::CurDir`], or there are no
     /// components at all, as in an empty path. This cannot escape no matter how
     /// it is joined. [`RelativePath::parse`] rejects this shape because it
-    /// is meaningless as a file to write or include; here it is the legitimate
+    /// is meaningless as a file to write or include. Here it is the legitimate
     /// "ask about root" case `is_dir_path('.')`/`path_exists('')` rely on.
     ///
     /// [`RelativePath::parse`]: crate::path::RelativePath::parse
@@ -253,6 +253,10 @@ mod tests {
     /// That is the `is`/`is not` syntax minijinja tests use
     /// ([`Environment::add_test`]), unlike filters' `|` syntax
     /// ([`Environment::add_filter`]).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the render fails.
     fn check(root: &Path, test: &str, input: &str) -> String {
         let template = format!("{{{{ value is {test} }}}}");
         env(root)
@@ -419,7 +423,7 @@ mod tests {
                 )
                 .expect_err("permission-denied is not silently false");
 
-            // Restore permissions so the tempdir can be cleaned up.
+            // Restore permissions so cleanup can remove the tempdir.
             fs::set_permissions(&locked_dir, fs::Permissions::from_mode(0o755))
                 .expect("restore permissions");
 
