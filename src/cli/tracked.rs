@@ -108,16 +108,8 @@ mod tests {
             .expect("parse tracked args")
             .tracked
         }
-
-        pub(super) fn action_args(action: TrackedAction) -> Tracked {
-            Tracked {
-                action,
-            }
-        }
     }
     use fixtures::*;
-
-    use crate::test_support::fixture_service;
 
     mod parsing {
         use super::*;
@@ -132,34 +124,6 @@ mod tests {
         fn clean_argv_maps_to_clean_action() {
             let args = parse(&["clean"]);
             assert!(matches!(args.action, TrackedAction::Clean));
-        }
-    }
-
-    mod list {
-        use super::*;
-
-        #[test]
-        fn succeeds_against_an_empty_tracked_store() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let service = fixture_service(temp.path());
-
-            action_args(TrackedAction::List)
-                .run(service.tracker_store())
-                .expect("list empty tracked store");
-        }
-    }
-
-    mod clean {
-        use super::*;
-
-        #[test]
-        fn on_an_empty_tracked_store_does_not_error() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let service = fixture_service(temp.path());
-
-            action_args(TrackedAction::Clean)
-                .run(service.tracker_store())
-                .expect("clean empty tracked store");
         }
     }
 }

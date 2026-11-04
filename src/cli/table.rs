@@ -20,18 +20,18 @@ pub(super) struct Table {
     /// Source expression, e.g. `#tag`, `folder/`, `@Class*`, or a boolean
     /// combination. Omit to query every indexed page.
     #[arg(long)]
-    from: Option<String>,
+    pub(super) from: Option<String>,
     /// Filter expression narrowing results, e.g. `"file.folder == \"books\""`.
     /// Repeatable; multiple `--where` flags compose as AND.
     #[arg(long = "where")]
-    filter: Vec<String>,
+    pub(super) filter: Vec<String>,
     /// Sort configuration. See [`SortArgs`].
     #[command(flatten)]
-    sort: SortArgs,
+    pub(super) sort: SortArgs,
     /// Field path to render as a table column, e.g. `file.name`. Repeat for
     /// multiple columns; each path also becomes its column's header.
     #[arg(long = "column", required = true)]
-    columns: Vec<String>,
+    pub(super) columns: Vec<String>,
 }
 
 impl Table {
@@ -69,7 +69,8 @@ impl Table {
     /// table, alongside the matched row count.
     ///
     /// Split from [`Self::run`] so tests can assert on rendered content without
-    /// capturing process stdout.
+    /// capturing process stdout. `pub(super)` so the shared
+    /// `query_pipeline_tests` module can drive it alongside `List::render`.
     ///
     /// # Errors
     ///
@@ -79,7 +80,10 @@ impl Table {
     ///   field path.
     ///
     /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
-    fn render(&self, config: &Config) -> Result<(String, usize), CliError> {
+    pub(super) fn render(
+        &self,
+        config: &Config,
+    ) -> Result<(String, usize), CliError> {
         let root = config.root();
         let order = self.sort.resolve(root)?;
         let rows = super::refresh_page_query(
@@ -112,11 +116,7 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         use super::*;
-        use crate::{
-            DirTreeError,
-            index::IndexError,
-            query::{QueryBuilderError, QueryError},
-        };
+        use crate::query::QueryError;
 
         fn config(root: &Path) -> Config {
             Config::test_default(root)
@@ -142,87 +142,6 @@ mod tests {
                 "| file.path |\n|-----------|\n| a.md      |\n| b.md      |\n"
             );
             assert_eq!(count, 2);
-        }
-
-        #[test]
-        fn sort_orders_rows_by_the_named_field_with_explicit_ascending() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("a.md"), "---\nrating: 3\n---\n")
-                .expect("write a.md");
-            fs::write(temp.path().join("b.md"), "---\nrating: 9\n---\n")
-                .expect("write b.md");
-            let table = Table {
-                from: None,
-                filter: vec![],
-                sort: SortArgs {
-                    keys: vec!["rating".to_owned()],
-                    asc: true,
-                    desc: false,
-                },
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let (rendered, count) =
-                table.render(&config(temp.path())).expect("valid query");
-
-            assert_eq!(
-                rendered,
-                "| file.path |\n|-----------|\n| a.md      |\n| b.md      |\n"
-            );
-            assert_eq!(count, 2);
-        }
-
-        #[test]
-        fn desc_reverses_the_sort_order() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("a.md"), "---\nrating: 3\n---\n")
-                .expect("write a.md");
-            fs::write(temp.path().join("b.md"), "---\nrating: 9\n---\n")
-                .expect("write b.md");
-            let table = Table {
-                from: None,
-                filter: vec![],
-                sort: SortArgs {
-                    keys: vec!["rating".to_owned()],
-                    asc: false,
-                    desc: false,
-                },
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let (rendered, count) =
-                table.render(&config(temp.path())).expect("valid query");
-
-            assert_eq!(
-                rendered,
-                "| file.path |\n|-----------|\n| b.md      |\n| a.md      |\n"
-            );
-            assert_eq!(count, 2);
-        }
-
-        #[test]
-        fn rejects_a_malformed_sort_field_path() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("a.md"), "# A\n").expect("write a.md");
-            let table = Table {
-                from: None,
-                filter: vec![],
-                sort: SortArgs {
-                    keys: vec!["file..bad".to_owned()],
-                    asc: false,
-                    desc: false,
-                },
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let error = table
-                .render(&config(temp.path()))
-                .expect_err("malformed sort fails");
-
-            assert!(matches!(error, CliError::Query {
-                source: QueryError::Builder(QueryBuilderError::FieldPath(_)),
-                ..
-            }));
         }
 
         #[test]
@@ -268,75 +187,6 @@ mod tests {
         }
 
         #[test]
-        fn from_tag_selects_only_matching_pages() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("a.md"), "#projects\n")
-                .expect("write a.md");
-            fs::write(temp.path().join("b.md"), "#books\n")
-                .expect("write b.md");
-            let table = Table {
-                from: Some("#projects".to_owned()),
-                filter: vec![],
-                sort: SortArgs::default(),
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let (rendered, count) =
-                table.render(&config(temp.path())).expect("valid query");
-
-            assert_eq!(
-                rendered,
-                "| file.path |\n|-----------|\n| a.md      |\n"
-            );
-            assert_eq!(count, 1);
-        }
-
-        #[test]
-        fn where_filters_by_frontmatter_field() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("a.md"), "---\nrating: 9\n---\n")
-                .expect("write a.md");
-            fs::write(temp.path().join("b.md"), "---\nrating: 3\n---\n")
-                .expect("write b.md");
-            let table = Table {
-                from: None,
-                filter: vec!["rating > 5".to_owned()],
-                sort: SortArgs::default(),
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let (rendered, count) =
-                table.render(&config(temp.path())).expect("valid query");
-
-            assert_eq!(
-                rendered,
-                "| file.path |\n|-----------|\n| a.md      |\n"
-            );
-            assert_eq!(count, 1);
-        }
-
-        #[test]
-        fn rejects_unparsable_filter_expression() {
-            let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("a.md"), "# A\n").expect("write a.md");
-            let table = Table {
-                from: None,
-                filter: vec!["not a valid expression".to_owned()],
-                sort: SortArgs::default(),
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let error = table
-                .render(&config(temp.path()))
-                .expect_err("unparsable filter fails");
-
-            assert!(matches!(error, CliError::Query {
-                source: QueryError::Builder(QueryBuilderError::Syntax(_)),
-                ..
-            }));
-        }
-
-        #[test]
         fn rejects_malformed_column_field_path() {
             let temp = tempfile::tempdir().expect("create temp dir");
             fs::write(temp.path().join("a.md"), "# A\n").expect("write a.md");
@@ -353,45 +203,6 @@ mod tests {
 
             assert!(matches!(error, CliError::Query {
                 source: QueryError::FieldPath(_),
-                ..
-            }));
-        }
-
-        #[cfg(unix)]
-        #[test]
-        fn wraps_refresh_failure_as_a_cli_index_error() {
-            use std::os::unix::fs::PermissionsExt as _;
-
-            struct RestorePermissions<'a>(&'a Path);
-
-            impl Drop for RestorePermissions<'_> {
-                fn drop(&mut self) {
-                    let _ = fs::set_permissions(
-                        self.0,
-                        fs::Permissions::from_mode(0o700),
-                    );
-                }
-            }
-
-            let temp = tempfile::tempdir().expect("create temp dir");
-            let locked = temp.path().join("locked");
-            fs::create_dir(&locked).expect("create locked dir");
-            fs::set_permissions(&locked, fs::Permissions::from_mode(0o000))
-                .expect("revoke read permission");
-            let _restore = RestorePermissions(&locked);
-            let table = Table {
-                from: None,
-                filter: vec![],
-                sort: SortArgs::default(),
-                columns: vec!["file.path".to_owned()],
-            };
-
-            let error = table
-                .render(&config(temp.path()))
-                .expect_err("unreadable subdirectory fails");
-
-            assert!(matches!(error, CliError::Index {
-                source: IndexError::Scan(DirTreeError::NodeInaccessible { .. }),
                 ..
             }));
         }

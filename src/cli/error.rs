@@ -976,6 +976,81 @@ mod tests {
         }
 
         #[test]
+        fn tracked_list() {
+            let error = CliError::TrackedList {
+                source: state_source(),
+            };
+
+            assert_eq!(error.to_string(), "failed to list tracked configs");
+            assert_eq!(
+                error.code().map(|code| code.to_string()),
+                Some("traces::cli::tracked::list_failed".to_owned())
+            );
+            assert_eq!(
+                error.help().map(|help| help.to_string()),
+                Some(
+                    "check that the tracked-config store is readable"
+                        .to_owned()
+                )
+            );
+            assert!(error.source().is_some());
+        }
+
+        #[test]
+        fn tracked_clean() {
+            let error = CliError::TrackedClean {
+                source: state_source(),
+            };
+
+            assert_eq!(
+                error.to_string(),
+                "failed to clean the tracked-config store"
+            );
+            assert_eq!(
+                error.code().map(|code| code.to_string()),
+                Some("traces::cli::tracked::clean_failed".to_owned())
+            );
+            assert_eq!(
+                error.help().map(|help| help.to_string()),
+                Some(
+                    "check that the tracked-config store is readable and \
+                     writable"
+                        .to_owned()
+                )
+            );
+            assert!(error.source().is_some());
+        }
+
+        #[test]
+        fn schema_query() {
+            let root = PathBuf::from("/some/project");
+            let error = CliError::SchemaQuery {
+                root,
+                source: SchemaError::ReadDirectory {
+                    directory: PathBuf::from("/some/project/.traces/schemas"),
+                    source: io::Error::other("boom"),
+                },
+            };
+
+            assert_eq!(
+                error.to_string(),
+                "failed to load Schemas for query in /some/project"
+            );
+            assert_eq!(
+                error.code().map(|code| code.to_string()),
+                Some("traces::cli::query::schema_failed".to_owned())
+            );
+            assert_eq!(
+                error.help().map(|help| help.to_string()),
+                Some(
+                    "check that /some/project has valid Schema files"
+                        .to_owned()
+                )
+            );
+            assert!(error.source().is_some());
+        }
+
+        #[test]
         fn index() {
             let root = PathBuf::from("/some/project");
             let error = CliError::Index {
