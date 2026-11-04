@@ -23,3 +23,11 @@ success-output = "never"
 # for artifact collection across test matrix jobs.
 retries = 0
 junit = { path = "junit.xml" }
+
+# Soak profile: identical to `ci` but with a run ceiling that fits
+# `--stress-count 20` (nextest profiles do not inherit, so `ci` keys are
+# repeated here).
+[profile.ci-soak]
+retries = 0
+global-timeout = "2h"
+junit = { path = "junit.xml" }
