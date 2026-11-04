@@ -27,9 +27,9 @@ Feature: Queries reflect project files and settings across runs
 
   Scenario: Deleting an ambiguous link target resolves the surviving target
     Given an indexed project with one of two link targets deleted
-    When I run "traces table --column file.name --column inlinks"
+    When I run "traces table --column file.path --column inlinks"
     Then the exit code is 0
-    And the row for "foo" contains "a.md"
+    And the inlinks for "notes/foo.md" are "a.md"
 
   Scenario: Deleting a note removes its path from the next query
     Given an indexed project with one of two link targets deleted
@@ -53,15 +53,15 @@ Feature: Queries reflect project files and settings across runs
 
   Scenario: A renamed target retains its inlink
     Given an indexed project with a link target renamed
-    When I run "traces table --column file.name --column inlinks"
+    When I run "traces table --column file.path --column inlinks"
     Then the exit code is 0
-    And the row for "foo" contains "a.md"
+    And the inlinks for "archive/foo.md" are "a.md"
 
   Scenario: Adding a link target resolves its inlink on the next query
     Given an indexed project with a newly added link target
-    When I run "traces table --column file.name --column inlinks"
+    When I run "traces table --column file.path --column inlinks"
     Then the exit code is 0
-    And the row for "new" contains "a.md"
+    And the inlinks for "new.md" are "a.md"
 
   Scenario: A list query creates a store without an index command
     Given a trusted project with a note "a.md" containing:
@@ -91,11 +91,11 @@ Feature: Queries reflect project files and settings across runs
     Then the exit code is 0
     And stdout is empty
 
-  Scenario: Inlinks render after a separate index run
+  Scenario: A link indexed in a separate run appears on its target
     Given an indexed project with a link to foo
-    When I run "traces table --column file.name --column inlinks"
+    When I run "traces table --column file.path --column inlinks"
     Then the exit code is 0
-    And the row for "foo" contains "a.md"
+    And the inlinks for "notes/foo.md" are "a.md"
 
   Scenario: Inlinks are sorted and deduplicated with empty sources omitted
     Given an indexed project with repeated and empty link sources
@@ -138,6 +138,7 @@ Feature: Queries reflect project files and settings across runs
       """
       - a.md
       """
+    And another list run has the same stdout
 
   Scenario: Bare and prefixed frontmatter tags both match a tag query
     Given an indexed project with bare and prefixed frontmatter tags

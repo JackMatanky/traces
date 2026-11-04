@@ -1,6 +1,6 @@
 //! Step definitions for note fields, tags, and tasks observed through queries.
 
-use rstest_bdd_macros::{given, when};
+use rstest_bdd_macros::{given, then, when};
 
 use super::{LastRun, Sandbox};
 use crate::config_fixture::ConfigFixture;
@@ -47,4 +47,18 @@ fn list_notes_with_tag(sandbox: &Sandbox, last_run: &mut LastRun, tag: String) {
 #[when(r#"I show the field "{field}" for notes"#)]
 fn show_field(sandbox: &Sandbox, last_run: &mut LastRun, field: String) {
     last_run.0 = Some(sandbox.run(&["table", "--column", &field]));
+}
+
+#[then(r#"filtering notes by "{filter}" yields no results"#)]
+fn no_notes_match(sandbox: &Sandbox, filter: String) {
+    let run = sandbox.run(&["list", "--where", &filter]);
+    run.assert_success();
+    run.assert_stdout_eq("");
+}
+
+#[then(r#"filtering tasks by "{filter}" yields no results"#)]
+fn no_tasks_match(sandbox: &Sandbox, filter: String) {
+    let run = sandbox.run(&["task", "--where", &filter]);
+    run.assert_success();
+    run.assert_stdout_eq("");
 }

@@ -73,18 +73,6 @@ fn link_target_added(sandbox: &Sandbox) {
     sandbox.write_note("new.md", "# New\n");
 }
 
-#[then(r#"the row for "{name}" contains "{source}""#)]
-fn row_contains_inlink(last_run: &LastRun, name: String, source: String) {
-    let run = last_run.0.as_ref().expect("prior command");
-    let row = run
-        .stdout
-        .lines()
-        .find(|line| line.starts_with(&format!("| {name} ")))
-        .unwrap_or_default();
-    assert!(!row.is_empty(), "no row for {name}; stdout was:\n{}", run.stdout);
-    assert!(row.contains(&source), "expected {source} in row: {row}");
-}
-
 #[then("the project has an index store")]
 fn project_has_index_store(sandbox: &Sandbox) {
     assert!(sandbox.root().join(".traces/index.redb").is_file());
@@ -187,9 +175,18 @@ fn store_removed(sandbox: &Sandbox) {
 fn persisted_list_result(sandbox: &Sandbox) {
     sandbox.write_config();
     sandbox.write_note("a.md", "# A\n");
+    sandbox.write_note("b.md", "# B\n");
     sandbox.run(&["trust"]).assert_success();
     sandbox.run(&["index"]).assert_success();
-    sandbox.run(&["list"]).assert_stdout_eq("- a.md\n");
+    sandbox.run(&["list"]).assert_stdout_eq("- a.md\n- b.md\n");
+}
+
+#[then("another list run has the same stdout")]
+fn another_list_matches(sandbox: &Sandbox, last_run: &LastRun) {
+    let first = last_run.0.as_ref().expect("first list command");
+    let second = sandbox.run(&["list"]);
+    second.assert_success();
+    assert_eq!(second.stdout, first.stdout);
 }
 
 #[given("an indexed project with bare and prefixed frontmatter tags")]

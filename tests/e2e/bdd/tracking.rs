@@ -71,3 +71,11 @@ fn tracked_config_path_remains(sandbox: &Sandbox) {
     list.assert_success();
     assert_project_configuration_path(sandbox, &list);
 }
+
+#[given("an untrusted project whose configuration was loaded once")]
+fn untrusted_project_loaded_once(sandbox: &Sandbox) {
+    sandbox.write_config();
+    let loaded = sandbox.run(&["list"]);
+    loaded.assert_code(1);
+    loaded.assert_never_exit_101();
+}

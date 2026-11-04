@@ -1,0 +1,22 @@
+| file.name | title                                                  | rating |
+|-----------|--------------------------------------------------------|--------|
+| page-00   | 東京タワー 00 with a deliberately long wide title cell | 0      |
+| page-01   | naïve café 01 with a deliberately long wide title cell | 7      |
+| page-02   | Zürich 02 with a deliberately long wide title cell     | 1      |
+| page-03   | 東京タワー 03 with a deliberately long wide title cell | 8      |
+| page-04   | naïve café 04 with a deliberately long wide title cell | 2      |
+| page-05   | Zürich 05 with a deliberately long wide title cell     | 9      |
+| page-06   | 東京タワー 06 with a deliberately long wide title cell | 3      |
+| page-07   | naïve café 07 with a deliberately long wide title cell | 10     |
+| page-08   | Zürich 08 with a deliberately long wide title cell     | 4      |
+| page-09   | 東京タワー 09 with a deliberately long wide title cell | 11     |
+| page-10   | naïve café 10 with a deliberately long wide title cell | 5      |
+| page-11   | Zürich 11 with a deliberately long wide title cell     | 12     |
+| page-12   | 東京タワー 12 with a deliberately long wide title cell | 6      |
+| page-13   | naïve café 13 with a deliberately long wide title cell | 0      |
+| page-14   | Zürich 14 with a deliberately long wide title cell     | 7      |
+| page-15   | 東京タワー 15 with a deliberately long wide title cell | 1      |
+| page-16   | naïve café 16 with a deliberately long wide title cell | 8      |
+| page-17   | Zürich 17 with a deliberately long wide title cell     | 2      |
+| page-18   | 東京タワー 18 with a deliberately long wide title cell | 9      |
+| page-19   | naïve café 19 with a deliberately long wide title cell | 3      |

@@ -30,6 +30,7 @@ Feature: Notes keep their fields, tags, and tasks available to queries
       """
       - draft.md
       """
+    And filtering notes by "status == 'pending'" yields no results
 
   Scenario: Nested tasks retain their document order and parent coordinates
     Given a trusted project with a note "plan.md" containing:
@@ -243,6 +244,7 @@ Feature: Notes keep their fields, tags, and tasks available to queries
       """
       - plan.md
       """
+    And filtering notes by "owner == 'Bea'" yields no results
 
   Scenario: Field keys match without regard to casing or punctuation
     Given a trusted project with a note "plan.md" containing:
@@ -265,6 +267,7 @@ Feature: Notes keep their fields, tags, and tasks available to queries
       - [x] Charlie done
       - [/] Alpha in-progress
       - [!] Delta on-hold
+      - [?] Echo unknown
       """
     When I run "traces task --todo"
     Then the exit code is 0
@@ -273,7 +276,9 @@ Feature: Notes keep their fields, tags, and tasks available to queries
       - [ ] Bravo task (items.md)
       - [/] Alpha in-progress (items.md)
       - [!] Delta on-hold (items.md)
+      - [?] Echo unknown (items.md)
       """
+    And filtering tasks by "status == 'x'" yields no results
 
   Scenario: The done shortcut includes only completed tasks
     Given a trusted project with a note "items.md" containing:

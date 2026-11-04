@@ -42,3 +42,9 @@ Feature: Configuration tracking survives trust changes and cleaning removes only
       removed 0 stale tracked entries
       """
     And the project configuration path remains tracked
+
+  Scenario: A load without trust still records the configuration as tracked
+    Given an untrusted project whose configuration was loaded once
+    When I run "traces tracked list"
+    Then the exit code is 0
+    And stdout is the project configuration path

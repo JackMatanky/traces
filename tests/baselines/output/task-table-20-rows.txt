@@ -1,0 +1,22 @@
+| Task                                                 | Status | Due        | Priority | File            |
+|------------------------------------------------------|--------|------------|----------|-----------------|
+| Alpha item                                           | Todo   | 2026-10-01 | highest  | tasks/alpha.md  |
+| Beta item                                            | Done   | 2026-10-05 | low      | tasks/alpha.md  |
+| Gamma item with a deliberately long descriptive text | Todo   | 2026-10-09 | medium   | tasks/alpha.md  |
+| Delta 日本語テキスト                                 | Todo   | 2026-10-12 | highest  | tasks/alpha.md  |
+| Epsilon                                              | Done   | 2026-10-15 | low      | tasks/alpha.md  |
+| Zeta                                                 | Todo   | 2026-11-02 | highest  | tasks/beta.md   |
+| Eta long-name task with wide columns padding check   | Todo   | 2026-11-03 | medium   | tasks/beta.md   |
+| Theta                                                | Done   | 2026-11-04 | low      | tasks/beta.md   |
+| Iota item                                            | Todo   | 2026-11-05 | highest  | tasks/beta.md   |
+| Kappa                                                | Todo   | 2026-11-06 | low      | tasks/beta.md   |
+| Lambda                                               | Todo   | 2026-12-01 | highest  | tasks/gamma.md  |
+| Mu item with a wide Unicode label 東京タワー         | Todo   | 2026-12-02 | medium   | tasks/gamma.md  |
+| Nu                                                   | Done   | 2026-12-03 | low      | tasks/gamma.md  |
+| Xi                                                   | Todo   | 2026-12-04 | highest  | tasks/gamma.md  |
+| Omicron                                              | Todo   | 2026-12-05 | low      | tasks/gamma.md  |
+| Parent task                                          | Todo   |            |          | tasks/nested.md |
+| Child task one                                       | Todo   | 2026-12-20 | highest  | tasks/nested.md |
+| Child task two                                       | Done   | 2026-12-21 | low      | tasks/nested.md |
+| Pi                                                   | Todo   | 2026-12-22 | highest  | tasks/nested.md |
+| Rho final row with padding                           | Todo   | 2026-12-23 | medium   | tasks/nested.md |
