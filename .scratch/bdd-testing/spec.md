@@ -850,3 +850,8 @@ change.
   the guarded behavior breaks. The table-cell property test now generates newline
   characters. Row 04-S7 is `partial`. Row 01-G23 is `pinned-elsewhere`. The
   duplicate `a template ... containing:` step is merged.
+- 2026-11-05: the missing deletion proofs ran. Slice 4 compares `inlinks.rs`,
+  `refresh.rs` and `fingerprint.rs`. Slice 7 compares `format.rs`, `task.rs` and
+  `duration.rs` (scope `parse|friendly|classify`). Every pair has the same
+  escape set before and after. No deletion adds an escape. The files `service.rs`
+  and `delta.rs` of slice 4 were not compared. See the ledger.

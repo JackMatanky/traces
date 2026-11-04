@@ -322,7 +322,12 @@ each scenario identifies the behavior if an assertion fails.
   - **Kill demonstration:** Production code in `src/index/fingerprint.rs::drift` was modified to return `None`. The former test and the survivor scenario both failed against the broken code. Restoration of the code made both tests pass.
   - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%.
   - **Mutation compare (after deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%. No new escape appeared. Baseline file `mutarust-baseline.json` stayed untouched.
-  - **Open:** The other six deleted tests have no individual kill demonstration or mutation compare recorded. The grouped `fingerprint.rs::drift` demonstration cannot be shown to fail every one of them.
+  - **Mutation compare (rerun 2026-11-04):** The run used `mise run test:mutants -f <file> --timeout 1200 --workers 2` at commit `06e8b177` (before) and `3a5988ce` (after) for the whole file, not only `drift`.
+    - `src/index/inlinks.rs`, 49 mutants: 34 killed, 7 escaped, 1 errored, 7 skipped, both runs. The escape-ID sets are identical. No new escape.
+    - `src/index/refresh.rs`, 42 mutants: 9 killed, 6 escaped, 10 errored, 17 skipped, both runs. The escape-ID sets are identical. No new escape.
+    - `src/index/fingerprint.rs`, 27 mutants: 9 killed, 0 escaped, 0 errored, 18 skipped, both runs.
+    - The files `src/index/service.rs` and `src/index/delta.rs` were not compared. The first attempts ended at the clean-run timeout and the runs were not repeated.
+  - **Open:** The other six deleted tests have no individual kill demonstration. The file-level compares above show no new escape in three guarded files.
   - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. Exactly 7 tests were removed:
     - `traces::e2e index::config_edit_heals_the_index_on_the_next_query`
     - `traces::e2e index::content_edit_between_spawns_is_query_visible`
@@ -544,8 +549,12 @@ run must diff this list after deleting the two tests.
   - **Assertion comparison:** The former test asserted exact stdout strings for plain task listing and coordinate task listing. The survivor scenarios assert the identical exact stdout strings. The survivor assertions are equal in strength.
   - **Kill demonstration:** Production code in `src/query/format.rs` was broken by substituting empty task description text. The former test and both survivor scenarios failed with stdout diff mismatches. Restoring the code restored all tests to passing.
   - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/query/format.rs --exec-timeout 900` generated 60 mutants. Result: 11 killed, 0 escaped, 40 errored, 9 skipped. Mutation score: 100.00%. Escape set: `[]`.
-  - **Mutation compare (after deletion):** No after-deletion escape-ID set or scoped run output is recorded. An after-run cannot be established from the deletion alone.
-  - **Open:** No before/after escape-ID sets for `src/query/format.rs` were recorded. The earlier 0-escape result does not establish a deletion compare; no pair was rerun here.
+  - **Mutation compare (rerun 2026-11-04):** The run used `mise run test:mutants -f <file> --timeout 1200 --workers 2` at commit `495e471e` (before) and `2ff6f32c` (after).
+    - `src/query/format.rs`, 60 mutants: 47 killed, 4 escaped, 0 errored, 9 skipped, both runs. The escape-ID sets are identical. No new escape.
+    - `src/note/parser/task.rs`, 76 mutants: 46 killed, 16 escaped, 0 errored, 14 skipped, both runs. The escape-ID sets are identical. No new escape.
+    - The 4 and 16 escapes already existed before the deletion. A later ticket can triage them.
+    - The earlier run with `--exec-timeout 900` counted 40 errored mutants for `format.rs`. The rerun with `--timeout 1200` classified them as killed or escaped.
+  - **Open:** The kill demonstration does not name the broken symbol for the other two slice 7 deletions.
   - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers` was removed.
   - **Twin re-read:** Re-read `task_table_renders_default_and_custom_columns` and `task_count_prints_only_the_match_total` in `tests/e2e/query.rs`. Neither asserts hierarchical indentation or custom marker characters.
 - **Successor note for arch-design:** Verified by `tests/features/note.feature`.
@@ -580,10 +589,14 @@ run must diff this list after deleting the two tests.
 - **Proof:**
   - **Assertion comparison:** The former test asserted exit code 0 and stdout `- matching.md\n`. The survivor scenario asserts exit code 0 and the identical stdout `- matching.md\n`.
   - **Kill demonstration:** The slice 7 record says invalidating multi-unit duration tokens made both tests fail. It does not name a file or symbol. Commit `2ff6f32c` does not identify either.
-  - **Mutation compare:** No before/after escape sets for `src/temporal` were recorded for this deletion. The claim that the guarded logic was clean has no recorded compare.
+  - **Mutation compare (rerun 2026-11-04):** The run used `mise run test:mutants -f src/temporal/duration.rs --match 'parse|friendly|classify' --timeout 1200 --workers 2` at commit `495e471e` (before) and `2ff6f32c` (after), in two parallel tabs. The `--match` scope keeps the run to 178 mutants.
+    - Before: 75 killed, 65 escaped, 26 errored, 12 skipped.
+    - After: 75 killed, 64 escaped, 26 errored, 13 skipped.
+    - The after-set has no escape that the before-set lacks. One before-escape (`expression/logical`) became skipped in the after run. No new escape.
+    - The 64 escapes already existed. The mutation score of this scope is about 64 percent, so the parser has weak unit pins.
   - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::list_filters_an_inline_multi_part_duration` was removed.
   - **Twin re-read:** Re-read `query.rs::list_filters_rfc3339_field_by_its_exact_instant`. That test proves timestamp instant comparisons, not multi-part duration syntax.
-- **Open:** The slice 7 mutation compare for `src/query/format.rs` and `src/temporal` is not recorded as a before/after pair.
+- **Open:** The kill demonstration does not name the broken symbol.
 - **Successor note for arch-design:** Verified by `tests/features/note.feature`.
 
 ### Retained slice 5 candidates
