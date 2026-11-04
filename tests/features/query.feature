@@ -279,7 +279,8 @@ Feature: Query results select and render notes through the command line
       {{ query.from("notes/").sort("rating").limit(2).list("file.path") }}{{ query.from("notes/").sort("rating").list("file.path") }}
       """
     When I run "traces template -i report --dry-run --no-input"
-    Then stdout is:
+    Then the exit code is 0
+    And stdout is:
       """
       - notes/a.md
       - notes/b.md
