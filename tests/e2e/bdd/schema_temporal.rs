@@ -146,8 +146,8 @@ fn spring_calendar_comparison(sandbox: &Sandbox) {
     sandbox.run(&["trust"]).assert_success();
 }
 
-#[then(r#"file "{path}" contains:"#)]
-fn file_contains(sandbox: &Sandbox, path: String, docstring: String) {
+#[then(r#"file "{path}" is:"#)]
+fn file_is(sandbox: &Sandbox, path: String, docstring: String) {
     let actual = std::fs::read_to_string(sandbox.root().join(path))
         .expect("rendered file exists");
     assert_eq!(actual, docstring.trim());

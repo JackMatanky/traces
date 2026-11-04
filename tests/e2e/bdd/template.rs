@@ -134,7 +134,7 @@ fn rendered_file_has_content(
     assert_eq!(fs::read_to_string(file).expect("read rendered file"), expected);
 }
 
-#[then(r#"the existing file "{path}" still contains "{expected}""#)]
+#[then(r#"the existing file "{path}" is "{expected}""#)]
 fn existing_file_unchanged(sandbox: &Sandbox, path: String, expected: String) {
     let file = sandbox.root().join(path);
     assert_eq!(fs::read_to_string(file).expect("read existing file"), expected);

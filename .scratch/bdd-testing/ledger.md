@@ -396,9 +396,9 @@ The rows are 04-S3, 04-S4, 04-S7, 04-T2, 04-T4, 04-T6 to 04-T8, and
 - 04-B6 shares one scenario: query filter and template `date_add` agree on the
   same month-end clamp (`1|2026-02-28`).
 
-New step definitions live in `tests/e2e/bdd/process.rs` (`in time zone`,
-`I list notes with filter:`) and `tests/e2e/bdd/schema_temporal.rs`
-(project fixtures and `file "{path}" contains:`).
+New step definitions live in `tests/e2e/bdd/process.rs` (`in time zone`),
+`tests/e2e/bdd/query.rs` (`I list notes with filter:`), and
+`tests/e2e/bdd/schema_temporal.rs` (project fixtures and `file "{path}" is:`).
 
 ### Deletions Note
 

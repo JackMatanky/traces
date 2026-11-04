@@ -2,7 +2,7 @@ Feature: A project is trusted only after the user runs trust
   Source: ADR-0002, src/config/GLOSSARY.md.
 
   Scenario: Init does not grant trust
-    Given a project initialised with init
+    Given a project initialized with init
     When I run "traces list"
     Then the exit code is 1
     And the first line of stderr is:

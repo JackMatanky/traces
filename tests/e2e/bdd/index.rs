@@ -1,6 +1,6 @@
 //! Steps for observable index freshness across spawned commands.
 
-use std::{fs, path::Path};
+use std::fs;
 
 use pretty_assertions::assert_eq;
 use rstest_bdd_macros::{given, then};
@@ -205,24 +205,6 @@ fn trusted_project_indexed(sandbox: &Sandbox) {
     sandbox.write_config();
     sandbox.run(&["trust"]).assert_success();
     sandbox.run(&["index"]).assert_success();
-}
-
-#[then("stdout contains the project configuration path")]
-fn tracked_config_path(sandbox: &Sandbox, last_run: &LastRun) {
-    let run = last_run.0.as_ref().expect("prior command");
-    let expected = sandbox
-        .root()
-        .join(".traces/config.toml")
-        .canonicalize()
-        .expect("canonical configuration path");
-    // Compare by filesystem identity: Windows reports a `\\?\` verbatim path.
-    assert!(
-        run.stdout.lines().any(|line| {
-            Path::new(line).canonicalize().is_ok_and(|path| path == expected)
-        }),
-        "stdout: {}",
-        run.stdout
-    );
 }
 
 #[given("an indexed project with hidden Git files and a symlink note")]

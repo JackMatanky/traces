@@ -153,7 +153,7 @@ Feature: Queries reflect project files and settings across runs
     Given a trusted project that was indexed
     When I run "traces tracked list"
     Then the exit code is 0
-    And stdout contains the project configuration path
+    And stdout is the project configuration path
 
   Scenario: Hidden Git files and symlink notes are absent from queries
     Given an indexed project with hidden Git files and a symlink note

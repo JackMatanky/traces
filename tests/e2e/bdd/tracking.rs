@@ -1,10 +1,12 @@
 //! Step definitions for configuration tracking through the spawned CLI.
 
-use std::fs;
+use std::{fs, path::Path};
 
+use pretty_assertions::assert_eq;
 use rstest_bdd_macros::{given, then};
 
 use super::{LastRun, Sandbox};
+use crate::support::Run;
 
 #[given("a project whose configuration tracking cannot be saved")]
 fn project_with_unwritable_tracking(sandbox: &Sandbox) {
@@ -34,15 +36,26 @@ fn trusted_project_with_deleted_configuration(sandbox: &Sandbox) {
         .expect("delete tracked configuration");
 }
 
-#[then("stdout is the project configuration path")]
-fn tracked_config_path_is_stdout(sandbox: &Sandbox, last_run: &LastRun) {
-    let run = last_run.0.as_ref().expect("a prior command must have run");
-    let path = sandbox
+fn assert_project_configuration_path(sandbox: &Sandbox, run: &Run) {
+    let expected = sandbox
         .root()
         .join(".traces/config.toml")
         .canonicalize()
         .expect("canonical tracked config path");
-    run.assert_stdout_eq(&format!("{}\n", path.display()));
+    let mut lines = run.stdout.lines();
+    let line = lines.next().expect("stdout has a configuration path");
+    // Compare by filesystem identity: Windows reports a `\\?\` verbatim path.
+    assert_eq!(
+        Path::new(line).canonicalize().expect("canonical stdout path"),
+        expected
+    );
+    assert!(lines.next().is_none(), "unexpected stdout: {}", run.stdout);
+}
+
+#[then("stdout is the project configuration path")]
+fn tracked_config_path_is_stdout(sandbox: &Sandbox, last_run: &LastRun) {
+    let run = last_run.0.as_ref().expect("a prior command must have run");
+    assert_project_configuration_path(sandbox, run);
 }
 
 #[then("no tracked configuration paths remain")]
@@ -56,10 +69,5 @@ fn tracked_config_paths_are_empty(sandbox: &Sandbox) {
 fn tracked_config_path_remains(sandbox: &Sandbox) {
     let list = sandbox.run(&["tracked", "list"]);
     list.assert_success();
-    let path = sandbox
-        .root()
-        .join(".traces/config.toml")
-        .canonicalize()
-        .expect("canonical tracked config path");
-    list.assert_stdout_eq(&format!("{}\n", path.display()));
+    assert_project_configuration_path(sandbox, &list);
 }

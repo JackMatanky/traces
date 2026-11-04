@@ -7,6 +7,10 @@ use pretty_assertions::assert_eq;
 use rstest_bdd_macros::{given, then, when};
 
 use super::{LastRun, Sandbox};
+use crate::{
+    config_fixture::ConfigFixture,
+    support::{Run, assert_reports_same_path},
+};
 
 #[then("initialization creates the default configuration files")]
 fn initialization_creates_default_configuration_files(
@@ -31,7 +35,7 @@ fn stderr_reports_successful_initialization(
     last_run: &LastRun,
 ) {
     let run = last_run.0.as_ref().expect("init ran");
-    super::super::support::assert_reports_same_path(
+    assert_reports_same_path(
         &run.stderr,
         "initialised traces in ",
         "\n",
@@ -41,11 +45,9 @@ fn stderr_reports_successful_initialization(
 
 #[given("a project already initialized with a custom configuration")]
 fn project_already_initialized(sandbox: &Sandbox) {
-    sandbox.write_config_fixture(
-        &super::super::config_fixture::ConfigFixture::raw(
-            "[templates]\ndirectory = \"custom\"\n",
-        ),
-    );
+    sandbox.write_config_fixture(&ConfigFixture::raw(
+        "[templates]\ndirectory = \"custom\"\n",
+    ));
     fs::create_dir_all(sandbox.root().join("custom"))
         .expect("create custom directory");
 }
@@ -75,11 +77,9 @@ fn write_global_config(sandbox: &Sandbox, config: &str, template: &str) {
      directory"
 )]
 fn project_with_global_template_and_local_output(sandbox: &Sandbox) {
-    sandbox.write_config_fixture(
-        &super::super::config_fixture::ConfigFixture::raw(
-            "[templates]\noutput_dir = \"notes\"\n",
-        ),
-    );
+    sandbox.write_config_fixture(&ConfigFixture::raw(
+        "[templates]\noutput_dir = \"notes\"\n",
+    ));
     fs::create_dir_all(sandbox.root().join("notes"))
         .expect("create local output directory");
     sandbox.run(&["trust"]).assert_success();
@@ -112,8 +112,7 @@ fn project_with_global_task_filter(sandbox: &Sandbox) {
 fn project_with_local_and_global_task_filters(sandbox: &Sandbox) {
     project_with_global_task_filter(sandbox);
     sandbox.write_config_fixture(
-        &super::super::config_fixture::ConfigFixture::new()
-            .with_task_tag_filters(&["local"]),
+        &ConfigFixture::new().with_task_tag_filters(&["local"]),
     );
     sandbox.run(&["trust"]).assert_success();
 }
@@ -174,7 +173,7 @@ fn list_templates_from_nested_project(
         .current_dir(sandbox.root().join("nested/leaf"))
         .output()
         .expect("spawn template listing");
-    last_run.0 = Some(super::super::support::Run {
+    last_run.0 = Some(Run {
         status: output.status,
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
@@ -195,11 +194,7 @@ fn untrusted_project_configuration(sandbox: &Sandbox) {
 
 #[given("a malformed project configuration that is trusted")]
 fn malformed_trusted_project_configuration(sandbox: &Sandbox) {
-    sandbox.write_config_fixture(
-        &super::super::config_fixture::ConfigFixture::raw(
-            "unknown_key = true\n",
-        ),
-    );
+    sandbox.write_config_fixture(&ConfigFixture::raw("unknown_key = true\n"));
     sandbox.run(&["trust"]).assert_success();
 }
 
@@ -207,11 +202,7 @@ fn malformed_trusted_project_configuration(sandbox: &Sandbox) {
 fn changed_trusted_configuration(sandbox: &Sandbox) {
     sandbox.write_config();
     sandbox.run(&["trust"]).assert_success();
-    sandbox.write_config_fixture(
-        &super::super::config_fixture::ConfigFixture::raw(
-            "unknown_key = true\n",
-        ),
-    );
+    sandbox.write_config_fixture(&ConfigFixture::raw("unknown_key = true\n"));
 }
 
 #[given("a trusted local project with malformed global configuration")]
@@ -226,21 +217,19 @@ fn malformed_global_configuration(sandbox: &Sandbox) {
 
 #[given("a project configuration with an invalid field key that is trusted")]
 fn trusted_project_with_invalid_field_key(sandbox: &Sandbox) {
-    sandbox.write_config_fixture(
-        &super::super::config_fixture::ConfigFixture::raw(
-            "[schemas]\nclass_field = \"\"\n",
-        ),
-    );
+    sandbox.write_config_fixture(&ConfigFixture::raw(
+        "[schemas]\nclass_field = \"\"\n",
+    ));
     sandbox.run(&["trust"]).assert_success();
 }
 
 #[then(r#"stderr contains diagnostic code "{code}""#)]
 fn stderr_contains_diagnostic_code(last_run: &LastRun, code: String) {
     let run = last_run.0.as_ref().expect("command ran");
-    run.assert_stdout_eq("");
-    assert!(
-        run.stderr.lines().any(|line| line.trim() == code),
-        "missing diagnostic code {code:?}; stderr: {}",
+    assert_eq!(
+        run.stderr.lines().next().unwrap_or(""),
+        code,
+        "unexpected first diagnostic line; stderr: {}",
         run.stderr
     );
 }
