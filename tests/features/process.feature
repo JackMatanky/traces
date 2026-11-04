@@ -1,7 +1,7 @@
 Feature: Spawned process contracts for exit codes and streams
   Source: ADR-0004, src/cli/GLOSSARY.md.
 
-  Scenario: Unknown subcommand exits with code two and prints usage
+  Scenario: Unknown subcommand exits with code two and writes the error to stderr
     When I run "traces nonexistent_command"
     Then the exit code is 2
     And the first line of stderr is:

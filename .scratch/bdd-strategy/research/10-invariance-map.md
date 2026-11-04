@@ -35,7 +35,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception (see the Exit 130 class below). | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception (see the Exit 130 class below). | F | covered: Unknown subcommand exits with code two and writes the error to stderr (reviewed 2026-11-03) |
 | 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
 | 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
 | 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
@@ -50,7 +50,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 01-G18 | Nearest-local discovery, global alongside | D | covered: Nearest local configuration is discovered alongside global configuration (reviewed 2026-11-03) |
 | 01-G21 | Two-level configuration scope, merged field by field | M (config TOML) | covered: Local and global configuration fields combine independently (reviewed 2026-11-03) |
 | 01-G22 | Four ordered config failure stages with distinct codes | F (stages), M (codes) | covered: Changed trusted configuration fails before its malformed content is parsed (reviewed 2026-11-03) |
-| 01-G23 | Four trust statuses with distinct meaning | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
+| 01-G23 | Four trust statuses with distinct meaning | F | pinned-elsewhere: src/config/trust.rs (`returns_untrusted_for_unknown_workspace`, `returns_stale_when_config_content_changes_after_trust`, `returns_missing_baseline_when_only_the_workspace_was_trusted`, `missing_baseline_displays_distinctly_from_stale`); the scenario `Untrusted revokes trust for later runs` covers only the untrusted outcome |
 | 01-G24 | No config loads without trust, across processes | F | covered: Untrust revokes trust for later runs (reviewed 2026-11-03) |
 | 01-G25 | The global config layer is never trust-gated | F | covered: A malformed global configuration fails without global trust (reviewed 2026-11-03) |
 | 01-G26 | Grant tracks before it trusts; untrust keeps the track | F | covered: Trust grant fails before trusting when tracking cannot save (reviewed 2026-11-03) |
@@ -114,7 +114,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 |---|---|---|---|
 | 04-S3 | A cycle in `extends` is a hard error (one case in a broken-vault story) | M (schema TOML) | covered: A cycle in file class inheritance stops selection (reviewed 2026-11-03) |
 | 04-S4 | One malformed schema excludes only itself | M (schema TOML) | covered: An invalid file class does not block a valid file class (reviewed 2026-11-03) |
-| 04-S7 | Structural and predicate references: the user-facing error split | M | covered: An unknown schema in a template fails with a diagnostic (reviewed 2026-11-03) |
+| 04-S7 | Structural and predicate references: the user-facing error split | M | partial: An unknown schema in a template fails with a diagnostic covers the unknown-schema case only; the unknown-field and unknown-class cases have no scenario yet |
 | 04-T2 | Naive input uses the local zone; storage is UTC | M (coercion) | covered: An offset-dated note matches the same instant to a nanosecond (reviewed 2026-11-03) |
 | 04-T4 | Equality versus shift across DST (the pair) | F | covered: Equal durations shift differently over the spring clock change (reviewed 2026-11-03) |
 | 04-T6 | A month-end clamp in a compound apply (one case) | F | covered: Adding one month to January's final day clamps to February's final day (reviewed 2026-11-03) |
@@ -132,7 +132,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 05-G1 | Numeric exit-code contract | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
+| 05-G1 | Numeric exit-code contract | F | covered: Unknown subcommand exits with code two and writes the error to stderr (reviewed 2026-11-03) |
 | 05-G2 | Stream split | F | covered: Listing templates exits with code zero and writes payload to stdout (reviewed 2026-11-03) |
 | 05-G3 | Stable diagnostic codes | M | covered: Missing project configuration exits with code one and reports discovery diagnostic (reviewed 2026-11-03) |
 | 05-G7 | Root confinement of every filesystem path | D | gap |

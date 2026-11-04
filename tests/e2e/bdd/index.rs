@@ -79,8 +79,9 @@ fn row_contains_inlink(last_run: &LastRun, name: String, source: String) {
     let row = run
         .stdout
         .lines()
-        .find(|line| line.starts_with(&format!("| {name}")))
-        .expect("target row must exist");
+        .find(|line| line.starts_with(&format!("| {name} ")))
+        .unwrap_or_default();
+    assert!(!row.is_empty(), "no row for {name}; stdout was:\n{}", run.stdout);
     assert!(row.contains(&source), "expected {source} in row: {row}");
 }
 

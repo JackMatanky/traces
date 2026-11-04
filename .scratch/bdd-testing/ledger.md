@@ -571,7 +571,7 @@ run must diff this list after deleting the two tests.
 
 ### Row 3: List Filters Multi-Part Inline Duration
 
-- **Namespaced row IDs:** 03-N07, 04-B5
+- **Namespaced row IDs:** 03-N07
 - **Behavior:** Ingest multi-part inline durations from note markdown and evaluate comparisons in query filters.
 - **Former test:** `e2e::query::list_filters_an_inline_multi_part_duration`
 - **Former layer:** `e2e`

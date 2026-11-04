@@ -353,7 +353,7 @@ mod tests {
             ///    passes through unmodified.
             #[test]
             fn escapes_table_cells_preserving_safety_and_cell_integrity(
-                s in "\\PC*",
+                s in "(\\PC|\n|\\|)*",
             ) {
                 let escaped = QueryDisplayFormat::escape_table_cell(&s);
 

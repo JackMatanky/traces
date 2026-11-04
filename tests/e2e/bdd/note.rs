@@ -24,11 +24,6 @@ fn project_with_task_tag_filter(
     sandbox.run(&["trust"]).assert_success();
 }
 
-#[given(r#"a template "{name}" containing:"#)]
-fn a_template_containing(sandbox: &Sandbox, name: String, docstring: String) {
-    sandbox.write_template(&name, docstring.trim_matches('\n'));
-}
-
 #[when(r#"I filter notes by "{filter}""#)]
 fn filter_notes(sandbox: &Sandbox, last_run: &mut LastRun, filter: String) {
     last_run.0 = Some(sandbox.run(&["list", "--where", &filter]));

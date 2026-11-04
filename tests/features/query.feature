@@ -83,6 +83,12 @@ Feature: Query results select and render notes through the command line
       rating: 9
       ---
       """
+    And a note "emma.md" containing:
+      """
+      ---
+      rating: 7
+      ---
+      """
     When I run "traces table --column file.name --column rating"
     Then the exit code is 0
     And stdout is:
@@ -90,6 +96,7 @@ Feature: Query results select and render notes through the command line
       | file.name | rating |
       |-----------|--------|
       | dune      | 9      |
+      | emma      | 7      |
       """
 
   Scenario: A task table displays the default columns and task states
@@ -156,7 +163,7 @@ Feature: Query results select and render notes through the command line
       """
 
   Scenario: Default descending sort places missing ratings last
-    Given a trusted project with a note "rated.md" containing:
+    Given a trusted project with a note "zz-rated.md" containing:
       """
       ---
       rating: 9
@@ -170,7 +177,7 @@ Feature: Query results select and render notes through the command line
     Then the exit code is 0
     And stdout is:
       """
-      - rated.md
+      - zz-rated.md
       - unrated.md
       """
 
@@ -459,13 +466,13 @@ Feature: Query results select and render notes through the command line
       """
 
   Scenario: Explicit descending sort places larger ratings before smaller ratings
-    Given a trusted project with a note "low.md" containing:
+    Given a trusted project with a note "alpha.md" containing:
       """
       ---
       rating: 3
       ---
       """
-    And a note "high.md" containing:
+    And a note "zulu.md" containing:
       """
       ---
       rating: 9
@@ -475,8 +482,8 @@ Feature: Query results select and render notes through the command line
     Then the exit code is 0
     And stdout is:
       """
-      - high.md
-      - low.md
+      - zulu.md
+      - alpha.md
       """
 
   Scenario: A prefixed sort key overrides the default direction
@@ -511,6 +518,12 @@ Feature: Query results select and render notes through the command line
       """
       ---
       rating: 3
+      ---
+      """
+    And a note "notes/over.md" containing:
+      """
+      ---
+      rating: 11
       ---
       """
     And a template "report.md" containing:

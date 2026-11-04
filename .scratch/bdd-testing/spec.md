@@ -841,3 +841,12 @@ change.
   `cargo deny check` fails without it: `basic-toml` 0.1.10 is unmaintained,
   and `rstest-bdd` 0.6.0 brings it through `i18n-embed`. The advisory lists
   no safe upgrade. Reassess the ignore when the upstream dependency changes.
+- 2026-11-04: the Windows `TZ` entry condition of slice 6 has evidence. CI run
+  41746390274 passed `test (e2e, windows-latest)`. That run includes the scenario
+  `Equal durations shift differently over the spring clock change`, which sets
+  `TZ=America/New_York`. The earlier [INFERENCE] is confirmed.
+- 2026-11-04: the review of the integration branch changed these items. The
+  chained-filter, descending-sort and table scenarios now fail when
+  the guarded behavior breaks. The table-cell property test now generates newline
+  characters. Row 04-S7 is `partial`. Row 01-G23 is `pinned-elsewhere`. The
+  duplicate `a template ... containing:` step is merged.
