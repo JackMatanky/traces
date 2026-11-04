@@ -78,10 +78,20 @@ impl FilePathTracker {
             entry.canonical_target.as_os_str().as_encoded_bytes(),
         );
 
-        write_entry.map_err(|source| FilePathTrackerError::StoreIo {
-            path: entry_path,
-            source,
-        })
+        match write_entry {
+            Ok(()) => Ok(()),
+            Err(source)
+                if source.kind() == io::ErrorKind::AlreadyExists
+                    && recorded_target(&entry_path).as_deref()
+                        == Some(entry.canonical_target.as_path()) =>
+            {
+                Ok(())
+            }
+            Err(source) => Err(FilePathTrackerError::StoreIo {
+                path: entry_path,
+                source,
+            }),
+        }
     }
 
     /// Checks whether `target` has an entry in this store.
@@ -191,13 +201,16 @@ impl FilePathTracker {
     ///
     /// Canonicalizes and hashes `target` to find the same entry path used by
     /// [`Self::record`]. The companion path is independent of whether the entry
-    /// itself is a Unix symlink or a Windows path-bearing file.
+    /// itself is a Unix symlink or a Windows path-bearing file. The write is
+    /// atomic: readers see either the previous contents or the complete new
+    /// contents, never a partially written file.
     ///
     /// # Errors
     ///
     /// - [`Canonicalize`] if `target` cannot be canonicalized.
     /// - [`StoreIo`] if the store root cannot be created.
-    /// - [`CompanionWrite`] if the companion cannot be written.
+    /// - [`CompanionWrite`] if the companion cannot be written or the
+    ///   replacement cannot be renamed into place.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
@@ -218,7 +231,22 @@ impl FilePathTracker {
                 source,
             }
         })?;
-        fs::write(&companion, contents).map_err(|source| {
+        let temp = companion_path(
+            &companion,
+            &format!(
+                ".{}.{}.tmp",
+                std::process::id(),
+                NEXT_TEMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ),
+        );
+        let write = fs::write(&temp, contents);
+        if let Err(source) = write {
+            return Err(FilePathTrackerError::CompanionWrite {
+                path: temp,
+                source,
+            });
+        }
+        fs::rename(&temp, &companion).map_err(|source| {
             FilePathTrackerError::CompanionWrite {
                 path: companion,
                 source,
@@ -455,6 +483,10 @@ impl StoreEntry {
     }
 }
 
+/// Distinguishes concurrent temporary companion writes within one process.
+static NEXT_TEMP: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
 fn companion_path(entry: &Path, suffix: &str) -> PathBuf {
     let mut name = entry.as_os_str().to_owned();
     name.push(suffix);
@@ -608,7 +640,31 @@ mod tests {
         }
     }
 
+    /// Outcome of one [`FilePathTracker::record`] call.
+    type RecordResult = Result<(), FilePathTrackerError>;
+
+    /// Records `target` from two threads released by one barrier.
+    fn record_concurrently(
+        fixture: &Fixture,
+        target: &Path,
+        start: &std::sync::Barrier,
+    ) -> (RecordResult, RecordResult) {
+        let record = || {
+            start.wait();
+            fixture.store.record(target)
+        };
+        std::thread::scope(|scope| {
+            let first = scope.spawn(record);
+            let second = scope.spawn(record);
+            (
+                first.join().expect("first thread"),
+                second.join().expect("second thread"),
+            )
+        })
+    }
+
     mod record {
+        use pretty_assertions::assert_eq;
 
         use super::*;
 
@@ -638,6 +694,35 @@ mod tests {
 
             // Assert
             assert!(result.is_ok());
+            assert_eq!(
+                fixture.store.list_all(&[]).expect("list entries"),
+                vec![target.canonicalize().expect("canonical target")]
+            );
+        }
+
+        #[test]
+        fn records_once_when_two_threads_record_the_same_path() {
+            use std::sync::Barrier;
+
+            let fixture = Fixture::new();
+            let target = fixture.target("target");
+            let entry = fixture.entry_path_for(&target);
+            let start = Barrier::new(2);
+
+            for attempt in 0..128 {
+                if attempt != 0 {
+                    fs::remove_file(&entry).expect("remove previous entry");
+                }
+                let (first, second) =
+                    record_concurrently(&fixture, &target, &start);
+
+                assert!(first.is_ok(), "first record failed: {first:?}");
+                assert!(second.is_ok(), "second record failed: {second:?}");
+                assert_eq!(
+                    fixture.store.list_all(&[]).expect("list entries"),
+                    vec![target.canonicalize().expect("canonical target")]
+                );
+            }
         }
 
         #[test]
@@ -1098,6 +1183,62 @@ mod tests {
     }
 
     mod companions {
+
+        /// Replaces the `.hash` companion of `target` with `contents`.
+        fn replace_companion(fixture: &Fixture, target: &Path, contents: &str) {
+            fixture
+                .store
+                .write_companion(target, ".hash", contents)
+                .expect("replace companion");
+        }
+
+        /// Alternates the `.hash` companion between `new` and `old` repeatedly.
+        fn churn_companion(
+            fixture: &Fixture,
+            target: &Path,
+            old: &str,
+            new: &str,
+        ) {
+            for _ in 0..64 {
+                replace_companion(fixture, target, new);
+                replace_companion(fixture, target, old);
+            }
+        }
+
+        /// Checks the companion is complete until `done` is set, then once
+        /// more.
+        fn read_until(
+            done: &std::sync::atomic::AtomicBool,
+            fixture: &Fixture,
+            target: &Path,
+            old: &str,
+            new: &str,
+        ) {
+            while !done.load(std::sync::atomic::Ordering::Acquire) {
+                assert_complete(fixture, target, old, new);
+            }
+            assert_complete(fixture, target, old, new);
+        }
+
+        /// Asserts the `.hash` companion holds exactly `old` or exactly `new`.
+        fn assert_complete(
+            fixture: &Fixture,
+            target: &Path,
+            old: &str,
+            new: &str,
+        ) {
+            let contents = fixture
+                .store
+                .read_companion(target, ".hash")
+                .expect("read companion")
+                .expect("companion remains present");
+            assert!(
+                contents == old || contents == new,
+                "read a partial companion of {} bytes",
+                contents.len()
+            );
+        }
+
         use pretty_assertions::assert_eq;
 
         use super::*;
@@ -1136,6 +1277,39 @@ mod tests {
             let companion =
                 companion_path(&fixture.entry_path_for(&target), ".hash");
             assert_eq!(fs::read_to_string(companion).unwrap(), "content");
+        }
+
+        #[test]
+        fn read_sees_only_complete_companions_during_replacement() {
+            use std::sync::{
+                Barrier,
+                atomic::{AtomicBool, Ordering},
+            };
+
+            let fixture = Fixture::new();
+            let target = fixture.target("target");
+            let old = "a".repeat(1024 * 1024);
+            let new = "b".repeat(1024 * 1024);
+            fixture
+                .store
+                .write_companion(&target, ".hash", &old)
+                .expect("write initial companion");
+            let start = Barrier::new(2);
+            let done = AtomicBool::new(false);
+
+            std::thread::scope(|scope| {
+                let writer = scope.spawn(|| {
+                    start.wait();
+                    churn_companion(&fixture, &target, &old, &new);
+                    done.store(true, Ordering::Release);
+                });
+                let reader = scope.spawn(|| {
+                    start.wait();
+                    read_until(&done, &fixture, &target, &old, &new);
+                });
+                writer.join().expect("writer thread");
+                reader.join().expect("reader thread");
+            });
         }
 
         #[test]

@@ -889,12 +889,25 @@ impl IndexStore {
         )
     }
 
+    /// Distinguishes invalid on-disk bytes from non-recoverable open failures.
+    fn is_recoverable_open_error(error: &redb::DatabaseError) -> bool {
+        match error {
+            redb::DatabaseError::Storage(redb::StorageError::Corrupted(_)) => {
+                true
+            }
+            redb::DatabaseError::Storage(redb::StorageError::Io(source)) => {
+                source.kind() == std::io::ErrorKind::InvalidData
+            }
+            _ => false,
+        }
+    }
+
     // --- Construction helpers -----------------------------------------
 
     /// Opens (or creates) the database file.
     ///
-    /// Recovers by wipe-and-recreate on redb corruption or a bad file header.
-    /// Redb reports a magic-number mismatch as an `InvalidData` I/O error.
+    /// Recovers by wipe-and-recreate on redb corruption or an invalid file
+    /// header. Redb reports an invalid magic number as `InvalidData` I/O.
     ///
     /// # Errors
     ///
@@ -907,19 +920,7 @@ impl IndexStore {
         };
         match redb::Database::create(path) {
             Ok(db) => Ok(db),
-            Err(source)
-                if matches!(
-                    &source,
-                    redb::DatabaseError::Storage(
-                        redb::StorageError::Corrupted(_)
-                    )
-                ) || matches!(
-                    &source,
-                    redb::DatabaseError::Storage(redb::StorageError::Io(error))
-                        if error.kind() == std::io::ErrorKind::InvalidData
-                            && error.to_string() == "Not a redb database: magic number mismatch"
-                ) =>
-            {
+            Err(source) if Self::is_recoverable_open_error(&source) => {
                 fs::remove_file(path).map_err(|error| StoreError::Io {
                     path: path.to_path_buf(),
                     source: error,
@@ -1874,6 +1875,78 @@ mod tests {
     mod schema_recovery {
 
         use super::*;
+
+        #[test]
+        fn repairs_a_future_version_marker_at_open() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            fs::write(temp.path().join("note.md"), "- [ ] retained task")
+                .expect("write note");
+            let service = IndexerService::for_tests(temp.path());
+            let index = service.build().expect("build index");
+            service.persist(&index).expect("persist index");
+
+            let store = IndexStore::open(temp.path()).expect("open store");
+            let txn = store.begin_write().expect("begin write txn");
+            {
+                let mut table = txn.open_table(META).expect("open meta table");
+                table
+                    .insert(META_VERSION_KEY, b"2".as_slice())
+                    .expect("write future format version");
+            }
+            txn.commit().expect("commit future version");
+            drop(store);
+
+            let reopened =
+                IndexStore::open(temp.path()).expect("rebuild future store");
+            let (_, rebuilt_notes, _) =
+                reopened.read_all().expect("read rebuilt store");
+
+            assert_eq!(rebuilt_notes.as_slice(), []);
+        }
+
+        #[test]
+        fn repairs_a_truncated_database_at_open() {
+            use std::io::Write as _;
+
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            let store = IndexStore::open(root).expect("create store");
+            write_all_parts(&store, &[], &[], &InlinkMap::default())
+                .expect("persist rows");
+            drop(store);
+            let db_path = root.join(INDEX_FILE);
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .open(&db_path)
+                .expect("open db file");
+            file.set_len(1).expect("truncate db to header byte");
+            file.flush().expect("flush truncation");
+
+            let reopened =
+                IndexStore::open(root).expect("rebuild truncated store");
+            let (files, notes, _) =
+                reopened.read_all().expect("read rebuilt store");
+
+            assert_eq!(files.as_slice(), []);
+            assert_eq!(notes.as_slice(), []);
+        }
+
+        #[test]
+        fn repairs_a_garbage_file_at_the_store_path_at_open() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let root = temp.path();
+            let db_path = root.join(INDEX_FILE);
+            fs::create_dir_all(db_path.parent().expect("db path has a parent"))
+                .expect("create parent dir");
+            fs::write(&db_path, b"definitely not a redb database")
+                .expect("write garbage file");
+
+            let store = IndexStore::open(root).expect("replace garbage file");
+            let (files, notes, _) = store.read_all().expect("read fresh store");
+
+            assert_eq!(files.as_slice(), []);
+            assert_eq!(notes.as_slice(), []);
+        }
 
         #[test]
         fn repairs_a_wrong_typed_table_at_open() {
@@ -2885,6 +2958,45 @@ mod tests {
             assert_eq!(files.as_slice(), []);
             assert_eq!(notes.as_slice(), []);
             assert!(links.is_empty());
+        }
+    }
+
+    mod is_recoverable_open_error {
+        use rstest::rstest;
+
+        use super::*;
+
+        #[rstest]
+        #[case::container_corrupted(redb::DatabaseError::Storage(
+            redb::StorageError::Corrupted("simulated damage".to_owned()),
+        ))]
+        #[case::invalid_file_header(redb::DatabaseError::Storage(
+            redb::StorageError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Not a redb database: magic number mismatch",
+            )),
+        ))]
+        fn accepts_a_wipeable_open_failure(#[case] error: redb::DatabaseError) {
+            assert!(
+                IndexStore::is_recoverable_open_error(&error),
+                "expected {error:?} to trigger wipe-and-recreate"
+            );
+        }
+
+        #[rstest]
+        #[case::lock_held(redb::DatabaseError::DatabaseAlreadyOpen)]
+        #[case::plain_io_failure(redb::DatabaseError::Storage(
+            redb::StorageError::Io(std::io::Error::other(
+                "permission denied",
+            )),
+        ))]
+        fn rejects_an_open_failure_that_removing_the_file_cannot_fix(
+            #[case] error: redb::DatabaseError,
+        ) {
+            assert!(
+                !IndexStore::is_recoverable_open_error(&error),
+                "expected {error:?} to surface instead of a wipe"
+            );
         }
     }
 

@@ -87,10 +87,15 @@ pub(super) trait AtomParser {
     ) -> QuerySyntaxError;
 }
 
+// Limits recursive parsing and expression-tree traversal on a default thread
+// stack.
+const MAX_EXPRESSION_DEPTH: usize = 128;
+
 struct BooleanExprParser<'input, G: AtomParser> {
     input: &'input str,
     tokens: SpannedTokenStream<G::Token>,
     grammar: G,
+    depth: usize,
 }
 
 /// Parser function for one precedence tier.
@@ -213,8 +218,17 @@ impl<'input, G: AtomParser> BooleanExprParser<'input, G> {
         let mut count = 0usize;
         while self.accept_control(LogicalControl::Not).is_some() {
             count = count.saturating_add(1);
+            if self.depth.saturating_add(count) >= MAX_EXPRESSION_DEPTH {
+                let span = self.next_span();
+                return Err(self
+                    .syntax_error(span, "fewer chained `not` operators")
+                    .into());
+            }
         }
-        let mut expression = self.parse_primary()?;
+        self.depth = self.depth.saturating_add(count);
+        let primary = self.parse_primary();
+        self.depth = self.depth.saturating_sub(count);
+        let mut expression = primary?;
         for _ in 0..count {
             expression = BooleanExpr::Not(Box::new(expression));
         }
@@ -225,7 +239,16 @@ impl<'input, G: AtomParser> BooleanExprParser<'input, G> {
         &mut self,
     ) -> Result<BooleanExpr<G::Atom>, QueryBuilderError> {
         if self.accept_control(LogicalControl::LeftParen).is_some() {
-            let expression = self.parse_or()?;
+            if self.depth >= MAX_EXPRESSION_DEPTH {
+                let span = self.next_span();
+                return Err(self
+                    .syntax_error(span, "fewer nested parentheses")
+                    .into());
+            }
+            self.depth = self.depth.saturating_add(1);
+            let expression = self.parse_or();
+            self.depth = self.depth.saturating_sub(1);
+            let expression = expression?;
             if self.accept_control(LogicalControl::RightParen).is_none() {
                 let span = self.next_span();
                 return Err(self.syntax_error(span, "`)` to close `(`").into());
@@ -294,6 +317,7 @@ where
         input,
         tokens,
         grammar,
+        depth: 0,
     }
     .parse()
 }
@@ -463,6 +487,60 @@ mod tests {
                     TestGrammar
                 )
                 .is_err()
+            );
+        }
+
+        #[rstest]
+        #[case::parentheses(true, "fewer nested parentheses")]
+        #[case::negation(false, "fewer chained `not` operators")]
+        fn rejects_fifty_thousand_deep_expressions_on_default_stack(
+            #[case] parentheses: bool,
+            #[case] expected: &'static str,
+        ) {
+            let result = std::thread::scope(|scope| {
+                scope
+                    .spawn(move || {
+                        let mut tokens = Vec::with_capacity(if parentheses {
+                            100_001
+                        } else {
+                            50_001
+                        });
+                        let control = if parentheses {
+                            LogicalControl::LeftParen
+                        } else {
+                            LogicalControl::Not
+                        };
+                        tokens
+                            .extend((0..50_000).map(|_| {
+                                token(TestToken::Control(control), 0)
+                            }));
+                        tokens.push(token(TestToken::Atom("a"), 0));
+                        if parentheses {
+                            tokens.extend((0..50_000).map(|_| {
+                                token(
+                                    TestToken::Control(
+                                        LogicalControl::RightParen,
+                                    ),
+                                    0,
+                                )
+                            }));
+                        }
+
+                        parse_boolean_expr(
+                            "a",
+                            SpannedTokenStream::new(tokens),
+                            TestGrammar,
+                        )
+                    })
+                    .join()
+                    .expect("parser must not overflow the default thread stack")
+            });
+
+            assert!(
+                matches!(&result, Err(QueryBuilderError::Syntax(error))
+                    if error.lex_error.to_string().contains(expected)),
+                "deep expression must fail with a typed depth diagnostic: \
+                 {result:?}"
             );
         }
     }

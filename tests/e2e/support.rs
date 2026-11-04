@@ -379,6 +379,34 @@ impl Sandbox {
         }
     }
 
+    /// Spawns two `traces` processes with `args` before waiting on either,
+    /// so both run against this sandbox at the same time, and captures each
+    /// output in a [`Run`].
+    pub(crate) fn run_twice_concurrently(&self, args: &[&str]) -> [Run; 2] {
+        let spawn = || {
+            self.command(args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("spawn traces")
+        };
+        let first = spawn();
+        let second = spawn();
+        [first, second].map(|child| {
+            let Output {
+                status,
+                stdout,
+                stderr,
+            } = child.wait_with_output().expect("wait for traces");
+            Run {
+                status,
+                stdout: String::from_utf8_lossy(&stdout).into_owned(),
+                stderr: String::from_utf8_lossy(&stderr).into_owned(),
+            }
+        })
+    }
+
     /// Executes `args` with explicit opt-in environment entries layered on
     /// top of the sandbox policy, and captures output in a [`Run`].
     ///

@@ -15,6 +15,8 @@ mod support;
 
 #[path = "e2e/completions.rs"]
 mod completions;
+#[path = "e2e/concurrency.rs"]
+mod concurrency;
 #[path = "e2e/config.rs"]
 mod config;
 #[path = "e2e/env_policy.rs"]
