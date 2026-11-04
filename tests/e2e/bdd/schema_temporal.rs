@@ -26,6 +26,8 @@ fn library_with_kind_field(sandbox: &Sandbox) {
             .with_schemas(".traces/schemas", Some("kind")),
     );
     sandbox.write_note("novel.md", "---\nkind: Novel\n---\n");
+    // The unclassed note must stay out of the @Novel match.
+    sandbox.write_note("plain.md", "# Plain\n");
     sandbox.run(&["trust"]).assert_success();
 }
 
@@ -34,7 +36,9 @@ fn project_with_categories(sandbox: &Sandbox) {
     sandbox.write_config();
     sandbox.write_schema_value(
         "categories.toml",
-        "[[entries]]\nid = \"rust\"\ntitle = \"Rust Programming\"\n",
+        "[[entries]]\nid = \"rust\"\ntitle = \"Rust \
+         Programming\"\n\n[[entries]]\nid = \"python\"\ntitle = \"Python \
+         Programming\"\n",
     );
     sandbox.write_schema(
         "topic",
@@ -44,7 +48,9 @@ fn project_with_categories(sandbox: &Sandbox) {
     sandbox.write_template(
         "topic_note.md",
         "Category: {{ schema.get('topic').field('category')[0].label }} ({{ \
-         schema.get('topic').field('category')[0].value }})",
+         schema.get('topic').field('category')[0].value }}); {{ \
+         schema.get('topic').field('category')[1].label }} ({{ \
+         schema.get('topic').field('category')[1].value }})",
     );
     sandbox.run(&["trust"]).assert_success();
 }
@@ -121,6 +127,33 @@ fn partially_invalid_classes(sandbox: &Sandbox) {
 fn missing_schema_template(sandbox: &Sandbox) {
     sandbox.write_config();
     sandbox.write_template("missing.md", "{{ schema.get('missing') }}");
+    sandbox.run(&["trust"]).assert_success();
+}
+
+#[given("a trusted library with a template that names an unknown schema field")]
+fn missing_schema_field_template(sandbox: &Sandbox) {
+    sandbox.write_config();
+    sandbox.write_schema("book", "[fields.status]\ntype = \"input\"");
+    sandbox.write_note("book.md", "---\nclass: book\n---\n");
+    sandbox.write_template(
+        "missing_field.md",
+        "{{ schema.get('book').field('missing_field') }}",
+    );
+    sandbox.run(&["trust"]).assert_success();
+}
+
+#[given(
+    "a trusted library with a template that queries an unknown schema class"
+)]
+fn unknown_schema_class_template(sandbox: &Sandbox) {
+    sandbox.write_config();
+    sandbox.write_note("horror.md", "---\nclass: horror\n---\n");
+    // An unclassed note must stay out of the literal fallback match.
+    sandbox.write_note("plain.md", "# Plain\n");
+    sandbox.write_template(
+        "unknown_class.md",
+        "{{ query.from(\"@horror\") | length }}",
+    );
     sandbox.run(&["trust"]).assert_success();
 }
 

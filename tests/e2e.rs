@@ -19,6 +19,8 @@ mod completions;
 mod config;
 #[path = "e2e/env_policy.rs"]
 mod env_policy;
+#[path = "e2e/golden.rs"]
+mod golden;
 #[path = "e2e/index.rs"]
 mod index;
 #[path = "e2e/process_contract.rs"]

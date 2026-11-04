@@ -61,7 +61,7 @@ Feature: Schema selection and calendar values at the project boundary
     Then the exit code is 0
     And file "topic_note.md" is:
       """
-      Category: Rust Programming (rust)
+      Category: Rust Programming (rust); Python Programming (python)
       """
 
   Scenario: An offset-dated note matches the same instant to a nanosecond
@@ -136,6 +136,22 @@ Feature: Schema selection and calendar values at the project boundary
       """
       - book.md
       """
+
+  Scenario: An unknown schema field fails with a diagnostic
+    Given a trusted library with a template that names an unknown schema field
+    When I run "traces template -i missing_field --no-input --dry-run"
+    Then the exit code is 1
+    And the first line of stderr is:
+      """
+      traces::cli::template::render_failed
+      """
+    And stdout is empty
+
+  Scenario: An unknown template schema class falls back to exact matching
+    Given a trusted library with a template that queries an unknown schema class
+    When I run "traces template -i unknown_class --no-input --dry-run"
+    Then the exit code is 0
+    And stdout is "1"
 
   Scenario: An unknown schema in a template fails with a diagnostic
     Given a trusted library with a template that names an unknown schema
