@@ -42,3 +42,12 @@ fn filter_pages(sandbox: &Sandbox, last_run: &mut LastRun, docstring: String) {
 fn filter_tasks(sandbox: &Sandbox, last_run: &mut LastRun, docstring: String) {
     last_run.0 = Some(sandbox.run(&["task", "--where", docstring.trim()]));
 }
+
+#[when("I list notes with filter:")]
+fn list_notes_with_filter(
+    sandbox: &Sandbox,
+    last_run: &mut LastRun,
+    docstring: String,
+) {
+    last_run.0 = Some(sandbox.run(&["list", "--where", docstring.trim()]));
+}

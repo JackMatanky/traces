@@ -4,6 +4,7 @@ use pretty_assertions::assert_eq;
 use rstest_bdd_macros::{then, when};
 
 use super::{LastRun, Sandbox};
+use crate::support::assert_reports_same_path;
 
 #[when(r#"I run "{cmd}""#)]
 fn run_command(sandbox: &Sandbox, last_run: &mut LastRun, cmd: String) {
@@ -30,15 +31,6 @@ fn run_command_in_time_zone(
     last_run.0 = Some(
         sandbox.run_with_envs(&args, &[("TZ", std::ffi::OsStr::new(&zone))]),
     );
-}
-
-#[when("I list notes with filter:")]
-fn list_notes_with_filter(
-    sandbox: &Sandbox,
-    last_run: &mut LastRun,
-    docstring: String,
-) {
-    last_run.0 = Some(sandbox.run(&["list", "--where", docstring.trim()]));
 }
 
 #[then("the exit code is {code}")]
@@ -105,10 +97,5 @@ fn stderr_reports_for_project_root(
     prefix: String,
 ) {
     let run = last_run.0.as_ref().expect("a prior command must have run");
-    super::super::support::assert_reports_same_path(
-        &run.stderr,
-        &prefix,
-        "\n",
-        sandbox.root(),
-    );
+    assert_reports_same_path(&run.stderr, &prefix, "\n", sandbox.root());
 }

@@ -347,8 +347,8 @@ mod tests {
             /// Proves the Markdown table cell escaping law (01:G30, 02:G8):
             /// 1. Safety against row breaking: escaped text contains no literal newline (`\n`).
             /// 2. Delimiter containment: every pipe (`|`) in the escaped output is
-            ///    preceded by an unescaped backslash (`\|`), preventing unescaped pipe
-            ///    delimiters from splitting table cells.
+            ///    preceded by a backslash. This checks the inserted character,
+            ///    not Markdown parity for pre-existing backslashes.
             /// 3. Identity on clean inputs: any input lacking newlines and pipes
             ///    passes through unmodified.
             #[test]

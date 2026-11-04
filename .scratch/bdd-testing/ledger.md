@@ -322,6 +322,7 @@ each scenario identifies the behavior if an assertion fails.
   - **Kill demonstration:** Production code in `src/index/fingerprint.rs::drift` was modified to return `None`. The former test and the survivor scenario both failed against the broken code. Restoration of the code made both tests pass.
   - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%.
   - **Mutation compare (after deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%. No new escape appeared. Baseline file `mutarust-baseline.json` stayed untouched.
+  - **Open:** The other six deleted tests have no individual kill demonstration or mutation compare recorded. The grouped `fingerprint.rs::drift` demonstration cannot be shown to fail every one of them.
   - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. Exactly 7 tests were removed:
     - `traces::e2e index::config_edit_heals_the_index_on_the_next_query`
     - `traces::e2e index::content_edit_between_spawns_is_query_visible`
@@ -395,9 +396,9 @@ The rows are 04-S3, 04-S4, 04-S7, 04-T2, 04-T4, 04-T6 to 04-T8, and
 - 04-B6 shares one scenario: query filter and template `date_add` agree on the
   same month-end clamp (`1|2026-02-28`).
 
-New step definitions live in `tests/e2e/bdd/process.rs` (`in time zone`,
-`I list notes with filter:`) and `tests/e2e/bdd/schema_temporal.rs`
-(project fixtures and `file "{path}" contains:`).
+New step definitions live in `tests/e2e/bdd/process.rs` (`in time zone`),
+`tests/e2e/bdd/query.rs` (`I list notes with filter:`), and
+`tests/e2e/bdd/schema_temporal.rs` (project fixtures and `file "{path}" is:`).
 
 ### Deletions Note
 
@@ -543,7 +544,8 @@ run must diff this list after deleting the two tests.
   - **Assertion comparison:** The former test asserted exact stdout strings for plain task listing and coordinate task listing. The survivor scenarios assert the identical exact stdout strings. The survivor assertions are equal in strength.
   - **Kill demonstration:** Production code in `src/query/format.rs` was broken by substituting empty task description text. The former test and both survivor scenarios failed with stdout diff mismatches. Restoring the code restored all tests to passing.
   - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/query/format.rs --exec-timeout 900` generated 60 mutants. Result: 11 killed, 0 escaped, 40 errored, 9 skipped. Mutation score: 100.00%. Escape set: `[]`.
-  - **Mutation compare (after deletion):** The deletion in `tests/e2e/query.rs` removes only test code. The scoped mutarust run on `src/query/format.rs` preserves 0 escaped mutants. The baseline file `mutarust-baseline.json` stayed untouched.
+  - **Mutation compare (after deletion):** No after-deletion escape-ID set or scoped run output is recorded. An after-run cannot be established from the deletion alone.
+  - **Open:** No before/after escape-ID sets for `src/query/format.rs` were recorded. The earlier 0-escape result does not establish a deletion compare; no pair was rerun here.
   - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers` was removed.
   - **Twin re-read:** Re-read `task_table_renders_default_and_custom_columns` and `task_count_prints_only_the_match_total` in `tests/e2e/query.rs`. Neither asserts hierarchical indentation or custom marker characters.
 - **Successor note for arch-design:** Verified by `tests/features/note.feature`.
@@ -577,11 +579,16 @@ run must diff this list after deleting the two tests.
 - **Survivor:** Scenario `Inline durations compare by elapsed time` (`tests/features/note.feature`)
 - **Proof:**
   - **Assertion comparison:** The former test asserted exit code 0 and stdout `- matching.md\n`. The survivor scenario asserts exit code 0 and the identical stdout `- matching.md\n`.
-  - **Kill demonstration:** Ingestion duration parsing was broken by invalidating multi-unit tokens; the former test and survivor scenario both failed.
-  - **Mutation compare:** Guarded logic in `src/temporal` was verified clean.
+  - **Kill demonstration:** The slice 7 record says invalidating multi-unit duration tokens made both tests fail. It does not name a file or symbol. Commit `2ff6f32c` does not identify either.
+  - **Mutation compare:** No before/after escape sets for `src/temporal` were recorded for this deletion. The claim that the guarded logic was clean has no recorded compare.
   - **Name diff:** Verified `cargo nextest list --all-features --run-ignored all` before and after deletion. `traces::e2e query::list_filters_an_inline_multi_part_duration` was removed.
   - **Twin re-read:** Re-read `query.rs::list_filters_rfc3339_field_by_its_exact_instant`. That test proves timestamp instant comparisons, not multi-part duration syntax.
+- **Open:** The slice 7 mutation compare for `src/query/format.rs` and `src/temporal` is not recorded as a before/after pair.
 - **Successor note for arch-design:** Verified by `tests/features/note.feature`.
+
+### Retained slice 5 candidates
+
+The three spec section 9.3 candidates `config.rs::templates_directory_config_drives_template_listing_from_disk`, `config.rs::global_templates_directory_changes_template_listing`, and `template.rs::writes_the_rendered_file_to_the_default_output_path` still exist in `tests/e2e/config.rs` and `tests/e2e/template.rs`. The ledger does not record an individual kill demonstration or before/after mutation compare for any of the three. Their deletion proof is incomplete, so they remain Rust tests.
 
 ### Retained Candidate Note
 
@@ -592,7 +599,7 @@ Spec section 9.3 candidate `config.rs::tag_filter_config_drives_task_selection_f
 Date: 2026-11-04. This wave finishes the deletions that earlier slices
 deferred. The proof of spec section 7 applies to each test. Kill
 demonstrations ran on a commit before the deletion commit. The name list
-before and after the deletion shows exactly the five names below removed.
+before and after the deletion shows exactly the four names in Rows 1 to 4 removed.
 The two `tracked.rs` tests are not removed (see Retained Tests).
 
 ### Mutation Compare
@@ -608,6 +615,7 @@ used the tree after the deletion. `mutarust-baseline.json` stayed untouched.
 | `src/config/model/tasks.rs` | 10 killed, 3 escaped, 6 skipped | 10 killed, 3 escaped, 6 skipped | Same escape IDs. No new escape. |
 | `src/config/model/schemas.rs` | 3 killed, 0 escaped | 3 killed, 0 escaped | No escape. |
 | `src/config/tracker.rs` | 1 killed, 0 escaped | 0 killed, 1 escaped | New escape: mutant `1bc082ba551c7449b7fa4cea638f0ec3` (`branch/if`). The proof fails. |
+The IDs in `/tmp/mut-before-A.log` and `/tmp/mut-after-A.log` are equal as sets (49 IDs). The IDs in `/tmp/mut-before-B.log` and `/tmp/mut-after-B.log` are equal as sets (2 IDs). The IDs in `/tmp/mut-before-C.log` and `/tmp/mut-after-C.log` are equal as sets (3 IDs). A is `src/temporal/datetime.rs`, B is `src/template/engine/schema.rs`, and C is `src/config/model/tasks.rs`. Each count and ID-set equality was read directly from the named logs.
 
 The `tracker.rs` run executed after the deletion of the two `tracked.rs`
 tests. Mutant `1bc082ba...` was killed before and escaped after. No scenario
@@ -682,9 +690,9 @@ kills it. The two `tracked.rs` tests stay (see Retained Tests).
 - **Survivor:** `A template reads the labels and values of a file-sourced select field`
   in `tests/features/schema-temporal.feature`.
 - **Proof:** Assertion comparison and twin re-read: slice 6 section above,
-  Row 2. Kill demonstration: `select_entry_value` always returned the plain
-  value. Both failed. Mutation compare: `src/template/engine/schema.rs`, same
-  2 escapes before and after.
+  Row 2. Kill demonstration: `select_entry_value` inserted `unmatched_label`
+  instead of `label`. Both failed. Mutation compare:
+  `src/template/engine/schema.rs`, same 2 escapes before and after.
 - **Successor note for arch-design:** None.
 
 ### Retained Tests
@@ -697,6 +705,6 @@ kills it. The two `tracked.rs` tests stay (see Retained Tests).
   `1bc082ba551c7449b7fa4cea638f0ec3` in `src/config/tracker.rs` escaped. The
   scenario Givens run `trust`, which already records the path, so no scenario
   pins that `index` records the configuration as a tracked path. Spec
-  section 7 says a new escape fails the proof. Row 03-P25 stays at its
-  current Status. A later change can add a scenario that kills the mutant.
-  Then the two tests can die.
+  section 7 says a new escape fails the proof. Rows 03-P25 and
+  05-file_tracker are `pinned-elsewhere` in research/10. A later change can
+  add a scenario that kills the mutant. Then the two tests can die.

@@ -4,8 +4,8 @@ use rstest_bdd_macros::given;
 
 use super::Sandbox;
 
-#[given("a project initialised with init")]
-fn a_project_initialised_with_init(sandbox: &Sandbox) {
+#[given("a project initialized with init")]
+fn a_project_initialized_with_init(sandbox: &Sandbox) {
     let run = sandbox.run(&["init"]);
     run.assert_success();
 }

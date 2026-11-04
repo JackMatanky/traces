@@ -59,7 +59,7 @@ Feature: Schema selection and calendar values at the project boundary
     Given a trusted project with a file-sourced category field
     When I run "traces template -i topic_note --no-input"
     Then the exit code is 0
-    And file "topic_note.md" contains:
+    And file "topic_note.md" is:
       """
       Category: Rust Programming (rust)
       """

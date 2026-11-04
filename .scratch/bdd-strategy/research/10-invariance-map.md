@@ -35,7 +35,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 
 | ID | Guarantee | Tier | Status |
 |---|---|---|---|
-| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception. | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03); the 130 part reads `pinned: src/main.rs::ctrl_c_abort_exits_130` (slice 8 dropped, decided 2026-11-03) |
+| 01-G1 | Exit codes 0, 1, 2; never 101. Exit 130 is a class-level exception (see the Exit 130 class below). | F | covered: Unknown subcommand exits with code two and prints usage (reviewed 2026-11-03) |
 | 01-G2 | Stdout holds the payload only. Stderr holds diagnostics. | F | covered: Cleaning trust store exits with code zero and writes status to stderr (reviewed 2026-11-03) |
 | 01-G3 | Count summaries go to stderr | F (channel) | covered: Task list writes count summary to stderr (reviewed 2026-11-03) |
 | 01-G4 | Stable diagnostic codes with per-stage help | M | covered: Missing command exits with code one and reports diagnostic code (reviewed 2026-11-03) |
@@ -91,7 +91,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 03-P20 | Inlinks: deduplicated, sorted, no empty sources | F | covered: Inlinks are sorted and deduplicated with empty sources omitted (reviewed 2026-11-03) |
 | 03-P21 | Wikilink resolution order: exact path, implied `.md`, nearest basename | F | covered: Exact and implied paths resolve before a nearby basename (reviewed 2026-11-03) |
 | 03-P22 | Scan scope: `.git`, symlinks and the store skipped | D | covered: Hidden Git files and symlink notes are absent from queries (reviewed 2026-11-03) |
-| 03-P25 | `index` populates the tracked-config store | D | covered: Indexing records the project configuration as tracked (reviewed 2026-11-03) |
+| 03-P25 | `index` populates the tracked-config store | D | pinned-elsewhere: tests/e2e/tracked.rs (list_prints_every_tracked_config_path, clean_removes_a_stale_tracked_entry_and_reports_the_count); conversion needs a scenario that tracks a configuration through load without trust, for example a global configuration |
 | 03-N01 | Parsing never fails; malformed frontmatter still queries | F | covered: Malformed frontmatter does not prevent a note from appearing (reviewed 2026-11-03) |
 | 03-N02 | Frontmatter mapping semantics | F | covered: Duplicate frontmatter fields use the last value (reviewed 2026-11-03) |
 | 03-N03 | Headings: ATX and setext, in document order | F | pinned: src/note/parser.rs::collects_atx_heading_with_its_level_text_and_source_line and collects_setext_display_text_from_first_source_line |
@@ -139,7 +139,7 @@ A scenario never pins a known defect (ticket 10 decision (b)):
 | 05-G8 | One YAML config for frontmatter and template filters (the parity rule) | D | covered: Frontmatter and template YAML interpret leading zero values alike (reviewed 2026-11-03) |
 | 05-field | `FieldKey` matches forgivingly; `FieldName` stays exact | D | pinned: src/field.rs::is_name_match_requires_exact_raw_text; Field keys match without regard to casing or punctuation covers the query half |
 | 05-task | Unknown status symbol gives an incomplete task | F | covered: Task output keeps all known and unknown markers at their nesting depth (reviewed 2026-11-03) |
-| 05-file_tracker | `clean` removes stale entries, never live ones | D | covered: Cleaning preserves a live tracked configuration path (reviewed 2026-11-03) |
+| 05-file_tracker | `clean` removes stale entries, never live ones | D | pinned-elsewhere: tests/e2e/tracked.rs (list_prints_every_tracked_config_path, clean_removes_a_stale_tracked_entry_and_reports_the_count); conversion needs a scenario that tracks a configuration through load without trust, for example a global configuration |
 | 05-dirtree | Traversal errors classified by where they occur | D | pinned: src/dirtree.rs::tests (no portable CLI channel distinguishes root versus node errors) |
 | 05-tag | Containment by segment prefix | F | covered: A parent tag selects notes carrying its descendant tag (reviewed 2026-11-03) |
 | 05-env_vars | `TRACES_CEILING_DIRS` bounds upward discovery | D | covered: A discovery ceiling stops the upward configuration search (reviewed 2026-11-03) |

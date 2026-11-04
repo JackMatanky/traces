@@ -10,7 +10,7 @@
 
 **Category:** enhancement
 
-**Status:** blocked-partial (scenario work done; deletions deferred — see ledger slice 6 section)
+**Status:** done (the deletion wave completed the three deferred test conversions and their mutation compares)
 
 - [x] Every row the slice owns has a scenario of the class that spec section 4 assigns.
 - [x] The Status of each owned row in the invariance map reads `covered`.
@@ -21,22 +21,18 @@
 - [x] A converted test is deleted only when this slice completes its last row.
   - `class_field_config_drives_class_selection_from_disk` stayed while
     01-G21 was slice 5's row; slice 5 has since covered 01-G21.
-- [ ] Each deletion has the proof of spec section 7.
-  - Not met this run: `class_field_config_drives_class_selection_from_disk`
-    must stay until slice 5 covers 01-G21 (die rule, its other row). The
-    two eligible tests were not deleted because their required scoped
-    mutation compares did not complete in this run. Kill demonstrations
-    and assertion comparisons are recorded in the ledger. The conversion
-    run remains: two before-runs, deletion, two after-runs, name diff.
+- [x] Each deletion has the proof of spec section 7.
+  - The deletion wave removed `class_field_config_drives_class_selection_from_disk`,
+    `list_filters_rfc3339_field_by_its_exact_instant`, and
+    `renders_file_sourced_select_field_in_e2e_template`. The ledger records
+    the kill demonstrations, before/after mutation compares, and name diff.
 - [x] `mise run verify` passes.
-  - Passed on the scenario tree (commit `102253b8`) and the merged tree
-    keeps slice 3's verified code; rerun `mise run verify` after the
-    deletion run.
+  - Passed on the scenario tree (commit `102253b8`) and on the review-fixes tree after the deletion wave (2026-11-04).
 - [x] The ledger section is complete.
 - [x] The gap recompute line is in the adoption map.
 - [x] The due rubric questions are answered.
 - [x] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] The slice branch is merged locally.
 
 **Out of scope:**
 

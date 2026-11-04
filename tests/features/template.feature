@@ -46,7 +46,7 @@ Feature: Template documents resolve and render within project boundaries
       """
       traces::cli::template::output_exists
       """
-    And the existing file "daily.md" still contains "keep me"
+    And the existing file "daily.md" is "keep me"
 
   Scenario: Force replaces an existing template output file
     Given a trusted project with a daily template and an existing output file
@@ -66,7 +66,7 @@ Feature: Template documents resolve and render within project boundaries
     When I run "traces template -i daily --dry-run"
     Then the exit code is 0
     And stdout is "# Today"
-    And the existing file "daily.md" still contains "keep me"
+    And the existing file "daily.md" is "keep me"
 
   Scenario: A local template takes precedence over a global template
     Given a trusted project with local and global daily templates
