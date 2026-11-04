@@ -1310,12 +1310,11 @@ mod tests {
         }
 
         proptest! {
-            /// Proves total order laws for `NoteFieldValueRef::compare` (03:N15):
+            /// Proves total order laws for `NoteFieldValueRef::compare`:
             /// 1. Reflexivity: `a.compare(a) == Equal` (including `NaN == NaN` and `-0.0 == 0.0`).
             /// 2. Antisymmetry: `a.compare(b) == b.compare(a).reverse()`.
             /// 3. Transitivity: if `a.compare(b) == ord1` and `b.compare(c) == ord2`
             ///    and `ord1 == ord2`, then `a.compare(c) == ord1`.
-            /// 4. Totality: for all `a` and `b`, `a.compare(b)` yields a definite `Ordering` (never indeterminate).
             #[test]
             fn satisfies_total_order_laws(
                 a in any_field_value_strategy(),
@@ -1342,18 +1341,6 @@ mod tests {
                 if ab == bc {
                     prop_assert_eq!(ac, ab);
                 }
-                if ab == Ordering::Less && bc == Ordering::Less {
-                    prop_assert_eq!(ac, Ordering::Less);
-                }
-                if ab == Ordering::Greater && bc == Ordering::Greater {
-                    prop_assert_eq!(ac, Ordering::Greater);
-                }
-                if ab == Ordering::Equal && bc == Ordering::Equal {
-                    prop_assert_eq!(ac, Ordering::Equal);
-                }
-
-                // 4. Totality
-                prop_assert!(matches!(ab, Ordering::Less | Ordering::Equal | Ordering::Greater));
             }
         }
     }

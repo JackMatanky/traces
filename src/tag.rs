@@ -513,14 +513,14 @@ mod tests {
         proptest! {
             /// Proves tag prefix hierarchy laws:
             /// 1. Reflexivity: every valid tag contains itself as a prefix (`tag.is_contained_in(tag.as_str())`).
-            /// 2. Prefix hierarchy & transitivity: given segment hierarchy `[s0, s1, ..., sn]`,
-            ///    every prefix path `s[0..=i]` contains the longer path `s[0..=j]` for `i <= j`.
-            ///    Equivalently, if `A.is_contained_in(B)` and `B.is_contained_in(C)`, then `A.is_contained_in(C)`.
+            /// 2. Prefix hierarchy: every descendant is contained in each ancestor
+            ///    whose path ends at a segment boundary.
             /// 3. Boundary & segment-boundary safety: a partial string prefix that does not
             ///    end at a segment boundary (e.g. `foo` vs `foobar`) never reports containment.
             #[test]
             fn preserves_containment_hierarchy_and_transitivity(
                 segments in tag_segments_strategy(),
+                suffix in "[a-z]{1,8}",
             ) {
                 let mut cumulative = Vec::with_capacity(segments.len());
                 let mut tags = Vec::with_capacity(segments.len());
@@ -550,27 +550,12 @@ mod tests {
                     }
                 }
 
-                // Transitivity check across arbitrary triples (i <= j <= k).
-                for (i, ancestor_c) in tags.iter().enumerate() {
-                    for middle_b in tags.iter().skip(i) {
-                        for descendant_a in tags.iter().skip(i) {
-                            if descendant_a.is_contained_in(middle_b.as_str())
-                                && middle_b.is_contained_in(ancestor_c.as_str())
-                            {
-                                prop_assert!(
-                                    descendant_a
-                                        .is_contained_in(ancestor_c.as_str())
-                                );
-                            }
-                        }
-                    }
-                }
 
-                // Strict segment boundary: appending partial alphanumeric chars to ancestor prefix fails.
-                if let (Some(first), Some(last)) = (tags.first(), tags.last()) {
-                    let false_prefix = format!("{}extra", first.as_str());
-                    prop_assert!(!last.is_contained_in(&false_prefix));
-                }
+                // Strict segment boundary: extend the last segment without a delimiter.
+                let last = tags.last().expect("generated at least one tag");
+                let off_boundary = Tag::parse(&format!("{}{suffix}", last.as_str()))
+                    .expect("valid generated tag");
+                prop_assert!(!off_boundary.is_contained_in(last.as_str()));
             }
         }
     }
