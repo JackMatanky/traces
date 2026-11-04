@@ -81,8 +81,12 @@ jobs:
   # default` (hard cargo error); the production configuration is
   # `--no-default-features`.
   test-unit:
-    name: test (unit, production config)
-    runs-on: ubuntu-latest
+    name: test (unit, production config, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     env:
       NEXTEST_PROFILE: ci
     steps:
@@ -93,7 +97,7 @@ jobs:
           install_args: rust
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "test-unit-ubuntu"
+          shared-key: "test-unit-${{ matrix.os }}"
       - run: mise install --locked cargo-binstall github:nextest-rs/nextest
       - run: >-
           cargo nextest run -p traces --no-default-features
@@ -104,8 +108,14 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: junit-test-unit
+          name: junit-test-unit-${{ matrix.os }}
           path: target/nextest/ci/junit.xml
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: proptest-regressions-${{ matrix.os }}
+          path: proptest-regressions/
+          if-no-files-found: ignore
   test-integration:
     name: test (integration, test-utils)
     runs-on: ubuntu-latest
@@ -180,6 +190,84 @@ jobs:
             echo "ERROR: No doctests ran." >&2
             exit 1
           fi
+
+  # -- PR mutation diff (production source changes only) --
+  mutation-diff:
+    name: mutation (changed source)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect changed production source
+        id: source
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA" HEAD -- 'src/'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            if [[ "$status" -ne 1 ]]; then
+              exit "$status"
+            fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: jdx/mise-action@v4
+        if: steps.source.outputs.changed == 'true'
+        with:
+          experimental: true
+          install_args: rust
+      - uses: Swatinem/rust-cache@v2
+        if: steps.source.outputs.changed == 'true'
+        with:
+          shared-key: "mutation-diff-ubuntu"
+      - if: steps.source.outputs.changed == 'true'
+        run: mise install --locked cargo-binstall github:nextest-rs/nextest cargo:mutarust
+      - name: Gate newly escaped mutations
+        if: steps.source.outputs.changed == 'true'
+        run: >-
+          mise run test:mutants --git-diff
+          --git-diff-base "${{ github.event.pull_request.base.sha }}"
+          --fail-on-escaped --ignore-msi-with-no-mutations
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.source.outputs.changed == 'true'
+        with:
+          name: mutation-diff-report
+          path: |
+            report.json
+            mutarust-report.html
+          if-no-files-found: ignore
+
+  # -- Coverage diagnostics; do not enforce a coverage percentage --
+  coverage:
+    name: coverage (diagnostic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+          install_args: rust
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "coverage-ubuntu"
+      - run: mise install --locked cargo-binstall github:nextest-rs/nextest cargo:cargo-llvm-cov
+      - run: mise run coverage:lcov
+      - name: Reject empty coverage reports
+        run: |
+          if [[ ! -s lcov.info ]] || ! grep -Eq '^LF:[1-9][0-9]*$' lcov.info; then
+            echo "ERROR: lcov.info is empty or reports zero lines found." >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: lcov
+          path: lcov.info
+          if-no-files-found: ignore
 
   # -- Repository hygiene & file formats (hk) --
   hygiene:
