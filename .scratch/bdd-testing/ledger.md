@@ -322,7 +322,7 @@ each scenario identifies the behavior if an assertion fails.
   - **Kill demonstration:** Production code in `src/index/fingerprint.rs::drift` was modified to return `None`. The former test and the survivor scenario both failed against the broken code. Restoration of the code made both tests pass.
   - **Mutation compare (before deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%.
   - **Mutation compare (after deletion):** Scoped run `mise run test:mutants -f src/index/fingerprint.rs --match drift --workers 1 --timeout 1200` generated 5 mutants. Result: 2 killed, 3 skipped, 0 escaped. Escape set: `[]`. Mutation score: 100.00%. No new escape appeared. Baseline file `mutarust-baseline.json` stayed untouched.
-  - **Mutation compare (rerun 2026-11-04):** The run used `mise run test:mutants -f <file> --timeout 1200 --workers 2` at commit `06e8b177` (before) and `3a5988ce` (after) for the whole file, not only `drift`.
+  - **Mutation compare (rerun 2026-11-04):** The run used `mise run test:mutants -f <file> --timeout 1200 --workers 2`. It covered the whole file, not only `drift`. The before commit is `06e8b177`. The after commit is `3a5988ce`.
     - `src/index/inlinks.rs`, 49 mutants: 34 killed, 7 escaped, 1 errored, 7 skipped, both runs. The escape-ID sets are identical. No new escape.
     - `src/index/refresh.rs`, 42 mutants: 9 killed, 6 escaped, 10 errored, 17 skipped, both runs. The escape-ID sets are identical. No new escape.
     - `src/index/fingerprint.rs`, 27 mutants: 9 killed, 0 escaped, 0 errored, 18 skipped, both runs.
