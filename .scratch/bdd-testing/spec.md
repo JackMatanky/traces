@@ -805,9 +805,9 @@ change.
   (row 1 of the ledger slice 5 section; full seven-item proof).
   `tracked.rs::list_prints_every_tracked_config_path` and
   `tracked.rs::clean_removes_a_stale_tracked_entry_and_reports_the_count` were
-  retained rather than deleted. The candidate table also maps 03-P25
-  (slice 4). Their row coverage by the new scenarios does not clear the
-  dual-ownership rule of section 7 for this slice. 46 scenarios passed
+  retained rather than deleted. Their rows 03-P25 and 05-file_tracker now read
+  `pinned-elsewhere`: neither scenario kills the tracker branch mutant.
+  See the deletion wave ledger. 46 scenarios passed
   100 of 100 stress iterations locally.
 - 2026-11-03: slice 4 added index-freshness scenarios for edits, paths, links,
   config drift, rendered notes, scan scope and the tracked-config store. The
@@ -824,8 +824,8 @@ change.
   invariance map. Rows 03-N03 and the exact-name half of 05-field are pinned to
   unit tests; no observable CLI channel exists for them.
   31 scenarios in tests/features/note.feature passed 100 of 100 stress
-  iterations locally. Three candidate tests were deleted with the section 7
-  proofs (see ledger.md):
+  iterations locally. Three candidate tests were deleted; the ledger records
+  missing before/after mutation pairs for two of their proof rows:
   - task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers
   - task_filter_shortcuts_narrow_output_accurately
   - list_filters_an_inline_multi_part_duration
@@ -835,3 +835,9 @@ change.
   `tracked.rs` tests stay. The after-run on `src/config/tracker.rs` shows a new
   escape (mutant `1bc082ba551c7449b7fa4cea638f0ec3`), so the section 7 proof
   fails for them. See the ledger section "Deletion Wave".
+- 2026-11-04: CI e2e now runs with `--all-features` (ticket 01) and
+  `--no-fail-fast` in the e2e job, so one test failure does not hide others.
+- 2026-11-04: `deny.toml` retains the `RUSTSEC-2026-0374` ignore.
+  `cargo deny check` fails without it: `basic-toml` 0.1.10 is unmaintained,
+  and `rstest-bdd` 0.6.0 brings it through `i18n-embed`. The advisory lists
+  no safe upgrade. Reassess the ignore when the upstream dependency changes.
