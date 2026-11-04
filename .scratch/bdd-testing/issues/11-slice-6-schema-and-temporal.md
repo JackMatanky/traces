@@ -27,9 +27,7 @@
     `renders_file_sourced_select_field_in_e2e_template`. The ledger records
     the kill demonstrations, before/after mutation compares, and name diff.
 - [x] `mise run verify` passes.
-  - Passed on the scenario tree (commit `102253b8`) and the merged tree
-    keeps slice 3's verified code; rerun `mise run verify` after the
-    deletion run.
+  - Passed on the scenario tree (commit `102253b8`) and on the review-fixes tree after the deletion wave (2026-11-04).
 - [x] The ledger section is complete.
 - [x] The gap recompute line is in the adoption map.
 - [x] The due rubric questions are answered.

@@ -17,6 +17,7 @@
   - 05-G7 still reads `gap`: the scenarios do not pin every filesystem path to the root. Rows 03-P25 and 05-file_tracker stay `pinned-elsewhere` after the tracker mutant escaped.
 - [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
 - [ ] Review the row placement with the user at entry. Spec section 9.3 lists the rows that were placed by domain affinity.
+  - No six-condition review or user entry placement review is recorded for this slice. The two checks remain unchecked.
 - [x] A converted test is deleted only when this slice completes its last row.
 - [x] Each deletion has the proof of spec section 7.
 - [x] `mise run verify` passes.
