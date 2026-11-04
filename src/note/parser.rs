@@ -804,6 +804,30 @@ mod tests {
             assert_eq!(note.tags().len(), 0);
         }
 
+        /// Fifty-thousand-deep blockquote chains stress the widest nesting
+        /// the Markdown grammar allows without quadratic input growth. The
+        /// pipeline must stay iterative: parsing on a 1 `MiB` stack pins the
+        /// explicit-stack design against a regression into recursion.
+        #[test]
+        fn parses_fifty_thousand_deep_blockquote_chain_on_a_small_stack() {
+            let source: String = "> ".repeat(50_000) + "\n- item";
+
+            let note = std::thread::scope(|scope| {
+                std::thread::Builder::new()
+                    .stack_size(1 << 20)
+                    .spawn_scoped(scope, || parse(&source))
+                    .expect("spawn parse thread")
+                    .join()
+                    .expect("deep nesting must not overflow the stack")
+            });
+
+            assert_eq!(note.lists().len(), 1);
+            assert_eq!(
+                note.lists().first().map(ListItem::raw_text),
+                Some("item")
+            );
+        }
+
         #[test]
         fn returns_none_for_frontmatter_when_absent() {
             let input = "# Header\nNo YAML block.";

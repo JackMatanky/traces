@@ -352,17 +352,81 @@ fn commit(
     content: &str,
     policy: CommitPolicy,
 ) -> Result<(), TemplateError> {
+    commit_with_writer(path, content, policy, |file, bytes| {
+        file.write_all(bytes)
+    })
+}
+
+fn commit_with_writer(
+    path: &Path,
+    content: &str,
+    policy: CommitPolicy,
+    writer: impl FnOnce(&mut fs::File, &[u8]) -> io::Result<()>,
+) -> Result<(), TemplateError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| TemplateError::Write {
             path: path.to_path_buf(),
             source,
         })?;
     }
-    let mut file = policy.create_file(path)?;
-    file.write_all(content.as_bytes()).map_err(|source| TemplateError::Write {
-        path: path.to_path_buf(),
-        source,
+    let temp_path = TempSiblingPath::sibling_of(path);
+    let mut file = CommitPolicy::CreateNew.create_file(temp_path.as_path())?;
+    if let Err(source) = writer(&mut file, content.as_bytes()) {
+        return Err(TemplateError::Write {
+            path: path.to_path_buf(),
+            source,
+        });
+    }
+    drop(file);
+    let published = match policy {
+        CommitPolicy::Overwrite => fs::rename(temp_path.as_path(), path),
+        // A hard link fails atomically when `path` exists, keeping
+        // `create_new` semantics; `Drop` removes the temp name afterwards.
+        CommitPolicy::CreateNew => fs::hard_link(temp_path.as_path(), path),
+    };
+    published.map_err(|source| {
+        if policy == CommitPolicy::CreateNew
+            && source.kind() == io::ErrorKind::AlreadyExists
+        {
+            TemplateError::OutputFileAlreadyExists {
+                path: path.to_path_buf(),
+            }
+        } else {
+            TemplateError::Write {
+                path: path.to_path_buf(),
+                source,
+            }
+        }
     })
+}
+
+/// Writes staged bytes to a sibling temporary file, then renames it over
+/// `path`; [`Drop`] deletes the temporary file if any step fails partway.
+struct TempSiblingPath {
+    path: PathBuf,
+}
+
+impl TempSiblingPath {
+    /// Builds a process-unique temp sibling path: `note.md` becomes
+    /// `.note.md.<pid>.tmp` beside it, so concurrent processes never share one.
+    fn sibling_of(path: &Path) -> Self {
+        let mut name = std::ffi::OsString::from(".");
+        name.push(path.file_name().unwrap_or_default());
+        name.push(format!(".{}.tmp", std::process::id()));
+        Self {
+            path: path.with_file_name(name),
+        }
+    }
+
+    fn as_path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempSiblingPath {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
 }
 
 #[cfg(test)]
@@ -978,6 +1042,87 @@ mod tests {
                 .expect("force overwrites");
 
             assert_eq!(fs::read_to_string(&path).expect("read"), "new");
+        }
+
+        #[test]
+        fn preserves_existing_content_when_overwrite_fails_mid_write() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let path = temp.path().join("note.md");
+            fs::write(&path, "old content").expect("seed existing file");
+
+            let result = commit_with_writer(
+                &path,
+                "new content",
+                CommitPolicy::Overwrite,
+                |file, bytes| {
+                    file.write_all(bytes.get(..3).unwrap_or_default())?;
+                    Err(io::Error::other("injected failure"))
+                },
+            );
+
+            assert!(matches!(result, Err(TemplateError::Write { .. })));
+            assert_eq!(
+                fs::read_to_string(&path).expect("read old file"),
+                "old content"
+            );
+        }
+
+        #[test]
+        fn removes_the_temp_file_when_the_write_fails_partway() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let path = temp.path().join("note.md");
+            fs::write(&path, "old").expect("seed existing file");
+
+            let result = commit_with_writer(
+                &path,
+                "new",
+                CommitPolicy::Overwrite,
+                |file, bytes| {
+                    file.write_all(bytes.get(..1).unwrap_or_default())?;
+                    Err(io::Error::other("injected failure"))
+                },
+            );
+
+            assert!(matches!(result, Err(TemplateError::Write { .. })));
+            assert_eq!(
+                fs::read_dir(temp.path()).expect("read parent").count(),
+                1
+            );
+        }
+
+        #[rstest::rstest]
+        #[case::create_new(CommitPolicy::CreateNew)]
+        #[case::overwrite(CommitPolicy::Overwrite)]
+        fn leaves_no_temp_file_after_success(#[case] policy: CommitPolicy) {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let path = temp.path().join("note.md");
+
+            commit(&path, "new", policy).expect("commit succeeds");
+
+            let names: Vec<_> = fs::read_dir(temp.path())
+                .expect("read parent")
+                .map(|entry| entry.expect("entry").file_name())
+                .collect();
+            assert_eq!(names, vec![std::ffi::OsString::from("note.md")]);
+        }
+
+        #[test]
+        fn create_new_rejects_an_existing_target_and_keeps_its_content() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let path = temp.path().join("note.md");
+            fs::write(&path, "old").expect("seed existing file");
+
+            let result = commit(&path, "new", CommitPolicy::CreateNew);
+
+            assert!(matches!(
+                result,
+                Err(TemplateError::OutputFileAlreadyExists { .. })
+            ));
+            assert_eq!(fs::read_to_string(&path).expect("read"), "old");
+            assert_eq!(
+                fs::read_dir(temp.path()).expect("read parent").count(),
+                1
+            );
         }
 
         #[test]
