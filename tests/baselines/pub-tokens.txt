@@ -626,11 +626,14 @@ src/lib.rs: pub fn build_test_index(notes: &[(&str, &str)]) -> Arc<WorkspaceInde
 src/lib.rs: pub fn config(&self) -> Config {
 src/lib.rs: pub fn config_with_templates_if_present(&self) -> Config {
 src/lib.rs: pub fn create_trusted_project(
+src/lib.rs: pub fn date_point_display_law_holds(input: &str) -> bool {
 src/lib.rs: pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
 src/lib.rs: pub fn fixture_service(root: &Path) -> ConfigService {
 src/lib.rs: pub fn indexer(&self) -> IndexerService {
+src/lib.rs: pub fn parse_filter_expression(input: &str) -> bool {
 src/lib.rs: pub fn parse_note<P: AsRef<Path>>(path: P, src: &str) -> Note {
 src/lib.rs: pub fn parse_note_str(src: &str) -> Note {
+src/lib.rs: pub fn parse_raw_config(input: &str) -> bool {
 src/lib.rs: pub fn parse_tag(s: &str) -> Tag {
 src/lib.rs: pub fn resolve_safe_path<P: AsRef<Path>>(
 src/lib.rs: pub fn root(&self) -> &Path {
@@ -648,6 +651,7 @@ src/lib.rs: pub fn write_schema_value<P: AsRef<Path>>(
 src/lib.rs: pub fn write_template<P: AsRef<Path>>(
 src/lib.rs: pub fn write_template<P: AsRef<Path>>(
 src/lib.rs: pub mod cli;
+src/lib.rs: pub mod fuzzing {
 src/lib.rs: pub mod testing {
 src/lib.rs: pub struct TestProject {
 src/lib.rs: pub use crate::{
@@ -998,6 +1002,7 @@ src/query/mod.rs: pub use service::QueryService;
 src/query/mod.rs: pub(crate) use builder::QueryMode;
 src/query/mod.rs: pub(crate) use error::{FieldPathError, QuerySyntaxError};
 src/query/mod.rs: pub(crate) use format::TaskPathStyle;
+src/query/mod.rs: pub(crate) use grammar::FilterExpr;
 src/query/mod.rs: pub(crate) use grammar::{
 src/query/mod.rs: pub(crate) use sort::{SortDirection, SortOrder};
 src/query/mod.rs: pub(super) fn find_base<'a>(
@@ -1528,6 +1533,7 @@ src/temporal/mod.rs: pub(crate) use date::DEFAULT_DATE_PATTERN;
 src/temporal/mod.rs: pub(crate) use datetime::{DEFAULT_DATETIME_PATTERN, now_instant};
 src/temporal/mod.rs: pub(crate) use error::CalendarError;
 src/temporal/mod.rs: pub(crate) use fmt::{
+src/temporal/mod.rs: pub(crate) use point::DatePrecision;
 src/temporal/mod.rs: pub(crate) use point::{DateDiff, DatePoint};
 src/temporal/mod.rs: pub(crate) use token::pattern_to_strftime;
 src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit};

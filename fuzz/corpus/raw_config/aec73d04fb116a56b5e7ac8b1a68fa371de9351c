@@ -1,0 +1,8 @@
+[frontmatter.date_created]
+name = "created"
+format = "%[tasks]
+tag_filters = {? = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]r.date_created]
+name = "created"
+format = "%[tasks]
+tag_filters = {? = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+]]]]]]]]]]]]]]]]]]]]]

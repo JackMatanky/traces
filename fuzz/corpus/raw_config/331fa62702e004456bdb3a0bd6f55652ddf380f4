@@ -1,0 +1,3 @@
+[templates]
+dirqctory = "tpl"
+output_dir = "out"

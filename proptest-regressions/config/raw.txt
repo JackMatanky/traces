@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8791f5113c7c9406236e96c42a2898cf766e1fdf1ba1670872856a227ed769af # shrinks to config = RawConfig { templates: RawTemplateConfig { directory: None, output_dir: None }, schemas: RawSchemasConfig { class_field: None, directory: Some("") }, frontmatter: RawFrontmatterConfig { title: None, aliases: None, tags: None, date_created: None, date_modified: None }, tasks: RawTaskConfig { tag_filters: [], statuses: [] } }
