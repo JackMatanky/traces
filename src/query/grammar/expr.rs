@@ -456,14 +456,14 @@ mod tests {
         fn rejects_incomplete_or_adjacent_tokens(
             #[case] tokens: Vec<Spanned<TestToken>>,
         ) {
-            assert!(
+            assert!(matches!(
                 parse_boolean_expr(
                     "fixture",
                     SpannedTokenStream::new(tokens),
                     TestGrammar
-                )
-                .is_err()
-            );
+                ),
+                Err(QueryBuilderError::Syntax(_))
+            ));
         }
     }
 

@@ -180,49 +180,44 @@ mod tests {
     };
 
     mod comparison {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
         use super::*;
-        #[test]
-        fn returns_true_when_comparing_null_to_null_literal() {
-            assert!(
-                QueryFieldValueRef::Note(NoteFieldValueRef::Null)
-                    .is_equal_to_literal(&NoteFieldValue::Null)
-            );
-        }
-
-        #[test]
-        fn returns_false_when_comparing_null_to_number_literal() {
-            assert!(
-                !QueryFieldValueRef::Note(NoteFieldValueRef::Null)
-                    .is_equal_to_literal(&NoteFieldValue::Number(1.0))
-            );
-        }
-
-        #[test]
-        fn returns_true_when_comparing_text_ref_to_matching_string_literal() {
-            assert!(
-                QueryFieldValueRef::Note(NoteFieldValueRef::String("hello"))
-                    .is_equal_to_literal(&NoteFieldValue::String(
-                        "hello".into()
-                    ))
-            );
-        }
-
-        #[test]
-        fn returns_false_when_comparing_text_ref_to_mismatched_string_literal()
-        {
-            assert!(
-                !QueryFieldValueRef::Note(NoteFieldValueRef::String("hello"))
-                    .is_equal_to_literal(&NoteFieldValue::String(
-                        "world".into()
-                    ))
-            );
-        }
-
-        #[test]
-        fn returns_true_when_comparing_number_ref_to_matching_number_literal() {
-            assert!(
-                QueryFieldValueRef::Note(NoteFieldValueRef::Number(5.0))
-                    .is_equal_to_literal(&NoteFieldValue::Number(5.0))
+        #[rstest]
+        #[case::null_to_null(
+            NoteFieldValueRef::Null,
+            NoteFieldValue::Null,
+            true
+        )]
+        #[case::null_to_number(
+            NoteFieldValueRef::Null,
+            NoteFieldValue::Number(1.0),
+            false
+        )]
+        #[case::text_to_matching_string(
+            NoteFieldValueRef::String("hello"),
+            NoteFieldValue::String("hello".into()),
+            true
+        )]
+        #[case::text_to_mismatched_string(
+            NoteFieldValueRef::String("hello"),
+            NoteFieldValue::String("world".into()),
+            false
+        )]
+        #[case::number_to_matching_number(
+            NoteFieldValueRef::Number(5.0),
+            NoteFieldValue::Number(5.0),
+            true
+        )]
+        fn compares_a_simple_ref_to_a_literal(
+            #[case] value: NoteFieldValueRef<'_>,
+            #[case] literal: NoteFieldValue,
+            #[case] expected: bool,
+        ) {
+            assert_eq!(
+                QueryFieldValueRef::Note(value).is_equal_to_literal(&literal),
+                expected
             );
         }
 
@@ -328,21 +323,18 @@ mod tests {
             assert!(qval.is_equal_to_literal(&literal));
         }
 
-        #[test]
-        fn returns_true_when_text_ref_contains_substring() {
-            assert!(
-                QueryFieldValueRef::Note(NoteFieldValueRef::String(
-                    "hello world"
-                ))
-                .is_containing(&NoteFieldValue::String("world".into()))
-            );
-        }
-
-        #[test]
-        fn returns_false_when_text_ref_does_not_contain_substring() {
-            assert!(
-                !QueryFieldValueRef::Note(NoteFieldValueRef::String("hello"))
-                    .is_containing(&NoteFieldValue::String("xyz".into()))
+        #[rstest]
+        #[case::substring_present("hello world", "world", true)]
+        #[case::substring_absent("hello", "xyz", false)]
+        fn text_ref_containment_is_substring_matching(
+            #[case] text: &str,
+            #[case] target: &str,
+            #[case] expected: bool,
+        ) {
+            assert_eq!(
+                QueryFieldValueRef::Note(NoteFieldValueRef::String(text))
+                    .is_containing(&NoteFieldValue::String(target.into())),
+                expected
             );
         }
 
@@ -386,38 +378,21 @@ mod tests {
 
     mod formatting {
         use pretty_assertions::assert_eq;
+        use rstest::rstest;
 
         use super::*;
-        #[test]
-        fn formats_empty_string_for_null_value() {
+        #[rstest]
+        #[case::null_as_empty(NoteFieldValueRef::Null, "")]
+        #[case::boolean_as_lowercase(NoteFieldValueRef::Bool(true), "true")]
+        #[case::number_without_decimals(NoteFieldValueRef::Number(42.0), "42")]
+        #[case::text_verbatim(NoteFieldValueRef::String("hello"), "hello")]
+        fn formats_a_simple_value(
+            #[case] value: NoteFieldValueRef<'_>,
+            #[case] expected: &str,
+        ) {
             let mut out = String::new();
-            QueryFieldValueRef::Note(NoteFieldValueRef::Null)
-                .append_text(&mut out);
-            assert_eq!(out, "");
-        }
-
-        #[test]
-        fn formats_boolean_as_lowercase_literal() {
-            let mut out = String::new();
-            QueryFieldValueRef::Note(NoteFieldValueRef::Bool(true))
-                .append_text(&mut out);
-            assert_eq!(out, "true");
-        }
-
-        #[test]
-        fn formats_number_without_unnecessary_decimals() {
-            let mut out = String::new();
-            QueryFieldValueRef::Note(NoteFieldValueRef::Number(42.0))
-                .append_text(&mut out);
-            assert_eq!(out, "42");
-        }
-
-        #[test]
-        fn formats_text_verbatim() {
-            let mut out = String::new();
-            QueryFieldValueRef::Note(NoteFieldValueRef::String("hello"))
-                .append_text(&mut out);
-            assert_eq!(out, "hello");
+            QueryFieldValueRef::Note(value).append_text(&mut out);
+            assert_eq!(out, expected);
         }
 
         #[test]

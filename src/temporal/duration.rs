@@ -1075,7 +1075,12 @@ mod tests {
 
         #[test]
         fn accepts_range_boundary() {
-            assert!(DurationValue::parse("7304484d").is_ok());
+            assert_eq!(
+                DurationValue::parse("7304484d")
+                    .expect("range boundary parses")
+                    .nominal_seconds(),
+                7_304_484 * 86_400
+            );
             assert!(matches!(
                 DurationValue::parse("7304485d"),
                 Err(DurationError::SecondsOutOfRange)
@@ -1150,14 +1155,22 @@ mod tests {
         #[case::ascending_order("1m 1h")]
         #[case::fraction_calendar_day("1.5d")]
         #[case::fraction_calendar_month("1.5mo")]
-        #[case::fraction_non_lowest("1.5h 30m")]
-        #[case::comma_without_space("1h,30m")]
         #[case::malformed_iso_fraction("P1.5D")]
         #[case::malformed_iso_negative("P-1M")]
-        fn rejects_invalid_grammar(#[case] input: &str) {
+        fn rejects_invalid_grammar_as_an_unknown_unit(#[case] input: &str) {
             assert!(
-                DurationValue::parse(input).is_err(),
-                "grammar form {input:?} must be rejected"
+                matches!(parse_error(input), Some(DurationError::UnknownUnit)),
+                "grammar form {input:?} must report an unknown unit"
+            );
+        }
+
+        #[rstest]
+        #[case::fraction_non_lowest("1.5h 30m")]
+        #[case::comma_without_space("1h,30m")]
+        fn rejects_invalid_grammar_as_a_missing_unit(#[case] input: &str) {
+            assert!(
+                matches!(parse_error(input), Some(DurationError::MissingUnit)),
+                "grammar form {input:?} must report a missing unit"
             );
         }
 
@@ -1529,14 +1542,21 @@ mod tests {
         fn rejects_non_string_scalar() {
             let json = "42";
             let result: Result<DurationValue, _> = serde_json::from_str(json);
-            assert!(result.is_err());
+            assert_eq!(
+                result.expect_err("non-string rejects").to_string(),
+                "invalid type: integer `42`, expected a string at line 1 \
+                 column 2"
+            );
         }
 
         #[test]
         fn rejects_invalid_string() {
             let json = "\"invalid\"";
             let result: Result<DurationValue, _> = serde_json::from_str(json);
-            assert!(result.is_err());
+            assert_eq!(
+                result.expect_err("invalid string rejects").to_string(),
+                "no number before unit"
+            );
         }
     }
 

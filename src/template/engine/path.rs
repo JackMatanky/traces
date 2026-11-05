@@ -552,8 +552,10 @@ mod tests {
 
             for test in ["path_exists", "is_file_path", "is_dir_path"] {
                 let template = format!("{{{{ 'x' is {test} }}}}");
-                assert!(
-                    env.render_str(&template, minijinja::context! {}).is_ok(),
+                assert_eq!(
+                    env.render_str(&template, minijinja::context! {})
+                        .map_err(|error| error.to_string()),
+                    Ok("False".to_owned()),
                     "expected {test} to be registered as a test"
                 );
             }
@@ -564,15 +566,17 @@ mod tests {
             let root = tempfile::tempdir().expect("create temp dir");
             let env = env(root.path());
 
-            for filter in [
-                "path_filename",
-                "path_basename",
-                "path_extension",
-                "path_parent",
+            for (filter, expected) in [
+                ("path_filename", "x"),
+                ("path_basename", "x"),
+                ("path_extension", ""),
+                ("path_parent", ""),
             ] {
                 let template = format!("{{{{ 'x' | {filter} }}}}");
-                assert!(
-                    env.render_str(&template, minijinja::context! {}).is_ok(),
+                assert_eq!(
+                    env.render_str(&template, minijinja::context! {})
+                        .map_err(|error| error.to_string()),
+                    Ok(expected.to_owned()),
                     "expected {filter} to be registered as a filter"
                 );
             }

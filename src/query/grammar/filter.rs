@@ -1264,7 +1264,10 @@ fn string_callback(lex: &mut Lexer<'_, FilterToken>) -> NoteFieldValue {
 mod tests {
     use std::{fs, sync::Arc};
 
-    use super::FilterExpr;
+    use super::{
+        ArithOp, BooleanExpr, CompareOp, ComparisonExpr, DurationValue,
+        FilterAtom, FilterExpr, NoteFieldValue, ValueExpr,
+    };
     use crate::{
         IndexerService,
         query::{QueryError, *},
@@ -1286,6 +1289,17 @@ mod tests {
             ("high.md", "---\nrating: 7\nstatus: done\n---"),
             ("unrated.md", "---\nstatus: done\n---"),
         ])
+    }
+
+    /// Builds the literal that the parser folds a `dur("<text>")` call into.
+    fn dur_call(text: &str) -> ValueExpr {
+        ValueExpr::Literal(NoteFieldValue::Duration(
+            DurationValue::parse(text).expect("valid duration"),
+        ))
+    }
+
+    fn number(value: f64) -> ValueExpr {
+        ValueExpr::Literal(NoteFieldValue::Number(value))
     }
 
     fn names(rows: &QuerySet) -> Vec<String> {
@@ -1553,10 +1567,35 @@ mod tests {
         }
 
         #[rstest]
-        #[case::duration_times_number("dur(\"1d\") * 2 == dur(\"2d\")")]
-        #[case::number_times_duration("2 * dur(\"1d\") == dur(\"2d\")")]
-        fn accepts_duration_scaling_by_a_number(#[case] expr: &str) {
-            assert!(FilterExpr::parse(expr).is_ok());
+        #[case::duration_times_number(
+            "dur(\"1d\") * 2 == dur(\"2d\")",
+            dur_call("1d"),
+            number(2.0)
+        )]
+        #[case::number_times_duration(
+            "2 * dur(\"1d\") == dur(\"2d\")",
+            number(2.0),
+            dur_call("1d")
+        )]
+        fn accepts_duration_scaling_by_a_number(
+            #[case] expr: &str,
+            #[case] lhs: ValueExpr,
+            #[case] rhs: ValueExpr,
+        ) {
+            assert_eq!(
+                FilterExpr::parse(expr).expect("valid filter"),
+                FilterExpr(BooleanExpr::Atom(FilterAtom::Comparison(
+                    ComparisonExpr::new(
+                        ValueExpr::Binary {
+                            lhs: Box::new(lhs),
+                            op: ArithOp::Mul,
+                            rhs: Box::new(rhs),
+                        },
+                        CompareOp::Eq,
+                        dur_call("2d"),
+                    )
+                )))
+            );
         }
 
         #[test]
