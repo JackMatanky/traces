@@ -6,6 +6,72 @@
       "file": "src/strsim.rs",
       "mutator": "numbers/incrementer",
       "line": 15
+    },
+    {
+      "id": "3dfa16ddcf109ff6f3234bacd3966640",
+      "file": "src/note/parser/task.rs",
+      "mutator": "branch/if",
+      "line": 75
+    },
+    {
+      "id": "e9200f0f4251792c6989332da20c1ef8",
+      "file": "src/note/parser/task.rs",
+      "mutator": "expression/comparison",
+      "line": 146
+    },
+    {
+      "id": "e76440d8c693c55c4a3e89ad59c3ccbc",
+      "file": "src/note/parser/task.rs",
+      "mutator": "expression/comparison",
+      "line": 155
+    },
+    {
+      "id": "4b1ec8af91d72e412de591a498e3c1f0",
+      "file": "src/note/parser/task.rs",
+      "mutator": "expression/remove",
+      "line": 66
+    },
+    {
+      "id": "ce2ac3bec2c0966095e300c9a96763f2",
+      "file": "src/note/parser/task.rs",
+      "mutator": "expression/remove",
+      "line": 146
+    },
+    {
+      "id": "9f05a13d64466fd025882dbd3f510099",
+      "file": "src/note/parser/task.rs",
+      "mutator": "expression/remove",
+      "line": 155
+    },
+    {
+      "id": "e3b0bb1c6c9942e98fba63e45a3c39fb",
+      "file": "src/note/parser/task.rs",
+      "mutator": "loop/break",
+      "line": 81
+    },
+    {
+      "id": "f1a63f7e28f71059e8b05f350b886107",
+      "file": "src/query/format.rs",
+      "mutator": "branch/else",
+      "line": 254
+    },
+    {
+      "id": "7fb6eaa96297bce8d094719d3fc19647",
+      "file": "src/query/format.rs",
+      "mutator": "branch/if",
+      "line": 275
+    },
+    {
+      "id": "35d9d3be02021bd3e4cac11aa66f67b1",
+      "file": "src/query/format.rs",
+      "mutator": "numbers/decrementer",
+      "line": 220
+    },
+    {
+      "id": "be548fb361b0b1f4e0f36997bca1ea01",
+      "file": "src/query/format.rs",
+      "mutator": "numbers/incrementer",
+      "line": 220
     }
   ]
 }
