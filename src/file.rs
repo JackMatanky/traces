@@ -61,8 +61,7 @@ impl FileMeta {
     ///
     /// # Errors
     ///
-    /// Returns an [`std::io::Error`] if the file's modification time cannot be
-    /// read.
+    /// - [`std::io::Error`] if the file's modification time cannot be read.
     pub(crate) fn from_metadata(
         relative: RelativePath,
         metadata: &fs::Metadata,

@@ -94,7 +94,7 @@ impl FromStr for FieldAddress {
     ///
     /// # Errors
     ///
-    /// Same as [`TryFrom<&str>`] for [`FieldAddress`].
+    /// - The errors of [`TryFrom<&str>`] for [`FieldAddress`].
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         Self::try_from(raw)
     }

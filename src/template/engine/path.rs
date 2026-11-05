@@ -104,10 +104,11 @@ impl PathOps {
 ///
 /// # Errors
 ///
-/// Returns a [`minijinja::Error`] with kind [`ErrorKind::InvalidOperation`] if
-/// a relative `path` traverses outside `root` (through `..` or a symlink
-/// escape) or if reading the resolved target's metadata fails for any reason
-/// other than "not found".
+/// - [`minijinja::Error`] of kind [`ErrorKind::InvalidOperation`] if a relative
+///   `path` traverses outside `root` (through `..` or a symlink escape).
+/// - [`minijinja::Error`] of kind [`ErrorKind::InvalidOperation`] if reading
+///   the resolved target's metadata fails for any reason other than "not
+///   found".
 ///
 /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn inspect(

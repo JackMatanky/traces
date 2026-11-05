@@ -145,8 +145,8 @@ impl ConfigFixture {
     ///
     /// # Errors
     ///
-    /// Returns an [`std::io::Error`] if creating parent directories or writing
-    /// the configuration file fails.
+    /// - [`std::io::Error`] if creating the parent directories fails.
+    /// - [`std::io::Error`] if writing the configuration file fails.
     pub fn write_to(&self, root: &Path) -> std::io::Result<PathBuf> {
         let config_path = root.join(CONFIG_FILE_REL);
         if let Some(parent) = config_path.parent() {

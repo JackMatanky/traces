@@ -370,7 +370,7 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// This method always returns `Ok`.
+    /// - None: this method always returns `Ok`.
     #[inline]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -644,8 +644,8 @@ impl Serialize for DurationValue {
     ///
     /// # Errors
     ///
-    /// Returns an error if formatting fails or the serializer rejects string
-    /// values.
+    /// - `S::Error` if formatting fails.
+    /// - `S::Error` if the serializer rejects string values.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -660,8 +660,8 @@ impl<'de> Deserialize<'de> for DurationValue {
     ///
     /// # Errors
     ///
-    /// Returns a deserialization error if the input is not a string or does
-    /// not satisfy the duration grammar.
+    /// - `D::Error` if the input is not a string.
+    /// - `D::Error` if the input does not satisfy the duration grammar.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

@@ -157,7 +157,7 @@ impl TemplatePath {
     ///
     /// # Errors
     ///
-    /// Returns an [`io::Error`] if the resolved template file cannot be read.
+    /// - [`io::Error`] if the resolved template file cannot be read.
     pub(super) fn read(&self) -> io::Result<String> {
         fs::read_to_string(self.absolute())
     }

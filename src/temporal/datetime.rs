@@ -387,8 +387,8 @@ impl Serialize for DateTimeValue {
     ///
     /// # Errors
     ///
-    /// Returns an error if pattern rendering fails or the serializer rejects
-    /// the string value.
+    /// - `S::Error` if pattern rendering fails.
+    /// - `S::Error` if the serializer rejects the string value.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -410,9 +410,11 @@ impl<'de> Deserialize<'de> for DateTimeValue {
     ///
     /// # Errors
     ///
-    /// Returns a deserialization error if the input is not a string or does not
-    /// match an accepted shape. Naive input also fails if local-zone lookup
-    /// fails or its timestamp is outside Jiff's supported range.
+    /// - `D::Error` if the input is not a string or does not match an accepted
+    ///   shape.
+    /// - `D::Error` if the local-zone lookup of a naive input fails.
+    /// - `D::Error` if the timestamp of a naive input is outside Jiff's
+    ///   supported range.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -452,8 +454,8 @@ impl DateTimeShape {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the input does not match an accepted date-time shape or
-    /// contains invalid fields or an offset.
+    /// - `Err` if the input does not match an accepted date-time shape.
+    /// - `Err` if the input contains invalid fields or an offset.
     pub(crate) fn parse_any(s: &str) -> Result<DateTimeInput, &'static str> {
         let normalized = Self::truncate_fractional_seconds(s);
         let normalized = Self::normalize_separator(normalized);
@@ -510,8 +512,8 @@ impl DateTimeShape {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the lexer does not identify one supported date-time
-    /// shape that spans all of `input`.
+    /// - `Err` if the lexer does not identify one supported date-time shape
+    ///   that spans all of `input`.
     fn recognize(input: &str) -> Result<Self, &'static str> {
         let mut lexer = TemporalShapeToken::lexer(input);
         let Some(Ok(token)) = lexer.next() else {

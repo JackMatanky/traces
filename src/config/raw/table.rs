@@ -84,12 +84,14 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Table<T> {
     }
 }
 
-/// Deserializes a required table field, for `deserialize_with`.
+/// Deserializes a required table field into `T` and rejects an array.
+///
+/// Use it as `deserialize_with` on a field that holds a [`Deserialize`] struct.
 ///
 /// # Errors
 ///
-/// Returns the deserializer's error when the value is not a table or when `T`
-/// rejects the table's keys.
+/// - [`Deserializer::Error`] if the value is not a table.
+/// - [`Deserializer::Error`] if `T` rejects the keys of the table.
 pub(super) fn table<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
@@ -98,12 +100,15 @@ where
     Table::<T>::deserialize(deserializer).map(|table| table.0)
 }
 
-/// Deserializes an optional table field, for `deserialize_with`.
+/// Deserializes an optional table field into `Option<T>` and rejects an array.
+///
+/// Use it as `deserialize_with` together with `default` on a field that holds
+/// an optional [`Deserialize`] struct.
 ///
 /// # Errors
 ///
-/// Returns the deserializer's error when a present value is not a table or
-/// when `T` rejects the table's keys.
+/// - [`Deserializer::Error`] if a present value is not a table.
+/// - [`Deserializer::Error`] if `T` rejects the keys of the table.
 pub(super) fn opt_table<'de, D, T>(
     deserializer: D,
 ) -> Result<Option<T>, D::Error>
@@ -115,12 +120,16 @@ where
         .map(|table| table.map(|table| table.0))
 }
 
-/// Deserializes an array of tables, for `deserialize_with`.
+/// Deserializes an array of tables into `Vec<T>` and rejects an array entry
+/// that is not a table.
+///
+/// Use it as `deserialize_with` on a field that holds a list of [`Deserialize`]
+/// structs.
 ///
 /// # Errors
 ///
-/// Returns the deserializer's error when the value is not an array or when an
-/// entry is not a table that `T` accepts.
+/// - [`Deserializer::Error`] if the value is not an array.
+/// - [`Deserializer::Error`] if an entry is not a table that `T` accepts.
 pub(super) fn table_list<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,
