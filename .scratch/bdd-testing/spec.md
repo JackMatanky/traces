@@ -892,10 +892,10 @@ change.
   `service.rs` and `delta.rs` of slice 4 were not compared. See the ledger.
 - 2026-11-05: a review follow-up wave closed the high and medium gaps. It added
   unit, process, golden, property and fuzz tests. It added the seventh gate
-  check and the `spec-change` hook. CI gained a three-OS unit job. A nightly
-  workflow runs mutation, soak, bench and fuzz jobs. A fuzz run found and fixed
+  check and the `spec-change` hook. CI gained a three-OS unit job. Scheduled
+  workflows run mutation, soak, bench and fuzz jobs. A fuzz run found and fixed
   a duration printing defect. The ledger section "Review Follow-up Wave" has the
-  details and the open items. The nightly mutation gate reports without failing
+  details and the open items. The scheduled mutation gate reports without failing
   until each module has a baseline.
 - 2026-11-05: the scenario suite moved to its own test binary.
   `tests/features.rs` holds the `scenarios!` entry. The steps moved to
@@ -923,6 +923,10 @@ change.
   section written as an array is rejected` is added and owned by 01-G22. The
   scenario count gate now touches `tests/features.rs`, rebuilds and lists
   again. It fails only if the counts still differ. The scenario count is 149.
-- 2026-11-05: the weekly `soak` job in `.github/workflows/nightly.yml` runs on
-  `ubuntu-latest` and `windows-latest`. The Windows run time is unmeasured. If
-  20 repeats exceed the 150-minute limit, lower the Windows stress count.
+- 2026-11-05: the weekly `soak` job runs on `ubuntu-latest` and
+  `windows-latest`. The Windows run time is unmeasured. If 20 repeats exceed the
+  150-minute limit, lower the Windows stress count.
+- 2026-11-05: `nightly.yml` is split into four workflows, one for each purpose:
+  `mutation.yml` and `fuzz.yml` run nightly, `soak.yml` and `bench.yml` run
+  weekly. Each has its own `cron`, so the `github.event.schedule` filters are
+  gone. The benchmark smoke job moved out of the soak job.

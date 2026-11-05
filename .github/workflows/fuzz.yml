@@ -1,0 +1,50 @@
+---
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  MISE_EXPERIMENTAL: "1"
+  MISE_YES: "1"
+  MISE_AUTO_INSTALL: "0"
+  RUSTUP_AUTO_INSTALL: "0"
+
+jobs:
+  fuzz-smoke:
+    name: fuzz (60s per target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        if: hashFiles('fuzz/**') != ''
+        with:
+          experimental: true
+          install_args: rust
+      - uses: Swatinem/rust-cache@v2
+        if: hashFiles('fuzz/**') != ''
+        with:
+          shared-key: "fuzz-ubuntu"
+      - name: Install cargo-fuzz
+        if: hashFiles('fuzz/**') != ''
+        run: mise exec -- cargo install cargo-fuzz --locked
+      - name: Fuzz each target for 60 seconds
+        if: hashFiles('fuzz/**') != ''
+        run: |
+          for file in fuzz/fuzz_targets/*.rs; do
+            [[ -f "$file" ]] || continue
+            target="${file##*/}"
+            mise exec -- cargo fuzz run "${target%.rs}" -- -max_total_time=60
+          done

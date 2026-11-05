@@ -1,0 +1,53 @@
+---
+name: Soak
+
+on:
+  schedule:
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  MISE_EXPERIMENTAL: "1"
+  MISE_YES: "1"
+  MISE_AUTO_INSTALL: "0"
+  RUSTUP_AUTO_INSTALL: "0"
+
+jobs:
+  soak:
+    name: e2e soak (${{ matrix.os }}, 20 repeats)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      NEXTEST_PROFILE: ci-soak
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+          install_args: rust
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "soak-${{ matrix.os }}"
+      - run: mise install --locked cargo-binstall github:nextest-rs/nextest
+      - run: >-
+          cargo nextest run -p traces --all-features
+          --no-tests fail --no-fail-fast --stress-count 20 -E 'binary(e2e) | binary(features)'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: junit-e2e-soak-${{ matrix.os }}
+          path: target/nextest/ci-soak/junit.xml
+          if-no-files-found: ignore

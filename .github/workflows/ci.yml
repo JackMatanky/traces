@@ -198,7 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # A large diff can exceed the time box. The job reports but does not block
-    # until the nightly baseline exists for every module.
+    # until the scheduled baseline exists for every module.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7

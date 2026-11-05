@@ -889,8 +889,8 @@ medium items. No test or scenario was deleted.
   exact error. Four groups of near-identical tests became `rstest` tables.
 - **CI.** The unit job runs on three operating systems. A pull-request job runs
   `mutation-diff`. A coverage job uploads `lcov.info` and fails on an empty
-  report. A nightly workflow runs a soak, mutation per module, benchmark smoke
-  and fuzz smoke.
+  report. Scheduled workflows run mutation per module (`mutation.yml`), fuzz
+  smoke (`fuzz.yml`), a soak (`soak.yml`) and benchmark smoke (`bench.yml`).
 
 ### Mutation Triage
 
@@ -913,7 +913,7 @@ Surviving mutants from the proof runs were triaged with new unit tests.
 
 - Mutation triage did not cover `src/temporal/datetime.rs` (49 escapes), `index`
   (13 escapes in `inlinks.rs` and `refresh.rs`) or the other modules. The
-  nightly mutation gate reports without failing until a manual run with
+  scheduled mutation gate reports without failing until a manual run with
   `update_baseline` creates the baseline for each module.
 - The two `tracked.rs` tests stay. Scenario `A load without trust still records
   the configuration as tracked` covers the mutant, but no mutation compare ran.
@@ -966,7 +966,7 @@ capture those lines.
 
 Stress evidence: `cargo nextest run --no-default-features --test features
 --stress-count 100` passed 100 of 100 iterations on macOS. Windows and Linux
-results come from the CI run. The nightly soak ran on Ubuntu only. It now runs
+results come from the CI run. The soak ran on Ubuntu only. It now runs
 on Ubuntu and Windows (`--stress-count 20`). No Windows soak result exists yet.
 
 Duplicate review of the nested-tag scenarios: none deleted. They differ as
