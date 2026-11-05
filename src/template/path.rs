@@ -284,7 +284,7 @@ mod tests {
             // happens: parse() never reads the filesystem, so this
             // never touches whatever real file may or may not exist at
             // this well-known path.
-            let error = TemplatePathInput::parse(Path::new("/etc/passwd"))
+            let error = TemplatePathInput::parse(&std::env::temp_dir())
                 .expect_err("absolute path is rejected");
 
             assert!(matches!(error, TemplatePathError::Absolute(_)));

@@ -828,7 +828,7 @@ mod test_support {
             )]
             fn rejects_absolute_paths() {
                 let root = Path::new("/workspace");
-                let _ = resolve_safe_path(root, Path::new("/etc/passwd"));
+                let _ = resolve_safe_path(root, &std::env::temp_dir());
             }
 
             #[test]
