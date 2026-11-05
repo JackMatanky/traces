@@ -1,0 +1,6 @@
+Build or rebuild the persisted [`WorkspaceIndex`](crate::index::WorkspaceIndex)
+
+Usage: traces index
+
+Options:
+  -h, --help  Print help

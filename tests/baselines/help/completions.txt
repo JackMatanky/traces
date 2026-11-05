@@ -1,0 +1,8 @@
+Generate shell completion scripts or list available template names
+
+Usage: traces completions <--shell <SHELL>|--list-templates>
+
+Options:
+      --shell <SHELL>   Generate a static shell completion script for `traces` [possible values: bash, elvish, fish, powershell, zsh]
+      --list-templates  Print available template names for dynamic tab-completion
+  -h, --help            Print help
