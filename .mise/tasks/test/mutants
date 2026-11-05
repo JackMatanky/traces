@@ -124,7 +124,9 @@ declare -a targets=()
 
 # `--profile mutants` accepted in Task 10 P2 (see
 # quality_gates_mise_adoption.md §11).
-TEST_FLAGS="--features test-utils --all-targets --profile mutants"
+# Benches are excluded: each mutant would re-run them, and the `note_parsing`
+# bench overflows the main-thread stack on x86_64 Linux under this profile.
+TEST_FLAGS="--features test-utils --lib --tests --profile mutants"
 TIMEOUT_COEFFICIENT=5
 DEFAULT_TARGET="./src..."
 

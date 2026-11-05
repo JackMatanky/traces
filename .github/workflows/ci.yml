@@ -100,10 +100,10 @@ jobs:
           shared-key: "test-unit-${{ matrix.os }}"
       - run: mise install --locked cargo-binstall github:nextest-rs/nextest
       - run: >-
-          cargo nextest run -p traces --no-default-features
+          cargo nextest run -p traces --no-default-features --no-fail-fast
           --no-tests fail -E 'kind(lib)'
       - run: >-
-          cargo nextest run -p traces --no-default-features
+          cargo nextest run -p traces --no-default-features --no-fail-fast
           --no-tests fail -E 'binary(traces)'
       - uses: actions/upload-artifact@v7
         if: always()
