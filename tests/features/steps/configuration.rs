@@ -17,7 +17,7 @@ fn initialization_creates_default_configuration_files(
     sandbox: &Sandbox,
     last_run: &LastRun,
 ) {
-    last_run.0.as_ref().expect("init ran").assert_success();
+    last_run.run().assert_success();
     assert!(sandbox.root().join(".traces").is_dir());
     assert!(sandbox.root().join(".traces/templates").is_dir());
     let config = fs::read_to_string(sandbox.root().join(".traces/config.toml"))
@@ -34,7 +34,7 @@ fn stderr_reports_successful_initialization(
     sandbox: &Sandbox,
     last_run: &LastRun,
 ) {
-    let run = last_run.0.as_ref().expect("init ran");
+    let run = last_run.run();
     assert_reports_same_path(
         &run.stderr,
         "initialised traces in ",
@@ -122,7 +122,7 @@ fn rendered_template_is_under_local_output(
     sandbox: &Sandbox,
     last_run: &LastRun,
 ) {
-    last_run.0.as_ref().expect("template ran").assert_success();
+    last_run.run().assert_success();
     let output = sandbox.root().join("notes/daily.md");
     assert!(output.is_file(), "missing rendered file: {}", output.display());
     assert_eq!(
@@ -173,7 +173,7 @@ fn list_templates_from_nested_project(
         .current_dir(sandbox.root().join("nested/leaf"))
         .output()
         .expect("spawn template listing");
-    last_run.0 = Some(Run {
+    last_run.set(Run {
         status: output.status,
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
@@ -182,7 +182,7 @@ fn list_templates_from_nested_project(
 
 #[then("only the nearest local and global templates are listed")]
 fn only_nearest_local_and_global_templates_are_listed(last_run: &LastRun) {
-    let run = last_run.0.as_ref().expect("template listing ran");
+    let run = last_run.run();
     run.assert_success();
     run.assert_stdout_eq("nearest\nshared\n");
 }
@@ -225,7 +225,7 @@ fn trusted_project_with_invalid_field_key(sandbox: &Sandbox) {
 
 #[then(r#"stderr contains diagnostic code "{code}""#)]
 fn stderr_contains_diagnostic_code(last_run: &LastRun, code: String) {
-    let run = last_run.0.as_ref().expect("command ran");
+    let run = last_run.run();
     assert_eq!(
         run.stderr.lines().next().unwrap_or(""),
         code,
@@ -251,7 +251,7 @@ fn list_with_ceiling(sandbox: &Sandbox, last_run: &mut LastRun) {
     } else {
         sandbox.root().canonicalize().expect("canonical project root")
     };
-    last_run.0 = Some(sandbox.run_with_envs(&["list"], &[(
+    last_run.set(sandbox.run_with_envs(&["list"], &[(
         "TRACES_CEILING_DIRS",
         ceiling.as_os_str(),
     )]));

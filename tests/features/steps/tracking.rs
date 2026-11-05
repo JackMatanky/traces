@@ -54,7 +54,7 @@ fn assert_project_configuration_path(sandbox: &Sandbox, run: &Run) {
 
 #[then("stdout is the project configuration path")]
 fn tracked_config_path_is_stdout(sandbox: &Sandbox, last_run: &LastRun) {
-    let run = last_run.0.as_ref().expect("a prior command must have run");
+    let run = last_run.run();
     assert_project_configuration_path(sandbox, run);
 }
 

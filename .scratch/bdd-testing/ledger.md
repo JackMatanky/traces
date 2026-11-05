@@ -792,3 +792,51 @@ Surviving mutants from the proof runs were triaged with new unit tests.
   Review whether that is intended.
 - The array-for-table quirk (`templates = ["x"]` parses as `directory = "x"`)
   is open.
+
+## Layout Change (2026-11-05)
+
+The scenario suite moved to its own test binary, `tests/features.rs`. Entries
+above that name an old path map to the new paths as follows. The 148 scenario
+titles did not change.
+
+| Old path | New path |
+|---|---|
+| `tests/e2e/bdd/*.rs` | `tests/features/steps/*.rs` |
+| `tests/e2e/support.rs`, `tests/e2e/config_fixture.rs` | `tests/support/mod.rs`, `tests/support/config_fixture.rs` |
+| `tests/features/query.feature` | `tests/features/query/query-{source,sort,filter,render}.feature` |
+| `tests/features/note.feature` | `tests/features/note/note-{tasks,fields,frontmatter,tags-links}.feature` |
+| `tests/features/configuration.feature` | `tests/features/config/config-{init,discovery,validation}.feature` |
+| `tests/features/template.feature` | `tests/features/template/template-{prompts,resolution,output}.feature` |
+| `tests/features/index-freshness.feature` | `tests/features/index/index-{edits,paths,store}.feature` |
+| `tests/features/schema-temporal.feature` | `tests/features/schema/schema-file-class.feature`, `tests/features/temporal/temporal-dates.feature` |
+| `tests/features/process.feature` | `tests/features/process/process-contract.feature` |
+| `tests/features/tracking.feature` | `tests/features/tracking/tracking.feature` |
+| `tests/features/trust.feature` | `tests/features/trust/trust.feature` |
+
+Step and harness changes in the same commit:
+
+- `LastRun` has `run()` and `set()`. Eleven copies of one `expect` call are gone.
+- The steps `the first line of stdout is:` and `stderr is "{expected}"` had no
+  scenario. They are deleted.
+- `run_command` and `run_command_in_time_zone` share `command_args`.
+- `stdout is:`, `stderr is:` and the first-line step share one docstring rule.
+  Each trims newlines only. The old stderr step also trimmed spaces.
+- The new check `check_steps.py` found no undefined, duplicate or ambiguous step.
+
+Break demonstration for the `in time zone` step: the step set `TRACES_UNUSED_ZONE`
+in place of `TZ`. Three scenarios failed:
+
+- `A local clock field matches its UTC instant in another time zone`
+- `Equal durations shift differently over the spring clock change`
+- `Calendar differences count the local day and elapsed hours separately`
+
+The step was restored and all scenarios pass. The generic `I run` step does not
+capture those lines.
+
+Duplicate review of the nested-tag scenarios: none deleted. They differ as follows.
+
+- `Filtering by a tag includes nested tags` uses a line that holds only the tag.
+- `A parent tag selects notes carrying its descendant tag` puts the tag in a
+  prose line.
+- `A filter matches nested tags by prefix` uses a filter expression. The other
+  two use a source.

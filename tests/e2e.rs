@@ -2,15 +2,14 @@
 //! sandboxes, including the default non-interactive `init` path. See
 //! `support` for isolation guarantees.
 
-#[expect(
-    clippy::disallowed_methods,
-    reason = "rstest-bdd step wrappers call std::panic::catch_unwind"
-)]
-#[path = "e2e/bdd/mod.rs"]
-mod bdd;
-#[path = "e2e/config_fixture.rs"]
+#[path = "support/config_fixture.rs"]
 mod config_fixture;
-#[path = "e2e/support.rs"]
+#[expect(
+    dead_code,
+    reason = "the features binary shares this harness and uses helpers this \
+              binary does not"
+)]
+#[path = "support/mod.rs"]
 mod support;
 
 #[path = "e2e/completions.rs"]

@@ -32,6 +32,7 @@
 #USAGE   - `mise run test:unit index::query` - run tests matching name substring
 #USAGE   - `mise run test:unit --test integration` - run the integration binary
 #USAGE   - `mise run test:unit --test e2e` - run the E2E binary
+#USAGE   - `mise run test:unit --test features` - run the Gherkin scenario binary
 #USAGE   - `mise run test:unit -E 'test(/^index::/)'` - nextest filter DSL
 #USAGE   """
 #USAGE }

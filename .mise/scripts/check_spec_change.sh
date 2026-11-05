@@ -11,7 +11,7 @@ fi
 
 while IFS= read -r -d '' path; do
     case "$path" in
-        tests/features/*|.scratch/bdd-strategy/research/10-invariance-map.md)
+        tests/features/*.feature|.scratch/bdd-strategy/research/10-invariance-map.md)
             if ! grep -q '^spec change:' "$message_file"; then
                 echo 'ERROR: Scenario or invariance-map changes require a commit message line starting spec change:' >&2
                 exit 1

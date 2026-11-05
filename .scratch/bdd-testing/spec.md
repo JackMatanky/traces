@@ -36,8 +36,8 @@ rstest-bdd-macros = "=0.6.0"
 ```
 
 - Both crates are required. Do not set feature flags on the macros crate.
-- Put one `#[expect(clippy::disallowed_methods, reason = "...")]` on the `mod bdd`
-  declaration in `tests/e2e.rs`. The step wrapper calls `catch_unwind`. A
+- Put one `#[expect(clippy::disallowed_methods, reason = "...")]` on the `mod steps`
+  declaration in `tests/features.rs`. The step wrapper calls `catch_unwind`. A
   narrower scope cannot reach the lint. The `#[expect]` fails the build when the
   lint stops appearing. Revisit it at every `rstest-bdd` upgrade.
 - Use bare `{name}` placeholders. Typed placeholders such as `{count:u32}` fail
@@ -122,7 +122,7 @@ Classify a guarantee in this order. One guarantee may match more than one.
 
 Placement and layers:
 
-- Scenarios live in the `e2e` binary only. No new nextest phase exists.
+- Scenarios live in the `features` binary. Its nextest phase is `features`.
 - The split stays: integration is in-process, e2e is spawn-only.
 - Proptests stay inline in `src/`. Commit `proptest-regressions/` files.
 - The `integration-e2e-suite` is partially adopted. Its layer invariants, hermetic
@@ -134,15 +134,17 @@ Placement and layers:
 
 ## 5. Organization (ticket 11)
 
-- Features: `tests/features/<capability>.feature`. The directory is flat.
-- Steps: `tests/e2e/bdd/mod.rs` plus domain-concept files. Cross-feature steps
-  (run, exit code, streams) live in `process.rs`. Wire with
-  `#[path = "e2e/bdd/mod.rs"] mod bdd;`. The form `bdd.rs` is wrong.
+- Features: `tests/features/<capability>/<capability>-<topic>.feature`. The
+  file stem keeps the area, because test names hold the stem and no folder.
+- Steps: `tests/features/steps/mod.rs` plus domain-concept files. Cross-feature
+  steps (run, exit code, streams) live in `process.rs`. `tests/features.rs`
+  wires them with `#[path = "features/steps/mod.rs"] mod steps;`. A plain
+  `mod steps;` is wrong in a crate-root test file.
 - One `scenarios!("tests/features", fixtures = [...])` call.
 - Two plain fixtures: `sandbox: Sandbox` and `last_run: LastRun` (a newtype over
   `Option<Run>`). The fixture builds the sandbox.
-- The `touch` rule sits in the doc comment of `tests/e2e/bdd/mod.rs`: after you
-  add a feature file, run `touch tests/e2e/bdd/mod.rs`. Do not add a `build.rs`.
+- The `touch` rule sits in the doc comment of `tests/features.rs`: after you
+  add a feature file, run `touch tests/features.rs`. Do not add a `build.rs`.
 - Vocabulary: glossary terms for behavior, ordinary words for setup, never an
   internal type name. A term that ticket 12 has not resolved stays out.
 - One observable behavior per scenario, one principal `When`. Add a step only with
@@ -155,17 +157,17 @@ Placement and layers:
   no generic assertion wrappers, no step-generating macros, no per-domain World.
 - Provenance: the `Feature` description states the guarantee and links its intent
   source. Scenarios carry no `Defect class:` tag.
-- `check:layers` Rust-symbol patterns scan `tests/e2e.rs` and `tests/e2e/`. They
+- `check:layers` Rust-symbol patterns scan `tests/e2e.rs`, `tests/e2e/`, `tests/features.rs`, `tests/features/` and `tests/support/`. They
   match `traces` or `process` before `{`, `;`, `::` or the word `as`. Avoid such
   step patterns. Feature text is not scanned by them.
-- The gate checks over `tests/features/` and `tests/e2e/bdd/`: no `Rule:` line,
+- The gate checks over `tests/features/`: no `Rule:` line,
   no `skip!`, no `@ignore`, no duplicate `Scenario:` title across files, and a
   failure when `git grep` exits with code 2 or higher.
 
 Authoring summary, quoted from ticket 11:
 
-- Features are in `tests/features/`, one file for each behavioral area.
-- Steps are in `tests/e2e/bdd/`, one file for each domain concept.
+- Features are in `tests/features/<capability>/`, one file for each topic.
+- Steps are in `tests/features/steps/`, one file for each domain concept.
 - Use bare `{name}` placeholders with the quotes in the pattern.
 - Write 3 to 5 steps and one principal `When`.
 - Never use `Rule:`, `skip!()` or `@ignore`.
@@ -260,7 +262,9 @@ Section 9.4 lists them: the `check:layers` fix, the five feature-text checks and
 the sixth gate check. The review of 2026-11-05 added a seventh check. Every
 `Scenario:` title must appear in a Status cell of the invariance map or in
 `.scratch/bdd-testing/scenario-owners.md`. The task `check:layers:selftest` tests
-the gate against fixtures and runs in `mise run verify`.
+the gate against fixtures and runs in `mise run verify`. A later review added an
+eighth check, `.mise/scripts/check_steps.py`. It matches every feature step to a
+step definition. It fails on an undefined, unused, duplicate or ambiguous step.
 
 ### 6.7 Contradiction dispositions (ticket 12, decision f)
 
@@ -509,14 +513,14 @@ Feature: A project is trusted only after the user runs trust
 
 - Add the two dev-dependencies of section 2. Add `"Zlib"` to the `[licenses]`
   allow list in `deny.toml`.
-- Create `tests/features/`, `tests/e2e/bdd/mod.rs` (with the `touch` doc comment
-  and the one `#[expect]`) and the step files for S1 and S2.
+- Create `tests/features/`, `tests/features.rs` (with the `touch` doc comment
+  and the one `#[expect]`), `tests/features/steps/mod.rs` and the step files for S1 and S2.
 - Steps needed: run a command, exit code, stdout is empty, first line of stderr
   (docstring form), and the two Givens. The vocabulary has exact-equality steps
   for stdout and stderr, empty ones included.
 - Fix `check:layers`: fail when `git grep` exits with code 2 or higher, remove the
   `|| true` on three greps (`mise.toml` lines 168, 175 and 182) and the hidden
-  error in the first pipeline, scan `tests/e2e/bdd/`, and add the five
+  error in the first pipeline, scan `tests/features/`, and add the five
   feature-text checks. Untracked files are not scanned by `git grep`. Stage new
   files before a local run. Flip the gate-owned note of section 6.2.
 - Add `.gitattributes` with the line `*.feature text eol=lf`.
@@ -575,10 +579,10 @@ ticket 08 reopens. The user decides whether to reopen.
 Stay: `init.rs::default_path_init_spawns_and_scaffolds_workspace` (pins 01-G15),
 `trust.rs::trust_all_and_untrust_all_count_asserted_via_trust_list`, and the
 workflow chain test. The helpers `Sandbox` (`write_config`, `run`) and `Run` in
-`tests/e2e/support.rs` are reused unchanged.
+`tests/support/mod.rs` are reused unchanged.
 
-**Phase wiring.** Scenarios sit in the `e2e` binary. The `e2e` phase of
-`mise run test` and the CI `test-e2e` matrix run them with no new phase.
+**Phase wiring.** Scenarios sit in the `features` binary. The `features` phase of
+`mise run test` and the CI `test-e2e` matrix run them.
 
 **Acceptance criteria.**
 
@@ -704,7 +708,7 @@ slice, and where it lands:
 
 | Obligation | Source | Lands in |
 |---|---|---|
-| Layout, `touch` comment, `mod bdd` with `#[expect]` | 11 | Slice 1, commit 1 |
+| Layout, `touch` comment, `mod steps` with `#[expect]` | 11 | Slice 1, commit 1 |
 | `"Zlib"` in `deny.toml` | 09, 11 | Slice 1, commit 1 |
 | `check:layers` exit-code fix and the feature-text checks | 08, 11, 12 | Slice 1, commit 1 |
 | Flip the gate-owned global note | 12 | Slice 1, commit 1 |
@@ -868,3 +872,19 @@ change.
   printing defect. The ledger section "Review Follow-up Wave" has the details and
   the open items. The nightly mutation gate reports without failing until each
   module has a baseline.
+- 2026-11-05: the scenario suite moved to its own test binary. `tests/features.rs`
+  holds the `scenarios!` entry. The steps moved to `tests/features/steps/`. The
+  shared harness moved to `tests/support/`, which both `e2e` and `features`
+  include. Feature files sit in one folder for each capability. Large files split
+  by topic, so `query` has four files. The file stem carries the area, because a
+  test name holds the stem and no folder. This replaces the flat layout and the
+  rule that scenarios live in the `e2e` binary only. The nextest `features` phase
+  and the CI `test (e2e)` job run both binaries. An eighth check,
+  `check_steps.py`, fails on an undefined, unused, duplicate or ambiguous step.
+  The 148 scenario titles are unchanged. The shared harness compiles into both
+  binaries, so the five `config_fixture` tests now run in each. A break
+  demonstration shows the `in time zone` step wins over the generic run step:
+  with `TZ` removed, three scenarios fail. The three nested-tag scenarios stay.
+  `Filtering by a tag includes nested tags` and `A parent tag selects notes
+  carrying its descendant tag` differ in the tag position. The filter scenario
+  uses a different mechanism.

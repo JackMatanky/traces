@@ -20,4 +20,11 @@ bash .mise/scripts/check_spec_change.sh "$root/message" "$root/paths"
 printf 'test: update fixtures\n' > "$root/message"
 printf 'tests/baselines/output/task.txt\0' > "$root/paths"
 bash .mise/scripts/check_spec_change.sh "$root/message" "$root/paths"
+printf 'tests/features/steps/process.rs\0tests/features.rs\0' > "$root/paths"
+bash .mise/scripts/check_spec_change.sh "$root/message" "$root/paths"
+printf 'tests/features/query/query-sort.feature\0' > "$root/paths"
+if bash .mise/scripts/check_spec_change.sh "$root/message" "$root/paths" > /dev/null 2>&1; then
+    echo 'ERROR: Nested feature change without trailer passed' >&2
+    exit 1
+fi
 echo 'Commit-message matcher self-test passed.'

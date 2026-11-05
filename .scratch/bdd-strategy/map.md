@@ -139,11 +139,12 @@ fresh session can start slice 1 with zero open design questions.
   containment and `NoteFieldValue` order as proptests. The invariance list sets
   the order of the first slices.
 - [11: Feature and step organization](issues/11-feature-step-organization.md):
-  features in flat `tests/features/<capability>.feature`.
-  - Steps live in `tests/e2e/bdd/mod.rs` and domain-concept files, never one
-    file per feature.
-  - Use `#[path = "e2e/bdd/mod.rs"]`. The `bdd.rs` form picks up sibling e2e
-    files.
+  features in `tests/features/<capability>/` folders (amended 2026-11-05;
+  the first decision was a flat directory).
+  - Steps live in `tests/features/steps/mod.rs` and domain-concept files, never
+    one file per feature.
+  - Use `#[path = "features/steps/mod.rs"]` in `tests/features.rs`. A plain `mod`
+    in a crate-root test file picks up the wrong path.
   - Use bare `{name}` placeholders with quotes in the pattern.
   - Use two plain fixtures, `Sandbox` and `LastRun`, with no World.
   - Prefer 3 to 5 steps.

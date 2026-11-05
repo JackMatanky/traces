@@ -30,17 +30,17 @@ fn three_rated_notes(sandbox: &Sandbox) {
 
 #[when("I select pages from:")]
 fn select_pages(sandbox: &Sandbox, last_run: &mut LastRun, docstring: String) {
-    last_run.0 = Some(sandbox.run(&["list", "--from", docstring.trim()]));
+    last_run.set(sandbox.run(&["list", "--from", docstring.trim()]));
 }
 
 #[when("I filter pages where:")]
 fn filter_pages(sandbox: &Sandbox, last_run: &mut LastRun, docstring: String) {
-    last_run.0 = Some(sandbox.run(&["list", "--where", docstring.trim()]));
+    last_run.set(sandbox.run(&["list", "--where", docstring.trim()]));
 }
 
 #[when("I filter tasks where:")]
 fn filter_tasks(sandbox: &Sandbox, last_run: &mut LastRun, docstring: String) {
-    last_run.0 = Some(sandbox.run(&["task", "--where", docstring.trim()]));
+    last_run.set(sandbox.run(&["task", "--where", docstring.trim()]));
 }
 
 #[when("I list notes with filter:")]
@@ -49,5 +49,5 @@ fn list_notes_with_filter(
     last_run: &mut LastRun,
     docstring: String,
 ) {
-    last_run.0 = Some(sandbox.run(&["list", "--where", docstring.trim()]));
+    last_run.set(sandbox.run(&["list", "--where", docstring.trim()]));
 }

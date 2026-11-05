@@ -173,7 +173,7 @@ if [[ -d tests/common ]]; then
     common_paths+=(tests/common/)
 fi
 
-e2e_traces_raw=$(check_grep -n -E '(^|[^[:alnum:]_])traces[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' -- tests/e2e.rs tests/e2e/ tests/e2e/bdd/ ${common_paths[@]+"${common_paths[@]}"})
+e2e_traces_raw=$(check_grep -n -E '(^|[^[:alnum:]_])traces[[:space:]]*(::|\{|;|[[:space:]]+as[[:space:]])' -- tests/e2e.rs tests/e2e/ tests/features.rs tests/features/ tests/support/ ${common_paths[@]+"${common_paths[@]}"} ':!*.feature')
 if [[ -n "${e2e_traces_raw}" ]]; then
     e2e_traces_refs=$(printf '%s\n' "${e2e_traces_raw}" | grep -v -E '["`].*traces[[:space:]]*::|^[[:space:]]*//' || true)
     if [[ -n "${e2e_traces_refs}" ]]; then
@@ -183,9 +183,9 @@ if [[ -n "${e2e_traces_raw}" ]]; then
     fi
 fi
 
-e2e_process_refs=$(check_grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' -- tests/e2e.rs tests/e2e/ tests/e2e/bdd/ ${common_paths[@]+"${common_paths[@]}"} ':!tests/e2e/support.rs')
+e2e_process_refs=$(check_grep -n -E 'process[[:space:]]*(::|\{|[[:space:]]+as[[:space:]])' -- tests/e2e.rs tests/e2e/ tests/features.rs tests/features/ tests/support/ ${common_paths[@]+"${common_paths[@]}"} ':!tests/support/mod.rs' ':!*.feature')
 if [[ -n "${e2e_process_refs}" ]]; then
-    echo "ERROR: tests/e2e/ must not use std::process outside support.rs" >&2
+    echo "ERROR: black-box tests must not use std::process outside tests/support/mod.rs" >&2
     echo "${e2e_process_refs}" >&2
     exit 1
 fi
@@ -204,21 +204,21 @@ if [[ -n "${cwd_refs}" ]]; then
     exit 1
 fi
 
-rule_refs=$(check_grep -n -E '^[[:space:]]*Rule:' -- tests/features/ tests/e2e/bdd/)
+rule_refs=$(check_grep -n -E '^[[:space:]]*Rule:' -- tests/features/)
 if [[ -n "${rule_refs}" ]]; then
     echo "ERROR: Rule: is forbidden in feature files and steps" >&2
     echo "${rule_refs}" >&2
     exit 1
 fi
 
-skip_refs=$(check_grep -n -E 'skip!' -- tests/features/ tests/e2e/bdd/)
+skip_refs=$(check_grep -n -E 'skip!' -- tests/features/)
 if [[ -n "${skip_refs}" ]]; then
     echo "ERROR: skip! is forbidden in scenario steps and features" >&2
     echo "${skip_refs}" >&2
     exit 1
 fi
 
-ignore_refs=$(check_grep -n -E '@ignore' -- tests/features/ tests/e2e/bdd/)
+ignore_refs=$(check_grep -n -E '@ignore' -- tests/features/)
 if [[ -n "${ignore_refs}" ]]; then
     echo "ERROR: @ignore is forbidden in feature files and steps" >&2
     echo "${ignore_refs}" >&2
@@ -236,6 +236,7 @@ if [[ -n "${scenario_titles}" ]]; then
 fi
 
 python3 .mise/scripts/check_scenarios.py
+python3 .mise/scripts/check_steps.py
 echo "==> Layer discipline checks passed."
 '''
 
@@ -246,6 +247,7 @@ run = '''
 #!/bin/bash
 set -euo pipefail
 bash .mise/scripts/check_scenarios_selftest.sh
+bash .mise/scripts/check_steps_selftest.sh
 bash .mise/scripts/check_spec_change_selftest.sh
 '''
 

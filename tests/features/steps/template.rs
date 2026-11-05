@@ -37,7 +37,7 @@ fn daily_template_with_prompt_defaults(sandbox: &Sandbox) {
 
 #[when("I preview the template without a terminal")]
 fn preview_without_terminal(sandbox: &Sandbox, last_run: &mut LastRun) {
-    last_run.0 = Some(
+    last_run.set(
         sandbox
             .run_with_watchdog(
                 &["template", "-i", "daily", "--dry-run"],

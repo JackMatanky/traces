@@ -47,7 +47,7 @@ jobs:
       - run: mise install --locked cargo-binstall github:nextest-rs/nextest
       - run: >-
           cargo nextest run -p traces --all-features
-          --no-tests fail --no-fail-fast --stress-count 20 -E 'binary(e2e)'
+          --no-tests fail --no-fail-fast --stress-count 20 -E 'binary(e2e) | binary(features)'
       - uses: actions/upload-artifact@v7
         if: always()
         with:

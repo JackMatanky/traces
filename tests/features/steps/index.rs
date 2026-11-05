@@ -125,7 +125,7 @@ fn exact_implied_and_nearby_links(sandbox: &Sandbox) {
 
 #[then(r#"the inlinks for "{path}" are "{expected}""#)]
 fn inlinks_are(last_run: &LastRun, path: String, expected: String) {
-    let run = last_run.0.as_ref().expect("prior command");
+    let run = last_run.run();
     let row = run
         .stdout
         .lines()
@@ -138,7 +138,7 @@ fn inlinks_are(last_run: &LastRun, path: String, expected: String) {
 
 #[then(r#"the inlinks for "{path}" are empty"#)]
 fn inlinks_empty(last_run: &LastRun, path: String) {
-    let run = last_run.0.as_ref().expect("prior command");
+    let run = last_run.run();
     let row = run
         .stdout
         .lines()
@@ -183,7 +183,7 @@ fn persisted_list_result(sandbox: &Sandbox) {
 
 #[then("another list run has the same stdout")]
 fn another_list_matches(sandbox: &Sandbox, last_run: &LastRun) {
-    let first = last_run.0.as_ref().expect("first list command");
+    let first = last_run.run();
     let second = sandbox.run(&["list"]);
     second.assert_success();
     assert_eq!(second.stdout, first.stdout);
