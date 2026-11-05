@@ -13,7 +13,11 @@ use crate::support::{Run, Sandbox};
 pub(crate) struct LastRun(Option<Run>);
 
 impl LastRun {
-    /// Returns the last command outcome; fails the scenario when none ran.
+    /// Returns the last command outcome.
+    ///
+    /// # Panics
+    ///
+    /// Panics, which fails the scenario, when no command has run yet.
     pub(crate) fn run(&self) -> &Run {
         self.0.as_ref().expect("a prior command must have run")
     }

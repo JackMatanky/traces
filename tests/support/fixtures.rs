@@ -172,111 +172,118 @@ fn toml_string(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
+    use super::ConfigFixture;
 
-    use super::*;
-
-    #[test]
-    fn formats_minimal_configuration() {
-        let fixture = ConfigFixture::minimal();
-        assert_eq!(fixture.to_toml_string(), MINIMAL_CONFIG_TOML);
+    fn parse(fixture: &ConfigFixture) -> toml::Table {
+        toml::from_str(&fixture.to_toml_string())
+            .expect("fixture renders valid TOML")
     }
 
-    #[test]
-    fn formats_raw_configuration() {
-        let raw_toml = "malformed toml = [[";
-        let fixture = ConfigFixture::raw(raw_toml);
-        assert_eq!(fixture.to_toml_string(), raw_toml);
+    mod to_toml_string {
+        use pretty_assertions::assert_eq;
+
+        use super::{ConfigFixture, parse};
+        use crate::fixtures::{
+            DEFAULT_SCHEMAS_DIR_REL, DEFAULT_TEMPLATES_DIR_NAME,
+            MINIMAL_CONFIG_TOML,
+        };
+
+        #[test]
+        fn renders_the_minimal_configuration() {
+            let fixture = ConfigFixture::minimal();
+
+            assert_eq!(fixture.to_toml_string(), MINIMAL_CONFIG_TOML);
+        }
+
+        #[test]
+        fn returns_raw_content_unchanged() {
+            let raw_toml = "malformed toml = [[";
+            let fixture = ConfigFixture::raw(raw_toml);
+
+            assert_eq!(fixture.to_toml_string(), raw_toml);
+        }
+
+        #[test]
+        fn renders_every_declared_section() {
+            let fixture = ConfigFixture::new()
+                .with_templates(DEFAULT_TEMPLATES_DIR_NAME)
+                .with_schemas(DEFAULT_SCHEMAS_DIR_REL, Some("kind"))
+                .with_task_tag_filters(&["task", "todo"])
+                .with_task_status('?', "Blocked", "on-hold");
+            let expected: toml::Table = toml::from_str(
+                r#"
+                [templates]
+                directory = "templates"
+
+                [schemas]
+                directory = ".traces/schemas"
+                class_field = "kind"
+
+                [tasks]
+                tag_filters = ["task", "todo"]
+
+                [[tasks.statuses]]
+                symbol = "?"
+                name = "Blocked"
+                kind = "on-hold"
+                "#,
+            )
+            .expect("expected TOML is valid");
+
+            assert_eq!(parse(&fixture), expected);
+        }
+
+        #[test]
+        fn escapes_special_characters_in_structured_values() {
+            let fixture = ConfigFixture::new()
+                .with_templates("dir\\\"name")
+                .with_schemas("schema\\path", Some("kind\"field"))
+                .with_task_tag_filters(&["todo\\daily", "a\"b"])
+                .with_task_status('"', "On\"\nhold", "in\\progress");
+            let expected: toml::Table = toml::from_str(
+                r#"
+                [templates]
+                directory = 'dir\"name'
+
+                [schemas]
+                directory = 'schema\path'
+                class_field = 'kind"field'
+
+                [tasks]
+                tag_filters = ['todo\daily', 'a"b']
+
+                [[tasks.statuses]]
+                symbol = '"'
+                name = "On\"\nhold"
+                kind = 'in\progress'
+                "#,
+            )
+            .expect("expected TOML is valid");
+
+            assert_eq!(parse(&fixture), expected);
+        }
     }
 
-    #[test]
-    fn formats_declared_sections() {
-        let fixture = ConfigFixture::new()
-            .with_templates(DEFAULT_TEMPLATES_DIR_NAME)
-            .with_schemas(DEFAULT_SCHEMAS_DIR_REL, Some("kind"))
-            .with_task_tag_filters(&["task", "todo"])
-            .with_task_status('?', "Blocked", "on-hold");
+    mod write_to {
+        use std::fs;
 
-        let toml = fixture.to_toml_string();
-        assert!(toml.contains("[templates]\ndirectory = \"templates\""));
-        assert!(toml.contains(
-            "[schemas]\ndirectory = \".traces/schemas\"\nclass_field = \
-             \"kind\""
-        ));
-        assert!(toml.contains("tag_filters = [\"task\", \"todo\"]"));
-        assert!(toml.contains("symbol = \"?\""));
-    }
+        use pretty_assertions::assert_eq;
 
-    #[test]
-    fn serializes_special_characters_in_structured_values() {
-        let fixture = ConfigFixture::new()
-            .with_templates("dir\\\"name")
-            .with_schemas("schema\\path", Some("kind\"field"))
-            .with_task_tag_filters(&["todo\\daily", "a\"b"])
-            .with_task_status('"', "On\"\nhold", "in\\progress");
-        let doc: toml::Table =
-            toml::from_str(&fixture.to_toml_string()).expect("valid TOML");
-        let templates = doc
-            .get("templates")
-            .and_then(toml::Value::as_table)
-            .expect("templates section");
-        assert_eq!(
-            templates.get("directory").and_then(toml::Value::as_str),
-            Some("dir\\\"name")
-        );
-        let schemas = doc
-            .get("schemas")
-            .and_then(toml::Value::as_table)
-            .expect("schemas section");
-        assert_eq!(
-            schemas.get("directory").and_then(toml::Value::as_str),
-            Some("schema\\path")
-        );
-        assert_eq!(
-            schemas.get("class_field").and_then(toml::Value::as_str),
-            Some("kind\"field")
-        );
+        use super::ConfigFixture;
+        use crate::fixtures::{CONFIG_FILE_REL, MINIMAL_CONFIG_TOML};
 
-        let tasks = doc
-            .get("tasks")
-            .and_then(toml::Value::as_table)
-            .expect("tasks section");
-        let filters = tasks
-            .get("tag_filters")
-            .and_then(toml::Value::as_array)
-            .expect("tag filters");
-        assert_eq!(
-            filters.first().and_then(toml::Value::as_str),
-            Some("todo\\daily")
-        );
-        assert_eq!(filters.get(1).and_then(toml::Value::as_str), Some("a\"b"));
-        let status = tasks
-            .get("statuses")
-            .and_then(toml::Value::as_array)
-            .and_then(|statuses| statuses.first())
-            .and_then(toml::Value::as_table)
-            .expect("configured status");
-        assert_eq!(
-            status.get("symbol").and_then(toml::Value::as_str),
-            Some("\"")
-        );
-        assert_eq!(
-            status.get("name").and_then(toml::Value::as_str),
-            Some("On\"\nhold")
-        );
-        assert_eq!(
-            status.get("kind").and_then(toml::Value::as_str),
-            Some("in\\progress")
-        );
-    }
+        #[test]
+        fn writes_the_rendered_configuration_under_the_traces_directory() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            let fixture = ConfigFixture::minimal();
 
-    #[test]
-    fn writes_config_file_to_disk() {
-        let temp = tempfile::tempdir().expect("create temp dir");
-        let fixture = ConfigFixture::minimal();
-        let path = fixture.write_to(temp.path()).expect("write config");
-        assert_eq!(path, temp.path().join(CONFIG_FILE_REL));
-        let read = fs::read_to_string(&path).expect("read written config");
-        assert_eq!(read, MINIMAL_CONFIG_TOML);
+            let path = fixture.write_to(temp.path()).expect("write config");
+
+            assert_eq!(path, temp.path().join(CONFIG_FILE_REL));
+            assert_eq!(
+                fs::read_to_string(&path).expect("read written config"),
+                MINIMAL_CONFIG_TOML
+            );
+        }
     }
 }

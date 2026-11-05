@@ -39,4 +39,7 @@ expect_error "ERROR: Undefined step at one.feature:4: then 'commented out'"
 printf '#[when("I run {a}")]\nfn g() {}\n#[when("I run {a}")]\nfn h() {}\n' > "$root/tests/features/steps/a.rs"
 printf 'Feature: Steps\n  Scenario: One\n    When I run x\n' > "$root/tests/features/nested/one.feature"
 expect_error "ERROR: Duplicate step definition: when 'I run {a}'"
+printf '#[when("I run {a}")]\nfn i() {}\n' > "$root/tests/features/steps/a.rs"
+printf 'Feature: Steps\n  Scenario: One\n    When I run x\n      ```\n      Then fenced text\n      ```\n' > "$root/tests/features/nested/one.feature"
+.mise/scripts/check_steps.py "$root"
 echo 'Step matching gate self-test passed.'
