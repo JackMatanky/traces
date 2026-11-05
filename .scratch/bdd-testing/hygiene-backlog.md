@@ -6,13 +6,14 @@ adoption slices. The user owns this backlog. It serves spec section 9.8.
 ## Rules
 
 Each test change in this backlog must use:
+
 - The die rule from spec section 7.
 - A ledger entry in `.scratch/bdd-testing/ledger.md` that records the proof and
   the surviving twin before any deletion.
 
 ## 1. Misplaced E2E Tests (5 items)
 
-These tests live in `tests/e2e/config_fixture.rs`. They test in-memory data
+These tests live in `tests/support/fixtures.rs`. They test in-memory data
 formatting and filesystem helpers without exercising the CLI binary. They belong
 in unit tests:
 
@@ -52,16 +53,16 @@ belong inline in unit tests under `src/`:
 
 These tests use loose checks that can hide regressions:
 
-1. `tests/e2e/completions.rs::zsh_shell_prints_a_completion_script`: asserts only
-   `contains("#compdef traces")`. Needs script structure validation.
-2. `tests/e2e/init.rs::default_path_init_spawns_and_scaffolds_workspace`: asserts
-   only `contains("initialised...")`. Needs exact scaffold verification.
+1. `tests/e2e/completions.rs::zsh_shell_prints_a_completion_script`: asserts
+   only `contains("#compdef traces")`. Needs script structure validation.
+2. `tests/e2e/init.rs::default_path_init_spawns_and_scaffolds_workspace`:
+   asserts only `contains("initialised...")`. Needs exact scaffold verification.
 3. `tests/e2e/query.rs` diagnostic tests (lines 100, 123, 193): assert loose
    substring matches. Need exact diagnostic code checks.
 4. `tests/integration/query.rs::query_builder_reuses_one_index_for_page_and_task_queries`:
    asserts only row counts.
-5. `tests/integration/query.rs::sorting_an_empty_query_set_returns_empty`: asserts
-   only `assert!(result.is_empty())`.
+5. `tests/integration/query.rs::sorting_an_empty_query_set_returns_empty`:
+   asserts only `assert!(result.is_empty())`.
 6. `tests/integration/template.rs::template_weekday_rejects_out_of_range_day_index`:
    asserts only `is_err()` without checking the error variant.
 7. `tests/integration/template.rs::template_shorthands_reject_malformed_iso_offsets`:

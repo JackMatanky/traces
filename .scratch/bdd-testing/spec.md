@@ -1,29 +1,33 @@
 # BDD adoption and implementation strategy
 
-Status: slices 1 to 7 are on the `bdd-testing` integration branch. Slice 8 was dropped. The deletion wave is done except for the two retained `tracked.rs` tests. Date: 2026-11-04. The implementation tickets are in `.scratch/bdd-testing/issues/`.
+Status: slices 1 to 7 are on the `bdd-testing` integration branch. Slice 8 was
+dropped. The deletion wave is done except for the two retained `tracked.rs`
+tests. Date: 2026-11-04. The implementation tickets are in
+`.scratch/bdd-testing/issues/`.
 
-This document is the destination of the [BDD adoption map](../bdd-strategy/map.md).
-The decision tickets and research live in `.scratch/bdd-strategy/`. This folder
-holds the spec, the ledger and the implementation tickets. Sections 9 and 9.7
-record the original slice order and entry conditions. Every section names
-the ticket that decided it.
+This document is the destination of the [BDD adoption
+map](../bdd-strategy/map.md). The decision tickets and research live in
+`.scratch/bdd-strategy/`. This folder holds the spec, the ledger and the
+implementation tickets. Sections 9 and 9.7 record the original slice order and
+entry conditions. Every section names the ticket that decided it.
 
 ## 1. Purpose and rules
 
-- BDD adds executable specifications to the `traces` workspace. A scenario states
-  what the system guarantees. It never states how the system works.
+- BDD adds executable specifications to the `traces` workspace. A scenario
+  states what the system guarantees. It never states how the system works.
 - The framework is `rstest-bdd`. Nextest runs every scenario.
 - Use idiomatic Rust and minimal abstraction. Build no custom infrastructure
   beyond adopting an existing crate.
-- Obey the deny-lints and the machine gates (`mise run check:layers`,
-  `mise run check:visibility`). Never route around them.
+- Obey the deny-lints and the machine gates (`mise run check:layers`, `mise run
+  check:visibility`). Never route around them.
 - No coverage or test-count target exists, ever (section 6.5).
 - A scenario never pins a known defect (section 3.3).
 - Files under `.scratch/bdd-strategy/` and `.scratch/bdd-testing/` use
   ASD-STE100 style. Cite external evidence by its tag only.
-- "Ticket NN" in this spec means a decision ticket in `.scratch/bdd-strategy/issues/`.
-  "Arch ticket NN" means an arch-design ticket. The implementation tickets in
-  `.scratch/bdd-testing/issues/` are "implementation ticket NN".
+- "Ticket NN" in this spec means a decision ticket in
+  `.scratch/bdd-strategy/issues/`. "Arch ticket NN" means an arch-design ticket.
+  The implementation tickets in `.scratch/bdd-testing/issues/` are
+  "implementation ticket NN".
 
 ## 2. Framework (ticket 06)
 
@@ -36,10 +40,11 @@ rstest-bdd-macros = "=0.6.0"
 ```
 
 - Both crates are required. Do not set feature flags on the macros crate.
-- Put one `#[expect(clippy::disallowed_methods, reason = "...")]` on the `mod steps`
-  declaration in `tests/features.rs`. The step wrapper calls `catch_unwind`. A
-  narrower scope cannot reach the lint. The `#[expect]` fails the build when the
-  lint stops appearing. Revisit it at every `rstest-bdd` upgrade.
+- Put one `#[expect(clippy::disallowed_methods, reason = "...")]` on the `mod
+  steps` declaration in `tests/features.rs`. The step wrapper calls
+  `catch_unwind`. A narrower scope cannot reach the lint. The `#[expect]` fails
+  the build when the lint stops appearing. Revisit it at every `rstest-bdd`
+  upgrade.
 - Use bare `{name}` placeholders. Typed placeholders such as `{count:u32}` fail
   clippy.
 - A missing step under `scenarios!` fails at run time with `Step not found`.
@@ -47,13 +52,15 @@ rstest-bdd-macros = "=0.6.0"
   pattern panics at start.
 - State lives in plain rstest fixtures. There is no World.
 - `skip!()` passes by default. Ticket 11 bans it.
-- Evidence: [research/06](../bdd-strategy/research/06-framework-revalidation.md).
+- Evidence:
+  [research/06](../bdd-strategy/research/06-framework-revalidation.md).
 - Upstream status on 2026-11-03 [G]: `rstest-bdd` 0.6.0 is the latest release.
   The project has one maintainer. Nobody has filed the upstream lint fix.
   Feature files are portable. Steps convert to plain Rust tests in about two to
   four hours [G]. This is information, not a plan.
 - Linux and Windows behavior of the macro, the generated tests and docstring
-  comparison is unproven. The first draft-PR run is the only evidence (section 9).
+  comparison is unproven. The first draft-PR run is the only evidence (section
+  9).
 
 ## 3. What earns a scenario
 
@@ -62,8 +69,8 @@ rstest-bdd-macros = "=0.6.0"
 - Scenarios address the spawned `traces` process. The CLI is the only product
   boundary today.
 - Use a facade seam only when the symbol is already in a frozen baseline and a
-  spawn cannot express the behavior. Ticket 13 does not use this exception.
-  A later slice needs a new decision to use it.
+  spawn cannot express the behavior. Ticket 13 does not use this exception. A
+  later slice needs a new decision to use it.
 - Each new shipped entry point (core, cli, lsp, mcp) is a new boundary. It
   reopens this rule.
 - BDD adoption changes none of `public-api-default.txt`,
@@ -74,8 +81,8 @@ rstest-bdd-macros = "=0.6.0"
 A guarantee earns a scenario only when all six hold:
 
 1. Observable behavior: a state change or an input-to-output mapping.
-2. Observable channel: stdout, stderr diagnostic codes (never miette text),
-   exit status, or files under the project root.
+2. Observable channel: stdout, stderr diagnostic codes (never miette text), exit
+   status, or files under the project root.
 3. Intent evidence that agrees with the code (ADR, glossary, doc claim). Resolve
    a doc and code contradiction first (section 6.7).
 4. No gate, lint or proptest law owns it. Overlap with other tests is allowed.
@@ -92,9 +99,9 @@ These exception classes never become plain scenarios:
 
 ### 3.3 Invariance list and defects (ticket 10)
 
-- [research/10](../bdd-strategy/research/10-invariance-map.md) lists 88 guarantees that pass
-  conditions 1 and 2. Each row has an arch ticket 16 tier. Treat tier D as
-  Frozen.
+- [research/10](../bdd-strategy/research/10-invariance-map.md) lists 88
+  guarantees that pass conditions 1 and 2. Each row has an arch ticket 16 tier.
+  Treat tier D as Frozen.
 - Row IDs have one dialect: `<inventory-prefix>-<ID>`. Examples: `01-G23`,
   `05-field`. Use the prefix in every reference.
 - A scenario never pins these defects: the closed-pipe panic (01-G1, G6), the
@@ -125,44 +132,46 @@ Placement and layers:
 - Scenarios live in the `features` binary. Its nextest phase is `features`.
 - The split stays: integration is in-process, e2e is spawn-only.
 - Proptests stay inline in `src/`. Commit `proptest-regressions/` files.
-- The `integration-e2e-suite` is partially adopted. Its layer invariants, hermetic
-  sandbox, baselines, gates, four-phase runner and ledger method bind. Its
-  per-test classification does not.
+- The `integration-e2e-suite` is partially adopted. Its layer invariants,
+  hermetic sandbox, baselines, gates, four-phase runner and ledger method bind.
+  Its per-test classification does not.
 - Anti-goals: no mock or stub framework, no PTY harness, no `harness = false`
   runner, no combinatorial Scenario Outline suites, no contract-test framework,
   and no layer without a gate or ledger that stops it from going silently dead.
 
 ## 5. Organization (ticket 11)
 
-- Features: `tests/features/<capability>/<capability>-<topic>.feature`. The
-  file stem keeps the area, because test names hold the stem and no folder.
+- Features: `tests/features/<capability>/<capability>-<topic>.feature`. A
+  capability with one file uses `<capability>.feature`. The file stem keeps the
+  area, because test names hold the stem and no folder.
 - Steps: `tests/features/steps/mod.rs` plus domain-concept files. Cross-feature
   steps (run, exit code, streams) live in `process.rs`. `tests/features.rs`
-  wires them with `#[path = "features/steps/mod.rs"] mod steps;`. A plain
-  `mod steps;` is wrong in a crate-root test file.
+  wires them with `#[path = "features/steps/mod.rs"] mod steps;`. A plain `mod
+  steps;` is wrong in a crate-root test file.
 - One `scenarios!("tests/features", fixtures = [...])` call.
 - Two plain fixtures: `sandbox: Sandbox` and `last_run: LastRun` (a newtype over
   `Option<Run>`). The fixture builds the sandbox.
-- The `touch` rule sits in the doc comment of `tests/features.rs`: after you
-  add a feature file, run `touch tests/features.rs`. Do not add a `build.rs`.
+- The `touch` rule sits in the doc comment of `tests/features.rs`: after you add
+  a feature file, run `touch tests/features.rs`. Do not add a `build.rs`.
 - Vocabulary: glossary terms for behavior, ordinary words for setup, never an
   internal type name. A term that ticket 12 has not resolved stays out.
-- One observable behavior per scenario, one principal `When`. Add a step only with
-  the first scenario that uses it. Delete it with the last.
-- Tag set: `@known-limitation` only. `Rule:`, `skip!()` and `@ignore` are banned.
-  The ban on `Rule:` has a framework reason: a `Rule:` block silently generates
-  no tests. The literature recommends `Rule:` [A]. Revisit the ban at an
-  `rstest-bdd` upgrade.
+- One observable behavior per scenario, one principal `When`. Add a step only
+  with the first scenario that uses it. Delete it with the last.
+- Tag set: `@known-limitation` only. `Rule:`, `skip!()` and `@ignore` are
+  banned. The ban on `Rule:` has a framework reason: a `Rule:` block silently
+  generates no tests. The literature recommends `Rule:` [A]. Revisit the ban at
+  an `rstest-bdd` upgrade.
 - Anti-abstraction: steps call `Sandbox` and `Run` methods directly. No CLI DSL,
   no generic assertion wrappers, no step-generating macros, no per-domain World.
-- Provenance: the `Feature` description states the guarantee and links its intent
-  source. Scenarios carry no `Defect class:` tag.
-- `check:layers` Rust-symbol patterns scan `tests/e2e.rs`, `tests/e2e/`, `tests/features.rs`, `tests/features/` and `tests/support/`. They
-  match `traces` or `process` before `{`, `;`, `::` or the word `as`. Avoid such
-  step patterns. Feature text is not scanned by them.
-- The gate checks over `tests/features/`: no `Rule:` line,
-  no `skip!`, no `@ignore`, no duplicate `Scenario:` title across files, and a
-  failure when `git grep` exits with code 2 or higher.
+- Provenance: the `Feature` description states the guarantee and links its
+  intent source. Scenarios carry no `Defect class:` tag.
+- `check:layers` Rust-symbol patterns scan `tests/e2e.rs`, `tests/e2e/`,
+  `tests/features.rs`, `tests/features/` and `tests/support/`. They match
+  `traces` or `process` before `{`, `;`, `::` or the word `as`. Avoid such step
+  patterns. Feature text is not scanned by them.
+- The gate checks over `tests/features/`: no `Rule:` line, no `skip!`, no
+  `@ignore`, no duplicate `Scenario:` title across files, and a failure when
+  `git grep` exits with code 2 or higher.
 
 Authoring summary, quoted from ticket 11:
 
@@ -197,8 +206,8 @@ Each row has one state:
   another layer. The target is mandatory.
 
 When you change a scenario, bump the date of every row that cites it. During a
-migration, the ledger (section 7) is authoritative. The `check:layers`
-exit-code fix has landed. Gate-owned rows read as covered.
+migration, the ledger (section 7) is authoritative. The `check:layers` exit-code
+fix has landed. Gate-owned rows read as covered.
 
 ### 6.3 Procedure
 
@@ -210,9 +219,10 @@ exit-code fix has landed. Gate-owned rows read as covered.
 5. Apply the review checklist (section 6.4) to every scenario file in review.
 
 A gap recompute re-derives every row from current facts. It is not a recount.
-Record it in one line of `.scratch/bdd-strategy/map.md`: `gap recompute: slice N, DATE`. A row whose date
-is older than the last recompute line reads as stale. A new mutation escape in a
-module that owns a covered row triggers a re-review of that row.
+Record it in one line of `.scratch/bdd-strategy/map.md`: `gap recompute: slice
+N, DATE`. A row whose date is older than the last recompute line reads as stale.
+A new mutation escape in a module that owns a covered row triggers a re-review
+of that row.
 
 The sixth gate check, quoted from ticket 12:
 
@@ -250,8 +260,8 @@ When the rubric and the authoring rules differ, the authoring rule wins.
 
 Never use these as targets, gates or scores: coverage percentage, scenario
 counts, test counts and pass rate. Never use any metric that fails Kaner and
-Bond's foreseeable-side-effect question. Line coverage stays a bare diagnostic. The
-`--fail-on-escaped` baseline is a per-survivor review trigger, not a score.
+Bond's foreseeable-side-effect question. Line coverage stays a bare diagnostic.
+The `--fail-on-escaped` baseline is a per-survivor review trigger, not a score.
 Mutation and coverage tooling stay unchanged. `min_msi` is declined. Updating
 `mutarust-baseline.json` needs a written burden in the mutation docs: the mutant
 id, the reason no test should assert it, and the date.
@@ -261,10 +271,11 @@ id, the reason no test should assert it, and the date.
 Section 9.4 lists them: the `check:layers` fix, the five feature-text checks and
 the sixth gate check. The review of 2026-11-05 added a seventh check. Every
 `Scenario:` title must appear in a Status cell of the invariance map or in
-`.scratch/bdd-testing/scenario-owners.md`. The task `check:layers:selftest` tests
-the gate against fixtures and runs in `mise run verify`. A later review added an
-eighth check, `.mise/scripts/check_steps.py`. It matches every feature step to a
-step definition. It fails on an undefined, unused, duplicate or ambiguous step.
+`.scratch/bdd-testing/scenario-owners.md`. The task `check:layers:selftest`
+tests the gate against fixtures and runs in `mise run verify`. A later review
+added an eighth check, `.mise/scripts/check_steps.py`. It matches every feature
+step to a step definition. It fails on an undefined, unused, duplicate or
+ambiguous step.
 
 ### 6.7 Contradiction dispositions (ticket 12, decision f)
 
@@ -294,7 +305,8 @@ step definition. It fails on an undefined, unused, duplicate or ambiguous step.
   - The scenario proves all guarantees of the old test.
 - A needs-split test becomes several key-example scenarios, never an outline.
 - A test whose rows span slices dies in the slice that completes its last row.
-- The workflow chain test `workflow.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`
+- The workflow chain test
+  `workflow.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`
   stays as the one Rust composition smoke test.
 - The `FileClassExpander` test stays. Arch-design updates it.
 - Keep forever: exception-class tests, proptest-owned tests, unit tests for
@@ -311,15 +323,15 @@ Every deletion needs all of these:
    the old test did. A `contains` step never replaces an equality assertion.
 2. **Kill demonstration.** Break the production code that the old test guards.
    Run the break on the first commit, before the deletion. The old test and the
-   survivor both fail. The ledger records the break in one line. The author picks
-   the break. The reviewer re-checks it.
+   survivor both fail. The ledger records the break in one line. The author
+   picks the break. The reviewer re-checks it.
 3. **Mutation compare**, only when the guarded code is outside `src/cli`. Scope
    it with `-f <file>`. Never use `--git-diff` or `--per-test`. Run it before
    and after the deletion. Record both escape sets in the ledger row. A new
    escape after the deletion fails the proof. `mutarust-baseline.json` stays
    untouched.
-4. **Twin re-read.** The session reads the twin test again. An audit "twin" claim
-   is a lead only.
+4. **Twin re-read.** The session reads the twin test again. An audit "twin"
+   claim is a lead only.
 5. **Ledger row** in `.scratch/bdd-testing/ledger.md`.
 6. **Review** checks that the change records each item. CI has no mutation job.
 
@@ -339,9 +351,9 @@ A row records no commit SHA. Recovery uses `git log -S '<test name>'`.
 
 Other rules:
 
-- Inventory: each slice records the name diff of
-  `cargo nextest list --all-features --run-ignored all` before and after. Each
-  removed name needs a ledger row.
+- Inventory: each slice records the name diff of `cargo nextest list
+  --all-features --run-ignored all` before and after. Each removed name needs a
+  ledger row.
 - Stress proof: `cargo nextest run --stress-count 100` on the scenario, locally.
   The count is an unsourced heuristic.
 - A move out of e2e keeps one e2e smoke test per row when no other e2e or
@@ -375,8 +387,8 @@ Feature files are a human-owned contract.
 - A scenario that characterizes existing behavior cannot fail first. It records
   one break demonstration in the PR instead.
 - Review enforces this policy. A hook adds a partial mechanical guard. The hook
-  `spec-change` in `hk.pkl` fails a commit when it changes `tests/features/**` or
-  the invariance map and the message lacks a line `spec change: <reason>`.
+  `spec-change` in `hk.pkl` fails a commit when it changes `tests/features/**`
+  or the invariance map and the message lacks a line `spec change: <reason>`.
 - The hook cannot see who edited a file, and an author can write any reason.
   This is a known limit.
 
@@ -385,17 +397,18 @@ Feature files are a human-owned contract.
 ### 9.1 Mechanics
 
 - One worktree and one branch per slice. Merge locally when the slice closes.
-- Slice 2 starts after slice 1 closes. Slices 3 to 8 start after slice 2 closes, so
-  that rubric question 3 is answered before the volume work starts.
-- CI runs only on push to `main` and on `pull_request`. Push the slice branch and
-  open a draft PR as a CI trigger only. Then merge locally and push `main`. In
-  ticket 13, "PR" reads "slice branch with its draft PR".
+- Slice 2 starts after slice 1 closes. Slices 3 to 8 start after slice 2 closes,
+  so that rubric question 3 is answered before the volume work starts.
+- CI runs only on push to `main` and on `pull_request`. Push the slice branch
+  and open a draft PR as a CI trigger only. Then merge locally and push `main`.
+  In ticket 13, "PR" reads "slice branch with its draft PR".
 - `mise run verify` must pass on the slice branch before the merge.
 - A slice that cannot finish its proof in one branch splits. Record the split in
   section 12.
-- Evidence for the choice: the research files in `.scratch/bdd-strategy/research/14-*.md`. Tags: A
-  bdd-adoption-evidence, B rust-cli-test-architecture, C ci-crossplatform-flakes,
-  D sequencing-pilot-evidence, E rust-foundation-gap-analysis, F
+- Evidence for the choice: the research files in
+  `.scratch/bdd-strategy/research/14-*.md`. Tags: A bdd-adoption-evidence, B
+  rust-cli-test-architecture, C ci-crossplatform-flakes, D
+  sequencing-pilot-evidence, E rust-foundation-gap-analysis, F
   executable-spec-quality, G framework-currency, H test-strategy-foundations.
 
 ### 9.2 Order rule
@@ -434,12 +447,12 @@ placed the other rows by domain affinity. They are:
 - 05-G7, 05-G8, 05-field, 05-task, 05-tag, 05-file_tracker, 05-dirtree and
   05-env_vars
 
-The user may reassign them. Slice 5 is large. It may split at entry
-(section 9.1).
+The user may reassign them. Slice 5 is large. It may split at entry (section
+9.1).
 
-Test conversion by slice, from the static
-[candidate table](../bdd-strategy/research/13-candidate-table.md). The slice that completes the
-last row converts the test:
+Test conversion by slice, from the static [candidate
+table](../bdd-strategy/research/13-candidate-table.md). The slice that completes
+the last row converts the test:
 
 | Slice | Candidate tests (file::name, shortened) |
 |---|---|
@@ -450,22 +463,24 @@ last row converts the test:
 | 6 | `config.rs::class_field_config_drives_class_selection_from_disk`; `query.rs::list_filters_rfc3339_field_by_its_exact_instant`; `template.rs::renders_file_sourced_select_field_in_e2e_template` |
 | 7 | `config.rs::tag_filter_config_drives_task_selection_from_disk`; `query.rs::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`; `query.rs::task_filter_shortcuts_narrow_output_accurately` (needs-split); `query.rs::list_filters_an_inline_multi_part_duration` |
 
-The `FileClassExpander` test `query.rs::class_descendant_selector_expands_through_the_schema_graph`
-stays in Rust (section 7). Slice 6 adds a scenario for 04-B1 beside it.
+The `FileClassExpander` test
+`query.rs::class_descendant_selector_expands_through_the_schema_graph` stays in
+Rust (section 7). Slice 6 adds a scenario for 04-B1 beside it.
 
-The candidate table maps `init.rs::default_path_init_spawns_and_scaffolds_workspace`
-to 01-G17. That test never touches trust. It pins 01-G15 only. Slice 5 owns its
-conversion. Arch ticket 25 names `index.rs::config_edit_heals_the_index_on_the_next_query`.
-It converts in slice 4. The mtime canary never converts.
+The candidate table maps
+`init.rs::default_path_init_spawns_and_scaffolds_workspace` to 01-G17. That test
+never touches trust. It pins 01-G15 only. Slice 5 owns its conversion. Arch
+ticket 25 names `index.rs::config_edit_heals_the_index_on_the_next_query`. It
+converts in slice 4. The mtime canary never converts.
 
 ### 9.4 Slice 1 (pilot): dossier
 
 Goal: bootstrap the layout, fixtures and gates, and prove the framework verdict
 in real conditions. Slice 1 has two commits and a gate between them.
 
-**Rows and scenarios.** The rows are 01-G17, 01-G23, 01-G24, and 01-G4 and
-05-G3 for the `config_build_untrusted` code. ADR-0002 dispositions 1 and 6 (code
-wins) apply. A scenario claims "untrusted". It never claims "stale".
+**Rows and scenarios.** The rows are 01-G17, 01-G23, 01-G24, and 01-G4 and 05-G3
+for the `config_build_untrusted` code. ADR-0002 dispositions 1 and 6 (code wins)
+apply. A scenario claims "untrusted". It never claims "stale".
 
 Feature file `tests/features/trust.feature`. The wording below is a draft. The
 author keeps it within section 5.
@@ -496,15 +511,16 @@ Feature: A project is trusted only after the user runs trust
 ```
 
 - S1 adds new coverage. Its Given spawns `init` and asserts exit 0.
-- S2 converts `tests/e2e/trust.rs::untrust_then_list_fails_with_the_untrusted_diagnostic`.
+- S2 converts
+  `tests/e2e/trust.rs::untrust_then_list_fails_with_the_untrusted_diagnostic`.
   Its Given step writes the config on the fixture's `Sandbox`, then runs `trust`
   and `untrust`. It asserts exit 0 for each run, as `Sandbox::trusted_via_cli`
   does for `trust`.
 - S2 is stronger than the old test. The old test asserted a non-zero exit and a
   `contains` match on the code. The scenario asserts exit code 1, the code line
   and an empty stdout.
-- The one-line docstring step is deliberate. It exercises docstring comparison on
-  Windows (ticket 13 requires this check).
+- The one-line docstring step is deliberate. It exercises docstring comparison
+  on Windows (ticket 13 requires this check).
 - Verified on macOS on 2026-11-03: after `init`, `list` exits 1, stdout is empty
   and the first stderr line is `traces::cli::config_build_untrusted`. After
   `trust` then `untrust`, `list` does the same.
@@ -514,19 +530,20 @@ Feature: A project is trusted only after the user runs trust
 - Add the two dev-dependencies of section 2. Add `"Zlib"` to the `[licenses]`
   allow list in `deny.toml`.
 - Create `tests/features/`, `tests/features.rs` (with the `touch` doc comment
-  and the one `#[expect]`), `tests/features/steps/mod.rs` and the step files for S1 and S2.
+  and the one `#[expect]`), `tests/features/steps/mod.rs` and the step files for
+  S1 and S2.
 - Steps needed: run a command, exit code, stdout is empty, first line of stderr
   (docstring form), and the two Givens. The vocabulary has exact-equality steps
   for stdout and stderr, empty ones included.
-- Fix `check:layers`: fail when `git grep` exits with code 2 or higher, remove the
-  `|| true` on three greps (`mise.toml` lines 168, 175 and 182) and the hidden
-  error in the first pipeline, scan `tests/features/`, and add the five
+- Fix `check:layers`: fail when `git grep` exits with code 2 or higher, remove
+  the `|| true` on three greps (`mise.toml` lines 168, 175 and 182) and the
+  hidden error in the first pipeline, scan `tests/features/`, and add the five
   feature-text checks. Untracked files are not scanned by `git grep`. Stage new
   files before a local run. Flip the gate-owned note of section 6.2.
 - Add `.gitattributes` with the line `*.feature text eol=lf`.
-- Add a nextest `[profile.ci]` with JUnit output and no retries. Edit `ci.yml` so
-  each nextest job selects the profile with `NEXTEST_PROFILE=ci` and uploads its
-  JUnit file as an artifact.
+- Add a nextest `[profile.ci]` with JUnit output and no retries. Edit `ci.yml`
+  so each nextest job selects the profile with `NEXTEST_PROFILE=ci` and uploads
+  its JUnit file as an artifact.
 - Fix `mise run test:unit`: add `--no-tests fail`.
 - Fix the coverage task divergence: coverage runs e2e with `--all-features`, but
   CI does not.
@@ -534,19 +551,22 @@ Feature: A project is trusted only after the user runs trust
   `support.rs:384-392` layers entries on top of the policy, so `TZ` overrides
   `TZ=UTC`.
 - Prove that the `#[expect]` fires.
-- S1 proof: one break demonstration. Make `init` write a trust grant. S1 must fail.
+- S1 proof: one break demonstration. Make `init` write a trust grant. S1 must
+  fail.
 
-**Gate between the commits.** Push the branch and open the draft PR. Every CI job
-must pass on the head: `check` and `test-e2e` on ubuntu, macos and windows, plus
-the ubuntu-only jobs. The `audit` job failed on 2026-10-29 at a `cargo-binstall`
-install step, not on code. Re-run it or fix its install before the gate counts.
-Run `cargo nextest run --stress-count 100` on S1 and S2 locally. If any OS fails
-for a framework cause, no deletion happens, adding scenarios stays allowed, and
-ticket 08 reopens. The user decides whether to reopen.
+**Gate between the commits.** Push the branch and open the draft PR. Every CI
+job must pass on the head: `check` and `test-e2e` on ubuntu, macos and windows,
+plus the ubuntu-only jobs. The `audit` job failed on 2026-10-29 at a
+`cargo-binstall` install step, not on code. Re-run it or fix its install before
+the gate counts. Run `cargo nextest run --stress-count 100` on S1 and S2
+locally. If any OS fails for a framework cause, no deletion happens, adding
+scenarios stays allowed, and ticket 08 reopens. The user decides whether to
+reopen.
 
 **Commit 2: first deletion and bookkeeping.**
 
-- Delete `tests/e2e/trust.rs::untrust_then_list_fails_with_the_untrusted_diagnostic`
+- Delete
+  `tests/e2e/trust.rs::untrust_then_list_fails_with_the_untrusted_diagnostic`
   after the section 7 proof:
   - Kill demonstration: make `untrust` keep the grant. The old test and S2 both
     fail.
@@ -563,7 +583,8 @@ ticket 08 reopens. The user decides whether to reopen.
   ID rule to every row, in one pass. Mark pilot rows `covered` and set the other
   states by the method of section 6.
 - Add the sixth gate check. It wakes when the Status columns exist.
-- Record the first gap recompute: `gap recompute: slice 1, DATE` in the adoption map.
+- Record the first gap recompute: `gap recompute: slice 1, DATE` in the adoption
+  map.
 - Profraw empirical check: do llvm-cov numbers see scenario-executed source?
   Settled on 2026-11-03: `cargo-llvm-cov` sees scenario-executed source when
   `tests/e2e/support.rs` passes `LLVM_PROFILE_FILE` through the sandbox
@@ -572,8 +593,9 @@ ticket 08 reopens. The user decides whether to reopen.
   the merged report (for example, `src/cli/init.rs` has 61.4% line coverage).
   Without this passthrough, coverage is blind (0.00% across all files) and
   leaves stray `.profraw` files in the sandbox workspace.
-- Fix the candidate table row for `init.rs::default_path_init_spawns_and_scaffolds_workspace`
-  (01-G17 does not apply).
+- Fix the candidate table row for
+  `init.rs::default_path_init_spawns_and_scaffolds_workspace` (01-G17 does not
+  apply).
 
 **Existing tests that slice 1 touches.** Deleted: the untrust-then-list test.
 Stay: `init.rs::default_path_init_spawns_and_scaffolds_workspace` (pins 01-G15),
@@ -581,8 +603,8 @@ Stay: `init.rs::default_path_init_spawns_and_scaffolds_workspace` (pins 01-G15),
 workflow chain test. The helpers `Sandbox` (`write_config`, `run`) and `Run` in
 `tests/support/mod.rs` are reused unchanged.
 
-**Phase wiring.** Scenarios sit in the `features` binary. The `features` phase of
-`mise run test` and the CI `test-e2e` matrix run them.
+**Phase wiring.** Scenarios sit in the `features` binary. The `features` phase
+of `mise run test` and the CI `test-e2e` matrix run them.
 
 **Acceptance criteria.**
 
@@ -631,9 +653,9 @@ At every slice close, do these steps in order:
 An entry condition is a task for the slice's first step. The author resolves it
 and records the result in section 12.
 
-- **Slice 6:** a scenario for another time zone uses
-  `When I run "..." in time zone "..."` through `run_with_envs`. Check that
-  Windows honors an IANA `TZ` value [INFERENCE].
+- **Slice 6:** a scenario for another time zone uses `When I run "..." in time
+  zone "..."` through `run_with_envs`. Check that Windows honors an IANA `TZ`
+  value [INFERENCE].
 - **Slice 8:** resolved 2026-11-03 by dropping the slice; see section 12 and
   section 9.9 item 13.
 
@@ -641,22 +663,22 @@ and records the result in section 12.
 
 Any session may take these after slice 1. None blocks a slice.
 
-- **U1.** Pin the four yaml.rs claims as unit tests: binary literals as integers,
-  an overflowing float stays a string, `u64::MAX` errors, a non-scalar key
-  errors. Check each claim against the code first. When code and doc disagree,
-  code wins.
+- **U1.** Pin the four yaml.rs claims as unit tests: binary literals as
+  integers, an overflowing float stays a string, `u64::MAX` errors, a non-scalar
+  key errors. Check each claim against the code first. When code and doc
+  disagree, code wins.
 - **U2.** Add three proptests: table escaping, tag containment and the
-  `NoteFieldValue` total order. Commit `proptest-regressions/` files. This closes
-  the ticket 12 deferral. Proptest seeds follow the source path, so a moved source
-  file loses its seeds.
+  `NoteFieldValue` total order. Commit `proptest-regressions/` files. This
+  closes the ticket 12 deferral. Proptest seeds follow the source path, so a
+  moved source file loses its seeds.
 - **Doc pass.** Renumber one ADR-0009 to 0010. Add in-tree markers for slugs,
   callouts and footnotes. Correct the `src/template/GLOSSARY.md` loader order.
   Owner: the session that runs it, with arch ticket 23.
-- **Hygiene backlog.** Create `.scratch/bdd-testing/hygiene-backlog.md` when slice
-  1 closes. The user owns it. It lists 5 misplaced e2e tests, 10 misplaced
+- **Hygiene backlog.** Create `.scratch/bdd-testing/hygiene-backlog.md` when
+  slice 1 closes. The user owns it. It lists 5 misplaced e2e tests, 10 misplaced
   integration tests, 7 weak assertions, and the foundation gaps of section 9.9
-  (item 12). Each item uses the die rule and the ledger of section 7. It is
-  not a slice.
+  (item 12). Each item uses the die rule and the ledger of section 7. It is not
+  a slice.
 
 ### 9.9 Not now
 
@@ -671,28 +693,27 @@ Each item has a reason and an owner.
 4. Gate-owned rows, doc conventions and the test harness (05-G4 to 05-G6, 05-G9,
    01-G28): not product guarantees.
 5. Glossary-only claims (slugs, callouts, footnotes): dropped (ticket 12).
-6. Known defects (closed-pipe panic, `i64` to `f64` loss, multi-value `.first()`):
-   no scenario until fixed (ticket 10).
-7. Class-hierarchy internals (`FileClassExpander`): the Rust test stays
-   (section 7). Arch ticket 20 owns the refactor. The 04-B1 scenario states
-   only the selection result that the CLI shows.
+6. Known defects (closed-pipe panic, `i64` to `f64` loss, multi-value
+   `.first()`): no scenario until fixed (ticket 10).
+7. Class-hierarchy internals (`FileClassExpander`): the Rust test stays (section
+   7). Arch ticket 20 owns the refactor. The 04-B1 scenario states only the
+   selection result that the CLI shows.
 8. Facade-seam scenarios and Scenario Outlines for needs-split tests: need a new
    decision (tickets 07, 13).
 9. New workspace entry points (core, cli, lsp, mcp): each reopens the tiering
    rule (ticket 07).
-10. Mutation and coverage in CI, score gates and targets: anti-metrics
-    (ticket 12).
-11. Unit and integration tests on three operating systems: a move out of e2e keeps
-    one e2e smoke test (ticket 13).
+10. Mutation and coverage in CI, score gates and targets: anti-metrics (ticket
+    12).
+11. Unit and integration tests on three operating systems: a move out of e2e
+    keeps one e2e smoke test (ticket 13).
 12. Foundation gaps found by the research (tags E and C): pinned GitHub Actions
-    by SHA,
-    dependabot, `SECURITY.md`, `CHANGELOG.md`, fuzzing, release automation,
-    `cargo-hack` and minimal-versions checks. Arch ticket 38 (open) owns the
-    version source, the changelog and the install text. Ticket 38 rejects
-    `cargo-semver-checks` because `check:visibility` already freezes the public
-    API. Every other item joins the hygiene backlog. `AGENTS.md` asks for a
-    changelog update on permanent fixes. No `CHANGELOG.md` exists, so the duty has
-    no target until ticket 38 decides.
+    by SHA, dependabot, `SECURITY.md`, `CHANGELOG.md`, fuzzing, release
+    automation, `cargo-hack` and minimal-versions checks. Arch ticket 38 (open)
+    owns the version source, the changelog and the install text. Ticket 38
+    rejects `cargo-semver-checks` because `check:visibility` already freezes the
+    public API. Every other item joins the hygiene backlog. `AGENTS.md` asks for
+    a changelog update on permanent fixes. No `CHANGELOG.md` exists, so the duty
+    has no target until ticket 38 decides.
 13. The process-level exit 130 case (01-G1, the 130 part): known limitation.
     Numeric 130 requires a real-TTY interactive prompt, and the scenario would
     need a pseudoterminal harness, which section 4 bans. The unit pins stay:
@@ -737,8 +758,8 @@ slice, and where it lands:
 - Linux and Windows results for the e2e placement: unknown until the slice 1
   draft PR runs.
 - Whether `src/config/trust.rs` passes `--fail-on-escaped` at base: unknown.
-- Mutation compare cost: more than 30 minutes per run for 20 mutants, because the
-  task runs the whole suite for each mutant.
+- Mutation compare cost: more than 30 minutes per run for 20 mutants, because
+  the task runs the whole suite for each mutant.
 - The candidate table is a static agent judgment. Its condition checks are not
   proof. The slice author re-verifies conditions 3 to 6.
 - The agent policy is review-enforced. No gate can see authorship.
@@ -753,11 +774,12 @@ Append one line for each slice close, split, entry-condition result and spec
 change.
 
 - 2026-11-03: spec written. Slice 1 is ready to start.
-- 2026-11-03: implementation tickets 01 to 16 written in `issues/`. Slices 3 to 8
-  wait for slice 2. No ticket waits for arch-design.
-- 2026-11-03: slice 1 gate passed. Draft PR 3 run, all jobs green on ubuntu, macos
-  and windows, including audit: <https://github.com/JackMatanky/traces/actions/runs/41626080102>.
-  The scenarios S1 and S2 passed 100 of 100 stress iterations locally. Deletions are
+- 2026-11-03: implementation tickets 01 to 16 written in `issues/`. Slices 3 to
+  8 wait for slice 2. No ticket waits for arch-design.
+- 2026-11-03: slice 1 gate passed. Draft PR 3 run, all jobs green on ubuntu,
+  macos and windows, including audit:
+  <https://github.com/JackMatanky/traces/actions/runs/41626080102>. The
+  scenarios S1 and S2 passed 100 of 100 stress iterations locally. Deletions are
   allowed.
 - 2026-11-03: slice 1 closed. Pilot rows (01-G4, 01-G17, 01-G23, 01-G24, 05-G3)
   are marked covered in the invariance map. The sixth gate check is active. The
@@ -769,34 +791,34 @@ change.
   in tests/features/process.feature passed 100 of 100 stress iterations locally.
   Exact-equality stdout and stderr steps and count summary step added. No test
   deletions.
-- 2026-11-03: the user confirmed the section 9.3 row placement for slice 5.
-  The rows placed by domain affinity remain in slice 5.
+- 2026-11-03: the user confirmed the section 9.3 row placement for slice 5. The
+  rows placed by domain affinity remain in slice 5.
 - 2026-11-03: slice 3 closed. Query scenarios cover the owned rows in
-  `tests/features/query.feature`. Four e2e tests moved to scenarios after
-  paired failure checks. Two unit test names now say `explicit ascending`.
-  The slice 3 ledger records the deletion proof and name inventory.
+  `tests/features/query.feature`. Four e2e tests moved to scenarios after paired
+  failure checks. Two unit test names now say `explicit ascending`. The slice 3
+  ledger records the deletion proof and name inventory.
 - 2026-11-03: slice 8 entry-condition spike ran. Platform gate: `scenarios!`
   generates one test for every feature file it finds. A flat feature file
-  without Unix-only steps would fail at run time on Windows ("Step not
-  found"). The only clean gate without `@ignore`, `skip!()` or a new tag is a
-  separate `#[cfg(unix)] scenarios!("tests/features/unix", ...)` call over a
+  without Unix-only steps would fail at run time on Windows ("Step not found").
+  The only clean gate without `@ignore`, `skip!()` or a new tag is a separate
+  `#[cfg(unix)] scenarios!("tests/features/unix", ...)` call over a
   `tests/features/unix/` directory. The layer gate's feature-text checks scan
   all of `tests/features/` recursively. The sixth gate check does too. The
   nested directory stays visible to them [INFERENCE for Windows]. Behavior
   spike: `src/main.rs` emits numeric 130 only when the dialog layer returns
-  `DialogError::UserInterrupted`. `inquire` reports that error only when
-  stdin is a real TTY. `src/dialog/terminal.rs` guards every prompt with
-  `stdin_is_tty`. A piped-stdin child that receives SIGINT dies by signal.
-  Then `ExitStatus::code()` is `None`, never `Some(130)`. A deterministic
-  prompt readiness observable needs a pseudoterminal. Spec section 4 bans a
-  PTY harness (`rustix` offers the `pty` feature, which would make the e2e
-  harness build one). The user decided (2026-11-03) to drop slice 8. The
-  exit 130 case stays a known limitation owned by the existing unit tests
+  `DialogError::UserInterrupted`. `inquire` reports that error only when stdin
+  is a real TTY. `src/dialog/terminal.rs` guards every prompt with
+  `stdin_is_tty`. A piped-stdin child that receives SIGINT dies by signal. Then
+  `ExitStatus::code()` is `None`, never `Some(130)`. A deterministic prompt
+  readiness observable needs a pseudoterminal. Spec section 4 bans a PTY harness
+  (`rustix` offers the `pty` feature, which would make the e2e harness build
+  one). The user decided (2026-11-03) to drop slice 8. The exit 130 case stays a
+  known limitation owned by the existing unit tests
   (`src/main.rs::ctrl_c_abort_exits_130` and
   `src/cli/mod.rs::user_interrupted_during_template_picker_returns_aborted_interrupted`).
   No process-level 130 case exists. No rustix feature is added. Spec sections
-  9.3, 9.7 and 9.9 are amended. The class-level 130 row reads
-  `pinned: src/main.rs::ctrl_c_abort_exits_130` in research/10.
+  9.3, 9.7 and 9.9 are amended. The class-level 130 row reads `pinned:
+  src/main.rs::ctrl_c_abort_exits_130` in research/10.
 - 2026-11-03: slice 5 closed. The configuration, tracking and template rows
   (01-G7, 01-G11, 01-G13, 01-G14, 01-G15, 01-G18, 01-G21, 01-G22, 01-G25,
   01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-env_vars and
@@ -804,21 +826,21 @@ change.
   - 01-G12 and 01-G16 stay pinned to their unit tests. The non-TTY providers
     agree, and no portable mid-scaffold CLI failure exists.
   - 05-G7 stays a gap. The universal every-path claim contradicts the accepted
-    absolute config-derived output path. Template runtime confinement is
-    covered under 02-G11.
+    absolute config-derived output path. Template runtime confinement is covered
+    under 02-G11.
   - 05-dirtree is pinned. No portable CLI channel distinguishes root from node
     walk errors.
 
-  Four feature files cover the slice:
-  `configuration.feature`, `template.feature`, `tracking.feature` plus the
-  pilot files. One deletion: `init.rs::default_path_init_spawns_and_scaffolds_workspace`
-  (row 1 of the ledger slice 5 section; full seven-item proof).
+  Four feature files cover the slice: `configuration.feature`,
+  `template.feature`, `tracking.feature` plus the pilot files. One deletion:
+  `init.rs::default_path_init_spawns_and_scaffolds_workspace` (row 1 of the
+  ledger slice 5 section; full seven-item proof).
   `tracked.rs::list_prints_every_tracked_config_path` and
   `tracked.rs::clean_removes_a_stale_tracked_entry_and_reports_the_count` were
   retained rather than deleted. Their rows 03-P25 and 05-file_tracker now read
-  `pinned-elsewhere`: neither scenario kills the tracker branch mutant.
-  See the deletion wave ledger. 46 scenarios passed
-  100 of 100 stress iterations locally.
+  `pinned-elsewhere`: neither scenario kills the tracker branch mutant. See the
+  deletion wave ledger. 46 scenarios passed 100 of 100 stress iterations
+  locally.
 - 2026-11-03: slice 4 added index-freshness scenarios for edits, paths, links,
   config drift, rendered notes, scan scope and the tracked-config store. The
   same-size mtime canary stays in Rust as a known limit for arch ticket 25.
@@ -827,19 +849,19 @@ change.
   `TZ=America/New_York` through `Sandbox::run_with_envs`; it selected the note.
   [INFERENCE] Windows should honor this IANA `TZ` value because
   `TimeZone::try_system` calls Jiff 0.2.38's `get_env_tz` before the platform
-  lookup. The Jiff source says that IANA `TZ` should work on Windows.
-  A Windows CI result is pending the orchestrator's branch run.
+  lookup. The Jiff source says that IANA `TZ` should work on Windows. A Windows
+  CI result is pending the orchestrator's branch run.
 - 2026-11-03: slice 7 closed. Note-model rows 03-N01, 03-N02, 03-N04 to 03-N12,
   03-N14, 03-N16, 03-N17, 05-G8, 05-task and 05-tag are marked covered in the
   invariance map. Rows 03-N03 and the exact-name half of 05-field are pinned to
-  unit tests; no observable CLI channel exists for them.
-  31 scenarios in tests/features/note.feature passed 100 of 100 stress
-  iterations locally. Three candidate tests were deleted; the ledger records
-  missing before/after mutation pairs for two of their proof rows:
+  unit tests; no observable CLI channel exists for them. 31 scenarios in
+  tests/features/note.feature passed 100 of 100 stress iterations locally. Three
+  candidate tests were deleted; the ledger records missing before/after mutation
+  pairs for two of their proof rows:
   - task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers
   - task_filter_shortcuts_narrow_output_accurately
-  - list_filters_an_inline_multi_part_duration
-  The tag-filter config test stays until slice 5 completes row 01-G21.
+  - list_filters_an_inline_multi_part_duration The tag-filter config test stays
+    until slice 5 completes row 01-G21.
 - 2026-11-04: deletion wave. Four deferred tests die with full proof: the tag
   filter, class field, exact instant and file-sourced select tests. The two
   `tracked.rs` tests stay. The after-run on `src/config/tracker.rs` shows a new
@@ -847,44 +869,46 @@ change.
   fails for them. See the ledger section "Deletion Wave".
 - 2026-11-04: CI e2e now runs with `--all-features` (ticket 01) and
   `--no-fail-fast` in the e2e job, so one test failure does not hide others.
-- 2026-11-04: `deny.toml` retains the `RUSTSEC-2026-0374` ignore.
-  `cargo deny check` fails without it: `basic-toml` 0.1.10 is unmaintained,
-  and `rstest-bdd` 0.6.0 brings it through `i18n-embed`. The advisory lists
-  no safe upgrade. Reassess the ignore when the upstream dependency changes.
+- 2026-11-04: `deny.toml` retains the `RUSTSEC-2026-0374` ignore. `cargo deny
+  check` fails without it: `basic-toml` 0.1.10 is unmaintained, and `rstest-bdd`
+  0.6.0 brings it through `i18n-embed`. The advisory lists no safe upgrade.
+  Reassess the ignore when the upstream dependency changes.
 - 2026-11-04: the Windows `TZ` entry condition of slice 6 has evidence. CI run
-  41746390274 passed `test (e2e, windows-latest)`. That run includes the scenario
-  `Equal durations shift differently over the spring clock change`, which sets
-  `TZ=America/New_York`. The earlier [INFERENCE] is confirmed.
+  41746390274 passed `test (e2e, windows-latest)`. That run includes the
+  scenario `Equal durations shift differently over the spring clock change`,
+  which sets `TZ=America/New_York`. The earlier [INFERENCE] is confirmed.
 - 2026-11-04: the review of the integration branch changed these items. The
-  chained-filter, descending-sort and table scenarios now fail when
-  the guarded behavior breaks. The table-cell property test now generates newline
+  chained-filter, descending-sort and table scenarios now fail when the guarded
+  behavior breaks. The table-cell property test now generates newline
   characters. Row 04-S7 is `partial`. Row 01-G23 is `pinned-elsewhere`. The
   duplicate `a template ... containing:` step is merged.
 - 2026-11-05: the missing deletion proofs ran. Slice 4 compares `inlinks.rs`,
   `refresh.rs` and `fingerprint.rs`. Slice 7 compares `format.rs`, `task.rs` and
   `duration.rs` (scope `parse|friendly|classify`). Every pair has the same
-  escape set before and after. No deletion adds an escape. The files `service.rs`
-  and `delta.rs` of slice 4 were not compared. See the ledger.
+  escape set before and after. No deletion adds an escape. The files
+  `service.rs` and `delta.rs` of slice 4 were not compared. See the ledger.
 - 2026-11-05: a review follow-up wave closed the high and medium gaps. It added
-  unit, process, golden, property and fuzz tests. It added the seventh gate check
-  and the `spec-change` hook. CI gained a three-OS unit job. A nightly workflow
-  runs mutation, soak, bench and fuzz jobs. A fuzz run found and fixed a duration
-  printing defect. The ledger section "Review Follow-up Wave" has the details and
-  the open items. The nightly mutation gate reports without failing until each
-  module has a baseline.
-- 2026-11-05: the scenario suite moved to its own test binary. `tests/features.rs`
-  holds the `scenarios!` entry. The steps moved to `tests/features/steps/`. The
-  shared harness moved to `tests/support/`, which both `e2e` and `features`
-  include. Feature files sit in one folder for each capability. Large files split
-  by topic, so `query` has four files. The file stem carries the area, because a
-  test name holds the stem and no folder. This replaces the flat layout and the
-  rule that scenarios live in the `e2e` binary only. The nextest `features` phase
-  and the CI `test (e2e)` job run both binaries. An eighth check,
-  `check_steps.py`, fails on an undefined, unused, duplicate or ambiguous step.
-  The 148 scenario titles are unchanged. The shared harness compiles into both
-  binaries, so the five `config_fixture` tests now run in each. A break
-  demonstration shows the `in time zone` step wins over the generic run step:
-  with `TZ` removed, three scenarios fail. The three nested-tag scenarios stay.
-  `Filtering by a tag includes nested tags` and `A parent tag selects notes
-  carrying its descendant tag` differ in the tag position. The filter scenario
-  uses a different mechanism.
+  unit, process, golden, property and fuzz tests. It added the seventh gate
+  check and the `spec-change` hook. CI gained a three-OS unit job. A nightly
+  workflow runs mutation, soak, bench and fuzz jobs. A fuzz run found and fixed
+  a duration printing defect. The ledger section "Review Follow-up Wave" has the
+  details and the open items. The nightly mutation gate reports without failing
+  until each module has a baseline.
+- 2026-11-05: the scenario suite moved to its own test binary.
+  `tests/features.rs` holds the `scenarios!` entry. The steps moved to
+  `tests/features/steps/`. The shared harness moved to `tests/support/`, which
+  both `e2e` and `features` include. Feature files sit in one folder for each
+  capability. Large files split by topic, so `query` has four files. The file
+  stem carries the area, because a test name holds the stem and no folder. This
+  replaces the flat layout and the rule that scenarios live in the `e2e` binary
+  only. The nextest `features` phase and the CI `test (e2e)` job run both
+  binaries. An eighth check, `check_steps.py`, fails on an undefined, unused,
+  duplicate or ambiguous step. The 148 scenario titles are unchanged. The shared
+  harness compiles into both binaries, so the five `fixtures` tests run in each.
+  The two gate scripts in `.mise/scripts/` use a `uv` script shebang.
+  `mise.toml` installs `uv`.
+  A break demonstration shows the `in time zone` step wins over the generic run
+  step: with `TZ` removed, three scenarios fail. The three nested-tag scenarios
+  stay. `Filtering by a tag includes nested tags` and `A parent tag selects
+  notes carrying its descendant tag` differ in the tag position. The filter
+  scenario uses a different mechanism.

@@ -37,9 +37,10 @@ fresh session can start slice 1 with zero open design questions.
     Do not route around them.
   - A bounded exception needs a recorded decision (see ticket 06).
 - **Maintenance duty**: ticket 06 sets one
-  `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration. Revisit
-  it at every `rstest-bdd` upgrade. The `#[expect]` fails when the lint stops
-  appearing. Nobody has filed the upstream fix yet.
+  `#[expect(clippy::disallowed_methods)]` on the `mod steps` declaration in
+  `tests/features.rs` (ticket 06 named `mod bdd`). Revisit it at every
+  `rstest-bdd` upgrade. The `#[expect]` fails when the lint stops appearing.
+  Nobody has filed the upstream fix yet.
 - **Standing evidence, source-cited, do not re-do**:
   [research/cucumber-rs.md](research/cucumber-rs.md),
   [research/rstest-bdd.md](research/rstest-bdd.md),
@@ -90,7 +91,7 @@ fresh session can start slice 1 with zero open design questions.
   [research/05](research/05-cross-cutting-contracts.md).
 - [06: Framework re-validation](issues/06-framework-revalidation.md): adopt
   `rstest-bdd` =0.6.0 with caveats. Do not change `clippy.toml`. Put one
-  `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration, because
+  `#[expect(clippy::disallowed_methods)]` on the module that holds the steps, because
   the step wrappers call `catch_unwind`. Bare `{name}` placeholders avoid a
   lint. A `build.rs` for new feature files costs a package rebuild (ticket 11
   decides). Ticket 08 decided: fold scenarios into the e2e binary only.
