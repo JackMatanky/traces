@@ -224,7 +224,7 @@ impl Serialize for DateValue {
     ///
     /// # Errors
     ///
-    /// Returns an error only if the serializer rejects string values.
+    /// - `S::Error` if the serializer rejects string values.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -242,8 +242,9 @@ impl<'de> Deserialize<'de> for DateValue {
     ///
     /// # Errors
     ///
-    /// Returns a deserialization error if the input is not a string, has a
-    /// malformed year, or does not match an accepted date shape.
+    /// - `D::Error` if the input is not a string.
+    /// - `D::Error` if the input has a malformed year or does not match an
+    ///   accepted date shape.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -283,7 +284,7 @@ impl DateShape {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if neither accepted shape parses.
+    /// - `Err` if neither accepted shape parses.
     pub(crate) fn parse_any(
         s: &str,
     ) -> Result<(civil::Date, Self), &'static str> {
@@ -318,8 +319,8 @@ impl DateShape {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if `s` does not match `self`'s shape or names a date
-    /// outside the supported calendar range.
+    /// - `Err` if `s` does not match `self`'s shape.
+    /// - `Err` if `s` names a date outside the supported calendar range.
     fn parse_date(self, s: &str) -> Result<civil::Date, &'static str> {
         match self {
             Self::YearMonthDay => Self::parse_year_month_day(s),
@@ -339,8 +340,8 @@ impl DateShape {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if `s` is not a full date or its fields are outside the
-    /// supported calendar range.
+    /// - `Err` if `s` is not a full date.
+    /// - `Err` if its fields are outside the supported calendar range.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "the input has exactly four year digits and a fixed \
@@ -405,8 +406,8 @@ impl DateShape {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if `s` is not a year-month shape or its month is outside
-    /// the supported range.
+    /// - `Err` if `s` is not a year-month shape.
+    /// - `Err` if its month is outside the supported range.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "year length is 4 or 5 bytes"
@@ -1111,19 +1112,21 @@ mod tests {
         }
 
         #[rstest]
-        #[case::number("date: 42\n")]
-        #[case::boolean("date: true\n")]
-        #[case::null("date: null\n")]
-        #[case::sequence("date: [2026]\n")]
-        fn rejects_non_string_scalars(#[case] yaml: &str) {
+        #[case::number("date: 42\n", "found non-string scalar")]
+        #[case::boolean("date: true\n", "found non-string scalar")]
+        #[case::null("date: null\n", "found non-string scalar")]
+        #[case::sequence("date: [2026]\n", "found sequence")]
+        fn rejects_non_string_scalars(#[case] yaml: &str, #[case] found: &str) {
             // Arrange: `yaml` is the case literal.
             // Act
             let result = noyalib::from_str::<YamlDate>(yaml);
             // Assert
+            let message = result.expect_err("rejects").to_string();
             assert!(
-                result.is_err(),
-                "`{yaml}` must be rejected as a non-string scalar, got \
-                 {result:?}"
+                message.contains(&format!(
+                    "date: type mismatch: expected string, {found}"
+                )),
+                "`{yaml}` must report {found:?}, got {message:?}"
             );
         }
 

@@ -1,26 +1,43 @@
 //! End-to-end test harness: spawns the real `traces` binary against isolated
-//! sandboxes, including the default non-interactive `init` path. See
-//! `support` for isolation guarantees.
+//! sandboxes, including the default non-interactive `init` path. See `support`
+//! for isolation guarantees.
 
-#[path = "e2e/config_fixture.rs"]
-mod config_fixture;
-#[path = "e2e/support.rs"]
+#[path = "support/fixtures.rs"]
+mod fixtures;
+#[expect(
+    dead_code,
+    reason = "the features binary shares this harness and uses helpers this \
+              binary does not"
+)]
+#[path = "support/mod.rs"]
 mod support;
 
 #[path = "e2e/completions.rs"]
 mod completions;
+#[path = "e2e/concurrency.rs"]
+mod concurrency;
 #[path = "e2e/config.rs"]
 mod config;
+#[path = "e2e/determinism.rs"]
+mod determinism;
 #[path = "e2e/env_policy.rs"]
 mod env_policy;
+#[path = "e2e/environment.rs"]
+mod environment;
+#[path = "e2e/exit_codes.rs"]
+mod exit_codes;
+#[path = "e2e/golden.rs"]
+mod golden;
+#[path = "e2e/help.rs"]
+mod help;
 #[path = "e2e/index.rs"]
 mod index;
-#[path = "e2e/init.rs"]
-mod init;
 #[path = "e2e/process_contract.rs"]
 mod process_contract;
 #[path = "e2e/query.rs"]
 mod query;
+#[path = "e2e/streams.rs"]
+mod streams;
 #[path = "e2e/template.rs"]
 mod template;
 #[path = "e2e/tracked.rs"]

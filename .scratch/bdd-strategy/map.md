@@ -37,9 +37,10 @@ fresh session can start slice 1 with zero open design questions.
     Do not route around them.
   - A bounded exception needs a recorded decision (see ticket 06).
 - **Maintenance duty**: ticket 06 sets one
-  `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration. Revisit
-  it at every `rstest-bdd` upgrade. The `#[expect]` fails when the lint stops
-  appearing. Nobody has filed the upstream fix yet.
+  `#[expect(clippy::disallowed_methods)]` on the `mod steps` declaration in
+  `tests/features.rs` (ticket 06 named `mod bdd`). Revisit it at every
+  `rstest-bdd` upgrade. The `#[expect]` fails when the lint stops appearing.
+  Nobody has filed the upstream fix yet.
 - **Standing evidence, source-cited, do not re-do**:
   [research/cucumber-rs.md](research/cucumber-rs.md),
   [research/rstest-bdd.md](research/rstest-bdd.md),
@@ -90,7 +91,7 @@ fresh session can start slice 1 with zero open design questions.
   [research/05](research/05-cross-cutting-contracts.md).
 - [06: Framework re-validation](issues/06-framework-revalidation.md): adopt
   `rstest-bdd` =0.6.0 with caveats. Do not change `clippy.toml`. Put one
-  `#[expect(clippy::disallowed_methods)]` on each `mod bdd` declaration, because
+  `#[expect(clippy::disallowed_methods)]` on the module that holds the steps, because
   the step wrappers call `catch_unwind`. Bare `{name}` placeholders avoid a
   lint. A `build.rs` for new feature files costs a package rebuild (ticket 11
   decides). Ticket 08 decided: fold scenarios into the e2e binary only.
@@ -139,11 +140,12 @@ fresh session can start slice 1 with zero open design questions.
   containment and `NoteFieldValue` order as proptests. The invariance list sets
   the order of the first slices.
 - [11: Feature and step organization](issues/11-feature-step-organization.md):
-  features in flat `tests/features/<capability>.feature`.
-  - Steps live in `tests/e2e/bdd/mod.rs` and domain-concept files, never one
-    file per feature.
-  - Use `#[path = "e2e/bdd/mod.rs"]`. The `bdd.rs` form picks up sibling e2e
-    files.
+  features in `tests/features/<capability>/` folders (amended 2026-11-05;
+  the first decision was a flat directory).
+  - Steps live in `tests/features/steps/mod.rs` and domain-concept files, never
+    one file per feature.
+  - Use `#[path = "features/steps/mod.rs"]` in `tests/features.rs`. A plain `mod`
+    in a crate-root test file picks up the wrong path.
   - Use bare `{name}` placeholders with quotes in the pattern.
   - Use two plain fixtures, `Sandbox` and `LastRun`, with no World.
   - Prefer 3 to 5 steps.
@@ -198,3 +200,16 @@ Nothing. The fog items graduated into [spec.md](../bdd-testing/spec.md):
 - Work belonging to `.scratch/integration-e2e-suite/`; read-only input here, its
   tickets are not this map's route.
 - Building custom framework or infrastructure beyond adopting an existing crate.
+
+## Gap recomputes
+
+- gap recompute: slice 1, 2026-11-03
+- gap recompute: slice 2, 2026-11-03
+- gap recompute: slice 3, 2026-11-03
+- gap recompute: slice 8 dropped, 2026-11-03. The exit 130 class-level case is a
+  known limitation (`pinned: src/main.rs::ctrl_c_abort_exits_130`); see
+  [spec.md](../bdd-testing/spec.md) sections 9.3, 9.7, 9.9 item 13 and 12.
+- gap recompute: slice 5, 2026-11-03
+- gap recompute: slice 4, 2026-11-03
+- gap recompute: slice 6, 2026-11-03
+- gap recompute: slice 7, 2026-11-03

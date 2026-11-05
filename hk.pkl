@@ -13,6 +13,7 @@ exclude = List(
     "build",
     "LICENSE",
     ".scratch",
+    "fuzz/corpus",
     ".agents"
 )
 
@@ -152,6 +153,11 @@ hooks {
             ["conventional-commit"] = (Builtins.check_conventional_commit) {
                 check = new Command {
                     argv = List("hk", "util", "check-conventional-commit", "--verbose", "{{commit_msg_file}}")
+                }
+            }
+            ["spec-change"] = new Step {
+                check = new Command {
+                    argv = List("bash", ".mise/scripts/check_spec_change.sh", "{{commit_msg_file}}")
                 }
             }
         }

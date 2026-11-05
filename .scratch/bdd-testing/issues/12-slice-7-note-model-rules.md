@@ -10,23 +10,24 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every row the slice owns has a scenario of the class that spec section 4 assigns.
-- [ ] The Status of each owned row in the invariance map reads `covered`.
-- [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
-- [ ] No scenario pins a known defect (spec section 3.3). The multi-value first-value read and the integer to float loss stay out.
-- [ ] The two tests that spec section 9.3 marks needs-split become key-example scenarios, never an outline.
-- [ ] A converted test is deleted only when this slice completes its last row.
-- [ ] Each deletion has the proof of spec section 7.
-- [ ] `mise run verify` passes.
-- [ ] The ledger section is complete.
-- [ ] The gap recompute line is in the adoption map.
-- [ ] The due rubric questions are answered.
-- [ ] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] Every row the slice owns has a scenario of the class that spec section 4 assigns (03-N03 and the exact-name half of 05-field are pinned unit-side: no CLI channel observes them, so the assigned scenario class does not apply per spec section 4 rule 1).
+- [x] The Status of each owned row in the invariance map reads `covered` (the two pinned exceptions carry explicit `pinned:` pointers with unit test names).
+- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
+- [x] No scenario pins a known defect (spec section 3.3). The multi-value first-value read and the integer to float loss stay out.
+- [x] The two tests that spec section 9.3 marks needs-split become key-example scenarios, never an outline.
+- [x] A converted test is deleted only when this slice completes its last row (tag_filter_config test deferred to slice 5; see ledger).
+- [x] Each deletion has the proof of spec section 7.
+- [x] `mise run verify` passes.
+- [x] The ledger section is complete.
+- [x] The gap recompute line is in the adoption map.
+- [x] The due rubric questions are answered (none due for this slice; rubric questions 1-3 evaluated at slices 1 and 2 closes).
+- [x] The amendment log has an entry.
+- [x] The slice branch is merged locally.
 
 **Out of scope:**
+
 - Rows that another slice owns.
 - Known defects (spec section 3.3).
 - Facade-seam scenarios and Scenario Outlines.

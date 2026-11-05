@@ -17,7 +17,7 @@ It cross-references each test against the research 10 invariance map.
 | `index.rs::newly_created_link_target_resolves_inlinks_after_spawned_refresh` | 01-G29, 03-P03, 03-P20 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |
 | `index.rs::list_creates_an_index_store_without_an_explicit_index_command` | 01-G29, 03-P01, 03-P25 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |
 | `index.rs::config_edit_heals_the_index_on_the_next_query` | 01-G29, 03-P08 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |
-| `init.rs::default_path_init_spawns_and_scaffolds_workspace` | 01-G15, 01-G16, 01-G17 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |
+| `init.rs::default_path_init_spawns_and_scaffolds_workspace` | 01-G15, 01-G16 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |
 | `query.rs::class_descendant_selector_expands_through_the_schema_graph` | 02-G1, 02-G3, 04-B1 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: fail (condemned expander seam) | yes (FileClassExpander) | yes | no | `blocked-by-seam` |
 | `query.rs::inlinks_render_across_spawned_queries` | 02-G4, 03-P20 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |
 | `query.rs::table_renders_a_markdown_table_with_one_row_per_page` | 01-G30, 02-G4, 02-G8 | C1: pass, C2: pass, C3: pass, C4: pass, C5: pass, C6: pass | no | yes | no | `convert-eligible` |

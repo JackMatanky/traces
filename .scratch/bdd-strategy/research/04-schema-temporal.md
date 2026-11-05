@@ -5,7 +5,7 @@ validation, conflict resolution) and `src/temporal/` (date/datetime/duration/poi
 parsing, zone and calendar arithmetic), plus the boundaries where both feed query and template.
 
 Method: breadth-first source reading (CodeGraph), full inline-test name survey, `src/schema/GLOSSARY.md`, `src/temporal/GLOSSARY.md`, `docs/adr/0006`,
-`docs/adr/0007`, `docs/adr/0009-filter-date-literals`, prior evidence in `.scratch/temporal-core/{spec.md,divergence-register.md,review.md}`, and every `tests/` touchpoint of both domains.
+`docs/adr/0007`, `docs/adr/0010-filter-date-literals`, prior evidence in `.scratch/temporal-core/{spec.md,divergence-register.md,review.md}`, and every `tests/` touchpoint of both domains.
 
 **Citation convention** (matches [cucumber-rs.md](./cucumber-rs.md) header): `file:line` =
 this repo; ADR numbers for decisions; `fn name` (`file:line`) = a test. Entry format per ticket 01 (`issues/01-surface-workflows.md:14-21`).

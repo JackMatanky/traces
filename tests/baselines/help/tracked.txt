@@ -1,0 +1,11 @@
+Inspect or clean the tracked-config store
+
+Usage: traces tracked <COMMAND>
+
+Commands:
+  list   List all tracked local config paths
+  clean  Remove stale tracked config entries
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

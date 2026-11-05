@@ -501,6 +501,65 @@ mod tests {
         }
     }
 
+    mod proptests {
+        use proptest::prelude::*;
+
+        use super::*;
+
+        fn tag_segments_strategy() -> impl Strategy<Value = Vec<String>> {
+            prop::collection::vec("[a-z][a-z0-9_-]{0,8}", 1..=6)
+        }
+
+        proptest! {
+            /// Proves tag prefix hierarchy laws:
+            /// 1. Reflexivity: every valid tag contains itself as a prefix (`tag.is_contained_in(tag.as_str())`).
+            /// 2. Prefix hierarchy: every descendant is contained in each ancestor
+            ///    whose path ends at a segment boundary.
+            /// 3. Boundary & segment-boundary safety: a partial string prefix that does not
+            ///    end at a segment boundary (e.g. `foo` vs `foobar`) never reports containment.
+            #[test]
+            fn preserves_containment_hierarchy_and_transitivity(
+                segments in tag_segments_strategy(),
+                suffix in "[a-z]{1,8}",
+            ) {
+                let mut cumulative = Vec::with_capacity(segments.len());
+                let mut tags = Vec::with_capacity(segments.len());
+
+                for seg in &segments {
+                    cumulative.push(seg.as_str());
+                    let raw = format!("#{}", cumulative.join("/"));
+                    let parsed = Tag::parse(&raw).expect("valid generated tag");
+                    tags.push(parsed);
+                }
+
+                // Reflexivity: tag is contained in its own string.
+                for tag in &tags {
+                    prop_assert!(tag.is_contained_in(tag.as_str()));
+                }
+
+                // Prefix hierarchy: longer tag is contained in shorter tag's string representation.
+                for (i, ancestor) in tags.iter().enumerate() {
+                    for descendant in tags.iter().skip(i) {
+                        let ancestor_prefix = ancestor.as_str();
+                        prop_assert!(
+                            descendant.is_contained_in(ancestor_prefix),
+                            "descendant {:?} must be contained in ancestor prefix {:?}",
+                            descendant.as_str(),
+                            ancestor_prefix
+                        );
+                    }
+                }
+
+
+                // Strict segment boundary: extend the last segment without a delimiter.
+                let last = tags.last().expect("generated at least one tag");
+                let off_boundary = Tag::parse(&format!("{}{suffix}", last.as_str()))
+                    .expect("valid generated tag");
+                prop_assert!(!off_boundary.is_contained_in(last.as_str()));
+            }
+        }
+    }
+
     mod is_exact_match {
         use super::*;
 

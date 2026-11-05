@@ -1,5 +1,7 @@
 # Research: Prototype BDD inside the e2e binary (ticket 09)
 
+Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+
 This file supports [09: Prototype BDD inside the e2e binary](../issues/09-bdd-e2e-prototype.md).
 It records the test measurements from a throwaway spike in the repo.
 The spike folds `rstest-bdd` scenarios into `tests/e2e.rs`.

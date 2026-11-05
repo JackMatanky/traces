@@ -568,6 +568,50 @@ mod tests {
                 matches!(result, Err(ConfigReadError::Parse { path: failed_path, .. }) if failed_path == path)
             );
         }
+        #[rstest]
+        #[case::integer_for_string("[templates]\noutput_dir = 5", "output_dir")]
+        #[case::table_for_array(
+            "[tasks]\ntag_filters = { a = 1 }",
+            "tag_filters"
+        )]
+        #[case::string_for_array(
+            "[tasks]\ntag_filters = \"todo\"",
+            "tag_filters"
+        )]
+        #[case::string_for_status_table(
+            "[tasks]\nstatuses = [\"done\"]",
+            "statuses"
+        )]
+        #[case::long_string_for_status_symbol(
+            "[[tasks.statuses]]\nsymbol = \"xy\"\nname = \"n\"\nkind = \
+             \"done\"",
+            "symbol"
+        )]
+        #[case::unknown_status_kind(
+            "[[tasks.statuses]]\nsymbol = \"x\"\nname = \"n\"\nkind = \
+             \"bogus\"",
+            "bogus"
+        )]
+        fn rejects_wrong_typed_values_with_a_typed_error(
+            #[case] content: &str,
+            #[case] expected_mention: &str,
+        ) {
+            let path = PathBuf::from("/project/.traces/config.toml");
+
+            let result = Parsed::from_content(&path, content);
+
+            let err = result.expect_err("wrong-typed value must fail");
+            assert!(
+                matches!(&err, ConfigReadError::Parse { path: failed, .. } if *failed == path)
+            );
+            assert!(
+                std::error::Error::source(&err).is_some_and(|source| source
+                    .to_string()
+                    .contains(expected_mention)),
+                "error should mention {expected_mention}: {err:?}"
+            );
+        }
+
         #[test]
         fn read_reports_io_error_not_parse_error_for_unreadable_path() {
             let temp = tempfile::tempdir().expect("temp dir");

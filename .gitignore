@@ -16,6 +16,10 @@ __MACOSX/
 # -------------------- Build & Compilation -------------------- #
 /target
 
+# ------------------------- Fuzzing --------------------------- #
+/fuzz/target
+/fuzz/artifacts
+
 # ---------------- Criterion Benchmark History ---------------- #
 # symlinked as target/criterion
 /.criterion/

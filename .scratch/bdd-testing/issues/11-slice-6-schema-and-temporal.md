@@ -10,24 +10,32 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done (the deletion wave completed the three deferred test conversions and their mutation compares)
 
-- [ ] Every row the slice owns has a scenario of the class that spec section 4 assigns.
-- [ ] The Status of each owned row in the invariance map reads `covered`.
-- [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
-- [ ] Resolve the entry condition of spec section 9.7 first, and record the result. A scenario runs in another time zone through the environment hook.
-- [ ] A check shows whether Windows honors an IANA `TZ` value.
-- [ ] The descendant-selector Rust test stays (spec section 7). A new scenario covers 04-B1 beside it.
-- [ ] A converted test is deleted only when this slice completes its last row.
-- [ ] Each deletion has the proof of spec section 7.
-- [ ] `mise run verify` passes.
-- [ ] The ledger section is complete.
-- [ ] The gap recompute line is in the adoption map.
-- [ ] The due rubric questions are answered.
-- [ ] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] Every row the slice owns has a scenario of the class that spec section 4 assigns.
+- [x] The Status of each owned row in the invariance map reads `covered`.
+- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
+- [x] Resolve the entry condition of spec section 9.7 first, and record the result. A scenario runs in another time zone through the environment hook.
+- [x] A check shows whether Windows honors an IANA `TZ` value.
+- [x] The descendant-selector Rust test stays (spec section 7). A new scenario covers 04-B1 beside it.
+- [x] A converted test is deleted only when this slice completes its last row.
+  - `class_field_config_drives_class_selection_from_disk` stayed while
+    01-G21 was slice 5's row; slice 5 has since covered 01-G21.
+- [x] Each deletion has the proof of spec section 7.
+  - The deletion wave removed `class_field_config_drives_class_selection_from_disk`,
+    `list_filters_rfc3339_field_by_its_exact_instant`, and
+    `renders_file_sourced_select_field_in_e2e_template`. The ledger records
+    the kill demonstrations, before/after mutation compares, and name diff.
+- [x] `mise run verify` passes.
+  - Passed on the scenario tree (commit `102253b8`) and on the review-fixes tree after the deletion wave (2026-11-04).
+- [x] The ledger section is complete.
+- [x] The gap recompute line is in the adoption map.
+- [x] The due rubric questions are answered.
+- [x] The amendment log has an entry.
+- [x] The slice branch is merged locally.
 
 **Out of scope:**
+
 - Rows that another slice owns.
 - Known defects (spec section 3.3).
 - Facade-seam scenarios and Scenario Outlines.

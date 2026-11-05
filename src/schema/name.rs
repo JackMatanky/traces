@@ -273,7 +273,10 @@ mod tests {
 
         #[test]
         fn try_from_rejects_an_empty_name() {
-            assert!(SchemaName::try_from("").is_err());
+            assert!(matches!(
+                SchemaName::try_from(""),
+                Err(SchemaNameError::Empty)
+            ));
         }
 
         #[test]

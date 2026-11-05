@@ -332,3 +332,21 @@ The user confirmed every decision below in this session. Evidence:
   `tests/e2e/bdd/mod.rs` with the `touch` doc comment, the `Zlib` entry in
   `deny.toml`, and the `check:layers` changes above. It checks Linux and
   Windows CI.
+
+## Amendment (2026-11-05)
+
+The user approved a new layout. It replaces decisions (a) and (h) where they
+differ. The 148 scenario titles did not change.
+
+- Scenarios run in their own test binary, `tests/features.rs`. The one-consumer
+  condition in decision (a) no longer holds. The `e2e` binary does not run them.
+- Features are in `tests/features/<capability>/` folders. A file stem keeps the
+  area, for example `query/query-sort.feature`.
+- Steps are in `tests/features/steps/`. Shared harness code is in `tests/support/`.
+  `tests/features.rs` wires both with `#[path]`.
+- The `touch` rule is in the doc comment of `tests/features.rs`.
+- The dead-step check is the script `.mise/scripts/check_steps.py`. It runs in
+  `check:layers`. It replaces the `cargo bdd unused` procedure in decision (h).
+  It also finds undefined, duplicate and ambiguous steps.
+- The Rust-symbol patterns scan `tests/e2e.rs`, `tests/e2e/`, `tests/features.rs`,
+  `tests/features/` and `tests/support/`. They skip `.feature` files.

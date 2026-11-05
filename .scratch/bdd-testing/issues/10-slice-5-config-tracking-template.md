@@ -10,22 +10,25 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** partial (05-G7 is a gap; the other unchecked entry items remain open)
 
 - [ ] Every row the slice owns has a scenario of the class that spec section 4 assigns.
 - [ ] The Status of each owned row in the invariance map reads `covered`.
+  - 05-G7 still reads `gap`: the scenarios do not pin every filesystem path to the root. Rows 03-P25 and 05-file_tracker stay `pinned-elsewhere` after the tracker mutant escaped.
 - [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
 - [ ] Review the row placement with the user at entry. Spec section 9.3 lists the rows that were placed by domain affinity.
-- [ ] A converted test is deleted only when this slice completes its last row.
-- [ ] Each deletion has the proof of spec section 7.
-- [ ] `mise run verify` passes.
-- [ ] The ledger section is complete.
-- [ ] The gap recompute line is in the adoption map.
-- [ ] The due rubric questions are answered.
-- [ ] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+  - No six-condition review or user entry placement review is recorded for this slice. The two checks remain unchecked.
+- [x] A converted test is deleted only when this slice completes its last row.
+- [x] Each deletion has the proof of spec section 7.
+- [x] `mise run verify` passes.
+- [x] The ledger section is complete.
+- [x] The gap recompute line is in the adoption map.
+- [x] The due rubric questions are answered (none due for this slice).
+- [x] The amendment log has an entry.
+- [x] The slice branch is merged locally.
 
 **Out of scope:**
+
 - Rows that another slice owns.
 - Known defects (spec section 3.3).
 - Facade-seam scenarios and Scenario Outlines.

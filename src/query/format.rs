@@ -338,6 +338,47 @@ mod tests {
         }
     }
 
+    mod proptests {
+        use proptest::prelude::*;
+
+        use super::QueryDisplayFormat;
+
+        proptest! {
+            /// Proves the Markdown table cell escaping law (01:G30, 02:G8):
+            /// 1. Safety against row breaking: escaped text contains no literal newline (`\n`).
+            /// 2. Delimiter containment: every pipe (`|`) in the escaped output is
+            ///    preceded by a backslash. This checks the inserted character,
+            ///    not Markdown parity for pre-existing backslashes.
+            /// 3. Identity on clean inputs: any input lacking newlines and pipes
+            ///    passes through unmodified.
+            #[test]
+            fn escapes_table_cells_preserving_safety_and_cell_integrity(
+                s in "(\\PC|\n|\\|)*",
+            ) {
+                let escaped = QueryDisplayFormat::escape_table_cell(&s);
+
+                // Safety law: no bare newline exists.
+                prop_assert!(!escaped.contains('\n'));
+
+                // Delimiter law: every pipe is preceded by a backslash.
+                for (idx, ch) in escaped.char_indices() {
+                    if ch == '|' {
+                        let preceding = &escaped[..idx];
+                        prop_assert!(
+                            preceding.ends_with('\\'),
+                            "pipe at offset {idx} was not preceded by backslash in {escaped:?}",
+                        );
+                    }
+                }
+
+                // Identity law: clean inputs pass unmodified.
+                if !s.contains(['\n', '|']) {
+                    prop_assert_eq!(&escaped, &s);
+                }
+            }
+        }
+    }
+
     mod render_task_list {
         use std::{fs, sync::Arc};
 

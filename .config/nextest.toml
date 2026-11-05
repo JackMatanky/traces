@@ -17,3 +17,24 @@ global-timeout = "20m"
 # Never replay captured stdout of passing tests (failure output unaffected:
 # failure-output defaults to immediate).
 success-output = "never"
+
+# The 50 000-deep nesting test parses in about 4 s on a developer machine but
+# took 36 s on an Ubuntu runner and over 60 s on Windows in unoptimized CI
+# builds. Give it room before the hang guard terminates it.
+[[profile.default.overrides]]
+filter = "test(parses_fifty_thousand_deep_nested_lists_on_a_default_stack)"
+slow-timeout = { period = "60s", terminate-after = 5 }
+
+[profile.ci]
+# CI profile: fail immediately on test failures (no retries) and emit JUnit XML
+# for artifact collection across test matrix jobs.
+retries = 0
+junit = { path = "junit.xml" }
+
+# Soak profile: identical to `ci` but with a run ceiling that fits
+# `--stress-count 20` (nextest profiles do not inherit, so `ci` keys are
+# repeated here).
+[profile.ci-soak]
+retries = 0
+global-timeout = "2h"
+junit = { path = "junit.xml" }

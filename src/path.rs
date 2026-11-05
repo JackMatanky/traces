@@ -345,7 +345,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the serializer rejects the byte payload.
+    /// - `S::Error` if the serializer rejects the byte payload.
     #[cfg(unix)]
     #[inline]
     pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
@@ -360,7 +360,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the deserializer rejects the byte payload.
+    /// - `D::Error` if the deserializer rejects the byte payload.
     #[cfg(unix)]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -376,7 +376,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the serializer rejects the wide-character payload.
+    /// - `S::Error` if the serializer rejects the wide-character payload.
     #[cfg(windows)]
     #[inline]
     pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
@@ -394,7 +394,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the deserializer rejects the wide-character payload.
+    /// - `D::Error` if the deserializer rejects the wide-character payload.
     #[cfg(windows)]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -410,7 +410,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the serializer rejects the string payload.
+    /// - `S::Error` if the serializer rejects the string payload.
     #[cfg(not(any(unix, windows)))]
     #[inline]
     pub fn serialize<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>
@@ -424,7 +424,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the deserializer rejects the string payload.
+    /// - `D::Error` if the deserializer rejects the string payload.
     #[cfg(not(any(unix, windows)))]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -489,7 +489,7 @@ mod tests {
 
         #[test]
         fn parse_rejects_an_absolute_path() {
-            let error = RelativePath::parse(Path::new("/etc/passwd"))
+            let error = RelativePath::parse(std::env::temp_dir().as_path())
                 .expect_err("absolute path is rejected");
 
             assert!(matches!(error, PathError::Absolute));

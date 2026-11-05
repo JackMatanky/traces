@@ -253,19 +253,35 @@ mod tests {
             )]);
         }
 
-        /// Lists each file that defines a digest constructor or bundle encoder.
-        const SOURCES: [&str; 6] = [
-            include_str!("../model.rs"),
-            include_str!("digest.rs"),
-            include_str!("frontmatter.rs"),
-            include_str!("schemas.rs"),
-            include_str!("tasks.rs"),
-            include_str!("templates.rs"),
-        ];
+        /// Reads `model.rs` and every `.rs` file in `model/` at test time, so
+        /// a new file cannot skip the scan. Fails on a subdirectory, which the
+        /// scan does not cover.
+        fn sources() -> Vec<String> {
+            let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("src/config");
+            let mut paths = vec![root.join("model.rs")];
+            for entry in
+                std::fs::read_dir(root.join("model")).expect("read model dir")
+            {
+                let path = entry.expect("read dir entry").path();
+                assert!(
+                    path.is_file(),
+                    "{} is not a file; extend the digest scan",
+                    path.display()
+                );
+                if path.extension().is_some_and(|ext| ext == "rs") {
+                    paths.push(path);
+                }
+            }
+            paths
+                .iter()
+                .map(|path| std::fs::read_to_string(path).expect("read source"))
+                .collect()
+        }
 
         #[test]
         fn finds_no_rest_pattern_in_any_digest_encoder() {
-            let rest_patterns: Vec<String> = SOURCES
+            let rest_patterns: Vec<String> = sources()
                 .iter()
                 .flat_map(|source| scan(source).rest_patterns)
                 .collect();
@@ -275,7 +291,7 @@ mod tests {
 
         #[test]
         fn finds_a_digests_constructor_on_every_section_type() {
-            let mut constructors: Vec<String> = SOURCES
+            let mut constructors: Vec<String> = sources()
                 .iter()
                 .flat_map(|source| scan(source).constructors)
                 .collect();

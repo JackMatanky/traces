@@ -1,0 +1,3 @@
+*.feature text eol=lf
+fuzz/corpus/** -text -diff
+tests/baselines/** text eol=lf

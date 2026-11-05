@@ -1,15 +1,15 @@
 #!/bin/bash
-#MISE description="Canonical test run: lib/bin units (production), integration (test-utils), E2E (shipped binary), doctests (all-features)"
+#MISE description="Canonical test run: lib/bin units (production), integration (test-utils), E2E and Gherkin features (shipped binary), doctests (all-features)"
 #MISE alias="t"
 #MISE sources=["@group:rust"]
 #MISE extends="gate:never-skip"
 #USAGE flag "--docs" negate="--no-docs" default=#true {
-#USAGE   help "Also run doctests after the three nextest phases"
+#USAGE   help "Also run doctests after the four nextest phases"
 #USAGE   long_help """
 #USAGE   Enabled by default:
 #USAGE   - library and binary unit/component tests on the production configuration
 #USAGE   - integration phase on the test-utils feature
-#USAGE   - E2E phase against the shipped feature-off binary
+#USAGE   - E2E and features phases against the shipped feature-off binary
 #USAGE   - doctests explicitly under --all-features (never default: test-support
 #USAGE     doctests would silently drop; CI requires a nonzero doctest count)
 #USAGE   Unfiltered nextest phases fail rather than silently running zero tests.
@@ -22,8 +22,8 @@
 #USAGE   Examples:
 #USAGE   - `mise run test -E 'test(index::refresh)'` - nextest filter expression
 #USAGE   - `mise run test refresh` - name substring filter
-#USAGE   - `mise run test --no-docs -E 'binary(e2e)'` - E2E suite only;
-#USAGE     filtered runs skip empty phases and fail if no phase matches
+#USAGE   - `mise run test --no-docs -E 'binary(features)'` - Gherkin scenarios
+#USAGE     only; filtered runs skip empty phases and fail if no phase matches
 #USAGE   """
 #USAGE }
 
@@ -35,7 +35,7 @@ matched_phases=0
 
 #######################################
 # Expands variadic passthrough arguments into phase_args (shared by all
-# three nextest phases).
+# nextest phases).
 # Globals:
 #   usage_args
 #   phase_args
@@ -82,7 +82,52 @@ run_phase() {
 }
 
 #######################################
-# Coordinates the four canonical phases.
+# Prints how many scenarios the features binary lists.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Scenario count to STDOUT.
+# Returns:
+#   0 always; a failing cargo list aborts through `set -e`.
+#######################################
+count_listed_scenarios() {
+  cargo nextest list -p traces --no-default-features --test features \
+    --color never --message-format oneline | grep -c 'features_scenarios::' || true
+}
+
+#######################################
+# Makes the features binary list every scenario the feature files declare.
+# Cargo does not notice a new feature file until tests/features.rs changes, so
+# a stale build would silently skip the new scenarios. A mismatch touches that
+# file and lists again; only a mismatch that survives the rebuild is an error.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Progress and error text to STDERR.
+# Returns:
+#   0 when the counts match, 1 otherwise.
+#######################################
+check_scenario_count() {
+  local listed declared
+  declared="$(find tests/features -name '*.feature' -exec grep -hE '^[[:space:]]*Scenario:' {} + | wc -l | tr -d ' ')"
+  listed="$(count_listed_scenarios)"
+  if [[ "${listed}" != "${declared}" ]]; then
+    echo "==> features binary lists ${listed} scenarios but the feature files declare ${declared}; rebuilding" >&2
+    touch tests/features.rs
+    listed="$(count_listed_scenarios)"
+  fi
+  if [[ "${listed}" != "${declared}" ]]; then
+    echo "ERROR: features binary lists ${listed} scenarios but the feature files declare ${declared}" >&2
+    return 1
+  fi
+}
+
+#######################################
+# Coordinates the canonical phases.
 # Globals:
 #   usage_docs
 # Arguments:
@@ -106,6 +151,11 @@ main() {
   # E2E: black-box suite against the shipped configuration — the binary is
   # built without test-utils on purpose (tests spawn it).
   run_phase e2e --no-default-features --test e2e \
+    "${phase_args[@]+"${phase_args[@]}"}"
+
+  # Features: the Gherkin scenarios; same black-box build as E2E.
+  check_scenario_count
+  run_phase features --no-default-features --test features \
     "${phase_args[@]+"${phase_args[@]}"}"
 
   if ((${#phase_args[@]} > 0 && matched_phases == 0)); then

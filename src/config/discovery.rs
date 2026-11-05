@@ -482,10 +482,16 @@ mod tests {
 
             let result = is_config_file(&blocking_file.join("config.toml"));
 
+            // Unix reports ENOTDIR (inaccessible); Windows reports
+            // ERROR_PATH_NOT_FOUND, which maps to NotFound and so to "no
+            // config".
+            #[cfg(unix)]
             assert!(matches!(
                 result,
                 Err(ConfigDiscoveryError::Inaccessible { .. })
             ));
+            #[cfg(windows)]
+            assert!(!result.expect("path under a file is simply missing"));
         }
     }
 }

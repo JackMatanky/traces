@@ -765,4 +765,27 @@ mod tests {
         tracker.end_list();
         tracker.into_lists().into_iter().next().expect("item present")
     }
+
+    mod nesting {
+        use super::*;
+
+        /// Fifty-thousand nested list items must parse on the default 2 `MiB`
+        /// thread stack: the tracker keeps explicit stacks, so depth never
+        /// reaches the call stack.
+        #[test]
+        fn parses_fifty_thousand_deep_nested_lists_on_a_default_stack() {
+            let source = "- ".repeat(50_000) + "leaf";
+
+            let item_count = std::thread::scope(|scope| {
+                std::thread::Builder::new()
+                    .stack_size(2 << 20)
+                    .spawn_scoped(scope, || parse(&source).lists().len())
+                    .expect("spawn parse thread")
+                    .join()
+                    .expect("deep list nesting must not overflow the stack")
+            });
+
+            assert_eq!(item_count, 50_000);
+        }
+    }
 }

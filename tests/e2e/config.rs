@@ -4,71 +4,9 @@
 use std::fs;
 
 use super::{
-    config_fixture::ConfigFixture,
+    fixtures::ConfigFixture,
     support::{Sandbox, plain},
 };
-
-/// Verifies `[tasks] tag_filters` from the on-disk TOML drives task
-/// selection in a spawned process.
-///
-/// Executes vs asserts:
-/// - Executes: `traces trust`, `traces index`, `traces task` — the child parses
-///   the config file from disk.
-/// - Asserts: only the `#todo` item is a Task; `#other` is not (under no filter
-///   both status-marked items would classify as Tasks).
-///
-/// Defect class: disk-config-untested (all prior config coverage was
-/// fixture-computed in-process).
-#[test]
-fn tag_filter_config_drives_task_selection_from_disk() {
-    let sandbox = Sandbox::new();
-    sandbox.write_config_fixture(
-        &ConfigFixture::new()
-            .with_templates("templates")
-            .with_task_tag_filters(&["todo"]),
-    );
-    sandbox.write_note("a.md", "# A\n\n- [ ] one #todo\n- [ ] two #other\n");
-
-    sandbox.run(&["trust"]).assert_success();
-    sandbox.run(&["index"]).assert_success();
-
-    let task = sandbox.run(&["task"]);
-    task.assert_success();
-    task.assert_never_exit_101();
-    task.assert_stdout_eq("- [ ] one (a.md)\n");
-}
-
-/// Verifies `[schemas] class_field` from the on-disk TOML drives class
-/// selection in a spawned process.
-///
-/// Executes vs asserts:
-/// - Executes: `traces trust`, `traces index`, then `list --from` class
-///   queries; the child indexes and matches under the configured field.
-/// - Asserts: the `kind: Novel` value matches `@Novel` (and the default
-///   `class`-field value would not exist here).
-///
-/// Defect class: disk-config-untested.
-#[test]
-fn class_field_config_drives_class_selection_from_disk() {
-    let sandbox = Sandbox::new();
-    sandbox.write_config_fixture(
-        &ConfigFixture::new()
-            .with_templates("templates")
-            .with_schemas(".traces/schemas", Some("kind")),
-    );
-    sandbox.write_note("a.md", "---\nkind: Novel\n---\n# A\n");
-
-    sandbox.run(&["trust"]).assert_success();
-    sandbox.run(&["index"]).assert_success();
-
-    let novel = sandbox.run(&["list", "--from", "@Novel"]);
-    novel.assert_success();
-    novel.assert_stdout_eq("- a.md\n");
-
-    let book = sandbox.run(&["list", "--from", "@Book"]);
-    book.assert_success();
-    book.assert_stdout_eq("");
-}
 
 /// Verifies `[templates] directory` from the on-disk TOML drives template
 /// discovery in a spawned process.
@@ -159,11 +97,11 @@ fn edited_config_fails_at_the_trust_stage_as_stale() {
 }
 
 /// Verifies the parse stage is reachable AFTER trust: `trust` hashes the
-/// malformed bytes without parsing them, so trusting the malformed config
-/// first succeeds and the next load fails at parse.
+/// malformed bytes without parsing them, so trusting the malformed config first
+/// succeeds and the next load fails at parse.
 ///
-/// The naive arrangement (trust a valid config, then corrupt it) halts at
-/// the stale-trust stage instead — that path is covered by
+/// The naive arrangement (trust a valid config, then corrupt it) halts at the
+/// stale-trust stage instead — that path is covered by
 /// [`edited_config_fails_at_the_trust_stage_as_stale`].
 ///
 /// Executes vs asserts:
@@ -177,8 +115,8 @@ fn malformed_config_trusted_first_fails_at_the_parse_stage() {
     let sandbox = Sandbox::new();
     sandbox.write_config_fixture(&ConfigFixture::raw("unknown_key = true\n"));
 
-    // `trust` records the content baseline without parsing: the malformed
-    // bytes are trusted as-is.
+    // `trust` records the content baseline without parsing: the malformed bytes
+    // are trusted as-is.
     sandbox.run(&["trust"]).assert_success();
 
     let list = sandbox.run(&["list"]);
@@ -226,8 +164,8 @@ fn invalid_field_key_fails_at_the_build_stage() {
 }
 
 /// Verifies the global-config positive leg: a global `[templates] directory`
-/// written to the child's config home changes what a spawned
-/// `completions --list-templates` renders.
+/// written to the child's config home changes what a spawned `completions
+/// --list-templates` renders.
 ///
 /// Executes vs asserts:
 /// - Executes: local trust, then a global config plus global template file
@@ -235,8 +173,8 @@ fn invalid_field_key_fails_at_the_build_stage() {
 ///   --list-templates`.
 /// - Asserts: both the local and the global template are listed — the global
 ///   layer contributed its configured directory. If the sandbox env policy
-///   (ticket 09) dropped `XDG_CONFIG_HOME`, the global config would be
-///   invisible and this test fails.
+///   dropped `XDG_CONFIG_HOME`, the global config would be invisible and this
+///   test fails.
 ///
 /// Defect class: disk-config-untested (global leg never spawn-covered).
 #[test]
@@ -310,11 +248,12 @@ fn malformed_global_config_fails_parse_for_trusted_local() {
 
 // Relocated from the dissolved `dispatch.rs` (ticket 19): the never-trusted
 // load boundary belongs to the config capability.
-/// Checks an untrusted config makes `list` fail with the untrusted
-/// diagnostic, non-zero exit, and empty stdout.
+
+/// Checks an untrusted config makes `list` fail with the untrusted diagnostic,
+/// non-zero exit, and empty stdout.
 ///
-/// Verifies that an untrusted root reaches the CLI error path, printing
-/// the expected diagnostic to stderr and exiting with a failure status.
+/// Verifies that an untrusted root reaches the CLI error path, printing the
+/// expected diagnostic to stderr and exiting with a failure status.
 #[test]
 fn untrusted_root_fails_with_the_config_build_diagnostic() {
     let sandbox = Sandbox::new();

@@ -28,7 +28,7 @@ use std::{
 
 use jiff::{
     Span, SpanRound, Unit,
-    fmt::friendly::{Designator, Direction, SpanPrinter},
+    fmt::friendly::{Designator, Direction, FractionalUnit, SpanPrinter},
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -52,9 +52,12 @@ pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
 
 const MAX_NOMINAL_SECONDS: f64 = 631_107_417_600.0;
 
+/// Prints sub-second fields as fractional seconds. The parser rejects the
+/// `ms`, `us`, and `ns` spellings, so Display text must never contain them.
 const PRINTER: SpanPrinter = SpanPrinter::new()
     .designator(Designator::Compact)
-    .direction(Direction::Sign);
+    .direction(Direction::Sign)
+    .fractional(Some(FractionalUnit::Second));
 
 /// Rounds a span's fractional seconds exactly once for nominal identity and
 /// fieldwise arithmetic. Calendar fields stay untouched.
@@ -367,7 +370,7 @@ impl DurationValue {
     ///
     /// # Errors
     ///
-    /// This method always returns `Ok`.
+    /// - None: this method always returns `Ok`.
     #[inline]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -641,8 +644,8 @@ impl Serialize for DurationValue {
     ///
     /// # Errors
     ///
-    /// Returns an error if formatting fails or the serializer rejects string
-    /// values.
+    /// - `S::Error` if formatting fails.
+    /// - `S::Error` if the serializer rejects string values.
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -657,8 +660,8 @@ impl<'de> Deserialize<'de> for DurationValue {
     ///
     /// # Errors
     ///
-    /// Returns a deserialization error if the input is not a string or does
-    /// not satisfy the duration grammar.
+    /// - `D::Error` if the input is not a string.
+    /// - `D::Error` if the input does not satisfy the duration grammar.
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1042,6 +1045,9 @@ mod tests {
         #[case::iso_negative_month_before_p("-P1M", -2_592_000.0)]
         #[case::iso_negative_date_time("-P1DT2H", -93_600.0)]
         #[case::iso_time_only_minutes("PT30M", 1_800.0)]
+        #[case::iso_lowercase_date("p1d", 86_400.0)]
+        #[case::iso_lowercase_time("pt1h", 3_600.0)]
+        #[case::iso_lowercase_negative("-p1d", -86_400.0)]
         fn accepts_compound_and_iso_durations(
             #[case] input: &str,
             #[case] expected: f64,
@@ -1065,6 +1071,8 @@ mod tests {
         #[case::seconds_fraction(".5s", 1.0)]
         #[case::negative_fraction("-.5h", -1_800.0)]
         #[case::positive_fraction("+.5h", 1_800.0)]
+        #[case::fraction_after_space("1h .5s", 3_601.0)]
+        #[case::fraction_after_comma("1h, .5s", 3_601.0)]
         fn accepts_hour_or_smaller_fraction_on_lowest_unit(
             #[case] input: &str,
             #[case] expected: f64,
@@ -1075,11 +1083,39 @@ mod tests {
 
         #[test]
         fn accepts_range_boundary() {
-            assert!(DurationValue::parse("7304484d").is_ok());
+            assert_eq!(
+                DurationValue::parse("7304484d")
+                    .expect("range boundary parses")
+                    .nominal_seconds(),
+                7_304_484 * 86_400
+            );
             assert!(matches!(
                 DurationValue::parse("7304485d"),
                 Err(DurationError::SecondsOutOfRange)
             ));
+        }
+
+        #[test]
+        fn accepts_iso_range_boundary() {
+            assert_eq!(
+                parse_seconds("P7304484D"),
+                Ok(631_107_417_600.0),
+                "an ISO duration exactly at the nominal maximum is valid"
+            );
+        }
+
+        #[rstest]
+        #[case::friendly_hours("7304484d 1h")]
+        #[case::friendly_seconds("7304484d 1s")]
+        #[case::iso_hours("P7304484DT1H")]
+        fn rejects_total_beyond_range_boundary(#[case] input: &str) {
+            assert!(
+                matches!(
+                    parse_error(input),
+                    Some(DurationError::SecondsOutOfRange)
+                ),
+                "fields in range but total beyond it: {input:?}"
+            );
         }
 
         #[test]
@@ -1111,6 +1147,15 @@ mod tests {
         #[case::lone_comma_before_unit("1,h")]
         #[case::spaced_number_without_unit("1 h 30")]
         #[case::non_ascii_unit("1µs")]
+        #[case::long_digit_run("99999999999999999999")]
+        #[case::lone_plus("+")]
+        #[case::lone_minus("-")]
+        #[case::signs_only("-+")]
+        #[case::trailing_plus("1+")]
+        #[case::trailing_minus("1-")]
+        #[case::dot_then_trailing_plus(".1+")]
+        #[case::dot_then_trailing_minus(".1-")]
+        #[case::trailing_comma("1,")]
         fn rejects_number_without_unit(#[case] input: &str) {
             assert!(matches!(
                 parse_error(input),
@@ -1126,6 +1171,17 @@ mod tests {
         #[case::micro_unit("1us")]
         #[case::capital_with_space("1 H")]
         #[case::exponent("1e3s")]
+        #[case::exponent_without_unit("1e3")]
+        #[case::capital_exponent("1E3")]
+        #[case::exponent_with_plus("1e+3")]
+        #[case::exponent_with_minus("1e-3")]
+        #[case::lone_e_unit("1e")]
+        #[case::sign_after_sign("-+1h")]
+        #[case::minus_after_minus("--1h")]
+        #[case::negative_millisecond("-1ms")]
+        #[case::positive_millisecond("+1ms")]
+        #[case::fractional_millisecond("1.5ms")]
+        #[case::millisecond_before_comma("1ms,1h")]
         fn rejects_unknown_or_unsupported_unit(#[case] input: &str) {
             assert!(matches!(
                 parse_error(input),
@@ -1150,14 +1206,24 @@ mod tests {
         #[case::ascending_order("1m 1h")]
         #[case::fraction_calendar_day("1.5d")]
         #[case::fraction_calendar_month("1.5mo")]
-        #[case::fraction_non_lowest("1.5h 30m")]
-        #[case::comma_without_space("1h,30m")]
         #[case::malformed_iso_fraction("P1.5D")]
         #[case::malformed_iso_negative("P-1M")]
-        fn rejects_invalid_grammar(#[case] input: &str) {
+        fn rejects_invalid_grammar_as_an_unknown_unit(#[case] input: &str) {
             assert!(
-                DurationValue::parse(input).is_err(),
-                "grammar form {input:?} must be rejected"
+                matches!(parse_error(input), Some(DurationError::UnknownUnit)),
+                "grammar form {input:?} must report an unknown unit"
+            );
+        }
+
+        #[rstest]
+        #[case::fraction_non_lowest("1.5h 30m")]
+        #[case::comma_without_space("1h,30m")]
+        #[case::plus_glued_to_unit("1h+30m")]
+        #[case::minus_glued_to_unit("1h-30m")]
+        fn rejects_invalid_grammar_as_a_missing_unit(#[case] input: &str) {
+            assert!(
+                matches!(parse_error(input), Some(DurationError::MissingUnit)),
+                "grammar form {input:?} must report a missing unit"
             );
         }
 
@@ -1167,6 +1233,158 @@ mod tests {
             assert!(matches!(
                 parse_error(&huge),
                 Some(DurationError::NumberOverflow)
+            ));
+        }
+
+        #[rstest]
+        #[case::below_limit(299, false)]
+        #[case::at_limit(300, false)]
+        #[case::above_limit(301, true)]
+        fn reports_number_overflow_only_above_300_digits(
+            #[case] digits: usize,
+            #[case] overflows: bool,
+        ) {
+            let input = format!("1{}h", "0".repeat(digits.saturating_sub(1)));
+            let error = parse_error(&input);
+            assert!(error.is_some(), "{digits} digits must not parse");
+            assert_eq!(
+                matches!(error, Some(DurationError::NumberOverflow)),
+                overflows,
+                "{digits} digits"
+            );
+        }
+
+        #[rstest]
+        #[case::double_e("1ee3")]
+        #[case::e_after_unit("1h e3")]
+        #[case::capital_e_after_unit("1h E3s")]
+        #[case::sign_not_followed_by_digit("1e+e1")]
+        fn rejects_non_exponent_e_as_a_missing_unit(#[case] input: &str) {
+            assert!(
+                matches!(parse_error(input), Some(DurationError::MissingUnit)),
+                "{input:?} is not scientific notation"
+            );
+        }
+    }
+
+    mod validate_friendly_input {
+        use super::*;
+
+        #[test]
+        fn rejects_sign_after_leading_whitespace() {
+            assert!(matches!(
+                validate_friendly_input(" -1h"),
+                Err(DurationError::MisplacedSign)
+            ));
+        }
+    }
+
+    mod normalize_friendly_input {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        #[test]
+        fn borrows_input_without_a_decimal_point() {
+            let normalized = normalize_friendly_input("1h 30m");
+            assert!(matches!(normalized, Cow::Borrowed("1h 30m")));
+        }
+
+        #[rstest]
+        #[case::leading_dot(".5h", "0.5h")]
+        #[case::negative_leading_dot("-.5h", "-0.5h")]
+        #[case::positive_leading_dot("+.5h", "+0.5h")]
+        #[case::dot_after_space("1h .5s", "1h 0.5s")]
+        #[case::dot_after_digit("1.5h", "1.5h")]
+        fn owns_input_and_pads_bare_decimal_points(
+            #[case] input: &str,
+            #[case] expected: &str,
+        ) {
+            let normalized = normalize_friendly_input(input);
+            assert!(matches!(normalized, Cow::Owned(_)));
+            assert_eq!(&*normalized, expected);
+        }
+    }
+
+    mod classify_jiff_error {
+        use super::*;
+
+        fn classify(message: &str, input: &str) -> DurationError {
+            classify_jiff_error(
+                input,
+                jiff::Error::from_args(format_args!("{message}")),
+            )
+        }
+
+        #[rstest]
+        #[case::range("value out of range")]
+        #[case::overflow("accumulated duration overflowed")]
+        #[case::too_big("value is too big")]
+        #[case::exceed("value exceeds the limit")]
+        fn reports_seconds_out_of_range_for_limit_messages(
+            #[case] message: &str,
+        ) {
+            assert!(matches!(
+                classify(message, "1h"),
+                DurationError::SecondsOutOfRange
+            ));
+        }
+
+        #[test]
+        fn reports_empty_for_the_empty_input_error() {
+            let error = "".parse::<Span>().expect_err("empty input is invalid");
+            assert!(matches!(
+                classify_jiff_error("", error),
+                DurationError::Empty
+            ));
+        }
+
+        #[rstest]
+        #[case::missing_number("missing number")]
+        #[case::no_number("no number")]
+        fn reports_missing_number_for_number_messages(#[case] message: &str) {
+            assert!(matches!(
+                classify(message, "h"),
+                DurationError::MissingNumber
+            ));
+        }
+
+        #[rstest]
+        #[case::unit("bad unit", "h")]
+        #[case::designator("bad designator", "h")]
+        #[case::unknown("unknown word", "h")]
+        #[case::unknown_beats_sign("unknown sign", "h")]
+        #[case::unrecognized_message_with_letters("boom", "1h")]
+        #[case::unrecognized_message_without_digits("boom", ",")]
+        fn reports_unknown_unit_for_unit_messages_and_unrecognized_text(
+            #[case] message: &str,
+            #[case] input: &str,
+        ) {
+            assert!(matches!(
+                classify(message, input),
+                DurationError::UnknownUnit
+            ));
+        }
+
+        #[test]
+        fn reports_misplaced_sign_for_sign_messages() {
+            assert!(matches!(
+                classify("sign", "h"),
+                DurationError::MisplacedSign
+            ));
+        }
+
+        #[rstest]
+        #[case::unparsed_input("unparsed input remains", "h")]
+        #[case::input_ends_with_digit("boom", "1h30")]
+        #[case::digits_without_letters("boom", "1,")]
+        fn reports_missing_unit_for_trailing_or_digit_only_input(
+            #[case] message: &str,
+            #[case] input: &str,
+        ) {
+            assert!(matches!(
+                classify(message, input),
+                DurationError::MissingUnit
             ));
         }
     }
@@ -1501,6 +1719,31 @@ mod tests {
             let json = serde_json::to_string(&duration).expect("serializes");
             assert_eq!(json, format!("\"{input}\""));
         }
+
+        /// Regression: the fuzz target found that `0.000000001s` displayed as
+        /// `1ns`, which the parser rejects, so a stored value could not be read
+        /// back.
+        #[rstest]
+        #[case::nanosecond("0.000000001s")]
+        #[case::millisecond("0.001s")]
+        #[case::fractional_second("1.5s")]
+        #[case::fractional_after_minutes("1m 0.5s")]
+        fn sub_second_durations_survive_a_serde_round_trip(
+            #[case] input: &str,
+        ) {
+            let duration = DurationValue::parse(input).expect("valid duration");
+
+            let json = serde_json::to_string(&duration).expect("serializes");
+            let restored: DurationValue =
+                serde_json::from_str(&json).expect("serialized text re-parses");
+
+            assert_eq!(restored, duration);
+            let shown = duration.to_string();
+            assert!(
+                ["ns", "µs", "ms"].iter().all(|unit| !shown.contains(unit)),
+                "display `{shown}` must not use sub-second unit spellings"
+            );
+        }
     }
 
     mod deserialization {
@@ -1529,14 +1772,21 @@ mod tests {
         fn rejects_non_string_scalar() {
             let json = "42";
             let result: Result<DurationValue, _> = serde_json::from_str(json);
-            assert!(result.is_err());
+            assert_eq!(
+                result.expect_err("non-string rejects").to_string(),
+                "invalid type: integer `42`, expected a string at line 1 \
+                 column 2"
+            );
         }
 
         #[test]
         fn rejects_invalid_string() {
             let json = "\"invalid\"";
             let result: Result<DurationValue, _> = serde_json::from_str(json);
-            assert!(result.is_err());
+            assert_eq!(
+                result.expect_err("invalid string rejects").to_string(),
+                "no number before unit"
+            );
         }
     }
 

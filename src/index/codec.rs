@@ -200,4 +200,136 @@ mod tests {
             assert_eq!(path, PathBuf::from("hello\u{FFFD}.md"));
         }
     }
+
+    mod proptests {
+        use std::{
+            path::PathBuf,
+            time::{Duration, SystemTime},
+        };
+
+        use pretty_assertions::assert_eq;
+        use proptest::prelude::*;
+
+        use super::super::{decode_row, encode_row};
+        use crate::{
+            FileMeta, Note, file::FileFormat, test_support::parse_note,
+        };
+
+        /// Generates a relative path of one to three unicode segments.
+        fn relative_path() -> impl Strategy<Value = PathBuf> {
+            prop::collection::vec("[\\p{L}\\p{N}_ -]{1,8}", 1..=3)
+                .prop_map(|segments| PathBuf::from(segments.join("/") + ".md"))
+        }
+
+        /// Generates a timestamp with sub-second precision after the epoch.
+        fn timestamp() -> impl Strategy<Value = SystemTime> {
+            (0_u64..4_000_000_000, 0_u32..1_000_000_000).prop_map(
+                |(secs, nanos)| {
+                    SystemTime::UNIX_EPOCH
+                        .checked_add(Duration::new(secs, nanos))
+                        .expect("timestamp within SystemTime range")
+                },
+            )
+        }
+
+        /// Generates Markdown with a heading, tags, links, and date fields.
+        fn markdown() -> impl Strategy<Value = String> {
+            let word = "[\\p{L}]{1,8}";
+            (
+                prop::collection::vec(word, 0..=3),
+                prop::collection::vec(word, 0..=3),
+                prop::collection::vec(word, 0..=3),
+                prop::option::of((1_u32..=9999, 1_u32..=12, 1_u32..=28)),
+            )
+                .prop_map(|(headings, tags, links, date)| {
+                    let mut parts = Vec::new();
+                    if let Some((year, month, day)) = date {
+                        parts.push(format!(
+                            "---\ncreated: \
+                             {year:04}-{month:02}-{day:02}\n---\n"
+                        ));
+                    }
+                    parts.extend(
+                        headings
+                            .iter()
+                            .map(|heading| format!("# {heading}\n\n")),
+                    );
+                    parts.extend(tags.iter().map(|tag| format!("#{tag} ")));
+                    parts.extend(
+                        links.iter().map(|link| format!("[[{link}]] ")),
+                    );
+                    parts.concat()
+                })
+        }
+
+        proptest! {
+            /// Pins the file-row law: any file row decodes to the row that
+            /// was encoded, including non-ASCII paths and timestamps.
+            #[test]
+            fn file_row_round_trips(
+                path in relative_path(),
+                created_at in prop::option::of(timestamp()),
+            ) {
+                // Arrange
+                let row = FileMeta::note_with_created_at_for_test(
+                    path.clone(),
+                    created_at,
+                );
+                let mut buf = Vec::new();
+
+                // Act
+                let bytes = encode_row(&path, &row, &mut buf)
+                    .expect("file row encodes");
+                let decoded: FileMeta = decode_row(&path, bytes)
+                    .expect("file row decodes");
+
+                // Assert
+                prop_assert_eq!(decoded, row);
+            }
+
+            /// Pins the note-row law: a parsed note decodes to the note that
+            /// was encoded, whatever headings, tags, links, and dates it has.
+            #[test]
+            fn note_row_round_trips(
+                path in relative_path(),
+                source in markdown(),
+            ) {
+                // Arrange
+                let row = parse_note(&path, &source);
+                let mut buf = Vec::new();
+
+                // Act
+                let bytes = encode_row(&path, &row, &mut buf)
+                    .expect("note row encodes");
+                let decoded: Note = decode_row(&path, bytes)
+                    .expect("note row decodes");
+
+                // Assert
+                prop_assert_eq!(decoded, row);
+            }
+
+            /// Pins the reused-buffer law: encoding a second row into a
+            /// buffer that holds a first row leaves only the second row.
+            #[test]
+            fn reused_buffer_holds_only_latest_row(
+                first in relative_path(),
+                second in relative_path(),
+            ) {
+                // Arrange
+                let first_row = FileMeta::for_test(first.clone(), FileFormat::Other);
+                let second_row = FileMeta::for_test(second.clone(), FileFormat::Note);
+                let mut buf = Vec::new();
+                encode_row(&first, &first_row, &mut buf).expect("first encodes");
+
+                // Act
+                let bytes = encode_row(&second, &second_row, &mut buf)
+                    .expect("second encodes");
+                let decoded: FileMeta = decode_row(&second, bytes)
+                    .expect("second decodes");
+
+                // Assert
+                assert_eq!(decoded.path(), second_row.path());
+            }
+        }
+    }
 }

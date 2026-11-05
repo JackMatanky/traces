@@ -1,5 +1,7 @@
 # Research 14: Rust CLI Test Architecture Landscape
 
+Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+
 This document supports [ticket 14](../issues/14-adoption-roadmap.md).
 It investigates how mature Rust CLI and developer tooling projects structure end-to-end and behavioral tests.
 The document evaluates test layouts, execution harnesses, snapshot tools, hermetic sandboxing, PTY testing, and real-world BDD adopters (`rstest-bdd` and `cucumber-rs`).

@@ -1,0 +1,65 @@
+# -----------------------------------------------------------------------------
+# Filename:    traces/fuzz/Cargo.toml
+# Docs:        https://rust-fuzz.github.io/book/cargo-fuzz/structure-aware-fuzzing.html
+# Description: cargo-fuzz crate for the Traces parsers. The empty `[workspace]`
+#              table keeps it out of the root workspace, so `cargo check
+#              --workspace`, clippy, and tests ignore it.
+# -----------------------------------------------------------------------------
+
+[package]
+name = "traces-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[[bin]]
+bench = false
+doc = false
+name = "filter_expression"
+path = "fuzz_targets/filter_expression.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "source_expression"
+path = "fuzz_targets/source_expression.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "date_point"
+path = "fuzz_targets/date_point.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "duration_value"
+path = "fuzz_targets/duration_value.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "raw_config"
+path = "fuzz_targets/raw_config.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "note_parse"
+path = "fuzz_targets/note_parse.rs"
+test = false
+
+[dependencies]
+libfuzzer-sys = "0.4"
+traces = { path = "..", features = ["test-utils"] }

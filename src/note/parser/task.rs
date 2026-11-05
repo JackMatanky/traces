@@ -365,6 +365,30 @@ mod tests {
         }
 
         #[test]
+        fn fills_later_slots_from_fields_after_an_earlier_emoji_slot() {
+            // `Created` precedes `Due` in `TaskDateType::ALL`: an occupied
+            // earlier slot must not end the inline-field fallback.
+            let text = "Task ➕ 2025-01-01";
+            let mut fields = IndexMap::new();
+            fields.insert(FieldKey::try_from("due").unwrap(), vec![
+                NoteFieldValue::Date(
+                    DateValue::parse_iso("2025-02-02").unwrap(),
+                ),
+            ]);
+
+            let set = TaskScan::scan(text, &[]).dates(&fields);
+
+            assert_eq!(
+                set.get(TaskDateType::Created),
+                Some(DateValue::parse_iso("2025-01-01").unwrap())
+            );
+            assert_eq!(
+                set.get(TaskDateType::Due),
+                Some(DateValue::parse_iso("2025-02-02").unwrap())
+            );
+        }
+
+        #[test]
         fn fills_emoji_free_slots_from_inline_fields() {
             let text = "Task 📅 2025-01-01";
             let mut fields = IndexMap::new();
@@ -455,6 +479,34 @@ mod tests {
         }
 
         #[test]
+        fn preserves_a_bare_date_field() {
+            let raw = "due:: 2026-10-01";
+            let cleaned = TaskScan::scan(raw, &[]).clean_text(&[]);
+            assert_eq!(cleaned, "due:: 2026-10-01");
+        }
+
+        #[test]
+        fn keeps_text_around_a_stripped_field() {
+            let raw = "before [due:: 2026-10-01] after";
+            let cleaned = TaskScan::scan(raw, &[]).clean_text(&[]);
+            assert_eq!(cleaned, "before after");
+        }
+
+        #[test]
+        fn drops_blank_lines_and_keeps_line_breaks() {
+            let raw = "first   line\n\n  \nsecond line\nthird";
+            let cleaned = TaskScan::scan(raw, &[]).clean_text(&[]);
+            assert_eq!(cleaned, "first line\nsecond line\nthird");
+        }
+
+        #[test]
+        fn drops_leading_blank_lines_without_a_leading_newline() {
+            let raw = "\n\nfirst\nsecond";
+            let cleaned = TaskScan::scan(raw, &[]).clean_text(&[]);
+            assert_eq!(cleaned, "first\nsecond");
+        }
+
+        #[test]
         fn strips_priority_emoji_with_variation_selector() {
             let raw = "Task 🔺\u{FE0F} remaining text";
             let cleaned = TaskScan::scan(raw, &[]).clean_text(&[]);
@@ -480,6 +532,18 @@ mod tests {
         }
 
         #[test]
+        fn keeps_a_token_starting_where_a_code_span_ends() {
+            let raw = "code🔺";
+            let code_spans = std::iter::once(0..4).collect::<Vec<_>>();
+            let scan = TaskScan::scan(raw, &code_spans);
+
+            assert_eq!(
+                scan.priority(&IndexMap::new()),
+                Some(TaskPriority::Highest)
+            );
+        }
+
+        #[test]
         fn keeps_a_token_abutting_a_code_span_boundary() {
             // A token ending exactly where the code span begins does not
             // overlap it: the retain filter is strict on both bounds.
@@ -496,6 +560,17 @@ mod tests {
 
     mod subtask_completion {
         use super::*;
+
+        #[test]
+        fn ignores_an_incomplete_non_task_item_with_complete_children() {
+            let mut completion = SubTaskCompletion::initial();
+            completion.observe_child(
+                false,
+                false,
+                SubTaskCompletion::AllComplete,
+            );
+            assert!(completion.is_fully_complete());
+        }
 
         #[test]
         fn starts_fully_complete_until_an_incomplete_child_is_observed() {

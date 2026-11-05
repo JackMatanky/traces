@@ -61,8 +61,7 @@ impl FileMeta {
     ///
     /// # Errors
     ///
-    /// Returns an [`std::io::Error`] if the file's modification time cannot be
-    /// read.
+    /// - [`std::io::Error`] if the file's modification time cannot be read.
     pub(crate) fn from_metadata(
         relative: RelativePath,
         metadata: &fs::Metadata,
@@ -416,16 +415,19 @@ mod tests {
 
                 let relative = RelativePath::derive(temp.path(), &file)
                     .expect("derive relative path");
-                let record =
-                    FileMeta::from_metadata(relative, &metadata_for(&file))
-                        .expect("build record");
+                let metadata = metadata_for(&file);
+                let record = FileMeta::from_metadata(relative, &metadata)
+                    .expect("build record");
 
                 assert_eq!(record.name().as_str(), "todo");
                 assert_eq!(record.path(), Path::new("notes/todo.md"));
                 assert_eq!(record.folder().as_path(), Path::new("notes"));
                 assert_eq!(record.format(), FileFormat::Note);
                 assert_eq!(record.size(), 7);
-                assert!(record.modified_at() <= SystemTime::now());
+                assert_eq!(
+                    record.modified_at(),
+                    metadata.modified().expect("read modified time")
+                );
             }
 
             #[test]

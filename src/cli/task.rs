@@ -412,6 +412,59 @@ mod tests {
             assert_eq!(count, 2);
         }
 
+        #[rstest]
+        #[case::table("--table")]
+        #[case::line_numbers("--line-numbers")]
+        fn renders_only_count_when_count_and_another_presentation_flag_are_set(
+            #[case] other_flag: &str,
+        ) {
+            use clap::Parser as _;
+
+            use crate::cli::{Cli, Commands};
+
+            let temp = tempfile::tempdir().expect("create temp dir");
+            fs::write(
+                temp.path().join("todo.md"),
+                "- [ ] buy milk\n- [x] pay rent\n",
+            )
+            .expect("write note");
+            let cli =
+                Cli::try_parse_from(["traces", "task", "--count", other_flag])
+                    .expect("parse task flags");
+            let task = match cli.command {
+                Some(Commands::Task(task)) => Some(task),
+                _ => None,
+            }
+            .expect("expected the Task subcommand");
+
+            let (rendered, count) =
+                task.render(&config(temp.path())).expect("valid query");
+
+            assert_eq!(rendered, "2\n");
+            assert_eq!(count, 2);
+        }
+
+        #[test]
+        fn rejects_column_without_table_even_under_count() {
+            use clap::Parser as _;
+
+            use crate::cli::Cli;
+
+            let error = Cli::try_parse_from([
+                "traces",
+                "task",
+                "--count",
+                "--column",
+                "list.text",
+            ])
+            .expect_err("column requires table even when counting");
+
+            assert_eq!(
+                error.kind(),
+                clap::error::ErrorKind::MissingRequiredArgument
+            );
+        }
+
         #[test]
         fn filters_incomplete_tasks_with_todo_flag() {
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -731,12 +784,10 @@ mod tests {
         }
         #[test]
         fn rejects_conflicting_todo_and_done_flags() {
-            let result =
-                Cli::try_parse_from(["traces", "task", "--todo", "--done"]);
-            assert!(
-                result.is_err(),
-                "passing both --todo and --done must fail"
-            );
+            let error =
+                Cli::try_parse_from(["traces", "task", "--todo", "--done"])
+                    .expect_err("todo and done conflict");
+            assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
         }
 
         #[test]
@@ -787,16 +838,16 @@ mod tests {
         }
         #[test]
         fn rejects_column_without_table() {
-            let result = Cli::try_parse_from([
+            let error = Cli::try_parse_from([
                 "traces",
                 "task",
                 "--column",
                 "list.text",
-            ]);
-            assert!(
-                result.is_err(),
-                "--column requires --table, so passing --column alone must \
-                 fail"
+            ])
+            .expect_err("column requires table or count");
+            assert_eq!(
+                error.kind(),
+                clap::error::ErrorKind::MissingRequiredArgument
             );
         }
 

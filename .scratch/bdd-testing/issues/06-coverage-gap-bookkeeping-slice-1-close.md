@@ -10,21 +10,21 @@
 
 **Category:** enhancement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The invariance-map tables have a Status column and one-dialect row IDs in one pass. The pilot rows read `covered`. Other states follow spec section 6.
-- [ ] The sixth gate check is live and resolves every pilot pointer. It names the row on failure.
-- [ ] The first gap recompute line is in the map.
-- [ ] The profraw check is done: coverage numbers either see scenario-executed source or are documented as blind to it.
-- [ ] The candidate-table row that wrongly maps the default-path init test to 01-G17 is fixed.
-- [ ] The hygiene backlog file exists and lists the items of spec section 9.8.
-- [ ] Rubric questions 1 and 2 are answered for the user.
-- [ ] `mise run verify` passes.
-- [ ] The ledger section is complete.
-- [ ] The gap recompute line is in the adoption map.
-- [ ] The due rubric questions are answered.
-- [ ] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [x] The invariance-map tables have a Status column and one-dialect row IDs in one pass. The pilot rows read `covered`. Other states follow spec section 6.
+- [x] The sixth gate check is live and resolves every pilot pointer. It names the row on failure.
+- [x] The first gap recompute line is in the map.
+- [x] The profraw check is done: coverage numbers either see scenario-executed source or are documented as blind to it.
+- [x] The candidate-table row that wrongly maps the default-path init test to 01-G17 is fixed.
+- [x] The hygiene backlog file exists and lists the items of spec section 9.8.
+- [x] Rubric questions 1 and 2 are answered for the user.
+- [x] `mise run verify` passes.
+- [x] The ledger section is complete.
+- [x] The gap recompute line is in the adoption map.
+- [x] The due rubric questions are answered.
+- [x] The amendment log has an entry.
+- [x] The slice branch is merged locally. The integration branch `bdd-testing` holds the slice.
 
 **Out of scope:**
 - Rows of later slices, except to mark them `gap`.

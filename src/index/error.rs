@@ -292,5 +292,21 @@ mod tests {
                 IndexError::Scan(DirTreeError::NodeInaccessible { .. })
             ));
         }
+
+        #[test]
+        fn path_display_matches_the_wrapped_path_error_with_no_added_text() {
+            let path_message = PathError::OutsideRoot.to_string();
+
+            let wrapped = IndexError::Path(PathError::OutsideRoot);
+
+            assert_eq!(wrapped.to_string(), path_message);
+        }
+
+        #[test]
+        fn path_error_converts_to_the_path_variant() {
+            let converted: IndexError = PathError::Absolute.into();
+
+            assert!(matches!(converted, IndexError::Path(PathError::Absolute)));
+        }
     }
 }

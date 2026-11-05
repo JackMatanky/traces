@@ -1,0 +1,31 @@
+Root command-line parser for `traces`.
+
+Dispatches to a subcommand when one is present, or to the default `-i`/`--input` template instantiation path when the flag is given. Returns [`CliError::NoCommand`] when neither is provided.
+
+Usage: traces [OPTIONS]
+       traces <COMMAND>
+
+Commands:
+  init         Initialize local traces configuration in the current directory
+  trust        Grant trust to one or more project roots
+  untrust      Revoke trust from one or more project roots
+  index        Build or rebuild the persisted [`WorkspaceIndex`](crate::index::WorkspaceIndex)
+  list         Query pages and print matching file paths as a Markdown bullet list
+  table        Query pages and print matching records as a Markdown table
+  task         Query tasks and print matching checkbox lines
+  template     Render a template and write it to disk, or list available templates
+  completions  Generate shell completion scripts or list available template names
+  tracked      Inspect or clean the tracked-config store
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -i, --input [<NAME>]
+          Optional template name for the default `traces -i <name>` dispatch.
+
+          Passing `-i` with no value opens the interactive fuzzy picker.
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

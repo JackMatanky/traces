@@ -500,7 +500,7 @@ mod tests {
         let paths: Vec<_> = index
             .entries()
             .iter()
-            .map(|e| e.file().path().to_str().unwrap())
+            .map(|e| crate::path::display_portable(e.file().path()))
             .collect();
         assert_eq!(paths, ["notes/note.md", "notes-x.md"]);
     }
@@ -1473,26 +1473,31 @@ mod tests {
         }
 
         #[test]
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "not async code; this test waits for the filesystem \
-                      mtime to advance after rewriting a file with the same \
-                      byte length; tokio::time::sleep does not apply here and \
-                      filetime is not worth the dep"
-        )]
         fn reparses_a_note_when_modified_timestamp_changes_with_same_file_size()
         {
             let temp = tempfile::tempdir().expect("create temp dir");
-            fs::write(temp.path().join("note.md"), "Status:: Draft")
-                .expect("write note");
+            let note = temp.path().join("note.md");
+            fs::write(&note, "Status:: Draft").expect("write note");
             let indexer = IndexerService::for_tests(temp.path());
             indexer
                 .persist(&indexer.build().expect("build index"))
                 .expect("persist index");
+            let persisted_mtime = fs::metadata(&note)
+                .and_then(|meta| meta.modified())
+                .expect("read persisted mtime");
 
-            std::thread::sleep(std::time::Duration::from_millis(15));
-            fs::write(temp.path().join("note.md"), "Status:: Final")
+            fs::write(&note, "Status:: Final")
                 .expect("rewrite note with same byte length");
+            // Set after the write: a write resets the mtime.
+            fs::File::options()
+                .write(true)
+                .open(&note)
+                .and_then(|file| {
+                    file.set_modified(
+                        persisted_mtime + std::time::Duration::from_secs(60),
+                    )
+                })
+                .expect("set a different mtime");
 
             let refreshed = indexer.refresh().expect("refresh index");
             let value = find_note(&refreshed, "note.md")

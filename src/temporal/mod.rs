@@ -56,6 +56,8 @@ pub(crate) use fmt::{
     DATETIME_MICROS_PATTERN, DATETIME_MILLIS_PATTERN, DATETIME_NANOS_PATTERN,
     render_pattern,
 };
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) use point::DatePrecision;
 pub(crate) use point::{DateDiff, DatePoint};
 pub(crate) use token::pattern_to_strftime;
 pub(crate) use unit::{DateUnit, TimeUnit};
@@ -384,7 +386,13 @@ pub(crate) mod test_support {
                     });
                 }));
 
-            assert!(result.is_err());
+            assert_eq!(
+                result
+                    .expect_err("closure panics")
+                    .downcast_ref::<&str>()
+                    .copied(),
+                Some("exercise unwind restoration")
+            );
             assert_eq!(
                 local_zone().expect("original zone is restored"),
                 original
