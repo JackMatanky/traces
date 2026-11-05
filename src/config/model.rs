@@ -443,6 +443,9 @@ mod tests {
             );
         }
 
+        // Windows spells the default relative paths with `\\`, so the digest
+        // differs.
+        #[cfg(unix)]
         #[test]
         fn matches_the_pinned_digest_for_a_fixed_config() {
             // Configuration fingerprints persist across releases. This test

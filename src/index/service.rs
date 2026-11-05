@@ -500,7 +500,7 @@ mod tests {
         let paths: Vec<_> = index
             .entries()
             .iter()
-            .map(|e| e.file().path().to_str().unwrap())
+            .map(|e| crate::path::display_portable(e.file().path()))
             .collect();
         assert_eq!(paths, ["notes/note.md", "notes-x.md"]);
     }

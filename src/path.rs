@@ -489,7 +489,7 @@ mod tests {
 
         #[test]
         fn parse_rejects_an_absolute_path() {
-            let error = RelativePath::parse(Path::new("/etc/passwd"))
+            let error = RelativePath::parse(std::env::temp_dir().as_path())
                 .expect_err("absolute path is rejected");
 
             assert!(matches!(error, PathError::Absolute));

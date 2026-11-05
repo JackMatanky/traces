@@ -606,11 +606,10 @@ mod tests {
                 .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
-                    node.path()
-                        .strip_prefix(root)
-                        .expect("under root")
-                        .to_string_lossy()
-                        .into_owned()
+                    crate::path::display_portable(
+                        node.path().strip_prefix(root).expect("under root"),
+                    )
+                    .into_owned()
                 })
                 .collect();
             relatives.sort();
@@ -751,11 +750,10 @@ mod tests {
                 .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
-                    node.path()
-                        .strip_prefix(root)
-                        .expect("under root")
-                        .to_string_lossy()
-                        .into_owned()
+                    crate::path::display_portable(
+                        node.path().strip_prefix(root).expect("under root"),
+                    )
+                    .into_owned()
                 })
                 .collect();
 
@@ -785,11 +783,10 @@ mod tests {
                 .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
-                    node.path()
-                        .strip_prefix(root)
-                        .expect("under root")
-                        .to_string_lossy()
-                        .into_owned()
+                    crate::path::display_portable(
+                        node.path().strip_prefix(root).expect("under root"),
+                    )
+                    .into_owned()
                 })
                 .collect();
 
@@ -855,11 +852,10 @@ mod tests {
                 .walk()
                 .map(|entry| entry.expect("entry is ok"))
                 .map(|node| {
-                    node.path()
-                        .strip_prefix(root)
-                        .expect("under root")
-                        .to_string_lossy()
-                        .into_owned()
+                    crate::path::display_portable(
+                        node.path().strip_prefix(root).expect("under root"),
+                    )
+                    .into_owned()
                 })
                 .collect();
 
@@ -885,11 +881,10 @@ mod tests {
                 .walk()
                 .map(|entry| entry.expect("entry is readable"))
                 .map(|node| {
-                    node.path()
-                        .strip_prefix(root)
-                        .expect("under root")
-                        .to_string_lossy()
-                        .into_owned()
+                    crate::path::display_portable(
+                        node.path().strip_prefix(root).expect("under root"),
+                    )
+                    .into_owned()
                 })
                 .collect();
             relatives.sort();
