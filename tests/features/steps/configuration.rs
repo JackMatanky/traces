@@ -8,7 +8,7 @@ use rstest_bdd_macros::{given, then, when};
 
 use super::{LastRun, Sandbox};
 use crate::{
-    config_fixture::ConfigFixture,
+    fixtures::ConfigFixture,
     support::{Run, assert_reports_same_path},
 };
 
@@ -242,8 +242,8 @@ fn trusted_configuration_at_discovery_ceiling(sandbox: &Sandbox) {
 
 #[when("I run \"traces list\" with the project root as the discovery ceiling")]
 fn list_with_ceiling(sandbox: &Sandbox, last_run: &mut LastRun) {
-    // The ceiling must equal the working directory the process reports.
-    // POSIX resolves symlinks there (macOS `/var` -> `/private/var`), so
+    // The ceiling must equal the working directory the process reports. POSIX
+    // resolves symlinks there (macOS `/var` -> `/private/var`), so
     // canonicalize. On Windows, `canonicalize` returns a `\\?\` verbatim path
     // that never equals the plain (possibly 8.3 short) `current_dir` form.
     let ceiling = if cfg!(windows) {

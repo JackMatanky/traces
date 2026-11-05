@@ -3,7 +3,7 @@
 use rstest_bdd_macros::{given, then, when};
 
 use super::{LastRun, Sandbox};
-use crate::config_fixture::ConfigFixture;
+use crate::fixtures::ConfigFixture;
 
 #[given(r#"another note "{path}" containing:"#)]
 fn another_note_containing(sandbox: &Sandbox, path: String, docstring: String) {

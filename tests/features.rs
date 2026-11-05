@@ -5,9 +5,9 @@
 //!
 //! # Feature file change detection
 //!
-//! Rustc tracks edits to existing `.feature` files through dep-info, but
-//! adding a new `.feature` file is not detected automatically without a
-//! build script. After you add a feature file, run:
+//! Rustc tracks edits to existing `.feature` files through dep-info, but adding
+//! a new `.feature` file is not detected automatically without a build script.
+//! After you add a feature file, run:
 //!
 //! ```sh
 //! touch tests/features.rs
@@ -15,8 +15,8 @@
 //!
 //! Do not add a `build.rs`.
 
-#[path = "support/config_fixture.rs"]
-mod config_fixture;
+#[path = "support/fixtures.rs"]
+mod fixtures;
 #[expect(
     clippy::disallowed_methods,
     reason = "rstest-bdd step wrappers call std::panic::catch_unwind"

@@ -17,6 +17,7 @@ rust = { version = "nightly-2026-10-01", profile = "minimal", components = [
 # JSON format 57, currently nightly-2026-06-10).
 hk = "2.0.0"
 cargo-binstall = "latest"
+uv = "latest"
 
 # -- Data Formats --
 taplo = "latest"
@@ -235,8 +236,8 @@ if [[ -n "${scenario_titles}" ]]; then
     fi
 fi
 
-python3 .mise/scripts/check_scenarios.py
-python3 .mise/scripts/check_steps.py
+.mise/scripts/check_scenarios.py
+.mise/scripts/check_steps.py
 echo "==> Layer discipline checks passed."
 '''
 

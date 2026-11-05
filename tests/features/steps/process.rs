@@ -7,13 +7,11 @@ use super::{LastRun, Sandbox};
 use crate::support::assert_reports_same_path;
 
 /// Splits a quoted command into arguments, dropping an optional leading
-/// `traces`.
+/// `traces` word.
 fn command_args(cmd: &str) -> Vec<&str> {
-    cmd.strip_prefix("traces ")
-        .or_else(|| cmd.strip_prefix("traces"))
-        .unwrap_or(cmd)
-        .split_whitespace()
-        .collect()
+    let mut words = cmd.split_whitespace().peekable();
+    words.next_if_eq(&"traces");
+    words.collect()
 }
 
 /// Turns a Gherkin docstring into the exact text a stream must contain.

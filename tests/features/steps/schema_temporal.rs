@@ -4,7 +4,7 @@ use pretty_assertions::assert_eq;
 use rstest_bdd_macros::{given, then};
 
 use super::Sandbox;
-use crate::config_fixture::ConfigFixture;
+use crate::fixtures::ConfigFixture;
 
 #[given("a trusted library with book, science fiction, and novel classes")]
 fn book_class_library(sandbox: &Sandbox) {

@@ -6,7 +6,7 @@ use pretty_assertions::assert_eq;
 use rstest_bdd_macros::{given, then};
 
 use super::{LastRun, Sandbox};
-use crate::config_fixture::ConfigFixture;
+use crate::fixtures::ConfigFixture;
 
 #[given("an indexed project with the original task")]
 fn indexed_original_task(sandbox: &Sandbox) {

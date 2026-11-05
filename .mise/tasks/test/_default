@@ -1,5 +1,5 @@
 #!/bin/bash
-#MISE description="Canonical test run: lib/bin units (production), integration (test-utils), E2E (shipped binary), doctests (all-features)"
+#MISE description="Canonical test run: lib/bin units (production), integration (test-utils), E2E and Gherkin features (shipped binary), doctests (all-features)"
 #MISE alias="t"
 #MISE sources=["@group:rust"]
 #MISE extends="gate:never-skip"
@@ -35,7 +35,7 @@ matched_phases=0
 
 #######################################
 # Expands variadic passthrough arguments into phase_args (shared by all
-# three nextest phases).
+# nextest phases).
 # Globals:
 #   usage_args
 #   phase_args

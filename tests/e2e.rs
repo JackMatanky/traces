@@ -1,9 +1,9 @@
 //! End-to-end test harness: spawns the real `traces` binary against isolated
-//! sandboxes, including the default non-interactive `init` path. See
-//! `support` for isolation guarantees.
+//! sandboxes, including the default non-interactive `init` path. See `support`
+//! for isolation guarantees.
 
-#[path = "support/config_fixture.rs"]
-mod config_fixture;
+#[path = "support/fixtures.rs"]
+mod fixtures;
 #[expect(
     dead_code,
     reason = "the features binary shares this harness and uses helpers this \

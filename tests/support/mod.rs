@@ -308,15 +308,13 @@ impl Sandbox {
     pub(crate) fn write_config(&self) {
         std::fs::create_dir_all(self.root().join("templates"))
             .expect("create templates dir");
-        self.write_config_fixture(
-            &super::config_fixture::ConfigFixture::minimal(),
-        );
+        self.write_config_fixture(&super::fixtures::ConfigFixture::minimal());
     }
 
     /// Writes a configuration fixture to .traces/config.toml.
     pub(crate) fn write_config_fixture(
         &self,
-        fixture: &super::config_fixture::ConfigFixture,
+        fixture: &super::fixtures::ConfigFixture,
     ) -> std::path::PathBuf {
         fixture.write_to(self.root()).expect("write config fixture")
     }

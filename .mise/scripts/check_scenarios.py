@@ -1,11 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """Check both directions of the research/10 scenario ownership contract."""
 
 import argparse
-from pathlib import Path
 import re
 import sys
-
+from pathlib import Path
 
 ROW = re.compile(
     r"^\|\s*(\d{2}-[\w-]+)\s*\|.*\|\s*covered:\s*(.*?)\s+"
@@ -51,12 +54,16 @@ def check(root: Path) -> list[str]:
             if not reason:
                 errors.append(f"ERROR: Scenario owner has no reason: '{title}'")
             if title not in scenarios:
-                errors.append(f"ERROR: Scenario owner points to missing scenario: '{title}'")
+                errors.append(
+                    f"ERROR: Scenario owner points to missing scenario: '{title}'"
+                )
             if title in owned:
                 errors.append(f"ERROR: Duplicate scenario owner: '{title}'")
             owned.add(title)
     for title in sorted(
-        scenarios - {t.strip() for _, titles in rows for t in titles.split(";")} - owned
+        scenarios
+        - {t.strip() for _, titles in rows for t in titles.split(";")}
+        - owned
     ):
         errors.append(f"ERROR: Uncited scenario: '{title}'")
     return errors
