@@ -4,16 +4,16 @@
 //! [`FileMeta`] stores the metadata the indexer persists for every regular file
 //! under a project root: project-root-relative path, parent folder, timestamps,
 //! byte size, and [`FileFormat`] classification. [`FileFormat::Note`] files
-//! also get parsed into [`crate::Note`] metadata; [`FileFormat::Other`] files
+//! also get parsed into [`crate::Note`] metadata. [`FileFormat::Other`] files
 //! keep only their [`FileMeta`].
 //!
 //! File-name newtypes decompose a path's final component for index lookup:
 //!
 //! - [`FileName`]: owns the full final component including extension
-//!   (`todo.md`). Constructed from a [`Path`] via [`TryFrom`]; returns
+//!   (`todo.md`). Constructed from a [`Path`] with [`TryFrom`]. Returns
 //!   [`FileNameError::Missing`] when the path has no final component.
 //! - [`BaseName`]: owns the stem with the extension stripped (`todo`), derived
-//!   from [`FileName`] via [`From`]. Used as the index key for stem-based link
+//!   from [`FileName`] with [`From`]. Used as the index key for stem-based link
 //!   resolution.
 //! - [`BaseNameRef`]: borrows the stem without allocation, enabling zero-copy
 //!   comparison and hash lookups directly from a [`Path`].
@@ -56,8 +56,8 @@ impl FileMeta {
     /// Builds a [`FileMeta`] from filesystem metadata.
     ///
     /// `relative` is a project-root-relative path already validated by the
-    /// scanner. The modification time is read from `metadata`; creation time is
-    /// captured if the host OS reports it, and [`None`] otherwise.
+    /// scanner. The modification time is read from `metadata`. Creation time
+    /// is captured if the host OS reports it, and [`None`] otherwise.
     ///
     /// # Errors
     ///
@@ -361,7 +361,7 @@ impl FileFormat {
     }
 }
 
-/// Reports why a [`FileName`] could not be constructed.
+/// Reports why constructing a [`FileName`] failed.
 #[derive(Debug, Error)]
 pub(crate) enum FileNameError {
     /// The path has no final component.

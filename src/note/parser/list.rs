@@ -4,6 +4,8 @@
 //! Markdown structures never recurse through the call stack. [`ItemFrame`]
 //! pairs an active item's buffers, marker state, and scanned metadata, then
 //! finalizes the frame into a classified [`ListItem`].
+use std::collections::{VecDeque, vec_deque};
+
 use indexmap::IndexMap;
 
 use super::{
@@ -130,16 +132,20 @@ impl ListTracker {
             is_ordered,
             marker: MarkerAccumulator::new(),
             subtask_completion: SubTaskCompletion::initial(),
-            descendants: Vec::new(),
+            descendants: VecDeque::new(),
         });
     }
 
-    /// Flushes and records the innermost list item.
+    /// Closes the innermost list item and attaches its subtree to the parent.
     ///
     /// The flush decides any pending leading marker (see
     /// [`Self::resolve_pending_marker`]) before the item's final classification
     /// reads its scanned metadata. Returns the flushed inline fields and tags,
     /// if any.
+    ///
+    /// The close attaches the child subtree as one chain. The attach moves
+    /// constant data per close. The flatten pass to a flat [`ListItem`]
+    /// run happens once, at the top level.
     pub(super) fn end_item(
         &mut self,
         tag_filters: &[Tag],
@@ -154,11 +160,17 @@ impl ListTracker {
                     finalized.is_complete,
                     finalized.completion,
                 );
-                parent_item.descendants.push(finalized.item);
-                parent_item.descendants.extend(finalized.descendants);
+                parent_item
+                    .descendants
+                    .push_back(DescendantChunk::Item(finalized.item));
+                if !finalized.descendants.is_empty() {
+                    parent_item.descendants.push_back(DescendantChunk::Chain(
+                        finalized.descendants,
+                    ));
+                }
             } else {
                 self.lists.push(finalized.item);
-                self.lists.extend(finalized.descendants);
+                flatten_into(finalized.descendants, &mut self.lists);
             }
         }
         flushed
@@ -298,6 +310,40 @@ impl ItemBuffers {
     }
 }
 
+/// Stores one run of finished descendant items in document order.
+///
+/// A [`DescendantChunk::Chain`] holds a closed item's whole subtree, so
+/// attaching a child to its parent moves constant data per close. The
+/// flatten pass runs once, at the top level.
+enum DescendantChunk {
+    Item(ListItem),
+    Chain(VecDeque<Self>),
+}
+
+/// Appends every item in `chunks` to `out` in document order.
+///
+/// An explicit stack replaces recursion, so nesting depth never reaches the
+/// call stack.
+fn flatten_into(chunks: VecDeque<DescendantChunk>, out: &mut Vec<ListItem>) {
+    let mut pending: Vec<vec_deque::IntoIter<DescendantChunk>> = Vec::new();
+    let mut current = chunks.into_iter();
+    loop {
+        match current.next() {
+            Some(DescendantChunk::Item(item)) => out.push(item),
+            Some(DescendantChunk::Chain(chain)) => {
+                pending.push(current);
+                current = chain.into_iter();
+            }
+            None => {
+                let Some(next) = pending.pop() else {
+                    break;
+                };
+                current = next;
+            }
+        }
+    }
+}
+
 /// Represents an active list item frame on the parser stack.
 struct ItemFrame {
     buffers: ItemBuffers,
@@ -316,7 +362,7 @@ struct ItemFrame {
     is_ordered: bool,
     marker: MarkerAccumulator,
     subtask_completion: SubTaskCompletion,
-    descendants: Vec<ListItem>,
+    descendants: VecDeque<DescendantChunk>,
 }
 
 impl ItemFrame {
@@ -463,8 +509,9 @@ struct FinalizedItem {
     is_complete: bool,
     /// The item's descendant-task completion state at close time.
     completion: SubTaskCompletion,
-    /// Child items accumulated while the frame was open.
-    descendants: Vec<ListItem>,
+    /// Child subtrees accumulated while the frame was open, in document
+    /// order.
+    descendants: VecDeque<DescendantChunk>,
 }
 
 /// Represents an active list frame on the parser stack.
@@ -767,6 +814,8 @@ mod tests {
     }
 
     mod nesting {
+        use pretty_assertions::assert_eq;
+
         use super::*;
 
         /// Fifty-thousand nested list items must parse on the default 2 `MiB`
@@ -776,16 +825,22 @@ mod tests {
         fn parses_fifty_thousand_deep_nested_lists_on_a_default_stack() {
             let source = "- ".repeat(50_000) + "leaf";
 
-            let item_count = std::thread::scope(|scope| {
+            let note = std::thread::scope(|scope| {
                 std::thread::Builder::new()
                     .stack_size(2 << 20)
-                    .spawn_scoped(scope, || parse(&source).lists().len())
+                    .spawn_scoped(scope, || parse(&source))
                     .expect("spawn parse thread")
                     .join()
                     .expect("deep list nesting must not overflow the stack")
             });
 
-            assert_eq!(item_count, 50_000);
+            let lists = note.lists();
+            assert_eq!(lists.len(), 50_000);
+            assert_eq!(
+                lists.last().map(ListItem::raw_text),
+                Some("leaf"),
+                "the innermost item must stay last in document order"
+            );
         }
     }
 }

@@ -18,13 +18,6 @@ global-timeout = "20m"
 # failure-output defaults to immediate).
 success-output = "never"
 
-# The 50 000-deep nesting test parses in about 4 s on a developer machine but
-# took 36 s on an Ubuntu runner and over 60 s on Windows in unoptimized CI
-# builds. Give it room before the hang guard terminates it.
-[[profile.default.overrides]]
-filter = "test(parses_fifty_thousand_deep_nested_lists_on_a_default_stack)"
-slow-timeout = { period = "60s", terminate-after = 5 }
-
 [profile.ci]
 # CI profile: fail immediately on test failures (no retries) and emit JUnit XML
 # for artifact collection across test matrix jobs.

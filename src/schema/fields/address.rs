@@ -11,7 +11,7 @@ use crate::{FieldName, FieldNameError, FieldNameRef};
 /// Represents an owned `#<schema>/<field>` coordinate parsed from a `$ref`
 /// string.
 ///
-/// Constructed via [`TryFrom<&str>`](TryFrom) or [`FromStr`].
+/// Constructed with [`TryFrom<&str>`](TryFrom) or [`FromStr`].
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct FieldAddress {
     schema: SchemaName,

@@ -1055,3 +1055,92 @@ formats without field names. The fix is a wrapper in `src/config/raw/table.rs`.
   case and the scenario failed. The attribute was restored.
 - Behavior change: a config file that wrote a section as an array now fails to
   load. Local and global files share the path.
+
+## Slice 5 Six-Condition Review (2026-11-05)
+
+Ticket 10, box 3. The review reads spec section 3.2 and spec section 5, the
+slice-5 rows of `scenario-owners.md`, and the invariance map. It checks every
+owned scenario against the six conditions and the authoring rules. All
+scenarios pass. No feature file changes, so the commit needs no
+`spec change:` line.
+
+Condition summary:
+
+- Condition 1: each scenario pins a single behavior, for example a rendered
+  file, a config load, a tracked entry, or a refusal.
+- Condition 2: each assertion uses stdout, stderr diagnostic codes, exit
+  status, or files under the project root. The step
+  `stderr contains diagnostic code "{code}"` checks the first stderr line,
+  so the check is stronger than the step name. Count summaries on stderr
+  match the pinned form of row 01-G3.
+- Condition 3: each Feature description links its intent source. The code
+  agrees with it. `src/env_vars.rs` pins `TRACES_CEILING_DIRS`. ADR-0002
+  pins tracking and trust order. ADR-0003 pins the non-TTY fallbacks. The
+  config and template glossaries pin scope, resolution and output
+  precedence.
+- Condition 4: no owned row belongs to the gate or property list of the map.
+- Condition 5: `tests/support/mod.rs` drops every shell variable and keeps
+  `TRACES_STATE_DIR` and `XDG_CONFIG_HOME` inside the sandbox. Tests set
+  `TRACES_CEILING_DIRS` through `run_with_envs`.
+- Condition 6: the map sends each seam to a scenario at the CLI boundary or
+  to no scenario. The open arch-design tickets move seams inside the
+  process, not the CLI contract.
+
+Verdicts per scenario. Each verdict is `pass` for all six conditions and for
+the rules of spec section 5.
+
+| File | Scenario | Rows | Verdict |
+|---|---|---|---|
+| tracking.feature | Indexed configuration is listed as a tracked path | 03-P25 | pass |
+| tracking.feature | A load without trust still records the configuration as tracked | 03-P25 | pass |
+| tracking.feature | Trust grant fails before trusting when tracking cannot save | 01-G26 | pass |
+| tracking.feature | Revoking trust leaves the configuration tracked | 01-G26 | pass |
+| tracking.feature | Cleaning a stale tracked path reports its removal | 01-G27, 05-file_tracker | pass |
+| tracking.feature | Cleaning preserves a live tracked configuration path | 05-file_tracker | pass |
+| index-store.feature | Indexing records the project configuration as tracked | 03-P25 | pass |
+| config-discovery.feature | Local and global configuration fields combine independently | 01-G21 | pass |
+| config-discovery.feature | An absent local task filter uses the global filter | 01-G21 | pass |
+| config-discovery.feature | A local task filter replaces the global filter | 01-G21 | pass |
+| config-discovery.feature | Nearest local configuration is discovered alongside global configuration | 01-G18 | pass |
+| config-discovery.feature | Missing local configuration fails at discovery | 01-G22 | pass |
+| config-discovery.feature | A discovery ceiling stops the upward configuration search | 05-env_vars | pass |
+| config-validation.feature | Untrusted local configuration fails at trust verification | 01-G22 | pass |
+| config-validation.feature | Malformed trusted configuration fails at parsing | 01-G22 | pass |
+| config-validation.feature | Changed trusted configuration fails before its malformed content is parsed | 01-G22 | pass |
+| config-validation.feature | Invalid trusted configuration value fails at validation | 01-G22 | pass |
+| config-validation.feature | A section written as an array is rejected | 01-G22 | pass |
+| config-validation.feature | A malformed global configuration fails without global trust | 01-G25 | pass |
+| config-init.feature | Non-interactive initialization scaffolds the default configuration | 01-G15 | pass |
+| config-init.feature | Repeat initialization leaves the existing configuration untouched | 01-G15 | pass |
+| template-prompts.feature | Non-TTY template prompts use their defined fallback answers | 01-G7 | pass |
+| template-prompts.feature | No-input preview uses the defined prompt defaults | 01-G7 | pass |
+| template-prompts.feature | The template picker refuses to run without an interactive terminal | 01-G11 | pass |
+| template-prompts.feature | The template picker reports when no templates are available | 01-G11 | pass |
+| template-resolution.feature | A local template takes precedence over a global template | 02-G10 | pass |
+| template-resolution.feature | An exact global filename wins over a local stem-only match | 02-G10 | pass |
+| template-resolution.feature | An unsafe template identifier fails before lookup | 02-G10 | pass |
+| template-resolution.feature | An ambiguous template stem refuses to select a file | 02-G10 | pass |
+| template-resolution.feature | A missing include marked ignore missing renders empty | 02-G18 | pass |
+| template-resolution.feature | An unsafe include remains an error when marked ignore missing | 02-G18 | pass |
+| template-output.feature | The default template output creates a rendered Markdown file | 01-G30 | pass |
+| template-output.feature | A non-interactive output collision preserves the existing file | 01-G13 | pass |
+| template-output.feature | Force replaces an existing template output file | 02-G12 | pass |
+| template-output.feature | Dry-run previews over an existing file without replacing it | 02-G12 | pass |
+| template-output.feature | Dry-run previews rendered content without writing a file | 01-G14 | pass |
+| template-output.feature | The command output path overrides a template declaration | 02-G11 | pass |
+| template-output.feature | A declared output path takes precedence over the default path | 02-G11 | pass |
+| template-output.feature | A template output path cannot escape the project root | 02-G11 | pass |
+
+Notes:
+
+- The scenario `The default template output creates a rendered Markdown
+  file` belongs to row 01-G30, a slice-3 row. The ticket lists it through
+  the output-path work of slice 5. The review checks it too.
+- The trust-order scenario `Changed trusted configuration fails before its
+  malformed content is parsed` is the ordering pin of row 01-G22. The five
+  other config-validation scenarios pin one stage each, with one distinct
+  diagnostic code each.
+- Row 02-G18 keeps the soft case and the hard case of the include loader.
+  The symlink quirk of the map stays a unit test.
+- The four exception rows of box 1 have no scenario, so the review does not
+  check them.

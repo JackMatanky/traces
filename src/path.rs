@@ -18,7 +18,7 @@
 //!
 //! The returned confined path is the plain join, not the canonicalized path. A
 //! symlink changed after validation and before later I/O can still redirect the
-//! operation; callers that need race-free writes must use directory handles or
+//! operation. Callers that need race-free writes must use directory handles or
 //! platform-specific open-at APIs.
 
 use std::{
@@ -34,9 +34,9 @@ use thiserror::Error;
 /// and query output.
 ///
 /// Internal storage and filesystem operations use platform-native encodings
-/// (see module docs); this normalizes only the *textual* representation shown
+/// (see module docs). This normalizes only the *textual* representation shown
 /// to users or matched against `/`-separated query syntax. Borrowed on Unix,
-/// where `/` is already the separator; non-UTF-8 components are lossily
+/// where `/` is already the separator. Non-UTF-8 components are lossily
 /// converted, matching [`Path::to_string_lossy`].
 #[must_use]
 pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
@@ -215,7 +215,7 @@ impl AsRef<Path> for SafeRelativePath {
 /// Borrows a reference to a directory path.
 ///
 /// Wraps `Path` to distinguish directory paths from file paths at the type
-/// level. The containing folder of `notes/todo.md` is `notes`; the containing
+/// level. The containing folder of `notes/todo.md` is `notes`. The containing
 /// folder of `root.md` is `""`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct FolderRef<'a>(&'a Path);
@@ -307,7 +307,7 @@ pub(crate) enum PathError {
          component"
     )]
     UnsafeComponent,
-    /// Reports that `strict-path` filesystem validation could not be completed.
+    /// Reports that `strict-path` filesystem validation failed.
     #[error(transparent)]
     StrictPath(#[from] StrictPathError),
 }
@@ -335,7 +335,7 @@ impl PathError {
 
 /// Serde support for paths using platform-native encodings.
 ///
-/// This is the crate's bytes-of-a-path codec; the index's bytes-of-a-row codec
+/// This is the crate's bytes-of-a-path codec. The index's bytes-of-a-row codec
 /// lives at `crate::index::codec`.
 pub mod codec {
     use std::path::{Path, PathBuf};

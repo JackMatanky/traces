@@ -6,13 +6,13 @@ use noyalib::ParserConfig;
 
 /// Configures YAML 1.2 parsing using noyalib's `serde_yaml_compat` preset.
 ///
-/// Leading-zero integers (`01234`) resolve as strings, YAML 1.1 binary literals
-/// resolve as integers, an overflowing float literal stays a string, an integer
-/// past `u64::MAX` errors instead of degrading to `f64`, a non-scalar mapping
+/// Leading-zero integers (`01234`) resolve as strings. YAML 1.1 binary literals
+/// resolve as integers. An overflowing float literal stays a string. An integer
+/// past `u64::MAX` errors instead of degrading to `f64`. A non-scalar mapping
 /// key errors, and `<<` merge keys stay ordinary entries. Built once and shared
-/// by every call to [`parse`] so [`RawFrontmatter`]'s YAML parsing and the
-/// template engine's `to_yaml`/`from_yaml` filters parse and render YAML
-/// identically.
+/// by every call to [`parse`]. [`RawFrontmatter`]'s YAML parsing and the
+/// template engine's `to_yaml`/`from_yaml` filters therefore parse and render
+/// YAML identically.
 ///
 /// [`RawFrontmatter`]: crate::note::RawFrontmatter
 static YAML_CONFIG: LazyLock<ParserConfig> =

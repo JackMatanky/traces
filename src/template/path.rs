@@ -267,11 +267,11 @@ mod tests {
 
         #[test]
         fn accepts_a_path_with_a_leading_current_dir_segment() {
-            // "./daily.md" splits into [CurDir, Normal("daily.md")]: a
+            // "./daily.md" splits into [CurDir, Normal("daily.md")]. A
             // leading CurDir component doesn't itself count toward
             // `has_normal_component`, but doesn't disqualify the path
-            // either: the trailing Normal component still does. This
-            // is the exact case `has_normal_component` exists to allow
+            // either. The trailing Normal component still does. This is
+            // the exact case `has_normal_component` exists to allow
             // (vs. a bare "." with no Normal component at all).
             let path = validated("./daily.md");
 
@@ -281,7 +281,7 @@ mod tests {
         #[test]
         fn rejects_an_absolute_path() {
             // A syntactically absolute path is rejected before any I/O
-            // happens: parse() never reads the filesystem, so this
+            // happens: parse() never reads the filesystem. This check
             // never touches whatever real file may or may not exist at
             // this well-known path.
             let error = TemplatePathInput::parse(&std::env::temp_dir())

@@ -10,13 +10,13 @@
 
 **Category:** enhancement
 
-**Status:** partial (slice closed 2026-11-03 with four exceptions; the six-condition review of spec section 3.2 has no record)
+**Status:** done (slice closed 2026-11-03 with four exceptions; the six-condition review of spec section 3.2 is in the ledger, 2026-11-05)
 
 - [x] Every row the slice owns has a scenario of the class that spec section 4 assigns, except four rows. Rows 01-G12 and 01-G16 stay pinned to unit tests. Row 05-dirtree stays pinned. Row 05-G7 stays a gap. The amendment log of 2026-11-03 gives the reasons.
 - [x] The Status of each owned row in the invariance map reads `covered`, except the four rows above.
   - 05-G7 reads `gap`: the scenarios do not pin every filesystem path to the root. Rows 03-P25 and 05-file_tracker read `pinned-elsewhere` after the tracker mutant escaped.
-- [ ] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
-  - No six-condition review is recorded for this slice. This box stays unchecked until a review is recorded.
+- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
+  - The review of 2026-11-05 checks every owned scenario against the six conditions and the authoring rules. The record with the per-scenario verdicts is in the ledger. All scenarios pass, and no feature file changes.
 - [x] Review the row placement with the user at entry. Spec section 9.3 lists the rows that were placed by domain affinity.
   - The amendment log of 2026-11-03 records the user confirmation.
 - [x] A converted test is deleted only when this slice completes its last row.

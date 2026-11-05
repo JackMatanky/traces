@@ -63,6 +63,15 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_distance_two_candidate_for_a_one_char_input() {
+        let candidates = ["bb"];
+        assert_eq!(
+            closest_match(candidates.into_iter().map(|c| (c, c)), "a"),
+            None
+        );
+    }
+
+    #[test]
     fn returns_none_for_an_empty_candidate_list() {
         assert_eq!(
             closest_match(std::iter::empty::<(&str, &str)>(), "name"),

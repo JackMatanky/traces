@@ -8,9 +8,9 @@
 //!
 //! # Identity and application
 //!
-//! Nominal seconds are the identity of a Duration: one month counts as 30 days
-//! and one year as 365 days, so equality, ordering, and hashing compare rounded
-//! nominal seconds and never the spelling.
+//! Nominal seconds are the identity of a Duration. One month counts as 30 days
+//! and one year as 365 days. Equality, ordering, and hashing therefore compare
+//! rounded nominal seconds and never the spelling.
 //!
 //! # Key Types
 //!
