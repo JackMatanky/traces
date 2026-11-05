@@ -242,7 +242,7 @@ jobs:
           path: |
             report.json
             mutarust-report.html
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
   # -- Coverage diagnostics; do not enforce a coverage percentage --
   coverage:

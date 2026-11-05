@@ -2,7 +2,6 @@
 #MISE description="Run mutation testing (engine: `mutarust`)"
 #MISE sources=["@group:rust"]
 #MISE extends="mutants"
-#MISE depends=["test"]
 #MISE aliases=["mutants"]
 #USAGE flag "-f --file <file>" {
 #USAGE   help "Mutate one file only (e.g. -f src/config/service.rs)"
@@ -107,8 +106,8 @@
 
 # Optional cap-lints: Task 10 P3 A/B completed — inconclusive at n=1, so it
 # stays off by default. Hypothesis: quality_gates_mise_adoption.md §10.2 row
-# 2; observed result: §11 P3. Also affects depends=["test"] and invalidates
-# build caches.
+# 2; observed result: §11 P3. Also invalidates build caches. The task has no
+# `depends`: mutarust runs the clean suite itself and stops if it fails.
 # #MISE env={ RUSTFLAGS = "--cap-lints=allow" }
 
 # File description (Google style §4.1) — placed after the #MISE/#USAGE block
@@ -444,6 +443,46 @@ build_declared_flags() {
 }
 
 ########################################
+# Runs mutarust in a lean copy of the repository. mutarust copies every
+# non-hidden entry of the working directory for each worker, so a local
+# `target/` of tens of GiB made one mutant take longer than 20 minutes. The
+# copy leaves out build output and large hidden directories, and the report
+# and baseline files return to the repository root afterwards. mutarust
+# writes the reports only when a run finishes, so an interrupted run leaves
+# none.
+# Globals:
+#   mutarust_args
+# Arguments:
+#   None
+# Outputs:
+#   mutarust output to STDOUT/STDERR.
+# Returns:
+#   Status of mutarust.
+########################################
+run_staged() {
+  local stage status=0 file
+  stage="$(mktemp -d "${TMPDIR:-/tmp}/mutants-stage.XXXXXX")"
+  # shellcheck disable=SC2064  # expand ${stage} now; the trap runs at exit
+  trap "rm -rf '${stage}'" EXIT
+  rsync -a \
+    --exclude=/target --exclude=/fuzz/target --exclude=/.worktrees \
+    --exclude=/.criterion --exclude=/.rust-docs --exclude=/.codegraph \
+    --exclude=/report.json --exclude=/mutarust-report.html \
+    --exclude=/mutarust-agentic.json --exclude=/mutarust-summary.json \
+    --exclude=/mutarust-gitlab.json \
+    ./ "${stage}/"
+  (cd "${stage}" && mutarust "${mutarust_args[@]+"${mutarust_args[@]}"}") ||
+    status=$?
+  for file in report.json mutarust-report.html mutarust-agentic.json \
+    mutarust-baseline.json mutarust-summary.json mutarust-gitlab.json; do
+    if [[ -f "${stage}/${file}" ]]; then
+      cp "${stage}/${file}" "./${file}"
+    fi
+  done
+  return "${status}"
+}
+
+########################################
 # Assembles the argument list and executes mutarust.
 # Globals:
 #   mutarust_args
@@ -460,17 +499,17 @@ main() {
   reject_bad_targets
   if is_inspect_mode; then
     build_inspect_args
-  else
-    build_static_flags
-    build_target_flags
-    build_gate_flags
-    build_declared_flags
-    if [[ "${#targets[@]}" -gt 0 ]]; then
-      mutarust_args+=("${targets[@]}")
-    fi
+    mutarust "${mutarust_args[@]+"${mutarust_args[@]}"}"
+    return
   fi
-
-  mutarust "${mutarust_args[@]+"${mutarust_args[@]}"}"
+  build_static_flags
+  build_target_flags
+  build_gate_flags
+  build_declared_flags
+  if [[ "${#targets[@]}" -gt 0 ]]; then
+    mutarust_args+=("${targets[@]}")
+  fi
+  run_staged
 }
 
 main "$@"

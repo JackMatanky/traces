@@ -62,4 +62,4 @@ jobs:
             report.json
             mutarust-report.html
             mutarust-baseline.json
-          if-no-files-found: ignore
+          if-no-files-found: warn
