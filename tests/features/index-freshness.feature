@@ -137,6 +137,7 @@ Feature: Queries reflect project files and settings across runs
     And stdout is:
       """
       - a.md
+      - b.md
       """
     And another list run has the same stdout
 

@@ -302,7 +302,7 @@ mod tests {
         #[test]
         fn rejects_show_with_action() {
             let error =
-                fixtures::TestCli::try_parse_from(["test", "--show", "list"])
+                fixtures::TestCli::try_parse_from(["test", "list", "--show"])
                     .expect_err("show conflicts with action");
 
             // Clap reports a top-level flag beside a subcommand as an
