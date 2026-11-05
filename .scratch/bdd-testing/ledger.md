@@ -833,6 +833,10 @@ in place of `TZ`. Three scenarios failed:
 The step was restored and all scenarios pass. The generic `I run` step does not
 capture those lines.
 
+Stress evidence: `cargo nextest run --no-default-features --test features
+--stress-count 100` passed 100 of 100 iterations on macOS. Windows and Linux
+results come from the CI run.
+
 Duplicate review of the nested-tag scenarios: none deleted. They differ as follows.
 
 - `Filtering by a tag includes nested tags` uses a line that holds only the tag.
