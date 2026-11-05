@@ -13,14 +13,14 @@
 **Status:** wont-do
 
 - [x] A platform-gating spike runs first. The tag set is closed and `@ignore` is banned. Find how a Unix-only scenario skips on Windows without a banned form. The result is recorded in the amendment log. (Result: a separate `#[cfg(unix)] scenarios!("tests/features/unix", ...)` call over a nested directory; recorded in spec section 12.)
-- [ ] Choose a signal-sending dev-dependency with the user. Stop and ask the user before you add it. (Not reached; the user decided to drop the slice instead. `rustix` `process` and `pty` features were identified but stay unadded.)
-- [ ] The scenario passes on Unix and the three-OS run stays green. (No scenario exists.)
-- [ ] `mise run verify` passes. (Ran on the amendment-only branch.)
-- [ ] The ledger section is complete. (Slice 8 section records the spike and the decision.)
-- [ ] The gap recompute line is in the adoption map. (`gap recompute: slice 8 dropped, 2026-11-03`.)
-- [ ] The due rubric questions are answered. (None due for this slice; rubric question 3 was answered at slice 2, and no scenario was authored.)
-- [ ] The amendment log has an entry.
-- [ ] The slice branch is merged locally.
+- [ ] Choose a signal-sending dev-dependency with the user. Stop and ask the user before you add it. (Not applicable: the user dropped the slice before this step. `rustix` `process` and `pty` features were identified but stay unadded.)
+- [ ] The scenario passes on Unix and the three-OS run stays green. (Not applicable: no scenario exists.)
+- [x] `mise run verify` passes. (Ran on the amendment-only branch.)
+- [x] The ledger section is complete. (Slice 8 section records the spike and the decision.)
+- [x] The gap recompute line is in the adoption map. (`gap recompute: slice 8 dropped, 2026-11-03`.)
+- [x] The due rubric questions are answered. (None due for this slice; rubric question 3 was answered at slice 2, and no scenario was authored.)
+- [x] The amendment log has an entry.
+- [x] The slice branch is merged locally.
 
 **Out of scope:**
 
