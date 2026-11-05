@@ -1,1 +1,2 @@
 *.feature text eol=lf
+fuzz/corpus/** -text

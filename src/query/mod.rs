@@ -80,6 +80,8 @@ pub(crate) use builder::QueryMode;
 pub(crate) use error::{FieldPathError, QuerySyntaxError};
 pub use error::{QueryBuilderError, QueryDialect, QueryError, QueryResult};
 pub(crate) use format::TaskPathStyle;
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) use grammar::FilterExpr;
 pub use grammar::SourceSelector;
 pub(crate) use grammar::{
     ClassExpansionMode, FieldPath, FileClassExpander, FileField, ListField,

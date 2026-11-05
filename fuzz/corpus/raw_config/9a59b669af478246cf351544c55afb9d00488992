@@ -1,0 +1,3 @@
+[4emplates]
+directory = "tpl"
+output_dir = "out"

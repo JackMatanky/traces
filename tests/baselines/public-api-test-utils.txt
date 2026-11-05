@@ -272,6 +272,10 @@ impl<T> tracing::instrument::WithSubscriber for traces::cli::UserAbort
 impl<T> yoke::erased::ErasedDestructor for traces::cli::UserAbort where T: 'static
 pub fn traces::cli::run() -> core::result::Result<traces::cli::CommandOutcome, traces::cli::CliError>
 pub type traces::cli::CliResult = core::result::Result<(), traces::cli::CliError>
+pub mod traces::fuzzing
+pub fn traces::fuzzing::date_point_display_law_holds(&str) -> bool
+pub fn traces::fuzzing::parse_filter_expression(&str) -> bool
+pub fn traces::fuzzing::parse_raw_config(&str) -> bool
 pub mod traces::testing
 pub mod traces::testing::path_codec
 pub fn traces::testing::path_codec::deserialize<'de, D>(D) -> core::result::Result<std::path::PathBuf, <D as serde_core::de::Deserializer>::Error> where D: serde_core::de::Deserializer<'de>

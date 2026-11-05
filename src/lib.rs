@@ -210,6 +210,67 @@ pub mod testing {
     };
 }
 
+#[cfg(any(test, feature = "test-utils"))]
+pub mod fuzzing {
+    //! Fuzz-target entry points for the `fuzz/` crate.
+    //!
+    //! Each function runs one internal parser on arbitrary text. It returns
+    //! `true` when the input parses, or when the display-then-parse law the
+    //! function names holds. A `false` law result is a real bug.
+
+    use jiff::tz::TimeZone;
+
+    use crate::{
+        DateError,
+        config::RawConfig,
+        query::FilterExpr,
+        temporal::{DatePoint, DatePrecision},
+    };
+
+    /// Parses `input` as a filter expression and reports whether it parsed.
+    #[must_use]
+    #[inline]
+    pub fn parse_filter_expression(input: &str) -> bool {
+        FilterExpr::parse(input).is_ok()
+    }
+
+    /// Parses `input` as a Config File and reports whether it parsed.
+    #[must_use]
+    #[inline]
+    pub fn parse_raw_config(input: &str) -> bool {
+        toml::from_str::<RawConfig>(input).is_ok()
+    }
+
+    /// Parses `input` as a date point and checks the display law.
+    ///
+    /// A day-precision calendar point must survive a `%Y-%m-%d` display and
+    /// re-parse unchanged. Returns `true` for unparsable input and for points
+    /// that the law does not cover.
+    #[must_use]
+    #[inline]
+    pub fn date_point_display_law_holds(input: &str) -> bool {
+        let Ok(point) = DatePoint::parse(input) else {
+            return true;
+        };
+        let DatePoint::Calendar {
+            date_precision: DatePrecision::Day,
+            ..
+        } = point
+        else {
+            return true;
+        };
+        match point.format_in("%Y-%m-%d", &TimeZone::UTC) {
+            Ok(text) => DatePoint::parse(&text) == Ok(point),
+            // Midnight UTC of the earliest dates lies before Jiff's minimum
+            // timestamp, so rendering them is documented to fail.
+            Err(DateError::OutOfRange {
+                ..
+            }) => true,
+            Err(_) => false,
+        }
+    }
+}
+
 /// Builds isolated fixtures for the crate's own `#[cfg(test)]` suites and,
 /// under the `test-utils` feature, for external `tests/`/`benches/`
 /// consumers.

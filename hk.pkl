@@ -13,6 +13,7 @@ exclude = List(
     "build",
     "LICENSE",
     ".scratch",
+    "fuzz/corpus",
     ".agents"
 )
 

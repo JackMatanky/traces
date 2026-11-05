@@ -1,0 +1,4 @@
+[[tasks.statuses]]
+symbol = "xy"
+name = "n"
+kind = "done"

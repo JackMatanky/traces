@@ -1,0 +1,4 @@
+[[tasks.statuses]]
+symbol = "x"
+name = "n"
+kind = "bogus"

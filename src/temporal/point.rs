@@ -3392,6 +3392,31 @@ mod tests {
                 // Assert
                 prop_assert_eq!(restored, point);
             }
+
+            /// Pins the ISO display law over the full supported year range:
+            /// rendering a full-precision calendar point with `%Y-%m-%d` and
+            /// re-parsing the text restores the point, including negative
+            /// years whose rendered sign sits outside the field width. Year
+            /// -9999 is excluded: its early days lie before Jiff's minimum
+            /// timestamp, so `format_in` reports `OutOfRange` by contract.
+            #[test]
+            fn iso_display_round_trips_supported_date_points(
+                year in -9998_i32..=9999,
+                month in 1_u32..=12,
+                day in 1_u32..=28,
+            ) {
+                // Arrange
+                let point = DatePoint::from(ymd(year, month, day));
+
+                // Act
+                let displayed = point
+                    .format_in("%Y-%m-%d", &TimeZone::UTC)
+                    .expect("canonical pattern renders");
+                let parsed = DatePoint::parse(&displayed);
+
+                // Assert
+                prop_assert_eq!(parsed, Ok(point));
+            }
         }
     }
 }
