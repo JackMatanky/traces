@@ -386,7 +386,13 @@ pub(crate) mod test_support {
                     });
                 }));
 
-            assert!(result.is_err());
+            assert_eq!(
+                result
+                    .expect_err("closure panics")
+                    .downcast_ref::<&str>()
+                    .copied(),
+                Some("exercise unwind restoration")
+            );
             assert_eq!(
                 local_zone().expect("original zone is restored"),
                 original

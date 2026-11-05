@@ -673,10 +673,10 @@ mod tests {
 
         #[test]
         fn rejects_malformed_field_path() {
-            assert!(
-                SortOrder::parse("file..bad", SortDirection::Descending)
-                    .is_err()
-            );
+            assert!(matches!(
+                SortOrder::parse("file..bad", SortDirection::Descending),
+                Err(QueryBuilderError::FieldPath(_))
+            ));
         }
     }
 

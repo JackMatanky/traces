@@ -825,18 +825,26 @@ mod tests {
                 "class(Book, children).with_descendants()",
                 "class(Book).with_children() extra",
             ] {
-                assert!(SourceExpr::parse(invalid).is_err(), "{invalid}");
+                assert!(
+                    matches!(
+                        SourceExpr::parse(invalid),
+                        Err(QueryBuilderError::Syntax(_))
+                    ),
+                    "{invalid}"
+                );
             }
         }
 
-        #[test]
-        fn parses_a_single_star_wildcard_path_glob() {
-            assert!(SourceExpr::parse("covers/*.md").is_ok());
-        }
-
-        #[test]
-        fn parses_a_double_star_wildcard_path_glob() {
-            assert!(SourceExpr::parse("**/draft.md").is_ok());
+        #[rstest]
+        #[case::single_star("covers/*.md")]
+        #[case::double_star("**/draft.md")]
+        fn parses_a_wildcard_path_glob(#[case] pattern: &str) {
+            assert_eq!(
+                SourceExpr::parse(pattern).expect("valid source"),
+                SourceExpr(BooleanExpr::Atom(
+                    SourceAtom::path(pattern).expect("valid atom")
+                ))
+            );
         }
 
         #[rstest]
@@ -1139,9 +1147,12 @@ mod tests {
         #[test]
         fn parses_descendants_expansion_mode() {
             let result = SourceExpr::parse("class(Book, descendants)");
-            assert!(
-                result.is_ok(),
-                "class(Book, descendants) must parse: {result:?}"
+            assert_eq!(
+                result.expect("class(Book, descendants) must parse"),
+                SourceExpr(BooleanExpr::Atom(SourceAtom::Class {
+                    names: vec!["Book".to_owned()],
+                    mode: ClassExpansionMode::Descendants(BTreeSet::new()),
+                }))
             );
         }
     }

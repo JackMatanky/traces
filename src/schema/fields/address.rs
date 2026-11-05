@@ -267,7 +267,10 @@ mod tests {
             let result: Result<FieldAddress, _> =
                 serde_json::from_str("\"not-a-ref\"");
 
-            assert!(result.is_err());
+            assert_eq!(
+                result.expect_err("malformed reference").to_string(),
+                "malformed $ref \"not-a-ref\": expected `#<schema>/<field>`"
+            );
         }
     }
 }
