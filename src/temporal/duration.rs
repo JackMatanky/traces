@@ -28,7 +28,7 @@ use std::{
 
 use jiff::{
     Span, SpanRound, Unit,
-    fmt::friendly::{Designator, Direction, SpanPrinter},
+    fmt::friendly::{Designator, Direction, FractionalUnit, SpanPrinter},
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -52,9 +52,12 @@ pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
 
 const MAX_NOMINAL_SECONDS: f64 = 631_107_417_600.0;
 
+/// Prints sub-second fields as fractional seconds. The parser rejects the
+/// `ms`, `us`, and `ns` spellings, so Display text must never contain them.
 const PRINTER: SpanPrinter = SpanPrinter::new()
     .designator(Designator::Compact)
-    .direction(Direction::Sign);
+    .direction(Direction::Sign)
+    .fractional(Some(FractionalUnit::Second));
 
 /// Rounds a span's fractional seconds exactly once for nominal identity and
 /// fieldwise arithmetic. Calendar fields stay untouched.
@@ -1500,6 +1503,31 @@ mod tests {
             let duration = DurationValue::parse(input).expect("valid duration");
             let json = serde_json::to_string(&duration).expect("serializes");
             assert_eq!(json, format!("\"{input}\""));
+        }
+
+        /// Regression: the fuzz target found that `0.000000001s` displayed as
+        /// `1ns`, which the parser rejects, so a stored value could not be read
+        /// back.
+        #[rstest]
+        #[case::nanosecond("0.000000001s")]
+        #[case::millisecond("0.001s")]
+        #[case::fractional_second("1.5s")]
+        #[case::fractional_after_minutes("1m 0.5s")]
+        fn sub_second_durations_survive_a_serde_round_trip(
+            #[case] input: &str,
+        ) {
+            let duration = DurationValue::parse(input).expect("valid duration");
+
+            let json = serde_json::to_string(&duration).expect("serializes");
+            let restored: DurationValue =
+                serde_json::from_str(&json).expect("serialized text re-parses");
+
+            assert_eq!(restored, duration);
+            let shown = duration.to_string();
+            assert!(
+                ["ns", "µs", "ms"].iter().all(|unit| !shown.contains(unit)),
+                "display `{shown}` must not use sub-second unit spellings"
+            );
         }
     }
 
