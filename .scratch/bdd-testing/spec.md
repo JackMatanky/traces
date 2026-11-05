@@ -862,8 +862,9 @@ change.
   escape set before and after. No deletion adds an escape. The files `service.rs`
   and `delta.rs` of slice 4 were not compared. See the ledger.
 - 2026-11-05: a review follow-up wave closed the high and medium gaps. It added
-  unit, process, golden, property and fuzz tests, the seventh gate check, the
-  `spec-change` hook, a three-OS unit job, and nightly mutation, soak, bench and
-  fuzz jobs. A fuzz run found and fixed a duration printing defect. The ledger
-  section "Review Follow-up Wave" has the details and the open items. The
-  nightly mutation gate reports without failing until each module has a baseline.
+  unit, process, golden, property and fuzz tests. It added the seventh gate check
+  and the `spec-change` hook. CI gained a three-OS unit job. A nightly workflow
+  runs mutation, soak, bench and fuzz jobs. A fuzz run found and fixed a duration
+  printing defect. The ledger section "Review Follow-up Wave" has the details and
+  the open items. The nightly mutation gate reports without failing until each
+  module has a baseline.
