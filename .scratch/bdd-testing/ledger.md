@@ -919,8 +919,8 @@ Surviving mutants from the proof runs were triaged with new unit tests.
   the configuration as tracked` covers the mutant, but no mutation compare ran.
 - Bare `traces trust --all list` and `--show list` parse `list` as a path. Closed
   on 2026-11-05: see "Follow-up Triage".
-- The array-for-table quirk (`templates = ["x"]` parses as `directory = "x"`) is
-  open. See "Follow-up Triage" for the cause and the fix options.
+- The array-for-table quirk (`templates = ["x"]` parses as `directory = "x"`)
+  was open. Closed on 2026-11-05: see "Array-for-table Fix".
 
 ## Layout Change (2026-11-05)
 
@@ -1001,18 +1001,24 @@ Result: a defect in the config parser. It is not fixed yet.
 - Reach: `templates = [dir]`, `templates = [dir, output_dir]` and
   `tasks.statuses = [["x", "Name", "todo"]]` are accepted. Each means a different
   thing than its text suggests.
-- Fix options: wrap the section fields in a `deserialize_with` function that
-  calls `deserialize_map` for a struct. That keeps the TOML span in the error
-  message. A pre-check on `toml::Table` is smaller but loses the span.
-- Why no fix yet: the fix changes the config boundary and needs a unit test for
-  each section type. A scenario for it needs a spec change.
+- Fix options (first draft, corrected below): a `deserialize_with` function that
+  calls `deserialize_map` would not work. In `toml` 1.1.6, `ArrayDeserializer`
+  forwards both `deserialize_struct` and `deserialize_map` to
+  `deserialize_any`, which calls `visit_seq`. See "Array-for-table Fix" for the
+  fix that landed.
+- Reach, corrected: any struct whose array length equals its field count is
+  accepted. `schemas = ["kind", "dir"]` and `tasks = [["a"], []]` are accepted
+  too. A shorter array fails by accident, through the Serde length check.
 
 ### Gate and script changes
 
-- `mise run test` runs `check_scenario_count` before the features phase. It
-  fails when the features binary lists a different number of scenarios than the
-  feature files declare, and it prints `touch tests/features.rs`. A probe file
-  with one scenario made it report 148 against 149.
+- `mise run test` runs `check_scenario_count` before the features phase. The
+  first version failed and printed `touch tests/features.rs`. A probe file with
+  one scenario made it report 148 against 149. The current version touches
+  `tests/features.rs`, rebuilds and lists again, and fails only if the counts
+  still differ. A second probe file made it report 150 against 151, rebuild, and
+  run the probe scenario. The self-healing step does not help a direct `cargo
+  nextest` run or an IDE run.
 - The Python gate scripts need Python 3.13. Every function and every local
   assignment carries a type annotation. `mypy --strict` and `ruff check` pass.
 - `check_steps.py` also skips steps inside a fenced block that uses three
@@ -1020,3 +1026,31 @@ Result: a defect in the config parser. It is not fixed yet.
   runtime behavior for those is unverified.
 - The `fixtures.rs` tests are in `mod to_toml_string` and `mod write_to`. They
   compare parsed TOML in place of substrings.
+
+## Array-for-table Fix (2026-11-05)
+
+Neither `toml` nor Serde has a strict-struct option. `deny_unknown_fields`
+governs map keys only, and a derived struct always has a sequence path for
+formats without field names. The fix is a wrapper in `src/config/raw/table.rs`.
+
+- `TableOnly` wraps a `Deserializer`. Its `deserialize_struct` passes a visitor
+  that forwards only `visit_map`. A sequence then fails with `invalid type:
+  sequence, expected struct <Name>`. The error keeps the line, the column and
+  the span of the value.
+- Seven fields use it through `deserialize_with`: `templates`, `schemas`,
+  `frontmatter` and `tasks` in `RawConfig`, `date_created` and `date_modified`
+  in `RawFrontmatterConfig`, and `statuses` in `RawTaskConfig`. Serialization is
+  unchanged.
+- Audit of the other TOML parse sites: `RawSchema` parses a document root, and
+  its `fields` is a map. `RawSchemaFieldDef` uses a map visitor. The values
+  file root has one `Option<Vec>` field. None of them has a nested derived
+  struct, so none needs the wrapper.
+- Tests: the `rstest` `rejects_an_array_where_a_table_belongs` has seven cases,
+  one for each field. The scenario `A section written as an array is rejected`
+  runs `templates = ["x"]` and expects exit code 1 and
+  `traces::cli::config_build_config_file_failed`. The round-trip property test
+  still passes, so table forms parse as before.
+- Break demonstration: the attribute on `templates` was removed. The `templates`
+  case and the scenario failed. The attribute was restored.
+- Behavior change: a config file that wrote a section as an array now fails to
+  load. Local and global files share the path.

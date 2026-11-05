@@ -36,3 +36,10 @@ Feature: Trust, parsing and validation failures stop before use
     Then the exit code is 1
     And stderr contains diagnostic code "traces::cli::config_build_invalid_field_key"
     And stdout is empty
+
+  Scenario: A section written as an array is rejected
+    Given a project configuration that writes a section as an array and is trusted
+    When I run "traces list"
+    Then the exit code is 1
+    And stderr contains diagnostic code "traces::cli::config_build_config_file_failed"
+    And stdout is empty

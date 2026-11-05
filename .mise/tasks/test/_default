@@ -82,26 +82,46 @@ run_phase() {
 }
 
 #######################################
-# Fails when the features binary lists fewer scenarios than the feature files
-# declare. Cargo does not notice a new feature file until tests/features.rs
-# changes, so a stale build would silently skip the new scenarios.
+# Prints how many scenarios the features binary lists.
 # Globals:
 #   None
 # Arguments:
 #   None
 # Outputs:
-#   Error text to STDERR on a mismatch.
+#   Scenario count to STDOUT.
+# Returns:
+#   0 always; a failing cargo list aborts through `set -e`.
+#######################################
+count_listed_scenarios() {
+  cargo nextest list -p traces --no-default-features --test features \
+    --message-format oneline | grep -c 'features_scenarios::' || true
+}
+
+#######################################
+# Makes the features binary list every scenario the feature files declare.
+# Cargo does not notice a new feature file until tests/features.rs changes, so
+# a stale build would silently skip the new scenarios. A mismatch touches that
+# file and lists again; only a mismatch that survives the rebuild is an error.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Progress and error text to STDERR.
 # Returns:
 #   0 when the counts match, 1 otherwise.
 #######################################
 check_scenario_count() {
   local listed declared
-  listed="$(cargo nextest list -p traces --no-default-features --test features \
-    --message-format oneline | grep -c 'features_scenarios::' || true)"
   declared="$(find tests/features -name '*.feature' -exec grep -hE '^[[:space:]]*Scenario:' {} + | wc -l | tr -d ' ')"
+  listed="$(count_listed_scenarios)"
+  if [[ "${listed}" != "${declared}" ]]; then
+    echo "==> features binary lists ${listed} scenarios but the feature files declare ${declared}; rebuilding" >&2
+    touch tests/features.rs
+    listed="$(count_listed_scenarios)"
+  fi
   if [[ "${listed}" != "${declared}" ]]; then
     echo "ERROR: features binary lists ${listed} scenarios but the feature files declare ${declared}" >&2
-    echo "Run: touch tests/features.rs" >&2
     return 1
   fi
 }

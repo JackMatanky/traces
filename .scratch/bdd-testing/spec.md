@@ -153,8 +153,9 @@ Placement and layers:
   `Option<Run>`). The fixture builds the sandbox.
 - The `touch` rule sits in the doc comment of `tests/features.rs`: after you add
   a feature file, run `touch tests/features.rs`. Do not add a `build.rs`.
-  `mise run test` checks the rule. It fails when the features binary lists a
-  different number of scenarios than the feature files declare.
+  `mise run test` applies the rule. When the features binary lists a different
+  number of scenarios than the feature files declare, it touches that file,
+  rebuilds and lists again. It fails only if the counts still differ.
 - Vocabulary: glossary terms for behavior, ordinary words for setup, never an
   internal type name. A term that ticket 12 has not resolved stays out.
 - One observable behavior per scenario, one principal `When`. Add a step only
@@ -914,3 +915,11 @@ change.
   stay. `Filtering by a tag includes nested tags` and `A parent tag selects
   notes carrying its descendant tag` differ in the tag position. The filter
   scenario uses a different mechanism.
+- 2026-11-05: a section written as an array is now an error. `templates =
+  ["x"]` filled `directory` and `schemas = ["a", "b"]` filled both keys,
+  because a derived Serde struct also accepts a sequence. Seven fields in
+  `src/config/raw.rs` use `deserialize_with` functions from
+  `src/config/raw/table.rs`, and the error keeps its TOML span. The scenario `A
+  section written as an array is rejected` is added and owned by 01-G22. The
+  scenario count gate now touches `tests/features.rs`, rebuilds and lists
+  again. It fails only if the counts still differ. The scenario count is 149.

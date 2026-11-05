@@ -223,6 +223,14 @@ fn trusted_project_with_invalid_field_key(sandbox: &Sandbox) {
     sandbox.run(&["trust"]).assert_success();
 }
 
+#[given(
+    "a project configuration that writes a section as an array and is trusted"
+)]
+fn trusted_project_with_array_section(sandbox: &Sandbox) {
+    sandbox.write_config_fixture(&ConfigFixture::raw("templates = [\"x\"]\n"));
+    sandbox.run(&["trust"]).assert_success();
+}
+
 #[then(r#"stderr contains diagnostic code "{code}""#)]
 fn stderr_contains_diagnostic_code(last_run: &LastRun, code: String) {
     let run = last_run.run();

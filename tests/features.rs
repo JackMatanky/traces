@@ -7,7 +7,9 @@
 //!
 //! Rustc tracks edits to existing `.feature` files through dep-info, but adding
 //! a new `.feature` file is not detected automatically without a build script.
-//! After you add a feature file, run:
+//! After you add a feature file, `mise run test` detects the stale build, runs
+//! `touch tests/features.rs`, and rebuilds. For any other test run, do it
+//! yourself:
 //!
 //! ```sh
 //! touch tests/features.rs

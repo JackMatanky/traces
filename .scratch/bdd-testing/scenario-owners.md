@@ -57,6 +57,7 @@ or with a row in the table below. This file is the second half of the
 | Untrusted local configuration fails at trust verification | 01-G22 |
 | Malformed trusted configuration fails at parsing | 01-G22 |
 | Invalid trusted configuration value fails at validation | 01-G22 |
+| A section written as an array is rejected | 01-G22 |
 | A removed tag no longer matches after an edit | 03-P02 |
 | A new tag matches after an edit | 03-P02 |
 | Deleting an ambiguous link target resolves the surviving target | 03-P03 |

@@ -257,6 +257,9 @@ src/config/raw.rs: pub(crate) tags: Option<String>,
 src/config/raw.rs: pub(crate) tasks: RawTaskConfig,
 src/config/raw.rs: pub(crate) templates: RawTemplateConfig,
 src/config/raw.rs: pub(crate) title: Option<String>,
+src/config/raw/table.rs: pub(super) fn opt_table<'de, D, T>(
+src/config/raw/table.rs: pub(super) fn table<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+src/config/raw/table.rs: pub(super) fn table_list<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 src/config/service.rs: pub fn for_test<P: Into<PathBuf>, Q: Into<PathBuf>>(
 src/config/service.rs: pub fn untrust(
 src/config/service.rs: pub struct ConfigService {

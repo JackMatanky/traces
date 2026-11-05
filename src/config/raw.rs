@@ -4,28 +4,29 @@
 //! [`super::builder::ConfigBuilder`] applies Configuration Scope precedence.
 //! The builder also resolves paths.
 
+mod table;
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 /// Holds Config File values before merge and path resolution.
 ///
-/// Local and global Config Files use these tables.
-/// Serde rejects unknown keys.
+/// Local and global Config Files use these tables. Serde rejects unknown keys.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawConfig {
     /// Holds the `[templates]` table.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "table::table")]
     pub(crate) templates: RawTemplateConfig,
     /// Holds the `[schemas]` table.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "table::table")]
     pub(crate) schemas: RawSchemasConfig,
     /// Holds the `[frontmatter]` table.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "table::table")]
     pub(crate) frontmatter: RawFrontmatterConfig,
     /// Holds the `[tasks]` table for Task Configuration.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "table::table")]
     pub(crate) tasks: RawTaskConfig,
 }
 
@@ -79,10 +80,18 @@ pub(crate) struct RawFrontmatterConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tags: Option<String>,
     /// Holds the creation timestamp's frontmatter key and date format.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "table::opt_table",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub(crate) date_created: Option<RawDateFieldConfig>,
     /// Holds the modification timestamp's frontmatter key and date format.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "table::opt_table",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub(crate) date_modified: Option<RawDateFieldConfig>,
 }
 
@@ -117,7 +126,11 @@ pub(crate) struct RawTaskConfig {
     pub(crate) tag_filters: Vec<String>,
     /// Lists task statuses that add to or replace defaults with the same
     /// symbol.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "table::table_list",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub(crate) statuses: Vec<RawTaskStatus>,
 }
 
@@ -168,6 +181,30 @@ mod tests {
 
         let error = result.expect_err("unknown field should fail");
         assert!(error.to_string().contains("bogus"));
+    }
+
+    #[rstest]
+    #[case::templates("templates = [\"a\", \"b\"]")]
+    #[case::schemas("schemas = [\"a\", \"b\"]")]
+    #[case::frontmatter("frontmatter = [\"a\", \"b\", \"c\", \"d\", \"e\"]")]
+    #[case::tasks("tasks = [[\"a\"], []]")]
+    #[case::date_created(
+        "[frontmatter]\ndate_created = [\"name\", \"format\"]"
+    )]
+    #[case::date_modified(
+        "[frontmatter]\ndate_modified = [\"name\", \"format\"]"
+    )]
+    #[case::task_status("[tasks]\nstatuses = [[\"x\", \"Name\", \"todo\"]]")]
+    fn rejects_an_array_where_a_table_belongs(#[case] content: &str) {
+        let result = toml::from_str::<RawConfig>(content);
+
+        let error = result.expect_err("array section should fail");
+        assert!(
+            error.message().contains("expected struct"),
+            "unexpected message: {}",
+            error.message()
+        );
+        assert!(error.span().is_some());
     }
 
     mod proptests {
