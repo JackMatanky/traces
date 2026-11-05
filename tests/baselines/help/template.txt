@@ -1,0 +1,35 @@
+Render a template and write it to disk, or list available templates
+
+Usage: traces template [OPTIONS] [NAME]
+
+Arguments:
+  [NAME]
+          Template name or path passed positionally
+
+Options:
+  -i, --input <NAME>
+          Template name or path passed through `-i`/`--input`
+
+  -l, --list
+          List available template names and exit without rendering
+
+  -o, --output <PATH>
+          Output path overriding any `file.write_to()` call inside the template.
+
+          Falls back in this order: 1. The template-declared `write_to` path. 2. The config-derived default output directory.
+
+  -f, --force
+          Overwrite the output path if it already exists
+
+  -n, --dry-run
+          Render to stdout and write nothing to disk.
+
+          Skips the output-existence check and conflicts with `-o`/`--output`.
+
+      --no-input
+          Disable interactive prompts during template rendering.
+
+          Every `ui.*` call returns its default. Calls without a default return an empty, false, or first-item response. This is for scripted or CI use and is independent of `--dry-run`.
+
+  -h, --help
+          Print help (see a summary with '-h')

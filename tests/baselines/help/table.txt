@@ -1,0 +1,12 @@
+Query pages and print matching records as a Markdown table
+
+Usage: traces table [OPTIONS] --column <COLUMNS>
+
+Options:
+      --from <FROM>       Source expression, e.g. `#tag`, `folder/`, `@Class*`, or a boolean combination. Omit to query every indexed page
+      --where <FILTER>    Filter expression narrowing results, e.g. `"file.folder == \"books\""`. Repeatable; multiple `--where` flags compose as AND
+      --sort <KEYS>...    Field path to sort by. Repeatable; multiple `--sort` flags or comma-separated values compose as composite sort terms. Defaults to descending order unless overridden by prefix `+` or the `--asc` flag
+      --asc               Sort in ascending order. Conflicts with `--desc`. Requires `--sort`
+      --desc              Sort in descending order (the default). Conflicts with `--asc`. Requires `--sort`
+      --column <COLUMNS>  Field path to render as a table column, e.g. `file.name`. Repeat for multiple columns; each path also becomes its column's header
+  -h, --help              Print help

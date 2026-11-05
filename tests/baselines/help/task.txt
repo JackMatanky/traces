@@ -1,0 +1,18 @@
+Query tasks and print matching checkbox lines
+
+Usage: traces task [OPTIONS]
+
+Options:
+      --from <FROM>       Source expression, e.g. `#tag`, `folder/`, `@Class*`, or a boolean combination. Omit to query every indexed note's tasks
+      --where <FILTER>    Filter expression narrowing results, e.g. `"list.completed == false"`. Repeatable; multiple `--where` flags compose as AND
+      --todo              Filter to incomplete tasks (`list.completed == false`). Conflicts with `--done`
+      --done              Filter to completed tasks (`list.completed == true`). Conflicts with `--todo`
+      --status <CHAR>     Filter by status character via `list.status_symbol == "<char>"`
+      --sort <KEYS>...    Field path to sort by. Repeatable; multiple `--sort` flags or comma-separated values compose as composite sort terms. Defaults to descending order unless overridden by prefix `+` or the `--asc` flag
+      --asc               Sort in ascending order. Conflicts with `--desc`. Requires `--sort`
+      --desc              Sort in descending order (the default). Conflicts with `--asc`. Requires `--sort`
+  -l, --line-numbers      Display clickable editor line coordinates `({path}:{line})`
+      --table             Render output as a Markdown table
+      --column <COLUMNS>  Field path to render as a table column. Custom overrides default table columns
+      --count             Output only the matching row count
+  -h, --help              Print help

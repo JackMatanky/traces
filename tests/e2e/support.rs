@@ -406,6 +406,40 @@ impl Sandbox {
         }
     }
 
+    /// Executes `args` with explicit opt-in environment entries layered on
+    /// top of the sandbox policy and named variables removed from it,
+    /// capturing output in a [`Run`].
+    ///
+    /// This is the only sanctioned way to study fallback resolution from a
+    /// test: removing a sandbox-owned entry (for example `TRACES_STATE_DIR`)
+    /// forces the child to resolve the store through the platform chain
+    /// (`XDG_STATE_HOME`, `HOME`, or `LOCALAPPDATA`) while every other entry
+    /// stays sandbox-owned, so nothing touches the host home.
+    pub(crate) fn run_with_envs_removing(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &OsStr)],
+        removed: &[&str],
+    ) -> Run {
+        let mut cmd = self.command(args);
+        for key in removed {
+            cmd.env_remove(key);
+        }
+        for (key, value) in envs {
+            cmd.env(key, value);
+        }
+        let Output {
+            status,
+            stdout,
+            stderr,
+        } = cmd.output().expect("spawn traces");
+        Run {
+            status,
+            stdout: String::from_utf8_lossy(&stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        }
+    }
+
     /// Executes `args` with stdin detached, bounded by a std-only watchdog:
     /// if the child outlives `timeout` it is killed and `None` is returned,
     /// so an interactive hang can never wedge the suite.

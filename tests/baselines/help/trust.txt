@@ -1,0 +1,25 @@
+Grant trust to one or more project roots
+
+Usage: traces trust [OPTIONS] [PATH]
+       traces trust <COMMAND>
+
+Commands:
+  list   List all trusted directories
+  clean  Remove stale trust entries
+  help   Print this message or the help of the given subcommand(s)
+
+Arguments:
+  [PATH]
+          Directory or `.traces/config.toml` to trust.
+
+          Defaults to the current directory.
+
+Options:
+      --show
+          Show resolved configuration trust status instead of changing it
+
+      --all
+          Apply trust or status checks to descendant configurations too
+
+  -h, --help
+          Print help (see a summary with '-h')

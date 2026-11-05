@@ -1,0 +1,16 @@
+Revoke trust from one or more project roots
+
+Usage: traces untrust [OPTIONS] [PATH]
+
+Arguments:
+  [PATH]
+          Directory or `.traces/config.toml` to untrust.
+
+          Defaults to the current directory.
+
+Options:
+      --all
+          Apply untrust to descendant configurations too
+
+  -h, --help
+          Print help (see a summary with '-h')

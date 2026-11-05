@@ -17,14 +17,24 @@ mod support;
 mod completions;
 #[path = "e2e/config.rs"]
 mod config;
+#[path = "e2e/determinism.rs"]
+mod determinism;
 #[path = "e2e/env_policy.rs"]
 mod env_policy;
+#[path = "e2e/environment.rs"]
+mod environment;
+#[path = "e2e/exit_codes.rs"]
+mod exit_codes;
+#[path = "e2e/help.rs"]
+mod help;
 #[path = "e2e/index.rs"]
 mod index;
 #[path = "e2e/process_contract.rs"]
 mod process_contract;
 #[path = "e2e/query.rs"]
 mod query;
+#[path = "e2e/streams.rs"]
+mod streams;
 #[path = "e2e/template.rs"]
 mod template;
 #[path = "e2e/tracked.rs"]

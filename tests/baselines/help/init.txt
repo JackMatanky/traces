@@ -1,0 +1,6 @@
+Initialize local traces configuration in the current directory
+
+Usage: traces init
+
+Options:
+  -h, --help  Print help
