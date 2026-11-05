@@ -52,8 +52,24 @@ fn assert_matches_baseline(actual: &str, name: &str) {
         fs::write(&path, actual).expect("write baseline");
     }
     assert!(path.is_file(), "missing baseline {}", path.display());
-    let expected = fs::read_to_string(&path).expect("read baseline");
+    let expected =
+        fs::read_to_string(&path).expect("read baseline").replace("\r\n", "\n");
     assert_eq!(actual, expected, "output baseline: {}", path.display());
+}
+
+/// Asserts that `stderr` is `<label> from <root>\n`, comparing the path by
+/// filesystem identity so Windows verbatim (`\\?\`) and short (`RUNNER~1`)
+/// spellings of the same directory match.
+fn assert_summary_from_root(stderr: &str, label: &str, root: &Path) {
+    let reported = stderr
+        .strip_prefix(&format!("{label} from "))
+        .and_then(|rest| rest.strip_suffix('\n'))
+        .unwrap_or_default();
+    assert!(!reported.is_empty(), "unexpected summary line: {stderr:?}");
+    assert_eq!(
+        Path::new(reported).canonicalize().expect("canonicalize reported"),
+        root.canonicalize().expect("canonicalize root"),
+    );
 }
 
 /// Resolves `tests/baselines/output/<name>.txt` relative to the crate root.
@@ -107,11 +123,7 @@ fn task_table_renders_twenty_unicode_wide_rows() {
     let task = sandbox.run(&["task", "--table"]);
     task.assert_success();
     task.assert_never_exit_101();
-    // Config root resolves through trust discovery, which canonicalizes;
-    // macOS maps `/var` tempdirs to `/private/var`, so compare against the
-    // canonical form.
-    let root = sandbox.root().canonicalize().expect("canonical root");
-    task.assert_stderr_eq(&format!("20 task(s) from {}\n", root.display()));
+    assert_summary_from_root(&task.stderr, "20 task(s)", sandbox.root());
     assert_matches_baseline(&task.stdout, "task-table-20-rows");
 }
 
@@ -126,8 +138,7 @@ fn task_list_renders_twenty_checkbox_rows_with_paths() {
     let task = sandbox.run(&["task"]);
     task.assert_success();
     task.assert_never_exit_101();
-    let root = sandbox.root().canonicalize().expect("canonical root");
-    task.assert_stderr_eq(&format!("20 task(s) from {}\n", root.display()));
+    assert_summary_from_root(&task.stderr, "20 task(s)", sandbox.root());
     assert_matches_baseline(&task.stdout, "task-list-20-rows");
 }
 
@@ -158,8 +169,7 @@ fn list_renders_twenty_bullets_in_default_order() {
     let list = sandbox.run(&["list"]);
     list.assert_success();
     list.assert_never_exit_101();
-    let root = sandbox.root().canonicalize().expect("canonical root");
-    list.assert_stderr_eq(&format!("20 page(s) from {}\n", root.display()));
+    assert_summary_from_root(&list.stderr, "20 page(s)", sandbox.root());
     assert_matches_baseline(&list.stdout, "list-20-rows");
 }
 

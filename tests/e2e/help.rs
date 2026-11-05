@@ -58,7 +58,10 @@ fn help_text_matches_baseline(#[case] args: &[&str], #[case] baseline: &str) {
     let sandbox = Sandbox::new();
 
     let run = sandbox.run(args);
-    let actual = strip_trailing_spaces(&run.stdout);
+    // clap derives the usage name from argv[0], which ends in `.exe` on
+    // Windows.
+    let actual =
+        strip_trailing_spaces(&run.stdout).replace("traces.exe", "traces");
 
     run.assert_success();
     run.assert_stderr_eq("");
@@ -69,8 +72,10 @@ fn help_text_matches_baseline(#[case] args: &[&str], #[case] baseline: &str) {
         std::fs::write(&path, &actual).expect("write help baseline");
         return;
     }
-    let expected = std::fs::read_to_string(&path).expect(
-        "read help baseline; run with TRACES_UPDATE_GOLDEN=1 to create it",
-    );
+    let expected = std::fs::read_to_string(&path)
+        .expect(
+            "read help baseline; run with TRACES_UPDATE_GOLDEN=1 to create it",
+        )
+        .replace("\r\n", "\n");
     assert_eq!(actual, expected);
 }

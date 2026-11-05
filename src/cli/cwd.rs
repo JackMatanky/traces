@@ -158,8 +158,14 @@ mod tests {
         let temp = tempfile::tempdir().expect("create temp dir");
         {
             let _guard = CwdGuard::enter(temp.path());
+            // `current_dir` returns the non-verbatim spelling on Windows while
+            // `canonicalize` returns `\\?\`, so canonicalize both sides.
             assert_eq!(
-                Cwd::new().expect("read inside guard").into_inner(),
+                Cwd::new()
+                    .expect("read inside guard")
+                    .into_inner()
+                    .canonicalize()
+                    .expect("canonicalize cwd"),
                 temp.path().canonicalize().expect("canonicalize temp dir")
             );
         }

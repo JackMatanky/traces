@@ -15,8 +15,7 @@ use rstest::rstest;
 
 use super::{SortArgs, error::CliError, list::List, table::Table};
 use crate::{
-    Config, DirTreeError,
-    index::IndexError,
+    Config,
     query::{QueryBuilderError, QueryError},
 };
 
@@ -215,6 +214,8 @@ fn rejects_unparsable_filter_expression(#[case] mode: Mode) {
 #[case::table(Mode::Table)]
 fn wraps_refresh_failure_as_a_cli_index_error(#[case] mode: Mode) {
     use std::os::unix::fs::PermissionsExt as _;
+
+    use crate::{DirTreeError, index::IndexError};
 
     struct RestorePermissions<'a>(&'a Path);
 
