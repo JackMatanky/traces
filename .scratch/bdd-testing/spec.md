@@ -923,3 +923,6 @@ change.
   section written as an array is rejected` is added and owned by 01-G22. The
   scenario count gate now touches `tests/features.rs`, rebuilds and lists
   again. It fails only if the counts still differ. The scenario count is 149.
+- 2026-11-05: the weekly `soak` job in `.github/workflows/nightly.yml` runs on
+  `ubuntu-latest` and `windows-latest`. The Windows run time is unmeasured. If
+  20 repeats exceed the 150-minute limit, lower the Windows stress count.

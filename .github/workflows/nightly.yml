@@ -30,9 +30,13 @@ env:
 jobs:
   soak:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 4 * * 0'
-    name: e2e soak (20 repeats)
-    runs-on: ubuntu-latest
+    name: e2e soak (${{ matrix.os }}, 20 repeats)
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     env:
       NEXTEST_PROFILE: ci-soak
     steps:
@@ -43,7 +47,7 @@ jobs:
           install_args: rust
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "nightly-soak-ubuntu"
+          shared-key: "nightly-soak-${{ matrix.os }}"
       - run: mise install --locked cargo-binstall github:nextest-rs/nextest
       - run: >-
           cargo nextest run -p traces --all-features
@@ -51,10 +55,10 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: junit-e2e-soak
+          name: junit-e2e-soak-${{ matrix.os }}
           path: target/nextest/ci-soak/junit.xml
           if-no-files-found: ignore
-      - if: always()
+      - if: always() && matrix.os == 'ubuntu-latest'
         run: mise run bench --mode test
 
   mutation:

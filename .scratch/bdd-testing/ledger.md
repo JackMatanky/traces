@@ -966,7 +966,8 @@ capture those lines.
 
 Stress evidence: `cargo nextest run --no-default-features --test features
 --stress-count 100` passed 100 of 100 iterations on macOS. Windows and Linux
-results come from the CI run.
+results come from the CI run. The nightly soak ran on Ubuntu only. It now runs
+on Ubuntu and Windows (`--stress-count 20`). No Windows soak result exists yet.
 
 Duplicate review of the nested-tag scenarios: none deleted. They differ as
 follows.
