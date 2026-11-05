@@ -94,7 +94,7 @@ run_phase() {
 #######################################
 count_listed_scenarios() {
   cargo nextest list -p traces --no-default-features --test features \
-    --message-format oneline | grep -c 'features_scenarios::' || true
+    --color never --message-format oneline | grep -c 'features_scenarios::' || true
 }
 
 #######################################
