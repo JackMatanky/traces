@@ -1,5 +1,7 @@
 # Research 14: Sequencing and Pilot Slice Evidence
 
+Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+
 This document provides external research for ticket 14 ("Adoption roadmap"). It
 gathers evidence on sequencing incremental adoption and choosing a pilot slice.
 It follows Simplified Technical English (ASD-STE100) principles.

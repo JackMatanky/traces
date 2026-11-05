@@ -1,5 +1,7 @@
 "# Research 12: Coverage-gap methodology, evidence dossier
 
+Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+
 This file supports
 [12: Coverage-gap methodology](../issues/12-coverage-gap-methodology.md).
 The ticket is claimed. The grilling has not started yet.

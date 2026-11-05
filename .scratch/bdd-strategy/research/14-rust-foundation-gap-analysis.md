@@ -1,5 +1,7 @@
 # Research 14: Rust Foundation Gap Analysis
 
+Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+
 This note supports ticket 14 of the BDD adoption map. It evaluates the codebase
 foundation against evidence-backed Rust best practices.
 

@@ -332,9 +332,9 @@ scenario identifies the behavior if an assertion fails.
       task (a.md)\n`.
     - `index.rs::path_set_changes_between_spawns_prune_ghosts_and_resolve_links`
       (needs-split): The old test asserted list and inlink rows across a
-      deletion and a rename. Survivors `Deleting a sibling path resolves an
-      ambiguous wikilink` and `Renaming a note removes the former path and
-      resolves its link` assert the same exact outputs.
+      deletion and a rename. Two survivors assert the same exact outputs:
+      - `Deleting a sibling path resolves an ambiguous wikilink`
+      - `Renaming a note removes the former path and resolves its link`
     - `newly_created_link_target_resolves_inlinks_after_spawned_refresh`:
       Asserted table inlinks contain `a.md`. Survivor `Adding a link target
       resolves its inlink on the next query` asserts table row for `new`
@@ -344,10 +344,10 @@ scenario identifies the behavior if an assertion fails.
       `A list query creates the index store when none exists` asserts exit code
       0, exact stdout `- a.md\n`, and index store file exists.
     - `config_edit_heals_the_index_on_the_next_query`: The old test asserted
-      `@Book` before the edit and `@Novel` after the edit. Survivor `An index
-      setting edit changes the next query without changing notes` asserts `-
-      a.md\n` for `@Book`. After the edit and re-trust, it asserts `- a.md\n`
-      for `@Novel` and empty stdout for `@Book`.
+      `@Book` before the edit and `@Novel` after the edit. The survivor is
+      `An index setting edit changes the next query without changing notes`.
+      It asserts `- a.md\n` for `@Book`. After the edit and re-trust, it asserts
+      `- a.md\n` for `@Novel` and empty stdout for `@Book`.
     - `inlinks_render_across_spawned_queries`: Asserted table inlink for foo
       contains `a.md`. Survivor `Inlinks render the referencing note path across
       spawned queries` asserts table row for `foo` contains inlink `a.md`.
@@ -492,20 +492,21 @@ mutation compares did not finish in this run.
 ### Kill Demonstrations (recorded pre-deletion, changes reverted)
 
 - `src/config/model/schemas.rs:42` `class_field_name()` returned the hardcoded
-  `"hardcoded_class"`. The old test
-  `class_field_config_drives_class_selection_from_disk` and the scenario `A
-  configured file class field selects the matching note` both failed with empty
-  stdout where `- a.md\n` / `- novel.md` were expected.
+  `"hardcoded_class"`. Two tests failed with empty stdout where `- a.md\n` and
+  `- novel.md` were expected:
+  - the old test `class_field_config_drives_class_selection_from_disk`
+  - the scenario `A configured file class field selects the matching note`
 - `src/template/engine/schema.rs:264` `select_entry_value` inserted the key
-  `"unmatched_label"` instead of `"label"`. The old test
-  `renders_file_sourced_select_field_in_e2e_template` and the scenario `A
-  template reads the labels and values of a file-sourced select field` both
-  failed with `Category: (rust)` versus `Category: Rust Programming (rust)`.
+  `"unmatched_label"` instead of `"label"`. Two tests failed with
+  `Category: (rust)` versus `Category: Rust Programming (rust)`:
+  - the old test `renders_file_sourced_select_field_in_e2e_template`
+  - the scenario with this title:
+    - `A template reads the labels and values of a file-sourced select field`
 - `src/temporal/datetime.rs:492` `DateTimeShape::parse_any` used `Offset::UTC`
-  instead of the parsed offset for RFC 3339 input. The old test
-  `list_filters_rfc3339_field_by_its_exact_instant` and the scenario `An
-  offset-dated note matches the same instant to a nanosecond` both failed with
-  empty stdout where `- matching.md\n` was expected.
+  instead of the parsed offset for RFC 3339 input. Two tests failed with empty
+  stdout where `- matching.md\n` was expected:
+  - the old test `list_filters_rfc3339_field_by_its_exact_instant`
+  - the scenario `An offset-dated note matches the same instant to a nanosecond`
 
 All three demonstrations ran on the pre-deletion tree (commit `102253b8`), where
 the old tests were still present, and were then reverted.
@@ -916,10 +917,10 @@ Surviving mutants from the proof runs were triaged with new unit tests.
   `update_baseline` creates the baseline for each module.
 - The two `tracked.rs` tests stay. Scenario `A load without trust still records
   the configuration as tracked` covers the mutant, but no mutation compare ran.
-- Bare `traces trust --all list` and `--show list` parse `list` as a path.
-  Review whether that is intended.
+- Bare `traces trust --all list` and `--show list` parse `list` as a path. Closed
+  on 2026-11-05: see "Follow-up Triage".
 - The array-for-table quirk (`templates = ["x"]` parses as `directory = "x"`) is
-  open.
+  open. See "Follow-up Triage" for the cause and the fix options.
 
 ## Layout Change (2026-11-05)
 
@@ -975,3 +976,47 @@ follows.
   prose line.
 - `A filter matches nested tags by prefix` uses a filter expression. The other
   two use a source.
+
+## Follow-up Triage (2026-11-05)
+
+### Quirk: `trust --all list`
+
+Result: intended, no change. `trust` takes an optional `PATH` and the
+subcommands `list` and `clean`. The flags `--all` and `--show` belong to the
+`PATH` form. After a flag, clap reads `list` as a path. The run exits with a
+clear error: `failed to resolve trust target list`. Use `traces trust list` to
+list trusted directories.
+
+### Quirk: array for a table
+
+Result: a defect in the config parser. It is not fixed yet.
+
+- Reproduction: `templates = ["x"]` in `.traces/config.toml`. `traces list`
+  succeeds and does not report the file as invalid. The same file with
+  `templates = "x"`, `schemas = ["kind"]` or `tasks = ["x"]` fails.
+- Cause: a derived Serde struct also accepts a sequence. `RawTemplateConfig`
+  has two fields and the second has `#[serde(default)]`. A one-element array
+  therefore fills `directory`. `RawSchemasConfig` has no default on its second
+  field, so a one-element array fails there.
+- Reach: `templates = [dir]`, `templates = [dir, output_dir]` and
+  `tasks.statuses = [["x", "Name", "todo"]]` are accepted. Each means a different
+  thing than its text suggests.
+- Fix options: wrap the section fields in a `deserialize_with` function that
+  calls `deserialize_map` for a struct. That keeps the TOML span in the error
+  message. A pre-check on `toml::Table` is smaller but loses the span.
+- Why no fix yet: the fix changes the config boundary and needs a unit test for
+  each section type. A scenario for it needs a spec change.
+
+### Gate and script changes
+
+- `mise run test` runs `check_scenario_count` before the features phase. It
+  fails when the features binary lists a different number of scenarios than the
+  feature files declare, and it prints `touch tests/features.rs`. A probe file
+  with one scenario made it report 148 against 149.
+- The Python gate scripts need Python 3.13. Every function and every local
+  assignment carries a type annotation. `mypy --strict` and `ruff check` pass.
+- `check_steps.py` also skips steps inside a fenced block that uses three
+  backticks. It does not collapse extra spaces in a step line, because the
+  runtime behavior for those is unverified.
+- The `fixtures.rs` tests are in `mod to_toml_string` and `mod write_to`. They
+  compare parsed TOML in place of substrings.

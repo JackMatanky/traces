@@ -1,5 +1,7 @@
 # Research 11: Convention review for feature and step organization
 
+Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+
 This file supports
 [11: Feature and step organization](../issues/11-feature-step-organization.md).
 It records what Cucumber and Rust BDD practice say about layout and

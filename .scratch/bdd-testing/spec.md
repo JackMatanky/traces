@@ -153,6 +153,8 @@ Placement and layers:
   `Option<Run>`). The fixture builds the sandbox.
 - The `touch` rule sits in the doc comment of `tests/features.rs`: after you add
   a feature file, run `touch tests/features.rs`. Do not add a `build.rs`.
+  `mise run test` checks the rule. It fails when the features binary lists a
+  different number of scenarios than the feature files declare.
 - Vocabulary: glossary terms for behavior, ordinary words for setup, never an
   internal type name. A term that ticket 12 has not resolved stays out.
 - One observable behavior per scenario, one principal `When`. Add a step only
