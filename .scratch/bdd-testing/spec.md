@@ -257,7 +257,10 @@ id, the reason no test should assert it, and the date.
 ### 6.6 Machine gates added by the adoption
 
 Section 9.4 lists them: the `check:layers` fix, the five feature-text checks and
-the sixth gate check.
+the sixth gate check. The review of 2026-11-05 added a seventh check. Every
+`Scenario:` title must appear in a Status cell of the invariance map or in
+`.scratch/bdd-testing/scenario-owners.md`. The task `check:layers:selftest` tests
+the gate against fixtures and runs in `mise run verify`.
 
 ### 6.7 Contradiction dispositions (ticket 12, decision f)
 
@@ -367,7 +370,10 @@ Feature files are a human-owned contract.
 - A behavior change is red-first. The scenario fails before the code change.
 - A scenario that characterizes existing behavior cannot fail first. It records
   one break demonstration in the PR instead.
-- Review enforces this policy. Nothing mechanical can see who edited a file.
+- Review enforces this policy. A hook adds a partial mechanical guard. The hook
+  `spec-change` in `hk.pkl` fails a commit when it changes `tests/features/**` or
+  the invariance map and the message lacks a line `spec change: <reason>`.
+- The hook cannot see who edited a file, and an author can write any reason.
   This is a known limit.
 
 ## 9. Roadmap (ticket 14)
@@ -855,3 +861,9 @@ change.
   `duration.rs` (scope `parse|friendly|classify`). Every pair has the same
   escape set before and after. No deletion adds an escape. The files `service.rs`
   and `delta.rs` of slice 4 were not compared. See the ledger.
+- 2026-11-05: a review follow-up wave closed the high and medium gaps. It added
+  unit, process, golden, property and fuzz tests, the seventh gate check, the
+  `spec-change` hook, a three-OS unit job, and nightly mutation, soak, bench and
+  fuzz jobs. A fuzz run found and fixed a duration printing defect. The ledger
+  section "Review Follow-up Wave" has the details and the open items. The
+  nightly mutation gate reports without failing until each module has a baseline.

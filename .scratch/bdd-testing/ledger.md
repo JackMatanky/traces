@@ -719,5 +719,76 @@ kills it. The two `tracked.rs` tests stay (see Retained Tests).
   scenario Givens run `trust`, which already records the path, so no scenario
   pins that `index` records the configuration as a tracked path. Spec
   section 7 says a new escape fails the proof. Rows 03-P25 and
-  05-file_tracker are `pinned-elsewhere` in research/10. A later change can
-  add a scenario that kills the mutant. Then the two tests can die.
+  05-file_tracker were `pinned-elsewhere` at that time. The review wave of
+  2026-11-05 added a scenario that tracks a configuration without trust. Both
+  rows are `covered` now. The two tests stay until a mutation compare passes.
+
+## Review Follow-up Wave (2026-11-05)
+
+A review of the adopted strategy found gaps. This wave closed the high and
+medium items. No test or scenario was deleted.
+
+### Added
+
+- **Unit pins (`src/cli`).** Tests pin the three diagnostics that had none:
+  `tracked::list_failed`, `tracked::clean_failed` and `query::schema_failed`.
+  Clap conflict tests assert `ErrorKind`. Flag precedence, completions per shell
+  and the shared list and table pipeline have tests. Four empty-store unit tests
+  were deleted. The e2e file `tests/e2e/streams.rs` replaces them.
+- **Process pins (`tests/e2e`).** New files pin help text for every subcommand
+  (`tests/baselines/help`), the exit-2 rules, the environment legs, stream and
+  message shapes, the unpinned diagnostics, and output determinism across file
+  creation order. Bare `traces -i` without a TTY fails in the picker with
+  `traces::cli::template::picker_failed`.
+- **Golden output.** `tests/e2e/golden.rs` compares five output shapes with files
+  in `tests/baselines/output`. `TRACES_UPDATE_GOLDEN=1` rewrites them.
+- **Gates.** The seventh gate check requires every scenario title to appear in
+  the invariance map or in `scenario-owners.md`. A self-test covers the gate. The
+  `spec-change` hook guards changes to features and the map.
+- **Scenarios.** Weak `Then` steps are stronger. Rows 04-S7 and 03-P25 are
+  `covered`. Row 05-file_tracker is `covered` by two scenarios.
+- **Robustness.** Tests cover a future store version, a truncated store and a
+  garbage store file. Two concurrent `index` processes leave a queryable store.
+  Template output uses a temporary file and a rename. The tracker survives a
+  corrupt companion file and concurrent `record` calls. The expression parser
+  rejects more than 128 nested levels with a typed error.
+- **Property and fuzz tests.** Round-trip properties cover the index row codec,
+  `RawConfig` and `DatePoint`. The `fuzz` crate has six targets and seed corpora.
+  A fuzz run found a real defect: a sub-second duration printed as `1ns`, which
+  the parser rejected. The printer now writes fractional seconds.
+- **Hygiene.** One sleep-based test now sets the modification time directly. The
+  digest metatest enumerates its directory. Many `is_err()` assertions check the
+  exact error. Four groups of near-identical tests became `rstest` tables.
+- **CI.** The unit job runs on three operating systems. A pull-request job runs
+  `mutation-diff`. A coverage job uploads `lcov.info` and fails on an empty
+  report. A nightly workflow runs a soak, mutation per module, benchmark smoke
+  and fuzz smoke.
+
+### Mutation Triage
+
+Surviving mutants from the proof runs were triaged with new unit tests.
+
+| File | Escapes before | Killed by new tests | Accepted as equivalent |
+|---|---|---|---|
+| `src/note/parser/task.rs` | 16 | 9 | 7 |
+| `src/temporal/duration.rs` (scope `parse\|friendly\|classify`) | 74 | 69 | 5 |
+| `src/query/format.rs` | 4 | 0 | 4 |
+
+- The accepted mutants are in `mutarust-baseline.json`. They change allocation
+  hints, remove early returns that only save work, or sit in code that no input
+  reaches.
+- Each kill was proven by applying the mutation by hand. A full rerun of the
+  mutation tool did not follow, so the escape counts above are not rerun results.
+
+### Not Done
+
+- Mutation triage did not cover `src/temporal/datetime.rs` (49 escapes), `index`
+  (13 escapes in `inlinks.rs` and `refresh.rs`) or the other modules. The nightly
+  mutation gate reports without failing until a manual run with `update_baseline`
+  creates the baseline for each module.
+- The two `tracked.rs` tests stay. Scenario `A load without trust still records
+  the configuration as tracked` covers the mutant, but no mutation compare ran.
+- Bare `traces trust --all list` and `--show list` parse `list` as a path.
+  Review whether that is intended.
+- The array-for-table quirk (`templates = ["x"]` parses as `directory = "x"`)
+  is open.

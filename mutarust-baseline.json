@@ -72,6 +72,36 @@
       "file": "src/query/format.rs",
       "mutator": "numbers/incrementer",
       "line": 220
+    },
+    {
+      "id": "bf6a25a3f5824426a7d14f972fb194d2",
+      "file": "src/temporal/duration.rs",
+      "mutator": "expression/comparison",
+      "line": 768
+    },
+    {
+      "id": "d88bb75c43afb2a1d8c43553dc1349f4",
+      "file": "src/temporal/duration.rs",
+      "mutator": "expression/remove",
+      "line": 768
+    },
+    {
+      "id": "476d5f2efa23264a038cd1ac7116a424",
+      "file": "src/temporal/duration.rs",
+      "mutator": "numbers/decrementer",
+      "line": 747
+    },
+    {
+      "id": "fc3b7f8555cfea938452e57cb09d2ceb",
+      "file": "src/temporal/duration.rs",
+      "mutator": "numbers/decrementer",
+      "line": 803
+    },
+    {
+      "id": "01f30d30702b441109919867ac566b31",
+      "file": "src/temporal/duration.rs",
+      "mutator": "numbers/incrementer",
+      "line": 803
     }
   ]
 }
