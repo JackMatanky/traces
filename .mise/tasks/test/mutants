@@ -127,6 +127,9 @@ declare -a targets=()
 # bench overflows the main-thread stack on x86_64 Linux under this profile.
 TEST_FLAGS="--features test-utils --lib --tests --profile mutants"
 TIMEOUT_COEFFICIENT=5
+# Each worker keeps its own build directory (about 0.7 GiB). mutarust starts one
+# worker per logical CPU by default, so the task caps the count.
+DEFAULT_WORKERS=4
 DEFAULT_TARGET="./src..."
 
 ########################################
@@ -152,10 +155,10 @@ parse_targets() {
 # Rejects target-list tokens the task owns or does not know. mise's variadic
 # positional absorbs unknown flag-like tokens (verified), so this scan is the
 # strict-unknown-flag backstop. Refusals keep the tailored messages from the
-# retired cascades; everything else flag-like gets the generic diagnostic.
-# Also backstops the --git-diff-base requires: mise's `requires` is satisfied
-# by any explicit value (e.g. `--no-git-diff`) and by a declared default, so
-# the parse-time check alone does not cover every path (verified).
+# retired cascades; everything else flag-like gets the generic diagnostic. Also
+# backstops the --git-diff-base requires: mise's `requires` is satisfied by any
+# explicit value (e.g. `--no-git-diff`) and by a declared default, so the
+# parse-time check alone does not cover every path (verified).
 # Globals:
 #   targets
 #   usage_git_diff
@@ -205,8 +208,8 @@ reject_bad_targets() {
 ########################################
 # True when a declared list/inspect flag was given. mutarust rejects all
 # configuration and mutation options there (verified live on 0.1.10: even
-# --verbose and loggers are refused), so main() bypasses every task-owned
-# flag; the flag-level `conflicts` lists enforce that at parse time.
+# --verbose and loggers are refused), so main() bypasses every task-owned flag;
+# the flag-level `conflicts` lists enforce that at parse time.
 # Globals:
 #   usage_list_mutators
 #   usage_list_files
@@ -226,10 +229,10 @@ is_inspect_mode() {
 
 ########################################
 # Assembles arguments for list/inspect modes. Task-owned flags are omitted
-# (mutarust forbids them there; parse-time conflicts reject run flags), so
-# only the mode flag, the -f/-m scope (or user targets, else DEFAULT_TARGET)
-# is emitted. --list-mutators takes no target — `exclusive` already refused
-# any flag or target alongside it, so the branch just emits the flag.
+# (mutarust forbids them there; parse-time conflicts reject run flags), so only
+# the mode flag, the -f/-m scope (or user targets, else DEFAULT_TARGET) is
+# emitted. --list-mutators takes no target — `exclusive` already refused any
+# flag or target alongside it, so the branch just emits the flag.
 # Globals:
 #   usage_list_mutators
 #   usage_list_files
@@ -301,6 +304,9 @@ build_static_flags() {
     fi
     if [[ -n "${usage_exec_timeout:-}" ]]; then
       mutarust_args+=(--exec-timeout "${usage_exec_timeout}")
+    fi
+    if [[ -z "${usage_workers:-}" ]]; then
+      mutarust_args+=(--workers "${DEFAULT_WORKERS}")
     fi
   fi
   return 0
@@ -443,6 +449,38 @@ build_declared_flags() {
 }
 
 ########################################
+# Removes temporary directories that an earlier run left behind after a kill
+# the task could not trap (SIGKILL, a power loss). A directory is stale when no
+# live process mentions it: the stage directories by path, and the older
+# mutarust-<pid>-<n> directories by the pid in the name.
+# Globals:
+#   TMPDIR
+# Arguments:
+#   None
+# Outputs:
+#   None
+# Returns:
+#   0 always.
+########################################
+sweep_stale_dirs() {
+  local dir pid base="${TMPDIR:-/tmp}"
+  for dir in "${base}"/mutants-stage.*; do
+    [[ -d "${dir}" ]] || continue
+    # A directory younger than ten minutes may belong to a run that is still
+    # copying files and has no process yet.
+    [[ -n "$(find "${dir}" -maxdepth 0 -mmin -10)" ]] && continue
+    pgrep -f "${dir}" >/dev/null 2>&1 || rm -rf "${dir}"
+  done
+  for dir in "${base}"/mutarust-*; do
+    [[ -d "${dir}" ]] || continue
+    pid="${dir##*/mutarust-}"
+    pid="${pid%%-*}"
+    kill -0 "${pid}" 2>/dev/null || rm -rf "${dir}"
+  done
+  return 0
+}
+
+########################################
 # Runs mutarust in a lean copy of the repository. mutarust copies every
 # non-hidden entry of the working directory for each worker, so a local
 # `target/` of tens of GiB made one mutant take longer than 20 minutes. The
@@ -460,23 +498,38 @@ build_declared_flags() {
 #   Status of mutarust.
 ########################################
 run_staged() {
-  local stage status=0 file
+  local stage status=0 file pid
+  sweep_stale_dirs
   stage="$(mktemp -d "${TMPDIR:-/tmp}/mutants-stage.XXXXXX")"
-  # shellcheck disable=SC2064  # expand ${stage} now; the trap runs at exit
-  trap "rm -rf '${stage}'" EXIT
+  mkdir "${stage}/work" "${stage}/tmp"
+  # Every process of the run mentions ${stage} on its command line, so the
+  # cleanup can find leftovers after an interrupt. Each worker builds in its
+  # own temporary directory, and an interrupted run left 0.2-0.8 GiB behind per
+  # worker. TMPDIR below keeps those directories inside ${stage}.
+  cleanup() {
+    pkill -TERM -f "${stage}" 2>/dev/null || true
+    sleep 1
+    rm -rf "${stage}"
+  }
+  trap cleanup EXIT
+  trap 'exit 130' INT TERM
   rsync -a \
     --exclude=/target --exclude=/fuzz/target --exclude=/.worktrees \
     --exclude=/.criterion --exclude=/.rust-docs --exclude=/.codegraph \
     --exclude=/report.json --exclude=/mutarust-report.html \
     --exclude=/mutarust-agentic.json --exclude=/mutarust-summary.json \
     --exclude=/mutarust-gitlab.json \
-    ./ "${stage}/"
-  (cd "${stage}" && mutarust "${mutarust_args[@]+"${mutarust_args[@]}"}") ||
-    status=$?
+    ./ "${stage}/work/"
+  # A background job plus `wait` lets the trap run at once on a signal.
+  (cd "${stage}/work" &&
+    TMPDIR="${stage}/tmp" CARGO_INCREMENTAL=0 \
+      mutarust "${mutarust_args[@]+"${mutarust_args[@]}"}") &
+  pid=$!
+  wait "${pid}" || status=$?
   for file in report.json mutarust-report.html mutarust-agentic.json \
     mutarust-baseline.json mutarust-summary.json mutarust-gitlab.json; do
-    if [[ -f "${stage}/${file}" ]]; then
-      cp "${stage}/${file}" "./${file}"
+    if [[ -f "${stage}/work/${file}" ]]; then
+      cp "${stage}/work/${file}" "./${file}"
     fi
   done
   return "${status}"
