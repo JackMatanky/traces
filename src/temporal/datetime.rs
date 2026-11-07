@@ -708,6 +708,22 @@ mod tests {
         fixtures::{fixed_datetime, ymd},
     };
 
+    #[test]
+    fn keeps_a_long_tail_after_a_short_fraction_unchanged() {
+        let input = "2026-01-01T00:00:00.5Z+01:00[Europe/Paris]";
+
+        let output = DateTimeShape::truncate_fractional_seconds(input);
+
+        assert!(matches!(output, Cow::Borrowed(text) if text == input));
+    }
+
+    #[test]
+    fn keeps_an_unsigned_five_digit_year_borrowed() {
+        let output = expand_signed_year("12345-6");
+
+        assert!(matches!(output, Cow::Borrowed("12345-6")));
+    }
+
     // ZoneGuard pins a Jiff time zone to the test thread without changing the
     // process TZ environment variable. Repeated sets replace the override.
     mod clock {

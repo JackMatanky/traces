@@ -506,12 +506,10 @@ run_staged() {
   # cleanup can find leftovers after an interrupt. Each worker builds in its
   # own temporary directory, and an interrupted run left 0.2-0.8 GiB behind per
   # worker. TMPDIR below keeps those directories inside ${stage}.
-  cleanup() {
-    pkill -TERM -f "${stage}" 2>/dev/null || true
-    sleep 1
-    rm -rf "${stage}"
-  }
-  trap cleanup EXIT
+  # The trap runs after run_staged returns, when the local ${stage} is gone,
+  # so the trap text embeds the path now.
+  # shellcheck disable=SC2064  # expand ${stage} when the trap is set
+  trap "pkill -TERM -f '${stage}' 2>/dev/null || true; sleep 1; rm -rf '${stage}'" EXIT
   trap 'exit 130' INT TERM
   rsync -a \
     --exclude=/target --exclude=/fuzz/target --exclude=/.worktrees \

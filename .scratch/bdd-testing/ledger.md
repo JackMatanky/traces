@@ -1144,3 +1144,28 @@ Notes:
   The symlink quirk of the map stays a unit test.
 - The four exception rows of box 1 have no scenario, so the review does not
   check them.
+
+## Mutation Triage (2026-11-07)
+
+An overnight run mutated `src/temporal/datetime.rs` and the `index` module with `--timeout 120`. That timeout also covers the compile step, so 393 of 617 mutants ended as errors and never ran their tests. Only the escapes below are valid. The numbers of escapes are lower bounds. The run must be repeated with a longer timeout.
+
+Ten mutants escaped. Five are real test gaps, and each has a new test. For each new test, the mutant was applied by hand and the test failed. The mutant was then reverted.
+
+- `datetime.rs` line 550: a long tail after a short fraction. The test `keeps_a_long_tail_after_a_short_fraction_unchanged` kills it.
+- `datetime.rs` line 608: an unsigned five-digit year. The test `keeps_an_unsigned_five_digit_year_borrowed` kills it.
+- `index/refresh.rs` line 89: a config drift report returned a deleted count of 1. The test `reports_no_counts_for_a_config_drift` kills it.
+- `index/refresh.rs` line 580: two adjacent modified notes. The test `merges_adjacent_modified_notes_over_their_persisted_rows` kills it.
+- `index/store.rs` line 1145: the end of the folder prefix range. The test `lists_only_the_paths_inside_a_folder` kills it. Production code calls `paths_in_folder` only with the empty folder, so this branch had no caller.
+
+Five are equivalent and are now in `mutarust-baseline.json`:
+
+- `index/mod.rs` line 62, `index/service.rs` lines 167, 181 and 309: each removes a `tracing` log call. No test reads the log output, and the log does not change the result of the function.
+- `index/trie.rs` line 150: the count of skipped folders adds 0 and not 1. The count is added to the distance of every candidate on the path upward. A shift that is equal for all candidates does not change the order or the ties.
+
+Not done:
+
+- The mutation run of `datetime.rs` and `index` with a longer timeout.
+- The mutation run of the `features` binary.
+- The exit code of the `strsim` run. The baseline holds the `strsim` escape at line 15.
+
+The `mutants` task had a cleanup bug. The trap used a local variable that was out of scope at exit. This is fixed. A run that was interrupted after 100 seconds left no temporary directory.

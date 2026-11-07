@@ -56,8 +56,8 @@ disable_mutators:
 skip_without_test: false
 skip_with_cfg: false
 
-# This repository does not use a score gate. Do not add min_msi until a
-# new decision is written down.
+# This repository does not use a score gate. Do not add min_msi until a new
+# decision is written down.
 #
 # min_msi sets a minimum mutation score from 0 to 100. The mutation score is the
 # share of mutants that the tests detect. A score below min_msi makes mutarust
@@ -76,6 +76,7 @@ skip_with_cfg: false
 # switches on every group. The disable_mutators entry above switches its group
 # off again.
 enable_mutators: []
+
 # ignore_source_lines lists regular expressions. mutarust does not create a
 # mutant when the mutant touches a line that matches an expression. The list is
 # empty, so no line matches.
