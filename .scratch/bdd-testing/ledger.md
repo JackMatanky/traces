@@ -1147,56 +1147,97 @@ Notes:
 
 ## Mutation Triage (2026-11-07)
 
-An overnight run mutated `src/temporal/datetime.rs` and the `index` module with `--timeout 120`. That timeout also covers the compile step, so 393 of 617 mutants ended as errors and never ran their tests. Only the escapes below are valid. The numbers of escapes are lower bounds. The run must be repeated with a longer timeout.
+An overnight run mutated `src/temporal/datetime.rs` and the `index` module with
+`--timeout 120`. That timeout also covers the compile step, so 393 of 617
+mutants ended as errors and never ran their tests. Only the escapes below are
+valid. The numbers of escapes are lower bounds. The run must be repeated with a
+longer timeout.
 
-Ten mutants escaped. Five are real test gaps, and each has a new test. For each new test, the mutant was applied by hand and the test failed. The mutant was then reverted.
+Ten mutants escaped. Five are real test gaps, and each has a new test. For each
+new test, the mutant was applied by hand and the test failed. The mutant was
+then reverted.
 
-- `datetime.rs` line 550: a long tail after a short fraction. The test `keeps_a_long_tail_after_a_short_fraction_unchanged` kills it.
-- `datetime.rs` line 608: an unsigned five-digit year. The test `keeps_an_unsigned_five_digit_year_borrowed` kills it.
-- `index/refresh.rs` line 89: a config drift report returned a deleted count of 1. The test `reports_no_counts_for_a_config_drift` kills it.
-- `index/refresh.rs` line 580: two adjacent modified notes. The test `merges_adjacent_modified_notes_over_their_persisted_rows` kills it.
-- `index/store.rs` line 1145: the end of the folder prefix range. The test `lists_only_the_paths_inside_a_folder` kills it. Production code calls `paths_in_folder` only with the empty folder, so this branch had no caller.
+- `datetime.rs` line 550: a long tail after a short fraction. The test
+  `keeps_a_long_tail_after_a_short_fraction_unchanged` kills it.
+- `datetime.rs` line 608: an unsigned five-digit year. The test
+  `keeps_an_unsigned_five_digit_year_borrowed` kills it.
+- `index/refresh.rs` line 89: a config drift report returned a deleted count of
+  1. The test `reports_no_counts_for_a_config_drift` kills it.
+- `index/refresh.rs` line 580: two adjacent modified notes. The test
+  `merges_adjacent_modified_notes_over_their_persisted_rows` kills it.
+- `index/store.rs` line 1145: the end of the folder prefix range. The test
+  `lists_only_the_paths_inside_a_folder` kills it. Production code calls
+  `paths_in_folder` only with the empty folder, so this branch had no caller.
 
 Five are equivalent and are now in `mutarust-baseline.json`:
 
-- `index/mod.rs` line 62, `index/service.rs` lines 167, 181 and 309: each removes a `tracing` log call. No test reads the log output, and the log does not change the result of the function.
-- `index/trie.rs` line 150: the count of skipped folders adds 0 and not 1. The count is added to the distance of every candidate on the path upward. A shift that is equal for all candidates does not change the order or the ties.
+- `index/mod.rs` line 62, `index/service.rs` lines 167, 181 and 309: each
+  removes a `tracing` log call. No test reads the log output, and the log does
+  not change the result of the function.
+- `index/trie.rs` line 150: the count of skipped folders adds 0 and not 1. The
+  count is added to the distance of every candidate on the path upward. A shift
+  that is equal for all candidates does not change the order or the ties.
 
 Not done:
 
 - The mutation run of `datetime.rs` and `index` with a longer timeout.
 - The mutation run of the `features` binary.
-- The exit code of the `strsim` run. The baseline holds the `strsim` escape at line 15.
+- The exit code of the `strsim` run. The baseline holds the `strsim` escape at
+  line 15.
 
-The `mutants` task had a cleanup bug. The trap used a local variable that was out of scope at exit. This is fixed. A run that was interrupted after 100 seconds left no temporary directory.
+The `mutants` task had a cleanup bug. The trap used a local variable that was
+out of scope at exit. This is fixed. A run that was interrupted after 100
+seconds left no temporary directory.
 
 ## Step Validation Spike and Workspace Layout (2026-11-08)
 
-The spike tested whether the compiler can replace the `check_steps.py` gate. It used `rstest-bdd-macros` 0.6.0.
+The spike tested whether the compiler can replace the `check_steps.py` gate. It
+used `rstest-bdd-macros` 0.6.0.
 
 Findings:
 
-- The feature `strict-compile-time-validation` does not check the `scenarios!` macro. Only the `#[scenario]` macro calls `validate_steps_exist`. A renamed step compiled without a diagnostic. The repository keeps the feature off, because it would do nothing here.
-- Typed placeholders work. `{code:i32}` compiles and passes. A scoped `#[expect(clippy::literal_string_with_formatting_args)]` on `mod steps` makes clippy pass. The workspace lint stays at `warn` for all other code. A value that is not a number gives `Step not found` at run time, as a missing step does.
-- A new `.feature` file is not in the next test run unless the build is stale. The run after a second new file had no recompile and still ran 155 tests. The note in `tests/features.rs` is correct, and `mise run test` already touches the file.
+- The feature `strict-compile-time-validation` does not check the `scenarios!`
+  macro. Only the `#[scenario]` macro calls `validate_steps_exist`. A renamed
+  step compiled without a diagnostic. The repository keeps the feature off,
+  because it would do nothing here.
+- Typed placeholders work. `{code:i32}` compiles and passes. A scoped
+  `#[expect(clippy::literal_string_with_formatting_args)]` on `mod steps` makes
+  clippy pass. The workspace lint stays at `warn` for all other code. A value
+  that is not a number gives `Step not found` at run time, as a missing step
+  does.
+- A new `.feature` file is not in the next test run unless the build is stale.
+  The run after a second new file had no recompile and still ran 155 tests. The
+  note in `tests/features.rs` is correct, and `mise run test` already touches
+  the file.
 
 Changes:
 
 - The step `the exit code is {code:i32}` uses a typed placeholder.
-- `check_steps.py` mirrors the framework regex of an integer hint. A signed hint matches `[+-]?\d+`. An unsigned hint matches `\d+`. The self-test rejects a word for a signed hint and a negative number for an unsigned hint.
+- `check_steps.py` mirrors the framework regex of an integer hint. A signed hint
+  matches `[+-]?\d+`. An unsigned hint matches `\d+`. The self-test rejects a
+  word for a signed hint and a negative number for an unsigned hint.
 
 Decision for a workspace of crates:
 
-- Each crate that has scenarios owns its `tests/features/` folder and its step definitions.
-- A step definition of the core crate calls the library API. A step definition of the CLI crate runs the binary.
-- Step definitions do not go in `src/`. They are test code, and a `src/` module would need `cfg(test)`.
-- A shared steps crate is only for step text that two crates both need. The checks of the compiler do not cover a shared crate.
-- Each crate runs `check_steps.py` on its own folder. The script takes the root of the crate as an argument.
+- Each crate that has scenarios owns its `tests/features/` folder and its step
+  definitions.
+- A step definition of the core crate calls the library API. A step definition
+  of the CLI crate runs the binary.
+- Step definitions do not go in `src/`. They are test code, and a `src/` module
+  would need `cfg(test)`.
+- A shared steps crate is only for step text that two crates both need. The
+  checks of the compiler do not cover a shared crate.
+- Each crate runs `check_steps.py` on its own folder. The script takes the root
+  of the crate as an argument.
 
 Not done:
 
-- A test of `#[scenario]` per scenario. It would add strict validation, but it needs one function for each scenario and loses the discovery of `scenarios!`.
-- A multi-crate fixture. The layout decision follows the documentation and one crate.
-- The overnight mutation run did not survive. The folder `/tmp/traces-mutation2` does not exist, and the run must start again.
+- A test of `#[scenario]` per scenario. It would add strict validation, but it
+  needs one function for each scenario and loses the discovery of `scenarios!`.
+- A multi-crate fixture. The layout decision follows the documentation and one
+  crate.
+- The overnight mutation run did not survive. The folder `/tmp/traces-mutation2`
+  does not exist, and the run must start again.
 
-The scoped expectation covers all of `mod steps`. A format-like string in step code is not reported.
+The scoped expectation covers all of `mod steps`. A format-like string in step
+code is not reported.
