@@ -1176,7 +1176,7 @@ The spike tested whether the compiler can replace the `check_steps.py` gate. It 
 
 Findings:
 
-- The feature `strict-compile-time-validation` does not check the `scenarios!` macro. Only the `#[scenario]` macro calls `validate_steps_exist`. A renamed step compiled with no error and no warning. The repository keeps the feature off, because it would do nothing here.
+- The feature `strict-compile-time-validation` does not check the `scenarios!` macro. Only the `#[scenario]` macro calls `validate_steps_exist`. A renamed step compiled without a diagnostic. The repository keeps the feature off, because it would do nothing here.
 - Typed placeholders work. `{code:i32}` compiles and passes. A scoped `#[expect(clippy::literal_string_with_formatting_args)]` on `mod steps` makes clippy pass. The workspace lint stays at `warn` for all other code. A value that is not a number gives `Step not found` at run time, as a missing step does.
 - A new `.feature` file is not in the next test run unless the build is stale. The run after a second new file had no recompile and still ran 155 tests. The note in `tests/features.rs` is correct, and `mise run test` already touches the file.
 
