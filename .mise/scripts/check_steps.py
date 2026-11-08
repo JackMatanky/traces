@@ -26,6 +26,9 @@ STEP: Final[Pattern[str]] = re.compile(
     r"^\s*(Given|When|Then|And|But)\s+(.*?)\s*$"
 )
 PLACEHOLDER: Final[Pattern[str]] = re.compile(r"(\{[^{}]*\})")
+INTEGER_HINT: Final[Pattern[str]] = re.compile(
+    r"\{\w+\s*:\s*(?P<kind>[iu])(?:8|16|32|64|128|size)\s*\}"
+)
 COMMENT_LINE: Final[Pattern[str]] = re.compile(r"(?m)^\s*//.*$")
 DOCSTRING_FENCES: Final[frozenset[str]] = frozenset({'"""', "```"})
 CONTINUATION: Final[Pattern[str]] = re.compile(r"\\\n\s*")
@@ -61,10 +64,19 @@ def unescape(literal: str) -> str:
     return ESCAPE.sub(r"\1", joined)
 
 
+def hole_regex(part: str) -> str:
+    """Mirror the `rstest-bdd` regex of one placeholder, including integer hints."""
+    hint: re.Match[str] | None = INTEGER_HINT.fullmatch(part)
+    if hint is None:
+        return "(.+?)"
+    return r"([+-]?\d+)" if hint["kind"] == "i" else r"(\d+)"
+
+
 def regex_of(pattern: str) -> Pattern[str]:
     parts: list[str] = PLACEHOLDER.split(pattern)
     body: str = "".join(
-        "(.+?)" if is_placeholder(part) else re.escape(part) for part in parts
+        hole_regex(part) if is_placeholder(part) else re.escape(part)
+        for part in parts
     )
     return re.compile(f"^{body}$")
 

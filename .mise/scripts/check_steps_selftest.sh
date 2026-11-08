@@ -42,4 +42,12 @@ expect_error "ERROR: Duplicate step definition: when 'I run {a}'"
 printf '#[when("I run {a}")]\nfn i() {}\n' > "$root/tests/features/steps/a.rs"
 printf 'Feature: Steps\n  Scenario: One\n    When I run x\n      ```\n      Then fenced text\n      ```\n' > "$root/tests/features/nested/one.feature"
 .mise/scripts/check_steps.py "$root"
+
+printf '#[then("the exit code is {code:i32}")]\nfn j() {}\n#[then("the count is {n:u32}")]\nfn k() {}\n' > "$root/tests/features/steps/a.rs"
+printf 'Feature: Steps\n  Scenario: One\n    Then the exit code is -2\n    And the count is 7\n' > "$root/tests/features/nested/one.feature"
+.mise/scripts/check_steps.py "$root"
+printf 'Feature: Steps\n  Scenario: One\n    Then the exit code is two\n    And the count is 7\n' > "$root/tests/features/nested/one.feature"
+expect_error "ERROR: Undefined step at one.feature:3: then 'the exit code is two'"
+printf 'Feature: Steps\n  Scenario: One\n    Then the exit code is -2\n    And the count is -7\n' > "$root/tests/features/nested/one.feature"
+expect_error "ERROR: Undefined step at one.feature:4: then 'the count is -7'"
 echo 'Step matching gate self-test passed.'

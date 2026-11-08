@@ -1169,3 +1169,34 @@ Not done:
 - The exit code of the `strsim` run. The baseline holds the `strsim` escape at line 15.
 
 The `mutants` task had a cleanup bug. The trap used a local variable that was out of scope at exit. This is fixed. A run that was interrupted after 100 seconds left no temporary directory.
+
+## Step Validation Spike and Workspace Layout (2026-11-08)
+
+The spike tested whether the compiler can replace the `check_steps.py` gate. It used `rstest-bdd-macros` 0.6.0.
+
+Findings:
+
+- The feature `strict-compile-time-validation` does not check the `scenarios!` macro. Only the `#[scenario]` macro calls `validate_steps_exist`. A renamed step compiled with no error and no warning. The repository keeps the feature off, because it would do nothing here.
+- Typed placeholders work. `{code:i32}` compiles and passes. A scoped `#[expect(clippy::literal_string_with_formatting_args)]` on `mod steps` makes clippy pass. The workspace lint stays at `warn` for all other code. A value that is not a number gives `Step not found` at run time, as a missing step does.
+- A new `.feature` file is not in the next test run unless the build is stale. The run after a second new file had no recompile and still ran 155 tests. The note in `tests/features.rs` is correct, and `mise run test` already touches the file.
+
+Changes:
+
+- The step `the exit code is {code:i32}` uses a typed placeholder.
+- `check_steps.py` mirrors the framework regex of an integer hint. A signed hint matches `[+-]?\d+`. An unsigned hint matches `\d+`. The self-test rejects a word for a signed hint and a negative number for an unsigned hint.
+
+Decision for a workspace of crates:
+
+- Each crate that has scenarios owns its `tests/features/` folder and its step definitions.
+- A step definition of the core crate calls the library API. A step definition of the CLI crate runs the binary.
+- Step definitions do not go in `src/`. They are test code, and a `src/` module would need `cfg(test)`.
+- A shared steps crate is only for step text that two crates both need. The checks of the compiler do not cover a shared crate.
+- Each crate runs `check_steps.py` on its own folder. The script takes the root of the crate as an argument.
+
+Not done:
+
+- A test of `#[scenario]` per scenario. It would add strict validation, but it needs one function for each scenario and loses the discovery of `scenarios!`.
+- A multi-crate fixture. The layout decision follows the documentation and one crate.
+- The overnight mutation run did not survive. The folder `/tmp/traces-mutation2` does not exist, and the run must start again.
+
+The scoped expectation covers all of `mod steps`. A format-like string in step code is not reported.

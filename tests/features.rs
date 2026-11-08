@@ -23,6 +23,11 @@ mod fixtures;
     clippy::disallowed_methods,
     reason = "rstest-bdd step wrappers call std::panic::catch_unwind"
 )]
+#[expect(
+    clippy::literal_string_with_formatting_args,
+    reason = "rstest-bdd typed placeholders such as {count:u32} look like \
+              format arguments"
+)]
 #[path = "features/steps/mod.rs"]
 mod steps;
 #[expect(
