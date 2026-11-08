@@ -1096,11 +1096,14 @@ impl IndexStore {
         if folder_str.is_empty() || folder_str == "." {
             self.collect_all_folder_paths(table)
         } else {
-            let prefix = if folder_str.ends_with('/') {
-                folder_str.into_owned()
-            } else {
-                format!("{folder_str}/")
-            };
+            // Stored keys are native path bytes, so the separator is
+            // platform-specific; `/` is also accepted on every platform.
+            let prefix =
+                if folder_str.ends_with(['/', std::path::MAIN_SEPARATOR]) {
+                    folder_str.into_owned()
+                } else {
+                    format!("{folder_str}{}", std::path::MAIN_SEPARATOR)
+                };
             self.collect_prefixed_folder_paths(table, &prefix)
         }
     }
