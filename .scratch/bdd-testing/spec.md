@@ -276,9 +276,9 @@ the sixth gate check. The review of 2026-11-05 added a seventh check. Every
 `Scenario:` title must appear in a Status cell of the invariance map or in
 `.scratch/bdd-testing/scenario-owners.md`. The task `check:layers:selftest`
 tests the gate against fixtures and runs in `mise run verify`. A later review
-added an eighth check, `.mise/scripts/check_steps.py`. It matches every feature
-step to a step definition. It fails on an undefined, unused, duplicate or
-ambiguous step.
+added an eighth check, the test `step_gate` in the `features` binary. It matches
+every feature step to a step definition with the parser and the matcher of
+`rstest-bdd`. It fails on an undefined, unused, duplicate or ambiguous step.
 
 ### 6.7 Contradiction dispositions (ticket 12, decision f)
 
@@ -905,10 +905,10 @@ change.
   stem carries the area, because a test name holds the stem and no folder. This
   replaces the flat layout and the rule that scenarios live in the `e2e` binary
   only. The nextest `features` phase and the CI `test (e2e)` job run both
-  binaries. An eighth check, `check_steps.py`, fails on an undefined, unused,
+  binaries. An eighth check, the `step_gate` test, fails on an undefined, unused,
   duplicate or ambiguous step. The 148 scenario titles are unchanged. The shared
   harness compiles into both binaries, so the five `fixtures` tests run in each.
-  The two gate scripts in `.mise/scripts/` use a `uv` script shebang.
+  The gate script `check_scenarios.py` uses a `uv` script shebang.
   `mise.toml` installs `uv`.
   A break demonstration shows the `in time zone` step wins over the generic run
   step: with `TZ` removed, three scenarios fail. The three nested-tag scenarios

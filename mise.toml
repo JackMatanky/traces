@@ -245,7 +245,6 @@ if [[ -n "${scenario_titles}" ]]; then
 fi
 
 .mise/scripts/check_scenarios.py
-.mise/scripts/check_steps.py --baseline tests/baselines/step-regexes.tsv
 echo "==> Layer discipline checks passed."
 '''
 
@@ -256,7 +255,6 @@ run = '''
 #!/bin/bash
 set -euo pipefail
 bash .mise/scripts/check_scenarios_selftest.sh
-bash .mise/scripts/check_steps_selftest.sh
 bash .mise/scripts/check_spec_change_selftest.sh
 '''
 

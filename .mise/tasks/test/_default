@@ -110,7 +110,6 @@ main() {
 
   # Features: the Gherkin scenarios; same black-box build as E2E.
   .mise/scripts/check_scenario_count.sh
-  .mise/scripts/check_step_registry.sh
   run_phase features --no-default-features --test features \
     "${phase_args[@]+"${phase_args[@]}"}"
 

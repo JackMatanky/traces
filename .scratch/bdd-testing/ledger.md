@@ -1360,3 +1360,49 @@ Kill demonstrations:
 
 Not covered: the parsing of feature files (`And`, `But`, docstrings and data
 tables) still has no check against the framework.
+
+## Step Gate in the Framework (2026-11-08)
+
+This entry replaces the two entries above it. The Python mirror in
+`check_steps.py` re-implemented three parts of `rstest-bdd`: the pattern lexer
+and regex, the specificity rank, and the Gherkin keyword rules. Two pins
+reduced the drift risk, but each framework change still touched four files.
+
+Findings of the spike:
+
+- `resolve_step` picks the best match with `max_by`. A tie gives no error, so
+  the framework never reports an ambiguous step. The gate must find a tie
+  itself.
+- `extract_placeholders` (the real matcher), `StepPattern::specificity` and
+  `duplicate_steps` are public. `rstest-bdd-macros` and `rstest-bdd` both use
+  `gherkin` 0.16 with the `parser` feature, and the lock file holds one copy.
+- `gherkin` gives each `And` and `But` step the type of the previous step.
+
+Changes:
+
+- The test `feature_steps_and_step_definitions_match_one_to_one` in
+  `tests/features/step_gate.rs` parses every feature file and matches each
+  step with the framework. It fails on an undefined, ambiguous, unused or
+  duplicate step. It reads the files from disk, so a stale build cannot hide a
+  new feature file from it.
+- `gherkin` is a dev-dependency (`0.16`, parser only), like the other
+  `rstest-bdd` crates.
+- Removed: `check_steps.py`, its self-test, `check_step_registry.sh`, the
+  baseline file `tests/baselines/step-regexes.tsv`, the integration test
+  `step_regexes`, and the dump test `registry.rs`. `check:layers` and the
+  `check:layers:selftest` task no longer call the step script. CI no longer has
+  a registry step. The gate runs inside the `features` binary, so it runs in
+  `mise run test` and in the CI job `test (e2e)`.
+- The layer checks and `check_scenario_count.sh` stay.
+
+Kill demonstrations:
+
+- A feature file with an undefined step, and a typed step given the word
+  `two`, gave two `Undefined step` lines. The `And` line took the keyword of
+  the line before it.
+- Two definitions of one pattern and an overlapping pair gave `Ambiguous`,
+  `Duplicate` and `Unused` lines. I removed the throwaway code afterwards.
+
+Not covered: when the feature text equals a pattern exactly, the framework
+prefers that pattern before it ranks the others. The gate does not copy this
+rule. No step text of the suite equals a pattern.

@@ -154,6 +154,7 @@ winnow = "1.0.4"
 # --------------------- Dev Dependencies ---------------------- #
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports"] }
+gherkin = { version = "0.16", default-features = false, features = ["parser"] }
 pretty_assertions = "1.4.1"
 proptest = "1.12.0"
 rstest = { version = "0.27.0", default-features = false }
