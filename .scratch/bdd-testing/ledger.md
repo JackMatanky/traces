@@ -1316,3 +1316,47 @@ run `validate_steps_exist` under `strict-compile-time-validation`."
   (`src/macros/scenario/mod.rs`).
 - Proposal: call the same function from `scenarios!`. The macro already parses
   each feature file. The user decides if the issue goes upstream.
+
+## Specificity and Registry Cross-Check (2026-11-08)
+
+The step gate ranks the matching definitions of a step line. It reports an
+ambiguous step when the two best definitions tie. The first mirror did not
+match the framework rule.
+
+Findings:
+
+- `SpecificityScore` has a third tie-break. A definition with more typed
+  placeholders wins an equal tie on literal text and placeholder count. The old
+  mirror had two keys, so it could report a false ambiguity.
+- `dump_registry` needs the `diagnostics` feature, which the repository does not
+  enable. The public `rstest_bdd::iter::<Step>` lists the registered steps
+  without that feature.
+
+Changes:
+
+- The mirror score is now `(literal, -holes, typed)`.
+- The baseline file has a third column, `literal/placeholders/typed`. It holds
+  `ERROR` for a pattern that the framework rejects.
+- The features binary has a test, `registered_steps_are_dumped_with_their_framework_regexes`
+  in `tests/features/registry.rs`. It writes `step-registry.tsv` in the Cargo
+  target temp folder. Each line holds the keyword, the pattern, the framework
+  regex and the framework score.
+- `check_steps.py --registry` compares the dump with the mirror for all 109
+  real steps. It also compares the registered steps with the definitions that
+  the script parses from the step files. A step that one side misses is an
+  error.
+- `.mise/scripts/check_step_registry.sh` runs the dump test and then the check.
+  `mise run test` runs it after the scenario count gate. CI runs it on Linux
+  only, because the Windows and macOS jobs have no `uv` and the check does not
+  depend on the platform.
+
+Kill demonstrations:
+
+- A literal count with one extra character in the mirror gave 109 registry
+  errors.
+- The self-test covers a changed score in the baseline and in the registry, a
+  step that only the registry holds, and a step that only the files hold. It
+  also covers a typed hole that wins over an untyped hole.
+
+Not covered: the parsing of feature files (`And`, `But`, docstrings and data
+tables) still has no check against the framework.

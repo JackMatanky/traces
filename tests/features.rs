@@ -20,6 +20,8 @@
 
 #[path = "support/fixtures.rs"]
 mod fixtures;
+#[path = "features/registry.rs"]
+mod registry;
 #[expect(
     clippy::disallowed_methods,
     reason = "rstest-bdd step wrappers call std::panic::catch_unwind"

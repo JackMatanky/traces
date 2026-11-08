@@ -1,4 +1,5 @@
-//! Pins how `rstest-bdd` turns a step pattern into a regular expression.
+//! Pins how `rstest-bdd` turns a step pattern into a regular expression and a
+//! specificity score.
 //!
 //! `.mise/scripts/check_steps.py` mirrors that conversion to match feature
 //! steps with step definitions before the suite runs. This test and the
@@ -9,7 +10,7 @@
 use std::fmt::Write as _;
 
 use pretty_assertions::assert_eq;
-use rstest_bdd_patterns::build_regex_from_pattern;
+use rstest_bdd_patterns::{SpecificityScore, build_regex_from_pattern};
 
 /// Patterns that cover every placeholder hint class and every escape class
 /// the mirror in `check_steps.py` accepts, plus two the framework rejects and
@@ -33,18 +34,31 @@ const PROBES: &[&str] = &[
     "run {a} then {b:u32}",
     "a.b-c#d&e~f",
     "a b \"q\" 'r' /s",
+    "café {x}",
     "{x: u32}",
     "stray { brace",
 ];
 
-/// Renders the baseline file text for `PROBES`: one `pattern<TAB>regex` line
-/// per probe, in probe order. A probe the framework rejects renders as `ERROR`.
+/// Renders the baseline file text for `PROBES`: one
+/// `pattern<TAB>regex<TAB>score` line per probe, in probe order. The score is
+/// `literal/placeholders/typed`. A probe the framework rejects renders `ERROR`
+/// in both columns.
 fn render_baseline() -> String {
     let mut text = String::new();
     for pattern in PROBES {
-        let regex = build_regex_from_pattern(pattern)
-            .unwrap_or_else(|_| String::from("ERROR"));
-        writeln!(text, "{pattern}\t{regex}")
+        let columns = build_regex_from_pattern(pattern)
+            .and_then(|regex| {
+                SpecificityScore::calculate(pattern).map(|score| {
+                    format!(
+                        "{regex}\t{}/{}/{}",
+                        score.literal_chars,
+                        score.placeholder_count,
+                        score.typed_placeholder_count
+                    )
+                })
+            })
+            .unwrap_or_else(|_| String::from("ERROR\tERROR"));
+        writeln!(text, "{pattern}\t{columns}")
             .expect("writing to a String cannot fail");
     }
     text

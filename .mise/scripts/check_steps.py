@@ -13,6 +13,7 @@ the first two only at run time, and never reports the others.
 import argparse
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from re import Match, Pattern
@@ -55,7 +56,7 @@ class Definition:
     pattern: str
     source: str
     matcher: Pattern[str]
-    specificity: tuple[int, int]
+    specificity: tuple[int, int, int]
 
 
 @dataclass(frozen=True)
@@ -109,12 +110,23 @@ def regex_of(pattern: str) -> Pattern[str]:
     return re.compile(regex_source(pattern))
 
 
-def specificity(pattern: str) -> tuple[int, int]:
-    """Mirror the `rstest-bdd` tie-break: more literal text, then fewer holes."""
+def specificity(pattern: str) -> tuple[int, int, int]:
+    """Mirror `SpecificityScore`: more literal text, then fewer holes, then more typed holes."""
     parts: list[str] = PLACEHOLDER.split(pattern)
+    holes: list[str] = [p for p in parts if is_placeholder(p)]
     literal: int = sum(len(p) for p in parts if not is_placeholder(p))
-    holes: int = sum(1 for p in parts if is_placeholder(p))
-    return literal, -holes
+    typed: int = sum(1 for p in holes if ":" in p)
+    return literal, -len(holes), typed
+
+
+def mirror_columns(pattern: str) -> tuple[str, str]:
+    """Return the regex and the `literal/holes/typed` score, or `ERROR` twice."""
+    try:
+        regex: str = regex_source(pattern)
+    except UnsupportedPattern:
+        return "ERROR", "ERROR"
+    literal, holes, typed = specificity(pattern)
+    return regex, f"{literal}/{-holes}/{typed}"
 
 
 def definitions(steps: Path) -> tuple[list[Definition], list[str]]:
@@ -172,19 +184,43 @@ def feature_steps(features: Path) -> list[FeatureStep]:
 
 
 def check_baseline(baseline: Path) -> list[str]:
-    """Compare the mirror with the framework regexes the Rust test pins."""
+    """Compare the mirror with the framework values the Rust test pins."""
     errors: list[str] = []
     for number, line in enumerate(baseline.read_text().splitlines(), 1):
-        pattern, _, framework = line.partition("\t")
-        try:
-            mirror: str = regex_source(pattern)
-        except UnsupportedPattern:
-            mirror = "ERROR"
+        pattern, *framework = line.split("\t")
+        mirror: list[str] = list(mirror_columns(pattern))
         if mirror != framework:
             errors.append(
                 f"ERROR: Mirror differs from the framework at {baseline.name}:"
-                f"{number}: '{pattern}' mirror '{mirror}' framework '{framework}'"
+                f"{number}: '{pattern}' mirror {mirror} framework {framework}"
             )
+    return errors
+
+
+def check_registry(registry: Path, steps: list[Definition]) -> list[str]:
+    """Compare every registered step with the mirror and with the parsed definitions."""
+    errors: list[str] = []
+    registered: Counter[tuple[str, str]] = Counter()
+    for line in registry.read_text().splitlines():
+        keyword, pattern, *framework = line.split("\t")
+        registered[(keyword, pattern)] += 1
+        mirror: list[str] = list(mirror_columns(pattern))
+        if mirror != framework:
+            errors.append(
+                f"ERROR: Mirror differs from the framework registry for {keyword} "
+                f"'{pattern}': mirror {mirror} framework {framework}"
+            )
+    parsed: Counter[tuple[str, str]] = Counter(
+        (d.keyword, d.pattern) for d in steps
+    )
+    errors.extend(
+        f"ERROR: Step registered but not found in the step files: {k} '{p}'"
+        for k, p in sorted((registered - parsed).elements())
+    )
+    errors.extend(
+        f"ERROR: Step found in the step files but not registered: {k} '{p}'"
+        for k, p in sorted((parsed - registered).elements())
+    )
     return errors
 
 
@@ -235,12 +271,20 @@ def main() -> int:
     parser.add_argument(
         "--baseline",
         type=Path,
-        help="TSV of pattern and framework regex pairs to compare with the mirror",
+        help="TSV of probe patterns with framework regex and score, compared with the mirror",
+    )
+    parser.add_argument(
+        "--registry",
+        type=Path,
+        help="TSV of registered steps with framework regex and score, written by the features binary",
     )
     args: argparse.Namespace = parser.parse_args()
     errors: list[str] = check(args.root)
     if args.baseline is not None:
         errors.extend(check_baseline(args.baseline))
+    if args.registry is not None:
+        steps, _ = definitions(args.root / "tests/features/steps")
+        errors.extend(check_registry(args.registry, steps))
     for error in errors:
         print(error, file=sys.stderr)
     return int(bool(errors))
