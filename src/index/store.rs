@@ -1096,11 +1096,14 @@ impl IndexStore {
         if folder_str.is_empty() || folder_str == "." {
             self.collect_all_folder_paths(table)
         } else {
-            let prefix = if folder_str.ends_with('/') {
-                folder_str.into_owned()
-            } else {
-                format!("{folder_str}/")
-            };
+            // Stored keys are native path bytes, so the separator is
+            // platform-specific; `/` is also accepted on every platform.
+            let prefix =
+                if folder_str.ends_with(['/', std::path::MAIN_SEPARATOR]) {
+                    folder_str.into_owned()
+                } else {
+                    format!("{folder_str}{}", std::path::MAIN_SEPARATOR)
+                };
             self.collect_prefixed_folder_paths(table, &prefix)
         }
     }
@@ -3139,6 +3142,28 @@ mod tests {
                 .ok()
                 .and_then(|text| toml::from_str::<FileMeta>(text).ok());
             assert!(decodes_as_toml.is_none());
+        }
+
+        #[test]
+        fn lists_only_the_paths_inside_a_folder() {
+            let temp = tempfile::tempdir().expect("create temp dir");
+            fs::create_dir_all(temp.path().join("a")).expect("create a");
+            fs::create_dir_all(temp.path().join("b")).expect("create b");
+            for name in ["a/one.md", "a/two.md", "b/three.md", "top.md"] {
+                fs::write(temp.path().join(name), "x").expect("write note");
+            }
+            let files = IndexerService::scan(temp.path()).expect("scan root");
+            let store = IndexStore::open(temp.path()).expect("open store");
+            write_all_parts(&store, &files, &[], &InlinkMap::default())
+                .expect("persist files");
+
+            let in_a =
+                store.paths_in_folder(Path::new("a")).expect("list folder a");
+
+            assert_eq!(*in_a, [
+                PathBuf::from("a/one.md"),
+                PathBuf::from("a/two.md")
+            ]);
         }
     }
 

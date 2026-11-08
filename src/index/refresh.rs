@@ -620,6 +620,66 @@ mod tests {
                 links_modified: 0,
             });
         }
+
+        #[test]
+        fn reports_no_counts_for_a_config_drift() {
+            let report = RefreshReport::ConfigDrift {
+                cause: DriftCause::Unrecorded,
+            };
+
+            assert_eq!(
+                (
+                    report.upserted_count(),
+                    report.deleted_count(),
+                    report.links_modified_count()
+                ),
+                (0, 0, 0)
+            );
+        }
+    }
+
+    /// Two adjacent modified notes each replace their own persisted row.
+    #[test]
+    fn merges_adjacent_modified_notes_over_their_persisted_rows() {
+        use std::{fs, path::PathBuf};
+
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+        use crate::test_support::parse_note;
+
+        let temp = tempfile::tempdir().expect("create temp dir");
+        for name in ["a.md", "b.md", "c.md"] {
+            fs::write(temp.path().join(name), "# Old").expect("write note");
+        }
+        let indexer = IndexerService::for_tests(temp.path());
+        indexer
+            .persist(&indexer.build().expect("build index"))
+            .expect("persist index");
+        let plan =
+            RefreshPlan::collect(temp.path(), &IndexFingerprint::for_test())
+                .expect("collect refresh plan");
+        let modified =
+            vec![parse_note("a.md", "# New A"), parse_note("b.md", "# New B")];
+
+        let merged = merge_refreshed_notes(plan.store(), &plan.delta, modified)
+            .expect("merge notes");
+
+        let headings: Vec<_> = merged
+            .as_slice()
+            .iter()
+            .map(|note| {
+                (
+                    note.path().to_path_buf(),
+                    note.headings().first().map(|h| h.text().to_owned()),
+                )
+            })
+            .collect();
+        assert_eq!(headings, [
+            (PathBuf::from("a.md"), Some("New A".to_owned())),
+            (PathBuf::from("b.md"), Some("New B".to_owned())),
+            (PathBuf::from("c.md"), Some("Old".to_owned())),
+        ]);
     }
 
     mod note_scope {

@@ -102,6 +102,36 @@
       "file": "src/temporal/duration.rs",
       "mutator": "numbers/incrementer",
       "line": 803
+    },
+    {
+      "id": "ae7eabbc0d56ace8135e9566adcbbdb3",
+      "file": "src/index/mod.rs",
+      "mutator": "statement/remove",
+      "line": 62
+    },
+    {
+      "id": "dc8f9d02d57f4902987dc05db7ae1e69",
+      "file": "src/index/service.rs",
+      "mutator": "branch/case",
+      "line": 181
+    },
+    {
+      "id": "e8485a0997851c5603e5ab292cd0aa59",
+      "file": "src/index/service.rs",
+      "mutator": "branch/case",
+      "line": 309
+    },
+    {
+      "id": "0aff1ce29be7078d81cb9623255b4449",
+      "file": "src/index/service.rs",
+      "mutator": "branch/if",
+      "line": 167
+    },
+    {
+      "id": "be2d7e6b0cc82f8d4726a5779735e40e",
+      "file": "src/index/trie.rs",
+      "mutator": "numbers/decrementer",
+      "line": 150
     }
   ]
 }

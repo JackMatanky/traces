@@ -37,7 +37,7 @@ fn run_command_in_time_zone(
     )]));
 }
 
-#[then("the exit code is {code}")]
+#[then("the exit code is {code:i32}")]
 fn exit_code_is(last_run: &LastRun, code: i32) {
     let run = last_run.run();
     run.assert_code(code);

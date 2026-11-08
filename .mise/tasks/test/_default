@@ -82,51 +82,6 @@ run_phase() {
 }
 
 #######################################
-# Prints how many scenarios the features binary lists.
-# Globals:
-#   None
-# Arguments:
-#   None
-# Outputs:
-#   Scenario count to STDOUT.
-# Returns:
-#   0 always; a failing cargo list aborts through `set -e`.
-#######################################
-count_listed_scenarios() {
-  cargo nextest list -p traces --no-default-features --test features \
-    --color never --message-format oneline | grep -c 'features_scenarios::' || true
-}
-
-#######################################
-# Makes the features binary list every scenario the feature files declare.
-# Cargo does not notice a new feature file until tests/features.rs changes, so
-# a stale build would silently skip the new scenarios. A mismatch touches that
-# file and lists again; only a mismatch that survives the rebuild is an error.
-# Globals:
-#   None
-# Arguments:
-#   None
-# Outputs:
-#   Progress and error text to STDERR.
-# Returns:
-#   0 when the counts match, 1 otherwise.
-#######################################
-check_scenario_count() {
-  local listed declared
-  declared="$(find tests/features -name '*.feature' -exec grep -hE '^[[:space:]]*Scenario:' {} + | wc -l | tr -d ' ')"
-  listed="$(count_listed_scenarios)"
-  if [[ "${listed}" != "${declared}" ]]; then
-    echo "==> features binary lists ${listed} scenarios but the feature files declare ${declared}; rebuilding" >&2
-    touch tests/features.rs
-    listed="$(count_listed_scenarios)"
-  fi
-  if [[ "${listed}" != "${declared}" ]]; then
-    echo "ERROR: features binary lists ${listed} scenarios but the feature files declare ${declared}" >&2
-    return 1
-  fi
-}
-
-#######################################
 # Coordinates the canonical phases.
 # Globals:
 #   usage_docs
@@ -154,7 +109,8 @@ main() {
     "${phase_args[@]+"${phase_args[@]}"}"
 
   # Features: the Gherkin scenarios; same black-box build as E2E.
-  check_scenario_count
+  .mise/scripts/check_scenario_count.sh
+  .mise/scripts/check_step_registry.sh
   run_phase features --no-default-features --test features \
     "${phase_args[@]+"${phase_args[@]}"}"
 

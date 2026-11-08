@@ -9,5 +9,7 @@ mod persistence;
 mod query;
 #[path = "integration/refresh.rs"]
 mod refresh;
+#[path = "integration/step_regexes.rs"]
+mod step_regexes;
 #[path = "integration/template_render.rs"]
 mod template_render;

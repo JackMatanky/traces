@@ -13,6 +13,7 @@ the first two only at run time, and never reports the others.
 import argparse
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from re import Match, Pattern
@@ -25,7 +26,22 @@ DEFINITION: Final[Pattern[str]] = re.compile(
 STEP: Final[Pattern[str]] = re.compile(
     r"^\s*(Given|When|Then|And|But)\s+(.*?)\s*$"
 )
-PLACEHOLDER: Final[Pattern[str]] = re.compile(r"(\{[^{}]*\})")
+PLACEHOLDER: Final[Pattern[str]] = re.compile(r"(\{[A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z0-9_]+)?\})")
+HINT: Final[Pattern[str]] = re.compile(r"\{[A-Za-z0-9_]+(?::(?P<hint>[A-Za-z0-9_]+))?\}")
+UNSUPPORTED_LITERAL: Final[Pattern[str]] = re.compile(r"[{}\\]")
+# Mirrors `rstest_bdd_patterns::get_type_pattern`; any other hint is `.+?`.
+UNSIGNED: Final[str] = r"\d+"
+SIGNED: Final[str] = r"[+-]?\d+"
+FLOAT: Final[str] = r"(?i:(?:[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?|nan|inf|infinity))"
+QUOTED: Final[str] = r""""(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'"""
+HINT_REGEX: Final[dict[str, str]] = {
+    **dict.fromkeys(("u8", "u16", "u32", "u64", "u128", "usize"), UNSIGNED),
+    **dict.fromkeys(("i8", "i16", "i32", "i64", "i128", "isize"), SIGNED),
+    **dict.fromkeys(("f32", "f64"), FLOAT),
+    "string": QUOTED,
+}
+# Mirrors `regex::escape`: space and quotes stay literal.
+RUST_ESCAPED: Final[frozenset[str]] = frozenset("\\.+*?()|[]{}^$#&-~")
 COMMENT_LINE: Final[Pattern[str]] = re.compile(r"(?m)^\s*//.*$")
 DOCSTRING_FENCES: Final[frozenset[str]] = frozenset({'"""', "```"})
 CONTINUATION: Final[Pattern[str]] = re.compile(r"\\\n\s*")
@@ -40,7 +56,7 @@ class Definition:
     pattern: str
     source: str
     matcher: Pattern[str]
-    specificity: tuple[int, int]
+    specificity: tuple[int, int, int]
 
 
 @dataclass(frozen=True)
@@ -61,40 +77,85 @@ def unescape(literal: str) -> str:
     return ESCAPE.sub(r"\1", joined)
 
 
-def regex_of(pattern: str) -> Pattern[str]:
+class UnsupportedPattern(ValueError):
+    """A step pattern uses syntax the mirror does not model; it fails closed."""
+
+
+def hole_regex(part: str) -> str:
+    """Mirror the `rstest-bdd` regex of one placeholder, including its type hint."""
+    hint: Match[str] | None = HINT.fullmatch(part)
+    if hint is None:
+        raise UnsupportedPattern(part)
+    return f"({HINT_REGEX.get(hint['hint'] or '', '.+?')})"
+
+
+def literal_regex(part: str) -> str:
+    """Mirror `regex::escape`. Braces and backslashes have framework escape rules."""
+    if UNSUPPORTED_LITERAL.search(part):
+        raise UnsupportedPattern(part)
+    return "".join(f"\\{c}" if c in RUST_ESCAPED else c for c in part)
+
+
+def regex_source(pattern: str) -> str:
+    """Return the anchored regex text `rstest-bdd` builds for `pattern`."""
     parts: list[str] = PLACEHOLDER.split(pattern)
     body: str = "".join(
-        "(.+?)" if is_placeholder(part) else re.escape(part) for part in parts
+        hole_regex(part) if is_placeholder(part) else literal_regex(part)
+        for part in parts
     )
-    return re.compile(f"^{body}$")
+    return f"^{body}$"
 
 
-def specificity(pattern: str) -> tuple[int, int]:
-    """Mirror the `rstest-bdd` tie-break: more literal text, then fewer holes."""
+def regex_of(pattern: str) -> Pattern[str]:
+    return re.compile(regex_source(pattern))
+
+
+def specificity(pattern: str) -> tuple[int, int, int]:
+    """Mirror `SpecificityScore`: more literal text, then fewer holes, then more typed holes."""
     parts: list[str] = PLACEHOLDER.split(pattern)
+    holes: list[str] = [p for p in parts if is_placeholder(p)]
     literal: int = sum(len(p) for p in parts if not is_placeholder(p))
-    holes: int = sum(1 for p in parts if is_placeholder(p))
-    return literal, -holes
+    typed: int = sum(1 for p in holes if ":" in p)
+    return literal, -len(holes), typed
 
 
-def definitions(steps: Path) -> list[Definition]:
+def mirror_columns(pattern: str) -> tuple[str, str]:
+    """Return the regex and the `literal/holes/typed` score, or `ERROR` twice."""
+    try:
+        regex: str = regex_source(pattern)
+    except UnsupportedPattern:
+        return "ERROR", "ERROR"
+    literal, holes, typed = specificity(pattern)
+    return regex, f"{literal}/{-holes}/{typed}"
+
+
+def definitions(steps: Path) -> tuple[list[Definition], list[str]]:
     found: list[Definition] = []
+    errors: list[str] = []
     for source in sorted(steps.rglob("*.rs")):
         text: str = COMMENT_LINE.sub("", source.read_text())
         for match in DEFINITION.finditer(text):
             raw: str | None = match.group(2)
             escaped: str | None = match.group(3)
             pattern: str = raw if raw is not None else unescape(escaped or "")
+            try:
+                matcher: Pattern[str] = regex_of(pattern)
+            except UnsupportedPattern:
+                errors.append(
+                    "ERROR: Step pattern outside the checked syntax: "
+                    f"{match.group(1)} '{pattern}' ({source.name})"
+                )
+                continue
             found.append(
                 Definition(
                     keyword=match.group(1),
                     pattern=pattern,
                     source=source.name,
-                    matcher=regex_of(pattern),
+                    matcher=matcher,
                     specificity=specificity(pattern),
                 )
             )
-    return found
+    return found, errors
 
 
 def feature_steps(features: Path) -> list[FeatureStep]:
@@ -122,9 +183,49 @@ def feature_steps(features: Path) -> list[FeatureStep]:
     return found
 
 
-def check(root: Path) -> list[str]:
-    steps: list[Definition] = definitions(root / "tests/features/steps")
+def check_baseline(baseline: Path) -> list[str]:
+    """Compare the mirror with the framework values the Rust test pins."""
     errors: list[str] = []
+    for number, line in enumerate(baseline.read_text().splitlines(), 1):
+        pattern, *framework = line.split("\t")
+        mirror: list[str] = list(mirror_columns(pattern))
+        if mirror != framework:
+            errors.append(
+                f"ERROR: Mirror differs from the framework at {baseline.name}:"
+                f"{number}: '{pattern}' mirror {mirror} framework {framework}"
+            )
+    return errors
+
+
+def check_registry(registry: Path, steps: list[Definition]) -> list[str]:
+    """Compare every registered step with the mirror and with the parsed definitions."""
+    errors: list[str] = []
+    registered: Counter[tuple[str, str]] = Counter()
+    for line in registry.read_text().splitlines():
+        keyword, pattern, *framework = line.split("\t")
+        registered[(keyword, pattern)] += 1
+        mirror: list[str] = list(mirror_columns(pattern))
+        if mirror != framework:
+            errors.append(
+                f"ERROR: Mirror differs from the framework registry for {keyword} "
+                f"'{pattern}': mirror {mirror} framework {framework}"
+            )
+    parsed: Counter[tuple[str, str]] = Counter(
+        (d.keyword, d.pattern) for d in steps
+    )
+    errors.extend(
+        f"ERROR: Step registered but not found in the step files: {k} '{p}'"
+        for k, p in sorted((registered - parsed).elements())
+    )
+    errors.extend(
+        f"ERROR: Step found in the step files but not registered: {k} '{p}'"
+        for k, p in sorted((parsed - registered).elements())
+    )
+    return errors
+
+
+def check(root: Path) -> list[str]:
+    steps, errors = definitions(root / "tests/features/steps")
     seen: set[tuple[str, str]] = set()
     for step in steps:
         key: tuple[str, str] = (step.keyword, step.pattern)
@@ -167,8 +268,23 @@ def check(root: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", nargs="?", default=".", type=Path)
-    root: Path = parser.parse_args().root
-    errors: list[str] = check(root)
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        help="TSV of probe patterns with framework regex and score, compared with the mirror",
+    )
+    parser.add_argument(
+        "--registry",
+        type=Path,
+        help="TSV of registered steps with framework regex and score, written by the features binary",
+    )
+    args: argparse.Namespace = parser.parse_args()
+    errors: list[str] = check(args.root)
+    if args.baseline is not None:
+        errors.extend(check_baseline(args.baseline))
+    if args.registry is not None:
+        steps, _ = definitions(args.root / "tests/features/steps")
+        errors.extend(check_registry(args.registry, steps))
     for error in errors:
         print(error, file=sys.stderr)
     return int(bool(errors))

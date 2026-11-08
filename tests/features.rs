@@ -7,21 +7,29 @@
 //!
 //! Rustc tracks edits to existing `.feature` files through dep-info, but adding
 //! a new `.feature` file is not detected automatically without a build script.
-//! After you add a feature file, `mise run test` detects the stale build, runs
-//! `touch tests/features.rs`, and rebuilds. For any other test run, do it
+//! After you add a feature file, `mise run test` and CI run
+//! `.mise/scripts/check_scenario_count.sh`. It detects the stale build, runs
+//! `touch tests/features.rs`, and rebuilds. For any other test run, do the same
 //! yourself:
 //!
 //! ```sh
-//! touch tests/features.rs
+//! .mise/scripts/check_scenario_count.sh
 //! ```
 //!
 //! Do not add a `build.rs`.
 
 #[path = "support/fixtures.rs"]
 mod fixtures;
+#[path = "features/registry.rs"]
+mod registry;
 #[expect(
     clippy::disallowed_methods,
     reason = "rstest-bdd step wrappers call std::panic::catch_unwind"
+)]
+#[expect(
+    clippy::literal_string_with_formatting_args,
+    reason = "rstest-bdd typed placeholders such as {count:u32} look like \
+              format arguments"
 )]
 #[path = "features/steps/mod.rs"]
 mod steps;

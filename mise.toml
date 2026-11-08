@@ -212,6 +212,14 @@ if [[ -n "${rule_refs}" ]]; then
     exit 1
 fi
 
+unsupported_gherkin=$(check_grep -n -E '^[[:space:]]*(Scenario Outline|Scenario Template|Scenarios|Examples|Example|Background):' -- tests/features/ ':!*.rs')
+if [[ -n "${unsupported_gherkin}" ]]; then
+    echo "ERROR: Scenario Outline, Examples, Example and Background are forbidden in feature files:" >&2
+    echo "       the scenario count and the step gate read plain Scenario blocks only" >&2
+    echo "${unsupported_gherkin}" >&2
+    exit 1
+fi
+
 skip_refs=$(check_grep -n -E 'skip!' -- tests/features/)
 if [[ -n "${skip_refs}" ]]; then
     echo "ERROR: skip! is forbidden in scenario steps and features" >&2
@@ -237,7 +245,7 @@ if [[ -n "${scenario_titles}" ]]; then
 fi
 
 .mise/scripts/check_scenarios.py
-.mise/scripts/check_steps.py
+.mise/scripts/check_steps.py --baseline tests/baselines/step-regexes.tsv
 echo "==> Layer discipline checks passed."
 '''
 
