@@ -50,4 +50,38 @@ printf 'Feature: Steps\n  Scenario: One\n    Then the exit code is two\n    And 
 expect_error "ERROR: Undefined step at one.feature:3: then 'the exit code is two'"
 printf 'Feature: Steps\n  Scenario: One\n    Then the exit code is -2\n    And the count is -7\n' > "$root/tests/features/nested/one.feature"
 expect_error "ERROR: Undefined step at one.feature:4: then 'the count is -7'"
+
+printf '#[when("say {{x}}")]\nfn l() {}\n' > "$root/tests/features/steps/a.rs"
+printf 'Feature: Steps\n  Scenario: One\n    When say {x}\n' > "$root/tests/features/nested/one.feature"
+expect_error "ERROR: Step pattern outside the checked syntax: when 'say {{x}}'"
+
+# The mirror must agree with the framework regexes the Rust test pins.
+baseline=tests/baselines/step-regexes.tsv
+printf '#[when("I run {a}")]\nfn m() {}\n' > "$root/tests/features/steps/a.rs"
+printf 'Feature: Steps\n  Scenario: One\n    When I run x\n' > "$root/tests/features/nested/one.feature"
+.mise/scripts/check_steps.py "$root" --baseline "$baseline"
+
+expect_baseline_error() {
+    local message=$1
+    if .mise/scripts/check_steps.py "$root" --baseline "$root/baseline.tsv" > /dev/null 2> "$root/stderr"; then
+        echo "ERROR: baseline passed but should report: $message" >&2
+        exit 1
+    fi
+    if ! grep -Fq "$message" "$root/stderr"; then
+        echo "ERROR: wrong baseline report for: $message" >&2
+        cat "$root/stderr" >&2
+        exit 1
+    fi
+}
+
+# A framework regex change for an integer hint.
+awk -F'\t' -v OFS='\t' '$1 == "{x:u32}" { $2 = "^([+-]?\\d+)$" } 1' "$baseline" > "$root/baseline.tsv"
+expect_baseline_error "ERROR: Mirror differs from the framework at baseline.tsv:3: '{x:u32}'"
+# A pattern the framework accepts but the mirror rejects.
+printf '{ x }\t^\\{ x \\}$\n' > "$root/baseline.tsv"
+expect_baseline_error "ERROR: Mirror differs from the framework at baseline.tsv:1: '{ x }' mirror 'ERROR'"
+# A pattern the framework rejects but the mirror accepts.
+printf '{x}\tERROR\n' > "$root/baseline.tsv"
+expect_baseline_error "ERROR: Mirror differs from the framework at baseline.tsv:1: '{x}'"
+
 echo 'Step matching gate self-test passed.'

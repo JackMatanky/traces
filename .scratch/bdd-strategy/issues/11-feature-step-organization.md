@@ -238,7 +238,9 @@ The user confirmed every decision below in this session. Evidence:
 - Use bare `{name}` placeholders only. Write the quotes in the pattern:
   ``stderr contains "{text}"``. Numbers stay unquoted. A value never holds a
   double quote. Use a docstring for such a value. Typed placeholders such as
-  `{count:u32}` fail clippy.
+  `{count:u32}` fail clippy unless `mod steps` carries the scoped `expect`.
+  The ledger entry of 2026-11-08 records the exception. A typed placeholder
+  rejects a wrong value at match time, so use one when the value is a number.
 - A literal pattern beats an overlapping placeholder pattern.
 
 ### Decision (c): fixtures

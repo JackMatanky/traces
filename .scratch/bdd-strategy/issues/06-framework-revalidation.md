@@ -142,6 +142,9 @@ ran on macOS arm64 only. The record is in
    - Type hints narrow the match regex and raise specificity.
    - Bare placeholders match loosely and fail at parse time.
    - Ticket 11, decision (b), decides the placeholder style.
+   - Superseded: `tests/features.rs` now carries a scoped `expect` on `mod
+     steps`. A typed placeholder such as `{code:i32}` is allowed there. The
+     ledger entry of 2026-11-08 records the decision.
 3. **Incremental builds do not notice new `.feature` files.** They track edits
    to existing files (`include_bytes!`, ADR-010). Added files need a `build.rs`
    with `println!("cargo::rerun-if-changed=tests/features");`. This is the

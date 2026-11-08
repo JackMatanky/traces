@@ -1,0 +1,18 @@
+{x}	^(.+?)$
+{x:i32}	^([+-]?\d+)$
+{x:u32}	^(\d+)$
+{x:i8}	^([+-]?\d+)$
+{x:i128}	^([+-]?\d+)$
+{x:u64}	^(\d+)$
+{x:isize}	^([+-]?\d+)$
+{x:usize}	^(\d+)$
+{x:f32}	^((?i:(?:[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?|nan|inf|infinity)))$
+{x:f64}	^((?i:(?:[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?|nan|inf|infinity)))$
+{x:string}	^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')$
+{x:String}	^(.+?)$
+{x:unknown}	^(.+?)$
+run {a} then {b:u32}	^run (.+?) then (\d+)$
+a.b-c#d&e~f	^a\.b\-c\#d\&e\~f$
+a b "q" 'r' /s	^a b "q" 'r' /s$
+{x: u32}	ERROR
+stray { brace	ERROR

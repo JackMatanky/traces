@@ -1241,3 +1241,78 @@ Not done:
 
 The scoped expectation covers all of `mod steps`. A format-like string in step
 code is not reported.
+
+## Step Regex Baseline and Scenario Count Gate (2026-11-08)
+
+The earlier mirror in `check_steps.py` modeled integer hints only. A review of
+`rstest-bdd-patterns` 0.6.0 showed that the framework does more.
+
+Findings:
+
+- A `{x:string}` hint matches a quoted string. A `{x:f64}` hint matches a
+  float. The old mirror treated both as `.+?`.
+- The framework lexer treats `\x` as an escaped character and `{{` as a literal
+  brace. It treats `{ x }` as literal text. It rejects `{x: u32}`.
+- `regex::escape` does not escape a space. `re.escape` of Python does.
+- The registry of `rstest-bdd` 0.6.0 (`dump_registry`) holds the keyword and
+  the pattern of each step. It holds no regex. `rstest_bdd_patterns` exports
+  `build_regex_from_pattern`, which gives the regex text.
+
+Decisions:
+
+- The mirror checks a small syntax. It accepts `{name}` and `{name:hint}`.
+  It rejects a backslash and a brace outside a placeholder. A rejected pattern
+  is an error, because the mirror then could not match the step correctly.
+- One baseline file pins the conversion: `tests/baselines/step-regexes.tsv`.
+  Each line holds a pattern, a tab, and the framework regex or `ERROR`.
+- The test `step_regexes` in the integration binary compares the baseline with
+  `build_regex_from_pattern`. A framework change fails this test.
+- `check_steps.py --baseline` compares the baseline with the mirror. A mirror
+  that drifts fails the check. The self-test covers a changed integer regex, a
+  pattern that the mirror rejects, and a pattern that the framework rejects.
+- `rstest-bdd-patterns` is a dev-dependency, pinned to `=0.6.0` like the other
+  `rstest-bdd` crates.
+- `.mise/scripts/check_scenario_count.sh` replaces the count function of
+  `mise run test`. CI runs the same script before the E2E and features run. A
+  restored build cache can be stale in the same way as a local build.
+- `mise run check:layers` rejects `Scenario Outline`, `Scenario Template`,
+  `Scenarios`, `Examples`, `Example` and `Background`. The count and the step
+  gate read plain `Scenario:` blocks only. No feature file uses these words.
+
+Kill demonstrations:
+
+- A changed `UNSIGNED` regex in the script gave `Mirror differs from the
+  framework` for `{x:u32}` and `{x:u64}`.
+- A new feature file was not in a direct `cargo nextest run --test features`
+  (154 tests). The gate found 149 listed and 150 declared, rebuilt, and the
+  next run had 155 tests.
+- A feature file with `Scenario Outline` and `Examples` failed `check:layers`.
+
+When the framework version changes:
+
+1. Run the integration test `step_regexes`.
+2. If it fails, copy the right side of the failure into
+   `tests/baselines/step-regexes.tsv`.
+3. Change the mirror in `check_steps.py` until the self-test passes.
+
+Files to change when the repository becomes a workspace of crates:
+
+- `mise.toml`: the task `check:layers` uses `tests/features/` and
+  `tests/baselines/` from the root.
+- `.mise/tasks/test/_default`: the phase `features` uses `-p traces` and
+  `--test features`.
+- `.mise/scripts/check_scenario_count.sh`: it uses `-p traces` and
+  `tests/features`.
+- `.mise/scripts/check_steps.py`: it reads `tests/features/steps` from the root.
+  Run it once for each crate.
+- `.github/workflows/ci.yml`: the count step names no crate.
+
+Draft for an upstream issue (not filed). The title is: "`scenarios!` does not
+run `validate_steps_exist` under `strict-compile-time-validation`."
+
+- Reproduction: enable the feature, use `scenarios!`, rename a step definition.
+  The crate compiles. The scenario fails at run time with `Step not found`.
+- Cause: only the `#[scenario]` macro calls `validate_steps_exist`
+  (`src/macros/scenario/mod.rs`).
+- Proposal: call the same function from `scenarios!`. The macro already parses
+  each feature file. The user decides if the issue goes upstream.
