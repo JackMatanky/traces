@@ -163,12 +163,6 @@ jobs:
       - name: Check every declared scenario is built
         shell: bash
         run: .mise/scripts/check_scenario_count.sh --all-features
-      - name: Check registered steps against the step gate
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          mise install uv
-          mise exec uv -- .mise/scripts/check_step_registry.sh --all-features
       - run: >-
           cargo nextest run -p traces --all-features
           --no-tests fail --no-fail-fast -E 'binary(e2e) | binary(features)'
