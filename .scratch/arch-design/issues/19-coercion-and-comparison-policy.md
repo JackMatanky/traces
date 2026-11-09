@@ -78,7 +78,7 @@ clock.
   nulls, as in MongoDB. Document this behavior. Do not rewrite it.
 - Total sort order serves `SortKey` and uses an explicit context. Keep the
   implemented rank table: `Null < Bool < Number < Duration < Temporal < Text <
-  Link < List < Object`. Nulls sort first. Ticket 28 owns their placement.
+  Link < List < Object`. Nulls sort first. Ticket 29 owns their placement.
   Remove `TextShape::classify` sniffing from `SortKey`. Do not map `List` or
   `Object` to `Null`.
 
@@ -219,7 +219,7 @@ The specification must confirm them.
 
 **Remains unresolved (handed off):**
 
-- [Query core](./28-query-core-and-plan.md): literal syntax for `in (...)` and
+- [Query core](./29-query-core-and-plan.md): literal syntax for `in (...)` and
   ranges. Relative keywords (`today`, `eom`), existence and type predicates, and
   null placement. String functions (`lower`, `startswith`, and `string()` only
   if a use appears). A truncating date function for day matching. `GroupBy` key

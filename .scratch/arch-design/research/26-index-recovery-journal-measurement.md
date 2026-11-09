@@ -5,9 +5,9 @@ Status: measured. Machine: Apple M4 Pro, macOS 27.2, APFS, Rust nightly-2026-10-
 ## Summary
 
 - [V] Journal writes and removals cost 8 to 76 ms per command at these sizes. The probe measured these costs on the real engine.
-- [H] The rebuild saved-work bound is 1,333 ms, but it is loose. A replay still pays the persist and must derive facets from facts. The real saved work is lower. Ticket 29 must measure it.
+- [H] The rebuild saved-work bound is 1,333 ms, but it is loose. A replay still pays the persist and must derive facets from facts. The real saved work is lower. Ticket 27 must measure it.
 - [V] The in-store journal table costs more than the external file at every measured size. At 50,000 notes it adds 477 ms over its own baseline apply.
-- [H] For incremental edits the journal pays above a 4 to 7 percent stop rate. The bound uses the refresh delta as saved work. The real saved work is lower. Ticket 29 must measure it.
+- [H] For incremental edits the journal pays above a 4 to 7 percent stop rate. The bound uses the refresh delta as saved work. The real saved work is lower. Ticket 27 must measure it.
 - [H] The screen did not reproduce the 85 percent write and 2 times size claims for a facet layout. The probe emulated a round-robin split, not the decided facet layout. The claim stays untested.
 - [V] `Durability::None` commits die on abort; `Immediate` commits survive. This check sampled one stop point per mode on one store copy. `Immediate` cost 4.6 ms more per command in this sample.
 - [V] The sampled rebuild kills left an empty or a full store, never partial. The probe sampled 9 stop points of 15. The next open took 17 to 37 ms.
@@ -159,8 +159,8 @@ The saved-work bounds are upper bounds. Each one omits replay persist and facet 
 
 - [V] No candidate rejects at the upper bound. The bounds are loose, so this is not proof that a journal pays.
 - [V] No-change commands save nothing. They never pass at any stop rate.
-- [H] The provisional rates assume the loose bounds. A cold CLI stops rarely, and its stop may not land in the window. Ticket 29 must measure the real saved work before anyone uses these rates.
-- [P] Keep the external file with the facts payload. Drop the in-store journal table. Decide adoption with ticket 29's replay measurements.
+- [H] The provisional rates assume the loose bounds. A cold CLI stops rarely, and its stop may not land in the window. Ticket 27 must measure the real saved work before anyone uses these rates.
+- [P] Keep the external file with the facts payload. Drop the in-store journal table. Decide adoption with ticket 27's replay measurements.
 
 ## Limits
 

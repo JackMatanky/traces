@@ -286,7 +286,7 @@ implements none of these items.
   [freshness](./25-index-freshness-and-invalidation.md): consistent query
   generation, policy and filename-parser fingerprint inputs, cross-process
   coordination, creation timestamp nullability and index encoding.
-- [Query core](./28-query-core-and-plan.md): resolve pass, pinned plan and
+- [Query core](./29-query-core-and-plan.md): resolve pass, pinned plan and
   fallible memoized materialization for all terminal access.
 - [Temporal boundary](./30-temporal-boundary-and-dialects.md): period and unit,
   ISO/custom weeks, skipped days, DateConfig and filename recognition.

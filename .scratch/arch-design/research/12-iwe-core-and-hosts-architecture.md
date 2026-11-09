@@ -280,7 +280,7 @@ IWE represents documents across three distinct forms:
   analogue) and an engine/app-layer crate (`diwe` analogue) for I/O, config, and
   watcher. CLI, LSP, and MCP consume it equally.
 - Informs [ticket
-  27](../issues/27-live-buffer-and-persisted-index-consistency.md): IWE needs no
+  27](../issues/28-live-buffer-and-persisted-index-consistency.md): IWE needs no
   shadow graph because it has no persisted index. The single in-memory graph is
   the only state. An open buffer is written into it (`open_documents` makes
   the editor authoritative and drops watcher events for that key until close).

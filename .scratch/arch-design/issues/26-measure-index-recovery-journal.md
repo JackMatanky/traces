@@ -164,7 +164,7 @@ For a full rebuild, measure two payloads before you choose a replay prototype:
 
 Read the journal facts only from disk handles.
 Never write a fact from an unsaved editor buffer.
-Ticket 27 owns the buffer overlay.
+Ticket 28 owns the buffer overlay.
 
 ### Step 3: Measure these scenarios
 
@@ -208,7 +208,7 @@ Record an upper bound on saved work for each selected size and scenario.
 Do not call a bound a complete replay measurement.
 
 For each candidate that survives, the follow-on task measures the recovery
-costs. Ticket 29 sections A and D carry the full list.
+costs. Ticket 27 sections A and D carry the full list.
 
 Report the cost without a failure. Every journaled write pays this cost.
 Report the cost and the protection window for the buffered control separately.
@@ -232,7 +232,7 @@ You cannot cut the power. Simulate a system crash through a fault-injecting
 file layer and saved file images. Record the method and its limits. Do not
 claim that simulation equals power loss.
 
-Ticket 29 section B carries the full fault-test specification.
+Ticket 27 section B carries the full fault-test specification.
 It covers the stop points, the system-crash cases, the input-change cases,
 the storage failures, the concurrency cases and the uncertain-commit rule.
 
@@ -240,7 +240,7 @@ the storage failures, the concurrency cases and the uncertain-commit rule.
 
 At the cost screen, check each measured rival query against a fresh parse.
 The follow-on task keeps every recovered query equal to a fresh parse.
-Ticket 29 section C carries the full facet list and the rejection rules.
+Ticket 27 section C carries the full facet list and the rejection rules.
 
 Check that nothing under `.traces/` enters the source scan.
 Ticket 25 sets this rule.
@@ -255,7 +255,7 @@ Do not claim that a result on one file system holds on another.
 ## Record these rules
 
 Record the gate's input data and limits in this ticket. The follow-on task
-records the detailed journal rules. Ticket 29 section E carries the list.
+records the detailed journal rules. Ticket 27 section E carries the list.
 
 ## Method
 
@@ -354,7 +354,7 @@ These sections are facts and open points. Treat them as fallible.
   host drops the handle and the plan. The store has no unwritable latch.
   Each persist tries the write-open again. Crash recovery is a no-op refresh of the
   uncommitted files. An unwritable store can repeat the same work [H].
-- [Ticket 27](./27-live-buffer-and-persisted-index-consistency.md): a query result names the
+- [Ticket 28](./28-live-buffer-and-persisted-index-consistency.md): a query result names the
   generation pair, the incarnation and the revision. A replay must change the revision.
 - Tickets 20 and 33 describe undo journals for agent writes.
   Ticket 22 describes one for `init`. They are different.
@@ -374,7 +374,7 @@ Marks use the map rules.
 
 - The saved-work bounds below are upper bounds. A replay still pays the
   persist, and it must derive facets from facts. The real saved work is
-  lower. Ticket 29 measures it.
+  lower. Ticket 27 measures it.
 - Rebuild, 50,000 notes: the external facts journal costs 76 ms per command.
   The loose saved-work upper bound is 1,332.9 ms. No rejection at the bound.
   This is not proof that a journal pays.
@@ -386,7 +386,7 @@ Marks use the map rules.
   a 4 to 7 percent stop rate inside the 125 ms window.
 - No-change commands save nothing and pay 8.0 ms. They never pass.
 - Verdict: no candidate rejects, so no journal is chosen here.
-  The screen sets provisional break-even rates. Ticket 29 must measure the
+  The screen sets provisional break-even rates. Ticket 27 must measure the
   real saved work before anyone uses the rates.
 
 ### Measured facts that bound the decision
@@ -399,7 +399,7 @@ Marks use the map rules.
   `Immediate` cost 4.6 ms more per command in this sample.
 - [V] The journal publication barrier is specified and costed. A synced
   journal file plus directory sync has a 4 ms floor. The probe did not run
-  the kill-and-replay test. Ticket 29 must prove the barrier end to end.
+  the kill-and-replay test. Ticket 27 must prove the barrier end to end.
 - [H] The claims of 85 percent more write time and 2 times size for a facet
   layout stay untested. The probe emulated a round-robin split, not the
   decided facet layout of ticket 24.
@@ -410,19 +410,19 @@ Marks use the map rules.
 
 ### Handoffs
 
-- [Ticket 29](./29-index-replay-prototype-and-fault-tests.md) owns the rest:
+- [Ticket 27](./27-index-replay-prototype-and-fault-tests.md) owns the rest:
   the real replay prototype with derivation, fault-injection crash tests,
   and the barrier end-to-end proof.
   It also owns Linux correctness checks, full-query recovery measurements,
   and the real saved-work bounds behind the break-even rates.
-- Ticket 36: its blocker moved from this ticket to ticket 29.
+- Ticket 36: its blocker moved from this ticket to ticket 27.
   The `None` versus `Immediate` choice stays with ticket 36.
 - Ticket 25: the read-only-open control finding (0.03 ms, no syncs) passes
   there. A read-only handle cannot coexist with a writable handle.
 - Ticket 33: the simulated-host retry path validates against these numbers.
   After a panic, discard the handle and the plan. Validate before publication.
 - Ticket 24: preserve the engine-neutral store port and adapter-owned durability.
-- Ticket 27: the generation pair after a replay. A replay must change the revision.
+- Ticket 28: the generation pair after a replay. A replay must change the revision.
 - Ticket 32: the path form in the journal.
 - Ticket 34: the notices for a replay or a discard.
 - Ticket 16: a change-table row for each new file on disk.

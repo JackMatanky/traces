@@ -81,7 +81,7 @@ inside the existing read transaction).
 | [note document model](./issues/23-note-document-model.md) | Stands | `src/note` untouched |
 | [index read model](./issues/24-index-read-model-and-query-execution.md) | **Amended (note)** | Query path untouched; cold path now includes the drift check and full-rebuild-on-drift |
 | [index freshness](./issues/25-index-freshness-and-invalidation.md) | **Rewritten** | Premise inverted: drift detection exists. Ticket now ratifies/revises the landed model and settles the four still-open items |
-| [query core](./issues/28-query-core-and-plan.md) | Stands | `src/query` untouched; `QuerySet` cloning correction already applied |
+| [query core](./issues/29-query-core-and-plan.md) | Stands | `src/query` untouched; `QuerySet` cloning correction already applied |
 | [temporal boundary](./issues/30-temporal-boundary-and-dialects.md) | Stands | `src/temporal` untouched |
 | [template boundary](./issues/31-template-engine-boundary.md) | Stands | `src/template` untouched |
 | [path and capability](./issues/32-path-and-capability-model.md) | Stands | `src/path.rs` untouched |

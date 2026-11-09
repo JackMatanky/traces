@@ -59,7 +59,7 @@ Focus, against decisions taken or open in this map:
   types and options earn their keep. What an LSP-completion or hover consumer
   needs from a field definition.
 - [Body-section schemas](./38-body-section-schemas.md) and [live
-  buffers](./27-live-buffer-and-persisted-index-consistency.md): anything
+  buffers](./28-live-buffer-and-persisted-index-consistency.md): anything
   Fileclass does about body structure or unsaved state.
 
 Informs: tickets 19, 20 (re-test), 30, 36, 37, 38.

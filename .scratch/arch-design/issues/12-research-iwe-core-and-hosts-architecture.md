@@ -49,7 +49,7 @@ Focus, against decisions already taken or still open in this map:
 - [Index read model](./24-index-read-model-and-query-execution.md) and
   [freshness](./25-index-freshness-and-invalidation.md): in-memory graph rebuilt
   per process versus persisted cache. How does IWE decide staleness?
-- [Live buffers](./27-live-buffer-and-persisted-index-consistency.md): how the
+- [Live buffers](./28-live-buffer-and-persisted-index-consistency.md): how the
   LSP overlays unsaved text on the graph, cancellation, and multi-root.
 - [Workspace host](./33-workspace-host-and-composition.md),
   [diagnostics](./34-error-and-diagnostic-architecture.md), [crate
@@ -57,7 +57,7 @@ Focus, against decisions already taken or still open in this map:
   the core, public surface, error types, and test seams.
 - Scale: vault sizes IWE benchmarks and what it pays at each.
 
-Informs: tickets 23, 24, 25, 33, 34, 35, 27 and the reconciliation ticket 36.
+Informs: tickets 23, 24, 25, 28, 33, 34, 35 and the reconciliation ticket 36.
 
 Deliverable:
 `.scratch/arch-design/research/12-iwe-core-and-hosts-architecture.md` (<= 300
@@ -95,7 +95,7 @@ sources by the owner. Findings:
   is input to ticket 35.
 - The LSP has no buffer overlay. Open buffers are written into the single
   in-memory graph. Open keys ignore watcher events until close. It works because
-  IWE has no persisted index. It does not answer ticket 27's persisted-index
+  IWE has no persisted index. It does not answer ticket 28's persisted-index
   question. Single root, no cancellation, full sync.
 - IWE has no persistent cache (20k notes: 705 ms cold load, M3 Pro, synthetic).
   Cost model for the keep-as-is comparison in tickets 24 and 25, not a verdict.
@@ -104,10 +104,10 @@ sources by the owner. Findings:
   and never rewrite unchanged bytes (ticket 25).
 - Corrections made by the owner to the agent's draft: the "Traces must keep
   redb" and "perfect consistency" claims were softened. They are decisions for
-  tickets 24 and 27. The 30,000 notes/s figure is 28,000.
+  tickets 24 and 28. The 30,000 notes/s figure is 28,000.
 
 Alternatives, invariants and removable code: not applicable to a research
 ticket.
 Unresolved: whether the app layer is a separate crate (ticket 35).
-Downstream: tickets 22, 23, 24, 25, 32, 33, 34, 35, 27, 36 carry an "Inputs"
+Downstream: tickets 22, 23, 24, 25, 28, 32, 33, 34, 35, 36 carry an "Inputs"
 section.

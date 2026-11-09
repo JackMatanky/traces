@@ -84,7 +84,7 @@ are downstream outcomes, not direct architecture targets.
   ticket 23.
 - Index and editor-buffer consistency is now a sharp decision and is tracked in
   [How should open editor buffers relate to the persisted
-  index?](27-live-buffer-and-persisted-index-consistency.md).
+  index?](28-live-buffer-and-persisted-index-consistency.md).
 - Operation-specific performance budgets and measurements remain with the
   relevant index, query, parser, and template decisions, including tickets
   23-31.

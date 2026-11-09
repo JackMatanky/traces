@@ -166,7 +166,7 @@ One-way (user-visible): changing path or trust ordering, treating unknown zone a
 |---|---|---|
 | [config ownership](../../issues/22-config-ownership-and-lifecycle.md) | host discovery snapshot (homes, ceilings, ignore) as one atomic transaction; zone-config handover (resolved zone at evaluation entry) | loader API, trust revalidation, reload triggers, key names |
 | [temporal](../../issues/30-temporal-boundary-and-dialects.md) | sampling unit, default and failure rule, who owns `now` | grammar, dialects, DST edge policy, `DateConfig` |
-| [query core](../../issues/28-query-core-and-plan.md) / [template](../../issues/31-template-engine-boundary.md) | one value reaches eager plan, lazy `QuerySet`, nested queries, date callbacks | bind/rebind IR, minijinja carrier |
+| [query core](../../issues/29-query-core-and-plan.md) / [template](../../issues/31-template-engine-boundary.md) | one value reaches eager plan, lazy `QuerySet`, nested queries, date callbacks | bind/rebind IR, minijinja carrier |
 | [path model](../../issues/32-path-and-capability-model.md) | selected root distinct from cwd, passive not authority | capability or confinement |
 | [workspace host](../../issues/33-workspace-host-and-composition.md) | input acquisition and lifetime rules | host type, service lifetimes, scheduling (midnight) |
 | [errors](../../issues/34-error-and-diagnostic-architecture.md) | whether zone and dir failures return, warn or default | error types, codes, rendering |

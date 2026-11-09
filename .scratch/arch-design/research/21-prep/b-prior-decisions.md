@@ -87,7 +87,7 @@ temporal civil values remove zone from index identity
 [schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):49-64). [H] If 21 punts, 25 must choose
 whether changing process zone/cwd/state home forces cache invalidation; the first should not, while workspace-root identity cannot
 silently change. Keep cache freshness separate from request-time time freshness.
-14. **[Query core and plan](../../issues/28-query-core-and-plan.md):38-79.** [V] Needs a stable evaluation input for constructing
+14. **[Query core and plan](../../issues/29-query-core-and-plan.md):38-79.** [V] Needs a stable evaluation input for constructing
 date-dependent filter operands, adaptive literals and sort keys once, without per-row clock or zone reads. [H] If 21 punts, its planner
 must introduce and name the zone/clock argument itself; divergence between query and template follows. Query remains synchronous under
 the forward-consumer ruling. [P] Decide time sampling scope at least at query-evaluation granularity; leave grammar and planning to 26.
@@ -119,7 +119,7 @@ input types and minimum public exports; the CLI-first split and core-app layerin
 ([map](../../map.md):19-45; [schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):66-72). [H] If 21
 punts, 32 must guess whether host environment and evaluation snapshot cross the core boundary. [P] Design the minimal data shape, then
 let 32 place and expose it; do not widen all leaf APIs to `pub` preemptively.
-21. **[Live buffer and persisted index consistency](../../issues/27-live-buffer-and-persisted-index-consistency.md):7-37.** [V] Needs
+21. **[Live buffer and persisted index consistency](../../issues/28-live-buffer-and-persisted-index-consistency.md):7-37.** [V] Needs
 checks/query operations to take a buffer snapshot without persisting it. [H] A clock captured only at process initialization gives
 date-sensitive editor diagnostics stale results after midnight even with unchanged content; a per-request evaluation snapshot plus host
 rescheduling can avoid that. If 21 punts, 34/LSP will choose sampling and invalidation rules independently of CLI.

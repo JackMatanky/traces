@@ -52,7 +52,7 @@ serialized record size by 4.3 percent [V:
 .scratch/arch-design/research/23-prep/g-probe-results.md:8-9].
 
 Ticket 35 needs the editor shape from an unsaved buffer [V:
-issues/27-live-buffer-and-persisted-index-consistency.md:9-14]. Q1 fixes this
+issues/28-live-buffer-and-persisted-index-consistency.md:9-14]. Q1 fixes this
 need [P]. The parser builds the shared `Note` directly from an in-memory buffer
 [P].
 
@@ -76,7 +76,7 @@ spans when reading only frontmatter [H].
    `src/index/store.rs:41` to wipe old caches on start-up [P].
 3. Unsaved editor buffer. An unsaved buffer changes spans and content in memory
    [H]. The on-disk `index.redb` remains stale [V:
-   issues/27-live-buffer-and-persisted-index-consistency.md:9-13]. Smallest fix:
+   issues/28-live-buffer-and-persisted-index-consistency.md:9-13]. Smallest fix:
    Ticket 35 routes LSP queries through an in-memory document overlay [P].
 
 ### Verdict
@@ -200,7 +200,7 @@ issues/37-schema-internals-simplification.md:12]. The note model's effective map
 supplies this input directly [P].
 
 Ticket 26 needs row identity and projection for multi-value lists [V:
-issues/28-query-core-and-plan.md:17-18]. Ticket 26 must format lists into joined
+issues/29-query-core-and-plan.md:17-18]. Ticket 26 must format lists into joined
 strings for tables [V: src/query/value.rs:36-40].
 
 ### Hidden costs
@@ -246,7 +246,7 @@ passing a borrowed status map to `parse_markdown` [P].
 ### Assumptions in open tickets
 
 Ticket 26 assumes the query executor can print task status names [V:
-issues/28-query-core-and-plan.md:35-36]. The executor holds the status map from
+issues/29-query-core-and-plan.md:35-36]. The executor holds the status map from
 `Config` and resolves symbols on demand [P].
 
 Ticket 31 and Ticket 35 pass `&TaskStatusMap` to `parse_markdown` [P].
@@ -387,7 +387,7 @@ produce zero notices [H].
 1. Unsaved buffer diagnostics in LSP. An unsaved buffer with `NaN` returns a
    notice with a `ByteSpan` [P]. The LSP translates it immediately into an
    editor diagnostic [V:
-   issues/27-live-buffer-and-persisted-index-consistency.md:21-23].
+   issues/28-live-buffer-and-persisted-index-consistency.md:21-23].
 2. High volume of notices during index rebuild. Ticket 32 must throttle or group
    stderr notices during bulk indexing [P].
 

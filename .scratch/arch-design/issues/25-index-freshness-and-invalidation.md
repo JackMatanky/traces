@@ -114,7 +114,7 @@ validation. Its host reads a pinned immutable generation.
 Do not mix fresh rows with unverified store rows.
 Do not assume that a redb file lock enforces policy consistency.
 Leave open-buffer overlays and save/close transitions to
-[the buffer ticket](./27-live-buffer-and-persisted-index-consistency.md).
+- [the buffer ticket](./28-live-buffer-and-persisted-index-consistency.md)
 
 ### E. Path-set change cost
 
@@ -374,7 +374,7 @@ Store-open rules:
 
 A long-lived host keeps its old binary until its editor restarts. It then meets
 a newer store. It never writes that store. It serves from its in-memory
-generation, or parses fresh if it has none. Tickets 33 and 27 own that behavior.
+generation, or parses fresh if it has none. Tickets 33 and 28 own that behavior.
 
 Why the version floor is gone:
 
@@ -437,7 +437,7 @@ Handoffs:
   portable. Then drop the platform part of the identity. Ticket 32 also has no
   Unicode normalization rule. Until it has one, NFC and NFD names are different
   files.
-- Tickets 33 and 27: the host rules above.
+- Tickets 33 and 28: the host rules above.
 - Ticket 34: the notice for a higher epoch. Rebuild heals stay quiet.
 - Ticket 35: the `build.rs` path to `Cargo.lock` after a workspace split, and
   the replacement of `check:boundaries`.
@@ -538,7 +538,7 @@ The code does not implement this ticket. This table lists what the refactor chan
 | Source scan | `scan` compares `path != index_db` (`src/index/service.rs:424-435`) | Remove the dead check. A test shows that nothing under `.traces/` enters the scan | None |
 | Change detection | `FileDelta::compute` compares `FileMeta` (`src/index/delta.rs:21`). The landed canary pins stale output for a restored mtime (`tests/e2e/index.rs:129-180`) | Add a `racy` bit per file row. Set it when `mtime >= scan_start - 2 s`. Add `ctime` on Unix. Read each changed file from one handle with a stat before and after. Retry the scan once on `NotFound` | Ticket 24 file rows |
 | Verify command | None | New `traces index --verify` hashes every file | Ticket 34 for the exit codes |
-| Host store use | A held store fails a read with exit 1 | A read falls back to a fresh parse with one stderr notice and exit 0. A host holds the store only during refresh and persist | Tickets 27, 33 |
+| Host store use | A held store fails a read with exit 1 | A read falls back to a fresh parse with one stderr notice and exit 0. A host holds the store only during refresh and persist | Tickets 28, 33 |
 | Commit recovery | No `commit_nonce` and no unwritable latch exist in `src/index/`. The research brief (C5, C6) says they were proposed and drops them | Do not add them. After an uncertain commit, drop the handle and the plan. Try the write-open at each persist | Ticket 24 |
 | Replacement failure | The store open and replacement path is `create_db` (`src/index/store.rs:903`) | A failed store replacement is a cache miss for reads | None |
 | ADR and glossary | ADR-0009 `proposed`. The glossary "Index Fingerprint" entry is stale | Replace both when the code lands | Ticket 36 |
@@ -546,6 +546,6 @@ The code does not implement this ticket. This table lists what the refactor chan
 
 Not in code:
 
-- The staleness bound (tickets 27 and 33).
+- The staleness bound (tickets 28 and 33).
 - The release process and the `--locked` install rule (ticket 39).
 - The journal decision (ticket 26).

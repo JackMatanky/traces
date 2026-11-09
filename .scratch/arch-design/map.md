@@ -41,6 +41,12 @@ not implement the redesign. It ends at hand-off to specification.
   - 33 to 34, 34 to 35, 35 to 36, 36 to 37.
   - 37 to 38, 38 to 39, 39 to 29.
   - Tickets 1 to 28 did not move.
+- Ticket renumbering (2026-11-09, second pass): the replay prototype moved
+  next to the index tickets. The replay prototype is 27, the live-buffer
+  ticket is 28, and query core is 29. Only git history uses the old numbers.
+  The old-to-new map follows.
+  - 27 to 28, 28 to 29, 29 to 27.
+  - Tickets outside 27 to 29 did not move.
 - Skills every session consults: `rust-design`, `domain-modeling`, `grilling`
   (HITL tickets), `research` (research tickets), `codebase-design`; project mise
   tasks (`mise run verify|test|bench`) for evidence; codegraph for navigation.
@@ -235,7 +241,7 @@ not implement the redesign. It ends at hand-off to specification.
   teach
   Traces?](./issues/13-research-iwe-query-schema-and-agent-write-gating.md):
   IWE query value semantics converge with ticket 19. Its query is a
-  serialisable document (question for ticket 28). Schema binds by host-config
+  serialisable document (question for ticket 29). Schema binds by host-config
   globs, with no inheritance. The MCP gate is always on and all-or-nothing. It
   validates whole pending documents with no delta rule (supports ticket 20 delta
   rule). It requires `expect` count guards on query mutations. Body schemas use
@@ -294,7 +300,7 @@ not implement the redesign. It ends at hand-off to specification.
   cache encoding ([index read
   model](./issues/24-index-read-model-and-query-execution.md), [index
   freshness](./issues/25-index-freshness-and-invalidation.md)), view enum
-  benchmark ([query core](./issues/28-query-core-and-plan.md)).
+  benchmark ([query core](./issues/29-query-core-and-plan.md)).
 - [Where do coercion and cross-type comparison live, and what is the
   policy?](./issues/19-coercion-and-comparison-policy.md): `PartialEq` stays
   structural. One value-semantics module owns filter equality and bracketed
@@ -309,7 +315,7 @@ not implement the redesign. It ends at hand-off to specification.
   upper bound. Two periods match only by normalized identity. Typed temporal and
   environmental failures are distinct from nonmatching data. Link equality uses
   the folded target, while `date(link)` reads the target. Two advisory stderr
-  notices are retained. Handoffs: [query core](./issues/28-query-core-and-plan.md),
+  notices are retained. Handoffs: [query core](./issues/29-query-core-and-plan.md),
   [temporal boundary](./issues/30-temporal-boundary-and-dialects.md) (natural
   language grammar, `DateConfig`), [execution
   context](./issues/21-ambient-environment-and-execution-context.md), [schema
@@ -339,7 +345,7 @@ not implement the redesign. It ends at hand-off to specification.
   MCP tools own every write, with host-run guards over the stateless 2026-07-28
   protocol. `traces check` takes paths and splits schema errors from violations. Delta rule applies. A class-set change prompts the user. Date-shaped text: no override, no
   quote convention. Body-section schemas form a separate ticket. Handoffs:
-  [query core](./issues/28-query-core-and-plan.md), [note document
+  [query core](./issues/29-query-core-and-plan.md), [note document
   model](./issues/23-note-document-model.md), [temporal
   boundary](./issues/30-temporal-boundary-and-dialects.md), [template
   boundary](./issues/31-template-engine-boundary.md),
@@ -362,7 +368,7 @@ not implement the redesign. It ends at hand-off to specification.
   24/25/32/33. Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md),
   [read model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
-  [query](./issues/28-query-core-and-plan.md),
+  [query](./issues/29-query-core-and-plan.md),
   [temporal](./issues/30-temporal-boundary-and-dialects.md),
   [templates](./issues/31-template-engine-boundary.md),
   [paths](./issues/32-path-and-capability-model.md),
@@ -391,17 +397,17 @@ not implement the redesign. It ends at hand-off to specification.
   and the version. A stored position never drives an edit. A task is a kind of
   list item. It stores the status symbol and kind, not the name. Keep the stored
   note-level tags and inline fields. Two maps and one note-owned effective
-  accessor. Several values form a list; ticket 28 adds membership. External URLs
+  accessor. Several values form a list; ticket 29 adds membership. External URLs
   leave the stored links. The math pass runs only for a heading with `$`.
   Notices return beside the `Note`. Handoffs: [read
   model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
-  [query](./issues/28-query-core-and-plan.md),
+  [query](./issues/29-query-core-and-plan.md),
   [template](./issues/31-template-engine-boundary.md),
   [host](./issues/33-workspace-host-and-composition.md),
   [errors](./issues/34-error-and-diagnostic-architecture.md),
   [topology](./issues/35-crate-topology-and-public-surface.md), [live
-  buffer](./issues/27-live-buffer-and-persisted-index-consistency.md),
+  buffer](./issues/28-live-buffer-and-persisted-index-consistency.md),
   [schema](./issues/37-schema-internals-simplification.md), [body
   sections](./issues/38-body-section-schemas.md).
 - [What is the index read model, and is there one query execution path or
@@ -413,7 +419,7 @@ not implement the redesign. It ends at hand-off to specification.
   scalar range keys and task date/status keys need semantic proof and end-to-end
   measurement. Sorts stay in the query plan. An unusable derived cache falls
   back to a trusted fresh parse for read queries, while `traces index` fails
-  closed. Ticket 25 owns freshness and crash recovery. Tickets 28, 32, 33, and
+  closed. Ticket 25 owns freshness and crash recovery. Tickets 29, 32, 33, and
   34 own rows, paths, writer admission, and notices.
 - [Does the landed index freshness model stand?](./issues/25-index-freshness-and-invalidation.md):
   config drift detection triggers a full rebuild. Store identity uses an engine
@@ -424,8 +430,8 @@ not implement the redesign. It ends at hand-off to specification.
   detects edits when size and mtime match; a file row stores a racy bit.
   ADR-0009 text and the glossary fingerprint definition are fallible and partly
   stale. Handoffs: [live
-  buffer](./issues/27-live-buffer-and-persisted-index-consistency.md), [query
-  core](./issues/28-query-core-and-plan.md),
+  buffer](./issues/28-live-buffer-and-persisted-index-consistency.md), [query
+  core](./issues/29-query-core-and-plan.md),
   [host](./issues/33-workspace-host-and-composition.md),
   [diagnostics](./issues/34-error-and-diagnostic-architecture.md).
 - [What does a durable index repair journal cost and
@@ -442,7 +448,7 @@ not implement the redesign. It ends at hand-off to specification.
   size for a facet layout stay untested. The screen split rows round-robin,
   not the decided layout. The `None` versus `Immediate` choice stays with
   ticket 36. Handoff:
-  [replay prototype](./issues/29-index-replay-prototype-and-fault-tests.md).
+  [replay prototype](./issues/27-index-replay-prototype-and-fault-tests.md).
 
 ## Not yet specified
 

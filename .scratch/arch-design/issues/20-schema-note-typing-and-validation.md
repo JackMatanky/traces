@@ -67,7 +67,7 @@ specified below.
 - Write-path guardrail for an MCP agent.
 - Schema definitions never affect parsing, the index or the fingerprint (only the configured class-field name is shared).
 
-**Layering (standing principle, binds tickets 28, 31, 33 and 35):** cli, lsp and
+**Layering (standing principle, binds tickets 29, 31, 33 and 35):** cli, lsp and
 mcp are thin hosts of `core`. `core` holds an app layer of use cases. The app
 layer composes domain modules (`note`, `schema`, `query`, `index`, `template`)
 over foundation types. Domain modules expose data and pure functions. No
@@ -157,7 +157,7 @@ remain unaware of bindings. One resolver answers both "which classes does note n
 have" and "which notes does class c claim". The latter includes hierarchy
 expansion for `@book*`. Equivalence between these two answers is a tested
 invariant on the unreduced class set. A move or a binding-tag edit changes the
-class set and counts as a class change (see the guardrail). Ticket 28 owns
+class set and counts as a class change (see the guardrail). Ticket 29 owns
 optimisation and benchmarking of path-binding queries. The `Path` atom scans all
 paths today.
 
@@ -176,7 +176,7 @@ throwaway workspace, but a newtype compiles.
 A latent hazard exists. Without an expander, store queries fall back to exact
 match while in-memory filters match nothing. Production always attaches one, so
 this is not a current bug. Ticket 20 records the decision and the schema-side
-producer. Ticket 28 owns the query-side change. Tickets 28 and 35 decide the
+producer. Ticket 29 owns the query-side change. Tickets 29 and 35 decide the
 owning module of the hierarchy type.
 
 **Template boundary:** The app layer checks the rendered note between `render()`
@@ -305,7 +305,7 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
 **Alternatives considered:**
 
 - *Keep schema passive:* rejected. It leaves `required`, `multi`, `min`, `max`,
-  `step` and `format` inert, blocks tickets 34, 35 and 27 and fails the
+  `step` and `format` inert, blocks tickets 34, 35 and 28 and fails the
   LSP-readiness commitment of ticket 17.
 - *Checker in a consumer module above `schema` and `note`* (the earlier
   recommendation): withdrawn. It puts the rule outside its invariant owner and
@@ -391,7 +391,7 @@ Aider.
   placement of the app layer: [crate
   topology](./35-crate-topology-and-public-surface.md).
 - Query-side change replacing the expander: [query
-  core](./28-query-core-and-plan.md).
+  core](./29-query-core-and-plan.md).
 - Field-key spans for adapters, and inline-field merge: [note document
   model](./23-note-document-model.md).
 - `date.format` dialect and the date-format check: [temporal
@@ -402,7 +402,7 @@ Aider.
   and diagnostic architecture](./34-error-and-diagnostic-architecture.md).
 - Host composition and use-case layer: [workspace
   host](./33-workspace-host-and-composition.md). Open-buffer checks: [live
-  buffer](./27-live-buffer-and-persisted-index-consistency.md).
+  buffer](./28-live-buffer-and-persisted-index-consistency.md).
 - Re-test of the "provisionally withstands scrutiny" claim for the
   `FileClassExpander` seam (overturned here):
   [reconciliation](./36-reconcile-decisions-and-audit-coverage.md).
@@ -413,7 +413,7 @@ Aider.
   budgets): [ticket 38](./38-body-section-schemas.md). 20 keeps the violation
   locator open to more than a frontmatter key.
 - Query-side expansion of bindings, the "has a known explicit class" atom and
-  the path-scan optimisation: [query core](./28-query-core-and-plan.md).
+  the path-scan optimisation: [query core](./29-query-core-and-plan.md).
 - Rank of the `schema.global.*` family and the schema-error exit code:
   [diagnostics](./34-error-and-diagnostic-architecture.md).
 - `[binding]` table and `global` semantics in the schema format and internals:

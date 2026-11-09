@@ -15,7 +15,7 @@ them.
   cost of note deserialization on a path-set change
   (`25-index-freshness-and-invalidation.md:26-39`).
 - [V] Ticket 26 needs row identity: `item_idx`, the `list.*` fields and document
-  order. It needs the multi-value semantics (`28-query-core-and-plan.md:17-18`).
+  order. It needs the multi-value semantics (`29-query-core-and-plan.md:17-18`).
 - [V] Ticket 28 needs stable `NoteFieldValue` values at the template boundary
   (`31-template-engine-boundary.md:11-16`).
 - [V] Ticket 31 needs a borrowed or owned parser input for a long-lived host
@@ -28,7 +28,7 @@ them.
   (`36-reconcile-decisions-and-audit-coverage.md:9-17`).
 - [V] Ticket 35 is blocked by ticket 23. It needs a way to build the editor
   shape from a buffer in memory
-  (`27-live-buffer-and-persisted-index-consistency.md:3-17`).
+  (`28-live-buffer-and-persisted-index-consistency.md:3-17`).
 - [V] Ticket 36 needs to know if the note gives one merged field map
   (`37-schema-internals-simplification.md:9-16`).
 - [V] Ticket 37 is blocked by ticket 23. Its question says: "Decide which body

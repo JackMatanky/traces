@@ -41,10 +41,10 @@ of topic D. Decide the facet split first.
 
 ### C. Rows
 
-- Decide what a `QueryRow` borrows from. Ticket 28 owns the row shape. This
+- Decide what a `QueryRow` borrows from. Ticket 29 owns the row shape. This
   ticket owns the source of the borrow.
 - State what a row needs: the `Note` facets, the `FileMeta`, the inlinks, the
-  item identity `item_idx` and the document order (ticket 28).
+  item identity `item_idx` and the document order (ticket 29).
 
 ### D. What the store persists
 
@@ -96,11 +96,11 @@ of topic D. Decide the facet split first.
   and the lazy decode. Ticket 25 decides if a refresh keeps an in-memory note
   cache. The facet split also sets what a path-set change decodes. One added
   file costs 499 ms and 395 MB at 50,000 notes today.
-- Ticket 28 decides the row type, the view enum, the pushdown protocol and the
+- Ticket 29 decides the row type, the view enum, the pushdown protocol and the
   membership operation.
 - Ticket 32 decides the persisted path form and the identity of a root.
 - Ticket 33 decides the held workspace and the writer admission for a root.
-- Ticket 27 decides how an open buffer overlays the persisted generation.
+- Ticket 28 decides how an open buffer overlays the persisted generation.
 - Ticket 34 decides how a notice shows.
 - Ticket 35 decides the visibility of `IndexStore` and `WorkspaceIndex`.
 
@@ -261,7 +261,7 @@ Do not reopen these decisions.
 - What becomes removable.
 - What remains unresolved.
 - The change-table rows (ticket 16).
-- The downstream tickets that change: 25, 26, 27, 28, 31, 32, 33, 34 and 35.
+- The downstream tickets that change: 25, 26, 28, 29, 31, 32, 33, 34 and 35.
 
 This ticket graduates these fog items: `CandidateTrie` and `indextree`
 retention, the store engine and repository split, and inline-field class
@@ -321,13 +321,13 @@ The evidence is in `research/24-prep/g-probe-results.md` and
   narrows. The plan still evaluates the source and full filter on each
   survivor, then runs ordered transforms at their original positions.
   Only push a predicate before `limit`, `flatten` or another transform if
-  equivalence is proved for that row mode (ticket 28).
+  equivalence is proved for that row mode (ticket 29).
 - The planner may use a range key only if its candidate set contains
   every row matching the filter (ticket 19). Prove this for each
   operator, row kind, temporal frame and field precedence. Unsupported
   mappings scan the relevant facet. Examples include complements,
   missing or null values, and adaptive or period comparisons.
-  Ticket 28 owns the pushdown capability protocol.
+  Ticket 29 owns the pushdown capability protocol.
 - Also prove exact `Int`/`Float` comparisons above 2^53, signed zero,
   infinity, adaptive quoted literals and Link target matching
   (ticket 19). Do not cast `i64` to `f64` or treat a raw string key
@@ -364,7 +364,7 @@ The evidence is in `research/24-prep/g-probe-results.md` and
 - A host publishes an immutable generation of shared entries. A refresh
   replaces entries if their note, file metadata or inlinks change. Each
   request pins one generation. A row owns its matching `Arc<FileEntry>`, not
-  the whole index. The cold CLI builds entries only for survivors. Ticket 28
+  the whole index. The cold CLI builds entries only for survivors. Ticket 29
   owns the final row API.
 - `WorkspaceIndex` remains total and sorted, with one entry per indexed
   file. The cold CLI builds selected `FileEntry` rows directly, not a
@@ -530,7 +530,7 @@ See [ticket 20's Answer](./20-schema-note-typing-and-validation.md).
   schemas.
 - Source selection needs an exclusion for "has a known explicit class". A
   secondary lookup for it avoids the `Not` full scan.
-- Ticket 28 optimises a folder glob such as `folder/**` to `paths_in_folder`.
+- Ticket 29 optimises a folder glob such as `folder/**` to `paths_in_folder`.
   The remaining `Path` scan is linear.
 - A "notes changed since the last check" notice (ticket 20, agent guardrail)
   reads the changed set that the refresh computes. A baseline store sits
@@ -553,12 +553,12 @@ See [ticket 23's Answer](./23-note-document-model.md).
 - The store keeps no external URL, byte span, footnote, callout or slug.
 - A change of the stored `Note` changes the extractor fingerprint or bumps the
   format epoch (ticket 25). Index results must equal a fresh parse.
-- Ticket 28 needs the item identity `item_idx`, the `list.*` fields and the
+- Ticket 29 needs the item identity `item_idx`, the `list.*` fields and the
   document order.
 - The bulk index path collects parser notices with their paths. Ticket 34 owns
   how they show.
 - Ticket 33 keeps a compact link and heading range index for open buffers. It
-  tags the range sets with a source revision. Ticket 27 decides the rest.
+  tags the range sets with a source revision. Ticket 28 decides the rest.
 - Ticket 23 left these items open: the boxed or unboxed task payload, host
   memory at 50,000 notes, and a two-process open of the store.
 
@@ -586,7 +586,7 @@ See [ticket 17's Answer](./17-grilling-forward-consumers-and-design-pressure.md)
 - Vaults can exceed 50,000 notes.
 - Evaluate each proposal by independent changeability, low coupling, fast
   verification, failure isolation and recoverability.
-- Ticket 27 owns the consistency of an open buffer and the persisted index.
+- Ticket 28 owns the consistency of an open buffer and the persisted index.
 
 ## Inputs from the precedent research
 
@@ -673,12 +673,12 @@ Invariant owners:
   candidate sets, and the path-order check at load and build boundaries.
 - Ticket 25: store identity (engine tag, platform family, format epoch,
   extractor fingerprint, policy fingerprint) and freshness invalidation.
-- Ticket 28: row type, residual filter, pushdown protocol and membership.
+- Ticket 29: row type, residual filter, pushdown protocol and membership.
 - Ticket 32: the persisted path form and root identity.
 - Ticket 33: host writer admission.
 - Ticket 34: how parser notices show.
 - Ticket 35: visibility of the index and store port.
-- Ticket 27: buffer overlay on a pinned generation.
+- Ticket 28: buffer overlay on a pinned generation.
 
 Remove the four multimap tables after implementation:
 `paths_by_tag`, `paths_by_file_class`, `tags_by_path` and `classes_by_path`.
@@ -697,7 +697,7 @@ stderr and keeps query results on stdout. The 1.8 s synthetic build
 included persistence, so it is not a measured fallback latency.
 The store layout and format epoch change within the Free envelope.
 
-Downstream tickets: 25 (freshness and format), 28 (plan and rows),
+Downstream tickets: 25 (freshness and format), 29 (plan and rows),
 31 (index-facing consumer), and 32 (path form). Also 32 (writer
 admission), 33 (notice display), 34 (visibility), 27 (buffer overlay), and
 26 (recovery journal).
@@ -713,15 +713,15 @@ The code does not implement this ticket. This table lists what the refactor chan
 | --- | --- | --- | --- |
 | Store abstraction port | Concrete `IndexStore` in `src/index/store.rs:145` and `src/query/service.rs:125` | Domain-level store port with an adapter boundary; no engine type crosses the boundary | Ticket 35 |
 | Persisted facet tables | Single serialized `notes` and `files` tables in `src/index/tables.rs:21,30` | Eleven stored facets: `files`, `fields`, `tags`, `classes`, `headings`, `outlinks`, `links`, `tasks`, `lists`, `notices`, `meta` | Ticket 23, Ticket 25 |
-| Redb secondary tables | Four multimap tables `PATHS_BY_TAG`, `PATHS_BY_FILE_CLASS`, `TAGS_BY_PATH`, `FILE_CLASSES_BY_PATH` in `src/index/tables.rs:43-70` | Remove the four multimap tables; query execution uses facet scans and proved range-key lookups | Ticket 28 |
-| Query execution paths | Dual path: memory scan in `src/query/service.rs:98` and `run_from_store` in `src/query/service.rs:123` | Single execution plan for CLI and hosts; CLI reads store candidates and hosts read a pinned generation | Ticket 28 |
-| Source resolution | `SourceResolver` in `src/query/service.rs:316-406` does full-store scans for `All`, `Not`, and empty expressions | Remove `SourceResolver`; enumerate `files` paths and narrow with safe predicates | Ticket 28 |
-| Query row borrow model | `QueryRow` borrows whole `Arc<WorkspaceIndex>` in `src/query/results.rs:38` | Row owns matching `Arc<FileEntry>` rather than the entire index | Ticket 28 |
-| Totality of WorkspaceIndex | `WorkspaceIndex::assemble` in `src/index/entry.rs:39` builds partial index for `run_from_store` in `src/query/service.rs:156` | `WorkspaceIndex` stays total and sorted; cold CLI constructs `FileEntry` rows directly | Ticket 28 |
+| Redb secondary tables | Four multimap tables `PATHS_BY_TAG`, `PATHS_BY_FILE_CLASS`, `TAGS_BY_PATH`, `FILE_CLASSES_BY_PATH` in `src/index/tables.rs:43-70` | Remove the four multimap tables; query execution uses facet scans and proved range-key lookups | Ticket 29 |
+| Query execution paths | Dual path: memory scan in `src/query/service.rs:98` and `run_from_store` in `src/query/service.rs:123` | Single execution plan for CLI and hosts; CLI reads store candidates and hosts read a pinned generation | Ticket 29 |
+| Source resolution | `SourceResolver` in `src/query/service.rs:316-406` does full-store scans for `All`, `Not`, and empty expressions | Remove `SourceResolver`; enumerate `files` paths and narrow with safe predicates | Ticket 29 |
+| Query row borrow model | `QueryRow` borrows whole `Arc<WorkspaceIndex>` in `src/query/results.rs:38` | Row owns matching `Arc<FileEntry>` rather than the entire index | Ticket 29 |
+| Totality of WorkspaceIndex | `WorkspaceIndex::assemble` in `src/index/entry.rs:39` builds partial index for `run_from_store` in `src/query/service.rs:156` | `WorkspaceIndex` stays total and sorted; cold CLI constructs `FileEntry` rows directly | Ticket 29 |
 | Release path-order check | Debug-only assertion in `SortedByPath::assumed_sorted` in `src/index/sort.rs:48-54` | Check path order in release builds at index build and store load boundaries | None |
 | Store transaction pinning | `read_batch` and `read_files_and_fingerprint` open separate read transactions in `src/index/store.rs:550,1004` | Pin one read transaction across candidate selection, facet reads, and fingerprint verification | Ticket 25 |
 | Cache failure handling | `refresh` logs an alert in `src/index/mod.rs:62`; `refresh_store` returns `IndexError::Store` in `src/index/service.rs:285` | Unified cache miss: fallback to fresh parse and print one stderr notice; exit 0 on success | Ticket 16, Ticket 34 |
-| Store lock lifecycle | `IndexStore::open` holds open database in `src/index/service.rs:338,407` | Host opens store only to commit write batches; reads come from pinned generation | Ticket 27, Ticket 33 |
+| Store lock lifecycle | `IndexStore::open` holds open database in `src/index/service.rs:338,407` | Host opens store only to commit write batches; reads come from pinned generation | Ticket 28, Ticket 33 |
 | Base generation check | `RefreshPlan::collect` reads fingerprint before scan without writer verification in `src/index/refresh.rs:336-354` | Transactional check compares base identity, revision, and fingerprint before committing delta | Ticket 25 |
 | Corrupted row policy | `read_batch` skips corrupt rows in `src/index/store.rs:1018-1026` | Corrupted or missing required facet triggers a complete cache miss rather than partial results | Ticket 25 |
 | Inbound links persistence | `read_all_links` reads `LINKS` table in `src/index/store.rs:588` | Persist inbound links graph in `links` facet; refresh updates edges atomically | Ticket 25 |

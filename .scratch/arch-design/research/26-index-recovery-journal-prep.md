@@ -81,7 +81,7 @@ Check all index-affecting changes again before the measurements.
   the `racy` bit and the rule that only a writer that decided to rebuild may
   delete a store file.
 - [V] [How should open editor buffers relate to the persisted
-  index?](../issues/27-live-buffer-and-persisted-index-consistency.md) says that
+  index?](../issues/28-live-buffer-and-persisted-index-consistency.md) says that
   a host holds the store only during a refresh and a persist. A replay must
   change the revision of the store.
 - [V] Ticket 22 gives `init` an undo journal. Ticket 20 lists a bounded undo

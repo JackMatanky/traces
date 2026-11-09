@@ -61,7 +61,7 @@ model, query core, template boundary.
   the semantic model.
 - **Agreed:** an owned runtime model with no parallel borrowed mirror enum in
   the model. Refined in Round 1: any borrowed view enum is query-local and is
-  decided by ticket 28 after a benchmark.
+  decided by ticket 29 after a benchmark.
 - **Agreed direction:** share only runtime value semantics that mean the same
   thing across consumers. Keep schema declarations, note source occurrences,
   query projections, and template-facing representations separate where their
@@ -241,7 +241,7 @@ alternative to evaluate.
 6. **Quoted-literal undercut downstream:** deferred to ticket 19.
 7. **Scope vs ticket 19:** resolved. Ticket 18 settles only schema-free
    parse-time classification.
-8. **Borrowed views:** deferred to ticket 28 with a benchmark gate.
+8. **Borrowed views:** deferred to ticket 29 with a benchmark gate.
 9. **Link payload in the runtime value:** open (Open question 1).
 10. **Visibility:** deferred to ticket 35. Evidence is in research result 6.
 11. **Size budget:** resolved by research result 1 (keep 80 B, no boxing).
@@ -382,7 +382,7 @@ capabilities, since the crate has end users and a public surface.
   ticket 19. Which type a runtime `FieldValue::Link` carries is now the root
   `Link` (Open question 1).
 - **Borrowed views (refines the "no mirror" line above):** the model exports
-  `&FieldValue` and no mirror enum. Any view enum is query-local. Ticket 28
+  `&FieldValue` and no mirror enum. Any view enum is query-local. Ticket 29
   benchmarks owned vs view over `file.name` sort and filter before deleting
   `NoteFieldValueRef`. Currently `resolve_file_ref` returns borrowed `&str`
   for `file.name` and borrowable paths without allocation.
@@ -528,7 +528,7 @@ two explicit template adapters: natural serde for schema literals and the
 hand-written runtime adapter. Runtime `Int` renders `5`, not `5.0`.
 
 **Borrowed views:** export `&NoteFieldValue`, not a mirror enum. Keep any view
-enum query-local. Do not remove `NoteFieldValueRef` before ticket 28 benchmarks
+enum query-local. Do not remove `NoteFieldValueRef` before ticket 29 benchmarks
 owned values against views for `file.name` sort and filter.
 
 **Invariant owners:**
@@ -544,7 +544,7 @@ owned values against views for `file.name` sort and filter.
 visitor, `DateTimeCoercion`, and `FieldStringValue` removable. It also removes
 both `From<FieldValueRef>` conversions, `Number(f64)`, the values-file saturation
 test, and the double frontmatter conversion. `NoteFieldValueRef` remains a
-removal candidate, pending ticket 28's benchmark gate.
+removal candidate, pending ticket 29's benchmark gate.
 
 **Deliberate behavior changes:**
 
@@ -572,7 +572,7 @@ removal candidate, pending ticket 28's benchmark gate.
 - [Index read model](./24-index-read-model-and-query-execution.md) and
   [freshness](./25-index-freshness-and-invalidation.md): temporal values encode
   as text and re-parse on every cache load, with a cache format change.
-- [Query core](./28-query-core-and-plan.md): view enum shape and benchmark gate.
+- [Query core](./29-query-core-and-plan.md): view enum shape and benchmark gate.
 - [Template boundary](./31-template-engine-boundary.md): the two adapters and
   number rendering.
 - [Crate topology and public

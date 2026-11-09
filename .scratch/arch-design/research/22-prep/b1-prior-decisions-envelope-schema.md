@@ -106,7 +106,7 @@ Direct quotes from resolved tickets and research briefs handing off requirements
    - Quote: `"The adapter gets OS-valued inputs once when it opens each workspace. These inputs are state/config homes, discovery ceilings, ignored directory names and the explicit start path. Preserve platform path encodings and path precedence. The config/path decisions must choose an explicit base for relative overrides or reject them."` (`issues/21:76-80`).
 
 3. **Map Handoff**:
-   - Quote: `"Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md), [read model](./issues/24-index-read-model-and-query-execution.md), [freshness](./issues/25-index-freshness-and-invalidation.md), [query](./issues/28-query-core-and-plan.md)..."` (`map.md:341-344`).
+   - Quote: `"Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md), [read model](./issues/24-index-read-model-and-query-execution.md), [freshness](./issues/25-index-freshness-and-invalidation.md), [query](./issues/29-query-core-and-plan.md)..."` (`map.md:341-344`).
 
 4. **Ticket 20 (Schema Typing)**:
    - Quote: `"...schema definitions never affect parsing, the index or the fingerprint (only the configured class-field name is shared)."` (`issues/20:64-65`).
