@@ -695,6 +695,35 @@ impl DurationComponent {
     }
 }
 
+/// Returns whether `unit` is a Jiff spelling of a millisecond, microsecond or
+/// nanosecond unit, in any letter case.
+fn is_subsecond_unit(unit: &str) -> bool {
+    const SUBSECOND_UNITS: [&str; 21] = [
+        "ms",
+        "msec",
+        "msecs",
+        "milli",
+        "millis",
+        "millisecond",
+        "milliseconds",
+        "us",
+        "usec",
+        "usecs",
+        "micro",
+        "micros",
+        "microsecond",
+        "microseconds",
+        "ns",
+        "nsec",
+        "nsecs",
+        "nano",
+        "nanos",
+        "nanosecond",
+        "nanoseconds",
+    ];
+    SUBSECOND_UNITS.iter().any(|candidate| unit.eq_ignore_ascii_case(candidate))
+}
+
 /// Validates a friendly-format duration before it reaches Jiff.
 ///
 /// # Errors
@@ -722,12 +751,11 @@ fn validate_friendly_input(input: &str) -> Result<(), DurationError> {
         if digits_len > 300 {
             return Err(DurationError::NumberOverflow);
         }
-        // The closed unit vocabulary stops at seconds. Reject Jiff's `ms`,
-        // `us`, and `ns` spellings.
-        let unit = word.trim_start_matches(|c: char| {
-            c.is_ascii_digit() || matches!(c, '.' | '+' | '-')
-        });
-        if matches!(unit, "ms" | "millisecond" | "milliseconds" | "us" | "ns") {
+        // The closed unit vocabulary stops at seconds. Reject every Jiff
+        // spelling of a sub-second unit, in any component of the word: such a
+        // field can exceed one second, which breaks the rounding invariant.
+        if word.split(|c: char| !c.is_ascii_alphabetic()).any(is_subsecond_unit)
+        {
             return Err(DurationError::UnknownUnit);
         }
     }
@@ -1181,7 +1209,17 @@ mod tests {
         #[case::negative_millisecond("-1ms")]
         #[case::positive_millisecond("+1ms")]
         #[case::fractional_millisecond("1.5ms")]
+        #[case::milli_after_larger_unit("1h30milli")]
+        #[case::milli_upper_case("1MILLI")]
         #[case::millisecond_before_comma("1ms,1h")]
+        #[case::milli_short_word("1milli")]
+        #[case::milli_fuzz_input("0004000milli")]
+        #[case::millis_word("1millis")]
+        #[case::msec_word("1msec")]
+        #[case::micro_word("1micro")]
+        #[case::usec_word("1usec")]
+        #[case::nano_word("1nano")]
+        #[case::nsec_word("1nsec")]
         fn rejects_unknown_or_unsupported_unit(#[case] input: &str) {
             assert!(matches!(
                 parse_error(input),

@@ -1,0 +1,50 @@
+// DYLD interposer: log fsync-class calls with a monotonic timestamp and path.
+// Set KILL_AT=n to send SIGKILL to the process just before its n-th sync call.
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/syslimits.h>
+
+#define INTERPOSE(rep, orig) \
+  __attribute__((used)) static struct { const void *r; const void *o; } \
+  _ip_##orig __attribute__((section("__DATA,__interpose"))) = {(const void *)(rep), (const void *)(orig)}
+
+static double now_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+
+static int counter = 0;
+
+static void log_call(const char *what, int fd) {
+  const char *k = getenv("KILL_AT");
+  if (k && ++counter == atoi(k)) {
+    fprintf(stderr, "KILL before sync %d\n", counter);
+    kill(getpid(), SIGKILL);
+  }
+  char path[PATH_MAX] = "?";
+  fcntl(fd, F_GETPATH, path);
+  const char *base = strrchr(path, '/');
+  fprintf(stderr, "SYNC %.2f %s %s\n", now_ms(), what, base ? base + 1 : path);
+}
+
+static int my_fcntl(int fd, int cmd, ...) {
+  va_list ap;
+  va_start(ap, cmd);
+  long arg = va_arg(ap, long);
+  va_end(ap);
+  if (cmd == F_FULLFSYNC) log_call("F_FULLFSYNC", fd);
+  return fcntl(fd, cmd, arg);
+}
+static int my_fsync(int fd) {
+  log_call("fsync", fd);
+  return fsync(fd);
+}
+INTERPOSE(my_fcntl, fcntl);
+INTERPOSE(my_fsync, fsync);

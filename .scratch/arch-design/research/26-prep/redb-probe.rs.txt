@@ -1,0 +1,403 @@
+//! Throwaway probe for ticket 26 preparation. Not a benchmark.
+use std::{
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+    time::Instant,
+};
+
+use redb::{Database, Durability, ReadableDatabase, ReadableTableMetadata, TableDefinition};
+const T: TableDefinition<&[u8], &[u8]> = TableDefinition::new("t");
+
+fn arg(n: usize) -> String {
+    std::env::args().nth(n).expect("missing argument")
+}
+
+fn fill(db: &Database, start: u64, rows: u64, dur: Durability) {
+    let mut w = db.begin_write().unwrap();
+    w.set_durability(dur).unwrap();
+    {
+        let mut t = w.open_table(T).unwrap();
+        let v = vec![7u8; 250];
+        for i in start..start + rows {
+            t.insert(i.to_be_bytes().as_slice(), v.as_slice()).unwrap();
+        }
+    }
+    w.commit().unwrap();
+}
+
+fn rows(db: &Database) -> u64 {
+    let r = db.begin_read().unwrap();
+    match r.open_table(T) {
+        Ok(t) => t.len().unwrap(),
+        Err(_) => 0,
+    }
+}
+
+fn median(mut v: Vec<f64>) -> f64 {
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    v[v.len() / 2]
+}
+
+fn name(d: Durability) -> &'static str {
+    match d {
+        Durability::None => "None",
+        _ => "Immediate",
+    }
+}
+
+fn child(path: &Path, base: u64, dur: &str, exit: &str) {
+    let db = Database::create(path).unwrap();
+    fill(&db, 0, base, Durability::Immediate);
+    let d = if dur == "none" {
+        Durability::None
+    } else {
+        Durability::Immediate
+    };
+    fill(&db, 1_000_000_000, 1, d);
+    match exit {
+        "drop" => drop(db),
+        "abort" => std::process::abort(),
+        "exit" => std::process::exit(0),
+        _ => unreachable!(),
+    }
+}
+
+fn check(path: &Path) {
+    let t = Instant::now();
+    let db = Database::create(path).unwrap();
+    let open_ms = t.elapsed().as_secs_f64() * 1e3;
+    let n = rows(&db);
+    let r = db.begin_read().unwrap();
+    let has = r
+        .open_table(T)
+        .ok()
+        .map(|t| {
+            t.get(1_000_000_000u64.to_be_bytes().as_slice())
+                .unwrap()
+                .is_some()
+        })
+        .unwrap_or(false);
+    println!("rows={n} last_commit_present={has} open_ms={open_ms:.2}");
+}
+
+fn me() -> PathBuf {
+    std::env::current_exe().unwrap()
+}
+
+fn scratch(file: &str) -> PathBuf {
+    let d = std::env::var("PROBE_DIR").unwrap_or_else(|_| "/tmp/redb-probe-data".into());
+    fs::create_dir_all(&d).unwrap();
+    PathBuf::from(d).join(file)
+}
+
+fn crashmatrix() {
+    for dur in ["none", "immediate"] {
+        for exit in ["drop", "exit", "abort"] {
+            let p = scratch("crash.redb");
+            let _ = fs::remove_file(&p);
+            let st = Command::new(me())
+                .args(["child", p.to_str().unwrap(), "1000", dur, exit])
+                .status()
+                .unwrap();
+            print!("commit={dur:9} end={exit:5} code={:?} -> ", st.code());
+            let out = Command::new(me())
+                .args(["check", p.to_str().unwrap()])
+                .output()
+                .unwrap();
+            print!("{}", String::from_utf8_lossy(&out.stdout));
+        }
+    }
+}
+
+fn repairscale(rows_n: u64) {
+    let p = scratch("big.redb");
+    let _ = fs::remove_file(&p);
+    {
+        let db = Database::create(&p).unwrap();
+        let chunk = 100_000;
+        let mut s = 0;
+        while s < rows_n {
+            fill(&db, s, chunk.min(rows_n - s), Durability::None);
+            s += chunk;
+        }
+        fill(&db, 2_000_000_000, 1, Durability::Immediate);
+    }
+    let size = fs::metadata(&p).unwrap().len();
+    let t = Instant::now();
+    {
+        let _db = Database::create(&p).unwrap();
+        println!(
+            "rows={rows_n} file_mb={:.1} clean_open_ms={:.1}",
+            size as f64 / 1e6,
+            t.elapsed().as_secs_f64() * 1e3
+        );
+    }
+    let st = Command::new(me())
+        .args(["abortopen", p.to_str().unwrap()])
+        .status()
+        .unwrap();
+    println!("abort child code {:?}", st.code());
+    let t = Instant::now();
+    let db = Database::create(&p).unwrap();
+    println!(
+        "unclean_open_ms={:.1} rows={}",
+        t.elapsed().as_secs_f64() * 1e3,
+        rows(&db)
+    );
+}
+
+fn lifecycle() {
+    for dur in [Durability::None, Durability::Immediate] {
+        let (mut cr, mut co, mut dr, mut to) = (vec![], vec![], vec![], vec![]);
+        for i in 0..21 {
+            let p = scratch("life.redb");
+            let _ = fs::remove_file(&p);
+            let t0 = Instant::now();
+            let db = Database::create(&p).unwrap();
+            let t1 = Instant::now();
+            fill(&db, 0, 10, dur);
+            let t2 = Instant::now();
+            drop(db);
+            let t3 = Instant::now();
+            if i > 0 {
+                cr.push((t1 - t0).as_secs_f64() * 1e3);
+                co.push((t2 - t1).as_secs_f64() * 1e3);
+                dr.push((t3 - t2).as_secs_f64() * 1e3);
+                to.push((t3 - t0).as_secs_f64() * 1e3);
+            }
+        }
+        println!(
+            "fresh-db {}: create={:.2} commit={:.2} drop={:.2} total={:.2} (ms, median of 20)",
+            name(dur),
+            median(cr),
+            median(co),
+            median(dr),
+            median(to)
+        );
+    }
+    for dur in [Durability::None, Durability::Immediate] {
+        let p = scratch("life2.redb");
+        let _ = fs::remove_file(&p);
+        drop(Database::create(&p).unwrap());
+        let (mut tot, mut c, mut d) = (vec![], vec![], vec![]);
+        for _ in 0..20 {
+            let t0 = Instant::now();
+            let db = Database::create(&p).unwrap();
+            let t1 = Instant::now();
+            fill(&db, 0, 1, dur);
+            let t2 = Instant::now();
+            drop(db);
+            let t3 = Instant::now();
+            tot.push((t3 - t0).as_secs_f64() * 1e3);
+            c.push((t2 - t1).as_secs_f64() * 1e3);
+            d.push((t3 - t2).as_secs_f64() * 1e3);
+        }
+        println!(
+            "reopen-db {}: commit={:.2} drop={:.2} open+commit+drop={:.2} (ms, median of 20)",
+            name(dur),
+            median(c),
+            median(d),
+            median(tot)
+        );
+    }
+}
+
+fn journalcost() {
+    let dir = scratch("jdir");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let dirsync = || fs::File::open(&dir).unwrap().sync_all().unwrap();
+    for size in [1_000usize, 100_000, 10_000_000, 100_000_000] {
+        let buf = vec![0xA5u8; size];
+        let (mut w, mut ws, mut wsd) = (vec![], vec![], vec![]);
+        let reps = if size >= 10_000_000 { 7 } else { 21 };
+        for i in 0..reps {
+            let p = dir.join("j.tmp");
+            let t = Instant::now();
+            let mut f = fs::File::create(&p).unwrap();
+            f.write_all(&buf).unwrap();
+            drop(f);
+            let a = t.elapsed().as_secs_f64() * 1e3;
+            fs::remove_file(&p).unwrap();
+
+            let t = Instant::now();
+            let mut f = fs::File::create(&p).unwrap();
+            f.write_all(&buf).unwrap();
+            f.sync_all().unwrap();
+            drop(f);
+            let b = t.elapsed().as_secs_f64() * 1e3;
+            fs::remove_file(&p).unwrap();
+
+            let t = Instant::now();
+            let mut f = fs::File::create(&p).unwrap();
+            f.write_all(&buf).unwrap();
+            f.sync_all().unwrap();
+            drop(f);
+            dirsync();
+            let c = t.elapsed().as_secs_f64() * 1e3;
+            fs::remove_file(&p).unwrap();
+            dirsync();
+            if i > 0 {
+                w.push(a);
+                ws.push(b);
+                wsd.push(c);
+            }
+        }
+        println!(
+            "journal {size:>11} B: write={:.2} write+sync={:.2} write+sync+dirsync={:.2} (ms, median)",
+            median(w),
+            median(ws),
+            median(wsd)
+        );
+    }
+    let mut rm = vec![];
+    for _ in 0..21 {
+        let p = dir.join("r.tmp");
+        let mut f = fs::File::create(&p).unwrap();
+        f.write_all(&[1u8; 1000]).unwrap();
+        f.sync_all().unwrap();
+        drop(f);
+        let t = Instant::now();
+        fs::remove_file(&p).unwrap();
+        dirsync();
+        rm.push(t.elapsed().as_secs_f64() * 1e3);
+    }
+    println!("journal removal + dirsync: {:.2} ms median", median(rm));
+}
+
+fn main() {
+    match arg(1).as_str() {
+        "child" => child(
+            Path::new(&arg(2)),
+            arg(3).parse().unwrap(),
+            &arg(4),
+            &arg(5),
+        ),
+        "check" => check(Path::new(&arg(2))),
+        "abortopen" => {
+            let db = Database::create(arg(2)).unwrap();
+            fill(&db, 3_000_000_000, 1, Durability::None);
+            std::process::abort();
+        }
+        "aba" => {
+            let p = arg(2);
+            let _ = fs::remove_file(&p);
+            drop(Database::create(&p).unwrap());
+            let (mut a1, mut b, mut a2) = (vec![], vec![], vec![]);
+            for i in 0..90 {
+                let (dur, v) = match i % 3 {
+                    0 => (Durability::None, &mut a1),
+                    1 => (Durability::Immediate, &mut b),
+                    _ => (Durability::None, &mut a2),
+                };
+                let t0 = Instant::now();
+                let db = Database::create(&p).unwrap();
+                fill(&db, i, 1, dur);
+                drop(db);
+                v.push(t0.elapsed().as_secs_f64() * 1e3);
+            }
+            println!("A(None) {:.2}  B(Immediate) {:.2}  A(None) {:.2}  ms median of 30 (open+commit+drop)", median(a1), median(b), median(a2));
+        }
+        "abortimm" => {
+            let db = Database::create(arg(2)).unwrap();
+            fill(&db, 3_000_000_000, 1, Durability::Immediate);
+            std::process::abort();
+        }
+        "rwseq" => {
+            let p = arg(2);
+            let mut seq = vec![];
+            for i in 0..20 {
+                let t0 = Instant::now();
+                let ro = Database::builder().open_read_only(&p).unwrap();
+                drop(ro);
+                let db = Database::create(&p).unwrap();
+                fill(&db, 4_000_000_000 + i, 1, Durability::None);
+                drop(db);
+                seq.push(t0.elapsed().as_secs_f64() * 1e3);
+            }
+            let db = Database::create(&p).unwrap();
+            let conc = Database::builder()
+                .open_read_only(&p)
+                .err()
+                .map(|e| e.to_string());
+            drop(db);
+            println!(
+                "ro-open, drop, rw open+commit+drop: {:.2} ms median of 20",
+                median(seq)
+            );
+            println!("read-only open while a writable handle is held: {conc:?}");
+        }
+        "ro" => {
+            let p = arg(2);
+            let (mut o, mut d) = (vec![], vec![]);
+            for _ in 0..20 {
+                let t0 = Instant::now();
+                let db = Database::builder().open_read_only(&p).unwrap();
+                let t1 = Instant::now();
+                let r = db.begin_read().unwrap();
+                let n = r.open_table(T).map(|t| t.len().unwrap()).unwrap_or(0);
+                let t2 = Instant::now();
+                drop(r);
+                drop(db);
+                let t3 = Instant::now();
+                o.push((t1 - t0).as_secs_f64() * 1e3);
+                d.push((t3 - t2).as_secs_f64() * 1e3);
+                let _ = n;
+            }
+            println!(
+                "read-only open: open={:.2} drop={:.2} ms median of 20",
+                median(o),
+                median(d)
+            );
+        }
+        "readonly" => {
+            let p = arg(2);
+            drop(Database::create(&p).unwrap());
+            let (mut o, mut d) = (vec![], vec![]);
+            for _ in 0..20 {
+                let t0 = Instant::now();
+                let db = Database::create(&p).unwrap();
+                let t1 = Instant::now();
+                let _ = rows(&db);
+                let t2 = Instant::now();
+                drop(db);
+                let t3 = Instant::now();
+                o.push((t1 - t0).as_secs_f64() * 1e3);
+                d.push((t3 - t2).as_secs_f64() * 1e3);
+            }
+            println!(
+                "existing db, read only: open={:.2} drop={:.2} ms median of 20",
+                median(o),
+                median(d)
+            );
+        }
+        "buildabort" => {
+            let _ = fs::remove_file(arg(2));
+            let db = Database::create(arg(2)).unwrap();
+            let n: u64 = arg(3).parse().unwrap();
+            let chunk = 100_000;
+            let mut s = 0;
+            while s < n {
+                fill(&db, s, chunk.min(n - s), Durability::Immediate);
+                s += chunk;
+            }
+            std::process::abort();
+        }
+        "timeopen" => {
+            let t = Instant::now();
+            let db = Database::create(arg(2)).unwrap();
+            println!(
+                "open_ms={:.1} rows={}",
+                t.elapsed().as_secs_f64() * 1e3,
+                rows(&db)
+            );
+        }
+        "crash" => crashmatrix(),
+        "repair" => repairscale(arg(2).parse().unwrap()),
+        "life" => lifecycle(),
+        "journal" => journalcost(),
+        other => panic!("unknown command {other}"),
+    }
+}
