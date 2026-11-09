@@ -30,8 +30,10 @@ Record each change that affects the index.
 
 Write down what a journal can save before you measure.
 Every path must check the full source snapshot, as every refresh does.
-This scan costs 12.0 ms at 50 notes and 65.7 ms at 20,000 notes.
-No path can avoid this cost.
+A no-op refresh costs 12.0 ms at 50 notes and 65.7 ms at 20,000 notes.
+At 50 notes, most of this time is the store open and close. It is not the scan.
+No path can avoid these costs.
+
 A journal can save only the parse and the derived-fact work of the changed files.
 
 The journal protects the work only in one window.
@@ -60,8 +62,9 @@ Stop if the journal cannot beat both path 1 and path 2 in this case.
 In that case, skip the full matrix.
 Record the gate result and the break-even in the research asset and in the answer.
 Run the full matrix only if the journal passes the gate.
+
 Always report the choice between `Durability::None` and `Durability::Immediate`.
-Ticket 24 chose `None` without a comparison.
+Ticket 24 chose `None`. It did not compare the total cost of open, commit and drop.
 
 ### Step 2: Compare these recovery paths
 
@@ -337,9 +340,13 @@ These sections are facts and open points. Treat them as fallible.
   uncommitted files. An unwritable store can repeat the same work [H].
 - [Ticket 27](./27-live-buffer-and-persisted-index-consistency.md): a query result names the
   generation pair, the incarnation and the revision. A replay must change the revision.
-- Ticket 20 and ticket 32 describe undo journals for agent writes and for `init`.
-  They are different. They protect vault files. This journal protects a derived cache.
+- Tickets 20 and 32 describe undo journals for agent writes.
+  Ticket 22 describes one for `init`. They are different.
+  They protect vault files. This journal protects a derived cache.
 - Ticket 16 freezes index results that equal a fresh parse. The journal must obey this rule.
+- [Preparation notes](../research/26-index-recovery-journal-prep.md): source facts,
+  probe results on macOS, a proposed gate and the faults found in this ticket.
+  Treat them as fallible.
 
 ## Handoffs
 
@@ -350,5 +357,5 @@ These sections are facts and open points. Treat them as fallible.
 - Ticket 32: the host persist rule and the staleness bound.
 - Ticket 33: the notices for a replay or a discard.
 - Ticket 16: a change-table row for each new file on disk.
-- Ticket 35: it does not list this ticket as a blocker.
+- Ticket 35: it waits for this ticket.
   The maintainer decides if the result must enter the specification, or if the journal is out of scope.
