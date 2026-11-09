@@ -10,12 +10,13 @@
 //! each fail the test.
 
 use std::{
+    borrow::Cow,
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
 
-use gherkin::{Feature, GherkinEnv, Step as GherkinStep};
+use gherkin::{Feature, GherkinEnv, Scenario, Step as GherkinStep};
 use rstest_bdd::{
     Step, StepKeyword, StepText, duplicate_steps, extract_placeholders, iter,
 };
@@ -43,21 +44,64 @@ fn feature_files(dir: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// Every step of a feature, including steps in a background or a rule.
-fn steps_of(feature: &Feature) -> Vec<&GherkinStep> {
-    let rule_steps = feature.rules.iter().flat_map(|rule| {
-        rule.background
+/// Substitutes `Examples:` row cells into `<header>` placeholders in `raw`.
+fn expand_row<'a>(
+    raw: &'a str,
+    headers: &[String],
+    row: &[String],
+) -> Cow<'a, str> {
+    let mut text = Cow::Borrowed(raw);
+    for (header, cell) in headers.iter().zip(row) {
+        let token = format!("<{header}>");
+        if text.contains(&token) {
+            text = Cow::Owned(text.replace(&token, cell));
+        }
+    }
+    text
+}
+
+/// Steps of a scenario, expanding `Examples:` rows when present.
+fn scenario_steps(scenario: &Scenario) -> Vec<(&GherkinStep, Cow<'_, str>)> {
+    if scenario.examples.is_empty() {
+        return scenario
+            .steps
             .iter()
-            .flat_map(|background| &background.steps)
-            .chain(rule.scenarios.iter().flat_map(|scenario| &scenario.steps))
-    });
-    feature
+            .map(|step| (step, Cow::Borrowed(step.value.as_str())))
+            .collect();
+    }
+    let mut out = Vec::new();
+    for ex in &scenario.examples {
+        if let Some(table) = &ex.table
+            && let Some((headers, rows)) = table.rows.split_first()
+        {
+            for row in rows {
+                for step in &scenario.steps {
+                    out.push((step, expand_row(&step.value, headers, row)));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Every step of a feature, including steps in a background, rule, or outline.
+fn steps_of(feature: &Feature) -> Vec<(&GherkinStep, Cow<'_, str>)> {
+    let bg_steps = feature
         .background
         .iter()
-        .flat_map(|background| &background.steps)
-        .chain(feature.scenarios.iter().flat_map(|scenario| &scenario.steps))
-        .chain(rule_steps)
-        .collect()
+        .flat_map(|bg| &bg.steps)
+        .map(|step| (step, Cow::Borrowed(step.value.as_str())));
+    let top_steps = feature.scenarios.iter().flat_map(scenario_steps);
+    let rule_steps = feature.rules.iter().flat_map(|rule| {
+        let r_bg = rule
+            .background
+            .iter()
+            .flat_map(|bg| &bg.steps)
+            .map(|step| (step, Cow::Borrowed(step.value.as_str())));
+        let r_sc = rule.scenarios.iter().flat_map(scenario_steps);
+        r_bg.chain(r_sc)
+    });
+    bg_steps.chain(top_steps).chain(rule_steps).collect()
 }
 
 /// Definitions of `keyword` that match `text`, best first.
@@ -94,15 +138,14 @@ fn problems(dir: &Path) -> Vec<String> {
         let name = path
             .file_name()
             .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
-        for step in steps_of(&feature) {
+        for (step, text) in steps_of(&feature) {
             let at = format!("{name}:{}", step.position.line);
             let keyword =
                 StepKeyword::try_from(step.ty).expect("a step has a keyword");
-            let hits = matches_of(keyword, &step.value);
+            let hits = matches_of(keyword, &text);
             let Some((best, best_score)) = hits.first() else {
                 problems.push(format!(
-                    "Undefined step at {at}: {keyword:?} '{}'",
-                    step.value
+                    "Undefined step at {at}: {keyword:?} '{text}'"
                 ));
                 continue;
             };
@@ -111,8 +154,7 @@ fn problems(dir: &Path) -> Vec<String> {
                 && second_score == best_score
             {
                 problems.push(format!(
-                    "Ambiguous step at {at}: '{}' matches '{}' and '{}'",
-                    step.value,
+                    "Ambiguous step at {at}: '{text}' matches '{}' and '{}'",
                     best.pattern.as_str(),
                     second.pattern.as_str()
                 ));
