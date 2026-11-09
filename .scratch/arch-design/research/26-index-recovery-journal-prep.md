@@ -1,57 +1,67 @@
 # Research for [What does a durable index repair journal cost and save?](../issues/26-measure-index-recovery-journal.md)
 
-This is preparation for the open ticket. It does not record a decision.
-[V] marks checked evidence. [H] marks a limitation or inference. [P] marks an
-option or a proposed answer.
+This note records evidence and tentative grilling decisions.
+It does not choose a journal.
+[V] marks checked evidence. [H] marks a limitation or inference. [P] marks
+a candidate or a tentative answer.
 
 The probe in section D is a throwaway program. It is not a benchmark. Its source
 is in [26-prep/redb-probe.rs.txt](26-prep/redb-probe.rs.txt). The sync shim is
-in [26-prep/dyld-sync-shim.c.txt](26-prep/dyld-sync-shim.c.txt). The repository
-code is `main` at `79f393a2`. No source file in `src/` or `tests/` changed
-since `207cc3fb` in a way that affects this ticket. The changes are comments,
+in [26-prep/dyld-sync-shim.c.txt](26-prep/dyld-sync-shim.c.txt).
+
+The repository code is `main` at `79f393a2`.
+The diff since `207cc3fb` includes comments,
 tests, one folder-key separator fix and one scanner call.
+Check all index-affecting changes again before the measurements.
 
 ## Summary
 
-- [V] A normal process exit makes a `Durability::None` commit durable.
-  `Database::drop` runs a final durable commit. A stop that skips `drop` loses
-  the last `None` commit. See sections C and D.
-- [V] Where the file system keeps its sync promise, redb shows no torn store.
-  After a stop it shows the last durable commit. A journal protects work. It
-  does not protect consistency.
-- [V] A journal helps in one window. The window starts when the journal is
-  durable. It ends when the store is durable. In the CLI the store becomes
-  durable at `drop`. The CLI keeps the store open during the query, so the
-  window runs from the commit to the end of the command.
-- [V] On macOS, Rust `sync_all` and `sync_data` call `F_FULLFSYNC`. A synced
-  journal costs about 4 ms to write and 3 ms to remove. `Durability::Immediate`
-  adds 0 to 9 ms in the probes. The effect depends on the order of runs. A buffered journal
-  costs 0.1 ms and survives a process stop only.
-- [V] The real `traces list` call makes 5 `F_FULLFSYNC` calls on `index.redb`,
-  even when nothing changed. They span about 14 to 16 ms. A synced journal would
-  add at least 3 more. See section D5.
-- [V] A parse costs 20 to 43 µs for each note in the `rich_realistic` build
-  benchmark. A 100-note edit saves at most 4 ms. A synced journal costs about
-  7 ms for each write. A synced journal loses at any rate for edits up to 100 notes.
-  A buffered journal pays only above a 5% rate.
-- [V] The 12.0 ms no-op refresh at 50 notes is mostly store open and close. The
-  probe shows 3.0 ms to open and 9 to 10 ms to drop. The first draft of the
-  ticket called this time the scan cost. Section H lists the fix.
-- [V] A read-only open of the store costs 0.03 ms and makes no sync call. See
-  section D6. This is a larger saving than any recovery design here.
-- [H] 150 trials killed the real binary with `SIGKILL` at random times after
-  an edit. In 109 trials the process was still running. All 150 next runs
-  showed the edit. The test is weak: it does not target a phase. See D5.
-- [V] A repair after an unclean stop depends on the last commit. After a clean
-  close and a `None` commit it takes 7 ms. After an `Immediate` commit it takes
-  33 to 88 ms, because only the close commit saves the allocator state. A
-  journal removes neither cost. `Immediate` makes the repair longer.
-- [V] Git does not harden derived data by default. The cache tools in research
-  05 treat a damaged cache as a miss. The CLI guide in this repository says to
-  make the program crash-only.
-- [P] Change the gate. Compare the saved work with the added cost for each
-  scenario before any prototype. Stop if the saved work is never larger. Report
-  the choice between `None` and `Immediate` as a separate result.
+- [V] A `Durability::None` commit survives a normal `Database::drop` in the
+  probe. A stop that skips `drop` loses it. The close routine can fail without
+  returning an error. It skips its final write during a panic.
+- [V] Where the file system keeps its sync promise, redb returns the last
+  durable commit after a stop. A journal can save work. It does not make an
+  already consistent store more consistent.
+- [V] A journal helps after its file and directory become durable.
+  The window ends at a durable store commit.
+  With `None`, the CLI holds the store through the query before `drop`.
+  With `Immediate`, the window ends when that explicit commit succeeds.
+- [V] On macOS, Rust `sync_all` and `sync_data` call `F_FULLFSYNC`.
+  The file probe took about 4 ms to write and sync a small journal.
+  Removal and directory sync took about 3 ms.
+  The `Immediate` commit added 0 to 9 ms in order-dependent runs.
+  A buffered write took 0.1 ms without encoding or safe publication.
+- [H] The sync shim counts `F_FULLFSYNC` and `fsync` calls.
+  It does not prove call order or durability.
+- [V] The real `traces list` call made 5 `F_FULLFSYNC` calls on `index.redb`,
+  even when nothing changed. They span about 14 to 16 ms. See section D5.
+- [H] The `rich_realistic` build took 20 to 43 µs for each note.
+  Its total includes a scan, not just parsing.
+  The 100-note edit has a saved-work upper bound of 4.3 ms.
+  The small-file journal probe cost about 7 ms with sync and removal.
+  This rules out that measured case only if it bounds a complete replay.
+  A buffered journal has unmeasured encoding, publication and cleanup costs.
+- [V] The 12.0 ms no-op refresh at 50 notes is mostly a writable store open
+  and close. The probe took 3.0 ms to open and 9 to 10 ms to drop.
+  Section H records the earlier error that called it a scan cost.
+- [H] A read-only open of the real store took 0.03 ms without a sync.
+  A complete read-only query is not measured. See section D6.
+- [V] The random-time kill tests covered 150 trials.
+  The sync shim also killed the real binary before 5 sync calls.
+  All next runs matched a fresh store in the tested cases. See D5.
+- [V] Repair after an unclean stop depends on the last durable state.
+  A clean close followed by a `None` commit and abort took about 7 ms.
+  After `Immediate` commits and abort, repair took 33 to 101 ms.
+  The journal adds no repair cost. See D3.
+- [V] Git does not harden derived data by default.
+  The cache tools in research 05 treat a damaged cache as a miss.
+  The CLI guide in this repository says to make the program crash-only.
+- [P] Use a staged rejection gate. Measure replay, encoding and safe
+  cleanup before declaring that a journal can pay.
+  Report `None` against `Immediate` without making the durability choice.
+- [P] Screen the external journal and the in-store redb journal table.
+  If a candidate passes the cost screen, open a follow-on task for the
+  replay prototype, the crash tests and the recovery-query checks.
 
 ## A. Decision boundaries
 
@@ -78,7 +88,7 @@ tests, one folder-key separator fix and one scanner call.
   journal for agent writes. Both protect vault files. This ticket concerns a
   derived cache. The two kinds must not share code or names.
 - [V] [Ticket 35](../issues/35-reconcile-decisions-and-audit-coverage.md) now
-  waits for this ticket.
+  waits for this ticket. The ticket handoff adds the follow-on rule.
 
 ## B. What a stop loses
 
@@ -91,25 +101,29 @@ write. The commit calls are at lines 811 and 858. `configure_cache_txn` sets
 `src/index/refresh.rs:332-353`. The store is open for the whole refresh. A stop
 at any point leaves the previous durable state.
 
-| Phase | A stop here loses | What redb keeps | A journal could save |
+| Phase | A stop here loses | What redb keeps | A journal can save |
 | --- | --- | --- | --- |
 | Open and scan | Nothing | Last durable state | Nothing |
 | Parse | Parse work | Last durable state | Nothing. No journal exists yet |
-| Write transaction | Parse work | Last durable state | Parse work, after the journal sync |
-| After `None` commit, before `drop` ends | The commit | Last durable state | Parse work, after the journal sync |
-| After `drop` ends | Nothing | The commit | Nothing |
+| Store write before its durable commit | Parse work | Last durable state | Prepared work after journal publication |
+| After `None` commit, before a successful durable close | The commit | Last durable state | Prepared work after journal publication |
+| After a successful durable commit | Nothing | The new state | Nothing |
 
-[V] A stop in the first two rows leaves a store that needs repair at the next
-open. The repair does not need the journal. See section D.
+[V] A stop before a durable commit leaves the last durable state.
+The next open can need repair. A journal cannot remove the redb repair.
 
-[H] The only phases that the journal can protect are rows three and four. In the
-CLI these rows last from the commit to the end of the command. The CLI keeps
-the store open during the query. At 20,000 notes the shim shows the store open
-for 67 to 81 ms. At 50,000 notes it shows 152 to 198 ms. See section D5.
+[H] The journal window starts after durable publication, not after the
+`None` commit. In the current CLI, `None` leaves the store open during the query.
+At 20,000 notes, the shim shows a store open of 67 to 81 ms.
+At 50,000 notes, it shows 152 to 198 ms. See D5.
 
-[V] A panic after the commit loses a `None` commit. `close_database` skips its
-final commit while the thread panics. See redb `src/db.rs:1967`. No code in
-`src/` calls `process::exit` or `abort`, so a normal return runs `drop`.
+An `Immediate` commit shortens the window after the commit.
+
+[V] A panic after a `None` commit loses the commit.
+`close_database` skips its final write while the thread panics.
+See redb `src/db.rs:1967`. No code in `src/` calls `process::exit` or
+`abort`, so a normal return runs `drop`. This does not prove that the
+close write succeeds.
 
 ## C. What redb guarantees
 
@@ -118,10 +132,14 @@ stop which skips `drop` loses it. In one process the design keeps the commit in
 memory. After a crash the database returns to the last durable commit. It stays
 consistent. See redb `docs/design.md:323-334` and `src/transactions.rs:378-385`.
 
-[V] `Database::drop` calls `close_database`. This function runs a commit with
-the default `Durability::Immediate` that writes the allocator state. A durable
-commit also persists earlier non-durable commits. See `src/db.rs:1922-1955` and
-`:1963-2010` in redb 4.3.0.
+[V] `Database::drop` calls `close_database`. That routine tries a durable
+commit that writes the allocator state. A durable commit also persists
+earlier non-durable commits. See redb `src/db.rs:1922-1955,1963-2010`.
+The routine returns no `Result` and can fail to flush without notifying
+the caller.
+
+A reopen can read buffered operating-system pages.
+Do not use a reopened revision to prove power-loss durability.
 
 [V] The header holds a `recovery_required` flag. A writable open sets it and
 flushes the file. A clean close clears it. After an unclean stop the next open
@@ -194,9 +212,9 @@ is 0 to 9 ms and the data cannot narrow it. The drop after an `Immediate` commit
 is shorter. The `Builder` of redb has no option that changes the sync count.
 It has `set_cache_size` and `set_repair_callback` only.
 
-[V] A read-only reopen with a writable handle costs 3.0 ms to open and 9 to
-10 ms to drop. The sum matches the 12.0 ms no-op refresh at 50 notes in
-research 25, section E.
+[V] A writable reopen takes 3.0 ms to open and 9 to 10 ms to drop.
+The sum matches the 12.0 ms no-op refresh at 50 notes in research 25,
+section E.
 
 ### D3. Repair time after an unclean stop
 
@@ -303,70 +321,86 @@ tickets 25 and 32. It is not part of this ticket's decision.
 
 ## E. Cost model and break-even
 
-[V] Let `O` be the added cost of a journal for each write that has no failure.
-Let `B` be the redo cost minus the replay cost for one failure. The journal pays
-when the failure rate is more than `O / B` for each write. If `B` is not larger
-than `O`, the journal never pays.
+[V] Let `O` be the extra cost of a journal on each normal journaled write.
+At a matched stop point, let `B` be the rival's first usable query time
+minus the replay query time. Compare redo and `Immediate` separately.
+For one phase with positive `O` and `B`, its conditional break-even is `O / B`.
+The recovery benefit changes with the stop point.
+Do not combine phases without an observed stop-time distribution.
 
-[V] Both paths pay the same costs after a stop. These are the store open and
-repair, the scan and the commit. See sections B and D3. So `B` is only the parse
-time of the changed files minus the decode time of the journal.
+[H] Shared costs include the source scan and part of the store open.
+Different paths can pay different repair, lock and barrier costs.
+Do not subtract these costs without a path-pair measurement.
+Parse time minus decode time is an upper bound for a direct replay.
+A parsed-fact replay also reconstructs derived keys, links and notices.
+These bounds do not measure a complete recovery query.
 
-[V] The `WorkspaceIndex::build` benchmark covers scan, parse and assembly. It
-does not persist. A Criterion quick run on this machine at `79f393a2` gave
-medians for the `rich_realistic` shape. They are 8.6 ms at 200 notes, 24.0 ms
-at 1,000 and 101.3 ms at 5,000. That is 43, 24 and 20 µs for each note.
+[V] The `WorkspaceIndex::build` benchmark includes scan, parse and assembly.
+It does not persist. A Criterion quick run used `79f393a2`.
+It gave 8.6 ms at 200 notes, 24.0 ms at 1,000 and 101.3 ms at 5,000.
+That is 43, 24 and 20 µs for each note on the `rich_realistic` shape.
 
-[H] These figures include the scan. They also include the speed-up from 12
-cores. They suit a large batch. For one note, use the single-thread
-`parse_markdown` benchmark: 8 µs for 1 KB, 62 µs for 10 KB and 113 µs for a
-large note. Real notes have a mean of 11 KB. So `B` for one note is about
-0.1 ms.
+[H] These times include the scan and a speed-up from 12 cores.
+For one note, the single-thread `parse_markdown` probe took 8 µs at 1 KB,
+62 µs at 10 KB and 113 µs for a large note.
+Real notes have a mean of 11 KB. The one-note saved-work bound is about
+0.1 ms. The old `WorkspaceIndex::load` results date from 2026-10-18.
+They show about 0.5 µs for each note above the open floor.
+Journal decode and complete replay are not measured.
 
-[H] Decode cost is not measured. The old `WorkspaceIndex::load` results show
-about 0.5 µs for each note above the open floor. They date from 2026-10-18.
-Treat `B` as the parse time minus a small decode time.
-
-| Scenario | `B` at most | `O`, synced journal | `O`, buffered journal | Result |
+| Scenario | Saved work at most | Synced journal estimate | Buffered estimate | Limit |
 | --- | ---: | ---: | ---: | --- |
-| 1-note edit | 0.1 ms | about 7 ms | about 0.1 ms | Synced never pays. Buffered pays only near a 100% rate |
-| 100-note edit | 4.3 ms | about 7 ms | about 0.2 ms | Synced never pays. Buffered pays above a 5% rate |
-| 5,000-note edit | 101 ms | about 14 ms | about 1.2 ms | Synced pays above a 14% rate. Buffered pays above a 1% rate. Journal size about 6.5 MB |
-| Full rebuild, 50,000 notes | about 0.65 s | about 35 to 60 ms | not measured | Break-even about 5% to 9% for each rebuild. The window is 0.87 s [H] |
+| 1-note edit | 0.1 ms | about 7 ms | about 0.1 ms | The synced case cannot pay with these bounds |
+| 100-note edit | 4.3 ms | about 7 ms | about 0.2 ms | The synced case cannot pay with these bounds |
+| 5,000-note edit | 101 ms | about 14 ms | about 1.2 ms | The 14% rate is only a bound for one favorable stop phase |
+| Full rebuild, 50,000 notes | about 0.65 s | about 35 to 60 ms | not measured | The 5% to 9% bounds use a guessed 30 MB journal and favorable stop phases |
 
-[H] The `O` values add the synced write (4 ms), the removal (3 ms) and a
-payload write. The payload encoding cost is not in the table. A real journal
-adds it. This makes `O` larger and the result worse for the journal.
+[H] The estimates omit complete encoding, publication, replay and the
+error-reporting barrier. The barrier is the `Immediate` replay commit.
+The rebuild estimate uses the
+synthetic old layout, not the decided task-heavy facets.
+The journal cost is a partial estimate, not a measured lower bound.
+Do not label a case viable because an upper bound on `B` exceeds `O`.
+The ticket rejects a case only when a measured upper bound on `B` does not
+exceed a measured lower bound on `O`.
 
-[H] Let `p` be the chance that a stop hits the window of one write. The journal
-pays when `p` is more than `O / B`. The window runs from the commit to the end
-of the command. It is 15 to 200 ms in the shim traces. Measure it for each
-command and size. No data gives a stop rate. Ticket 25 says not to invent one.
+[H] A stop before journal publication has no replay benefit.
+Path timings differ. At the same elapsed stop time, a rival can already be durable.
+In that phase, a journal cannot claim saved redo work.
+Measure the window for each path from the same start point.
+The stop-time distribution remains unknown.
 
-[P] The gate in ticket 26 starts from the full rebuild. This case has the
-largest `B` and the largest `O`. It does not show the best case for the
-journal. Test `B > O` for each scenario instead.
+[P] Stage the matrix. Measure representative edits and rebuilds, then
+expand near an observed crossover. Do not add a file-count switch to
+production code before the measurements.
 
 ## F. Candidate designs
 
 | ID | Design | Protects | Added cost | Verdict |
 | --- | --- | --- | --- | --- |
 | P1 | Redo. This is the landed model. | Nothing extra | 0 | Baseline. It matches Git, Cargo, Ruff and the crash-only rule |
-| P2 | `Durability::Immediate` | A stop after the commit and before `drop` ends. Power loss in that window | 0 to 9 ms, and a longer repair after a stop (88 ms against 7 ms at 270 MB) | The cheapest rival. It needs no new state. It can lose to P1 for a small edit |
-| P3 | `None` and a clean `drop` | A normal exit | 0 | Landed. It has two holes: a panic and a stop before `drop` ends |
-| P4 | Host retry in memory | A failed or uncertain commit | 0 | Landed in part. `PersistFailed` keeps the update. See `src/index/refresh.rs:156-180` |
-| P5 | Buffered journal, no sync | A process stop only | about 0.1 ms and the encoding | Works only for the commit-to-end window. It needs a format, a replay and a cleanup rule |
-| P6 | Synced journal | A process stop and power loss | about 7 ms and the encoding | More costly than P2 for the same protection |
-| P7 | Journal as a table in the store | Same as P2 | One more commit | P2 in disguise. The store commit already is the journal |
-| P8 | Side file, then rename, for a rebuild | A crash in a rebuild | A second file and a sync | The rebuild is one transaction already. A synced rename gives the P2 gain for a rebuild only. Not scored. Measure with the rebuild `O` |
+| P2 | `Durability::Immediate` | A stop after its commit, before `drop`, and power loss in that window | 0 to 9 ms in the probe; repair took 88 ms against 7 ms at 270 MB | It does not save work if a stop occurs during its store write |
+| P3 | `None` and a clean `drop` | A normal exit without a close error | 0 | A panic, early stop or hidden close error can leave the last commit non-durable |
+| P4 | Host retry in memory | A failed or uncertain commit | 0 | `PersistFailed` keeps an update today. A production host does not exist. See `src/index/refresh.rs:156-180` |
+| P5 | Buffered journal, no sync | A process stop only | about 0.1 ms for a small write, before encoding and publication | Measure safe publication, replay and cleanup; do not call it durable |
+| P6 | External synced journal | A stop after journal sync, before the store's durable barrier | At least the journal sync, publication and removal; the barrier is the `Immediate` replay commit | Compare journal plus `Immediate` with P2 during the store write |
+| P7 | Journal table in redb | A stop after a first durable journal transaction, before the facet transaction | Two durable transactions and extra rows [H] | A second durable transaction can apply facets and remove the journal atomically [H] |
+| P8 | Side file, then rename, for a rebuild | A stop during a rebuild | A second file, file sync, rename and directory sync | Compare repair, bytes and first usable query only for a viable rebuild |
 | P9 | Resumable rebuild. Commit each chunk. Mark `META` as incomplete | A crash in a rebuild | 4 ms for each chunk | Rare benefit. It breaks one coherent generation unless the mark works. Defer |
 | P10 | Dirty sentinel file | Detection of an unclean stop | One file | No gain. The commit carries `META`, the `racy` bit and the rows together |
-| P11 | Read-only open when no file changed | Nothing. It is a speed gain | -12 ms and -5 syncs for a no-change call | Not a recovery design. It removes the cost that a journal would add to. See D6. Pass to tickets 25 and 32 |
+| P11 | Read-only open when no file changed | Nothing. It is a speed control | -12 ms and -5 syncs in the handle probe | Measure a complete query and hand the result to ticket 32 |
 | P12 | A flag that a `SIGINT` handler sets. The run stops and drops the store | A `Ctrl-C` in the window | A handler and a cancel check | Not tested. A handler cannot drop a redb handle safely. `SIGKILL` and power loss still skip it |
 
-[V] P7 follows from the redb design. A journal table that is written in a
-separate `Immediate` commit is a durable commit. It adds a second transaction
-and no new protection.
+[H] P7 needs a complete two-transaction prototype before it earns a cost or
+recovery claim. First, a durable redb transaction stores the prepared facts.
+Second, another durable transaction writes facets and removes the journal.
+If the second commit fails, the first transaction must remain replayable.
+An unreadable or incompatible store cannot supply an in-store journal.
+
+If the store file is new, check its parent-directory durability.
+The two redb transactions alone do not prove that a new file name survives
+power loss.
+Test that case as redo or a side-file rebuild.
 
 [V] P10 gives nothing. A lost commit also loses its `META` row and its `racy`
 bits, because they share one transaction. The next refresh compares each file
@@ -376,17 +410,18 @@ row with the disk. Ticket 25 already requires this check.
 stop in the parse leaves no journal, because the journal follows the parse. The
 journal helps only after the parse ends.
 
-[H] A journal cannot help when the store is not writable. It needs the store to
-replay. A journal in the user state directory adds orphan files when the vault
-moves or disappears. Ticket 25 already leaves cleanup of retired cache files
-open. Do not add a second location to the matrix.
+[H] A journal cannot help when the store is not writable. It needs the store
+to replay. A journal in the user state directory adds orphan files when
+the vault moves. Do not add a second location to the matrix.
 
-[H] If a journal passes the gate, build replay on the same `persist` function.
-A second write path will drift when the format epoch changes. The journal must
-carry the epoch, the extractor fingerprint and the policy fingerprint. It must
-carry the base incarnation and revision. After a replay the store revision must
-change. A store with a newer revision than the journal base means that the
-commit was durable. Discard the journal. Never apply a delta twice.
+[H] A replay needs a complete source check, the policy and the writer base.
+Use the same facet write path for normal writes and replay.
+After replay, change the store revision.
+If the store has a newer revision, discard an obsolete journal.
+Do not apply the same delta twice.
+
+Do not reject a moved vault only because its root path changed.
+Ticket 25 excludes that path from store identity.
 
 [H] A journal needs no new dependency for the pieces. `blake3`, `postcard` and
 `uuid` are production dependencies. The Rust standard library has `File::lock`
@@ -456,62 +491,92 @@ from an incomplete write. A journal here would need a rule for the tail.
 | ID | Fault in ticket 26 | Proposed change |
 | --- | --- | --- |
 | H1 | Step 1 called the 12.0 ms and 65.7 ms times "this scan". They are no-op refresh times. At 50 notes they are mostly store open and close. | Fixed in the ticket. |
-| H2 | Step 1 does not say that a normal exit makes a `None` commit durable. | Add the drop fact and the panic hole to Step 1. |
-| H3 | The gate uses the full rebuild as the best case. It is the case with the largest `O` and the largest `B`. | Test `B > O` for each scenario. Run the full matrix only where `B > O`. |
+| H2 | Step 1 did not separate a successful normal close from an I/O failure or panic. | Describe the successful probe and the unreported close error. |
+| H3 | The full rebuild has both a large `O` and a large `B`; it is not the sole best case. | Stage the matrix. Reject a case only when its measured `B` upper bound does not exceed the measured `O` lower bound. |
 | H4 | Path 2 measures the commit only. The commit is 4 ms in one test and the drop gets shorter. | Measure the sum of open, commit and drop. |
 | H5 | Two journal locations are tested. The user state directory has no replay target when the store is unwritable. | Test only the location next to the store. |
-| H6 | The power-loss simulation uses file images at sync points. This misses torn tails, garbage and reordering. | If the gate passes, use a fault-injecting file layer. Otherwise state the limit. |
+| H6 | File images alone miss torn tails, garbage and reordering. | Use fail points first. Simulate power loss with a fault-injecting file layer only for candidates that pass the cost gate. |
 | H7 | The failure list omits a deleted store with a surviving journal. | Add the case. The BDD feature requires that the query result stays correct. |
 | H8 | The repair measure names one case. | Measure both regimes: clean close, then stop; and durable commits, then stop. |
-| H9 | The process-stop list does not say which stops skip `drop`. | Test `exit`, `abort`, `SIGKILL` and a panic after the commit. |
-| H10 | The break-even text does not remove costs that every path pays. | Define `B` as parse time minus decode time. |
+| H9 | The stop list did not separate `SIGKILL`, `abort`, a panic and `Ctrl-C`. | Test every phase with `SIGKILL`, and test the other modes at representative boundaries. Do not force a real OOM. |
+| H10 | Parse time minus decode time is only a saved-work bound. | Measure the complete replay and first usable query against each rival. |
 | H11 | The Handoffs list said that ticket 35 does not list this ticket. It does now. | Fixed in the ticket. |
 | H12 | The window is not the 10 to 20 ms of `drop`. The CLI keeps the store open during the query. | Measure the window for each command and size. |
 | H13 | Path 2 ignores the repair after an `Immediate` commit. It is 33 to 88 ms. | Include the repair time in the cost of path 2. |
+| H14 | `Database::drop` does not return a failed close write. | Keep a journal until the `Immediate` replay commit returns `Ok`. |
+| H15 | A copied store and journal can carry matching identities. | Check the source snapshot and the writer base. Do not reject a copy by path alone. |
+| H16 | P7 called a journal table a duplicate of `Immediate`. | Test its two-transaction design. It can protect prepared work during the store write. |
+| H17 | The 14% and 5% to 9% rates use saved-work bounds and incomplete journal costs. | Mark them as bounds, not profitable failure rates. |
+| H18 | One failure rate for an entire path hides different stop-phase benefits. | Compare matched elapsed stop points and report a conditional rate for each beneficial phase. |
 
-## I. Questions for the grilling, with proposed answers
+## I. Tentative grilling decisions
 
-1. **Is this ticket still a measurement task, or can it close with an analytic
-   answer?**
-   [P] Keep it a task. Make section E the first step.
-   Add a gate: if `B` is never larger than `O`, stop and record the answer.
-   The probe shows this on macOS for incremental edits.
-   A rebuild at 50,000 notes is open, with a break-even of about 5% to 9% for each rebuild.
-2. **Which failures count?**
-   [P] Count a process stop, a panic and a host crash for lost work. Count power
-   loss for consistency only. redb and `META` already give consistency. Lost
-   work in a cache costs one redo.
-3. **Is `Durability::Immediate` a required rival?**
-   [P] Yes. Measure open, commit and drop together. The A-B-A run shows 0 to 9 ms.
-   It closes the gap between the commit and the end of the command, and the
-   panic hole. It lengthens the repair after a stop: 88 ms against 7 ms at
-   270 MB. Decide it in ticket 24 or 35, not as a journal.
-4. **Should the matrix test a user state directory location?**
-   [P] No. See section F.
-5. **Which sync call does the test use?**
-   [P] Use `File::sync_all`. On macOS it is `F_FULLFSYNC`, as in redb. Record
-   `fsync` on Linux and `FlushFileBuffers` on Windows. Report the buffered cost
-   and the synced cost. Do not use Git's `writeout-only`. It is not durable.
-6. **How do we simulate a crash?**
-   [P] For the gate, use a child process, a fail point and `abort`. If the gate
-   passes, build a fault-injecting file layer as SQLite does. State that file
-   images at sync points miss reordering and torn writes.
-7. **What does the answer change downstream?**
-   [P] Ticket 24: the durability setting and the stale comment. Ticket 32: the
-   host must drop the store at the end of each persist. A panic or an early
-   exit skips the final commit. Ticket 35: the choice between `None` and
-   `Immediate`. Ticket 33: no notice is needed if there is no journal.
-8. **What stays open after a no-journal answer?**
-   [P] The Linux and Windows sync costs. The rebuild `O` at 50,000 notes. The
-   window length for each command and size. The repair time of a 67 MB store
-   after an `Immediate` commit.
-9. **Should a read-only open be the first change?**
-   [P] Pass it to tickets 25 and 32. A no-change call then skips 12 ms and
-   5 syncs. See D6. It also avoids the unclean state for a pure query.
-10. **What rule must a long-lived host obey?**
-   [P] Drop the store after each persist. Never catch a panic while the store
-   is open. A held `None` store keeps every commit non-durable. A caught panic
-   loses them. Ticket 32 owns the rule.
+[P] These answers are tentative. They replace the earlier proposals in this
+note. Keep the ticket open until its measurements are complete.
+
+### I1. Scope and performance
+
+- Keep ticket 26 as a measurement task. Do not select a journal.
+- Keep incremental source updates and rebuilds on policy or identity drift.
+  Measure a cost crossover, but do not add a file-count switch now.
+- Use a staged rejection gate, not a full-rebuild-first gate.
+  Measure changed counts, total notes, note shapes and path-set changes.
+  Expand around cases whose measured cost bounds overlap.
+- Report normal-write cost and the first usable query after a stop.
+  Compare redo, `Immediate`, a journal and a conditional rebuild side file.
+- Measure two rebuild payload bounds on the decided task-heavy facets.
+  One carries prepared facets. One carries parsed facts and rebuilds derived data.
+- Report a conditional eligible-stop rate for each matched phase.
+  Measure each window. Do not combine rates without a stop distribution.
+- If a candidate passes the gate, open a follow-on task.
+  Move to it the replay prototype, the crash tests, the Linux checks
+  and the recovery-query checks. Rewire ticket 35 to that follow-on task.
+  Do not resolve ticket 26 from costs alone.
+
+### I2. Durability and recovery
+
+- Count process stops and power loss as possible redo events.
+  Check store consistency separately. Keep file-system sync limits explicit.
+- Use `File::sync_all` for an external journal and sync its parent directory.
+  Measure each call. Do not assume Windows has the same guarantee.
+- Use a buffered journal only as a process-stop control.
+  Include encoding, safe publication, replay and cleanup in its cost.
+- Use fail points for process stops.
+  Test `SIGKILL` at each phase and other stop modes at key boundaries.
+  Simulate power loss only for candidates that survive the cost gate.
+- Keep a durable journal until the `Immediate` replay commit returns `Ok`.
+  Do not use `Database::drop` or a reopened revision as that proof.
+  The journal-side sync uses `File::sync_all` plus a parent-directory sync.
+  Compare journal plus `Immediate` with `Immediate` alone during store writes.
+- When a journal fails, discard its facts and use the existing redo path.
+  Do not make an optional cache aid a reason to reject a valid source update.
+- When a source, policy, writer-base or compatible-identity check fails,
+  discard the whole journal. Keep a higher-epoch journal untouched.
+- Check a copied vault by facts, not by its absolute path.
+  Ticket 25 excludes the root from store identity.
+
+### I3. Ownership and platform limits
+
+- Hold the store writer handle before journal publication or replay.
+  Use the adapter's lock and check the writer base under it.
+- Keep the domain store port engine-neutral.
+  Keep any justified journal inside the redb adapter.
+  Let another engine decide whether its own log is sufficient.
+- Measure a complete read-only query, handover and repair fallback here.
+  Pass the result to ticket 32. Do not change production index code.
+- Simulate the host lifecycle in a throwaway harness.
+  Ticket 32 must check the result against a production host later.
+  After a panic, discard the handle and plan before revalidation.
+- Measure latency on macOS/APFS.
+  Use Podman's Linux VM for correctness checks on VM-local storage.
+  Do not claim native-Linux speed, Windows behavior or real power-loss proof.
+
+[P] Add P7, the in-store redb journal table, to the staged cost screen.
+The first durable transaction records facts.
+The second durable transaction applies facets and removes the journal.
+An unreadable or incompatible store cannot replay it.
+Check directory durability when the store file is new.
+The two-transaction cost and failure behavior are not measured.
 
 ## J. Remaining gaps
 
@@ -523,13 +588,17 @@ repeat runs, and it shows noise as large as the effect.
 for phases and a 50,000-note vault for a rebuild. The 10 phase cases and 3
 rebuild cases passed. A journal under test would need its own fail points.
 
-[H] The rebuild `O` is an estimate. It adds 3 ms of encoding from the codec
-benchmark. It adds a write and sync of about 30 MB. It adds 4 ms for the
-directory and the removal. The journal size is a guess. The decode time of a
-journal is not measured.
+[H] The rebuild `O` is an estimate from the old layout.
+It adds 3 ms of encoding from the codec benchmark.
+It adds a write and sync of about 30 MB.
+It adds 4 ms for the directory and removal.
+The 11-facet task-heavy payload can have a different size.
+Neither payload's decode and full replay time is measured.
 
-[H] Linux and Windows behavior is not measured. The sync call, the cost, the
-directory sync and the repair time can differ.
+[H] Linux and Windows behavior is not measured.
+The existing Podman `applehv` machine is stopped and has 2 GiB of memory.
+Plan Linux correctness checks on VM-local storage.
+Do not use a Linux VM result as a native-Linux latency result.
 
 [H] Network file systems, FAT volumes and case-insensitive volumes affect the
 baseline too. redb needs honest sync calls and file locks. The store open
