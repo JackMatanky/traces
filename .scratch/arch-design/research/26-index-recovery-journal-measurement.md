@@ -4,12 +4,13 @@ Status: measured. Machine: Apple M4 Pro, macOS 27.2, APFS, Rust nightly-2026-10-
 
 ## Summary
 
-- [V] The external journal never rejects at the gate. For a 50,000-note rebuild it costs 76 ms (facts) against about 1,333 ms of saved work.
-- [V] The in-store journal table adds 477 ms to every rebuild. It is dominated by the external file (76 ms) for the same protection.
-- [V] For incremental edits the journal pays above a 4 to 7 percent stop rate. The stop must land inside a 125 ms window. A cold CLI sits far below that rate.
-- [V] The 85 percent write and 2 times size claims for a facet layout did not reproduce. Measured ratio: 1.01 write, 1.000 bytes.
-- [V] `Durability::None` commits die on abort; re-verified on the real store. `Immediate` adds 4.6 ms per command and makes the next open 20 times slower after an abrupt stop.
-- [V] A kill anywhere before the last sync of a rebuild leaves an empty store. The next open takes 17 to 37 ms and no partial store ever appears.
+- [V] Journal writes and removals cost 8 to 76 ms per command at these sizes. The probe measured these costs on the real engine.
+- [H] The rebuild saved-work bound is 1,333 ms, but it is loose. A replay still pays the persist and must derive facets from facts. The real saved work is lower. Ticket 29 must measure it.
+- [V] The in-store journal table costs more than the external file at every measured size. At 50,000 notes it adds 477 ms over its own baseline apply.
+- [H] For incremental edits the journal pays above a 4 to 7 percent stop rate. The bound uses the refresh delta as saved work. The real saved work is lower. Ticket 29 must measure it.
+- [H] The screen did not reproduce the 85 percent write and 2 times size claims for a facet layout. The probe emulated a round-robin split, not the decided facet layout. The claim stays untested.
+- [V] `Durability::None` commits die on abort; `Immediate` commits survive. This check sampled one stop point per mode on one store copy. `Immediate` cost 4.6 ms more per command in this sample.
+- [V] The sampled rebuild kills left an empty or a full store, never partial. The probe sampled 9 stop points of 15. The next open took 17 to 37 ms.
 
 ## Method
 
@@ -69,11 +70,11 @@ Two `Immediate` transactions: the first records facts into a `journal` table, th
 
 ## R4: recovery cost after a stop
 
-First usable query after a stop, measured as:
+The probe replayed prebuilt rows, not a real replay. Treat these numbers as lower bounds. The steps were:
 
 1. Create a fresh store.
-2. Replay the facts in one `Immediate` commit.
-3. Run one read, then drop.
+2. Replay prebuilt facts rows in one `Immediate` commit.
+3. Read one raw row, then drop.
 
 |Size|Journal path|Rival warm open plus read|
 |---|---|---|
@@ -81,15 +82,16 @@ First usable query after a stop, measured as:
 |5,000|37.65 ms|3.19 ms|
 |50,000|145.38 ms|3.03 ms|
 
-- [V] The rival after a stop is not a warm open. It is a full rescan: 1,718 ms at 50,000 notes. The journal recovery at 145 ms wins by about 1.57 s.
+- [V] The rival after a stop is not a warm open. It is a full rescan: 1,718 ms at 50,000 notes.
+- [H] The journal path must also derive links, range keys and notices from facts, and it must persist. These costs are missing here. A full-query comparison at matched stop points belongs to ticket 29.
 
 ## R5: facet layout claim
 
-- [V] The emulation split `notes` into 8 facet tables with the same bytes.
+- [V] The emulation split `notes` rows round-robin across 8 tables with the same bytes. This is not the decided facet layout of ticket 24.
 - [V] It wrote each layout in one `Immediate` transaction into fresh files.
 - [V] The write times matched at every size.
 - [V] At 50,000 notes the split layout took 828.9 ms against 820.8 ms.
-- [V] The 85 percent write and 2 times size claims did not reproduce in this emulation.
+- [H] The claims of 85 percent more write time and 2 times size stay untested. This emulation does not test the decided layout.
 
 ## R6: commit durability on the real store
 
@@ -119,7 +121,7 @@ Child aborts without close. Parent reopens the 50,000-note store.
 
 ## R8: kill sweep during a 50,000-note rebuild
 
-`SIGKILL` before the k-th sync call. Next process reopens 3 times.
+`SIGKILL` before the k-th sync call, k = 1, 2, 3, 4, 5, 6, 8, 12, 15 of 15. Next process reopens 3 times.
 
 |k|Store state|Notes|First open|
 |---|---|---|---|
@@ -127,8 +129,8 @@ Child aborts without close. Parent reopens the 50,000-note store.
 |2 to 12|Empty schema|0|17 to 37 ms|
 |15, the last sync|Full|50,000|33.31 ms|
 
-- [V] The store file stays at 45,056 bytes until the durable commit lands. No partial 60 MB file ever appears.
-- [V] The outcome is empty or full, never partial. The next open after an empty store costs at most 37 ms.
+- [V] The store file stayed at 45,056 bytes until the durable commit landed. No partial large file appeared in this sample.
+- [V] Every sampled stop left an empty or a full store, never partial. The next open after an empty store cost at most 37 ms.
 - [H] All syncs before the last one are redb internals. The engine gains nothing from syncing earlier in a rebuild.
 
 ## R9: incremental rival on the real engine
@@ -146,24 +148,25 @@ Child aborts without close. Parent reopens the 50,000-note store.
 
 ## G1: gate evaluation
 
-Saved-work upper bound is the marginal rival cost. Added cost is the journal O per command. The gate rejects a candidate only when saved never exceeds added.
+The saved-work bounds are upper bounds. Each one omits replay persist and facet derivation, so the real saved work is lower. The gate rejects a candidate only when even the upper bound never exceeds the added cost.
 
-|Scenario|Rival B|External O|In-store added O|Break-even stop rate, external|
+|Scenario|Rival B|External O|In-store added O|Provisional break-even, external|
 |---|---|---|---|---|
-|Rebuild, 50,000|1,332.9 ms|76 ms|477 ms|5.7 percent|
-|Edit 100, 50,000|125 ms|8.0 ms|4.9 ms|6.4 percent|
-|Edit 5,000, 50,000|898 ms|7.9 ms|not measured|0.9 percent|
+|Rebuild, 50,000|1,332.9 ms|76 ms|477 ms|above 5.7 percent|
+|Edit 100, 50,000|125 ms|8.0 ms|4.9 ms|above 6.4 percent|
+|Edit 5,000, 50,000|898 ms|7.9 ms|not measured|above 0.9 percent|
 |No change, 50,000|0 ms|8.0 ms|4.9 ms|never pays|
 
-- [V] No candidate rejects on rebuild: 76 ms against 1,333 ms leaves a wide margin.
-- [V] No candidate rejects on large edits. The window is the 125 ms tail after journal publication.
-- [H] A cold CLI stops rarely and its stop is unlikely to land in that tail. Expected saving per command sits below the 8 ms cost. Only a host that reloads often can cross the rate.
-- [P] Keep the external file with the facts payload. Drop the in-store journal table. Decide the incremental rate question with real stop data in the follow-on task.
+- [V] No candidate rejects at the upper bound. The bounds are loose, so this is not proof that a journal pays.
+- [V] No-change commands save nothing. They never pass at any stop rate.
+- [H] The provisional rates assume the loose bounds. A cold CLI stops rarely, and its stop may not land in the window. Ticket 29 must measure the real saved work before anyone uses these rates.
+- [P] Keep the external file with the facts payload. Drop the in-store journal table. Decide adoption with ticket 29's replay measurements.
 
 ## Limits
 
 - [V] Journal encode here copies real row bytes. A real journal encodes parsed facts, so these costs are lower bounds. [H] The postcard proxy would add tens of percent, not orders of magnitude.
 - [V] All numbers are macOS and APFS. Linux, Windows, and network volumes are untested.
-- [V] Notes are synthetic. Real vault notes vary in size and frontmatter shape.
+- [V] Notes are synthetic. The fixture makes 1 task per note against the specified 0.75, so task-heavy paths are under-tested.
 - [V] `F_FULLFSYNC` counts prove call order, not disk durability. No real power-loss test ran.
+- [V] The durability check sampled one stop point per mode. The kill sweep sampled 9 of 15 stop points. Both cover a narrow band.
 - [V] The recovery replay wrote prebuilt rows. It did not re-derive links, tags, or notices from facts. The follow-on task must measure that derivation.

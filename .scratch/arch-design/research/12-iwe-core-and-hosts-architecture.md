@@ -275,7 +275,7 @@ IWE represents documents across three distinct forms:
   of an engine/core layer. Domain operations should return pure data
   (`Changes`), and use cases should be explicit functions or thin structs
   (`DocumentFinder`), not heavy context objects.
-- Informs [ticket 34](../issues/34-crate-topology-and-public-surface.md): IWE
+- Informs [ticket 35](../issues/35-crate-topology-and-public-surface.md): IWE
   shows the value of a two-tier core. It uses a zero-I/O domain crate (`liwe`
   analogue) and an engine/app-layer crate (`diwe` analogue) for I/O, config, and
   watcher. CLI, LSP, and MCP consume it equally.
@@ -291,7 +291,7 @@ IWE represents documents across three distinct forms:
 - Informs [ticket 23](../issues/23-note-document-model.md): IWE confirms the
   separation of raw content from structural arena nodes, but serves as a
   cautionary tale against whole-document AST re-serialization.
-- Informs [ticket 33](../issues/33-error-and-diagnostic-architecture.md): IWE
+- Informs [ticket 34](../issues/34-error-and-diagnostic-architecture.md): IWE
   avoids monolithic error crates. It uses localized operation error enums and
   lightweight string diagnostics. This proves that complex error hierarchies
   across the core/host seam are unnecessary overhead.

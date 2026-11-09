@@ -30,7 +30,7 @@ This scout evaluates the module boundaries, dependency directions, trait costs,
 and import topologies of eight candidate seam architectures, applying the
 principles of the `rust-design` skill (`MODELING.md`, `DISCOVERY.md`), and
 assesses how each candidate withstands a future workspace crate split
-(Ticket 32).
+(Ticket 33).
 
 ---
 

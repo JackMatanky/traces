@@ -152,10 +152,10 @@ dev-dependency (`Cargo.toml:148,164`); `src/main.rs` installs nothing. Therefore
 failed-persist warning that leaves "the stored fingerprint stale" (`:185-188`) are
 discarded in production. The one event that would tell a user "your index was just
 rebuilt under different assumptions" is compiled out of their visibility. Today's CLI
-gets away with it because every command re-syncs; a host that skips syncs (ticket 34
+gets away with it because every command re-syncs; a host that skips syncs (ticket 35
 scheduling) loses the only signal that staleness healing ever happened. Eliminating
 element: host owns the subscriber as part of process-adapter setup, or the CLI prints
-drift reports at normal verbosity — a ticket-31/30 handoff.
+drift reports at normal verbosity — a ticket-32/31 handoff.
 
 ### D7: Non-TTY silently selects defaults; a future host inherits the policy by accident (k)
 
@@ -186,7 +186,7 @@ resolves midnight via `local_zone()` and fails on gaps/out-of-range
 whole-day skips). Both sites silently return a *ranking*, so a filter like
 `due > X` can exclude a row without any diagnostic. Eliminating element: temporal owns
 a fallible `day_interval`/promotion primitive (brief T4) whose error propagates as a
-query error (ticket 31), instead of an ordering guess.
+query error (ticket 32), instead of an ordering guess.
 
 ### D9: `Display for DateTimeValue` reads the ambient zone at write time and fails as a formatting error (h, l)
 

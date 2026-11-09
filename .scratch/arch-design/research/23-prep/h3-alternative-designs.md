@@ -176,9 +176,9 @@ Three consumers need these facts:
 
 1. LSP navigation: jump from reference to definition, show definition text on
    hover, and provide folding ranges for callouts [P].
-2. Diagnostics (ticket 31): report undefined footnote references, duplicate
+2. Diagnostics (ticket 32): report undefined footnote references, duplicate
    definitions, and unused definitions [V: `b3-open-ticket-demands.md:53`].
-3. Body schemas (ticket 36): check mandatory callouts and exclude footnote text
+3. Body schemas (ticket 37): check mandatory callouts and exclude footnote text
    from section token budgets [V: `b3-open-ticket-demands.md:58`].
 
 Cost: Parsing callout headers needs a simple prefix check on blockquotes [P].
@@ -203,8 +203,8 @@ The parser merges frontmatter and inline fields into one `IndexMap` [P].
 It discards the source distinction [P].
 Tradeoffs:
 Query reads are fast [H].
-However, schema validation in ticket 20 and ticket 35 cannot tell frontmatter from body fields [V: `20-schema-note-typing-and-validation.md:196-200`].
-Diagnostics in ticket 31 cannot pinpoint the authored source line [V: `31-error-and-diagnostic-architecture.md:30-37`].
+However, schema validation in ticket 20 and ticket 36 cannot tell frontmatter from body fields [V: `20-schema-note-typing-and-validation.md:196-200`].
+Diagnostics in ticket 32 cannot pinpoint the authored source line [V: `34-error-and-diagnostic-architecture.md:30-37`].
 Storing both the effective map and the source maps would duplicate memory [H].
 
 2. Candidate B: Two maps with an accessor (Q3 leaning proposal).
@@ -303,9 +303,9 @@ Verdict: Adopt stable position anchor for row identity [P].
 Strongest argument against proposal:
 Line and byte positions also shift when text changes earlier in the document [H].
 
-### 5.3 Unsaved-buffer build for ticket 34
+### 5.3 Unsaved-buffer build for ticket 35
 
-Ticket 34 needs to build the editor note from an in-memory buffer without disk access [V: `b3-open-ticket-demands.md:29-31`].
+Ticket 35 needs to build the editor note from an in-memory buffer without disk access [V: `b3-open-ticket-demands.md:30-32`].
 Today `MarkdownParserInput::for_test` takes in-memory text, but it is gated by `test-utils` [V: `src/lib.rs:559-561`].
 The production constructor takes `&Path` and reads the file [V: `src/note/parser/input.rs`].
 The model needs a public constructor `MarkdownParserInput::from_buffer(path, text)` [P].
@@ -328,9 +328,9 @@ Verdict: Adopt as option with a lazy eviction policy for large vaults [P].
 Strongest argument against proposal:
 A lazy eviction policy complicates the LSP memory model and reintroduces disk reads [H].
 
-### 5.5 Section extents and preambles for ticket 36
+### 5.5 Section extents and preambles for ticket 37
 
-Ticket 36 needs section boundaries and text slices for body schemas [V: `b3-open-ticket-demands.md:34-35,58`].
+Ticket 37 needs section boundaries and text slices for body schemas [V: `b3-open-ticket-demands.md:35-36,58`].
 `Heading` stores `level`, `text`, `line`, and `span` [V: `src/note/heading.rs:10-14`].
 It does not store the full section extent [V: `src/note/heading.rs:10-14`].
 Also, notes often contain preamble text before the first heading [H].

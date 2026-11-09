@@ -22,7 +22,7 @@ vault facts cited here are one example, not evidence.
    frontmatter-only, severity tiers, `schema.*` codes, hover, completion,
    go-to-definition, `origin`/`description`/`parent_order` on the schema model);
    ticket 19 the frontmatter-span mechanism; ticket 25 the diagnostics envelope;
-   tickets 11/39/40/41 the span model. Arch-design ticket 17 names that effort
+   tickets 11/29/40/41 the span model. Arch-design ticket 17 names that effort
    as evidence of intent and explicitly **reopens** its "spans on the shared
    `Note`" decision. I read the ticket 17/18/23 headers but not the LSP effort,
    and I let a scout summarise `d-prior-decisions`. That was a review gap.
@@ -80,7 +80,7 @@ question.
 **Prior validator design** (md-pkm-lsp 20, audited in `f` §2). Still sound: pure
 `validate` over a parsed note, frontmatter-only first (inline fields deferred:
 no spans, multi-valued semantics), advisory, `source: "traces"` + `schema.*`
-codes with per-code overrides and an `enabled` gate (ticket 29), schema-TOML
+codes with per-code overrides and an `enabled` gate (ticket 30), schema-TOML
 spans forbidden in v1 (go-to-def lands on the file). Stale or contradicted:
 `TypeMismatch`/`MissingRequired` as **Error** (ticket 19: advisory); strict
 string match for select (ticket 19: adaptive literals, `Link` matches via folded
@@ -207,7 +207,7 @@ Violation { field: FieldKey, element: Option<usize>, kind,
      path. Ticket 19's "advisory, never gating" covers read, index and query.
      Reconcile by keeping the kernel policy-free: it emits violations with
      stable codes, and each host supplies a policy `code -> ignore | warn |
-     reject`. Ticket 29's per-code override map is the same mechanism; `reject`
+     reject`. Ticket 30's per-code override map is the same mechanism; `reject`
      is a host-side outcome, not a kernel one.
   2. **The input is a proposed field map, not a parsed note.** Values arrive as
      JSON. Option (a): render the proposed frontmatter to YAML, parse it with
@@ -294,7 +294,7 @@ multi-valued fields from day one? Also resolve whether the probe on Noyalib
 | file link source (`folders`/`ext`/`class`) | link resolution + class lookup (index) | tier 2, via oracle; prior Q15 said type-only |
 | unknown field | never an error; 20 Q2 two-tier typo hint | Hint/Information |
 | unknown class | exists today (`warn_unknown_classes`) | keep |
-Severity vocabulary and overrides are ticket 29's registry model; severities are not "Error" for type problems (ticket 19).
+Severity vocabulary and overrides are ticket 30's registry model; severities are not "Error" for type problems (ticket 19).
 
 ### Q4. The "schema override" for date-shaped text (ticket 19 handoff)
 
@@ -351,7 +351,7 @@ field could replace them).
 S1 post-render check as consumer of the kernel; ADR-0006 values-only stance
 unchanged (S2 out); `Schema` handle contract to 28. Internals to sequence after
 the seam: collapse `RawSchemaFieldType`/`SchemaFieldTypeTag`; delete
-`SchemaService::new`; error enums with ticket 31 (authoring errors fail/degrade
+`SchemaService::new`; error enums with ticket 32 (authoring errors fail/degrade
 at load; note violations never mix); CSR and `parser.rs` untouched by any
 option.
 

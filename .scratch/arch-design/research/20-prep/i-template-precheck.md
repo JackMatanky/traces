@@ -268,7 +268,7 @@ Where should the template pre-check live in Traces?
 
 - **Mechanism:** `TemplateService::write` (or a helper inside `service.rs`) parses the rendered note, calls `schema::validate::validate(&note, &schema)`, and handles advisory/gating outcomes [P].
 - **Dependency Direction:** `src/template/` already depends on `src/schema/` (`src/template/engine.rs:60`, `src/template/engine/schema.rs:69-72`) [V]. Calling `schema::validate` adds no new dependency edge [H].
-- **Workspace Split Steer (Ticket 32):** In a multi-crate workspace split (`traces-schema`, `traces-template`), `traces-template` naturally depends on `traces-schema`. This direction is clean and acyclic [H].
+- **Workspace Split Steer (Ticket 33):** In a multi-crate workspace split (`traces-schema`, `traces-template`), `traces-template` naturally depends on `traces-schema`. This direction is clean and acyclic [H].
 
 ### 5.2 Option B: Trait Injection (`dyn NoteValidator` into `TemplateService`)
 

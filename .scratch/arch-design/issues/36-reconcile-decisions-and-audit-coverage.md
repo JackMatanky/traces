@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 18, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 39
+Blocked by: 18, 19, 20, 21, 22, 23, 24, 25, 28, 30, 31, 32, 33, 34, 35, 36
 
 ## Question
 
@@ -63,7 +63,7 @@ Research [12](../research/12-iwe-core-and-hosts-architecture.md),
 [14](../research/14-fileclass-model-binding-and-validation.md) were added after
 ticket 20 resolved. Re-test resolved decisions against their per-ticket notes
 and the comment appended to ticket 20. Re-test the layering principle against
-IWE's `liwe`/`diwe` split (ticket 34). Corrections to earlier claims are listed
+IWE's `liwe`/`diwe` split (ticket 35). Corrections to earlier claims are listed
 in each research file's ledger and in ticket 20's comment.
 
 ## Inputs from the execution-context decision

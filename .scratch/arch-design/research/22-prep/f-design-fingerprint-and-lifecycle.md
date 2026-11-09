@@ -2,7 +2,7 @@
 
 **Document Status:** Working Draft for Grilling (Wayfinder Ticket 22, Sub-questions c & e, Lifecycle)  
 **Baseline Git HEAD:** `8064cf76` (incorporating `main @ 207cc3fb`)  
-**Scope:** Design options for residual `ConfigDigests` (c), `ConfigFile` typestate vs direct pipeline (e), and the workspace configuration lifecycle (Ticket 21 compliance, host inputs, request admission, generation retention, and downstream handoff to Ticket 30).  
+**Scope:** Design options for residual `ConfigDigests` (c), `ConfigFile` typestate vs direct pipeline (e), and the workspace configuration lifecycle (Ticket 21 compliance, host inputs, request admission, generation retention, and downstream handoff to Ticket 31).  
 **Conventions:** `[V]` = Verified by direct source read / compilation; `[H]` = Architectural inference / synthesis; `[P]` = Design proposal for grilling.
 
 ---
@@ -440,9 +440,9 @@ This is called in `src/config/service.rs:75` (`load`) and `175` (`trust_subjects
 - The adapter crate (CLI, LSP host) acquires `HostInputs` at startup and passes them into core. Clippy `disallowed-methods` bans `std::env::var` inside `src/config/`.
 - In `trust_subjects(path, scope)`: Receives the explicit `HostInputs` or uses the workspace's held locator.
 
-### 4.4 Downstream Boundary with Ticket 30 (`WorkspaceHost`)
+### 4.4 Downstream Boundary with Ticket 31 (`WorkspaceHost`)
 
-Wayfinder Ticket 30 owns long-lived workspace composition, watcher orchestration, and debounce triggers. To ensure a clean seam, Ticket 22 defines what config exposes to Ticket 30:
+Wayfinder Ticket 31 owns long-lived workspace composition, watcher orchestration, and debounce triggers. To ensure a clean seam, Ticket 22 defines what config exposes to Ticket 31:
 
 - **Owned by Ticket 22 (Config Boundary)**:
   1. `HostInputs` struct and precedence rules.
@@ -450,7 +450,7 @@ Wayfinder Ticket 30 owns long-lived workspace composition, watcher orchestration
   3. `ConfigGeneration` type (holding `Arc<Config>`, `generation_id`, `content_hash`).
   4. Deterministic admission recheck function (`admit_request()` / `recheck()`).
   5. Scaffolding service (`ConfigScaffold::init`) decoupled from CLI dialogs.
-- **Owned by Ticket 30 (Workspace Host Boundary)**:
+- **Owned by Ticket 31 (Workspace Host Boundary)**:
   1. Filesystem watcher subscription on `.traces/config.toml`.
   2. Debouncing rapid editor saves.
   3. Evicting or replacing `WorkspaceConfig` across generations.
@@ -484,4 +484,4 @@ To allow the specification to sequence work into discrete pull requests, the sub
 | **(e) `ConfigFile` Typestate** | Ticket 16 (hash before parse invariant), Ticket 21 (admission recheck) | **YES**. Replacing `ConfigFile<Source, State>` with `VerifiedLocalConfig` touches only `src/config/file.rs` and `src/config/service.rs`. | PR 2: Replace phantom typestate with `VerifiedLocalConfig`. |
 | **Lifecycle & `from_env`** | Ticket 21 (`HostInputs` snapshot definition) | Depends on (e) for the clean `VerifiedLocalConfig` admission check. | PR 3: Introduce `HostInputs`, eliminate `ConfigLocator::from_env`, implement `admit_request`. |
 | **Downstream: Ticket 25** | Blocked by (c) | Ticket 25 (Index Freshness) directly consumes the updated `IndexFingerprint` definition from (c). | Implement 22(c) before Ticket 25. |
-| **Downstream: Ticket 30** | Blocked by Lifecycle / (e) | Ticket 30 (`WorkspaceHost`) consumes `admit_request()` and `ConfigGeneration`. | Implement 22 Lifecycle before Ticket 30. |
+| **Downstream: Ticket 31** | Blocked by Lifecycle / (e) | Ticket 31 (`WorkspaceHost`) consumes `admit_request()` and `ConfigGeneration`. | Implement 22 Lifecycle before Ticket 31. |

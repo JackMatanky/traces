@@ -37,8 +37,8 @@ This document provides independent design options for Wayfinder Ticket 22 (`.scr
    - **O6**: Enforce no-ambient-reads via Clippy `disallowed-methods` [V: `issues/21:194-202`].
    - **Unattended-prompt rule**: Core/template receive `DialogProvider` without checking TTY; unattended prompts use authored defaults or return typed errors; no silent fallback to empty text or false [V: `issues/21:182-189`].
 3. **Downstream Integration**:
-   - **Ticket 30 (`WorkspaceHost`)**: Host composition of config loading, admission revalidation, and initialization.
-   - **Ticket 32 (`Crate Topology`)**: Steer toward separating CLI into its own crate, requiring core domain use cases for scaffolding and trust management.
+   - **Ticket 31 (`WorkspaceHost`)**: Host composition of config loading, admission revalidation, and initialization.
+   - **Ticket 33 (`Crate Topology`)**: Steer toward separating CLI into its own crate, requiring core domain use cases for scaffolding and trust management.
 
 ---
 
@@ -309,7 +309,7 @@ The following matrix contrasts how each system operation affects underlying stor
   - *Why D4*: The code inventory proves that `TrackerStore` has **zero engine consumers** [V: `a3:200-202`]. It was borrowed from `mise` under an assumption that Traces would need machine-wide config inventories for version pruning [V: `ADR-0002:40-44, 125-132`]. Traces has no such feature. Retiring tracking eliminates 409 LoC of dead weight, deletes an artificial two-store ordering invariant, and removes a CLI command that adds user cognitive load without operational value.
   - *Why D5 as fallback*: If the human values `traces tracked` for personal auditing, Option D5 is the superior design: it encapsulates both stores behind one unbypassable `TrustManager` interface, preventing partial state divergence and making the ordering invariant structural rather than conventional.
 - **Best Dissent against D4**: "A user who works across 50 git repositories cannot easily answer 'which repositories on my machine have local `.traces/config.toml` files?' without `traces tracked list`. If they ran a security audit or revoked permissions, they lose the ability to see un-trusted or forgotten projects."
-- **Flip Fact**: If evidence shows that users or automated tools actively use `traces tracked list` in shell scripts to inventory vaults, or if a planned ticket (e.g. Ticket 30 `WorkspaceHost`) requires discovering all workspaces on a machine for background indexing, D4 must be rejected in favor of D5.
+- **Flip Fact**: If evidence shows that users or automated tools actively use `traces tracked list` in shell scripts to inventory vaults, or if a planned ticket (e.g. Ticket 31 `WorkspaceHost`) requires discovering all workspaces on a machine for background indexing, D4 must be rejected in favor of D5.
 
 ---
 
@@ -344,11 +344,11 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 - Conversely, `[schemas].directory` defaults to `"schemas"` in `builder.rs:141-150`, but `init` does not scaffold `.traces/schemas/` at all [V: `a3:304-305`].
 - **Architectural Debt**: Config defaults are split between `builder.rs`, `constants.rs`, and `cli::init.rs` rather than owned by a single source of truth in `RawConfig` or `ConfigBuilder`.
 
-#### 4. The Unattended-Prompt Rule & Host Composition (Tickets 21, 30, 32)
+#### 4. The Unattended-Prompt Rule & Host Composition (Tickets 21, 31, 33)
 
 - **Ticket 21 Mandate**: In non-interactive contexts (CI, `--no-input`, LSP, MCP), the core must receive answers as plain data or query a `DialogProvider` that resolves authored defaults without detecting a TTY [V: `issues/21:182-189`].
-- **Ticket 30 Mandate**: Hosts (CLI, LSP `traces/initWorkspace`, MCP tools) must share identical scaffolding semantics. Scaffolding cannot remain trapped in `src/cli/` [V: `issues/30:12, 38-41`].
-- **Ticket 32 Steer**: Preparing for separating the CLI into its own crate requires extracting domain logic from `src/cli/init.rs` into the core library [V: `map.md:33-42`].
+- **Ticket 31 Mandate**: Hosts (CLI, LSP `traces/initWorkspace`, MCP tools) must share identical scaffolding semantics. Scaffolding cannot remain trapped in `src/cli/` [V: `issues/30:12, 38-41`].
+- **Ticket 33 Steer**: Preparing for separating the CLI into its own crate requires extracting domain logic from `src/cli/init.rs` into the core library [V: `map.md:33-42`].
 
 ---
 
@@ -502,7 +502,7 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 | **Dependency Edges** | `cli -> config, dialog`. Bypasses `ConfigService`. | `cli -> app::init -> config, fs`. | `cli -> app::init -> raw_config`. | `cli -> app::init -> (config, template)`. | `cli -> app::init -> (config, trust_manager)`. |
 | **Test Impact** | 0 test changes. | Enables programmatic testing without CLI harness. | Unit tests verify TOML roundtrip against `RawConfig`. | Tests template starter rendering. | E2E tests no longer need explicit `traces trust` after init. |
 | **Reversibility** | Baseline. | High. | High. | Moderate. | High. |
-| **Crate Split Readiness (Ticket 32)** | **Blocks** CLI split (domain logic in CLI). | **Enables** CLI split. | **Enables** CLI split. | **Enables** CLI split. | **Enables** CLI split. |
+| **Crate Split Readiness (Ticket 33)** | **Blocks** CLI split (domain logic in CLI). | **Enables** CLI split. | **Enables** CLI split. | **Enables** CLI split. | **Enables** CLI split. |
 | **Cost** | 0 migration cost; leaves UX defect. | Low: simple extraction of existing logic. | Low: adds `RawConfig::starter()`. | Moderate: adds template asset bundling. | Low: composes existing trust grant into init. |
 
 ---
@@ -512,7 +512,7 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 - **Lean**: **Option G5 combining G3 and G2 (Core `InitService` + Canonical `RawConfig::starter` + `TrustPolicy::AutoTrust`)**.
   - *Why*:
     1. It eliminates the post-init untrusted trap: a human who runs `traces init` expects the vault to be immediately usable without having to discover and execute `traces trust` [V: `a3:323-333`].
-    2. It moves domain logic out of `src/cli/init.rs` into a pure, testable core use case, unblocking the CLI crate split (Ticket 32) and enabling LSP/MCP vault creation (Ticket 30).
+    2. It moves domain logic out of `src/cli/init.rs` into a pure, testable core use case, unblocking the CLI crate split (Ticket 33) and enabling LSP/MCP vault creation (Ticket 31).
     3. It adheres strictly to Ticket 21's unattended-prompt rule: non-CLI hosts pass pre-computed `InitOptions`, while the CLI prompts via `DialogProvider`.
     4. It resolves the template directory default asymmetry (`findings-ledger:19`) by anchoring starter configuration in `RawConfig`.
 - **Best Dissent against G5**: "Implicitly trusting a workspace on creation violates the principle of explicit security authorization. If a script or malicious tool creates a vault in a user's directory, auto-trusting grants execution privileges without explicit confirmation."
@@ -563,16 +563,16 @@ src/
 │   ├── file_tracker.rs      # Reusable hash-keyed symlink persistence
 │   ├── undo.rs              # Transactional UndoJournal
 │   └── host_env.rs          # Snapshotted HostEnvironment (Ticket 21)
-├── app/                     # Reusable Application Use Cases (Ticket 30)
+├── app/                     # Reusable Application Use Cases (Ticket 31)
 │   ├── trust.rs             # TrustManager (reused by CLI, LSP, MCP)
 │   ├── scaffold.rs          # InitService (reused by CLI, LSP, MCP)
 │   └── load.rs              # Config load & admission revalidation pipeline
-└── host/cli/                # Outward-facing CLI crate (Ticket 32)
+└── host/cli/                # Outward-facing CLI crate (Ticket 33)
     ├── init.rs              # Dialog prompt collection -> app::scaffold
     └── trust.rs             # Terminal output formatting -> app::trust
 ```
 
-### Option C: Multi-Crate Workspace Layout (Target of Ticket 32)
+### Option C: Multi-Crate Workspace Layout (Target of Ticket 33)
 
 Separates the CLI and Infrastructure into distinct crates:
 
@@ -657,11 +657,11 @@ Sub-questions (d) and (g) have clear independence boundaries allowing them to be
 1. **Independence of Sub-Question (d) (Trust/Tracking Stores)**:
    - Completely independent of sub-questions (a) (root types), (b) (parser input), and (c) (residual digests).
    - Can be decided and implemented immediately without waiting for Note or Query decisions.
-   - Blocks downstream Ticket 30 (`WorkspaceHost`) which needs the final `TrustManager` API for request-admission revalidation.
+   - Blocks downstream Ticket 31 (`WorkspaceHost`) which needs the final `TrustManager` API for request-admission revalidation.
 2. **Independence of Sub-Question (g) (Scaffolding Ownership)**:
    - Independent of (a), (b), (c), and (e).
    - Composes with (d): if Option G5 (AutoTrust on create) is chosen, `InitService` calls `TrustManager::grant`. However, the decision to extract `InitService` from `cli::init` can be made independently of whether trust is auto-granted.
-   - Prerequisite for Ticket 32 (separating the CLI into its own crate).
+   - Prerequisite for Ticket 33 (separating the CLI into its own crate).
 3. **Recommended Specification Sequence**:
    - **Step 1**: Resolve (d) $\rightarrow$ Choose D4 (retire tracker) or D5 (combined `TrustManager`).
    - **Step 2**: Resolve (g) $\rightarrow$ Extract `InitService` with `RawConfig::starter` (G3), and wire `AutoTrust` (G5) using the chosen trust interface from Step 1.

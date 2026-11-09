@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 7, 28, 29, 18, 16
+Blocked by: 7, 16, 18, 28, 31
 
 ## Question
 
@@ -47,7 +47,7 @@ serde for schema literals and the hand-written runtime adapter. `Int` renders
 
 See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Template
 comparisons and date handling use the shared relation module, not minijinja's
-own comparison. The natural-language date grammar (ticket 29) is shared with
+own comparison. The natural-language date grammar (ticket 30) is shared with
 `date()` and `date_add` filters. `now`/`today` come from the execution context.
 
 ## Inputs from the schema typing decision

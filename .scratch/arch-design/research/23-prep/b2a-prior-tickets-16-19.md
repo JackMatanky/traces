@@ -72,7 +72,7 @@ file gives a paraphrase.
 |----------|--------|----------|---------------------|
 | Two owned value enums; no borrowed mirror. | `issues/18-value-model.md:447-450,471-477` | C1, C6 | BINDS. `Note` stores owned `NoteFieldValue`: `Null`, `Bool`, `Int(i64)`, `Float(f64)`, `String`, `Date`, `DateTime`, `Duration`, `Link(Link)`, `List` and `Object`. |
 | Keep the 80-byte size test. Do not box more variants. | `issues/18-value-model.md:390-396,475-476` | C6, C16 | BINDS. `NoteFieldValue` stays at 80 bytes or less. |
-| `Link` and `NoteLink` are separate. | `issues/18-value-model.md:433-435,486-492` | C1, C2, C10 | BINDS. `Link` holds `target`, `display` and `embedded`. `NoteLink` is the editor-side occurrence type with the syntax kind and the span. Ticket 23 defines it. Ticket 32 chooses the module name. |
+| `Link` and `NoteLink` are separate. | `issues/18-value-model.md:433-435,486-492` | C1, C2, C10 | BINDS. `Link` holds `target`, `display` and `embedded`. `NoteLink` is the editor-side occurrence type with the syntax kind and the span. Ticket 23 defines it. Ticket 33 chooses the module name. |
 | Keep the Noyalib compat parser. Convert its `Value` directly to `NoteFieldValue`. | `issues/18-value-model.md:201-224,467-470,494-501` | C3, C8 | BINDS. Ticket 23 must not use the Noyalib CST for frontmatter. `Document::span_at(path)` is unsound for dotted keys, tags and block scalars. |
 | Use one classification order for frontmatter and inline fields. Frontmatter ignores quotes. Inline quotes escape. | `issues/18-value-model.md:502-508` | C6, C8 | BINDS. The date, duration, link and blank parsers are shared. |
 | Use `Int(i64)` and `Float(f64)`. | `issues/18-value-model.md:509-515` | C4, C6 | BINDS. The inline parser gives `Int` when the text fits `i64`. |
@@ -88,7 +88,7 @@ file gives a paraphrase.
 |----------|--------|----------|---------------------|
 | The parser classifies a value once. No code classifies it again. A consumer gets a text view of the typed value. | `issues/19-*.md:55-59,104-108` | C1, C6 | BINDS. The note stores typed values and no raw lexeme. |
 | Inline fields can yield `DateTime`. A naive date-time is a civil value. | `issues/19-*.md:101-103,575-577` | C6 | BINDS. `parse_atom_at` in `src/note/parser/inline.rs` must parse `DateTime`. |
-| A `NaN` becomes `Null` and the parser reports a notice. | `issues/19-*.md:90-91,188-193` | C11, C15 | BINDS. Parsing stays infallible. Ticket 31 owns the mechanism that shows the notice. |
+| A `NaN` becomes `Null` and the parser reports a notice. | `issues/19-*.md:90-91,188-193` | C11, C15 | BINDS. Parsing stays infallible. Ticket 32 owns the mechanism that shows the notice. |
 | A multi-valued inline field classifies each element. | `issues/19-*.md:226-227` | C6 | BINDS. Each element of `key:: a, b, 2025-01-15, [[link]]` goes through the atom grammar. |
 | `Link` identity is the folded target. `display` and `embedded` are attributes. | `issues/19-*.md:154-156` | C1, C10 | INFORMS. Equality ignores the display and the embed syntax. |
 
@@ -99,7 +99,7 @@ file gives a paraphrase.
 ## Conflicts and handoffs that the ticket needs
 
 1. Inline `DateTime` and the grammar.
-   - Ticket 18 excluded inline `DateTime` (`issues/18:357-358,505-506`). Ticket
+   - Ticket 18 excluded inline `DateTime` (`issues/18:367-368,505-506`). Ticket
      19 reversed this (`issues/19:101-103,575-577`).
    - Ticket 23 must place `parse_datetime_at` in `parse_atom_at`
      (`src/note/parser/inline.rs:131-141`). Questions: does `YYYY-MM-DDTHH:MM`
@@ -109,7 +109,7 @@ file gives a paraphrase.
    - Ticket 19 requires a notice for `NaN` (`issues/19:90-91,188-193`). Ticket
      16 requires that vault parsing is Frozen (`issues/16:72`).
    - Ticket 23 must give the parser signature: a `(Note, Vec<NoteNotice>)`
-     result, or a notice sink. Ticket 31 owns the presentation.
+     result, or a notice sink. Ticket 32 owns the presentation.
 3. Frontmatter spans and the direct conversion.
    - Ticket 18 rejected the CST and converts `noyalib::Value` directly.
    - Ticket 20 says adapters need a span for each field key and each list

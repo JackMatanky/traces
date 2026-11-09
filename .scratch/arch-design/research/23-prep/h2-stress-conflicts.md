@@ -6,7 +6,7 @@ for ticket 24. Its Q1 to Q7 numbering and its verdicts on the shared stored-span
 design are history. See the ticket's `## Answer` and `h5`.
 
 This document stress tests decisions Q1 through Q7 against all tickets. It
-compares decisions against tickets 16 to 22 and 24 to 36 [V]. It also checks the
+compares decisions against tickets 16 to 22 and 24 to 37 [V]. It also checks the
 redesign map [V: .scratch/arch-design/map.md:1-405]. Every claim has a tag: [V]
 for checked text, [H] for inference, [P] for a proposal.
 
@@ -21,7 +21,7 @@ for checked text, [H] for inference, [P] for a proposal.
 | Q4 | 22 | `Make note own its parser input, so note no longer imports config` [V: issues/22-config-ownership-and-lifecycle.md:354-355] | None |
 | Q5 | 16 | `Frozen: vault-format parsing... The same files must parse to the same meaning` [V: issues/23-note-document-model.md:76-77] | None |
 | Q6 | 20 | `schema owns the pure, span-free rule over resolved effective fields` [V: issues/20-schema-note-typing-and-validation.md:298-299] | None |
-| Q7 | 31 | `A parse-time NaN-to-Null warning is a third` [V: issues/31-error-and-diagnostic-architecture.md:33] | None |
+| Q7 | 31 | `A parse-time NaN-to-Null warning is a third` [V: issues/34-error-and-diagnostic-architecture.md:33] | None |
 
 ## Decision Q1: Stored body spans and long-lived host
 
@@ -51,8 +51,8 @@ issues/25-index-freshness-and-invalidation.md:36-39]. Q1 increases the
 serialized record size by 4.3 percent [V:
 .scratch/arch-design/research/23-prep/g-probe-results.md:8-9].
 
-Ticket 34 needs the editor shape from an unsaved buffer [V:
-issues/34-live-buffer-and-persisted-index-consistency.md:9-14]. Q1 fixes this
+Ticket 35 needs the editor shape from an unsaved buffer [V:
+issues/27-live-buffer-and-persisted-index-consistency.md:9-14]. Q1 fixes this
 need [P]. The parser builds the shared `Note` directly from an in-memory buffer
 [P].
 
@@ -76,8 +76,8 @@ spans when reading only frontmatter [H].
    `src/index/store.rs:41` to wipe old caches on start-up [P].
 3. Unsaved editor buffer. An unsaved buffer changes spans and content in memory
    [H]. The on-disk `index.redb` remains stale [V:
-   issues/34-live-buffer-and-persisted-index-consistency.md:9-13]. Smallest fix:
-   Ticket 34 routes LSP queries through an in-memory document overlay [P].
+   issues/27-live-buffer-and-persisted-index-consistency.md:9-13]. Smallest fix:
+   Ticket 35 routes LSP queries through an in-memory document overlay [P].
 
 ### Verdict
 
@@ -195,12 +195,12 @@ become a `List`, scalar equality filters fail [H]. For example, `WHERE author =
 
 ### Assumptions in open tickets
 
-Ticket 35 expects `ResolvedFields::check(&FieldMap) -> Vec<Violation>` [V:
-issues/35-schema-internals-simplification.md:12]. The note model's effective map
+Ticket 36 expects `ResolvedFields::check(&FieldMap) -> Vec<Violation>` [V:
+issues/37-schema-internals-simplification.md:12]. The note model's effective map
 supplies this input directly [P].
 
 Ticket 26 needs row identity and projection for multi-value lists [V:
-issues/26-query-core-and-plan.md:17-18]. Ticket 26 must format lists into joined
+issues/28-query-core-and-plan.md:17-18]. Ticket 26 must format lists into joined
 strings for tables [V: src/query/value.rs:36-40].
 
 ### Hidden costs
@@ -246,10 +246,10 @@ passing a borrowed status map to `parse_markdown` [P].
 ### Assumptions in open tickets
 
 Ticket 26 assumes the query executor can print task status names [V:
-issues/26-query-core-and-plan.md:35-36]. The executor holds the status map from
+issues/28-query-core-and-plan.md:35-36]. The executor holds the status map from
 `Config` and resolves symbols on demand [P].
 
-Ticket 30 and Ticket 34 pass `&TaskStatusMap` to `parse_markdown` [P].
+Ticket 31 and Ticket 35 pass `&TaskStatusMap` to `parse_markdown` [P].
 
 ### Hidden costs
 
@@ -291,7 +291,7 @@ in headings still run pass 2 [P]. Parity remains 100 percent [V].
 
 Speeds up parse times by 21 percent on 98.8 percent of notes [V:
 .scratch/arch-design/research/23-prep/g-probe-results.md:14-15]. Directly
-benefits Ticket 24, Ticket 25, Ticket 30, and Ticket 34 [P].
+benefits Ticket 24, Ticket 25, Ticket 31, and Ticket 35 [P].
 
 ### Hidden costs
 
@@ -358,8 +358,8 @@ ticket resolution [P].
 ## Decision Q7: Parser notices channel
 
 The parser returns `(Note, Vec<NoteNotice>)` [P]. `Note` does not store notices
-[P]. Ticket 31 owns notice presentation [V:
-issues/31-error-and-diagnostic-architecture.md:30-36].
+[P]. Ticket 32 owns notice presentation [V:
+issues/34-error-and-diagnostic-architecture.md:30-36].
 
 ### Conflicts with resolved tickets
 
@@ -373,8 +373,8 @@ requirement [P].
 
 ### Assumptions in open tickets
 
-Ticket 31 expects a notice channel for parser diagnostics [V:
-issues/31-error-and-diagnostic-architecture.md:33-36]. Ticket 24 and Ticket 25
+Ticket 32 expects a notice channel for parser diagnostics [V:
+issues/34-error-and-diagnostic-architecture.md:33-36]. Ticket 24 and Ticket 25
 avoid storing repeated notice strings in redb [P].
 
 ### Hidden costs
@@ -387,8 +387,8 @@ produce zero notices [H].
 1. Unsaved buffer diagnostics in LSP. An unsaved buffer with `NaN` returns a
    notice with a `ByteSpan` [P]. The LSP translates it immediately into an
    editor diagnostic [V:
-   issues/34-live-buffer-and-persisted-index-consistency.md:21-23].
-2. High volume of notices during index rebuild. Ticket 31 must throttle or group
+   issues/27-live-buffer-and-persisted-index-consistency.md:21-23].
+2. High volume of notices during index rebuild. Ticket 32 must throttle or group
    stderr notices during bulk indexing [P].
 
 ### Verdict

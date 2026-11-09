@@ -198,7 +198,7 @@ Today `refresh` logs the failure and returns the in-memory index. Today
   (`a1`, section D). Ticket 23 decided that the bulk path collects them.
 - [P] A notice is a fact of one parse. If the store keeps notices, one facet
   holds them, with the path as the key. If the store drops them, a command such
-  as `traces check` reparses the note (ticket 31). Ask ticket 31 first.
+  as `traces check` reparses the note (ticket 32). Ask ticket 32 first.
 
 ### Class lookups
 

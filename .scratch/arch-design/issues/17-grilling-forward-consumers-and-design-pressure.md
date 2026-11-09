@@ -87,7 +87,7 @@ are downstream outcomes, not direct architecture targets.
   index?](27-live-buffer-and-persisted-index-consistency.md).
 - Operation-specific performance budgets and measurements remain with the
   relevant index, query, parser, and template decisions, including tickets
-  23-30.
+  23-31.
 - Affected downstream decisions include note modeling (23), index read model
   (24), freshness and invalidation (25), workspace host (32), and error and
   diagnostic architecture (33). Crate topology (34) must account for the

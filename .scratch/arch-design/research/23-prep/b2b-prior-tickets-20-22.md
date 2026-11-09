@@ -28,7 +28,7 @@ stale.
 - [V] `index` owns `IndexPolicy`. `IndexPolicy::fingerprint()` is the only
   source of the fingerprint (`issues/22:94-107`).
 - [V] Ticket 22 hands the final place of `TaskStatus*` and `TaskListItem` to
-  ticket 23 (`issues/22:84,292-294`).
+  ticket 23 (`issues/22:84,302-304`).
 - [V] `TaskStatus` lives at the crate root (`src/task.rs:51-55`). It holds an
   owned `name: String`.
 
@@ -86,7 +86,7 @@ The agent reviews `h-arch-design-note-split-review.md`, section 3.2 (lines
    editor. Ticket 20 made the schema check span-blind. Does the index store any
    spans?
 2. Borrowed or owned parser input. Ticket 22 says the parser borrows it. The
-   red-team notes warn about lifetimes in async hosts (tickets 30 and 34).
+   red-team notes warn about lifetimes in async hosts (tickets 31 and 35).
 3. Status interning and the status map. If the parser stores only the marker
    `char`, it needs no `TaskStatusMap` at parse time.
 
@@ -96,7 +96,7 @@ Exact handoff text:
   inline fields into that map; ticket 23 handles this, and no merge is promised
   here." (`issues/20:122-123`)
 - Ticket 20: "Field-key spans for adapters; inline-field merge: note document
-  model (ticket 23)." (`issues/20:382-383`)
+  model (ticket 23)." (`issues/20:392-393`)
 - Ticket 21: "Keep path-derived facts, such as the filename period, out of
   `Note` (ticket 21)." (`issues/21:68-69`)
 - Ticket 21: "Let the index-freshness decision choose whether to persist derived

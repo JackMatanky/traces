@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 6, 18, 19, 24, 13
+Blocked by: 6, 13, 18, 19, 24
 
 ## Question
 
@@ -41,7 +41,7 @@ See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). Handed to this
 
 See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Delete `FileClassExpander`, its crate-root impl, the `&mut ClassExpansionMode` out-parameter and `Option<Arc<dyn>>`. The query service receives a plain class hierarchy (keyed by one normalising `ClassName`) from the app layer. It returns unknown classes as data instead of logging. It behaves the same with or without a hierarchy attached.
 
-Verified latent hazard: with no expander attached, store queries fall back to exact match (`src/query/service.rs:402-406`) but in-memory filters match nothing (`src/query/grammar/source.rs:228-229`, empty class set). Production always attaches one when classes are used (`src/cli/mod.rs:478-480`, `src/template/engine/query.rs:121-122`). This gap is a hazard for a new host or library caller, not a current user-visible bug. Where the hierarchy type lives is for this ticket and 32.
+Verified latent hazard: with no expander attached, store queries fall back to exact match (`src/query/service.rs:402-406`) but in-memory filters match nothing (`src/query/grammar/source.rs:228-229`, empty class set). Production always attaches one when classes are used (`src/cli/mod.rs:478-480`, `src/template/engine/query.rs:121-122`). This gap is a hazard for a new host or library caller, not a current user-visible bug. Where the hierarchy type lives is for this ticket and 33.
 
 Binding (also from 20): expand `@class` (and `@class*`) into `Class | Tag |
 Path` atoms from class-owned `[binding]` data (tags with nested matching,

@@ -539,7 +539,7 @@ loops
 
 ## 7. Deep Dive: The Schema Model Additions
 
-The LSP (Tickets 23, 24, 30) and MCP require specific extensions to the schema
+The LSP (Tickets 23, 24, 31) and MCP require specific extensions to the schema
 model. Below is the technical specification for each addition:
 
 ### 7.1 Provenance (`origin: SchemaName`) [P]

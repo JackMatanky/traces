@@ -87,8 +87,8 @@ Ticket 20 (`issues/20-schema-note-typing-and-validation.md`) resolved the schema
 
 7. **Placement of `FieldName`, `FieldKey`, and Field Types (Tickets 18–20)**:
    - Current state: `src/field.rs` sits at Tier 3 (`survey/cross-cutting.md:35`), defining `FieldName` (raw exact name), `FieldKey` (forgiving case-folded name), and legacy `FieldValue`.
-   - Ticket 18 Answer (`issues/18:447-450, 478-485`): Two owned enums. Runtime `NoteFieldValue` stays in `note` (or moves below `note` and `schema` per Ticket 32); schema-local literal enum `SchemaLiteral` moves into `schema`. Legacy `FieldValue`, `FieldValueRef`, `DateTimeCoercion`, and `FieldStringValue` are deleted (`issues/18:535-539`).
-   - Ticket 20 Answer (`issues/20:80-82, 334-339`): Runtime value sits below both `schema` and `note`. `schema` validates `&FieldMap` using pure functions. `FieldName` and `FieldKey` remain common vocabulary for identifying fields across `schema`, `note`, and `config`.
+   - Ticket 18 Answer (`issues/18:447-450, 478-485`): Two owned enums. Runtime `NoteFieldValue` stays in `note` (or moves below `note` and `schema` per Ticket 33); schema-local literal enum `SchemaLiteral` moves into `schema`. Legacy `FieldValue`, `FieldValueRef`, `DateTimeCoercion`, and `FieldStringValue` are deleted (`issues/18:535-539`).
+   - Ticket 20 Answer (`issues/20:80-82, 344-349`): Runtime value sits below both `schema` and `note`. `schema` validates `&FieldMap` using pure functions. `FieldName` and `FieldKey` remain common vocabulary for identifying fields across `schema`, `note`, and `config`.
 
 ---
 
@@ -97,7 +97,7 @@ Ticket 20 (`issues/20-schema-note-typing-and-validation.md`) resolved the schema
 Direct quotes from resolved tickets and research briefs handing off requirements to Ticket 22:
 
 1. **Ticket 19 (Coercion Policy)**:
-   - Quote: `"[Temporal boundary](./27-temporal-boundary-and-dialects.md): natural-language grammar and crate, duration refinement, civil vs instant type shape, and a DateConfig sub-Config (coordinated with ticket 22)."` (`issues/19:223-225`).
+   - Quote: `"[Temporal boundary](./30-temporal-boundary-and-dialects.md): natural-language grammar and crate, duration refinement, civil vs instant type shape, and a DateConfig sub-Config (coordinated with ticket 22)."` (`issues/19:223-225`).
    - Quote: `"The execution-context Answer sets a lazily acquired system-local default zone (configurable override source still belongs to tickets 22/27)..."` (`issues/19:251-254`).
 
 2. **Ticket 21 (Execution Context & Ambient State)**:
@@ -106,11 +106,11 @@ Direct quotes from resolved tickets and research briefs handing off requirements
    - Quote: `"The adapter gets OS-valued inputs once when it opens each workspace. These inputs are state/config homes, discovery ceilings, ignored directory names and the explicit start path. Preserve platform path encodings and path precedence. The config/path decisions must choose an explicit base for relative overrides or reject them."` (`issues/21:76-80`).
 
 3. **Map Handoff**:
-   - Quote: `"Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md), [read model](./issues/24-index-read-model-and-query-execution.md), [freshness](./issues/25-index-freshness-and-invalidation.md), [query](./issues/26-query-core-and-plan.md)..."` (`map.md:341-344`).
+   - Quote: `"Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md), [read model](./issues/24-index-read-model-and-query-execution.md), [freshness](./issues/25-index-freshness-and-invalidation.md), [query](./issues/28-query-core-and-plan.md)..."` (`map.md:341-344`).
 
 4. **Ticket 20 (Schema Typing)**:
    - Quote: `"...schema definitions never affect parsing, the index or the fingerprint (only the configured class-field name is shared)."` (`issues/20:64-65`).
-   - Quote: `"IWE binds in the host config ([schemas.<name>].match, globs with gitignore-style !, last match wins)... The Answer keeps class-owned [binding]; ticket 35 should state how ! ordering works in the existing [binding] table..."` (`issues/20:465-468`).
+   - Quote: `"IWE binds in the host config ([schemas.<name>].match, globs with gitignore-style !, last match wins)... The Answer keeps class-owned [binding]; ticket 36 should state how ! ordering works in the existing [binding] table..."` (`issues/20:465-468`).
 
 ---
 

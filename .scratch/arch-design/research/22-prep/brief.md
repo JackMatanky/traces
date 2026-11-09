@@ -175,7 +175,7 @@ Lean: G2 + G3 (core, canonical content). G5's auto-trust is the contested part. 
 template files pre-exist. I think that is too narrow [H]: ADR-0002's boundary is the workspace root, and a cloned repo can
 bring `.traces/schemas/`, ignore settings or other content besides templates. A safer predicate is "`.traces/` did not
 exist before init created it, and init wrote every file in it". Value question (Q2): is the post-init `Untrusted` error a
-bug to fix, or a deliberate "you must review it" step? Flip: ticket 30 decides a host-level trust policy.
+bug to fix, or a deliberate "you must review it" step? Flip: ticket 31 decides a host-level trust policy.
 
 ### Loader lifecycle (ties c, d, e to ticket 21)
 
@@ -210,7 +210,7 @@ against the global config dir [V, a2 §3.4]; ticket 21 requires an explicit base
 5. **Q5.** Should `TaskStatus` stop carrying an owned name (a 23 call), or stay as-is here?
 6. **Q6.** Should `Local` vs `Global` provenance be a type, so a host cannot mistake the ungated
    global file for a trusted one?
-7. **Q7.** Crate shape: leave all physical splitting to ticket 32 (red team and e's own recommendation), with 22 only
+7. **Q7.** Crate shape: leave all physical splitting to ticket 33 (red team and e's own recommendation), with 22 only
    making the module graph split-ready?
 
 ## 5. Proposed grilling script (a "yes" accepts one default, not the package)

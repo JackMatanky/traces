@@ -11,7 +11,6 @@ Do not choose a journal in this task.
 The maintainer decides after the measurements.
 Ticket [Does the landed index freshness model
 stand?](./25-index-freshness-and-invalidation.md) is resolved.
-It does not wait for this task.
 
 Make a throwaway prototype.
 The redesign has not landed, so no production code has the decided layout.
@@ -30,9 +29,11 @@ Record each change that affects the index.
 
 Write down what a journal can save before you measure.
 Check the full source snapshot on every path.
-A no-op refresh costs 12.0 ms at 50 notes and 65.7 ms at 20,000 notes.
+Research 11 measured 12.0 ms for a no-op refresh at 50 notes and 65.7 ms at
+20,000 notes, on the old store layout.
 At 50 notes, most of this time is the writable store open and close.
 Do not call it the scan cost.
+Treat these numbers as [H] inputs.
 
 Measure a read-only open as a separate control. It can avoid the writable open
 and close on an unchanged query. It cannot avoid the source check.
@@ -85,13 +86,13 @@ Record the gate result and its limits. Do not choose a journal.
 If any candidate survives the cost screen, create a follow-on task.
 Move the full replay prototype, fault-injecting crash tests, Linux correctness
 checks and recovery-query measurements to that task.
-Move ticket 35's blocker from this ticket to the follow-on task.
+Move ticket 36's blocker from this ticket to the follow-on task.
 Record a cost-screen result under this ticket's `## Answer`.
 Name the unresolved recovery proof. Do not select a journal from costs alone.
 
 Report the `None` and `Immediate` comparison as a separate result.
 Ticket 24 chose `None` without a total open, commit and drop comparison.
-Ticket 35 owns the durability choice after the needed measurements.
+Ticket 36 owns the durability choice after the needed measurements.
 
 ### Step 2: Compare these recovery paths
 
@@ -110,7 +111,7 @@ Ticket 35 owns the durability choice after the needed measurements.
 
    Tickets 24 and 25 set these rules.
    A cold CLI process cannot use this path. Label the host model as a simulation.
-   Ticket 32 must check the result against the eventual host.
+   Ticket 33 must check the result against the eventual host.
 4. **Durable journal.** Write prepared facts beside the store before its write.
    Hold the store writer handle before journal publication or replay.
    Check the writer base while the handle is held. Replay only after the input checks.
@@ -206,17 +207,8 @@ cost, the rival's first usable query and each protection window.
 Record an upper bound on saved work for each selected size and scenario.
 Do not call a bound a complete replay measurement.
 
-For each candidate that survives, assign these measurements to the follow-on task:
-
-- The first usable query after a restart and repeated queries after recovery.
-- The journal encode, write, file sync, directory sync and removal times.
-- The journal decode and replay times.
-- The store open, commit, durable-barrier and close times.
-- The redb repair time after each class of unclean stop.
-- The recovery time and the number of file reads and parses.
-- The journal bytes by facet, the store size before and after, and peak memory.
-- The protection window after journal publication and before the durable store commit.
-- The store-writer lock hold time and the time another process waits.
+For each candidate that survives, the follow-on task measures the recovery
+costs. Ticket 29 sections A and D carry the full list.
 
 Report the cost without a failure. Every journaled write pays this cost.
 Report the cost and the protection window for the buffered control separately.
@@ -226,7 +218,7 @@ The same reviewer reported that it doubles the file size. No one checked these f
 Check them on the decided layout with `lists` and the derived `tasks` facet.
 Measure the task-only scan, the full query rows and a one-note replacement.
 
-### Step 4: Specify failure tests for the follow-on task
+### Step 4: Hand the failure tests to the follow-on task
 
 Apply this step only to candidates that survive the cost screen.
 Separate two failure classes:
@@ -236,92 +228,19 @@ Separate two failure classes:
 - **System crash or power loss.** The operating system can lose pages that were not synced.
   A lost `Durability::None` commit costs redo work and can leave a store to repair.
 
-Test the process stop with a child process and fail points.
-Use `SIGKILL` at every journal, store and replay phase.
-Test `abort`, a panic and `Ctrl-C` at representative boundaries.
-Record whether the handler runs `drop`. Do not treat these modes as equivalent.
+You cannot cut the power. Simulate a system crash through a fault-injecting
+file layer and saved file images. Record the method and its limits. Do not
+claim that simulation equals power loss.
 
-You cannot cut the power. If a candidate survives the cost gate, simulate a
-system crash through a fault-injecting file layer and saved file images.
-Test loss, partial writes and ordering at sync points.
-
-Record the method and its limits. Do not claim that simulation equals power loss.
-
-Stop the process at each of these points:
-
-- Before the journal write ends. After it ends, before the journal sync.
-- After the journal sync and before journal publication.
-- After journal publication and before the store commit.
-  Reopen and read the journal to check that the synced bytes survived.
-- Before and after the error-reporting store durability barrier.
-- Before the journal removal and after it, before the directory sync.
-- During replay, before and after the replay commit.
-  Check that replay is safe to repeat.
-- In the middle of a full rebuild.
-
-Test these system-crash cases for surviving candidates:
-
-- Lose the last `Durability::None` store commit.
-- Keep the journal directory entry. Lose the journal data.
-- Lose or keep the store commit while the journal survives.
-- Leave the journal after the durable store commit.
-
-Change the input before replay:
-
-- Change one source file that the journal does not list.
-- Change one file that the journal lists.
-  Do not keep a stale inbound link, notice or range key.
-- Add, delete and rename a file.
-- Change a file to the same size and `mtime`, inside the racy window.
-  Compute the `racy` bit from the original scan start, not the replay time.
-- Change the policy.
-- Change each part of the store identity.
-  The parts include the engine tag, platform family, incarnation and revision.
-- Use a lower format epoch and a higher format epoch.
-  Use a changed extractor fingerprint.
-  Do not replay or delete a journal with a higher epoch.
-  Ticket 25 sets the same rule for the store.
-
-Discard the whole journal when a source, policy, writer-base or compatible-identity
-check fails. Keep a higher-epoch journal untouched, as stated above.
-Validate a copied or restored vault from its store identity, writer base, policy
-and complete source snapshot. Do not reject a copy only because its path changed.
-Ticket 25 permits a vault move without a store rebuild.
-
-Test the storage failures:
-
-- Make the store directory unwritable. Run the command more than once.
-  Make sure the journal does not grow or repeat work without a limit.
-- Open a read-only vault.
-- Fill the disk during the journal write.
-- Corrupt or truncate the journal.
-- Delete the store but keep the journal. Check the query against a fresh parse.
-
-If an optional journal write, sync or decode fails, ignore its facts and redo
-from source files. Do not change the index read and write error rules.
-
-Test the concurrent cases:
-
-- Start a second process while the first holds the store or the journal.
-  Test a journal from a live writer and one from a dead writer.
-  Never let two processes replay one journal.
-- Drop the store handle before a durability check, then let another writer act.
-  Check the writer base again before cleanup.
-
-Treat a failed redb commit as an uncertain outcome.
-After it, check the store incarnation and revision.
-Ticket 25 drops the 128-bit `commit_nonce`. Do not use it.
+Ticket 29 section B carries the full fault-test specification.
+It covers the stop points, the system-crash cases, the input-change cases,
+the storage failures, the concurrency cases and the uncertain-commit rule.
 
 ## Check every result
 
 At the cost screen, check each measured rival query against a fresh parse.
-Assign the remaining recovery checks to the follow-on task when it opens.
-
-The follow-on task's checks keep every recovered query equal to a fresh parse.
-It checks every facet: `files`, `fields`, `tags`, `classes`, `headings`, `outlinks`, `links`,
-`tasks`, `lists`, `notices` and the range keys.
-Reject partial data and mixed-policy rows.
-Make sure a replay does not skip a journaled file without a decision.
+The follow-on task keeps every recovered query equal to a fresh parse.
+Ticket 29 section C carries the full facet list and the rejection rules.
 
 Check that nothing under `.traces/` enters the source scan.
 Ticket 25 sets this rule.
@@ -335,25 +254,8 @@ Do not claim that a result on one file system holds on another.
 
 ## Record these rules
 
-Record the gate's input data and limits in this ticket.
-Assign the detailed journal rules below to the follow-on task when it opens.
-
-- Where the journal stores vault-derived facts.
-- Who can read the journal, the file mode and the sync tools or backups that copy it.
-  The store holds the same facts today. Compare the exposure with the store.
-- The journal name. Ticket 25 puts the engine tag in the cache file name.
-- The cleanup rule for a stale journal, an orphan journal and a journal of a retired engine.
-  Ticket 25 leaves the removal of retired cache files open.
-- The behavior when the journal is absent.
-- What each path reports to the user after a replay, a discard or a failure.
-  Ticket 33 owns the notices.
-- Whether the redb adapter can own the journal without a new domain port operation.
-  Ticket 24 keeps durability and locking inside each adapter.
-- Whether another engine already has a log such as SQLite WAL.
-- The new states and failure modes that the journal adds.
-- The error-reporting barrier that permits journal removal.
-  The screen uses the `Immediate` replay commit for it.
-- The behavior when journal publication fails or leaves an orphan.
+Record the gate's input data and limits in this ticket. The follow-on task
+records the detailed journal rules. Ticket 29 section E carries the list.
 
 ## Method
 
@@ -423,7 +325,7 @@ Link the answer from ticket 25. Return the trade-offs to the maintainer.
 If no candidate survives, record the rejection evidence and remaining limits.
 If a candidate survives, create the follow-on task before resolving this ticket.
 Move the full-replay and failure-test requirements to the follow-on task.
-Change ticket 35's blocker to the follow-on task.
+Change ticket 36's blocker to the follow-on task.
 Do not report recovery correctness or a journal choice from a cost-screen result.
 
 The answer must name these items:
@@ -433,7 +335,7 @@ The answer must name these items:
 - The code that the journal makes removable. Name none if there is none.
 - What stays unresolved.
 - The downstream tickets that the result changes.
-- If a candidate survived: the follow-on task and the changed ticket 35 blocker.
+- If a candidate survived: the follow-on task and the changed ticket 36 blocker.
 
 ## Inputs from earlier tickets
 
@@ -454,32 +356,13 @@ These sections are facts and open points. Treat them as fallible.
   uncommitted files. An unwritable store can repeat the same work [H].
 - [Ticket 27](./27-live-buffer-and-persisted-index-consistency.md): a query result names the
   generation pair, the incarnation and the revision. A replay must change the revision.
-- Tickets 20 and 32 describe undo journals for agent writes.
+- Tickets 20 and 33 describe undo journals for agent writes.
   Ticket 22 describes one for `init`. They are different.
   They protect vault files. This journal protects a derived cache.
 - Ticket 16 freezes index results that equal a fresh parse. The journal must obey this rule.
 - [Preparation notes](../research/26-index-recovery-journal-prep.md): source facts,
   macOS probes and estimates from the old store layout.
   The note records tentative grilling decisions. Treat all estimates as fallible.
-
-## Handoffs
-
-- Ticket 24: preserve the engine-neutral store port and adapter-owned durability.
-- Ticket 25: link the measurement and the read-only-open finding.
-- Ticket 27: the generation pair after a replay.
-- Ticket 31: the path form in the journal.
-- Ticket 32: check the simulated host against the real host.
-  - Measure read-only open and the writable fallback here.
-  - Hand the result to ticket 32.
-  - After a panic, discard the handle and plan.
-  - Validate before publication.
-- Ticket 33: the notices for a replay or a discard.
-- Ticket 16: a change-table row for each new file on disk.
-- Ticket 35: it waits for this ticket.
-  The ticket 26 gate can move its blocker to a follow-on task when a
-  journal candidate survives the cost screen. Ticket 35 owns the
-  `None` versus `Immediate` choice. The maintainer decides if a journal
-  result enters the specification.
 
 ## Answer
 
@@ -489,29 +372,37 @@ Marks use the map rules.
 
 ### Gate verdicts
 
+- The saved-work bounds below are upper bounds. A replay still pays the
+  persist, and it must derive facets from facts. The real saved work is
+  lower. Ticket 29 measures it.
 - Rebuild, 50,000 notes: the external facts journal costs 76 ms per command.
-  The rival costs 1,332.9 ms. No rejection. The margin is about 17 times.
-- The in-store journal table adds 477 ms to every rebuild.
-  The external file adds 76 ms for the same protection. Drop the in-store table.
-- Edit 100 notes: the rival adds 125 ms of parse and commit work.
-  The external journal costs 8.0 ms per command. No rejection at the bound.
-  It pays only above a 4 to 7 percent stop rate inside the 125 ms window.
+  The loose saved-work upper bound is 1,332.9 ms. No rejection at the bound.
+  This is not proof that a journal pays.
+- The in-store journal table costs more than the external file at
+  every measured size. At 50,000 notes it adds 477 ms over its own baseline
+  apply. [P] Drop the in-store table.
+- Edit 100 notes: the loose saved-work bound is 125 ms. The external journal
+  costs 8.0 ms per command. No rejection at the bound. [H] It pays only above
+  a 4 to 7 percent stop rate inside the 125 ms window.
 - No-change commands save nothing and pay 8.0 ms. They never pass.
 - Verdict: no candidate rejects, so no journal is chosen here.
-  The screen sets a break-even stop rate. It does not pick a design.
+  The screen sets provisional break-even rates. Ticket 29 must measure the
+  real saved work before anyone uses the rates.
 
 ### Measured facts that bound the decision
 
-- [V] A kill anywhere before the last sync of a rebuild leaves an empty store.
-  The next open costs 17 to 37 ms. No partial store ever appears.
-- [V] `Durability::None` commits die on abort. `Immediate` commits survive.
-  `Immediate` adds 4.6 ms per command and makes the next open 20 times
-  slower after an abrupt stop without close.
-- [V] The journal publication barrier works. A synced journal file plus
-  directory sync has a 4 ms floor. Replay removal waits for an `Ok`
-  `Immediate` replay commit.
-- [V] The facet-layout claims of 85 percent more write time and 2 times size
-  did not reproduce. Measured write ratio 0.99 to 1.01. Size ratio 1.000.
+- [V] The sampled rebuild kills left an empty or a full store, never
+  partial. The probe sampled 9 of 15 stop points. The next open costs 17 to
+  37 ms.
+- [V] `Durability::None` commits die on abort. `Immediate` commits
+  survive. This check sampled one stop point per mode on one store copy.
+  `Immediate` cost 4.6 ms more per command in this sample.
+- [V] The journal publication barrier is specified and costed. A synced
+  journal file plus directory sync has a 4 ms floor. The probe did not run
+  the kill-and-replay test. Ticket 29 must prove the barrier end to end.
+- [H] The claims of 85 percent more write time and 2 times size for a facet
+  layout stay untested. The probe emulated a round-robin split, not the
+  decided facet layout of ticket 24.
 - [V] The no-change refresh costs 385 ms at 50,000 notes. Open and scan
   dominate it. A journal cannot remove this cost.
 - [H] Journal encode costs here copy real row bytes, so they are lower
@@ -519,14 +410,22 @@ Marks use the map rules.
 
 ### Handoffs
 
-- [Ticket 39](./39-index-replay-prototype-and-fault-tests.md) owns the rest:
-  the real replay prototype, fault-injection crash tests, Linux correctness
-  checks, and recovery-query measurements.
-- Ticket 35: its blocker moves from this ticket to ticket 39.
-  The `None` versus `Immediate` choice stays with ticket 35.
+- [Ticket 29](./29-index-replay-prototype-and-fault-tests.md) owns the rest:
+  the real replay prototype with derivation, fault-injection crash tests,
+  and the barrier end-to-end proof.
+  It also owns Linux correctness checks, full-query recovery measurements,
+  and the real saved-work bounds behind the break-even rates.
+- Ticket 36: its blocker moved from this ticket to ticket 29.
+  The `None` versus `Immediate` choice stays with ticket 36.
 - Ticket 25: the read-only-open control finding (0.03 ms, no syncs) passes
   there. A read-only handle cannot coexist with a writable handle.
-- Ticket 32: the simulated-host retry path validates against these numbers.
+- Ticket 33: the simulated-host retry path validates against these numbers.
+  After a panic, discard the handle and the plan. Validate before publication.
+- Ticket 24: preserve the engine-neutral store port and adapter-owned durability.
+- Ticket 27: the generation pair after a replay. A replay must change the revision.
+- Ticket 32: the path form in the journal.
+- Ticket 34: the notices for a replay or a discard.
+- Ticket 16: a change-table row for each new file on disk.
 
 ## Code delta
 

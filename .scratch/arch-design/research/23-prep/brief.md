@@ -46,7 +46,7 @@ This directory follows `research/20-prep` and `research/22-prep`.
 | C11 | Infallibility and notices | D | How does the parser report a notice? |
 | C12 | Persistence | A | Store the whole `Note` or extracted facts? Can the store decode lazily? |
 | C13 | Live buffer | A | How does an unsaved buffer enter the model? |
-| C14 | Body facts for ticket 36 | B | Which heading extents and text slices? |
+| C14 | Body facts for ticket 37 | B | Which heading extents and text slices? |
 | C15 | Compatibility of each change | Compatibility rules | Which query results change? |
 | C16 | Performance budgets | Evidence gate | What does each operation cost at each vault size? |
 | C17 | Naming, visibility, glossary | D | What does the glossary claim that the code lacks? |

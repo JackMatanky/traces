@@ -100,7 +100,7 @@ remove the visibility rule. Apply this rule to crate topology and every boundary
 decision.
 
 **Consequences for the map.** Unblocks [path and capability
-model](./31-path-and-capability-model.md) and [value
+model](./32-path-and-capability-model.md) and [value
 model](./18-value-model.md). The heuristic-coercion removal option in the
 coercion ticket no longer needs a further compat decision (Migratable). The
 crate-topology ticket evaluates every alternative (including the single-crate

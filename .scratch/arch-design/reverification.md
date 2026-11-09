@@ -82,13 +82,13 @@ inside the existing read transaction).
 | [index read model](./issues/24-index-read-model-and-query-execution.md) | **Amended (note)** | Query path untouched; cold path now includes the drift check and full-rebuild-on-drift |
 | [index freshness](./issues/25-index-freshness-and-invalidation.md) | **Rewritten** | Premise inverted: drift detection exists. Ticket now ratifies/revises the landed model and settles the four still-open items |
 | [query core](./issues/28-query-core-and-plan.md) | Stands | `src/query` untouched; `QuerySet` cloning correction already applied |
-| [temporal boundary](./issues/29-temporal-boundary-and-dialects.md) | Stands | `src/temporal` untouched |
-| [template boundary](./issues/30-template-engine-boundary.md) | Stands | `src/template` untouched |
-| [path and capability](./issues/31-path-and-capability-model.md) | Stands | `src/path.rs` untouched |
-| [workspace host](./issues/32-workspace-host-and-composition.md) | **Amended (note)** | `IndexerService::from(&Config)` derives a fingerprint; heal is log-only |
-| [error architecture](./issues/33-error-and-diagnostic-architecture.md) | Stands | `src/cli/error.rs` untouched; heal observability noted in the ledger |
-| [crate topology](./issues/34-crate-topology-and-public-surface.md) | **Amended (numbers)** | 46 identifiers, 1,550-line baseline |
-| [reconcile](./issues/35-reconcile-decisions-and-audit-coverage.md) | **Amended** | Standing re-check of drift and ADR-0009 supersession added |
+| [temporal boundary](./issues/30-temporal-boundary-and-dialects.md) | Stands | `src/temporal` untouched |
+| [template boundary](./issues/31-template-engine-boundary.md) | Stands | `src/template` untouched |
+| [path and capability](./issues/32-path-and-capability-model.md) | Stands | `src/path.rs` untouched |
+| [workspace host](./issues/33-workspace-host-and-composition.md) | **Amended (note)** | `IndexerService::from(&Config)` derives a fingerprint; heal is log-only |
+| [error architecture](./issues/34-error-and-diagnostic-architecture.md) | Stands | `src/cli/error.rs` untouched; heal observability noted in the ledger |
+| [crate topology](./issues/35-crate-topology-and-public-surface.md) | **Amended (numbers)** | 46 identifiers, 1,550-line baseline |
+| [reconcile](./issues/36-reconcile-decisions-and-audit-coverage.md) | **Amended** | Standing re-check of drift and ADR-0009 supersession added |
 
 Totals: 29 tickets: 17 stand unchanged by construction, 12 are amended, and 0
 are invalidated outright. 1 ticket (the freshness ticket) was rewritten. No

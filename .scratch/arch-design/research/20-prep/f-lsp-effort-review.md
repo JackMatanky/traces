@@ -1,6 +1,6 @@
 # Prior LSP effort review (md-pkm-lsp) for arch-design ticket 20
 
-Exhaustive audit of `.scratch/md-pkm-lsp/` (tickets 08, 10, 11, 14, 19, 20, 21, 22, 23, 25, 26, 33, 40, 41; map.md; research files 20, 25, 26, 39, 40) against current codebase and arch-design tickets 16–19.
+Exhaustive audit of `.scratch/md-pkm-lsp/` (tickets 08, 10, 11, 14, 19, 20, 21, 22, 23, 25, 26, 34, 40, 41; map.md; research files 20, 25, 26, 39, 40) against current codebase and arch-design tickets 16–19.
 Tags: [V] verified against cited file:line; [H] inference; [P] proposal for ticket 20.
 
 ---
@@ -78,7 +78,7 @@ Tags: [V] verified against cited file:line; [H] inference; [P] proposal for tick
 
 ### Critical audit against arch-design decisions 16–19
 
-1. **Value model conflict (ticket 18) [V `issues/18:31-37`]**:
+1. **Value model conflict (ticket 18) [V `issues/18:32-38`]**:
    - Ticket 18 established `NoteFieldValue::Int(i64)` and `Float(f64)`, schema-local literal type for schema options (strings stay strings, native TOML dates stay strings), and NO `FieldValue` in schema.
    - Ticket 20's validator assumed `SchemaFieldType::Number` checked against a single `Number(f64)` or `FieldValue::Number`. With `Int` vs `Float`, schema needs to know whether `number` allows both or distinguishes integers (e.g. `step: 1.0` vs integer counts).
    - Ticket 18 decided select options that name links are interpreted as links ONLY at consumer boundary with shared wikilink parser. Ticket 20 Q6 strictly checked string equality against `select_values()` — this would falsely flag `[[target]]` note fields as `InvalidSelect`!
@@ -111,9 +111,9 @@ Tags: [V] verified against cited file:line; [H] inference; [P] proposal for tick
 
 ## 3. Span decision history & representation split
 
-### History of tickets 11, 39, 40, 41
+### History of tickets 11, 29, 40, 41
 
-1. **Ticket 11 & Research 39 [V `issues/11:31-75`, `research/39:15-30`]**: Rejected parallel span index. Added `Range<BytePos>` to AST nodes. Narrowed `BytePos` to `u32`. Decided transient spans (never in redb, §8).
+1. **Ticket 11 & Research 39 [V `issues/11:32-75`, `research/39:15-30`]**: Rejected parallel span index. Added `Range<BytePos>` to AST nodes. Narrowed `BytePos` to `u32`. Decided transient spans (never in redb, §8).
 2. **Note-Parse 04 & Option A withdrawal [V `issues/40:8-16`, `issues/41:7-9`]**: Attempted mandatory `Spanned<T>` with `#[serde(skip)]` and a doc comment "spans from store decode as 0..0, never trust them." Withdrawn mid-triage as a type-system lie: type promises presence, store delivers dead data.
 3. **Ticket 40 & 41 (Option B vs Option C) [V `issues/40:17-45`, `issues/41:10-32`]**:
    - **Option B (persist spans)**: Derive serde on `Spanned<T>`. Spans roundtrip through redb `NOTES` table. Zero test churn. Amends 11 §8. Wire cost: 8 bytes per occurrence.
@@ -147,7 +147,7 @@ Tags: [V] verified against cited file:line; [H] inference; [P] proposal for tick
 | Feature | Schema data needed | Exists today? | Which arch-design ticket owns it |
 |---|---|---|---|
 | **Select value completion** | `SchemaFieldDef::select_values()` | **Yes** [V `src/schema/fields/select.rs:40`] | Ticket 18 (value model literal type), Ticket 20 (typing/completion) |
-| **File-field completion** | `SchemaFileFieldRef` (filters: `folders`, `ext`, `class`) + index lookup | **Yes** [V `src/schema/fields/file.rs:42-53`], no completion handler | Ticket 20 (schema query filter), Ticket 34 (LSP completion) |
+| **File-field completion** | `SchemaFileFieldRef` (filters: `folders`, `ext`, `class`) + index lookup | **Yes** [V `src/schema/fields/file.rs:42-53`], no completion handler | Ticket 20 (schema query filter), Ticket 35 (LSP completion) |
 | **Hover on FileClass / field** | `Schema::fields()`, `origin`, `description`, `parent_order` | **Partial**: `fields()` exists; `origin`, `description`, `parent_order` do NOT [V `src/schema/fields.rs:52`] | Ticket 20 (schema field metadata & inheritance) |
 | **Go-to-definition** | Path `{schema_dir}/{name}.toml`, `origin: Option<SchemaName>` | **Partial**: config path exists; `origin` does NOT [V `src/schema/fields.rs:52`] | Ticket 20 (schema metadata) |
 | **Typo suggestions (`suggest_field`)** | Canonical match + Levenshtein distance against schema fields | **Yes** [V `src/schema/service.rs:252` (`suggest_field`)] | Ticket 20 (visibility / service facade) |

@@ -24,7 +24,7 @@ not implement the redesign. It ends at hand-off to specification.
   (ADR-0009 appears twice).
 - Code and tickets disagree by design. The tickets describe the target. The
   code is not yet refactored. Each resolved ticket ends with a "Code delta"
-  section that lists the change. Ticket 35 orders those deltas. `path:line`
+  section that lists the change. Ticket 36 orders those deltas. `path:line`
   citations in tickets refer to the working tree near `cb15b21c`. Ticket-to-ticket
   conflicts are defects. Ticket-to-code gaps are not.
 - Ticket renumbering (2026-10-30): the journal measurement and the live-buffer
@@ -34,6 +34,13 @@ not implement the redesign. It ends at hand-off to specification.
   - 28 to 30, 29 to 31, 30 to 32, 31 to 33.
   - 32 to 34, 33 to 35, 35 to 36, 36 to 37.
   - Tickets 1 to 25 and 38 did not move.
+- Ticket renumbering (2026-11-09): the replay prototype ticket moved next to
+  the index tickets, so the index family reads 24 to 29. Only git history uses
+  the old numbers. The old-to-new map follows.
+  - 29 to 30, 30 to 31, 31 to 32, 32 to 33.
+  - 33 to 34, 34 to 35, 35 to 36, 36 to 37.
+  - 37 to 38, 38 to 39, 39 to 29.
+  - Tickets 1 to 28 did not move.
 - Skills every session consults: `rust-design`, `domain-modeling`, `grilling`
   (HITL tickets), `research` (research tickets), `codebase-design`; project mise
   tasks (`mise run verify|test|bench`) for evidence; codegraph for navigation.
@@ -64,8 +71,8 @@ not implement the redesign. It ends at hand-off to specification.
   - `check`: inspect current code now.
   - `verify` or `re-verify`: adversarial claim testing.
   - `validate`: schema validation.
-  - `audit`: ticket 35's coverage sweep.
-  - `reconcile`: ticket 35's consistency pass.
+  - `audit`: ticket 36's coverage sweep.
+  - `reconcile`: ticket 36's consistency pass.
   - `ratify`: accept the landed design unchanged.
   Never swap `index`, `store` (redb), or `cache`.
 - Breadth-first survey (per-subsystem, code-verified by scouts; claims NOT yet
@@ -113,7 +120,7 @@ not implement the redesign. It ends at hand-off to specification.
     stdout/stderr split.
   - Acyclic 10-tier module DAG; layered test isolation.
   - `LineIndex`/`FieldKey`/`Blake3Hasher` framing.
-  The reconciliation ticket (ticket 35) re-tests these items.
+  The reconciliation ticket (ticket 36) re-tests these items.
 
 ## Decisions so far
 
@@ -218,7 +225,7 @@ not implement the redesign. It ends at hand-off to specification.
   daemon?](./issues/12-research-iwe-core-and-hosts-architecture.md): confirms
   ticket 20 layering. Pure operations return a plain `Changes` set. Hosts apply
   it, with no one-implementor traits. The app layer lives in its own crate
-  (`diwe`, for ticket 34). The LSP writes open buffers into the one in-memory
+  (`diwe`, for ticket 35). The LSP writes open buffers into the one in-memory
   graph. It drops watcher events for open keys. This works only because IWE has
   no persisted index. No persistent cache: 20k notes cold in 705 ms (M3 Pro,
   synthetic). This provides a cost model for tickets 24 and 25, not a verdict.
@@ -242,13 +249,13 @@ not implement the redesign. It ends at hand-off to specification.
   (docs state the opposite). This supports ticket 20 suppression and conflict
   reporting. Its validation is weaker than ticket 20 (`step` is UI-only, `[]`
   satisfies `required`, custom date formats unchecked). 28 field types, about
-  ten distinct (ticket 36). No body or buffer model.
+  ten distinct (ticket 37). No body or buffer model.
 - [What are `schematter-validator` and the document-schema
   spec?](./issues/15-research-schematter-validator-and-document-schema.md):
   IWE validator crate (about 1,200 lines, `jsonschema` dependency, one
   implementation, draft spec) is a poor fit. It brings a second schema dialect,
   a recursive section tree, and no spans. Its matcher semantics are reusable as a
-  design over Traces flat headings (ticket 37). No dependency decision remains.
+  design over Traces flat headings (ticket 38). No dependency decision remains.
 - [What counts as the externally observable surface the redesign must
   preserve?](./issues/16-grilling-compatibility-envelope.md): sole consumer, so
   almost everything is Migratable through the specification change table (no
@@ -271,7 +278,7 @@ not implement the redesign. It ends at hand-off to specification.
   it?](./issues/18-value-model.md): two owned types and no borrowed mirror enum.
   The runtime `NoteFieldValue` (`Int(i64)`/`Float(f64)`, `Link`, derived tagged
   serde, 80 B kept) serves notes, queries, and templates. Ticket 20 later
-  requires its owner to sit below both note and schema (ticket 34 chooses its
+  requires its owner to sit below both note and schema (ticket 35 chooses its
   exact placement). A schema-local literal type (strings stay strings) replaces
   the schema `FieldValue`. Only a root `Link` (`target`, normalized `display`,
   `embedded`) is shared. `NoteLink` (syntax kind, span) is the editor-side type
@@ -303,7 +310,7 @@ not implement the redesign. It ends at hand-off to specification.
   environmental failures are distinct from nonmatching data. Link equality uses
   the folded target, while `date(link)` reads the target. Two advisory stderr
   notices are retained. Handoffs: [query core](./issues/28-query-core-and-plan.md),
-  [temporal boundary](./issues/29-temporal-boundary-and-dialects.md) (natural
+  [temporal boundary](./issues/30-temporal-boundary-and-dialects.md) (natural
   language grammar, `DateConfig`), [execution
   context](./issues/21-ambient-environment-and-execution-context.md), [schema
   typing](./issues/20-schema-note-typing-and-validation.md), [index
@@ -334,12 +341,12 @@ not implement the redesign. It ends at hand-off to specification.
   quote convention. Body-section schemas form a separate ticket. Handoffs:
   [query core](./issues/28-query-core-and-plan.md), [note document
   model](./issues/23-note-document-model.md), [temporal
-  boundary](./issues/29-temporal-boundary-and-dialects.md), [template
-  boundary](./issues/30-template-engine-boundary.md),
-  [diagnostics](./issues/33-error-and-diagnostic-architecture.md), [crate
-  topology](./issues/34-crate-topology-and-public-surface.md), [schema
-  internals](./issues/36-schema-internals-simplification.md), [body
-  sections](./issues/37-body-section-schemas.md).
+  boundary](./issues/30-temporal-boundary-and-dialects.md), [template
+  boundary](./issues/31-template-engine-boundary.md),
+  [diagnostics](./issues/34-error-and-diagnostic-architecture.md), [crate
+  topology](./issues/35-crate-topology-and-public-surface.md), [schema
+  internals](./issues/37-schema-internals-simplification.md), [body
+  sections](./issues/38-body-section-schemas.md).
 - [What is the explicit execution context, and what ambient state is
   eliminated?](./issues/21-ambient-environment-and-execution-context.md):
   adapters snapshot OS inputs at workspace opening. Core workspaces own
@@ -352,17 +359,17 @@ not implement the redesign. It ends at hand-off to specification.
   identity and sorting remain distinct. Authored defaults work unattended;
   missing answers fail. Multi-root construction is supported without a
   registry. Same-root index writer coordination stays with tickets
-  24/25/31/32. Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md),
+  24/25/32/33. Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md),
   [read model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
   [query](./issues/28-query-core-and-plan.md),
-  [temporal](./issues/29-temporal-boundary-and-dialects.md),
-  [templates](./issues/30-template-engine-boundary.md),
-  [paths](./issues/31-path-and-capability-model.md),
-  [host](./issues/32-workspace-host-and-composition.md),
-  [errors](./issues/33-error-and-diagnostic-architecture.md),
-  [topology](./issues/34-crate-topology-and-public-surface.md),
-  [reconciliation](./issues/35-reconcile-decisions-and-audit-coverage.md).
+  [temporal](./issues/30-temporal-boundary-and-dialects.md),
+  [templates](./issues/31-template-engine-boundary.md),
+  [paths](./issues/32-path-and-capability-model.md),
+  [host](./issues/33-workspace-host-and-composition.md),
+  [errors](./issues/34-error-and-diagnostic-architecture.md),
+  [topology](./issues/35-crate-topology-and-public-surface.md),
+  [reconciliation](./issues/36-reconcile-decisions-and-audit-coverage.md).
 - [Who owns config-derived types, trust/tracking state, and the config
   lifecycle?](./issues/22-config-ownership-and-lifecycle.md): the root types
   `task`, `tag`, and `field` stay as shared vocabulary. `note` owns its parser input, so `note` no longer imports `config`. `ConfigDigests` is deleted. `index` owns
@@ -374,7 +381,7 @@ not implement the redesign. It ends at hand-off to specification.
   `ConfigService` owns its locator. A relative path variable is an error.
   `init` is a core use case, trusting only a workspace that it created. `Config`
   carries a stamp. `ConfigService::admit` is the admission primitive. Core holds
-  no workspace object (ticket 32).
+  no workspace object (ticket 33).
 - [What is the note document model: spans, facts, items, multi-value
   metadata?](./issues/23-note-document-model.md): Persist one facts type,
   `Note`, with no byte span, footnote or callout. `Note` is an assembled view of
@@ -390,13 +397,13 @@ not implement the redesign. It ends at hand-off to specification.
   model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
   [query](./issues/28-query-core-and-plan.md),
-  [template](./issues/30-template-engine-boundary.md),
-  [host](./issues/32-workspace-host-and-composition.md),
-  [errors](./issues/33-error-and-diagnostic-architecture.md),
-  [topology](./issues/34-crate-topology-and-public-surface.md), [live
+  [template](./issues/31-template-engine-boundary.md),
+  [host](./issues/33-workspace-host-and-composition.md),
+  [errors](./issues/34-error-and-diagnostic-architecture.md),
+  [topology](./issues/35-crate-topology-and-public-surface.md), [live
   buffer](./issues/27-live-buffer-and-persisted-index-consistency.md),
-  [schema](./issues/36-schema-internals-simplification.md), [body
-  sections](./issues/37-body-section-schemas.md).
+  [schema](./issues/37-schema-internals-simplification.md), [body
+  sections](./issues/38-body-section-schemas.md).
 - [What is the index read model, and is there one query execution path or
   two?](./issues/24-index-read-model-and-query-execution.md): one query plan
   over a facet store and immutable host generations. Cold queries load only selected entries. `WorkspaceIndex` stays total. The index owns an
@@ -406,8 +413,8 @@ not implement the redesign. It ends at hand-off to specification.
   scalar range keys and task date/status keys need semantic proof and end-to-end
   measurement. Sorts stay in the query plan. An unusable derived cache falls
   back to a trusted fresh parse for read queries, while `traces index` fails
-  closed. Ticket 25 owns freshness and crash recovery. Tickets 28, 31, 32, and
-  33 own rows, paths, writer admission, and notices.
+  closed. Ticket 25 owns freshness and crash recovery. Tickets 28, 32, 33, and
+  34 own rows, paths, writer admission, and notices.
 - [Does the landed index freshness model stand?](./issues/25-index-freshness-and-invalidation.md):
   config drift detection triggers a full rebuild. Store identity uses an engine
   tag, platform family, format epoch, extractor fingerprint, and policy
@@ -419,25 +426,29 @@ not implement the redesign. It ends at hand-off to specification.
   stale. Handoffs: [live
   buffer](./issues/27-live-buffer-and-persisted-index-consistency.md), [query
   core](./issues/28-query-core-and-plan.md),
-  [host](./issues/32-workspace-host-and-composition.md),
-  [diagnostics](./issues/33-error-and-diagnostic-architecture.md).
+  [host](./issues/33-workspace-host-and-composition.md),
+  [diagnostics](./issues/34-error-and-diagnostic-architecture.md).
 - [What does a durable index repair journal cost and
   save?](./issues/26-measure-index-recovery-journal.md): cost screen measured,
-  no journal chosen. The external facts journal survives the screen for
-  rebuilds: 76 ms per command against 1,332.9 ms of saved work at 50,000
-  notes. The in-store journal table loses (477 ms added per rebuild).
-  Incremental edits pay above a 4 to 7 percent stop rate inside a 125 ms
-  window only. No-change commands never pass. A kill before the last rebuild
-  sync leaves an empty store; the next open costs 17 to 37 ms. The
-  facet-layout claims of 85 percent more write time and 2 times size did not
-  reproduce. The `None` versus `Immediate` choice stays with ticket 35.
-  Handoff: [replay prototype](./issues/39-index-replay-prototype-and-fault-tests.md).
+  no journal chosen. Against the loose saved-work upper bound no candidate
+  rejects. At 50,000 notes the external facts journal costs 76 ms per command
+  against a 1,332.9 ms bound for rebuilds. The bound counts the persist that
+  a replay still pays, so this is not proof that a journal saves. The in-store
+  journal table costs more than the external file at every measured size (477
+  ms added per rebuild). Break-even rates for edits are provisional and
+  unmeasured. No-change commands never pass. A kill before the last rebuild
+  sync leaves an empty store in the sample of 9 of 15 stop points. The next
+  open costs 17 to 37 ms. The claims of 85 percent more write time and 2 times
+  size for a facet layout stay untested. The screen split rows round-robin,
+  not the decided layout. The `None` versus `Immediate` choice stays with
+  ticket 36. Handoff:
+  [replay prototype](./issues/29-index-replay-prototype-and-fault-tests.md).
 
 ## Not yet specified
 
 - **Schema internals**: graduated to [What schema internals survive now that
   schema produces a checker and a class
-  hierarchy?](./issues/36-schema-internals-simplification.md).
+  hierarchy?](./issues/37-schema-internals-simplification.md).
 - **Note parser internals**: graduated. [Ticket
   23](./issues/23-note-document-model.md) decides status interning, the second
   pass, the footprint, and footnote, callout and slug modelling. Only the
@@ -448,7 +459,7 @@ not implement the redesign. It ends at hand-off to specification.
   remain evidence gates.
 - **Template internals**: compiled-AST and regex caches, lazy schema load.
   Sharpen after [What is the template engine boundary with query, schema,
-  temporal, and the host?](./issues/30-template-engine-boundary.md).
+  temporal, and the host?](./issues/31-template-engine-boundary.md).
 - **Output formats** (`--format json|csv`) and where formatting lives; **async
   dialog bridging** for a long-lived host. Both hang on the forward-consumer and
   workspace-host decisions.
@@ -459,7 +470,7 @@ not implement the redesign. It ends at hand-off to specification.
   features outside the destination. Only their pressure on core (a change-set
   check with a base and destination path) is recorded in [ticket
   20](./issues/20-schema-note-typing-and-validation.md) and [ticket
-  32](./issues/32-workspace-host-and-composition.md).
+  33](./issues/33-workspace-host-and-composition.md).
 
 ## Out of scope
 

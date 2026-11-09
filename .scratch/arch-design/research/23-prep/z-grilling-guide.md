@@ -39,9 +39,9 @@ Requirements used:
 - R2: An adapter gets a span for each frontmatter key (ticket 20).
 - R3: The cold CLI path stays fast. Decoding is 16.6 ms for 2,711 notes.
 - R4: Index results equal a fresh parse (ticket 16).
-- R5: An unsaved buffer gives a note without disk access (ticket 34).
+- R5: An unsaved buffer gives a note without disk access (ticket 35).
 - R6: Few types and few duplicated invariants.
-- R7: Body facts for ticket 36 (heading extent and text slices).
+- R7: Body facts for ticket 37 (heading extent and text slices).
 
 | Design | R1 | R2 | R3 | R4 | R5 | R6 | R7 | Main failure |
 |--------|----|----|----|----|----|----|----|--------------|
@@ -142,7 +142,7 @@ Options:
 - Options for a key in both sources: frontmatter wins (today); concatenate
   (Dataview); keep two maps and let the app layer choose.
 - [P] Keep two maps in the note. Offer the effective view as an accessor. The
-  schema check and ticket 35 keep the difference between authored frontmatter
+  schema check and ticket 36 keep the difference between authored frontmatter
   and body fields.
 - Options for several values: always a list; scalar for one and a list for
   several (Dataview). [P] A uniform list avoids two shapes.
@@ -192,15 +192,15 @@ Options:
   only.
 - [P] Return the notices from the parser call. Do not store them. A stored
   notice would repeat on every query. Ticket 19 says notices are advisory.
-- Ticket 31 owns how a notice shows.
+- Ticket 32 owns how a notice shows.
 
-### Q12. Body facts for ticket 36
+### Q12. Body facts for ticket 37
 
 - [P] Keep headings with level, text, line and span. Derive the section extent
   from the next heading of the same or a lower level. Do not store paragraphs,
   code blocks or tables. Take text slices from the source on demand.
 - Failure: a body schema that checks a paragraph count needs more facts. Ask
-  ticket 36 for its list before it blocks.
+  ticket 37 for its list before it blocks.
 
 ### Q13. Change-table rows
 

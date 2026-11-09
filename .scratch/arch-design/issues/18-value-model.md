@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: resolved
-Blocked by: 2, 16, 1
+Blocked by: 1, 2, 16
 
 ## Question
 
@@ -243,7 +243,7 @@ alternative to evaluate.
    parse-time classification.
 8. **Borrowed views:** deferred to ticket 28 with a benchmark gate.
 9. **Link payload in the runtime value:** open (Open question 1).
-10. **Visibility:** deferred to ticket 34. Evidence is in research result 6.
+10. **Visibility:** deferred to ticket 35. Evidence is in research result 6.
 11. **Size budget:** resolved by research result 1 (keep 80 B, no boxing).
 12. **Behavior change from the literal rule:** obsolete, since quoted
     frontmatter values stay typed. Replaced by the behavior changes this
@@ -393,7 +393,7 @@ capabilities, since the crate has end users and a public surface.
   - Ticket 20: explicit string-to-link interpretation at the schema boundary.
   - Ticket 21: zone input.
   - Tickets 24 and 25: cache format change and temporal encoding.
-  - Ticket 34: public visibility of the runtime value and `Link`/`NoteLink`.
+  - Ticket 35: public visibility of the runtime value and `Link`/`NoteLink`.
 
 ### Research results (items 1 to 6)
 
@@ -434,7 +434,7 @@ capabilities, since the crate has end users and a public surface.
    Externally the enum is constructible and exposes `as_str`, `as_date`,
    `as_ref`, and `NoteFieldValueRef::compare`. `Note::outlinks()` returns
    `&[Link]` whose accessors are `pub(crate)`, so it is opaque. The value
-   types' public surface is thin. Ticket 34 should keep public only what is
+   types' public surface is thin. Ticket 35 should keep public only what is
    meant for end users. The `test-utils` baseline was not checked.
 
 ### Open questions (answered)
@@ -496,7 +496,7 @@ parser.
 Set `display` to `None` if the trimmed, unescaped display is absent, empty or
 equal to the trimmed, unescaped target. This removes the two current spellings
 of "no alias". Own wikilink rendering and parsing at the root. They
-round-trip for wikilinks only. Ticket 34 chooses the module name. `NoteLink` is the
+round-trip for wikilinks only. Ticket 35 chooses the module name. `NoteLink` is the
 editor-side occurrence type with syntax kind and source span. Ticket 23 defines
 it.
 
@@ -573,10 +573,10 @@ removal candidate, pending ticket 28's benchmark gate.
   [freshness](./25-index-freshness-and-invalidation.md): temporal values encode
   as text and re-parse on every cache load, with a cache format change.
 - [Query core](./28-query-core-and-plan.md): view enum shape and benchmark gate.
-- [Template boundary](./30-template-engine-boundary.md): the two adapters and
+- [Template boundary](./31-template-engine-boundary.md): the two adapters and
   number rendering.
 - [Crate topology and public
-  surface](./34-crate-topology-and-public-surface.md): visibility of the value
+  surface](./35-crate-topology-and-public-surface.md): visibility of the value
   types, `Link` and `NoteLink`.
 
 ## Superseded in part by ticket 19

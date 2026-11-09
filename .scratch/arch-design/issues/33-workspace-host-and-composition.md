@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 17, 21, 22, 24, 25, 12, 13
+Blocked by: 12, 13, 17, 21, 22, 24, 25
 
 ## Question
 
@@ -120,7 +120,7 @@ Build independent workspaces with injected policies and immutable service
 generations. `cli`, `lsp` and `mcp` consume the app layer in core, not CLI
 globals. Represent canonical root plus policy/generation identity so a future
 multi-root host needs no domain API rewrite. Defer a registry. Coordinate at
-most one writer policy for a canonical root's index with tickets 24/25/31;
+most one writer policy for a canonical root's index with tickets 24/25/32;
 separate in-memory identities do not isolate its store.
 
 At each new request, reverify local config trust/content before using a held

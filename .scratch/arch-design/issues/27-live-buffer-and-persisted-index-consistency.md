@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 23, 24, 25, 12
+Blocked by: 12, 23, 24, 25
 
 ## Question
 
@@ -40,7 +40,7 @@ persisted-index question of this ticket.
 
 See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
-- A host checks the sources within a staleness bound. It does not check before each query. This ticket and ticket 32 set the bound.
+- A host checks the sources within a staleness bound. It does not check before each query. This ticket and ticket 33 set the bound.
 - A host holds the store only during a refresh and a persist.
 - Each query result names the generation that it read. Use the incarnation and the revision as the generation pair.
 - A host that meets a store with a higher format epoch never writes it. It serves from its in-memory generation, or it parses fresh if it has none.

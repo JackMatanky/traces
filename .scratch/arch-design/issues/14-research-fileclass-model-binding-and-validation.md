@@ -53,16 +53,16 @@ Focus, against decisions taken or open in this map:
 - [Coercion and comparison](./19-coercion-and-comparison-policy.md) and [value
   model](./18-value-model.md): how typed fields coerce and compare frontmatter
   values (numbers, dates, durations, links, lists, objects).
-- [Temporal boundary](./29-temporal-boundary-and-dialects.md): date and
+- [Temporal boundary](./30-temporal-boundary-and-dialects.md): date and
   duration formats, Moment tokens, interval choices.
-- [Schema internals](./36-schema-internals-simplification.md): which of the 26
+- [Schema internals](./37-schema-internals-simplification.md): which of the 26
   types and options earn their keep. What an LSP-completion or hover consumer
   needs from a field definition.
-- [Body-section schemas](./37-body-section-schemas.md) and [live
+- [Body-section schemas](./38-body-section-schemas.md) and [live
   buffers](./27-live-buffer-and-persisted-index-consistency.md): anything
   Fileclass does about body structure or unsaved state.
 
-Informs: tickets 19, 20 (re-test), 29, 35, 36, 37.
+Informs: tickets 19, 20 (re-test), 30, 36, 37, 38.
 
 Deliverable:
 `.scratch/arch-design/research/14-fileclass-model-binding-and-validation.md` (<=
@@ -108,7 +108,7 @@ recording.
   boolean checks accept numeric and boolean strings. Ticket 20 keeps its
   stricter rules.
 - 28 field types in the AST, about ten structurally distinct. Two are dead
-  stubs, three are canvas sync: input to ticket 36. Nested fields are keyed by
+  stubs, three are canvas sync: input to ticket 37. Nested fields are keyed by
   `path\0name`.
 - No body validation, no buffer handling. Writes only through the host's
   frontmatter API. Rename-field migration rewrites `fieldsOrder` across
@@ -118,5 +118,5 @@ recording.
   overrides frontmatter". The claim is recorded as code-read, untested.
 
 Unresolved: none for the destination.
-Downstream: tickets 29 and 36 carry an "Inputs" section. Ticket 20 has a
+Downstream: tickets 30 and 37 carry an "Inputs" section. Ticket 20 has a
 comment.

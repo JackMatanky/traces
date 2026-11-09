@@ -54,7 +54,7 @@ directory is not in Git. This file keeps the findings that matter.
 | Diagnostics | Source spans of dead links, bad fields, bad sections | Per edit, after a delay | Fresh buffer parse plus target facts (zk 1 s, Oxide 300 ms, Marksman 200 ms) |
 | Symbols, folding | Heading line, text range, section extent | Per request | Heading facts (rumdl workspace symbols use heading line) or fresh parse |
 | Schema check with spans (ticket 20) | Key span and element span of frontmatter | On open buffer and on check | Fresh bytes. No tool stores them. |
-| Body-section check (ticket 36) | Heading levels, section extent, text slices | On check | Heading lines give the extent. Text slices need the source. |
+| Body-section check (ticket 37) | Heading levels, section extent, text slices | On check | Heading lines give the extent. Text slices need the source. |
 | Footnote and callout features | Definition and reference ranges, callout kind and title | Per request | Fresh parse only. IWE and Marksman drop both. rumdl records footnote offsets. |
 | Export and rewrite | Event stream, no spans | Batch | Transient events (obsidian-export). Not persisted. |
 | MCP or agent read | Facts, section text | Per call | Facts plus file read (IWE shares one graph with its MCP host) |
@@ -173,7 +173,7 @@ Each cell says how the design behaves. "ok" means no problem found.
 | Rename across files | Must reparse anyway | Fresh bytes, correct | Correct | Must reparse anyway | Must reparse anyway |
 | Diagnostics per keystroke | ok | ok | ok | ok | ok |
 | Schema key spans (ticket 20) | Needs a scan anyway | ok, in the doc | Host builds them | Needs a scan anyway | ok |
-| Body check from the CLI (ticket 36) | Extent from lines | Extent from heading lines. Text from a file read. | Needs the host | Same as D1 | ok |
+| Body check from the CLI (ticket 37) | Extent from lines | Extent from heading lines. Text from a file read. | Needs the host | Same as D1 | ok |
 | Agent edits a file, then a query | Row stale until refresh | ok | ok | Row stale for positions | Row stale |
 | Format upgrade | Rewrites all rows | Rewrites all rows | Rewrites all rows | Rewrites all rows | Rewrites all rows |
 | Drift between rules | One builder | One extractor | Two consumers of the extractor | One builder | One builder |
@@ -222,14 +222,14 @@ span class. No precedent has D1 or D5 on disk.
 5. Link facts get classes. Internal links carry syntax, embed flag, path,
    heading anchor and block id. External URLs are stored only if a consumer
    exists. Ticket 28 decides that.
-6. Ticket 36 reads section extents from heading lines. It reads text slices from
+6. Ticket 37 reads section extents from heading lines. It reads text slices from
    the source.
 
 [H] Why not D1 or D5: no precedent persists positions, and every edit path
 re-reads the file. The only gain is faster closed-file requests. A background
 parse removes most of that cost.
 
-[H] Why not D4: tickets 20 and 36 need spans outside the LSP. A core document
+[H] Why not D4: tickets 20 and 37 need spans outside the LSP. A core document
 keeps those spans testable now. The editor-specific indexes stay in the host.
 
 [H] Why not D6: the cost is +59% parse time. No precedent needs it.
@@ -247,7 +247,7 @@ keeps those spans testable now. The editor-specific indexes stay in the host.
 
 - The facts and the document can disagree. [P] Add a differential test on the
   corpus: count each construct in both outputs.
-- A host must handle the buffer overlay and the version. [H] Ticket 34 owns
+- A host must handle the buffer overlay and the version. [H] Ticket 35 owns
   this.
 - The first LSP requests that need ranges can wait for the background parse. [P]
   Answer from facts first. Parse the open file at once.

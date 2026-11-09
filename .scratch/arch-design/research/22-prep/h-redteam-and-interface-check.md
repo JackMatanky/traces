@@ -42,10 +42,10 @@ Below is the exhaustive adversarial attack on every lean and keep, followed by c
 1. **Strongest Counter-Argument (Evidence)**:
    - **Fatal cyclic inversion on `FieldName`**: In `e` §1.3 (Option a2), the design proposes: `FieldName` moves to `src/note/field.rs` [V: `e:82`]. But direct code inspection proves that `FieldName` is imported by `src/config/builder.rs:19` (`use crate::FieldName;`) [V] and `src/schema/error.rs:12` (`use crate::FieldName;`) [V]! In the 10-tier DAG, `note` is Tier 3 (or Tier 5) while `config` is Tier 3 and `schema` is Tier 4. Placing `FieldName` in `note` forces `config -> note` and `schema -> note`. This completely inverts the dependency hierarchy and creates a cyclic dependency if `note` imports `NoteParserConfig` from `config`!
    - **Pre-empts Ticket 23**: Ticket 23 (`23-note-document-model.md:16-21`) explicitly states its mandate: "Decide whether the list/task items remain children of Note or become separate indexed entities... Decide the per-task status representation (an owned String vs a symbol/id into the status map)" [V]. Option a2 freezes `TaskStatusMap` in a new leaf file `src/task_status.rs` and moves `TaskItem` to `src/note/task.rs`, usurping Ticket 23's authority before it has convened.
-   - **Pre-empts Ticket 32**: Ticket 32 (`32-crate-topology-and-public-surface.md:19-20`) lists: "Decide the re-homing of the root-level modules (task/field/tag/file_tracker/dirs/env_vars/delimiter/file_class_expander)" [V]. Unilaterally scattering root modules across subsystems in Ticket 22 destroys Ticket 32's architectural freedom.
+   - **Pre-empts Ticket 33**: Ticket 33 (`35-crate-topology-and-public-surface.md:19-20`) lists: "Decide the re-homing of the root-level modules (task/field/tag/file_tracker/dirs/env_vars/delimiter/file_class_expander)" [V]. Unilaterally scattering root modules across subsystems in Ticket 22 destroys Ticket 33's architectural freedom.
 
 2. **Concrete Failure Scenario**:
-   - **Compilation Cycle / Multi-crate split**: A developer attempts to split `traces` into `traces-config` and `traces-core` per Ticket 32. `traces-config` needs `FieldName` to represent the configured `class_field` setting (`config/model/class_field.rs:31`). Because `FieldName` was placed inside `src/note/`, `traces-config` must depend on `traces-note`. But `traces-note` needs `NoteParserConfig` projected from `traces-config`. The build breaks with a cyclic crate dependency.
+   - **Compilation Cycle / Multi-crate split**: A developer attempts to split `traces` into `traces-config` and `traces-core` per Ticket 33. `traces-config` needs `FieldName` to represent the configured `class_field` setting (`config/model/class_field.rs:31`). Because `FieldName` was placed inside `src/note/`, `traces-config` must depend on `traces-note`. But `traces-note` needs `NoteParserConfig` projected from `traces-config`. The build breaks with a cyclic crate dependency.
 
 3. **Most Credible Alternative Overlooked**:
    - **Leaf Primitives Module (`src/domain/` or `src/primitives/`)**: Retain `FieldName`, `TaskStatusSymbol`, `TaskStatusType`, and `Tag` in a cohesive Tier 0 leaf module (`src/primitives/` or `src/domain/`) that depends on nothing. Do NOT move `FieldName` to `note`. Defer task item relocation until Ticket 23.
@@ -75,7 +75,7 @@ Below is the exhaustive adversarial attack on every lean and keep, followed by c
 
 1. **Strongest Counter-Argument (Evidence)**:
    - **Over-specification pre-empting Ticket 23**: Ticket 23 owns note parser passes, status interning, and markdown parsing semantics [V: `23:20-25`]. `NoteParserConfig` assumes that `TaskStatusMap` is borrowed by reference, that `tag_filters` is a slice of `Tag`, and that frontmatter delimiters are parameterized this way. If Ticket 23 chooses an interned status string table or a streaming tokenizer without `Tag` allocations, `NoteParserConfig` becomes obsolete immediately after landing.
-   - **Lifetime contagion**: `NoteParserConfig<'a>` carries an explicit lifetime `'a`. In long-lived LSP hosts (Ticket 30), borrowing from an ephemeral `Config` snapshot prevents `NoteParserConfig` from being stored in long-lived parser workers or channels without cloning.
+   - **Lifetime contagion**: `NoteParserConfig<'a>` carries an explicit lifetime `'a`. In long-lived LSP hosts (Ticket 31), borrowing from an ephemeral `Config` snapshot prevents `NoteParserConfig` from being stored in long-lived parser workers or channels without cloning.
 
 2. **Concrete Failure Scenario**:
    - **LSP Background Worker Pool**: In an LSP host handling concurrent `textDocument/didChange` notifications, note parsing is offloaded to a threadpool via channels. `NoteParserConfig<'a>` cannot be sent across threads unless it is `'static`. Passing `&'a TaskStatusMap` and `&'a [Tag]` forces the host to allocate and clone, defeating the purpose of the zero-allocation borrow struct.
@@ -230,10 +230,10 @@ Below is the exhaustive adversarial attack on every lean and keep, followed by c
    - **Admission Deadlock / Race on Concurrent Requests**: In an LSP host, multiple requests arrive concurrently (e.g., `textDocument/hover`, `textDocument/completion`, and background indexing). If `admit_request()` re-checks disk on every single request, concurrent requests will thrash the filesystem with redundant `stat` and hash calls. If a config change is detected mid-flight while Request A is executing against Generation 1 and Request B triggers a reload to Generation 2, index and store access can become inconsistent if store locks are not coordinated [V: `21:98-100`].
 
 2. **Concrete Failure Scenario**:
-   - **Concurrent CLI Processes Sharing State**: Two CLI processes (`traces query` and `traces template render`) run simultaneously against the same workspace. Process A runs `admit_request()` and begins indexing. Process B modifies `.traces/config.toml`. Process A has already admitted the request and proceeds with Generation 1, but writes to `.traces/index.redb`. Process B admits with Generation 2 and attempts to heal the index. As Ticket 21 explicitly warns: "Tickets 24, 25, 29 and 30 own cross-process coordination, canonical path identity and store locking. A registry key cannot isolate two sessions that share `.traces/index.redb`" [V: `21:98-100`].
+   - **Concurrent CLI Processes Sharing State**: Two CLI processes (`traces query` and `traces template render`) run simultaneously against the same workspace. Process A runs `admit_request()` and begins indexing. Process B modifies `.traces/config.toml`. Process A has already admitted the request and proceeds with Generation 1, but writes to `.traces/index.redb`. Process B admits with Generation 2 and attempts to heal the index. As Ticket 21 explicitly warns: "Tickets 24, 25, 30 and 31 own cross-process coordination, canonical path identity and store locking. A registry key cannot isolate two sessions that share `.traces/index.redb`" [V: `21:98-100`].
 
 3. **Most Credible Alternative Overlooked**:
-   - **Debounced Watcher-Invalidated Admission**: Instead of polling disk on every single `admit_request()`, use an `AtomicBool` dirty flag driven by filesystem watcher events (Ticket 30). `admit_request()` only performs disk I/O when the dirty flag is set. For CLI, `admit_request()` checks disk exactly once at startup.
+   - **Debounced Watcher-Invalidated Admission**: Instead of polling disk on every single `admit_request()`, use an `AtomicBool` dirty flag driven by filesystem watcher events (Ticket 31). `admit_request()` only performs disk I/O when the dirty flag is set. For CLI, `admit_request()` checks disk exactly once at startup.
 
 4. **Verdict & Flip Fact**:
    - **Verdict**: **Holds with Change**.
@@ -241,7 +241,7 @@ Below is the exhaustive adversarial attack on every lean and keep, followed by c
      1. CLI executes the admission check exactly once during workspace open.
      2. Long-lived hosts (LSP) use a debounced dirty flag from the watcher to avoid per-request disk thrashing.
      3. Admitted requests retain an `Arc<ConfigGeneration>` ensuring immutable isolation for the lifetime of that request.
-   - **Flip Fact**: If Ticket 30 decides that the workspace host is single-threaded and purely event-driven, complex atomic admission coordination is simplified.
+   - **Flip Fact**: If Ticket 31 decides that the workspace host is single-threaded and purely event-driven, complex atomic admission coordination is simplified.
 
 ---
 
@@ -331,7 +331,7 @@ Below is the exhaustive adversarial attack on every lean and keep, followed by c
 
 #### Adversarial Attack on Keep Baseline G1
 
-- **Counter-Argument**: Leaving scaffolding in `src/cli/init.rs` keeps 557 LoC of domain logic, directory creation, rollback journaling, and TOML formatting trapped in the CLI layer, blocking the CLI crate split (Ticket 32) and preventing programmatic vault initialization in LSP/MCP (Ticket 30).
+- **Counter-Argument**: Leaving scaffolding in `src/cli/init.rs` keeps 557 LoC of domain logic, directory creation, rollback journaling, and TOML formatting trapped in the CLI layer, blocking the CLI crate split (Ticket 33) and preventing programmatic vault initialization in LSP/MCP (Ticket 31).
 - **Verdict**: Refuted. Scaffolding must move to core.
 
 ---
@@ -372,9 +372,9 @@ This section audits how the design leans in Ticket 22 commit, constrain, or pre-
 │  ├─► Ticket 23: Note document model, AST spans, task item entities          │
 │  ├─► Ticket 24: redb index schema, read models, query row projection        │
 │  ├─► Ticket 25: IndexFingerprint composition, drift healing, ignore rules    │
-│  ├─► Ticket 29: Path resolution, sandbox boundaries, capability tokens      │
-│  ├─► Ticket 30: WorkspaceHost composition, watcher debounce, session life   │
-│  └─► Ticket 32: Crate partitioning, workspace Cargo.toml, visibility gates  │
+│  ├─► Ticket 30: Path resolution, sandbox boundaries, capability tokens      │
+│  ├─► Ticket 31: WorkspaceHost composition, watcher debounce, session life   │
+│  └─► Ticket 33: Crate partitioning, workspace Cargo.toml, visibility gates  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -428,49 +428,49 @@ This section audits how the design leans in Ticket 22 commit, constrain, or pre-
   - Trust is verified at the workspace config level, authorizing all templates under `templates.directory` [V: `ADR-0002:26-29`].
 - **Flagged Boundary Violations**: None.
 
-#### Ticket 29: Path and Capability Model
+#### Ticket 30: Path and Capability Model
 
 - **What 22 Leans Commit It To**:
   - `HostInputs` supplies canonical root paths and ceiling boundaries.
 - **Flagged Boundary Violations**:
-  - `e`'s `HostPaths` attempted to define platform path resolution in `src/host/paths.rs`. Path capability and canonicalization policy belongs to Ticket 29.
+  - `e`'s `HostPaths` attempted to define platform path resolution in `src/host/paths.rs`. Path capability and canonicalization policy belongs to Ticket 30.
 - **Minimal Contract Required from 22**:
   - `22` takes raw `PathBuf`s in `HostInputs`; does not invent custom path capability types.
 
-#### Ticket 30: Workspace Host and Composition
+#### Ticket 31: Workspace Host and Composition
 
 - **What 22 Leans Commit It To**:
   - `f` Option L3 commits the host to calling `admit_request()` on a held `WorkspaceConfig`.
   - `g` Option G2 commits scaffolding to a headless `InitService` callable by LSP/MCP.
 - **Flagged Boundary Violations**:
-  - `f` Sketch L3 placed `WorkspaceConfig` inside `config`. Composition of config, index, schema, and templates belongs to Ticket 30 (`WorkspaceHost`).
+  - `f` Sketch L3 placed `WorkspaceConfig` inside `config`. Composition of config, index, schema, and templates belongs to Ticket 31 (`WorkspaceHost`).
 - **Minimal Contract Required from 22**:
-  - `22` provides `ConfigLoader::load(&HostInputs)` and `ConfigAdmissionGate::recheck(&HostInputs, &ConfigGeneration)`. Ticket 30 owns `WorkspaceHost`.
+  - `22` provides `ConfigLoader::load(&HostInputs)` and `ConfigAdmissionGate::recheck(&HostInputs, &ConfigGeneration)`. Ticket 31 owns `WorkspaceHost`.
 
-#### Ticket 31: Error and Diagnostic Architecture
+#### Ticket 32: Error and Diagnostic Architecture
 
 - **What 22 Leans Commit It To**:
   - `ConfigError`, `TrustError`, and `DiscoveryError` are typed enums.
 - **Flagged Boundary Violations**: None.
 
-#### Ticket 32: Crate Topology and Public Surface
+#### Ticket 33: Crate Topology and Public Surface
 
 - **What 22 Leans Commit It To**:
   - `e` Option a4 and Package 3 propose an immediate 3-crate split (`traces-core`, `traces-host`, `traces`).
 - **Flagged Boundary Violations**:
-  - **MAJOR VIOLATION**: Ticket 32 is explicitly: "Single crate or workspace, and what is the public surface? Decide between one crate and a workspace split" [V: `32:9-12`]. Ticket 22 MUST NOT split crates or create `crates/traces-core/`. Ticket 22 must remain strictly single-crate.
+  - **MAJOR VIOLATION**: Ticket 33 is explicitly: "Single crate or workspace, and what is the public surface? Decide between one crate and a workspace split" [V: `32:9-12`]. Ticket 22 MUST NOT split crates or create `crates/traces-core/`. Ticket 22 must remain strictly single-crate.
 - **Minimal Contract Required from 22**:
   - Clean internal module boundaries that *enable* a future split, but zero crate splits in Ticket 22.
 
-#### Tickets 33–36: Reconcile, Live Buffer, Schema Internals, Body Schemas
+#### Tickets 34–36: Reconcile, Live Buffer, Schema Internals, Body Schemas
 
-- **Impact**: No direct dependencies, except that `FieldName` must remain accessible to `schema` (Tickets 35, 36) without depending on `note`.
+- **Impact**: No direct dependencies, except that `FieldName` must remain accessible to `schema` (Tickets 36, 37) without depending on `note`.
 
 ---
 
 ### 4.2 Minimal Set of Facts Ticket 22 Must Fix
 
-To unblock tickets 23, 24, 25, 29, 30, and 32 without pre-empting their design choices, Ticket 22 must fix exactly the following minimal set of facts:
+To unblock tickets 23, 24, 25, 30, 31, and 33 without pre-empting their design choices, Ticket 22 must fix exactly the following minimal set of facts:
 
 1. **Host Inputs Interface**: Define `HostInputs` snapshot struct (`start_path`, `state_home`, `config_home`, `ceiling_dirs`, `ignored_dirs`) acquired at the adapter edge.
 2. **Local Trust & Admission Invariant**: Local `.traces/config.toml` must have its BLAKE3 hash verified against `TrustManager` before parsing. A held workspace exposes `recheck_admission(inputs, current_generation)` returning `Ok(())` or `Err(AdmissionError)`.
@@ -491,10 +491,10 @@ To unblock tickets 23, 24, 25, 29, 30, and 32 without pre-empting their design c
 | **L3** | **(f) Fold `file_tracker`, `HostPaths` in adapter, `IgnorePolicy` in `dirtree`** (Option f2) | `e:367` | **Holds with Change** | Fold `file_tracker` into `src/config/store/`. **Do NOT put `IgnorePolicy` in `dirtree.rs`**; place it in `src/host/ignore.rs`. Expand `HostPaths` to full Ticket 21 `HostInputs`. | If Ticket 25 requires gitignore globbing, `IgnorePolicy` requires a dedicated matcher module. |
 | **L4** | **(c) Delete `ConfigDigests`; Consumer `IndexFingerprint` + `ConfigContentHash`** (Option C3/C4) | `f:189` | **Holds with Change** | Delete `ConfigDigests` (-380 LoC), `Config::hash`, and `syn` test. Provide `ConfigContentHash` for admission. Provide `IndexRelevantConfig` view struct from `config` to guarantee compile-time exhaustiveness. | If Ticket 25 adopts whole-cache rebuild on any local config edit, field-level fingerprinting is dropped. |
 | **L5** | **(e) Sealed newtype `VerifiedLocalConfig` replacing typestate** (Option E2) | `f:309` | **Holds with Change** | Adopt `VerifiedLocalConfig` to guarantee read-once-hash-before-parse. Explicitly model Global config and LocalDefault via a typed `ConfigProvenance` enum (Option E4). | If human requires content tracking for global config reloads, Global config requires a matching token. |
-| **L6** | **Lifecycle: Held `WorkspaceConfig` with `admit_request()`** (Option L3) | `f:378` | **Holds with Change** | Retain `admit_request()`, but clarify that CLI checks once at startup, while long-lived hosts use debounced watcher signals to avoid per-request disk thrashing. Scope host composition to Ticket 30. | If Ticket 30 decides on a pure actor model, admission rechecking is message-driven. |
+| **L6** | **Lifecycle: Held `WorkspaceConfig` with `admit_request()`** (Option L3) | `f:378` | **Holds with Change** | Retain `admit_request()`, but clarify that CLI checks once at startup, while long-lived hosts use debounced watcher signals to avoid per-request disk thrashing. Scope host composition to Ticket 31. | If Ticket 31 decides on a pure actor model, admission rechecking is message-driven. |
 | **L7** | **(d) Retire `TrackerStore` & `traces tracked`** (Option D4) | `g:308` | **REFUTED** | **Adopt Option D5 (`TrustManager`)**. Retain tracking store under the hood to preserve auditability of untrusted/refused repos and Ticket 16 compatibility. Consolidate both stores behind one unbypassable manager. | If human explicitly orders deprecation of `traces tracked` in the Ticket 16 change table, D4 may proceed. |
 | **L8** | **(g) Core `InitService` + Canonical `RawConfig::starter` + `AutoTrust`** (Option G5) | `g:512` | **Holds with Change** | Adopt Core `InitService` and canonical starter TOML. **Amend `AutoTrust` to be strictly conditional**: auto-trust ONLY IF template directory has no pre-existing files; otherwise fail-safe to untrusted to prevent Trojan Template exploits. | If human prefers strict `direnv`-style security, `AutoTrust` is removed and explicit `traces trust` is required. |
-| **L9** | **Multi-crate split in Ticket 22** (e: Option a4 & Package 3) | `e:134, 563` | **REFUTED** | Reject all crate splitting in Ticket 22. Maintain single-crate structure with narrowed visibility. Crate topology is the exclusive remit of Ticket 32. | If the human commands an immediate workspace split before Ticket 32. |
+| **L9** | **Multi-crate split in Ticket 22** (e: Option a4 & Package 3) | `e:134, 563` | **REFUTED** | Reject all crate splitting in Ticket 22. Maintain single-crate structure with narrowed visibility. Crate topology is the exclusive remit of Ticket 33. | If the human commands an immediate workspace split before Ticket 33. |
 
 ---
 

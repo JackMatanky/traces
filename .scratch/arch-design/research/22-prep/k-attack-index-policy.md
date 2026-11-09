@@ -8,7 +8,7 @@ Design **C6** proposes deleting `ConfigDigests`, `Config::hash`, and the five di
 |---|---|---|---|
 | **C2** | Prune only dead surface (5 path digests, `Config::hash`, `compose`, `traces.config.v1`, part of syn scan); retain `ConfigDigests` and two-stage chain. | **Viable Fallback** | Leaves 2-stage indirection; `IndexerService` still takes `&Config` and can read un-fingerprinted fields; retains `syn` dev-dependency [V]. |
 | **C6** | `index` owns `IndexPolicy`; `IndexerService` consumes only `IndexPolicy`; single-point `fingerprint()`; leaf types encode themselves; deletes `ConfigDigests`. | **HOLDS WITH CHANGE** | Fails to detect new config settings at compile time unless projection is exhaustively bound [H]; breaks if `title`/`aliases`/`date` keys are dropped before tickets 23/24 land [V]. |
-| **C7** | `config` owns `IndexView`; `Config` exhaustively projects to `IndexView`; `IndexerService` consumes `IndexView`. | **Strong Alternative** | Inverts dependency direction: couples `config` to indexer consumption needs; complicates ticket 32 crate split [H]. |
+| **C7** | `config` owns `IndexView`; `Config` exhaustively projects to `IndexView`; `IndexerService` consumes `IndexView`. | **Strong Alternative** | Inverts dependency direction: couples `config` to indexer consumption needs; complicates ticket 33 crate split [H]. |
 
 **Final Verdict**: **C6 Holds with Change**. C6 solves the fundamental flaw of the current architecture—that `IndexerService` receives the full `&Config` and can arbitrarily read fields not tracked in `IndexFingerprint`—while deleting ~436 LoC and eliminating the heavy `syn` dev-dependency. However, C6 must be amended to: (1) retain the metadata role keys (`title`, `aliases`, `date_created`, `date_modified`) in the policy to prevent silent staleness when tickets 23/24 land; (2) use an exhaustive destructure pattern in `IndexPolicy::from_config` to preserve compile-time breakages when `Config` fields are added; and (3) enforce a strict module boundary prohibiting `Config` imports inside `src/index/**`.
 
@@ -226,9 +226,9 @@ Ticket 22 settled decision `b2`: `note` defines `NoteParserConfig` containing `T
 
 ---
 
-## 8. Architectural Trajectory & Multi-Crate Impact (Ticket 32)
+## 8. Architectural Trajectory & Multi-Crate Impact (Ticket 33)
 
-Ticket 32 explores splitting the CLI into a separate crate (`traces-cli`), leaving core domain logic in `traces-core`, and potentially separating domain crates later (`traces-config`, `traces-note`, `traces-index`, `traces-query`).
+Ticket 33 explores splitting the CLI into a separate crate (`traces-cli`), leaving core domain logic in `traces-core`, and potentially separating domain crates later (`traces-config`, `traces-note`, `traces-index`, `traces-query`).
 
 ### Coupling Under C2 / C7 vs C6
 
@@ -276,7 +276,7 @@ Ticket 32 explores splitting the CLI into a separate crate (`traces-cli`), leavi
 | - *Ticket 24 (Date Keys)* | Low: keys already in `ConfigDigests` [V]. | Needs keys in `IndexPolicy` or explicit handoff to 24 [P]. | Needs keys in `IndexView` [H]. |
 | - *Ticket 25 (Freshness/Concurrency)*| Orthogonal (all equal). | Orthogonal (all equal). | Orthogonal (all equal). |
 | - *Ticket 27 (Period Parse Policy)* | Awkward: host inputs must inject into `ConfigDigests` [H]. | **Cleanest**: `IndexPolicy` naturally holds `PeriodParsePolicy` from `HostInputs` [P]. | Awkward: `HostInputs` mixed into config-owned view [H]. |
-| **Ticket 32 (Crate Split)** | Leaves `config` tied to index hashing needs [H]. | **Ideal**: `index` has no dependency on `config`; app layer bridges them [P]. | Leaves `config` owning index-specific view types [H]. |
+| **Ticket 33 (Crate Split)** | Leaves `config` tied to index hashing needs [H]. | **Ideal**: `index` has no dependency on `config`; app layer bridges them [P]. | Leaves `config` owning index-specific view types [H]. |
 | **Reversibility** | Trivial (deletions only) [V]. | High: `IndexPolicy` is crate-internal [P]. | Moderate: `IndexView` lives in `config` [H]. |
 
 ---

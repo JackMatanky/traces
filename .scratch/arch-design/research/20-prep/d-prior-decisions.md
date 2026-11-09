@@ -83,7 +83,7 @@ Map `map.md:234-240` lists 6 unsharpened items under "Schema internals" that can
 |---|---|---|---|
 | **1. External Select-Values** | 2,032 LoC (`fields/select.rs:1-2032`) | **Decide in 20:** Whether external `.toml`/`.json` select dictionaries remain supported or are retired in favour of inline lists + index queries (`from_class`). | Internal caching, file watcher invalidation, and data-loading refactoring in `select.rs`. |
 | **2. Imperative Option Parsing vs Serde** | 918 LoC (`fields/parser.rs:28-143`) | **Wait:** Internal implementation detail. Option parsing into untyped `IndexMap<String, SchemaLiteral>` can migrate to Serde internally without changing schema capabilities. | Refactoring `SchemaFieldParser` to strongly-typed Serde enum tables. |
-| **3. Five Nested Field-Error Enums** | 655 LoC (`fields/error.rs:32-232`) | **Decide in 20:** Define the boundary between *schema authoring errors* (malformed TOML, cycle) and *note validation diagnostics* (type mismatch, missing required). | Collapsing the 5 internal error enums into unified structs (handled by Ticket 31). |
+| **3. Five Nested Field-Error Enums** | 655 LoC (`fields/error.rs:32-232`) | **Decide in 20:** Define the boundary between *schema authoring errors* (malformed TOML, cycle) and *note validation diagnostics* (type mismatch, missing required). | Collapsing the 5 internal error enums into unified structs (handled by Ticket 32). |
 | **4. CSR Adjacency Scale-Fit** | 734 LoC (`graph/adjacency.rs:42-47`) | **Wait:** Verified sound and allocation-free [V: `survey/schema.md:106-108`]. Graph representation does not affect note typing or validation contracts. | Internal simplification to `IndexMap` if desired during specification. |
 | **5. Dead `SchemaService::new` Constructor** | 9 LoC (`service.rs:52-60`) | **Wait:** Pure dead-code cleanup (`expect(dead_code)`). | Trivial removal during specification. |
 | **6. Template `Schema` Handle Hack** | ~30 LoC (`template/engine/schema.rs:82-90`) | **Decide in 20:** The API contract exposed by `Schema` to consumers (does it carry an internal hierarchy reference or remain a detached value object?). | Minijinja `State` temp-cache elimination (handled by Ticket 28). |
@@ -121,7 +121,7 @@ The user's decisions across tickets 16–19 establish clear, consistent architec
 - **Option B (On-Demand Advisory Validation Pass — Recommended):** Notes parse and index unconditionally. An independent validator pass (`validate(note, schema) -> Vec<SchemaDiagnostic>`) evaluates note frontmatter/inline fields against resolved schema definitions on demand (for CLI `traces check` / `traces lint` and LSP `textDocument/publishDiagnostics`). Emits structured diagnostics with source byte spans. Never blocks indexing or query execution.
 - **Option C (Ingestion-Time Gating / Typed Store):** Notes are validated against schemas during indexing. Notes with schema violations are rejected from Redb or have non-conforming fields nulled. (Breaks open-world tolerance, tightly couples `index` to `schema`, turns schema edits into index wipe cliffs).
 - **Option D (Query-Time Schema Projection):** Stored notes remain raw; queries use schema definitions to dynamically project and cast fields (e.g. coercing strings to schema-declared types during query execution).
-- *Downstream Blockers:* **Blocks Tickets 23, 24, 25, 26, 30, 31, 32, 34.**
+- *Downstream Blockers:* **Blocks Tickets 23, 24, 25, 26, 31, 32, 33, 35.**
 
 ### Question 2: How does the "Frontmatter String Override" operate, and who owns it?
 
@@ -139,7 +139,7 @@ The user's decisions across tickets 16–19 establish clear, consistent architec
 - **Option B (Independent Analysis / Lint Module):** An independent module (e.g. `src/analysis/` or `src/lint/`) sitting at Tier 8+ above `note` and `schema` imports both and implements validation. Keeps `schema` and `note` decoupled.
 - **Option C (`note::validate`):** `src/note/` imports `Schema` and validates itself.
 - **Option D (No Validator):** If Option A of Q1 is selected, no validator or diagnostic type exists.
-- *Downstream Blockers:* **Blocks Tickets 31 (Diagnostic Architecture), 32 (Crate Topology).**
+- *Downstream Blockers:* **Blocks Tickets 32 (Diagnostic Architecture), 33 (Crate Topology).**
 
 ### Question 4: What is the boundary between Schema Field Types and Template `ui` Prompts?
 
@@ -157,7 +157,7 @@ The user's decisions across tickets 16–19 establish clear, consistent architec
 - **Option A (Keep as-is):** Retain external `.toml`/`.json` file caching, path confinement, and 5 nested error types in `fields/select.rs` (~2.0k LoC) for large external taxonomies.
 - **Option B (Retire External Select Files — Simplify):** Select fields support only inline string/object lists in `.traces/schemas/*.toml`. Large option datasets are queried via `file` fields (`from_class` / index queries). Deletes ~1,500 LoC and 3 error enums.
 - **Option C (Simplify External Loading):** Retain external file references, but strip custom caching and path-confinement gymnastics; read them via standard Serde at `SchemaService::load` time.
-- *Downstream Blockers:* **Blocks Ticket 29 (Path & Capability).**
+- *Downstream Blockers:* **Blocks Ticket 30 (Path & Capability).**
 
 ---
 

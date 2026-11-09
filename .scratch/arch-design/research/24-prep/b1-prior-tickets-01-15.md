@@ -121,7 +121,7 @@ proposal, not an accepted decision. The source revision matters: research 01 and
   Topic D.
 - [V] Research 09 found that the current path codec stores OS-native bytes or
   wide units in redb. It proposed portable UTF-8 relative paths, with
-  confinement at I/O. Ticket 29 owns the path form. Source:
+  confinement at I/O. Ticket 30 owns the path form. Source:
   `../09-capability-path-precedent.md:53-60,88-102`. Topic D.
 - [V] Research 02 found eager temporal and link classification at the note
   boundary. It found that numbers above $2^{53}$ lose precision as `f64` in the

@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: resolved
-Blocked by: 21, 12
+Blocked by: 12, 21
 
 ## Question
 
@@ -63,7 +63,7 @@ new held-workspace request. Admitted requests retain their immutable
 generation. Global config freshness is separate. Supply one workspace policy to
 its services, not a process-global value, so different roots can coexist. The
 config surface also owns `DateConfig` integration (zone source, week rules and
-opt-in bare-year filenames). Decide its syntax with ticket 29, not here.
+opt-in bare-year filenames). Decide its syntax with ticket 30, not here.
 
 ## Answer
 
@@ -179,7 +179,7 @@ not cite these agent files in `22-prep/`: `n1-conflicts-resolved-tickets.md`,
 
 ### Decision: admission, global config and path variables
 
-- Do not hold a workspace object in core. Ticket 32 owns it.
+- Do not hold a workspace object in core. Ticket 33 owns it.
 - Make `Config` carry a stamp. The stamp holds the local digest and an optional
   global digest.
 - Name the admission function `ConfigService::admit(&Config)`. Do not name it
@@ -224,7 +224,7 @@ prints the `traces trust` command.
 
 - Keep `deny_unknown_fields`. Add no `version` key until the first breaking
   change. Then use a migration that keeps comments, as IWE does.
-- Make `config` own and parse the `[date]` table into `DateConfig`. Ticket 29
+- Make `config` own and parse the `[date]` table into `DateConfig`. Ticket 30
   decides the syntax.
 - Use this precedence for the time zone: host override, then config, then
   system.
@@ -239,7 +239,7 @@ prints the `traces trust` command.
 Each sub-question kept "keep as is" as an option.
 
 - Root types: move the status types into `note` or `config`. Reject: it adds an
-  edge or pre-empts ticket 23. Put the types in a core crate. Reject: ticket 34
+  edge or pre-empts ticket 23. Put the types in a core crate. Reject: ticket 35
   decides it.
 - Parser input: pass primitives, or pass `&Config`. Reject both.
 - Digests: trim the dead digests only (the fallback). Let `config` own an
@@ -303,33 +303,33 @@ The Trust Store layout does not change. Existing grants stay valid.
   and the racy timestamps. Ticket 25 also decides if a period-policy field
   exists. The "fingerprint wider than consumed" probe in ticket 25 no longer
   applies. A changed ignore set needs a rescan and a rebuild.
-- [Temporal](./29-temporal-boundary-and-dialects.md): Decide the `[date]`
+- [Temporal](./30-temporal-boundary-and-dialects.md): Decide the `[date]`
   syntax. The filename-period subset enters `IndexPolicy` if the index stores
   periods.
-- [Template boundary](./30-template-engine-boundary.md): `TemplateService` holds
+- [Template boundary](./31-template-engine-boundary.md): `TemplateService` holds
   `&Config`, and the template engine builds an indexer
   (`template/engine.rs:125-135`). `Config` no longer holds the ignore and period
   policy. The composition root builds `IndexPolicy` one time for the CLI and the
   template engine.
-- [Paths](./31-path-and-capability-model.md): The host rejects relative path
+- [Paths](./32-path-and-capability-model.md): The host rejects relative path
   variables. Do not assume a base. Decide if `.traces` can be a symlink. Decide
   how a root alias gets an identity.
-- [Host](./32-workspace-host-and-composition.md): Decide the held workspace, the
+- [Host](./33-workspace-host-and-composition.md): Decide the held workspace, the
   watcher, the debounce, the composition of `IndexPolicy`, the dialog threading
   and who applies trust after init. `ConfigService::admit` is the admission
   primitive.
-- [Errors](./33-error-and-diagnostic-architecture.md): Decide the new error sets
+- [Errors](./34-error-and-diagnostic-architecture.md): Decide the new error sets
   for config, trust and init. Decide the error for `traces trust` without a
   config.
-- [Crate topology](./34-crate-topology-and-public-surface.md): Ticket 22 fixes
-  the logical owners and the module graph. Ticket 34 decides the crate cuts and
+- [Crate topology](./35-crate-topology-and-public-surface.md): Ticket 22 fixes
+  the logical owners and the module graph. Ticket 35 decides the crate cuts and
   the `pub` items. After a CLI split, `ConfigService`, `HostInputs`, `admit` and
   the init use case are the first outward-facing surface. The constructor that
   reads the OS belongs with the adapters.
-- [Schema internals](./36-schema-internals-simplification.md) and [body
-  sections](./37-body-section-schemas.md): The schema files own class
+- [Schema internals](./37-schema-internals-simplification.md) and [body
+  sections](./38-body-section-schemas.md): The schema files own class
   `[binding]` (ticket 20). Ticket 22 adds no config key for it. `FieldName`
   stays a leaf.
-- [Reconciliation](./35-reconcile-decisions-and-audit-coverage.md): Test the
+- [Reconciliation](./36-reconcile-decisions-and-audit-coverage.md): Test the
   `IndexPolicy` boundary again. Test the shared ignore value between trust
   discovery and the index walker.

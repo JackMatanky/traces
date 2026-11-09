@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: resolved
-Blocked by: 5, 22, 24, 12
+Blocked by: 5, 12, 22, 24
 
 ## Question
 
@@ -105,9 +105,9 @@ closed-file edit.
 - Decide which invariant controls workspaces with different policies at one
   canonical root.
 - Leave host writer admission to [the workspace-host
-  ticket](./32-workspace-host-and-composition.md).
+  ticket](./33-workspace-host-and-composition.md).
 - Leave canonical root identity to [the path
-  ticket](./31-path-and-capability-model.md).
+  ticket](./32-path-and-capability-model.md).
 
 Ticket 24 requires one read snapshot for candidates, facets and fingerprint
 validation. Its host reads a pinned immutable generation.
@@ -143,7 +143,7 @@ same-stem candidate sets. The inverted unresolved-stem index from research
 - Decide how to report repeated failed heals without hiding a stale or failed
   index.
 - Give notice presentation to [the diagnostic
-  ticket](./33-error-and-diagnostic-architecture.md).
+  ticket](./34-error-and-diagnostic-architecture.md).
 - Keep any check watermark and prior violation keys outside the index and its
   fingerprint.
 - Leave the decision to create that optional check store to the check and host
@@ -276,7 +276,7 @@ Decisions the maintainer made in this round:
 
 Confirmed decisions:
 
-- Settle the host staleness bound with downstream tickets 32 and 27.
+- Settle the host staleness bound with downstream tickets 33 and 27.
 - Decouple ticket 26: crash recovery is a no-op refresh of uncommitted files
   (12 to 65 ms). The journal is an optional optimization that does not block
   this ticket's invalidation rules.
@@ -291,7 +291,7 @@ revision. The evidence is in [the research brief](../research/25-index-freshness
 `META` holds these identity parts:
 
 - **Engine tag.** It names the storage engine and its major version, such as
-  `redb4`. Ticket 24 gives this rule to this ticket (`24:299-300`). The tag is
+  `redb4`. Ticket 24 gives this rule to this ticket (`24:309-310`). The tag is
   part of the cache file name, so one file serves one engine. The current file
   keeps its name for the first engine.
 - **Platform family.** Unix and Windows serialize arbitrary vault paths
@@ -312,7 +312,7 @@ The extractor fingerprint hashes two inputs:
 1. The resolved versions of the crates that feed persisted values:
    `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard`.
    `build.rs` reads them from `Cargo.lock`. The build fails if a listed crate is
-   missing. Whoever prunes a crate updates the list. Tickets 29 and 34 may prune
+   missing. Whoever prunes a crate updates the list. Tickets 30 and 35 may prune
    `speedate` or `noyalib`.
 2. The encoded bytes of probe records built from an embedded corpus and
    synthetic facet records.
@@ -354,7 +354,7 @@ Store-open rules:
   fingerprint is a rebuild. The last case means someone skipped the bless task,
   so the rule fails safe. These rebuilds are automatic heals. They stay quiet.
 - A row that fails to decode, or a damaged `META`, is a rebuild.
-- A higher epoch is an unusable cache under ticket 24 (`24:374-384`). A read
+- A higher epoch is an unusable cache under ticket 24 (`24:384-394`). A read
   parses the source files and gives one stderr notice. It exits 0 if the parse
   and the query succeed. It does not write and does not wipe. A host that starts
   cold against such a store parses fresh the same way.
@@ -374,7 +374,7 @@ Store-open rules:
 
 A long-lived host keeps its old binary until its editor restarts. It then meets
 a newer store. It never writes that store. It serves from its in-memory
-generation, or parses fresh if it has none. Tickets 32 and 27 own that behavior.
+generation, or parses fresh if it has none. Tickets 33 and 27 own that behavior.
 
 Why the version floor is gone:
 
@@ -393,7 +393,7 @@ Boundary rules:
   `pulldown_cmark` only in `src/note/parser.rs`. The task pins today's state.
 - Enforce this with a `check:boundaries` mise task. Use `git grep`, as
   `check:layers` does. Do not write a Rust test that reads source text. The task
-  is provisional. Ticket 34 may replace it with crate boundaries.
+  is provisional. Ticket 35 may replace it with crate boundaries.
 - Do not confine `logos`, `noyalib`, `jiff` or `speedate`. Four subsystems use
   `logos`: the shared lexer, the note parser, the query grammar and the temporal
   module. `noyalib` is in `src/yaml.rs`, `src/field.rs`, `src/note/metadata.rs`
@@ -414,7 +414,7 @@ Known gaps:
   extractor adds a regression note to the corpus. That changes the fingerprint.
   `traces index --verify` is the backstop.
 - A `cargo install` without `--locked` can resolve other crate versions than the
-  packaged `Cargo.lock`. Ticket 38 requires `--locked` in the install
+  packaged `Cargo.lock`. Ticket 39 requires `--locked` in the install
   instructions.
 - An enum variant that no corpus note uses. Spike `serde-reflection` in the
   implementation to close it. This is unverified for the tagged serde types.
@@ -433,19 +433,19 @@ Known gaps:
 
 Handoffs:
 
-- Ticket 31: the store is not portable across platform families until paths are
-  portable. Then drop the platform part of the identity. Ticket 31 also has no
+- Ticket 32: the store is not portable across platform families until paths are
+  portable. Then drop the platform part of the identity. Ticket 32 also has no
   Unicode normalization rule. Until it has one, NFC and NFD names are different
   files.
-- Tickets 32 and 27: the host rules above.
-- Ticket 33: the notice for a higher epoch. Rebuild heals stay quiet.
-- Ticket 34: the `build.rs` path to `Cargo.lock` after a workspace split, and
+- Tickets 33 and 27: the host rules above.
+- Ticket 34: the notice for a higher epoch. Rebuild heals stay quiet.
+- Ticket 35: the `build.rs` path to `Cargo.lock` after a workspace split, and
   the replacement of `check:boundaries`.
-- Tickets 19 and 29: a civil datetime must deserialize without a zone lookup.
-  Tickets 29 and 34: update the crate list if they prune a crate.
-- Ticket 35: replace ADR-0009 and the glossary text named in "Stale ADR and
+- Tickets 19 and 30: a civil datetime must deserialize without a zone lookup.
+  Tickets 30 and 35: update the crate list if they prune a crate.
+- Ticket 36: replace ADR-0009 and the glossary text named in "Stale ADR and
   glossary text" when the implementation lands.
-- Ticket 38: the release process. It no longer gates this ticket.
+- Ticket 39: the release process. It no longer gates this ticket.
 
 Change-table rows for ticket 16:
 
@@ -493,7 +493,7 @@ defer to them.
 
 ### Audit of all tickets
 
-Four reviewers audited tickets 01 to 38, the ADRs and the glossaries. They
+Four reviewers audited tickets 01 to 39, the ADRs and the glossaries. They
 treated every ticket as fallible, this one included. The parent verified each
 finding that could change this ticket. The full table is in section H5 of the
 research brief.
@@ -511,14 +511,14 @@ Findings logged for other tickets, not adopted here:
 - Ticket 24: a reviewer reports that the 11-facet split costs 85% more write
   time and doubles the file size. I did not re-derive the figures. A slower
   write raises the rebuild cost that this ticket relies on.
-- Ticket 32: a host that serves from memory pays 467 MB of RSS at 50,000 notes.
-- Ticket 33: a notice channel that does not travel as an error. A higher epoch
+- Ticket 33: a host that serves from memory pays 467 MB of RSS at 50,000 notes.
+- Ticket 34: a notice channel that does not travel as an error. A higher epoch
   exits 0.
 - Ticket 26: a reviewer called the measurement plan large. The maintainer
   decided to keep the range of 50 to 50,000 notes. The range comes from the
   maintainer's vaults and from other Obsidian vaults. Earlier data
   (`research/11`) suggests a journal adds more fixed latency than it saves.
-- Ticket 38: a reviewer calls it dead weight. It no longer gates this ticket.
+- Ticket 39: a reviewer calls it dead weight. It no longer gates this ticket.
   The maintainer asked for it.
 
 ## Code delta
@@ -530,22 +530,22 @@ The code does not implement this ticket. This table lists what the refactor chan
 | Format marker | `META_VERSION = b"1"` and `META_VERSION_KEY` (`src/index/store.rs:39-41`). A mismatch makes `open` clear the store | Remove both. `META` holds the engine tag, platform family, format epoch, extractor fingerprint, policy fingerprint and written-by version | Ticket 24 `meta` table |
 | Store open | `create_db` deletes the file before `rebuild_needed` decides (`src/index/store.rs:903-931`). `rebuild_needed` compares one version value (`src/index/store.rs:936-988`) | Reads never delete. Only a writer that decided to rebuild deletes. Lower epoch, other platform, other fingerprint, damaged `META` or undecodable rows: rebuild. Higher epoch: read miss with one stderr notice, exit 0 | Ticket 24 |
 | Policy fingerprint | `IndexFingerprint` built from `ConfigDigests` (`src/index/fingerprint.rs`, `src/config/model/digest.rs`) | `IndexPolicy::fingerprint()`. Delete `ConfigDigests` | Ticket 22 |
-| Refresh report | `RefreshReport::ConfigDrift` and `DriftCause` (`src/index/refresh.rs:44`, `src/index/service.rs:177,294,315`) | Rename. Add identity causes: engine, platform, epoch, extractor, damaged `META`. Rebuild heals stay quiet | Ticket 33 |
-| Extractor fingerprint | None | New `build.rs` reads resolved versions of `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard` from `Cargo.lock`. New probe builder and embedded corpus in `src/index/`, computed once on first open | Tickets 19, 29 for the civil datetime |
+| Refresh report | `RefreshReport::ConfigDrift` and `DriftCause` (`src/index/refresh.rs:44`, `src/index/service.rs:177,294,315`) | Rename. Add identity causes: engine, platform, epoch, extractor, damaged `META`. Rebuild heals stay quiet | Ticket 34 |
+| Extractor fingerprint | None | New `build.rs` reads resolved versions of `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard` from `Cargo.lock`. New probe builder and embedded corpus in `src/index/`, computed once on first open | Tickets 19, 30 for the civil datetime |
 | Identity file | None | A committed identity file. A test fails on drift. New task `mise run index:bless` rewrites it and adds 1 to the epoch | None |
-| Boundary check | `check:layers` only (`mise.toml:148`) | New `check:boundaries` task. Use `git grep`. Confine `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. Confine `redb` and `postcard` to `src/index/` | Ticket 34 may replace it |
+| Boundary check | `check:layers` only (`mise.toml:148`) | New `check:boundaries` task. Use `git grep`. Confine `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. Confine `redb` and `postcard` to `src/index/` | Ticket 35 may replace it |
 | Cache file name | `.traces/index.redb` (`src/index/mod.rs:48`) | The name carries the engine tag | Ticket 24 |
 | Source scan | `scan` compares `path != index_db` (`src/index/service.rs:424-435`) | Remove the dead check. A test shows that nothing under `.traces/` enters the scan | None |
 | Change detection | `FileDelta::compute` compares `FileMeta` (`src/index/delta.rs:21`). The landed canary pins stale output for a restored mtime (`tests/e2e/index.rs:129-180`) | Add a `racy` bit per file row. Set it when `mtime >= scan_start - 2 s`. Add `ctime` on Unix. Read each changed file from one handle with a stat before and after. Retry the scan once on `NotFound` | Ticket 24 file rows |
-| Verify command | None | New `traces index --verify` hashes every file | Ticket 33 for the exit codes |
-| Host store use | A held store fails a read with exit 1 | A read falls back to a fresh parse with one stderr notice and exit 0. A host holds the store only during refresh and persist | Tickets 27, 32 |
+| Verify command | None | New `traces index --verify` hashes every file | Ticket 34 for the exit codes |
+| Host store use | A held store fails a read with exit 1 | A read falls back to a fresh parse with one stderr notice and exit 0. A host holds the store only during refresh and persist | Tickets 27, 33 |
 | Commit recovery | No `commit_nonce` and no unwritable latch exist in `src/index/`. The research brief (C5, C6) says they were proposed and drops them | Do not add them. After an uncertain commit, drop the handle and the plan. Try the write-open at each persist | Ticket 24 |
 | Replacement failure | The store open and replacement path is `create_db` (`src/index/store.rs:903`) | A failed store replacement is a cache miss for reads | None |
-| ADR and glossary | ADR-0009 `proposed`. The glossary "Index Fingerprint" entry is stale | Replace both when the code lands | Ticket 35 |
-| Ticket 16 table | Row 78 holds the corrected contract | Add the change-table rows listed above to the redesign spec | Ticket 35 |
+| ADR and glossary | ADR-0009 `proposed`. The glossary "Index Fingerprint" entry is stale | Replace both when the code lands | Ticket 36 |
+| Ticket 16 table | Row 78 holds the corrected contract | Add the change-table rows listed above to the redesign spec | Ticket 36 |
 
 Not in code:
 
-- The staleness bound (tickets 27 and 32).
-- The release process and the `--locked` install rule (ticket 38).
+- The staleness bound (tickets 27 and 33).
+- The release process and the `--locked` install rule (ticket 39).
 - The journal decision (ticket 26).

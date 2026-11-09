@@ -146,7 +146,7 @@ Spanned<Value>>`:
 
 ## Not measured
 
-- The cost of an on-demand reparse of one editor buffer (ticket 34). The final
+- The cost of an on-demand reparse of one editor buffer (ticket 35). The final
   round measured a prototype scan of the whole corpus only.
 - Key spans from Noyalib.
 - A repeat run on a personal vault.

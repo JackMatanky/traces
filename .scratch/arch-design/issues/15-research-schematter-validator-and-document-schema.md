@@ -16,8 +16,8 @@ section matcher with token budgets. The crate implements a published spec
 only its callers (`crates/liwe/src/schema.rs`, `schema/document.rs`,
 `crates/diwe/src/schema.rs`), not the crate.
 
-[Body-section schemas](./37-body-section-schemas.md) and [schema
-internals](./36-schema-internals-simplification.md) need crate details. They
+[Body-section schemas](./38-body-section-schemas.md) and [schema
+internals](./37-schema-internals-simplification.md) need crate details. They
 compare two choices: adopt a crate for the body matcher, or write a small
 heading matcher over persisted `Note` headings.
 
@@ -47,8 +47,8 @@ source repository, the spec text):
   reimplement the section matcher alone. Measure this against heading data in
   `Note`.
 
-Informs: [ticket 37](./37-body-section-schemas.md) (primary), [ticket
-36](./36-schema-internals-simplification.md), reconciliation ticket 35.
+Informs: [ticket 38](./38-body-section-schemas.md) (primary), [ticket
+37](./37-schema-internals-simplification.md), reconciliation ticket 36.
 
 Deliverable:
 `.scratch/arch-design/research/15-schematter-validator-and-document-schema.md`
@@ -86,6 +86,6 @@ are [S] (read by the research agent, not re-read by the owner).
   greedy, `minContains`/`maxContains`, `additionalSections`, terminal wildcard,
   duplicate-entry schema error) do not need the crate.
 
-Unresolved: none for ticket 37 to wait on. Downstream: [body-section
-schemas](./37-body-section-schemas.md) (the "adopt a crate" alternative is
-answered), [schema internals](./36-schema-internals-simplification.md).
+Unresolved: none for ticket 38 to wait on. Downstream: [body-section
+schemas](./38-body-section-schemas.md) (the "adopt a crate" alternative is
+answered), [schema internals](./37-schema-internals-simplification.md).

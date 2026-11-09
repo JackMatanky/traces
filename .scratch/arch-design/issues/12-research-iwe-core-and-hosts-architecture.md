@@ -51,13 +51,13 @@ Focus, against decisions already taken or still open in this map:
   per process versus persisted cache. How does IWE decide staleness?
 - [Live buffers](./27-live-buffer-and-persisted-index-consistency.md): how the
   LSP overlays unsaved text on the graph, cancellation, and multi-root.
-- [Workspace host](./32-workspace-host-and-composition.md),
-  [diagnostics](./33-error-and-diagnostic-architecture.md), [crate
-  topology](./34-crate-topology-and-public-surface.md): what the CLI owns versus
+- [Workspace host](./33-workspace-host-and-composition.md),
+  [diagnostics](./34-error-and-diagnostic-architecture.md), [crate
+  topology](./35-crate-topology-and-public-surface.md): what the CLI owns versus
   the core, public surface, error types, and test seams.
 - Scale: vault sizes IWE benchmarks and what it pays at each.
 
-Informs: tickets 23, 24, 25, 32, 33, 34, 27 and the reconciliation ticket 35.
+Informs: tickets 23, 24, 25, 33, 34, 35, 27 and the reconciliation ticket 36.
 
 Deliverable:
 `.scratch/arch-design/research/12-iwe-core-and-hosts-architecture.md` (<= 300
@@ -92,7 +92,7 @@ sources by the owner. Findings:
   return a plain `Changes { creates, updates, removes }`. `diwe` applies them.
   cli, lsp and mcp are thin hosts. No one-implementor trait crosses the seam. It
   differs in one respect: the app layer is its own library crate (`diwe`), which
-  is input to ticket 34.
+  is input to ticket 35.
 - The LSP has no buffer overlay. Open buffers are written into the single
   in-memory graph. Open keys ignore watcher events until close. It works because
   IWE has no persisted index. It does not answer ticket 27's persisted-index
@@ -108,6 +108,6 @@ sources by the owner. Findings:
 
 Alternatives, invariants and removable code: not applicable to a research
 ticket.
-Unresolved: whether the app layer is a separate crate (ticket 34).
-Downstream: tickets 22, 23, 24, 25, 31, 32, 33, 34, 27, 35 carry an "Inputs"
+Unresolved: whether the app layer is a separate crate (ticket 35).
+Downstream: tickets 22, 23, 24, 25, 32, 33, 34, 35, 27, 36 carry an "Inputs"
 section.

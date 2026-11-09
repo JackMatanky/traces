@@ -68,7 +68,7 @@ recollection. The author's vault is not evidence anywhere in this file.
 - **Violation locator.** If body schemas ever arrive, `Violation.field` needs a
   locator that is not only a frontmatter key.
 - **Surgical edits.** Obsidian Local REST API and the Anthropic memory tool show
-  agents damaging formatting with whole-file writes [S]; relevant to ticket 30
+  agents damaging formatting with whole-file writes [S]; relevant to ticket 31
   and the MCP edit mechanism.
 
 ## 5. Scout reliability
@@ -90,4 +90,4 @@ Recorded in [ticket 20's Answer](../../../issues/20-schema-note-typing-and-valid
 order-independent multi-class rule, multiple `extends` parents kept, `global`
 as a lowest-precedence layer with its own code family, class binding by tag and
 path (an explicit known class suppresses bindings), `hint`, the exit-code
-split, and body-section schemas deferred to ticket 36.
+split, and body-section schemas deferred to ticket 37.

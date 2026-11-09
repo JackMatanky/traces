@@ -10,7 +10,7 @@ Status: input to [ticket 20's Answer](../../../issues/20-schema-note-typing-and-
 which supersedes this file where they differ: `traces check` takes `--before`
 and `--after` (not a git baseline), the delta key is `(field, code,
 hash(value))` without the element index, `step` is checked, severities belong to
-ticket 31 (not scout E), and the author's vault is one example, not evidence.
+ticket 32 (not scout E), and the author's vault is one example, not evidence.
 
 ## 1. What changed since brief revision 2
 
@@ -21,8 +21,8 @@ ticket 31 (not scout E), and the author's vault is one example, not evidence.
 | `file_class_expander.rs` is a sound seam (survey) | Rejected | See section 3 |
 | "LSP binds the agent" | LSP is feedback, not a gate | Section 5 |
 | Date-shaped text needs an override or quote convention | Narrower than thought | Section 6 |
-| Violations carry default severity (scout E) | Not adopted | Ticket 31 owns severity |
-| Move `NoteFieldValue` into `src/field.rs` (scout A) | Open | Ticket 18 left its home to ticket 32 |
+| Violations carry default severity (scout E) | Not adopted | Ticket 32 owns severity |
+| Move `NoteFieldValue` into `src/field.rs` (scout A) | Open | Ticket 18 left its home to ticket 33 |
 
 ## 2. Layering that survives a CLI-first workspace split [P]
 
@@ -82,7 +82,7 @@ ResolvedFields::check(&FieldMap) -> Vec<Violation>    (pure, span-free)
   Link, List, Object) must sit below both. Its dependencies are `Link`,
   temporal values and `IndexMap`, all already root-level [H, not traced].
   Ticket 18 rejected one enum shared with schema literals but left the home of
-  the runtime value open (module placement by ticket 32), so this is a
+  the runtime value open (module placement by ticket 33), so this is a
   placement decision, not a reversal. Schema literals stay a separate type.
 - Tier-2 `file` checks (folders, ext, class of the link target) need the
   index. The checker exposes the file-field constraints as data; the app layer
@@ -136,7 +136,7 @@ model module (broad blast radius).
 - `Violation { field, element, kind, expected, found }`, stable codes, no span,
   no severity. Bounded expected: count, truncated flag, top-k closest via
   `strsim`.
-- Disagreement: E has 20 pin default severities. Ticket 31 blocks on 20 for the
+- Disagreement: E has 20 pin default severities. Ticket 32 blocks on 20 for the
   diagnostic envelope; 20 pins codes and the principle that type problems are
   never `Error` by default, and 31 owns severities and overrides.
 - Huge enums and strftime formats cannot be projected to JSON Schema; they

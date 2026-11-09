@@ -114,7 +114,7 @@ watermark plus the set of violation keys `(field, code, hash(value))` at the
 last check gives a delta without git. Cost: a second derived store outside the
 index and its fingerprint (schema must stay out of the index). Alternative with
 no store: report all violations of changed notes with no delta. Ownership:
-tickets 24, 25 and 31; 20 only requires that the contract can take a stored
+tickets 24, 25 and 32; 20 only requires that the contract can take a stored
 baseline as `before`.
 
 Stance for the Answer: "the portable guarantee is detect and feed back;

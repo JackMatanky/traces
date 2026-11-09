@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: resolved
-Blocked by: 18, 3
+Blocked by: 3, 18
 
 ## Question
 
@@ -143,7 +143,7 @@ lexeme.
 - Natural-language dates remain a hook, not a decided grammar. The proposed
   grammar is deterministic, closed and English. It resolves against injected
   `today` and is shared by filter literals, `date()`, `date_add` and template
-  filters. Ticket 29 owns grammar and crate choice.
+  filters. Ticket 30 owns grammar and crate choice.
 
 **Links:** equality and order use the target-plus-subpath `ComparisonKey`.
 `display` and `embedded` remain queryable attributes. Sort Links with the string
@@ -157,7 +157,7 @@ across mixed Date and Link rows, use `date(field)`.
 
 **Durations:** nominal seconds (`1mo == 30d`, `1y == 365d`) stay the equality
 and order provisionally. Calendar arithmetic stays Jiff-based. Refinement
-belongs to ticket 29.
+belongs to ticket 30.
 
 **Strings:** `==` and `!=` stay byte-exact for strings. Link comparison instead
 folds case through `ComparisonKey`: `project == "alpha"` matches `[[Alpha]]`,
@@ -185,7 +185,7 @@ The specification must confirm them.
   excluded by bracket mismatch. They also include a build-time advisory notice
   for an invalid date-shaped quoted literal. For example, `"2025-02-30"` still
   runs as a string. A bare invalid date literal remains a syntax error.
-- Ticket 33 owns the diagnostic and error mechanism.
+- Ticket 34 owns the diagnostic and error mechanism.
 
 **Invariant owners:**
 
@@ -224,7 +224,7 @@ The specification must confirm them.
   null placement. String functions (`lower`, `startswith`, and `string()` only
   if a use appears). A truncating date function for day matching. `GroupBy` key
   relation, and how adaptation threads into `ValueExpr` arithmetic.
-- [Temporal boundary](./29-temporal-boundary-and-dialects.md): natural-language
+- [Temporal boundary](./30-temporal-boundary-and-dialects.md): natural-language
   grammar and crate, duration refinement, civil vs instant type shape, and a
   `DateConfig` sub-Config (coordinated with ticket 22).
 - [Note document model](./23-note-document-model.md): inline `DateTime` and
@@ -232,11 +232,11 @@ The specification must confirm them.
 - [Index read model](./24-index-read-model-and-query-execution.md) and
   [freshness](./25-index-freshness-and-invalidation.md): civil datetime cache
   encoding and the cache format change.
-- [Template boundary](./30-template-engine-boundary.md): templates use this
+- [Template boundary](./31-template-engine-boundary.md): templates use this
   relation module, not minijinja's own comparison.
-- [Error architecture](./33-error-and-diagnostic-architecture.md): the mechanism
+- [Error architecture](./34-error-and-diagnostic-architecture.md): the mechanism
   for the two advisory notices.
-- [Crate topology](./34-crate-topology-and-public-surface.md): visibility of the
+- [Crate topology](./35-crate-topology-and-public-surface.md): visibility of the
   relation module and collator dependency.
 
 Research: [brief](../research/19-prep/brief.md) and its inputs `a` to `k`.
@@ -255,7 +255,7 @@ These values use the shared Link equality relation, not the query binder's liter
 
 The [execution-context Answer](./21-ambient-environment-and-execution-context.md)
 sets a lazily acquired system-local default zone
-(a configurable override source still belongs to tickets 22/29).
+(a configurable override source still belongs to tickets 22/30).
 The answer also sets civil `CalendarPeriod` identity and an exclusive literal upper boundary.
 Period membership is a filter predicate, not `PartialEq` or `Ord`.
 Period-versus-period equality is exact normalized identity.
@@ -288,7 +288,7 @@ Do not edit the glossaries yet. They describe the current code:
   Remove "unzoned input resolves in the process's local zone".
   Remove "comparisons with Date promote the Date to local midnight".
   Rewrite *Zone* (supplied by the execution context, not process-local).
-  Keep *Duration* nominal wording once ticket 29 settles it.
+  Keep *Duration* nominal wording once ticket 30 settles it.
 - TODO `src/GLOSSARY.md`: *Duration* still says "written source components".
   This statement conflicts with `src/temporal/GLOSSARY.md` (pre-existing drift).
   *Temporal Strictness & Resolution* says query filters evaluate "strict typed expressions", which adaptive literals qualify.

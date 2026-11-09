@@ -58,7 +58,7 @@ keep its tag.
 ## Editor consumers
 
 - [V] No LSP code or LSP dependency exists today.
-- [H] Ticket 34 needs an unsaved buffer to override the stored note. This can
+- [H] Ticket 35 needs an unsaved buffer to override the stored note. This can
   need a `Note` built from the buffer. IWE keeps an in-memory graph overlay.
 
 ## Public surface

@@ -87,7 +87,7 @@ Check all index-affecting changes again before the measurements.
 - [V] Ticket 22 gives `init` an undo journal. Ticket 20 lists a bounded undo
   journal for agent writes. Both protect vault files. This ticket concerns a
   derived cache. The two kinds must not share code or names.
-- [V] [Ticket 35](../issues/35-reconcile-decisions-and-audit-coverage.md) now
+- [V] [Ticket 36](../issues/36-reconcile-decisions-and-audit-coverage.md) now
   waits for this ticket. The ticket handoff adds the follow-on rule.
 
 ## B. What a stop loses
@@ -317,7 +317,7 @@ change opens the store for writing. The sequence of read-only open, drop and
 writable open costs 14.5 ms. A read-only open fails with "Database already
 open" while a writable handle is held, so one process cannot hold both. Ticket
 25 lists a read-only vault as open. Pass this result to
-tickets 25 and 32. It is not part of this ticket's decision.
+tickets 25 and 33. It is not part of this ticket's decision.
 
 ## E. Cost model and break-even
 
@@ -388,7 +388,7 @@ production code before the measurements.
 | P8 | Side file, then rename, for a rebuild | A stop during a rebuild | A second file, file sync, rename and directory sync | Compare repair, bytes and first usable query only for a viable rebuild |
 | P9 | Resumable rebuild. Commit each chunk. Mark `META` as incomplete | A crash in a rebuild | 4 ms for each chunk | Rare benefit. It breaks one coherent generation unless the mark works. Defer |
 | P10 | Dirty sentinel file | Detection of an unclean stop | One file | No gain. The commit carries `META`, the `racy` bit and the rows together |
-| P11 | Read-only open when no file changed | Nothing. It is a speed control | -12 ms and -5 syncs in the handle probe | Measure a complete query and hand the result to ticket 32 |
+| P11 | Read-only open when no file changed | Nothing. It is a speed control | -12 ms and -5 syncs in the handle probe | Measure a complete query and hand the result to ticket 33 |
 | P12 | A flag that a `SIGINT` handler sets. The run stops and drops the store | A `Ctrl-C` in the window | A handler and a cancel check | Not tested. A handler cannot drop a redb handle safely. `SIGKILL` and power loss still skip it |
 
 [H] P7 needs a complete two-transaction prototype before it earns a cost or
@@ -500,7 +500,7 @@ from an incomplete write. A journal here would need a rule for the tail.
 | H8 | The repair measure names one case. | Measure both regimes: clean close, then stop; and durable commits, then stop. |
 | H9 | The stop list did not separate `SIGKILL`, `abort`, a panic and `Ctrl-C`. | Test every phase with `SIGKILL`, and test the other modes at representative boundaries. Do not force a real OOM. |
 | H10 | Parse time minus decode time is only a saved-work bound. | Measure the complete replay and first usable query against each rival. |
-| H11 | The Handoffs list said that ticket 35 does not list this ticket. It does now. | Fixed in the ticket. |
+| H11 | The Handoffs list said that ticket 36 does not list this ticket. It does now. | Fixed in the ticket. |
 | H12 | The window is not the 10 to 20 ms of `drop`. The CLI keeps the store open during the query. | Measure the window for each command and size. |
 | H13 | Path 2 ignores the repair after an `Immediate` commit. It is 33 to 88 ms. | Include the repair time in the cost of path 2. |
 | H14 | `Database::drop` does not return a failed close write. | Keep a journal until the `Immediate` replay commit returns `Ok`. |
@@ -530,7 +530,7 @@ note. Keep the ticket open until its measurements are complete.
   Measure each window. Do not combine rates without a stop distribution.
 - If a candidate passes the gate, open a follow-on task.
   Move to it the replay prototype, the crash tests, the Linux checks
-  and the recovery-query checks. Rewire ticket 35 to that follow-on task.
+  and the recovery-query checks. Rewire ticket 36 to that follow-on task.
   Do not resolve ticket 26 from costs alone.
 
 ### I2. Durability and recovery
@@ -563,9 +563,9 @@ note. Keep the ticket open until its measurements are complete.
   Keep any justified journal inside the redb adapter.
   Let another engine decide whether its own log is sufficient.
 - Measure a complete read-only query, handover and repair fallback here.
-  Pass the result to ticket 32. Do not change production index code.
+  Pass the result to ticket 33. Do not change production index code.
 - Simulate the host lifecycle in a throwaway harness.
-  Ticket 32 must check the result against a production host later.
+  Ticket 33 must check the result against a production host later.
   After a panic, discard the handle and plan before revalidation.
 - Measure latency on macOS/APFS.
   Use Podman's Linux VM for correctness checks on VM-local storage.
@@ -610,7 +610,7 @@ store open removes the file and creates it again. A second handle can block
 that on Windows [INFERENCE]. The mapping of `SIGKILL` and `Ctrl-C` is unknown.
 
 [H] A long-lived host has no row in the tables. A held store keeps every `None`
-commit non-durable. The work lost grows with the number of batches. Ticket 32
+commit non-durable. The work lost grows with the number of batches. Ticket 33
 owns this. See question 10.
 
 [H] The ticket asks who can read the journal and which tools copy it. The store

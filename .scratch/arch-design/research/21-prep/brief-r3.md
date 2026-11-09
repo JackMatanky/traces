@@ -30,7 +30,7 @@ Evidence base for this revision:
 
 1. Upstream artifacts were treated as binding. [V] The premise audit found: ticket 20's 'functions with explicit inputs'
    was assistant-introduced (session row 557) and bundled into a later 'agreed'; the 'Cwd judged sound' note descends from
-   one survey line; ticket 20:292 cites an ADR-0009 that matches neither duplicate file; 'discovery cannot move' stretched
+   one survey line; ticket 20:302 cites an ADR-0009 that matches neither duplicate file; 'discovery cannot move' stretched
    the Frozen trust ORDER to the locator's inputs.
 2. Migration cost selected leans (CwdGuard, parameter spread). [V] `CwdGuard` and its lock are `#[cfg(test)]` only
    (`src/cli/cwd.rs:50-126`) and the canonical runner is nextest, one process per test (`mise.toml:32`,

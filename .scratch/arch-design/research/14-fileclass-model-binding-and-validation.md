@@ -4,7 +4,7 @@
 - Repo: `mdelobelle/fileclass` (TypeScript Obsidian plugin; Metadata Menu
   successor)
 - Sources: `/tmp/fc/` (src, tests, docs/content, demo/ROADMAP.md, CLAUDE.md)
-- Context: Informs Traces schema redesign (tickets 18, 19, 20, 29, 27, 36, 37)
+- Context: Informs Traces schema redesign (tickets 18, 19, 20, 30, 27, 37, 38)
 - Tags: [V] verified from source/tests, [H] architectural interpretation
 
 ---
@@ -222,7 +222,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   safer [H].
 - Unchecked Custom Date Formats: Fileclass abandons date validation when custom
   formats are used. Traces can parse and validate structured temporal formats
-  using a dedicated parser crate [H: ticket 29].
+  using a dedicated parser crate [H: ticket 30].
 - Delegation to Host GUI: Fileclass relies on Obsidian Bases for foreign keys,
   lookups, and reverse relations. Traces must own relationship queries within
   its core query engine [H].
@@ -230,7 +230,7 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   for comparison (`equals`, `contains`). Traces uses a typed `NoteFieldValue`
   and strict adaptive equality [H: tickets 18, 19].
 - Frontmatter-Only Restriction: While frontmatter isolation simplifies write
-  safety, Traces requires body section schemas (ticket 37) for structured notes
+  safety, Traces requires body section schemas (ticket 38) for structured notes
   [H].
 
 ---
@@ -250,11 +250,11 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   multi-text fields (`MultiInput`) but forbids them for relational multi-links
   (`MultiFile`). Traces should retain explicit list types in AST while allowing
   scalar coercion in queries.
-- Ticket 36 (Schema Internals): Prune thin/redundant types. Of Fileclass's 28
+- Ticket 37 (Schema Internals): Prune thin/redundant types. Of Fileclass's 28
   types, only ~10 represent unique structural data types. `Cycle`,
   `CycleDuration`, `Location`, `Icon`, `Color` are UI presentation concerns.
-- Ticket 27 & 37 (Live Buffers & Body Schemas): Fileclass has zero live buffer
-  synchronization or body validation. It provides no precedent for tickets 27/37.
+- Ticket 27 & 38 (Live Buffers & Body Schemas): Fileclass has zero live buffer
+  synchronization or body validation. It provides no precedent for tickets 27/38.
 
 ### Round-4 Claims Verification Ledger
 

@@ -94,7 +94,7 @@ fallback is revised, pending reconciliation before implementation.
   identity as the index fingerprint.
 - Zone changes do not change stored civil note values or filename periods.
   Resolve timestamp-derived civil dates during evaluation. Never persist those
-  dates with a zone-free fingerprint. Tickets 24, 25, 31 and 32 own cross-process
+  dates with a zone-free fingerprint. Tickets 24, 25, 32 and 33 own cross-process
   coordination, canonical path identity and store locking. A registry key cannot
   isolate two sessions that share `.traces/index.redb`.
 - Check the hash of local config before parsing it, as ticket 16 requires. At
@@ -190,7 +190,7 @@ fallback is revised, pending reconciliation before implementation.
   Treat an explicitly selected `--force` as a separate overwrite policy. Do not
   change a provider's interactivity when its queued answers run out.
 - Revise only ADR-0003's non-TTY fallback. Keep its accepted index-by-position
-  selection contract. Do not change the ADR's historical status here. Ticket 32
+  selection contract. Do not change the ADR's historical status here. Ticket 33
   must reconcile its documented fallback before implementation. Preserve
   authored defaults such as `init` paths.
 - Get cwd, environment values, clock time and zone only at identified adapter
@@ -288,20 +288,20 @@ implements none of these items.
   coordination, creation timestamp nullability and index encoding.
 - [Query core](./28-query-core-and-plan.md): resolve pass, pinned plan and
   fallible memoized materialization for all terminal access.
-- [Temporal boundary](./29-temporal-boundary-and-dialects.md): period and unit,
+- [Temporal boundary](./30-temporal-boundary-and-dialects.md): period and unit,
   ISO/custom weeks, skipped days, DateConfig and filename recognition.
-- [Template boundary](./30-template-engine-boundary.md): render frame and
+- [Template boundary](./31-template-engine-boundary.md): render frame and
   captured escaping sets, fallible formatting, explicit dialog responses.
-- [Path identity](./31-path-and-capability-model.md) and [workspace
-  composition](./32-workspace-host-and-composition.md): canonical root identity,
+- [Path identity](./32-path-and-capability-model.md) and [workspace
+  composition](./33-workspace-host-and-composition.md): canonical root identity,
   multi-root-ready per-workspace policy, one coherent same-root index-writer
   generation, trust admission, dialog policy.
-- [Error architecture](./33-error-and-diagnostic-architecture.md): typed
+- [Error architecture](./34-error-and-diagnostic-architecture.md): typed
   execution and prompt errors translated without changing frozen CLI exit codes
   or successful output.
-- [Crate topology](./34-crate-topology-and-public-surface.md): adapter-only
+- [Crate topology](./35-crate-topology-and-public-surface.md): adapter-only
   ambient calls and a narrow outward core interface.
-- [Final reconciliation](./35-reconcile-decisions-and-audit-coverage.md): record
+- [Final reconciliation](./36-reconcile-decisions-and-audit-coverage.md): record
   each migratable behavior and reconcile ADR-0003 before cutover.
 
 ## TODOs

@@ -245,13 +245,13 @@ The human stated: *"The tracked store is a superset of the trust store."*
 
 ---
 
-## 9. Attack Point 8: Decisions Delegated to Tickets 29 and 30
+## 9. Attack Point 8: Decisions Delegated to Tickets 30 and 31
 
-1. **Ticket 29 (Path & Capability Model):**
+1. **Ticket 30 (Path & Capability Model):**
    - Canonicalization rules for symlinked `.traces/` directories and config files.
    - Confinement boundary: whether template and schema paths must resolve strictly within `root`.
    - Resolution base for relative paths declared inside `config.toml`.
-2. **Ticket 30 (Host Composition & Lifecycle):**
+2. **Ticket 31 (Host Composition & Lifecycle):**
    - Per-request admission caching: whether long-lived hosts (LSP/MCP) re-hash `config.toml` on every request or rely on file watchers.
    - Interactive prompt handling when `Untrusted` or `Stale` configuration is detected during daemon operation.
 

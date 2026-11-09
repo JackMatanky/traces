@@ -47,9 +47,9 @@ Two shapes remain:
 | Effective view must not add body fields to the schema check. | ticket 20 lines 52-65 | Keep the check frontmatter-only. |
 | `Box<TaskData>` has no measured size or allocation cost. | `g-probe-results.md` | Measure boxed and unboxed after the name `String` leaves. |
 | The guard must test the heading source range for `$`, not the cleaned text. | `src/note/parser.rs:106-161` | Add a mixed corpus with setext, escaped and empty math headings. |
-| Bulk indexing drops notices. | `src/index/service.rs:328-355` | Collect path-qualified notices beside bulk results. Ticket 31 shows them. |
-| A version bump deletes the store at open. 50,000 notes then reparse. Two processes can collide. | `src/index/store.rs:174-185` | The host reports "facts unavailable" during the rebuild. Tickets 25 and 30 own the two-process rule. |
-| A background parse can publish ranges of old bytes after a newer buffer arrives. | ticket 34 lines 9-17 | Tag each range set with a source revision. Drop stale results. The open buffer wins. |
+| Bulk indexing drops notices. | `src/index/service.rs:328-355` | Collect path-qualified notices beside bulk results. Ticket 32 shows them. |
+| A version bump deletes the store at open. 50,000 notes then reparse. Two processes can collide. | `src/index/store.rs:174-185` | The host reports "facts unavailable" during the rebuild. Tickets 25 and 31 own the two-process rule. |
+| A background parse can publish ranges of old bytes after a newer buffer arrives. | ticket 35 lines 9-17 | Tag each range set with a source revision. Drop stale results. The open buffer wins. |
 | A closed-file edit can race another write. | scout r2 case 4 | Compare the full source snapshot at commit. Abort on a difference. |
 | Heading scope for tasks: the last earlier line can pick a heading inside a quote or list. | `src/note/heading.rs:7-45` | Define scope with parser heading ranges. Test it. |
 | `BytePos` clamps above 4 GiB. A clamped edit range is wrong. | `src/position.rs:171-213` | Give no ranges for oversize input. |

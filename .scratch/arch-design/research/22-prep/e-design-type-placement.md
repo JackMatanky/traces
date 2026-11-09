@@ -586,7 +586,7 @@ traces/ (Package 3 Workspace)
 ```
 
 - **Public Surface Delta**: Domain primitives become public API of `traces-core`. Compiler physically prevents engine modules from leaking application config into primitives.
-- **Evaluation**: Excellent architectural boundaries; higher initial setup churn; defers until Ticket 32.
+- **Evaluation**: Excellent architectural boundaries; higher initial setup churn; defers until Ticket 33.
 
 ---
 
@@ -599,8 +599,8 @@ These three questions cannot be answered by mechanical facts alone; they require
    *Tradeoff*: `src/` flatness vs. reducing root directory entry count from 19 to 18.
 
 2. **Timing of the Workspace Crate Split**:
-   Should the extraction of `traces-core` (primitives) and separating `traces-cli` into its own crate happen now as part of Ticket 22, or should it be deferred to Ticket 32 (Crate Topology & Public Surface) after Tickets 23–30 have completed internal module decoupling?
-   *Recommendation*: Defer crate extraction to Ticket 32. Perform internal module cleanups (Package 2) in Ticket 22 so internal dependencies are already clean when the physical crate split occurs.
+   Should the extraction of `traces-core` (primitives) and separating `traces-cli` into its own crate happen now as part of Ticket 22, or should it be deferred to Ticket 33 (Crate Topology & Public Surface) after Tickets 23–30 have completed internal module decoupling?
+   *Recommendation*: Defer crate extraction to Ticket 33. Perform internal module cleanups (Package 2) in Ticket 22 so internal dependencies are already clean when the physical crate split occurs.
 
 3. **Task Status Memory Footprint in `TaskListItem`**:
    `TaskStatus` currently stores an owned `String` (`name: String`) alongside `symbol: TaskStatusSymbol` and `kind: TaskStatusType` [V: `src/task.rs:51-55`]. This forces every `TaskListItem` AST node to allocate a heap `String` [V: `a1` §2.2]. Should Ticket 22 simplify `TaskStatus` to `(TaskStatusSymbol, TaskStatusType)` and make the status name accessible only via lookup in `TaskStatusMap`?

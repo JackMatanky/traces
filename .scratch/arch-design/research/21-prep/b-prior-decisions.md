@@ -35,7 +35,7 @@ instant in the chosen zone, lest the pair disagree across midnight; exact host s
 5. **Other temporal consumers.** [V] Query's relative/natural date grammar and template date functions must use the same evaluation
 inputs; `DateConfig` coordination goes to temporal and config ownership
 ([coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md):190-214;
-[temporal boundary and dialects](../../issues/27-temporal-boundary-and-dialects.md):30-66). [H] A process-start `today` makes a
+[temporal boundary and dialects](../../issues/30-temporal-boundary-and-dialects.md):30-66). [H] A process-start `today` makes a
 long-lived server stale after midnight; conversely, sampling per row creates intra-query inconsistency. The grammar itself is not
 decided here.
 6. **Schema and trust are independent of the clock.** [V] Schema checking is advisory, on demand, pure and span-free over resolved
@@ -70,7 +70,7 @@ context is free” follows from measurements.
 11. **Path capability remains separate.** [V] Research locates root confinement at I/O boundaries and portable relative index paths,
 while treating a cap-std conversion as unjustified without evidence for this local CLI
 ([capability/path precedent](../09-capability-path-precedent.md):88-145). [H] Capturing cwd/root in an immutable context is not a
-filesystem capability or a guarantee against symlink races; [path and capability model](../../issues/29-path-and-capability-model.md)
+filesystem capability or a guarantee against symlink races; [path and capability model](../../issues/32-path-and-capability-model.md)
 retains that security decision.
 
 ## 2. Decisions expected from this ticket, per downstream ticket
@@ -87,39 +87,39 @@ temporal civil values remove zone from index identity
 [schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):49-64). [H] If 21 punts, 25 must choose
 whether changing process zone/cwd/state home forces cache invalidation; the first should not, while workspace-root identity cannot
 silently change. Keep cache freshness separate from request-time time freshness.
-14. **[Query core and plan](../../issues/26-query-core-and-plan.md):38-79.** [V] Needs a stable evaluation input for constructing
+14. **[Query core and plan](../../issues/28-query-core-and-plan.md):38-79.** [V] Needs a stable evaluation input for constructing
 date-dependent filter operands, adaptive literals and sort keys once, without per-row clock or zone reads. [H] If 21 punts, its planner
 must introduce and name the zone/clock argument itself; divergence between query and template follows. Query remains synchronous under
 the forward-consumer ruling. [P] Decide time sampling scope at least at query-evaluation granularity; leave grammar and planning to 26.
-15. **[Temporal boundary and dialects](../../issues/27-temporal-boundary-and-dialects.md):30-66.** [V] Explicitly awaits 21 and 22 for
+15. **[Temporal boundary and dialects](../../issues/30-temporal-boundary-and-dialects.md):30-66.** [V] Explicitly awaits 21 and 22 for
 zone source, default zone and `DateConfig` ownership while it owns natural-language grammar, formatting/dialect and civil/instant type
 shape. [H] If 21 punts, 27 must decide default zone and fallback policy to make civil/instant evaluation work; if 22 punts too, no owner
 can state whether a config change affects the next evaluation. [P] Distinguish system-zone default from UTC, fixed override and
 error/no-zone cases before arguing type names.
-16. **[Template engine boundary](../../issues/28-template-engine-boundary.md):39-55.** [V] Needs `now` /`today` shared with query and
+16. **[Template engine boundary](../../issues/31-template-engine-boundary.md):39-55.** [V] Needs `now` /`today` shared with query and
 the common temporal relation/grammar, while template prompting stays lazy and post-render schema checking is app-layer work
 ([schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):168-174). [H] If 21 punts, template leaves
 may keep reading the clock/zone separately even if query is deterministic. A dry-run lacks an output path for schema path bindings
 (:249-254); do not invent one inside a context.
-17. **[Path and capability model](../../issues/29-path-and-capability-model.md):7-35.** [V] Needs an unambiguous root plus relative path
+17. **[Path and capability model](../../issues/32-path-and-capability-model.md):7-35.** [V] Needs an unambiguous root plus relative path
 for confinement and class binding; stdin and dry-run may lack output paths. [H] If 21 punts, 29 will choose how to turn process cwd into
 an authorized root; if 21 overreaches, a passive context might be mislabeled a capability. The path check must still happen at each I/O
 boundary ([capability/path precedent](../09-capability-path-precedent.md):88-145).
-18. **[Workspace host and composition](../../issues/30-workspace-host-and-composition.md):7-77.** [V] Blocked by 21/22/24/25; owns
+18. **[Workspace host and composition](../../issues/33-workspace-host-and-composition.md):7-77.** [V] Blocked by 21/22/24/25; owns
 CLI-first assembly, service lifetimes, dialogs and host/session design. [H] If 21 punts, 30 must define environment/clock capture and
 constructor arguments itself; if 21 chooses a long-lived omnibus host object, it preempts 30 and violates the explicit-input use-case
 principle. [P] 21 should define immutable inputs and freshness rules, and let 30 choose a host's storage/lifecycle and 22 the config
 loader.
-19. **[Error and diagnostic architecture](../../issues/31-error-and-diagnostic-architecture.md):23-50.** [V] Needs typed operational
+19. **[Error and diagnostic architecture](../../issues/34-error-and-diagnostic-architecture.md):23-50.** [V] Needs typed operational
 failures versus advisories and host-owned rendering/exit mapping; schema violations have stable codes and host policy. [H] If 21 punts,
 31 cannot know whether unavailable zone, invalid configured zone, or directory-discovery failure is returned, warned on, or silently
 defaulted. [P] Decide the semantics of discovering/sampling each input here; let 31 assign error types/codes and presentation.
-20. **[Crate topology and public surface](../../issues/32-crate-topology-and-public-surface.md):7-76.** [V] Needs actual cross-crate
+20. **[Crate topology and public surface](../../issues/35-crate-topology-and-public-surface.md):7-76.** [V] Needs actual cross-crate
 input types and minimum public exports; the CLI-first split and core-app layering constrain this, but a many-crate design is not settled
 ([map](../../map.md):19-45; [schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):66-72). [H] If 21
 punts, 32 must guess whether host environment and evaluation snapshot cross the core boundary. [P] Design the minimal data shape, then
 let 32 place and expose it; do not widen all leaf APIs to `pub` preemptively.
-21. **[Live buffer and persisted index consistency](../../issues/34-live-buffer-and-persisted-index-consistency.md):7-37.** [V] Needs
+21. **[Live buffer and persisted index consistency](../../issues/27-live-buffer-and-persisted-index-consistency.md):7-37.** [V] Needs
 checks/query operations to take a buffer snapshot without persisting it. [H] A clock captured only at process initialization gives
 date-sensitive editor diagnostics stale results after midnight even with unchanged content; a per-request evaluation snapshot plus host
 rescheduling can avoid that. If 21 punts, 34/LSP will choose sampling and invalidation rules independently of CLI.
@@ -127,7 +127,7 @@ rescheduling can avoid that. If 21 punts, 34/LSP will choose sampling and invali
 civil-datetime cache encoding, not system-zone cache identity
 ([coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md):180-208);
 [note document model](../../issues/23-note-document-model.md) gets inline datetime shape;
-[schema internals](../../issues/35-schema-internals-simplification.md) gets path/tag bindings, not host clock. [H] These are reasons to
+[schema internals](../../issues/37-schema-internals-simplification.md) gets path/tag bindings, not host clock. [H] These are reasons to
 pass concrete data rather than couple parsing to a universal environment.
 
 ## 3. Couplings and sequencing risks
@@ -135,7 +135,7 @@ pass concrete data rather than couple parsing to a universal environment.
 23. **The 21–22–30 triangle.** [V] Ticket 21 explicitly unlocks config ownership and workspace host
 ([execution-context question](../../issues/21-ambient-environment-and-execution-context.md):24-28), while
 [config ownership and lifecycle](../../issues/22-config-ownership-and-lifecycle.md):7-39 and
-[workspace host and composition](../../issues/30-workspace-host-and-composition.md):7-77 each depend on its answer. [H] Decide *where
+[workspace host and composition](../../issues/33-workspace-host-and-composition.md):7-77 each depend on its answer. [H] Decide *where
 inputs enter* in 21, *how configuration is loaded/reloaded* in 22, and *what hosts retain and when they reconstruct* in 30. These must
 be reviewed as one boundary, not silently decided three times.
 24. **Time is not process environment alone.** [V] Jiff `TimeZone::system` caches internally; jj pins parse time, whereas Cargo's
@@ -187,7 +187,7 @@ context.
 31. **Most consequential reversal.** [V] The [value model](../../issues/18-value-model.md):445-573 and ticket 21's old input
 ([execution-context question](../../issues/21-ambient-environment-and-execution-context.md):30-34) say naive datetimes are zone-shifted
 into the persisted cache. The later [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md):94-100,180-208
-and the explicit correction in ticket 21 :36-43 replace this with civil cached values and evaluation-only zone. [H] Any recommendation
+and the explicit correction in ticket 21 :37-43 replace this with civil cached values and evaluation-only zone. [H] Any recommendation
 to put timezone in index fingerprint or reindex on timezone change relies on the stale premise.
 32. **Old temporal specification versus newer decisions.** [V] The historical
 [temporal-core specification](../../../temporal-core/spec.md):13-25,40-45,62-80,98-105 describes local naive input converted to UTC and

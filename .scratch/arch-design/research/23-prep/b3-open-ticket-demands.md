@@ -1,6 +1,6 @@
 # Demands of the open tickets on ticket 23
 
-This file lists what tickets 24 to 36 need from the note model. Line citations
+This file lists what tickets 24 to 37 need from the note model. Line citations
 of the form `23:NN` point to the version of ticket 23 in commit `47628bd3`. The
 ticket text changed after that commit. Use the topic names, not the line
 numbers. Line citations to the other tickets are from the agent. I did not check
@@ -15,24 +15,24 @@ them.
   cost of note deserialization on a path-set change
   (`25-index-freshness-and-invalidation.md:26-39`).
 - [V] Ticket 26 needs row identity: `item_idx`, the `list.*` fields and document
-  order. It needs the multi-value semantics (`26-query-core-and-plan.md:17-18`).
+  order. It needs the multi-value semantics (`28-query-core-and-plan.md:17-18`).
 - [V] Ticket 28 needs stable `NoteFieldValue` values at the template boundary
-  (`28-template-engine-boundary.md:11-16`).
-- [V] Ticket 30 needs a borrowed or owned parser input for a long-lived host
-  (`30-workspace-host-and-composition.md:48-52`).
-- [V] Ticket 31 needs the infallibility contract and a channel for parser
-  notices (`31-error-and-diagnostic-architecture.md:30-37`).
-- [V] Ticket 32 needs the visibility and the place of `Note`, `Link`, `NoteLink`
-  and `TaskListItem` (`32-crate-topology-and-public-surface.md:75-80`).
-- [V] Ticket 33 checks the invariants of ticket 23 again
-  (`33-reconcile-decisions-and-audit-coverage.md:9-17`).
-- [V] Ticket 34 is blocked by ticket 23. It needs a way to build the editor
+  (`31-template-engine-boundary.md:11-16`).
+- [V] Ticket 31 needs a borrowed or owned parser input for a long-lived host
+  (`33-workspace-host-and-composition.md:48-52`).
+- [V] Ticket 32 needs the infallibility contract and a channel for parser
+  notices (`34-error-and-diagnostic-architecture.md:30-37`).
+- [V] Ticket 33 needs the visibility and the place of `Note`, `Link`, `NoteLink`
+  and `TaskListItem` (`35-crate-topology-and-public-surface.md:75-80`).
+- [V] Ticket 34 checks the invariants of ticket 23 again
+  (`36-reconcile-decisions-and-audit-coverage.md:9-17`).
+- [V] Ticket 35 is blocked by ticket 23. It needs a way to build the editor
   shape from a buffer in memory
-  (`34-live-buffer-and-persisted-index-consistency.md:3-17`).
-- [V] Ticket 35 needs to know if the note gives one merged field map
-  (`35-schema-internals-simplification.md:9-16`).
-- [V] Ticket 36 is blocked by ticket 23. Its question says: "Decide which body
-  facts the note model keeps (23)" (`36-body-section-schemas.md:3-5,25`).
+  (`27-live-buffer-and-persisted-index-consistency.md:3-17`).
+- [V] Ticket 36 needs to know if the note gives one merged field map
+  (`37-schema-internals-simplification.md:9-16`).
+- [V] Ticket 37 is blocked by ticket 23. Its question says: "Decide which body
+  facts the note model keeps (23)" (`38-body-section-schemas.md:3-5,25`).
 - [P] Ticket 23 settles these decisions now: the representation split, the span
   policy, the item row identity, the multi-value semantics, the notice channel
   and the status representation.
@@ -62,7 +62,7 @@ them.
 1. Representation split (C1, C12).
    - Ticket 24 cannot decide the persisted format before this decision.
    - A shared `Note` with spans forces ticket 24 to persist or strip the spans.
-   - A split lets ticket 24 design a compact record and lets ticket 34 reparse
+   - A split lets ticket 24 design a compact record and lets ticket 35 reparse
      the buffer.
 2. Span unit and span lifetime (C2, C3).
    - The unit sets the data type (`TextRange`, `u32` or `usize`).
@@ -72,9 +72,9 @@ them.
 3. Item entity status and row identity (C4, C5). Ticket 26 needs it.
 4. Multi-value semantics (C6). Today the parser keeps all values and the query
    reads the first value.
-5. Infallibility and the notice channel (C11). Ticket 31 owns the presentation.
+5. Infallibility and the notice channel (C11). Ticket 32 owns the presentation.
    Ticket 23 owns the function signature, for example `(Note, Vec<NoteNotice>)`.
-6. Status representation and place (C7). Ticket 32 and ticket 24 need it.
+6. Status representation and place (C7). Ticket 33 and ticket 24 need it.
    Research 11 says interning cuts `ListItem` from 160 B to 128 B and removes
    10k allocations. The probe confirms 160 B for `ListItem`.
 
@@ -83,9 +83,9 @@ them.
 1. The redb table layout and the pushdown of secondary indexes (ticket 24).
 2. The invalidation mechanism and the fingerprint granularity (ticket 25).
 3. The query intermediate representation (ticket 26).
-4. The diagnostic severity, registry and presentation (ticket 31).
-5. The crate boundaries and packaging (ticket 32).
-6. The body section schema syntax and the token counter (ticket 36).
+4. The diagnostic severity, registry and presentation (ticket 32).
+5. The crate boundaries and packaging (ticket 33).
+6. The body section schema syntax and the token counter (ticket 37).
 
 ## Risks of an early answer
 
@@ -100,13 +100,13 @@ them.
      bytes.
 3. Token counting in the parser.
    - Risk: the `note` module depends on a tokenizer crate such as `tiktoken-rs`.
-   - [P] Record text slices or offsets only. Ticket 36 counts tokens.
+   - [P] Record text slices or offsets only. Ticket 37 counts tokens.
 4. An early merge of inline fields into the frontmatter map.
-   - Risk: tickets 20 and 35 lose the difference between authored frontmatter
+   - Risk: tickets 20 and 36 lose the difference between authored frontmatter
      and body fields. Ticket 26 loses the provenance of a collision.
    - [P] Keep both maps. Offer an effective view as an accessor.
 5. A parser input that holds a reference to the status map.
-   - Risk: a long-lived host (ticket 30, ticket 34) needs the whole workspace
+   - Risk: a long-lived host (ticket 31, ticket 35) needs the whole workspace
      config to reparse one buffer.
    - [P] Parse the task marker as a `char` or a symbol. Resolve the name later.
 
@@ -116,7 +116,7 @@ them.
   the sum of decoding (18.48 ms) and link resolution (0.52 ms). A whole
   path-set change takes 32 ms to 35 ms. The probe shows the text, not the
   spans, is the bulk of the bytes.
-- C1: Spans serve the LSP, the diagnostics (ticket 31) and the schema adapters
+- C1: Spans serve the LSP, the diagnostics (ticket 32) and the schema adapters
   (ticket 20). None of these runs on the cold query path [P].
 - C7: Interning the status removes allocations and shrinks `ListItem`.
 - C11: The parser never returns `Err`. It returns a valid note and a list of
@@ -126,7 +126,7 @@ them.
 
 - A benchmark of zero-copy decoding against postcard.
 - The memory cost of heading byte extents on vaults over 50k notes.
-- The line citations to tickets 24 to 36.
+- The line citations to tickets 24 to 37.
 
 ## Inconsistencies found while rewriting
 

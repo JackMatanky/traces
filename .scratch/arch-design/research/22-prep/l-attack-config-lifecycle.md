@@ -20,7 +20,7 @@
 | **L0 Unmitigated Per-Request Reload** | **REFUTED** | Full `load()` takes ~106.0 µs on APFS hot cache (`strict-path` boundary checks + 3 canonicalizations + TOML parse + memory allocs). At keystroke rate, this thrashes syscalls and heap. Requires a watcher/admission gate `[V]`. |
 | **L0 Ticket 21 Invariant Compliance** | **REFUTED** | L0 cannot provide immutable generation identity across derived services, cannot coordinate in-flight request completion during concurrent reload failure, and forces hosts to reinvent admission logic `[V, H]`. |
 | **L0 Local-Only `source_digest`** | **REFUTED** | Local-only digest misses global config edits, ignore policy changes (`HostInputs::ignored_dirs`), and CLI overrides. Two requests with equal local digests are not interchangeable `[V]`. |
-| **L3 Held Workspace in Core (`config`)** | **HOLDS WITH CHANGE** | `admit_request()` semantics are necessary, but placing `WorkspaceConfig` (which coordinates index, schema, and templates) inside `src/config/` violates module boundaries and duplicates Ticket 30 (`WorkspaceHost`) `[V, H]`. |
+| **L3 Held Workspace in Core (`config`)** | **HOLDS WITH CHANGE** | `admit_request()` semantics are necessary, but placing `WorkspaceConfig` (which coordinates index, schema, and templates) inside `src/config/` violates module boundaries and duplicates Ticket 31 (`WorkspaceHost`) `[V, H]`. |
 | **`ConfigLocator` Owned by `ConfigService`** | **HOLDS** | Eliminates 2 ambient `ConfigLocator::from_env()` calls, turns `trust_subjects` into an instance method, isolates ceilings/global config in tests, and breaks zero existing integration tests `[V]`. |
 | **Multi-Root Process Coexistence** | **HOLDS** | Zero `LazyLock` items exist in `src/config/**`. Removing globals in `src/dirs.rs` and `src/env_vars.rs` via `HostInputs` allows arbitrary concurrent roots with isolated configs and state stores `[V]`. |
 | **L-Alt (Decoupled `ConfigSnapshot` Gate)** | **HOLDS (LEAN)** | `ConfigService` produces immutable `ConfigSnapshot` and provides `check_admission(&snapshot)` (15 µs fast check). Avoids holding workspace locks in core while giving hosts full Ticket 21 admission guarantees `[P]`. |
@@ -246,9 +246,9 @@ When `ConfigService` is constructed with an adapter-provided `HostInputs` snapsh
 
 ---
 
-## 8. Investigation 7: Boundary Between Ticket 22 and Ticket 30
+## 8. Investigation 7: Boundary Between Ticket 22 and Ticket 31
 
-To avoid architecture creep, Ticket 22 must define the domain primitives of configuration while deferring host orchestration to Ticket 30 (`WorkspaceHost`).
+To avoid architecture creep, Ticket 22 must define the domain primitives of configuration while deferring host orchestration to Ticket 31 (`WorkspaceHost`).
 
 | Responsibility | Owner | Rationale |
 |---|---|---|
@@ -257,10 +257,10 @@ To avoid architecture creep, Ticket 22 must define the domain primitives of conf
 | `ConfigSourceDigest` & `ConfigSnapshot` types | **Ticket 22** | Immutable configuration values carrying their verified hash. |
 | Deterministic admission check (`check_admission`) | **Ticket 22** | Core domain rule verifying hash-before-parse and companion match. |
 | Canonical starter TOML (`RawConfig::starter()`) | **Ticket 22** | Config parsing and schema default representation. |
-| Watcher subscription (`notify` integration) | **Ticket 30** | OS filesystem watcher thread and event loop. |
-| Event debouncing (50 ms trailing timer) | **Ticket 30** | Scheduling policy to coalesce rapid editor saves. |
-| Multi-generation service swapping (`IndexStore`, `TemplateService`) | **Ticket 30** | Composition and lifecycle of multi-domain workspace components. |
-| Request cancellation & in-flight scheduling | **Ticket 30** | Concurrency control and host worker pool management. |
+| Watcher subscription (`notify` integration) | **Ticket 31** | OS filesystem watcher thread and event loop. |
+| Event debouncing (50 ms trailing timer) | **Ticket 31** | Scheduling policy to coalesce rapid editor saves. |
+| Multi-generation service swapping (`IndexStore`, `TemplateService`) | **Ticket 31** | Composition and lifecycle of multi-domain workspace components. |
+| Request cancellation & in-flight scheduling | **Ticket 31** | Concurrency control and host worker pool management. |
 
 ---
 
@@ -276,7 +276,7 @@ To avoid architecture creep, Ticket 22 must define the domain primitives of conf
    - *Flaw*: Same as L0; lacks an admission fast path and forces host to coordinate caching `[H]`.
 3. **L3: Stateful Held Workspace (`WorkspaceConfig`)**
    - Core manages a held object with an `admit_request()` method and an internal `Arc<ConfigGeneration>`.
-   - *Flaw*: Prematurely couples configuration domain to host orchestration (Ticket 30 territory); places cross-service workspace state in `src/config/` `[V, H]`.
+   - *Flaw*: Prematurely couples configuration domain to host orchestration (Ticket 31 territory); places cross-service workspace state in `src/config/` `[V, H]`.
 4. **L-Alt: Decoupled Admission Gate (`ConfigSnapshot` + `check_admission`) [RECOMMENDED]**
    - `ConfigService` remains stateless (owning only stores and locator).
    - `load(&self, start)` produces an immutable, refcounted `ConfigSnapshot`.
@@ -285,7 +285,7 @@ To avoid architecture creep, Ticket 22 must define the domain primitives of conf
      - Stat config file mtime/size. If matches snapshot metadata, returns `AdmissionStatus::Valid` in **1.5 µs** `[V]`.
      - If mtime differs, reads file and hashes: if hash matches `snapshot.digest.local_hash`, returns `Valid`.
      - If hash differs or companion fails, returns `AdmissionStatus::Stale` or `Err(ConfigTrustError::Untrusted)`.
-   - Leaves thread synchronization and watchers to Ticket 30 while giving the host an unbypassable, high-performance admission primitive `[P]`.
+   - Leaves thread synchronization and watchers to Ticket 31 while giving the host an unbypassable, high-performance admission primitive `[P]`.
 
 ### 9.2 Head-to-Head Comparison Matrix
 
@@ -296,7 +296,7 @@ To avoid architecture creep, Ticket 22 must define the domain primitives of conf
 | **Host Simplicity (LSP)** | Low: host must build watcher cache and compare digests | Low: host must build watcher cache | High: host calls `admit_request()` | **High**: host calls `check_admission()` |
 | **Cost at Keystroke Rate** | **Unacceptable** (106.0 µs / req, 1,000 syscalls/s) | **Unacceptable** (106.0 µs / req) | **Optimal** (0 ns with watcher, 1.5 µs fallback) | **Optimal** (0 ns with watcher, 1.5 µs fallback) |
 | **Misuse Resistance** | Low: host can easily forget to check digest or reload | Low: host can cache indefinitely | High: gate is hardcoded into `WorkspaceConfig` | **High**: typed `check_admission` primitive |
-| **Module Seam Cleanliness** | High: `config` is leaf | High: `config` is leaf | Poor: `config` absorbs host lifecycle | **Optimal**: clean handoff to Ticket 30 |
+| **Module Seam Cleanliness** | High: `config` is leaf | High: `config` is leaf | Poor: `config` absorbs host lifecycle | **Optimal**: clean handoff to Ticket 31 |
 | **Reversibility** | High | High | Low (refactoring held object is invasive) | **High** (plain data types) |
 
 ---
@@ -431,5 +431,5 @@ impl ConfigService {
 6. `ConfigLocator` must be owned by `ConfigService`: this removes the 2 remaining `from_env()` ambient calls and makes `trust_subjects` an instance method.
 7. Updating `fixture_service` isolates all 150+ integration tests with zero test breakage outside 4 fixture helper sites.
 8. Multi-root process coexistence is fully achievable: `src/config/` has zero static variables; `HostInputs` eliminates all `dirs`/`env_vars` globals.
-9. L-Alt (Decoupled Admission Gate) provides the winning design: `ConfigService` produces `ConfigSnapshot` and offers `check_admission`, cleanly handing scheduling to Ticket 30.
+9. L-Alt (Decoupled Admission Gate) provides the winning design: `ConfigService` produces `ConfigSnapshot` and offers `check_admission`, cleanly handing scheduling to Ticket 31.
 10. Deliverable path: `.scratch/arch-design/research/22-prep/l-attack-config-lifecycle.md`.

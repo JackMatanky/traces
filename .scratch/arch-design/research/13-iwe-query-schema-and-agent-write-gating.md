@@ -247,11 +247,11 @@
   - IWE's Claude Code post-tool hook (`post_tool.rs`) is a harness-specific
     second line of defense. It does not change ticket 20's rule that no design
     depends on hooks.
-- **Ticket 28 (Query Core) & Ticket 32 (Write Use Cases):**
+- **Ticket 28 (Query Core) & Ticket 33 (Write Use Cases):**
   - Demonstrates value of `expect` count guards for precision agent mutations.
   - Shows that separating read query projection (`find`) from LLM context
     assembly with graph expansion (`retrieve`) is a superior agent interface.
-- **Ticket 37 (Body Section Schemas):**
+- **Ticket 38 (Body Section Schemas):**
   - IWE's ordered, greedy, non-backtracking matcher with header constraints and
     occurrence bounds (`minContains`/`maxContains`) provides a concrete,
     field-tested blueprint for Traces body schemas.

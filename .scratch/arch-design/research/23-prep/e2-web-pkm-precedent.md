@@ -109,7 +109,7 @@ From `docs/digests/lsp_feel-ix-343-markdown-oxide-digest.txt` (agent):
 - C13: Dataview uses events and a `revision`. It does not reparse every file for
   each query.
 - C14: `sections` are root-level blocks. Dataview uses them to decide which
-  sections to scan. [H] A two-stage model fits ticket 36: host section spans,
+  sections to scan. [H] A two-stage model fits ticket 37: host section spans,
   then item facts inside.
 
 ## Not checked

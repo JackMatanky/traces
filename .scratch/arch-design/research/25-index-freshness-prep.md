@@ -405,7 +405,7 @@ ticket](../issues/26-measure-index-recovery-journal.md).
 | Watcher journal | Rejected | It adds a daemon and drops events under load. |
 | A second process holds the store during replacement | Contradicted | `ExclusiveWriter` refuses the second open. Only the gap in G7 remains. |
 | `Durability::None` rollback serves stale rows | Contained | Facets and `meta` commit in one transaction. Older rows carry older stats and reparse. |
-| NFC and NFD names churn the delta | Not settled | A changed name is a rename, but ticket 31 has no normalization rule (a search found none). Round three added an explicit handoff. |
+| NFC and NFD names churn the delta | Not settled | A changed name is a rename, but ticket 32 has no normalization rule (a search found none). Round three added an explicit handoff. |
 | Evicted cloud files hang the refresh | Contained | Only rows with a changed stat are read. A fresh parse reads the same files. |
 | Persisted range keys store civil dates for `file.mdate` | Handoff | The read-model decision persists keys for note-level fields only. Keep timestamp keys as UTC instants. |
 | The same-size edit canary asserts stale output | Accepted | Record it as a change-table row. Flip the assertion to the new text. |
@@ -431,10 +431,10 @@ manual-`FORMAT_VERSION` and lock-pin design in G9. The decision text is in
 
 | Finding | Verdict | Evidence | Effect |
 | --- | --- | --- | --- |
-| The fingerprint covers only extractor output. `FileMeta`, links, tag maps, key codecs and table layout can change unseen. | Accepted | Eight tables in `src/index/tables.rs` today. Ticket 24 (resolved) replaces them with 11 facets (`24:307-310`). The corpus hash touches `Note` only. | Hash one probe record per facet except `meta`, and one range key per scalar key encoding. A test fails if a table other than `META` has none. |
+| The fingerprint covers only extractor output. `FileMeta`, links, tag maps, key codecs and table layout can change unseen. | Accepted | Eight tables in `src/index/tables.rs` today. Ticket 24 (resolved) replaces them with 11 facets (`24:317-320`). The corpus hash touches `Note` only. | Hash one probe record per facet except `meta`, and one range key per scalar key encoding. A test fails if a table other than `META` has none. |
 | A hash has no order. The store cannot tell a newer store from an older one. | Accepted | A hash only supports equality. | Add an ordered `u32` epoch. The `index:bless` task sets it. |
 | "Major or minor" fails for `0.x`, and no release process exists. | Accepted | `version = "0.1.0"`. Two tags exist and both are `merge-safety/*`. | Drop the version floor. List the extractor crates in the fingerprint instead. |
-| Unix and Windows serialize paths differently. | Verified | `src/path.rs:349-391`. | Platform family joins the identity. Ticket 31 may remove it. |
+| Unix and Windows serialize paths differently. | Verified | `src/path.rs:349-391`. | Platform family joins the identity. Ticket 32 may remove it. |
 | An unzoned datetime depends on the host zone. | Verified, already decided | `src/temporal/datetime.rs:133-136`. Ticket 19 makes naive datetimes civil. | The corpus uses no unzoned datetime until that lands. |
 | `logos` and `noyalib` are not owned by one module. | Verified | `logos`: `src/lexer.rs`, `src/note/parser/lexer.rs`, `src/query/grammar/`, `src/temporal/`. `noyalib`: `src/yaml.rs`, `src/field.rs`, `src/note/metadata.rs`, `src/template/engine/yaml.rs`. | Confine only `pulldown-cmark`, `redb` and `postcard`. Cover the rest by the crate list. |
 | The repository already enforces boundaries with `git grep` in `mise` tasks. | Verified | `mise.toml:148-190`, `check:layers`. | Add `check:boundaries` in the same style. |
@@ -471,7 +471,7 @@ manual-`FORMAT_VERSION` and lock-pin design in G9. The decision text is in
 ### H4. Check against earlier decisions
 
 Three reviewers compared section H and the "Store identity" text with tickets
-16 to 38, ADRs and glossaries. The parent verified each row below.
+16 to 39, ADRs and glossaries. The parent verified each row below.
 
 | Earlier decision | What the first draft said | Resolution |
 | --- | --- | --- |
@@ -482,12 +482,12 @@ Three reviewers compared section H and the "Store identity" text with tickets
 | `24:309`: the `meta` table keeps the format version. | A new "epoch" name. | The epoch is that format version. |
 | `src/cli/index.rs:38-48`: `traces index` always rebuilds. | A new `--rebuild` flag. | Remove the flag. |
 | `25:213`: one cache file per engine. | H2 said ticket 24 chose it. | Ticket 25 chose it. The engine tag now names the file. |
-| `25:229`: keep successful automatic heals quiet. | Ticket 33 would write notice texts for a platform rebuild. | Rebuilds stay quiet. Only a higher epoch gets a notice. |
+| `25:229`: keep successful automatic heals quiet. | Ticket 34 would write notice texts for a platform rebuild. | Rebuilds stay quiet. Only a higher epoch gets a notice. |
 | `22:99`, `24:170`: `IndexPolicy::fingerprint()` is the only source of "the fingerprint". `src/index/GLOSSARY.md:52-60`: "Index Fingerprint" is the config digest. | A second "Fingerprint" in `META`. | Call the new hash the extractor fingerprint. The glossary entry is itself stale: it contradicts `25:28` and describes digests that ticket 22 deletes. Rename it "Policy Fingerprint". |
 | ADR-0009 (`proposed`) and `src/index/GLOSSARY.md:34-50`: `Fresh`, `Stale`, `Drifted`, `ConfigDrift`. | The first draft reused the state and added a cause. | ADR-0009 overstates the code: a format mismatch wipes at open and never reaches `Drifted`. The name "ConfigDrift" is wrong for engine or epoch causes. Keep one rebuild state. Rename it and its cause type. A higher epoch is a read miss, not a refresh state. |
 | `23:367,385`: a stored `Note` change bumps `META_VERSION`. | Stale text in ticket 25. | The epoch meets the rule. The text is updated. |
 | `29:14`, `34:20` (open): they may prune `speedate` or `noyalib`. | A fixed crate list that fails the build. | Keep the failing build. Add a handoff: update the list when pruning. |
-| `34` (open): a workspace split. | `build.rs` reads `Cargo.lock`. `check:boundaries` greps paths. | Hand off to ticket 34. The lock path moves and the task becomes crate boundaries. |
+| `34` (open): a workspace split. | `build.rs` reads `Cargo.lock`. `check:boundaries` greps paths. | Hand off to ticket 35. The lock path moves and the task becomes crate boundaries. |
 | `16:67-78`: every observable CLI change goes in the change table. | `--verify` was missing from the rows. | Add it. |
 | `22:110`: no time zone in the fingerprint. | Not stated. | Holds. The corpus has no unzoned datetime. |
 | `18`, `24`: derived serde stays for the cache. | No store-only record types. | Holds. |
@@ -499,7 +499,7 @@ One reviewer claim was wrong: `pulldown-cmark` types do not leak across
 
 ### H5. Audit of all tickets
 
-Four reviewers audited tickets 01 to 38, the ADRs and the glossaries. They
+Four reviewers audited tickets 01 to 39, the ADRs and the glossaries. They
 treated every ticket as fallible, ticket 25 included. The parent verified the
 findings that could change ticket 25. Reviewer findings that contradict a
 maintainer-confirmed ticket without new evidence are logged, not adopted.
@@ -514,10 +514,10 @@ maintainer-confirmed ticket without new evidence are logged, not adopted.
 | A future-dated mtime stays racy forever. | Valid, minor. | Correct but costs a re-read on each refresh. Record it. |
 | `traces index` from an older binary silently replaces a newer store. | Valid, minor. | Keep the behavior. Add one stderr notice. |
 | A read-only vault falls back to a parse because `create` needs write access. | Plausible. [INFERENCE] | Open question for the implementation: try a read-only open. |
-| Ticket 31 has no Unicode normalization rule. | Verified. A search found nothing. | The handoff in G16 pointed at nothing. Add an explicit handoff. |
-| Civil datetimes must deserialize without a zone lookup. | Valid forward constraint. | Add a handoff to tickets 19 and 29. |
+| Ticket 32 has no Unicode normalization rule. | Verified. A search found nothing. | The handoff in G16 pointed at nothing. Add an explicit handoff. |
+| Civil datetimes must deserialize without a zone lookup. | Valid forward constraint. | Add a handoff to tickets 19 and 30. |
 | The 11-facet split costs 85% more write time and doubles the file size (`AuditIndexCore`). | Not verified. I did not re-derive the figures. | Log for ticket 24. It also raises the rebuild cost that ticket 25 relies on. |
-| Switch the engine to LMDB or SQLite. | Not adopted. | Ticket 24 compared engines and keeps the choice reversible (`24:304`). |
+| Switch the engine to LMDB or SQLite. | Not adopted. | Ticket 24 compared engines and keeps the choice reversible (`24:314`). |
 | Corruption should fail closed. | Not adopted. The reviewer misread. | Ticket 24 prints a stderr notice. It does not fall back silently. |
-| Cancel ticket 26. Close ticket 38. | Judgment call. | Raise with the maintainer. Do not decide here. |
-| The host cannot both hold no handle and serve a pinned generation. | Mostly wrong. | Ticket 24 serves from memory. The real cost is memory: 467 MB at 50,000 notes. Log for ticket 32. |
+| Cancel ticket 26. Close ticket 39. | Judgment call. | Raise with the maintainer. Do not decide here. |
+| The host cannot both hold no handle and serve a pinned generation. | Mostly wrong. | Ticket 24 serves from memory. The real cost is memory: 467 MB at 50,000 notes. Log for ticket 33. |

@@ -777,7 +777,7 @@ the external precedent surveyed above.
    caching [V]. Traces must ensure external JSON/link value sources are resolved
    by an independent provider, not baked into the schema validator core.
 3. **Diagnostic Severities (SHACL `sh:severity`):**
-   Ticket 20 deferred severities to Ticket 31. SHACL proves that distinguishing
+   Ticket 20 deferred severities to Ticket 32. SHACL proves that distinguishing
    `Violation` (invalid syntax/type), `Warning` (unknown field, missing
    recommended metadata), and `Info` (deprecated field) is vital for actionable
    editor diagnostics [V].

@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 8, 20, 32, 12, 13
+Blocked by: 8, 12, 13, 20, 34
 
 ## Question
 

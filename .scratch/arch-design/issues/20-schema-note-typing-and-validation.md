@@ -67,7 +67,7 @@ specified below.
 - Write-path guardrail for an MCP agent.
 - Schema definitions never affect parsing, the index or the fingerprint (only the configured class-field name is shared).
 
-**Layering (standing principle, binds tickets 28, 30, 32 and 34):** cli, lsp and
+**Layering (standing principle, binds tickets 28, 31, 33 and 35):** cli, lsp and
 mcp are thin hosts of `core`. `core` holds an app layer of use cases. The app
 layer composes domain modules (`note`, `schema`, `query`, `index`, `template`)
 over foundation types. Domain modules expose data and pure functions. No
@@ -81,7 +81,7 @@ inputs, and they do not hold a context object.
   mandated. `ResolvedFields::check(&FieldMap) -> Vec<Violation>` returns
   violations in deterministic field order, without spans or severity.
 - The runtime value type (today `NoteFieldValue`) sits below both `schema` and
-  `note`. Schema literals remain a separate type (ticket 18). Ticket 34 decides
+  `note`. Schema literals remain a separate type (ticket 18). Ticket 35 decides
   its exact placement. At check time, parse select values that name links with
   the root `Link` wikilink parser (ticket 18). Compare them with ticket 19's
   Link equality, not the query binder's adaptive-literal rule. Do not
@@ -117,7 +117,7 @@ inputs, and they do not hold a context object.
 - No declared option is silently ignored. Check `min` and `max`. Check `step`
   exactly for integers and with relative tolerance for floats. `date.format` is
   a write-format hint: the check accepts Date/DateTime and any scalar if the
-  format has no date component. This gap remains explicit until ticket 29 fixes
+  format has no date component. This gap remains explicit until ticket 30 fixes
   the dialect.
 - Add `origin`, `description` and `parent_order` now. The schema format may
   still change freely. Every field type accepts the new `description` key.
@@ -133,7 +133,7 @@ A class declaration of the same field always wins. `required` in `global` still
 degrades to `false`. A class can exclude a global field with `excludes`.
 Violations from this layer carry layer `global`. The diagnostic adapter derives
 a separate `schema.global.*` code family. Hosts can set a different policy
-(for example, hint-level in the LSP or ignored on unclassed notes). Ticket 33
+(for example, hint-level in the LSP or ignored on unclassed notes). Ticket 34
 owns default severities and is asked to rank this family below class violations.
 This changes the documented invariant in `src/schema/mod.rs:48-51`. The doc
 comment and the survey are updated with the specification.
@@ -176,7 +176,7 @@ throwaway workspace, but a newtype compiles.
 A latent hazard exists. Without an expander, store queries fall back to exact
 match while in-memory filters match nothing. Production always attaches one, so
 this is not a current bug. Ticket 20 records the decision and the schema-side
-producer. Ticket 28 owns the query-side change. Tickets 28 and 34 decide the
+producer. Ticket 28 owns the query-side change. Tickets 28 and 35 decide the
 owning module of the hierarchy type.
 
 **Template boundary:** The app layer checks the rendered note between `render()`
@@ -205,7 +205,7 @@ what the harness provides [P, `research/20-prep/round5/report.md`]:
 - *Any `traces` call:* a bounded notice of notes changed since the last check
   that gained violations. It needs a check watermark and the violation keys at
   the last check as the `before`. This forms a second derived store outside the
-  index and fingerprint, with unmeasured cost (tickets 24, 25, 33). Without it,
+  index and fingerprint, with unmeasured cost (tickets 24, 25, 34). Without it,
   report all violations of changed notes, no delta.
 - *An MCP client:* validated edit and create tools, the only gate, plus a
   dry-run `check_note` tool taking a path and proposed content. A gate is as
@@ -305,7 +305,7 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
 **Alternatives considered:**
 
 - *Keep schema passive:* rejected. It leaves `required`, `multi`, `min`, `max`,
-  `step` and `format` inert, blocks tickets 33, 34 and 27 and fails the
+  `step` and `format` inert, blocks tickets 34, 35 and 27 and fails the
   LSP-readiness commitment of ticket 17.
 - *Checker in a consumer module above `schema` and `note`* (the earlier
   recommendation): withdrawn. It puts the rule outside its invariant owner and
@@ -319,7 +319,7 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
 - *Optional link-oracle trait for tier-2 checks:* withdrawn (one-implementor
   trait).
 - *Binding the agent through the LSP:* rejected (advisory by protocol).
-- *Default severities in the check:* not adopted. Ticket 33 owns severities.
+- *Default severities in the check:* not adopted. Ticket 34 owns severities.
 - *Last-listed wins (Fileclass), first-listed wins, conjunction of all classes
   (IWE, JSON Schema `allOf`), single class only:* order-dependent rules were
   rejected as the cross-class rule. Reordering a class list must not flip
@@ -389,41 +389,41 @@ Aider.
 
 - Value-type placement below `schema`, hierarchy type module, visibility, crate
   placement of the app layer: [crate
-  topology](./34-crate-topology-and-public-surface.md).
+  topology](./35-crate-topology-and-public-surface.md).
 - Query-side change replacing the expander: [query
   core](./28-query-core-and-plan.md).
 - Field-key spans for adapters, and inline-field merge: [note document
   model](./23-note-document-model.md).
 - `date.format` dialect and the date-format check: [temporal
-  boundary](./29-temporal-boundary-and-dialects.md).
+  boundary](./30-temporal-boundary-and-dialects.md).
 - Template service wiring of the post-render check: [template
-  boundary](./30-template-engine-boundary.md).
+  boundary](./31-template-engine-boundary.md).
 - Diagnostic envelope, severities, per-code overrides and the registry: [error
-  and diagnostic architecture](./33-error-and-diagnostic-architecture.md).
+  and diagnostic architecture](./34-error-and-diagnostic-architecture.md).
 - Host composition and use-case layer: [workspace
-  host](./32-workspace-host-and-composition.md). Open-buffer checks: [live
+  host](./33-workspace-host-and-composition.md). Open-buffer checks: [live
   buffer](./27-live-buffer-and-persisted-index-consistency.md).
 - Re-test of the "provisionally withstands scrutiny" claim for the
   `FileClassExpander` seam (overturned here):
-  [reconciliation](./35-reconcile-decisions-and-audit-coverage.md).
-- Schema internals (graduated fog): see ticket 36.
+  [reconciliation](./36-reconcile-decisions-and-audit-coverage.md).
+- Schema internals (graduated fog): see ticket 37.
 - How MCP edit tools apply note changes, if they need edit ranges: raised when
-  MCP is specified (ticket 32 or later).
+  MCP is specified (ticket 33 or later).
 - Body-section schemas (required headings, order, depth, later blocks and token
-  budgets): [ticket 37](./37-body-section-schemas.md). 20 keeps the violation
+  budgets): [ticket 38](./38-body-section-schemas.md). 20 keeps the violation
   locator open to more than a frontmatter key.
 - Query-side expansion of bindings, the "has a known explicit class" atom and
   the path-scan optimisation: [query core](./28-query-core-and-plan.md).
 - Rank of the `schema.global.*` family and the schema-error exit code:
-  [diagnostics](./33-error-and-diagnostic-architecture.md).
+  [diagnostics](./34-error-and-diagnostic-architecture.md).
 - `[binding]` table and `global` semantics in the schema format and internals:
-  [ticket 36](./36-schema-internals-simplification.md).
+  [ticket 37](./37-schema-internals-simplification.md).
 - Notice-on-read baseline store, CLI write commands, change-set check and the
   session/inbox workflow: [read
   model](./24-index-read-model-and-query-execution.md),
   [freshness](./25-index-freshness-and-invalidation.md),
-  [diagnostics](./33-error-and-diagnostic-architecture.md), [workspace
-  host](./32-workspace-host-and-composition.md).
+  [diagnostics](./34-error-and-diagnostic-architecture.md), [workspace
+  host](./33-workspace-host-and-composition.md).
 
 ## TODOs
 
@@ -437,7 +437,7 @@ edit the glossaries or ADRs yet; they describe the current code):
   Conflict*, and *Violation* (layer, origin, hint) with a Not-this list against
   *Diagnostic*.
 - TODO `src/GLOSSARY.md` and `GLOSSARY-MAP.md`: add *Core* and *App Layer* and
-  the consumer (cli, lsp, mcp) vocabulary when ticket 34 names them.
+  the consumer (cli, lsp, mcp) vocabulary when ticket 35 names them.
 - TODO `docs/adr/0006`: its "`required`/`multi` inert until the MCP guardrail
   stage" wording is superseded. They are checked advisorily, and gating is host
   policy. Add the layering principle and host-policy model as a new ADR (status
@@ -471,14 +471,14 @@ overturned.** Confirmed or refined:
 - *Other gates.* IWE's MCP schema gate is always on; "strict" means mandatory
   `expect` count guards on `iwe_query` mutations (`docs/mcp.md:99`), and every
   write tool accepts `dry_run`. Multi-document changes are all-or-nothing.
-  `expect` guards are a candidate for the MCP host's bulk guards (ticket 32).
+  `expect` guards are a candidate for the MCP host's bulk guards (ticket 33).
 - *Stricter than both.* Fileclass never validates `step`, lets `[]` satisfy
   `required` (`validate.ts:58`) and accepts any non-empty string for a field
   with a custom date format. IWE has no `step`. The Answer's rules stand.
 - *Binding placement.* IWE binds in the host config (`[schemas.<name>].match`,
   globs with gitignore-style `!`, last match wins), has no inheritance and
   composes overlapping schemas order-free. The Answer keeps class-owned
-  `[binding]`. Ticket 36 should state how `!` ordering works in the existing
+  `[binding]`. Ticket 37 should state how `!` ordering works in the existing
   glob dialect.
 - *Design-time checks.* IWE exits 2 for unreachable schema entries and Fileclass
   strikes through a tag that can never bind. A "binding that can never match"

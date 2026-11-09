@@ -36,7 +36,7 @@ Filter semantics today are already half type-bracketed and half SQLite-style:
 ## 2. Corrections to scout output and earlier notes (do not carry these forward)
 
 1. CodeInventory says lexical storage (1C) is "rejected by ticket 18". It is not: ticket 18 lists it as
-   alternative D and defers it to this ticket (`18:321-323`, `18:463`). It is a live option.
+   alternative D and defers it to this ticket (`18:331-333`, `18:463`). It is a live option.
 2. DecisionSynthesis "Challenge 1" says Noyalib exposes scalar style so frontmatter could just honour quotes.
    The parser's `ScalarStyle` is `pub(crate)` (`noyalib-0.0.53/src/parser/scanner.rs:21`); the public
    `ser::ScalarStyle` is output-side. Ticket 18 already measured that only the CST route exposes style and that
@@ -173,7 +173,7 @@ Each: options, my lean, what to stress-test. "Keep" = status quo.
 - E1 [lean]: classification failure keeps the string (already so); explicit casts fail to Null (TRY_CAST);
   filters never error; arithmetic on mismatched kinds yields Null (already `filter.rs:371`).
 - E2: add advisory diagnostics (taplo pattern) for failed casts and cross-bracket comparisons; needs spans
-  (ticket 23) and the diagnostic architecture (ticket 31), so decide only the *principle* here.
+  (ticket 23) and the diagnostic architecture (ticket 32), so decide only the *principle* here.
 - E3 erroring filters: see Q5-C.
 
 ## 5. Handoffs this ticket must make explicit

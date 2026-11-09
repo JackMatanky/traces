@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 9, 16, 21, 12
+Blocked by: 9, 12, 16, 21
 
 ## Question
 
@@ -57,7 +57,7 @@ it from the confined filesystem capability.
 
 Multi-root readiness does not let two roots aliasing one directory write
 independent indexes. Resolve symlink/alias identity and TOCTOU policy here and
-in tickets 25/32. Do not presume a registry or new capability.
+in tickets 25/33. Do not presume a registry or new capability.
 
 ## Inputs from the freshness decision
 

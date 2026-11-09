@@ -27,7 +27,7 @@ inference, [P] proposal. Nothing here is a decision; it is the menu for the gril
    it was decided that app layers are functions only. Earlier drafts of this folder (b, e, g, brief rev 1) treated it as
    binding and used it to rule out topology B and to favour "smallest-view arguments"; those leans are withdrawn.
    Whether the app layer is objects (a `Workspace`/`Session`-style type owning same-lifetime collaborators, methods as use
-   cases) or functions belongs to [workspace host and composition](../../issues/30-workspace-host-and-composition.md), and
+   cases) or functions belongs to [workspace host and composition](../../issues/33-workspace-host-and-composition.md), and
    21 must be answerable under either. The real hazard is narrower: a mega-context passed as a parameter to every leaf
    (service locator), which is different from an app object that owns services.
 3. **There are three lifetimes, not one.** [H] Host (dirs, env policy: stable per process), workspace (project root,
@@ -49,7 +49,7 @@ inference, [P] proposal. Nothing here is a decision; it is the menu for the gril
   is how a context grows by accretion. [P] Alternative to grill: `temporal` owns an opaque evaluation object (zone,
   `now`, week start, interval rules) and exposes operations (`today()`, `shift`, `period_edge`, `day_interval`);
   query and template hold the handle and never see a zone. Cost: a temporal-owned type that must stay narrow.
-- **Topology B and E are back on the table** pending ticket 30: an app object owning config, stores, index handle and
+- **Topology B and E are back on the table** pending ticket 31: an app object owning config, stores, index handle and
   ignore policy, with per-call evaluation input as an argument, is a conventional design and fits a long-lived LSP.
 - **Provenance discipline.** [V] tags in b-prior-decisions confirm the text exists in an artifact, not that you ratified
   it. Items drawn from ticket Answers, survey "judged sound" notes and ADRs (including `Cwd` "sound", ticket 20's
@@ -124,7 +124,7 @@ object; consumers read under 25% of fields; mutation in flight; a filter test ne
 Cross-decision [P]: sample `now: Timestamp` once, resolve one `TimeZone`, derive `today` from that pair (never
 `Zoned::now()` after choosing a zone). Deferred sets either carry the resolved value or require one at materialisation.
 A cached bound relative query in an LSP needs rebinding at midnight; fresh input cannot schedule an event (host duty,
-tickets 30/34). Midnight, zone change and tzdb change deserve separate refresh policies.
+tickets 31/35). Midnight, zone change and tzdb change deserve separate refresh policies.
 
 ### D2. Host inputs (f-design-host-inputs)
 
@@ -165,12 +165,12 @@ One-way (user-visible): changing path or trust ordering, treating unknown zone a
 | Ticket | 21 supplies | Left open |
 |---|---|---|
 | [config ownership](../../issues/22-config-ownership-and-lifecycle.md) | host discovery snapshot (homes, ceilings, ignore) as one atomic transaction; zone-config handover (resolved zone at evaluation entry) | loader API, trust revalidation, reload triggers, key names |
-| [temporal](../../issues/27-temporal-boundary-and-dialects.md) | sampling unit, default and failure rule, who owns `now` | grammar, dialects, DST edge policy, `DateConfig` |
-| [query core](../../issues/26-query-core-and-plan.md) / [template](../../issues/28-template-engine-boundary.md) | one value reaches eager plan, lazy `QuerySet`, nested queries, date callbacks | bind/rebind IR, minijinja carrier |
-| [path model](../../issues/29-path-and-capability-model.md) | selected root distinct from cwd, passive not authority | capability or confinement |
-| [workspace host](../../issues/30-workspace-host-and-composition.md) | input acquisition and lifetime rules | host type, service lifetimes, scheduling (midnight) |
-| [errors](../../issues/31-error-and-diagnostic-architecture.md) | whether zone and dir failures return, warn or default | error types, codes, rendering |
-| [crate topology](../../issues/32-crate-topology-and-public-surface.md) | concrete types crossing host to core | placement, `pub` surface |
+| [temporal](../../issues/30-temporal-boundary-and-dialects.md) | sampling unit, default and failure rule, who owns `now` | grammar, dialects, DST edge policy, `DateConfig` |
+| [query core](../../issues/28-query-core-and-plan.md) / [template](../../issues/31-template-engine-boundary.md) | one value reaches eager plan, lazy `QuerySet`, nested queries, date callbacks | bind/rebind IR, minijinja carrier |
+| [path model](../../issues/32-path-and-capability-model.md) | selected root distinct from cwd, passive not authority | capability or confinement |
+| [workspace host](../../issues/33-workspace-host-and-composition.md) | input acquisition and lifetime rules | host type, service lifetimes, scheduling (midnight) |
+| [errors](../../issues/34-error-and-diagnostic-architecture.md) | whether zone and dir failures return, warn or default | error types, codes, rendering |
+| [crate topology](../../issues/35-crate-topology-and-public-surface.md) | concrete types crossing host to core | placement, `pub` surface |
 
 Recommended handling of the triangle: grill 21 alone (who captures, when it changes, who receives), then a joint
 interface check against 22 and 30 before any public type is frozen. Bundling 21+22+30 would ask for type ownership,

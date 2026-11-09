@@ -4,7 +4,7 @@
 
 Superseded where it differs from [ticket 20's
 Answer](../../../issues/20-schema-note-typing-and-validation.md): severities
-belong to ticket 31, and the delta key omits the element index. Its sketches
+belong to ticket 32, and the delta key omits the element index. Its sketches
 assume `NoteFieldValue: Hash`, which ticket 19 rules out.
 
 ## 1. Sub-problem Restated
@@ -40,7 +40,7 @@ Critical domain pressures include:
   windows.
 - **Severity Ownership**: Clarifying whether severity belongs inside the raw
   validation violation or in the diagnostic presentation envelope owned by
-  Ticket 31.
+  Ticket 32.
 
 ---
 
@@ -300,16 +300,16 @@ into JSON Schema, but impedance mismatches exist:
   - Wikilink targets (`[[note]]`): JSON Schema has no concept of PKM links.
   - Dynamic file sources (`values = { path = ... }`).
 
-### 4.6 Severity Ownership: Ticket 20 vs Ticket 31
+### 4.6 Severity Ownership: Ticket 20 vs Ticket 32
 
 - **Ticket 20 Scope**: Owns the domain check and result model:
   `ValidationViolation { field, element, kind }`. Violations state objective
   facts (e.g. "field X is missing", "value Y is not in enum").
-- **Ticket 31 Scope**: Owns the diagnostic envelope and severity mapping:
+- **Ticket 32 Scope**: Owns the diagnostic envelope and severity mapping:
   `Diagnostic { code, severity, span, message, help, fix }`.
 - **Default Severity**: Ticket 20 specifies a *recommended default severity*
   associated with each rule code (e.g. `schema.missing-required` $\to$
-  `Warning`), while Ticket 31 defines configuration overrides
+  `Warning`), while Ticket 32 defines configuration overrides
   (`[schemas.diagnostics]` or host policies) where MCP can treat it as
   `isError: true` while LSP treats it as `Information`.
 
@@ -351,7 +351,7 @@ into JSON Schema, but impedance mismatches exist:
      - MCP Adapter formats `isError: true` with actionable self-correction
        hints.
 - **Strongest Argument Against**: Requires maintaining adapter transformations
-  for each host and coordinating between Ticket 20 (violations) and Ticket 31
+  for each host and coordinating between Ticket 20 (violations) and Ticket 32
   (diagnostics).
 
 ### Candidate 4: Unconventional A — Lazy Violation Stream / Iterator
@@ -464,9 +464,9 @@ When running `traces check --delta` or git pre-commit hooks:
 
 ---
 
-## 7. What Ticket 20 Must Pin vs Leave for Ticket 31
+## 7. What Ticket 20 Must Pin vs Leave for Ticket 32
 
-| Concern | Owned by Ticket 20 | Owned by Ticket 31 |
+| Concern | Owned by Ticket 20 | Owned by Ticket 32 |
 |---|---|---|
 | **Violation Struct & Enum** | Exact `ValidationViolation` & `ViolationKind` | Ignored (consumes them) |
 | **Rule Codes** | Stable string codes (`schema.*`) | Diagnostic code registry & URLs |

@@ -194,7 +194,7 @@ Facts:
   Issue 12284 made this failure non-fatal. Git and Cargo also treat a derived
   cache as disposable (`e2`).
 - [V] Ticket 21 does not promise concurrent index writers with different
-  policies for one root. Ticket 30 owns writer admission inside a host. This
+  policies for one root. Ticket 31 owns writer admission inside a host. This
   question owns what a second process sees.
 
 Rules for a failed persist (`h1`, section 4):
@@ -241,11 +241,11 @@ Ask, for each stored thing: which query or update needs it?
 | `FileMeta.day` | a hybrid of filename and creation time | Drop. Ticket 21 removes the hybrid. |
 | `FileMeta` timestamps and size | `file.ctime`, `file.mtime`, `file.size` and the refresh delta | Keep as optional source timestamps. |
 | temporal text | parsed on each load | Defer a compact form until the facet decode is measured. |
-| notices | none today | Do not persist in the first cut. Ask ticket 31. |
+| notices | none today | Do not persist in the first cut. Ask ticket 32. |
 | "has a known explicit class" | the meta facet at query time | No table. |
 | class axis over inline fields | none | Frontmatter only. Ticket 20 names three class sources and inline fields are not one. |
 
-Constraint for ticket 29: the persisted path form is a relative UTF-8 path with
+Constraint for ticket 30: the persisted path form is a relative UTF-8 path with
 `/` (research 09). This guide does not choose it.
 
 ## Question 7: Totality

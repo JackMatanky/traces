@@ -69,7 +69,7 @@ Ticket 19 sits at the nexus of the type system, temporal domain, and query engin
  ├──► [Ticket 26: Query Core & Plan] (blocked by 19; filter ==, sort total order)
  ├──► [Ticket 27: Temporal Boundary & Dialects] (blocked by 19; duration ==)
  ├──► [Ticket 28: Template Engine Boundary] (minijinja value bridge)
- └──► [Ticket 30: Workspace Host & Composition] (session context threading)
+ └──► [Ticket 31: Workspace Host & Composition] (session context threading)
 ```
 
 - **Ticket 20 (`schema-note-typing-and-validation.md`):** [V: `issues/20:5,11-14`]
@@ -99,7 +99,7 @@ Ticket 19 sits at the nexus of the type system, temporal domain, and query engin
 - **Ticket 28 (`template-engine-boundary.md`):** [V: `issues/28:5,9-18`]
   - *Needs from 19:* Minijinja dynamic value bridging: how `NoteFieldValue` behaves under template comparison operators; number rendering (`5` vs `5.0`) [V: `18:515-516; 28:9-18`].
   - *Ordering Trap:* Minijinja historically stringified durations and links (`src/template/engine/query.rs:604`); 19's equality model must coordinate with template operator expectations.
-- **Ticket 30 (`workspace-host-and-composition.md`):** [V: `issues/30:9-17`]
+- **Ticket 31 (`workspace-host-and-composition.md`):** [V: `issues/30:9-17`]
   - *Needs from 19:* Evaluation session requirements (threading `ExecutionContext` through query services).
 
 ---
