@@ -1,0 +1,12 @@
+[package]
+name = "t26-probe"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+redb = "=4.3.0"
+postcard = "1"
+traces = { path = "/Users/jack/Documents/41_personal/traces", features = ["test-utils"] }
+
+[profile.release]
+opt-level = 3

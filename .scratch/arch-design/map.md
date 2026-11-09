@@ -421,6 +421,17 @@ not implement the redesign. It ends at hand-off to specification.
   core](./issues/28-query-core-and-plan.md),
   [host](./issues/32-workspace-host-and-composition.md),
   [diagnostics](./issues/33-error-and-diagnostic-architecture.md).
+- [What does a durable index repair journal cost and
+  save?](./issues/26-measure-index-recovery-journal.md): cost screen measured,
+  no journal chosen. The external facts journal survives the screen for
+  rebuilds: 76 ms per command against 1,332.9 ms of saved work at 50,000
+  notes. The in-store journal table loses (477 ms added per rebuild).
+  Incremental edits pay above a 4 to 7 percent stop rate inside a 125 ms
+  window only. No-change commands never pass. A kill before the last rebuild
+  sync leaves an empty store; the next open costs 17 to 37 ms. The
+  facet-layout claims of 85 percent more write time and 2 times size did not
+  reproduce. The `None` versus `Immediate` choice stays with ticket 35.
+  Handoff: [replay prototype](./issues/39-index-replay-prototype-and-fault-tests.md).
 
 ## Not yet specified
 

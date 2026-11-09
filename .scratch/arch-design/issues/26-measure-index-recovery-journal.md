@@ -1,7 +1,7 @@
 # What does a durable index repair journal cost and save?
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 24, 25
 
 ## Question
@@ -480,3 +480,62 @@ These sections are facts and open points. Treat them as fallible.
   journal candidate survives the cost screen. Ticket 35 owns the
   `None` versus `Immediate` choice. The maintainer decides if a journal
   result enters the specification.
+
+## Answer
+
+Measured. Full numbers live in
+[the cost screen](../research/26-index-recovery-journal-measurement.md).
+Marks use the map rules.
+
+### Gate verdicts
+
+- Rebuild, 50,000 notes: the external facts journal costs 76 ms per command.
+  The rival costs 1,332.9 ms. No rejection. The margin is about 17 times.
+- The in-store journal table adds 477 ms to every rebuild.
+  The external file adds 76 ms for the same protection. Drop the in-store table.
+- Edit 100 notes: the rival adds 125 ms of parse and commit work.
+  The external journal costs 8.0 ms per command. No rejection at the bound.
+  It pays only above a 4 to 7 percent stop rate inside the 125 ms window.
+- No-change commands save nothing and pay 8.0 ms. They never pass.
+- Verdict: no candidate rejects, so no journal is chosen here.
+  The screen sets a break-even stop rate. It does not pick a design.
+
+### Measured facts that bound the decision
+
+- [V] A kill anywhere before the last sync of a rebuild leaves an empty store.
+  The next open costs 17 to 37 ms. No partial store ever appears.
+- [V] `Durability::None` commits die on abort. `Immediate` commits survive.
+  `Immediate` adds 4.6 ms per command and makes the next open 20 times
+  slower after an abrupt stop without close.
+- [V] The journal publication barrier works. A synced journal file plus
+  directory sync has a 4 ms floor. Replay removal waits for an `Ok`
+  `Immediate` replay commit.
+- [V] The facet-layout claims of 85 percent more write time and 2 times size
+  did not reproduce. Measured write ratio 0.99 to 1.01. Size ratio 1.000.
+- [V] The no-change refresh costs 385 ms at 50,000 notes. Open and scan
+  dominate it. A journal cannot remove this cost.
+- [H] Journal encode costs here copy real row bytes, so they are lower
+  bounds. A facts encode from the real parser adds tens of percent.
+
+### Handoffs
+
+- [Ticket 39](./39-index-replay-prototype-and-fault-tests.md) owns the rest:
+  the real replay prototype, fault-injection crash tests, Linux correctness
+  checks, and recovery-query measurements.
+- Ticket 35: its blocker moves from this ticket to ticket 39.
+  The `None` versus `Immediate` choice stays with ticket 35.
+- Ticket 25: the read-only-open control finding (0.03 ms, no syncs) passes
+  there. A read-only handle cannot coexist with a writable handle.
+- Ticket 32: the simulated-host retry path validates against these numbers.
+
+## Code delta
+
+None. No production code changed. The probe is a throwaway crate that drives
+the engine through `traces::testing`. Its source is recorded in
+`research/26-prep/`. The screen ran at release mode, one benchmark at a time,
+with no `RUSTFLAGS`.
+
+Drift check: `git diff 207cc3fb..main -- src tests docs` shows 197 files.
+The index changed in 13 files (+1,003, -576), including `store.rs`,
+`refresh.rs` and `service.rs`. The probe measured `main` at `79f393a2`,
+so the landed drift is inside these numbers. They are not stale.

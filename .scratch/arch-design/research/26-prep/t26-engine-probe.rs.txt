@@ -1,0 +1,1000 @@
+// t26-probe: cost-screen measurements for ticket 26 (scratch, never committed).
+//
+// Drives the real engine (traces crate) for build/persist timings and opens
+// the resulting redb store raw for journal-payload harvesting and journal
+// write/replay cost measurements on the decided layout.
+use std::env;
+use std::fs::{self, File};
+use std::io::Write as _;
+use std::path::{Path, PathBuf};
+use std::process::{exit, Command};
+use std::time::Instant;
+
+use redb::{
+    Database, Durability, MultimapTableDefinition, ReadableDatabase, ReadableMultimapTable,
+    ReadableTable, ReadableTableMetadata, TableDefinition, WriteTransaction,
+};
+use traces::testing::IndexerService;
+
+// Mirrors src/index/tables.rs layout. Tags: 0 files, 1 notes, 2 links,
+// 3 paths_by_tag, 4 paths_by_file_class, 5 tags_by_path, 6 classes_by_path,
+// 7 meta.
+const FILES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("files");
+const NOTES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("notes");
+const META: TableDefinition<&[u8], &[u8]> = TableDefinition::new("meta");
+const LINKS: MultimapTableDefinition<&[u8], &[u8]> = MultimapTableDefinition::new("links");
+const PBT: MultimapTableDefinition<&[u8], &[u8]> = MultimapTableDefinition::new("paths_by_tag");
+const PBFC: MultimapTableDefinition<&[u8], &[u8]> =
+    MultimapTableDefinition::new("paths_by_file_class");
+const TBP: MultimapTableDefinition<&[u8], &[u8]> = MultimapTableDefinition::new("tags_by_path");
+const CBP: MultimapTableDefinition<&[u8], &[u8]> = MultimapTableDefinition::new("classes_by_path");
+
+const F0: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet0");
+const F1: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet1");
+const F2: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet2");
+const F3: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet3");
+const F4: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet4");
+const F5: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet5");
+const F6: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet6");
+const F7: TableDefinition<&[u8], &[u8]> = TableDefinition::new("facet7");
+const FACET_DEFS: [TableDefinition<&[u8], &[u8]>; 8] = [F0, F1, F2, F3, F4, F5, F6, F7];
+
+const NAMES: [&str; 8] = [
+    "files",
+    "notes",
+    "links",
+    "paths_by_tag",
+    "paths_by_file_class",
+    "tags_by_path",
+    "classes_by_path",
+    "meta",
+];
+
+#[derive(Debug)]
+struct Op {
+    tag: u8,
+    put: bool,
+    key: Vec<u8>,
+    val: Vec<u8>,
+}
+
+fn data_dir() -> PathBuf {
+    let base = env::var("PROBE_DIR").unwrap_or_else(|_| "/tmp/t26-probe-data".to_string());
+    let p = PathBuf::from(base);
+    fs::create_dir_all(&p).expect("create data dir");
+    p
+}
+
+fn vault_dir(n: usize) -> PathBuf {
+    data_dir().join(format!("t26-vault-{n}"))
+}
+
+fn store_path(vault: &Path) -> PathBuf {
+    vault.join(".traces/index.redb")
+}
+
+fn work_file(name: &str) -> PathBuf {
+    let p = data_dir().join(name);
+    let _ = fs::remove_file(&p);
+    p
+}
+
+fn elapsed(t: Instant) -> f64 {
+    t.elapsed().as_secs_f64() * 1e3
+}
+
+fn median(mut xs: Vec<f64>) -> f64 {
+    xs.sort_by(|a, b| a.total_cmp(b));
+    xs[xs.len() / 2]
+}
+
+fn dirsync(dir: &Path) {
+    let d = File::open(dir).expect("open dir");
+    d.sync_all().expect("dirsync");
+}
+
+fn die(msg: String) -> ! {
+    eprintln!("{msg}");
+    exit(2);
+}
+
+// ----- vault generator (ticket 26 fixture spec: ~9.75 items, ~0.75 tasks per
+// note) -----
+
+fn gen_note(i: usize, n: usize) -> (PathBuf, String) {
+    let classes = ["Project", "Area", "Resource", "Archive"];
+    let mut body = String::with_capacity(700);
+    body.push_str("---\nrating: ");
+    body.push_str(&(i % 10).to_string());
+    body.push_str("\nclass: ");
+    body.push_str(classes[i % 4]);
+    body.push_str("\n---\n# Note ");
+    body.push_str(&i.to_string());
+    body.push_str(" #common #topic/");
+    body.push_str(&(i % 5).to_string());
+    body.push_str(" #rare_");
+    body.push_str(&(i % 50).to_string());
+    body.push_str("\n## Section ");
+    body.push_str(&(i % 3).to_string());
+    body.push('\n');
+    for j in 0..10 {
+        if j % 13 == 4 {
+            body.push_str(&format!(
+                "- [ ] Task {j} for note {i} @due(2026-01-{}) #task/topic_{}\n",
+                j + 1,
+                j % 5
+            ));
+        } else {
+            body.push_str(&format!("- item {j} text {i}\n"));
+        }
+    }
+    body.push_str(&format!("Related: [[note-{}]].\n", (i + 1) % n));
+    let path = format!("areas/area-{}/project-{}/note-{}.md", i % 16, i % 4, i);
+    (PathBuf::from(path), body)
+}
+
+fn make_vault(n: usize) -> PathBuf {
+    let vault = vault_dir(n);
+    if vault.join("areas").exists() {
+        return vault;
+    }
+    let _ = fs::remove_dir_all(&vault);
+    fs::create_dir_all(&vault).expect("mkdir vault");
+    for i in 0..n {
+        let (rel, body) = gen_note(i, n);
+        let full = vault.join(&rel);
+        fs::create_dir_all(full.parent().expect("parent")).expect("mkdir note dir");
+        fs::write(&full, body).expect("write note");
+    }
+    vault
+}
+
+// ----- dump: read the real store's raw rows as (key, val) ops -----
+
+fn dump_store(store_copy: &Path, out_dir: &Path) -> Vec<Vec<Op>> {
+    fs::create_dir_all(out_dir).expect("mkdir dump");
+    for entry in fs::read_dir(out_dir).expect("list dump") {
+        let p = entry.expect("dump entry").path();
+        fs::remove_file(p).expect("rm old dump file");
+    }
+    let db = Database::create(store_copy).expect("open store copy");
+    let txn = db.begin_read().expect("read txn");
+    let mut all = Vec::with_capacity(8);
+    for (tag, name) in NAMES.iter().enumerate() {
+        let tag = tag as u8;
+        let mut ops = Vec::new();
+        let mut count = 0u64;
+        let mut total = 0u64;
+        if is_multimap_tag(tag) {
+            let def = MultimapTableDefinition::<&[u8], &[u8]>::new(name);
+            let t = txn.open_multimap_table(def).expect("open mm");
+            for row in t.iter().expect("mm iter") {
+                let (k, values) = row.expect("mm row");
+                let kb: &[u8] = k.value();
+                for v in values {
+                    let guard = v.expect("mm val");
+                    let vb: &[u8] = guard.value();
+                    ops.push(Op {
+                        tag,
+                        put: true,
+                        key: kb.to_vec(),
+                        val: vb.to_vec(),
+                    });
+                    count += 1;
+                    total += (kb.len() + vb.len()) as u64;
+                }
+            }
+        } else {
+            let def = TableDefinition::<&[u8], &[u8]>::new(name);
+            let t = txn.open_table(def).expect("open table");
+            for row in t.iter().expect("iter") {
+                let (k, v) = row.expect("row");
+                let kb: &[u8] = k.value();
+                let vb: &[u8] = v.value();
+                ops.push(Op {
+                    tag,
+                    put: true,
+                    key: kb.to_vec(),
+                    val: vb.to_vec(),
+                });
+                count += 1;
+                total += (kb.len() + vb.len()) as u64;
+            }
+        }
+        let med = median(
+            ops.iter()
+                .map(|o| (o.key.len() + o.val.len()) as f64)
+                .collect(),
+        );
+        println!(
+            "dump {} rows={} total_bytes={} median_row={:.1}",
+            name, count, total, med
+        );
+        // Frame: [u32 klen][key][u32 vlen][val]
+        let mut f = File::create(out_dir.join(format!("{tag:02}-{name}.bin"))).expect("dump file");
+        for op in &ops {
+            f.write_all(&(op.key.len() as u32).to_le_bytes())
+                .expect("klen");
+            f.write_all(&op.key).expect("key");
+            f.write_all(&(op.val.len() as u32).to_le_bytes())
+                .expect("vlen");
+            f.write_all(&op.val).expect("val");
+        }
+        all.push(ops);
+    }
+    drop(txn);
+    drop(db);
+    all
+}
+
+fn load_dump(dir: &Path) -> Vec<Vec<Op>> {
+    let mut all = Vec::with_capacity(8);
+    for (tag, name) in NAMES.iter().enumerate() {
+        let bytes = fs::read(dir.join(format!("{tag:02}-{name}.bin")))
+            .unwrap_or_else(|e| panic!("read dump {name}: {e}"));
+        all.push(parse_frames(tag as u8, &bytes));
+    }
+    all
+}
+
+fn parse_frames(tag: u8, bytes: &[u8]) -> Vec<Op> {
+    let mut ops = Vec::new();
+    let mut at = 0usize;
+    while at < bytes.len() {
+        let mut buf4 = [0u8; 4];
+        buf4.copy_from_slice(&bytes[at..at + 4]);
+        let klen = u32::from_le_bytes(buf4) as usize;
+        at += 4;
+        let key = bytes[at..at + klen].to_vec();
+        at += klen;
+        buf4.copy_from_slice(&bytes[at..at + 4]);
+        let vlen = u32::from_le_bytes(buf4) as usize;
+        at += 4;
+        let val = bytes[at..at + vlen].to_vec();
+        at += vlen;
+        ops.push(Op {
+            tag,
+            put: true,
+            key,
+            val,
+        });
+    }
+    if at != bytes.len() {
+        panic!("truncated dump frame for tag {tag}");
+    }
+    ops
+}
+
+fn is_multimap_tag(tag: u8) -> bool {
+    (2..=6).contains(&tag)
+}
+
+// ----- payload builders -----
+
+enum Mode {
+    Facets,
+    Facts,
+    Edit100,
+}
+
+fn parse_mode(s: &str) -> Mode {
+    match s {
+        "facets" => Mode::Facets,
+        "facts" => Mode::Facts,
+        "edit100" => Mode::Edit100,
+        other => die(format!("unknown mode {other} (facets|facts|edit100)")),
+    }
+}
+
+fn payload(dump: Vec<Vec<Op>>, mode: &Mode) -> Vec<Op> {
+    match mode {
+        Mode::Facets => dump.into_iter().flatten().collect(),
+        Mode::Facts => dump.into_iter().take(2).flatten().collect(),
+        Mode::Edit100 => {
+            let notes = dump.into_iter().nth(1).expect("notes dump");
+            let mut ops = Vec::with_capacity(200);
+            for src in notes.iter().take(100) {
+                ops.push(Op {
+                    tag: 1,
+                    put: false,
+                    key: src.key.clone(),
+                    val: Vec::new(),
+                });
+            }
+            ops.extend(notes.into_iter().take(100).map(|src| Op {
+                tag: 1,
+                put: true,
+                key: src.key,
+                val: src.val,
+            }));
+            ops
+        }
+    }
+}
+
+// Record: [u8 tag][u8 op][u32 klen][key][u32 vlen][val]
+fn serialize(ops: &[Op]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(ops.len() * 64);
+    for op in ops {
+        out.push(op.tag);
+        out.push(u8::from(op.put));
+        out.extend_from_slice(&(op.key.len() as u32).to_le_bytes());
+        out.extend_from_slice(&op.key);
+        out.extend_from_slice(&(op.val.len() as u32).to_le_bytes());
+        out.extend_from_slice(&op.val);
+    }
+    out
+}
+
+fn parse_record(b: &[u8]) -> Op {
+    let tag = b[0];
+    let put = b[1] == 1;
+    let mut at = 2usize;
+    let mut buf4 = [0u8; 4];
+    buf4.copy_from_slice(&b[at..at + 4]);
+    let klen = u32::from_le_bytes(buf4) as usize;
+    at += 4;
+    let key = b[at..at + klen].to_vec();
+    at += klen;
+    let val = if put {
+        buf4.copy_from_slice(&b[at..at + 4]);
+        let vlen = u32::from_le_bytes(buf4) as usize;
+        at += 4;
+        let val = b[at..at + vlen].to_vec();
+        at += vlen;
+        val
+    } else {
+        at += 4; // del records still carry the (zero) length field
+        Vec::new()
+    };
+    if at != b.len() {
+        panic!("truncated journal record");
+    }
+    Op { tag, put, key, val }
+}
+
+fn insert_ops(txn: &WriteTransaction, ops: &[Op]) {
+    // Ops are grouped by tag order already; per-table inserts.
+    for (ti, name) in NAMES.iter().enumerate() {
+        let tag = ti as u8;
+        let group: Vec<&Op> = ops.iter().filter(|o| o.tag == tag).collect();
+        if group.is_empty() {
+            continue;
+        }
+        if is_multimap_tag(tag) {
+            let def = MultimapTableDefinition::<&[u8], &[u8]>::new(name);
+            let mut t = txn.open_multimap_table(def).expect("mm open");
+            for op in &group {
+                if op.put {
+                    t.insert(op.key.as_slice(), op.val.as_slice())
+                        .expect("mm insert");
+                }
+            }
+        } else {
+            let def = TableDefinition::<&[u8], &[u8]>::new(name);
+            let mut t = txn.open_table(def).expect("table open");
+            for op in &group {
+                if op.put {
+                    t.insert(op.key.as_slice(), op.val.as_slice())
+                        .expect("insert");
+                }
+            }
+        }
+    }
+}
+
+fn apply_ops(txn: &WriteTransaction, ops: &[Op]) {
+    for op in ops {
+        let name = NAMES[op.tag as usize];
+        if is_multimap_tag(op.tag) {
+            let def = MultimapTableDefinition::<&[u8], &[u8]>::new(name);
+            let mut t = txn.open_multimap_table(def).expect("mm open");
+            if op.put {
+                let _ = t.insert(op.key.as_slice(), op.val.as_slice());
+            }
+        } else {
+            let def = TableDefinition::<&[u8], &[u8]>::new(name);
+            let mut t = txn.open_table(def).expect("table open");
+            if op.put {
+                t.insert(op.key.as_slice(), op.val.as_slice())
+                    .expect("insert");
+            } else {
+                let _ = t.remove(op.key.as_slice());
+            }
+        }
+    }
+}
+
+fn empty_schema(path: &Path) {
+    let db = Database::create(path).expect("create schema db");
+    let mut txn = db.begin_write().expect("schema txn");
+    for def in [FILES, NOTES, META] {
+        txn.open_table(def).expect("schema table");
+    }
+    for def in [LINKS, PBT, PBFC, TBP, CBP] {
+        txn.open_multimap_table(def).expect("schema mm");
+    }
+    let _ = txn.set_durability(Durability::Immediate);
+    txn.commit().expect("schema commit");
+    drop(db);
+}
+
+// ----- commands -----
+
+fn cmd_build(n: usize) {
+    let vault = make_vault(n);
+    let indexer = IndexerService::for_tests(&vault);
+    let t0 = Instant::now();
+    let index = indexer.build().expect("build");
+    let build_ms = elapsed(t0);
+    let t1 = Instant::now();
+    indexer.persist(&index).expect("persist");
+    let persist_ms = elapsed(t1);
+
+    let store = store_path(&vault);
+    let mut reopens = Vec::new();
+    let mut notes_len = 0u64;
+    for _ in 0..5 {
+        let t = Instant::now();
+        let db = Database::create(&store).expect("reopen");
+        let txn = db.begin_read().expect("read");
+        notes_len = txn.open_table(NOTES).expect("notes").len().expect("len");
+        drop(txn);
+        drop(db);
+        reopens.push(elapsed(t));
+    }
+    let reopen_first = reopens[0];
+    let reopen_med = median(reopens);
+    println!(
+        "build n={n} build_ms={build_ms:.1} persist_ms={persist_ms:.1} reopen_first={reopen_first:.1} reopen_med={reopen_med:.1} notes={notes_len} store_bytes={}",
+        fs::metadata(&store).expect("store meta").len()
+    );
+
+    // Dump raw rows for the journal payload work.
+    let dump_src = work_file(&format!("dump-src-{n}.redb"));
+    fs::copy(&store, &dump_src).expect("copy store for dump");
+    dump_store(&dump_src, &data_dir().join(format!("dump-{n}")));
+}
+
+fn cmd_rows(store_arg: &str) {
+    let src = PathBuf::from(store_arg);
+    let copy = work_file("rows-copy.redb");
+    fs::copy(&src, &copy).expect("copy");
+    dump_store(&copy, &data_dir().join("dump-adhoc"));
+}
+
+fn cmd_journal(n: usize, mode_s: &str) {
+    let mode = parse_mode(mode_s);
+    let dump = load_dump(&data_dir().join(format!("dump-{n}")));
+    let ops = payload(dump, &mode);
+    let bytes = serialize(&ops);
+
+    // Encode proxy: postcard over the byte slices (lower bound: verbatim copy
+    // is memcpy; upper bound: real struct encode sits near this proxy).
+    let t_enc = Instant::now();
+    let mut enc_total = 0usize;
+    for op in &ops {
+        enc_total += postcard::to_allocvec(&op.key).expect("enc key").len();
+        enc_total += postcard::to_allocvec(&op.val).expect("enc val").len();
+    }
+    let enc_ms = elapsed(t_enc);
+
+    let mut write_ms = Vec::new();
+    let mut sync_ms = Vec::new();
+    let mut total_ms = Vec::new();
+    let jf = data_dir().join("journal.tmp");
+    for _ in 0..7 {
+        let t = Instant::now();
+        let mut f = File::create(&jf).expect("journal file");
+        f.write_all(&bytes).expect("journal write");
+        let t_w = elapsed(t);
+        let t2 = Instant::now();
+        f.sync_all().expect("journal sync");
+        drop(f);
+        dirsync(&data_dir());
+        let t_s = elapsed(t2);
+        write_ms.push(t_w);
+        sync_ms.push(t_s);
+        total_ms.push(t_w + t_s);
+    }
+    let t_rm = Instant::now();
+    fs::remove_file(&jf).expect("journal rm");
+    dirsync(&data_dir());
+    let rm_ms = elapsed(t_rm);
+    println!(
+        "journal n={n} mode={mode_s} ops={} raw_bytes={} postcard_bytes={} enc_ms={enc_ms:.1} write_med={:.2} sync_med={:.2} total_med={:.2} rm+dir_ms={rm_ms:.2}",
+        ops.len(),
+        bytes.len(),
+        enc_total,
+        median(write_ms),
+        median(sync_ms),
+        median(total_ms)
+    );
+}
+
+fn cmd_jtable(n: usize, mode_s: &str) {
+    let mode = parse_mode(mode_s);
+    let dump = load_dump(&data_dir().join(format!("dump-{n}")));
+    let ops = payload(dump, &mode);
+    let records = serialize(&ops);
+    const JOURNAL: TableDefinition<&[u8], &[u8]> = TableDefinition::new("journal");
+
+    let (path, _live) = match mode {
+        // edit100 records into a copy of the live store (the real design).
+        Mode::Edit100 => {
+            let vault_store = store_path(&vault_dir(n));
+            let p = work_file("jt-edit.redb");
+            fs::copy(&vault_store, &p).expect("copy live store");
+            (p, true)
+        }
+        // rebuild records into a fresh store being built.
+        _ => {
+            let p = work_file("jt-rebuild.redb");
+            empty_schema(&p);
+            (p, false)
+        }
+    };
+    let db = Database::create(&path).expect("open jt store");
+
+    // txn1: record journal entries (Immediate).
+    let t1 = Instant::now();
+    {
+        let mut txn = db.begin_write().expect("txn1");
+        let mut jt = txn.open_table(JOURNAL).expect("journal table");
+        let mut seq = 0u64;
+        let mut at = 0usize;
+        while at < records.len() {
+            let rl = record_len(&records[at..]);
+            jt.insert(seq.to_le_bytes().as_slice(), &records[at..at + rl])
+                .expect("journal insert");
+            seq += 1;
+            at += rl;
+        }
+        drop(jt);
+        let _ = txn.set_durability(Durability::Immediate);
+        txn.commit().expect("txn1 commit");
+    }
+    let t1_ms = elapsed(t1);
+
+    // txn2: apply entries to the real tables, then clear the journal (Immediate).
+    let t2 = Instant::now();
+    {
+        let mut txn = db.begin_write().expect("txn2");
+        let mut replay = Vec::with_capacity(ops.len());
+        let mut keys = Vec::with_capacity(ops.len());
+        {
+            let jt = txn.open_table(JOURNAL).expect("journal table");
+            for row in jt.iter().expect("journal iter") {
+                let (k, v) = row.expect("journal row");
+                keys.push(k.value().to_vec());
+                replay.push(parse_record(v.value()));
+            }
+        }
+        apply_ops(&txn, &replay);
+        {
+            let mut jt = txn.open_table(JOURNAL).expect("journal table");
+            for k in &keys {
+                let _ = jt.remove(k.as_slice()).expect("journal remove");
+            }
+        }
+        let _ = txn.set_durability(Durability::Immediate);
+        txn.commit().expect("txn2 commit");
+    }
+    let t2_ms = elapsed(t2);
+    drop(db);
+
+    // Baseline: apply the same payload in one Immediate txn, no journal.
+    let base = match mode {
+        Mode::Edit100 => {
+            let vault_store = store_path(&vault_dir(n));
+            let p = work_file("jt-base.redb");
+            fs::copy(&vault_store, &p).expect("copy live store");
+            let dbb = Database::create(&p).expect("open base");
+            let t = Instant::now();
+            let mut txn = dbb.begin_write().expect("base txn");
+            apply_ops(&txn, &ops);
+            let _ = txn.set_durability(Durability::Immediate);
+            txn.commit().expect("base commit");
+            let ms = elapsed(t);
+            drop(dbb);
+            ms
+        }
+        _ => {
+            let p = work_file("jt-base.redb");
+            empty_schema(&p);
+            let dbb = Database::create(&p).expect("open base");
+            let t = Instant::now();
+            let mut txn = dbb.begin_write().expect("base txn");
+            insert_ops(&txn, &ops);
+            let _ = txn.set_durability(Durability::Immediate);
+            txn.commit().expect("base commit");
+            let ms = elapsed(t);
+            drop(dbb);
+            ms
+        }
+    };
+    println!(
+        "jtable n={n} mode={mode_s} records={} journal_bytes={} txn1_ms={t1_ms:.2} txn2_ms={t2_ms:.2} both_ms={:.2} baseline_ms={base:.2}",
+        ops.len(),
+        records.len(),
+        t1_ms + t2_ms
+    );
+}
+
+fn record_len(b: &[u8]) -> usize {
+    let klen = u32::from_le_bytes([b[2], b[3], b[4], b[5]]) as usize;
+    let voff = 6 + klen;
+    let vlen = u32::from_le_bytes([b[voff], b[voff + 1], b[voff + 2], b[voff + 3]]) as usize;
+    voff + 4 + vlen
+}
+
+fn cmd_firstq(n: usize) {
+    let store = store_path(&vault_dir(n));
+
+    // Rival: open the real store and read one row (cold CLI includes drop).
+    let mut bare = Vec::new();
+    let mut with_drop = Vec::new();
+    for _ in 0..9 {
+        let t = Instant::now();
+        let db = Database::create(&store).expect("open rival");
+        let txn = db.begin_read().expect("read");
+        let notes = txn.open_table(NOTES).expect("notes");
+        let _ = notes.first().expect("first");
+        drop(notes);
+        drop(txn);
+        bare.push(elapsed(t));
+        drop(db);
+        with_drop.push(elapsed(t));
+    }
+    println!(
+        "firstq rival n={n} open+read_med={:.2} open+read+drop_med={:.2}",
+        median(bare),
+        median(with_drop)
+    );
+
+    // Journal path: fresh store, replay facts payload (Immediate), read one row.
+    let ops = payload(
+        load_dump(&data_dir().join(format!("dump-{n}"))),
+        &Mode::Facts,
+    );
+    let p = work_file("fq.redb");
+    let mut reps = Vec::new();
+    for _ in 0..3 {
+        let _ = fs::remove_file(&p);
+        empty_schema(&p);
+        let db = Database::create(&p).expect("open fq");
+        let t = Instant::now();
+        let mut txn = db.begin_write().expect("replay txn");
+        insert_ops(&txn, &ops);
+        let _ = txn.set_durability(Durability::Immediate);
+        txn.commit().expect("replay commit");
+        let commit_ms = elapsed(t);
+        let t2 = Instant::now();
+        let txn2 = db.begin_read().expect("read");
+        let notes = txn2.open_table(NOTES).expect("notes");
+        let _ = notes.first().expect("first");
+        drop(notes);
+        drop(txn2);
+        let read_ms = elapsed(t2);
+        let t3 = Instant::now();
+        drop(db);
+        reps.push((commit_ms, read_ms + elapsed(t3)));
+    }
+    let (c, d): (Vec<f64>, Vec<f64>) = reps.into_iter().unzip();
+    let med_total = median(c.iter().zip(d.iter()).map(|(a, b)| a + b).collect());
+    let med_c = median(c);
+    let med_d = median(d);
+    println!(
+        "firstq journal n={n} replay_commit_med={med_c:.2} read+drop_med={med_d:.2} total_med={med_total:.2} payload_ops={}",
+        ops.len()
+    );
+}
+
+fn cmd_life(store_arg: &str) {
+    let src = PathBuf::from(store_arg);
+    let p = work_file("life.redb");
+    fs::copy(&src, &p).expect("copy");
+    for dur in [Durability::None, Durability::Immediate, Durability::None] {
+        let mut reps = Vec::new();
+        for _ in 0..30 {
+            let t = Instant::now();
+            let db = Database::create(&p).expect("life open");
+            let mut txn = db.begin_write().expect("life txn");
+            let mut notes = txn.open_table(NOTES).expect("notes");
+            let zero = [0u8; 8];
+            notes
+                .insert(&b"probe/life-row"[..], zero.as_slice())
+                .expect("ins");
+            drop(notes);
+            let _ = txn.set_durability(dur);
+            txn.commit().expect("life commit");
+            drop(db);
+            reps.push(elapsed(t));
+        }
+        let name = if matches!(dur, Durability::Immediate) {
+            "Immediate"
+        } else {
+            "None"
+        };
+        let min = reps.iter().cloned().fold(f64::MAX, f64::min);
+        let max = reps.iter().cloned().fold(0.0, f64::max);
+        let med = median(reps);
+        println!("life dur={name} med={med:.2} min={min:.2} max={max:.2}");
+    }
+}
+
+fn cmd_repair(store_arg: &str, mode_s: &str) {
+    let src = PathBuf::from(store_arg);
+    // Baseline row count from a pristine copy.
+    let pristine = work_file("rep-pristine.redb");
+    fs::copy(&src, &pristine).expect("copy pristine");
+    let db0 = Database::create(&pristine).expect("open pristine");
+    let baseline = {
+        let txn = db0.begin_read().expect("read");
+        txn.open_table(NOTES).expect("notes").len().expect("len")
+    };
+    drop(db0);
+
+    let p = work_file("rep.redb");
+    fs::copy(&src, &p).expect("copy rep");
+    let exe = env::current_exe().expect("exe");
+    let st = Command::new(exe)
+        .args(["child", mode_s])
+        .arg(&p)
+        .status()
+        .expect("spawn child");
+    let killed = !st.success();
+
+    let mut opens = Vec::new();
+    let mut rows_ok = true;
+    // none-close/imm-noclose commit a row durably (expected baseline+1);
+    // none-noclose's commit is memory-only and must vanish on abort.
+    let expected = if mode_s == "none-noclose" {
+        baseline
+    } else {
+        baseline + 1
+    };
+    for i in 0..5 {
+        let t = Instant::now();
+        let db = Database::create(&p).expect("reopen");
+        let txn = db.begin_read().expect("read");
+        let len = txn.open_table(NOTES).expect("notes").len().expect("len");
+        if len != expected {
+            rows_ok = false;
+        }
+        drop(txn);
+        drop(db);
+        if i == 0 {
+            println!("repair first_open_ms={:.2}", elapsed(t));
+        }
+        opens.push(elapsed(t));
+    }
+    println!(
+        "repair mode={mode_s} child_failed={killed} rows_ok={rows_ok} expected={expected} warm_med={:.2}",
+        median(opens)
+    );
+}
+
+fn cmd_child(mode_s: &str, path: &str) {
+    let p = PathBuf::from(path);
+    let db = Database::create(&p).expect("child open");
+    let mut txn = db.begin_write().expect("child txn");
+    let mut notes = txn.open_table(NOTES).expect("notes");
+    let zero = [0u8; 8];
+    notes
+        .insert(&b"probe/repair-row"[..], zero.as_slice())
+        .expect("ins");
+    drop(notes);
+    match mode_s {
+        "none-close" => {
+            let _ = txn.set_durability(Durability::None);
+            txn.commit().expect("commit");
+            drop(db);
+        }
+        "none-noclose" => {
+            let _ = txn.set_durability(Durability::None);
+            txn.commit().expect("commit");
+        }
+        "imm-noclose" => {
+            let _ = txn.set_durability(Durability::Immediate);
+            txn.commit().expect("commit");
+        }
+        other => die(format!("unknown child mode {other}")),
+    }
+    std::process::abort();
+}
+
+fn cmd_kill(n: usize, k: usize) {
+    let src = vault_dir(n);
+    let dst = data_dir().join(format!("t26-vault-{n}-kill"));
+    let _ = fs::remove_dir_all(&dst);
+    copy_vault(&src, &dst);
+    let exe = env::current_exe().expect("exe");
+    let shim = "/tmp/redb-probe/shim.dylib";
+    let st = Command::new(exe)
+        .args(["buildchild", &*dst.to_string_lossy()])
+        .env("DYLD_INSERT_LIBRARIES", shim)
+        .env("KILL_AT", k.to_string())
+        .status()
+        .expect("spawn build");
+    let killed_by_shim = !st.success();
+
+    let store = store_path(&dst);
+    if !store.exists() {
+        println!(
+            "kill n={n} k={k} killed={killed_by_shim} store=absent (killed before file creation)"
+        );
+        return;
+    }
+    let mut opens = Vec::new();
+    let mut notes_len = 0u64;
+    let mut valid = true;
+    for _ in 0..3 {
+        let t = Instant::now();
+        let db = match Database::create(&store) {
+            Ok(db) => db,
+            Err(e) => {
+                println!("kill n={n} k={k} killed={killed_by_shim} store=invalid ({e})");
+                return;
+            }
+        };
+        let txn = db.begin_read().expect("read");
+        match txn.open_table(NOTES) {
+            Ok(t2) => notes_len = t2.len().expect("len"),
+            Err(_) => {
+                valid = false; // killed before any schema commit landed
+                notes_len = 0;
+            }
+        }
+        drop(txn);
+        drop(db);
+        opens.push(elapsed(t));
+    }
+    // Empty (0 notes) is the valid pre-build state; a full store is the
+    // committed state. Anything between is corruption.
+    let atomic = notes_len == 0 || notes_len == n as u64;
+    let kill_first = opens[0];
+    let kill_med = median(opens);
+    println!(
+        "kill n={n} k={k} killed={killed_by_shim} schema_present={valid} open_first={kill_first:.2} open_med={kill_med:.2} notes={notes_len} atomic_ok={atomic} store_bytes={}",
+        fs::metadata(&store).expect("store meta").len()
+    );
+}
+
+fn cmd_buildchild(vault: &str) {
+    let vault = PathBuf::from(vault);
+    let indexer = IndexerService::for_tests(&vault);
+    let index = indexer.build().expect("build");
+    indexer.persist(&index).expect("persist");
+}
+
+fn copy_vault(src: &Path, dst: &Path) {
+    fs::create_dir_all(dst).expect("mkdir dst");
+    for entry in fs::read_dir(src).expect("read src") {
+        let e = entry.expect("entry");
+        let name = e.file_name();
+        if name == ".traces" || name == "target" {
+            continue;
+        }
+        let to = dst.join(&name);
+        if e.path().is_dir() {
+            copy_vault(&e.path(), &to);
+        } else {
+            fs::copy(e.path(), to).expect("copy file");
+        }
+    }
+}
+
+fn cmd_facets(n: usize) {
+    let mut dump = load_dump(&data_dir().join(format!("dump-{n}")));
+    let notes_ops = std::mem::take(&mut dump[1]);
+    let rest: Vec<Op> = dump.into_iter().flatten().collect();
+
+    // Landed shape: single notes table.
+    let landed = work_file("fac-landed.redb");
+    empty_schema(&landed);
+    let db = Database::create(&landed).expect("open landed");
+    let t = Instant::now();
+    let mut txn = db.begin_write().expect("landed txn");
+    insert_ops(&txn, &notes_ops);
+    insert_ops(&txn, &rest);
+    let _ = txn.set_durability(Durability::Immediate);
+    txn.commit().expect("landed commit");
+    let landed_ms = elapsed(t);
+    let landed_bytes = fs::metadata(&landed).expect("landed meta").len();
+    drop(db);
+
+    // Emulated 11-facet style shape: notes rows split round-robin across 8
+    // facet tables (same total bytes, more table overhead).
+    let split = work_file("fac-split.redb");
+    let db2 = Database::create(&split).expect("open split");
+    let t2 = Instant::now();
+    let mut txn2 = db2.begin_write().expect("split txn");
+    {
+        for (i, op) in notes_ops.iter().enumerate() {
+            let def = FACET_DEFS[i % 8];
+            let mut t = txn2.open_table(def).expect("facet table");
+            t.insert(op.key.as_slice(), op.val.as_slice())
+                .expect("facet ins");
+        }
+        insert_ops(&txn2, &rest);
+    }
+    let _ = txn2.set_durability(Durability::Immediate);
+    txn2.commit().expect("split commit");
+    let split_ms = elapsed(t2);
+    let split_bytes = fs::metadata(&split).expect("split meta").len();
+    drop(db2);
+
+    println!(
+        "facets n={n} landed_ms={landed_ms:.1} landed_bytes={landed_bytes} split8_ms={split_ms:.1} split8_bytes={split_bytes} ms_ratio={:.2} bytes_ratio={:.3}",
+        split_ms / landed_ms.max(0.01),
+        split_bytes as f64 / landed_bytes.max(1) as f64
+    );
+}
+
+fn cmd_refresh(n: usize, count: usize) {
+    let src = vault_dir(n);
+    let dst = data_dir().join(format!("t26-vault-{n}-edit"));
+    let _ = fs::remove_dir_all(&dst);
+    copy_vault(&src, &dst);
+    let mut changed = Vec::new();
+    for i in 0..count {
+        let (rel, mut body) = gen_note(i, n);
+        body.push_str("\n<!-- touched for t26 -->\n");
+        let full = dst.join(&rel);
+        fs::write(&full, body).expect("rewrite note");
+        changed.push(rel);
+    }
+    // Restore the persisted store so the refresh takes the incremental path.
+    fs::create_dir_all(dst.join(".traces")).expect("mkdir traces");
+    fs::copy(
+        store_path(&src),
+        dst.join(".traces/index.redb"),
+    )
+    .expect("copy store");
+    let indexer = IndexerService::for_tests(&dst);
+    let t = Instant::now();
+    let (_index, report) = indexer.refresh_with_report().expect("refresh");
+    let ms = elapsed(t);
+    println!(
+        "refresh n={n} changed={count} refresh_ms={ms:.1} upserted={} deleted={} links_modified={}",
+        report.upserted_count(),
+        report.deleted_count(),
+        report.links_modified_count()
+    );
+}
+
+fn cmd_usage() -> ! {
+    die("usage: t26-probe <build n|rows store|journal n mode|jtable n mode|firstq n|life store|repair store mode|kill n k|facets n|child mode path|buildchild vault>".to_string())
+}
+
+fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("build") => cmd_build(args.get(1).expect("n").parse().expect("n num")),
+        Some("rows") => cmd_rows(args.get(1).expect("store")),
+        Some("journal") => cmd_journal(
+            args.get(1).expect("n").parse().expect("n num"),
+            args.get(2).map(String::as_str).expect("mode"),
+        ),
+        Some("jtable") => cmd_jtable(
+            args.get(1).expect("n").parse().expect("n num"),
+            args.get(2).map(String::as_str).expect("mode"),
+        ),
+        Some("firstq") => cmd_firstq(args.get(1).expect("n").parse().expect("n num")),
+        Some("life") => cmd_life(args.get(1).expect("store")),
+        Some("repair") => cmd_repair(args.get(1).expect("store"), args.get(2).expect("mode")),
+        Some("kill") => cmd_kill(
+            args.get(1).expect("n").parse().expect("n num"),
+            args.get(2).expect("k").parse().expect("k num"),
+        ),
+        Some("facets") => cmd_facets(args.get(1).expect("n").parse().expect("n num")),
+        Some("child") => cmd_child(args.get(1).expect("mode"), args.get(2).expect("path")),
+        Some("refresh") => cmd_refresh(
+            args.get(1).expect("n").parse().expect("n num"),
+            args.get(2).expect("count").parse().expect("count num"),
+        ),
+        Some("buildchild") => cmd_buildchild(args.get(1).expect("vault")),
+        _ => cmd_usage(),
+    }
+}
