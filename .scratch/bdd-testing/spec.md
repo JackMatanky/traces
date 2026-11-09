@@ -45,9 +45,10 @@ rstest-bdd-macros = "=0.6.0"
   `catch_unwind`. A narrower scope cannot reach the lint. The `#[expect]` fails
   the build when the lint stops appearing. Revisit it at every `rstest-bdd`
   upgrade.
-- Use bare `{name}` placeholders. Typed placeholders such as `{count:u32}` fail
-  clippy.
-- A missing step under `scenarios!` fails at run time with `Step not found`.
+- Use bare `{name}` placeholders. A typed placeholder is allowed if `step_gate`
+  accepts it. The step `the exit code is {code:i32}` is the only use.
+- A missing step under `scenarios!` fails at run time with `Step not found`. The
+  test `step_gate` fails earlier for an undefined step.
 - The step registry is global for the e2e binary. A duplicate keyword plus
   pattern panics at start.
 - State lives in plain rstest fixtures. There is no World.
@@ -153,9 +154,11 @@ Placement and layers:
   `Option<Run>`). The fixture builds the sandbox.
 - The `touch` rule sits in the doc comment of `tests/features.rs`: after you add
   a feature file, run `touch tests/features.rs`. Do not add a `build.rs`.
-  `mise run test` applies the rule. When the features binary lists a different
-  number of scenarios than the feature files declare, it touches that file,
-  rebuilds and lists again. It fails only if the counts still differ.
+  `mise run test` and the CI job `test (e2e)` both run
+  `.mise/scripts/check_scenario_count.sh`. When the features binary lists a
+  different number of scenarios than the feature files declare, the script
+  touches that file, rebuilds and lists again. It fails only if the counts still
+  differ.
 - Vocabulary: glossary terms for behavior, ordinary words for setup, never an
   internal type name. A term that ticket 12 has not resolved stays out.
 - One observable behavior per scenario, one principal `When`. Add a step only
@@ -279,6 +282,7 @@ tests the gate against fixtures and runs in `mise run verify`. A later review
 added an eighth check, the test `step_gate` in the `features` binary. It matches
 every feature step to a step definition with the parser and the matcher of
 `rstest-bdd`. It fails on an undefined, unused, duplicate or ambiguous step.
+`check:layers` also rejects the Outline and Background words.
 
 ### 6.7 Contradiction dispositions (ticket 12, decision f)
 
@@ -758,8 +762,8 @@ slice, and where it lands:
 
 ## 11. Open and unverified
 
-- Linux and Windows results for the e2e placement: unknown until the slice 1
-  draft PR runs.
+- Linux and Windows results for the e2e placement: closed. The `e2e` and
+  `features` jobs passed on ubuntu, macos and windows in draft PRs 3, 4 and 5.
 - Whether `src/config/trust.rs` passes `--fail-on-escaped` at base: unknown.
 - Mutation compare cost: more than 30 minutes per run for 20 mutants, because
   the task runs the whole suite for each mutant.
@@ -768,8 +772,8 @@ slice, and where it lands:
 - The agent policy is review-enforced. No gate can see authorship.
 - `rstest-bdd` has one maintainer and an unfixed upstream lint issue.
 - The kill demonstration is manual. The 100-run stress count is a heuristic.
-- The `audit` CI job failed on 2026-10-29 at a tool install. Its state on the
-  current head is unknown.
+- The `audit` CI job: closed. It passed on draft PRs 4 and 5 after the failure
+  of 2026-10-29.
 
 ## 12. Amendment log
 
@@ -930,3 +934,21 @@ change.
   `mutation.yml` and `fuzz.yml` run nightly, `soak.yml` and `bench.yml` run
   weekly. Each has its own `cron`, so the `github.event.schedule` filters are
   gone. The benchmark smoke job moved out of the soak job.
+- 2026-11-08: the Python step mirror is gone. The test `step_gate` in
+  `tests/features/step_gate.rs` reads the feature files with the `gherkin`
+  parser. It matches the steps with the matcher of `rstest-bdd`. The files
+  `check_steps.py`, `check_step_registry.sh` and the step baseline are deleted.
+- 2026-11-08: `.mise/scripts/check_scenario_count.sh` replaces the count function
+  of `mise run test`. CI runs it before the E2E and features run.
+- 2026-11-08: `check:layers` rejects `Scenario Outline`, `Scenario Template`,
+  `Scenarios`, `Examples`, `Example` and `Background`. This settles item 8 of
+  section 9.9 for Outlines.
+- 2026-11-08: a typed placeholder is allowed where `step_gate` accepts it. The
+  step `the exit code is {code:i32}` is the only use.
+- 2026-11-08: to change the `rstest-bdd` version, change the three `=0.6.0` pins
+  and run the features binary. `step_gate` fails if the matching changed.
+- 2026-11-08: the first runs of the scheduled workflows found two defects. Fuzz
+  found that `0004000milli` parsed as a duration. The unit list now rejects
+  every sub-second spelling. Benchmark smoke overflowed the stack in a debug
+  build. The lexers now skip whole runs, and the smoke run uses the bench
+  profile. Both fixes are on `main`. The hygiene backlog section 5 lists them.

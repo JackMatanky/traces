@@ -79,3 +79,19 @@ These infrastructure items harden the repository build and release pipeline:
 5. Add fuzzing harness for query and frontmatter parsers.
 6. Add automated release workflow.
 7. Add `cargo-hack` and `minimal-versions` checks in CI.
+
+## 5. Scheduled Workflow Findings
+
+The scheduled workflows `fuzz.yml`, `soak.yml`, `bench.yml` and `mutation.yml`
+had never run before 2026-11-08. Each item follows the die rule from spec
+section 7.
+
+1. Fixed: Benchmark smoke overflowed the stack in a debug build. The lexer
+   recursed once for each skipped match. The lexers now skip whole runs. The
+   smoke run uses the bench profile.
+2. Fixed: Fuzz found that `0004000milli` parsed as a duration. The unit list now
+   rejects every sub-second spelling.
+3. Fixed: all four scheduled workflows have now run once.
+4. Open: a debug build still overflows the stack on about 5,000 short lines in
+   one note.
+5. Open: the mutation run with `-m index` failed. The cause is not known.
