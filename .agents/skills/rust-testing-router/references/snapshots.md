@@ -1,59 +1,63 @@
-# Snapshots
+# Snapshot Testing (`insta`)
 
-> Use `insta` when correctness is visual or structural and a reviewable diff is clearer than a handwritten assertion.
+> Use `insta` for multi-line structures, tables, or diagnostics where a reviewable `.snap` diff beats inline strings.
 
-Snapshots make output changes deliberate: the approved `.snap` file is committed and reviewed with the code change.
+## 1. When to Use
 
-## When to Use
-
-| Situation | Prefer |
+| Output Shape | Prefer |
 |---|---|
-| Short, simple values | `assert_eq!` |
-| Multi-line or structured output | `assert_debug_snapshot!` |
-| JSON/YAML serialization | `assert_json_snapshot!` / `assert_yaml_snapshot!` |
-| Rendered errors or CLI output | `assert_snapshot!` |
-| Compiler-error-style output | `assert_snapshot!` |
+| Scalar value, tuple, or small struct | `pretty_assertions::assert_eq!` |
+| Multi-line CLI table, help text, or diagnostic report | `insta::assert_snapshot!` |
+| Serialized JSON or YAML payload | `insta::assert_json_snapshot!` / `assert_yaml_snapshot!` |
+| Complex nested `Debug` tree | `insta::assert_debug_snapshot!` |
 
-Do not snapshot randomness, timestamps, UUIDs, or external-resource output unless unstable fields are redacted or faked.
+Do not snapshot unredacted timestamps, random UUIDs, temporary file paths, or hash-map iteration orders.
 
-## Example
+## 2. Basic Usage
 
 ```rust
-use insta::{assert_debug_snapshot, assert_json_snapshot};
+use insta::{assert_json_snapshot, assert_snapshot};
 
 #[test]
-fn render_error_produces_expected_message() {
-    let err = AppError::NotFound { id: 42 };
-    assert_debug_snapshot!(err);
-}
+fn formats_diagnostic_report() {
+    let report = render_diagnostic("missing field `title`", 4, 12);
 
-#[test]
-fn config_serializes_to_expected_shape() {
-    assert_json_snapshot!(Config::default());
+    assert_snapshot!(report);
 }
 ```
 
-## Review Flow
+## 3. Redacting Non-Deterministic Fields
 
-1. Run tests; new or changed snapshots are written as `.snap.new`.
-2. Run `cargo insta review` and accept only intentional output changes.
-3. Commit accepted `.snap` files with the code change.
-4. In CI, use `INSTA_UPDATE=no cargo test` so unapproved snapshots fail.
-
-## Redactions
+Scrub dynamic values (timestamps, generated IDs, or sandbox paths) before snapshotting, or use `insta` redactions:
 
 ```rust
-assert_json_snapshot!(
-    "endpoints/get_user_data",
-    data,
-    { ".created_at" => "[timestamp]", ".id" => "[uuid]" }
-);
+#[test]
+fn serializes_audit_event() {
+    let event = AuditEvent::now("user_login");
+
+    assert_json_snapshot!(
+        "audit_event_login",
+        event,
+        {
+            ".timestamp" => "[timestamp]",
+            ".event_id" => "[uuid]",
+        }
+    );
+}
 ```
 
-Keep snapshots small and explicitly named when the default test name is not clear.
+## 4. Review and CI Gate Commands
 
-## Avoid
+1. Run the test suite to generate `.snap.new` files for changed outputs.
+2. Inspect and accept intentional changes interactively with `cargo insta review`.
+3. Commit accepted `.snap` files alongside the code change.
+4. Enforce snapshot freshness and reject stale `.snap` files in CI:
 
-- Snapshotting short scalar values; use `assert_eq!`.
-- Snapshotting unstable timestamps, UUIDs, random ordering, or external output without redactions/fakes.
-- Accepting `.snap.new` files without reading the diff.
+```bash
+INSTA_UPDATE=no cargo nextest run
+cargo insta test --check --unreferenced=reject
+```
+
+## Completion
+
+Completion: all dynamic fields are redacted or normalized, `.snap` files are committed, and `INSTA_UPDATE=no` passes with zero pending or unreferenced snapshots.

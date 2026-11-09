@@ -1,76 +1,95 @@
-# RAII Cleanup
+# RAII Cleanup and Hermetic Resources
 
-> Use RAII (`Drop`) when test setup must be cleaned up even if the test panics.
+> Use RAII (`Drop`) guards and isolated sandboxes so test teardown runs even when an assertion panics.
 
-## When to Use
+## 1. Why Teardown Must Use `Drop`
 
-Use a guard for temp files/directories, environment variables, server handles, database transactions, or any resource that would pollute later tests if cleanup is skipped.
+Code written after an `assert!` does not execute when the assertion panics. Wrap temporary files, child processes, background servers, and database transactions in types that clean up inside `Drop`.
 
-Do not write manual teardown after the assertion; it will not run if the assertion panics.
+## 2. Temporary Files and Directories
 
-## Temp Files
-
-Use `Drop`, `tempfile`, or `scopeguard` when cleanup must run on panic.
+Use `tempfile::TempDir` or `tempfile::NamedTempFile` for filesystem sandboxes:
 
 ```rust
 #[test]
-fn process_file_returns_ok_for_valid_input() {
-    let file = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(file.path(), "test data").unwrap();
+fn writes_index_into_workspace_directory() {
+    let workspace = tempfile::TempDir::new().expect("create temp workspace");
+    let config_path = workspace.path().join("config.toml");
+    std::fs::write(&config_path, "version = 1").expect("write config");
 
-    let result = process_file(file.path());
+    let status = initialize_index(workspace.path());
 
-    assert!(result.is_ok());
-} // file is removed even if the assertion panics
+    assert!(status.is_ok(), "expected index init to succeed, got {status:?}");
+} // workspace directory is removed here even on panic
 ```
 
-## Environment Variables
+Keep the `TempDir` binding alive for the full scope of the test. Calling `.path()` on a temporary `TempDir::new().unwrap().path()` drops the directory before the statement finishes.
 
-For global state such as environment variables, use a named guard that restores the original value in `Drop`, and run those tests single-threaded.
+## 3. Environment Variables Without `unsafe`
+
+In Rust 2024 and crates with `unsafe_code = "deny"`, `std::env::set_var` and `std::env::remove_var` are `unsafe` because mutating process-global environment variables races with other threads and C libraries. Never write an `unsafe` `EnvGuard` in test code.
+
+Use one of these three safe patterns instead:
+
+### Pattern A: Hermetic Child Process Environment (Preferred for CLI Tests)
+
+Clear the child environment and pass explicit variables on `std::process::Command`:
 
 ```rust
-struct EnvGuard {
-    key: String,
-    original: Option<String>,
-}
-
-impl EnvGuard {
-    fn set(key: &str, value: &str) -> Self {
-        let original = std::env::var(key).ok();
-        // SAFETY: environment writes are process-global; run these tests single-threaded.
-        unsafe { std::env::set_var(key, value) };
-        Self { key: key.to_string(), original }
-    }
-}
-
-impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        // SAFETY: restored under the same single-threaded test constraint.
-        match &self.original {
-            Some(value) => unsafe { std::env::set_var(&self.key, value) },
-            None => unsafe { std::env::remove_var(&self.key) },
-        }
-    }
-}
+use std::process::Command;
 
 #[test]
-fn reads_config_from_env() {
-    let _guard = EnvGuard::set("APP_MODE", "test");
-    assert_eq!(read_mode(), "test");
+fn cli_respects_custom_config_dir() {
+    let sandbox = tempfile::TempDir::new().expect("create sandbox");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_my_app"))
+        .current_dir(sandbox.path())
+        .env_clear()
+        .env("HOME", sandbox.path())
+        .env("MY_APP_CONFIG", sandbox.path().join("custom.toml"))
+        .arg("status")
+        .output()
+        .expect("spawn binary");
+
+    assert!(output.status.success());
 }
 ```
 
-## Common Guards
+### Pattern B: Dependency Injection (Preferred for Unit Tests)
 
-| Resource | Guard |
+Pass environment values as parameters or through a small lookup trait/closure instead of reading `std::env::var` deep inside domain logic:
+
+```rust
+pub fn resolve_cache_dir(get_env: impl Fn(&str) -> Option<String>) -> PathBuf {
+    get_env("MY_APP_CACHE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/tmp/default"))
+}
+```
+
+### Pattern C: Scoped `temp-env` Crate Under Process Isolation
+
+When legacy library code calls `std::env::var` directly, use `temp_env::with_var` and run with `cargo nextest` (which isolates each test in its own process):
+
+```rust
+#[test]
+fn reads_legacy_env_variable() {
+    temp_env::with_var("LEGACY_TIMEOUT_SECS", Some("30"), || {
+        assert_eq!(read_legacy_timeout(), 30);
+    });
+}
+```
+
+## 4. Common Resource Guards
+
+| Resource | Safe Pattern |
 |---|---|
-| Temp file | `tempfile::NamedTempFile` |
-| Temp directory | `tempfile::TempDir` |
-| One-off cleanup | `scopeguard::defer!` |
-| Env var | Custom `Drop` guard plus single-threaded execution |
-| Server/thread | Guard that sends shutdown in `Drop` |
-| DB transaction | Guard that rolls back in `Drop` |
+| Temporary directory | `tempfile::TempDir` held in a local variable |
+| Temporary file | `tempfile::NamedTempFile` |
+| Child process / server | Struct implementing `Drop` that calls `child.kill()` and `child.wait()` |
+| One-off rollback action | `scopeguard::defer! { ... }` |
+| Subprocess environment | `Command::env_clear()` + `.env(k, v)` |
 
 ## Completion
 
-Every fixture either builds Arrange data only or is explicitly named as a cleanup guard; hidden assertions in helpers belong in `rust-unit-testing/references/code-quality.md` findings.
+Completion: zero manual teardown lines appear after assertions, zero `unsafe` environment mutations exist, and every resource cleans up on panic.

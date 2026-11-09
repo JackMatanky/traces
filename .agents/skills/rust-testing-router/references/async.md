@@ -1,55 +1,65 @@
-# Async Testing
+# Async Testing (`tokio`)
 
-> Use `#[tokio::test]` to run async test functions; an `async fn` needs a runtime to be polled.
+> Use `#[tokio::test]` with deterministic single-threaded execution and paused virtual time for timers and intervals.
 
-## Runtime
+## 1. Required Cargo Features
+
+To use `#[tokio::test]` and `start_paused = true`, enable the `test-util`, `macros`, and `rt` features under `[dev-dependencies]`:
+
+```toml
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util", "macros", "rt"] }
+```
+
+Without `"test-util"`, `#[tokio::test(start_paused = true)]` and `tokio::time::advance` fail to compile.
+
+## 2. Deterministic Runtime and Paused Time
+
+Use the default single-threaded runtime (`flavor = "current_thread"`) unless multi-threaded task stealing is the behavior under test. Never call real `std::thread::sleep` in async tests. Pause the clock with `start_paused = true`:
 
 ```rust
-#[tokio::test]
-async fn fetch_data_returns_ok_for_valid_request() {
-    let result = fetch_data().await;
-    assert!(result.is_ok());
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn uses_single_threaded_runtime() {}
+use std::time::Duration;
 
 #[tokio::test(start_paused = true)]
-async fn advances_time_deterministically() {
-    tokio::time::advance(Duration::from_secs(60)).await;
+async fn retries_request_after_backoff_interval() {
+    let client = TestClient::flaky_once();
+
+    let task = tokio::spawn(async move { client.fetch_with_retry().await });
+    tokio::time::advance(Duration::from_secs(30)).await;
+    let response = task.await.expect("join task");
+
+    assert!(response.is_ok(), "expected retry to succeed, got {response:?}");
 }
 ```
 
-Prefer `current_thread` when real parallelism is not under test. Prefer `start_paused = true` over real sleeps for timeout or interval behavior.
+## 3. Bounding Hung Futures with `timeout`
 
-## Timeouts
-
-```rust
-use tokio::time::{timeout, Duration};
-
-#[tokio::test]
-async fn slow_operation_completes_within_five_seconds() {
-    let result = timeout(Duration::from_secs(5), slow_operation()).await;
-    assert!(result.is_ok(), "operation timed out");
-}
-```
-
-## Channels
+Wrap channel waits in `tokio::time::timeout` so a broken test fails with a clear message instead of hanging:
 
 ```rust
+use std::time::Duration;
+use tokio::time::timeout;
+
 #[tokio::test]
-async fn channel_delivers_messages_in_order() {
-    let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+async fn channel_delivers_messages_in_fifo_order() {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+    tx.send("first").await.expect("send first");
+    tx.send("second").await.expect("send second");
+    drop(tx);
 
-    tokio::spawn(async move {
-        tx.send("hello").await.unwrap();
-        tx.send("world").await.unwrap();
-    });
+    let first = timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .expect("recv timed out");
+    let second = timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .expect("recv timed out");
 
-    assert_eq!(rx.recv().await, Some("hello"));
-    assert_eq!(rx.recv().await, Some("world"));
+    assert_eq!(first, Some("first"));
+    assert_eq!(second, Some("second"));
     assert_eq!(rx.recv().await, None);
 }
 ```
 
-Use `mocks.md` for async trait seams and `raii-cleanup.md` for cleanup guards around async resources.
+## Completion
+
+Completion: async tests declare required `tokio` dev-dependencies, use `start_paused = true` instead of real sleeps, and bound channel receives with timeouts.

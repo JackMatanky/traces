@@ -1,60 +1,93 @@
-# Concurrency Testing
+# Concurrency Model Checking (`loom`)
 
-> Use `loom` for lock-free or custom synchronization code; stress tests are not proof.
+> Use `loom` to check lock-free atomics and custom synchronization across all valid C11 memory-model interleavings.
 
-## When to Use
+## 1. When to Use
 
-Reach for `loom` when hand-writing raw atomics, lock-free data structures, or custom synchronization where an `Ordering` mistake only appears under rare interleavings.
+Use `loom` for `Atomic*` operations, lock-free queues, or custom primitives where `Relaxed` vs. `Release`/`Acquire` bugs fail under rare schedules.
 
-Do not use it for ordinary logic around standard `Mutex`, `RwLock`, or channels unless you are testing a custom primitive built from them.
+Do not use `loom` for ordinary business logic protected by `std::sync::Mutex` or `RwLock`.
 
-## Pattern
+## 2. Configuring `check-cfg` in `Cargo.toml`
 
-Gate instrumented types behind `#[cfg(loom)]`; production code keeps using `std`.
+Rust 1.80+ warns on unknown `cfg(loom)` gates unless you register `loom` in `Cargo.toml`:
 
-```rust
-#[cfg(loom)]
-use loom::sync::atomic::{AtomicBool, Ordering};
-#[cfg(not(loom))]
-use std::sync::atomic::{AtomicBool, Ordering};
+```toml
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
 
-pub struct Flag(AtomicBool);
-
-impl Flag {
-    pub const fn new() -> Self {
-        Self(AtomicBool::new(false))
-    }
-
-    pub fn set(&self) {
-        self.0.store(true, Ordering::Release);
-    }
-
-    pub fn is_set(&self) -> bool {
-        self.0.load(Ordering::Acquire)
-    }
-}
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
 ```
 
+## 3. Non-Vacuous Two-Atomic Message-Passing Model
+
+A single-atomic test after `thread.join()` is vacuous because `join()` already synchronizes memory. A valid `loom` test requires at least two shared locations where one atomic synchronizes visibility of another:
+
 ```rust
 #[cfg(loom)]
+use loom::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[cfg(not(loom))]
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+pub struct Channel {
+    data: AtomicUsize,
+    ready: AtomicBool,
+}
+
+impl Channel {
+    pub fn new() -> Self {
+        Self {
+            data: AtomicUsize::new(0),
+            ready: AtomicBool::new(false),
+        }
+    }
+
+    pub fn publish(&self, value: usize) {
+        self.data.store(value, Ordering::Relaxed);
+        // Release publishes prior Relaxed writes to any Acquire reader.
+        self.ready.store(true, Ordering::Release);
+    }
+
+    pub fn try_read(&self) -> Option<usize> {
+        // Weakening Acquire or Release to Relaxed makes loom fail below.
+        if self.ready.load(Ordering::Acquire) {
+            Some(self.data.load(Ordering::Relaxed))
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(loom)]
 #[test]
-fn flag_set_visible_to_other_thread() {
+fn acquire_release_orders_payload_visibility() {
     loom::model(|| {
-        let flag = loom::sync::Arc::new(Flag::new());
-        let flag2 = loom::sync::Arc::clone(&flag);
+        let chan = loom::sync::Arc::new(Channel::new());
+        let writer = loom::sync::Arc::clone(&chan);
 
-        let writer = loom::thread::spawn(move || flag2.set());
-        writer.join().unwrap();
+        let handle = loom::thread::spawn(move || {
+            writer.publish(42);
+        });
 
-        assert!(flag.is_set(), "flag must be set after join");
+        if let Some(val) = chan.try_read() {
+            assert_eq!(val, 42, "observed ready=true before data=42");
+        }
+
+        handle.join().expect("join writer");
+        assert_eq!(chan.try_read(), Some(42));
     });
 }
 ```
 
-Run it with:
+## 4. Running `loom`
+
+Keep thread counts (2 to 3 threads) and loop bounds small inside `loom::model` so state-space exploration finishes quickly:
 
 ```bash
-RUSTFLAGS="--cfg loom" cargo test --test loom_flag
+RUSTFLAGS="--cfg loom" cargo nextest run --lib acquire_release_orders_payload_visibility
 ```
 
-Keep loom closures small; interleavings grow combinatorially. `loom` checks the C11 memory model, not unrelated business logic.
+## Completion
+
+Completion: `cfg(loom)` is registered in `check-cfg`, the model fails when `Ordering` is weakened to `Relaxed`, and `RUSTFLAGS="--cfg loom"` passes.

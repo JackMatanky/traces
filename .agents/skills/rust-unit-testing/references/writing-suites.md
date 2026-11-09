@@ -1,81 +1,78 @@
-# Writing Unit Suites for Existing Code
+# Writing Unit Test Suites
 
-> Derive unit suite cases from the code's actual branch surface, not from guessing at "edge cases."
+> Obey this 6-step procedure to design a complete, non-redundant unit test suite for a Rust function, type, or module.
 
-## When to Use
+## Step 1: Audit Against the 8-Category Case-Surface Checklist
 
-You've been asked to write a unit suite for a function, struct, or module that already exists (or that you just wrote). Follow this end to end rather than writing tests ad hoc — ad hoc testing reliably misses error variants and boundaries that a mechanical pass over the code catches for free.
+Inspect the signature, types, and invariants of the target unit. Check which of these eight categories apply before writing test code:
 
-## Step 1: Pin Down the Contract
+1. **Happy path:** Representative valid input produces the documented return value or state change.
+2. **Boundary and adjacent values:** Minimum, maximum, `N - 1`, `N`, `N + 1`, `0`, `1`, `usize::MAX`, or numeric overflow edges.
+3. **Empty, zero, and singleton collections:** `""`, `&[]`, `None`, single-element slices, and multi-byte UTF-8 boundaries.
+4. **Invalid and malformed input:** Unclosed delimiters, invalid tokens, out-of-range parameters, or bad UTF-8 sequences.
+5. **Reachable `Err` variants:** Every documented `Err(Variant)` in the return type is triggered and matched structurally.
+6. **State transitions and ordering:** Valid sequences (`init -> active -> closed`), rejected out-of-order calls, and double-close behavior.
+7. **Idempotency and round-trip laws:** Applying normalization twice yields the same result, and `parse(format(x)) == Ok(x)`.
+8. **Resource and recursion depth limits:** Deeply nested inputs, capacity bounds, and timeout or cancellation paths.
 
-Read the implementation, not just the signature. For each public item under test, write down (mentally or literally, for anything non-trivial):
+## Step 2: Place the Test Module
 
-- What does "correct" mean here? What invariant is this code responsible for upholding?
-- What does the caller own vs. what does this function own?
-- Is failure expected (`Result`/`Option`) or a bug (`panic!`/`assert!`/`unwrap`/`expect`)?
+Put unit tests in `#[cfg(test)] mod tests` at the bottom of `src/foo.rs`, or in `src/foo/tests.rs` above ~200 lines:
 
-If you can't state the contract in a sentence, you don't understand the code well enough yet to test it well — go read its callers, or the type it belongs to, until you can.
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
 
-**Completion criterion:** you can state, in one sentence per public item, what it promises to do and what it promises never to do.
+    #[test]
+    fn parses_valid_port() {
+        let port = parse_port("8080");
 
-## Step 2: Enumerate the Case Surface Mechanically
-
-Walk the implementation and pull out every one of these as a candidate test case. This is a checklist, not a suggestion list — go through all six categories for every function under test, even the ones that seem obviously not applicable, and note "n/a" rather than skipping silently.
-
-| Source in the code | What it produces |
-|---|---|
-| Every `return Err(...)` / `?`-propagated error site | One case per distinct error variant reachable from this function |
-| Every `match`/`if let` arm on an enum parameter or field | One case per arm |
-| Every `Option::None` return path | One case for the "not found"/"absent" state |
-| Every `panic!`/`assert!`/`unwrap`/`expect` in the implementation | Either a `#[should_panic]` case (if the panic is deliberate API contract — see [`../../rust-testing-router/references/assertions.md`](../../rust-testing-router/references/assertions.md#panic-contracts)) or a flag that this should return `Result` instead |
-| Numeric parameters | `0`, negative (if signed), the type's `MIN`/`MAX`, one past a documented bound, and the value that triggers overflow/underflow if arithmetic is involved |
-| Collection/string parameters | empty, single element, the documented capacity/length boundary, and — for strings — unicode/multi-byte characters if the function does any byte-level indexing |
-| State machines / stateful types | every valid transition, and at least one attempted invalid transition |
-
-Build this as a literal list before writing any test code:
-
-```
-get_user(id: u64) -> Result<User, UserError>
-  - Ok: user exists                              -> returns_user_when_found
-  - Err(UserError::NotFound): id has no user      -> returns_not_found_when_missing
-  - Err(UserError::DbError(_)): repo call fails    -> returns_db_error_when_repo_fails
-  - id == 0 (boundary, no documented meaning)      -> n/a, 0 is a valid id here
+        assert_eq!(port, Ok(8080));
+    }
+}
 ```
 
-**Completion criterion:** every row in the table above is either mapped to at least one planned case, or explicitly marked `n/a` with a one-line reason. An empty or skipped row is the single most common way a unit suite quietly ships with a coverage hole.
+## Step 3: Structure Each Test (Arrange, Act, Assert)
 
-## Step 3: Group Cases into Units of Work
+Separate the three phases with a single blank line. Do not write `// Arrange`, `// Act`, or `// Assert` comments:
 
-Cluster the cases from Step 2 by the function/behavior they belong to, and name each group using the canonical module names in [`naming.md`](naming.md) (`constructor`, `validation`, `lookup`, `parse`, etc.). This becomes your `#[cfg(test)] mod tests { mod <group> { ... } }` structure — see [`../SKILL.md`](../SKILL.md#unit-suite-basics) for the shape.
+- **Arrange:** Construct only the state relevant to this test case. Use the builder pattern or `#[fixture]` functions so irrelevant fields stay out of sight.
+- **Act:** Call the single method or function under test and bind its return value (`let actual = ...;`).
+- **Assert:** Assert on `actual` using [`../../rust-testing-router/references/assertions.md`](../../rust-testing-router/references/assertions.md).
 
-## Step 4: Pick a Test Type per Case
+## Step 4: Choose Parameterized, Property, or Fuzz Techniques
 
-For each case, decide what kind of test it is using the router's boundary guidance in [`../../rust-testing-router/references/boundaries.md`](../../rust-testing-router/references/boundaries.md):
+Do not copy-paste five near-identical test functions when one data-driven or generative test is clearer:
 
-- Plain `#[test]` — the default for a single case with a fixed input/output.
-- Several cases differing only in input/output literals → collapse into one table-driven block using [`../../rust-testing-router/references/table-driven.md`](../../rust-testing-router/references/table-driven.md) instead of writing them out one by one.
-- A property that should hold across a *class* of inputs (roundtrip, idempotence, invariant) rather than fixed examples → [`proptest`](../../rust-testing-router/references/property-based.md), in addition to, not instead of, the concrete boundary cases from Step 2.
-- The case requires a DB/HTTP/filesystem dependency → extract a trait, inject a fake/mock — see [`../../rust-testing-router/references/mocks.md`](../../rust-testing-router/references/mocks.md).
-- The case involves `async fn` → [`../../rust-testing-router/references/async.md`](../../rust-testing-router/references/async.md).
-- The case's expected output is large/structured (rendered error, JSON) → [`../../rust-testing-router/references/snapshots.md`](../../rust-testing-router/references/snapshots.md) instead of a hand-written `assert_eq!`.
+- Discrete input/output rows (3+ cases) -> use `#[rstest]` with `#[case]` in [`../../rust-testing-router/references/table-driven.md`](../../rust-testing-router/references/table-driven.md).
+- Shared setup with per-test overrides -> use `#[fixture]` in [`../../rust-testing-router/references/rstest-fixtures.md`](../../rust-testing-router/references/rstest-fixtures.md).
+- Universal algebraic invariants across arbitrary valid inputs -> use `proptest` in [`../../rust-testing-router/references/property-based.md`](../../rust-testing-router/references/property-based.md).
+- Untrusted byte streams or deep parser nesting -> use `cargo-fuzz` in [`../../rust-testing-router/references/fuzzing.md`](../../rust-testing-router/references/fuzzing.md).
 
-## Step 5: Write Each Test
+## Step 5: Isolate External Collaborators
 
-- Name it with the formula in [`naming.md`](naming.md).
-- Structure it Arrange/Act/Assert per [`../SKILL.md`](../SKILL.md#unit-suite-basics) — `unwrap`/`expect` only in Arrange.
-- Assert with `pretty_assertions::assert_eq!`/`matches!` per [`../../rust-testing-router/references/assertions.md`](../../rust-testing-router/references/assertions.md), with a message that states what was expected and why.
-- If the case needs setup that must clean up even on panic, use an RAII guard — [`../../rust-testing-router/references/raii-cleanup.md`](../../rust-testing-router/references/raii-cleanup.md).
+If the unit under test talks to a clock, network, or disk:
 
-## Step 6: Verify
+- Inject a narrow trait and use a hand-written fake from [`../../rust-testing-router/references/mocks.md`](../../rust-testing-router/references/mocks.md).
+- Use the `tempfile::TempDir` guard from [`../../rust-testing-router/references/raii-cleanup.md`](../../rust-testing-router/references/raii-cleanup.md) for local file operations.
 
-- Every row from Step 2's table now has a test with a name you can point to. If any row is still unmapped, go back to Step 4 — don't ship a suite with a known, silently-dropped case.
-- Run `cargo nextest run` (and `cargo test --doc` if you touched doc examples) — see [`../../rust-testing-router/references/commands.md`](../../rust-testing-router/references/commands.md).
-- Re-read the suite once as a reviewer would — see [`review.md`](review.md) — before calling it done. Writing and reviewing are different mental modes; do both even when you're the only one who touched the file.
+## Step 6: Confirm Discovery and Red-First Failure
 
-**Completion criterion for the whole suite:** the Step 2 table has zero unmapped, non-`n/a` rows, every test name follows the naming formula, and `cargo nextest run` is green.
+1. List the library test targets to confirm the new tests are compiled and discovered:
 
-## See Also
+   ```bash
+   cargo nextest list -E 'kind(lib)'
+   ```
 
-- [`review.md`](review.md) — the same case-enumeration method, applied to an existing suite to find gaps
-- [`../SKILL.md`](../SKILL.md#unit-suite-basics) — suite shape and Arrange/Act/Assert detail
-- [`naming.md`](naming.md) — the naming formula and canonical module names
+2. Check that each new test fails when the production branch or invariant it guards is inverted (red-first proof).
+3. Run the unit suite with `--no-tests=fail`:
+
+   ```bash
+   cargo nextest run --lib --no-tests=fail
+   ```
+
+## Completion
+
+Completion: all applicable categories from the 8-Category Case-Surface Checklist are covered, tests are listed in `cargo nextest list -E 'kind(lib)'`, and the suite passes with `--no-tests=fail`.

@@ -1,79 +1,92 @@
-# Mocks
+# Fakes, Trait Seams, and Mocks
 
-> Prefer a small fake behind a trait; use `mockall` when expectations matter.
+> Lead with hand-written fakes behind small traits. Use `mockall` only when call-order or call-count expectations are the contract.
 
-## Trait Boundary
+## 1. Trait Seams (Native `async fn` in Traits)
 
-Put external dependencies behind traits so tests can inject fakes for databases, HTTP APIs, filesystems, clocks, and failure modes that are hard to trigger against the real dependency.
+Put external systems (databases, HTTP clients, clocks, filesystems) behind narrow domain traits so unit tests can inject deterministic in-memory fakes.
 
-Do not mock pure deterministic functions. Do not mock the real dependency when the integration itself is what needs testing.
-
-Concrete dependencies make error paths, timeouts, and edge cases hard to cover without slow or flaky external systems.
+Starting in Rust 1.75+, native `async fn` in traits works without the `#[async_trait]` macro for static dispatch (`impl Trait` or generics):
 
 ```rust
-trait UserRepository {
-    fn find_by_id(&self, id: u64) -> Result<Option<User>, DbError>;
+pub trait UserStore {
+    async fn fetch_user(&self, id: u64) -> Result<Option<User>, StoreError>;
+    async fn save_user(&mut self, user: User) -> Result<(), StoreError>;
 }
 
-struct UserService<R: UserRepository> {
-    repo: R,
+pub struct AccountService<S: UserStore> {
+    store: S,
 }
 ```
 
-Use `Box<dyn Trait>` when generics would leak too far through the API.
+Do not mock pure functions or value types. Do not mock the boundary under test in an integration suite (`tests/`).
 
-For async dependencies, the trait usually needs `Send + Sync`, and projects commonly use `async_trait` if native async traits are not enough for the chosen mock approach.
+## 2. Hand-Written Fakes (Primary Pattern)
 
-## Hand-Written Fakes
-
-For simple behavior, a fake is clearer than a mocking framework.
+A small struct with an in-memory `HashMap` or `Vec` is clearer, faster to compile, and less brittle than macro-generated mocks:
 
 ```rust
-struct FakeUserRepo {
+use std::collections::HashMap;
+
+#[derive(Default)]
+struct FakeUserStore {
     users: HashMap<u64, User>,
+    fail_next: bool,
 }
 
-impl UserRepository for FakeUserRepo {
-    fn find_by_id(&self, id: u64) -> Result<Option<User>, DbError> {
+impl UserStore for FakeUserStore {
+    async fn fetch_user(&self, id: u64) -> Result<Option<User>, StoreError> {
+        if self.fail_next {
+            return Err(StoreError::Unavailable);
+        }
         Ok(self.users.get(&id).cloned())
+    }
+
+    async fn save_user(&mut self, user: User) -> Result<(), StoreError> {
+        if self.fail_next {
+            return Err(StoreError::Unavailable);
+        }
+        self.users.insert(user.id, user);
+        Ok(())
     }
 }
 ```
 
-## `mockall`
+## 3. `mockall` (Optional Secondary Pattern)
 
-Use `mockall` for call counts, ordered calls, argument matching, many trait methods, or generated async trait mocks.
+Use `mockall` only when the interaction protocol (call count, call order, or one method of a wide trait) is tested:
 
 ```rust
 use mockall::automock;
 
 #[automock]
-trait Database {
-    fn get_user(&self, id: u64) -> Option<User>;
+trait Notifier {
+    fn send_alert(&self, message: &str) -> Result<(), NotifyError>;
 }
 
 #[test]
-fn find_user_returns_name_from_repo() {
-    let mut mock = MockDatabase::new();
-    mock.expect_get_user()
-        .with(mockall::predicate::eq(42))
+fn sends_single_alert_when_threshold_is_exceeded() {
+    let mut mock = MockNotifier::new();
+    mock.expect_send_alert()
+        .with(mockall::predicate::eq("CPU > 90%"))
         .times(1)
-        .returning(|_| Some(User { id: 42, name: "Alice".into() }));
+        .returning(|_| Ok(()));
 
-    assert_eq!(UserService::new(mock).find_user(42).unwrap().name, "Alice");
+    let status = monitor_cpu(95, &mock);
+
+    assert!(status.is_ok());
 }
 ```
 
-Expectations are verified when the mock drops.
-
-Useful expectation tools: `.times(...)` for call counts, `.with(...)` or `.withf(...)` for argument predicates, `Sequence` for ordered calls, and `.returning(...)` for input-dependent values.
-
-## Choice
+## 4. Choosing Between Fakes and `mockall`
 
 | Situation | Prefer |
 |---|---|
-| One or two methods, simple return values | Hand-written fake |
-| Call count or sequence matters | `mockall` |
-| Many trait methods, only some used per test | `mockall` |
-| One forced error path | Fake or `mockall`, whichever is shorter |
-| Async trait with expectations | `mockall` plus the project's async-trait pattern |
+| State-based verification or forced error return | Hand-written fake |
+| Native `async fn` trait with static dispatch | Hand-written fake |
+| Exact call count (`.times(1)`) or `Sequence` ordering | `mockall` |
+| Wide trait where a test exercises only one method | `mockall` |
+
+## Completion
+
+Completion: external collaborators sit behind narrow traits, state-based tests use hand-written fakes without `#[async_trait]`, and `mockall` is reserved for interaction contracts.

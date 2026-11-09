@@ -1,220 +1,142 @@
-# Criterion
+# Criterion Benchmarking Guide
 
-> Use `criterion` for benchmarking. It provides warmup, multiple iterations,
-  outlier detection, and statistical comparison between runs that a bare
-  `Instant::now()` timer can't.
+> Use `criterion` to measure warm, statistically rigorous latency and throughput distributions in release builds.
 
-## When to Use
+## 1. `Cargo.toml` Configuration (`harness = false`)
 
-Benchmark after you have a correctness-verified implementation and a specific
-reason to measure: a suspected hot path, a decision between two implementations,
-or tracking a regression. Profile first to find where time actually goes, then
-benchmark the specific thing you're optimizing. Benchmark representative inputs,
-not toy values that fit only the example.
-
-## Setup
+Disable the default `libtest` harness on every Criterion target. Set `bench = false` on `[lib]` and `[[bin]]` targets so `cargo bench` accepts Criterion flags:
 
 ```toml
+[lib]
+bench = false
+
+[[bin]]
+name = "my_app"
+bench = false
+
 [dev-dependencies]
 criterion = "0.8"
 
 [[bench]]
-name = "my_benchmark"
+name = "parser_bench"
 harness = false
 ```
 
-## Basic Benchmark
+## 2. Protecting Inputs and Outputs with `std::hint::black_box`
+
+Import `black_box` from `std::hint::black_box` (the `criterion::black_box` path is a legacy alias). Wrap constant inputs so the compiler cannot fold them at compile time, and return or wrap outputs so dead-code elimination cannot delete the work:
 
 ```rust
-// benches/my_benchmark.rs
 use std::hint::black_box;
-
 use criterion::{criterion_group, criterion_main, Criterion};
 
-fn fibonacci(n: u64) -> u64 {
-    match n {
-        0 => 0,
-        1 => 1,
-        n => fibonacci(n - 1) + fibonacci(n - 2),
-    }
+fn bench_parse_header(c: &mut Criterion) {
+    let raw = "id: 42\ntitle: Benchmark\n";
+    c.bench_function("parse_header", |b| {
+        b.iter(|| parse_header(black_box(raw)))
+    });
 }
 
-fn bench_fibonacci(c: &mut Criterion) {
-    c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
-}
-
-criterion_group!(benches, bench_fibonacci);
+criterion_group!(benches, bench_parse_header);
 criterion_main!(benches);
 ```
 
-## black_box Is Not Optional
+When using `group.bench_with_input(id, &input, |b, input| ...)`, Criterion passes the `input` parameter through `black_box` automatically.
 
-Without it, the compiler may prove the result is unused and eliminate the whole
-computation — benchmarking nothing. Since criterion 0.6 it always delegates to
-`std::hint::black_box`; the old `criterion::black_box` path is a compatibility
-alias, so import from `std::hint`:
+## 3. Selecting the Timing Loop and `BatchSize`
+
+Choose the loop method that matches ownership and teardown cost:
+
+- `b.iter(|| ...)` - default loop when the routine borrows its input (`&T`) and returns a small value.
+- `b.iter_batched(setup, routine, batch_size)` - runs `setup` untimed before each batch, passes owned input to `routine`, and drops outputs outside the timer.
+- `b.iter_batched_ref(setup, routine, batch_size)` - passes `&mut T` to `routine` when `routine` mutates the input in place and drops it untimed.
+- `b.iter_with_large_drop(|| ...)` - defers dropping large return values until after timing finishes.
 
 ```rust
 use std::hint::black_box;
+use criterion::{BatchSize, Criterion};
 
-// Bad: result unused, may be eliminated entirely by the optimizer
-b.iter(|| fibonacci(20));
-
-// Good: black_box on input blocks constant folding, on output blocks dead-code elimination
-b.iter(|| black_box(fibonacci(black_box(20))));
-```
-
-`bench_with_input` passes its input through `black_box` for you, so benchmarks
-that get their input from the closure parameter need no extra wrapping.
-
-If benchmark output changes unexpectedly, first check whether the benchmark
-measures real work: result used, setup excluded, inputs representative, no async
-runtime or I/O noise accidentally included.
-
-## Timing Loops
-
-Pick the loop by what the routine needs (criterion's own decision table for
-`Bencher`):
-
-- `iter` — default; near-zero measurement overhead.
-- `iter_batched` / `iter_batched_ref` — per-iteration setup that must stay
-  untimed. Use `iter_batched_ref` when the setup value implements `Drop` and its
-  drop must not be timed.
-- `iter_with_large_drop` — no per-iteration setup, but the return value has an
-  expensive `drop`.
-- `iter_custom` — you drive iteration and timing yourself (e.g. delegating to
-  another process).
-
-```rust
-use criterion::{BatchSize, black_box};
-
-b.iter_batched(
-    || build_input(),                  // untimed setup
-    |input| expensive(black_box(&input)),
-    BatchSize::SmallInput,             // default choice; ~500ps overhead
-);
-```
-
-`BatchSize::SmallInput` fits almost everything. `LargeInput` trades measurement
-overhead (~750ps) for memory; `PerIteration` costs ~350ns of overhead per
-measurement and is for inputs too large or too resource-bound to hold many in
-memory.
-
-## Comparing Implementations
-
-```rust
-fn bench_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("String concat");
-    let data = "hello";
-
-    group.bench_function(
-        "format!",
-        |b| b.iter(|| format!("{}{}", black_box(data), " world")),
-    );
-    group.bench_function("push_str", |b| {
-        b.iter(|| {
-            let mut s = String::from(black_box(data));
-            s.push_str(" world");
-            s
-        })
+fn bench_in_place_sort(c: &mut Criterion) {
+    let template: Vec<u64> = (0..10_000).rev().collect();
+    c.bench_function("sort_10k_u64", |b| {
+        b.iter_batched(
+            || template.clone(),
+            |mut data| {
+                data.sort_unstable();
+                black_box(data)
+            },
+            BatchSize::SmallInput,
+        );
     });
-    group.bench_function("concat", |b| b.iter(|| [black_box(data), " world"].concat()));
-
-    group.finish();
 }
 ```
 
-## Parameterized Benchmarks
+Choose `BatchSize` by memory footprint and clone/drop semantics:
+
+| Variant | Semantics | Use When |
+|---|---|---|
+| `BatchSize::SmallInput` | Pre-allocates many inputs per batch | Input is small enough that thousands of copies fit in cache/RAM |
+| `BatchSize::LargeInput` | Allocates fewer inputs per batch | Input holds kilobytes or megabytes (for example, a large AST or buffer) |
+| `BatchSize::PerIteration` | Runs setup and drop before/after every single iteration | Input holds scarce OS resources (temp dirs, file descriptors, sockets) |
+
+## 4. Parameterized Groups and `Throughput`
+
+Measure scaling across input sizes with `BenchmarkId` and `Throughput`:
 
 ```rust
-use criterion::BenchmarkId;
+use std::hint::black_box;
+use criterion::{BenchmarkId, Criterion, Throughput};
 
-fn bench_vec_push(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Vec::push");
+fn bench_scanner_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("scanner_scaling");
 
-    for size in [100, 1000, 10000] {
-        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
-            b.iter(|| {
-                let mut v = Vec::new();
-                for i in 0..size {
-                    v.push(black_box(i));
-                }
-                v
-            });
-        });
+    for count in [100usize, 1_000, 10_000] {
+        let payload = "line_item=42\n".repeat(count);
+        group.throughput(Throughput::Bytes(payload.len() as u64));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(count),
+            &payload,
+            |b, input| b.iter(|| scan_lines(black_box(input))),
+        );
     }
 
     group.finish();
 }
 ```
 
-## Throughput Measurement
+## 5. Benchmark Contract Doc Comments
 
-When one iteration processes a known amount of data, set `Throughput` so
-criterion reports bytes/elements per second alongside time:
-
-```rust
-use criterion::Throughput;
-
-fn bench_parse(c: &mut Criterion) {
-    let input = "a long string to parse...";
-    let mut group = c.benchmark_group("Parser");
-    group.throughput(Throughput::Bytes(input.len() as u64));
-
-    group.bench_function("parse", |b| b.iter(|| parse(black_box(input))));
-
-    group.finish();
-}
-```
-
-Variants: `Bytes`, `Elements`, `Bits`, `BytesDecimal` (decimal KB/MB units), `ElementsAndBytes`.
-
-## Tuning and Interpreting
-
-Per-group (or on the `Criterion` builder): `sample_size`, `warm_up_time`,
-`measurement_time`, `noise_threshold`, `confidence_level`. Raise
-`measurement_time` or `sample_size` when the confidence interval is too wide
-to answer the question; leave defaults otherwise.
-
-Criterion compares each run against the previous run (or `--baseline`) and
-labels the change: improved, regressed, no change detected, or change within
-noise threshold. Trust the label only when the result reproduces across runs
-on a quiet machine (no concurrent builds or heavy I/O); a single sample full
-of outliers is a measurement problem, not a regression signal.
-
-## Async
+Document every benchmark function so readers know what regression signature to look for:
 
 ```rust
-// Cargo.toml: criterion = { version = "0.8", features = ["async_tokio"] }
-b.to_async(tokio::runtime::Runtime::new().unwrap())
-    .iter(|| async { client.request(black_box(&payload)).await });
+/// Measures line-scanner throughput across payload line counts.
+///
+/// Parameters: varies line count (100, 1k, 10k); reports bytes/sec.
+/// Fixture: pre-allocated UTF-8 buffer; string allocation excluded from timing.
+///
+/// Expected outcomes:
+/// - Linear O(n) scaling with stable bytes/sec throughput across sizes.
+///
+/// Unexpected outcomes:
+/// - Quadratic time growth, indicating repeated buffer re-scans.
 ```
 
-Build the runtime outside the loop; a `tokio::runtime::Handle` works too (0.6+).
-`smol`/`async-std` have their own feature flags.
+## 6. Smoke Testing, Baselines, and Comparison Tools
 
-## Profiling
+1. **Smoke test in `bench` profile:** Run a single unmeasured pass of all benchmarks to check for panics. Pass `--profile bench` when benchmarks construct deep ASTs or large inputs that overflow debug stacks:
 
-```bash
-# attach perf/other profiler; no statistics
-cargo bench -- --profile-time 5 --bench my_benchmark fib
-```
+   ```bash
+   cargo test --profile bench --benches
+   ```
 
-## Running
+2. **Serial execution:** Never run benchmarks in parallel with other builds or tests. Avoid setting `RUSTFLAGS="-C target-cpu=native"` unless requested.
+3. **Baselines and `critcmp`:** Save a baseline before optimizing, compare after with `critcmp`, or use `iai-callgrind` in noisy CI:
 
-```bash
-cargo bench                              # all benchmarks
-cargo bench -- fib                       # filter by name
-cargo bench -- --save-baseline main      # save a baseline for comparison
-cargo bench -- --baseline main           # compare against a saved baseline
-cargo bench -- --quick                   # fewer samples, faster feedback
-```
+   ```bash
+   cargo bench --bench parser_bench -- --save-baseline before
+   cargo bench --bench parser_bench -- --baseline before
+   ```
 
-## See Also
+## Completion
 
-Optional enrichment; this skill's workflow does not depend on it. Where the
-`rust-skills` collection is installed: `perf-profile-first` and
-`anti-premature-optimize` expand on profiling before benchmarking, and
-`perf-black-box-bench` on black_box mechanics. Where `rust-testing-router` is
-installed, its `references/concurrency.md` covers verifying concurrent code
-with `loom` before benchmarking it.
+Completion: benchmarks use `std::hint::black_box`, isolate setup with `BatchSize`, pass `cargo test --profile bench --benches`, and report a Markdown table.

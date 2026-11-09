@@ -1,67 +1,55 @@
 ---
 name: rust-unit-testing
-description: >
-  Use when writing, reviewing, or refactoring Rust unit suites: #[cfg(test)],
-  #[test], source-derived coverage gaps, doctests, lint suppression review,
-  and unit suite code-quality review.
-license: MIT
+description: Rust unit tests (#[cfg(test)], #[test]) and rustdoc doctests. Use when writing, reviewing, or refactoring in-crate unit suites.
 metadata:
-  version: "1.0.0"
-  companion_to: rust-testing-router
+  version: "1.1.0"
+  companion_to: "rust-testing-router"
 ---
 
 # Rust Unit Testing
 
-Unit work starts from source understanding, not from guessed edge cases.
+Unit tests in `#[cfg(test)] mod tests` check module invariants, edge cases, and error branches. Rustdoc doctests check that public API examples compile and run.
 
-## Choose Workflow
+## Precedence Rule
 
-| Task | Use |
-|---|---|
-| Write a new unit suite | `references/writing-suites.md` |
-| Review/refactor an existing unit suite | `references/review.md` |
-| Maintain doctests | `references/doctests.md` |
-| Review suite code clarity or lint suppressions | `references/code-quality.md` |
+Project conventions, `AGENTS.md`, and local specifications take precedence over default naming and layout rules in this skill.
 
-## Unit Suite Basics
+## Core Principles
 
-Put unit tests in `#[cfg(test)] mod tests { ... }` next to the implementation so private items are reachable and the suite moves with the code during refactors.
+1. **Test behavior, not implementation:** Assert observable return values and state transitions rather than private helper call order.
+2. **Separate Arrange, Act, and Assert with blank lines:** Do not add `// Arrange`, `// Act`, or `// Assert` banner comments.
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[test]
+fn withdrawal_reduces_balance() {
+    let mut account = Account::with_balance(100);
 
-    #[test]
-    fn returns_error_when_name_is_empty() {
-        // Arrange
-        let name = "";
+    let receipt = account.withdraw(40).expect("withdraw 40 from 100");
 
-        // Act
-        let result = User::new(name);
-
-        // Assert
-        assert!(matches!(result, Err(UserError::EmptyName)));
-    }
+    assert_eq!(receipt.remaining, 60);
+    assert_eq!(account.balance(), 60);
 }
 ```
 
-Rules:
-- Test the behavior contract and local invariants, not implementation line-by-line.
-- Keep Arrange, Act, Assert visually separate.
-- `unwrap()`/`expect()` is acceptable in Arrange; in Act/Assert, capture the result and assert explicitly.
-- Prefer Arrange helpers that build data; avoid hidden assertions in helpers.
-- Use fresh per-test fixtures; avoid shared mutable state, uncontrolled time, and randomness.
-- Keep unit tests local, deterministic, and fast. Use integration tests for cross-boundary workflows.
+3. **Unwrap and expect policy:** Never use `.unwrap()` in production code. Inside test Arrange/Act setup, prefer `.expect("descriptive setup reason")` or `?` propagation. For the value under test in the Assert phase, assert on `Ok(...)` or `Err(...)` directly instead of calling `.unwrap()`.
+4. **Keep test code at production quality:** Use `#[expect(lint, reason = "...")]` for lint suppression. Never use bare `allow` attributes.
 
-For non-trivial units, enumerate happy paths, boundary conditions, failure paths, invariants, and state transitions before writing tests. Use submodules per behavior group when a file has multiple meaningful units.
+## 4-Step Workflow
 
-## Shared References
+1. Map the target function or type against the 8-Category Case-Surface Checklist in [`references/writing-suites.md`](references/writing-suites.md).
+   Completion: every applicable category is mapped to a planned test case.
+2. Name and structure each test using [`references/naming.md`](references/naming.md) and [`references/code-quality.md`](references/code-quality.md).
+   Completion: test names state behavior and condition, and phases are separated by blank lines.
+3. Add or update executable `/// # Examples` doctests on public items using [`references/doctests.md`](references/doctests.md).
+   Completion: `cargo test --doc` compiles and passes with zero `.unwrap()` calls in visible example code.
+4. Check the test discovery, red-first failure, and empirical quality using [`references/review.md`](references/review.md).
+   Completion: new tests appear in `cargo nextest list -E 'kind(lib)'`, fail when the implementation breaks, and pass clean.
 
-Use `../rust-testing-router/references/assertions.md`, `../rust-testing-router/references/raii-cleanup.md`, `../rust-testing-router/references/table-driven.md`, `../rust-testing-router/references/property-based.md`, `../rust-testing-router/references/mocks.md`, `../rust-testing-router/references/snapshots.md`, `../rust-testing-router/references/async.md`, `../rust-testing-router/references/concurrency.md`, and `../rust-testing-router/references/commands.md` when a workflow reaches that branch.
+## Reference Guide
 
-## Completion
-
-- New suite: every non-`n/a` case-surface row maps to a named test.
-- Review: output includes a gap list, a per-test audit, a code-quality finding list, and a lint suppression inventory, each explicitly empty if no findings.
-- Doctest work: every changed public example is run with `cargo test --doc`, marked `no_run`/`compile_fail`/`ignore-*` with reason, or explicitly out of scope.
+- [`references/writing-suites.md`](references/writing-suites.md) - 8-Category Case-Surface Checklist and suite authoring workflow.
+- [`references/review.md`](references/review.md) - 7-step review checklist, anti-pattern catalog, and coverage/mutation audit.
+- [`references/naming.md`](references/naming.md) - naming patterns (`<unit>_<scenario>_<outcome>`) and module grouping.
+- [`references/code-quality.md`](references/code-quality.md) - lint hygiene, helper extraction, and test readability.
+- [`references/doctests.md`](references/doctests.md) - writing rustdoc examples with `#` hidden lines and `?` error handling.
+- [`../rust-testing-router/SKILL.md`](../rust-testing-router/SKILL.md) - shared references for assertions, `rstest` tables and fixtures, `proptest`, fuzzing, fakes, snapshots, async, concurrency, coverage, and mutation testing.

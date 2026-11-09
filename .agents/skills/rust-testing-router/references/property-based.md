@@ -1,78 +1,62 @@
-# Property-Based Testing
+# Property-Based Testing (`proptest`)
 
-> Use `proptest` when the property should hold for a class of inputs, not just hand-picked examples.
+> Use `proptest` when an invariant or algebraic law holds across a class of generated inputs.
 
-## When to Use
+## 1. When to Use
 
-Reach for `proptest` when you can state a property, such as:
+Reach for `proptest` when you can state a universal law over a domain:
 
-| Property | Example |
+| Property Law | Shape |
 |---|---|
-| Roundtrip | `decode(encode(x)) == x` |
-| Idempotence | `f(f(x)) == f(x)` |
-| Commutativity | `f(a, b) == f(b, a)` |
-| Associativity | `f(f(a, b), c) == f(a, f(b, c))` |
-| Identity | `f(x, identity) == x` |
-| Invariant | `len(push(v, x)) == len(v) + 1` |
+| Round-trip identity | `decode(encode(x)) == Ok(x)` |
+| Idempotence | `normalize(normalize(x)) == normalize(x)` |
+| Structural invariant | `sorted(v).windows(2).all(\|w\| w[0] <= w[1])` |
+| Differential oracle | `fast_impl(x) == reference_impl(x)` |
+| Commutativity / Associativity | `merge(a, b) == merge(b, a)` |
 
-Do not use it when the expected output is one fixed value, the input space is small and enumerable, or the problem is thread interleaving correctness; use `table-driven.md` cases or `concurrency.md` instead.
+Keep deterministic boundary unit tests (`0`, `MIN`, `MAX`, empty) alongside property tests. Property generators sample the space, while explicit unit cases pin exact boundaries on every run.
 
-## Basic Usage
+For coverage-guided exploration of raw byte streams or deep recursion limits, see [`fuzzing.md`](fuzzing.md).
+
+## 2. Basic Usage
+
+Use `prop_assert!` and `prop_assert_eq!` inside `proptest!` so failures trigger automatic shrinking instead of aborting immediately:
 
 ```rust
 use proptest::prelude::*;
 
 proptest! {
     #[test]
-    fn reverse_reverse_is_identity(s in ".*") {
-        let reversed: String = s.chars().rev().collect();
-        let double_reversed: String = reversed.chars().rev().collect();
-        prop_assert_eq!(s, double_reversed);
+    fn slug_roundtrips_through_formatter(raw in "[a-z0-9]+(-[a-z0-9]+)*") {
+        let parsed = Slug::parse(&raw).expect("valid generator input");
+
+        prop_assert_eq!(parsed.as_str(), raw);
     }
 }
 ```
 
-Use `prop_assert!` and `prop_assert_eq!` inside `proptest!` blocks so failures can shrink instead of escaping as raw panics.
+## 3. Composing Domain Strategies (Avoid `prop_assume!` Abuse)
 
-## Strategies
+Build valid domain inputs by composing strategies with `.prop_map(...)` and `.prop_flat_map(...)` rather than filtering arbitrary inputs with `prop_assume!`.
+
+- Keep `prop_assume!` rejection rates below 10%. High rejection rates slow test runs and abort `proptest` with `TooManyRejections`.
+- Construct valid structures directly:
 
 ```rust
-proptest! {
-    #[test]
-    fn accepts_common_shapes(
-        x in 0..100i32,
-        email in "[a-z]+@[a-z]+\\.[a-z]{2,3}",
-        values in prop::collection::vec(any::<i32>(), 0..10),
-        maybe in prop::option::of(any::<i32>()),
-    ) {
-        // assert the property here
-    }
+use proptest::prelude::*;
+
+fn valid_range_strategy() -> impl Strategy<Value = (u32, u32)> {
+    (0..10_000u32).prop_flat_map(|start| (Just(start), start..=10_000u32))
 }
 ```
 
-Use custom strategies when valid domain values need construction rules:
+## 4. Commit `proptest-regressions/` to Git
 
-```rust
-fn user_strategy() -> impl Strategy<Value = User> {
-    ("[a-zA-Z]{1,20}", 0..120u8).prop_map(|(name, age)| User { name, age })
-}
-```
+When `proptest` finds and shrinks a failing case, it writes the minimal seed to a `proptest-regressions/` file next to the source or test file.
 
-## Shrinking
+- **Always commit `proptest-regressions/` files to version control.**
+- Committed regression seeds replay first on every future test run before random generation starts, locking in the fix deterministically.
 
-Read the shrunk failure, not the original random case. The minimized input is usually the useful reproduction.
+## Completion
 
-## Configuration
-
-```rust
-proptest! {
-    #![proptest_config(ProptestConfig {
-        cases: 1000,
-        max_shrink_iters: 10000,
-        ..ProptestConfig::default()
-    })]
-
-    #[test]
-    fn extensive_property_check(x in any::<i32>()) { }
-}
-```
+Completion: property tests use `prop_assert!` macros, keep `prop_assume!` rejections under 10%, and track `proptest-regressions/` in git.
