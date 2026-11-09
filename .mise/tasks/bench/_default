@@ -149,7 +149,10 @@ collect_bench_files() {
 # Smoke-run the selected bench targets via `cargo test`: criterion's documented
 # CI path. `--features test-utils` is load-bearing: all `[[bench]]` targets
 # declare `required-features`, and `cargo test` silently skips targets when
-# unmet.
+# unmet. `--profile bench` is load-bearing too: the lexer's state machine
+# recurses once per skipped match, and an unoptimized build has no tail-call
+# elimination, so the default test profile overflows the main-thread stack on
+# a large input. The bench profile is also the build `cargo bench` measures.
 #
 # Globals:
 #   `usage_args`, `usage_compare`: flags parsed by `mise` (noted-and-ignored)
@@ -173,7 +176,8 @@ run_smoke() {
       'note: --compare ignored in --mode test (no measurement to compare)' >&2
   fi
   printf '==> Smoke-testing %d benchmark target(s)\n' "${count}"
-  exec cargo test --no-fail-fast --features test-utils "${targets[@]}"
+  exec cargo test --no-fail-fast --profile bench --features test-utils \
+    "${targets[@]}"
 }
 
 #######################################

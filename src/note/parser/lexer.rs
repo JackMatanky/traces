@@ -114,7 +114,14 @@ pub(super) struct FieldToken {
 
 /// Represents tokenized components extracted from free-form Markdown text.
 #[derive(Debug, PartialEq, Logos)]
-#[logos(extras = TaskFieldEmojis, skip(r"[\s\S]", priority = 0))]
+#[logos(extras = TaskFieldEmojis)]
+// Skip runs, not single characters: logos compiles each skipped match into a
+// recursive state call, and a debug build has no tail-call optimization, so a
+// per-character skip overflows the stack on a long paragraph. A run stops at
+// every character that can start a token and at `\n` and `:`, so a bare
+// `Key::` at a line start is longer than the run before it and wins.
+#[logos(skip "[^\\n:#\\[(\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}\u{1F4C5}\u{1F5D3}\u{2795}\u{1F6EB}\u{23F3}\u{2705}\u{274C}]+")]
+#[logos(skip "[\\n:]+")]
 pub(super) enum ItemToken {
     #[token("\u{1F53A}\u{FE0F}", |_| TaskPriority::Highest)]
     #[token("\u{1F53A}", |_| TaskPriority::Highest)]
@@ -289,7 +296,7 @@ fn tag_callback<'source, T: Logos<'source, Source = str>>(
 }
 /// Token stream for Markdown tags in free-form text.
 #[derive(Clone, Debug, PartialEq, Logos)]
-#[logos(skip(r"[\s\S]", priority = 0))]
+#[logos(skip "[^#]+")]
 enum TagToken {
     /// Valid hashtag token.
     #[token("#", tag_callback)]
@@ -326,6 +333,103 @@ pub(super) fn scan_metadata(
 mod tests {
     use super::*;
     use crate::{DateValue, DurationValue};
+
+    /// Skipped text must not cost stack depth: a debug build has no tail-call
+    /// optimization, so a lexer that recurses once per skipped character
+    /// overflows the stack on a long paragraph.
+    mod long_input {
+        use pretty_assertions::assert_eq;
+
+        use super::*;
+
+        const PROSE: &str = "plain prose without any token start. ";
+        const REPEATS: usize = 20_000;
+
+        #[test]
+        fn scans_fields_after_a_long_skipped_run() {
+            let text = format!("{}\nStatus:: Draft", PROSE.repeat(REPEATS));
+
+            let fields = scan_fields(&text, TaskFieldEmojis::Exclude);
+
+            assert_eq!(
+                fields.iter().map(|(key, _)| key.name()).collect::<Vec<_>>(),
+                ["Status"]
+            );
+        }
+
+        #[test]
+        fn scans_tags_after_a_long_skipped_run() {
+            let text = format!("{} #after", PROSE.repeat(REPEATS));
+
+            let tags = scan_tags(&text);
+
+            assert_eq!(tags.iter().map(Tag::as_str).collect::<Vec<_>>(), [
+                "#after"
+            ]);
+        }
+
+        #[test]
+        fn tokenizes_a_long_text_without_a_token() {
+            let text = PROSE.repeat(REPEATS);
+
+            assert_eq!(tokenize_item_text(&text, TaskFieldEmojis::Include), []);
+        }
+
+        #[test]
+        fn scans_a_field_after_a_very_long_single_word_line() {
+            let text = format!("{}\nKey:: v", "a".repeat(200_000));
+
+            let fields = scan_fields(&text, TaskFieldEmojis::Exclude);
+
+            assert_eq!(
+                fields.iter().map(|(key, _)| key.name()).collect::<Vec<_>>(),
+                ["Key"]
+            );
+        }
+
+        #[test]
+        fn scans_no_field_in_one_very_long_word() {
+            let text = "a".repeat(200_000);
+
+            assert_eq!(scan_fields(&text, TaskFieldEmojis::Exclude), []);
+        }
+    }
+
+    /// A bare field starts a line with `[ \t]*[A-Za-z][A-Za-z0-9_-]*::`. These
+    /// cases pin the boundary of that rule.
+    mod bare_field_boundary {
+        use pretty_assertions::assert_eq;
+        use rstest::rstest;
+
+        use super::*;
+
+        fn keys(input: &str) -> Vec<String> {
+            scan_fields(input, TaskFieldEmojis::Exclude)
+                .iter()
+                .map(|(key, _)| key.name().to_owned())
+                .collect()
+        }
+
+        #[rstest]
+        #[case::leading_space_and_tab("  \tKey:: v", &["Key"])]
+        #[case::after_blank_lines("a\n\n  Status:: Draft", &["Status"])]
+        #[case::punctuated_key("text\nKey-1_a:: v", &["Key-1_a"])]
+        #[case::digit_first("1abc:: v", &[])]
+        #[case::hyphen_first("-key:: v", &[])]
+        #[case::two_words("Due Date:: v", &[])]
+        #[case::mid_line("x Key:: v", &[])]
+        #[case::single_colon("Key: v", &[])]
+        #[case::triple_colon("Key::: v", &["Key"])]
+        #[case::crlf_lines("a\r\nKey:: v\r\nOther:: w", &["Key", "Other"])]
+        #[case::after_non_ascii("é\nKey:: v", &["Key"])]
+        #[case::non_ascii_before_key("éKey:: v", &[])]
+        fn recognizes_a_field_only_at_a_line_start(
+            #[case] input: &str,
+            #[case] expected: &[&str],
+        ) {
+            assert_eq!(keys(input), expected);
+        }
+    }
     mod inline_fields {
         use pretty_assertions::assert_eq;
         use rstest::rstest;
