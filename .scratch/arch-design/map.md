@@ -449,6 +449,24 @@ not implement the redesign. It ends at hand-off to specification.
   not the decided layout. The `None` versus `Immediate` choice stays with
   ticket 36. Handoff:
   [replay prototype](./issues/27-index-replay-prototype-and-fault-tests.md).
+- [Does the index replay prototype survive fault tests, and what does
+  recovery cost?](./issues/27-index-replay-prototype-and-fault-tests.md):
+  the re-targeted throwaway probe passed 42 of 42 release-profile fault
+  tests on macOS against the real `.traces/index.redb` layout. It proved
+  the ticket-25 fork hole. Incarnation plus revision is not enough; the
+  digest backstop is required. It also proved full identity-mutation
+  handling, signal safety, hostile-body safety, and real-`ENOSPC`
+  behavior.
+  Measurement found
+  no winning policy. No-journal `Immediate` wins the write path. A
+  retained journal wins the 50,000-note read-only refresh. Replay
+  decode alone runs about 60 times the 53.3 ms write budget. Real
+  `ENOSPC` under `Durability::None` is silent sparse-write loss with no
+  catchable error, a new adoption blocker. Ticket 27 resolved without an
+  adoption verdict. Handoffs: [ticket
+  36](./issues/36-reconcile-decisions-and-audit-coverage.md) (adoption)
+  and ticket 33 (freshness bound data). Probe assets live on branch
+  `scratch/t27-probe-worktree`.
 
 ## Not yet specified
 

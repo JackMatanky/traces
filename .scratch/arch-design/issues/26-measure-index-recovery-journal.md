@@ -118,8 +118,9 @@ Ticket 36 owns the durability choice after the needed measurements.
    Make the journal durable before the store write:
    - Sync the journal file and its parent directory.
      Sync on macOS uses `F_FULLFSYNC`.
-   - Keep the journal until the replay commit with `Durability::Immediate` returns `Ok`.
-     That commit is the error-reporting barrier that permits journal removal.
+   - Keep the journal until an `Immediate` apply, replay or verified-target
+     checkpoint returns `Ok`. Ticket 27 measures the normal apply and the
+     deferred checkpoint.
    - Do not use `Database::drop` as the barrier. Its close commit reports no error.
      A reopen that reads the new revision does not prove durability.
 5. **Buffered journal control.** Write the prepared facts without a sync.
@@ -128,15 +129,19 @@ Ticket 36 owns the durability choice after the needed measurements.
    Build and sync the new store in a side file. Replace the old store and sync
    the directory before claiming that the replacement is durable.
    Ticket 25 treats a failed replacement as a cache miss for reads.
-7. **In-store journal table.** Screen this redb candidate beside the external journal.
-   Use `Durability::Immediate` for both transactions.
-   The transactions do these steps:
+7. **In-store journal table.** Screen this redb candidate beside the external
+   journal.
+   Use `Durability::Immediate` for both transactions. The transactions do these
+   steps:
    - Record the facts in a first durable transaction.
-   - Apply the facets and remove the journal atomically in a second durable transaction.
+   - Apply the facets and remove the journal atomically in a second durable
+     transaction.
+
    Apply these limits:
    - Include the parent-directory durability cost if the store file is new.
    - An unreadable or incompatible store cannot replay this journal.
-   - Expand this path only if its cost bounds and failure tests justify replay work.
+   - Expand this path only if its cost bounds and failure tests justify replay
+     work.
    - Do not select it from this cost screen.
 
 For an external journal, test only the location next to the store under `.traces/`.
@@ -420,7 +425,8 @@ Marks use the map rules.
 - Ticket 25: the read-only-open control finding (0.03 ms, no syncs) passes
   there. A read-only handle cannot coexist with a writable handle.
 - Ticket 33: the simulated-host retry path validates against these numbers.
-  After a panic, discard the handle and the plan. Validate before publication.
+  A release panic aborts the process. On restart, reopen the store and validate
+  before publication. Only an unwind test build can discard its handle and plan.
 - Ticket 24: preserve the engine-neutral store port and adapter-owned durability.
 - Ticket 28: the generation pair after a replay. A replay must change the revision.
 - Ticket 32: the path form in the journal.
