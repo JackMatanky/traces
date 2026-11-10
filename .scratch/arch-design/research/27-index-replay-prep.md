@@ -19,8 +19,8 @@ Sources for this file:
   crash testing.
 - The digest corpus about cache freshness: Git, Cargo, Mercurial, rustc,
   Obsidian and Dataview.
-- The prior probes of this repository: the `dyld-sync-shim` and the
-  `t26-probe` crate.
+- The prior probes of this repository: the `dyld-sync-shim` and the `t26-probe`
+  crate.
 
 ## The inherited contract
 
@@ -57,21 +57,21 @@ Sources for this file:
   PATHS_BY_FILE_CLASS, TAGS_BY_PATH, FILE_CLASSES_BY_PATH, META.
 - `src/index/store.rs:351-358` sets `redb::Durability::None` on all write
   transactions. This is the only durability setting in `src`. The comment says:
-  the store is a derived cache; a crash loses the last write; a refresh
-  rebuilds by a rescan.
-- `src/index/store.rs:565-579` reads the stored fingerprint into
-  `Virgin`, `Recorded` or `Unreadable`. Callers fail closed.
+  the store is a derived cache; a crash loses the last write; a refresh rebuilds
+  by a rescan.
+- `src/index/store.rs:565-579` reads the stored fingerprint into `Virgin`,
+  `Recorded` or `Unreadable`. Callers fail closed.
 - `src/index/store.rs:743` `persist` handles `Rebuild` and `Incremental`. An
   empty incremental returns early. A debug assert gates empty passes.
 - `src/index/store.rs:894-921` is the commit code that tickets 26 and the e2
   probe cite.
-- `src/index/store.rs:360` holds a fault-injection hook that replaces a note
-  row with invalid bytes. The fault tests reuse it.
+- `src/index/store.rs:360` holds a fault-injection hook that replaces a note row
+  with invalid bytes. The fault tests reuse it.
 - `src/index/service.rs:206` `prepare_pass` produces
-  `RefreshState::Stale(pending)`. `refresh_store` at line 272 applies it.
-  A write error has no in-memory fallback.
-- `src/index/delta.rs` computes a path-sorted `FileDelta` and an
-  `InlinkDelta` in one merge pass.
+  `RefreshState::Stale(pending)`. `refresh_store` at line 272 applies it. A
+  write error has no in-memory fallback.
+- `src/index/delta.rs` computes a path-sorted `FileDelta` and an `InlinkDelta`
+  in one merge pass.
 - `src/index/fingerprint.rs` holds 10 Blake3 digests, a digest per
   index-relevant setting. It excludes the root, template and schema dirs.
 - `benches/common/cache.rs:11` sets `INDEX_DB_RELATIVE_PATH` to
@@ -89,10 +89,9 @@ Facts from the local redb documentation:
 - `Durability::None` commits stay in memory. A later `Immediate` commit makes
   them durable. `Durability::Immediate` guarantees persistence when `commit`
   returns.
-- A `commit` error means an atomic but uncertain outcome: the changes are
-  fully applied or not applied, but they may already be durable. The database
-  refuses further write transactions. A close and a reopen repair the internal
-  state.
+- A `commit` error means an atomic but uncertain outcome: the changes are fully
+  applied or not applied, but they may already be durable. The database refuses
+  further write transactions. A close and a reopen repair the internal state.
 - A panic inside a transaction poisons it. The transaction rolls back, but a
   corruption that caused the poison stays in the file.
 - `Database::open` detects and recovers crashes, power loss and unclean
@@ -108,13 +107,13 @@ Lessons for ticket 27:
 - The barrier is a per-transaction `set_durability(Immediate)` on the replay
   transaction. The `None` default of `configure_cache_txn` stays for all other
   writes.
-- A failed commit is not a rollback. The recovery checks the incarnation and
-  the revision after a reopen, as the ticket requires at 27:121-123.
-- The ticket asks for the redb repair time after each unclean stop. Measure
-  the implicit open recovery and the explicit `check_integrity` separately.
-- The single-writer lock is the tool against two processes that replay the
-  same journal. Serialize the validation, the replay and the removal inside
-  one write transaction.
+- A failed commit is not a rollback. The recovery checks the incarnation and the
+  revision after a reopen, as the ticket requires at 27:121-123.
+- The ticket asks for the redb repair time after each unclean stop. Measure the
+  implicit open recovery and the explicit `check_integrity` separately.
+- The single-writer lock is the tool against two processes that replay the same
+  journal. Serialize the validation, the replay and the removal inside one write
+  transaction.
 
 ### SQLite rollback journal lifecycle
 
@@ -124,14 +123,13 @@ Facts from the SQLite atomic commit document:
   the database pages. It deletes the journal only after the database pages are
   durable, and it syncs the directory after the deletion.
 - A journal that survives a crash is a hot journal. The next writer replays it
-  before any read or write. This rule needs an exclusive lock during the
-  replay.
+  before any read or write. This rule needs an exclusive lock during the replay.
 - SQLite defends against a garbage-filled journal in two ways: a header page
   count that stays zero until the content is flushed, and per-page checksums
   that a rollback verifies. It keeps the checksums even with `FULL` sync.
 - The recovery decision is encoded in the journal header state.
-- SQLite assumes that a file deletion is atomic. A partial deletion can
-  corrupt the database.
+- SQLite assumes that a file deletion is atomic. A partial deletion can corrupt
+  the database.
 
 Lessons for ticket 27:
 
@@ -150,20 +148,19 @@ Lessons for ticket 27:
 
 Facts from the OSDI 2018 and SOSP 2021 papers:
 
-- CrashMonkey records the I/O sequence of a workload and replays it to every
-  I/O boundary. After each replay it mounts the image and checks the
-  invariants. The crash points are bounded by the number of I/O operations,
-  not by time.
-- ALICE captures the disk image at every `fsync` boundary inside a library
-  file system and checks the same invariants.
+- CrashMonkey records the I/O sequence of a workload and replays it to every I/O
+  boundary. After each replay it mounts the image and checks the invariants. The
+  crash points are bounded by the number of I/O operations, not by time.
+- ALICE captures the disk image at every `fsync` boundary inside a library file
+  system and checks the same invariants.
 
 Lessons for ticket 27:
 
 - The stop points of the ticket are already at sync boundaries. The
-  `dyld-sync-shim` with `KILL_AT=n` implements this method on macOS. Extend
-  the sweep to all sync calls of the prototype, not only one.
-- The oracle after any stop point is the same test: the recovered query equals
-  a fresh parse. Run it after every crash point and record the outcome class.
+  `dyld-sync-shim` with `KILL_AT=n` implements this method on macOS. Extend the
+  sweep to all sync calls of the prototype, not only one.
+- The oracle after any stop point is the same test: the recovered query equals a
+  fresh parse. Run it after every crash point and record the outcome class.
 - The saved-image method matches ALICE: capture the file images at each sync
   boundary, then reopen from the image. Record the limit: this simulates a
   process stop with clean pages, not a power loss with torn writes and write
@@ -181,12 +178,12 @@ Facts from the PostgreSQL internals material:
 Lessons for ticket 27:
 
 - Make the replay idempotent by construction instead of with page LSNs: the
-  journal records absolute row upserts and explicit key deletions. Replaying
-  the same rows twice produces the same state. This satisfies the ticket rule
-  that replay is safe to repeat.
-- Torn writes inside a journal file are caught by the whole-file checksum.
-  The recovery discards the journal and rebuilds. No page-level machinery is
-  needed at fact granularity.
+  journal records absolute row upserts and explicit key deletions. Replaying the
+  same rows twice produces the same state. This satisfies the ticket rule that
+  replay is safe to repeat.
+- Torn writes inside a journal file are caught by the whole-file checksum. The
+  recovery discards the journal and rebuilds. No page-level machinery is needed
+  at fact granularity.
 
 ### Cache freshness precedents from the digest corpus
 
@@ -196,20 +193,20 @@ Lessons for ticket 27:
 - Cargo never hashes an `mtime` into a fingerprint. It rewinds the dep-info
   mtime to the build start.
 - Mercurial marks an ambiguous timestamp with a sentinel and re-verifies.
-- rustc never serializes parse trees. It persists hashes and re-parses,
-  because a re-parse is cheaper than a deserialize.
+- rustc never serializes parse trees. It persists hashes and re-parses, because
+  a re-parse is cheaper than a deserialize.
 - Obsidian keeps the metadata cache in memory with events. Dataview persists
   only a summary as a cold-start warm cache and rebuilds the indices on load.
 
 Lessons for ticket 27:
 
 - The journal must carry the scan start of the original pass. The replay
-  computes the racy bit from the recorded scan start, not from the replay
-  time, as the ticket requires at 27:86-87.
+  computes the racy bit from the recorded scan start, not from the replay time,
+  as the ticket requires at 27:86-87.
 - Never put an `mtime` value into an identity key. The store identity holds
   digests and tags, not timestamps.
-- The journal holds facts, not parse trees. This matches the rustc rule and
-  the ticket rule to encode parsed facts, not row bytes.
+- The journal holds facts, not parse trees. This matches the rustc rule and the
+  ticket rule to encode parsed facts, not row bytes.
 
 ### Fault injection on this machine
 
@@ -219,10 +216,10 @@ Lessons for ticket 27:
   `KILL_AT=n` is set.
 - `src/index/store.rs:360` corrupts a note row in place through a
   fault-injection hook. The fault tests reuse it.
-- Failure classes and `drop` behavior: `SIGKILL` runs no handler and no
-  `drop`. `abort` runs no unwind and no `drop`. A panic unwinds and runs
-  `drop` for live values. `Ctrl-C` with the default handler runs no `drop`.
-  An out-of-memory kill is an untested limit, as the ticket says.
+- Failure classes and `drop` behavior: `SIGKILL` runs no handler and no `drop`.
+  `abort` runs no unwind and no `drop`. A panic unwinds and runs `drop` for live
+  values. `Ctrl-C` with the default handler runs no `drop`. An out-of-memory
+  kill is an untested limit, as the ticket says.
 
 ## Design questions for the grilling
 
@@ -238,8 +235,8 @@ Three designs exist:
 | C | Fill, sync, flip a committed flag in the header, sync again | Two syncs of one file. No rename. No directory sync for publication. |
 
 Recommendation: B on macOS and Linux. The ticket already requires a directory
-sync for the journal file. B gives the cleanest match to the stop-point list
-and the cleanest orphan rule. Record the Windows limit: no directory sync.
+sync for the journal file. B gives the cleanest match to the stop-point list and
+the cleanest orphan rule. Record the Windows limit: no directory sync.
 
 ### DQ2. The removal rule
 
@@ -249,9 +246,15 @@ The removal sequence:
 - Sync the directory after the removal.
 - Measure the cost of the removal sync per window.
 
+An alternative comes from the SQLite recovery path. Truncate the journal to
+zero, or zero its header, and sync the file. The journal is then not hot, and no
+directory sync is needed for that decision. The deletion happens later and is
+cosmetic. This trades a directory sync for a file sync and removes the
+hot-journal ambiguity.
+
 Defense in depth: the writer base check inside the replay transaction also
-catches a consumed journal. The store revision is past the journal revision.
-The base check then fails, and the code discards the journal.
+catches a consumed journal. The store revision is past the journal revision. The
+base check then fails, and the code discards the journal.
 
 ### DQ3. The journal format
 
@@ -260,17 +263,16 @@ The base check then fails, and the code discards the journal.
 | A | One postcard blob, a header with magic, version, identity, lengths and a whole-body Blake3 checksum | Any damage means: discard and rebuild. No partial replay. |
 | B | Framed records with per-record checksums | A salvage of a prefix is possible, but a partial application is forbidden, so the salvage has no value. |
 
-Recommendation: A. It satisfies the checksum item of the content list, it is
-the smallest encode, and the discard rule is already the ticket rule.
-The header encodes the recovery decision, as SQLite does.
+Recommendation: A. It satisfies the checksum item of the content list, it is the
+smallest encode, and the discard rule is already the ticket rule. The header
+encodes the recovery decision, as SQLite does.
 
 ### DQ4. The journal scope
 
-Journal the incremental windows. Do not journal a full rebuild. The rival
-facts:
+Journal the incremental windows. Do not journal a full rebuild. The rival facts:
 
-- A rebuild repeats after a kill. The measured cost is about 1,801 ms at
-  50,000 notes including persistence.
+- A rebuild repeats after a kill. The measured cost is about 1,801 ms at 50,000
+  notes including persistence.
 - A kill inside the rebuild transaction rolls back to the previous consistent
   store state through the redb recovery.
 - The stop point in the middle of a full rebuild stays in the test plan with
@@ -290,11 +292,11 @@ vault from the complete source snapshot.
 
 ### DQ6. Concurrency
 
-Validate and replay inside one write transaction. redb serializes writers, so
-a second process blocks on `begin_write`, and its base check fails after the
-first writer commits. The ticket rule that two processes never replay one
-journal follows from the lock. Measure the lock hold time and the wait time of
-the second process, as the ticket asks at 27:42.
+Validate and replay inside one write transaction. redb serializes writers, so a
+second process blocks on `begin_write`, and its base check fails after the first
+writer commits. The ticket rule that two processes never replay one journal
+follows from the lock. Measure the lock hold time and the wait time of the
+second process, as the ticket asks at 27:42.
 
 ### DQ7. The failed-commit protocol
 
@@ -315,30 +317,29 @@ specify:
 
 ### DQ9. Adapter ownership
 
-The redb adapter owns the journal file. No new domain port operation is
-needed: the domain sees only a persist result. A future engine with its own
-journal, such as SQLite, keeps the rule inside its adapter. This answers the
-ticket question at 27:187-189.
+The redb adapter owns the journal file. No new domain port operation is needed:
+the domain sees only a persist result. A future engine with its own journal,
+such as SQLite, keeps the rule inside its adapter. This answers the ticket
+question at 27:187-189.
 
 ### DQ10. Notices and exits
 
 A replay success is silent. A journal discard causes a quiet rebuild with no
-notice, under the ticket 25 open rules. Only a higher-epoch store produces
-the one notice and exit 0. Ticket 34 owns the notice texts. This ticket
-specifies the states and the mapping.
+notice, under the ticket 25 open rules. Only a higher-epoch store produces the
+one notice and exit 0. Ticket 34 owns the notice texts. This ticket specifies
+the states and the mapping.
 
 ### DQ11. Readers and the journal
 
-Readers never replay. A reader that sees a journal treats the store as
-possibly stale, which the cache rules already allow. The no-change control
-uses a read-only open, as the ticket requires at 27:146-147.
+Readers never replay. A reader that sees a journal treats the store as possibly
+stale, which the cache rules already allow. The no-change control uses a
+read-only open, as the ticket requires at 27:146-147.
 
 ### DQ12. The unmeasured rivals
 
 The saved-work bound needs the parse-only fallback measured, because a journal
 discard pays a rescan that the current numbers do not split. Add this
-measurement to the plan. It also fills the open gap of ticket 25 at
-25:431-432.
+measurement to the plan. It also fills the open gap of ticket 25 at 25:431-432.
 
 ## Test plan
 
@@ -400,16 +401,19 @@ upper bound on saved work with the measured lower bound on added cost.
 - The prototype lives in a throwaway crate on the public surface and
   `traces::testing`, in the style of the `t26-probe` crate. It moves into the
   redb adapter only if the maintainer adopts it.
-- Risk: the public surface may not expose the identity read and write helpers.
-  The probe then mirrors the postcard formats locally. This is acceptable for
-  a probe and is a reason to keep the adoption in one place later.
+- `traces::testing` is frozen at 47 identifiers under the `test-utils` feature
+  (`src/lib.rs:177-211`). The list has no store or META access. The probe
+  mirrors the table definitions and opens `.traces/index.redb` with redb
+  directly, as the ticket 26 probes did. The service-level helpers
+  `IndexerService`, `TestProject`, `build_test_index` and `QueryService` stay
+  the primary path for fixtures and queries.
 - Risk: the shim kills at sync boundaries only. Torn writes inside a `write`
   call are simulated with file surgery. Record this limit.
 - Risk: the system-crash simulation is a process stop with clean pages. It is
   not a power loss. The ticket forbids the claim of equality, and the research
   asset must repeat the limit.
-- The Linux run uses the Podman VM with VM-local storage and 2 GiB of memory.
-  It checks correctness, not latency.
+- The Linux run uses the Podman VM with VM-local storage and 2 GiB of memory. It
+  checks correctness, not latency.
 
 ## Consistency checks against the ticket text
 
@@ -420,12 +424,17 @@ upper bound on saved work with the measured lower bound on added cost.
 - The None-commit-loss case applies to the normal incremental path and to
   rebuilds, not to the journaled path, whose commit is `Immediate`. The test
   plan states this scope.
-- The ticket drops the `commit_nonce`. The identity pair is the incarnation
-  and the revision. No test uses a nonce.
+- The ticket drops the `commit_nonce`. The identity pair is the incarnation and
+  the revision. No test uses a nonce.
 - The research asset `../research/27-index-replay-prototype.md` does not exist
   yet. This ticket creates it and links it under an `## Answer` heading.
-- Ticket 36 owns the `None` versus `Immediate` choice. This ticket supplies
-  the measured delta between the two settings on the replay transaction.
+- Ticket 33 states that the staleness bound is set with this ticket. The
+  measurements here, mainly the no-change control and the refresh costs, are the
+  input. Ticket 33 owns the bound decision.
+- The Linux VM has 2 GiB. Ticket 33 reports 467 MB for a pinned generation at
+  50,000 notes. The simulated-host runs in the VM must fit both.
+- Ticket 36 owns the `None` versus `Immediate` choice. This ticket supplies the
+  measured delta between the two settings on the replay transaction.
 
 ## Open questions for the grilling
 
@@ -438,3 +447,6 @@ upper bound on saved work with the measured lower bound on added cost.
 6. Cleanup rules for orphan, stale and retired journals. DQ8.
 7. The notice mapping handoff to ticket 34. DQ10.
 8. The scope of the Linux run: correctness only, or a latency spot check.
+9. The removal design: unlink with a directory sync, or truncate-first with a
+   later cosmetic delete. DQ2.
+10. The staleness bound input that ticket 33 needs from these measurements.
