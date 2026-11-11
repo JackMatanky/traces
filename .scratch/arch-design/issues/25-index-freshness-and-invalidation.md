@@ -114,6 +114,7 @@ validation. Its host reads a pinned immutable generation.
 Do not mix fresh rows with unverified store rows.
 Do not assume that a redb file lock enforces policy consistency.
 Leave open-buffer overlays and save/close transitions to
+
 - [the buffer ticket](./28-live-buffer-and-persisted-index-consistency.md)
 
 ### E. Path-set change cost
@@ -276,7 +277,7 @@ Decisions the maintainer made in this round:
 
 Confirmed decisions:
 
-- Settle the host staleness bound with downstream tickets 33 and 27.
+- Settle the host staleness bound with downstream tickets 33 and 28.
 - Decouple ticket 26: crash recovery is a no-op refresh of uncommitted files
   (12 to 65 ms). The journal is an optional optimization that does not block
   this ticket's invalidation rules.
@@ -285,8 +286,9 @@ Confirmed decisions:
 
 The maintainer chose a fingerprint with a version floor. Round three replaced
 the version floor. A check against earlier decisions then corrected the engine
-tag owner, the `META` fields and the rollback path. The maintainer confirmed this
-revision. The evidence is in [the research brief](../research/25-index-freshness-prep.md), section H.
+tag owner, the `META` fields and the rollback path. The maintainer confirmed
+this revision. The evidence is in [the research
+brief](../research/25-index-freshness-prep.md), section H.
 
 `META` holds these identity parts:
 
