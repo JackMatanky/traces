@@ -494,8 +494,9 @@ implement the redesign. It ends at hand-off to specification.
   ticket 33 owns the host freshness decision. The probe source is in
   `.scratch/arch-design/research/27-probe/replay/`; the production
   `test-utils` seams lived only on the removed scratch branch, so a future
-  run needs them again. The linked ticket and research asset
-  distinguish the tested behavior from the remaining gates.
+  run needs them again; ticket 35 decides their durable version. The linked
+  ticket and research asset distinguish the tested behavior from the
+  remaining gates.
 
 ## Not yet specified
 

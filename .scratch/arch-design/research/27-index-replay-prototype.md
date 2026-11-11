@@ -67,7 +67,7 @@ the scratch branch. They are:
   `checkpoint_for_probe`, `database_for_probe`, `persist_into_for_probe`.
 
 The main repository does not carry these seams. A future probe run needs
-them again; ticket 16 decides the durable version. No production behavior
+them again; ticket 35 decides the durable version. No production behavior
 changed.
 
 The replay probe journals and replays the real `.traces/index.redb` layout:
