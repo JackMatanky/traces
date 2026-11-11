@@ -47,23 +47,28 @@ requirements checklist, not a completed coverage claim.
 
 ### Real-layout replay probe and branch provenance
 
-The throwaway replay crate lives on the scratch worktree branch
-`scratch/t27-probe-worktree`. Its branch-relative path is
-`.scratch/arch-design/research/27-probe/replay/`, under `.worktrees/t27-probe/`.
-The instructions exist only on that branch at
-`.scratch/arch-design/research/27-probe/replay/README.md`.
-
-The former main-repository link `./27-probe/replay/README.md` is not a local
-results dependency. That branch's replay instructions and the layout probe's
-stderr output contain the run commands and known limits.
+The throwaway replay crate lives in the main repository at
+`.scratch/arch-design/research/27-probe/replay/`. The branch
+`scratch/t27-probe-worktree` held the working copy during the runs and is
+now removed. The probe instructions are in
+[the replay probe](./27-probe/replay/README.md).
 
 The layout probe and its older results are in
 [the layout probe](./27-probe/layout/).
 
-Production code changes stay on the scratch branch, behind the `test-utils`
-feature. They expose `IndexStore` and the index database path constant. They add
-two gated test helpers on `IndexStore`, a gated `QueryService` pass-through, and
-a gated `WorkspaceIndex` constructor from facts. No production behavior changed.
+The probe needs the production `test-utils` seams. Those seams lived only on
+the scratch branch. They are:
+
+- The public `IndexStore` and the index database path constant.
+- Two gated test helpers on `IndexStore`.
+- A gated `QueryService` pass-through.
+- A gated `WorkspaceIndex` constructor from facts.
+- Four native-durability seams: `rebuild_for_probe`,
+  `checkpoint_for_probe`, `database_for_probe`, `persist_into_for_probe`.
+
+The main repository does not carry these seams. A future probe run needs
+them again; ticket 16 decides the durable version. No production behavior
+changed.
 
 The replay probe journals and replays the real `.traces/index.redb` layout:
 
