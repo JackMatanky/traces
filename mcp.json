@@ -10,6 +10,15 @@
         "ADR_DIRECTORY": "docs/adr/"
       }
     },
+    "hk": {
+      "args": [
+        "mcp",
+        "--root",
+        "."
+      ],
+      "command": "hk",
+      "env": {}
+    },
     "mise": {
       "args": [
         "mcp"
@@ -20,6 +29,7 @@
       }
     },
     "rust-docs": {
+      "args": [],
       "command": "rust-docs-mcp",
       "env": {
         "RUST_DOCS_MCP_CACHE_DIR": ".rust-docs/cache/",
