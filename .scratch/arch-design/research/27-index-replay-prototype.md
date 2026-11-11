@@ -11,8 +11,10 @@ process-stop results, not proof against arbitrary power-loss reorderings.
 
 The corrected matched protocol (native redb durability, 20 runs per case,
 a-b-a-c-a order, equal-work placements) ran on Linux. The journal surcharge
-sits inside the A-B-A noise band at 5k and 50k. Replay saves 8 to 11 percent
-against parse fallback at 50k and verifies against a fresh parse at every run.
+sits inside the A-B-A noise band at 5k and 50k. Replay saves 89 ms, about
+20 percent, against parse fallback at 5k. Under the colder second-session
+protocol the 50k replay saving is not measurable. A later section records
+the cache-state difference that explains the two sessions.
 
 A dedicated `ENOSPC` probe shows real, scoped behavior. The writer gets a
 catchable `StorageFull` error. Acknowledged `Durability::None` rows vanish on
@@ -245,6 +247,96 @@ The macOS tables below keep their record as the earlier-generation harness
 output. The Linux tables above supersede them for the corrected protocol. The
 Linux tables use native redb durability, a true a-b-a-c-a order, 20 runs
 everywhere, equal-work placements, and real stable/racy snapshots.
+
+## Anchor, stop-window and second-session runs
+
+A second corrected session ran on a fresh Linux container. Each sample now
+carries its own best-effort cache hint. In this session the 50k parse phase
+runs 3.8 to 4.3 s. The first session's parse phase ran about 1.1 s, so that
+session served warmer pages.
+
+Do not compare the two sessions' totals. The first session's recovery table
+shows warm-cache behavior. This section shows the colder protocol. It
+supersedes the first session for recovery claims.
+
+### 50-note anchor (full case list, 20 runs per case)
+
+| Case | Median ms | Range ms | Note |
+|---|---:|---|---|
+| Policy a, no-journal `Immediate` | 10.4 | 9.6–25.7 | n = 60 |
+| Policy b, journaled `Immediate` | 12.1 | 10.5–23.9 | journal 3,701 B |
+| Policy c, journaled `None` + checkpoint | 12.4 | 10.2–18.9 | |
+| Recovery, replay, one-note edit | 6.10 | 5.77–8.21 | |
+| Recovery, parse fallback, one-note edit | 7.13 | | |
+
+At 50 notes every recovery is a few milliseconds. Parse does not dominate.
+The journal surcharge sits inside the noise band. Replay saves about 1 ms.
+
+### Second-session policy phases (20 runs per block, a-b-a-c-a)
+
+| Phase, median ms | 5k | 50k |
+|---|---:|---:|
+| Base store scan | 50.5 | 470.2 |
+| Parse sources | 124.3 | 3,752.1 |
+| Validate derived facts | 480.0 | 5,292.4 |
+| Journal encode | 1.4 | 15.3 |
+| Publish write plus file sync | 9.9 | 12.4 |
+| Publish directory sync | 0.5 | 1.3 |
+| Native commit | 79.5 to 89.8 | 718 to 773 |
+| Checkpoint (c only) | 5.2 | 33.6 |
+| Journal removal plus directory sync | 2.6 | 22.7 |
+
+The 5k a-block drift is about 3 percent. The 50k a-block drift is about
+12 percent and trends down. Total medians are 757.2 (a), 770.1 (b), and
+786.3 ms (c) at 5k. At 50k the
+totals are 10,349.5 (a), 10,824.1 (b), and 10,065.1 ms (c). Policy deltas sit
+inside this drift, so no ranking is proved. The
+measured per-phase journal overhead is about 14 ms at 5k and 52 ms at 50k.
+
+### Stop-window recovery (20 runs each)
+
+| Stop class | 5k outcome | 5k median ms | 50k outcome | 50k median ms |
+|---|---|---:|---|---:|
+| Before the journal exists | parsed | 437.6 | parsed | 5,988.1 |
+| After journal publish, before commit | replayed | 348.4 | replayed | 6,163.2 |
+| After commit, journal retained | unchanged | 435.5 | unchanged | 7,333.7 |
+
+The 5k ranges are 385.9–562.6, 299.5–462.6, and 407.0–509.7 ms. The 50k
+ranges are 4,680.7–7,304.6, 4,480.8–6,951.0, and 6,728.8–8,052.6 ms. At 5k
+replay saves 89 ms against parse. At 50k the replay median is 175 ms slower
+than parse and the ranges overlap. The 50k replay saving is not measurable
+under this protocol. The post-commit stop pays a source compare, not a
+persist, and its cost matches the ordinary refresh cost.
+
+### Per-phase break-even
+
+The break-even test never combines phases. Each phase carries its own
+overhead, and each phase realizes its own saving:
+
+- Encode plus publish phases at 5k carry 11.9 ms of overhead. A stop there
+  saves 89.2 ms. The break-even point is one stop per 7.5 writes in the
+  12 percent replayable window.
+- The removal phase charges 2.6 ms at 5k and saves nothing. This cost never
+  breaks even.
+- The pre-publish phases charge no overhead and save nothing.
+- At 50k the encode plus publish phases carry 29.1 ms of overhead. The
+  measured saving is zero, and the point estimate favors parse by 175 ms.
+  The break-even point is not reached.
+- The replayable window spans encode start to commit end: 91 ms of a 770 ms
+  write at 5k, and 802 ms of a 10,824 ms write at 50k.
+
+### Proposed host staleness bound
+
+The freshness target stays: a command must not serve an index older than the
+last successful publish. The proposed bound is: after an interrupted write,
+the next command must produce a queryable store within one completed publish
+cycle of the same host. Measured recovery plus first query: 361 ms with
+replay and 450 ms with parse at 5k, against a 770 ms publish cycle. Measured:
+6.2 to 6.3 s at 50k against a 10.8 s publish cycle. The bound holds at both
+sizes on VM storage. Ticket 33 must re-measure on real hosts.
+
+First usable query after recovery runs 12.1 to 12.9 ms at 5k and 121 to
+128 ms at 50k.
 
 ## Reported measurements (macOS, release profile)
 

@@ -15,8 +15,7 @@ sections A–E. The resolved status records the investigation's completion, not
 completion of all adoption gates.
 
 Ticket 36 weighs adoption and the `None` versus `Immediate` choice. Ticket 33
-gets the freshness data. A numeric host freshness bound remains a handoff
-requirement.
+gets the freshness data and validates the proposed bound against real hosts.
 
 The [prototype evidence](../research/27-index-replay-prototype.md) records the
 method, measurements and limits. The evidence does not support adoption on its
@@ -94,11 +93,11 @@ the no-journal median is 6,686.0 ms. Journaled `Immediate` is 6,705.5 ms
 surcharge sits inside the noise band at both sizes. No policy ranking is
 proved.
 
-Recovery saves real work. At 5k, replay takes about 300 ms against about
-330 ms for parse fallback (8 to 10 percent saved). At 50k, replay takes about
-2,940 ms against about 3,220 ms (8.2 to 10.7 percent saved across the
-edit and links scenarios). A policy rebuild dominates both paths at
-about 5.7 s at 50k.
+Recovery saves real work at 5k. Replay takes about 300 ms against about
+330 ms for parse fallback (8 to 10 percent saved). The 2026-11-10 run
+reports 8.2 to 10.7 percent saved at 50k, but the colder second-session
+protocol does not reproduce that saving. Treat the 50k replay saving as
+unproven. A policy rebuild dominates both paths at about 5.7 s at 50k.
 
 The source-check placement comparison now uses equal work. Placement A (check
 before hold) totals 551.2 ms with a 217.8 ms hold at 50k. Placement B (check
@@ -139,6 +138,43 @@ as the primary evidence for the corrected protocol.
   not a universal recovery-latency limit. Compare recovery against the matched
   fallback, with all costs counted as section D specifies.
 
+### Second-session anchor, stop-window and bound (2026-11-11)
+
+A fresh container reran the protocol with a per-sample cache hint. The 50k
+parse phase then ran 3.8 to 4.3 s, against about 1.1 s in the first session.
+The first session served warmer pages, so its recovery savings are
+warm-cache figures. This section supersedes the 2026-11-10 recovery table for
+recovery claims.
+
+The 50-note anchor is now inside the matrix. Totals are 10.4 ms for policy a
+(n = 60), 12.1 ms for b, and 12.4 ms for c. Replay takes 6.10 ms against
+7.13 ms for parse fallback. At this size every recovery is a few
+milliseconds, and the journal surcharge sits inside the noise band.
+
+The stop-window cases answer when the journal pays:
+
+- At 5k a stop before the journal exists parses (437.6 ms). A stop after
+  publish replays (348.4 ms). The saving is 89.2 ms, about 20 percent.
+- At 5k a stop after commit pays the ordinary refresh cost (435.5 ms), not
+  a persist. The store is already current.
+- At 50k the parse stop takes 5,988.1 ms and the replay stop takes
+  6,163.2 ms. The ranges overlap and the median favors parse by 175 ms.
+  The 50k replay saving is not measurable under the colder protocol.
+- Per phase, the 5k encode and publish phases carry 11.9 ms of overhead for
+  an 89.2 ms saving per stop. The break-even point is one stop per 7.5
+  writes landing in that window. The removal phase (2.6 ms at 5k, 22.7 ms
+  at 50k) saves nothing and never breaks even.
+- The replayable window spans encode start to commit end: 91 of 770 ms at
+  5k, and 802 of 10,824 ms at 50k.
+
+The host freshness bound: after an interrupted write, the next
+command must produce a queryable store within one completed publish cycle of
+the same host. That limit applies per host. Measured recovery plus first
+query is 361 to 450 ms at 5k
+against a 770 ms cycle. At 50k it is 6.2 to 6.3 s against a 10.8 s cycle. The
+bound holds at both sizes on VM storage. Ticket 33 re-measures it on real
+hosts.
+
 ### Requirements that the evidence does not close
 
 The original conclusion says correctness gates closed except the Linux run and
@@ -152,9 +188,11 @@ evidence. These requirements remain visible:
   layout claims remain unproved.
 - Whole-blob versus streaming framed facts and incremental rebuild savings
   remain unproved.
-- The 50-note anchor sits outside the measured matrix.
-- The stop-window rates, per-phase break-even rates and the numeric host
-  freshness proposal remain requirements below.
+
+The second session closed three requirements: the 50-note anchor, the
+stop-window rates with per-phase break-even, and the numeric freshness
+proposal. The 2026-11-10 50k recovery savings are now treated as
+warm-cache figures.
 
 No new experiment is part of this document revision beyond the corrected Linux
 protocol and `ENOSPC` probe reported above. The provisional protocol below is a
