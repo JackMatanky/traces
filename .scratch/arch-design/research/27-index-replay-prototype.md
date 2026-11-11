@@ -218,6 +218,9 @@ Every recovered outcome is `replayed`, and every fallback outcome is `parsed`.
 A source change during replay discards the journal and parses. The
 class-change fallback case shows this in 20 of 20 runs.
 
+This table ran on warmer pages than the second session. The second-session
+section supersedes it for recovery claims.
+
 ### Source-check placement with equal work (20 runs each)
 
 | Placement | 50k total median ms | 50k hold median ms |
@@ -246,7 +249,9 @@ The retained journal costs nothing on a pure read-only no-change pass.
 The macOS tables below keep their record as the earlier-generation harness
 output. The Linux tables above supersede them for the corrected protocol. The
 Linux tables use native redb durability, a true a-b-a-c-a order, 20 runs
-everywhere, equal-work placements, and real stable/racy snapshots.
+everywhere, equal-work placements, and real stable/racy snapshots. The
+second-session section later in this file supersedes the first-session
+recovery table and its phase medians.
 
 ## Anchor, stop-window and second-session runs
 

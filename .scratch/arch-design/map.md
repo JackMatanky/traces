@@ -455,8 +455,9 @@ implement the redesign. It ends at hand-off to specification.
   against a 1,332.9 ms bound for rebuilds. The bound counts the persist that
   a replay still pays, so this is not proof that a journal saves. The in-store
   journal table costs more than the external file at every measured size (477
-  ms added per rebuild). Break-even rates for edits are provisional and
-  unmeasured. No-change commands never pass. A kill before the last rebuild
+  ms added per rebuild). Break-even rates for edits are provisional in this
+  screen. Ticket 27 later measures them for the prototype journal. No-change
+  commands never pass. A kill before the last rebuild
   sync leaves an empty store in the sample of 9 of 15 stop points. The next
   open costs 17 to 37 ms. The claims of 85 percent more write time and 2 times
   size for a facet layout stay untested. The screen split rows round-robin,
@@ -475,11 +476,11 @@ implement the redesign. It ends at hand-off to specification.
   The measurements do not establish a winning production policy. The corrected
   Linux protocol uses native redb durability, 20 runs per case and an A-B-A
   order. It puts the journal surcharge inside the noise band at 5k and 50k
-  notes. Replay saves 8 to 11 percent against parse fallback at 50k and
-  verifies against a fresh parse at every run. The faster 50,000-note case
-  labeled read-only actually runs writable recovery. The reported 60-times
-  comparison uses the historical 53.3 ms row-copy bound, not a
-  recovery-latency budget.
+  notes. Replay saves about 20 percent against parse fallback at 5k. A colder
+  second session does not reproduce the reported 50k saving. The faster
+  50,000-note case labeled read-only actually runs writable recovery. The
+  reported 60-times comparison uses the historical 53.3 ms row-copy bound, not
+  a recovery-latency budget.
 
   The dedicated `ENOSPC` probe reports a catchable `StorageFull` error at the
   failing commit. Acknowledged `Durability::None` rows vanish on reopen at that
