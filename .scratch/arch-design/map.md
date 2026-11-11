@@ -13,8 +13,8 @@ redesign specification. The decisions cover boundaries, component
 responsibilities, and invariant ownership. They cover domain models,
 interfaces, algorithms, and data-structure changes. They identify transferable
 comparative lessons, foundational investments, and dependency constraints.
-Externally observable capabilities and correctness are preserved. This map does
-not implement the redesign. It ends at hand-off to specification.
+Preserve externally observable capabilities and correctness. This map does not
+implement the redesign. It ends at hand-off to specification.
 
 ## Notes
 
@@ -47,32 +47,40 @@ not implement the redesign. It ends at hand-off to specification.
   The old-to-new map follows.
   - 27 to 28, 28 to 29, 29 to 27.
   - Tickets outside 27 to 29 did not move.
-- Skills every session consults: `rust-design`, `domain-modeling`, `grilling`
-  (HITL tickets), `research` (research tickets), `codebase-design`; project mise
-  tasks (`mise run verify|test|bench`) for evidence; codegraph for navigation.
-  Benchmarks: release only, never in parallel, no RUSTFLAGS.
-- Standing preferences: adversarial and independent; evaluate "keep as is" for
-  every candidate; try to disprove the preferred option; distinguish [V]
-  verified, [H] hypothesis, [P] proposal; quality is not fewer lines or more
-  types. Resolve one ticket per session (research tickets exempt).
+- Consult these skills each session: `rust-design`, `domain-modeling`,
+  `grilling` (HITL tickets), `research` (research tickets), and
+  `codebase-design`. Use the project mise tasks
+  (`mise run verify|test|bench`) for evidence. Use codegraph for navigation.
+  - Use release builds for benchmarks.
+  - Never run benchmarks in parallel.
+  - Do not set RUSTFLAGS.
+- Use adversarial and independent analysis.
+  - Evaluate "keep as is" for every candidate.
+  - Try to disprove the preferred option.
+  - Distinguish [V] verified, [H] hypothesis, and [P] proposal.
+  - Do not equate quality with fewer lines or more types.
+  - Resolve one ticket per session, except research tickets.
 - User steer (2026-10-18, after the compatibility-envelope ruling): during this
   wayfinder, consider evolving the codebase toward a workspace layout,
   **starting by separating the CLI** into its own crate. This is a direction to
-  evaluate, not a decision. The crate-topology and workspace-host tickets must
-  test it against keep-as-is.
-  Separating the CLI makes it an outward-facing consumer of the core. The core
-  crate `pub` surface is then justified by the CLI boundary. This follows the
+  evaluate, not a decision. Compare it with keep-as-is in the crate-topology
+  and workspace-host tickets.
+
+  Separating the CLI makes it an outward-facing consumer of the core. The CLI
+  boundary then justifies the core crate `pub` surface. This obeys the
   visibility rule in the compatibility-envelope answer.
-  Sequencing: the CLI split depends on first deciding what the CLI owns today but should not own. Examples
+  Sequencing: the CLI split depends on first deciding what the CLI owns today
+  but should not own. Examples
   include composition, scaffolding, query-source normalisation, and task-filter
   synthesis. See the workspace-host ticket.
 - Every decision ticket's resolution names: alternatives considered (incl.
   retain), invariant owner, what becomes removable, what remains unresolved, and
   affected downstream tickets.
-- Ticket prose (2026-10-25): the `Question` sections of open tickets follow
+- Ticket prose (2026-10-25): the `Question` sections of open tickets obey
   ASD-STE100 Simplified Technical English. They use verb-first instructions,
-  vertical decision lists, and sentences of 20 words or fewer. The `Inputs from …`
-  sections, `Facts:` evidence, and research files stay outside STE.
+  vertical decision lists, and sentences of 20 words or fewer. The
+  `Inputs from …` sections, `Facts:` evidence, and research files stay outside
+  STE.
   Definitions of key terms:
   - `check`: inspect current code now.
   - `verify` or `re-verify`: adversarial claim testing.
@@ -260,7 +268,8 @@ not implement the redesign. It ends at hand-off to specification.
   spec?](./issues/15-research-schematter-validator-and-document-schema.md):
   IWE validator crate (about 1,200 lines, `jsonschema` dependency, one
   implementation, draft spec) is a poor fit. It brings a second schema dialect,
-  a recursive section tree, and no spans. Its matcher semantics are reusable as a
+  a recursive section tree, and no spans. Its matcher semantics are reusable
+  as a
   design over Traces flat headings (ticket 38). No dependency decision remains.
 - [What counts as the externally observable surface the redesign must
   preserve?](./issues/16-grilling-compatibility-envelope.md): sole consumer, so
@@ -343,7 +352,9 @@ not implement the redesign. It ends at hand-off to specification.
   command, git, read notice, LSP). Prevention operates only by placement
   (isolated copy or inbox, outside destination). Prevention also applies where
   MCP tools own every write, with host-run guards over the stateless 2026-07-28
-  protocol. `traces check` takes paths and splits schema errors from violations. Delta rule applies. A class-set change prompts the user. Date-shaped text: no override, no
+  protocol. `traces check` takes paths and splits schema errors from
+  violations. Delta rule applies. A class-set change prompts the user.
+  Date-shaped text: no override, no
   quote convention. Body-section schemas form a separate ticket. Handoffs:
   [query core](./issues/29-query-core-and-plan.md), [note document
   model](./issues/23-note-document-model.md), [temporal
@@ -378,7 +389,9 @@ not implement the redesign. It ends at hand-off to specification.
   [reconciliation](./issues/36-reconcile-decisions-and-audit-coverage.md).
 - [Who owns config-derived types, trust/tracking state, and the config
   lifecycle?](./issues/22-config-ownership-and-lifecycle.md): the root types
-  `task`, `tag`, and `field` stay as shared vocabulary. `note` owns its parser input, so `note` no longer imports `config`. `ConfigDigests` is deleted. `index` owns
+  `task`, `tag`, and `field` stay as shared vocabulary. `note` owns its parser
+  input, so `note` no longer imports `config`. `ConfigDigests` is deleted.
+  `index` owns
   `IndexPolicy` as the only source of the fingerprint. One exhaustive
   projection builds it from `Config`. Ticket 25 keeps content and granularity.
   Two trust and tracker stores remain. `ConfigService` is the only writer.
@@ -412,7 +425,8 @@ not implement the redesign. It ends at hand-off to specification.
   sections](./issues/38-body-section-schemas.md).
 - [What is the index read model, and is there one query execution path or
   two?](./issues/24-index-read-model-and-query-execution.md): one query plan
-  over a facet store and immutable host generations. Cold queries load only selected entries. `WorkspaceIndex` stays total. The index owns an
+  over a facet store and immutable host generations. Cold queries load only
+  selected entries. `WorkspaceIndex` stays total. The index owns an
   engine-neutral port, with redb as the first Rust-native adapter. Store
   snapshots and writer-transaction base checks prevent mixed generations.
   `lists` keeps tasks; `tasks` duplicates them in one atomic write. Note-level
@@ -451,22 +465,34 @@ not implement the redesign. It ends at hand-off to specification.
   [replay prototype](./issues/27-index-replay-prototype-and-fault-tests.md).
 - [Does the index replay prototype survive fault tests, and what does
   recovery cost?](./issues/27-index-replay-prototype-and-fault-tests.md):
-  the re-targeted throwaway probe passed 42 of 42 release-profile fault
-  tests on macOS against the real `.traces/index.redb` layout. It proved
-  the ticket-25 fork hole. Incarnation plus revision is not enough; the
-  digest backstop is required. It also proved full identity-mutation
-  handling, signal safety, hostile-body safety, and real-`ENOSPC`
-  behavior.
-  Measurement found
-  no winning policy. No-journal `Immediate` wins the write path. A
-  retained journal wins the 50,000-note read-only refresh. Replay
-  decode alone runs about 60 times the 53.3 ms write budget. Real
-  `ENOSPC` under `Durability::None` is silent sparse-write loss with no
-  catchable error, a new adoption blocker. Ticket 27 resolved without an
-  adoption verdict. Handoffs: [ticket
-  36](./issues/36-reconcile-decisions-and-audit-coverage.md) (adoption)
-  and ticket 33 (freshness bound data). Probe assets live on branch
-  `scratch/t27-probe-worktree`.
+  the real-layout probe passes 63 of 63 macOS release-profile cases. The
+  Linux container run passes 62 of 63 cases (one ignored by design) against
+  `.traces/index.redb`. The same-incarnation, same-revision fork
+  exposes a missing content check. A digest rejects that fork in the probe;
+  ticket 25 has not adopted that safeguard. The probe also covers its modeled
+  identity mutations, signal stops, and hostile-body rejection.
+
+  The measurements do not establish a winning production policy. The corrected
+  Linux protocol uses native redb durability, 20 runs per case and an A-B-A
+  order. It puts the journal surcharge inside the noise band at 5k and 50k
+  notes. Replay saves 8 to 11 percent against parse fallback at 50k and
+  verifies against a fresh parse at every run. The faster 50,000-note case
+  labeled read-only actually runs writable recovery. The reported 60-times
+  comparison uses the historical 53.3 ms row-copy bound, not a
+  recovery-latency budget.
+
+  The dedicated `ENOSPC` probe reports a catchable `StorageFull` error at the
+  failing commit. Acknowledged `Durability::None` rows vanish on reopen at that
+  failure boundary. `Immediate` rows survive, and an orderly close loses
+  nothing. This result stays an adoption blocker for ticket 36; it does not
+  establish a general redb failure rule.
+
+  Ticket 27 records a completed investigation, not complete adoption proof.
+  [Ticket
+  36](./issues/36-reconcile-decisions-and-audit-coverage.md) owns adoption;
+  ticket 33 owns the host freshness decision. The probe source remains on
+  branch `scratch/t27-probe-worktree`. The linked ticket and research asset
+  distinguish the tested behavior from the remaining gates.
 
 ## Not yet specified
 

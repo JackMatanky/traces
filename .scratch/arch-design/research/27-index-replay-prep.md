@@ -1,13 +1,22 @@
 # Ticket 27 grilling preparation: the index replay prototype and the fault tests
 
-## Purpose and method
+## Historical plan and reading order
 
-This file prepares the grilling of
+This is the initial design and research plan for ticket 27. The editorial review
+date is 2026-11-10; the source does not record the original plan date. The plan
+is not a report of completed coverage.
+
+Read [the results](./27-index-replay-prototype.md) for the completed experiments
+and their limits.
+
+This plan prepares the grilling of
 [27-index-replay-prototype-and-fault-tests.md](../issues/27-index-replay-prototype-and-fault-tests.md).
-It collects the inherited contract, the code facts, the research lessons, the
-design questions and the test plan. The grilling decides the design questions.
-This ticket is a `task` ticket. It does not change production code. The
-maintainer decides adoption after the ticket.
+It separates inherited contracts, production facts, external lessons, DQ
+decisions, fault cases, measurements, and result-dependent decisions. The DQ
+decisions define the proposed prototype, not journal adoption.
+
+This ticket is a `task` ticket. The initial plan excludes production code
+changes. The maintainer decides adoption after the ticket.
 
 Sources for this file:
 
@@ -49,7 +58,7 @@ Sources for this file:
 | Ticket 28 | A replay changes the revision. Every query result names the incarnation and the revision. | 28 + 27:128-129 |
 | Ticket 21 | One writer per canonical root. The generation pair is published after the commit. | 21:89-99 |
 
-## The code today
+## Production facts recorded for the initial plan
 
 - `src/index/store.rs:38-43` defines the META keys: `version` = `1` and
   `fingerprint`. A version mismatch clears the store.
@@ -80,7 +89,10 @@ Sources for this file:
 - `src/index/store.rs:165-188` `IndexStore::open` creates the parent directory
   and the database. A `rebuild_needed` result drops the file and recreates it.
 
-## Research lessons
+## External research and local injection lessons
+
+The research and risk sections retain uncertainty where strict STE would change
+the meaning.
 
 ### redb 4.3.0 durability and recovery
 
@@ -109,9 +121,9 @@ Lessons for ticket 27:
   successful commit can clear its journal. A `None` apply leaves its journal
   until an error-reporting `Immediate` checkpoint or replay. A checkpoint
   qualifies only after the writer checks the stored target against the journal.
-- A failed commit is not a rollback. Close the handle and reopen the store. Read
+- A failed commit is not a rollback. Close the handle. Reopen the store. Read
   the incarnation and revision. Return the existing error. Recheck the base and
-  complete source snapshot in the next command before replay.
+  the complete source snapshot in the next command before replay.
 - Measure implicit open recovery and explicit `check_integrity` on separate
   saved images. Do not count the second repair as part of the first.
 - redb rejects a second process at open while the exclusive writer holds the
@@ -139,7 +151,7 @@ Lessons for ticket 27:
 
 - SQLite syncs its directory after journal removal. This design does not. After
   a successful `Immediate` commit, a returned journal has an old base revision.
-  The next writer discards it. Test the returned entry with a saved image.
+  The next writer discards it. Check the returned entry with a saved image.
   Measure the omitted sync as a cost control.
 - Put a magic, format version, epoch and checked identity in the header. Check
   the complete body before a commit. A damaged current-format journal causes a
@@ -213,30 +225,62 @@ Lessons for ticket 27:
 ### Fault injection on this machine
 
 - `.scratch/arch-design/research/26-prep/dyld-sync-shim.c.txt` interposes
-  `fsync` and `fcntl(F_FULLFSYNC)` on macOS. `KILL_AT=n` stops before the
-  n-th sync. It logs on stderr, misses non-sync boundaries and forwards
-  variadic `fcntl` calls without checking the argument form. Do not reuse it
-  unchanged for the complete suite.
+  `fsync` and `fcntl(F_FULLFSYNC)` on macOS. `KILL_AT=n` stops before the n-th
+  sync. It logs on stderr, misses non-sync boundaries and forwards variadic
+  `fcntl` calls without checking the argument form. Do not reuse it unchanged
+  for the complete suite.
 - `src/index/store.rs:366` is a private test-only row-poison helper. The
-  external probe mirrors the table definition and changes a test copy with
-  redb.
+  external probe mirrors the table definition and changes a test copy with redb.
 - `SIGKILL`, `abort`, `Ctrl-C` with its default handler and a release-profile
   panic run no `drop`. A separate unwind test build can exercise a `drop` path.
   Label that build as non-production. An out-of-memory kill stays an untested
   limit.
 
-## Settled design decisions
+## Initial implementation plan and risks
 
-These decisions define the prototype, not an adopted journal. Tickets 27 and 36
-still need the fault results and cost data.
+The initial plan uses the public surface and `traces::testing`, in the style of
+`t26-probe`. It calls for a throwaway crate, no production code changes, and a
+shadow store for the decided eleven-facet layout. The results describe the later
+scratch-branch helpers and distinguish the two probe identities.
+
+At planning time, `traces::testing` has 47 identifiers under the `test-utils`
+feature (`src/lib.rs:177-211`). This is a historical surface count, not a
+restriction on later scratch-branch helpers. It does not expose store `META`.
+
+- Mirror the table definitions for direct redb checks.
+- Use the exported `IndexerService`, `TestProject` and `QueryService` for real
+  fixtures and query checks.
+- The `poison_note_row` helper at `src/index/store.rs:366` is
+  `#[cfg(test)] pub(super)`. Use a test copy and direct redb for corrupt rows.
+  Do not treat the helper as an external probe API.
+- Reject special files, symlinks and implausible lengths before decode. Use a
+  nonblocking, no-follow open for the journal on supported systems. A checksum
+  does not prevent a malicious FIFO from blocking at `open`.
+- Use named failpoints beyond the old macOS sync shim. Keep logs out of child
+  stderr. The shim's `fcntl` forwarding reads a variadic argument without
+  checking its command. Do not reuse that part unchanged.
+- Treat saved file images as a limited crash simulation. The initial Linux VM
+  plan uses VM-local storage and 2 GiB of memory. The completed Linux run uses 4
+  GiB, as the results explain. redb defaults to a 1 GiB cache. Ticket 33
+  measured 467 MB for a pinned 50,000-note generation. Report any case that
+  cannot fit. Do not silently omit it.
+
+## DQ decisions for the planned prototype
+
+These decisions define the initial prototype contract, not an adopted journal.
+The fault and measurement matrices below specify the planned evidence. The
+results asset identifies completed work, changed probe surfaces, and open gates
+for tickets 27 and 36.
 
 ### DQ1. Publication
 
-Use a fixed temp name next to `index.redb.journal` under `.traces/`. Create the
-temp file with mode `0600` while the store writer handle is held. Write and sync
-the temp file. Rename it to the final name and sync the parent directory. Do not
-replace an unresolved final journal. The directory sync does not have a Windows
-equivalent in this plan.
+- Use a fixed temp name next to `index.redb.journal` under `.traces/`.
+- Create the temp file with mode `0600` while you hold the store writer handle.
+- Write the temp file. Sync the temp file.
+- Rename it to the final name. Sync the parent directory.
+- Do not replace an unresolved final journal.
+
+The directory sync does not have a Windows equivalent in this plan.
 
 ### DQ2. Removal and normal writes
 
@@ -246,20 +290,22 @@ Compare these paths against no-journal `Immediate`:
   that commit returns `Ok`.
 - A journaled normal apply with `Durability::None` keeps its journal. Resolve it
   with an error-reporting `Immediate` checkpoint or replay before the next
-  publication. Before a checkpoint, check that the stored target matches the
-  journal under the writer handle. Do not clear it on `Database::drop`.
+  publication. Check that the stored target matches the journal under the writer
+  handle before a checkpoint. Do not clear it on `Database::drop`.
 
-Charge the later checkpoint and cleanup to the original write. After the
-qualifying commit, unlink the journal without a directory sync. A crash can
-bring the entry back. The writer base check then rejects it. Test that state
-from a saved image. Measure the omitted directory sync as a control.
+Charge the later checkpoint and cleanup to the original write.
+
+- Unlink the journal without a directory sync after the qualifying commit. A
+  crash can bring the entry back. The writer base check then rejects it.
+- Check that state from a saved image.
+- Measure the omitted directory sync as a control.
 
 ### DQ3. Format and damage
 
 Use a fixed prefix with magic, header version and format epoch.
 
-- Check the header before trusting its lengths or identity.
-- Check the full body before commit. Bound the file size and every decode
+- Check the header before you trust its lengths or identity.
+- Check the full body before the commit. Bound the file size and every decode
   allocation.
 - Compare a single postcard blob with framed postcard facts and a global
   checksum. Framing gives streaming and bounded memory, not partial replay.
@@ -273,45 +319,49 @@ from ticket 26 before choosing the rebuild candidate.
 
 - Use the direct-facet payload as a cost control. Derive the candidate facets
   from recorded parsed facts at replay.
-- Test a kill inside a rebuild with and without the journal. Compare full
+- Run a kill case inside a rebuild with and without the journal. Compare full
   costs on the same fixture and release profile.
-- The older 1,333 ms, 1,718 ms and 1,801 ms figures came from different
-  runs. Do not combine them into a measured benefit.
+- The older 1,333 ms, 1,718 ms and 1,801 ms figures came from different runs. Do
+  not combine them into a measured benefit.
 
 ### DQ5. Changed sources
 
-Check the complete path set against the original source snapshot. Combine the
-base store file records with the journal changes. Use the original scan start
-for the racy rule.
-
-- Record and recheck content digests for racy files, including unchanged files.
-  Get the digest from the parser's read buffer for a changed file.
+- Check the complete path set against the original source snapshot.
+- Combine the base store file records with the journal changes.
+- Use the original scan start for the racy rule.
+- Record content digests for racy files, including unchanged files. Recheck these
+  digests. Get the digest from the parser's read buffer for a changed file.
 - Discard the whole journal if any source, policy, identity or writer-base check
   fails. Do not re-parse a single changed file inside the replay.
 
 A moved root alone does not invalidate the journal. A Unix copy can change
-inode-change times. Discard on that metadata mismatch and parse fresh.
+inode-change times. Discard the journal on that metadata mismatch. Parse fresh.
+
 Report both stable and all-racy fixture costs. A future-dated `mtime` stays racy
 under ticket 25.
 
 ### DQ6. Concurrency and lock time
 
 redb rejects a second process at `open` while a writer holds the file. It does
-not wait at `begin_write`. Record the actual query fallback and its notice.
-Report harness retry wait separately. The writer checks the base inside its
-write transaction before replay. Measure source validation both before and
-during the writer-handle hold. Include any extra read-only to writable handover
-cost. The store lock does not freeze source files.
+not wait at `begin_write`.
+
+- Record the actual query fallback and its notice.
+- Report harness retry wait separately.
+- The writer checks the base inside its write transaction before replay.
+- Measure source validation both before and during the writer-handle hold.
+- Include any extra read-only to writable handover cost.
+
+The store lock does not freeze source files.
 
 ### DQ7. A failed commit
 
 Treat a failed commit as an uncertain outcome:
 
-- Drop the handle and reopen the store. Check the incarnation and revision.
+- Drop the handle. Reopen the store. Check the incarnation and revision.
 - Return the existing write error. Do not retry in the same command.
-- In the next command, check the complete source snapshot and the base. Replay
+- Check the complete source snapshot and the base in the next command. Replay
   if the original base remains valid.
-- Otherwise discard a compatible journal and refresh from source. A target
+- Discard a compatible journal otherwise. Refresh from source. A target
   revision alone does not prove whose commit won.
 - Preserve a higher-epoch journal.
 
@@ -319,8 +369,8 @@ Treat a failed commit as an uncertain outcome:
 
 Use `index.redb.journal` and a fixed temp name for this engine.
 
-- A writer with the store handle cleans its safe current-engine temp, stale
-  journal and orphan journal. Resolve the final name before another rename.
+- Remove the safe current-engine temp, stale journal and orphan journal while
+  you hold the store handle. Resolve the final name before another rename.
 - Preserve a higher-epoch or unreadable-version journal. Skip the optional
   journal while that final name stays occupied.
 - Ticket 36 records the open owner decision for retired-engine files. Limit the
@@ -330,6 +380,7 @@ Use `index.redb.journal` and a fixed temp name for this engine.
 
 Keep journal ownership, durability and locking in the redb adapter. Add no
 domain port operation. Use the current platform-bound store path form.
+
 Ticket 32 owns any portable form. A future engine can use its own log.
 
 Journal facts can reach backup and sync tools that copy `.traces/`. Mode `0600`
@@ -340,36 +391,42 @@ currently inherits the process `umask`.
 
 Replay and normal discard are quiet. A damaged optional journal alone does not
 produce a notice. Keep the existing one-notice read fallback when the store
-itself is unusable. A higher-epoch store produces its existing notice and exit 0
-after a successful fresh parse. Ticket 34 owns the text. An optional journal
-failure does not change the store write error rules.
+itself is unusable.
+
+A higher-epoch store produces its existing notice and exit 0 after a successful
+fresh parse. Ticket 34 owns the text. An optional journal failure does not
+change the store write error rules.
 
 ### DQ11. Readers
 
 A pure read-only operation does not open the journal. A query command that
 enters writable refresh can validate and replay it before publishing a query.
-Test a read-only vault with a journal and zero journal writes. Measure the
-no-change read-only control with and without a retained journal.
+
+- Run a case with a read-only vault, a journal and zero journal writes.
+- Measure the no-change read-only control with and without a retained journal.
 
 ### DQ12. Decision input
 
-Measure parse-only redo and the saved work from each path. The screen's 125 ms
-edit bound includes unknown work. Profile scan, parse, link reads, reconcile and
-persistence separately. Include the replay persist and source validation.
+- Measure parse-only redo and the saved work from each path. The screen's 125 ms
+  edit bound includes unknown work.
+- Profile scan, parse, link reads, reconcile and persistence separately.
+- Include the replay persist and source validation.
+- Compare no-journal `None`, no-journal `Immediate`, both journaled normal-write
+  paths and the buffered control.
+- Match stop times, fixture, profile and cache state.
 
-Compare no-journal `None`, no-journal `Immediate`, both journaled normal-write
-paths and the buffered control. Match stop times, fixture, profile and cache
-state. An overlap between cost and benefit intervals proves no ranking. Use the
-ticket 26 rejection gate only when saved-work upper bound does not exceed
+An overlap between cost and benefit intervals proves no ranking. Use the ticket
+26 rejection gate only when the saved-work upper bound does not exceed the
 added-cost lower bound.
 
 Ticket 27 proposes a host staleness bound after measuring validation costs and
 stating a freshness target. Ticket 33 checks that bound against the real host.
 
-## Fault-test plan
+## Planned fault matrix
 
-Each row checks full query equivalence with a fresh parse. Also check the
-test-only outcome, parse count, revision, exit code and notice stream.
+Each row specifies a requirement, not a claim of completed coverage. Each row
+checks full query equivalence with a fresh parse. Also check the test-only
+outcome, parse count, revision, exit code and notice stream.
 
 | Scenario | Injection | Expected path | Extra check |
 |---|---|---|---|
@@ -385,13 +442,13 @@ test-only outcome, parse count, revision, exit code and notice stream.
 | Stop inside replay commit | Named stop or sync interposer | Replay or discard | Full result and revision after repair |
 | Stop inside a full rebuild | Named stop | Replay candidate or redo control | No partial store query |
 | Lose a prior `None` base commit | Saved old-base image | Discard and redo | Do not apply against the wrong base |
-| Keep journal entry, lose journal data | Saved image or body truncation | Discard and redo | Header and body checks fail closed |
-| Lose store commit, keep journal | Saved old-store image | Replay | Full query and an empty next refresh |
-| Keep store commit and journal | Saved image | Stale discard | No duplicate revision advance |
+| Keep the journal entry. Lose the journal data. | Saved image or body truncation | Discard and redo | Header and body checks fail closed |
+| Lose the store commit. Keep the journal. | Saved old-store image | Replay | Full query and an empty next refresh |
+| Keep the store commit and journal | Saved image | Stale discard | No duplicate revision advance |
 | Change an unlisted source file | Edit before replay | Discard and redo | Check inbound links, notices and keys |
 | Change a listed source file | Edit before replay | Discard and redo | No local re-parse inside replay |
 | Add, delete or rename a source file | Edit before replay | Discard and redo | Check inbound links and path set |
-| Keep size and `mtime`, change racy content | Edit and restore `mtime` | Discard and redo | Original scan start and digest decide |
+| Keep size and `mtime`. Change the racy content. | Edit the content. Restore `mtime`. | Discard and redo | Original scan start and digest decide |
 | Change the policy | Change fingerprint input | Discard and rebuild | No mixed-policy rows |
 | Change each store identity part | Edit one field per run | Discard or preserve by epoch | No foreign base accepted |
 | Use a lower or higher store epoch | Edit store `META` | Rebuild or fresh parse | Higher store gets one notice |
@@ -400,30 +457,35 @@ test-only outcome, parse count, revision, exit code and notice stream.
 | Fork a store at the same incarnation and revision | Change affected rows in a copy | Reject or report protocol failure | Full query must equal fresh parse |
 | Make the store directory unwritable | Repeat the command | Existing store error rule | At most a final journal and a temp |
 | Make the vault read-only | Read-only mount or mode | Read-only query or fresh parse | Zero journal writes on a pure read |
-| Fill disk during journal write | Inject ENOSPC | Normal source path | No growing temp files |
-| Fill disk after journal publication | Inject store-commit ENOSPC | Existing write error | Compare a no-journal write |
+| Fill the disk during the journal write | Inject ENOSPC | Normal source path | No growing temp files |
+| Fill the disk after journal publication | Inject store-commit ENOSPC | Existing write error | Compare a no-journal write |
 | Corrupt, truncate or lie about journal length | File surgery | Discard or preserve unknown | No panic or unbounded allocation |
-| Plant a symlink or FIFO at journal name | File surgery | Normal source path | No follow or blocked open |
-| Delete store, keep current journal | Remove store in a test copy | Discard and redo | Check full query |
+| Plant a symlink or FIFO at the journal name | File surgery | Normal source path | No symlink following or blocking at open |
+| Delete the store. Keep the current journal. | Remove the store in a test copy | Discard and redo | Check the full query |
 | Start a second process with a live writer | Child process | Actual query fallback | Open error, not a transaction wait |
 | Start a second process after writer death | Child process | One replay | Harness retry wait is separate |
-| Run two `None` journaled writes | Stop before each checkpoint | Replay or redo by base | Resolve first journal before second |
-| Drop handle after failed commit | Second writer acts | Discard or next-command replay | No same-command retry |
+| Run two `None` journaled writes | Stop before each checkpoint | Replay or redo by base | Resolve the first journal before the second |
+| Drop the handle after a failed commit | Second writer acts | Discard or next-command replay | No same-command retry |
 
 The probe needs named stop points for non-sync boundaries. The old macOS shim
-does not provide them. Keep injector logs separate from child stderr. Use a
-Linux injector for the Linux fault run.
+does not provide them.
+
+- Keep injector logs separate from child stderr.
+- Use a Linux injector for the Linux fault run.
 
 Add controls that disable replay, the base check and the source check. These
-controls must fail the relevant rows. Saved file images model selected lost
-writes. They do not prove behavior under real power loss or arbitrary write
-reordering.
+controls must fail the relevant rows.
 
-## Measurement plan
+Saved file images model selected lost writes. They do not prove behavior under
+real power loss or arbitrary write reordering.
 
-Use the shipped `release` profile for matched runs. The repo sets `opt-level =
-"z"`, `panic = "abort"`, fat LTO and one codegen unit. The default `bench`
-profile uses `opt-level = 3`. Force Criterion to use the shipped profile.
+## Planned measurement matrix and decision rules
+
+Use the shipped `release` profile for matched runs. The repo sets
+`opt-level = "z"`, `panic = "abort"`, fat LTO and one codegen unit. The default
+`bench` profile uses `opt-level = 3`.
+
+Force Criterion to use the shipped profile.
 
 The ticket 26 throwaway probe also used `opt-level = 3`. Keep its numbers as
 historical bounds, not as a matched gate input. Run benchmarks in series,
@@ -440,87 +502,71 @@ without `RUSTFLAGS`.
 | File and parent-directory sync | Timed prototype calls | Publication cost, not just syscall counts |
 | Removal directory sync control | Separate timed branch | Price the omitted cleanup sync |
 | redb repair after each stop class | Separate saved images for open and integrity check | Do not double-count repair |
-| Journal bytes, store size and peak RSS | Per facet and per phase | 2 GiB VM and layout claims |
+| Journal bytes, store size and peak RSS | Per facet and per phase | Initial 2 GiB VM limit and layout claims |
 | Writer-handle hold and other-process query | Actual concurrent children | Fallback latency and lock cost |
 | Harness acquisition retry | Separate timed control | Do not call it production wait |
 | No-change with no journal and a retained journal | Read-only open, no writer held | Measure the cold query control |
 | First usable and repeated queries | Cold CLI and simulated host | Compare with a trusted fresh parse |
 | No-journal `None` and `Immediate` writes | Same fixture and phase | Check if a journal adds value |
 | Buffered journal control | Process stops only | Do not claim power-loss protection |
-| Task scan, assembled rows and one-note replace | Decided eleven-facet shadow layout | Test the 85 percent and 2 times claims |
+| Task scan, assembled rows and one-note replace | Decided eleven-facet shadow layout | Check the 85 percent and 2 times claims |
 | Parse-only redo and each persist stage | Time separately | Calculate real saved work |
 | Journal-induced store ENOSPC | A no-journal control on the same free space | Check for a new user-visible failure |
 
-Use 50, 5,000 and 50,000-note anchors. Extend near measured crossovers. Check
-the fixture count against about 0.75 tasks per note. Use a hub-linked shape for
-inbound links.
+- Use 50, 5,000 and 50,000-note anchors.
+- Extend near measured crossovers.
+- Check the fixture count against about 0.75 tasks per note.
+- Use a hub-linked shape for inbound links.
 
 Run cold cases at least 20 times with an A-B-A control. Report the median and
 range. Do not rank overlapping ranges.
 
-For each matched stop phase, let `O` be the extra normal-write journal cost.
+Let `O` be the extra normal-write journal cost for each matched stop phase.
 Include any later checkpoint and cleanup. Let `B` be the rival first usable
 query time minus the journal first usable query time. Include source checks,
 redb repair, decode, derivation and replay persist.
 
 - Report `O / B` only where both are positive. A touch that invalidates the
   snapshot has no journal benefit.
-- Reject a candidate only when saved-work upper bound does not exceed added-cost
-  lower bound. An overlap proves neither a win nor a rejection.
+- Reject a candidate only when the saved-work upper bound does not exceed the
+  added-cost lower bound. An overlap proves neither a win nor a rejection.
 - Do not invent a failure rate or a stop-time distribution.
 
-## Prototype shape and risks
-
-- Keep the prototype in a throwaway crate on the public surface and
-  `traces::testing`, in the style of `t26-probe`. Do not change production code.
-  The decided eleven-facet layout needs a throwaway shadow store.
-- `traces::testing` is frozen at 47 identifiers under the `test-utils` feature
-  (`src/lib.rs:177-211`). It does not expose store `META`. Mirror the table
-  definitions for direct redb checks. Use the exported `IndexerService`,
-  `TestProject` and `QueryService` for real fixtures and query checks.
-- The `poison_note_row` helper at `src/index/store.rs:366` is `#[cfg(test)]
-  pub(super)`. Use a test copy and direct redb for corrupt rows. Do not treat
-  the helper as an external probe API.
-- Reject special files, symlinks and implausible lengths before decode. Use a
-  nonblocking, no-follow open for the journal on supported systems. A checksum
-  does not prevent a malicious FIFO from blocking at `open`.
-- Use named failpoints beyond the old macOS sync shim. Keep logs out of child
-  stderr. The shim's `fcntl` forwarding reads a variadic argument without
-  checking its command. Do not reuse that part unchanged.
-- Treat saved file images as a limited crash simulation. The Linux VM uses
-  VM-local storage and 2 GiB of memory. redb defaults to a 1 GiB cache. Ticket
-  33 measured 467 MB for a pinned 50,000-note generation. Report any case that
-  cannot fit. Do not silently omit it.
-
-## Consistency checks
+## Cross-ticket contracts and delivery plan
 
 - Ticket 26 now names an `Immediate` normal apply or replay as a removal
   barrier. Its release-panic handoff now says that the process aborts.
-- Ticket 24 decides eleven facets. The current production store has eight
-  tables. The throwaway layout probe must measure the decided shape.
-- Ticket 25 keeps racy files racy from the original scan start. The journal
-  adds digests for that source check, but adds no `commit_nonce`.
+- Ticket 24 decides eleven facets. The production snapshot above has eight
+  tables. The initial plan calls for a throwaway layout probe of the decided
+  shape. The results distinguish that incomplete shadow from the real-layout
+  replay probe.
+- Ticket 25 keeps racy files racy from the original scan start. The journal adds
+  digests for that source check, but adds no `commit_nonce`.
 - Ticket 28 makes replay advance the revision. A forked store with matching
   incarnation and revision but different affected rows needs a fault test.
-- Ticket 32 owns portable path bytes. The journal uses current store bytes
-  until that decision changes the format.
+- Ticket 32 owns portable path bytes. The journal uses current store bytes until
+  that decision changes the format.
 - Ticket 33 checks the proposed staleness bound after ticket 27 measures the
   cost. A numeric bound needs an explicit freshness target.
-- Ticket 34 owns notice text. A damaged optional journal alone does not
-  become a store-read failure.
+- Ticket 34 owns notice text. A damaged optional journal alone does not become a
+  store-read failure.
 - Ticket 36 decides adoption and the owner for retired-engine file cleanup.
-- The asset `../research/27-index-replay-prototype.md` does not exist yet.
-  Ticket 27 writes it after the real prototype and links it under `## Answer`.
+- The initial delivery plan names `../research/27-index-replay-prototype.md` as
+  the results asset. That asset now exists. Ticket 27 links it under
+  `## Answer`.
 
-## Decisions that need the prototype results
+## Result-dependent decisions from the initial plan
+
+The questions below remain the plan's decision checklist. The results asset
+states which evidence exists and which gates remain open.
 
 - Whether either journal path beats the no-journal `Immediate` path at a
   measured stop phase.
 - Whether whole-blob or streaming replay wins at a large rebuild size.
 - Whether a full-rebuild facts journal survives the real saved-work gate.
-- Whether the same-revision fork test exposes a base-identity hole. A
-  failed proof blocks adoption until the identity contract changes.
-- Whether the journal makes a store write fail after it uses available
-  space. A new failure blocks adoption.
-- Which numerical host staleness bound fits the measured cost and the
-  stated freshness target.
+- Whether the same-revision fork test exposes a base-identity hole. A failed
+  proof blocks adoption until the identity contract changes.
+- Whether the journal makes a store write fail after it uses available space. A
+  new failure blocks adoption.
+- Which numerical host staleness bound fits the measured cost and the stated
+  freshness target.

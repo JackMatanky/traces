@@ -3,96 +3,250 @@
 Status: investigation complete. This is not an adoption result.
 Ticket 27 is resolved. Ticket 36 weighs adoption.
 
-## Method and artifact
+## Findings and limits
+
+The real-layout replay probe passes 63 of 63 macOS cases with redb 4.3.0. The
+Linux container run passes 62 of those cases (one ignored by design). These are
+process-stop results, not proof against arbitrary power-loss reorderings.
+
+The corrected matched protocol (native redb durability, 20 runs per case,
+a-b-a-c-a order, equal-work placements) ran on Linux. The journal surcharge
+sits inside the A-B-A noise band at 5k and 50k. Replay saves 8 to 11 percent
+against parse fallback at 50k and verifies against a fresh parse at every run.
+
+A dedicated `ENOSPC` probe shows real, scoped behavior. The writer gets a
+catchable `StorageFull` error. Acknowledged `Durability::None` rows vanish on
+reopen at the failure boundary. `Immediate` rows survive. This stays an
+adoption blocker for ticket 36 to weigh.
+
+Four distinctions control interpretation:
+
+| Evidence | What it establishes | What it does not establish |
+|---|---|---|
+| Eight-table replay probe | Real production layout, persistence, and query comparison | The decided eleven-facet implementation or notices |
+| Eleven-facet layout shadow | Historical layout observations from fixture facts | Complete timestamps, range keys, notices, or full query rows |
+| Corrected policy timing cases | Native-durability costs at matched work on VM storage | Native-Linux or production-host latency, or an adoption result |
+| Fault cases and saved images | Selected process-stop and damage behavior | Arbitrary torn writes, power-loss ordering, or a full completed plan matrix |
+| `ENOSPC` probe | Real errno-level failure, row-survival split by durability, tmpfs and orderly exit | Power-loss ordering, other redb versions, or other filesystems |
+
+Two original interpretations need correction, not removal:
+
+- The source calls 53.3 ms a ticket-26 “write budget.” This historical
+  ROW-COPY/ENCODE comparison is not a recovery latency limit.
+- The macOS harness labeled the journaled-`Immediate` surcharge as sync cost
+  from an external fsync surrogate. The corrected protocol measures native
+  redb durability directly and finds no measurable surcharge.
+
+The research and risk sections retain uncertainty where strict STE would change
+the meaning. The [initial plan](./27-index-replay-prep.md) remains the
+requirements checklist, not a completed coverage claim.
+
+## Method and probe identities
+
+### Real-layout replay probe and branch provenance
 
 The throwaway replay crate lives on the scratch worktree branch
-`scratch/t27-probe-worktree`, at
-`.scratch/arch-design/research/27-probe/replay/` under
-`.worktrees/t27-probe/`. The layout probe and its older results are in
-[the layout probe](./27-probe/layout/). Production code changes are
-limited to that scratch branch, gated behind the `test-utils` feature.
-The changes expose `IndexStore` and the index database path constant.
-They also add two gated test helpers on `IndexStore`, a gated
-`QueryService` pass-through, and a gated `WorkspaceIndex` constructor
-from facts. No production behavior changed.
+`scratch/t27-probe-worktree`. Its branch-relative path is
+`.scratch/arch-design/research/27-probe/replay/`, under `.worktrees/t27-probe/`.
+The instructions exist only on that branch at
+`.scratch/arch-design/research/27-probe/replay/README.md`.
 
-The replay probe journals and replays the **real** `.traces/index.redb`
-layout: the eight production redb tables, postcard rows, and real
-persistence through `WorkspaceIndex::for_probe_facts` and
-`IndexerService::persist`. Verification compares full `QueryRow`
-accessors against a fresh-parse store through
-`run_from_store_for_probe`. Decided-identity fields are incarnation,
-revision, epoch, policy, and extractor fingerprint. The probe models
-them in the journal header and a sidecar file. The production store does
-not carry them yet. The notices facet is out of scope. The parser is
-infallible and the codebase has no notices data. This gate stays open
-for tickets 29 and 34.
+The former main-repository link `./27-probe/replay/README.md` is not a local
+results dependency. That branch's replay instructions and the layout probe's
+stderr output contain the run commands and known limits.
 
-It exercises publication, source checks, replay, and process stops. The
-layout crate derives eleven named facets from parsed fixture notes. Run
-commands and known limits are in [the replay
-instructions](./27-probe/replay/README.md) and the layout probe's stderr
-output.
+The layout probe and its older results are in
+[the layout probe](./27-probe/layout/).
 
-Host: Apple M4 Pro, macOS 27.2, APFS, arm64. Source commit `51af072a`.
-Nightly Rust 1.101.0 (2026-09-30). Release builds use `opt-level = "z"`,
-fat LTO, one codegen unit, and `panic = "abort"`. No `RUSTFLAGS` were
-set. The Linux runs used a Podman Fedora aarch64 VM with 4 GiB RAM. They
-are not native-Linux latency evidence. These tests model process stops,
-not arbitrary power-loss reorderings.
+Production code changes stay on the scratch branch, behind the `test-utils`
+feature. They expose `IndexStore` and the index database path constant. They add
+two gated test helpers on `IndexStore`, a gated `QueryService` pass-through, and
+a gated `WorkspaceIndex` constructor from facts. No production behavior changed.
 
-## Correctness results
+The replay probe journals and replays the real `.traces/index.redb` layout:
 
-The macOS release-profile suite passed 42 of 42 tests with redb 4.3.0
-(about 10 seconds). A Linux run passed 25 of 25 with pinned redb 4.3.0
-(2.12 seconds) after the VM memory rose to 4 GiB. The re-targeted
-42-test suite has not yet run there. The suite covers, beyond the
-original 25 cases:
+- The eight production redb tables and postcard rows.
+- Real persistence through `WorkspaceIndex::for_probe_facts` and
+  `IndexerService::persist`.
+- Full `QueryRow` accessor comparisons against a fresh-parse store through
+  `run_from_store_for_probe`.
 
-- The fork hole. With the base check weakened to incarnation plus
-  revision only (`PROBE_WEAK_BASE=1`), a journal from a divergent store
-  with the same revision is wrongly accepted, and verification fails.
-  This is direct evidence that the ticket-25 contract needs the digest
-  backstop.
-- Every decided-identity part mutates and is handled: policy drift,
-  incarnation, revision, epoch up (discard and reparse), epoch down
-  (preserve and serve a fresh query), extractor fingerprint.
-- Read-only vault and a true read-only redb handle never open or apply
-  the journal.
-- A Unix `cp -R` discards and reparses. A `mv` replays. An edit racing
-  the final source check fails safe.
-- `SIGKILL` and `SIGINT` at a hold failpoint behave like the simulated
-  stops. Repair timing and `check_integrity` output are printed without
-  time assertions.
-- A hostile but checksum-valid body is rejected by a length guard
-  without a large allocation.
-- The mid-rebuild stop rolls back inside a single redb transaction. This
-  is a tautology before incremental rebuilds exist and proves nothing
-  about a multi-transaction rebuild.
+The journal header and a sidecar model incarnation, revision, epoch, policy, and
+extractor fingerprint. The production store does not carry those
+decided-identity fields yet.
 
-Fact hashing canonicalizes postcard rows through ordered JSON before
-blake3, because postcard map bytes are not canonical. Recovery checks
-the target digest after applying changes, not before.
+The notices facet is out of scope: the parser is infallible, and the codebase
+has no notices data. This gate stays open for tickets 29 and 34.
 
-Real `ENOSPC` was exercised in a container with a 64 MiB `tmpfs`. The
-result changes the decided error model. redb 4.3.0 mmaps the store. With
-`Durability::None`, an `ENOSPC` commit reports success. The file stays
-sparse, the new rows are silently lost, and queries serve the stale
-state. With a hard file-size cap, the process dies by `SIGXFSZ` with no
-catchable error.
+Fact hashing canonicalizes postcard rows through ordered JSON before blake3
+because postcard map bytes are not canonical. Recovery checks the target digest
+after applying changes, not before.
 
-- The journal-induced failure surface matches the no-journal surface.
-  There is no new failure class.
-- Both surfaces are silent loss. The decided reopen-and-classify path
-  has no `ENOSPC` error to classify on this stack.
-- This silent loss is itself an adoption blocker for ticket 36 to weigh.
+### Incomplete eleven-facet layout shadow
 
-## Matched measurements (macOS, release profile)
+The layout crate derives eleven named facets from parsed fixture notes. It is
+not the real-layout replay crate. Its shadow omits timestamps, most range keys,
+notices, and full query rows. The historical layout table below therefore cannot
+size the complete decided implementation.
 
-Protocol: 20 runs per policy case, A-B-A interleaving, no-op controls
-(drift clean). Placement and scenario cases take 5 runs. Execution is
-serial. The warmup run is discarded. Report medians and ranges.
-Fixture: 5,000 and 50,000 notes, one-note edit as the comparison work.
+### Environment and measurement protocol
+
+| Item | Recorded setup |
+|---|---|
+| Host | Apple M4 Pro, macOS 27.2, APFS, arm64 |
+| Source | Commit `51af072a`, worktree branch `scratch/t27-probe-worktree` |
+| Compiler | Nightly Rust 1.101.0 (2026-09-30) |
+| Release profile | `opt-level = "z"`, fat LTO, one codegen unit, `panic = "abort"` |
+| Compiler flags | No `RUSTFLAGS` set |
+| Corrected protocol host | Podman rust:1.96-slim container (aarch64), pinned redb 4.3.0, nightly-2026-10-01; VM storage, not native-Linux latency evidence |
+| Execution | Serial; fresh child process per sample |
+| Policy cases | 20 runs per block, order a-b-a-c-a (a = 60 runs); native `Durability::Immediate` commits |
+| Other cases | 20 runs per case |
+| Reported statistics | Medians and ranges |
+| Fixtures | 5,000 and 50,000 notes; one-note edit as the policy comparison work |
+
+The `Immediate` labels below retain the source's case names. The external
+store-file fsync and directory fsync surrogate does not prove native redb
+`Durability::Immediate` behavior.
+
+The deferred path reports write-path cost without proving that later checkpoint
+and cleanup costs are fully charged. Do not treat these measurements as the
+complete matched protocol from the initial plan.
+
+The reported no-op controls are “drift clean”; that label is not proof of a
+cold-cache protocol.
+
+## Fault evidence
+
+### Completed test coverage
+
+| Run | Result | Duration | Limit |
+|---|---|---|---|
+| macOS, release profile, redb 4.3.0 | 63 of 63 passed | 9.4 seconds | Process-stop evidence |
+| Linux container, re-targeted suite, pinned redb 4.3.0 | 62 passed, 1 ignored by design | 8.1 seconds | `SIGKILL`/`SIGINT` cases need `T27_SIGNAL_HELPER` when the image ships no `kill` binary |
+
+The suite extends the original 25 cases with these checks:
+
+| Case | Reported evidence | Interpretation or limit |
+|---|---|---|
+| Same-revision fork | `PROBE_WEAK_BASE=1` weakens the base check to incarnation plus revision. The probe wrongly accepts a divergent journal, and verification fails. | Direct evidence for a digest backstop, not an adopted ticket-25 identity contract |
+| Decided identity | Policy drift, incarnation, revision, epoch up, epoch down, and extractor fingerprint mutate | Epoch up discards and reparses; epoch down preserves and serves a fresh query |
+| Pure read-only access | A read-only vault and a true read-only redb handle never open or apply the journal | Distinct from the writable refresh measurement below |
+| Root and source changes | Unix `cp -R` discards and reparses; `mv` replays; an edit racing the final source check fails safe | Root pathname alone does not decide replay |
+| Process stops | `SIGKILL` and `SIGINT` at a hold failpoint behave like simulated stops | Repair timing and `check_integrity` output have no time assertions |
+| Hostile valid checksum | A length guard rejects the body without a large allocation | Does not establish all malicious-input cases |
+| Mid-rebuild stop | A single redb transaction rolls back | Tautological before incremental rebuilds; proves nothing about a multi-transaction rebuild |
+
+### ENOSPC and file-size failure observations
+
+A dedicated `enospc-probe` binary tested real `ENOSPC` on a 64 MiB `tmpfs`
+(container). It used native `Durability::None` and `Immediate` commits with a
+1 MiB cache and 1 MiB rows. The receipt is an external synchronized file. The
+pristine-copy checker opens read-only first.
+
+The failing commit gives the writer a real catchable error
+(`redb::Error::Io` errno 28, `StorageFull`). The loss follows that error. Under
+`Durability::None`, every row acknowledged before the failing commit was
+absent after reopen (none-0: `acknowledged=31 actual=0`; none-16: `23` rows
+the same). Under native `Immediate`, all earlier acknowledged rows survived on
+the same filesystem (immediate-0: 31 of 31; immediate-16: 23 of 23). An
+orderly close with no failure kept all 128 `None` rows on a roomy control
+filesystem. The loss therefore needs the failure boundary, not a `None` commit
+alone. A retained journal shifts only the exhaustion threshold (31 to 23 rows
+at 16 MiB).
+
+A post-`ENOSPC` store keeps a recovery flag, so `open_read_only` reports
+`RepairAborted` even with free space. The separately labelled writable reopen
+is the only working scan; `check_integrity` stayed clean in all cases.
+A hard file-size cap instead kills the process with `SIGXFSZ`.
+
+| Case | Writer exit | Acknowledged rows | Survived on reopen |
+|---|---|---|---|
+| none-0 | 3, errno 28 | 31 | No (0 of 31) |
+| none-16 | 3, errno 28 | 23 | No (0 of 23) |
+| immediate-0 | 3, errno 28 | 31 | Yes (31 of 31) |
+| immediate-16 | 3, errno 28 | 23 | Yes (23 of 23) |
+| control (none, roomy fs) | 0 | 128 | Yes (128 of 128) |
+
+The journal-induced and no-journal surfaces matched: both lose acknowledged
+`None` rows at the failure boundary. The decided reopen-and-classify path has
+an error to report, but it cannot restore the lost acknowledged rows.
+
+Keep these observations within the tested stack: redb 4.3.0, tmpfs, orderly
+exit at the failure boundary. This is not a power-loss test and not a general
+redb guarantee.
+
+## Corrected protocol measurements (Linux container, release profile, native durability)
+
+### Journal policy comparison, 20 runs per block, order a-b-a-c-a
+
+Work is the one-note edit. Policy a is the no-journal `Immediate` write.
+Policy b is the journaled `Immediate` write. Policy c is the journaled
+deferred `None` write with a later native checkpoint charge.
+
+| Policy | 5k median ms | 5k range ms | 50k median ms | 50k range ms | Journal |
+|---|---:|---|---:|---|---:|
+| a, no-journal `Immediate` | 663.7 (a blocks 671.9/658.1/659.8) | 637.1–790.1 | 6,686.0 | 6,475.4–8,115.3 | 0 B |
+| b, journaled `Immediate` | 667.3 | 642.2–713.4 | 6,705.5 | 6,579.1–8,305.6 | 317 KB / 3.3 MB |
+| c, journaled `None` + checkpoint | 662.9 | 643.5–689.5 | 6,620.8 | 6,531.4–6,984.8 | 317 KB / 3.3 MB |
+
+At 5k the a-block drift is about 2 percent. Policy b adds +3.6 ms and policy c
+subtracts 0.8 ms against the a median. At 50k, policy b adds +19.5 ms
+(0.3 percent) and policy c subtracts 65.2 ms (1 percent). The a-block range is
+wide, so both deltas sit inside the noise band. The journal surcharge on a
+cold full publish is not measurable with this protocol. No policy ranking is
+proved.
+
+Phase medians at 50k: parse about 1,080 ms, validation about 4.45 s,
+native commit 618 to 669 ms, checkpoint about 26 ms (c only). Peak RSS is
+319 to 338 MB at 50k.
+
+### Recovery: replay versus parse fallback (20 runs each)
+
+| Scenario | 5k replay ms | 5k fallback ms | 50k replay ms | 50k fallback ms | 50k saved |
+|---|---:|---:|---:|---:|---:|
+| no-change | 300.4 | 328.2 | 2,926.6 | 3,187.2 | 8.2 percent |
+| one-note edit | 305.2 | 330.1 | 2,945.3 | 3,222.6 | 8.6 percent |
+| hundred-note edit | 299.0 | 331.4 | 2,938.7 | 3,291.3 | 10.7 percent |
+| links add/delete/rename | 301.9 | 330.5 | 2,941.3 | 3,218.9 | 8.6 percent |
+| policy rebuild | 563.6 | 594.3 | 5,689.5 | 5,879.6 | 3.2 percent |
+
+Replay verifies against a fresh parse and full assembled entries at every run.
+Every recovered outcome is `replayed`, and every fallback outcome is `parsed`.
+A source change during replay discards the journal and parses. The
+class-change fallback case shows this in 20 of 20 runs.
+
+### Source-check placement with equal work (20 runs each)
+
+| Placement | 50k total median ms | 50k hold median ms |
+|---|---:|---:|
+| A: check before hold | 551.2 | 217.8 |
+| B: check inside hold | 560.9 | 558.3 |
+
+The totals match within noise. Placement B holds the writer lock 2.56 times
+longer at 50k (217.8 to 558.3 ms) and 2.2 times longer at 5k (27.4 to
+60.2 ms). Equal work removes the earlier unequal-comparison caveat.
+
+### Snapshot, read-only and query costs (20 runs each)
+
+| Case | 5k median ms | 50k median ms |
+|---|---:|---:|
+| Snapshot, stable fixture | 305.6 | 2,997.9 |
+| Snapshot, all-racy fixture | 302.3 | 3,002.6 |
+| Read-only no-change digest, no journal | 21.6 | 216.4 |
+| Read-only no-change digest, retained journal | 22.0 | 215.6 |
+| First usable query | 8.7 to 10.2 | 90.2 to 101.9 |
+| Repeated query | 7.8 to 8.6 | about 80 |
+
+Stable versus all-racy differs by under 5 ms at both sizes with 20 runs each.
+The retained journal costs nothing on a pure read-only no-change pass.
+
+The macOS tables below keep their record as the earlier-generation harness
+output. The Linux tables above supersede them for the corrected protocol. The
+Linux tables use native redb durability, a true a-b-a-c-a order, 20 runs
+everywhere, equal-work placements, and real stable/racy snapshots.
+
+## Reported measurements (macOS, release profile)
 
 ### Journal policy comparison (work = one-note edit)
 
@@ -105,25 +259,25 @@ Fixture: 5,000 and 50,000 notes, one-note edit as the comparison work.
 | journaled `Immediate`, 50k | 20 | 12,205.6 | 12,002.6–13,312.3 | 3,289,454 | commit+durability 5,530.3, sync 13.8 |
 | journaled deferred `None`, 50k | 20 | 6,716.7 | 6,549.6–6,850.1 | 3,289,454 | commit+durability 0.0, sync 10.4 |
 
-Key readings:
+| Other reported quantity | Value | Interpretation limit |
+|---|---|---|
+| Journal encode, postcard plus blake3 | About 0.3 ms at both sizes | Below historical 53.3 ms ROW-COPY/ENCODE comparison; not a recovery budget |
+| Journaled `Immediate` sync-related surcharge | About 490 ms at 5k; 5.5 s at 50k | Source attributes it to journal-file sync, store-file fsync, and directory fsync, not encode |
+| Parse time across paths | About 400 ms at 5k; 4.8 to 6.7 s at 50k | Deferred path still parses current state up front |
+| 50k no-journal store | 76,754,944 B | Full rebuild writes all rows |
+| 50k journaled `Immediate` store | 51,236,864 B | Different work prevents a universal sizing comparison |
+| 50k deferred store | 33,689,600 B | Different work prevents a universal sizing comparison |
+| 50k peak RSS | About 462 MB with a journal; 281 to 339 MB without | Harness and path-specific observations |
 
-- Journal encode (postcard plus blake3) is about 0.3 ms at both sizes.
-  This sits far under the 53.3 ms ticket-26 write budget. Encoding is
-  not a cost concern.
-- The journaled `Immediate` surcharge is not encode. It is journal-file
-  sync, store-file fsync, and directory fsync: about 490 ms at 5k and
-  5.5 s at 50k.
-- The deferred journal pays almost nothing in the write path but still
-  parses the current state up front. Parse dominates everywhere: about
-  400 ms at 5k and 4.8 to 6.7 s at 50k.
-- No policy dominates. The no-journal `Immediate` path wins the write
-  path at both sizes. A retained journal wins the read-only no-change
-  refresh at 50k (4,315.3 ms versus 6,329.0 ms without). The retained
-  journal shifts cost from reads to the next write.
-- Store sizes at 50k: no-journal 76,754,944 B, journaled `Immediate`
-  51,236,864 B, deferred 33,689,600 B. The no-journal store is bigger
-  because a full rebuild writes all rows. Peak RSS at 50k is about
-  462 MB with a journal and 281 to 339 MB without.
+The source concludes that encoding is not a cost concern and that no policy
+dominates. It reports the no-journal `Immediate` path as the write-path winner
+at both sizes. It describes deferred cost as almost nothing in the write path,
+despite the larger reported total.
+
+These are reported interpretations, not a complete cost-benefit proof. The
+source also says a retained journal shifts cost from reads to the next write.
+The timing table does not remove the initial plan's checkpoint-and-cleanup
+accounting requirement.
 
 ### Source-check placement (5 runs)
 
@@ -134,52 +288,82 @@ Key readings:
 | A, 50k | 5 | 2,134.7 | 2,117.0–2,159.9 | 199.8 |
 | B, 50k | 5 | 1,939.8 | 1,921.2–1,965.7 | 1,920.7 |
 
-Placement B cuts total wall time by 9 to 14 percent by overlapping parse
-with the store digest. The writer hold grows to nearly the whole parse.
-Placement A keeps the hold small at a 9 to 14 percent total-time cost.
-This is a trade-off, not a winner.
+The original interpretation says B cuts wall time by 9 to 14 percent by
+overlapping parse with the store digest. It says A keeps the hold small at a 9
+to 14 percent total-time cost.
+
+The 5k totals do not support that percentage range. The 5k ranges overlap, so
+these measurements do not establish a performance ranking. Retain the
+measurements rather than adopting the reported percentage range as established.
+
+The hold under B grows to nearly the whole parse. This remains a total-time
+versus writer-hold trade-off, not a winner.
 
 ### Snapshot hash: stable versus all-racy (one run each)
 
-Stable and all-racy differ by less than 4 ms at both sizes. The 5k pair
-is 159.1 versus 132.6 ms. The 50k pair is 1,953.0 versus 1,949.0 ms.
-Fixture mtime changes add no measurable hash cost.
+| Fixture | Stable ms | All-racy ms |
+|---|---:|---:|
+| 5k | 159.1 | 132.6 |
+| 50k | 1,953.0 | 1,949.0 |
+
+The original report claims a difference below 4 ms at both sizes and no
+measurable cost from fixture mtime changes. The 5k pair contradicts the first
+claim; the 50k pair differs by 4.0 ms at the reported precision. One run per
+case does not establish the second claim or a timing distribution.
 
 ### Recovery cost and scenarios (5 runs each, medians)
 
-At 5k: clean replay 424.3 ms versus parse-only fallback 781.0 ms, so the
-saved-work bound is 356.7 ms, about 46 percent of the fallback. The
-first usable query takes 11.5 ms and a repeated query 6.9 ms. Scenario
-totals: no-change 480.5, one-note edit 471.0, hundred-note edit 442.3,
-add/delete/rename with inbound links 475.4, policy-change rebuild 474.4
-(journal 1.54 MB).
+| Recovery quantity | 5k | 50k |
+|---|---:|---:|
+| Clean replay, reported comparison | 424.3 ms | 4,264.3 ms |
+| Parse-only fallback | 781.0 ms | 8,061.0 ms |
+| Reported saved-work bound | 356.7 ms, about 46 percent | 3,796.7 ms, about 47 percent |
+| First usable query | 11.5 ms | About 63.0 ms |
+| Repeated query | 6.9 ms | About 54.5 ms |
+| Decode plus replay | Not separately reported | About 3.2 s |
+| Harness peak RSS | Not separately reported | About 488 MB |
 
-At 50k, scenario totals use 5 runs each. The table gives median, range,
-and journal bytes:
+Clean replay and no-change scenario totals have distinct reported values at both
+sizes. Ticket 27 reports 4,264.3 ms for 50k clean replay. The scenario table
+reports 4,266.5 ms for 50k no-change. The source does not establish that these
+observations use the same timing boundary.
 
-| Scenario | Median ms | Range ms | Journal B |
-|---|---:|---|---:|
-| no-change | 4,266.5 | 4,249.1–4,359.1 | 3,289,265 |
-| one-note edit | 4,349.1 | 4,251.2–4,382.0 | 3,289,360 |
-| hundred-note edit | 4,284.2 | 4,277.2–4,300.4 | 3,298,825 |
-| links add/delete/rename | 4,275.5 | 4,267.7–4,296.0 | 3,289,559 |
-| policy-change rebuild | 4,333.4 | 4,325.9–4,355.0 | 15,821,983 |
+The saved-work figures are reported comparisons, not measured upper/lower
+interval bounds for the ticket-26 rejection gate.
 
-The parse-only fallback at 50k takes a median of 8,061.0 ms. The
-saved-work bound is therefore 3,796.7 ms, about 47 percent of the
-fallback. Read-only no-change access takes 6,329.0 ms without a journal
-and 4,315.3 ms with one retained. At 50k the first usable query takes
-about 63.0 ms and a repeated query about 54.5 ms. Decode plus replay
-takes about 3.2 s. That is roughly 60 times the 53.3 ms write budget.
-Replay itself does not fit the budget at this size. The harness peak
-RSS at 50k is about 488 MB.
+| Scenario | 5k median ms | 50k median ms | 50k range ms | 50k journal B |
+|---|---:|---:|---|---:|
+| no-change | 480.5 | 4,266.5 | 4,249.1–4,359.1 | 3,289,265 |
+| one-note edit | 471.0 | 4,349.1 | 4,251.2–4,382.0 | 3,289,360 |
+| hundred-note edit | 442.3 | 4,284.2 | 4,277.2–4,300.4 | 3,298,825 |
+| links add/delete/rename, with inbound links | 475.4 | 4,275.5 | 4,267.7–4,296.0 | 3,289,559 |
+| policy-change rebuild | 474.4 | 4,333.4 | 4,325.9–4,355.0 | 15,821,983 |
 
-## Layout observations (superseded for sizing)
+The reported 5k policy-change journal is 1.54 MB. The source gives no 5k
+scenario ranges or other 5k scenario journal sizes.
 
-The layout-probe numbers below predate the re-target. They are one
-serial run per anchor. They are **not** medians, A-B-A measurements, or
-a matched durability comparison. The shadow omits timestamps, most range
-keys, notices, and full query rows:
+| 50k access case, originally called read-only no-change | Time ms |
+|---|---:|
+| Without a journal | 6,329.0 |
+| With a retained journal | 4,315.3 |
+
+This metric invokes writable refresh/recovery; it is not a pure read-only handle
+measurement. A pure read-only operation never opens or applies the journal. The
+reported retained-journal advantage therefore belongs to writable no-change
+refresh/recovery.
+
+The original report calls 3.2 s roughly 60 times the 53.3 ms “write budget” and
+concludes replay exceeds that budget. The ratio preserves the historical
+comparison, but 53.3 ms is not a recovery budget. It does not establish a
+recovery latency rejection threshold.
+
+## Historical layout observations (superseded for sizing)
+
+These observations predate the real-layout re-target. Each anchor has one serial
+run, not medians, A-B-A measurements, or a matched durability comparison.
+
+The incomplete shadow omits timestamps, most range keys, notices, and full query
+rows.
 
 | Notes | Tasks | Control store (`None`) | Shadow store (`Immediate`) | Control persist | Shadow persist | Process peak RSS |
 |---:|---:|---:|---:|---:|---:|---:|
@@ -187,16 +371,30 @@ keys, notices, and full query rows:
 | 5,000 | 3,750 | 8,425,472 B | 16,846,848 B | 199.748 ms | 285.830 ms | 78,446,592 B |
 | 50,000 | 37,500 | 67,375,104 B | 134,746,112 B | 1,054.827 ms | 2,865.841 ms | 712,179,712 B |
 
-The matched measurement tables land here when the running harness
-finishes.
+## Open gates and decisions
 
-## Evidence not established
+Investigation completion does not close these requirements:
 
-The prototype has not proved a Linux run of the full 42-test suite. It
-has not proved the 85-percent and 2x cost claims, whole-blob versus
-streaming payloads, or incremental rebuild savings. Those gates need the
-real implementation owned by ticket 16 and decided by ticket 36.
-Torn-write ordering needs a block-level injector and was not tested.
-The matched measurements now exist. Any numeric host freshness bound
-goes to ticket 33 with this data. Ticket 36 must not adopt the journal
-from this evidence alone.
+| Gate | Missing evidence or owner |
+|---|---|
+| Complete decided layout | Real eleven-facet implementation, including notices; ticket 16 implementation and ticket 36 decision |
+| Notices behavior | Tickets 29 and 34 |
+| Cost claims | The 85-percent and 2x claims remain unproved |
+| Payload choice | Whole-blob versus streaming payloads; no completed streamed-frame comparison |
+| Rebuild value | Incremental rebuild savings; single-transaction rollback is not that evidence |
+| 50-note anchor | Outside the measured matrix |
+| Crash model | Torn-write ordering needs a block-level injector; not tested |
+| Host freshness | Ticket 33 needs an explicit freshness target before a numeric bound |
+| Stop windows | Per-phase break-even rates and stop-window rates remain unmeasured |
+| Adoption | Ticket 36 must not adopt the journal from this evidence alone |
+
+The corrected protocol closed these gates:
+
+- The full Linux re-targeted suite.
+- The 20-run repetition rule with the A-B-A noise control.
+- The equal-work placement comparison.
+- Native `Immediate` durability evidence with the deferred checkpoint charge.
+- The full `ENOSPC` reproduction with row-survival checks.
+
+The measurement tables are present above; they do not close unmeasured rows of
+the initial plan.
