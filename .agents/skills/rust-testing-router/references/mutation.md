@@ -29,7 +29,9 @@ Mutation engines compile and test dozens of mutated copies of the crate. Obey th
   cargo mutarust --run-mutant-id <id>
   ```
 
-  Note that each `mutarust` invocation overwrites its JSON/report artifact (`mutarust-report.json`). Save or inspect the report before starting a single-mutant re-run.
+  Note that each run overwrites the per-run reports: `report.json`, `mutarust-report.html`, `mutarust-agentic.json`, `mutarust-summary.json`, and `mutarust-gitlab.json`. Save or inspect a report before you start a single-mutant re-run.
+
+  These five reports describe the last run. Git ignores them. `mutarust-agentic.json` is the machine-readable run log for agent triage.
 
 ## 3. Running `cargo-mutants`
 
@@ -52,6 +54,12 @@ Classify every surviving (escaped) mutant into one of three buckets:
 | **True Escape (Weak Test)** | Mutant changes observable behavior (`<` to `<=`, deleted error check), and tests still pass | Add or sharpen a unit/integration assertion that kills the mutant |
 | **Equivalent Mutant** | Mutant cannot change observable behavior (for example, pre-allocation capacity hint `Vec::with_capacity(n)` mutated to `0`) | Document why it is equivalent and add to baseline or exclusion rules |
 | **Dead / Redundant Code** | Branch cannot be reached by any valid input | Delete the dead branch or replace it with a type invariant |
+
+Apply a triage decision with the baseline file, `mutarust-baseline.json`. Git tracks this file. Each run gates on it with `--fail-on-escaped`.
+
+- Accept reviewed escapes: `mise run test:mutants --update-baseline`. Commit the changed file.
+- Gate a run on the baseline: `mise run test:mutants --fail-on-escaped`. The run fails on escapes absent from the baseline.
+- Use a different baseline: `mise run test:mutants --baseline <file>`.
 
 ## Completion
 
