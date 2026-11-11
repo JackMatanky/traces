@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "adrs": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "adrs",
+      "env": {
+        "ADR_DIRECTORY": "docs/adr/"
+      }
+    },
+    "mise": {
+      "args": [
+        "mcp"
+      ],
+      "command": "mise",
+      "env": {
+        "MISE_EXPERIMENTAL": "1"
+      }
+    },
+    "rust-docs": {
+      "command": "rust-docs-mcp",
+      "env": {
+        "RUST_DOCS_MCP_CACHE_DIR": ".rust-docs/cache/",
+        "RUST_DOCS_MCP_TOOLCHAIN": "nightly-2026-06-10"
+      }
+    }
+  }
+}
