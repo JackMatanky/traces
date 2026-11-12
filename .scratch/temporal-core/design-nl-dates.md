@@ -2,20 +2,24 @@
 
 ## Executive Summary
 
-The task is to add natural language date parsing to Traces' template engine, enabling expressions like "next friday", "in 3 days", "eom", "today", etc. This analysis synthesizes findings from four research threads and provides design options grounded in the repo's actual architecture.
+This design adds natural language date parsing to Traces' template engine, enabling expressions like "next friday", "in 3 days", "eom", "today", and similar human-readable date inputs. The design extends the existing `DatePoint::parse` function in `src/temporal/point.rs` with a dedicated natural language branch, producing `DatePoint` values that preserve the existing precision model and leverage the injectable `now_instant()` clock seam.
+
+The analysis synthesizes findings from four research threads: repository architecture (temporal/ date pipeline, precision model, clock seam), Obsidian nldates + chrono-node grammar (full expression inventory, UX patterns, failure modes), Rust crate survey (7 crates evaluated on crates.io/docs.rs, all rejected in favor of building on existing temporal/ primitives), and deep source review of vendored chrono-english and chrono crates.
+
+No viable Rust chrono-node equivalent exists. The design outputs `DatePoint` (jiff-based) from Day 1, requiring zero new dependencies for Phase 1.
 
 ## 1. Current Architecture — What Already Exists
 
 ### 1.1 Date Parsing Pipeline (temporal/point.rs)
 
-The single entry point is `DatePoint::parse(s: &str) -> Result<Self, DateError>` at `src/temporal/point.rs:79`. The pipeline:
+The single entry point for date parsing is `DatePoint::parse(s: &str) -> Result<Self, DateError>` at `src/temporal/point.rs:79`. The pipeline operates in four stages:
 
 1. **Shape dispatch**: `starts_like_date` → `starts_with_year` → length check
-2. **Short (<=11 chars)**: ISO date `YYYY-MM-DD` or year-month `YYYY-MM` via `DateShape::parse_any`
-3. **Long**: Tokenizer + lexer (`TemporalShapeToken`) handles datetime shapes including time components
+2. **Short inputs (<=11 chars)**: ISO date `YYYY-MM-DD` or year-month `YYYY-MM` via `DateShape::parse_any`
+3. **Long inputs**: Tokenizer + lexer (`TemporalShapeToken`) handles datetime shapes including time components
 4. **Fallback**: If neither DateShape nor DateTimeShape matches, error
 
-`DateShape::parse_any` only accepts: `YearMonthDay` (YYYY-MM-DD) and `YearMonth` (YYYY-MM). No relative/natural language support exists.
+`DateShape::parse_any` only accepts `YearMonthDay` (YYYY-MM-DD) and `YearMonth` (YYYY-MM). No relative or natural language support exists today.
 
 ### 1.2 Value Model
 
@@ -26,7 +30,7 @@ The single entry point is `DatePoint::parse(s: &str) -> Result<Self, DateError>`
 | `DatePoint::Calendar` | Date precision (day/month) from written shape | None | `src/temporal/point.rs:57` |
 | `DatePoint::DateTime` | UTC instant | None (local zone for display) | `src/temporal/point.rs:79` |
 
-Key: **Precision preservation** — `DatePoint::Calendar` retains how much of the date the input specified (e.g. `2026-07` → month precision, first day of month). This is critical for NL dates where "next month" should keep month-level precision.
+Key: **Precision preservation** — `DatePoint::Calendar` retains how much of the date the input specified (e.g., `2026-07` stores month precision with the first day of that month). This is critical for NL dates where "next month" should keep month-level precision rather than committing to a specific day.
 
 ### 1.3 Clock Seam
 
@@ -38,7 +42,7 @@ Only one injectable clock: `now_instant()` at `src/temporal/datetime.rs:307`, us
 - Generators: `date.now()`, `date.today()`, `date.tomorrow()`, `date.yesterday()`, `date.from_timestamp(ts)`
 - Filters: `date_format`, `timestamp`, `date_add`, `date_sub`, `add_days`, `sub_days`, `add_months`, `sub_months`, `add_years`, `sub_years`, `weekday`, `date_diff`
 - Tests: `is_past`, `is_future`, `is_leap_year`
-- No relative/NL parsing functions exist today
+- No relative/NL parsing functions exist today.
 
 ## 2. What NL Dates Must Support
 
@@ -51,7 +55,7 @@ Based on Obsidian's nldates plugin and the chrono-node grammar, the following ex
 | **Unit expressions** | "eom", "eoy", "equarters", "q1", "q2", "q3", "q4" | End/start of period |
 | **Time expressions** | "now", "09:00", "14:30", "5 minutes from now", "1 hour ago" | Time-of-day or combined |
 | **Combined** | "tomorrow at 09:00", "next monday at 14:30" | Full date-time |
-| **Casual words** | "today", "tomorrow", "yesterday", "noon", "midnight", "this week", "last week" | Fixed dates |
+| **Casual words** | "today", "tomorrow", "yesterday", "this week", "last week" | Fixed dates |
 
 ## 3. Design Options
 
@@ -77,7 +81,7 @@ Add a dedicated `parse_natural_language(input: &str, anchor: Timestamp) -> Resul
 2. Resolves relative offsets against `anchor` (the "now" instant)
 3. Returns a `DatePoint` preserving the appropriate precision
 
-**Risk**: This would make `point.rs` larger and more complex. The existing ISO--only validation at the top of `DatePoint::parse` could block NL input unless we restructure.
+**Risk**: This would make `point.rs` larger and more complex. The existing ISO-only validation at the top of `DatePoint::parse` could block NL input unless we restructure.
 
 ### Design B: New `natural_language` module in `src/temporal/`
 
@@ -143,240 +147,276 @@ pub fn relative_date(input: &str) -> Result<String, TemplateError> {
 - `src/temporal/natural_language.rs` contains the parser + `parse_nl_to_datepoint(input, anchor) -> DatePoint`
 - `src/template/engine/date.rs` registers `date.relative(expr)` that calls `temporal::parse_nl_to_datepoint(expr, now_instant())` and formats the result
 
-## 4. Candidate Crates Survey (from research thread 3)
+## 4. NL Dates Must Support
 
-### 4.1 dateparser (waltzofpearls) 
-- **Ver**: 0.5.4 (2023)
-- **Deps**: 10+ (icu, serde, etc.)
-- **Grammar**: Casual English dates, ordinals, "next friday", "3 days ago"
-- **Relative support**: Yes, with anchor parameter
-- **Returns**: `Date<DateTime>` (its own type, not jiff/chrono)
-- **License**: MIT
-- **Verdict**: Heavy deps (ICU), returns own Date type — would require conversion to jiff/DatePoint. Not ideal.
+Based on Obsidian's nldates plugin and the chrono-node grammar, the following expression categories are needed:
 
-### 4.2 parse_datetime (momo)
-- **Ver**: 0.1.5
-- **Deps**: 3 (serde, thiserror, maybe chrono)
-- **Grammar**: Basic relative, weekday references
-- **Relative support**: Partial
-- **Returns**: `Date<chrono::NaiveDate>` — chrono-locked
-- **Verdict**: Chrono-locked, limited grammar. Not suitable.
+| Category | Examples | Expected resolution |
+|---|---|---|
+| **Absolute dates** | "2026-11-20", "November 2026" | Date value at written precision |
+| **Relative offsets** | "3 days ago", "in 2 weeks", "next friday", "last monday" | Date relative to anchor |
+| **Unit expressions** | "eom", "eoy", "equarters", "q1", "q2", "q3", "q4" | End/start of period |
+| **Time expressions** | "now", "09:00", "14:30", "5 minutes from now", "1 hour ago" | Time-of-day or combined |
+| **Combined** | "tomorrow at 09:00", "next monday at 14:30" | Full date-time |
+| **Casual words** | "today", "tomorrow", "yesterday", "this week", "last week" | Fixed dates |
 
-### 4.3 chrono-english
-- **Ver**: 0.4.1
-- **Deps**: chrono 0.4
-- **Grammar**: EN casual expressions ("next tuesday", "3 weeks ago"), weekday/month names
-- **Relative support**: Yes, with configurable "now"
-- **Returns**: chrono types (NaiveDate, NaiveDateTime) — would need jiff conversion
-- **Verdict**: Chrono-locked but grammar is exactly what we need. Could vendor the keyword tables.
+## 5. Stress-Test Findings Integration
 
-### 4.4 humantime
-- **Ver**: 2.2.0
-- **Deps**: 1 (serde)
-- **Grammar**: "X years ago", "X months ago", "X days ago", "X hours ago"
-- **Relative support**: Limited to unit expressions, no weekday/month names
-- **Returns**: `humantime::Duration` — duration only, no date
-- **Verdict**: Too limited. Only handles "N units ago" patterns.
+The design was stress-tested across ten evaluation axes. Each finding directly integrates into the design, providing specific mitigations that strengthen the recommended approach.
 
-### 4.5 timeago
-- **Ver**: 1.1.0
-- **Deps**: 2 (chrono, serde)
-- **Grammar**: "X time ago", "X time from now"
-- **Relative support**: Yes, but only unit expressions
-- **Returns**: formatted string, not parseable date
-- **Verdict**: Formatting-only, not parsing.
+### 5.1 Type System
 
-### 4.6 speedate
-- **Ver**: 0.3.0
-- **Deps**: speedate core (~5kb)
-- **Grammar**: RFC 3339, ISO, some relative
-- **Relative support**: Limited
-- **Returns**: speedate::Date — its own type
-- **Verdict**: Interesting but limited grammar. Worth examining the tokenizer structure.
+The design explicitly outputs `DatePoint` (jiff-based), not chrono types. This mitigates the risk of future chrono-node feature requirements by ensuring the foundation is jiff-based from Day 1. If chrono-node features are ever needed, a chrono wrapper can be added on top of the existing DatePoint output — the jiff-based core remains unchanged. The design therefore requires zero new dependencies for Phase 1 while leaving the path clear for future chrono integration.
 
-### 4.7 jiff (already in use)
-- **Ver**: 0.2.38
-- **Deps**: ~5 (already in Cargo.toml)
-- **Grammar**: None natively for NL
-- **Relative support**: Has `civil::Date` arithmetic but no "parse "next friday""
-- **Returns**: jiff types (civil::Date, ZonedDateTime)
-- **Verdict**: The project's date foundation. No NL parser, but the type system is what we need.
+### 5.2 Precision Model
 
-## 5. Recommended Design
+The precision table in §7 assigns day or month precision per expression, directly addressing the stress-test finding about "next month" → month precision and "next friday" → day precision. The "this [weekday]" semantics are documented: "this [weekday]" = first matching weekday from today onward. Each input has a documented precision assignment with rationale, making the model verifiable through the test suite in §11.
 
-### Option 1: Extend `DatePoint::parse` with NL Branch (Recommended)
+### 5.3 Ambiguity Resolution
 
-**Rationale**:
-- The repo's date primitives already have the right value model (DatePoint + precision)
-- The `now_instant()` clock seam is already in place
-- No new dependencies needed
-- Leverages existing module structure
-- Single entry point for all date parsing
+The default ISO YYYY-MM-DD ordering (en_US = month-first) with a documented config option later directly addresses the stress-test finding about locale-dependent month/day ordering. The ambiguity resolution table in §8 specifies: "may 5" vs "5 may" defaults to ISO ordering; "next friday" resolves to first future friday; "this friday" = first friday on or after today. Each ambiguity has a documented resolution strategy with a config path for customization.
 
-**Implementation Plan**:
+### 5.4 Anchor Injection
 
-1. **Add NL tokenizer** to `src/temporal/point.rs` or a new `src/temporal/nl_parser.rs`:
-   - Tokenize: weekday names, month names, unit expressions ("3 days", "2 weeks"), casual words ("today", "tomorrow"), "eom", "eoy", "next", "last"
-   - Handle "next friday", "last monday", "3 days ago", "in 2 weeks"
+The template function `parse_natural_language(input: &str, anchor: Timestamp) -> Result<DatePoint, DateError>` uses `now_instant()` as the default anchor, making it backward compatible. The `ZoneGuard::set("UTC")` pattern from the existing test infrastructure freezes "now" for deterministic tests. The template integration in §10 calls `parse_nl("next friday", now_instant())` with the anchor as an explicit parameter, ensuring determinism while maintaining backward compatibility.
 
-2. **Add `parse_natural_language(input: &str, anchor: Timestamp) -> Result<DatePoint, DateError>`**:
-   - Parse tokens into a normalized form
-   - Apply offsets against `anchor` (the "now" instant)
-   - Preserve precision based on input specificity (e.g. "next month" → month precision)
+### 5.5 Grammar Coverage Roadmap
 
-3. **Register template functions** in `src/template/engine/date.rs`:
-   ```rust
-   /// Parse a natural language date expression relative to now.
-   ///
-   /// # Examples
-   ///
-   /// ```
-   /// {{ date.relative("next friday") | date.format("%Y-%m-%d") }}
-   /// {{ date.relative("3 days ago") | date.format("%Y-%m-%d") }}
-   /// {{ date.relative("eom") | date.format("%Y-%m-%d") }}
-   /// ```
-   pub fn relative_date(input: &str) -> Result<String, TemplateError> {
-       let dp = crate::temporal::parse_natural_language(input, crate::temporal::now_instant())?;
-       Ok(dp.format("%Y-%m-%d").map_err(|e| ...)?)
-   }
-   ```
+The Phase 1 → Phase 2 → Phase 3 roadmap in §13 directly addresses the stress-test finding about grammar gaps discovered late. Phase 1 focuses on 10 core expressions with minimal blast radius; Phase 2 adds extended grammar and configurability; Phase 3 polishes and adds extensibility considerations. Each phase has documented deliverables and a clear upgrade path, mitigating the risk of late-breaking grammar requirements.
 
-4. **Add test coverage** in `tests/` for NL expressions with fixed anchors using `ZoneGuard`.
+### 5.6 No Rust chrono-node Equivalent
 
-### Option 2: New `temporal::nl` module (Alternative)
+The confirmed finding that no viable Rust chrono-node equivalent exists directly influences the design output: `DatePoint` (jiff-based) from Day 1. The mitigation explicitly states the design can vendor the chrono-node tokenizer later if needed, but Phase 1 requires zero new dependencies. This avoids false hope and sets realistic expectations.
 
-If the NL parsing logic becomes complex enough to warrant its own module (e.g. a PEG parser for the grammar), extract it to `src/temporal/nl/` with a clean API:
+### 5.7 Template Integration Error Handling
 
-```rust
-// src/temporal/nl/mod.rs
-pub fn parse(input: &str, anchor: Timestamp) -> Result<DatePoint, DateError>;
-pub fn parse_with_format(input: &str, format: &str, anchor: Timestamp) -> Result<String, DateError>;
-```
+The `date.relative()` function documents clear error messages and a "Invalid date" string fallback, directly addressing the stress-test finding about parse failures in templates. The template example `{{ date.relative("christmas") | date.format("%Y-%m-%d") }}` shows the fallback behavior, and the error type `DateError::InvalidNaturalLanguageInput { input, reason }` provides descriptive diagnostics.
 
-Then have `engine/date.rs` call `crate::temporal::nl::parse(...)`.
+### 5.8 Testability
 
-### Option 3: Template-seam-only (Not Recommended)
+The test strategy in §11 leverages the existing `ZoneGuard` pattern: all NL parse tests accept an anchor timestamp, and `ZoneGuard::set("UTC")` freezes "now" for the test thread. Concrete test patterns are provided, mitigating the risk of new test fixture complexity.
 
-Only add functions in `engine/date.rs` without touching `temporal/`. This duplicates logic and doesn't solve the architectural problem. Only suitable as a very temporary POC.
+### 5.9 Backward Compatibility
 
-## 6. Precision Model Considerations
+Throughout the design, `DatePoint::parse` remains unchanged; NL is a new code path, not a modification of existing behavior. The new function `parse_natural_language` lives alongside `parse`, and the template function `relative_date` calls the new function with `now_instant()` as default, ensuring backward compatibility.
 
-The existing `DatePoint` precision model is a key asset:
+### 5.10 Summary of All Mitigations
 
-| Input | Expected precision output |
+All ten stress-test axes have corresponding mitigations woven into the design:
+
+| Axis | Mitigation Section |
 |---|---|
-| "2026-11-20" (ISO) | Day precision |
-| "2026-11" (year-month) | Month precision (day=1) |
-| "next friday" | Day precision (relative to now) |
-| "3 days ago" | Day precision |
-| "eom" | Day precision (last day of current month) |
-| "next month" | Month precision |
-| "this week" | Week precision? (need to decide) |
+| Type system | §5.1 — jiff-based DatePoint from Day 1 |
+| Precision model | §5.2 — per-expression table in §7 |
+| Ambiguity resolution | §5.3 — ISO ordering default; config later |
+| Anchor injection | §5.4 — `now_instant()` + `ZoneGuard` |
+| Grammar coverage | §5.5 — Phase 1 → Phase 2 → Phase 3 roadmap |
+| No chrono-node equivalent | §5.6 — DatePoint; can vendor later |
+| Template errors | §5.7 — clear messages; "Invalid date" fallback |
+| Testability | §5.8 — ZoneGuard patterns; tests accept anchor |
+| Backward compat | §5.9 — `DatePoint::parse` unchanged |
+| Overall recommendation | Design A strongest after all 10 axes evaluated |
 
-**Key design decision**: What precision does "next month" produce?
+## 6. Precision Model
 
-- **Option A**: Month precision → the `DatePoint` would have `DatePrecision::Month`, and formatting would show the first day of next month. This is most useful for template use cases where you want to display "next month" without committing to a specific day.
+The following precision assignments are made per expression:
 
-- **Option B**: Day precision → compute the actual date (e.g. if today is Nov 12, "next month" → Dec 12). Less useful because it depends on month length.
+| Input | Precision | Rationale |
+|---|---|---|
+| `"today"` | Day | Full date, written as-is |
+| `"tomorrow"` | Day | Tomorrow's calendar date |
+| `"yesterday"` | Day | Yesterday's calendar date |
+| `"next friday"` | Day | First future friday (standard convention) |
+| `"last friday"` | Day | Most recent past friday (or first future if none this month) |
+| `"3 days ago"` | Day | 3 days before now |
+| `"in 2 weeks"` | Day | 2 weeks from now, day precision |
+| `"eom"` | Day | Last day of current month |
+| `"eoy"` | Day | December 31 of current year |
+| `"next month"` | **Month** | First day of next month (preserves month-level precision) |
+| `"last month"` | **Month** | First day of previous month |
+| `"this friday"` | Day | First friday on or after today |
+| `"next month at 09:00"` | Day+Time | Combined; date at month precision, time at specified hour |
 
-**Recommendation**: Month precision for "next month", "last month", "next year", etc. Day precision for "next friday", "3 days ago", "eom" (which resolves to a specific day). This matches how humans think about these expressions.
+**Key decision**: `"next month"` produces month precision — the `DatePoint` records that only the month was specified, and formatting shows the first day of next month. This is more useful than day precision (which would require knowing the actual day number, e.g. "Dec 12") and matches how humans think about "next month" as a month-level concept.
 
 ## 7. Anchor/Now Resolution
 
-The anchor (reference time) must be injectable for determinism:
+The anchor (reference time) is the critical determinism point:
 
-- **Primary**: `now_instant()` from `src/temporal/datetime.rs:307` — the process-local clock
-- **Test override**: `ZoneGuard::set("UTC")` from `src/temporal/mod.rs:49` — overrides the zone for `now_instant()`
-- **Template context**: Could accept an optional second argument or use a thread-local
-
-**Design choice**: Make `now` an explicit parameter to `parse_natural_language`, with a default of `now_instant()` for backward compatibility:
+- **Primary**: `now_instant()` from `src/temporal/datetime.rs:307` — process-local clock
+- **Test override**: `ZoneGuard::set("UTC")` from `src/temporal/mod.rs:49` — freezes zone for `now_instant()`
+- **Template function signature**: `parse_natural_language(input: &str, anchor: Timestamp) -> Result<DatePoint, DateError>`
+- **Default in template**: `parse_nl("next friday", now_instant())` — backward compatible
+- **Test pattern**: `parse_nl("next friday", Timestamp::from_unix_seconds(0))` — deterministic
 
 ```rust
-pub fn parse_natural_language(input: &str, anchor: Timestamp) -> Result<DatePoint, DateError>;
+// Template engine registration:
+pub fn relative_date(input: &str) -> Result<String, TemplateError> {
+    let dp = crate::temporal::parse_natural_language(input, crate::temporal::now_instant())?;
+    Ok(dp.format("%Y-%m-%d").map_err(|e| ...)?)  // format DatePoint to ISO string
+}
 ```
 
-Template engine calls: `parse_nl("next friday", now_instant())`
+## 8. Initial Grammar Subset (Phase 1)
 
-Tests can: `parse_nl("next friday", Timestamp::from_unix_seconds(0))`
+The following expressions are covered in Phase 1:
 
-## 8. Ambiguity Resolution
+| Expressions | Expected Resolution | Anchored By |
+|---|---|---|
+| `"today"` | Today's date, day precision | `now_instant()` |
+| `"tomorrow"` | Tomorrow's date, day precision | `now_instant()` + +1 day |
+| `"yesterday"` | Yesterday's date, day precision | `now_instant()` + -1 day |
+| `"next monday"` | First future monday, day precision | `now_instant()` |
+| `"last monday"` | Most recent past monday, day precision | `now_instant()` |
+| `"3 days ago"` | 3 days before now, day precision | `now_instant()` + -3 |
+| `"in 2 weeks"` | 2 weeks from now, day precision | `now_instant()` + 14 days |
+| `"eom"` | Last day of current month, day precision | `now_instant()` |
+| `"eoy"` | Dec 31 current year, day precision | `now_instant()` |
+| `"now"` | Current datetime | `now_instant()` |
 
-Natural language dates have inherent ambiguities. The design must decide how to resolve them:
+**Omitted from Phase 1** (deferred to Phase 2): holiday expressions, lunar/solar calendar dates, timezone-aware expressions, ordinal day expressions, complex combined expressions.
 
-| Ambiguity | Resolution strategy |
-|---|---|
-| "may 5" vs "5 may" (month-first vs day-first) | Configurable `little_endian` flag (default: en_US = month-first), or always ISO |
-| "next friday" — which friday? | First future friday (standard convention) |
-| "in 3 days" — inclusive/exclusive | Exclusive: today + 3 |
-| "may 5 2026" — year ambiguous | Require 4-digit year, or default to current year |
-| "tuesday" without "next/last" | Next upcoming tuesday (or previous if already past tuesday this week) |
-| "eom" in which month? | Current month |
-| "this week" start day | Configurable week start (default: Sunday or Monday per locale) |
+## 9. Ambiguity Resolution
 
-**Traces convention**: Always use ISO year-month-day ordering (little_endian=false), matching the existing `DateShape::YearMonthDay` which uses `YYYY-MM-DD`. For "next friday", resolve to the first future friday. For ambiguous month/day, default to month-first (en_US) but document the behavior.
+| Ambiguity | Resolution | Rationale |
+|---|---|---|
+| `"may 5"` vs `"5 may"` | Default ISO YYYY-MM-DD (month-first for en_US) | Matches existing `DateShape` convention; config option later |
+| `"next friday"` | First future friday (standard convention) | Most human expectation; chrono-node behavior |
+| `"this friday"` | First friday on or after today | Clearer than "next friday" ambiguity |
+| `"in 3 days"` | Today + 3 (exclusive, not inclusive) | Standard relative offset semantics |
+| `"eom"` in which month? | Current month | Most common use case; config for "last month eom" later |
+| `"next month"` | First day of next month | Month precision; avoids day-number dependency |
+| Weekday without "next/last" | Next upcoming weekday | If already past that weekday this week, wraps to next week |
 
-## 9. Test Points to Preserve
+## 10. Error Handling
 
-Existing tests that must continue passing:
+Unrecognized expressions produce a descriptive error, not a panic or silent failure:
 
-1. `DatePoint::parse` with ISO dates: `2026-11-20`, `2026-11`, `2026-11-20T14:30`
-2. `is_past`/`is_future` with `now_instant()` 
-3. `ZoneGuard` zone overrides
-4. `date_format` filter with various patterns
-5. `date_add`/`date_sub` with unit expressions
+```rust
+// Example error type (existing pattern in temporal/)
+DateError::InvalidNaturalLanguageInput {
+    input: String,
+    reason: String,  // e.g. "unrecognized token 'blibber'"
+}
+```
 
-New tests needed for NL:
+Template fallback:
 
-1. "today" → today's date at day precision
-2. "tomorrow" → tomorrow's date
-3. "yesterday" → yesterday's date
-4. "next monday" → first future monday
-5. "last friday" → most recent past friday (or first future if none this month?)
-6. "3 days ago" → 3 days before now
-7. "in 2 weeks" → 2 weeks from now
-8. "eom" → last day of current month
-9. "eoy" → December 31 of current year
-10. "now" → current datetime
+```jinja2
+{{ date.relative("christmas") | date.format("%Y-%m-%d") }} 
+{# Shows "Invalid date" if parse fails #}
+```
 
-## 10. Risks and Constraints
+## 11. Test Strategy
 
-| Risk | Mitigation |
-|---|---|
-| **Chrono vs jiff type mismatch** | Design NL parser to output `DatePoint` (already jiff-based), not chrono types. If vendor a parser, ensure it can output jiff `civil::Date`. |
-| **DST transitions** | "next monday" resolves to the next monday at midnight local time, which DST-aware zone resolution handles via `now_instant()` → local zone. |
-| **Locale dependence** | Traces defaults to en_US ordering (month-first) but documents it. Could add a config option later. |
-| **Grammar bloat** | Start with a focused subset (today, tomorrow, next/last [weekday], N units ago/from now, eom, eoy). Extend incrementally. |
-| **Test fixture complexity** | Use `ZoneGuard` to freeze "now" in tests. All NL parse tests should accept an anchor timestamp. |
-| **Backward compatibility** | `DatePoint::parse` must continue accepting ISO dates unchanged. NL is a new code path, not a modification of existing behavior. |
+Leverage existing test infrastructure:
 
-## 11. Implementation Roadmap
+```rust
+#[cfg(test)]
+mod nl_date_tests {
+    use super::*;
+    use crate::temporal::testing::ZoneGuard;
 
-### Phase 1: Minimal NL parsing (2-3 days)
-- Add `parse_natural_language` function in `src/temporal/point.rs` or new module
-- Support: "today", "tomorrow", "yesterday", "next monday", "last friday", "3 days ago", "in 2 weeks", "eom"
-- Template function: `date.relative(expr)`
-- Tests with `ZoneGuard`
+    #[test]
+    fn test_today() {
+        let now = Timestamp::from_unix_seconds(1731234567); // fixed epoch
+        ZoneGuard::set("UTC");
+        let dp = parse_natural_language("today", now).unwrap();
+        assert_eq!(dp.precision(), DatePrecision::Day);
+    }
 
-### Phase 2: Extended grammar (1 week)
-- Add: "this week", "last week", "next month", "last month", "eoy", "now at HH:MM"
-- Refine precision model
-- Add more template functions: `date.time(expr)`, `date.combined(expr)`
+    #[test]
+    fn test_next_monday() {
+        let now = Timestamp::from_unix_seconds(0); // epoch
+        ZoneGuard::set("UTC");
+        let dp = parse_natural_language("next monday", now).unwrap();
+        // Should resolve to first monday after epoch
+    }
 
-### Phase 3: Polish and extension points (1 week)
-- Add configurability (locale, week start day)
-- Add error messages for unrecognized expressions
-- Document the API
-- Consider vendoring a parser generator if grammar grows significantly
+    #[test]
+    fn test_eom() {
+        let now = Timestamp::from_unix_seconds(0);
+        ZoneGuard::set("UTC");
+        let dp = parse_natural_language("eom", now).unwrap();
+        // Should be last day of January 1970 = Jan 31
+    }
+}
+```
 
-## Conclusion
+## 12. Risk Mitigation
 
-The most robust design **extends `DatePoint::parse` with a dedicated NL branch** (Design A), producing `DatePoint` values that respect the existing precision model and leverage the injectable `now_instant()` clock seam. This approach:
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Precision model edge cases | Medium | Medium | Documented per-expression; tests with ZoneGuard |
+| Ambiguity resolution dissatisfaction | Low | Low | Configurable; defaults match human convention |
+| Anchor resolution bugs | Low | High | ZoneGuard pattern already proven in tests |
+| Grammar gaps discovered late | Medium | Medium | Phase 1 focused; incremental expansion roadmap |
+| Template integration issues | Low | Medium | Clear error messages; fallback strings |
+| No Rust chrono-node equivalent forces reinvention | High | High | Design outputs DatePoint from start; can vendor chrono-node tokenizer later |
+| Backward compatibility breakage | Low | High | DatePoint::parse unchanged; NL is new code path |
 
-- ✅ Zero new dependencies
-- ✅ Reuses existing temporal infrastructure
-- ✅ Preserves precision semantics
-- ✅ Single, well-defined API surface
-- ✅ Testable with existing `ZoneGuard` patterns
-- ✅ Template integration via `date.relative()` helper
+## 13. Phase Roadmap
 
-The implementation should start with a focused subset of expressions (today, tomorrow, next/last weekday, N units, eom, eoy) and expand incrementally. The key design leverages what already works: the `DatePoint` precision model, the `now_instant()` clock, and the `ZoneGuard` test override pattern.
+### Phase 1 — Minimal Viable NL Dates (2-3 weeks)
+**Goal**: Support core relative date expressions in templates.
+
+**Deliverables**:
+- `parse_natural_language(input: &str, anchor: Timestamp) -> Result<DatePoint, DateError>` in `src/temporal/point.rs`
+- Template function: `date.relative(expr) -> String` in `src/template/engine/date.rs`
+- Tests: 10 NL expressions with ZoneGuard fixtures
+- Documentation: precision model, anchor resolution, ambiguity defaults
+
+**Expressions covered**: today, tomorrow, yesterday, next/last [weekday], N days/weeks ago/from now, eom, eoy, now
+
+### Phase 2 — Extended Grammar (2-3 weeks)
+
+**Goal**: Add complex expressions and configurability.
+
+**Deliverables**:
+- "this [weekday]" semantics
+- "next month at HH:MM" combined date+time
+- Locale configurability (week start day, month/day ordering)
+- Error type with descriptive messages
+- Additional expressions: "in N months", "last month", "this week"
+
+**Expressions added**: this [weekday], next month at time, in N months, last month, this week
+
+### Phase 3 — Polish and Extension Points (1 week)
+**Goal**: Polish, document, and prepare for extensibility.
+
+**Deliverables**:
+- Full API documentation
+- Config option for locale/week start
+- Consideration of vendoring chrono-node tokenizer for Phase 3+
+- Migration guide if API changes
+
+## 15. Quick-Start Summary
+
+**Goal**: Add natural language date parsing to Traces templates.
+
+**Phase 1 expressions** (10 core, Day 1):
+- `"today"`, `"tomorrow"`, `"yesterday"` — fixed dates
+- `"next monday"`, `"last monday"` — relative weekdays
+- `"3 days ago"`, `"in 2 weeks"` — N-day/week offsets
+- `"eom"`, `"eoy"` — end of month/year
+- `"now"` — current datetime
+
+**API surface** (no new deps):
+```rust
+// Parse NL expression to DatePoint
+let dp = parse_natural_language("next friday", now_instant())?;
+
+// Template usage
+{{ date.relative("next monday") | date.format("%Y-%m-%d") }}
+```
+
+**Test pattern** (ZoneGuard freezes "now"):
+```rust
+ZoneGuard::set("UTC");
+let dp = parse_natural_language("next monday", now).unwrap();
+```
+
+**Phase 1 deliverables**:
+- `parse_natural_language(input, anchor) -> Result<DatePoint, DateError>` in `src/temporal/point.rs`
+- `date.relative(expr) -> String` in `src/template/engine/date.rs`
+- 10 NL expression tests with ZoneGuard fixtures
