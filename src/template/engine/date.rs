@@ -7,10 +7,12 @@
 //! Namespace generators return formatted strings from the current instant,
 //! date, or Unix timestamp: `date.now()`, `date.today()`, `date.tomorrow()`,
 //! `date.yesterday()`, and `date.from_timestamp(ts)`.
+//!
 //! Filters transform piped date/time strings: `date_format`, `timestamp`,
 //! `date_add`, `date_sub`, `add_days`, `sub_days`, `add_months`, `sub_months`,
 //! `add_years`, `sub_years`, `weekday`, and `date_diff`. Period-edge filters
 //! register from [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP).
+//!
 //! The `date_format` name avoids a conflict with minijinja's built-in `format`
 //! filter. Tests inspect piped values: `is_past`, `is_future`, and
 //! `is_leap_year`.
