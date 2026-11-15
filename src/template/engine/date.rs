@@ -451,6 +451,7 @@ fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
 ///
 /// Explicit `%Y` displays negative years but does not round-trip: strtime
 /// counts the sign inside the four-digit width, so year `-9` renders as `-009`.
+///
 /// The crate rejects that value on reparse. Canonical round-trip forms
 /// (`%Y-%m-%d`, `%Y-%m`, `%F`, and canonical date-time patterns) keep
 /// the sign outside the year digits and reparse exactly.
@@ -1045,6 +1046,7 @@ mod tests {
     /// one render window.
     ///
     /// One template evaluation reads the clock once for all three values.
+    ///
     /// Separate renders can cross local midnight and make the one-day
     /// assertions fail.
     mod today_tomorrow_yesterday {

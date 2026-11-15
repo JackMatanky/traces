@@ -143,6 +143,7 @@ impl TemplateLoader {
     /// The method searches `dir` or the subdirectory named by `path`'s parent
     /// component. It looks for files with `path`'s stem. It returns `None`
     /// when no file matches and `Some` when one file matches.
+    ///
     /// Like [`Self::find_path_in`], it excludes symlinks.
     /// [`crate::dirtree::DirNode::is_file`] reports a link's type, not its
     /// target's.
