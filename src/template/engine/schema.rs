@@ -271,6 +271,7 @@ fn bind_related(
 /// shape that `.field()` returns.
 ///
 /// Returns a plain string when `label == value` and `extra` is empty.
+///
 /// It returns a `{value, label, ...extra}` object for a structured
 /// inline value object or an external values-file entry.
 fn select_entry_value(entry: &SchemaSelectFieldEntry) -> Value {
