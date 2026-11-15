@@ -186,6 +186,7 @@ impl DeclaredOutputPath {
 /// Reports validation and lookup errors for template identifiers.
 ///
 /// Validation errors occur before the loader searches a template directory.
+///
 /// Lookup errors occur after validation succeeds.
 #[derive(Debug, Error)]
 pub enum TemplatePathError {

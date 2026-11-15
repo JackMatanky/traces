@@ -36,6 +36,7 @@ struct Cached<T>(T);
 ///
 /// `T` needs to be cheap to clone (an `Arc<_>` or a similarly shared
 /// type).
+///
 /// Every call clones the cached value out of the extension rather than
 /// handing back a reference tied to its lifetime.
 ///
