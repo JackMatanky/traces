@@ -292,6 +292,7 @@ fn select_entry_value(entry: &SchemaSelectFieldEntry) -> Value {
 /// every non-Note file. The `Class` atom's match set stays empty here. It has
 /// the same unresolved shape that DSL parsing produces for
 /// `@Book`/`class(Name)`.
+///
 /// [`crate::query::SourceSelector::resolve_classes`] populates it later.
 /// That pass also resolves DSL-parsed class atoms.
 ///
