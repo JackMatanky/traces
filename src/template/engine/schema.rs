@@ -1,31 +1,32 @@
 //! Registers the `schema` namespace for templates, and wires
 //! [`crate::schema::Schema`] into minijinja directly.
 //!
-//! [`SchemaOps`] is the `schema` namespace object registered as a minijinja
-//! global by [`super::TemplateEngine`]. It exposes one method:
+//! [`SchemaOps`] is the `schema` namespace object. [`super::TemplateEngine`]
+//! registers it as a minijinja global. It exposes one method:
 //!
-//! - `schema.get(name)`: binds the resolved [`Schema`] named `name` directly
-//!   (`Schema` implements minijinja's [`Object`] itself, mirroring
-//!   [`super::query`]'s `impl Object for QuerySet`), hard-erroring if no Schema
+//! - `schema.get(name)`: binds the resolved [`Schema`] named `name` directly.
+//!   `Schema` implements minijinja's [`Object`] itself, mirroring
+//!   [`super::query`]'s `impl Object for QuerySet`. It hard-errors if no Schema
 //!   by that name resolves.
 //!
 //! The bound [`Schema`] exposes one plain attribute and three methods:
 //!
 //! - `.name`: the Schema's own name (its source file's stem).
 //! - `.field(name)`: the named field's selectable values. For a `select` field,
-//!   plain strings (for simple string lists) or resolved `{value, label,
-//!   ...extra}` objects (for structured inline objects and file sources). For a
-//!   `file` field, a Query Source filter. This filter is declarative data:
-//!   building it executes no query. It composes with `query.from(...)` and `|
-//!   with_children`/`| with_descendants`. Returns `none` for every other type.
+//!   the values are plain strings for simple string lists. Structured inline
+//!   objects and file sources resolve to `{value, label, ...extra}` objects.
+//!   For a `file` field, the value is a Query Source filter. The filter is
+//!   declarative data: building it executes no query. The filter composes with
+//!   `query.from(...)` and `| with_children`/`| with_descendants`. It returns
+//!   `none` for every other type.
 //! - `.children()`: every Schema that directly `extends` this Schema. Each
-//!   result is a bound `Schema`. Empty, not an error, when nothing directly
-//!   extends this Schema.
+//!   result is a bound `Schema`. The result is empty, not an error, when
+//!   nothing directly extends this Schema.
 //! - `.descendants()`: every Schema that `extends` this Schema, directly or
 //!   through any number of ancestors. Each result is a bound `Schema`, so a
 //!   Template can walk the whole subtree (`.name`, `.field(...)`,
-//!   `.children()`, and `.descendants()` again). Empty, not an error, when
-//!   nothing extends this Schema.
+//!   `.children()`, and `.descendants()` again). The result is empty, not an
+//!   error, when nothing extends this Schema.
 //!
 //! `schema.get` and `.field` are structural references. A typo in either
 //! name surfaces as a render error with template context, not a panic, as
@@ -36,9 +37,9 @@
 //!
 //! # Resolution Timing
 //!
-//! Every Schema TOML file is read and resolved once, at
-//! [`super::TemplateEngine`] construction (`SchemaService::new`), not lazily on
-//! the first `schema.get(...)` call. Every render for that engine's whole
+//! [`super::TemplateEngine`] reads and resolves every Schema TOML file once
+//! at its own construction (`SchemaService::new`), not lazily on the first
+//! `schema.get(...)` call. Every render for that engine's whole
 //! lifetime shares the identical already-resolved `Arc<SchemaService>`: no
 //! render-scoped registry cache or re-resolution.
 //!
@@ -79,21 +80,22 @@ use crate::{
 const METHODS: &[&str] = &["get"];
 
 /// Lists the keys that a bound [`Schema`] exposes. `field`/`children`/
-/// `descendants` are called as methods, and `name` is a plain attribute.
-/// Backs [`Object::enumerate`] on [`Schema`]'s own `impl Object` below.
+/// `descendants` are methods, and `name` is a plain attribute.
+/// The list backs [`Object::enumerate`] on [`Schema`]'s own `impl Object`
+/// below.
 const SCHEMA_METHODS: &[&str] = &["children", "descendants", "field", "name"];
 
-/// Render-local extension holding the `Arc<SchemaService>`, so [`Schema`]'s
-/// own [`Object`] impl can reach [`SchemaService::matches`]/
-/// [`SchemaService::children_of`]/[`SchemaService::descendants_of`] without
-/// holding a context field itself.
+/// A render-local extension that holds the `Arc<SchemaService>` so
+/// [`Schema`]'s own [`Object`] impl can reach [`SchemaService::matches`] /
+/// [`SchemaService::children_of`] / [`SchemaService::descendants_of`]
+/// without holding a context field itself.
 ///
 /// [`SchemaOps::get_value`]'s `"get"` branch seeds it before it hands
 /// out any `Schema`-backed value. Every live `Schema` [`Value`] in a
 /// render therefore already has it stashed by the time
-/// `.field()`/`.children()`/`.descendants()` runs. Insertion is
-/// first-write-wins. Every seed in a render carries the same shared
-/// service, so whichever wins is equivalent.
+/// `.field()`/`.children()`/`.descendants()` runs. The first insertion
+/// wins. Every seed in a render carries the same shared service, so
+/// whichever wins is equivalent.
 #[derive(Debug)]
 struct SchemaServiceCache(Arc<SchemaService>);
 
@@ -163,6 +165,8 @@ impl Object for SchemaOps {
 ///
 /// - [`ErrorKind::InvalidOperation`] if no `Schema` value in this render ever
 ///   went through `schema.get`.
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn cached_service(state: &State) -> TemplateEngineResult<Arc<SchemaService>> {
     state
         .get_extension::<SchemaServiceCache>()
@@ -249,6 +253,8 @@ type RelateFn = fn(&SchemaService, &str) -> Vec<Arc<Schema>>;
 ///
 /// - [`ErrorKind::InvalidOperation`] if no Schema service is cached for this
 ///   render (see [`cached_service`]).
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn bind_related(
     state: &State,
     schema: &Arc<Schema>,
@@ -265,7 +271,7 @@ fn bind_related(
 /// shape that `.field()` returns.
 ///
 /// Returns a plain string when `label == value` and `extra` is empty.
-/// Otherwise returns a `{value, label, ...extra}` object for a structured
+/// It returns a `{value, label, ...extra}` object for a structured
 /// inline value object or an external values-file entry.
 fn select_entry_value(entry: &SchemaSelectFieldEntry) -> Value {
     if entry.label() == entry.value() && entry.extra().is_empty() {
@@ -279,11 +285,12 @@ fn select_entry_value(entry: &SchemaSelectFieldEntry) -> Value {
 
 /// Builds a [`SourceSelector`] filter from a `file` field's declaration.
 ///
-/// Empty `folders`/`class` values are omitted from the built expression.
-/// They are not defaulted to always-true, so a class-only field still
-/// narrows to Notes of that class instead of matching every non-Note
-/// file. The `Class` atom's match set stays empty here. It has the same
-/// unresolved shape that DSL parsing produces for `@Book`/`class(Name)`.
+/// The built expression omits empty `folders`/`class` values. The builder
+/// does not default empty values to always-true. A class-only field
+/// therefore still narrows to Notes of that class instead of matching
+/// every non-Note file. The `Class` atom's match set stays empty here. It has
+/// the same unresolved shape that DSL parsing produces for
+/// `@Book`/`class(Name)`.
 /// [`crate::query::SourceSelector::resolve_classes`] populates it later.
 /// That pass also resolves DSL-parsed class atoms.
 ///
@@ -327,8 +334,9 @@ fn file_field_source(
 /// Builds the glob matching every file under `folder` (or, when `folder` is
 /// empty, every file anywhere in the project) with the given `ext`.
 ///
-/// Mirrors the DSL's own glob compilation (`compile_glob`) so a `file` field's
-/// filter composes identically to hand-written source text.
+/// The glob mirrors the DSL's own glob compilation (`compile_glob`), so
+/// a `file` field's filter composes identically to hand-written source
+/// text.
 ///
 /// # Errors
 ///
@@ -360,7 +368,7 @@ fn glob_compile_error(source: regex::Error) -> Error {
 /// resolved fields.
 ///
 /// Appends a `; did you mean "..."?` hint when [`Schema::suggest_field`]
-/// finds exactly one plausible candidate. Omits the hint otherwise. The
+/// finds exactly one plausible candidate. It omits the hint otherwise. The
 /// hint never changes whether the lookup succeeds: suggestions are
 /// diagnostic text only.
 fn unknown_field_error(schema: &Schema, field: &str) -> Error {
@@ -1111,11 +1119,9 @@ mod tests {
 
         #[test]
         fn a_broken_sibling_schema_still_breaks_construction() {
-            // Directory-wide load failure is documented, not hidden.
-            // Resolution happens once at construction, so one malformed
-            // sibling Schema fails the whole registry and therefore every
-            // render. This holds regardless of whether the template ever
-            // reaches into `schema` (see the `register` module below).
+            // The test shows that one malformed sibling Schema fails the
+            // whole registry. The failure affects every render, even when a
+            // template does not use `schema`. The `register` module tests this.
             let temp = tempfile::tempdir().expect("create temp dir");
             write_schema(
                 temp.path(),

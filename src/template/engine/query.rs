@@ -1,73 +1,70 @@
-//! Registers the `query`, `lists`, and `tasks` namespaces for templates.
+//! Registers the `query`, `lists`, and `tasks` namespaces for template queries.
 //!
-//! All three namespaces are backed by [`QueryOps`], registered by
-//! [`super::TemplateEngine::new`]:
-//! - [`QueryOps::page`] creates the `query` global
-//! - [`QueryOps::list`] creates the `lists` global
-//! - [`QueryOps::task`] creates the `tasks` global.
+//! [`super::TemplateEngine::new`] registers all three namespaces through [`QueryOps`]:
 //!
-//! Each namespace starts a query with `.from([expr])`, whose expression forms
-//! mirror [`SourceSelector`]'s variants:
+//! - [`QueryOps::page`] registers the `query` global.
+//! - [`QueryOps::list`] registers the `lists` global.
+//! - [`QueryOps::task`] registers the `tasks` global.
 //!
-//! - `.from()`: every indexed Note.
-//! - `.from("#tag")`: Notes with an exact or nested tag.
-//! - `.from("folder/")`: Notes under a folder.
-//! - `.from("@Class*")`: Notes whose File Class is `Class` or a transitive
-//!   descendant.
+//! Each namespace starts a query with `.from([expr])`. The expression forms
+//! match [`SourceSelector`] variants:
 //!
-//! Each call reuses the render's cached [`WorkspaceIndex`], refreshing it once
-//! per render (see [`QueryOps::cached_index`]), and returns a [`QuerySet`]
-//! wrapped in a [`Value`].
+//! - `.from()` selects every indexed Note.
+//! - `.from("#tag")` selects Notes with an exact or nested tag.
+//! - `.from("folder/")` selects Notes under a folder.
+//! - `.from("@Class*")` selects Notes whose File Class is `Class` or a
+//!   transitive descendant.
+//!
+//! Each call reuses the render's cached [`WorkspaceIndex`]. It refreshes the
+//! index once per render (see [`QueryOps::cached_index`]) and returns a
+//! [`QuerySet`] in a [`Value`].
 //!
 //! # Row Shape
 //!
-//! `query` returns one row per Note. `lists` returns one row per list item
-//! (plain bullets, checkboxes, and tasks). `tasks` returns one row per task
-//! item. Universal and task-specific properties are exposed through the
-//! canonical `record.list.<field>` namespace wrapped by [`ListFields`],
-//! alongside the parent Note's `file.*`, frontmatter, inline-field, and tag
-//! metadata.
+//! `query` returns one row per Note. `lists` returns one row per list item:
+//! plain bullets, checkboxes, and tasks. `tasks` returns one row per task item.
+//! The canonical `record.list.<field>` namespace exposes universal and
+//! task-specific properties through [`ListFields`]. Rows also expose the parent
+//! Note's `file.*`, frontmatter, inline-field, and tag metadata.
 //!
 //! # Chaining and Terminal Methods
 //!
-//! Template callers chain `.where(...)`/`.filter(...)`, `.sort(...)`,
-//! `.limit(...)`, `.group_by(...)`, and `.flatten(...)`. The transformation
-//! logic lives on [`QuerySet`] itself. This module only supplies the
-//! minijinja [`Object`] wiring.
+//! Template callers chain `.where(...)` or `.filter(...)`, `.sort(...)`,
+//! `.limit(...)`, `.group_by(...)`, and `.flatten(...)`. [`QuerySet`] contains
+//! the transformation logic. This module supplies only the minijinja [`Object`]
+//! wiring.
 //!
-//! The terminal methods [`QuerySet::table`], [`QuerySet::list`],
-//! [`QuerySet::task_list`], and `count` (an alias for [`QuerySet::len`]) end
-//! a chain instead of continuing it. They render final markdown or scalar
-//! output. Each is reachable both as a `call_method`
-//! (`rows.table(["Name"], ["file.name"])`) and as a pipeline filter,
-//! registered once by [`QueryOps::register_terminal_filters`]
-//! (`rows | table(["Name"], ["file.name"])`). Both forms call the same
-//! [`QuerySet`] method.
+//! [`QuerySet::table`], [`QuerySet::list`], [`QuerySet::task_list`], and
+//! `count` (an alias for [`QuerySet::len`]) stop a chain. They render final
+//! Markdown or scalar output. Each method is available as a `call_method`
+//! (`rows.table(["Name"], ["file.name"])`) and as a pipeline filter (`rows |
+//! table(["Name"], ["file.name"])`). [`QueryOps::register_terminal_filters`]
+//! registers the filters once. Both forms call the same [`QuerySet`] method.
 //!
 //! # Object Wiring
 //!
-//! [`QuerySet`] and [`QueryRow`] get their [`Object`] impls here instead of in
-//! [`crate::index`]. This keeps [`crate::index`] independent from minijinja,
-//! so `traces task` can reuse [`WorkspaceIndex`], [`QuerySet`], and
-//! [`QueryRow`] without pulling in rendering concerns.
+//! This module implements [`Object`] for [`QuerySet`] and [`QueryRow`], not
+//! [`crate::index`]. This keeps [`crate::index`] independent from minijinja.
+//! `traces task` can then reuse [`WorkspaceIndex`], [`QuerySet`], and
+//! [`QueryRow`] without rendering concerns.
 //!
-//! `record` attributes other than `file` and `list` forward to
-//! [`QueryRow::field`], the same resolver `.where()` and `.sort()` use.
-//! `record.file.*` and `record.list.*` use forwarding wrappers ([`FileFields`]
-//! and [`ListFields`]) instead. Minijinja resolves a dotted attribute path one
-//! segment at a time, so the wrappers call [`FileField::parse`] and
-//! [`ListField::parse`] directly. They skip the string-prefix handling that
-//! [`QueryRow::field`] needs once the `file`/`list` segment is already known.
+//! `record` attributes other than `file` and `list` use [`QueryRow::field`],
+//! the resolver that `.where()` and `.sort()` use. `record.file.*` and
+//! `record.list.*` use forwarding wrappers ([`FileFields`] and [`ListFields`]).
+//! Minijinja resolves a dotted attribute path one segment at a time. The
+//! wrappers call [`FileField::parse`] and [`ListField::parse`] directly. They
+//! skip the string-prefix handling in [`QueryRow::field`] because the `file` or
+//! `list` segment is already known.
 //!
 //! # Errors
 //!
 //! - [`IndexerService::refresh`] and [`QueryError`] failures become
-//!   [`minijinja::Error`] values with stable messages. They keep the original
-//!   error as [`std::error::Error::source`].
+//!   [`minijinja::Error`] values with stable messages. The errors retain the
+//!   original error as [`std::error::Error::source`].
 //!
-//! The mapping mirrors [`super::ui`]'s `dialog_error` and
-//! [`super::error::confine_error`]. Query failures carry template name,
-//! line, and column context like every other namespace.
+//! The mapping matches [`super::ui`]'s `dialog_error` and
+//! [`super::error::confine_error`]. Query failures include the template name,
+//! line, and column, as other namespaces do.
 
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 
@@ -88,31 +85,28 @@ use crate::{
     schema::SchemaService,
 };
 
-/// Lists the method names that `query`, `lists`, and `tasks` each expose for
-/// [`QueryOps::enumerate`].
+/// Lists the methods that [`QueryOps::enumerate`] exposes for each namespace.
 const METHODS: &[&str] = &["from"];
 
-/// Backs the `query`, `lists`, and `tasks` minijinja namespace objects. One
-/// instance serves each namespace, and it differs only in the global it
-/// registers as and the [`QueryBuilder`] mode it executes.
+/// Backs the `query`, `lists`, and `tasks` minijinja namespace objects.
+/// Each instance registers one global and runs one [`QueryBuilder`] mode.
 #[derive(Debug)]
 pub(super) struct QueryOps {
-    /// Stores the minijinja global name that this instance registers as.
+    /// Stores the minijinja global name for this instance.
     name: &'static str,
     indexer: Arc<IndexerService>,
-    /// The constructor pre-configures this service once. Every `.from()` call
-    /// reuses it instead of rebuilding it.
+    /// Stores the pre-configured service. Every `.from()` call reuses it.
     service: QueryService,
-    /// Holds the row granularity that this namespace dispatches to
+    /// Holds the row granularity that this namespace sends to
     /// [`QueryBuilder`].
     mode: QueryMode,
 }
 
 impl QueryOps {
-    /// Wires the shared pipeline that every namespace dispatches through. The
-    /// constructor pre-configures one [`QueryService`] with `class_field` and
-    /// the File Class `schemas` expander, built for registration as the
-    /// `name` global at `mode`'s row granularity.
+    /// Creates the shared dispatch pipeline for a namespace.
+    /// It configures [`QueryService`] with `class_field` and the File Class
+    /// `schemas` expander, then registers `name` with the row granularity
+    /// in `mode`.
     fn new(
         name: &'static str,
         mode: QueryMode,
@@ -129,7 +123,7 @@ impl QueryOps {
         }
     }
 
-    /// Builds page-level dispatch around the configured indexer under `query`.
+    /// Builds page-level dispatch for the `query` global.
     #[inline]
     #[must_use]
     pub(super) fn page(
@@ -140,9 +134,9 @@ impl QueryOps {
         Self::new("query", QueryMode::Pages, indexer, class_field, schemas)
     }
 
-    /// Builds list-level dispatch around the configured indexer under `lists`.
-    /// Each row is one list item (plain bullets, checkboxes, and tasks) instead
-    /// of one Note.
+    /// Builds list-level dispatch for the `lists` global.
+    /// Each row is one list item: a plain bullet, checkbox, or task, not one
+    /// Note.
     #[inline]
     #[must_use]
     pub(super) fn list(
@@ -153,8 +147,8 @@ impl QueryOps {
         Self::new("lists", QueryMode::Lists, indexer, class_field, schemas)
     }
 
-    /// Builds task-level dispatch around the configured indexer under `tasks`.
-    /// Each row is one task item instead of one Note. See the module docs.
+    /// Builds task-level dispatch for the `tasks` global.
+    /// Each row is one task item, not one Note. See the module docs.
     #[inline]
     #[must_use]
     pub(super) fn task(
@@ -165,20 +159,19 @@ impl QueryOps {
         Self::new("tasks", QueryMode::Tasks, indexer, class_field, schemas)
     }
 
-    /// Registers this object as its `name` global (`query`, `lists`, or
-    /// `tasks`).
+    /// Registers this object as the `name` global: `query`, `lists`, or
+    /// `tasks`.
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         let name = self.name;
         env.add_global(name, Value::from_object(self));
     }
 
-    /// Registers `table`, `list`, `task_list`, and `count` as pipeline filters.
-    /// The filter form `rows | table(["Name"], ["file.name"])` mirrors the
-    /// call-method form `rows.table(["Name"], ["file.name"])`, documented on
-    /// [`Object::call_method`] for [`QuerySet`]. These filters carry no state,
-    /// so they register once and apply to any [`QuerySet`], whatever namespace
-    /// produced it.
+    /// Registers terminal pipeline filters for every [`QuerySet`].
+    /// The filter form `rows | table(["Name"], ["file.name"])` matches
+    /// `rows.table(["Name"], ["file.name"])`, documented on
+    /// [`Object::call_method`]. These filters carry no state, so they apply
+    /// to every namespace.
     pub(super) fn register_terminal_filters(env: &mut Environment<'static>) {
         env.add_filter("table", table_filter);
         env.add_filter("list", list_filter);
@@ -188,9 +181,9 @@ impl QueryOps {
         env.add_filter("with_descendants", with_descendants_filter);
     }
 
-    /// Runs this namespace's query method for `source` against `state`'s cached
-    /// [`WorkspaceIndex`], refreshing it first if not already cached this
-    /// render. See [`Self::cached_index`].
+    /// Runs this namespace's query for `source` against the cached
+    /// [`WorkspaceIndex`]. Refreshes the index if this render has not
+    /// cached it. See [`Self::cached_index`].
     ///
     /// # Errors
     ///
@@ -208,16 +201,14 @@ impl QueryOps {
     }
 
     /// Returns this render's cached [`WorkspaceIndex`], refreshing and caching
-    /// it first if not already cached this render. The cache lives in `state`'s
-    /// render-local typed extensions. The `query`, `lists`, and `tasks`
-    /// namespaces share it because all dispatch through [`QueryOps::run`]. A
-    /// render that calls into multiple namespaces pays for one
-    /// [`IndexerService::refresh`] instead of one per query call. Extensions
-    /// are scoped to one render, including `{% include %}`s, and reset for the
-    /// next. A cache field on [`QueryOps`] itself would wrongly persist across
-    /// independent renders on a reused
-    /// [`Environment`]/[`super::TemplateEngine`]. See
-    /// [`super::cache::cached`].
+    /// it when needed. The cache lives in `state`'s render-local typed
+    /// extensions. All three namespaces share it through [`QueryOps::run`].
+    /// A render that calls multiple namespaces makes one
+    /// [`IndexerService::refresh`] call instead of one call per query.
+    /// Extensions apply to one render, including `{% include %}`s, and
+    /// reset for the next render. A cache field on [`QueryOps`] would
+    /// persist across independent renders that reuse an [`Environment`] or
+    /// [`super::TemplateEngine`]. See [`super::cache::cached`].
     ///
     /// # Errors
     ///
@@ -265,20 +256,20 @@ impl Object for QueryOps {
     }
 }
 
-/// Maps a [`QueryError`] into a [`minijinja::Error`].
-///
-/// It keeps the original error as [`source`].
+/// Maps a [`QueryError`] to a [`minijinja::Error`] and retains the original
+/// error as [`source`].
 ///
 /// [`source`]: std::error::Error::source
 fn query_error(source: QueryError) -> Error {
     super::error::invalid_operation("query failed", source)
 }
 
-/// Resolves `.from()`'s optional argument into a [`SourceSelector`].
+/// Resolves the optional `.from()` argument to a [`SourceSelector`].
 ///
 /// - `None` selects every indexed file.
-/// - A bound [`SourceSelector`] `Value` (a Schema `file` field, possibly
-///   widened by `with_children`/`with_descendants`) passes through unchanged.
+/// - A bound [`SourceSelector`] `Value` from a Schema `file` field passes
+///   through unchanged. This includes selectors widened by `with_children` or
+///   `with_descendants`.
 /// - Any other value must be a DSL source-expression string.
 ///
 /// # Errors
@@ -307,13 +298,12 @@ fn resolve_from_arg(
     SourceSelector::parse(text).map_err(query_error)
 }
 
-/// Lets `.field()` hand a [`SourceSelector`] filter through the minijinja
-/// boundary: `.from()` and the `with_children`/`with_descendants` filters
-/// downcast it back with [`Value::downcast_object_ref`].
+/// Lets `.field()` pass a [`SourceSelector`] through minijinja.
+/// `.from()` and the `with_children` or `with_descendants` filters recover it
+/// with [`Value::downcast_object_ref`].
 ///
-/// This `impl` has no method overrides. It is the only bare `impl Object` in
-/// this crate, and its only job is to smuggle a typed value through a
-/// `Value`.
+/// This `impl` has no method overrides. It is the crate's only bare `impl
+/// Object` and passes a typed value through a `Value`.
 impl Object for SourceSelector {}
 
 impl Object for QuerySet {
@@ -334,26 +324,23 @@ impl Object for QuerySet {
 
     /// Dispatches [`QuerySet`] methods by template name.
     ///
-    /// The terminal methods `table`, `list`, `task_list`, and `count` render
-    /// final output and return early, without touching the non-terminal chain
-    /// below:
+    /// Terminal methods render final output and stop the chain:
     ///
-    /// - `table(headers, columns)` and `list(path)` render field path strings
-    ///   (or, for `table`'s `headers`, display labels), not further
-    ///   [`QuerySet`] arguments.
+    /// - `table(headers, columns)` and `list(path)` take field path strings.
+    ///   `table` also takes display labels in `headers`.
     /// - `task_list()` takes no arguments.
-    /// - `count()` takes no arguments and returns [`QuerySet::len`] directly;
-    ///   it cannot fail, unlike the other three.
+    /// - `count()` takes no arguments and returns [`QuerySet::len`] without an
+    ///   error.
     ///
-    /// Every other name falls through to the non-terminal chain: `.where`/
-    /// `.filter`, `.sort`, `.limit`, `.group_by`, and `.flatten`. Each of those
-    /// calls consumes a clone of the current rows and wraps the transformed
-    /// result in a [`Value`] for further chaining:
+    /// Other names call the non-terminal chain: `.where`, `.filter`, `.sort`,
+    /// `.limit`, `.group_by`, and `.flatten`. Each method clones the
+    /// current rows, transforms them, and wraps the result in a [`Value`]
+    /// for further chaining.
     ///
-    /// - `where` and `filter` both call `QuerySet::filter`. The Rust-side
-    ///   `r#where` alias exists only for Rust callers.
-    /// - `sort` defaults to `SortDirection::default` (descending) when the
-    ///   optional `descending` argument is omitted.
+    /// - `where` and `filter` both call `QuerySet::filter`. Rust callers can
+    ///   use `r#where`.
+    /// - `sort` uses `SortDirection::default` (descending) when `descending` is
+    ///   omitted.
     ///
     /// # Errors
     ///
@@ -446,20 +433,17 @@ impl Object for QuerySet {
     }
 }
 
-/// Renders a markdown table for the `rows | table(...)` filter. See
+/// Renders a Markdown table for the `rows | table(...)` filter. See
 /// [`QuerySet::table`].
 ///
-/// The filter takes owned `Vec<String>` for `headers`/`columns` rather than
-/// borrowed `Vec<&str>`. Two reasons stack here:
-///
-/// - minijinja's `Function` trait (backing filters) needs each parameter type
-///   to implement `ArgType` for every lifetime. A borrowed `Vec<&str>` cannot
-///   satisfy this. Only its owned `String` form can.
-/// - Even [`Object::call_method`]'s [`from_args`], which has no such
-///   constraint, cannot borrow a `Vec<&str>` out of a list-literal argument
-///   value: minijinja reports "type conversion is not legal in this situation
-///   (implicit borrow)". Both entry points build owned `Vec<String>` first and
-///   borrow from that.
+/// The filter takes owned `Vec<String>` values for `headers` and `columns`, not
+/// borrowed `Vec<&str>` values. The minijinja `Function` trait needs each
+/// parameter to implement `ArgType` for every lifetime. A borrowed vector
+/// cannot meet this need. The owned `String` form can. [`Object::call_method`]
+/// also cannot borrow `Vec<&str>` from a list-literal argument value. Minijinja
+/// reports "type conversion is not legal in this situation (implicit borrow)".
+/// Both entry points first build owned `Vec<String>` values and borrow
+/// from them.
 ///
 /// # Errors
 ///
@@ -482,7 +466,7 @@ fn table_filter(
     rows.table(&headers_slice, &columns_slice).map_err(query_error)
 }
 
-/// Renders a markdown list for the `rows | list(path)` filter. See
+/// Renders a Markdown list for the `rows | list(path)` filter. See
 /// [`QuerySet::list`].
 ///
 /// # Errors
@@ -495,7 +479,7 @@ fn list_filter(rows: &QuerySet, path: &str) -> TemplateEngineResult<String> {
     rows.list(path).map_err(query_error)
 }
 
-/// Renders a markdown task list for the `rows | task_list` filter. See
+/// Renders a Markdown task list for the `rows | task_list` filter. See
 /// [`QuerySet::task_list`].
 ///
 /// # Errors
@@ -513,8 +497,8 @@ fn count_filter(rows: &QuerySet) -> usize {
     rows.len()
 }
 
-/// Widens a `file` field's `Class` atom to direct-children depth for the
-/// `field | with_children` filter.
+/// Sets a `file` field's `Class` atom to direct-children depth for `field |
+/// with_children`.
 fn with_children_filter(source: &SourceSelector) -> Value {
     Value::from_object(set_class_depth(
         source.clone(),
@@ -522,8 +506,8 @@ fn with_children_filter(source: &SourceSelector) -> Value {
     ))
 }
 
-/// Widens a `file` field's `Class` atom to transitive-descendants depth for the
-/// `field | with_descendants` filter.
+/// Sets a `file` field's `Class` atom to transitive-descendants depth for
+/// `field | with_descendants`.
 fn with_descendants_filter(source: &SourceSelector) -> Value {
     Value::from_object(set_class_depth(
         source.clone(),
@@ -531,9 +515,9 @@ fn with_descendants_filter(source: &SourceSelector) -> Value {
     ))
 }
 
-/// Replaces every `Class` atom's [`ClassExpansionMode`] in `source` with
-/// `mode`. Each atom's match set stays empty, so the selector stays
-/// unresolved. `resolve_classes` fills the match sets in at query time.
+/// Replaces each `Class` atom's [`ClassExpansionMode`] in `source` with `mode`.
+/// Each atom keeps an empty match set, so the selector stays unresolved.
+/// `resolve_classes` fills each match set at query time.
 fn set_class_depth(
     mut source: SourceSelector,
     mode: impl Fn(BTreeSet<String>) -> ClassExpansionMode,
@@ -555,14 +539,15 @@ fn set_class_depth(
 impl Object for QueryRow {
     /// Resolves `record.<key>` or `record["<key>"]`.
     ///
-    /// `"file"` and `"list"` return forwarding wrappers for `record.file.*` and
-    /// `record.list.*`. Every other key resolves through [`QueryRow`]'s field
-    /// lookup, the same frontmatter, inline-field, and tag lookup used by
-    /// `.where()` and `.sort()`.
+    /// The `file` and `list` keys return wrappers for `record.file.*` and
+    /// `record.list.*`. Other keys use [`QueryRow`]'s field lookup for
+    /// frontmatter, inline fields, and tags. This is the lookup that
+    /// `.where()` and `.sort()` use.
     ///
-    /// The lookup rejects a dotted, empty, or unknown `file.*`/`list.*`
-    /// accessor. A rejected key resolves to `None` like any other missing
-    /// attribute, so `QueryError::FieldPath` never surfaces as a render error.
+    /// The lookup rejects dotted, empty, and unknown `file.*` or `list.*`
+    /// accessors. A rejected key returns `None`, like any missing
+    /// attribute. `QueryError::FieldPath` therefore never becomes a render
+    /// error.
     #[inline]
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
@@ -581,15 +566,12 @@ impl Object for QueryRow {
 
 /// Forwards `record.file.<field>` to [`FileField::parse`].
 ///
-/// This is a thin wrapper, not a second lookup path. It exists because
-/// minijinja resolves a dotted attribute path one segment at a time.
-/// `record.file` must itself resolve to *something* before minijinja looks
-/// up `.name` on it.
+/// Minijinja resolves a dotted attribute path one segment at a time. It must
+/// resolve `record.file` before it looks up `.name`.
 ///
-/// It calls the same [`FileField`] accessor pair that [`QueryRow::field`]
-/// uses for its `file.*` branch. It skips that method's string-based `file.`
-/// prefix handling, which does not apply here: `key` is already a single
-/// attribute segment, never a dotted path.
+/// This wrapper calls the [`FileField`] accessor pair that [`QueryRow::field`]
+/// uses for `file.*`. It skips the string-based `file.` prefix handling because
+/// `key` is one attribute segment, not a dotted path.
 #[derive(Debug)]
 struct FileFields(Arc<QueryRow>);
 
@@ -606,15 +588,12 @@ impl Object for FileFields {
 
 /// Forwards `record.list.<field>` to [`ListField::parse`].
 ///
-/// This is a thin wrapper, not a second lookup path. It exists because
-/// minijinja resolves a dotted attribute path one segment at a time.
-/// `record.list` must itself resolve to *something* before minijinja looks
-/// up `.<field>` on it.
+/// Minijinja resolves a dotted attribute path one segment at a time. It must
+/// resolve `record.list` before it looks up a field.
 ///
-/// It calls the same [`ListField`] accessor pair that [`QueryRow::field`]
-/// uses for its `list.*` branch. It skips that method's string-based `list.`
-/// prefix handling, which does not apply here: `key` is already a single
-/// attribute segment, never a dotted path.
+/// This wrapper calls the [`ListField`] accessor pair that [`QueryRow::field`]
+/// uses for `list.*`. It skips the string-based `list.` prefix handling because
+/// `key` is one attribute segment, not a dotted path.
 #[derive(Debug)]
 struct ListFields(Arc<QueryRow>);
 
@@ -629,14 +608,13 @@ impl Object for ListFields {
     }
 }
 
-/// Converts a resolved [`NoteFieldValue`] into a minijinja [`Value`].
+/// Converts a resolved [`NoteFieldValue`] to a minijinja [`Value`].
 ///
-/// - [`NoteFieldValue::Null`] becomes minijinja's `none` rather than
-///   `undefined`: [`QueryRow`]'s own docs note that a well-formed path with no
-///   value resolves to `Null`, not an error. That's a defined empty value, not
-///   a missing attribute.
-/// - [`NoteFieldValue::Link`] renders as its target path. Traces has no
-///   minijinja-facing link type yet.
+/// - [`NoteFieldValue::Null`] becomes minijinja's `none`, not `undefined`. A
+///   valid path with no value resolves to `Null`, not an error, as [`QueryRow`]
+///   documents.
+/// - [`NoteFieldValue::Link`] becomes its target path. Traces has no minijinja
+///   link type.
 fn field_value(value: NoteFieldValue) -> Value {
     match value {
         NoteFieldValue::Null => Value::from(()),
@@ -668,10 +646,10 @@ mod tests {
         Config, DialogProvider, PresetDialogProvider, config::SchemasConfig,
     };
 
-    /// Builds a shared [`SchemaService`] for `root`, backing [`page_ops`],
-    /// [`list_ops`], and [`task_ops`] so all namespaces resolve the same Schema
-    /// registry directory (`root/.traces/schemas`), mirroring
-    /// [`super::super::TemplateEngine::new`]'s wiring.
+    /// Builds one [`SchemaService`] for `root` for [`page_ops`], [`list_ops`],
+    /// and [`task_ops`]. All namespaces use the same Schema registry
+    /// directory, `root/.traces/schemas`. This matches
+    /// [`super::super::TemplateEngine::new`] wiring.
     fn schema_service(root: &Path) -> Arc<SchemaService> {
         Arc::new(
             SchemaService::new(&root.join(".traces/schemas"))
@@ -679,8 +657,8 @@ mod tests {
         )
     }
 
-    /// Builds a `query` [`QueryOps`] for `root` with the default class field
-    /// (`class`) and Schema registry directory (`root/.traces/schemas`).
+    /// Builds `query` [`QueryOps`] for `root` with the default `class` field.
+    /// The Schema registry directory is `root/.traces/schemas`.
     fn page_ops(root: &Path) -> QueryOps {
         QueryOps::page(
             Arc::new(IndexerService::for_tests(root)),
@@ -689,7 +667,7 @@ mod tests {
         )
     }
 
-    /// Builds a `lists` [`QueryOps`], the [`page_ops`] counterpart.
+    /// Builds the `lists` [`QueryOps`] counterpart to [`page_ops`].
     fn list_ops(root: &Path) -> QueryOps {
         QueryOps::list(
             Arc::new(IndexerService::for_tests(root)),
@@ -698,7 +676,7 @@ mod tests {
         )
     }
 
-    /// Builds a `tasks` [`QueryOps`], the [`page_ops`] counterpart.
+    /// Builds the `tasks` [`QueryOps`] counterpart to [`page_ops`].
     fn task_ops(root: &Path) -> QueryOps {
         QueryOps::task(
             Arc::new(IndexerService::for_tests(root)),
@@ -707,8 +685,8 @@ mod tests {
         )
     }
 
-    /// Builds a minimal [`Environment`] with `query`, `lists`, and `tasks`
-    /// registered against `root`, plus terminal query filters.
+    /// Builds a minimal [`Environment`] with `query`, `lists`, and `tasks` for
+    /// `root`. It also registers the terminal query filters.
     fn env(root: &Path) -> Environment<'static> {
         let mut env = Environment::new();
         page_ops(root).register(&mut env);
@@ -722,9 +700,9 @@ mod tests {
         env(root).render_str(source, minijinja::context!())
     }
 
-    /// Renders `source` against `root` with the `query`/`tasks` namespaces
-    /// bound to a non-default File Class frontmatter field, exercising the
-    /// `[schemas] class_field` wiring end-to-end.
+    /// Renders `source` against `root` with `query` and `tasks` bound to a
+    /// custom File Class field. This checks the `[schemas] class_field`
+    /// wiring.
     fn render_with_class_field(
         root: &Path,
         class_field: &str,
@@ -991,9 +969,8 @@ mod tests {
             )
             .expect("render succeeds");
 
-            // The Note has one complete and one incomplete task. The filter
-            // must keep only the matching task row, not both task rows from
-            // the Note that has at least one match.
+            // The Note has one complete task and one incomplete task.
+            // The filter must keep only the matching task row.
             assert_eq!(rendered, "pay rent");
         }
 
@@ -1135,9 +1112,7 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             write_note(temp.path(), "note.md", "# Note");
 
-            // Chaining `{% for %}` after a terminal renderer is meaningless.
-            // This test only proves that empty headers/columns lists do not
-            // panic.
+            // This test checks that empty headers and columns do not panic.
             let rendered =
                 render(temp.path(), "{{ query.from().table([], []) }}")
                     .expect("render succeeds");
@@ -1230,12 +1205,10 @@ mod tests {
 
         use super::*;
 
-        /// `table`/`list` accept field path strings, not minijinja
-        /// expressions. The spec says "Terminal table/list helpers accept
-        /// field path strings, not arbitrary minijinja expression strings".
-        /// So `file.name | upper` has no terminal-renderer form. A
-        /// `{% for %}` loop remains the escape hatch that gives template
-        /// authors the full filter pipeline per value.
+        /// `table` and `list` accept field path strings, not minijinja
+        /// expressions. Thus, no terminal renderer can express
+        /// `file.name | upper`. A `{% for %}` loop lets template
+        /// authors apply the full filter pipeline to each value.
         #[test]
         fn for_loop_applies_a_minijinja_filter_terminal_renderers_cannot_express()
          {
@@ -1475,8 +1448,8 @@ mod tests {
             )
             .expect("render succeeds");
 
-            // The default Todo status symbol is a bare space, hence the
-            // empty-looking segment between `Todo|` and `|todo`.
+            // The default Todo status symbol is a space.
+            // It creates the empty-looking segment between `Todo|` and `|todo`.
             assert_eq!(
                 rendered,
                 "buy milk #errand|True|task|Todo| \
@@ -1490,8 +1463,8 @@ mod tests {
 
         use super::*;
 
-        /// `>` and `<` on rows must follow document order: a total order
-        /// where each distinct pair compares one way, never both.
+        /// `>` and `<` on rows use document order.
+        /// Each distinct pair has one order, not both.
         #[test]
         fn row_comparisons_follow_document_order() {
             let temp = tempfile::tempdir().expect("create temp dir");
@@ -1776,11 +1749,11 @@ mod tests {
             let env = Environment::new();
             let mut state = env.empty_state();
 
-            // Populates the render's cached WorkspaceIndex. Both namespaces
-            // share the same cached extension.
+            // This call caches the render's WorkspaceIndex.
+            // Both namespaces share the cached extension.
             page_from.call(&mut state, &[]).expect("query.from succeeds");
-            // The test writes this note after it caches the index. A
-            // cache-sharing tasks.from() call must not observe this new task.
+            // This test writes a note after it caches the index.
+            // The cache-sharing `tasks.from()` call must not see the new task.
             write_note(temp.path(), "todo.md", "- [ ] buy milk\n");
             let tasks =
                 task_from.call(&mut state, &[]).expect("tasks.from succeeds");
@@ -1825,8 +1798,8 @@ mod tests {
                 "- [ ] buy milk\n- [x] pay rent\n",
             );
 
-            // A page-level query over the same Note returns exactly one row.
-            // The task-level query must not collapse back to it.
+            // The page-level query returns one row for this Note.
+            // The task-level query must keep separate task rows.
             let pages = render(temp.path(), "{{ query.from() | length }}")
                 .expect("render succeeds");
             let tasks = render(temp.path(), "{{ tasks.from() | length }}")
@@ -1842,8 +1815,8 @@ mod tests {
 
         use super::*;
 
-        /// Writes `toml` as `<name>.toml` under `root`'s Schema registry
-        /// directory, creating it if needed.
+        /// Writes `toml` to `<name>.toml` in `root`'s Schema registry
+        /// directory. Creates the directory if needed.
         fn write_schema(root: &Path, name: &str, toml: &str) {
             let dir = root.join(".traces/schemas");
             fs::create_dir_all(&dir).expect("create schema dir");
@@ -1851,7 +1824,7 @@ mod tests {
                 .expect("write schema");
         }
 
-        /// Writes a Note carrying `frontmatter` between YAML delimiters.
+        /// Writes a Note with `frontmatter` between YAML delimiters.
         fn write_class_note(root: &Path, name: &str, frontmatter: &str) {
             write_note(
                 root,
@@ -1909,8 +1882,8 @@ mod tests {
         #[test]
         fn degrades_to_exact_match_when_the_class_has_no_schema() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            // No Schema registry: `book` cannot resolve subclasses, so only
-            // a Note whose class is literally `book` matches.
+            // Without a Schema registry, `book` cannot resolve subclasses.
+            // Only a Note whose class is `book` matches.
             write_class_note(temp.path(), "dune.md", "class: book");
             write_class_note(temp.path(), "unknown.md", "class: sci_fi");
 
@@ -1953,8 +1926,8 @@ mod tests {
                 render(temp.path(), r#"{{ lists.from("@book") | length }}"#)
                     .expect("render succeeds");
 
-            // Both list items match, where `tasks.from` would yield only the
-            // task row.
+            // Both list items match.
+            // `tasks.from` would return only the task row.
             assert_eq!(rendered, "2");
         }
 
@@ -1970,8 +1943,8 @@ mod tests {
                 r#"{{ query.from("@book") | length }}"#,
             )
             .expect("render succeeds");
-            // Under the default `class` field the `kind: book` Note carries
-            // no File Class, so the same query must select nothing.
+            // The default `class` field does not read `kind: book` as a File
+            // Class. The same query therefore selects no Notes.
             let default =
                 render(temp.path(), r#"{{ query.from("@book") | length }}"#)
                     .expect("render succeeds");

@@ -5,9 +5,8 @@
 //! - `to_yaml`: serializes a template value to a YAML string.
 //! - `from_yaml`: parses a YAML string into a template value.
 //!
-//! Each filter is a plain function registered through
-//! [`Environment::add_filter`]. None carry shared state, so there is no
-//! [`Object`] dispatch.
+//! Each filter is a plain function that [`Environment::add_filter`] registers.
+//! None carry shared state, so there is no [`Object`] dispatch.
 //!
 //! [`Object`]: minijinja::value::Object
 //! [`Environment::add_filter`]: minijinja::Environment::add_filter
@@ -16,7 +15,7 @@ use minijinja::{Environment, Value, value::Serde};
 
 use super::error::{TemplateEngineResult, invalid_operation};
 
-/// A registration namespace for the stateless YAML filters.
+/// Represents a registration namespace for the stateless YAML filters.
 #[derive(Debug)]
 pub(super) struct YamlOps;
 
@@ -35,14 +34,16 @@ impl YamlOps {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-///   `noyalib` cannot serialize the value into YAML.
+/// - [`ErrorKind::InvalidOperation`] if `noyalib` cannot serialize the value
+///   into YAML.
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
     let mut yaml = noyalib::to_string(value).map_err(|err| {
         invalid_operation("to_yaml: failed to serialize value to YAML", err)
     })?;
-    // noyalib omits the document-terminating newline the previous
-    // serializer emitted. A block scalar for a trailing-newline string
+    // The previous serializer emitted a document-terminating newline. noyalib
+    // omits that newline. A block scalar for a trailing-newline string
     // already ends in one.
     if !yaml.ends_with('\n') {
         yaml.push('\n');
@@ -56,8 +57,9 @@ pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`](minijinja::ErrorKind::InvalidOperation) if
-///   the input fails to parse as valid YAML.
+/// - [`ErrorKind::InvalidOperation`] if the input fails to parse as valid YAML.
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 pub(super) fn from_yaml(text: &str) -> TemplateEngineResult<Value> {
     if text.trim().is_empty() {
         return Ok(Value::from(()));

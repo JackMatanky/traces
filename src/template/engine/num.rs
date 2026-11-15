@@ -1,19 +1,18 @@
 //! Registers numeric filters for templates.
 //!
-//! [`NumOps`] adds four stateless filters:
+//! [`NumOps`] registers four filters that carry no shared state:
 //!
 //! - `ceil`
 //! - `floor`
 //! - `sqrt`
 //! - `num_format`
 //!
-//! Each filter is a plain function registered through
-//! [`Environment::add_filter`], not an [`Object`], because no filter carries
-//! shared state. `num_format` is prefixed rather than named `format` to avoid
-//! minijinja's built-in `format` filter.
+//! Each filter is a function registered with [`Environment::add_filter`], not
+//! an [`Object`]. The `num_format` name avoids minijinja's built-in `format`
+//! filter.
 //!
-//! minijinja converts integer and float [`Value`] arguments into `f64` and
-//! raises its normal argument-type error for anything else.
+//! minijinja converts integer and float [`Value`] arguments to `f64`. It
+//! returns its standard argument-type error for other values.
 //!
 //! [`Object`]: minijinja::value::Object
 //! [`Value`]: minijinja::value::Value
@@ -22,13 +21,13 @@ use minijinja::{Environment, Error, ErrorKind};
 
 use super::error::TemplateEngineResult;
 
-/// Registration namespace for the stateless numeric filters.
+/// Provides the registration entry point for the stateless numeric filters.
 pub(super) struct NumOps;
 
 impl NumOps {
     /// Registers the numeric filters with `env`.
     ///
-    /// This is an associated function because [`NumOps`] carries no state.
+    /// The associated function needs no [`NumOps`] state.
     #[inline]
     pub(super) fn register(env: &mut Environment<'static>) {
         env.add_filter("ceil", |value: f64| value.ceil());
@@ -40,13 +39,15 @@ impl NumOps {
 
 /// Computes the square root of `value`.
 ///
-/// [`f64::sqrt`] returns `NaN` for negative input, so this filter rejects
-/// negative values and returns a template error instead of rendering `NaN`.
-/// `-0.0` is allowed because `-0.0 < 0.0` is false under IEEE 754.
+/// [`f64::sqrt`] returns `NaN` for a negative value. This filter returns a
+/// template error for a negative value instead of rendering `NaN`. It accepts
+/// `-0.0` because IEEE 754 makes `-0.0 < 0.0` false.
 ///
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` is negative.
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn sqrt(value: f64) -> TemplateEngineResult<f64> {
     if value < 0.0 {
         return Err(Error::new(
@@ -57,8 +58,7 @@ fn sqrt(value: f64) -> TemplateEngineResult<f64> {
     Ok(value.sqrt())
 }
 
-/// Formats `value` with `decimals` decimal places using Rust's `{:.N$}`
-/// precision formatting.
+/// Formats `value` with `decimals` decimal places using Rust's `{:.N$}` format.
 fn num_format(value: f64, decimals: usize) -> String {
     format!("{value:.decimals$}")
 }

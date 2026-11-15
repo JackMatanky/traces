@@ -4,24 +4,24 @@
 //! top-level `-i <path>` and minijinja `{% include %}`/`{% extends %}` inputs.
 //! Its caller must pass a [`TemplatePathInput`], which proves the raw path was
 //! validated before search. It then searches [`TemplateLoader::directories`] in
-//! local-before-global order via [`TemplateLoader::find_path_in`] and
+//! local-before-global order with [`TemplateLoader::find_path_in`] and
 //! [`TemplateLoader::find_name_in`].
 //!
-//! An invalid name (absolute, `..`, or no real segment such as an empty name or
-//! bare `.`) fails validation before any directory is searched, returning
-//! [`TemplatePathError::Absolute`] or [`TemplatePathError::UnsafeComponent`].
-//! This is distinct from [`TemplatePathError::TemplateNotFound`], which
-//! [`TemplateLoader::find`] returns only after every directory was searched and
-//! none matched.
+//! Validation rejects an absolute name, `..`, an empty name, or bare `.` before
+//! it searches any directory. It returns [`TemplatePathError::Absolute`] or
+//! [`TemplatePathError::UnsafeComponent`].
+//! [`TemplatePathError::TemplateNotFound`] is different.
+//! [`TemplateLoader::find`] returns it only after it searches every directory
+//! and finds no match.
 //!
 //! # Why Not `minijinja::path_loader`
 //!
-//! [`TemplateLoader::load`] backs minijinja's `{% include %}`/`{% extends %}`
-//! loader callback, wired through [`Environment::set_loader`] in
-//! [`TemplateEngine::new`]. [`minijinja::path_loader`] is not used because its
-//! `safe_join` rejects any dot-prefixed path segment. That would reject `{%
-//! include ".draft.md" %}` and the project's own dot-prefixed default template
-//! directory, `.traces/templates`.
+//! [`TemplateLoader::load`] supplies minijinja's `{% include %}` and `{%
+//! extends %}` loader callback. [`TemplateEngine::new`] connects it with
+//! [`Environment::set_loader`]. The code does
+//! not use [`minijinja::path_loader`] because its `safe_join` rejects
+//! dot-prefixed path segments. That rule rejects `{% include ".draft.md" %}`
+//! and the default template directory, `.traces/templates`.
 //!
 //! [`Environment::set_loader`]: minijinja::Environment::set_loader
 //! [`TemplateEngine::new`]: super::engine::TemplateEngine::new
@@ -36,16 +36,16 @@ use minijinja::{Error, ErrorKind};
 use super::path::{TemplatePath, TemplatePathError, TemplatePathInput};
 use crate::{Config, DirTree};
 
-/// A template search path: at most one local directory and at most one global
-/// directory, searched local-first.
+/// Template loader searches at most one local directory and one global
+/// directory, in that order.
 ///
-/// Production code builds this from [`Config::local_template_dir`] and
-/// [`Config::global_template_dir`] through `From<&Config>`. [`Self::new`] is
-/// the `Config`-agnostic constructor used by tests.
+/// Production code builds it from [`Config::local_template_dir`] and
+/// [`Config::global_template_dir`] with [`From`]. Tests use [`Self::new`]
+/// without [`Config`].
 ///
-/// `Clone` is cheap because the struct stores two `Option<PathBuf>` values.
+/// [`Clone`] is cheap because the struct stores two [`Option<PathBuf>`] values.
 /// [`TemplateEngine::new`] clones one loader into minijinja's `set_loader`
-/// callback and keeps the original for [`Self::find`], avoiding a second
+/// callback and keeps the original for [`Self::find`]. This avoids a second
 /// derivation from [`Config`].
 ///
 /// [`TemplateEngine::new`]: super::engine::TemplateEngine::new
@@ -70,21 +70,22 @@ impl TemplateLoader {
         }
     }
 
-    /// Searches local and global directories for a validated template path
+    /// Searches the local and global directories for a validated template path
     /// input.
     ///
-    /// This is the path both top-level `-i` resolution and
-    /// `{% include %}`/`{% extends %}` loading run through after validation.
+    /// Top-level `-i` resolution and `{% include %}`/`{% extends %}` loading
+    /// both use this method after validation.
     ///
     /// # Errors
     ///
-    /// - [`AmbiguousTemplate`] if `name`'s stem matches more than one file
-    ///   within a single template directory.
+    /// - [`AmbiguousTemplate`] if `name`'s stem matches multiple files within a
+    ///   single template directory.
     /// - [`DirectoryRead`] if reading a template directory fails during stem
     ///   lookup.
     /// - [`TemplateNotFound`] if no template directory has a match.
-    /// - [`UnsafeComponent`] or [`Absolute`] if a matched file name fails
-    ///   relative path validation.
+    /// - [`UnsafeComponent`] if a matched file name is not a safe relative
+    ///   path.
+    /// - [`Absolute`] if a matched file name is absolute.
     ///
     /// [`AmbiguousTemplate`]: TemplatePathError::AmbiguousTemplate
     /// [`DirectoryRead`]: TemplatePathError::DirectoryRead
@@ -107,12 +108,12 @@ impl TemplateLoader {
         Err(TemplatePathError::TemplateNotFound(name.as_ref().to_path_buf()))
     }
 
-    /// Returns an iterator over the search directories in local-first order,
-    /// deduplicating identical paths.
+    /// Returns the search directories in local-first order and removes
+    /// duplicate paths.
     ///
-    /// No canonicalization is performed, so two differently-spelled paths to
-    /// the same place, for example one reached via a symlink, are searched
-    /// twice.
+    /// The method does not canonicalize paths. It searches two paths twice if
+    /// they name the same location with different spellings, such as a path
+    /// that uses a symlink.
     fn directories(&self) -> impl Iterator<Item = &Path> {
         let global = self
             .global
@@ -121,11 +122,11 @@ impl TemplateLoader {
         self.local.as_deref().into_iter().chain(global)
     }
 
-    /// Matches `name` directly within `dir`, returning the [`TemplatePath`] if
-    /// a matching file exists.
+    /// Finds `name` inside `dir` and returns a [`TemplatePath`] if a matching
+    /// file exists.
     ///
-    /// Uses [`fs::symlink_metadata`] rather than [`Path::is_file`], matching
-    /// [`Self::find_name_in`]: a symlink never counts as a match.
+    /// The method uses [`fs::symlink_metadata`] instead of [`Path::is_file`],
+    /// like [`Self::find_name_in`]. A symlink never counts as a match.
     ///
     /// [`Path::is_file`]: std::path::Path::is_file
     fn find_path_in(
@@ -137,21 +138,23 @@ impl TemplateLoader {
             .then(|| TemplatePath::verified(name.clone(), dir.to_path_buf()))
     }
 
-    /// Matches `name` by file stem within `dir` when `name` has no extension.
+    /// Matches `name` by file stem inside `dir` when `name` has no extension.
     ///
-    /// Searches `dir` itself, or `dir`'s subdirectory named by `path`'s parent
-    /// component, for files sharing `path`'s file stem: `None` for no matches,
-    /// the sole match for exactly one. Like [`Self::find_path_in`], a symlink
-    /// never counts as a match because [`crate::dirtree::DirNode::is_file`]
-    /// reports the link's own type, not its target's.
+    /// The method searches `dir` or the subdirectory named by `path`'s parent
+    /// component. It looks for files with `path`'s stem. It returns `None`
+    /// when no file matches and `Some` when one file matches.
+    /// Like [`Self::find_path_in`], it excludes symlinks.
+    /// [`crate::dirtree::DirNode::is_file`] reports a link's type, not its
+    /// target's.
     ///
     /// # Errors
     ///
-    /// - [`AmbiguousTemplate`] if more than one file in the search directory
-    ///   shares the stem.
+    /// - [`AmbiguousTemplate`] if multiple files in the search directory share
+    ///   the stem.
     /// - [`DirectoryRead`] if reading the search directory fails.
-    /// - [`UnsafeComponent`] or [`Absolute`] if a matched file name fails
-    ///   relative path validation.
+    /// - [`UnsafeComponent`] if a matched file name is not a safe relative
+    ///   path.
+    /// - [`Absolute`] if a matched file name is absolute.
     ///
     /// [`AmbiguousTemplate`]: TemplatePathError::AmbiguousTemplate
     /// [`DirectoryRead`]: TemplatePathError::DirectoryRead
@@ -205,20 +208,19 @@ impl TemplateLoader {
         }
     }
 
-    /// Resolves `name` via [`Self::find`] and reads it.
+    /// Resolves `name` with [`Self::find`] and reads it.
     ///
-    /// This is the logic behind minijinja's `{% include %}`/`{% extends %}`
-    /// loader callback, wired in by [`TemplateEngine::new`].
+    /// [`TemplateEngine::new`] connects this method to minijinja's `{% include
+    /// %}` and `{% extends %}` loader callback.
     ///
-    /// A missing include becomes `Ok(None)`, which lets minijinja honour
-    /// `ignore missing`. Invalid identifiers, ambiguity, and inaccessible
-    /// template directories are hard failures so template authors can repair
-    /// the actual cause.
+    /// A missing include returns `Ok(None)`, so minijinja can honor `ignore
+    /// missing`. Invalid names, ambiguous matches, and inaccessible
+    /// template directories return errors.
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] if resolving `name` fails for anything
-    /// except absence, or if the resolved file cannot be read.
+    /// - [`minijinja::Error`] if resolving `name` fails for anything except
+    ///   absence, or if the resolved file cannot be read.
     ///
     /// [`TemplateEngine::new`]: super::engine::TemplateEngine::new
     pub(super) fn load(&self, name: &str) -> Result<Option<String>, Error> {
@@ -248,14 +250,15 @@ impl TemplateLoader {
 
     /// Lists available template names.
     ///
-    /// Returns the file stem of every top-level `.md` file in the local
-    /// directory, then the global directory with global duplicates excluded.
-    /// This backs the `--list` flag, the interactive picker's candidates, and
-    /// `traces completions --list-templates`. The scan is not recursive and
-    /// mirrors [`Self::find`]'s local-before-global precedence.
+    /// Returns the stem of each top-level `.md` file in the local directory,
+    /// then each new stem from the global directory. The method supplies
+    /// names for `--list`, the interactive picker, and `traces completions
+    /// --list-templates`. It does not scan subdirectories and uses the
+    /// local-before-global order of [`Self::find`].
     ///
-    /// Missing or unreadable directories are skipped. That is not an error,
-    /// just fewer candidates, and there is no `Result` here to report one in.
+    /// The method skips missing or unreadable directories. This reduces the
+    /// candidate list and returns no error because the method has no
+    /// `Result` value.
     #[must_use]
     pub(super) fn list_available(&self) -> Vec<String> {
         let mut names = Self::stems_in(self.local.as_deref());
@@ -267,16 +270,14 @@ impl TemplateLoader {
         names
     }
 
-    /// Collects the file stems of every top-level `.md` file directly inside
-    /// `dir`.
+    /// Collects the stems of top-level `.md` files directly inside `dir`.
     ///
-    /// A symlink entry does not count, matching the
-    /// [`crate::dirtree::DirNode::is_file`]
-    /// check in [`Self::find_name_in`]. Returns empty when `dir` is `None`,
-    /// does not exist, or cannot be read: listing failures shrink the
-    /// candidate list, deliberately; there is no `Result` here to report
-    /// one in, so the discard is stated explicitly rather than hidden in a
-    /// `filter_map(Result::ok)`. This never recurses into subdirectories.
+    /// The method excludes symlinks, like the
+    /// [`crate::dirtree::DirNode::is_file`] check in
+    /// [`Self::find_name_in`]. It returns an empty list if `dir` is `None`,
+    /// does not exist, or cannot be read. Listing failures reduce the
+    /// candidate list. The method has no `Result` value for these failures.
+    /// It does not scan subdirectories.
     fn stems_in(dir: Option<&Path>) -> Vec<String> {
         let Some(dir) = dir else {
             return Vec::new();
@@ -734,8 +735,9 @@ mod tests {
             let loader =
                 TemplateLoader::new(Some(temp.path().to_path_buf()), None);
 
-            // "missing" with no extension → find_name_in searches dir,
-            // finds nothing → TemplateNotFound → load returns None.
+            // The name has no extension, so `find_name_in` checks the directory
+            // and finds no match. `find` returns
+            // `TemplateNotFound`, then `load` returns `None`.
             let source = loader.load("missing").expect("load succeeds");
 
             assert_eq!(source, None);
@@ -767,9 +769,9 @@ mod tests {
 
         #[test]
         fn finds_a_global_template_when_local_is_absent() {
-            // A project with no local template directory configured at
-            // all (not merely an empty one) must still resolve
-            // against the global directory.
+            // A project with no local template directory must still resolve
+            // templates from the global directory. An empty local
+            // directory is a different case.
             let temp = tempfile::tempdir().expect("create temp dir");
             let global_dir = temp.path().join("global-templates");
             let file = write_file(&global_dir, "daily.md");

@@ -2,14 +2,14 @@
 //!
 //! [`TemplateWriteTarget::write`] resolves a render's output path and writes
 //! `content` under a [`CommitPolicy`]. [`WriteMode`] is defined here and
-//! converted from CLI flags via [`WriteMode::from_flags`], but
+//! converted from CLI flags with [`WriteMode::from_flags`], but
 //! [`TemplateService::write`] is the only place that matches on it.
 //!
-//! [`TemplateWriteTarget`] gathers output-destination candidates and resolves
-//! them by precedence:
+//! [`TemplateWriteTarget`] gathers output path candidates and resolves them
+//! by precedence:
 //!
 //! 1. `-o` / `--output` (`requested`): a runtime value confined to
-//!    [`Config::root`] via [`SafeRelativePath::parse`].
+//!    [`Config::root`] with [`SafeRelativePath::parse`].
 //! 2. `file.write_to()` ([`DeclaredOutputPath`]): also a runtime value confined
 //!    to [`Config::root`].
 //! 3. Caller-supplied default: from an already trust-gated
@@ -28,7 +28,8 @@ use std::{
 use super::{error::TemplateError, path::DeclaredOutputPath};
 use crate::{DialogError, DialogProvider, path::SafeRelativePath};
 
-/// Controls whether rendered output is returned or written.
+/// Write mode controls whether rendered output returns to the caller or goes to
+/// disk.
 ///
 /// Built from CLI flags before rendering begins. Rendering still runs in both
 /// modes, including `ui.*` template helpers.
@@ -57,10 +58,10 @@ impl WriteMode {
     }
 }
 
-/// Selects how committed writes handle an existing target.
+/// Commit policy controls how a write handles an existing output path.
 ///
-/// This is [`WriteMode::Commit`]'s payload, produced once from CLI flags and
-/// then threaded through output resolution and the final write.
+/// [`WriteMode::Commit`] stores this value. The code creates it from CLI flags
+/// and uses it for output path resolution and the final write.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum CommitPolicy {
     /// Create a new file and fail if the target already exists.
@@ -121,7 +122,8 @@ impl CommitPolicy {
     }
 }
 
-/// Reports what happened to rendered content after a [`WriteMode`] decision.
+/// Write outcome reports what happens to rendered content under a
+/// [`WriteMode`].
 #[derive(Debug, Eq, PartialEq)]
 pub enum WriteOutcome {
     /// Wrote rendered content to the resolved output path.
@@ -130,12 +132,12 @@ pub enum WriteOutcome {
     Previewed(String),
 }
 
-/// Where a render's output goes.
+/// Holds the output path candidates for a render.
 ///
 /// Gathers the `-o` candidate (`requested`) and whatever `file.write_to()`
 /// captured (`declared`). [`Self::target_path`] applies the precedence policy,
 /// `requested` over `declared` over a caller-supplied default, confining
-/// `requested`/`declared` to `root` via [`Self::confine`].
+/// `requested`/`declared` to `root` with [`Self::confine`].
 #[derive(Debug)]
 pub(super) struct TemplateWriteTarget<'a> {
     root: &'a Path,
@@ -155,7 +157,7 @@ impl<'a> TemplateWriteTarget<'a> {
         }
     }
 
-    /// Sets the `-o` candidate.
+    /// Sets the `-o` output path candidate.
     #[inline]
     #[must_use]
     pub(super) const fn with_requested(
@@ -166,7 +168,7 @@ impl<'a> TemplateWriteTarget<'a> {
         self
     }
 
-    /// Sets the `file.write_to()` candidate.
+    /// Sets the `file.write_to()` output path candidate.
     #[inline]
     #[must_use]
     pub(super) fn with_declared(
@@ -177,16 +179,15 @@ impl<'a> TemplateWriteTarget<'a> {
         self
     }
 
-    /// Resolves the output destination, then writes `content` there.
+    /// Resolves the output path, then writes `content` there.
     ///
-    /// Keeps raw file writes private to this module: callers can only write via
-    /// a path produced by [`Self::resolve`].
+    /// Keeps raw file writes private to this module: callers can only write
+    /// with a path produced by [`Self::resolve`].
     ///
     /// # Errors
     ///
     /// - [`OutputPathEscapesRoot`] if the target path resolves outside `root`.
-    /// - [`OutputPathUnverifiable`] if output path confinement cannot be
-    ///   verified.
+    /// - [`OutputPathUnverifiable`] if the confinement check fails.
     /// - [`Prompt`] if an interactive collision prompt fails or is cancelled.
     /// - [`OutputFileAlreadyExists`] if the output file exists under
     ///   [`CommitPolicy::CreateNew`].
@@ -210,13 +211,13 @@ impl<'a> TemplateWriteTarget<'a> {
     }
 
     /// Resolves the candidate by precedence (`requested` > `declared` >
-    /// `default`), without interactive prompt or existence checks.
+    /// `default`). It does not prompt or check whether the output path exists.
     ///
     /// # Errors
     ///
     /// - [`OutputPathEscapesRoot`] if `requested` or `declared` names a path
     ///   outside `root`.
-    /// - [`OutputPathUnverifiable`] if confinement cannot be verified.
+    /// - [`OutputPathUnverifiable`] if the confinement check fails.
     ///
     /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
     /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
@@ -232,17 +233,22 @@ impl<'a> TemplateWriteTarget<'a> {
             )
     }
 
-    /// Resolves the output destination for `policy`:
-    /// 1. Evaluates precedence (`requested` > `declared` > `default`).
-    /// 2. Confines non-default candidates to `root`.
-    /// 3. Under [`CommitPolicy::CreateNew`], if `-o` wasn't passed, `provider`
-    ///    is interactive, and the path exists, prompts for a root-relative
-    ///    alternative until a valid, non-colliding path is given.
+    /// Resolves the output path for `policy`.
+    ///
+    /// The method applies these steps:
+    ///
+    /// 1. It selects the first available candidate (`requested` > `declared` >
+    ///    `default`).
+    /// 2. It confines non-default candidates to `root`.
+    /// 3. Under [`CommitPolicy::CreateNew`], it prompts for a root-relative
+    ///    path if `-o` is unset, `provider` is interactive, and the selected
+    ///    path exists. It repeats until the path is valid and does not collide
+    ///    with another file.
     ///
     /// # Errors
     ///
     /// - [`OutputPathEscapesRoot`] if `requested` or `declared` escapes `root`.
-    /// - [`OutputPathUnverifiable`] if confinement cannot be verified.
+    /// - [`OutputPathUnverifiable`] if the confinement check fails.
     /// - [`Prompt`] if the collision prompt is cancelled or fails.
     ///
     /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
@@ -284,19 +290,19 @@ impl<'a> TemplateWriteTarget<'a> {
                 }
                 current_path = confined;
             }
-            // Else: path escaped root during interactive prompt; falls through
-            // to loop back and prompt again.
+            // Else: the path escapes root during the interactive prompt. The
+            // loop runs again and prompts again.
         }
     }
 
     /// Confines `candidate`, a runtime `-o`/`file.write_to()` value, to `root`
-    /// via [`SafeRelativePath::parse`]. See the module docs.
+    /// with [`SafeRelativePath::parse`]. See the module docs.
     ///
     /// # Errors
     ///
     /// - [`OutputPathEscapesRoot`] if `candidate` is unsafe or resolves outside
     ///   `root`.
-    /// - [`OutputPathUnverifiable`] if confinement cannot be verified.
+    /// - [`OutputPathUnverifiable`] if the confinement check fails.
     ///
     /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
     /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
@@ -380,8 +386,8 @@ fn commit_with_writer(
     drop(file);
     let published = match policy {
         CommitPolicy::Overwrite => fs::rename(temp_path.as_path(), path),
-        // A hard link fails atomically when `path` exists, keeping
-        // `create_new` semantics; `Drop` removes the temp name afterwards.
+        // A hard link fails atomically when `path` exists, so `create_new`
+        // semantics hold. `Drop` removes the temp name afterwards.
         CommitPolicy::CreateNew => fs::hard_link(temp_path.as_path(), path),
     };
     published.map_err(|source| {
@@ -401,7 +407,7 @@ fn commit_with_writer(
 }
 
 /// Writes staged bytes to a sibling temporary file, then renames it over
-/// `path`; [`Drop`] deletes the temporary file if any step fails partway.
+/// `path`. [`Drop`] deletes the temporary file if a step fails.
 struct TempSiblingPath {
     path: PathBuf,
 }
@@ -435,9 +441,14 @@ mod tests {
 
     /// Returns a real, canonicalized temp directory.
     ///
-    /// macOS's temp dir is itself reached through a symlink (`/tmp` to
-    /// `/private/tmp`), so tests asserting an exact output path need an
-    /// already-canonical root.
+    /// macOS reaches the temp directory through a symlink (`/tmp` to
+    /// `/private/tmp`). Tests that check an exact output path need a canonical
+    /// root.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if creating the temp directory fails.
+    /// - Panics if canonicalizing the temp directory fails.
     fn canonical_root() -> (tempfile::TempDir, PathBuf) {
         let temp = tempfile::tempdir().expect("create temp dir");
         let root = temp.path().canonicalize().expect("canonicalize temp root");
@@ -519,8 +530,8 @@ mod tests {
             .expect("leading . is safe");
 
             // The leading "./" resolves through the existing `root/.`
-            // ancestor and is normalized away by canonicalization: the
-            // confined path has no trailing dot component left in it.
+            // ancestor. Canonicalization normalizes it away, so the
+            // confined path has no trailing dot component.
             assert_eq!(target, root.join("notes/daily.md"));
         }
 
@@ -576,10 +587,11 @@ mod tests {
             let outside = tempfile::tempdir().expect("create outside dir");
             symlink(outside.path(), root.join("link")).expect("create symlink");
 
-            // The write-side gap this closes: `-o`/`file.write_to()`
-            // resolving through a symlink planted inside `root` used to
-            // pass this lexical-only check and could write outside
-            // `root` (see the module docs).
+            // This test covers a write-side gap. A path from
+            // `-o`/`file.write_to()` used to pass this lexical
+            // check after it resolved through a symlink inside `root`. The
+            // write then happened outside `root` (see the module
+            // docs).
             let error = TemplateWriteTarget::confine(
                 &root,
                 Path::new("link/secret.md"),

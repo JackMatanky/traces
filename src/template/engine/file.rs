@@ -1,20 +1,19 @@
-//! Registers `file.*` helpers for templates.
+//! Registers file helpers for template rendering.
 //!
-//! [`FileOps`] is the `file` namespace object registered as a [`minijinja`]
-//! global by [`super::TemplateEngine`]. It exposes two methods:
+//! [`FileOps`] registers the `file` namespace as a global in
+//! [`super::TemplateEngine`]. It provides two methods:
 //!
-//! - `file.write_to("path")`: declares the output path for the current render.
-//! - `file.include("path")`: reads another file under [`Config::root`] and
-//!   inlines its contents.
+//! - `file.write_to("path")` declares the output path for the current render.
+//! - `file.include("path")` reads and inserts a file under [`Config::root`].
 //!
-//! `write_to` stores its argument in minijinja's per-render
-//! [`State::set_temp`]. [`super::TemplateEngine::render`] reads that value
-//! once rendering completes.
+//! The `write_to` method stores its path in minijinja's per-render
+//! [`State::set_temp`]. [`super::TemplateEngine::render`] reads the path after
+//! rendering completes.
 //!
-//! `file.include()` confines its `path` argument to `root` by calling
-//! [`SafeRelativePath::parse`], the same seam [`TemplateWriteTarget`] uses for
-//! `-o` and `file.write_to()` candidates. The read and write sides reject
-//! symlink escapes the same way.
+//! The `include` method confines its path to the Project Root with
+//! [`SafeRelativePath::parse`]. [`TemplateWriteTarget`] uses the same parser
+//! for `-o` and `file.write_to()` paths. Both read and write operations reject
+//! symlink escapes.
 //!
 //! [`Config::root`]: crate::config::Config::root
 //! [`SafeRelativePath::parse`]: crate::path::SafeRelativePath::parse
@@ -30,27 +29,26 @@ use minijinja::{
 use super::error::{TemplateEngineResult, confine_error};
 use crate::path::SafeRelativePath;
 
-/// The [`State::set_temp`] key used to store `file.write_to()`'s declared path.
+/// Names the [`State::set_temp`] key that stores the `file.write_to()` path.
 ///
-/// [`super::TemplateEngine::render`] reads the value back under this key after
-/// render completes.
+/// [`super::TemplateEngine::render`] reads this value after rendering
+/// completes.
 pub(super) const WRITE_TO_KEY: &str = "file.write_to";
 
-/// The method names `file` exposes, for [`FileOps::enumerate`].
+/// Lists the method names that [`FileOps::enumerate`] exposes.
 const METHODS: &[&str] = &["write_to", "include"];
 
-/// Backs the `file` namespace object.
+/// Stores the project root for the `file` template namespace.
 ///
-/// Holds the project root used to confine `file.include()` paths. `write_to`
-/// needs no equivalent state because its captured value lives in the render
-/// [`State`].
+/// Confines `file.include()` paths to this root. The `write_to` path lives in
+/// the render [`State`].
 #[derive(Debug)]
 pub(super) struct FileOps {
     root: Arc<Path>,
 }
 
 impl FileOps {
-    /// Creates a `file` namespace object rooted at `root`.
+    /// Creates a `file` namespace object with the given `root`.
     #[inline]
     #[must_use]
     pub(super) const fn new(root: Arc<Path>) -> Self {

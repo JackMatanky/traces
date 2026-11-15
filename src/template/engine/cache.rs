@@ -34,7 +34,8 @@ struct Cached<T>(T);
 /// The function runs `load` when this render has no cached value. It caches
 /// the load result before it returns the value.
 ///
-/// `T` should be cheap to clone (an `Arc<_>` or similarly shared type).
+/// `T` needs to be cheap to clone (an `Arc<_>` or a similarly shared
+/// type).
 /// Every call clones the cached value out of the extension rather than
 /// handing back a reference tied to its lifetime.
 ///

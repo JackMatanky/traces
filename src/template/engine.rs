@@ -1,8 +1,8 @@
-//! Builds and runs the minijinja environment used by [`TemplateService`].
+//! Builds the minijinja environment that [`TemplateService`] uses.
 //!
-//! [`TemplateEngine`] owns one [`Environment`] configured with the loader and
-//! helper surface used by templates. Rendering returns [`RenderOutput`], which
-//! includes the rendered text and an optional `file.write_to()` destination.
+//! [`TemplateEngine`] owns an [`Environment`] with the template loader and
+//! helper functions. Rendering returns [`RenderOutput`] with the rendered text
+//! and optional `file.write_to()` path.
 //!
 //! Helper modules:
 //!
@@ -63,12 +63,12 @@ use crate::{
     schema::{SchemaService, warn_schema_construction_diagnostics},
 };
 
-/// Renders template source through minijinja, backed by [`TemplateLoader`]'s
-/// `{% include %}` and `{% extends %}` resolution.
+/// Renders template source with [`TemplateLoader`] support for `{% include %}`
+/// and `{% extends %}`.
 ///
-/// [`TemplateService`] retains a [`TemplateLoader`] clone for inclusion
-/// resolution, built from the same [`Config`] as the clone wired into this
-/// engine, ensuring both agree on template directory priorities.
+/// [`TemplateService`] keeps a [`TemplateLoader`] clone for inclusion
+/// resolution. It builds the clone from the same [`Config`] as this engine, so
+/// both use the same template directory order.
 ///
 /// [`TemplateService`]: super::service::TemplateService
 /// [`TemplateLoader`]: super::loader::TemplateLoader
@@ -79,31 +79,30 @@ pub(super) struct TemplateEngine {
 }
 
 impl TemplateEngine {
-    /// Builds a [`TemplateEngine`] backed by `loader`, registering all custom
-    /// submodule functions and the standalone [`uuid`] function.
+    /// Builds a [`TemplateEngine`] with `loader` and registers its helper
+    /// functions and [`uuid`].
     ///
     /// Registers functions from the [`date`], [`duration`], [`mod@file`],
-    /// [`path`], [`num`], [`query`], [`mod@schema`], [`string`], [`ui`], and
-    /// [`mod@yaml`] submodules. Enables debug mode on the underlying minijinja
-    /// environment to support line and column diagnostic locations on render
-    /// errors.
+    /// [`path`], [`num`], [`query`], [`mod@schema`], [`string`], [`ui`],
+    /// and [`mod@yaml`] submodules. Debug mode adds line and column
+    /// locations to render errors.
     ///
     /// # Arguments
     ///
-    /// * `loader` - The [`TemplateLoader`] used for `{% include %}` and `{%
+    /// - `loader`: The [`TemplateLoader`] used for `{% include %}` and `{%
     ///   extends %}` resolution.
-    /// * `provider` - The [`DialogProvider`] implementation handling `ui.*`
+    /// - `provider`: The [`DialogProvider`] implementation handling `ui.*`
     ///   calls.
-    /// * `config` - Supplies the project root confining file operations,
-    ///   queries, and path inspections, the `[schemas]` class field used by
-    ///   `query.from()`/`lists.from()`/`tasks.from()` source expressions, and
-    ///   the Schema registry directory for the `schema` namespace.
+    /// - `config`: Supplies the project root that confines file operations,
+    ///   queries, and path inspections. It also supplies the `[schemas]` class
+    ///   field that `query.from()`/`lists.from()`/`tasks.from()` source
+    ///   expressions use, and the Schema registry directory for the `schema`
+    ///   namespace.
     ///
     /// # Errors
     ///
-    /// - [`SchemaLoad`] if the Schema registry cannot be loaded: the registry
-    ///   directory could not be read or listed, a Schema file failed to parse,
-    ///   or the `extends` DAG contains a cycle.
+    /// - [`SchemaLoad`] if reading or listing the registry directory fails,
+    ///   parsing a Schema file fails, or the `extends` DAG contains a cycle.
     ///
     /// [`SchemaLoad`]: TemplateError::SchemaLoad
     /// [`uuid`]: fn@uuid
@@ -116,11 +115,10 @@ impl TemplateEngine {
         config: &Config,
     ) -> Result<Self, TemplateError> {
         let mut env = Environment::new();
-        // Powers `minijinja::Error::range()`/`template_source()`, which
-        // `crate::cli::error` uses to compute a line:column location for
-        // template diagnostics (see `render_error_location`). Cheap: it only
-        // retains the rendered template's source text and the failing span,
-        // and only on error.
+        // Debug mode supplies `minijinja::Error::range()` and
+        // `template_source()`. `crate::cli::error` uses them to compute
+        // template diagnostic locations in `render_error_location`. The
+        // engine retains source text and the failing span only on error.
         env.set_debug(true);
         env.set_loader({
             let loader = loader.clone();
@@ -128,10 +126,11 @@ impl TemplateEngine {
         });
         let root = config.root_arc();
         let class_field = config.class_field_arc();
-        // Resolved once here and shared with `QueryOps` (below) so
-        // `query`/`lists`/`tasks` `.from()` and `schema.get()` read the
-        // identical, already-resolved `SchemaService` for this engine's whole
-        // lifetime: no render-scoped re-resolution or caching.
+        // The engine resolves `SchemaService` once and shares it with
+        // `QueryOps` below. The `query`/`lists`/`tasks` `.from()`
+        // helpers and `schema.get()` use this same service
+        // for the engine's lifetime. They do not resolve or cache it during a
+        // render.
         let schema_directory = config.schemas().directory();
         let construction = SchemaService::load_verbose(schema_directory)?;
         warn_schema_construction_diagnostics(&construction);
@@ -172,20 +171,20 @@ impl TemplateEngine {
         })
     }
 
-    /// Compiles and renders template `source` identified by `name` with an
-    /// empty context, returning a [`RenderOutput`] containing the rendered text
-    /// and any path captured by `file.write_to()`.
+    /// Compiles and renders `source` as template `name` with an empty context.
+    /// Returns the rendered text and any path captured by `file.write_to()`
+    /// in [`RenderOutput`].
     ///
-    /// The template `name` is passed to minijinja as the template identifier so
-    /// diagnostic errors report the actual template name rather than defaulting
-    /// to `<string>`. Captured state from `file.write_to()` is collected across
-    /// the entire render tree, including any included or extended templates.
+    /// The engine gives `name` to minijinja as the template identifier.
+    /// Diagnostic errors then report that name instead of `<string>`. The
+    /// engine collects `file.write_to()` state across the full render tree,
+    /// including included and extended templates.
     ///
     /// # Errors
     ///
-    /// Returns a [`minijinja::Error`] if `source` fails to parse or render, or
-    /// if a referenced `{% include %}` or `{% extends %}` template target fails
-    /// to load or render.
+    /// - [`minijinja::Error`] if `source` fails to parse or render. The error
+    ///   also occurs if a referenced `{% include %}` or `{% extends %}`
+    ///   template target fails to load or render.
     #[inline]
     pub(super) fn render(
         &self,
@@ -208,8 +207,7 @@ impl TemplateEngine {
     }
 }
 
-/// Contains the output of a template render operation and optional declared
-/// output path.
+/// Holds the rendered template text and its optional declared output path.
 #[derive(Debug)]
 pub(super) struct RenderOutput {
     /// The rendered template content.
@@ -218,12 +216,11 @@ pub(super) struct RenderOutput {
     pub(super) write_to: Option<DeclaredOutputPath>,
 }
 
-/// Generates a random UUID v4 string formatted per RFC 4122.
+/// Generates a random UUID v4 string in RFC 4122 format.
 ///
-/// Output format: `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.
-///
-/// Registered in minijinja as the standalone `uuid()` function, unlike
-/// namespace-qualified helpers such as `file.*`, `ui.*`, or `date.*`.
+/// The output format is `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`. `MiniJinja`
+/// registers this function as `uuid()`, not as a namespace-qualified helper
+/// such as `file.*`, `ui.*`, or `date.*`.
 fn uuid() -> String {
     Uuid::new_v4().to_string()
 }
@@ -239,14 +236,14 @@ mod tests {
     }
 
     /// Builds a [`Config`] rooted at `root` with no template directories and
-    /// default `[schemas]` settings, for tests that only need a project root
-    /// to pass to [`TemplateEngine::new`].
+    /// default `[schemas]` settings. Tests use it when they only need a
+    /// project root for [`TemplateEngine::new`].
     fn config_for(root: &Path) -> Config {
         Config::test_default(root)
     }
 
-    /// Creates a cheap, deterministic [`DialogProvider`] for tests that do not
-    /// exercise `ui.*` functions.
+    /// Creates a deterministic [`DialogProvider`] for tests that do not call
+    /// `ui.*` functions.
     ///
     /// [`DialogProvider`]: crate::DialogProvider
     fn preset_provider() -> Arc<dyn DialogProvider> {
@@ -511,11 +508,11 @@ mod tests {
         }
     }
 
-    /// Verifies that each namespace, filter, and function is accessible through
+    /// Checks that each namespace, filter, and function is accessible through
     /// [`TemplateEngine`].
     ///
-    /// Exhaustive per-feature behavior lives in each collaborator's own tests
-    /// (`file`, `date`, `string`, `ui`, `schema`).
+    /// Each collaborator's tests check its full behavior (`file`, `date`,
+    /// `string`, `ui`, `schema`).
     mod utilities {
         use pretty_assertions::assert_eq;
 

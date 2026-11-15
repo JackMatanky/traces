@@ -1,14 +1,13 @@
 //! Defines errors for template resolution, rendering, and writing.
 //!
-//! [`TemplateError`] is the primary error returned by [`TemplateService`]. It
-//! records the failing pipeline stage and preserves source errors. CLI code
-//! adds diagnostic codes and help text outside this module.
+//! [`TemplateError`] reports the failed pipeline stage and preserves source
+//! errors. CLI code adds diagnostic codes and help text outside this module.
 //!
 //! # Key Types
 //!
-//! - [`TemplateError`]: Resolve, read, render, output-path, write, and prompt
-//!   failures.
-//! - [`RenderFailureKind`]: Coarse render-error category for diagnostics.
+//! - [`TemplateError`]: reports resolution, read, render, output-path, write,
+//!   and prompt errors.
+//! - [`RenderFailureKind`]: classifies render errors for CLI diagnostics.
 //!
 //! [`TemplateService`]: super::service::TemplateService
 
@@ -21,71 +20,71 @@ use crate::{DialogError, index::IndexError, query::QueryError};
 
 /// Reports the failed stage of a template operation.
 ///
-/// Variants preserve their source error when one exists. Callers can match the
-/// variant instead of parsing display text.
+/// Variants preserve source errors when available. Callers can match a variant
+/// instead of parsing display text.
 #[derive(Debug, Error)]
 pub enum TemplateError {
-    /// Resolving the requested template identifier failed.
+    /// Reports a failure to resolve the requested template identifier.
     ///
-    /// Covers validation failures, ambiguous stem matches, unreadable template
-    /// directories, and missing templates. The wrapped [`TemplatePathError`]
-    /// names the exact condition.
+    /// This variant covers validation errors, ambiguous stem matches,
+    /// unreadable template directories, and missing templates. The wrapped
+    /// [`TemplatePathError`] identifies the condition.
     #[error(transparent)]
     Resolve(#[from] TemplatePathError),
 
-    /// Reading the resolved template source failed.
+    /// Reports a failure to read the resolved template source.
     #[error("failed to read template {path}")]
     Read {
-        /// Absolute path selected by template resolution.
+        /// Absolute path selected during template resolution.
         path: PathBuf,
-        /// Filesystem error returned while reading the source file.
+        /// Filesystem error from the source-file read.
         #[source]
         source: io::Error,
     },
 
-    /// Creating a new output file would overwrite an existing file.
+    /// Reports an existing output file when the policy is
+    /// [`CommitPolicy::CreateNew`].
     ///
-    /// Returned only for [`CommitPolicy::CreateNew`].
-    /// [`CommitPolicy::Overwrite`] truncates the file instead.
+    /// [`CommitPolicy::Overwrite`] truncates the existing file.
     ///
     /// [`CommitPolicy::CreateNew`]: super::writer::CommitPolicy::CreateNew
     /// [`CommitPolicy::Overwrite`]: super::writer::CommitPolicy::Overwrite
     #[error("output file already exists at {path}")]
     OutputFileAlreadyExists {
-        /// Existing file that blocked the write.
+        /// Existing file that blocks the write.
         path: PathBuf,
     },
 
-    /// An explicit output path could escape the project root.
+    /// Reports an output path that escapes the project root.
     ///
-    /// Covers `-o` and `file.write_to()` values that are absolute, contain
-    /// unsafe components such as `..`, or resolve through a symlink outside the
-    /// root.
+    /// This variant covers absolute `-o` and `file.write_to()` paths, paths
+    /// with unsafe components such as `..`, and paths that use an external
+    /// symlink.
     #[error("output path {path} escapes the project root")]
     OutputPathEscapesRoot {
-        /// Rejected output candidate as supplied by the caller or template.
+        /// Rejected output path from the caller or template.
         path: PathBuf,
     },
 
-    /// An explicit output path could not be verified against the project root.
+    /// Reports an explicit path that fails the root confinement check.
     ///
-    /// Returned when `strict-path` cannot validate the root boundary or resolve
-    /// the candidate's existing path components. The writer fails closed
-    /// instead of writing to an unverified path.
+    /// This variant occurs when `strict-path` cannot check the root boundary or
+    /// resolve existing path components. The writer stops instead of writing
+    /// to a path that it has not checked.
     #[error("failed to verify output path {path} is inside the project root")]
     OutputPathUnverifiable {
-        /// Output candidate whose confinement could not be verified.
+        /// Output path rejected by the root confinement check.
         path: PathBuf,
-        /// Filesystem error returned while validating the path boundary.
+        /// Filesystem error from the path-boundary check.
         #[source]
         source: io::Error,
     },
 
-    /// Rendering the template source failed.
+    /// Reports a failure to render the template source.
     ///
-    /// Covers minijinja syntax errors, missing helper functions, bad helper
-    /// arguments, include or extends failures, query/index/schema failures,
-    /// file include failures, and dialog failures raised during rendering.
+    /// This variant covers minijinja syntax errors, missing helpers, and bad
+    /// helper arguments. It also covers include or extends errors,
+    /// query/index/schema errors, file include errors, and dialog errors.
     #[error("failed to render template {path}")]
     Render {
         /// Absolute path used as the minijinja template name.
@@ -95,38 +94,43 @@ pub enum TemplateError {
         source: minijinja::Error,
     },
 
-    /// Writing rendered output failed.
+    /// Reports a failure to write rendered output.
     ///
-    /// Covers parent directory creation, file creation except existing-file
-    /// collisions reported by [`Self::OutputFileAlreadyExists`], and writing
-    /// the rendered bytes.
+    /// This variant covers parent-directory creation, file creation except
+    /// existing-file collisions reported by [`Self::OutputFileAlreadyExists`],
+    /// and writes of rendered bytes.
     #[error("failed to write rendered output to {path}")]
     Write {
-        /// Target path being written.
+        /// Template output path being written.
         path: PathBuf,
-        /// Filesystem error returned while creating or writing the file.
+        /// Filesystem error from file creation or writing.
         #[source]
         source: io::Error,
     },
 
-    /// An interactive output-collision prompt failed or was cancelled.
+    /// Reports a failed or cancelled output-collision prompt.
     ///
-    /// Covers the writer prompt shown before replacing an existing output file.
+    /// This variant covers the writer prompt before it replaces an output file.
     #[error(transparent)]
     Prompt(#[from] DialogError),
 
-    /// Loading the Schema registry failed during service construction.
+    /// Reports a registry-wide Schema loading error during service
+    /// construction.
     ///
-    /// Reached only for registry-wide failures: the registry directory could
-    /// not be read or listed, a Schema file's TOML syntax is malformed or has
-    /// an unknown key, or the `extends` DAG contains a cycle; see the wrapped
-    /// [`SchemaError`](crate::schema::SchemaError) for which.
+    /// This variant covers these registry-wide errors:
     ///
-    /// A field-level defect *within* an otherwise well-formed Schema TOML file
-    /// (an invalid attribute value, an out-of-bounds `$ref`, an ambiguous field
-    /// name) never reaches this variant: that Schema alone is excluded from the
-    /// registry and logged as a construction-time failure instead, while every
-    /// other Schema still resolves.
+    /// - The service cannot read or list the registry directory.
+    /// - A Schema TOML file has invalid syntax or an unknown key.
+    /// - The `extends` DAG contains a cycle.
+    ///
+    /// The wrapped [`SchemaError`] identifies the failure.
+    ///
+    /// A field-level error in a valid Schema TOML file does not reach this
+    /// variant. Examples include an invalid attribute value, an out-of-bounds
+    /// `$ref`, or an ambiguous field name. The registry excludes that Schema
+    /// and logs a construction error. Other Schemas remain available.
+    ///
+    /// [`SchemaError`]: crate::schema::SchemaError
     #[error(transparent)]
     #[expect(
         private_interfaces,
@@ -140,34 +144,33 @@ pub enum TemplateError {
 
 /// Classifies template rendering failures for CLI diagnostics.
 ///
-/// Inspects [`minijinja::Error::kind`] and the retained source chain instead of
-/// parsing display text, so new custom functions do not require string matching
-/// in the CLI diagnostic layer.
+/// The method checks [`minijinja::Error::kind`] and the retained source chain.
+/// It does not parse display text. New template helpers need no CLI string
+/// matching.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RenderFailureKind {
-    /// The template's own minijinja syntax is invalid.
+    /// Reports invalid minijinja syntax in the template.
     Syntax,
-    /// An interactive `ui.*` prompt failed for a reason other than a deliberate
-    /// user abort (handled separately, upstream of this classification).
+    /// Reports a failed `ui.*` prompt, except for a deliberate user abort.
     Prompt,
-    /// A `query.*` call failed on a malformed field path, filter expression,
-    /// sort path, or `.table()` header/column mismatch.
+    /// Reports a `query.*` error from a malformed field path, filter, sort
+    /// path, or `.table()` header and column mismatch.
     Query,
-    /// Refreshing the file index for a `query.*` call failed: a filesystem,
-    /// database, or (de)serialization error, not a template authoring mistake.
+    /// Reports a filesystem, database, or serialization error while a
+    /// `query.*` call refreshes the file index.
     Index,
-    /// A `file.include()` (or other Custom Function) I/O operation failed.
+    /// Reports an I/O error from `file.include()` or another template helper.
     Io,
-    /// Anything else: an unknown function/filter/test, a bad argument, an
-    /// undefined-value operation, or another engine-level failure.
+    /// Reports another engine error, such as an unknown function, filter, or
+    /// test, a bad argument, or an undefined-value operation.
     Other,
 }
 
 impl RenderFailureKind {
-    /// Classifies a [`minijinja::Error`] into a coarse [`RenderFailureKind`].
+    /// Classifies a [`minijinja::Error`] as a [`RenderFailureKind`].
     ///
-    /// Inspects [`minijinja::Error::kind`] and the source chain to identify
-    /// the failure category without parsing display text.
+    /// The method checks the error kind and source chain. It does not parse
+    /// display text.
     ///
     /// # Examples
     ///

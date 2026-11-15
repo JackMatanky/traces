@@ -1,18 +1,17 @@
-//! Validates and labels path values in the template pipeline.
+//! Validates and labels template paths.
 //!
 //! # Key Types
 //!
-//! - [`TemplatePathInput`]: Relative template identifier accepted at CLI and
-//!   include boundaries.
-//! - [`TemplatePath`]: Resolved template path produced after loader lookup.
-//! - [`DeclaredOutputPath`]: Raw `file.write_to()` value captured during
+//! - [`TemplatePathInput`]: Validated relative template identifier.
+//! - [`TemplatePath`]: Template path that the loader has resolved to a file.
+//! - [`DeclaredOutputPath`]: Raw `file.write_to()` path captured during
 //!   rendering.
-//! - [`TemplatePathError`]: Validation and lookup failures for template
+//! - [`TemplatePathError`]: Validation and lookup errors for template
 //!   identifiers.
 //!
-//! [`TemplatePath`] is created by [`TemplateLoader`] immediately after finding
-//! a real file. [`DeclaredOutputPath`] is intentionally not validated here;
-//! [`writer`] resolves and confines it alongside `-o` output paths.
+//! [`TemplateLoader`] creates [`TemplatePath`] after it finds a file. This
+//! module does not validate [`DeclaredOutputPath`]. The [`writer`] module
+//! resolves and confines it with `-o` output paths.
 //!
 //! [`TemplateLoader`]: super::loader::TemplateLoader
 //! [`writer`]: super::writer
@@ -26,20 +25,20 @@ use thiserror::Error;
 
 use crate::path::{PathError, RelativePath};
 
-/// The extension every rendered note gets by default, absent an explicit
-/// `-o`/`file.write_to()` override.
+/// The default extension for each rendered note unless `-o` or
+/// `file.write_to()` sets another path.
 const DEFAULT_EXTENSION: &str = "md";
 
-/// Holds a validated template identifier before loader resolution.
+/// Holds a validated template identifier before the loader resolves it.
 ///
-/// The identifier is relative, contains at least one normal path component, and
-/// cannot escape through parent traversal. It does not prove the template file
-/// exists.
+/// The identifier is relative and contains at least one normal path component.
+/// It cannot escape through parent traversal, but it does not prove that the
+/// template file exists.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TemplatePathInput(RelativePath);
 
 impl TemplatePathInput {
-    /// Parses a path as a template identifier.
+    /// Parses `path` as a template identifier.
     ///
     /// Accepts relative names such as `daily`, `daily.md`, and
     /// `folder/daily.md`. Rejects absolute paths, parent traversal, empty
@@ -48,9 +47,8 @@ impl TemplatePathInput {
     /// # Errors
     ///
     /// - `TemplatePathError::Absolute` if `path` is absolute.
-    /// - `TemplatePathError::UnsafeComponent` if `path` contains `..`, any
-    ///   component that is not a plain name or `.`, or no
-    ///   [`Component::Normal`].
+    /// - `TemplatePathError::UnsafeComponent` if `path` contains `..`, an
+    ///   unsupported component, or no [`Component::Normal`].
     ///
     /// [`Component::Normal`]: std::path::Component::Normal
     ///
@@ -68,8 +66,6 @@ impl TemplatePathInput {
     /// # #[cfg(not(feature = "test-utils"))]
     /// # fn main() {}
     /// ```
-    ///
-    /// [`Component::Normal`]: std::path::Component::Normal
     #[inline]
     pub fn parse(path: &Path) -> Result<Self, TemplatePathError> {
         RelativePath::parse(path).map(Self).map_err(|error| match error {
@@ -101,10 +97,9 @@ pub(super) struct TemplatePath {
 }
 
 impl TemplatePath {
-    /// Creates a [`TemplatePath`] proven to exist by [`TemplateLoader`]'s
-    /// search: called only from [`TemplateLoader::find_path_in`] and
-    /// [`TemplateLoader::find_name_in`], immediately after each confirms the
-    /// file exists. Nothing later in the pipeline re-verifies it.
+    /// Creates a [`TemplatePath`] after [`TemplateLoader::find_path_in`] or
+    /// [`TemplateLoader::find_name_in`] confirms that the file exists. Later
+    /// pipeline stages do not check that the file still exists.
     ///
     /// [`TemplateLoader`]: super::loader::TemplateLoader
     /// [`TemplateLoader::find_path_in`]: super::loader::TemplateLoader::find_path_in
@@ -121,9 +116,8 @@ impl TemplatePath {
         }
     }
 
-    /// Test-only fixture constructor, bypassing the existence guarantee
-    /// [`Self::verified`] documents. Production code must go through
-    /// [`TemplateLoader::find`].
+    /// Creates a test fixture without the existence guarantee of
+    /// [`Self::verified`]. Production code uses [`TemplateLoader::find`].
     ///
     /// [`TemplateLoader::find`]: super::loader::TemplateLoader::find
     #[cfg(test)]
@@ -138,22 +132,23 @@ impl TemplatePath {
         }
     }
 
-    /// Returns the absolute path by joining `source_dir` with `input`.
+    /// Returns the absolute path formed by joining `source_dir` and `input`.
     #[inline]
     #[must_use]
     pub(super) fn absolute(&self) -> PathBuf {
         self.source_dir.join(self.input.as_ref())
     }
 
-    /// Returns the default output filename with its extension forced to `md`,
-    /// keeping directory segments.
+    /// Returns the default output filename with the `md` extension and
+    /// preserves its directory segments.
     #[inline]
     #[must_use]
     pub(super) fn default_output_filename(&self) -> PathBuf {
         self.input.as_ref().with_extension(DEFAULT_EXTENSION)
     }
 
-    /// Reads this resolved template's source from disk.
+    /// Reads this resolved template's source from disk and returns it as a
+    /// string.
     ///
     /// # Errors
     ///
@@ -169,7 +164,8 @@ impl AsRef<Path> for TemplatePath {
     }
 }
 
-/// A raw `file.write_to()` path declared by the template during rendering.
+/// Holds the raw `file.write_to()` path that a template declares during
+/// rendering.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct DeclaredOutputPath(PathBuf);
 
@@ -187,25 +183,25 @@ impl DeclaredOutputPath {
     }
 }
 
-/// Reports template identifier validation and lookup failures.
+/// Reports validation and lookup errors for template identifiers.
 ///
-/// Validation errors are raised before any template directory is searched.
-/// Lookup errors are raised after validation succeeds.
+/// Validation errors occur before the loader searches a template directory.
+/// Lookup errors occur after validation succeeds.
 #[derive(Debug, Error)]
 pub enum TemplatePathError {
-    /// The identifier was absolute.
+    /// The identifier is absolute.
     ///
-    /// Template lookup only accepts paths relative to configured template
+    /// Template lookup accepts only paths relative to configured template
     /// directories.
     #[error("template path {0} must be relative, not absolute")]
     Absolute(PathBuf),
-    /// The identifier was not a safe relative path.
+    /// The identifier is not a safe relative path.
     ///
-    /// Covers parent traversal, unsupported components, an empty path, and a
-    /// bare `.` with no normal component.
+    /// This error covers parent traversal, unsupported components, an empty
+    /// path, and `.` without a normal component.
     #[error("template path {0} is not a valid template identifier")]
     UnsafeComponent(PathBuf),
-    /// Stem lookup matched more than one file in one template directory.
+    /// Stem lookup matched more than one file in a template directory.
     #[error("template name \"{name}\" matched multiple files: {candidates:?}")]
     AmbiguousTemplate {
         /// Requested identifier that produced multiple matches.
@@ -222,7 +218,7 @@ pub enum TemplatePathError {
         #[source]
         source: io::Error,
     },
-    /// No configured template directory contained the requested template.
+    /// No configured template directory contains the requested template.
     #[error("template \"{0}\" not found")]
     TemplateNotFound(PathBuf),
 }
@@ -267,12 +263,11 @@ mod tests {
 
         #[test]
         fn accepts_a_path_with_a_leading_current_dir_segment() {
-            // "./daily.md" splits into [CurDir, Normal("daily.md")]. A
-            // leading CurDir component doesn't itself count toward
-            // `has_normal_component`, but doesn't disqualify the path
-            // either. The trailing Normal component still does. This is
-            // the exact case `has_normal_component` exists to allow
-            // (vs. a bare "." with no Normal component at all).
+            // "./daily.md" splits into [CurDir, Normal("daily.md")]. A leading
+            // CurDir does not count as a normal component, but it
+            // does not make the path invalid. The trailing
+            // Normal component makes the path valid. A bare "." has no Normal
+            // component.
             let path = validated("./daily.md");
 
             assert_eq!(path.as_ref(), Path::new("./daily.md"));
@@ -280,10 +275,9 @@ mod tests {
 
         #[test]
         fn rejects_an_absolute_path() {
-            // A syntactically absolute path is rejected before any I/O
-            // happens: parse() never reads the filesystem. This check
-            // never touches whatever real file may or may not exist at
-            // this well-known path.
+            // The parser rejects an absolute path before I/O because it never
+            // reads the file system. This check does not access any
+            // file at this path.
             let error = TemplatePathInput::parse(&std::env::temp_dir())
                 .expect_err("absolute path is rejected");
 

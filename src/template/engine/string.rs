@@ -1,21 +1,15 @@
-//! Registers the string filters for templates.
+//! Registers stateless string filters for template rendering.
 //!
-//! [`StrOps`] adds thirteen stateless filters:
+//! [`StrOps`] registers thirteen filters: five case conversions, six string
+//! operations, and two regex operations. The filters convert case, trim text,
+//! truncate text, count words, repeat text, and process regex patterns.
 //!
-//! - Case conversion: `snake_case`, `kebab_case`, `camel_case`, `pascal_case`,
-//!   and `title_case`.
-//! - Manipulation: `trim_prefix`, `trim_suffix`, `truncate`, `truncate_words`,
-//!   `word_count`, and `repeat`.
-//! - Regex helpers: `regex_replace` and `regex_match`.
+//! Each filter is a function registered with [`Environment::add_filter`]. The
+//! filters have no shared state and do not use [`Object`] dispatch.
 //!
-//! Each filter is a plain function registered through
-//! [`Environment::add_filter`]. None carry shared state, so there is no
-//! [`Object`] dispatch.
-//!
-//! Case conversion delegates to [`convert_case`]'s [`Casing::to_case`]. The
-//! stdlib-backed filters wrap `str::strip_prefix`, `str::strip_suffix`,
-//! `str::repeat`, and [`str::split_whitespace`] directly. `regex_replace` and
-//! `regex_match` compile their pattern fresh on every call with [`Regex::new`].
+//! Case conversion uses [`Casing::to_case`]. Prefix and suffix trimming, string
+//! repetition, and word splitting use the Rust standard library. Regex filters
+//! compile each pattern on every call with [`Regex::new`].
 //!
 //! [`Object`]: minijinja::value::Object
 //! [`Casing::to_case`]: convert_case::Casing::to_case
@@ -26,13 +20,14 @@ use regex::Regex;
 
 use super::error::TemplateEngineResult;
 
-/// A registration namespace for the stateless string filters.
+/// Names the stateless string filters registered with the template environment.
 pub(super) struct StrOps;
 
 impl StrOps {
-    /// Registers the string filters with `env`.
+    /// Registers the stateless string filters with `env`.
     ///
-    /// This is an associated function because [`StrOps`] carries no state.
+    /// This associated function needs no [`StrOps`] instance because the
+    /// filters carry no state.
     #[inline]
     pub(super) fn register(env: &mut Environment<'static>) {
         env.add_filter("snake_case", |value: &str| value.to_case(Case::Snake));
@@ -55,34 +50,31 @@ impl StrOps {
     }
 }
 
-/// Trims a prefix from the start of `value`.
+/// Removes `prefix` from the start of `value` when it is present.
 ///
-/// Returns `value` unchanged when `prefix` is not present, using
-/// [`str::strip_prefix`].
+/// Returns `value` unchanged when [`str::strip_prefix`] finds no `prefix`.
 fn trim_prefix(value: &str, prefix: &str) -> String {
     value.strip_prefix(prefix).unwrap_or(value).to_owned()
 }
 
-/// Trims a suffix from the end of `value`.
+/// Removes `suffix` from the end of `value` when it is present.
 ///
-/// Returns `value` unchanged when `suffix` is not present, using
-/// [`str::strip_suffix`].
+/// Returns `value` unchanged when [`str::strip_suffix`] finds no `suffix`.
 fn trim_suffix(value: &str, suffix: &str) -> String {
     value.strip_suffix(suffix).unwrap_or(value).to_owned()
 }
 
-/// Truncates `value` to a maximum character count.
+/// Truncates `value` to `length` characters and returns the result.
 ///
-/// Truncates by character count, not byte count, so multi-byte UTF-8 input is
-/// not split mid-character. Keeps the total output length, including the
-/// ellipsis, within `length`. Returns `value` unchanged when it already fits.
+/// Counts Unicode characters, not bytes, and does not split a multi-byte UTF-8
+/// character. Includes the ellipsis within `length`. Returns `value` unchanged
+/// when its character count does not exceed `length`.
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-///   not a string.
-/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
-///   `ellipsis`.
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is not a string.
+/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has a key other
+///   than `ellipsis`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Kwargs::assert_all_used consumes self by value; &Kwargs \
@@ -99,9 +91,8 @@ fn truncate(
         return Ok(value.to_owned());
     }
 
-    // The ellipsis alone doesn't fit within `length`, leaving no room for
-    // `value`. Return the ellipsis itself truncated to `length` rather than
-    // underflowing `length - ellipsis_len`.
+    // If the ellipsis meets or exceeds `length`, return its first `length`
+    // characters. This avoids subtracting `ellipsis_len` from `length`.
     let ellipsis_len = ellipsis.chars().count();
     if ellipsis_len >= length {
         return Ok(ellipsis.chars().take(length).collect());
@@ -112,20 +103,18 @@ fn truncate(
     Ok(format!("{kept}{ellipsis}"))
 }
 
-/// Truncates `value` to a maximum word count.
+/// Truncates `value` to `count` whitespace-separated words and returns the
+/// result.
 ///
-/// Truncates by whitespace-separated word count rather than character count.
-/// See [`truncate`] for the character-count variant. Uses a single pass over
-/// [`str::split_whitespace`]. The same iterator both builds the kept words
-/// and, with one trailing `next()`, checks whether a word was left out. No
-/// intermediate [`Vec`] is collected just to measure the word count.
+/// Uses one pass over [`str::split_whitespace`] to collect retained words and
+/// check for omitted words. Returns the input unchanged when no word is
+/// omitted.
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-///   not a string.
-/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
-///   `ellipsis`.
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is not a string.
+/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has a key other
+///   than `ellipsis`.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Kwargs::assert_all_used consumes self by value; &Kwargs \
@@ -147,10 +136,8 @@ fn truncate_words(
         kept.push_str(word);
     }
 
-    // `words` already yielded its first `count` items above. If it's now
-    // exhausted, every word fit within `count` and no truncation happened.
-    // Return `value` unchanged to preserve its original whitespace rather than
-    // the single-space-joined `kept` buffer.
+    // If `words` is exhausted, every word fits within `count`.
+    // Return `value` unchanged to preserve its original whitespace.
     if words.next().is_none() {
         return Ok(value.to_owned());
     }
@@ -162,29 +149,27 @@ fn truncate_words(
     Ok(kept)
 }
 
-/// Extracts the `ellipsis` kwarg for truncation filters.
+/// Gets the `ellipsis` kwarg for truncation filters.
 ///
-/// Defaults to `"..."` and rejects any other kwarg with
+/// Uses `"..."` when the kwarg is absent and rejects unknown kwargs with
 /// [`Kwargs::assert_all_used`].
 ///
 /// # Errors
 ///
-/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is present but
-///   not a string.
-/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has any key besides
-///   `ellipsis`.
+/// - [`minijinja::ErrorKind::InvalidOperation`] if `ellipsis` is not a string.
+/// - [`minijinja::ErrorKind::TooManyArguments`] if `kwargs` has a key other
+///   than `ellipsis`.
 fn ellipsis_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
     let ellipsis = kwargs.get::<Option<&str>>("ellipsis")?.unwrap_or("...");
     kwargs.assert_all_used()?;
     Ok(ellipsis)
 }
 
-/// Replaces regex pattern matches in `value` with a replacement string.
+/// Replaces every non-overlapping regex match in `value` with `replacement`.
 ///
-/// Replaces every non-overlapping match of `pattern` with `replacement`, which
-/// may reference capture groups as `$1`/`$2` using [`Regex::replace_all`]'s
-/// replacement syntax. The pattern is compiled fresh on every call with
-/// [`Regex::new`] rather than cached.
+/// The replacement can refer to capture groups such as `$1` and `$2` with the
+/// syntax of [`Regex::replace_all`]. Compiles `pattern` on every call with
+/// [`Regex::new`].
 ///
 /// # Errors
 ///
@@ -200,9 +185,9 @@ fn regex_replace(
     Ok(re.replace_all(value, replacement).into_owned())
 }
 
-/// Checks whether `value` matches a regex pattern.
+/// Checks whether `value` contains a match for the regex `pattern`.
 ///
-/// Returns `true` if `value` contains any match for `pattern`.
+/// Returns `true` when the pattern matches and `false` otherwise.
 ///
 /// # Errors
 ///
@@ -214,10 +199,9 @@ fn regex_match(value: &str, pattern: &str) -> TemplateEngineResult<bool> {
     Ok(re.is_match(value))
 }
 
-/// Wraps a [`regex::Error`] in a [`minijinja::Error`].
+/// Converts a [`regex::Error`] into a [`minijinja::Error`].
 ///
-/// Used by `regex_replace` and `regex_match` to return a template error instead
-/// of letting an invalid pattern panic.
+/// The regex filters return this template error when a pattern is invalid.
 fn regex_compile_error(pattern: &str, source: regex::Error) -> Error {
     super::error::invalid_operation(
         format!("invalid regex pattern {pattern:?}"),
@@ -238,10 +222,10 @@ mod tests {
         env
     }
 
-    /// Renders `template` against a single `value` binding.
+    /// Renders `template` with one `value` binding.
     ///
-    /// Used by filters whose only dynamic input is the piped string. Literal
-    /// filter arguments stay embedded in `template`.
+    /// Uses embedded literal filter arguments when the piped string is the only
+    /// dynamic input.
     ///
     /// # Panics
     ///
@@ -255,8 +239,7 @@ mod tests {
             .expect("template renders")
     }
 
-    /// Renders `template` against `value` and returns the expected render
-    /// error.
+    /// Renders `template` with `value` and returns its render error.
     ///
     /// # Panics
     ///
@@ -310,13 +293,11 @@ mod tests {
         assert_eq!(rendered, expected);
     }
 
-    /// Boundary rows the two behavior tables above do not reach.
+    /// Covers boundary inputs that the two behavior tables do not include.
     ///
-    /// Covers an empty string across all five filters. That input is the one
-    /// most likely to expose a panic. It also covers a single word with no
-    /// delimiter, Unicode input, digits, and punctuation. One representative
-    /// filter per non-empty boundary kind is enough because `convert_case`'s
-    /// splitting logic is shared across all five [`Case`] targets.
+    /// Tests empty strings with all five filters, plus a single word, Unicode,
+    /// digits, and punctuation. The five [`Case`] targets share splitting
+    /// logic.
     #[rstest]
     #[case::snake_case_with_empty_input("snake_case", "", "")]
     #[case::kebab_case_with_empty_input("kebab_case", "", "")]

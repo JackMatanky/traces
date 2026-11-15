@@ -104,10 +104,8 @@ impl PathOps {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if a relative `path` traverses outside
-///   `root` (through `..` or a symlink escape).
-/// - [`ErrorKind::InvalidOperation`] if reading the resolved target's metadata
-///   fails for any reason other than "not found".
+/// - [`ErrorKind::InvalidOperation`] if path confinement fails or metadata
+///   reading fails for a reason other than "not found".
 ///
 /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn inspect(
@@ -150,8 +148,8 @@ impl InspectTarget {
     ///
     /// # Errors
     ///
-    /// - [`OutsideRoot`] or [`UnsafeComponent`] if a relative `path` resolves
-    ///   outside `root`.
+    /// - [`OutsideRoot`] if a relative `path` escapes `root`.
+    /// - [`UnsafeComponent`] if a relative `path` contains an unsafe component.
     /// - [`StrictPath`] if the resolver cannot confirm containment.
     ///
     /// [`OutsideRoot`]: PathError::OutsideRoot
@@ -172,11 +170,11 @@ impl InspectTarget {
 
     /// Checks whether `candidate` names `root` itself.
     ///
-    /// That means every component is [`Component::CurDir`], or there are no
-    /// components at all, as in an empty path. This cannot escape no matter how
-    /// it is joined. [`RelativePath::parse`] rejects this shape because it
-    /// is meaningless as a file to write or include. Here it is the legitimate
-    /// "ask about root" case `is_dir_path('.')`/`path_exists('')` rely on.
+    /// Every component must be [`Component::CurDir`], or the path must have no
+    /// components, as with an empty path. Joining this path cannot escape
+    /// the root. [`RelativePath::parse`] rejects this path because it
+    /// cannot name a file to write or include. Path tests use it to query the
+    /// root with `is_dir_path('.')` or `path_exists('')`.
     ///
     /// [`RelativePath::parse`]: crate::path::RelativePath::parse
     fn is_root_reference(candidate: &Path) -> bool {
@@ -256,7 +254,7 @@ mod tests {
     ///
     /// # Panics
     ///
-    /// Panics if the render fails.
+    /// - Panics if minijinja fails to render the generated template.
     fn check(root: &Path, test: &str, input: &str) -> String {
         let template = format!("{{{{ value is {test} }}}}");
         env(root)

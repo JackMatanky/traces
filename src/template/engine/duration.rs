@@ -39,6 +39,8 @@ impl DurationOps {
 /// - [`ErrorKind::InvalidOperation`] if `value` is neither a duration string
 ///   nor a number, or if `value` does not parse or convert into a
 ///   [`DurationValue`].
+///
+/// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 fn duration_format(value: Value) -> TemplateEngineResult<String> {
     let dv = if let Some(s) = value.as_str() {
         DurationValue::parse(s).map_err(|source| {

@@ -42,10 +42,10 @@ pub(super) fn confine_error(path: &str, source: PathError) -> Error {
 /// Builds an [`ErrorKind::InvalidOperation`] [`minijinja::Error`] carrying
 /// `source` as its error-chain cause.
 ///
-/// Shared by every `template::engine` submodule that maps a domain error
-/// (I/O, index, query, regex, dialog) into minijinja's error type. The
-/// resulting error keeps the same "generic message plus preserved source"
-/// shape.
+/// Every `template::engine` submodule shares it when it maps a domain
+/// error (I/O, index, query, regex, dialog) into minijinja's error type.
+/// The resulting error keeps the same "generic message plus preserved
+/// source" shape.
 pub(super) fn invalid_operation<E>(
     message: impl Into<String>,
     source: E,

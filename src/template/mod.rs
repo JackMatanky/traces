@@ -2,27 +2,23 @@
 //!
 //! The template pipeline has four stages:
 //!
-//! - Validate a [`TemplatePathInput`] before lookup.
-//! - Resolve the template through [`loader`] using local-before-global search.
-//! - Render with [`engine`], which wraps minijinja and registers the template
-//!   helper namespaces.
-//! - Resolve and write the output through [`writer`], honoring dry-run and
-//!   commit modes.
+//! - Validate a [`TemplatePathInput`] before resolution.
+//! - Resolve the template with [`loader`] in local-before-global order.
+//! - Render the template with [`engine`], which registers template helper
+//!   namespaces.
+//! - Resolve and write the output with [`writer`], according to
+//!   [`WriteMode::DryRun`] or [`WriteMode::Commit`].
 //!
 //! # Key Types
 //!
-//! - [`TemplateService`]: Entry point that chains resolution, rendering, and
-//!   writing for the CLI.
-//! - [`TemplatePathInput`]: Validated relative template identifier.
-//! - [`TemplatePathError`]: Validation and lookup failures for template
-//!   identifiers.
-//! - [`TemplateError`]: User-facing error for resolve, read, render, and write
-//!   failures.
-//! - [`RenderFailureKind`]: Coarse render-error category for diagnostics.
-//! - [`WriteMode`]: Choice between previewing rendered content and committing
-//!   it to disk.
-//! - [`WriteOutcome`]: Output produced by a write-mode decision.
-//! - [`CommitPolicy`]: Existing-file behavior for committed writes.
+//! - [`TemplateService`]: chains template resolution, rendering, and writing.
+//! - [`TemplatePathInput`]: validated relative template identifier.
+//! - [`TemplatePathError`]: validation and resolution errors for identifiers.
+//! - [`TemplateError`]: error shown in CLI output for pipeline failures.
+//! - [`RenderFailureKind`]: render-error category for CLI diagnostics.
+//! - [`WriteMode`]: selects whether the service previews or writes output.
+//! - [`WriteOutcome`]: result of the selected write mode.
+//! - [`CommitPolicy`]: controls how a write handles an existing file.
 //!
 //! [`CommitPolicy`]: writer::CommitPolicy
 
