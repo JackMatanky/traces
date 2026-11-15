@@ -89,6 +89,7 @@ use crate::{
 const METHODS: &[&str] = &["from"];
 
 /// Backs the `query`, `lists`, and `tasks` minijinja namespace objects.
+///
 /// Each instance registers one global and runs one [`QueryBuilder`] mode.
 #[derive(Debug)]
 pub(super) struct QueryOps {
