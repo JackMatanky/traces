@@ -483,7 +483,8 @@ mod tests {
 
             assert!(matches!(
                 error,
-                TemplateError::OutputPathEscapesRoot { path } if path == Path::new("/etc/passwd")
+                TemplateError::OutputPathEscapesRoot { path }
+                    if path == Path::new("/etc/passwd")
             ));
         }
 
