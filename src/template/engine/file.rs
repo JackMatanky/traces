@@ -1,10 +1,11 @@
-//! Registers file helpers for template rendering.
+//! Registers file helpers for templates.
 //!
 //! [`FileOps`] registers the `file` namespace as a global in
 //! [`super::TemplateEngine`]. It provides two methods:
 //!
 //! - `file.write_to("path")` declares the output path for the current render.
-//! - `file.include("path")` reads and inserts a file under [`Config::root`].
+//! - `file.include("path")` reads a file under [`Config::root`] and inserts its
+//!   content.
 //!
 //! The `write_to` method stores its path in minijinja's per-render
 //! [`State::set_temp`]. [`super::TemplateEngine::render`] reads the path after
@@ -14,6 +15,13 @@
 //! [`SafeRelativePath::parse`]. [`TemplateWriteTarget`] uses the same parser
 //! for `-o` and `file.write_to()` paths. Both read and write operations reject
 //! symlink escapes.
+//!
+//! # Examples
+//!
+//! ```text
+//! {{ file.write_to("daily/2024-01-02.md") }}
+//! {{ file.include("snippets/intro.md") }}
+//! ```
 //!
 //! [`Config::root`]: crate::config::Config::root
 //! [`SafeRelativePath::parse`]: crate::path::SafeRelativePath::parse

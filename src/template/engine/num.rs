@@ -59,6 +59,11 @@ fn sqrt(value: f64) -> TemplateEngineResult<f64> {
 }
 
 /// Formats `value` with `decimals` decimal places using Rust's `{:.N$}` format.
+///
+/// # Arguments
+///
+/// - `value`: the number to format.
+/// - `decimals`: the number of digits after the decimal point.
 fn num_format(value: f64, decimals: usize) -> String {
     format!("{value:.decimals$}")
 }

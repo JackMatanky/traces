@@ -1,4 +1,4 @@
-//! Registers stateless string filters for template rendering.
+//! Registers stateless string filters for templates.
 //!
 //! [`StrOps`] registers thirteen filters: five case conversions, six string
 //! operations, and two regex operations. The filters convert case, trim text,
@@ -10,6 +10,18 @@
 //! Case conversion uses [`Casing::to_case`]. Prefix and suffix trimming, string
 //! repetition, and word splitting use the Rust standard library. Regex filters
 //! compile each pattern on every call with [`Regex::new`].
+//!
+//! # Examples
+//!
+//! ```text
+//! {{ "hello world" | snake_case }}          -> hello_world
+//! {{ "notes.md" | trim_suffix(".md") }}     -> notes
+//! {{ "Hello World" | truncate(8) }}         -> Hello...
+//! {{ "one two three" | truncate_words(2) }} -> one two ...
+//! {{ "one two three" | word_count }}        -> 3
+//! {{ "ab" | repeat(3) }}                    -> ababab
+//! {{ "a1b2" | regex_replace("\d", "#") }}   -> a#b#
+//! ```
 //!
 //! [`Object`]: minijinja::value::Object
 //! [`Casing::to_case`]: convert_case::Casing::to_case
@@ -53,6 +65,17 @@ impl StrOps {
 /// Removes `prefix` from the start of `value` when it is present.
 ///
 /// Returns `value` unchanged when [`str::strip_prefix`] finds no `prefix`.
+///
+/// # Examples
+///
+/// ```
+/// # let mut env = minijinja::Environment::new();
+/// # env.add_filter("trim_prefix", |value: &str| value.strip_prefix("foo_").unwrap_or(value).to_owned());
+/// let rendered = env
+///     .render_str("{{ 'foo_bar' | trim_prefix }}", ())
+///     .expect("template renders");
+/// assert_eq!(rendered, "bar");
+/// ```
 fn trim_prefix(value: &str, prefix: &str) -> String {
     value.strip_prefix(prefix).unwrap_or(value).to_owned()
 }
@@ -66,8 +89,8 @@ fn trim_suffix(value: &str, suffix: &str) -> String {
 
 /// Truncates `value` to `length` characters and returns the result.
 ///
-/// Counts Unicode characters, not bytes, and does not split a multi-byte UTF-8
-/// character. Includes the ellipsis within `length`. Returns `value` unchanged
+/// Counts Unicode characters, not bytes, and never splits a UTF-8 character.
+/// Includes the ellipsis within `length`. Returns `value` unchanged
 /// when its character count does not exceed `length`.
 ///
 /// # Errors

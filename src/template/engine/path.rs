@@ -1,4 +1,4 @@
-//! Registers the path tests and the filters for templates.
+//! Registers path tests and path filters for templates.
 //!
 //! [`PathOps`] adds three minijinja [`Environment::add_test`] tests:
 //!
@@ -13,13 +13,25 @@
 //! - `path_extension`
 //! - `path_parent`
 //!
-//! The I/O tests resolve relative paths against [`Config::root`] and use
-//! absolute paths as-is. They call [`std::fs::metadata`] directly instead of
-//! [`Path::exists`], [`Path::is_file`], or [`Path::is_dir`], which collapse
-//! every I/O error into `false`. Permission errors therefore surface as
-//! [`minijinja::Error`] instead of being misreported as "does not exist".
+//! The three filesystem tests resolve relative paths against [`Config::root`]
+//! and use absolute paths as-is. They call [`std::fs::metadata`] directly
+//! instead of [`Path::exists`], [`Path::is_file`], or [`Path::is_dir`], which
+//! turn every filesystem error into `false`. Permission errors therefore
+//! surface as [`minijinja::Error`] instead of being misreported as "does not
+//! exist".
 //!
-//! The filters are pure string transformations over [`std::path::Path`].
+//! The four filters transform [`std::path::Path`] input with pure string
+//! operations. They read no files.
+//!
+//! # Examples
+//!
+//! ```text
+//! {{ "src/main.rs" | path_filename }}  -> main.rs
+//! {{ "src/main.rs" | path_basename }}   -> main
+//! {{ "src/main.rs" | path_extension }}  -> rs
+//! {{ "src/main.rs" | path_parent }}     -> src
+//! {% if "notes" is dir_path %}...{% endif %}
+//! ```
 //!
 //! [`Config::root`]: crate::config::Config::root
 
@@ -38,7 +50,7 @@ use crate::{
     path::{PathError, SafeRelativePath},
 };
 
-/// A filesystem fact selected by a path I/O test.
+/// A filesystem fact selected by a path test.
 #[derive(Copy, Clone)]
 enum PathQuery {
     Exists,
@@ -46,10 +58,11 @@ enum PathQuery {
     IsDir,
 }
 
-/// Backs the path test and filter group.
+/// Groups the path tests and path filters for registration.
 ///
-/// Holds the project root used by the three I/O tests. The four string filters
-/// carry no state and are registered as plain functions.
+/// Holds the project root that the three filesystem tests resolve paths
+/// against. The four string filters carry no state and register as plain
+/// functions.
 #[derive(Debug)]
 pub(super) struct PathOps {
     root: Arc<Path>,
@@ -65,7 +78,7 @@ impl PathOps {
         }
     }
 
-    /// Registers the path tests and the filters.
+    /// Registers the path tests and path filters with `env`.
     #[inline]
     pub(super) fn register(self, env: &mut Environment<'static>) {
         self.register_test(env, "path_exists", PathQuery::Exists);
@@ -77,7 +90,7 @@ impl PathOps {
         env.add_filter("path_parent", parent);
     }
 
-    /// Registers one boolean I/O test under `name`.
+    /// Registers one boolean filesystem test under `name`.
     ///
     /// The closure calls [`inspect`], the shared implementation behind
     /// `path_exists`, `is_file_path`, and `is_dir_path`. It clones `root`
@@ -99,8 +112,9 @@ impl PathOps {
 }
 
 /// Resolves `path` against `root` with [`InspectTarget::resolve`], then answers
-/// `query` against the resolved target. A missing target answers `false` for
-/// every query.
+/// `query` against the resolved target.
+///
+/// A missing target answers `false` for every query.
 ///
 /// # Errors
 ///
@@ -139,12 +153,12 @@ struct InspectTarget(PathBuf);
 impl InspectTarget {
     /// Resolves `path` against `root`.
     ///
-    /// The resolver uses absolute paths as-is. A path naming `root` itself
-    /// ([`Self::is_root_reference`]) resolves directly to it. Every other
-    /// relative path uses [`SafeRelativePath::parse`] for confinement, the same
-    /// seam [`super::file`] uses for `file.include()` and `file.write_to()`
-    /// paths. The resolver therefore rejects parent traversals and symlink
-    /// escapes consistently across template primitives.
+    /// Uses an absolute `path` as-is. Resolves a `path` that names `root`
+    /// itself ([`Self::is_root_reference`]) directly to `root`. Resolves every
+    /// other relative path with [`SafeRelativePath::parse`], the check
+    /// [`super::file`] applies to `file.include()` and the writer applies to
+    /// `-o` and `file.write_to()` paths. Parent traversals and symlink escapes
+    /// therefore fail here exactly as they fail in those paths.
     ///
     /// # Errors
     ///
@@ -174,7 +188,7 @@ impl InspectTarget {
     /// components, as with an empty path. Joining this path cannot escape the
     /// root. [`RelativePath::parse`] rejects this path because it cannot name a
     /// file to write or include. Path tests use it to query the root with
-    /// `is_dir_path('.')` or `path_exists('')`.
+    /// `is_dir_path('')` or `path_exists('')`.
     ///
     /// [`RelativePath::parse`]: crate::path::RelativePath::parse
     fn is_root_reference(candidate: &Path) -> bool {
@@ -254,7 +268,7 @@ mod tests {
     ///
     /// # Panics
     ///
-    /// - Panics if minijinja fails to render the generated template.
+    /// Panics if minijinja fails to render the generated template.
     fn check(root: &Path, test: &str, input: &str) -> String {
         let template = format!("{{{{ value is {test} }}}}");
         env(root)
@@ -421,7 +435,7 @@ mod tests {
                 )
                 .expect_err("permission-denied is not silently false");
 
-            // Restore permissions so cleanup can remove the tempdir.
+            // Restore permissions so the test can remove the locked directory.
             fs::set_permissions(&locked_dir, fs::Permissions::from_mode(0o755))
                 .expect("restore permissions");
 

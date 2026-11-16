@@ -8,6 +8,13 @@
 //! Each filter is a plain function that [`Environment::add_filter`] registers.
 //! None carry shared state, so there is no [`Object`] dispatch.
 //!
+//! # Examples
+//!
+//! ```text
+//! {{ note | to_yaml }}
+//! {{ (text | from_yaml).title }}
+//! ```
+//!
 //! [`Object`]: minijinja::value::Object
 //! [`Environment::add_filter`]: minijinja::Environment::add_filter
 
@@ -15,14 +22,15 @@ use minijinja::{Environment, Value, value::Serde};
 
 use super::error::{TemplateEngineResult, invalid_operation};
 
-/// Represents a registration namespace for the stateless YAML filters.
+/// Names the stateless YAML filters registered with the template environment.
 #[derive(Debug)]
 pub(super) struct YamlOps;
 
 impl YamlOps {
     /// Registers the YAML filters with `env`.
     ///
-    /// This is an associated function because [`YamlOps`] carries no state.
+    /// The filters carry no state, so this function takes no [`YamlOps`]
+    /// instance.
     #[inline]
     pub(super) fn register(env: &mut Environment<'static>) {
         env.add_filter("to_yaml", to_yaml);
@@ -30,21 +38,20 @@ impl YamlOps {
     }
 }
 
-/// Serializes a template value into a YAML string.
+/// Serializes a template value into a YAML string that ends with a newline.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `noyalib` cannot serialize the value
-///   into YAML.
+/// - [`ErrorKind::InvalidOperation`] if the `noyalib` serializer cannot write
+///   the value as YAML.
 ///
 /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
     let mut yaml = noyalib::to_string(value).map_err(|err| {
         invalid_operation("to_yaml: failed to serialize value to YAML", err)
     })?;
-    // The previous serializer emitted a document-terminating newline. noyalib
-    // omits that newline. A block scalar for a trailing-newline string already
-    // ends in one.
+    // End the document with a newline. A block scalar for a string that ends
+    // in a newline already carries one, so the check avoids a second newline.
     if !yaml.ends_with('\n') {
         yaml.push('\n');
     }
@@ -53,11 +60,13 @@ pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
 
 /// Parses a YAML string into a template [`Value`].
 ///
-/// Empty or whitespace-only input returns a unit/none value.
+/// Empty or whitespace-only input returns the none value.
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if the input fails to parse as valid YAML.
+/// - [`ErrorKind::InvalidOperation`] if [`parse`] rejects the input.
+///
+/// [`parse`]: crate::yaml::parse
 ///
 /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
 pub(super) fn from_yaml(text: &str) -> TemplateEngineResult<Value> {

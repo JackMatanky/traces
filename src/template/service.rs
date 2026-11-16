@@ -27,7 +27,7 @@ use crate::{Config, DialogProvider};
 /// The service holds the configured template loader and minijinja engine. It
 /// supports multiple renders with the same [`Config`].
 ///
-/// ## Interaction with [`WriteMode`]
+/// # Interaction with [`WriteMode`]
 ///
 /// [`WriteMode`] controls file writes, not prompt calls. The [`DialogProvider`]
 /// receives every `ui.*` call in every mode. Select a suitable
@@ -48,8 +48,10 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - `TemplateError::SchemaLoad` if the service cannot load the Schema
+    /// - [`TemplateError::SchemaLoad`] if the service cannot load the Schema
     ///   registry.
+    ///
+    /// [`TemplateError::SchemaLoad`]: TemplateError::SchemaLoad
     #[inline]
     pub fn new(
         config: &'a Config,
@@ -92,21 +94,29 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - `TemplateError::Resolve` if the template name does not resolve.
-    /// - `TemplateError::Read` if the service cannot read the resolved template
-    ///   source.
-    /// - `TemplateError::Render` if minijinja cannot evaluate the template.
-    /// - `TemplateError::OutputPathEscapesRoot` if the output path escapes the
-    ///   project root.
-    /// - `TemplateError::OutputPathUnverifiable` if `strict-path` cannot check
-    ///   path confinement.
-    /// - `TemplateError::Prompt` if a template prompt fails or you cancel it.
-    /// - `TemplateError::OutputFileAlreadyExists` if the file exists under
+    /// - [`TemplateError::Resolve`] if the template name does not resolve.
+    /// - [`TemplateError::Read`] if the service cannot read the resolved
+    ///   template source.
+    /// - [`TemplateError::Render`] if minijinja cannot evaluate the template.
+    /// - [`TemplateError::OutputPathEscapesRoot`] if the output path escapes
+    ///   the project root.
+    /// - [`TemplateError::OutputPathUnverifiable`] if `strict-path` cannot
+    ///   check path confinement.
+    /// - [`TemplateError::Prompt`] if a template prompt fails or you cancel it.
+    /// - [`TemplateError::OutputFileAlreadyExists`] if the file exists under
     ///   [`CommitPolicy::CreateNew`].
-    /// - `TemplateError::Write` if the service cannot create a directory or
+    /// - [`TemplateError::Write`] if the service cannot create a directory or
     ///   file, or write the rendered content.
     ///
     /// [`CommitPolicy::CreateNew`]: super::writer::CommitPolicy::CreateNew
+    /// [`TemplateError::Resolve`]: TemplateError::Resolve
+    /// [`TemplateError::Read`]: TemplateError::Read
+    /// [`TemplateError::Render`]: TemplateError::Render
+    /// [`TemplateError::OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
+    /// [`TemplateError::OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
+    /// [`TemplateError::Prompt`]: TemplateError::Prompt
+    /// [`TemplateError::OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
+    /// [`TemplateError::Write`]: TemplateError::Write
     #[inline]
     pub fn render_to_file(
         &self,

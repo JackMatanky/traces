@@ -447,7 +447,7 @@ fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
 /// tokens (`YYYY MM DD HH mm ss`, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`). Bracket
 /// literals such as `[Daily]` render as literal text in both.
 ///
-/// [`fmt::strtime`] formats a zoned date-time. Therefore, `%Z` shows the
+/// [`jiff::fmt::strtime`] formats a zoned date-time. Therefore, `%Z` shows the
 /// resolved local zone on either side of a DST fold. Leap seconds are not
 /// representable. Week numbers use ISO `%V`/`%G`, not `%U` or `%W`.
 ///
@@ -455,8 +455,8 @@ fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
 /// counts the sign inside the four-digit width, so year `-9` renders as `-009`.
 ///
 /// The crate rejects that value on reparse. Canonical round-trip forms
-/// (`%Y-%m-%d`, `%Y-%m`, `%F`, and canonical date-time patterns) keep
-/// the sign outside the year digits and reparse exactly.
+/// (`%Y-%m-%d`, `%Y-%m`, `%F`, and canonical date-time patterns) keep the sign
+/// outside the year digits and reparse exactly.
 ///
 /// # Errors
 ///

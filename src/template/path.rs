@@ -46,11 +46,13 @@ impl TemplatePathInput {
     ///
     /// # Errors
     ///
-    /// - `TemplatePathError::Absolute` if `path` is absolute.
-    /// - `TemplatePathError::UnsafeComponent` if `path` contains `..`, an
+    /// - [`TemplatePathError::Absolute`] if `path` is absolute.
+    /// - [`TemplatePathError::UnsafeComponent`] if `path` contains `..`, an
     ///   unsupported component, or no [`Component::Normal`].
     ///
     /// [`Component::Normal`]: std::path::Component::Normal
+    /// [`TemplatePathError::Absolute`]: TemplatePathError::Absolute
+    /// [`TemplatePathError::UnsafeComponent`]: TemplatePathError::UnsafeComponent
     ///
     /// ```rust
     /// # #[cfg(feature = "test-utils")]

@@ -217,9 +217,10 @@ pub(super) struct RenderOutput {
 
 /// Generates a random UUID v4 string in RFC 4122 format.
 ///
-/// The output format is `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`. `MiniJinja`
-/// registers this function as `uuid()`, not as a namespace-qualified helper
-/// such as `file.*`, `ui.*`, or `date.*`.
+/// The output format is `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`. The engine
+/// registers this function as `uuid()` through [`TemplateEngine::new`], not
+/// as a namespace-qualified helper such as [`mod@file`], [`ui`], or
+/// [`date`].
 fn uuid() -> String {
     Uuid::new_v4().to_string()
 }
