@@ -41,18 +41,16 @@ Check affected conclusions again after ticket 37 resolves.
 
 Required reconciliation checks (added after re-verification on main @ `207cc3fb`):
 
-1. Re-run the drift check before reconciling: `git diff 207cc3fb..main -- src
-   tests docs` and any divergence from `reverification.md`.
-2. Confirm that the freshness decision (ticket 25) replaced the landed
-   fingerprint design with a store identity. Confirm that the config-lifecycle
-   decision (ticket 22) accounted for the residual digest surface.
-3. State in the specification which existing ADRs it supersedes, including
-   ADR-0009 (implemented, still `proposed`) and the stale glossary entry "Index
-   Fingerprint".
-4. Collect the "Code delta" section of each resolved ticket. Order the deltas by
-   dependency. This order is the refactor sequence. Report every
-   ticket-to-ticket conflict that you find. Do not report a ticket-to-code gap
-   as a conflict.
+- Re-run the drift check before reconciling: `git diff 207cc3fb..main -- src
+  tests docs`. Check any divergence from `reverification.md`.
+- Confirm that ticket 25 replaced the landed fingerprint design with a store
+  identity. Confirm that ticket 22 accounted for the residual digest surface.
+- State in the specification which existing ADRs it supersedes. Include ADR-0009
+  (implemented, still `proposed`) and the stale glossary entry "Index
+  Fingerprint".
+- Collect the "Code delta" section of each resolved ticket. Order the deltas by
+  dependency. This order is the refactor sequence. Report every ticket-to-ticket
+  conflict. Do not report a ticket-to-code gap as a conflict.
 
 Output:
 
@@ -131,3 +129,28 @@ See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md), [ticket
   implementation.
 - Keep current-code glossaries and ADR history accurate until cutover. Record
   successor definitions and supersession notes with the implementation.
+
+## Decision records and evidence gates
+
+Use the same question numbers in each new Answer. Give each question one
+disposition:
+
+- Decided, with the choice, reason and evidence.
+- Inherited, with the source ticket and decision.
+- Evidence-blocked, with the missing evidence and its effect on the choice.
+- Deferred, with the user's scope approval and the receiving ticket or fog item.
+
+For each changed rule, name its invariant owner and downstream consumers. Name
+the earlier decision that it supersedes. A pointer to conflicting text does not
+resolve the conflict. Give each receiving ticket the accepted contract before
+that ticket resolves.
+
+Classify each proposed check by its purpose:
+
+- Decision evidence: a result that can change the architecture choice. Complete
+  this evidence before resolving the affected question.
+- Implementation gate: a check of the implemented design. Record it for cutover.
+  Do not claim that an unrun check passes.
+
+Do not reopen a settled question without new evidence or an explicit scope
+change. After a defect, repeat the affected checks rather than the whole review.
