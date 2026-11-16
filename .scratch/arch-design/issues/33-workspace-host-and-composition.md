@@ -99,6 +99,10 @@ Ticket 20 says the MCP host, not core, owns how an MCP edit tool applies a
 lossless frontmatter change. It raises edit-range needs "when MCP is specified
 (ticket 33 or later)".
 
+Ticket 20 says the MCP host, not core, owns how an MCP edit tool applies a
+lossless frontmatter change. It raises edit-range needs "when MCP is specified
+(ticket 33 or later)".
+
 ## Inputs from the IWE research
 
 See [research 12](../research/12-iwe-core-and-hosts-architecture.md) and
