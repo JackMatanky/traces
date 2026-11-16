@@ -1,6 +1,7 @@
 //! Registers the `query`, `lists`, and `tasks` namespaces for template queries.
 //!
-//! [`super::TemplateEngine::new`] registers all three namespaces through [`QueryOps`]:
+//! [`super::TemplateEngine::new`] registers all three namespaces through
+//! [`QueryOps`]:
 //!
 //! - [`QueryOps::page`] registers the `query` global.
 //! - [`QueryOps::list`] registers the `lists` global.
@@ -106,9 +107,10 @@ pub(super) struct QueryOps {
 
 impl QueryOps {
     /// Creates the shared dispatch pipeline for a namespace.
+    ///
     /// It configures [`QueryService`] with `class_field` and the File Class
-    /// `schemas` expander, then registers `name` with the row granularity
-    /// in `mode`.
+    /// `schemas` expander, then registers `name` with the row granularity in
+    /// `mode`.
     fn new(
         name: &'static str,
         mode: QueryMode,
@@ -137,6 +139,7 @@ impl QueryOps {
     }
 
     /// Builds list-level dispatch for the `lists` global.
+    ///
     /// Each row is one list item: a plain bullet, checkbox, or task, not one
     /// Note.
     #[inline]
@@ -150,6 +153,7 @@ impl QueryOps {
     }
 
     /// Builds task-level dispatch for the `tasks` global.
+    ///
     /// Each row is one task item, not one Note. See the module docs.
     #[inline]
     #[must_use]
@@ -170,10 +174,11 @@ impl QueryOps {
     }
 
     /// Registers terminal pipeline filters for every [`QuerySet`].
+    ///
     /// The filter form `rows | table(["Name"], ["file.name"])` matches
     /// `rows.table(["Name"], ["file.name"])`, documented on
-    /// [`Object::call_method`]. These filters carry no state, so they apply
-    /// to every namespace.
+    /// [`Object::call_method`]. These filters carry no state, so they apply to
+    /// every namespace.
     pub(super) fn register_terminal_filters(env: &mut Environment<'static>) {
         env.add_filter("table", table_filter);
         env.add_filter("list", list_filter);
@@ -184,8 +189,8 @@ impl QueryOps {
     }
 
     /// Runs this namespace's query for `source` against the cached
-    /// [`WorkspaceIndex`]. Refreshes the index if this render has not
-    /// cached it. See [`Self::cached_index`].
+    /// [`WorkspaceIndex`]. Refreshes the index if this render has not cached
+    /// it. See [`Self::cached_index`].
     ///
     /// # Errors
     ///
@@ -204,12 +209,12 @@ impl QueryOps {
 
     /// Returns this render's cached [`WorkspaceIndex`], refreshing and caching
     /// it when needed. The cache lives in `state`'s render-local typed
-    /// extensions. All three namespaces share it through [`QueryOps::run`].
-    /// A render that calls multiple namespaces makes one
+    /// extensions. All three namespaces share it through [`QueryOps::run`]. A
+    /// render that calls multiple namespaces makes one
     /// [`IndexerService::refresh`] call instead of one call per query.
-    /// Extensions apply to one render, including `{% include %}`s, and
-    /// reset for the next render. A cache field on [`QueryOps`] would
-    /// persist across independent renders that reuse an [`Environment`] or
+    /// Extensions apply to one render, including `{% include %}`s, and reset
+    /// for the next render. A cache field on [`QueryOps`] would persist across
+    /// independent renders that reuse an [`Environment`] or
     /// [`super::TemplateEngine`]. See [`super::cache::cached`].
     ///
     /// # Errors
@@ -301,6 +306,7 @@ fn resolve_from_arg(
 }
 
 /// Lets `.field()` pass a [`SourceSelector`] through minijinja.
+///
 /// `.from()` and the `with_children` or `with_descendants` filters recover it
 /// with [`Value::downcast_object_ref`].
 ///
@@ -335,9 +341,9 @@ impl Object for QuerySet {
     ///   error.
     ///
     /// Other names call the non-terminal chain: `.where`, `.filter`, `.sort`,
-    /// `.limit`, `.group_by`, and `.flatten`. Each method clones the
-    /// current rows, transforms them, and wraps the result in a [`Value`]
-    /// for further chaining.
+    /// `.limit`, `.group_by`, and `.flatten`. Each method clones the current
+    /// rows, transforms them, and wraps the result in a [`Value`] for further
+    /// chaining.
     ///
     /// - `where` and `filter` both call `QuerySet::filter`. Rust callers can
     ///   use `r#where`.
@@ -444,8 +450,8 @@ impl Object for QuerySet {
 /// cannot meet this need. The owned `String` form can. [`Object::call_method`]
 /// also cannot borrow `Vec<&str>` from a list-literal argument value. Minijinja
 /// reports "type conversion is not legal in this situation (implicit borrow)".
-/// Both entry points first build owned `Vec<String>` values and borrow
-/// from them.
+/// Both entry points first build owned `Vec<String>` values and borrow from
+/// them.
 ///
 /// # Errors
 ///
@@ -518,6 +524,7 @@ fn with_descendants_filter(source: &SourceSelector) -> Value {
 }
 
 /// Replaces each `Class` atom's [`ClassExpansionMode`] in `source` with `mode`.
+///
 /// Each atom keeps an empty match set, so the selector stays unresolved.
 /// `resolve_classes` fills each match set at query time.
 fn set_class_depth(
@@ -543,13 +550,12 @@ impl Object for QueryRow {
     ///
     /// The `file` and `list` keys return wrappers for `record.file.*` and
     /// `record.list.*`. Other keys use [`QueryRow`]'s field lookup for
-    /// frontmatter, inline fields, and tags. This is the lookup that
-    /// `.where()` and `.sort()` use.
+    /// frontmatter, inline fields, and tags. This is the lookup that `.where()`
+    /// and `.sort()` use.
     ///
     /// The lookup rejects dotted, empty, and unknown `file.*` or `list.*`
-    /// accessors. A rejected key returns `None`, like any missing
-    /// attribute. `QueryError::FieldPath` therefore never becomes a render
-    /// error.
+    /// accessors. A rejected key returns `None`, like any missing attribute.
+    /// `QueryError::FieldPath` therefore never becomes a render error.
     #[inline]
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
@@ -649,8 +655,8 @@ mod tests {
     };
 
     /// Builds one [`SchemaService`] for `root` for [`page_ops`], [`list_ops`],
-    /// and [`task_ops`]. All namespaces use the same Schema registry
-    /// directory, `root/.traces/schemas`. This matches
+    /// and [`task_ops`]. All namespaces use the same Schema registry directory,
+    /// `root/.traces/schemas`. This matches
     /// [`super::super::TemplateEngine::new`] wiring.
     fn schema_service(root: &Path) -> Arc<SchemaService> {
         Arc::new(
@@ -703,8 +709,7 @@ mod tests {
     }
 
     /// Renders `source` against `root` with `query` and `tasks` bound to a
-    /// custom File Class field. This checks the `[schemas] class_field`
-    /// wiring.
+    /// custom File Class field. This checks the `[schemas] class_field` wiring.
     fn render_with_class_field(
         root: &Path,
         class_field: &str,

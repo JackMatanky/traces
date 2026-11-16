@@ -83,9 +83,9 @@ impl TemplateEngine {
     /// functions and [`uuid`].
     ///
     /// Registers functions from the [`date`], [`duration`], [`mod@file`],
-    /// [`path`], [`num`], [`query`], [`mod@schema`], [`string`], [`ui`],
-    /// and [`mod@yaml`] submodules. Debug mode adds line and column
-    /// locations to render errors.
+    /// [`path`], [`num`], [`query`], [`mod@schema`], [`string`], [`ui`], and
+    /// [`mod@yaml`] submodules. Debug mode adds line and column locations to
+    /// render errors.
     ///
     /// # Arguments
     ///
@@ -117,8 +117,8 @@ impl TemplateEngine {
         let mut env = Environment::new();
         // Debug mode supplies `minijinja::Error::range()` and
         // `template_source()`. `crate::cli::error` uses them to compute
-        // template diagnostic locations in `render_error_location`. The
-        // engine retains source text and the failing span only on error.
+        // template diagnostic locations in `render_error_location`. The engine
+        // retains source text and the failing span only on error.
         env.set_debug(true);
         env.set_loader({
             let loader = loader.clone();
@@ -127,10 +127,9 @@ impl TemplateEngine {
         let root = config.root_arc();
         let class_field = config.class_field_arc();
         // The engine resolves `SchemaService` once and shares it with
-        // `QueryOps` below. The `query`/`lists`/`tasks` `.from()`
-        // helpers and `schema.get()` use this same service
-        // for the engine's lifetime. They do not resolve or cache it during a
-        // render.
+        // `QueryOps` below. The `query`/`lists`/`tasks` `.from()` helpers and
+        // `schema.get()` use this same service for the engine's lifetime. They
+        // do not resolve or cache it during a render.
         let schema_directory = config.schemas().directory();
         let construction = SchemaService::load_verbose(schema_directory)?;
         warn_schema_construction_diagnostics(&construction);
@@ -172,8 +171,8 @@ impl TemplateEngine {
     }
 
     /// Compiles and renders `source` as template `name` with an empty context.
-    /// Returns the rendered text and any path captured by `file.write_to()`
-    /// in [`RenderOutput`].
+    /// Returns the rendered text and any path captured by `file.write_to()` in
+    /// [`RenderOutput`].
     ///
     /// The engine gives `name` to minijinja as the template identifier.
     /// Diagnostic errors then report that name instead of `<string>`. The
@@ -236,16 +235,14 @@ mod tests {
     }
 
     /// Builds a [`Config`] rooted at `root` with no template directories and
-    /// default `[schemas]` settings. Tests use it when they only need a
-    /// project root for [`TemplateEngine::new`].
+    /// default `[schemas]` settings. Tests use it when they only need a project
+    /// root for [`TemplateEngine::new`].
     fn config_for(root: &Path) -> Config {
         Config::test_default(root)
     }
 
-    /// Creates a deterministic [`DialogProvider`] for tests that do not call
-    /// `ui.*` functions.
-    ///
-    /// [`DialogProvider`]: crate::DialogProvider
+    /// Creates a deterministic [`crate::DialogProvider`] for tests that do not
+    /// call `ui.*` functions.
     fn preset_provider() -> Arc<dyn DialogProvider> {
         Arc::new(crate::PresetDialogProvider::new())
     }

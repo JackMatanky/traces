@@ -43,8 +43,8 @@ pub(super) fn to_yaml(value: &Value) -> TemplateEngineResult<String> {
         invalid_operation("to_yaml: failed to serialize value to YAML", err)
     })?;
     // The previous serializer emitted a document-terminating newline. noyalib
-    // omits that newline. A block scalar for a trailing-newline string
-    // already ends in one.
+    // omits that newline. A block scalar for a trailing-newline string already
+    // ends in one.
     if !yaml.ends_with('\n') {
         yaml.push('\n');
     }

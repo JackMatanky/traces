@@ -283,8 +283,8 @@ mod tests {
         /// [`DialogError::NotInteractive`].
         ///
         /// Tests that [`dialog_error`] preserves the source for `confirm` and
-        /// `text_input`. [`PresetDialogProvider`] cannot fail those
-        /// calls, but `select` can fail on empty items.
+        /// `text_input`. [`PresetDialogProvider`] cannot fail those calls, but
+        /// `select` can fail on empty items.
         #[derive(Debug)]
         pub(super) struct FailingDialogProvider;
 

@@ -19,10 +19,10 @@
 //!
 //! [`TemplateLoader::load`] supplies minijinja's `{% include %}` and `{%
 //! extends %}` loader callback. [`TemplateEngine::new`] connects it with
-//! [`Environment::set_loader`]. The code does
-//! not use [`minijinja::path_loader`] because its `safe_join` rejects
-//! dot-prefixed path segments. That rule rejects `{% include ".draft.md" %}`
-//! and the default template directory, `.traces/templates`.
+//! [`Environment::set_loader`]. The code does not use
+//! [`minijinja::path_loader`] because its `safe_join` rejects dot-prefixed path
+//! segments. That rule rejects `{% include ".draft.md" %}` and the default
+//! template directory, `.traces/templates`.
 //!
 //! [`Environment::set_loader`]: minijinja::Environment::set_loader
 //! [`TemplateEngine::new`]: super::engine::TemplateEngine::new
@@ -142,8 +142,8 @@ impl TemplateLoader {
     /// Matches `name` by file stem inside `dir` when `name` has no extension.
     ///
     /// The method searches `dir` or the subdirectory named by `path`'s parent
-    /// component. It looks for files with `path`'s stem. It returns `None`
-    /// when no file matches and `Some` when one file matches.
+    /// component. It looks for files with `path`'s stem. It returns `None` when
+    /// no file matches and `Some` when one file matches.
     ///
     /// Like [`Self::find_path_in`], it excludes symlinks.
     ///
@@ -217,8 +217,8 @@ impl TemplateLoader {
     /// %}` and `{% extends %}` loader callback.
     ///
     /// A missing include returns `Ok(None)`, so minijinja can honor `ignore
-    /// missing`. Invalid names, ambiguous matches, and inaccessible
-    /// template directories return errors.
+    /// missing`. Invalid names, ambiguous matches, and inaccessible template
+    /// directories return errors.
     ///
     /// # Errors
     ///
@@ -254,14 +254,14 @@ impl TemplateLoader {
     /// Lists available template names.
     ///
     /// Returns the stem of each top-level `.md` file in the local directory,
-    /// then each new stem from the global directory. The method supplies
-    /// names for `--list`, the interactive picker, and `traces completions
+    /// then each new stem from the global directory. The method supplies names
+    /// for `--list`, the interactive picker, and `traces completions
     /// --list-templates`. It does not scan subdirectories and uses the
     /// local-before-global order of [`Self::find`].
     ///
     /// The method skips missing or unreadable directories. This reduces the
-    /// candidate list and returns no error because the method has no
-    /// `Result` value.
+    /// candidate list and returns no error because the method has no `Result`
+    /// value.
     #[must_use]
     pub(super) fn list_available(&self) -> Vec<String> {
         let mut names = Self::stems_in(self.local.as_deref());
@@ -276,11 +276,10 @@ impl TemplateLoader {
     /// Collects the stems of top-level `.md` files directly inside `dir`.
     ///
     /// The method excludes symlinks, like the
-    /// [`crate::dirtree::DirNode::is_file`] check in
-    /// [`Self::find_name_in`]. It returns an empty list if `dir` is `None`,
-    /// does not exist, or cannot be read. Listing failures reduce the
-    /// candidate list. The method has no `Result` value for these failures.
-    /// It does not scan subdirectories.
+    /// [`crate::dirtree::DirNode::is_file`] check in [`Self::find_name_in`]. It
+    /// returns an empty list if `dir` is `None`, does not exist, or cannot be
+    /// read. Listing failures reduce the candidate list. The method has no
+    /// `Result` value for these failures. It does not scan subdirectories.
     fn stems_in(dir: Option<&Path>) -> Vec<String> {
         let Some(dir) = dir else {
             return Vec::new();

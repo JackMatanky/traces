@@ -69,8 +69,8 @@ pub enum TemplateError {
     /// Reports an explicit path that fails the root confinement check.
     ///
     /// This variant occurs when `strict-path` cannot check the root boundary or
-    /// resolve existing path components. The writer stops instead of writing
-    /// to a path that it has not checked.
+    /// resolve existing path components. The writer stops instead of writing to
+    /// a path that it has not checked.
     #[error("failed to verify output path {path} is inside the project root")]
     OutputPathUnverifiable {
         /// Output path rejected by the root confinement check.
@@ -156,8 +156,8 @@ pub enum RenderFailureKind {
     /// Reports a `query.*` error from a malformed field path, filter, sort
     /// path, or `.table()` header and column mismatch.
     Query,
-    /// Reports a filesystem, database, or serialization error while a
-    /// `query.*` call refreshes the file index.
+    /// Reports a filesystem, database, or serialization error while a `query.*`
+    /// call refreshes the file index.
     Index,
     /// Reports an I/O error from `file.include()` or another template helper.
     Io,

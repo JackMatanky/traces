@@ -171,10 +171,10 @@ impl InspectTarget {
     /// Checks whether `candidate` names `root` itself.
     ///
     /// Every component must be [`Component::CurDir`], or the path must have no
-    /// components, as with an empty path. Joining this path cannot escape
-    /// the root. [`RelativePath::parse`] rejects this path because it
-    /// cannot name a file to write or include. Path tests use it to query the
-    /// root with `is_dir_path('.')` or `path_exists('')`.
+    /// components, as with an empty path. Joining this path cannot escape the
+    /// root. [`RelativePath::parse`] rejects this path because it cannot name a
+    /// file to write or include. Path tests use it to query the root with
+    /// `is_dir_path('.')` or `path_exists('')`.
     ///
     /// [`RelativePath::parse`]: crate::path::RelativePath::parse
     fn is_root_reference(candidate: &Path) -> bool {

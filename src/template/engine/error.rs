@@ -17,8 +17,8 @@ pub(super) type TemplateEngineResult<T> = std::result::Result<T, Error>;
 /// [`PathError::Absolute`], [`PathError::UnsafeComponent`], and
 /// [`PathError::OutsideRoot`] share the "escapes the project root" message
 /// because template authors see all three as the same failed containment check.
-/// [`PathError::StrictPath`] gets a separate message because the check
-/// cannot confirm containment.
+/// [`PathError::StrictPath`] gets a separate message because the check cannot
+/// confirm containment.
 pub(super) fn confine_error(path: &str, source: PathError) -> Error {
     source.fold_confinement(
         || {
@@ -42,10 +42,10 @@ pub(super) fn confine_error(path: &str, source: PathError) -> Error {
 /// Builds an [`ErrorKind::InvalidOperation`] [`minijinja::Error`] carrying
 /// `source` as its error-chain cause.
 ///
-/// Every `template::engine` submodule shares it when it maps a domain
-/// error (I/O, index, query, regex, dialog) into minijinja's error type.
-/// The resulting error keeps the same "generic message plus preserved
-/// source" shape.
+/// Every `template::engine` submodule shares it when it maps a domain error
+/// (I/O, index, query, regex, dialog) into minijinja's error type. The
+/// resulting error keeps the same "generic message plus preserved source"
+/// shape.
 pub(super) fn invalid_operation<E>(
     message: impl Into<String>,
     source: E,

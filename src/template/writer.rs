@@ -5,8 +5,8 @@
 //! converted from CLI flags with [`WriteMode::from_flags`], but
 //! [`TemplateService::write`] is the only place that matches on it.
 //!
-//! [`TemplateWriteTarget`] gathers output path candidates and resolves them
-//! by precedence:
+//! [`TemplateWriteTarget`] gathers output path candidates and resolves them by
+//! precedence:
 //!
 //! 1. `-o` / `--output` (`requested`): a runtime value confined to
 //!    [`Config::root`] with [`SafeRelativePath::parse`].
@@ -342,8 +342,8 @@ impl<'a> TemplateWriteTarget<'a> {
     }
 }
 
-/// Writes `content` to `path` under `policy`, creating parent directories
-/// first if needed.
+/// Writes `content` to `path` under `policy`, creating parent directories first
+/// if needed.
 ///
 /// # Errors
 ///
@@ -529,9 +529,9 @@ mod tests {
             )
             .expect("leading . is safe");
 
-            // The leading "./" resolves through the existing `root/.`
-            // ancestor. Canonicalization normalizes it away, so the
-            // confined path has no trailing dot component.
+            // The leading "./" resolves through the existing `root/.` ancestor.
+            // Canonicalization normalizes it away, so the confined path has no
+            // trailing dot component.
             assert_eq!(target, root.join("notes/daily.md"));
         }
 
@@ -588,10 +588,9 @@ mod tests {
             symlink(outside.path(), root.join("link")).expect("create symlink");
 
             // This test covers a write-side gap. A path from
-            // `-o`/`file.write_to()` used to pass this lexical
-            // check after it resolved through a symlink inside `root`. The
-            // write then happened outside `root` (see the module
-            // docs).
+            // `-o`/`file.write_to()` used to pass this lexical check after it
+            // resolved through a symlink inside `root`. The write then happened
+            // outside `root` (see the module docs).
             let error = TemplateWriteTarget::confine(
                 &root,
                 Path::new("link/secret.md"),

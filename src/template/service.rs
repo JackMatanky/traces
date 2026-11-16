@@ -29,9 +29,9 @@ use crate::{Config, DialogProvider};
 ///
 /// ## Interaction with [`WriteMode`]
 ///
-/// [`WriteMode`] controls file writes, not prompt calls. The
-/// [`DialogProvider`] receives every `ui.*` call in every mode. Select a
-/// suitable [`DialogProvider`] to prevent interactive calls. Do not use
+/// [`WriteMode`] controls file writes, not prompt calls. The [`DialogProvider`]
+/// receives every `ui.*` call in every mode. Select a suitable
+/// [`DialogProvider`] to prevent interactive calls. Do not use
 /// [`WriteMode::DryRun`] for this purpose.
 pub struct TemplateService<'a> {
     config: &'a Config,
@@ -234,9 +234,9 @@ impl<'a> TemplateService<'a> {
     /// Renders `source` and uses `path` as the template name in errors.
     ///
     /// The method gives `path` to [`TemplateEngine`] as the template
-    /// identifier. Syntax and prompt errors then report its absolute path
-    /// and line number, not the default `<string>` name. The method does
-    /// not read `path` again.
+    /// identifier. Syntax and prompt errors then report its absolute path and
+    /// line number, not the default `<string>` name. The method does not read
+    /// `path` again.
     ///
     /// # Errors
     ///
