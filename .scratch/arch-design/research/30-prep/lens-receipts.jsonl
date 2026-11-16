@@ -1,0 +1,15 @@
+{"agent":"TemporalPriorDecisions","status":"returned","file":"b-prior-decisions.md","notes":"B1-B83 ledger, P1-P6, C1-C19, Q1-Q36 map, unreliable sources list, 7-item supersession list; B65/C3 ticket 29 owns Civil/Instant/Period group order"}
+{"agent":"TemporalDigestLessons","status":"returned","file":"c-digest-lessons.md","notes":"Q1-Q36 digest evidence and lessons; STE errors repaired to 0"}
+{"agent":"TemporalCrateEvidence2","status":"returned","file":"d-crate-evidence.md","notes":"First crate agent failed on provider route; replacement delivered; corrects owner note on tz-system feature"}
+{"agent":"TemporalExternalDesigns","status":"returned","file":"e-external-designs.md","notes":"23 primary sources; STE repair requested after 37 errors"}
+{"agent":"TemporalLensUpstream","status":"returned","lens":1,"notes":"5 hypotheses: pattern field scan via BrokenDownTime getters, canonical year via jiff writer, ISOWeekDate::new for week shapes, reject jiff friendly parser for prefix boundary, speedate removal after diagnostic adapter"}
+{"agent":"TemporalLensLayout","status":"returned","lens":2,"notes":"5 hypotheses: keep outer DatePoint enum, no DatePoint variant in NoteFieldValue, CalendarPeriod in temporal by value, keep SortKey narrow, keep module seams"}
+{"agent":"TemporalLensInvariants","status":"returned","lens":5,"notes":"5 DISCOVERY entries incl two unequal equalities and ambient zone in predicate evaluation (field.rs:286-312, filter.rs:783)"}
+{"agent":"TemporalLensConcurrency","status":"returned","lens":7,"notes":"5 hypotheses: zone churn in a render, silent row drop on zone failure, display swallows zone error, jiff process-global zone cache, now_instant sampled per value"}
+{"agent":"TemporalLensScaling","status":"returned","lens":8,"notes":"5 hypotheses incl per-row zone lookup in filter arithmetic, sort key reclassification, file.day memo, pushdown proof set"}
+{"agent":"TemporalLensDeletion","status":"returned","lens":9,"notes":"5 hypotheses: speedate removal, winnow direct dep removal (crate stays via toml), ambient zone thinning after ticket 21, token.rs relocation decision, verified-null for wrappers"}
+{"agent":"TemporalLensAllocation","status":"failed","lens":3,"notes":"Provider route error HTTP 400 prompt_cache_key, three attempts; owner covered scope by direct inspection"}
+{"agent":"TemporalLensSeams","status":"failed","lens":4,"notes":"Provider route error HTTP 400 prompt_cache_key, three attempts; owner covered scope by direct inspection"}
+{"agent":"TemporalLensLeakage","status":"failed","lens":6,"notes":"Provider route error HTTP 400 prompt_cache_key; not re-queued; GAP, nobody covered it"}
+{"agent":"TemporalLensTests","status":"failed","lens":10,"notes":"Provider route error HTTP 400 prompt_cache_key; not re-queued; GAP, nobody covered it"}
+{"agent":"TemporalRedTeam","status":"pending","file":"h-redteam.md","notes":"Adversarial review of synthesis.md"}

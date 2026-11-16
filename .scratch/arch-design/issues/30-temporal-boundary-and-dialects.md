@@ -16,6 +16,25 @@ Use [ticket 36's decision-record
 rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
 Keep decision evidence separate from implementation gates.
 
+## Preparation for the grilling
+
+Read in this order, all under
+[`research/30-prep/`](../research/30-prep/):
+
+1. [The synthesis](../research/30-prep/synthesis.md) lists, per question,
+   the inherited rules, the alternatives and a proposed answer.
+2. [The prior-decision ledger](../research/30-prep/b-prior-decisions.md)
+   carries the accepted constraints as ids B1 to B83, P1 to P6, C1 to C19.
+3. [The grilling guide](../research/30-prep/z-grilling-guide.md) orders the
+   questions into clusters and lists the human questions.
+4. [The red-team review](../research/30-prep/h-redteam.md) attacks the
+   synthesis. The synthesis records the repairs it caused.
+5. The evidence files are
+   [c-digest-lessons](../research/30-prep/c-digest-lessons.md),
+   [d-crate-evidence](../research/30-prep/d-crate-evidence.md),
+   [e-external-designs](../research/30-prep/e-external-designs.md) and
+   [owner-evidence](../research/30-prep/owner-evidence.md).
+
 ### Moment compatibility and format dialects
 
 1. Decide whether Moment compatibility is a domain concept. Ticket 16 makes
