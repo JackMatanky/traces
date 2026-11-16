@@ -23,6 +23,7 @@
 //!
 //! `query` returns one row per Note. `lists` returns one row per list item:
 //! plain bullets, checkboxes, and tasks. `tasks` returns one row per task item.
+//!
 //! The canonical `record.list.<field>` namespace exposes universal and
 //! task-specific properties through [`ListFields`]. Rows also expose the parent
 //! Note's `file.*`, frontmatter, inline-field, and tag metadata.

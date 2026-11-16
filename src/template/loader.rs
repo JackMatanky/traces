@@ -10,6 +10,7 @@
 //! Validation rejects an absolute name, `..`, an empty name, or bare `.` before
 //! it searches any directory. It returns [`TemplatePathError::Absolute`] or
 //! [`TemplatePathError::UnsafeComponent`].
+//!
 //! [`TemplatePathError::TemplateNotFound`] is different.
 //! [`TemplateLoader::find`] returns it only after it searches every directory
 //! and finds no match.
@@ -145,6 +146,7 @@ impl TemplateLoader {
     /// when no file matches and `Some` when one file matches.
     ///
     /// Like [`Self::find_path_in`], it excludes symlinks.
+    ///
     /// [`crate::dirtree::DirNode::is_file`] reports a link's type, not its
     /// target's.
     ///
