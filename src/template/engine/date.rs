@@ -21,6 +21,7 @@
 //! [`DatePoint::parse`], which selects parsing behavior from the input shape. A
 //! full date-time shape parses as a date-time. A bare ISO date (`YYYY-MM-DD` or
 //! reduced-precision `YYYY-MM`) parses as a calendar date at midnight.
+//!
 //! Arithmetic filters serialize values at the input's original precision with
 //! the calendar owner.
 //!
