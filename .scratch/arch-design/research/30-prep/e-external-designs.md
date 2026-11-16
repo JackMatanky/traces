@@ -8,6 +8,8 @@ counterexamples from outside the repository. It does not resolve the ticket.
 
 - Researcher: temporal external-designs reviewer.
 - Date: 2026-11-16.
+- Repair pass: 2026-11-17. K-round citation fixes and the runtime probe
+  facts (`m-gap-closure.md`).
 - Source rev of this research: brief at
   [`brief.md`](./brief.md) (rev `971bdd5729d9d5f51a1bd6fed46bab6947df936a`).
 - Prose: ASD-STE100 style. Sentences stay short. Approved verbs: use, check,
@@ -56,6 +58,7 @@ Primary sources, read on 2026-11-16 unless noted:
 | S21 | W3C XSD 1.1 Part 2: Datatypes, <https://www.w3.org/TR/xmlschema11-2/> |
 | S22 | crates.io API reads for `jiff-english` 0.0.1 and `fuzzydate` 0.4.1, 2026-11-16 (recorded in ticket 30; I re-checked the cache state of both) |
 | S23 | Duckling (facebook/duckling) README, <https://github.com/facebook/duckling> |
+| S24 | In-repo probe runs: `probes/parity`, `probes/parity/tests/layout.rs`, `probes/candidates`, `probes/moment`; results recorded in `m-gap-closure.md` (2026-11-17) |
 
 Gaps at the end of this file list what these sources do not cover.
 
@@ -72,8 +75,9 @@ Gaps at the end of this file list what these sources do not cover.
   change per call. A value that depends on the locale is not a stable domain
   value (S7).
 - [V] Moment's forgiving parser is the default. The string
-  `5917238b-ef3e-4bd0-90dd-abc123456789` matches `YYYYDDD` and parses as
-  `5917-08-26` (S7, strict-mode guide).
+  `5917238b-33ff-f849-cd63-80f4c9b37d0c` matches `YYYYDDD` and parses as
+  `5917-08-26` (S7, strict-mode guide, which also documents the
+  `moment.ISO_8601` strict mode).
 - [V] `minijinja-contrib` date filters use strftime only. They hold no Moment
   logic [V-repo, research 07].
 
@@ -150,8 +154,8 @@ External evidence:
 - [V] A two-grammar system needs a dispatch rule and documents it: the
   current `pattern_to_strftime` dispatches on `%`. That rule makes
   `YYYY` a Moment pattern and `%Y` a strftime pattern. It cannot express a
-  format that mixes both, and a format like `%Q` (strftime-ish quarter) does
-  not exist in jiff [V-repo, S19].
+  format that mixes both. Jiff has no quarter directive; its `%Q` is a
+  zone-offset alias, not a quarter (S19).
 - [V] Dataview accepts two grammars by argument shape: `date(text)` auto-parses
   ISO and `date(text, format)` uses Luxon tokens (S9).
 
@@ -173,19 +177,26 @@ an owner-confirmed need for Moment tokens in queries or config.
 
 - [V] The owner's Fileclass data declares exactly these partial formats
   [V-repo].
-- [V] Fileclass accepts any non-empty string as the value of a field with a
-  custom Moment `dateFormat` [V-repo, research 14].
-- [V] Temporal's `PlainYearMonth` and `PlainYear` are the only mainstream
-  value types for month- and year-only data. Their docs warn that a
-  constructor with a non-default reference day makes two values of the same
-  month unequal (S2). Partial precision needs a normalized representation.
+- [V] Fileclass skips pattern validation when a field's declared format is
+  a plain string, so Moment `dateFormat` tokens go unlinted; its outer
+  validator still checks empty values and `required` [V-repo, research 14;
+  K8 in `k-citation-verification.md`].
+- [V] Mainstream value types for month- and year-only data: Temporal ships
+  `PlainYearMonth` and `PlainMonthDay` (no plain-year type), java.time
+  ships `Year` and `YearMonth`, and XSD has `gYear`/`gYearMonth` (S2, S14,
+  S21). The `PlainYearMonth` docs warn that a constructor with a
+  non-default reference day makes two values of the same month unequal
+  (S2). Partial precision needs a normalized representation.
 - [V] Moment parse semantics: `Q` sets the month to the first month of the
-  quarter; `DDD`/`DDDD` read day-of-year 1 to 365 (S7). A value check can
-  classify each token, but the class of `Q` is "quarter selector", not
-  "full date".
-- [H] Ticket 20 hands over a truncated sentence ("Only date, datetime
-  and"). Its intended rule is unknown. Ticket 36 lists this as a
-  supersession to re-check. Do not read a rule into the fragment.
+  quarter; `DDD`/`DDDD` read day-of-year 1 to 366 in leap years (S7). A
+  value check can classify each token, but the class of `Q` is "quarter
+  selector", not "full date".
+- [V] Ticket 20 hands over a truncated sentence ("Only date, datetime
+  and") inside its [Date-shaped-text discussion](../../issues/20-schema-note-typing-and-validation.md),
+  lines 305-315. Ticket 20 already delegates the value check to the
+  date-format check, and B26's accepted rule accepts complete scalars
+  provisionally. The fragment does not gate the check in this file.
+  Ticket 36 keeps it as a recovery item (`i-leakage-review.md`, I1).
 
 Counterexample against "check every `date.format` against a full date": a
 field declared `DDDD` holds `152`. That is a valid value of its declared
@@ -198,8 +209,8 @@ format silently emits wrong dates when a writer uses it.
 [P] Classify each format token at schema load. Formats that name a full date
 get the value check. Formats that name a month, quarter, or day-of-year get
 a structural check only (string shape). Formats with no date component get
-no check, as ticket 20 hands over. Get the ticket 20 fragment before
-adopting.
+no value check. The ticket 20 fragment is located and read; it does not
+gate this proposal (`i-leakage-review.md`, I1).
 
 ### q5. `format` under `[frontmatter.date_created]` and `[frontmatter.date_modified]`
 
@@ -207,9 +218,10 @@ adopting.
   defaults are `%Y-%m-%dT%H:%M:%S` (strftime).
 - [V] A configured input format with day-first or month-first order is a
   hazard PG documents: `01/02/03` re-reads per `DateStyle` mode (S5).
-- [V] RFC 3339 §5.6 shows why the timestamp format for stored values should
-  stay fixed and sortable: ordering works only when components run from
-  least to most precise with one zone spelling (S3).
+- [V] RFC 3339 section 5.1 shows why the timestamp format for stored values
+  should stay fixed and sortable. Lexicographic order equals time order
+  only when all strings share one precision, one uppercase `T`/`Z`
+  spelling, and one zone offset (S3).
 
 Options: keep the keys where they are, move them into the new `[date]`
 table, or delete them.
@@ -267,16 +279,19 @@ moves with the week rule into temporal.
   `scan_date_prefix` in `src/temporal/lexer.rs` sees `YYYY-MM-DD` and
   `YYYY-MM` only. The note parser also calls `parse_prefix`. Ticket 16
   freezes that parsing.
-- [V] Dataview derives `file.day` only from a file name of the form
-  `yyyy-mm-dd` or `yyyymmdd`, or from a `Date` field or inline field in the
-  note (S9). Two differences from Traces: no weeks or quarters, and a
-  broader fallback (frontmatter dates, not creation time).
+- [V] Dataview's `extractDate` searches the whole file name for full date
+  shapes (`yyyy-mm-dd`, `yyyymmdd`, ISO datetimes), and its `findDate`
+  checks typed metadata fields first (S9). Two differences from Traces: no
+  weeks or quarters, and no strict-prefix scan (frontmatter dates, not
+  creation time).
 - [V] NumPy's `datetime64` shows the opposite convention: `'2005'` parses as
   a year-granularity value and equals `'2005-01-01'` (S17). Traces must not
   do this: ticket 21 forbids reinterpreting an invalid longer prefix as a
   shorter prefix.
-- [V] A `parse_prefix`-style scan is prefix-driven. Year-first ISO order
-  keeps prefix parsing unambiguous (RFC 3339 ordering property, S3).
+- [V] A `parse_prefix`-style scan is prefix-driven, and year-first ISO is
+  the prefix-friendly order. RFC 3339's ordering property covers complete
+  same-shape strings, not prefixes with arbitrary tails, so prefix
+  unambiguity is a convention, not an RFC theorem (S3).
 
 Ticket 21 adds validated ISO weeks, quarters, and an opt-in bare year, and
 scopes the new parser to filenames.
@@ -304,10 +319,11 @@ kind plus a start, not one `DateValue` (ticket 21).
   week 1 of a year when it includes at least `minDays` days of that year.
   CLDR also tells implementations how to read week number 53 in a year
   with no week 53. The reader treats it as week 1 of the next year (S1).
-- [V] Moment encodes the same rule as `doy = 7 + dow - janX`, where `janX`
-  is the first day of January that belongs to week 1. Presets: ISO/Europe
-  (dow 1, janX 4) and US (dow 0, janX 6). Other presets: a common Arab one
-  (dow 6, janX 12) and dow 1/janX 7 (S7).
+- [V] Moment encodes the same rule as `week: {dow, doy}` with
+  `doy = 7 + dow - janX`, where `janX` is the first day of January that
+  belongs to week 1. Presets: ISO (dow 1, doy 4, janX 4) and US (dow 0,
+  doy 6, janX 1). Other presets: a common Arab one (dow 6, doy 12, janX 1)
+  and (dow 1, doy 7, janX 1) (S7).
 - [V] java.time `WeekFields` takes `(firstDayOfWeek, minimalDaysInFirstWeek)`
   and separates "week of year" (with a week 0) from "week-based-year" (no
   week 0; week 1 owns its days). Its table shows `2009-01-01` as week 1 of
@@ -315,16 +331,16 @@ kind plus a start, not one `DateValue` (ticket 21).
 - [V] POSIX `%U`/`%W` are week-0 schemes keyed to Sunday/Monday starts.
   `%V` is the ISO scheme: week 1 holds January 4 and the first Thursday
   (S11).
-- [V] NumPy's `W` unit is a plain 7-day span keyed to Monday with no
-  week-one rule at all (S17). A week unit without a week-one rule silently
-  disagrees with ISO `W`.
+- [V] NumPy's `W` unit is an epoch-anchored 7-day span with no week-one
+  rule; it is not Monday-keyed (S17). A week unit without a week-one rule
+  silently disagrees with ISO `W`.
 - [V] Obsidian Tasks pins ISO weeks only, Monday to Sunday, and tracks the
   request for other week starts as an open issue (S10).
 
 Counterexample against "first-day setting alone is enough": with first day
-Monday, min-days 1 and min-days 4 put `2009-01-01` in different week
-numberings (S14 week table). A `week_start = monday` config does not say
-which.
+Monday, min-days 4 and min-days 5 put `2009-01-01` in different years.
+Week 1 of 2009 versus week 53 of 2008 (S14 week table). A
+`week_start = monday` config does not say which.
 
 Counterexample for the rollover trap: ISO `2025-W53` does not exist. CLDR
 tells readers to map it to week 1 of 2026. Ticket 21 forbids that
@@ -357,13 +373,18 @@ separate spelling.
 Counterexample against keeping it: two RFC 3339 grammars can disagree on
 edge forms, and the fingerprint carries both crates forever.
 
-Counterexample against removing it before a check: nobody has diffed the
-call site's accepted forms against jiff. Ticket 16 freezes vault-format
-parsing. A silent grammar change breaks frozen parsing.
+Counterexample against removing it before a check: the call site's accepted
+forms had not been diffed against jiff when this file was written. The
+parity probe now ran in-repo (`probes/parity`, S24): 4,635,370 guarded
+inputs, zero acceptance, value, and error-category differences. The guard
+is the ten-byte date shape only; raw jiff accepts a superset (compact
+`20260101`, naive datetimes, negative years). Ticket 16 freezes
+vault-format parsing. A silent grammar change breaks frozen parsing.
 
 [P] Remove after a parity audit of the call site's accepted forms against
-jiff. Until then, keep. The audit output belongs in the ticket Answer, not
-in this file.
+jiff. The audit exists in-repo (`probes/parity`, S24) and holds for the
+guarded date shape. The remaining audit scope (the call site's other
+shapes) still belongs in the ticket Answer before removal.
 
 ### q10. Does `winnow` stay?
 
@@ -421,10 +442,12 @@ for the closed keyword set.
   by default (S19).
 - [V] Jiff's year range tops out at 9999, smaller than Temporal's (S19).
   Note dates in a notes tool sit far inside that range.
-- [H] Binary size with `tzdb-bundle-always`: not measured. The feature buys
-  reproducibility (no dependence on the system zone database version) and
-  costs bytes. The bundled database updates with crate releases. The
-  extractor fingerprint already changes with jiff versions.
+- [H] Binary size with `tzdb-bundle-always`: not measured. The feature
+  bundles tzdb data in the binary. Reproducibility holds only if the build
+  pins the bundled data version and ignores the system database. State the
+  selected data source and version before relying on that claim (S19). The
+  bundled database updates with crate releases. The extractor fingerprint
+  already changes with jiff versions.
 
 Counterexample against removal: temporal needs a zone database with history
 and skipped-day correctness (q21 counterexamples come from tzdb data that
@@ -475,20 +498,27 @@ owner needs, with what the evidence gives:
 
 | Item | `jiff-english` 0.0.1 | `fuzzydate` 0.4.1 | in-repo |
 | --- | --- | --- | --- |
-| Licence, releases | MIT; 1 release (2026-08-07) [V, S22] | MIT; 14 releases [V, S22] | n/a |
+| Licence, releases | MIT; 1 release (2026-08-07); 29 downloads (crates.io, 2026-11-17) [V, S22, S24] | MIT; 14 releases; last update 2026-04-05 (crates.io, 2026-11-17) [V, S22, S24] | n/a |
 | Size | ~1.3k lines [V, S22] | ~2.6k lines [V, S22] | [H] not written yet |
-| Dependencies | `jiff ^0.2` default features + `scanlex ^0.1` [V, S22] | `chrono` (feature `clock`), `lazy_static`, `thiserror` [V, S22] | none |
-| Determinism | [H] needs a source read; its docs are not generated in the local cache | [H] takes an anchor? unverified; docs not generated in the local cache | yes, by construction (frame in q33) |
-| Week rules | [H] unknown | [H] follows chrono's rules; chrono week rules differ from jiff's ISO defaults | decided by q8 |
-| Output type | [H] unknown | [H] unknown; chrono-english outputs chrono values | `CalendarPeriod` (start, unit) per ticket 21 |
-| Coverage of the closed grammar | [H] unknown | [H] unknown | exactly the decided list |
-| Coupling with jiff `=0.2.38` | depends on `jiff ^0.2` with default features; Traces sets `default-features = false` [V, S22] | adds `chrono`; two datetime stacks in one binary | none |
+| Dependencies | `jiff ^0.2` default features + `scanlex ^0.1`; the probe shows the jiff default features unify into the build (`tz-fat`, tzdb bundles, `perf-inline`) [V, S22, S24] | `chrono 0.4.45` (feature `clock`), `lazy_static`, `thiserror`; the jiff tree stays untouched [V, S22, S24] | none |
+| Determinism | bounded probe matrix, one anchor, own process per phrase [V, S24]; a source-level `week_day` slicing panic risk remains | same probe shape; no panic observed on the matrix [V, S24] | yes, by construction (frame in q33) |
+| Week rules | `last friday` returns the previous day (2026-03-13 from the 2026-03-14 anchor) [V, S24] | `last friday` returns one week back (2026-03-06); bare weekdays keep the anchor time [V, S24] | decided by q8 |
+| Output type | a point; `next week` is rejected outright [V, S24] | a point; `next week` returns a +7-day point [V, S24] | `CalendarPeriod` (start, unit) per ticket 21 |
+| Coverage of the closed grammar | no `next week`, no `eom`, no `in 2 weeks`; lenient mode misparses `start of month` as midnight today [V, S24] | no `eom`, no `in 2 weeks`; `next week` covered as a point [V, S24] | exactly the decided list |
+| Coupling with jiff `=0.2.38` | unifies jiff default features into the build [V, S24] | adds `chrono`; two datetime stacks in one binary [V, S24] | none |
+| Binary cost, probe | +65.0 KiB over the 409 KiB probe baseline, including the feature unification [V, S24] | +48.9 KiB, including the `chrono` stack [V, S24] | [H] not measured |
+| Speed, probe | 263 to 588 ns/parse (indicative) [V, S24] | 215 to 585 ns/parse (indicative) [V, S24] | [H] not measured |
 | Version risk | 0.0.1, 29 downloads, one release [V, S22] | active but pulls a second stack | repo owns changes |
+
+Limits of the probe rows: the matrix is a bounded phrase list. Exhaustive
+Unicode, overflow, and ambient-state behavior is not covered, and the
+benchmark is indicative, not controlled (S24).
 
 Evidence from the closest comparable crate, `chrono-english` 0.2.1 (S20):
 
-- It takes the anchor as an explicit `DateTime` parameter. Deterministic by
-  construction.
+- It takes the anchor as an explicit `DateTime` parameter. Determinism is
+  conditional: the result depends only on the text and pinned inputs, but
+  zone data and week rules are among those inputs (S20).
 - It outputs `Interval = Seconds | Days | Months` for bare offsets. That is
   a duration, not a period. `next week` needs a period (q16). No candidate
   crate's documented output is a period.
@@ -505,15 +535,15 @@ arithmetic defaults, inside a codebase that just pinned jiff.
 
 Counterexample against `jiff-english`: one release, one month old by its
 date, 29 downloads. That is not a maintenance signal. It is a prototype
-signal.
+signal. A crates.io API re-check on 2026-11-17 still shows 29 downloads
+(S24).
 
-[P] Build in the repository, as ticket 30 proposes. The evidence above does
-not beat the default. No candidate documents period output, anchor
-injection, or week rules. The docs of both candidates were not generated in
-the local cache (source-only). Rejecting condition: a source read of either
-candidate shows it already yields `(start, unit)` periods with an injected
-anchor and no second calendar stack. That read is cheap. The d-crate
-researcher can do it.
+[P] Build in the repository, as ticket 30 proposes. The runtime probe
+settles the rejecting condition in the negative. Neither candidate yields
+`(start, unit)` periods or takes an injected anchor, and `jiff-english`
+rejects `next week` outright (S24, `m-gap-closure.md`). Probe costs:
++65.0 KiB (english, with jiff default-feature unification) and +48.9 KiB
+(fuzzy, with a `chrono` stack); both parse in under a microsecond.
 
 ### q15. The meaning of a bare weekday
 
@@ -659,10 +689,11 @@ implementation to the owner's users, the word changes. The IR name stays.
 - [V] Temporal: `PlainDate`/`PlainDateTime` (civil) versus `Instant` versus
   `ZonedDateTime`, with documented conversion traps: `toPlainDateTime()`
   drops the offset, so re-zoning can land on the other side of a fold (S2).
-- [V] PG: one type with a mode flag (`timestamp with/without time zone`) is
-  the counterexample design. Its docs record the costs: a `without time
-  zone` value silently ignores an offset in its input, and the stored zone
-  is never retained (S5).
+- [V] PG ships two distinct SQL types (`timestamp without time zone`,
+  `timestamp with time zone`) whose input parsing is type-directed and
+  permissive. The docs record the costs: a `without time zone` value
+  silently ignores an offset in its input, and the stored zone is never
+  retained (S5).
 - [V] NumPy: one naive type. Offset-bearing input parse is deprecated
   (S17).
 - [V-repo] `NoteFieldValue` must stay at 80 bytes. `DateValue` is 4 bytes,
@@ -694,7 +725,9 @@ measured here.
   evidence for storing the normalized start, never the raw label (S2).
 - [V] Arrow carries an interval type in its columnar format with units
   months, day-time, and month-day-nano (S16). The minimal unit (month
-  interval) is a plain integer of months.
+  interval) is a plain integer of months. It is a storage encoding without
+  calendar semantics; it supports a `(start, unit)`-style layout but does
+  not decide period equality or ordering.
 - [V-repo] The store does not persist filename periods. Queries derive them
   (ticket 24). Group keys use `(start, unit)`. Membership never defines a
   group key or range key (ticket 29).
@@ -731,12 +764,15 @@ This question keeps that rule separate from membership.
   (S5). PG's comparison acquires a zone implicitly, which the repo forbids
   (ticket 21: UTC is never an implicit fallback).
 - [V] tzdb shows the counterexamples that force the rule:
-  - Skipped day: Samoa's 2011-12-30 does not exist. The zone jumps from
-    2011-12-29 23:59:59 at -11 to 2011-12-31 00:00:00 at +13 (S6,
-    australasia).
+  - Skipped day: Samoa's 2011-12-30 does not exist. The zone switches
+    standard offsets from -11 to +13 at 2011-12-29 24:00 local. With the
+    DST rules in force on both sides, the observed shift is -10:00 to
+    +14:00 (S6, australasia).
   - Ambiguous midnight: Cuba's rules put transitions at standard-time
     midnight (`0:00s`), so the fall-back hour 00:00-00:59 occurs twice and
-    the spring-forward night skips local midnight (S6, northamerica).
+    the spring-forward night skips local midnight. The 2026f release
+    suspends the usual November 2026 return, so any worked example must
+    name its year (S6, northamerica).
 - [V] Jiff's parser is type-directed about this: a `Z` string into a civil
   type is an error (S19).
 
@@ -758,7 +794,7 @@ Answer.
 
 ### q22. The total sort key for mixed temporal values
 
-- [V] RFC 3339 §5.6 defines when plain string sort equals time sort:
+- [V] RFC 3339 section 5.1 defines when plain string sort equals time sort:
   components from least to most precise, one zone spelling, same fractional
   digits. Optional punctuation breaks it (S3).
 - [V] Temporal's `Duration.compare` needs `relativeTo` when any
@@ -766,14 +802,15 @@ Answer.
   otherwise. It refuses to order mixed-precision nominal values without an
   anchor (S2).
 - [V] `PlainYearMonth.compare` sorts by the ISO first day of the month
-  (S2). Dataview sorts its ISO date strings lexically (S9).
-- [V-repo] Ticket 29 sorts distinct group keys by a "temporal class order"
-  that nobody has defined. This question defines it.
-- [H] XSD 1.1 durations are partially ordered: a month duration and a
-  day-time duration can be incomparable (the spec's own examples contrast
-  `1697-02-01` and `1903-03-01`). I could not extract the XSD text through
-  the fetch path (two tries returned metadata only). Treat the claim as
-  plausible-but-unverified, or read S21 directly before grilling.
+  (S2). Dataview compares across its types in `compareValue`, with dates by
+  epoch, rather than sorting text (S9; c Q22).
+- [V-repo] Ticket 29 section 3 fixes the group class order (Civil,
+  Instant, Period; B65/C3). This question keeps the mixed-value sort key
+  and the unit tie-break.
+- [V] XSD 1.1 durations are partially ordered: the spec checks `P1M`
+  against `P30D` on four reference datetimes, and the order flips between
+  February 1697 and March 1903 (S21; confirmed in the K round,
+  `k-citation-verification.md`, K11).
 
 Counterexample against "sort everything by physical time": a month period
 and a day period have no physical time without an anchor. Nominal
@@ -781,16 +818,18 @@ durations flip order by anchor month (XSD example, S21). The key must be
 label-based, not time-based, across classes.
 
 Counterexample against "sort by written text only": ISO strings sort
-correctly only inside one class and one zone spelling (S3). Cross-class
-text sort puts `2026-03` (month) before `2026-02-28` (day), which is wrong.
+correctly only inside one class, one shape, and one zone spelling (S3).
+Mixed shapes carry no time order. `2026-02-28` (date) and `2026-03`
+(month) differ in shape, so their text order is a byte order, not a time
+order.
 
-[P] Key = (class rank, class-local value, unit tie-break). Class rank:
-`Date` < `DateTime` (civil) < `Instant` < `Period`? The rank order is a
-choice. The constraint: one rank per class, periods after points, unit
-tie-break ascending Day < Week < Month < Quarter < Year. Civil values sort
-by their civil components (year, month, day, time). Instants sort by
-instant. The Answer must state the rank explicitly. This file only supplies
-the shape and the traps.
+[P] Key = (class rank, class-local value, unit tie-break). Class rank must
+respect the accepted group class order: Civil, Instant, Period (B65/C3).
+Within Civil, `Date` before `DateTime` is a free choice. The constraint:
+one rank per class, periods after points, unit tie-break ascending Day <
+Week < Month < Quarter < Year. Civil values sort by their civil components
+(year, month, day, time). Instants sort by instant. The Answer must state
+the rank explicitly. This file only supplies the shape and the traps.
 
 ### q23. Nominal duration equality and order
 
@@ -806,9 +845,9 @@ the shape and the traps.
   and time. No years or months [V-repo, research 14].
 
 Counterexample against numeric equality across nominal and exact units: one
-month is 28 to 31 days depending on the month. 30 days equals one month
-twice a year and differs the rest. Any equality that says `1 month == 30
-days` is wrong four times a year.
+month is 28 to 31 days depending on the month. XSD's own `P1M` versus
+`P30D` checks flip by reference date (S21). Any fixed conversion decides
+the flip by convention, not by fact.
 
 Counterexample against physical order without an anchor: Temporal throws
 when asked (S2). PG clamps month arithmetic and documents the asymmetry
@@ -846,10 +885,11 @@ External URLs are not note targets.
   an octet that stands for a reserved character changes the URI. The RFC
   says: "do not percent-encode or decode the same string more than once"
   (S13).
-- [V] CommonMark 0.31.2: a link destination is raw text (spaces and parens
-  need escaping or the `<...>` form) or an angle form. The spec does not
-  mandate percent-encoding of non-ASCII by renderers. It notes that some
-  contexts must percent-encode (S12).
+- [V] CommonMark 0.31.2: a bare link destination may hold balanced,
+  unescaped parentheses; unbalanced ones need escaping, or the `<...>`
+  angle form, which allows spaces and any escaped character. The spec does
+  not mandate percent-encoding of non-ASCII by renderers. It notes that
+  some contexts must percent-encode (S12).
 - [V-repo] `scan_date_prefix` accepts `YYYY-MM-DD` and `YYYY-MM` prefixes;
   the pattern argument of `date()` accepts a strftime format [V-repo].
 
@@ -940,8 +980,9 @@ into `DatePolicy` at load. The edge stays one-way.
 
 - [V] IANA zone names: `AREA/LOCATION`, ASCII letters with `.`, `-`, `_`;
   no digits; no case-only-distinct names; legacy spellings live as links in
-  `backward`; `Etc/UTC` and `GMT` exist; `Etc/Unknown` is reserved by CLDR
-  (S6 theory).
+  `backward`; `Etc/UTC` and `GMT` exist; `Etc/Unknown` is reserved by CLDR.
+  The naming rules are guidelines with legacy exceptions (`Etc/GMT0`,
+  `GMT0`, `EST5EDT`) (S6 theory).
 - [V] PG accepts three zone spellings with different meanings: full IANA
   names, abbreviations (date-dependent offset, e.g. `MSK` moved +3 to +4),
   and POSIX-style strings whose sign is opposite to ISO (`UTC-4` = ISO
@@ -954,14 +995,14 @@ string. `EST` is an abbreviation with a date-dependent meaning. `UTC-4`
 reverses sign relative to ISO. Three spellings, three meanings, one config
 key: that is the documented PG trap (S5).
 
-Counterexample against no validation: a typo (`Europe/Prague` does not
-exist) surfaces as a per-row zone lookup failure instead of a config
+Counterexample against no validation: a typo (`Europe/Prag` is not a zone
+name) surfaces as a per-row zone lookup failure instead of a config
 error.
 
 [P] Accept IANA names plus an explicit fixed-offset form (`±HH:MM`).
-Validate at config load against the bundled database (the
-`tzdb-bundle-always` feature makes load-time validation deterministic).
-Reject abbreviations and POSIX strings.
+Validate at config load against a stated data source and version (a bundled
+database with a pinned tzdb version makes load-time validation
+deterministic). Reject abbreviations and POSIX strings.
 
 ### q30. How the host gets the system zone and reports failure
 
@@ -975,8 +1016,12 @@ Reject abbreviations and POSIX strings.
   all times before 1970, and the `backzone` file is less reliable (S6).
   System-database and bundled-database versions can differ, which changes
   answers near historical edges.
-- [H] Jiff's `tz-system` failure mode (what error surfaces when the system
-  database is unreadable) needs one doc check before the Answer states it.
+- [V] Jiff's failure mode is source-read and recorded: `TimeZone::try_system`
+  returns an error when zone discovery fails or the `tz-system` feature is
+  off, and `TimeZone::system` can fall back to `UTC` under the same
+  conditions. The frame must use `try_system` and memoize the error
+  (S19; owner-evidence.md, jiff section; K20 in
+  `k-citation-verification.md`).
 
 Counterexample against reading the system zone per row: PG's
 `transaction_timestamp` note (one consistent notion of current time per
@@ -993,9 +1038,9 @@ Deterministic fixtures inject the zone.
 
 Evidence is in q8. The added points:
 
-- [V] CLDR root default is Monday with 1 day, not Sunday. The US convention
-  differs from the CLDR default (S1). An English-only tool still needs to
-  choose.
+- [V] CLDR territory `001` defaults to Monday with 1 day, not Sunday. The
+  US convention differs from the CLDR default (S1). An English-only tool
+  still needs to choose.
 - [V] Tasks shipped ISO-only and users file requests for other week starts
   (S10). Configurability is a real request, not a hypothetical.
 - [V-repo] The owner's week template lists days from `day(0)`, Sunday
@@ -1003,9 +1048,9 @@ Evidence is in q8. The added points:
   default.
 
 Counterexample against "week start configurable, week-one rule fixed at
-ISO": `first_day = sunday` with `min_days = 4` is a combination no major
-locale uses. It re-numbers weeks in ways the q8 tables show (S14). The
-pair must move together.
+ISO": `first_day = sunday` with `min_days = 4` is rare. CLDR lists it for
+`is` and `pt`, but it is not unused (S1). It re-numbers weeks in ways the q8
+tables show (S14). The pair must move together.
 
 [P] Configurable as the `(first_day, min_days)` pair, default ISO. The
 week rule enters the frame and the fingerprint-relevant policy set if
@@ -1070,8 +1115,9 @@ type and constructors. Query and template hold and pass frames.
   documents why: one consistent notion of current time per transaction
   (S5). The scope distinction is the evidence that an ambient read has a
   scope. Traces' scope is the frame.
-- [V] java.time: ambient clock access exists (`Clock.system...`) but every
-  API takes the clock or zone it needs. Tests use `Clock.fixed` (S14).
+- [V] java.time: ambient clock access exists (`Clock.system...`), and the
+  library offers explicit clock and zone overloads where the design needs
+  injection. Tests use `Clock.fixed` (S14).
 
 Counterexample for keeping any ambient read: two queries in one render
 frame could observe different clocks or zones across the removal boundary.
@@ -1120,9 +1166,10 @@ cell depends on evaluation order.
   first-round notice.
 - [V] Dataview's `file.day` is silently absent when the file name has no
   date. No notice, no error (S9). That is the silent-Null baseline.
-- [V] Fileclass accepts any non-empty string for a custom-format date field
-  today [V-repo, research 14]. A malformed date in a validated field is
-  invisible today.
+- [V] Fileclass skips pattern validation for a plain-string custom format
+  today; the outer validator still checks empty values and `required`
+  [V-repo, research 14; K8 in `k-citation-verification.md`]. A malformed
+  date value in such a field is invisible today.
 
 Counterexample for noticing every Null: `file.date` is Null for most files.
 A notice per row floods output and trains users to ignore notices.
@@ -1152,9 +1199,9 @@ evidence lives:
 | DST fold and gap | S5 functions-datetime (Denver 1 day vs 24 hours); S2 timezone doc (LA fold/gap) |
 | Month clamp | S5 (Mar 31 + 1 month = Apr 30); S20 (Jan 30 + 1 month = Feb 28/29); S2 (`constrain`/`reject`) |
 | Invalid week 53 | S1 (week 53 rollover note); ISO `2025-W53` invalid, no rollover (ticket 21) |
-| Prefix fallback | S9 (Dataview filename forms); S17 (NumPy year-granularity equality); S7 (Moment forgiving parse of a UUID as `YYYYDDD`); ticket 21 no-reinterpretation rule |
+| Prefix fallback | S9 (Dataview filename forms); S17 (NumPy year-granularity equality — a different convention, not a prefix fallback); S7 (Moment forgiving parse of a UUID as `YYYYDDD`); ticket 21 no-reinterpretation rule |
 | Percent-encoded link | S13 §2.4 (decode once); S12 (destination forms) |
-| Period equality vs membership | S2 `PlainYearMonth` (reference-day inequality); ticket 21 `(start, unit)`; S4 (nominal vs exact); S21 `[H]` (partial order) |
+| Period equality vs membership | S2 `PlainYearMonth` (reference-day inequality); ticket 21 `(start, unit)`; S4 (nominal vs exact); S21 `[V]` (partial order) |
 | Relative literal parsing | S5 (`today`/`tomorrow` staleness in prepared statements); S10 (Tasks recompute and issue #1289); S23 (Duckling `reference_time`) |
 | Null-notice observability | S9 (Dataview silent `file.day`); q36 case table |
 
@@ -1199,23 +1246,27 @@ grilling, not decisions.
 List for the integration owner. Each needs a check or a decision to leave
 open:
 
-1. `fuzzydate` and `jiff-english` APIs: docs not generated in the local
-   cache. My table entries for determinism, output type, and coverage are
-   `[H]`. One source read each closes this.
-2. W3C XSD duration partial order: `[H]`. The fetch path returned metadata
-   only, twice. Read S21 by hand or drop the claim.
+1. `fuzzydate` and `jiff-english` APIs: closed. The runtime probe
+   (`probes/candidates`, S24) measured the behavior matrix; the q14 table
+   rows now cite it.
+2. W3C XSD duration partial order: closed. S21 read and confirmed in the
+   K round (`k-citation-verification.md`, K11); q22 states it as `[V]`.
 3. Arrow strptime directive table: not retrieved. S16 gives the columnar
    types and the pyarrow signature (default `%Y-%m-%dT%H:%M:%S`, locale `C`,
    error on unknown tz). Enough for the interval-type evidence, not for a
    directive-by-directive comparison.
-4. Jiff `tz-system` failure behavior: `[H]`, one doc check.
-5. Binary size effects of `tzdb-bundle-always`, `logos`, and an in-repo NL
-   grammar: not measured anywhere in this file. The brief forbids
-   unmeasured cost claims. The change-table rows must not cite sizes.
-6. In-repo grammar size and test cost (q14 last row): not written yet.
+4. Jiff `tz-system` failure behavior: closed. Source-read in the K round
+   (K20); q30 states it as `[V]` with the `try_system`/`system` split.
+5. Binary size effects: the two NL candidates are now measured in the
+   probe (+65.0 KiB and +48.9 KiB, S24). `tzdb-bundle-always`, `logos`,
+   and an in-repo NL grammar in repository builds: still not measured. The
+   brief forbids unmeasured cost claims; change-table rows must not cite
+   sizes except the probe's own.
+6. In-repo grammar size and test cost (q14 Size row): not written yet.
    That estimate belongs to the owner with the d-crate researcher's input.
-7. `moment.now` overridability: not verified. Not needed by any question,
-   listed only because Moment determinism came up in passing.
+7. `moment.now` overridability: closed as documented. Moment's plugin
+   guide documents the `moment.now` override (K23 in
+   `k-citation-verification.md`).
 8. The `chrono-english` doc phrase "this coming Friday" leaves
    same-day behavior unstated (is `friday` on a Friday today or +7?). A
    source read answers it if the owner wants the parallel exactly.

@@ -29,11 +29,21 @@ Read in this order, all under
    questions into clusters and lists the human questions.
 4. [The red-team review](../research/30-prep/h-redteam.md) attacks the
    synthesis. The synthesis records the repairs it caused.
-5. The evidence files are
+5. The review reports are
+   [i-leakage-review](../research/30-prep/i-leakage-review.md),
+   [j-test-coverage-review](../research/30-prep/j-test-coverage-review.md),
+   [k-citation-verification](../research/30-prep/k-citation-verification.md)
+   and
+   [l-answer-verification](../research/30-prep/l-answer-verification.md).
+   The synthesis cites their items as i-file, j-file, k-file and l-file.
+6. The evidence files are
    [c-digest-lessons](../research/30-prep/c-digest-lessons.md),
    [d-crate-evidence](../research/30-prep/d-crate-evidence.md),
    [e-external-designs](../research/30-prep/e-external-designs.md) and
    [owner-evidence](../research/30-prep/owner-evidence.md).
+7. [m-gap-closure](../research/30-prep/m-gap-closure.md) is written by the
+   parent run. It records the probe outputs and the measured evidence that
+   the sessions reference, including the Q19 layout proof.
 
 ### Moment compatibility and format dialects
 
@@ -75,9 +85,12 @@ See "Current code".
 ### Natural-language dates
 
 13. Decide the grammar. Ticket 19 proposes a closed English list of keywords,
-    weekdays and offsets such as `in 2 weeks`.
+    weekdays and offsets such as `in 2 weeks`. Adoption, the rule-table
+    semantics and the crate choice in question 14 are separate decisions.
 14. Decide whether to build the grammar in the repository or use a crate.
-    The candidates are `jiff-english` and `fuzzydate`. Run the prep step first.
+    [d-crate-evidence](../research/30-prep/d-crate-evidence.md) holds the
+    prep evidence for `jiff-english`, `fuzzydate`, `parse_datetime` and
+    `chrono-english`.
 15. Decide the meaning of a bare weekday: next, nearest, or the day in the
     current week.
 16. Decide how the grammar represents the interval precision of phrases such as
@@ -229,9 +242,15 @@ envelope.
 
 ## Prep before grilling
 
-The natural-language grammar needs a prep step before the grilling. Ticket 19
-says nobody reviewed `jiff-english` or `fuzzydate`. A search of `.scratch` finds
-no review of either crate [V].
+The natural-language grammar needed a prep step before the grilling. Ticket 19
+said nobody reviewed `jiff-english` or `fuzzydate`. That gap is closed:
+[d-crate-evidence](../research/30-prep/d-crate-evidence.md) reviews
+`jiff-english`, `fuzzydate`, `parse_datetime` and `chrono-english` against the
+evidence list below [V]. The k-citation pass checked that file's citations
+([k-citation-verification](../research/30-prep/k-citation-verification.md)).
+Measured runtime evidence for the candidates, including parsing behavior,
+sizes and throughput, is in
+[m-gap-closure](../research/30-prep/m-gap-closure.md).
 
 Facts from the crates.io API, read on 2026-11-16 [V]:
 
@@ -270,8 +289,9 @@ The prep step must give the owner this evidence for each candidate:
 - Feature and version coupling with `jiff` `=0.2.38`.
 - The size and test cost of a grammar built in the repository.
 
-[P] Run the prep first. Treat a grammar built in the repository as the default
-option until the evidence beats it.
+[P] The prep evidence is in place. Treat a grammar built in the repository as
+the default option until the evidence beats it. The build-versus-crate
+decision stays open.
 
 ## Inputs from the coercion and comparison decision
 
@@ -303,7 +323,10 @@ ticket:
   superseded.
 - A Markdown link is open. Ticket 19 asks for a rule for how `date(link)` reads
   a Markdown target. A Markdown target keeps its extension and can be
-  percent-encoded. External URLs are not note targets.
+  percent-encoded. External URLs are not note targets. Component separation
+  precedes decoding. Take the last raw segment before any percent-decode.
+  An encoded separator such as `%2F` never creates a path boundary
+  (RFC 3986 section 2.4).
 
 Other decided rules that bind this ticket:
 
@@ -323,7 +346,9 @@ See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Schema
 year-only variant. The `date` check accepts any scalar when the format has no
 date component. Tests in `schema` use Moment tokens. Temporal and the template
 filter seam translate them. Pick the dialect. After choosing a dialect, add the
-date-format check.
+date-format check. A lint-only check, as question 4 proposes, narrows this
+provisional scalar acceptance; it is a proposed amendment to ticket 20, not an
+inherited behavior.
 
 The Answer text of ticket 20 is cut off after "Only date, datetime and". Do not
 read a rule into that fragment.
@@ -331,12 +356,16 @@ read a rule into that fragment.
 ## Inputs from the Fileclass research
 
 See [research 14](../research/14-fileclass-model-binding-and-validation.md).
-Fileclass checks dates with ISO regexes only. A field with a custom Moment
-`dateFormat` accepts any non-empty string. It also accepts a wikilink as a date
-(`src/fields/validate.ts`) [V]. `dateFormatCheck.ts` instead lints the tokens of
-the declared format string, not values [V]. Fileclass validates durations
-against an RFC 5545 subset (weeks, or days and time; no years or months)
-(`src/fields/duration.ts`) [V].
+Fileclass checks dates with ISO regexes only. `validateDatePattern` bypasses
+pattern validation when `dateFormat` is a string. It does not itself
+enforce a non-empty string. The outer validator handles empty values and
+the `required` option (`src/fields/validate.ts`) [V]. `dateFormatCheck.ts`
+instead lints the tokens of the declared format string, not values [V].
+Fileclass's duration input grammar resembles an RFC 5545 subset (weeks, or
+days and time; no years or months). The inspected parser is not an exact
+RFC validator. Its regex permits mixed weeks, days and time, and it
+ignores a captured sign. Its arithmetic treats a day as 86,400,000
+milliseconds in UTC (`src/fields/duration.ts`) [V: k-citation-verification K8].
 
 [H] Two cheap options exist for the dialect choice. Check a declared format at
 schema load as a schema error, not a note violation. Keep the value check
@@ -370,7 +399,9 @@ a distinct total key.
 Day/month filename prefixes continue. Add validated ISO weeks (Monday, four-day
 week one) and quarters, with an opt-in bare year. Do not reinterpret invalid
 longer prefixes as shorter prefixes. Custom week starts also need a week-one
-rule.
+rule. Filename week prefixes stay ISO regardless of a configurable general
+week rule. Ticket 21 fixes them to Monday start and the ISO week-one rule
+(21:170-179).
 
 Scope the new prefix parser to filenames: shared vault-format parsing remains
 frozen under ticket 16. `file.date` is filename-only. `file.cdate` is
@@ -553,8 +584,10 @@ See [ticket 29's Answer](./29-query-core-and-plan.md).
   civil values agree. Civil values and instants stay separate classes. A period
   groups by `(start, unit)`. Membership never defines a group key or a range
   key.
-- Ticket 29 sorts distinct group keys by "temporal class order". Nobody has
-  defined that order. The sort key decision above defines it.
+- Ticket 29 sorts distinct group keys by "temporal class order". Ticket 29
+  defines that order as Civil, Instant, Period (29:721-730). The sort key
+  decision above decides the value-sort key and how it relates to those
+  group classes.
 - The first pushdown scope covers unquoted temporal literals and `And` only.
 
 ## Downstream consumers
@@ -605,8 +638,10 @@ Supersession list for ticket 36:
 - Ticket 25 omits `winnow` from the extractor crate list.
 - Ticket 23's Question still adds date keys to `IndexPolicy`. Its later input
   removes them unless the index consumes them.
-- Ticket 29 leaves the mixed temporal class order undefined. It also uses `eom`
-  as a relative keyword, although the current grammar defines a function.
+- Ticket 29 defines the group-class order (Civil, Instant, Period) but
+  leaves the mixed temporal value-sort key open. Ticket 36 receives the Q22
+  outcome. It also uses `eom` as a relative keyword, although the current
+  grammar defines a function.
 - The temporal survey and `reverification.md` predate the translator move.
 
 These are recorded discrepancies, not changes to the earlier Answers.

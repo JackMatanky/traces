@@ -1,0 +1,21 @@
+[package]
+name = "temporal-cost-probe"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+jiff = { version = "=0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
+jiff-english = { version = "=0.0.1", optional = true }
+fuzzydate = { version = "=0.4.1", optional = true }
+chrono = { version = "=0.4.45", optional = true }
+
+[features]
+english = ["dep:jiff-english"]
+fuzzy = ["dep:fuzzydate", "dep:chrono"]
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+panic = "abort"
+codegen-units = 1

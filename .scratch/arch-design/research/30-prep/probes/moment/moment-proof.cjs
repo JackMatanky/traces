@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict');
+const moment = require('./moment.cjs');
+const date = moment.utc('2025-12-28').locale('en');
+assert.equal(moment.version, '2.30.1');
+assert.equal(moment.localeData('en').firstDayOfWeek(), 0);
+assert.equal(moment.localeData('en').firstDayOfYear(), 6);
+assert.equal(date.format('YYYY-[W]ww'), '2025-W01');
+assert.equal(date.format('gggg-[w]ww'), '2026-w01');
+assert.equal(date.format('GGGG-[W]WW'), '2025-W52');
+console.log('Moment 2.30.1 en assertions passed: dow=0 doy=6 calendar/local=2025-W01 local/weekyear=2026-w01 ISO=2025-W52');

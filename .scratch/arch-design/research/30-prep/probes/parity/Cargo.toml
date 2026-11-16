@@ -1,0 +1,20 @@
+[package]
+name = "temporal-gap-probe"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+jiff = { version = "=0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
+speedate = "=0.18.0"
+pretty_assertions = "=1.4.1"
+
+[dev-dependencies]
+indexmap = "=2.14.2"
+stats_alloc = "=0.1.10"
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+panic = "abort"
+codegen-units = 1

@@ -35,8 +35,11 @@ The owner also ran two probes. The parity probe checked 4,635,370 inputs
 through the speedate path and a guarded jiff path with no difference
 (Q9). The Moment probe printed the owner's week tokens under the `en`
 locale (Q7). Sizes: `civil::Date` 4 bytes, `civil::DateTime` 12,
-`Timestamp` 16, `Span` 64, a two-case payload enum 24 (Q19). Artifacts:
-`/tmp/traces-temporal-gap.8Jdo7V/`.
+`Timestamp` 16, `Span` 64, a two-case payload enum 24 (Q19). The probe
+outputs live in [m-gap-closure.md](./m-gap-closure.md), which the parent
+run writes. The parity probe lives in-repo at
+[probes/parity](./probes/parity) and reproduced its recorded numbers
+exactly; probes/parity/tests/layout.rs holds the Q19 layout proof.
 
 Evidence tags:
 
@@ -167,13 +170,18 @@ Alternatives.
 - B. A lint plus a value check by class.
 - C. No check.
 
-Recommendation. A. [P]
-A needs no decision about stored values. B adds a value check beyond the
-accepted hint rule. The accepted rule already accepts any scalar when the
-format has no date component (20:119-123). Which stored values a partial
-date or a quarter format accepts stays a separate human choice [V: l-file
-L2]. Ticket 36 recovers the fragment; do not complete it by inference.
-For the owner's unquoted formats, the parser reads the values as numbers.
+Recommendation. A, as a proposed amendment to ticket 20. [P]
+The accepted hint rule provisionally accepts any scalar when the format has
+no date component (20:119-123). Lint-only A narrows that provisional
+acceptance, so it is a proposed amendment, not an inherited behavior
+[V: l-file L1]. It needs a change-table row and a ticket 36 supersession
+note. The three format classes stay distinct [V: l-file L2]: a full date,
+a partial date and no date component. Which stored values a partial date
+or a quarter format accepts is a separate human choice. Ticket 36 recovers
+the mid-sentence fragment ("Only date, datetime and", 20:305-315).
+Completing it by inference or gating the delegated check on it is out of
+scope. For
+the owner's unquoted formats, the parser reads the values as numbers.
 Quoted numbers stay text (20:311-315), so the routing of each written value
 decides what a string-shape check sees.
 
@@ -271,8 +279,9 @@ A counterexample for the grilling, verified at runtime. The owner's week
 template writes `YYYY-[W]ww`. A Moment 2.30.1 probe with the `en` locale
 (dow 0, doy 6) prints `2025-W01` for Sunday 2025-12-28 and `2026-w01` for
 the locale week token `gggg-[w]ww`. The ISO form `GGGG-[W]WW` prints
-`2025-W52` [V: owner probe, `/tmp/traces-temporal-gap.8Jdo7V/moment-proof.cjs`,
-assertions pass]. The ISO prefix rule reads `2025-W01` as the week of
+`2025-W52` [V: owner probe `moment-proof.cjs`, recorded in
+[m-gap-closure.md](./m-gap-closure.md), assertions pass]. The ISO prefix
+rule reads `2025-W01` as the week of
 2024-12-30. Two meanings for one name are possible.
 
 Reject condition. The grilling adds filename-local rules that temporal should
@@ -287,8 +296,9 @@ has `ISOWeekDate` and the week-0 directives `%U` and `%W`
 and a test corpus.
 
 No rollover. A week 53 that does not exist is invalid, for a typed literal
-and for a filename prefix (ticket 21). CLDR tells readers to roll over
-[V: e-file q8]. This ticket must say that Traces does not.
+and for a filename prefix (ticket 21). CLDR recommends rollover as
+compatibility guidance for lenient readers, not as a parser duty
+[V: e-file q8, k-file K4]. This ticket must say that Traces does not.
 
 ## Cluster C: parsing stack (Q9 to Q12)
 
@@ -300,9 +310,11 @@ to another. Negative years already use `civil::Date::new`
 [V: d-crate Q3]. Jiff accepts a superset of the shape that speedate accepts:
 unguarded `Date::from_str` accepts `20260101` and
 `2026-01-01T00:00:00` [V: d-crate Q3, owner probe]. The parity probe ran on
-4,635,370 generated inputs. It found 0 acceptance, 0 value and
+4,635,370 generated inputs. It found 0 acceptance, 0 value, and
 0 error-category differences between the speedate path and a guarded jiff
-path [V: owner probe, `/tmp/traces-temporal-gap.8Jdo7V/`]. Removal drops
+path. Source: owner probe [V], recorded in
+[m-gap-closure.md](./m-gap-closure.md), reproduced in-repo at
+[probes/parity](./probes/parity). Removal drops
 `lexical-parse-float` and `strum` from the lockfile
 [V: Deletion lens D1].
 
@@ -382,37 +394,57 @@ Recommendation. A. [P]
 Dataview uses a closed keyword set. Tasks documents ambiguous ranges as the
 failure of flexible parsing [V: e-file q13]. A query engine needs
 deterministic plans. C is valid only with an explicit scope decision.
+Adoption is one decision; the rule-table semantics below and the crate
+choice in Q14 are two more (l-file L11). The grilling may adopt the closed
+grammar and still edit every row.
 
-Open work. The Answer needs a rule table with a positive and a negative
-example. The draft below is a proposal. The grilling edits rows, it does not
-design from scratch. [P]
+The Answer needs a rule table with a positive and a negative
+example. The draft below is a proposal. Nothing in it is implemented.
+Completeness stays unproved and is an implementation gate. The table
+writes the Q17 recommendation A spelling: nullary function calls. If the
+grilling keeps another Q17 spelling, the rows change spelling, not
+meaning [P].
 
 | Phrase | Kind | Meaning (proposal) | Positive | Negative |
 | --- | --- | --- | --- | --- |
-| `today` | point | the frame civil date | `due = today` matches today | `tomorrow` |
-| `now` | point | the frame instant | `t < now` | `today < now` is a class mismatch |
-| `tomorrow` / `yesterday` | point | today ± 1 day | `due = tomorrow` | `2 tomorrow` |
-| `<weekday>` | point | decision Q15; default: next occurrence after today | `due = monday` | `next monday` needs the prefix |
+| `today()` | point | the frame civil date | `due = today()` | `2 today()` |
+| `now()` | point | the frame instant | `t < now()` | `now() < 1d` is a Temporal-to-Duration cross-bracket |
+| `tomorrow()` / `yesterday()` | point | today ± 1 day | `due = tomorrow()` | `2 tomorrow` |
+| `<weekday>` | point | Q15 decides the same-day rule; default proposal: next occurrence strictly after today | `due = monday` | `mondays` |
 | `this/next/last <weekday>` | point | current-week day, next occurrence, previous occurrence | `due = next monday` | `last next monday` |
-| `this/next/last week/month/quarter/year` | period | `(start, unit)` of that period | `due in next week` | `next week` as a point |
-| `in <n> <unit>` | point | today + n units, unit is day/week/month/quarter/year | `due < in 2 weeks` | `in 2 fortnights` |
-| `<n> <unit>(s) ago` | point | today − n units | `done > 3 days ago` | `3 days ago tomorrow` |
-| `sow/eow/som/eom/soq/eoq/soy/eoy` | point | start or end of the current period | `due <= eom` | `eom next week` |
+| `this/next/last week/month/quarter/year` | period | `(start, unit)` of that period | `due in next week` | `file.date + next week` puts a period in arithmetic |
+| `in <n> <unit>` | point (Q16 open: point or period) | today + n units, checked | `due < in 2 weeks` | `in 2 fortnights` |
+| `<n> <unit>(s) ago` | point (Q16 open: point or period) | today − n units | `done > 3 days ago` | `3 days ago tomorrow` |
+| `eom()`, `sow()`, and the other six edge functions | point | start or end of the current period | `due <= eom()` | `eom() next week` |
 | `start of/end of <period>` | point | alias of the row above | `start of month` | `middle of month` |
 
 Rules the table must also state:
 
-- `now` and `today` share the frame. `now` uses the frame instant and `today`
-  uses the frame civil date (B16).
-- Weekday rows obey the Q15 same-day rule. The table above assumes
-  strictly after today [P].
-- Period phrases never clamp. `in 1 month` from 2027-01-31 is an invalid
-  date, and the row returns `Null` with a notice (Q36), not 2027-02-28 [H:
-  offsets differ from period membership; the grilling decides].
+- Anchor. Every phrase resolves against the injected frame. `now()` reads
+  the frame instant and `today()` reads the frame civil date (B16). No
+  phrase reads an ambient clock.
+- Full consumption. A literal matches a row only when the whole literal
+  matches that row. `in 2 weeks ago` matches no row.
+- Unicode. Matching and any slicing respect `char` boundaries. A non-ASCII
+  byte never panics, unlike the crate slicing hazard in Q14.
+- Checked integers. Counts are integers and arithmetic is checked.
+  `in 999999999999 weeks` overflows and is rejected at parse time.
+  Whether that rejection is a typed advisory or the B21 string silence is
+  a human choice [P].
 - Date-shaped advisory scope (B21): every phrase in this table is
   date-shaped. A typo such as `"next weke"` matches no rule, so it is not
   date-shaped and runs as a string with no notice. That silence is the
   accepted behavior today [V: c-digest Q17].
+- Weekday rows obey the Q15 same-day rule. The table above assumes
+  strictly after today [P]. The `this/next/last` prefix rows state their
+  same-day rules with it.
+- Parse rejection is not arithmetic clamping. A phrase that matches no row
+  is not date-shaped and runs as a string. A phrase that matches a row
+  computes with the accepted arithmetic policy. The policy clamps
+  month-end dates: from 2027-01-30, `in 1 month` gives 2027-02-28 as a
+  point [V: h-redteam Q16, `point.rs:1726-1771`]. The period rows avoid the
+  clamp by deriving the period that holds `today` and shifting whole
+  units (Q16).
 
 Reject condition. The owner uses phrases the closed list cannot cover.
 
@@ -431,8 +463,23 @@ Facts [V: d-crate Q6].
 - `jiff-english` and `chrono-english` slice `&s[0..3]` on identifiers. A
   non-ASCII identifier can panic there.
 - `jiff-english` is one release with 29 downloads [V: ticket 30 prep].
-- Nobody measured binary size, compile time or the cost of an in-repo
-  grammar.
+- Runtime probe [V: [m-gap-closure.md](./m-gap-closure.md),
+  probes/candidates]. `jiff-english` 0.0.1 rejects `next week` outright
+  (`expected week day or month name`); `fuzzydate` 0.4.1 returns a +7-day
+  point. `last friday` diverges: english gives the previous day, fuzzy
+  gives a week back. A bare weekday gives the next strictly-after day in
+  both, at midnight for english and at the preserved anchor time for
+  fuzzy. Neither accepts `eom` or `in 2 weeks`. The `jiff-english` lenient
+  mode misparses `start of month` as midnight today; strict rejects it.
+  Typos, full-width digits and CJK input fail cleanly, with no panic
+  observed. Throughput is 263 to 588 ns per parse for english and 215 to
+  585 ns for fuzzy. Both return points only: no periods, no spans, and no
+  error spans. The probe adds 65.0 KiB for english and 48.9 KiB for fuzzy
+  over a 409 KiB baseline. English unifies `jiff` default features into
+  the build, which conflicts with `default-features = false`; fuzzy keeps
+  `jiff` untouched but adds `chrono` 0.4.45. Both target edition 2021
+  with no `rust-version` and build clean on stable 1.89.0. `fuzzydate`
+  was last updated 2026-04-05 with 164k downloads.
 
 Alternatives.
 
@@ -443,10 +490,16 @@ Alternatives.
 
 Recommendation. A. [P]
 The digest evidence adds an error contract: span-carrying errors, no
-zero-date fallback and no process exit [V: c-digest Q14]. No candidate meets
-it. The d-crate file lists rejection tests T1 to T10.
+zero-date fallback and no process exit [V: c-digest Q14]. No candidate
+meets it. The runtime probe confirms the source reading: every candidate
+returns points only, no period, no span, and no error span. The
+`jiff-english` build also pulls `jiff` default features back in. The
+d-crate file lists rejection tests T1 to T10. An injected anchor
+supports reproducibility; it does not by itself prove the determinism
+contract, which also pins zone data, week rules and dialect (k-file
+K17). The in-repo grammar has no demonstrated coverage yet.
 
-Reject condition. A later source read shows a candidate that yields
+Reject condition. A later read or probe shows a candidate that yields
 `(start, unit)` periods with an injected anchor, spans and no second
 calendar stack.
 
@@ -567,7 +620,14 @@ Facts.
   The enum is 80 bytes. The largest payload is 72 bytes [V: ticket 18].
 - The probe measured the sizes: `civil::Date` 4 bytes, `civil::DateTime` 12,
   `Timestamp` 16, `Span` 64, a two-case `{Civil|Instant}` payload enum
-  24 bytes [V: owner probe, `/tmp/traces-temporal-gap.8Jdo7V/`].
+  24 bytes [V: owner probe, recorded in
+[m-gap-closure.md](./m-gap-closure.md)].
+- A layout probe proves the complete proposed `NoteFieldValue` stays at
+  exactly 80 bytes. The 72-byte Duration payload binds the largest
+  variant. The 16-to-24-byte payload growth moves no other variant, and a
+  zero-alloc window test passed [V:
+  [m-gap-closure.md](./m-gap-closure.md),
+  probes/parity/tests/layout.rs]. The landed runtime layout is unchanged.
 - A new variant bumps the format epoch (B58).
 
 Alternatives.
@@ -581,18 +641,28 @@ Alternatives.
 
 Recommendation. A. [P]
 A keeps `NoteFieldValue` at its current variant count. It keeps one
-temporal bracket for filters (B15). The measured payload enum is about
-24 bytes, so the wrapper grows from 16 to about 24 bytes, inside the
-80-byte cap [V: probe]. The inner enum still needs a size test and a
-no-cross-class-`Ord` test. Ticket 29 forbids cross-class `Ord` (B67).
+temporal bracket for filters (B15). The payload enum measures about 24
+bytes for the two-case `{Civil|Instant}` carrier. The layout probe proves
+the complete proposed `NoteFieldValue` stays at exactly 80 bytes. The
+72-byte Duration payload binds the largest variant, and the 16-to-24-byte
+growth moves no other variant [V: i-file L5, j-file,
+[m-gap-closure.md](./m-gap-closure.md), probes/parity/tests/layout.rs].
+The existing `field.rs:579-580` assertion cannot measure a proposed
+carrier, so a size test stays an implementation gate. The
+no-cross-class-`Ord` requirement needs a compile-fail contract test.
+`Ord` derives are per type, so a runtime test cannot prove that an
+implementation is absent (j-file). Ticket 29 forbids cross-class `Ord`
+(B67).
 
-Gates (implementation). The sizes above are measured; keep the size test in
-the crate. Bump the format epoch. Add the civil case to the fingerprint
-corpus (B58). Record the naive-datetime semantic change for ticket 36. It is
-authorized by B16 but it changes a frozen parse result.
+Gates (implementation). Keep the size test in the crate and run it with
+the candidate carrier; the layout proof is the current reference
+([m-gap-closure.md](./m-gap-closure.md)). Bump the format epoch. Add the
+civil case to the fingerprint corpus (B58). Record the naive-datetime
+semantic change for ticket 36. It is authorized by B16 but it changes a
+frozen parse result.
 
-Reject condition. The inner enum grows `NoteFieldValue` past 80 bytes. Then
-choose B.
+Reject condition. A later layout change pushes `NoteFieldValue` past 80
+bytes with the inner enum. Then choose B.
 
 ### Q20 Where `CalendarPeriod` sits in the value model
 
@@ -612,12 +682,19 @@ Alternatives.
 Recommendation. B if the owner wants stored fields free of periods. A if
 periods appear in stored fields. [P]
 `file.date` is derived at evaluation and never stored (B35, B51). Stored
-notes hold no period in frontmatter [H]. That points to B. B adds a second
-value carrier. Ticket 18 chose one value type. The tension needs the
-owner's judgment.
+notes hold no period in frontmatter [H]. That points to B. Ticket 18 chose
+one runtime value type (18:458-461). B is therefore a proposed explicit
+revision of that single-carrier rule, not a silent inheritance
+[V: l-file L4, i-file L6]. It needs a change-table row and a ticket 36
+supersession note.
+Runtime representation stays separate from note-parser acceptance: a
+runtime period variant does not force the note parser to produce periods.
+The option must carry a computed `file.date` from evaluation through
+grouping or a template without storing it (i-file L6).
 
 Reject condition for B. A query needs a period inside a `List` or `Object`
-field value.
+field value, or a computed `file.date` cannot reach grouping or a template
+end to end. Then B falls.
 
 ### Q21 Date versus instant at an ambiguous or skipped local midnight
 
@@ -710,14 +787,19 @@ percent-encoded, and external URLs are not note targets [V: ticket 19].
 
 Alternatives.
 
-- A. Decode percent-escapes once. Take the last segment. Strip `#anchor` and
-  the extension. Parse a prefix or the given pattern. A target with a URL
-  scheme yields `Null`.
+- A. Take the last raw `/`-separated segment first. Strip `#anchor` and
+  the extension. Decode percent-escapes once. Parse a prefix or the given
+  pattern. A target with a URL scheme yields `Null`.
 - B. Read the linked note's date field. This is not a live option (B22).
 
 Recommendation. A. [P]
-Example: `2026-01%20notes.md` decodes to `2026-01 notes`. A URL such as
-`https://x/2026-01-01` yields `Null`.
+Order matters. Component separation precedes decoding (RFC 3986 section
+2.4). An encoded separator never creates a new path boundary, and no
+pass decodes twice [V: k-file K22]. Example: `2026-01%20notes.md` takes
+its last raw segment, drops `.md`, then decodes to `2026-01 notes`. A
+target `2026/01%2F02.md` has the last raw segment `01%2F02.md`, which
+decodes to `01/02`; decoding first would re-segment the path and read
+`02` instead. A URL such as `https://x/2026-01-01` yields `Null`.
 
 Open point. Does `[[b]]` fold to the same `ComparisonKey` as `[b](b.md)`
 (B22)? Ticket 23 or the value module owns that rule.
@@ -738,10 +820,12 @@ Alternatives.
 
 Recommendation. A, with flat key names. [P]
 Use `filename_year_prefix`. A dotted key such as `filename.year_prefix`
-makes a nested table in TOML, which is B. The design has four keys: `zone`,
-`week` (a preset or a pair), and `filename_year_prefix`. The first draft
-counted two diagnostic keys. Ticket 22 puts diagnostics with the parser, not
-in `DateConfig` [H: owner did not re-read ticket 22 for this claim].
+makes a nested table in TOML, which is B. The design has exactly three
+keys: `zone`, `week` (a preset or a pair), and `filename_year_prefix`
+[V: l-file L13]. A diagnostic key would be new scope: it needs an
+identified consumer and owner before it joins. Ticket 22 decides the
+config-parser boundary (22:87-94, 22:223-233); it does not settle whether
+a diagnostic setting exists anywhere.
 
 Merge and trust (B46, ticket 22). Ticket 22 already fixes the merge for
 `[date]`: global config first, then local, field by field (22:223-235).
@@ -750,7 +834,7 @@ would be a proposed amendment, not a missing rule [V: l-file L8]. A week
 rule that a global file sets changes the meaning of week labels in every
 vault. See Q31.
 
-Reject condition. A fifth key joins. Then split the table by consumer.
+Reject condition. A fourth key joins. Then split the table by consumer.
 
 ### Q27 The fields of `DateConfig`
 
@@ -794,7 +878,8 @@ Facts. Precedence is host override, then config, then system (B42). A fixed
 offset has no clean IANA name. `Etc/GMT-2` means UTC+02:00, with a reversed
 sign. The repo uses it in a test (`src/note/field.rs:1041`)
 [V: h-redteam Q29]. The e-file recommends an explicit `+HH:MM` form
-[V: e-file q29]. Legacy names such as `EST5EDT` pass a tzdb lookup [H].
+[V: e-file q29]. Legacy names such as `EST5EDT` are documented exceptions
+to the tzdb naming guidelines [V: k-file K14].
 
 Alternatives.
 
@@ -802,15 +887,20 @@ Alternatives.
 - B. An IANA name or an explicit `+HH:MM` offset.
 
 Recommendation. B. [P]
-B avoids the `Etc/GMT` sign trap. Validate the spelling against the bundled
-tzdb (`tzdb-bundle-always`). The validation time is a human choice.
-A config-load check rejects a bad name early. It can also fail commands
-that need no zone. A first-need check matches B28. The system zone stays
+B avoids the `Etc/GMT` sign trap. Three concerns stay separate [V: l-file
+L9]. The spelling syntax is an IANA name or an explicit `+HH:MM` offset.
+A spelling check validates that text against the bundled tzdb
+(`tzdb-bundle-always`) and acquires no zone. Acquisition loads the zone
+at first need and stays lazy per frame (B28). A config-load spelling
+check is possible without any acquisition. Whether to run it at load is
+a human choice. A load-time spelling check must not force a zone for
+civil-only work, and it must not fall back to UTC. The system zone stays
 lazy (Q30).
 
-Open point. A bad configured zone fails every command, including commands
-that need no zone. Is that acceptable? The alternative is lazy validation at
-first need. B28 says to acquire a zone only when needed.
+Open point. The open timing choice is where the spelling check runs:
+config load or first acquisition. B28 already fixes lazy acquisition, so
+a load-time check moves a failure earlier; it does not change the
+acquisition rule.
 
 Reject condition. A measured need for POSIX TZ strings. None exists.
 
@@ -846,14 +936,18 @@ Facts.
 
 - `CalendarPeriod::Week` is ISO, Monday start, with the ISO week-one rule
   [V: c-digest Q8].
-- Tasks forces ISO. Dataview `sow` follows the locale. nldates reads a
+- Tasks forces ISO. Dataview `sow` shifts by locale only under its
+  `useLocaleWeeks` setting; the inspected default week is the Luxon ISO
+  week [V: c-digest Q8, k-file K3]. nldates reads a
   private locale field and shifts labels silently [V: c-digest Q8].
 - CLDR, Moment and java.time define a week by a first day and a minimum
   number of days in week one [V: e-file q8].
 - The owner's week template lists days from `day(0)`, which is Sunday
   [V: ticket 30 Current code].
 - Jiff has no custom week-year. A custom rule needs new arithmetic and tests.
-- The pair `(sunday, 4)` has no major locale.
+- The `(sunday, 4)` pair is real: CLDR 49 lists Iceland and Portugal in
+  both the four-day and the Sunday-first groups [V: k-file K4]. The
+  preset design does not depend on locale coverage counts.
 
 Alternatives.
 
@@ -978,10 +1072,13 @@ Recommendation. A. [P]
 Instant bounds depend on the zone and on Q21. The proof set covers each
 operator and row kind separately. It needs the quoted-literal scan path, the
 zone-gap day and the period boundary cases. Bounds never come from the
-mixed-temporal sort rank.
+mixed-temporal sort rank. No Exact temporal mapping exists today, and no
+exact claim precedes its per-operator, per-kind residual-equivalence proof.
+The current plan has no temporal candidate-bound protocol; that is a scoped
+source observation, not a whole-repository absence proof [V: j-file].
 
-Reject condition. The ticket 29 owner rules that period bounds count as
-membership. Then C for periods.
+Reject condition. The grilling wants zone-dependent bounds before the
+config pins the zone set. Then C for zone-dependent kinds.
 
 ### Q36 Notices for `Null` dates
 
@@ -1046,8 +1143,37 @@ The four review files i to l repaired these points of the red-team round:
   The affected spots above cite the k-file corrections.
 - The direct Answer read corrected 15 ledger citations (l-file L14).
 
+## Corrections made in the closure round
+
+This repair round fixed these points of the sections above:
+
+- Q4 presents lint-only as a proposed amendment to ticket 20's provisional
+  scalar acceptance, not as an inherited behavior (l-file L1).
+- Q13 writes Q17's function spelling, fixes the `now()` negative example,
+  and aligns the clamp wording with the accepted arithmetic policy.
+- Q13 separates adoption, rule-table semantics and crate choice, and marks
+  the grammar unimplemented and completeness unproved (l-file L11).
+- Q19 separates the payload measurement from the whole-enum bound; the
+  layout probe in [m-gap-closure.md](./m-gap-closure.md) now proves the
+  bound at exactly 80 bytes.
+- Q14 adds the runtime probe: both candidates return points only, reject
+  or misparse period phrases, and fail cleanly on non-ASCII input.
+- Q9 cites the in-repo parity probe, which reproduced its recorded
+  numbers exactly.
+- Q20 marks option B as an explicit revision of ticket 18's single-carrier
+  rule (l-file L4, i-file L6).
+- Q25 orders segment selection before decoding (k-file K22).
+- Q26 names exactly three keys (l-file L13).
+- Q29 separates the spelling check from zone acquisition (l-file L9).
+- Q31 corrects the Dataview `sow` and `(sunday, 4)` claims (k-file K3,
+  K4).
+- Q35 removes a false reject condition about membership bounds.
+- Probe references link [m-gap-closure.md](./m-gap-closure.md) instead of
+  session-local artifact paths.
+
 ## What the preparation did not cover
 
-- Binary size, compile time and run time for every crate option.
+- Compile time and run time for every crate option beyond the probe's
+  throughput figures.
 - Any temporal key timing.
 - The owner's answers to the human questions above.
