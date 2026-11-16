@@ -7,38 +7,36 @@
 //! times then pays for one load instead of hand-rolling its own get-or-load
 //! body per resource. `schema.rs` seeds its render's
 //! [`SchemaService`](crate::schema::SchemaService) the same way, with a typed
-//! newtype of its own and no load step. [`Schema`](crate::schema::Schema)'s
-//! own minijinja `Object` impl can then reach it without holding a reference
+//! newtype of its own and no load step. [`Schema`](crate::schema::Schema)'s own
+//! minijinja `Object` impl can then reach it without holding a reference
 //! itself.
 //!
 //! minijinja 3's extensions replace the string-keyed temp pattern for typed
 //! state. Each extension uses a `TypeId` key instead of a `&'static str`. It
 //! needs no [`Value`](minijinja::value::Value)
 //! [`Object`](minijinja::value::Object) wrapper and no interior mutability
-//! because it needs `&mut State`. Like temps, extensions are render-local.
-//! They persist across includes, blocks, and macros. They drop with the
-//! render's state.
+//! because it needs `&mut State`. Like temps, extensions are render-local. They
+//! persist across includes, blocks, and macros. They drop with the render's
+//! state.
 
 use minijinja::State;
 
-/// Wraps a render-scoped cacheable value in its own extension type, keeping
-/// the cache slot isolated from any raw `T` extension elsewhere. `T` alone
-/// selects the slot. A second `cached()` call site that instantiates the same
-/// `T` in one render reuses the first call's value. Templates never see this
-/// type.
+/// Wraps a render-scoped cacheable value in its own extension type, keeping the
+/// cache slot isolated from any raw `T` extension elsewhere. `T` alone selects
+/// the slot. A second `cached()` call site that instantiates the same `T` in
+/// one render reuses the first call's value. Templates never see this type.
 #[derive(Debug)]
 struct Cached<T>(T);
 
 /// Returns the render-scoped value cached in `state`'s extensions.
 ///
-/// The function runs `load` when this render has no cached value. It caches
-/// the load result before it returns the value.
+/// The function runs `load` when this render has no cached value. It caches the
+/// load result before it returns the value.
 ///
-/// `T` needs to be cheap to clone (an `Arc<_>` or a similarly shared
-/// type).
+/// `T` needs to be cheap to clone (an `Arc<_>` or a similarly shared type).
 ///
-/// Every call clones the cached value out of the extension rather than
-/// handing back a reference tied to its lifetime.
+/// Every call clones the cached value out of the extension rather than handing
+/// back a reference tied to its lifetime.
 ///
 /// A failed load caches nothing, so the next call retries `load`.
 ///
