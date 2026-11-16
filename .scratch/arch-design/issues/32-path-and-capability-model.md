@@ -18,7 +18,7 @@ Blocked by: 9, 12, 16, 21
 - Decide `DirTree` and `file_tracker` path usage.
 
 Facts: `survey/root-primitives.md` H7/§2, `survey/template.md` H4/H5,
-`survey/cross-cutting.md` H4, `src/path.rs:64,146,181-190,340-437`,
+`survey/cross-cutting.md` H4, `src/path.rs`,
 `src/template/writer.rs`, `research/09`.
 
 Alternatives: capability `ProjectRoot` handle; newtype propagation;
@@ -36,8 +36,8 @@ Read [research 9](../research/09-capability-path-precedent.md) before the
 grilling. It prices the options:
 
 - The current codec makes a store machine-local. Unix writes raw OS bytes
-  (`src/path.rs:356`), Windows writes wide units (`src/path.rs:390`), and the
-  two forms are incompatible (`src/path.rs:340-437`) [V].
+  (`src/path.rs`), Windows writes wide units (`src/path.rs`), and the
+  two forms are incompatible (`src/path.rs`) [V].
 - Git keeps internal tree paths as `/`-separated UTF-8 byte strings and converts
   to OS form only at the I/O boundary. Ruff runs its whole database on validated
   UTF-8 paths. The `relative-path` crate models portable UTF-8 paths with fixed
@@ -45,8 +45,8 @@ grilling. It prices the options:
 - The UTF-8 option has a cost: a non-UTF-8 Unix file name has no UTF-8 form and
   cannot round-trip [V].
 - `SafeRelativePath::parse` validates with `strict-path` and then discards the
-  canonicalized path. It returns the plain join (`src/path.rs:190`) and keeps
-  the acknowledged TOCTOU window (`src/path.rs:159-161`) [V]. `strict-path` is a
+  canonicalized path. It returns the plain join (`src/path.rs`) and keeps
+  the acknowledged TOCTOU window (`src/path.rs`) [V]. `strict-path` is a
   point-of-validation check, not an ongoing handle [V].
 - Cargo warns against `std::fs::canonicalize` for path storage flows: it fails
   on nonexistent paths, resolves symlinks unexpectedly, and introduces Windows
@@ -73,8 +73,8 @@ the project root. Prior decisions put other stores elsewhere:
   (`../research/22-prep/a3-inventory-trust-tracking-init.md`).
 - The global config file lives in the config home.
 - Template path inspection accepts absolute paths
-  (`src/template/engine/path.rs:161-170`), and the template default output joins
-  `Config::output_dir` without confinement (`src/template/writer.rs:328-336`).
+  (`src/template/engine/path.rs`), and the template default output joins
+  `Config::output_dir` without confinement (`src/template/writer.rs`).
   These are standing leaks. This ticket either endorses or closes each one. They
   are not evidence that config I/O is vault-confined.
 
@@ -132,7 +132,7 @@ See [ticket 22's Answer](./22-config-ownership-and-lifecycle.md).
 See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
 - Unix and Windows write different path bytes into the store
-  (`src/path.rs:349-391`). Until this ticket gives one portable form, the store
+  (`src/path.rs`). Until this ticket gives one portable form, the store
   identity holds a platform family. A store does not move between families.
   Remove the platform family when the form is portable.
 - This ticket has no Unicode normalization rule. Until it has one, NFC and NFD
@@ -146,7 +146,7 @@ See [ticket 26's Answer](./26-measure-index-recovery-journal.md) and [ticket
 27's Answer](./27-index-replay-prototype-and-fault-tests.md).
 
 - Ticket 26 hands over "the path form in the journal"
-  (`issues/26-measure-index-recovery-journal.md:83`). The journal records the
+  (`issues/26-measure-index-recovery-journal.md`). The journal records the
   base store identity and per-file metadata with the original scan start. It
   records facts for replay, old derived keys to delete, and link edges of
   unchanged files. Every one of those is a path-keyed structure.
@@ -157,7 +157,7 @@ See [ticket 26's Answer](./26-measure-index-recovery-journal.md) and [ticket
 - The journal writes to a fixed temp name under `.traces/`, beside the
   engine-specific journal name. The journal name and its path form stay open:
   "The path form in the journal. Ticket 32 owns the path model."
-  (`issues/27-index-replay-prototype-and-fault-tests.md:451-452`).
+  (`issues/27-index-replay-prototype-and-fault-tests.md`).
 - The journal portability answer must agree with the platform-family rule of
   ticket 25. A journal that moves between platform families needs the same
   portable path form as the store.
@@ -171,14 +171,14 @@ See [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
   bytes must sort in the order that the range needs.
 - Check the path order at index build and at store load, in release builds too.
 - The candidate facet layout keys tables by path
-  (`../research/24-prep/z-grilling-guide.md:89-92`). The guide proposes a store
+  (`../research/24-prep/z-grilling-guide.md`). The guide proposes a store
   path type whose rows own `Arc<FileEntry>` [P]
-  (`../research/24-prep/z-grilling-guide.md:264-266`). Decide the path type
+  (`../research/24-prep/z-grilling-guide.md`). Decide the path type
   here; the row type belongs to ticket 29.
 - Sorted-path facts: the release order check costs 1.7 ms at 50,000 paths with
   `Path` comparison and 0.12 ms with `OsStr` comparison [V]. The binary search
   in `LinkResolver::get_by_path` and the merge in `assemble_internal` need the
-  order (`../research/24-prep/z-grilling-guide.md:259-262`).
+  order (`../research/24-prep/z-grilling-guide.md`).
 
 ## Shared contracts from tickets 28 and 29
 
@@ -207,11 +207,11 @@ Both tickets are open. Read them for shared contracts only.
    it. The `.redb` layout is Free (wiped once already). The trust gate behaviour
    stays frozen.
 4. Error topology: `fold_confinement` maps confinement errors to escape versus
-   unverifiable (`src/path.rs:316-333`). `RelativePath` is pure;
-   `SafeRelativePath` does I/O (`src/path.rs:159-161`, `:181`). Keep that split
+   unverifiable (`src/path.rs`). `RelativePath` is pure;
+   `SafeRelativePath` does I/O (`src/path.rs`). Keep that split
    visible in the decision (`survey/root-primitives.md` section 3).
-5. Glossary conflict: `src/GLOSSARY.md:18-20` mandates "Avoid: relative path",
-   which contradicts `RelativePath` (`src/path.rs:64`)
+5. Glossary conflict: `src/GLOSSARY.md` mandates "Avoid: relative path",
+   which contradicts `RelativePath` (`src/path.rs`)
    (`survey/root-primitives.md` section 3). A decision that keeps a relative
    path type must correct that glossary entry.
 
@@ -238,14 +238,14 @@ Each scenario feeds specific question bullets. None is decided here.
   to the file system [V] (gitoxide `protect_hfs`, research 9). A
   normalization-folding key would collide them. Feeds the Unicode rule.
 - **8.3 short names.** `PROGRA~1` style names get boundary treatment from
-  `strict-path` (`Cargo.toml:144`) and rejection in hostile trees from gitoxide
+  `strict-path` (`Cargo.toml`) and rejection in hostile trees from gitoxide
   `protect_ntfs` [V] (research 9). Feeds the Windows reality instruction.
 - **Symlinked `.traces`.** Two repositories share one `.traces` directory
   through a symlink. Root-keyed trust keeps the grants separate [V]
   (`../research/22-prep/j-attack-unified-config-store.md`, section 2.6). Whether
   `.traces` may be a symlink is open (F11). Feeds the alias bullet.
 - **TOCTOU swap.** `strict_join` validates; a concurrent symlink swap redirects
-  the next I/O (`src/path.rs:159-161`) [V]. Feeds the TOCTOU stance, per
+  the next I/O (`src/path.rs`) [V]. Feeds the TOCTOU stance, per
   boundary type: note reads, template inspection, template output.
 - **Template inspection of an external tool path.** A template calls
   `path_exists('/usr/local/bin/pandoc')` [H]. Today that succeeds, which is the
@@ -258,7 +258,7 @@ Each scenario feeds specific question bullets. None is decided here.
   replay. Feeds the form and journal bullets.
 - **Path-set change during replay.** One added file makes the next query decode
   every note: 499 ms and 395 MB at 50,000 notes [V]
-  (`../research/24-prep/z-grilling-guide.md:19-21`). State which path-set
+  (`../research/24-prep/z-grilling-guide.md`). State which path-set
   assumption replay makes: it writes facts only for files it recorded. Feeds the
   form and journal bullets.
 
@@ -289,12 +289,12 @@ Each scenario feeds specific question bullets. None is decided here.
 - Ticket 33 composes the workspace host and shares the alias and TOCTOU policy
   with this ticket.
 - Ticket 34 owns replay and discard notices
-  (`issues/26-measure-index-recovery-journal.md:84`).
+  (`issues/26-measure-index-recovery-journal.md`).
 - Tickets 28, 29, and 35 consume the settled model. Ticket 29 co-owns the row
   type with the 24 guide proposal.
 - Ticket 16 requires a change-table row for every behaviour change here,
   including any new journal file on disk
-  (`issues/27-index-replay-prototype-and-fault-tests.md:453-454`).
+  (`issues/27-index-replay-prototype-and-fault-tests.md`).
 
 ## What the grilling must settle
 
@@ -369,7 +369,7 @@ Alternatives:
 - Boundary validation with one audited file system facade. This is the chosen
   form.
 - Retain `SafeRelativePath`. It validates with `strict-path`, discards the
-  canonical result and returns a plain join (`src/path.rs:190`). It also does
+  canonical result and returns a plain join (`src/path.rs`). It also does
   I/O inside a path type, and it ties persisted data to one host [H].
 
 Rule:
@@ -390,7 +390,7 @@ Rule:
   live under the OS state home, outside the vault. The vault invariant does not
   cover them (see D11).
 - Error topology stays visible. `fold_confinement` maps a confinement error to
-  "escape" or "unverifiable" (`src/path.rs:316-333`). `RelativePath` is pure.
+  "escape" or "unverifiable" (`src/path.rs`). `RelativePath` is pure.
   `ProjectRoot` does the I/O.
 
 Invariant owner: `ProjectRoot` owns confinement of vault file access, with the
@@ -398,16 +398,16 @@ two named exceptions in D9. `RelativePath` owns lexical validity. A stored
 value contains no `..`, NUL or empty component.
 
 Code made removable: `SafeRelativePath` and its tests
-(`src/path.rs:159-190`, `:558+`). The source reports give 8 call sites [H].
-Their impact list is `schema/fields/select.rs:258`, `template/writer.rs:313`,
-`template/engine/file.rs:81`, `template/engine/path.rs:165`,
-`config/model.rs:300`, `lib.rs`, `file.rs` and `path.rs`.
+(`src/path.rs`). The source reports give 8 call sites [H].
+Their impact list is `schema/fields/select.rs`, `template/writer.rs`,
+`template/engine/file.rs`, `template/engine/path.rs`,
+`config/model.rs`, `lib.rs`, `file.rs` and `path.rs`.
 This list mixes callers, definitions and other affected files.
 The checked tree has 5 production calls and 6 test calls [V].
 The production calls are the five numbered source locations above.
 
 Unresolved: the crate and module home of `ProjectRoot` (tickets 33 and 35).
-Whether the new method keeps the `strict-path` dependency (`Cargo.toml:144`) is
+Whether the new method keeps the `strict-path` dependency (`Cargo.toml`) is
 an implementation choice [H].
 
 #### D2. Newtype and API rules (settle 1; Question bullets 2 and 3)
@@ -415,48 +415,50 @@ an implementation choice [H].
 Alternatives:
 
 - A new name such as `RelPath` or `VaultPath`. The name `RelativePath` already
-  exists (`src/path.rs:64`). The source tally is 63 hits in 6 files [H].
-  A new name leaves two similar types. AuditUxConventions asked for a clean break.
-  The checked tree has 32 whole-word uses in 6 files [V].
+  exists (`src/path.rs`). The source tally is 63 hits in 6 files [H]. A new name
+  leaves two similar types. AuditUxConventions asked for a clean break. The
+  checked tree has 32 whole-word uses in 6 files [V].
 - Retain `RelativePath(PathBuf)`. It allows `.` components and holds an
   OS-specific form.
 - Plain `String` or `PathBuf` with validation only at the boundary. It leaves
   the persisted form undefined.
-- Reuse the name `RelativePath` with new rules. This is the chosen option.
-  The first recommendation aimed to leave 1,681 `.path()` calls mostly untouched.
+- Reuse the name `RelativePath` with new rules. This is the chosen option. The
+  first recommendation aimed to leave 1,681 `.path()` calls mostly untouched.
   The later native-boundary correction removes that promise.
 
 Rule:
 
-- `RelativePath` is a normalized, `/`-joined UTF-8 `String`. It is pure and
-  does no I/O.
-- `parse(&str)` rejects rooted input before normalization, including leading
-  `/` and `//`. Reject NUL and every `..` component.
+- `RelativePath` is a normalized, `/`-joined UTF-8 `String`. It is pure and does
+  no I/O.
+- `parse(&str)` rejects rooted input before normalization, including leading `/`
+  and `//`. Reject NUL and every `..` component.
 - Remove `.` components and repeated or trailing separators. The normalized
   result needs at least one named component and contains no empty component.
 - Thus `a//b` becomes `a/b`, `./a/./b` becomes `a/b`, and `a/` becomes `a`.
   Empty input, `.`, `./`, `/a`, `//a` and `a/../b` fail.
-- Only `RelativePath::from_os(&OsStr)` and
-  `ProjectRoot::relativize(&Path) -> Result<RelativePath, Skip>` treat `\` as a
-  separator. They do this on Windows only. `relativize` calls `from_os` for each
-  component.
+- Only `RelativePath::from_os(&OsStr)` and `ProjectRoot::relativize(&Path) ->
+  Result<RelativePath, Skip>` treat `\` as a separator. They do this on Windows
+  only. `relativize` calls `from_os` for each component.
 - The text API is `as_str()`. There is no public zero-cost `as_path()` promise.
   `ProjectRoot` owns native path conversion and native component validation.
   Native-unrepresentable names produce typed errors. `RelativePath` stays pure
-  portable text. The maintainer confirmed this correction after the Windows review.
+  portable text. The maintainer confirmed this correction after the Windows
+  review.
 - Native conversion rejects roots, prefixes, traversal and component
   reinterpretation before joining the root. On Windows this includes device,
-  stream and trailing-alias interpretations. Never open another file as a fallback.
-- Keep `strict-path` for the initial cutover. Remove it only after the replacement
-  passes the confinement conformance cases. A lexical prefix check is insufficient.
-- `RelativePath` has no `Borrow<str>` and no `Deref<Target = str>`. The `Ord`
-  of the type maps `/` to NUL, so it differs from `str` order. `Borrow` needs
+  stream and trailing-alias interpretations. Never open another file as a
+  fallback.
+- Keep `strict-path` for the initial cutover. Remove it only after the
+  replacement passes the confinement conformance cases. A lexical prefix check
+  is insufficient.
+- `RelativePath` has no `Borrow<str>` and no `Deref<Target = str>`. The `Ord` of
+  the type maps `/` to NUL, so it differs from `str` order. `Borrow` needs
   `Ord`, `Eq` and `Hash` to agree.
 - A property test checks that `Ord`, `Eq` and `Hash` agree. The generator
   produces NUL, `%00`, empty components and a lone `\`.
 - `HasPath::path()` returns `&RelativePath`.
-- `RelativePath` holds one `String`. The NUL-form key is not stored in the
-  type (see D4).
+- `RelativePath` holds one `String`. The NUL-form key is not stored in the type
+  (see D4).
 
 How each structure carries confined and raw paths:
 
@@ -472,14 +474,14 @@ How each structure carries confined and raw paths:
 | Confinement errors | `fold_confinement` keeps the escape and unverifiable split. Message text belongs to ticket 34. | Ticket 34 |
 
 Public API break: `FileMeta::path`, `Note::path`, `MarkdownParserInput::new` and
-`FileEntry::inlinks` change type. The `path_codec` re-export (`src/lib.rs:192`)
+`FileEntry::inlinks` change type. The `path_codec` re-export (`src/lib.rs`)
 goes away. The baselines `pub-tokens.txt`, `public-api-default.txt` (16 lines)
 and `public-api-test-utils.txt` (the three `testing::path_codec` lines) change.
 If `FileMeta::path()` returns `&RelativePath`, the type must become `pub` or sit
 in a private module. That is a widening under the ticket 16 rule. Ticket 35
 decides it.
 
-Glossary duty (obligation 5): `src/GLOSSARY.md:20` says "Avoid: relative path".
+Glossary duty (obligation 5): `src/GLOSSARY.md` says "Avoid: relative path".
 That text conflicts with the type. Correct it and add a pure "Relative Path"
 entry beside "Root-Confined Path". The full glossary list is in "Resolution and
 handoffs".
@@ -487,7 +489,7 @@ handoffs".
 Invariant owner: `RelativePath` for lexical rules. Ticket 35 for visibility.
 
 Code made removable: the `.`-allowing `RelativePath(PathBuf)` body, the
-`HasPath::path() -> &Path` signature (`src/path.rs:57`), and the use of
+`HasPath::path() -> &Path` signature (`src/path.rs`), and the use of
 `PathBuf` for `FileMeta.path` and `Note.path`.
 
 Unresolved: the visibility of `RelativePath` (ticket 35). Native Windows
@@ -498,10 +500,10 @@ conformance remains an acceptance gate, not a claimed result.
 Alternatives:
 
 - OS bytes (retain today's codec). The Unix codec writes raw OS bytes
-  (`src/path.rs:356`). The Windows codec writes wide units (`src/path.rs:390`).
-  The two forms are incompatible (`src/path.rs:340-437`). The store stays
+  (`src/path.rs`). The Windows codec writes wide units (`src/path.rs`).
+  The two forms are incompatible (`src/path.rs`). The store stays
   machine-local and keeps the platform family. The std docs say that
-  `as_encoded_bytes` is not safe to store in a file (`os_str.rs:1049-1060`) [V].
+  `as_encoded_bytes` is not safe to store in a file (`os_str.rs`) [V].
 - UTF-8 with `/`, NFC keys, with a normalization step at every reconcile.
   The first red team asked for this. The final rule keeps the listed spelling
   instead (D5).
@@ -535,7 +537,7 @@ Rule:
   a crash-safe store/journal identity transition.
 - Replay writes facts only for files that the journal recorded.
 - Today's saved-index added-file baseline is 499 ms and 394.9 MB at 50,000 notes
-  (`research/24-prep/g-probe-results.md:88-95`) [V].
+  (`research/24-prep/g-probe-results.md`) [V].
   This is not a measurement of replay, deletion or the amended implementation.
 - The folder-range, sort and release check rules are in D4.
 
@@ -545,9 +547,9 @@ canonical path value. Journal facts carry that value without NUL separators.
 
 Code made removable:
 
-- The platform codecs in `src/path.rs:340-437` and the `path_codec` re-export.
-- The lossy decode `path_from_bytes` (`src/index/codec.rs:89`) and the byte
-  codec for non-UTF-8 names (`src/index/codec.rs:83-94`).
+- The platform codecs in `src/path.rs` and the `path_codec` re-export.
+- The lossy decode `path_from_bytes` (`src/index/codec.rs`) and the byte
+  codec for non-UTF-8 names (`src/index/codec.rs`).
 - The platform family field in `META`, and the probe test
   `rejects_mutated_platform`.
 
@@ -597,11 +599,11 @@ Rule:
 - Costs at 50,000 paths [V]: `Vec<PathBuf>.sort()` takes 31.6 ms. A `String`
   comparator that maps `/` to 0 takes about 10 ms at opt-level 3. Pre-built keys
   take 4.5 ms.
-- The shipped profile is `opt-level = "z"` (`Cargo.toml:269-281`). An
+- The shipped profile is `opt-level = "z"` (`Cargo.toml`). An
   iterator-heavy comparator is about 2x slower there (22 ms in the audit run).
   Recheck the timings under the shipped profile (change row 19).
 - The release check at index build and at store load compares NUL-form keys.
-  This supersedes the `OsStr` check of ticket 24 (`24:392-395`). The check cost
+  This supersedes the `OsStr` check of ticket 24. The check cost
   of the NUL form is not measured.
 - The `Path::cmp` ban is a type rule. No `PathBuf` or `Path` appears in a sorted
   structure. A clippy `disallowed-methods` entry cannot enforce it. Clippy 1.98
@@ -612,17 +614,17 @@ Rule:
 - Windows: `Path::cmp` order on valid Unicode equals code-point order [H]. Add
   the property test to Windows CI. Integration tests run on Linux only today.
 
-Sites to change: `delta.rs:31,175`; `refresh.rs:280,478,575`; `inlinks.rs:402`;
-`inlinks.rs:88` (`par_sort_unstable`); `entry.rs:90`; `service.rs:442`;
-`store.rs:1080,1168`; `query/service.rs:364,392,417`; `index/sort.rs`.
+Sites to change: `delta.rs`; `refresh.rs`; `inlinks.rs`;
+`inlinks.rs` (`par_sort_unstable`); `entry.rs`; `service.rs`;
+`store.rs`; `query/service.rs`; `index/sort.rs`.
 
 Invariant owner: `RelativePath::Ord` is the single definition of order. The
 type rule keeps other orders out.
 
 Code made removable: the `Path::cmp` comparators at the sites above, and the
-`Path` re-sort of rows after a byte-range read (`store.rs:469-477`,
-`:1158-1168`) [V]. The debug-only assert in `SortedByPath::assumed_sorted`
-(`src/index/sort.rs:48-54`) stays only for callers that reorder in memory.
+`Path` re-sort of rows after a byte-range read (`store.rs`) [V]. The debug-only
+assert in `SortedByPath::assumed_sorted` (`src/index/sort.rs`) stays only for
+callers that reorder in memory.
 
 Unresolved: type-based enforcement of the byte order across the public API
 (ticket 35). The Windows order check (CI).
@@ -654,13 +656,13 @@ Rule:
   it creates in NFC.
 - A query in another spelling matches in two steps. First, it matches the exact
   listed bytes. On a miss, it looks up the Comparison Key map. The Comparison
-  Key is NFC, then `char::to_lowercase`, then NFC (`src/GLOSSARY.md:107-115`).
+  Key is NFC, then `char::to_lowercase`, then NFC (`src/GLOSSARY.md`).
 - Each pinned generation builds the map lazily with a `OnceLock`. The input is
   the `files` keys. The map covers files and folders.
 - A unique match rewrites a path-literal atom or a folder atom to the listed
   spelling at planning time. Several matches return the union of the
   candidates, with no diagnostic. The glossary says that Ambiguity (PathTie) is
-  normal and "never a diagnostic" (`src/GLOSSARY.md:98-105`).
+  normal and "never a diagnostic" (`src/GLOSSARY.md`).
 - Glob atoms are never rewritten.
 - String comparisons such as `file.folder == "x"` stay exact. Ticket 19 makes
   strings byte-exact.
@@ -670,16 +672,16 @@ Rule:
   is an exact `Path::cmp` search. IWE and Obsidian resolve wikilinks without
   case, with an exact-case match winning [V]. Change row 6 records it. The
   extractor fingerprint lists the normalization dependency. The epoch bumps
-  (ticket 25, `25:312-317`).
+  (ticket 25).
 - New dependency: an NFC crate. `icu_normalizer` 2.4 is in the registry cache.
   `Cargo.lock` has none today. The dependency record says that it exists
   because of query-time and link-time fold.
-- `normalize_source_input` (`src/cli/mod.rs:440-472`) probes the real file
+- `normalize_source_input` (`src/cli/mod.rs`) probes the real file
   system today. It moves into core and resolves through the fold map (change
   row 8). Ticket 33 decides who calls it. Ticket 29 settled synthesis.
 - The IR needs a path-atom split before the rewrite can exist: today
   `SourceAtom::Path(GlobPattern)` is a regex glob over `display_portable`
-  (`src/query/grammar/source.rs:190`, `:250-290`; ADR-0008:77-84). Ticket 29
+  (`src/query/grammar/source.rs`; ADR-0008). Ticket 29
   owns `PathAtom::{Literal, Folder, Glob}`.
 
 Probe evidence on macOS APFS [V]:
@@ -709,7 +711,7 @@ Invariant owner: the single Comparison Key function in core owns the fold. The
 planner owns the rewrite. The store never sees a folded key.
 
 Code made removable: the file system probe in `normalize_source_input`
-(`src/cli/mod.rs:440-472`).
+(`src/cli/mod.rs`).
 
 Unresolved:
 
@@ -736,17 +738,17 @@ Alternatives:
   `.z\u200Czz` is not `.zz` [V]. The user dropped this rule.
 - Match `.traces` and every ignored directory without case. It hides `Target/`
   and `Node_Modules/` on case-sensitive Linux. It also changes user ignores and
-  config discovery, which share the predicate (`env_vars.rs:19-44`;
-  `index/service.rs:427`; `config/discovery.rs:163`).
+  config discovery, which share the predicate (`env_vars.rs`;
+  `index/service.rs`; `config/discovery.rs`).
 - Retain the exact, case-sensitive match. This leaves a live bug (below).
 - Exclude the admitted metadata directory by filesystem identity and prune its
   complete subtree. Keep the protected-name check as a separate lexical rule.
 
 Live bug [V, measured on APFS]. After `.traces` became `.Traces`, the scan
-indexed `.Traces/config.toml` and `.Traces/index.redb`. The store changed size on
-every `list` (98304, 94208, 98304 bytes). The cause is the exact match in
-`is_ignored_dir`. The lexical `path != index_db` check
-(`service.rs:430-435`) does not establish filesystem identity.
+indexed `.Traces/config.toml` and `.Traces/index.redb`. The store changed size
+on every `list` (98304, 94208, 98304 bytes). The cause is the exact match in
+`is_ignored_dir`. The lexical `path != index_db` check (`service.rs`) does not
+establish filesystem identity.
 
 Rule:
 
@@ -814,7 +816,7 @@ Rule:
   `\uXXXX`, and valid text prints as UTF-8.
 - One function does the conversion: `RelativePath::from_os` through
   `ProjectRoot::relativize`. The real ingresses use it: the scan
-  (`RelativePath::derive`, `src/index/service.rs:424-461`),
+  (`RelativePath::derive`, `src/index/service.rs`),
   `ProjectRoot::relativize`, and the host URI mapping (later).
 - The CLI `--from` is `Option<String>`, and clap rejects non-UTF-8 input before
   the function runs. Outlink targets are `&str`. For both, the ingress is
@@ -824,8 +826,8 @@ Rule:
 - The revisit trigger is a user report of a legacy-encoded vault. A host that
   must name such a note is the other trigger.
 - This reverses current tested behavior. The code indexes non-UTF-8 files
-  byte-exact today (`src/index/codec.rs:83-94`, `service.rs:1300`,
-  `store.rs:2772`, `benches/index_codec.rs`). Invert those tests. Do not delete
+  byte-exact today (`src/index/codec.rs`, `service.rs`,
+  `store.rs`, `benches/index_codec.rs`). Invert those tests. Do not delete
   them. Change row 3 records the change.
 
 Evidence on Linux today (ext4 container, release build of HEAD) [V]:
@@ -833,13 +835,13 @@ Evidence on Linux today (ext4 container, release build of HEAD) [V]:
 - `traces index` prints `indexed 11 file(s)`. `list` shows 8 pages. The 3
   non-UTF-8 files are silently missing.
 - Tag, class and folder sources return paths through the lossy
-  `path_from_bytes` (`src/index/codec.rs:89`). Then `read_batch` runs
-  `table.get(lossy_bytes)` and returns `Ok(None)` (`store.rs:1009-1016`). No
+  `path_from_bytes` (`src/index/codec.rs`). Then `read_batch` runs
+  `table.get(lossy_bytes)` and returns `Ok(None)` (`store.rs`). No
   notice appears.
 - `list --from '#t1'` returned only `normal.md`, although three files carry the
   tag.
 - `as_encoded_bytes` is documented as not safe to store in a file
-  (`os_str.rs:1049-1060`).
+  (`os_str.rs`).
 
 Precedent (condensed from [the evidence
 file](../research/32-prep/e3-non-utf-8-precedent.md)):
@@ -849,10 +851,10 @@ file](../research/32-prep/e3-non-utf-8-precedent.md)):
 | jj | Skips the path and reports it. `RepoPath` is UTF-8. Before commit `54c4b49`, one such file failed the whole snapshot. | [V] commit 54c4b494; issues 9774, 9002 |
 | Nushell | Skips the name and prints a message. | [V] nushell issue 11100 |
 | rust-analyzer | Skips the name without a message. A watcher panic (issue 16914) showed that the predicate must cover every ingress. | [V] `crates/vfs-notify/src/lib.rs` |
-| ty | Reports an error and continues the walk. | [V] `ruff/crates/ty_project/src/walk.rs:305-310,370` |
+| ty | Reports an error and continues the walk. | [V] `ruff/crates/ty_project/src/walk.rs` |
 | Deno | Lists the name with U+FFFD since PR 34623. The lossy name is a different file. | [V] deno PR 34623 |
-| git, ripgrep, fd, Mercurial | Keep the bytes. git prints quoted octal. | [V] git docs; ripgrep `printer/src/util.rs:304`; fd `output.rs:80-107` |
-| IWE | Keeps a lossy key. Two names that differ only in invalid bytes silently overwrite each other in a `HashMap`. A write through the key hits a different file. | [V] `crates/liwe/src/fs.rs:29-40` |
+| git, ripgrep, fd, Mercurial | Keep the bytes. git prints quoted octal. | [V] git docs; ripgrep `printer/src/util.rs`; fd `output.rs` |
+| IWE | Keeps a lossy key. Two names that differ only in invalid bytes silently overwrite each other in a `HashMap`. A write through the key hits a different file. | [V] `crates/liwe/src/fs.rs` |
 | Obsidian | Closed source. A developer says the name encoding is managed by the OS. | [V] forum 71622; [H] for the internals |
 
 Prevalence: no data exists for note vaults [V]. A Markdown link can carry raw
@@ -885,15 +887,15 @@ Alternatives:
   dropped it.
 - Accept and document. This is the chosen option. It is also the retain case:
   `strict_join` validates, and a symlink swap redirects the next I/O
-  (`src/path.rs:159-161`) [V].
+  (`src/path.rs`) [V].
 
 Rule by boundary:
 
 | Boundary | Stance | Reason |
 | --- | --- | --- |
 | Note reads | Accept races in every component, including the final name. | The path facade is not a sandbox against a concurrent vault writer. |
-| Template output | Accept parent and temp-name races. D9 retains the configured output-directory exception. With a stable parent, publication does not follow a pre-existing final destination symlink. | `commit_with_writer` (`src/template/writer.rs:366-407`) creates a temp sibling with `create_new` (`O_EXCL`) and publishes with `rename` or `hard_link`. This does not protect a mutable parent. |
-| Template inspection | The confined default accepts the window. D9 exempts the separately named raw-path test. | `std::fs::metadata` follows symlinks (`engine/path.rs:118`). With `strict_join` in front, an in-root symlink that points out is rejected [V]. |
+| Template output | Accept parent and temp-name races. D9 retains the configured output-directory exception. With a stable parent, publication does not follow a pre-existing final destination symlink. | `commit_with_writer` (`src/template/writer.rs`) creates a temp sibling with `create_new` (`O_EXCL`) and publishes with `rename` or `hard_link`. This does not protect a mutable parent. |
+| Template inspection | The confined default accepts the window. D9 exempts the separately named raw-path test. | `std::fs::metadata` follows symlinks (`engine/path.rs`). With `strict_join` in front, an in-root symlink that points out is rejected [V]. |
 | State-home stores | Out of scope. They are not vault-confined. | They hold machine-local state. Ticket 22 owns the documented tracker `try_exists` gap. |
 | Windows | Keeps the path-based check. | Windows has no beneath primitive [H]. |
 
@@ -901,7 +903,7 @@ Recorded later option [P]:
 
 - Open the confined parent once.
 - Use `openat`, `linkat` and `renameat` through `rustix`. It is already a
-  dependency (`Cargo.toml:164`).
+  dependency (`Cargo.toml`).
 - Use `openat2(RESOLVE_BENEATH)` on Linux 5.6 and later. Fall back on `ENOSYS`.
 - Use `O_RESOLVE_BENEATH` (0x1000) on macOS [V, `sys/fcntl.h`].
 - Do not use `NO_SYMLINKS` or `NOFOLLOW_ANY`. They break in-root symlinked
@@ -931,39 +933,40 @@ Alternatives:
   takes raw paths. This is the chosen option.
 - Confined namespace only (AuditSimplicity 11). It has the smaller surface. The
   user kept C, because absolute-path inspection is a frozen capability.
-- Retain: absolute paths accepted in one test (`src/template/engine/path.rs:161-170`).
+- Retain: absolute paths accepted in one test (`src/template/engine/path.rs`).
   This is the standing leak.
 
 Rule:
 
 - The default inspection tests are confined to the root. `DryRun` resolves the
-  output with the writer rule, including the configured output-directory exception.
-  Confined inspection and output use the same `ProjectRoot` confinement method.
+  output with the writer rule, including the configured output-directory
+  exception. Confined inspection and output use the same `ProjectRoot`
+  confinement method.
 - A separately named raw-path test covers external tools. Name the two tests so
   that a user cannot confuse "confined" with "raw".
-- All vault file access stays inside the root, except for two named cases.
-  The raw-path test reads external state and writes nothing.
-  The configured output directory is the second exception.
+- All vault file access stays inside the root, except for two named cases. The
+  raw-path test reads external state and writes nothing. The configured output
+  directory is the second exception.
 - The change row 21 records the change. The capability stays.
 - The default output-directory join stays. `TemplateWriteTarget::trusted` can
-  keep an absolute path or a path outside the root
-  (`src/template/writer.rs:328-342`) [V]. The user endorsed this named exception.
-  Local config values need local trust. Global config is not trust-gated
-  (ticket 22:187-198) [V]. The builder can inherit `output_dir` from global config
-  (`src/config/builder.rs:96-109`) [V]. This Answer changes no trust policy.
-- A runtime `-o` or `file.write_to()` value stays confined through `ProjectRoot`.
-  `DryRun` and the prompt show the resolved path.
-  A test must show that an untrusted local config never reaches the join.
-- The template I/O seam owns this admitted-config exception. Do not expose
-  a generic public unchecked join. Runtime and prompt path text never uses it.
-- A confined inspection can select `ProjectRoot` itself without constructing
-  an empty `RelativePath`. A normal file output needs a named path.
+  keep an absolute path or a path outside the root (`src/template/writer.rs`)
+  [V]. The user endorsed this named exception. Local config values need local
+  trust. Global config is not trust-gated (ticket 22) [V]. The builder can
+  inherit `output_dir` from global config (`src/config/builder.rs`) [V]. This
+  Answer changes no trust policy.
+- A runtime `-o` or `file.write_to()` value stays confined through
+  `ProjectRoot`. `DryRun` and the prompt show the resolved path. A test must
+  show that an untrusted local config never reaches the join.
+- The template I/O seam owns this admitted-config exception. Do not expose a
+  generic public unchecked join. Runtime and prompt path text never uses it.
+- A confined inspection can select `ProjectRoot` itself without constructing an
+  empty `RelativePath`. A normal file output needs a named path.
 
 Invariant owner: `ProjectRoot` for the confined rule. Ticket 31 owns the
 template adapter that exposes the names.
 
 Code made removable: the absolute-path branch in the default inspection test
-(`src/template/engine/path.rs:161-170`), which moves to the raw-path test.
+(`src/template/engine/path.rs`), which moves to the raw-path test.
 
 Unresolved:
 
@@ -1020,15 +1023,15 @@ Rule:
 - Vault paths use `RelativePath`.
 - State-home stores (trust and tracker) keep raw `PathBuf`. The vault invariant
   does not cover them.
-- `DirTree` walks the vault and yields OS paths (`src/dirtree.rs:71`). The scan
+- `DirTree` walks the vault and yields OS paths (`src/dirtree.rs`). The scan
   converts each entry once through `ProjectRoot::relativize` (D7). Code above
   that boundary sees `RelativePath` only.
-- The tracker canonicalizes and hashes paths (`src/file_tracker.rs:469-483`).
+- The tracker canonicalizes and hashes paths (`src/file_tracker.rs`).
   Its `contains` check uses `try_exists` only, and it misses a symlink swap
-  (`src/file_tracker.rs:117,149,362`). Ticket 22 owns this gap. The decision is
+  (`src/file_tracker.rs`). Ticket 22 owns this gap. The decision is
   to document it.
 - On Unix, the tracker stores the target as a symlink. On Windows, it writes
-  `as_encoded_bytes` to a file (`src/file_tracker.rs:76-79`). This has the same
+  `as_encoded_bytes` to a file (`src/file_tracker.rs`). This has the same
   std-docs issue as the store codec. The risk is low, because the state is
   machine-local [H].
 
@@ -1074,8 +1077,8 @@ Unresolved: the `try_exists` symlink gap (ticket 22).
 | 1. Admission identity (tickets 20 and 21) | This Answer revises no admission gate. It fixes one scan predicate: `.traces` matches without case (D6). |
 | 2. Confinement boundaries (tickets 08, 11, 13, 20 and 21) | `ProjectRoot` confines notes, queries, schemas and template paths. The raw-path inspection test and configured output-directory join are named exceptions (D9). Local trust and global config obey ticket 22. The output boundary stays explicit and prompted. |
 | 3. Compat envelope (ticket 16) | The change table below lists each change. The `.redb` layout is Free. The trust gate behavior stays frozen. The order of stdout stays frozen. |
-| 4. Error topology | `fold_confinement` keeps the escape and unverifiable split (`src/path.rs:316-333`). `RelativePath` is pure. `ProjectRoot` does the I/O. |
-| 5. Glossary conflict | Correct `src/GLOSSARY.md:20`. Add a pure "Relative Path" entry (see "Resolution and handoffs") [P]. |
+| 4. Error topology | `fold_confinement` keeps the escape and unverifiable split (`src/path.rs`). `RelativePath` is pure. `ProjectRoot` does the I/O. |
+| 5. Glossary conflict | Correct `src/GLOSSARY.md`. Add a pure "Relative Path" entry (see "Resolution and handoffs") [P]. |
 
 ### Adversarial review and required corrections
 
@@ -1142,19 +1145,19 @@ Invariant owners:
 Supersession duties. This Answer records the rows. It does not rewrite the
 decisions of the other tickets:
 
-| Ticket and line | Text today | Duty |
+| Ticket and subject | Text today | Duty |
 | --- | --- | --- |
-| 24 rule 3 (`:299`) | Store identity records the engine tag, platform family, format epoch and two fingerprints. | The platform family leaves the identity. The canonical root stays. |
-| 24 (`:311`) | `meta` keeps the platform family. | Change the `meta` field list in the same way. |
-| 24 (`:392-395`) | The release order check uses `OsStr` comparison. | The NUL-form key check supersedes it. |
-| 25 "Store identity" (`:299-300`) | Unix and Windows write different path bytes. A store does not move between families. | Remove the platform family. A changed canonical root invalidates the store and journal (D3). |
-| 25 (`:355-357`) | A different platform family is a rebuild. | Remove the platform family from the rebuild rule. Keep the canonical root in the identity. |
-| 25 (`:359-362`) | A higher epoch parses fresh and does not wipe. | Keep this rule. It also covers a store that a newer binary wrote. |
-| 25 (`:312-317`) | The extractor fingerprint hashes crate versions and probe records. | List the normalization dependency. The epoch bumps with fold-based link resolution. |
+| 24 store identity (rule 3) | Store identity records the engine tag, platform family, format epoch and two fingerprints. | The platform family leaves the identity. The canonical root stays. |
+| 24 `meta` list | `meta` keeps the platform family. | Change the `meta` field list in the same way. |
+| 24 release order check | The release order check uses `OsStr` comparison. | The NUL-form key check supersedes it. |
+| 25 "Store identity" | Unix and Windows write different path bytes. A store does not move between families. | Remove the platform family. A changed canonical root invalidates the store and journal (D3). |
+| 25 rebuild rule | A different platform family is a rebuild. | Remove the platform family from the rebuild rule. Keep the canonical root in the identity. |
+| 25 higher-epoch rule | A higher epoch parses fresh and does not wipe. | Keep this rule. It also covers a store that a newer binary wrote. |
+| 25 extractor fingerprint | The extractor fingerprint hashes crate versions and probe records. | List the normalization dependency. The epoch bumps with fold-based link resolution. |
 | 25 (new rules) | None. | A stored row without `ctime` that a Unix reader finds is stale. The scan test covers `.Traces`, the physical `.traceſ` alias and an admitted in-root metadata target. The scan excludes the metadata directory by filesystem identity (D6). |
-| 26 (`:251`) | The journal holds the platform family in the base identity. | Drop the platform family. Journal fact paths use canonical UTF-8 `/` text, not NUL-encoded lookup keys. |
-| 27 (`:306`, `:313-316`) | The identity tests include the platform family. The probe has `rejects_mutated_platform` (`research/27-probe/replay/tests/fault.rs:842`). A copy is not rejected only because its path changed. | Drop the platform test. A changed canonical root rebuilds recognized derived state and discards the old-root journal. The `mv` replay result stays prototype evidence (D3). |
-| 22 (`:182`) | Core holds no workspace object. | D1 states that `ProjectRoot` is, or contains, the `WorkspaceIdentity`. |
+| 26 journal base identity | The journal holds the platform family in the base identity. | Drop the platform family. Journal fact paths use canonical UTF-8 `/` text, not NUL-encoded lookup keys. |
+| 27 identity tests and path-change rule | The identity tests include the platform family. The probe has `rejects_mutated_platform` (`research/27-probe/replay/tests/fault.rs`). A copy is not rejected only because its path changed. | Drop the platform test. A changed canonical root rebuilds recognized derived state and discards the old-root journal. The `mv` replay result stays prototype evidence (D3). |
+| 22 workspace object rule | Core holds no workspace object. | D1 states that `ProjectRoot` is, or contains, the `WorkspaceIdentity`. |
 
 Duties for other tickets:
 
@@ -1180,22 +1183,22 @@ Duties for other tickets:
 
 Glossary duties:
 
-- `src/GLOSSARY.md:20`: correct "Avoid: relative path". Add a pure "Relative
+- `src/GLOSSARY.md`: correct "Avoid: relative path". Add a pure "Relative
   Path" entry beside "Root-Confined Path".
-- `src/GLOSSARY.md:63-68`: replace or delete the Path Codec entry.
-- `src/GLOSSARY.md:107-115`: extend the Comparison Key. Add a Canonical Key and
+- `src/GLOSSARY.md`: replace or delete the Path Codec entry.
+- `src/GLOSSARY.md`: extend the Comparison Key. Add a Canonical Key and
   a NUL-form sort key, so that the three "key" terms stay distinct.
-- `src/GLOSSARY.md:98-105`: Ambiguity (PathTie, never a diagnostic) stays
+- `src/GLOSSARY.md`: Ambiguity (PathTie, never a diagnostic) stays
   consistent with the union rule.
 - Add an Avoid line for the DSL `ctime`, the birth-time alias
-  (`src/query/grammar/field.rs:205`). Ticket 25 `ctime` is the inode-change
+  (`src/query/grammar/field.rs`). Ticket 25 `ctime` is the inode-change
   time.
 
 Map duties (done on 2026-11-16 in `.scratch/arch-design/map.md`):
 
 - Add a "Decisions so far" line for ticket 32.
-- Lines 438-441 name the platform family in the identity. Update them.
-- Graduate the fog item "Persistence portability" (about line 520).
+- The entries that name the platform family in the identity need an update.
+- Graduate the fog item "Persistence portability".
 - Record the blocked-by repairs:
   - Ticket 30: 14, 19, 21, 22 and 29.
   - Ticket 31: 7, 16, 18, 28, 29, 30 and 32.
@@ -1254,27 +1257,27 @@ The code does not implement this ticket. This table lists what the refactor
 changes. The Today column records the working tree on 2026-11-15 [V].
 The Target column records the ticket decisions [P].
 
-| Area | Today (path:line) | Target (ticket decision) | Depends on |
+| Area | Today (file and symbol) | Target (ticket decision) | Depends on |
 | --- | --- | --- | --- |
-| Confinement owner | `SafeRelativePath` in `src/path.rs:159-190`: I/O in a path type, plain join at `:190`, TOCTOU comment at `:159-161`. Five production calls (D1) [V]. | `ProjectRoot` confinement method. Delete `SafeRelativePath`. | Ticket 33, ticket 35 |
-| Relative path type | `RelativePath(PathBuf)` in `src/path.rs:64`. It allows `.` components. `HasPath::path() -> &Path` in `src/path.rs:57`. | A `/`-joined UTF-8 `String` with `as_str()`. No public zero-cost `as_path()` promise. `ProjectRoot` converts and validates native components, with typed errors. `HasPath::path() -> &RelativePath`. | Ticket 35 |
-| Parse rules | `ConfigSubDir` in `src/config/model.rs:278`. `TemplatePathInput` in `src/template/path.rs:38`. | `RelativePath::parse` normalizes `./`. It rejects `..`, NUL and empty components. | None |
-| Persisted path | Codecs in `src/path.rs:340-437`. `PathKey::as_bytes` in `src/index/codec.rs:74`. `path_from_bytes` in `src/index/codec.rs:89`. Re-export in `src/lib.rs:192`. | Canonical UTF-8 `/` path values. The store adapter owns NUL-encoded lookup keys. Delete the codecs and the re-export. New epoch. | Ticket 25 |
-| Store identity | Platform family in `META` (`24:299`, `24:311`, `25:299-300`, `25:355-357`). | Remove the platform family. Keep the canonical root. | Ticket 25 |
-| Order and comparison | `Path::cmp` at `delta.rs:31,175`, `refresh.rs:280,478,575`, `inlinks.rs:88,402`, `entry.rs:90`, `service.rs:442`, `store.rs:1080,1168`, `query/service.rs:364,392,417`, and `index/sort.rs`. | `RelativePath::Ord` in NUL form. No `Path` in a sorted structure. | Ticket 29 |
-| Release order check | Debug-only assert in `SortedByPath::assumed_sorted` (`src/index/sort.rs:48-54`). | Check the NUL-form order at index build and store load, in release builds too. | Ticket 24 |
-| Folder range | `collect_folder_paths` in `src/index/store.rs:1090`. Lossy prefix at `:1095`. Byte range at `:1123-1154`. Result sort at `:1168`. | `[prefix\0, prefix\x01)` with a boundary test. | Ticket 24 |
-| Admission | `is_ignored_dir` in `src/env_vars.rs:19-44`. Callers at `src/index/service.rs:427` and `src/config/discovery.rs:163`. Dead check at `src/index/service.rs:430-435`. | Match `.traces` without case through the Comparison Key. Other dirs keep exact case. | Ticket 25 |
-| Non-UTF-8 names | Scan at `src/index/service.rs:424-461`. Byte-exact tests at `src/index/codec.rs:83-94`, `service.rs:888,1300`, `store.rs:2342,2750,2772,2812` and `benches/index_codec.rs:67`. | Skip with a notice. Invert the tests. | Ticket 34 |
-| Fold map and links | No map. `LinkResolver::get_by_path` is an exact search (`inlinks.rs:400-406`). `normalize_source_input` probes the file system (`src/cli/mod.rs:440-472`). | A Comparison Key map for each pinned generation. Fold-based link resolution. The extractor fingerprint lists the dependency. | Tickets 25, 29, 33 |
-| IR path atoms | `SourceAtom::Path(GlobPattern)` in `src/query/grammar/source.rs:190`, `:250-290`. | `PathAtom::{Literal, Folder, Glob}`. | Ticket 29 |
-| Dependencies and profile | No NFC crate in `Cargo.lock`. `opt-level = "z"` in `Cargo.toml:269-281`. | Add `icu_normalizer` 2.4. Recheck the sort timings. | None |
-| TOCTOU | `commit_with_writer` in `src/template/writer.rs:366-407`. `rustix` in `Cargo.toml:164`. | No change. Document the window. Keep the `openat` option. | None |
-| Template inspection | Absolute paths accepted in `src/template/engine/path.rs:161-170`. `fs::metadata` at `:118`. Confined writer rule at `src/template/writer.rs:303-323`. Trusted output join at `:328-342`. | A confined default and a separately named raw-path test. `DryRun` retains the configured output-directory exception. | Ticket 31 |
-| Traversal and trackers | `DirTree` in `src/dirtree.rs:71`. Tracker in `src/file_tracker.rs:76-79,117,149,362,469-483`. | The scan converts once through `ProjectRoot::relativize`. State-home stores keep raw `PathBuf`. | Ticket 22 |
-| Glossary | `src/GLOSSARY.md:20`, `:63-68`, `:98-105`, `:107-115`. | The edits in "Resolution and handoffs". | None |
-| Public API baselines | `pub-tokens.txt`. `public-api-default.txt` (`FileMeta::path` :1392, `Note::path` :1743, `MarkdownParserInput::new` :1687). `public-api-test-utils.txt:280-282`. | Regenerate. The three `testing::path_codec` lines disappear. | Ticket 35 |
-| Journal | Path form open (`issues/27-index-replay-prototype-and-fault-tests.md:451-452`). Identity text at `26:251` and `27:306`. | Journal fact paths use canonical UTF-8 `/` text, not NUL-encoded lookup keys. Drop the platform test `rejects_mutated_platform`. | Tickets 26, 27 |
+| Confinement owner | `SafeRelativePath` in `src/path.rs`: I/O in a path type, plain join, TOCTOU. Five production calls (D1) [V]. | `ProjectRoot` confinement method. Delete `SafeRelativePath`. | Ticket 33, ticket 35 |
+| Relative path type | `RelativePath(PathBuf)` in `src/path.rs`. It allows `.` components. `HasPath::path() -> &Path` in `src/path.rs`. | A `/`-joined UTF-8 `String` with `as_str()`. No public zero-cost `as_path()` promise. `ProjectRoot` converts and validates native components, with typed errors. `HasPath::path() -> &RelativePath`. | Ticket 35 |
+| Parse rules | `ConfigSubDir` in `src/config/model.rs`. `TemplatePathInput` in `src/template/path.rs`. | `RelativePath::parse` normalizes `./`. It rejects `..`, NUL and empty components. | None |
+| Persisted path | Codecs in `src/path.rs`. `PathKey::as_bytes` in `src/index/codec.rs`. `path_from_bytes` in `src/index/codec.rs`. Re-export in `src/lib.rs`. | Canonical UTF-8 `/` path values. The store adapter owns NUL-encoded lookup keys. Delete the codecs and the re-export. New epoch. | Ticket 25 |
+| Store identity | Platform family in `META`. | Remove the platform family. Keep the canonical root. | Ticket 25 |
+| Order and comparison | `Path::cmp` at `delta.rs`, `refresh.rs`, `inlinks.rs`, `entry.rs`, `service.rs`, `store.rs`, `query/service.rs`, and `index/sort.rs`. | `RelativePath::Ord` in NUL form. No `Path` in a sorted structure. | Ticket 29 |
+| Release order check | Debug-only assert in `SortedByPath::assumed_sorted` (`src/index/sort.rs`). | Check the NUL-form order at index build and store load, in release builds too. | Ticket 24 |
+| Folder range | `collect_folder_paths` in `src/index/store.rs`. The lossy prefix, the byte range read and the result sort. | `[prefix\0, prefix\x01)` with a boundary test. | Ticket 24 |
+| Admission | `is_ignored_dir` in `src/env_vars.rs`. Callers at `src/index/service.rs` and `src/config/discovery.rs`. Dead check at `src/index/service.rs`. | Match `.traces` without case through the Comparison Key. Other dirs keep exact case. | Ticket 25 |
+| Non-UTF-8 names | Scan at `src/index/service.rs`. Byte-exact tests at `src/index/codec.rs`, `service.rs`, `store.rs` and `benches/index_codec.rs`. | Skip with a notice. Invert the tests. | Ticket 34 |
+| Fold map and links | No map. `LinkResolver::get_by_path` is an exact search (`inlinks.rs`). `normalize_source_input` probes the file system (`src/cli/mod.rs`). | A Comparison Key map for each pinned generation. Fold-based link resolution. The extractor fingerprint lists the dependency. | Tickets 25, 29, 33 |
+| IR path atoms | `SourceAtom::Path(GlobPattern)` in `src/query/grammar/source.rs`. | `PathAtom::{Literal, Folder, Glob}`. | Ticket 29 |
+| Dependencies and profile | No NFC crate in `Cargo.lock`. `opt-level = "z"` in `Cargo.toml`. | Add `icu_normalizer` 2.4. Recheck the sort timings. | None |
+| TOCTOU | `commit_with_writer` in `src/template/writer.rs`. `rustix` in `Cargo.toml`. | No change. Document the window. Keep the `openat` option. | None |
+| Template inspection | Absolute paths accepted in `src/template/engine/path.rs`. `fs::metadata`. Confined writer rule at `src/template/writer.rs`. Trusted output join. | A confined default and a separately named raw-path test. `DryRun` retains the configured output-directory exception. | Ticket 31 |
+| Traversal and trackers | `DirTree` in `src/dirtree.rs`. Tracker in `src/file_tracker.rs`. | The scan converts once through `ProjectRoot::relativize`. State-home stores keep raw `PathBuf`. | Ticket 22 |
+| Glossary | `src/GLOSSARY.md`. | The edits in "Resolution and handoffs". | None |
+| Public API baselines | `pub-tokens.txt`. `public-api-default.txt` (`FileMeta::path`, `Note::path`, `MarkdownParserInput::new`). `public-api-test-utils.txt`. | Regenerate. The three `testing::path_codec` lines disappear. | Ticket 35 |
+| Journal | Path form open (`issues/27-index-replay-prototype-and-fault-tests.md`). Identity text. | Journal fact paths use canonical UTF-8 `/` text, not NUL-encoded lookup keys. Drop the platform test `rejects_mutated_platform`. | Tickets 26, 27 |
 
 Not in code:
 
@@ -1290,12 +1293,12 @@ Not in code:
 
 Remaining handoffs and open choices:
 
-- "Decide how `FileMeta`, index rows, query paths, template paths, and CLI errors
-  carry confined versus raw paths." The Answer fixes the form for each type
-  except the CLI error text. Ticket 34 owns that text.
+- "Decide how `FileMeta`, index rows, query paths, template paths, and CLI
+  errors carry confined versus raw paths." The Answer fixes the form for each
+  type except the CLI error text. Ticket 34 owns that text.
 - "The journal name and its path form stay open." Journal fact paths use
-  canonical UTF-8 `/` text. The journal name is not a path-form question.
-  This ticket does not decide the journal name.
+  canonical UTF-8 `/` text. The journal name is not a path-form question. This
+  ticket does not decide the journal name.
 - The names of the two template inspection tests.
 - Native Windows identity and component conformance checks.
 - Keep `strict-path` until replacement conformance succeeds.

@@ -9,7 +9,7 @@ Blocked by: 7, 16, 18, 28, 29, 30, 32
 Decide how the template engine relates to the rest:
 
 - Decide between typed host objects and stringified values at the minijinja
-  boundary (`src/template/engine/query.rs:604`).
+  boundary (`src/template/engine/query.rs`).
 - Decide whether the `QuerySet` bridge wrapper adds anything over the query
   layer's own lazy set. The question is only about the wrapper. `research/01`
   verified the bridge: chained methods clone only the `Arc<Vec<QueryRow>>` +
@@ -61,7 +61,8 @@ stays a source of values, not of prompts (ADR-0006).
 
 Today `--dry-run` computes no output path. Thus its post-render check cannot
 apply path bindings. Ticket 32's target adds consistent resolved-target preview.
-Reconcile path binding when that target is known; retain frontmatter and tag checks.
+Reconcile path binding when that target is known; retain frontmatter and tag
+checks.
 
 ## Inputs from the execution-context decision
 
@@ -99,11 +100,12 @@ See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
 - A host render reads its pinned derived generation, including admitted buffers.
 - Expose `{key, rows}` through a distinct `GroupedQuerySet`. Preserve the typed
   key and the `QuerySet` rows.
-- Preserve fallible terminals, clause identities and atom spans through callbacks.
+- Preserve fallible terminals, clause identities and atom spans through
+  callbacks.
 - Return typed replacement errors for grouped `sort`, `limit`, `where` and
   `count` calls. Name the permitted operation in each error.
 - Choose names for the confined default inspection test and the raw-path test.
 - Apply the writer's output-directory rule to `DryRun`. Local values pass local
   trust admission. Global values obey ticket 22's global-config policy.
-- Keep output-path resolution consistent between inspection, preview and writing.
-  Show preview diagnostics without changing successful stdout payloads.
+- Keep output-path resolution consistent between inspection, preview and
+  writing. Show preview diagnostics without changing successful stdout payloads.

@@ -30,7 +30,7 @@ claim, write a small temporary bench under a temp dir (not committed):
    probes can estimate it.
 6. (withdrawn: `research/01` refuted the claim that chained `queryset` methods
    clone rows; skip.)
-7. redb commit-floor (~34 ms claim, `benches/index_store.rs:113`): confirm and
+7. redb commit-floor (~34 ms claim, `benches/index_store.rs`): confirm and
    identify what dominates.
 
 record machine, commands, raw numbers (table), and state which claims are

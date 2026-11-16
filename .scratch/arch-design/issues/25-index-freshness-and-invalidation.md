@@ -7,11 +7,11 @@ Blocked by: 5, 12, 22, 24
 ## Question
 
 The index must return the same results as a fresh parse of trusted files and
-config. Config drift detection landed at `207cc3fb`.
-Use that design as the keep-as-is baseline.
-Use [config ownership](./22-config-ownership-and-lifecycle.md) and
-[the index read model](./24-index-read-model-and-query-execution.md).
-Do not reopen their ownership or store-shape decisions.
+config. Config drift detection landed at `207cc3fb`. Use that design as the
+keep-as-is baseline.
+Use [config ownership](./22-config-ownership-and-lifecycle.md) and [the index
+read model](./24-index-read-model-and-query-execution.md). Do not reopen their
+ownership or store-shape decisions.
 
 ### A. Config drift
 
@@ -30,11 +30,10 @@ Do not reopen their ownership or store-shape decisions.
   to avoid repeated rebuilds on an unwritable store.
 
 The landed code builds the fingerprint from 10 of 15 `ConfigDigests` settings.
-It writes the fingerprint and rows in one redb transaction.
-See `src/index/fingerprint.rs:158-201` and `src/index/store.rs`.
-The drift check runs at each refresh. Drift has priority over file staleness.
-`src/index/service.rs` rebuilds on drift. An unreadable fingerprint produces
-`DriftCause::Unrecorded`.
+It writes the fingerprint and rows in one redb transaction. See
+`src/index/fingerprint.rs` and `src/index/store.rs`. The drift check runs at
+each refresh. Drift has priority over file staleness. `src/index/service.rs`
+rebuilds on drift. An unreadable fingerprint produces `DriftCause::Unrecorded`.
 
 Ticket 22 removes `ConfigDigests`. One exhaustive projection builds
 `IndexPolicy`. Do not retain the old probe that treats `title`, `aliases` and
@@ -57,14 +56,13 @@ date keys as necessary fingerprint inputs.
   source scan. Today the scan excludes only `.traces/index.redb`. Check how the
   new engine handles an old engine's unreadable bytes.
 
-Today `META_VERSION = b"1"` changes by hand (`src/index/store.rs:41`).
-`IndexStore::open` wipes the store after a version mismatch.
-It does not use the `Drifted` path that ADR-0009 describes.
+Today `META_VERSION = b"1"` changes by hand (`src/index/store.rs`).
+`IndexStore::open` wipes the store after a version mismatch. It does not use the
+`Drifted` path that ADR-0009 describes.
 [H] A parser change without a version bump can serve stale facts.
 Tickets 18, 19 and 23 change stored values, civil dates and the `Note` shape.
 Ticket 24 changes the store to independent facets, task copies and secondary
-keys. These changes must invalidate old bytes, parser notices and derived
-keys.
+keys. These changes must invalidate old bytes, parser notices and derived keys.
 
 ### C. Source freshness and crash recovery
 
@@ -85,13 +83,12 @@ keys.
 - Use a fresh parse for a read query after a cache miss. Make `traces index`
   fail closed.
 
-The current delta has no racy-timestamp guard (`src/index/delta.rs`).
-The existing `service.rs` tests sleep to let mtime advance.
+The current delta has no racy-timestamp guard (`src/index/delta.rs`). The
+existing `service.rs` tests sleep to let mtime advance.
 Research 05 describes Git's guard for a file whose mtime reaches the index
-timestamp. IWE avoids needless mtime changes with `write_file_if_changed`
-(diwe v0.24.1). Do not rewrite unchanged source bytes to refresh a host
-view. Ticket 23 requires a full source-snapshot comparison at commit for a
-closed-file edit.
+timestamp. IWE avoids needless mtime changes with `write_file_if_changed` (diwe
+v0.24.1). Do not rewrite unchanged source bytes to refresh a host view. Ticket
+23 requires a full source-snapshot comparison at commit for a closed-file edit.
 
 ### D. Store generations and concurrent policies
 
@@ -131,10 +128,9 @@ Leave open-buffer overlays and save/close transitions to
 - Keep `CandidateTrie` and `indextree`, as ticket 24 decided.
 
 Research 11 measured 18.5 ms of note deserialization on a 5,000-note path
-change. That is 97% of the measured work.
-Link re-resolution took 0.5 ms, or 2.7%.
-Ticket 24 replaces whole-note rows with facets. It keeps the trie for large
-same-stem candidate sets. The inverted unresolved-stem index from research
+change. That is 97% of the measured work. Link re-resolution took 0.5 ms, or
+2.7%. Ticket 24 replaces whole-note rows with facets. It keeps the trie for
+large same-stem candidate sets. The inverted unresolved-stem index from research
 05 targets link work, not the measured decoding cost.
 
 ### F. Heal visibility and check state
@@ -151,21 +147,19 @@ same-stem candidate sets. The inverted unresolved-stem index from research
   owners.
 
 Today production only logs `RefreshReport`: `tracing::info!` for drift and
-`debug!` for file changes. Count accessors are test-only.
-The cost of a drift heal has not been measured.
-A cold query can wait for a full rebuild [H].
-An unwritable store can repeat that work [H].
+`debug!` for file changes. Count accessors are test-only. The cost of a drift
+heal has not been measured. A cold query can wait for a full rebuild [H]. An
+unwritable store can repeat that work [H].
 
 ### Evidence and handoffs
 
 Read `docs/adr/0009-index-refresh.md`, `reverification.md`, `research/05` and
-`research/11`.
-Check `src/index/fingerprint.rs`, `src/index/refresh.rs`, `src/index/service.rs`
-and `src/index/store.rs`.
-Use `tests/e2e/index.rs` (`config_edit_heals_the_index_on_the_next_query`) as a
-behavior check.
-Preparatory research: [Index freshness evidence and open proof](../research/25-index-freshness-prep.md).
-Do not treat ADR-0009 as unimplemented. It has landed and remains `proposed`.
+`research/11`. Check `src/index/fingerprint.rs`, `src/index/refresh.rs`,
+`src/index/service.rs` and `src/index/store.rs`. Use `tests/e2e/index.rs`
+(`config_edit_heals_the_index_on_the_next_query`) as a behavior check.
+Preparatory research: [Index freshness evidence and open
+proof](../research/25-index-freshness-prep.md). Do not treat ADR-0009 as
+unimplemented. It has landed and remains `proposed`.
 
 - [Ticket 18](./18-value-model.md) changes `Number` to `Int`/`Float` and changes
   `Link` serialization.
@@ -183,16 +177,15 @@ Do not treat ADR-0009 as unimplemented. It has landed and remains `proposed`.
 - [Ticket 24](./24-index-read-model-and-query-execution.md) owns facet
   atomicity, read snapshots and the writer base check.
 
-Ticket 24 derives filename periods at query time.
-Do not fingerprint filename-period parsing rules for fields the store
-does not persist. Persist source creation timestamps only when available.
-Never substitute mtime for `cdate`.
-If another persisted fact starts to use filename-period rules, include
+Ticket 24 derives filename periods at query time. Do not fingerprint
+filename-period parsing rules for fields the store does not persist. Persist
+source creation timestamps only when available. Never substitute mtime for
+`cdate`. If another persisted fact starts to use filename-period rules, include
 those rules in `IndexPolicy`.
 
 Record the alternatives, invariant owner, removable code, unresolved questions
-and downstream handoffs in the answer.
-Record each observable change in the specification's change table (ticket 16).
+and downstream handoffs in the answer. Record each observable change in the
+specification's change table (ticket 16).
 
 ## Comments
 
@@ -229,9 +222,8 @@ this ticket's resolution.
 - Keep the current host failure state visible. Leave notice presentation to the
   diagnostic ticket.
 
-The durable recovery journal remains open. Measure it in
-[What does a durable index repair journal cost and
-save?](./26-measure-index-recovery-journal.md).
+The durable recovery journal remains open. Measure it in [What does a durable
+index repair journal cost and save?](./26-measure-index-recovery-journal.md).
 Compare it with a validated incremental replan and an in-memory host retry
 before deciding.
 
@@ -278,9 +270,9 @@ Decisions the maintainer made in this round:
 Confirmed decisions:
 
 - Settle the host staleness bound with downstream tickets 33 and 28.
-- Decouple ticket 26: crash recovery is a no-op refresh of uncommitted files
-  (12 to 65 ms). The journal is an optional optimization that does not block
-  this ticket's invalidation rules.
+- Decouple ticket 26: crash recovery is a no-op refresh of uncommitted files (12
+  to 65 ms). The journal is an optional optimization that does not block this
+  ticket's invalidation rules.
 
 ### Store identity
 
@@ -293,21 +285,21 @@ brief](../research/25-index-freshness-prep.md), section H.
 `META` holds these identity parts:
 
 - **Engine tag.** It names the storage engine and its major version, such as
-  `redb4`. Ticket 24 gives this rule to this ticket (`24:309-310`). The tag is
-  part of the cache file name, so one file serves one engine. The current file
-  keeps its name for the first engine.
+  `redb4`. Ticket 24 gives this rule to this ticket. The tag is part of the
+  cache file name, so one file serves one engine. The current file keeps its
+  name for the first engine.
 - **Platform family.** Unix and Windows serialize arbitrary vault paths
-  differently (`src/path.rs:349-391`). A store does not move between families.
-- **Format epoch.** An ordered `u32`. It is the "format version" of ticket 24
-  (`24:309`). It decides only "newer" or "older".
+  differently (`src/path.rs`). A store does not move between families.
+- **Format epoch.** An ordered `u32`. It is the "format version" of ticket 24 .
+  It decides only "newer" or "older".
 - **Extractor fingerprint.** A 32-byte hash. It decides "same behavior".
 - **Policy fingerprint.** `IndexPolicy::fingerprint()` supplies it. The glossary
   term "Index Fingerprint" is stale. See "Stale ADR and glossary text" below.
 - **Written-by version.** The binary version. Notices use it. No rule compares
   it.
 
-`META` also keeps the store incarnation and the revision (`24:431-438`). They
-guard the writer transaction. They are not identity parts.
+`META` also keeps the store incarnation and the revision. They guard the writer
+transaction. They are not identity parts.
 
 The extractor fingerprint hashes two inputs:
 
@@ -334,12 +326,12 @@ The corpus rules are:
 - It has a minimal note.
 - It uses a fixed ASCII path for corpus notes. For ASCII, the Unix and Windows
   path encodings write the same bytes, because postcard writes a `u16` below 128
-  as one byte (`src/path.rs:349-391`). This makes the committed extractor
-  fingerprint identical across platforms. The identity test runs on Windows CI
-  too. This is unverified on Windows.
+  as one byte (`src/path.rs`). This makes the committed extractor fingerprint
+  identical across platforms. The identity test runs on Windows CI too. This is
+  unverified on Windows.
 - It uses explicit-offset datetimes only. An unzoned value depends on the host
-  zone today (`src/temporal/datetime.rs:133-136`). When ticket 19 lands the
-  civil variant, add it to the corpus. That bumps the epoch.
+  zone today (`src/temporal/datetime.rs`). When ticket 19 lands the civil
+  variant, add it to the corpus. That bumps the epoch.
 
 The process computes the fingerprint once, on the first store open. It does not
 compute it at startup.
@@ -356,17 +348,17 @@ Store-open rules:
   fingerprint is a rebuild. The last case means someone skipped the bless task,
   so the rule fails safe. These rebuilds are automatic heals. They stay quiet.
 - A row that fails to decode, or a damaged `META`, is a rebuild.
-- A higher epoch is an unusable cache under ticket 24 (`24:384-394`). A read
-  parses the source files and gives one stderr notice. It exits 0 if the parse
-  and the query succeed. It does not write and does not wipe. A host that starts
-  cold against such a store parses fresh the same way.
-- `traces index` already rebuilds in full (`src/cli/index.rs:38-48`). It
-  replaces a newer store. This is the way out after a rollback. The notice names
-  `traces index`. This ticket adds no new flag for it.
+- A higher epoch is an unusable cache under ticket 24. A read parses the source
+  files and gives one stderr notice. It exits 0 if the parse and the query
+  succeed. It does not write and does not wipe. A host that starts cold against
+  such a store parses fresh the same way.
+- `traces index` already rebuilds in full (`src/cli/index.rs`). It replaces a
+  newer store. This is the way out after a rollback. The notice names `traces
+  index`. This ticket adds no new flag for it.
 - Only a writer that has decided to rebuild may delete a store file. A read that
   meets an engine error before `META` is readable treats the store as a miss.
-  Today `create_db` deletes the file first (`src/index/store.rs:903-931`). This
-  must change.
+  Today `create_db` deletes the file first (`src/index/store.rs`). This must
+  change.
 - A changed engine tag uses another file. A newer `redb` major version never
   opens an older engine's file.
 - A rebuild heal reports its cause. Rename `RefreshReport::ConfigDrift` and
@@ -424,8 +416,8 @@ Known gaps:
   is open.
 - The runtime cost of the corpus pass is unmeasured.
 - A host-zone value stays outside the identity until tickets 21 and 24 remove
-  `FileMeta.day` (`src/file.rs:88-98`). A zone change leaves stale `day` values.
-  The synthetic file probe sets `day` by hand.
+  `FileMeta.day` (`src/file.rs`). A zone change leaves stale `day` values. The
+  synthetic file probe sets `day` by hand.
 - A future-dated mtime stays racy. The store re-reads that file on every
   refresh. This is correct but costs time. Measure it before you add a clamp.
 - A read-only vault cannot `create` the store. Check whether a read-only open of
@@ -473,8 +465,8 @@ defer to them.
 - ADR-0009 is `proposed`. No one accepted it. It does not bind this ticket.
 - ADR-0009 says a format-version mismatch is a `Drifted` refresh state. The code
   does not do this. `IndexStore::open` wipes the store before a refresh runs
-  (`src/index/store.rs:936-988`, and the premise at `25:62-63`). `DriftCause`
-  has only `Settings` and `Unrecorded` (`src/index/fingerprint.rs`).
+  (`src/index/store.rs`, and the premise in this ticket). `DriftCause` has only
+  `Settings` and `Unrecorded` (`src/index/fingerprint.rs`).
 - ADR-0009 names the state "config drift". Format and engine changes are not
   config changes. The name hides the cause. Rename it, as above.
 - ADR-0009 enforces completeness by destructuring the config digest bundles.
@@ -484,8 +476,8 @@ defer to them.
   switch (brief G12). Ticket 25 keeps the landed rule only until a measurement
   justifies another.
 - The glossary says the "Index Fingerprint" includes every setting "even those
-  no index-time code reads today". This ticket decides the opposite (`25:28`).
-  The glossary also describes per-setting config digests that ticket 22 deletes.
+  no index-time code reads today". This ticket decides the opposite. The
+  glossary also describes per-setting config digests that ticket 22 deletes.
   Rename the term "Policy Fingerprint". Rewrite its definition.
 - The glossary defines `Note` as one persisted form, and `Incremental Delta` as
   a timestamp comparison. Ticket 24 decomposes the `Note` into facets. Round two
@@ -503,10 +495,10 @@ research brief.
 Ticket 16 overstates its guarantee. Row 74 freezes "index result equivalence
 with a fresh parse of files and config". No stat-based check can guarantee that.
 The landed canary test pins stale output for a same-size edit with a restored
-mtime (`tests/e2e/index.rs:129-180`). Replace the row with a stated contract: a
-file with an unchanged size, mtime and (on Unix) ctime counts as unchanged,
-outside the racy window. `traces index --verify` checks the rest. Record the
-Windows gap in the change table.
+mtime (`tests/e2e/index.rs`). Replace the row with a stated contract: a file
+with an unchanged size, mtime and (on Unix) ctime counts as unchanged, outside
+the racy window. `traces index --verify` checks the rest. Record the Windows gap
+in the change table.
 
 Findings logged for other tickets, not adopted here:
 
@@ -530,20 +522,20 @@ changes. Locations are the working tree on 2026-10-30.
 
 | Area | Today | Target | Depends on |
 | --- | --- | --- | --- |
-| Format marker | `META_VERSION = b"1"` and `META_VERSION_KEY` (`src/index/store.rs:39-41`). A mismatch makes `open` clear the store | Remove both. `META` holds the engine tag, platform family, format epoch, extractor fingerprint, policy fingerprint and written-by version | Ticket 24 `meta` table |
-| Store open | `create_db` deletes the file before `rebuild_needed` decides (`src/index/store.rs:903-931`). `rebuild_needed` compares one version value (`src/index/store.rs:936-988`) | Reads never delete. Only a writer that decided to rebuild deletes. Lower epoch, other platform, other fingerprint, damaged `META` or undecodable rows: rebuild. Higher epoch: read miss with one stderr notice, exit 0 | Ticket 24 |
+| Format marker | `META_VERSION = b"1"` and `META_VERSION_KEY` (`src/index/store.rs`). A mismatch makes `open` clear the store | Remove both. `META` holds the engine tag, platform family, format epoch, extractor fingerprint, policy fingerprint and written-by version | Ticket 24 `meta` table |
+| Store open | `create_db` deletes the file before `rebuild_needed` decides (`src/index/store.rs`). `rebuild_needed` compares one version value (`src/index/store.rs`) | Reads never delete. Only a writer that decided to rebuild deletes. Lower epoch, other platform, other fingerprint, damaged `META` or undecodable rows: rebuild. Higher epoch: read miss with one stderr notice, exit 0 | Ticket 24 |
 | Policy fingerprint | `IndexFingerprint` built from `ConfigDigests` (`src/index/fingerprint.rs`, `src/config/model/digest.rs`) | `IndexPolicy::fingerprint()`. Delete `ConfigDigests` | Ticket 22 |
-| Refresh report | `RefreshReport::ConfigDrift` and `DriftCause` (`src/index/refresh.rs:44`, `src/index/service.rs:177,294,315`) | Rename. Add identity causes: engine, platform, epoch, extractor, damaged `META`. Rebuild heals stay quiet | Ticket 34 |
+| Refresh report | `RefreshReport::ConfigDrift` and `DriftCause` (`src/index/refresh.rs`, `src/index/service.rs`) | Rename. Add identity causes: engine, platform, epoch, extractor, damaged `META`. Rebuild heals stay quiet | Ticket 34 |
 | Extractor fingerprint | None | New `build.rs` reads resolved versions of `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard` from `Cargo.lock`. New probe builder and embedded corpus in `src/index/`, computed once on first open | Tickets 19, 30 for the civil datetime |
 | Identity file | None | A committed identity file. A test fails on drift. New task `mise run index:bless` rewrites it and adds 1 to the epoch | None |
-| Boundary check | `check:layers` only (`mise.toml:148`) | New `check:boundaries` task. Use `git grep`. Confine `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. Confine `redb` and `postcard` to `src/index/` | Ticket 35 may replace it |
-| Cache file name | `.traces/index.redb` (`src/index/mod.rs:48`) | The name carries the engine tag | Ticket 24 |
-| Source scan | `scan` compares `path != index_db` (`src/index/service.rs:424-435`) | Remove the dead check. A test shows that nothing under `.traces/` enters the scan | None |
-| Change detection | `FileDelta::compute` compares `FileMeta` (`src/index/delta.rs:21`). The landed canary pins stale output for a restored mtime (`tests/e2e/index.rs:129-180`) | Add a `racy` bit per file row. Set it when `mtime >= scan_start - 2 s`. Add `ctime` on Unix. Read each changed file from one handle with a stat before and after. Retry the scan once on `NotFound` | Ticket 24 file rows |
+| Boundary check | `check:layers` only (`mise.toml`) | New `check:boundaries` task. Use `git grep`. Confine `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. Confine `redb` and `postcard` to `src/index/` | Ticket 35 may replace it |
+| Cache file name | `.traces/index.redb` (`src/index/mod.rs`) | The name carries the engine tag | Ticket 24 |
+| Source scan | `scan` compares `path != index_db` (`src/index/service.rs`) | Remove the dead check. A test shows that nothing under `.traces/` enters the scan | None |
+| Change detection | `FileDelta::compute` compares `FileMeta` (`src/index/delta.rs`). The landed canary pins stale output for a restored mtime (`tests/e2e/index.rs`) | Add a `racy` bit per file row. Set it when `mtime >= scan_start - 2 s`. Add `ctime` on Unix. Read each changed file from one handle with a stat before and after. Retry the scan once on `NotFound` | Ticket 24 file rows |
 | Verify command | None | New `traces index --verify` hashes every file | Ticket 34 for the exit codes |
 | Host store use | A held store fails a read with exit 1 | A read falls back to a fresh parse with one stderr notice and exit 0. A host holds the store only during refresh and persist | Tickets 28, 33 |
 | Commit recovery | No `commit_nonce` and no unwritable latch exist in `src/index/`. The research brief (C5, C6) says they were proposed and drops them | Do not add them. After an uncertain commit, drop the handle and the plan. Try the write-open at each persist | Ticket 24 |
-| Replacement failure | The store open and replacement path is `create_db` (`src/index/store.rs:903`) | A failed store replacement is a cache miss for reads | None |
+| Replacement failure | The store open and replacement path is `create_db` (`src/index/store.rs`) | A failed store replacement is a cache miss for reads | None |
 | ADR and glossary | ADR-0009 `proposed`. The glossary "Index Fingerprint" entry is stale | Replace both when the code lands | Ticket 36 |
 | Ticket 16 table | Row 78 holds the corrected contract | Add the change-table rows listed above to the redesign spec | Ticket 36 |
 
@@ -558,29 +550,29 @@ Not in code:
 Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
 amend this Answer. They do not reopen it. Observations carry [V].
 
-- Platform family (lines 299-300 and 355-357): ticket 32 removes it from the
-  store identity. The canonical root stays in the identity. A store under
-  another root is a fork. The reader rebuilds it. A rebuild heal stays quiet:
-  the refresh report carries the cause (ticket 34 gives the text).
+- Platform family: ticket 32 removes it from the store identity. The canonical
+  root stays in the identity. A store under another root is a fork. The reader
+  rebuilds it. A rebuild heal stays quiet: the refresh report carries the cause
+  (ticket 34 gives the text).
 - Format epoch: ticket 32 adds one format epoch for the new path form. An older
-  reader still never wipes a store with a higher epoch (line 359).
-- Extractor fingerprint: include the NFC normalization dependency.
-  Fold-based link resolution bumps the format epoch.
-- Missing `ctime`: a stored row without `ctime` is stale when a Unix host
-  reads it.
+  reader still never wipes a store with a higher epoch.
+- Extractor fingerprint: include the NFC normalization dependency. Fold-based
+  link resolution bumps the format epoch.
+- Missing `ctime`: a stored row without `ctime` is stale when a Unix host reads
+  it.
 - Scan exclusion: cover `.Traces`, physical APFS `.traceſ`, and an admitted
-  in-root metadata target under a different listed name.
-  Exclude its filesystem identity and subtree, not only its text spelling.
+  in-root metadata target under a different listed name. Exclude its filesystem
+  identity and subtree, not only its text spelling.
 - Overlay proof: assign each scan an identity and its original monotonic start.
-  A retained closed snapshot has `proof_time`, including snapshots without a save.
-  For a save, use its ordered receipt time.
+  A retained closed snapshot has `proof_time`, including snapshots without a
+  save. For a save, use its ordered receipt time.
 - A scan with `scan_start >= proof_time + 2 s` proves a closed snapshot only
   after validation and atomic installation of the coherent in-memory base.
   Release the snapshot in that same owner transition.
 - A no-change scan needs no new persisted revision. Failed, incomplete or
   discarded scans prove nothing. Failed persistence does not invalidate an
   installed, validated in-memory base.
-- Test no-change scans, racy rows, failed publication, and a later terminal edit.
-  Ticket 33 wires the completion event and schedules pending validations.
+- Test no-change scans, racy rows, failed publication, and a later terminal
+  edit. Ticket 33 wires the completion event and schedules pending validations.
 - Staleness bound: ticket 28 states the overlay rules for a bound parameter.
   Ticket 33 sets the number.

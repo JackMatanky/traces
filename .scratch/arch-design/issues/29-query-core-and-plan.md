@@ -14,21 +14,21 @@ bullet:
   interpretation over the settled facet contracts suffices.
 - Decide `GroupBy` semantics: real grouping, removal, or the sort alias.
 - Compare typed `QueryBuilder` filters with string synthesis. The CLI
-  synthesises DSL strings today (`src/cli/task.rs:42-64`).
+  synthesises DSL strings today (`src/cli/task.rs`).
 - Define the `QuerySet` laziness contract for templates. Verified lazy: an `Arc`
   base plus an `ExecutionPlan`. Rows clone only at terminal materialization
   (`research/01`, claim 7).
 - Select the row representation. `QueryRow` holds `Arc<WorkspaceIndex>` today
-  (`src/query/results.rs:37-43,48-55`).
+  (`src/query/results.rs`).
 - Set the ownership of `format.rs` output rendering.
 - Preserve diagnostic spans through the template boundary.
 - Preserve the `cmp_document_order` correctness invariant for multi-row notes
-  (`src/query/results.rs:420-425`; research 01, claim 6: it ignores `item_idx`
+  (`src/query/results.rs`; research 01, claim 6: it ignores `item_idx`
   today).
 
 Facts: `survey/query.md` (all), `src/query/plan.rs`,
 `src/query/grammar/{source,filter}.rs`,
-`src/query/results.rs:37-43,420-425,48-55`,
+`src/query/results.rs`,
 `src/query/format.rs`.
 
 Inputs: `research/06`, value model, coercion policy, read-model decision.
@@ -138,10 +138,10 @@ unknown classes as data instead of logging. It behaves the same with or without
 a hierarchy attached.
 
 Verified latent hazard: with no expander attached, store queries fall back to
-exact match (`src/query/service.rs:381-394`) but in-memory filters match nothing
-(`src/query/grammar/source.rs:220-225`, empty class set). Production always
-attaches one when classes are used (`src/cli/mod.rs:482-485`,
-`src/template/engine/query.rs:120-121`). This gap is a hazard for a new host or
+exact match (`src/query/service.rs`) but in-memory filters match nothing
+(`src/query/grammar/source.rs`, empty class set). Production always
+attaches one when classes are used (`src/cli/mod.rs`,
+`src/template/engine/query.rs`). This gap is a hazard for a new host or
 library caller, not a current user-visible bug. Where the hierarchy type lives
 is for this ticket and [ticket 35](./35-crate-topology-and-public-surface.md).
 
@@ -151,7 +151,7 @@ vault-relative globs with `!` exclusions) handed in by the app layer. A note
 with a known explicit class uses only that class, so bound members need an
 exclusion atom ("has a known explicit class"). Optimise folder-style globs
 (`folder/**`) to the `paths_in_folder` lookup and benchmark the remaining `Path`
-scan (currently linear, `src/query/service.rs:396-404`).
+scan (currently linear, `src/query/service.rs`).
 
 Binding parity is a completion obligation. The membership resolver and the
 validation resolver must agree, tested on the unreduced class set (ticket 20).
@@ -232,7 +232,7 @@ corrections and research 06:
 - A candidate set must contain every matching row. The residual filter still
   runs on all candidates (research 06, DataFusion `Inexact`).
 - Task rows read item metadata first. Item metadata can override the note value
-  (`src/query/results.rs:313-326`). A note-field key cannot safely prune a
+  (`src/query/results.rs`). A note-field key cannot safely prune a
   filter on a task row. Scope a range key to a row mode where the key and the
   filter read the same value.
 - A facet key writer must read values through the effective accessor that ticket
@@ -345,16 +345,15 @@ unless marked otherwise.
 
 #### Row terms used in this Answer
 
-[V] Query modes are `Pages`, `Lists` and `Tasks` (`src/query/builder.rs:18-26`).
+[V] Query modes are `Pages`, `Lists` and `Tasks` (`src/query/builder.rs`).
 The row tag has only `RowType::Page` and `RowType::List { item_idx }`
-(`src/query/results.rs:25-30,42`).
+(`src/query/results.rs`).
 Pages mode creates a Page row for each matching file, including attachments
-(`src/query/service.rs:223-229,289-302`).
+(`src/query/service.rs`).
 Lists mode selects every list item. Tasks mode selects only items for which
-`item.kind().is_task()` is true
-(`src/query/service.rs:231-248`).
-Both item modes create the same List row tag (`src/query/service.rs:278-282`).
-`item_idx` addresses `Note::lists()` (`src/query/results.rs:63-77`).
+`item.kind().is_task()` is true (`src/query/service.rs`).
+Both item modes create the same List row tag (`src/query/service.rs`).
+`item_idx` addresses `Note::lists()` (`src/query/results.rs`).
 Thus, "Task rows" means rows selected by Tasks mode, not a third row tag.
 "List rows" means rows selected by Lists mode, including its task items.
 [P] The target keeps one row struct and the existing row-kind distinction
@@ -405,14 +404,14 @@ Chosen rule and invariant owner (query core, this ticket):
   the filter AST extended with `Path`, `Tag` and `Class` source atoms.
 - The IR has `PathAtom::{Literal, Folder, Glob}`. Today
   `SourceAtom::Path(GlobPattern)` is a regex glob over `display_portable`
-  (`src/query/grammar/source.rs:190`, ADR-0008:77-84). `file.path ==` is byte
+  (`src/query/grammar/source.rs`, ADR-0008). `file.path ==` is byte
   equality. The planner has a separate candidate rule for each form.
 - Every atom carries `Option<Span>` plus a clause id. Section 8 gives the
   details.
 - Class names and depth are immutable in the IR. The resolved class set lives
   in the plan. Today `visit_atoms_mut` changes `ClassExpansionMode` in place
-  (`source.rs:81`). `with_children` changes it in templates
-  (`src/template/engine/query.rs:500-537`).
+  (`source.rs`). `with_children` changes it in templates
+  (`src/template/engine/query.rs`).
 - One IR is not one predicate. The source predicate runs first. Each filter
   stage keeps its plan position.
 - A Filter may move before a Sort or before another Filter. A Filter never
@@ -424,7 +423,7 @@ Chosen rule and invariant owner (query core, this ticket):
   comparator order. Descending ties must keep stage input order. A byte order
   must not stand in for a collated string order.
 - The descending tie order needs care [V]. The executor sorts stably with a
-  reversed compare (`src/query/sort.rs:115-117`). A reverse index scan would
+  reversed compare (`src/query/sort.rs`). A reverse index scan would
   reverse the ties.
 
 What withstands scrutiny in the keep-as-is option:
@@ -447,17 +446,17 @@ Hidden DSL differences that this Answer records [V]:
 - A source `Path` atom is a case-sensitive regex glob. `file.path ==` is byte
   equality.
 - Spans exist today only inside `QuerySyntaxError`
-  (`src/query/error.rs:110-123`).
+  (`src/query/error.rs`).
 
 ADR duties (record rows, change no other ticket):
 
-- ADR-0008: `SourceAtom::Path(GlobPattern)` (`:77-84`) and "no introspection
-  of parsed expressions" (`:104`) change.
-- ADR-0010: "quoted and unquoted forms must mean the same thing" (`:30`, `:42`)
+- ADR-0008: `SourceAtom::Path(GlobPattern)` and "no introspection
+  of parsed expressions" change.
+- ADR-0010: "quoted and unquoted forms must mean the same thing"
   is false after ticket 19. The pushdown rule relies on the difference. Add
   "superseded in part".
-- ADR-0005: the eight tables and the `group_by` chain wording (`:38`, `:45`,
-  `:67`) are superseded by tickets 24 and 29.
+- ADR-0005: the eight tables and the `group_by` chain wording are superseded by
+  tickets 24 and 29.
 - ADR-0009: superseded by ticket 25.
 
 Serde form of the IR (IWE question [H]): deferred. IWE ships a serialisable
@@ -471,9 +470,9 @@ keywords, existence and type predicates, string functions and a truncating
 date function. Ticket 30 owns the relative keywords and the temporal dialect.
 `--group-by` is a CLI flag and not DSL syntax.
 
-Code made removable: the in-place class mutation (`source.rs:81`,
-`src/template/engine/query.rs:500-537`). The regex-only `SourceAtom::Path`
-(`source.rs:190`).
+Code made removable: the in-place class mutation (`source.rs`,
+`src/template/engine/query.rs`). The regex-only `SourceAtom::Path`
+(`source.rs`).
 
 Unresolved: the `member_of` spelling and the filename-period parser wait on
 ticket 30. Ticket 31 owns span preservation at the template callbacks.
@@ -519,8 +518,8 @@ Protocol rules:
 
 - R1. A range key is Exact only with a matching-set equality proof and all of
   these conditions:
-  - The literal is an unquoted token of bracket B. B is bare Int or Float,
-    bare Date or DateTime, bare Duration, or bare bool.
+  - The literal is an unquoted token of bracket B. B is bare Int or Float, bare
+    Date or DateTime, bare Duration, or bare bool.
   - The operator is `==`, `<`, `<=`, `>` or `>=`.
   - The left side is a plain field path. It has no arithmetic, call or
     field-versus-field form.
@@ -533,20 +532,20 @@ Protocol rules:
   not match across brackets. No other kind can match.
 - R3. Any quoted literal is Unsupported and scans. A later optimization may
   probe a union of brackets. The counterexamples are in the list below.
-- R4. `!=`, `null`, missing, and a `Not` of anything not provably complete
-  are never keys. In the probe, `rating != 5` returns 10 of 12 rows and
-  `rating == null` returns 6 [V].
+- R4. `!=`, `null`, missing, and a `Not` of anything not provably complete are
+  never keys. In the probe, `rating != 5` returns 10 of 12 rows and `rating ==
+  null` returns 6 [V].
 - R5. Closed bounds on a lossy monotone encoding prove a superset, not Exact.
   Temporal probes need operator-specific bounds for Date, civil DateTime,
-  instant and CalendarPeriod values under the pinned frame.
-  Point-period matching uses membership bounds. Period-period comparison uses
-  normalized `(start, unit)` identity and order. An unproved mapping is Unsupported.
+  instant and CalendarPeriod values under the pinned frame. Point-period
+  matching uses membership bounds. Period-period comparison uses normalized
+  `(start, unit)` identity and order. An unproved mapping is Unsupported.
 - R6. `Not(Exact S)` is `Exact(U \ S)`. U is ALL `files` rows, attachments
-  included. In Pages mode `img.png` is a row (`src/query/service.rs:289-302`).
+  included. In Pages mode `img.png` is a row (`src/query/service.rs`).
   `Not(Inexact)` and `Not(Unsupported)` are Unsupported.
-- R7. `And` intersects supported children. It is Exact only if every child
-  is Exact. A supported child with an Unsupported child makes it Inexact.
-  With no supported child, scan the full input.
+- R7. `And` intersects supported children. It is Exact only if every child is
+  Exact. A supported child with an Unsupported child makes it Inexact. With no
+  supported child, scan the full input.
 - `Or` unions supported children. It is Exact only if all children are Exact.
   Any Unsupported branch makes the `Or` Unsupported.
 - Empty And and Or use the universe and empty-set identities respectively.
@@ -558,7 +557,7 @@ Counterexamples for R3 and R1 (ten rows in
 [h3-redteam-round2.md](../research/29-prep/h3-redteam-round2.md), section 1):
 
 - `code == '012'` matches the String `"012"` by raw text. The feature file
-  `tests/features/note/note-frontmatter.feature:51-64` pins this [V].
+  `tests/features/note/note-frontmatter.feature` pins this [V].
 - `rating == "5"` matches String `"5"` rows.
 - `due == "2026-07-29"` matches an inline String.
 - A day literal matches period-valued rows and civil DateTimes.
@@ -571,51 +570,55 @@ or periods come from the spec text plus today's behavior. They did not run
 
 First implementation scope (override 1):
 
-- R1 applies only to proved Exact numeric, temporal and bool probes.
-  An unproved or merely Inexact encoding scans in this first scope.
+- R1 applies only to proved Exact numeric, temporal and bool probes. An unproved
+  or merely Inexact encoding scans in this first scope.
 - The scope includes And-intersection and source-plus-filter.
 - R6 `Not`, `Or`, text range tables and quoted literals wait. These cases scan.
   The residual filter still runs; it cannot recover an omitted candidate.
-- The 100 ms gate on a vault of 20,000 notes or fewer is necessary, not sufficient.
-  Add a case only after repeatable whole-process benefit is measured.
-- Compare the same query, frame and generation with the case enabled and disabled.
-  Include diagnostic cost, candidate reduction, write cost and cache size.
+- The 100 ms gate on a vault of 20,000 notes or fewer is necessary, not
+  sufficient. Add a case only after repeatable whole-process benefit is
+  measured.
+- Compare the same query, frame and generation with the case enabled and
+  disabled. Include diagnostic cost, candidate reduction, write cost and cache
+  size.
 
 Rule for Task and List rows (`file.*` has no item override):
 
 - Item metadata overrides note values on Task and List rows
-  (`src/query/results.rs:313-326`).
-- `file.*` fields have no item override (`src/query/results.rs:230-311`). Range
+  (`src/query/results.rs`).
+- `file.*` fields have no item override (`src/query/results.rs`). Range
   and
   equality keys on `file.folder`, `file.path` and `file.name` MAY prune Task
   and List rows.
 - Metadata fields and `tags` cannot prune Task and List rows.
-  [V] Item tags resolve separately (`src/query/results.rs:193-199`).
+  [V] Item tags resolve separately (`src/query/results.rs`).
   Other fields prune Pages rows only.
 - Filename-derived `file.date` keys stay Unsupported until ticket 30 defines
-  the filename-period parser. `file.day` is retired (`30:106-110`).
+  the filename-period parser. `file.day` is retired.
 
 Per-field bracket metadata and notices:
 
-- Store global bracket totals in `meta` in the same transaction as derived facts.
-  Delete old derived facts before writing replacements and totals.
+- Store global bracket totals in `meta` in the same transaction as derived
+  facts. Delete old derived facts before writing replacements and totals.
 - Totals describe the generation, not an arbitrary query's input.
 - Each atom's exact mismatch total uses its logical filter-stage input. The
   notice describes incompatible brackets there, not an optimizer's visited rows.
-- Compute notices independently of short-circuit evaluation and predicate movement.
-  Use an exact diagnostic pass when metadata cannot prove the scoped result.
+- Compute notices independently of short-circuit evaluation and predicate
+  movement. Use an exact diagnostic pass when metadata cannot prove the scoped
+  result.
 - Derived generations use effective buffer values for their diagnostic metadata.
   Disk-only totals cannot establish their notices.
-- Compare scan and pushed notices for source restrictions, And, Limit, row
-  modes and buffer edits. Include this work in the optimization benefit check.
+- Compare scan and pushed notices for source restrictions, And, Limit, row modes
+  and buffer edits. Include this work in the optimization benefit check.
 
 Source selection stays "the indexable subset of the predicates" (ticket 24):
 
-- `All`, `Not` and a source-less query enumerate `files` paths. They narrow
-  with safe predicates.
+- `All`, `Not` and a source-less query enumerate `files` paths. They narrow with
+  safe predicates.
 - A folder `Path` literal uses the path range of ticket 32.
 - A derived query scans its effective generation unless its candidate index
-  includes every replacement and addition. A persisted-only index cannot prune it.
+  includes every replacement and addition. A persisted-only index cannot prune
+  it.
 - Candidate intersections use one common path/row-identity order or membership
   sets. Value-index traversal order is not path order.
 - `Tag` uses tag keys.
@@ -638,27 +641,26 @@ Evidence (full tables in
 
 - Whole-process wall time of a scan: 28 / 48 / 204 ms at 1k / 5k / 50k notes
   [V]. With perfect pushdown (a 0-row range query) the floor is 26 / 39 / 140
-  ms. Separate floor runs measured scans at 29 / 48 / 205 ms.
-  Those runs give savings of 3 / 9 / 65 ms (31 ms at 20k).
+  ms. Separate floor runs measured scans at 29 / 48 / 205 ms. Those runs give
+  savings of 3 / 9 / 65 ms (31 ms at 20k).
 - A scan crosses 100 ms near 19k notes. The floor crosses 100 ms near 33k.
 - The floor is mostly the freshness walk: about 110 ms of 140 ms at 50k. Plain
   `find` over the same files takes 125 ms and `fd` takes 60 ms.
-- Every scan costs the same from 0.1% to 80% selectivity. Row decode,
-  assemble and drop make up 87-90% of the avoidable cost. Filter evaluation is
-  about 10 ms.
+- Every scan costs the same from 0.1% to 80% selectivity. Row decode, assemble
+  and drop make up 87-90% of the avoidable cost. Filter evaluation is about 10
+  ms.
 - Templates load the whole generation (about 50 ms at 5k, 255 ms at 50k for the
   first query, then about 3 ms per extra query). Store pushdown does not apply
   there. A host pays no walk per query.
-- Real shapes: of 45 distinct queries in the author's vault, 21 are AND-only
-  and 21 have a range. A plain field-versus-literal `or` is 2 of 47 branches.
-  `!=` and Not return 75-80% of rows. Quoted text equality is the most common
+- Real shapes: of 45 distinct queries in the author's vault, 21 are AND-only and
+  21 have a range. A plain field-versus-literal `or` is 2 of 47 branches. `!=`
+  and Not return 75-80% of rows. Quoted text equality is the most common
   equality. The decided rule excludes it at first.
 - Store costs (50k): a numeric range `rating >= 4.5` returns 5,000 rows in 171
   us. A folder range returns 7,143 rows in 261.5 us. The first match decodes
-  4.5. Path order inside one value holds. Clearing a facet takes 3.7 ms.
-  Deletes do not shrink the file. The total is 33.7 MB for either build
-  pattern. A numeric range table adds about 0 MB at 50k. A text facet table
-  adds 16.8 MB.
+  4.5. Path order inside one value holds. Clearing a facet takes 3.7 ms. Deletes
+  do not shrink the file. The total is 33.7 MB for either build pattern. A
+  numeric range table adds about 0 MB at 50k. A text facet table adds 16.8 MB.
 - Machine: macOS arm64, shipped `opt-level = "z"` binary, synthetic vaults,
   medians of 11, busy machine.
 
@@ -666,13 +668,12 @@ Attacks that no design survives [V, h2-redteam.md]:
 
 - Arbitrary user grammar extensions: any fixed IR admits a query that the
   planner cannot prove. The facet scan is the ceiling, not a gap.
-- Cross-facet joins (link targets as filterable rows) are out of scope by
-  ticket 24's settled shape. Nobody re-opens them here.
+- Cross-facet joins (link targets as filterable rows) are out of scope by ticket
+  24's settled shape. Nobody re-opens them here.
 
-Code made removable: the full-store `SourceResolver` read path and the
-`Not` full scan (`src/query/service.rs:316-406`, `:340-370`), after ticket 24
-removes them. The four multimap tables (ticket 24). This ticket owns the
-protocol that replaces them.
+Code made removable: the full-store `SourceResolver` read path and the `Not`
+full scan (`src/query/service.rs`), after ticket 24 removes them. The four
+multimap tables (ticket 24). This ticket owns the protocol that replaces them.
 
 Unresolved: range-key encode and read costs on a real vault. The range-key
 encoding of task keys. Task-row group equivalence (ticket 36).
@@ -682,77 +683,75 @@ encoding of task keys. Task-row group equivalence (ticket 36).
 Alternatives:
 
 - Keep the sort alias and document it as a sort. The first round called this
-  accepted debt [P, h1]. The alias hides the fact that no grouping happens.
-  This is the retain option.
+  accepted debt [P, h1]. The alias hides the fact that no grouping happens. This
+  is the retain option.
 - Remove the `group_by` method. Offer a sort plus a marker.
 - Nest groups as plan rows with a second row shape (Dataview `{key, rows}`).
-  Later stages would then see group rows. Every consumer would need a second
-  row mode.
+  Later stages would then see group rows. Every consumer would need a second row
+  mode.
 - Build a distinct grouped result after the plan runs. This is the chosen
   option.
 - For the key: one key, a repeatable flat composite key, or nested keys.
 
 Chosen rule (invariant owner: the query core):
 
-- A DISTINCT `GroupedQuerySet` exists. It is built after filter, sort and
-  limit. The order of the Tasks plugin is the model: filter, sort, limit,
-  group, `limit groups`.
+- A DISTINCT `GroupedQuerySet` exists. It is built after filter, sort and limit.
+  The order of the Tasks plugin is the model: filter, sort, limit, group, `limit
+  groups`.
 - It is an ordered list of `{key, rows}`. Each `rows` is a normal `QuerySet`.
 - There is NO plan stage after grouping.
 - The Rust type has no `sort`, `limit`, `where` or `count` method.
 - The template (minijinja) object returns a TYPED error for those names. The
   error names the replacement. Templates dispatch dynamically
-  (`src/template/engine/query.rs:402-433`), so the type cannot hide the names.
+  (`src/template/engine/query.rs`), so the type cannot hide the names.
 - `take_groups(n)` exists only when a template needs it.
 - ONE key now. A repeatable flat composite key is a named later extension.
   Nested group levels are rejected. They make `rows` a list of groups, not a
   `QuerySet`.
-- The plan variant `QueryTransform::GroupBy` is deleted
-  (`src/query/plan.rs:146,212-221,250-254`). It is a sort alias today.
-- `QuerySet::group_by` is replaced (`src/query/results.rs:599-608`, `:606`).
+- The plan variant `QueryTransform::GroupBy` is deleted (`src/query/plan.rs`).
+  It is a sort alias today.
+- `QuerySet::group_by` is replaced (`src/query/results.rs`).
 - The template method `group_by` stays. It now returns groups.
 
 Key equality uses ticket 19's exact numeric equality. Period membership never
 defines a key:
 
-- Numbers use the exact number line. Int against Float is exact. No compare
-  uses `i64 as f64`. `-0.0` is normalized at key build. NaN is already Null.
+- Numbers use the exact number line. Int against Float is exact. No compare uses
+  `i64 as f64`. `-0.0` is normalized at key build. NaN is already Null.
 - Temporal keys use three classes. Civil keys are `(date, time)`, with Date as
   midnight. Instant keys are epoch nanoseconds. Period keys are the normalized
   `(start, unit)`. The classes stay apart and order Civil, Instant, Period.
-- A mixed civil and instant comparator is not transitive across a DST gap
-  [V]. The probe used `America/New_York 2026-03-08`. The cycle is civil 02:30
-  < civil 03:00 < instant 07:15Z < civil 02:30. `sort_by` panicked in 15 of 200
-  runs.
-- A Date and a midnight civil DateTime are `==`-equal under ticket 19
-  (`19:137`). They group together.
+- A mixed civil and instant comparator is not transitive across a DST gap [V].
+  The probe used `America/New_York 2026-03-08`. The cycle is civil 02:30 < civil
+  03:00 < instant 07:15Z < civil 02:30. `sort_by` panicked in 15 of 200 runs.
+- A Date and a midnight civil DateTime are `==`-equal under ticket 19 . They
+  group together.
 - A CalendarPeriod groups by exact `(start, unit)` identity. Membership never
   defines its equality. The final review lifts the earlier ban on period keys.
-- Link keys use `ComparisonKey`, then target plus subpath. Ticket 19 sorts
-  Links with the collator on the target only. Equality uses the folded target
-  plus the subpath. `[[A#x]]` and `[[A#y]]` would merge under a target-only
-  sort.
+- Link keys use `ComparisonKey`, then target plus subpath. Ticket 19 sorts Links
+  with the collator on the target only. Equality uses the folded target plus the
+  subpath. `[[A#x]]` and `[[A#y]]` would merge under a target-only sort.
 - Strings use raw bytes. Collator Equal plus the byte tiebreak equals byte
   equality, so this is safe.
-- ONE grouping code path serves every key type. Hash-group on the canonical
-  key. Then sort only the distinct keys: numeric order, temporal class order,
+- ONE grouping code path serves every key type. Hash-group on the canonical key.
+  Then sort only the distinct keys: numeric order, temporal class order,
   structural order or the collator.
-- Canonicalize every existing value kind. Fan out only the outer queried list.
-  A nested list becomes one ordered structural sequence key.
+- Canonicalize every existing value kind. Fan out only the outer queried list. A
+  nested list becomes one ordered structural sequence key.
 - Object keys use byte-sorted property names and recursively canonical values.
   Insertion order never matters. Compare sorted name lists, then their values.
 - Reuse scalar normalization at every leaf. Raw structural `PartialEq` alone
   does not establish exact Int/Float group equivalence.
 - Tags project String elements. Inlinks project Link elements.
-- Structural labels render canonical property and element order deterministically.
-  Templates keep the complete typed key.
+- Structural labels render canonical property and element order
+  deterministically. Templates keep the complete typed key.
 
 Measured at 50k rows (RedTeam29, replica comparators, real `jiff` and
 `icu_collator`) [V]:
 
 - Sort plus split: 5-7 ms for numbers and bytes. 50-210 ms with ICU.
-- Hash-group for numbers and byte keys: 2-8 ms.
-  With ICU, it takes 132 ms at 50,000 text groups.
+- Hash-group for numbers and byte keys: 2-8 ms. With ICU, it takes 132 ms at
+  50,000 text groups.
 - A naive Int-Float comparator through `as f64` breaks transitivity. It gives
   563 violating triples per 2M values. It gives 315 groups against 29 true
   classes.
@@ -783,27 +782,25 @@ Required invariant tests (owner: the query core test suite):
 
 Fan-out and counts:
 
-- Fan out the outer list only. Deduplicate its canonical keys before adding
-  a row. Each row belongs at most once to each group.
+- Fan out the outer list only. Deduplicate its canonical keys before adding a
+  row. Each row belongs at most once to each group.
 - Preserve pre-group row order inside each group.
 - Missing, Null, NaN normalized to Null and an empty outer list use the null
   group. Empty nested lists and empty objects remain distinct structural keys.
 - Today `SortKey::from_value_ref` turns lists, objects, Tags and Inlinks into
-  Null (`src/query/sort.rs:316-317,346-349`). A new group-key projection is
-  needed.
+  Null (`src/query/sort.rs`). A new group-key projection is needed.
 - R is the set of rows after filter, sort and limit. D is the number of rows in
   R.
-- Membership total M is the sum of distinct canonical memberships per row.
-  An empty outer list contributes one null membership.
-  Group sizes sum to M, not D.
-- Template accessors: `len` is the group count. `row_count` is the distinct
-  row count. `entry_count` is the membership count.
+- Membership total M is the sum of distinct canonical memberships per row. An
+  empty outer list contributes one null membership. Group sizes sum to M, not D.
+- Template accessors: `len` is the group count. `row_count` is the distinct row
+  count. `entry_count` is the membership count.
 - Rows carry a PRE-GROUP ORDINAL and a flatten ordinal. Distinct counts and
   dedup use the ordinal.
 - Do not use the `QueryRow::eq` method for dedup. It deep-compares the whole
-  `FileEntry` (`results.rs:428-434`).
-- `(note position, item_idx)` alone collides after `flatten`
-  (`results.rs:36-43`, `plan.rs:255-272`).
+  `FileEntry` (`results.rs`).
+- `(note position, item_idx)` alone collides after `flatten` (`results.rs`,
+  `plan.rs`).
 
 Group order and field rules:
 
@@ -813,34 +810,34 @@ Group order and field rules:
 - A `-` prefix is descending. This is the `+` and `-` grammar of
   `SortOrder::parse`.
 - The asymmetry is deliberate. A bare `--sort FIELD` is DESCENDING today
-  (`src/cli/mod.rs:293-302`, `src/query/GLOSSARY.md:43-47`). `--asc` and
-  `--desc` need `--sort`. The help text says so.
+  (`src/cli/mod.rs`, `src/query/GLOSSARY.md`). `--asc` and `--desc` need
+  `--sort`. The help text says so.
 - `--sort` orders the rows inside each group.
 - `--group-by` takes exactly one term. A comma is an error.
 - An absent note field groups under the null group.
-- An unknown or malformed `file.*` field is an error with a `help:` line.
-  Today `--sort nosuch` exits 0 and does nothing.
+- An unknown or malformed `file.*` field is an error with a `help:` line. Today
+  `--sort nosuch` exits 0 and does nothing.
 
 Heading label and form:
 
-- The label is the canonical spelling of the key class. For strings and Links
-  it is the byte-minimal raw spelling among the class members. For numbers it
-  is the normalized decimal (`5`, not `5.0`). Dates use ISO. Durations use the
+- The label is the canonical spelling of the key class. For strings and Links it
+  is the byte-minimal raw spelling among the class members. For numbers it is
+  the normalized decimal (`5`, not `5.0`). Dates use ISO. Durations use the
   canonical form.
 - The label is NEVER "the first row's key". That key changes when a file is
   renamed.
 - Null prints `(none)`. Normalize the display label first.
 - For a non-null label equal to `(none)` or starting with `\`, add one leading
   backslash. Apply output escaping exactly once after this marker.
-- The heading level is fixed at `##`. The help text says it can collide when
-  you paste it under a note heading.
+- The heading level is fixed at `##`. The help text says it can collide when you
+  paste it under a note heading.
 - For headings, fold `\n \r U+2028 U+2029 U+0085 \v \f` to spaces and trim
   before adding the marker. Then escape Markdown delimiters.
 - Render remaining C0, DEL, C1 and Unicode directional formatting controls as
-  visible escapes before output. Preserve ordinary RTL letters and combining marks.
-- Markdown escaping covers `` \ ` * _ [ ] < > & ~ $ { } ^ ! ``.
-  Escape a trailing run of `#` after a space or at the start.
-  Do not escape `- + = |`.
+  visible escapes before output. Preserve ordinary RTL letters and combining
+  marks.
+- Markdown escaping covers `` \ ` * _ [ ] < > & ~ $ { } ^ ! ``. Escape a
+  trailing run of `#` after a space or at the start. Do not escape `- + = |`.
 - Cover ESC, backspace, carriage return, bidi formatting controls, Persian,
   Hebrew and leading-backslash sentinel strings in output tests.
 - A property test uses pulldown-cmark 0.13 (GFM, math, heading attributes,
@@ -850,32 +847,30 @@ Heading label and form:
 CLI surface:
 
 - `--group-by FIELD` exists on `list`, `table` and `task`. A shared flattened
-  clap args struct holds it, beside `SortArgs` (`src/cli/mod.rs:289-303`).
-- The output is one markdown heading per group. Then the existing renderer
-  draws that group. `task --table` renders one table per group with its own
-  header.
-- `--count` with `--group-by` prints `n<TAB>key` per group.
-  Encode TAB, carriage return, newline, remaining line separators and backslash.
-  Apply the same non-null marker after label normalization.
+  clap args struct holds it, beside `SortArgs` (`src/cli/mod.rs`).
+- The output is one markdown heading per group. Then the existing renderer draws
+  that group. `task --table` renders one table per group with its own header.
+- `--count` with `--group-by` prints `n<TAB>key` per group. Encode TAB, carriage
+  return, newline, remaining line separators and backslash. Apply the same
+  non-null marker after label normalization.
 - WITHOUT `--group-by`, `--count` stays a bare number. That shape is frozen.
-- `--count` is NEW on `list` and `table`. Today only `task` has it, and
-  `list --count` exits 2. The help text says the output form changes with
+- `--count` is NEW on `list` and `table`. Today only `task` has it, and `list
+  --count` exits 2. The help text says the output form changes with
   `--group-by`.
-- `--count` wins over `--table`. It keeps the stderr summary off, as flat
-  `task --count` does.
-- The stderr summary keeps the house style: `D page(s) in G group(s) from
-  ROOT`. Tasks print `D task(s)`. The existing form is `N page(s) from ROOT`
-  (`src/cli/list.rs:65`). An `(M listings)` clause appears only when M is not
-  D.
+- `--count` wins over `--table`. It keeps the stderr summary off, as flat `task
+  --count` does.
+- The stderr summary keeps the house style: `D page(s) in G group(s) from ROOT`.
+  Tasks print `D task(s)`. The existing form is `N page(s) from ROOT`
+  (`src/cli/list.rs`). An `(M listings)` clause appears only when M is not D.
 - An empty grouped result exits 0 and prints nothing.
 - There is no `--format` flag yet. Printed labels are presentation, not typed
-  serialization. Number `5` and String `5` can share a label.
-  Templates retain lossless typed keys. Do not promise machine round-tripping.
+  serialization. Number `5` and String `5` can share a label. Templates retain
+  lossless typed keys. Do not promise machine round-tripping.
 
 Template migration:
 
 - Old `group_by(x)` equals `sort(x, false)`. Templates default `sort` to
-  DESCENDING (`src/template/engine/query.rs:411-415`).
+  DESCENDING (`src/template/engine/query.rs`).
 - A template that reads a group as a row fails loudly for `{{ n.file.name }}`.
   The value is undefined.
 - The change is silent for `{{ n.file }}` (prints empty), `{% if n.file %}`
@@ -883,12 +878,12 @@ Template migration:
 
 Uses to update:
 
-- `src/query/plan.rs:146,212-221,250-254`.
-- `src/query/results.rs:599-608` and the tests at `results.rs:1250-1311`.
-- `src/template/engine/query.rs:30-33,325-338,422-425,928-941`. The test
+- `src/query/plan.rs`.
+- `src/query/results.rs` and the tests at `results.rs`.
+- `src/template/engine/query.rs`. The test
   `group_by_clusters_equal_values_ascending` expects `"b a "`.
-- `src/query/GLOSSARY.md:65` and `docs/adr/0005-template-query.md:67`.
-- `tests/baselines/pub-tokens.txt:1020,1046`.
+- `src/query/GLOSSARY.md` and `docs/adr/0005-template-query.md`.
+- `tests/baselines/pub-tokens.txt`.
 - No `.feature` file, e2e test, example, bench or `docs/vault` template uses
   `group_by`. This search cannot cover user templates outside the repo [H].
 
@@ -897,16 +892,15 @@ Precedent (the full comparison is in
 
 - Dataview `GROUP BY` yields `{key, rows}` and sorts keys ascending with nulls
   first [V].
-- Tasks groups last, with headings: filter, sort, limit, group, `limit
-  groups` [V].
-- jq `group_by` returns arrays sorted by key. pandas returns a `GroupBy`
-  object. SQL collapses the rows [V].
-- Nushell `--to-table` keeps key types, so `1` and `1.0` are separate groups.
-  It is new in 0.117.0. Traces differs: ticket 19 uses exact numeric equality
+- Tasks groups last, with headings: filter, sort, limit, group, `limit groups`
   [V].
+- jq `group_by` returns arrays sorted by key. pandas returns a `GroupBy` object.
+  SQL collapses the rows [V].
+- Nushell `--to-table` keeps key types, so `1` and `1.0` are separate groups. It
+  is new in 0.117.0. Traces differs: ticket 19 uses exact numeric equality [V].
 
 Lazy errors through minijinja: `Object::get_value` returns `Option`, and
-`enumerate` returns an `Enumerator` (`src/template/engine/query.rs:316-323`).
+`enumerate` returns an `Enumerator` (`src/template/engine/query.rs`).
 Neither can fail. Ticket 21's memoized typed error has no channel for
 `GroupedQuerySet`. Ticket 31 owns the handoff.
 
@@ -934,7 +928,7 @@ Chosen rule (owner: the query core builder):
 - CLI synthesis moves to the builder. This fixes `traces task --status é` and
   `traces task --status ✓`, which return 0 tasks today [V].
   `char::escape_default` makes `\u{e9}`, and the DSL does not decode it
-  (`src/cli/task.rs:46`). Change row 13.
+  (`src/cli/task.rs`). Change row 13.
 - Ticket 33 decides who calls the core. Tell ticket 33 that ticket 29 settled
   synthesis. A second decision there would duplicate this one.
 - The builder must validate the target shapes that the strings check today.
@@ -942,7 +936,7 @@ Chosen rule (owner: the query core builder):
 - Serde form of the IR is deferred (section 1).
 
 Code made removable: the string formatting in `TaskFilterArgs::status_filter`
-(`src/cli/task.rs:42-64`, `:44-46`). `refresh_query` (`src/cli/mod.rs:339`)
+(`src/cli/task.rs`). `refresh_query` (`src/cli/mod.rs`)
 stays unchanged for `--where` strings.
 
 Unresolved: who calls the builder (ticket 33). The template bridge (ticket 31).
@@ -971,20 +965,20 @@ generation:
 - `QuerySet` and `GroupedQuerySet` read one pinned generation. It is persisted
   or derived. They know NOTHING about buffers.
 - The seam is "any pinned generation". Ticket 28 owns the derived generation.
-- Each immutable query family owns a shared `Arc` memo. Clones share it.
-  A changed plan, frame or generation gets a distinct memo identity.
-- Keep no process-global memo registry. The memo retains the generation and
-  the clause table for cached failures. Equal predicates with different origins
-  do not share diagnostic errors.
+- Each immutable query family owns a shared `Arc` memo. Clones share it. A
+  changed plan, frame or generation gets a distinct memo identity.
+- Keep no process-global memo registry. The memo retains the generation and the
+  clause table for cached failures. Equal predicates with different origins do
+  not share diagnostic errors.
 - The grouped memo also includes its field and direction.
-- Each result names `(incarnation, revision, derived_id)` within its host lifetime.
-  Cross-process consumers need a host-session identity as well.
-- Relative keywords (`today`, `eom`, ticket 30) bind to the pinned frame at
-  plan time. A standalone query acquires a new frame. A render or request
-  supplies its shared frame (ticket 21).
-- Every terminal returns or propagates a memoized typed error. The terminals
-  are iteration, indexing, formatting and grouping. No terminal returns an
-  empty result for a failure (tickets 21 and 31).
+- Each result names `(incarnation, revision, derived_id)` within its host
+  lifetime. Cross-process consumers need a host-session identity as well.
+- Relative keywords (`today`, `eom`, ticket 30) bind to the pinned frame at plan
+  time. A standalone query acquires a new frame. A render or request supplies
+  its shared frame (ticket 21).
+- Every terminal returns or propagates a memoized typed error. The terminals are
+  iteration, indexing, formatting and grouping. No terminal returns an empty
+  result for a failure (tickets 21 and 31).
 - A corrupt required facet is a complete cache miss. The query falls back to a
   fresh parse, exits 0 and prints one notice (ticket 24).
 
@@ -1003,43 +997,41 @@ Alternatives:
 - Three row types behind one enum.
 - A synthetic global order across the row modes. No consumer needs it.
 - A row that holds `Arc<WorkspaceIndex>` plus a `RowIndex` (today:
-  `src/query/results.rs:37-43,48-55`), against a row that owns its
+  `src/query/results.rs`), against a row that owns its
   `Arc<FileEntry>`.
 
 Chosen rule (invariant owner: the query core):
 
 - [P] One row struct with the existing row-kind tag. See the row terms above.
   [V] The current tags are `RowType::Page` and `RowType::List { item_idx }`
-  (`src/query/results.rs:25-30,42`).
+  (`src/query/results.rs`).
 - There is no synthetic global order.
 - Document order is `(note position, item_idx)`, compared in that order. The
-  flatten ordinal follows. `item_idx` is the index into `Note::lists`
-  (ticket 24). Task and list rows both carry it.
+  flatten ordinal follows. `item_idx` is the index into `Note::lists` (ticket
+  24). Task and list rows both carry it.
 - This is the item order contract that ticket 23 asked for. It fixes
-  `cmp_document_order` (`results.rs:420-431`), which ignores `item_idx`.
-- A row owns its matching `Arc<FileEntry>` (ticket 24). Today this is not
-  built. `WorkspaceIndex.entries` is `Box<[FileEntry]>`
-  (`src/index/entry.rs:21-22`). `QueryRow` holds `Arc<WorkspaceIndex>` plus a
-  `RowIndex`.
-- A row carries a pre-group ordinal and a flatten ordinal (section 3).
-  Distinct counts and dedup use the ordinal.
+  `cmp_document_order` (`results.rs`), which ignores `item_idx`.
+- A row owns its matching `Arc<FileEntry>` (ticket 24). Today this is not built.
+  `WorkspaceIndex.entries` is `Box<[FileEntry]>` (`src/index/entry.rs`).
+  `QueryRow` holds `Arc<WorkspaceIndex>` plus a `RowIndex`.
+- A row carries a pre-group ordinal and a flatten ordinal (section 3). Distinct
+  counts and dedup use the ordinal.
 - Task display depth uses the active preceding ancestor stack in the emitted
   list or group. An ancestor appearing later is not a display parent.
-- Emit an orphan at depth zero. Do not reorder rows after an explicit sort.
-  Keep source `list.depth` unchanged. Apply this rule to flat and grouped output.
-- Today's renderer uses `row.depth()` (`src/query/format.rs:225-227`).
+- Emit an orphan at depth zero. Do not reorder rows after an explicit sort. Keep
+  source `list.depth` unchanged. Apply this rule to flat and grouped output.
+- Today's renderer uses `row.depth()` (`src/query/format.rs`).
 - Evidence [V, binary]: `traces task --todo` with a done parent prints the
   orphaned child at depth 1. Sorting does the same. Change row 12 records the
-  fix. It touches frozen stdout and is an intentional defect fix. The
-  maintainer acknowledged it.
+  fix. It touches frozen stdout and is an intentional defect fix. The maintainer
+  acknowledged it.
 
-Code made removable: the whole-index borrow in `QueryRow`
-(`results.rs:37-43,48-55`). The use of `QueryRow::eq` for row identity
-(`results.rs:428-434`).
+Code made removable: the whole-index borrow in `QueryRow` (`results.rs`). The
+use of `QueryRow::eq` for row identity (`results.rs`).
 
-Unresolved: the exact Rust shape of the row API (ticket 35). The cold CLI
-builds `FileEntry` rows for survivors only (ticket 24). Task-row group
-equivalence (ticket 36).
+Unresolved: the exact Rust shape of the row API (ticket 35). The cold CLI builds
+`FileEntry` rows for survivors only (ticket 24). Task-row group equivalence
+(ticket 36).
 
 ### 7. Ownership of `format.rs` output rendering
 
@@ -1047,28 +1039,25 @@ Alternatives:
 
 - Keep `format.rs` inside the query module. This is the retain option.
 - Move rendering to an output module. Ticket 35 picks the path.
-- Keep two Markdown paths, as Nushell does (`to md` and
-  `table --theme markdown`).
+- Keep two Markdown paths, as Nushell does (`to md` and `table --theme
+  markdown`).
 - Shared column widths for grouped tables, against per-group widths.
 
 Chosen rule (invariant owner: the output module). Ticket 35 owns the module
 path:
 
-- The render code moves to an output module. `src/query/GLOSSARY.md:3-4` and
-  `GLOSSARY-MAP.md:23-24` change their module descriptions.
-- The pipeline has three steps. Typed rows or groups (an ITERATOR) go to a
-  plain cell grid with no domain types. ONE markdown renderer draws the grid.
+- The render code moves to an output module. `src/query/GLOSSARY.md` and
+  `GLOSSARY-MAP.md` change their module descriptions.
+- The pipeline has three steps. Typed rows or groups (an ITERATOR) go to a plain
+  cell grid with no domain types. ONE markdown renderer draws the grid.
 - The query core returns typed rows and groups and no text.
 - Widths are PER-GROUP. The renderer streams groups, so its grid holds one group
-  at a time.
-  This bounds incremental render-grid memory, not memory for hash grouping or
-  retained rows.
-- Flat tables still need global widths, which take two passes.
-  Only grouped output streams.
-- Keep the existing cell escaping and its property tests (`format.rs:268-290`,
-  `:293-380`).
-- The zero-column table form `"||\n"` (`format.rs:126`) needs a grouped
-  equivalent.
+  at a time. This bounds incremental render-grid memory, not memory for hash
+  grouping or retained rows.
+- Flat tables still need global widths, which take two passes. Only grouped
+  output streams.
+- Keep the existing cell escaping and its property tests (`format.rs`).
+- The zero-column table form `"||\n"` (`format.rs`) needs a grouped equivalent.
   An empty grouped result prints nothing and exits 0.
 - There is no terminal-width planning. The output is markdown, not a terminal
   table.
@@ -1105,7 +1094,7 @@ Nushell lessons (details in
 
 Code made removable: the render code inside the query module, once the output
 module exists. The flat `render` entry point that takes `&[QueryRow]`
-(`format.rs:83`) changes to take an iterator.
+(`format.rs`) changes to take an iterator.
 
 Unresolved: the module path and the Rust API of `GroupedQuerySet` (ticket 35).
 The EPIPE writer contract shares a location with the output module. Tickets 33
@@ -1126,9 +1115,8 @@ Chosen rule (invariant owner: the IR builder):
   into that clause.
 - Typed builder calls carry `None`.
 - A repeatable `--where` fuses into one And, so a clause id is needed.
-- Spans exist today only inside `QuerySyntaxError`
-  (`src/query/error.rs:110-123`). The evaluator has no spans, and
-  `FieldPathError` carries none.
+- Spans exist today only inside `QuerySyntaxError` (`src/query/error.rs`). The
+  evaluator has no spans, and `FieldPathError` carries none.
 - A notice after the parse needs an atom span and a clause id. Ticket 19 and
   ticket 34 notices need them.
 - `QueryError` keeps its spans intact. Tickets 31 and 34 decide the rest.
@@ -1140,15 +1128,14 @@ Notices:
   text.
 - Dedup key: one notice per (document or path, kind) until the state changes or
   the buffer closes.
-- Error shape: miette with one `help:` line that names the replacement. This
-  is the house style. `grep` finds no `warning:` text in `src/`.
+- Error shape: miette with one `help:` line that names the replacement. This is
+  the house style. `grep` finds no `warning:` text in `src/`.
 - Exact mismatch notices use each atom's logical stage input. Global bracket
   totals are a shortcut only when they prove that scoped result (section 2).
 
-Unresolved: how spans survive the minijinja callbacks (ticket 31). The
-envelope, the severity and the display (ticket 34). Whether the plan collects
-notices on the result instead of printing them [P, z-grilling-guide.md]
-(ticket 34).
+Unresolved: how spans survive the minijinja callbacks (ticket 31). The envelope,
+the severity and the display (ticket 34). Whether the plan collects notices on
+the result instead of printing them [P, z-grilling-guide.md] (ticket 34).
 
 Code made removable: none. The span carrier is new.
 
@@ -1157,7 +1144,7 @@ Code made removable: none. The span carrier is new.
 Alternatives:
 
 - Keep the position-only compare. This is the retain option. It ignores
-  `item_idx` (`src/query/results.rs:420-431`).
+  `item_idx` (`src/query/results.rs`).
 - Compare position, then `item_idx` (chosen).
 - A synthetic global order across modes. Rejected, as in section 6.
 
@@ -1166,12 +1153,11 @@ Chosen rule (invariant owner: the query core):
 - Document order is `(note position, item_idx)`, compared in that order.
 - The flatten ordinal breaks ties between rows that `flatten` creates from one
   row.
-- Each Sort and TopK preserves stage input order for equal keys.
-  Document order supplies that input order only before earlier stages reorder
-  rows.
-  [V] The current Sort is stable (`src/query/sort.rs:129-151`).
-  TopK uses the stage input ordinal (`src/query/plan.rs:286-301`).
-  A re-sort at the presentation edge is not enough.
+- Each Sort and TopK preserves stage input order for equal keys. Document order
+  supplies that input order only before earlier stages reorder rows. [V] The
+  current Sort is stable (`src/query/sort.rs`). TopK uses the stage input
+  ordinal (`src/query/plan.rs`). A re-sort at the presentation edge is not
+  enough.
 - The default note order is the path order of ticket 32: the key is the path
   with `/` replaced by `0x00`. Stdout order stays the same as today. No change
   row is needed for order.
@@ -1180,11 +1166,10 @@ Required tests:
 
 - `cmp_document_order` compares two list items in one note by `item_idx`.
 - `flatten` of one multi-value field keeps a stable order through the ordinal.
-- The unit test `index/service.rs:488-505` keeps passing: it expects
-  `["notes/note.md", "notes-x.md"]`.
+- The unit test `index/service.rs` keeps passing: it expects `["notes/note.md",
+  "notes-x.md"]`.
 
-Code made removable: the position-only `cmp_document_order`
-(`results.rs:420-431`).
+Code made removable: the position-only `cmp_document_order` (`results.rs`).
 
 Unresolved: none for this ticket. Ticket 23 uses this contract.
 
@@ -1200,19 +1185,18 @@ Alternatives:
 
 Chosen rule (invariant owner: the query core). Ticket 30 owns the spelling:
 
-- `member_of` is reserved as an IR node name only. It has no implementation
-  and no frontend. The spelling waits on ticket 30.
+- `member_of` is reserved as an IR node name only. It has no implementation and
+  no frontend. The spelling waits on ticket 30.
 - Its relation is never a range key and never a group key.
-- Membership stays separate from equality and from the sort key (tickets 19
-  and 21). A period compares against an instant through the local civil date
-  of the instant. A skipped next day does not invalidate a real prior day.
+- Membership stays separate from equality and from the sort key (tickets 19 and
+  21). A period compares against an instant through the local civil date of the
+  instant. A skipped next day does not invalidate a real prior day.
 - Period and period equality is the exact `(start, unit)` identity (ticket 21).
 - The advisory bracket-mismatch notice rides the notice mechanism (section 8).
   The envelope belongs to ticket 34.
 
 Unresolved: the spelling and the frontend (ticket 30). The first-round notice
-for rows with a Null date (h2) is not adopted here. Tickets 30 and 34 decide
-it.
+for rows with a Null date (h2) is not adopted here. Tickets 30 and 34 decide it.
 
 Code made removable: none. The node name is new.
 
@@ -1243,8 +1227,9 @@ Measured here (single machine, macOS arm64) [V]:
   about 10 ms for a String comparator at opt-level 3.
 - Normalization costs (`g1-probes.md`, ticket 32).
 - Original overlay prototype: full rebuild 113.8 ms at 50k, plus 59.3 ms gather;
-  12.7 ms at 5k. These are not amended resolution-context lifecycle measurements.
-  A new exact-base/effective-path context can need another full resolve.
+  12.7 ms at 5k. These are not amended resolution-context lifecycle
+  measurements. A new exact-base/effective-path context can need another full
+  resolve.
 - The grouping costs (section 3) and grouped render costs (section 7).
 - End-to-end pushdown UX (`g2-pushdown-ux.md`).
 
@@ -1252,8 +1237,7 @@ Still open (ticket 36 or the implementation):
 
 - Owned against view for `file.name` sort and filter (the ticket 18 gate).
   `NoteFieldValueRef` goes only after this benchmark.
-- Folder glob against the linear `Path` scan
-  (`src/query/service.rs:396-404`).
+- Folder glob against the linear `Path` scan (`src/query/service.rs`).
 - Range-key encode and read costs on a real vault.
 - Full row materialization on a real vault.
 - Same-stem candidates at 5,000. RELABEL the "trie 224 ms against flat 412-436
@@ -1295,14 +1279,13 @@ the decisions in these ways:
   source atom only. The final set states the full protocol. The first
   implementation pushes only unquoted range keys, And-intersection and
   source-plus-filter.
-- The range-key rule narrowed (the Q5 correction). Quoted literals, `!=`,
-  `null` and missing never use a range key. `Or` scans in the first
-  implementation.
-  The full protocol can support `Or` later (R7). The counterexample table has
-  ten rows.
+- The range-key rule narrowed (the Q5 correction). Quoted literals, `!=`, `null`
+  and missing never use a range key. `Or` scans in the first implementation. The
+  full protocol can support `Or` later (R7). The counterexample table has ten
+  rows.
 - R6 replaced "Not over Exact is Inexact". `Not(Exact S)` is `Exact(U \ S)`.
-- Task and List rows may prune on `file.*` keys. The first round banned all
-  note keys for Task rows.
+- Task and List rows may prune on `file.*` keys. The first round banned all note
+  keys for Task rows.
 - Bracket-mismatch counts moved into the `meta` facet. A residual-only notice
   would vanish on a pruned run.
 - `GroupBy` is real grouping. The first round kept the alias as accepted debt.
@@ -1320,8 +1303,7 @@ the decisions in these ways:
 - The group heading shows a canonical spelling, not the first row's key.
 - The heading uses `heading_escape`. The naive heading failed 64,587 of 400k
   keys.
-- `--count` lines use `n<TAB>key`, not `key: n`. The summary keeps `from
-  ROOT`.
+- `--count` lines use `n<TAB>key`, not `key: n`. The summary keeps `from ROOT`.
 - Shared widths became per-group widths (the Q27 correction).
 - `member_of` shrank to an IR node name (AuditSimplicity item 20).
 - The overlay seam moved from "swap rows before memoization" to "any pinned
@@ -1332,21 +1314,18 @@ the decisions in these ways:
 - `format.rs` moved from "record a preference" to a decision (output module).
 - The maintainer rejected three audit proposals: Exact equality only for the
   first pushdown, compile-time absence of grouped-set methods, and a
-  base-id-only
-  memo key.
-  Templates dispatch dynamically, so the template adapter still needs typed
-  errors.
+  base-id-only memo key. Templates dispatch dynamically, so the template adapter
+  still needs typed errors.
 
 ### Evidence limits
 
 - Ticket 19 semantics are not implemented. The range-key counterexamples that
   rely on adaptive literals or periods come from the spec text plus today's
   behavior. They did not run [H].
-- The comparator probes use replica comparators. They use real `jiff` and
-  real `icu_collator` with the numeric-ordering and tertiary-strength settings
-  of ticket 19. They do not use the real `SortKey`.
-- The minijinja probe used a map-shaped group, not the real
-  `GroupedQuerySet`.
+- The comparator probes use replica comparators. They use real `jiff` and real
+  `icu_collator` with the numeric-ordering and tertiary-strength settings of
+  ticket 19. They do not use the real `SortKey`.
+- The minijinja probe used a map-shaped group, not the real `GroupedQuerySet`.
 - Windows `Path::cmp` order is not checked.
 - The UX data is synthetic and comes from a busy machine.
 - `docs/vault` queries are Dataview and Tasks queries. The mapping to Traces
@@ -1359,9 +1338,9 @@ the decisions in these ways:
 
 ### Resolution and handoffs
 
-The grammar and plan shape: two frontends lower to ONE predicate IR. A plan
-with a pushdown protocol runs on one pinned generation. The residual filter
-always runs. The first pushdown ships unquoted range keys only.
+The grammar and plan shape: two frontends lower to ONE predicate IR. A plan with
+a pushdown protocol runs on one pinned generation. The residual filter always
+runs. The first pushdown ships unquoted range keys only.
 
 The alternatives that the Answer weighs:
 
@@ -1382,9 +1361,8 @@ the grilling-time duties.
 Their presence does not assert that each duty remains undone.
 
 - Ticket 24:
-  - Supersession rows for the platform family (rule 3 at `:299` and the
-    store identity text at `:311`). Record the release order check by
-    NUL-form key (from ticket 32).
+  - Supersession rows for the platform family (rule 3 and the store identity
+    text). Record the release order check by NUL-form key (from ticket 32).
   - Relabel the "224 ms trie" figure (section on the measurement plan).
   - Store per-field bracket counts in the `meta` facet, in the same write
     transaction as the facet change.
@@ -1397,18 +1375,17 @@ Their presence does not assert that each duty remains undone.
 - Tickets 26 and 27: the path form equals the store form. Record the platform
   family supersession.
 - Ticket 28:
-  - The seam is "any pinned generation". `QuerySet` knows nothing about
-    buffers.
+  - The seam is "any pinned generation". `QuerySet` knows nothing about buffers.
   - The memo key is `(plan, frame, generation triple)`. The triple holds the
     base pair and the `derived_id`.
   - A new overlay state is a new derived generation. It gives rows that own
     `Arc<FileEntry>`.
   - A path-set change does ONE full re-resolve: 113.8 ms at 50k (about 173 ms
-    with the note gather) and 12.7 ms at 5k. It runs off the request thread.
-    The change is latest-wins. Queries keep the previous derived generation
-    until the new one publishes.
+    with the note gather) and 12.7 ms at 5k. It runs off the request thread. The
+    change is latest-wins. Queries keep the previous derived generation until
+    the new one publishes.
   - The existing refresh uses `patch_and_diff` only when `is_paths_unchanged`
-    (`src/index/refresh.rs:413-421`, comment at `:468-471`).
+    (`src/index/refresh.rs`).
 - Ticket 30:
   - Relative keywords (`today`, `eom`) and key bounds bind under the pinned
     frame at plan time.
@@ -1417,8 +1394,7 @@ Their presence does not assert that each duty remains undone.
     Unsupported until then. `file.day` is retired.
   - `date.format`.
 - Ticket 31:
-  - A fallible-terminal channel for minijinja
-    (`src/template/engine/query.rs:316-323`).
+  - A fallible-terminal channel for minijinja (`src/template/engine/query.rs`).
   - The group value form, and a template adapter that returns `{key, rows}`.
     Ticket 16 freezes the capability.
   - Span preservation at the callbacks.
@@ -1426,11 +1402,11 @@ Their presence does not assert that each duty remains undone.
 - Ticket 32:
   - The sort and range key is the path with `/` replaced by `0x00`. The folder
     range is `[prefix\0, prefix\x01)`.
-  - A path-literal or folder source atom that misses the exact listed bytes
-    uses the comparison-key map. A unique match rewrites the atom to the
-    listed spelling at planning. Several matches return the UNION of
-    candidates with no diagnostic. Globs are never rewritten. String
-    comparisons such as `file.folder == "x"` stay exact.
+  - A path-literal or folder source atom that misses the exact listed bytes uses
+    the comparison-key map. A unique match rewrites the atom to the listed
+    spelling at planning. Several matches return the UNION of candidates with no
+    diagnostic. Globs are never rewritten. String comparisons such as
+    `file.folder == "x"` stay exact.
   - Glob atoms keep pattern text. Literal and folder atoms keep typed input
     until planning resolves them to listed `RelativePath` values.
 - Ticket 33:
@@ -1464,24 +1440,20 @@ ADR duties: ADR-0005, ADR-0008, ADR-0009 and ADR-0010 (section 1).
 
 Glossary duties:
 
-- `src/GLOSSARY.md:20`, `:63-68`, `:107-115` and `:98-105` (the Ambiguity
-  entry is already consistent).
-- `src/query/GLOSSARY.md:65` (`group_by` becomes a terminal that returns a
-  Grouped Query Set).
-- `src/query/GLOSSARY.md:43-47` (Sort Order defaults to descending, while
-  `--group-by` is ascending).
-- `src/query/GLOSSARY.md:3-4` and `GLOSSARY-MAP.md:23-24` (output rendering
-  moves).
-- `src/index/GLOSSARY.md:52` (Index Fingerprint is stale per ticket 25).
+- `src/GLOSSARY.md` (the Ambiguity entry is already consistent).
+- `src/query/GLOSSARY.md` (`group_by` becomes a terminal that returns a Grouped
+  Query Set).
+- `src/query/GLOSSARY.md` (Sort Order defaults to descending, while `--group-by`
+  is ascending).
+- `src/query/GLOSSARY.md` and `GLOSSARY-MAP.md` (output rendering moves).
+- `src/index/GLOSSARY.md` (Index Fingerprint is stale per ticket 25).
 
-The map duties below were done on 2026-11-16. The cited map line numbers are
-historical, not current anchors.
+The map duties below were done on 2026-11-16.
 
 Map duties (`.scratch/arch-design/map.md`): add "Decisions so far" lines for
-tickets 28, 29 and 32. Update lines 438-441, which name the platform family in
-the identity. Graduate the fog item "Persistence portability" (about `:520`).
-Keep "Output formats" open, because `--format` is deferred. Record the
-Blocked-by repairs.
+tickets 28, 29 and 32. Update the entries that name the platform family in the
+identity. Graduate the fog item "Persistence portability". Keep "Output
+formats" open, because `--format` is deferred. Record the Blocked-by repairs.
 
 Observations for tickets 24, 25 and 33. They are not decided here
 ([g2-pushdown-ux.md](../research/29-prep/g2-pushdown-ux.md)):
@@ -1502,30 +1474,30 @@ The code does not implement this ticket. This table lists what the refactor
 changes. The locations come from the code reads of the grilling session
 (2026-11-14 and 2026-11-15).
 
-| Area | Today (path:line) | Target (ticket decision) | Depends on |
+| Area | Today (file and symbol) | Target (ticket decision) | Depends on |
 | --- | --- | --- | --- |
-| Predicate IR | Separate parsers `src/query/grammar/{filter,source,expr}.rs`. `SourceAtom::Path(GlobPattern)` at `source.rs:190`. | One IR with `PathAtom::{Literal, Folder, Glob}` and `Tag`, `Class` atoms. Both grammars lower to it. | Ticket 19, ticket 30 |
-| Class expansion | `visit_atoms_mut` changes `ClassExpansionMode` in place (`source.rs:81`). `with_children` does the same in templates (`src/template/engine/query.rs:500-537`). | Class names and depth are immutable in the IR. The plan holds the resolved set. | Ticket 20 |
-| Spans | Spans only in `QuerySyntaxError` (`src/query/error.rs:110-123`). | `Option<Span>` on every atom plus a clause id. A builder-owned clause table. | Ticket 31, ticket 34 |
-| Filter moves and TopK | `fuse_sort_limit` fuses a Sort and a Limit into `TopK` (`src/query/plan.rs:110-130`). | A Filter never moves before a Limit. TopK needs the same key, and numeric or temporal keys at first. | None |
-| Candidate selection | `SourceResolver` scans the full store for `All`, `Not` and empty sources (`src/query/service.rs:316-406`). | Candidate step with Exact, Inexact and Unsupported. Residual filter always runs. | Ticket 24, ticket 32 |
-| Folder and glob paths | Linear `Path` scan (`src/query/service.rs:396-404`). | Folder `Path` literal uses the path range. A benchmark covers the remaining glob scan. | Ticket 24, ticket 32 |
+| Predicate IR | Separate parsers `src/query/grammar/{filter,source,expr}.rs`. `SourceAtom::Path(GlobPattern)` at `source.rs`. | One IR with `PathAtom::{Literal, Folder, Glob}` and `Tag`, `Class` atoms. Both grammars lower to it. | Ticket 19, ticket 30 |
+| Class expansion | `visit_atoms_mut` changes `ClassExpansionMode` in place (`source.rs`). `with_children` does the same in templates (`src/template/engine/query.rs`). | Class names and depth are immutable in the IR. The plan holds the resolved set. | Ticket 20 |
+| Spans | Spans only in `QuerySyntaxError` (`src/query/error.rs`). | `Option<Span>` on every atom plus a clause id. A builder-owned clause table. | Ticket 31, ticket 34 |
+| Filter moves and TopK | `fuse_sort_limit` fuses a Sort and a Limit into `TopK` (`src/query/plan.rs`). | A Filter never moves before a Limit. TopK needs the same key, and numeric or temporal keys at first. | None |
+| Candidate selection | `SourceResolver` scans the full store for `All`, `Not` and empty sources (`src/query/service.rs`). | Candidate step with Exact, Inexact and Unsupported. Residual filter always runs. | Ticket 24, ticket 32 |
+| Folder and glob paths | Linear `Path` scan (`src/query/service.rs`). | Folder `Path` literal uses the path range. A benchmark covers the remaining glob scan. | Ticket 24, ticket 32 |
 | Bracket counts | No counts exist. | Per-field bracket counts in the `meta` facet. | Ticket 24 |
-| Row type | `QueryRow` holds `Arc<WorkspaceIndex>` plus `RowIndex` (`src/query/results.rs:37-43,48-55`). `entries` is `Box<[FileEntry]>` (`src/index/entry.rs:21-22`). | The row owns its matching `Arc<FileEntry>`. | Ticket 24, ticket 28 |
-| Document order | `cmp_document_order` ignores `item_idx` (`results.rs:420-431`). | `(note position, item_idx)` plus the flatten ordinal. | Ticket 23 |
-| Row identity | `QueryRow::eq` deep-compares the entry (`results.rs:428-434`). | Pre-group ordinal and flatten ordinal. | None |
-| Task depth | `render_task_list` indents by `row.depth()` (`src/query/format.rs:225-227`). | Active preceding ancestors determine display depth. Orphans start at zero; sort order stays. | Change row 12 |
-| Grouping | `QueryTransform::GroupBy` is a sort alias (`plan.rs:146,212-221,250-254`). `QuerySet::group_by` (`results.rs:599-608`). | Distinct `GroupedQuerySet`. Hash-group. No plan stage after grouping. | Ticket 19, ticket 21 |
-| Group key | `SortKey::from_value_ref` turns lists, objects, Tags and Inlinks into Null (`src/query/sort.rs:316-317,346-349`). | Recursive canonical keys and outer-list fan-out. Temporal subclasses: Civil, Instant, Period. | Ticket 19 |
-| Template `group_by` | Dispatch at `src/template/engine/query.rs:402-433`. Test at `:928-941`. | The object returns groups. Typed errors name the replacement. | Ticket 31 |
-| Lazy errors in minijinja | `get_value` returns `Option`. `enumerate` returns an `Enumerator` (`src/template/engine/query.rs:316-323`). | A fallible-terminal channel. | Ticket 31 |
-| Memo | `#[derive(Clone)]` copies `OnceLock` state. `push` resets it (`results.rs:454-459,512-520`). | Shared `Arc` memo keyed by `(plan, frame, generation triple)`. | Ticket 28 |
-| CLI flags | `SortArgs` only (`src/cli/mod.rs:289-303`). `--count` only on `task` (`task.rs:112`). | A shared group args struct beside `SortArgs`. `--count` on `list` and `table`. | Ticket 33, ticket 35 |
-| Count and summary | `N page(s) from ROOT` (`src/cli/list.rs:65`, `table.rs:64`). `N task(s)` (`task.rs:196`). | `D page(s) in G group(s) from ROOT` under `--group-by`. | Change row 10 |
-| CLI synthesis | `TaskFilterArgs::status_filter` formats a string (`src/cli/task.rs:42-64`). `escape_default` at `:46`. | Typed builder calls. | Ticket 33 |
-| Rendering | `render` takes `&[QueryRow]` (`src/query/format.rs:83`). Flat widths at `:147-153`. Empty table `"||\n"` at `:126`. | Output module with a cell grid and one renderer. Per-group widths for groups. | Ticket 35 |
+| Row type | `QueryRow` holds `Arc<WorkspaceIndex>` plus `RowIndex` (`src/query/results.rs`). `entries` is `Box<[FileEntry]>` (`src/index/entry.rs`). | The row owns its matching `Arc<FileEntry>`. | Ticket 24, ticket 28 |
+| Document order | `cmp_document_order` ignores `item_idx` (`results.rs`). | `(note position, item_idx)` plus the flatten ordinal. | Ticket 23 |
+| Row identity | `QueryRow::eq` deep-compares the entry (`results.rs`). | Pre-group ordinal and flatten ordinal. | None |
+| Task depth | `render_task_list` indents by `row.depth()` (`src/query/format.rs`). | Active preceding ancestors determine display depth. Orphans start at zero; sort order stays. | Change row 12 |
+| Grouping | `QueryTransform::GroupBy` is a sort alias (`plan.rs`). `QuerySet::group_by` (`results.rs`). | Distinct `GroupedQuerySet`. Hash-group. No plan stage after grouping. | Ticket 19, ticket 21 |
+| Group key | `SortKey::from_value_ref` turns lists, objects, Tags and Inlinks into Null (`src/query/sort.rs`). | Recursive canonical keys and outer-list fan-out. Temporal subclasses: Civil, Instant, Period. | Ticket 19 |
+| Template `group_by` | Dispatch in `src/template/engine/query.rs`, and its test. | The object returns groups. Typed errors name the replacement. | Ticket 31 |
+| Lazy errors in minijinja | `get_value` returns `Option`. `enumerate` returns an `Enumerator` (`src/template/engine/query.rs`). | A fallible-terminal channel. | Ticket 31 |
+| Memo | `#[derive(Clone)]` copies `OnceLock` state. `push` resets it (`results.rs`). | Shared `Arc` memo keyed by `(plan, frame, generation triple)`. | Ticket 28 |
+| CLI flags | `SortArgs` only (`src/cli/mod.rs`). `--count` only on `task` (`task.rs`). | A shared group args struct beside `SortArgs`. `--count` on `list` and `table`. | Ticket 33, ticket 35 |
+| Count and summary | `N page(s) from ROOT` (`src/cli/list.rs`, `table.rs`). `N task(s)` (`task.rs`). | `D page(s) in G group(s) from ROOT` under `--group-by`. | Change row 10 |
+| CLI synthesis | `TaskFilterArgs::status_filter` formats a string (`src/cli/task.rs`). `escape_default`. | Typed builder calls. | Ticket 33 |
+| Rendering | `render` takes `&[QueryRow]` (`src/query/format.rs`). The flat width pass and the empty-table form `"||\n"`. | Output module with a cell grid and one renderer. Per-group widths for groups. | Ticket 35 |
 | Default sort order | `Path::cmp` order. | NUL-form key (ticket 32). Stdout order is unchanged. | Ticket 32 |
-| Docs and baselines | `tests/baselines/pub-tokens.txt:1020,1046`. Help baselines `tests/baselines/help/{list,table,task}.txt`. Tests `src/query/results.rs:1250-1311`. | Update baselines, tests, glossaries and ADRs. | None |
+| Docs and baselines | `tests/baselines/pub-tokens.txt`. Help baselines `tests/baselines/help/{list,table,task}.txt`. Tests `src/query/results.rs`. | Update baselines, tests, glossaries and ADRs. | None |
 
 Not in code:
 

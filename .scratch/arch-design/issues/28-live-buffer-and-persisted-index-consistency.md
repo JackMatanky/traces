@@ -165,7 +165,7 @@ in-memory graph (full-document sync). `open_documents` records open keys.
 Watcher events for an open key are dropped until `didClose`, when the file is
 re-read from disk (`crates/iwes/src/router/server.rs`) [V]. A `didClose` of an
 unsaved new document drops the content
-(`crates/iwes/tests/reconcile_test.rs:69-78`) [V].
+(`crates/iwes/tests/reconcile_test.rs`) [V].
 The CHANGELOGs show why. Last-write-wins let disk changes overwrite unsaved
 buffers (fixed in v0.16.0 with editor ownership). Rebuilding the BM25 index per
 keystroke stalled the server (v0.18.0, now batched after 300 ms idle) [V]. It
@@ -175,9 +175,9 @@ through separate processes. [H] Because IWE has no persisted index, this settles
 only the in-process view of buffers. It does not test the persisted-index
 question of this ticket.
 The primary changelog records the ownership fix under v0.16.0
-(`docs/digests/iwe-org-iwe-src-digest.txt:37835-37846`) [V].
-The 300 ms constant is at `:38866`. Research 12 attributes the ownership fix
-to v0.17.0; that version attribution is incorrect.
+(`docs/digests/iwe-org-iwe-src-digest.txt`) [V].
+The 300 ms constant is in the same digest. Research 12 attributes the
+ownership fix to v0.17.0; that version attribution is incorrect.
 
 ## Evidence limits
 
@@ -582,7 +582,7 @@ Per-base cache [V for measurements, P for lifecycle rules]:
   path set can corrupt inlinks without an error.
 - An immutable resolver component can serve a new context when the path set
   stays unchanged. `RefreshPlan::is_paths_unchanged` supplies the existing
-  predicate (`src/index/refresh.rs:472`). The old context does not survive.
+  predicate (`src/index/refresh.rs`). The old context does not survive.
 - Each exact-base change can need a full context rebuild, even when an
   overlay-only path remains open. No cheap rebuild bound is established.
 
@@ -601,32 +601,32 @@ Path-set change in the overlay (a new unsaved document or a ghost row):
 - This rule REPLACES the line that said a path-set change uses
   `patch_and_diff`. That line was wrong. The existing refresh calls
   `patch_and_diff` only when `is_paths_unchanged` holds
-  (`src/index/refresh.rs:413-421`, comment at `:468-471`). A path add or
+  (`src/index/refresh.rs`). A path add or
   remove runs `LinkResolver::new` plus `InlinkMap::with_resolver` over all
-  notes (`:430-454`). An added file can change the wikilink resolution of other
+  notes. An added file can change the wikilink resolution of other
   notes (nearest match, ties) [V].
 
 Code preconditions [V for current code, P for requirements]:
 
 - `WorkspaceIndex.entries` is `Box<[FileEntry]>`
-  (`src/index/entry.rs:21-22`). Ticket 24 decides that rows own
+  (`src/index/entry.rs`). Ticket 24 decides that rows own
   `Arc<FileEntry>`. That decision is not built.
 - `FileEntry` is `{ file, note: Option<Box<Note>>, inlinks: Box<[PathBuf]> }`
-  (`src/index/entry.rs:135-138`). Replacing an entry whose inlinks changed
+  (`src/index/entry.rs`). Replacing an entry whose inlinks changed
   deep-clones the `Note`.
 - Requirement [P]: `FileEntry` shares `Note` and `inlinks` by `Arc`. The
   `Arc<Note>` variant is not measured. The 0.148 ms figure comes from
   `/tmp/rt28-proto/`, not from the repository.
-- `LinkResolver<'a>` borrows `&'a [FileMeta]` (`src/index/inlinks.rs:307-310`).
+- `LinkResolver<'a>` borrows `&'a [FileMeta]` (`src/index/inlinks.rs`).
   `InlinkMap::with_resolver` takes `&[Note]`.
 - `WorkspaceIndex` owns no `InlinkMap` and no resolver. `assemble_internal`
-  drops the map (`src/index/entry.rs:79-102`).
-- `get_by_path` is a `Path::cmp` binary search (`src/index/inlinks.rs:400-405`).
+  drops the map (`src/index/entry.rs`).
+- `get_by_path` is a `Path::cmp` binary search (`src/index/inlinks.rs`).
   The resolver must become owned before it can live in a generation object.
   That is a redesign [P].
-- `InlinkMap::patch_and_diff` is crate-internal (`src/index/inlinks.rs:208`).
-  It scans every target with `retain` (`:214-228`).
-- The shipped profile is `opt-level = "z"` (`Cargo.toml:276-281`). Measure
+- `InlinkMap::patch_and_diff` is crate-internal (`src/index/inlinks.rs`).
+  It scans every target with `retain`.
+- The shipped profile is `opt-level = "z"` (`Cargo.toml`). Measure
   again [P].
 
 Invariant owner: the owner of generation changes (ticket 33 wires it) enforces
@@ -682,12 +682,12 @@ Rule:
 - Ticket 23 promises no incremental reparse. Its prototype scan took about 29%
   of parse time [V]. The real `NoteDoc` builder cost is unmeasured.
 - Precedent [V]. rust-analyzer applies changes in batches before the next
-  snapshot (`.scratch/md-pkm-lsp/research/14-buffer-overlay-model.md:79`).
+  snapshot (`.scratch/md-pkm-lsp/research/14-buffer-overlay-model.md`).
   Its non-retrying requests return `ContentModified` after cancellation
-  (`.scratch/md-pkm-lsp/research/x-rust-lsp-implementation-patterns.md:402`).
+  (`.scratch/md-pkm-lsp/research/x-rust-lsp-implementation-patterns.md`).
   markdown-oxide runs `Vault::update_vault` on each `didChange` under the write
   lock. It debounces only diagnostics, at 300 ms
-  (`docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt:1659-1668,1726-1744,1876-1890,2236-2242`).
+  (`docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt`).
   IWE writes the buffer into its graph at once. It batches only the BM25
   rebuild after 300 ms (v0.18.0).
 - Original baseline: parse plus targeted patch takes 171 us at 50k and 45 us
@@ -787,7 +787,7 @@ Rule for identity and admission:
   - a document outside the root;
   - a document with a non-UTF-8 name;
   - an existing file that fails scanner node-kind or symlink checks
-    (`src/index/service.rs:412-448`, test `skips_symlinks_entirely` at `:829`);
+    (`src/index/service.rs`, test `skips_symlinks_entirely`);
   - a path whose lexical admission excludes an ignored or metadata component;
   - a non-`.md` document (`FileFormat::Other`);
   - an `untitled:` URI;
@@ -821,13 +821,13 @@ Rule for deletion:
 - A ghost never persists.
 - The cost for the derived generation is one full re-resolve (Group 2).
 - The saved-index added-file baseline is 499 ms and 394.9 MB at 50,000 notes
-  (`research/24-prep/g-probe-results.md:88-95`) [V].
+  (`research/24-prep/g-probe-results.md`) [V].
 - At 5k, note decoding takes 18.48 ms, or 97.3% of measured in-memory
-  reconciliation work (`research/11-performance-evidence.md:89-95`) [V].
+  reconciliation work (`research/11-performance-evidence.md`) [V].
   This denominator excludes scanning and persistence. Neither figure measures
   deletion, ghost removal or the amended retained-generation implementation.
 - Today's reconciliation reads stored notes on path-set changes
-  (`src/index/refresh.rs:429-455`) [V].
+  (`src/index/refresh.rs`) [V].
 - The derived generation does not pay the cliff. It builds from in-memory
   entries that already hold notes. The cliff would apply if host entries were
   lazy facets [H]. The stem bucket needs every note's outlinks.
@@ -1108,7 +1108,7 @@ reversal.
    for the gather. That is about 173 ms. The targeted patch costs 0.148 ms.
 8. The line "a path-set change uses `patch_and_diff`" became one full
    re-resolve. The existing refresh calls `patch_and_diff` only for an
-   unchanged path set (`src/index/refresh.rs:413-421`). The 13 ms figure
+   unchanged path set (`src/index/refresh.rs`). The 13 ms figure
    belongs to that other path.
 9. `ContentModified` became the core outcome `Stale`. The host maps it.
 10. The first-round S4 outcome became a ghost for dirty or unknown text after
@@ -1143,7 +1143,7 @@ Other corrections:
 - The first-round probe measured an overlay check at query time. The final
   design has no per-row check, so those figures are context only (see the
   evidence limits).
-- Ticket 24 line 397 says "trie build 224 ms at 5,000 same-stem candidates".
+- Ticket 24 says "trie build 224 ms at 5,000 same-stem candidates".
   The trie build alone takes 2.0 to 2.3 ms. The 224 ms figure is probably the
   whole `InlinkMap::new` [H]. Ticket 24 relabels the number. The trie decision
   stays.
@@ -1263,7 +1263,7 @@ stay tickets 29 and 19.
   flat-to-trie crossing (63 to 64 candidates).
 - The repository does not hold the source of the 0.148 ms figure. Keep every
   claim that carries [H].
-- The shipped profile is opt-level "z" (`Cargo.toml:276-281`). One audit
+- The shipped profile is opt-level "z" (`Cargo.toml`). One audit
   measured that "z" slows iterator-heavy comparators by about 2x. The overlay
   figures are not measured again under "z" [V].
 - The 50,000-note figures of ticket 23 are linear extrapolations [H].
@@ -1287,7 +1287,7 @@ stay tickets 29 and 19.
   50,000 entries (design G2 in `research/24-prep/h1-stress-test-designs.md`)
   [V].
 - The template engine refreshes for each render and holds a `WorkspaceIndex` in
-  its state (`src/template/engine/query.rs:203-226`) [V]. That is current-code
+  its state (`src/template/engine/query.rs`) [V]. That is current-code
   evidence, not a decided host design.
 - Two machines on one file system (a network mount) are out of scope. No
   overlay, lock or racy margin can make the bound hold there [H].
@@ -1298,24 +1298,24 @@ The code does not implement this ticket. The table lists what the refactor
 changes. The Today column is [V]. The Target column is [P].
 Locations are the working tree on 2026-11-15.
 
-| Area | Today (path:line) | Target (ticket decision) | Depends on |
+| Area | Today (file and symbol) | Target (ticket decision) | Depends on |
 | --- | --- | --- | --- |
-| Generation rows | `WorkspaceIndex.entries: Box<[FileEntry]>` in `src/index/entry.rs:21-22` | A spine of `Arc<FileEntry>`. A derived generation clones the spine and replaces only affected entries. | Ticket 24, ticket 29 |
-| Entry sharing | `FileEntry { file, note: Option<Box<Note>>, inlinks: Box<[PathBuf]> }` in `src/index/entry.rs:135-138` | Share `Note` and `inlinks` by `Arc`. The `Arc<Note>` variant is not measured. | Ticket 24 |
-| Resolver ownership | `LinkResolver<'a>` borrows `&'a [FileMeta]` in `src/index/inlinks.rs:307-310` | An owned baseline resolver and a private immutable resolution context for the exact base snapshot and effective path set. | Ticket 24, ticket 32 (key form), ticket 35 |
-| Map at assembly | `assemble_internal` moves the inlinks into entries and drops the `InlinkMap` in `src/index/entry.rs:79-102` | The private context retains base-note edges under its effective resolver. | Ticket 24 |
-| Link patch | `patch_and_diff` is crate-internal in `src/index/inlinks.rs:208`. It scans every target with `retain` at `:214-228`. `resolve_edges_for` is at `:291`. | A pure `derive(base, current_buffers)` in core. It replaces base-note edges with all current buffer edges under one effective resolver. | Ticket 24, ticket 29 |
-| Path-set change | The `else` branch runs `LinkResolver::new` plus `InlinkMap::with_resolver` over all notes in `src/index/refresh.rs:430-454` | One full re-resolve per exact-base/effective-path context, off the request thread. A base publish can repeat this cost. | Group 2 |
-| Resolver reuse | `is_paths_unchanged` in `src/index/refresh.rs:472-480` | Reuse an immutable resolver component when paths stay unchanged. A new base still invalidates the private context. | Ticket 25 |
-| Admission predicate | `scan` in `src/index/service.rs:424-444` and `is_ignored_dir` in `src/env_vars.rs:43` | Shared lexical admission plus existing-node checks. A new final component needs an admitted parent. | Ticket 32, ticket 33 |
-| Store lifecycle | `IndexStore::open` in `src/index/refresh.rs:338` and `src/index/service.rs:368,407` | The host opens the store only for a refresh and a persist. The overlay reads memory. | Ticket 24, ticket 25, ticket 33 |
+| Generation rows | `WorkspaceIndex.entries: Box<[FileEntry]>` in `src/index/entry.rs` | A spine of `Arc<FileEntry>`. A derived generation clones the spine and replaces only affected entries. | Ticket 24, ticket 29 |
+| Entry sharing | `FileEntry { file, note: Option<Box<Note>>, inlinks: Box<[PathBuf]> }` in `src/index/entry.rs` | Share `Note` and `inlinks` by `Arc`. The `Arc<Note>` variant is not measured. | Ticket 24 |
+| Resolver ownership | `LinkResolver<'a>` borrows `&'a [FileMeta]` in `src/index/inlinks.rs` | An owned baseline resolver and a private immutable resolution context for the exact base snapshot and effective path set. | Ticket 24, ticket 32 (key form), ticket 35 |
+| Map at assembly | `assemble_internal` moves the inlinks into entries and drops the `InlinkMap` in `src/index/entry.rs` | The private context retains base-note edges under its effective resolver. | Ticket 24 |
+| Link patch | `patch_and_diff` is crate-internal in `src/index/inlinks.rs`. It scans every target with `retain`. `resolve_edges_for`. | A pure `derive(base, current_buffers)` in core. It replaces base-note edges with all current buffer edges under one effective resolver. | Ticket 24, ticket 29 |
+| Path-set change | The `else` branch runs `LinkResolver::new` plus `InlinkMap::with_resolver` over all notes in `src/index/refresh.rs` | One full re-resolve per exact-base/effective-path context, off the request thread. A base publish can repeat this cost. | Group 2 |
+| Resolver reuse | `is_paths_unchanged` in `src/index/refresh.rs` | Reuse an immutable resolver component when paths stay unchanged. A new base still invalidates the private context. | Ticket 25 |
+| Admission predicate | `scan` in `src/index/service.rs` and `is_ignored_dir` in `src/env_vars.rs` | Shared lexical admission plus existing-node checks. A new final component needs an admitted parent. | Ticket 32, ticket 33 |
+| Store lifecycle | `IndexStore::open` in `src/index/refresh.rs` and `src/index/service.rs` | The host opens the store only for a refresh and a persist. The overlay reads memory. | Ticket 24, ticket 25, ticket 33 |
 | Generation pair | None. `src/` has no `incarnation` and no `revision` (grep finds no match). | The base pair in `meta` plus a process-wide `derived_id`. Results name the triple. | Ticket 24, ticket 25 |
 | Buffer parse | None. `src/` has no `parse_with_doc` and no `NoteDoc`. | A public `parse_with_doc` for an unsaved buffer (ticket 23). | Ticket 23 |
 | Schema check | None. `src/` has no `check_note`. | The host calls `check_note(before, after)` on the debounced parse. | Ticket 20, ticket 33 |
-| Template index cache | The per-render `WorkspaceIndex` cache in `src/template/engine/cache.rs:5` and `src/template/engine/query.rs:203-226` | A template run inside a host reads the pinned derived generation. The cache must not outlive its generation. | Ticket 31, ticket 33 |
-| Overlay row facts | `FileMeta` in `src/file.rs:45`, `size` at `:222` | The derived entry has `file.size` as buffer bytes. `mtime` and `created` come from the base. | Ticket 29 |
+| Template index cache | The per-render `WorkspaceIndex` cache in `src/template/engine/cache.rs` and `src/template/engine/query.rs` | A template run inside a host reads the pinned derived generation. The cache must not outlive its generation. | Ticket 31, ticket 33 |
+| Overlay row facts | `FileMeta` in `src/file.rs`, `size` | The derived entry has `file.size` as buffer bytes. `mtime` and `created` come from the base. | Ticket 29 |
 | Overlay notices | No notice emission outside the stderr count lines (grep finds no notice prefix in `src/`) | Overlay notices ride the ticket 34 mechanism with the dedup key. | Ticket 34 |
-| Release profile | `[profile.release]` is `opt-level = "z"` in `Cargo.toml:276-281` | Measure the overlay and sort costs again under "z". | Ticket 32 (row 19) |
+| Release profile | `[profile.release]` is `opt-level = "z"` in `Cargo.toml` | Measure the overlay and sort costs again under "z". | Ticket 32 (row 19) |
 
 Not in code:
 

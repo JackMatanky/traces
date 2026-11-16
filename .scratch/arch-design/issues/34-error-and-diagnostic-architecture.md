@@ -21,7 +21,7 @@ Decide the error architecture:
   miette out of libraries. Challenge ADR-0004 on that point.
 
 Facts: `survey/cli.md` H3/H7, `survey/cross-cutting.md` §3 (error table),
-ADR-0004, `src/query/error.rs`, `src/cli/error.rs:39-52`.
+ADR-0004, `src/query/error.rs`, `src/cli/error.rs`.
 
 Inputs: `research/08`, schema validation decision, workspace host decision.
 
@@ -95,29 +95,30 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 - A read that meets a store with a higher format epoch parses fresh, gives one
   stderr notice, and exits 0. Make the notice travel as a notice, not an error.
 - A rebuild heal gives no notice. Report its cause in the refresh report only.
-- Ticket 25 renames `RefreshReport::ConfigDrift` and `DriftCause`. Identity causes
-  include engine, canonical root, epoch, extractor and damaged `META`.
+- Ticket 25 renames `RefreshReport::ConfigDrift` and `DriftCause`. Identity
+  causes include engine, canonical root, epoch, extractor and damaged `META`.
   Ticket 32 removes the platform family. This ticket gives the cause texts.
 - `traces index` from an older binary replaces a newer store. It gives one
   stderr notice first.
 
 ## Inputs from the note document and index read model decisions
 
-See [ticket 23's Answer](./23-note-document-model.md) and
-[ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's
+Answer](./24-index-read-model-and-query-execution.md).
 
 - `parse_markdown` returns notices beside `Note`. A parse-time `NaN` becomes
   `Null` with a notice.
-- This ticket owns how parser notices show. It also owns the bulk-index notice path.
+- This ticket owns how parser notices show. It also owns the bulk-index notice
+  path.
 - Ticket 24 stores parser notices in the `notices` facet.
 - A cache failure on a read is one stderr notice and exit 0. See ticket 24 and
   the freshness inputs above.
 
 ## Inputs from the live-buffer, query-core and path decisions
 
-See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
-[ticket 29](./29-query-core-and-plan.md) and
-[ticket 32](./32-path-and-capability-model.md).
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md), [ticket
+29](./29-query-core-and-plan.md) and [ticket
+32](./32-path-and-capability-model.md).
 
 - Use one notice mechanism for query evaluation, overlay divergence and skipped
   paths. Keep notices separate from typed failures.
@@ -129,7 +130,7 @@ See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
   duplicates.
 - Give no notice for a comparison-key lookup that returns several candidates.
 - Choose the Windows device-name lint code and the diagnostic envelope and text.
-- Keep mismatch notices exact for each atom's logical filter-stage input.
-  Global totals are a shortcut only when they prove that scoped result.
-- Keep labels safe for terminals without removing ordinary RTL letters.
-  Visible escapes for controls do not make display labels typed serialization.
+- Keep mismatch notices exact for each atom's logical filter-stage input. Global
+  totals are a shortcut only when they prove that scoped result.
+- Keep labels safe for terminals without removing ordinary RTL letters. Visible
+  escapes for controls do not make display labels typed serialization.

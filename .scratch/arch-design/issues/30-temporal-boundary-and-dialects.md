@@ -13,14 +13,14 @@ Temporal is 10k LoC (3k production). Scouts judged `DatePoint`,
   calendar anchors in `template/engine/date.rs` (2.5k LoC) move into temporal.
   Keep them in a sibling `format` unit instead. The unit is shared with schema
   `format` validation and CLI.
-- Decide where `Dataview` filename-day derivation lives (`src/file.rs:88-98`).
+- Decide where `Dataview` filename-day derivation lives (`src/file.rs`).
 - Decide the parsing stack: `speedate`/`winnow`/`logos`/`jiff` for four call
   sites.
 - Decide what remains after the execution-context decision.
 - Decide whether Moment compatibility is a domain concept.
 
 Facts: `survey/temporal.md`, `survey/template.md` H2,
-`survey/root-primitives.md` §3, `src/schema/fields/date.rs:12-14` (unvalidated
+`survey/root-primitives.md` §3, `src/schema/fields/date.rs` (unvalidated
 format), `.scratch/temporal-core/divergence-register.md`.
 
 Alternatives: move dialects into temporal. Keep them in the template as a
@@ -72,7 +72,7 @@ date-format check.
 See [research 14](../research/14-fileclass-model-binding-and-validation.md).
 Fileclass checks dates with ISO regexes only. A field with a custom Moment
 `dateFormat` accepts any non-empty string. It also accepts a wikilink as a date
-(`src/fields/validate.ts:62-64,90-100`) [V]. `dateFormatCheck.ts` instead lints
+(`src/fields/validate.ts`) [V]. `dateFormatCheck.ts` instead lints
 the tokens of the declared format string, not values [V]. Fileclass validates
 durations against an RFC 5545 subset (weeks, or days and time; no years or
 months) (`src/fields/duration.ts`) [V].
@@ -116,11 +116,12 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
 - The extractor fingerprint hashes the resolved versions of `jiff` and
   `speedate`. A change to the parsing stack changes the fingerprint and forces
-  one rebuild. Update the crate list in ticket 25 if this ticket removes a crate.
+  one rebuild. Update the crate list in ticket 25 if this ticket removes a
+  crate.
 - A civil datetime must deserialize from the cache without a zone lookup.
 - Until the civil variant exists in code, the fingerprint corpus uses only
-  datetimes with an explicit offset. Add the civil variant when it lands.
-  That change bumps the format epoch.
+  datetimes with an explicit offset. Add the civil variant when it lands. That
+  change bumps the format epoch.
 
 ## Inputs from the query-core decision
 

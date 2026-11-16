@@ -9,9 +9,9 @@ Blocked by: 13
 [Ticket 13's
 research](../research/13-iwe-query-schema-and-agent-write-gating.md) showed an
 external crate for schemas. IWE delegates schema parsing, compilation and
-validation to `schematter-validator = "0.2.0"` (`Cargo.toml:20` of
-`iwe-org/iwe`). Frontmatter uses JSON Schema 2020-12. The body uses an ordered
-section matcher with token budgets. The crate implements a published spec
+validation to `schematter-validator = "0.2.0"` (`Cargo.toml` of `iwe-org/iwe`).
+Frontmatter uses JSON Schema 2020-12. The body uses an ordered section matcher
+with token budgets. The crate implements a published spec
 (`https://document-schema.org/draft/2026-06/schema`). The IWE digests contain
 only its callers (`crates/liwe/src/schema.rs`, `schema/document.rs`,
 `crates/diwe/src/schema.rs`), not the crate.
@@ -62,18 +62,17 @@ Instructions:
 
 ## Answer
 
-Deliverable: [research
-15](../research/15-schematter-validator-and-document-schema.md). Sources are
-docs.rs, the spec site, and the `iwe-org/schematter` repository. Crate internals
-are [S] (read by the research agent, not re-read by the owner).
+Deliverable:
+[research 15](../research/15-schematter-validator-and-document-schema.md).
+Sources are docs.rs, the spec site, and the `iwe-org/schematter` repository.
+Crate internals are [S] (read by the research agent, not re-read by the owner).
 
-- The crate `schematter-validator` 0.2.0 uses Apache-2.0 and shares IWE's
-  author and organization. The author split it from IWE in 2026-07. It has two
+- The crate `schematter-validator` 0.2.0 uses Apache-2.0 and shares IWE's author
+  and organization. The author split it from IWE in 2026-07. It has two
   releases, about 2,600 downloads, one implementation, and a draft spec
-  (`draft/2026-06`). The crate has about 1,200 lines and depends on
-  `jsonschema` 0.47, `serde_json`, `serde_yaml_ng` and `regex`. It lacks a
-  markdown parser and a tokenizer. Caller-supplied integers provide token
-  counts.
+  (`draft/2026-06`). The crate has about 1,200 lines and depends on `jsonschema`
+  0.47, `serde_json`, `serde_yaml_ng` and `regex`. It lacks a markdown parser
+  and a tokenizer. Caller-supplied integers provide token counts.
 - Input: frontmatter as `serde_json::Value`. The body is a caller-built
   recursive `Document { sections, blocks, token counts }`. Violations carry
   string breadcrumbs, a JSON-Pointer `schemaPath`, keyword and `hint`.

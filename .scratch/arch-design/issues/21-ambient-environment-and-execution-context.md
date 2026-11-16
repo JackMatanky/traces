@@ -12,10 +12,9 @@ values held by `LazyLock`, the system zone, `now` and cwd. If so, which inputs
 does the context contain? Who constructs it? How do tests and long-lived hosts
 get deterministic behavior? How does the design avoid a god object?
 
-Facts: `src/dirs.rs:85-190`, `src/env_vars.rs:8-37`, test HOME hack
-`src/dirs.rs:81-83`, `local_zone()` per leaf and `ZoneGuard`
-(`src/temporal/mod.rs:58-255`), `Cwd`/`CwdGuard` (`src/cli/cwd.rs`, judged sound
-as a single audited boundary).
+Facts: `src/dirs.rs`, `src/env_vars.rs`, test HOME hack `src/dirs.rs`,
+`local_zone()` per leaf and `ZoneGuard` (`src/temporal/mod.rs`),
+`Cwd`/`CwdGuard` (`src/cli/cwd.rs`, judged sound as a single audited boundary).
 
 Alternatives: explicit `ExecutionContext`/`Environment` passed down, split
 contexts (time/zone vs filesystem roots vs env policy), or ambient state with
@@ -94,9 +93,9 @@ fallback is revised, pending reconciliation before implementation.
   identity as the index fingerprint.
 - Zone changes do not change stored civil note values or filename periods.
   Resolve timestamp-derived civil dates during evaluation. Never persist those
-  dates with a zone-free fingerprint. Tickets 24, 25, 32 and 33 own cross-process
-  coordination, canonical path identity and store locking. A registry key cannot
-  isolate two sessions that share `.traces/index.redb`.
+  dates with a zone-free fingerprint. Tickets 24, 25, 32 and 33 own
+  cross-process coordination, canonical path identity and store locking. A
+  registry key cannot isolate two sessions that share `.traces/index.redb`.
 - Check the hash of local config before parsing it, as ticket 16 requires. At
   request admission, a held workspace rechecks local trust and content. Reject
   changed or revoked local config instead of using the old parsed value. An
@@ -165,8 +164,9 @@ fallback is revised, pending reconciliation before implementation.
   for creation time. Creation timestamps are best-effort operating-system data.
 - `file.mdate`/`mtime` use modification time. The timestamp fields remain
   instants. During evaluation, project `cdate` and `mdate` timestamps into civil
-  dates with the pinned zone. If the system cannot resolve the needed zone, return a
-  typed error. Never persist these zone-derived dates as zone-independent facts.
+  dates with the pinned zone. If the system cannot resolve the needed zone,
+  return a typed error. Never persist these zone-derived dates as
+  zone-independent facts.
 - Preserve existing day/month filename prefix recognition. Add validated ISO
   week forms with Monday as the start and a four-day week one. Add quarter forms
   with clear prefix boundaries. Enable a bare year prefix only through
@@ -198,10 +198,10 @@ fallback is revised, pending reconciliation before implementation.
   `disallowed-methods` paths. Do not use a nonfunctional `std::env::var*`
   wildcard. Treat source scans as inventory, not proof.
 - Replace test-only `HOME`/zone guards after injection gives deterministic
-  fixtures. A CLI-only cwd guard can remain while in-process adapter tests change
-  cwd. Prefer subprocess checks for real environment behavior. Treat random
-  template UUIDs as a separate, explicit entropy capability, not an implicit
-  part of the workspace policy.
+  fixtures. A CLI-only cwd guard can remain while in-process adapter tests
+  change cwd. Prefer subprocess checks for real environment behavior. Treat
+  random template UUIDs as a separate, explicit entropy capability, not an
+  implicit part of the workspace policy.
 
 ### Alternatives considered and why not chosen
 
@@ -258,8 +258,8 @@ now yield `Null`. `file.cdate`/`file.ctime` no longer fall back to mtime.
 
 Coarse period upper bounds exclude the next day's start. Unattended missing
 answers fail. A required zone/render failure fails the operation. Query result
-access may become fallible. Preserve the frozen vault-format parser, exit
-codes, stdout/stderr split and successful stdout shapes from ticket 16. The
+access may become fallible. Preserve the frozen vault-format parser, exit codes,
+stdout/stderr split and successful stdout shapes from ticket 16. The
 specification must migrate affected CLI/template queries and asserted
 diagnostics rather than relabel these as compatibility-neutral.
 
@@ -269,10 +269,10 @@ storage-lock and cross-process coordination without assuming redb provides the
 needed policy invariant. They define the period sort unit tie-break, compact
 encoding, week formats beyond ISO, and the configured zone source.
 
-Downstream tickets also define explicit temporal types, template carrier
-shapes, and privileged-write trust rechecks at commit. A long-lived host must
-determine when it refreshes diagnostics after midnight. This ticket silently
-implements none of these items.
+Downstream tickets also define explicit temporal types, template carrier shapes,
+and privileged-write trust rechecks at commit. A long-lived host must determine
+when it refreshes diagnostics after midnight. This ticket silently implements
+none of these items.
 
 ### Handoffs
 

@@ -8,9 +8,9 @@ Blocked by: none
 
 Traces coerces strings heuristically in three places:
 
-- `src/field.rs:843`: ISO-date coercion at deserialization.
-- `src/query/sort.rs:462`: `TextShape::classify`.
-- `src/query/grammar/filter.rs:238`: literal promotion.
+- `src/field.rs`: ISO-date coercion at deserialization.
+- `src/query/sort.rs`: `TextShape::classify`.
+- `src/query/grammar/filter.rs`: literal promotion.
 
 Traces performs zero validation of note values against schemas
 (`survey/schema.md` H1, `survey/query.md` H6, `survey/note.md` H7). Schemas

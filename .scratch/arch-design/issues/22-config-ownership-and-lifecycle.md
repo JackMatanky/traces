@@ -11,11 +11,11 @@ Resolve the boundary of the config subsystem:
 - (a) Check why `task.rs`/`tag.rs`/`field.rs` live at the crate root. Decide
   where `TaskStatusMap`, the tag filters and the status/emoji parsing belong to
   config, note, or a leaf.
-- (b) Check the upward `note -> config` edge (`src/note/parser/input.rs:9`).
+- (b) Check the upward `note -> config` edge (`src/note/parser/input.rs`).
   Decide whether the parsers take primitives or a typed parser-config.
 - (c) Decide the residual `ConfigDigests` surface now that drift detection
   landed (main @ `207cc3fb`). 10 of 15 per-setting digests feed the index-owned
-  `IndexFingerprint` (`src/index/fingerprint.rs:158`). `Config::hash`/`compose`
+  `IndexFingerprint` (`src/index/fingerprint.rs`). `Config::hash`/`compose`
   (pinned `traces.config.v1` framing), the root/templates/schema-directory
   digests, and the 380-line `syn` source-scan test (`syn` dev-dep) still have no
   production consumer. Every `IndexerService` construction computes and discards
@@ -47,8 +47,8 @@ migrations through `toml_edit`. These migrations preserve user comments
 (`[library]` to `[workspace]`, v0.25.0). Schema binding lives in this host
 config (`[schemas.<name>].match`), not in the schema files. [Ticket
 20](./20-schema-note-typing-and-validation.md) chose class-owned `[binding]`.
-The only transferable point for this ticket is comment-preserving migration
-if the config format changes.
+The only transferable point for this ticket is comment-preserving migration if
+the config format changes.
 
 ## Inputs from the execution-context decision
 
@@ -58,12 +58,12 @@ overrides. Specify precedence, an explicit base for relative paths (or reject
 relative overrides), and where config-derived policy lives. Do not use a
 Unicode-only environment map for paths.
 
-Hash-verify local config before parsing. Revalidate trust/content at each
-new held-workspace request. Admitted requests retain their immutable
-generation. Global config freshness is separate. Supply one workspace policy to
-its services, not a process-global value, so different roots can coexist. The
-config surface also owns `DateConfig` integration (zone source, week rules and
-opt-in bare-year filenames). Decide its syntax with ticket 30, not here.
+Hash-verify local config before parsing. Revalidate trust/content at each new
+held-workspace request. Admitted requests retain their immutable generation.
+Global config freshness is separate. Supply one workspace policy to its
+services, not a process-global value, so different roots can coexist. The config
+surface also owns `DateConfig` integration (zone source, week rules and opt-in
+bare-year filenames). Decide its syntax with ticket 30, not here.
 
 ## Answer
 
@@ -90,8 +90,8 @@ not cite these agent files in `22-prep/`: `n1-conflicts-resolved-tickets.md`,
 - Build the parser input one time for each indexing run. The parser borrows it.
   Do not clone it for each file.
 - The parser input needs three config reads [V]: the tags field name, the tag
-  filters and the status map (`src/note/parser.rs:381,527,528`). Confirm the
-  list when ticket 23 lists the index-time reads.
+  filters and the status map (`src/note/parser.rs`). Confirm the list when
+  ticket 23 lists the index-time reads.
 
 ### Decision: index policy and digests (c)
 
@@ -307,10 +307,9 @@ The Trust Store layout does not change. Existing grants stay valid.
   syntax. The filename-period subset enters `IndexPolicy` if the index stores
   periods.
 - [Template boundary](./31-template-engine-boundary.md): `TemplateService` holds
-  `&Config`, and the template engine builds an indexer
-  (`template/engine.rs:125-135`). `Config` no longer holds the ignore and period
-  policy. The composition root builds `IndexPolicy` one time for the CLI and the
-  template engine.
+  `&Config`, and the template engine builds an indexer (`template/engine.rs`).
+  `Config` no longer holds the ignore and period policy. The composition root
+  builds `IndexPolicy` one time for the CLI and the template engine.
 - [Paths](./32-path-and-capability-model.md): The host rejects relative path
   variables. Do not assume a base. Decide if `.traces` can be a symlink. Decide
   how a root alias gets an identity.

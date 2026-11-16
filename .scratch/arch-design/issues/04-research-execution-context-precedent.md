@@ -8,11 +8,11 @@ Blocked by: none
 
 Traces reads process-ambient state in many places:
 
-- `LazyLock` XDG/state dirs and ignored-dir env (`src/dirs.rs:85-190`,
-  `src/env_vars.rs:8-37`), with a `#[cfg(test)] static HOME` hack
+- `LazyLock` XDG/state dirs and ignored-dir env (`src/dirs.rs`,
+  `src/env_vars.rs`), with a `#[cfg(test)] static HOME` hack
 - `local_zone()`/`TimeZone::try_system` per AST leaf, with a 200-line
-  thread-local `ZoneGuard` (`src/temporal/mod.rs:58-255`,
-  `src/query/grammar/filter.rs:386-761`, `src/template/engine/date.rs:121`)
+  thread-local `ZoneGuard` (`src/temporal/mod.rs`,
+  `src/query/grammar/filter.rs`, `src/template/engine/date.rs`)
 - `now()`
 - `Cwd`/`CwdGuard` (`src/cli/cwd.rs`)
 
@@ -61,4 +61,5 @@ belongs to the decision tickets that list this ticket in Blocked by.
 
 ## Resolution
 
-Research complete. Deliverable produced at `.scratch/arch-design/research/04-execution-context-precedent.md`.
+Research complete. Deliverable produced at
+`.scratch/arch-design/research/04-execution-context-precedent.md`.

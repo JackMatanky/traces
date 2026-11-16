@@ -7,12 +7,13 @@ Blocked by: none
 ## Question
 
 The template engine (13k LoC) stringifies rich values at the minijinja boundary
-(`src/template/engine/query.rs:604`). Then 2.5k lines of `engine/date.rs`
-re-parse them. That file embeds a Moment.js dialect translator (`:488-623`),
-ordinal suffixes, and calendar anchors. `Schema` needs a hidden `State` cache
-hack to reach its service (`src/template/engine/schema.rs:82-90`). Render-scoped
-index caching lives in minijinja `State`. See `survey/template.md` H1/H2/H3/H7,
-`survey/schema.md` H6, `survey/temporal.md` H4.
+
+(`src/template/engine/query.rs`). Then 2.5k lines of `engine/date.rs` re-parse
+them. That file embeds a Moment.js dialect translator, ordinal suffixes, and
+calendar anchors. `Schema` needs a hidden `State` cache hack to reach its
+service (`src/template/engine/schema.rs`). Render-scoped index caching lives in
+minijinja `State`. See `survey/template.md` H1/H2/H3/H7, `survey/schema.md` H6,
+`survey/temporal.md` H4.
 
 Study these comparables:
 

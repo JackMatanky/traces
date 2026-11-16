@@ -118,9 +118,9 @@ Do not reopen these decisions.
 - Vault-format parsing is Frozen (ticket 16). The parser stays infallible.
 - The Noyalib compat parser stays. The Noyalib CST is rejected for values.
 - `Link` and `NoteLink` are separate types. `Link` is the root value. It holds
-  `target`, `display`, `kind` and `embedded`. `NoteLink` holds a `Link` and
-  the ranges. Frontmatter and inline fields handle every link type, so `kind`
-  varies in a field value.
+  `target`, `display`, `kind` and `embedded`. `NoteLink` holds a `Link` and the
+  ranges. Frontmatter and inline fields handle every link type, so `kind` varies
+  in a field value.
 - `NoteFieldValue` keeps its 80 B size test.
 - The schema check is span-free (ticket 20). Adapters attach spans.
 - The editor needs no general write-back. A future writer splices spans into the
@@ -133,9 +133,9 @@ Do not reopen these decisions.
 ### Facts
 
 - `survey/note.md` (all of §3).
-- `src/note/model.rs:24-33`.
-- `src/note/parser.rs:108,121,488-498`.
-- `src/note/lists.rs:41-50`.
+- `src/note/model.rs`.
+- `src/note/parser.rs`.
+- `src/note/lists.rs`.
 - Measured sizes come from `research/11`.
 - Sound parts: `MarkerAccumulator`, the Logos single pass, the flat list
   hierarchy and the infallible parser.
@@ -274,13 +274,13 @@ a personal vault. Every 50,000-note number is a linear extrapolation [H].
   buffer. The unsaved-buffer constructor is public (ticket 28).
 - `Link` stays the stored internal-link fact. It holds the target, the display
   text, the embed flag and the syntax kind. `NoteLink` is the document
-  occurrence type. It holds a `Link` and the ranges. The index stores `Link`
-  and never stores ranges. `Link` lives at the crate root as shared vocabulary.
+  occurrence type. It holds a `Link` and the ranges. The index stores `Link` and
+  never stores ranges. `Link` lives at the crate root as shared vocabulary.
 - A stored position never drives an edit. An edit reads the current bytes.
 - `Note` is an assembled view of independent facets: meta (frontmatter, tags and
   rolled-up fields), headings, links and items. No facet needs another facet's
-  storage. Ticket 24 chooses the physical split and what loads when. No
-  consumer needs all facts of all notes in memory.
+  storage. Ticket 24 chooses the physical split and what loads when. No consumer
+  needs all facts of all notes in memory.
 
 Alternatives considered, with the reason to reject each:
 
@@ -343,12 +343,13 @@ Alternatives considered, with the reason to reject each:
   anchor and the display text. External URLs are not stored in `Note`. A block
   reference (`^id`) is not modelled.
 - A task stores no heading link. A query derives the heading above a task from
-  the parser's heading ranges. A heading inside a quote or a list does not count.
+  the parser's heading ranges. A heading inside a quote or a list does not
+  count.
 
 ### Decision: the parser (topic D)
 
-- A task stores the status symbol and the status kind. It does not store the name.
-  The status map resolves the name. An unknown symbol keeps its symbol and
+- A task stores the status symbol and the status kind. It does not store the
+  name. The status map resolves the name. An unknown symbol keeps its symbol and
   resolves as `Todo`. The parser keeps the map to decide the kind and
   `fully_complete`.
 - Decide between a boxed and an unboxed task payload with a measured size and
@@ -364,8 +365,8 @@ Alternatives considered, with the reason to reject each:
 - The parser stays infallible. It returns notices beside the `Note`. The `Note`
   stores none. The bulk index path collects notices with their paths. Ticket 34
   owns how they show.
-- The parser borrows its settings for one call. A long-lived host owns them in an
-  `Arc`. A fact-changing setting enters `IndexPolicy` (ticket 22).
+- The parser borrows its settings for one call. A long-lived host owns them in
+  an `Arc`. A fact-changing setting enters `IndexPolicy` (ticket 22).
 - A change of the stored `Note` changes the extractor fingerprint or bumps the
   format epoch (ticket 25). Index results must equal a fresh parse.
 
@@ -392,7 +393,7 @@ Alternatives considered, with the reason to reject each:
 - The task status name `String` in the stored item.
 - The footnote, callout and slug entries in the glossary. Add the first two back
   as `NoteDoc` entries.
-- The wrong doc comment at `src/note/parser.rs:77-78`.
+- The wrong doc comment at `src/note/parser.rs`.
 - The stale comment about `NoteFieldValue::Number` in `src/note/lists.rs`.
 
 ### What remains unresolved
@@ -443,32 +444,38 @@ Alternatives considered, with the reason to reject each:
 
 ## Code delta
 
-The code does not implement this ticket. This table lists what the refactor changes. Locations are the working tree on 2026-11-02.
+The code does not implement this ticket. This table lists what the refactor
+changes. Locations are the working tree on 2026-11-02.
 
-| Area | Today (path:line) | Target (ticket decision) | Depends on |
+| Area | Today (file and symbol) | Target (ticket decision) | Depends on |
 | --- | --- | --- | --- |
-| Document representation | `Note` in `src/note/model.rs:24-33` stores parsed facts without byte spans. No document type exists | Keep `Note` as the facts type. Add `NoteDoc` with flat range vectors and a line index. The index never stores `NoteDoc` | Ticket 35 |
-| Document builder | No `NoteDoc` scanner exists. `parse_markdown` in `src/note/parser.rs:106` builds `Note` | Add `NoteDoc::scan(src, settings)`. Add `parse_with_doc` for an open buffer. Put shared rules in a new rules module | Ticket 28 |
-| Link occurrence type | `Link` in `src/note/links.rs:28-34` is the only link type. It holds `kind` and `embedded`. It lives in `note` | Move `Link` to the crate root as shared vocabulary. Keep `kind` and `embedded`. Add `NoteLink` in `note`. It holds a `Link` and byte ranges. The index stores `Link` only | Ticket 18, Ticket 35 |
-| Field-value links | Field values recognize wikilinks only (`src/field.rs:769-797`, `src/note/metadata.rs:67-73`) | Frontmatter and inline fields recognize wikilinks, Markdown links and embeds. The recognizer does not use `pulldown-cmark` | Ticket 16, Ticket 19 |
-| Heading parsing | Two Markdown passes run for every note in `src/note/parser.rs:108-114,118-122` | Collect heading text in pass 1. Run the math pass only when a heading source range holds `$` | None |
-| Heading slugs | Heading slugs are not stored or derived in `src/note/model.rs:29` or `src/note/parser.rs:118-162` | Derive slugs on demand from heading text. Deduplicate identical slugs with numeric suffixes | None |
-| Task item payload | `TaskStatus` in `src/task.rs:51-55` holds an owned `name: String`. `TaskListItem` in `src/note/lists.rs:348-352` stores `TaskStatus` | Store only status symbol and status kind in the item. Resolve status names from the status map | Ticket 22 |
-| Multi-value inline fields | `Note::get` in `src/note/model.rs:164-173` returns `.first()` of inline field values | Multi-valued inline fields yield a list value. Single values yield a scalar. Classify each element at parse time | Ticket 19, Ticket 29 |
-| Effective field accessor | `QueryResultRow` in `src/query/results.rs:313-326` merges frontmatter and inline fields | `Note` owns the effective field accessor. Frontmatter fields take precedence over inline fields | Ticket 37 |
-| External links | `ParserContext::end_link` in `src/note/parser.rs:430-441` pushes all URLs into `outlinks` | Exclude external URLs from stored `Note::outlinks` | Ticket 31 |
-| Parser diagnostics | `parse_markdown` in `src/note/parser.rs:106` returns only `Note` and logs warnings via `tracing` | `parse_markdown` returns notices beside `Note`. `NaN` values become `Null` with a notice | Ticket 19, Ticket 34 |
+| Document representation | `Note` in `src/note/model.rs` stores parsed facts without byte spans. No document type exists | Keep `Note` as the facts type. Add `NoteDoc` with flat range vectors and a line index. The index never stores `NoteDoc` | Ticket 35 |
+| Document builder | No `NoteDoc` scanner exists. `parse_markdown` in `src/note/parser.rs` builds `Note` | Add `NoteDoc::scan(src, settings)`. Add `parse_with_doc` for an open buffer. Put shared rules in a new rules module | Ticket 28 |
+| Link occurrence type | `Link` in `src/note/links.rs` is the only link type. It holds `kind` and `embedded`. It lives in `note` | Move `Link` to the crate root as shared vocabulary. Keep `kind` and `embedded`. Add `NoteLink` in `note`. It holds a `Link` and byte ranges. The index stores `Link` only | Ticket 18, Ticket 35 |
+| Field-value links | Field values recognize wikilinks only (`src/field.rs`, `src/note/metadata.rs`) | Frontmatter and inline fields recognize wikilinks, Markdown links and embeds. The recognizer does not use `pulldown-cmark` | Ticket 16, Ticket 19 |
+| Heading parsing | Two Markdown passes run for every note in `src/note/parser.rs` | Collect heading text in pass 1. Run the math pass only when a heading source range holds `$` | None |
+| Heading slugs | Heading slugs are not stored or derived in `src/note/model.rs` or `src/note/parser.rs` | Derive slugs on demand from heading text. Deduplicate identical slugs with numeric suffixes | None |
+| Task item payload | `TaskStatus` in `src/task.rs` holds an owned `name: String`. `TaskListItem` in `src/note/lists.rs` stores `TaskStatus` | Store only status symbol and status kind in the item. Resolve status names from the status map | Ticket 22 |
+| Multi-value inline fields | `Note::get` in `src/note/model.rs` returns `.first()` of inline field values | Multi-valued inline fields yield a list value. Single values yield a scalar. Classify each element at parse time | Ticket 19, Ticket 29 |
+| Effective field accessor | `QueryResultRow` in `src/query/results.rs` merges frontmatter and inline fields | `Note` owns the effective field accessor. Frontmatter fields take precedence over inline fields | Ticket 37 |
+| External links | `ParserContext::end_link` in `src/note/parser.rs` pushes all URLs into `outlinks` | Exclude external URLs from stored `Note::outlinks` | Ticket 31 |
+| Parser diagnostics | `parse_markdown` in `src/note/parser.rs` returns only `Note` and logs warnings via `tracing` | `parse_markdown` returns notices beside `Note`. `NaN` values become `Null` with a notice | Ticket 19, Ticket 34 |
 | Section extents | `Heading` in `src/note/model.rs` holds level, text and start line only | Compute section extents from heading lines for token budgets and body checks | Ticket 38 |
-| Parser settings lifecycle | `MarkdownParserInput` in `src/note/parser/input.rs:25-34` borrows configuration | Borrows settings for one call. A long-lived host stores settings in an `Arc` | Ticket 22, Ticket 33 |
+| Parser settings lifecycle | `MarkdownParserInput` in `src/note/parser/input.rs` borrows configuration | Borrows settings for one call. A long-lived host stores settings in an `Arc` | Ticket 22, Ticket 33 |
 
 Not in code:
 
-- Footnotes and callouts remain glossary terms for `NoteDoc` and stay out of the index.
-- The status map stays in the parser input to resolve status kinds and completeness.
+- Footnotes and callouts remain glossary terms for `NoteDoc` and stay out of the
+  index.
+- The status map stays in the parser input to resolve status kinds and
+  completeness.
 - The stored note format epoch bumps when stored note facts change (ticket 25).
-- The schema checker remains span-blind and validates only frontmatter fields (ticket 20).
+- The schema checker remains span-blind and validates only frontmatter fields
+  (ticket 20).
 
 Unclear in the ticket:
 
-- "Decide between a boxed and an unboxed task payload with a measured size and allocation count".
-- "The final field set of the parser input is open. The code reads three values: the tags field name, the tag filters and the status map".
+- "Decide between a boxed and an unboxed task payload with a measured size and
+  allocation count".
+- "The final field set of the parser input is open. The code reads three values:
+  the tags field name, the tag filters and the status map".

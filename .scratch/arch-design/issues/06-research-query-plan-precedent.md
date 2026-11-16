@@ -60,6 +60,6 @@ Deliverable completed at
 
 > Correction (orchestrator): finding 5 in this research rests on a scout claim
 > that `research/01` claim 7 REFUTED. The claim said "eliminate eager `QuerySet`
-> cloning at `engine/query.rs:398`". In truth, chained `QuerySet` methods clone
-> an `Arc` + plan, not rows. The lazy-builder lesson stands only as a pattern.
+> cloning at `engine/query.rs`". In truth, chained `QuerySet` methods clone an
+> `Arc` + plan, not rows. The lazy-builder lesson stands only as a pattern.
 > It does not identify a defect.

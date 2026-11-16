@@ -7,14 +7,14 @@ Mission brief: [mission.md](./mission.md).
 
 ## Destination
 
-This map delivers architectural decisions for Traces. The decisions are
-coherent and backed by evidence. They are sufficient to write a comprehensive
-redesign specification. The decisions cover boundaries, component
-responsibilities, and invariant ownership. They cover domain models,
-interfaces, algorithms, and data-structure changes. They identify transferable
-comparative lessons, foundational investments, and dependency constraints.
-Preserve externally observable capabilities and correctness. This map does not
-implement the redesign. It ends at hand-off to specification.
+This map delivers architectural decisions for Traces. The decisions are coherent
+and backed by evidence. They are sufficient to write a comprehensive redesign
+specification. The decisions cover boundaries, component responsibilities, and
+invariant ownership. They cover domain models, interfaces, algorithms, and
+data-structure changes. They identify transferable comparative lessons,
+foundational investments, and dependency constraints. Preserve externally
+observable capabilities and correctness. This map does not implement the
+redesign. It ends at hand-off to specification.
 
 ## Notes
 
@@ -22,10 +22,10 @@ implement the redesign. It ends at hand-off to specification.
   markdown vaults. Read `GLOSSARY-MAP.md` and the per-module `GLOSSARY.md` for
   vocabulary. Existing ADRs are in `docs/adr/` and are fallible context
   (ADR-0009 appears twice).
-- Code and tickets disagree by design. The tickets describe the target. The
-  code is not yet refactored. Each resolved ticket ends with a "Code delta"
-  section that lists the change. Ticket 36 orders those deltas. `path:line`
-  citations in tickets refer to the working tree near `cb15b21c`. Ticket-to-ticket
+- Code and tickets disagree by design. The tickets describe the target. The code
+  is not yet refactored. Each resolved ticket ends with a "Code delta" section
+  that lists the change. Ticket 36 orders those deltas. Tickets cite files and
+  symbols, not line numbers, because line numbers drift. Ticket-to-ticket
   conflicts are defects. Ticket-to-code gaps are not.
 - Ticket renumbering (2026-10-30): the journal measurement and the live-buffer
   ticket moved next to the index tickets. The `research/*-prep/` files and git
@@ -34,23 +34,23 @@ implement the redesign. It ends at hand-off to specification.
   - 28 to 30, 29 to 31, 30 to 32, 31 to 33.
   - 32 to 34, 33 to 35, 35 to 36, 36 to 37.
   - Tickets 1 to 25 and 38 did not move.
-- Ticket renumbering (2026-11-09): the replay prototype ticket moved next to
-  the index tickets, so the index family reads 24 to 29. Only git history uses
-  the old numbers. The old-to-new map follows.
+- Ticket renumbering (2026-11-09): the replay prototype ticket moved next to the
+  index tickets, so the index family reads 24 to 29. Only git history uses the
+  old numbers. The old-to-new map follows.
   - 29 to 30, 30 to 31, 31 to 32, 32 to 33.
   - 33 to 34, 34 to 35, 35 to 36, 36 to 37.
   - 37 to 38, 38 to 39, 39 to 29.
   - Tickets 1 to 28 did not move.
-- Ticket renumbering (2026-11-09, second pass): the replay prototype moved
-  next to the index tickets. The replay prototype is 27, the live-buffer
-  ticket is 28, and query core is 29. Only git history uses the old numbers.
-  The old-to-new map follows.
+- Ticket renumbering (2026-11-09, second pass): the replay prototype moved next
+  to the index tickets. The replay prototype is 27, the live-buffer ticket is
+  28, and query core is 29. Only git history uses the old numbers. The
+  old-to-new map follows.
   - 27 to 28, 28 to 29, 29 to 27.
   - Tickets outside 27 to 29 did not move.
 - Consult these skills each session: `rust-design`, `domain-modeling`,
   `grilling` (HITL tickets), `research` (research tickets), and
-  `codebase-design`. Use the project mise tasks
-  (`mise run verify|test|bench`) for evidence. Use codegraph for navigation.
+  `codebase-design`. Use the project mise tasks (`mise run verify|test|bench`)
+  for evidence. Use codegraph for navigation.
   - Use release builds for benchmarks.
   - Never run benchmarks in parallel.
   - Do not set RUSTFLAGS.
@@ -63,32 +63,30 @@ implement the redesign. It ends at hand-off to specification.
 - User steer (2026-10-18, after the compatibility-envelope ruling): during this
   wayfinder, consider evolving the codebase toward a workspace layout,
   **starting by separating the CLI** into its own crate. This is a direction to
-  evaluate, not a decision. Compare it with keep-as-is in the crate-topology
-  and workspace-host tickets.
+  evaluate, not a decision. Compare it with keep-as-is in the crate-topology and
+  workspace-host tickets.
 
   Separating the CLI makes it an outward-facing consumer of the core. The CLI
   boundary then justifies the core crate `pub` surface. This obeys the
-  visibility rule in the compatibility-envelope answer.
-  Sequencing: the CLI split depends on first deciding what the CLI owns today
-  but should not own. Examples
-  include composition, scaffolding, query-source normalisation, and task-filter
-  synthesis. See the workspace-host ticket.
+  visibility rule in the compatibility-envelope answer. Sequencing: the CLI
+  split depends on first deciding what the CLI owns today but should not own.
+  Examples include composition, scaffolding, query-source normalisation, and
+  task-filter synthesis. See the workspace-host ticket.
 - Every decision ticket's resolution names: alternatives considered (incl.
   retain), invariant owner, what becomes removable, what remains unresolved, and
   affected downstream tickets.
 - Ticket prose (2026-10-25): the `Question` sections of open tickets obey
   ASD-STE100 Simplified Technical English. They use verb-first instructions,
-  vertical decision lists, and sentences of 20 words or fewer. The
-  `Inputs from …` sections, `Facts:` evidence, and research files stay outside
-  STE.
+  vertical decision lists, and sentences of 20 words or fewer. The `Inputs from
+  …` sections, `Facts:` evidence, and research files stay outside STE.
   Definitions of key terms:
   - `check`: inspect current code now.
   - `verify` or `re-verify`: adversarial claim testing.
   - `validate`: schema validation.
   - `audit`: ticket 36's coverage sweep.
   - `reconcile`: ticket 36's consistency pass.
-  - `ratify`: accept the landed design unchanged.
-  Never swap `index`, `store` (redb), or `cache`.
+  - `ratify`: accept the landed design unchanged. Never swap `index`, `store`
+    (redb), or `cache`.
 - Breadth-first survey (per-subsystem, code-verified by scouts; claims NOT yet
   adversarially verified, see [Which scout claims survive adversarial
   verification?](./issues/01-research-verify-load-bearing-claims.md)):
@@ -107,8 +105,8 @@ implement the redesign. It ends at hand-off to specification.
   (`git show 3d934849^:.scratch/arch-redesign/map.md`). It was deleted at
   `3d934849`. Treated as fallible input only. This map was charted independently
   from code.
-- Research deviation: this tracker is local markdown. Research findings land
-  in `research/NN-*.md` on the working tree and are linked from the ticket. No
+- Research deviation: this tracker is local markdown. Research findings land in
+  `research/NN-*.md` on the working tree and are linked from the ticket. No
   `research/<name>` git branches are pushed.
 - Late precedent research (2026-10-21): IWE and Fileclass were first read from
   source after ticket 20 resolved ([core and
@@ -118,23 +116,24 @@ implement the redesign. It ends at hand-off to specification.
   [Fileclass](./issues/14-research-fileclass-model-binding-and-validation.md)).
   Open tickets carry an "Inputs from the IWE (and Fileclass) research" section;
   ticket 20 and 19 carry a dated comment. Digests live in `docs/digests/`.
-- Renumbering (2026-10-21): the four IWE/Fileclass research tickets moved to
-  12 to 15, after the other research tickets. Earlier tickets 12 to 32 became 16
-  to 36 (add 4). The prep folders were renamed to `research/19-prep/` and
+- Renumbering (2026-10-21): the four IWE/Fileclass research tickets moved to 12
+  to 15, after the other research tickets. Earlier tickets 12 to 32 became 16 to
+  36 (add 4). The prep folders were renamed to `research/19-prep/` and
   `research/20-prep/` (formerly `15-prep`, `16-prep`). Their ticket references
   were updated by hand. Only git history uses the old numbering.
-- Provisionally withstand scrutiny (scouts, unverified; ticket 20 overturned
-  the `FileClassExpander` seam):
+- Provisionally withstand scrutiny (scouts, unverified; ticket 20 overturned the
+  `FileClassExpander` seam):
   - `DatePoint`/`DifferenceEngine` and `DurationValue` nominal identity.
-  - Schema Kahn linearisation + ancestor-bounded `$ref` + whole-directory reload.
+  - Schema Kahn linearisation + ancestor-bounded `$ref` + whole-directory
+    reload.
   - Redb derived-cache design (`Durability::None`, auto-recreate, fail-open).
   - Infallible note parser, `MarkerAccumulator`, single-pass Logos item lexing,
     flat list hierarchy.
   - ADR-0004 CLI error isolation, `CommandOutcome`/`UserAbort`, `CwdGuard`,
     stdout/stderr split.
   - Acyclic 10-tier module DAG; layered test isolation.
-  - `LineIndex`/`FieldKey`/`Blake3Hasher` framing.
-  The reconciliation ticket (ticket 36) re-tests these items.
+  - `LineIndex`/`FieldKey`/`Blake3Hasher` framing. The reconciliation ticket
+    (ticket 36) re-tests these items.
 
 ## Decisions so far
 
@@ -167,20 +166,20 @@ implement the redesign. It ends at hand-off to specification.
   keeps a fixed cross-kind lattice for sorting, while cross-bracket relational
   filters do not match.
 - [How do mature CLIs make ambient environment (clock, zone, dirs, env)
-  explicit?](./issues/04-research-execution-context-precedent.md): jj and uv split
-  context into host environment, workspace, and temporal parts. Do not use one
-  large context structure. Sample `now` once and acquire the zone only if needed
-  (ticket 21 refinement). Snapshot cwd for workspace discovery. The research
-  proposed interactive-only prompts. Ticket 21 permits authored unattended
-  defaults but rejects invented answers.
+  explicit?](./issues/04-research-execution-context-precedent.md): jj and uv
+  split context into host environment, workspace, and temporal parts. Do not use
+  one large context structure. Sample `now` once and acquire the zone only if
+  needed (ticket 21 refinement). Snapshot cwd for workspace discovery. The
+  research proposed interactive-only prompts. Ticket 21 permits authored
+  unattended defaults but rejects invented answers.
 - [How do incremental systems fingerprint inputs and decide
   staleness?](./issues/05-research-freshness-fingerprint-precedent.md): input
   completeness is best owned by the type system (Ruff `CacheKey` derive) over
   hand-listed digests. An index-owned fingerprint over consumed config in redb
   `meta` table suffices. Commit `207cc3fb` built this fingerprint, so this is
   confirmed. Inverted unresolved-stem maps (Obsidian advanced-metadata-cache,
-  rumdl) disprove the full-vault rescan on path changes. Git racy-timestamp guard
-  was missing from the Traces delta (still missing at `207cc3fb`).
+  rumdl) disprove the full-vault rescan on path changes. Git racy-timestamp
+  guard was missing from the Traces delta (still missing at `207cc3fb`).
 - [How do query engines structure predicate languages, plans, and
   pushdown?](./issues/06-research-query-plan-precedent.md): source selection is
   an indexable subset of predicates, not a separate language (SQLite,
@@ -218,8 +217,8 @@ implement the redesign. It ends at hand-off to specification.
   already free (`into_offset_iter` is used). An 8-byte `ByteSpan` (= ruff
   `TextRange`) with on-demand `LineIndex` is compact. Rumdl proves one pass
   yields slugs. Dataview never rolls task fields into page metadata and squashes
-  single occurrences to scalars. Obsidian/Tasks intern status by symbol.
-  List items belong as children of the note.
+  single occurrences to scalars. Obsidian/Tasks intern status by symbol. List
+  items belong as children of the note.
 - [What do the existing benchmarks and targeted new measurements say about the
   consequential performance
   claims?](./issues/11-research-performance-evidence.md): on Apple M4 Pro, a
@@ -243,19 +242,19 @@ implement the redesign. It ends at hand-off to specification.
   graph. It drops watcher events for open keys. This works only because IWE has
   no persisted index. No persistent cache: 20k notes cold in 705 ms (M3 Pro,
   synthetic). This provides a cost model for tickets 24 and 25, not a verdict.
-  Its lossy tree writer regressed repeatedly. Writers must splice spans and never
-  rewrite unchanged bytes (tickets 23, 25).
+  Its lossy tree writer regressed repeatedly. Writers must splice spans and
+  never rewrite unchanged bytes (tickets 23, 25).
 - [What do IWE's query language, document schema, search and MCP write path
   teach
-  Traces?](./issues/13-research-iwe-query-schema-and-agent-write-gating.md):
-  IWE query value semantics converge with ticket 19. Its query is a
-  serialisable document (question for ticket 29). Schema binds by host-config
-  globs, with no inheritance. The MCP gate is always on and all-or-nothing. It
-  validates whole pending documents with no delta rule (supports ticket 20 delta
-  rule). It requires `expect` count guards on query mutations. Body schemas use
-  an ordered greedy section matcher through an external crate (ticket 15).
-  Corrects earlier claims: no frontmatter `type` binding, no strict mode switch,
-  and reserved-prefix fields are validated.
+  Traces?](./issues/13-research-iwe-query-schema-and-agent-write-gating.md): IWE
+  query value semantics converge with ticket 19. Its query is a serialisable
+  document (question for ticket 29). Schema binds by host-config globs, with no
+  inheritance. The MCP gate is always on and all-or-nothing. It validates whole
+  pending documents with no delta rule (supports ticket 20 delta rule). It
+  requires `expect` count guards on query mutations. Body schemas use an ordered
+  greedy section matcher through an external crate (ticket 15). Corrects earlier
+  claims: no frontmatter `type` binding, no strict mode switch, and
+  reserved-prefix fields are validated.
 - [What does Fileclass's source teach about class resolution, typed fields and
   validation?](./issues/14-research-fileclass-model-binding-and-validation.md):
   confirms `global` as the lowest-precedence layer for every note and per-class
@@ -265,12 +264,12 @@ implement the redesign. It ends at hand-off to specification.
   satisfies `required`, custom date formats unchecked). 28 field types, about
   ten distinct (ticket 37). No body or buffer model.
 - [What are `schematter-validator` and the document-schema
-  spec?](./issues/15-research-schematter-validator-and-document-schema.md):
-  IWE validator crate (about 1,200 lines, `jsonschema` dependency, one
+  spec?](./issues/15-research-schematter-validator-and-document-schema.md): IWE
+  validator crate (about 1,200 lines, `jsonschema` dependency, one
   implementation, draft spec) is a poor fit. It brings a second schema dialect,
-  a recursive section tree, and no spans. Its matcher semantics are reusable
-  as a
-  design over Traces flat headings (ticket 38). No dependency decision remains.
+  a recursive section tree, and no spans. Its matcher semantics are reusable as
+  a design over Traces flat headings (ticket 38). No dependency decision
+  remains.
 - [What counts as the externally observable surface the redesign must
   preserve?](./issues/16-grilling-compatibility-envelope.md): sole consumer, so
   almost everything is Migratable through the specification change table (no
@@ -324,9 +323,10 @@ implement the redesign. It ends at hand-off to specification.
   upper bound. Two periods match only by normalized identity. Typed temporal and
   environmental failures are distinct from nonmatching data. Link equality uses
   the folded target, while `date(link)` reads the target. Two advisory stderr
-  notices are retained. Handoffs: [query core](./issues/29-query-core-and-plan.md),
-  [temporal boundary](./issues/30-temporal-boundary-and-dialects.md) (natural
-  language grammar, `DateConfig`), [execution
+  notices are retained. Handoffs: [query
+  core](./issues/29-query-core-and-plan.md), [temporal
+  boundary](./issues/30-temporal-boundary-and-dialects.md) (natural language
+  grammar, `DateConfig`), [execution
   context](./issues/21-ambient-environment-and-execution-context.md), [schema
   typing](./issues/20-schema-note-typing-and-validation.md), [index
   model](./issues/24-index-read-model-and-query-execution.md).
@@ -352,11 +352,10 @@ implement the redesign. It ends at hand-off to specification.
   command, git, read notice, LSP). Prevention operates only by placement
   (isolated copy or inbox, outside destination). Prevention also applies where
   MCP tools own every write, with host-run guards over the stateless 2026-07-28
-  protocol. `traces check` takes paths and splits schema errors from
-  violations. Delta rule applies. A class-set change prompts the user.
-  Date-shaped text: no override, no
-  quote convention. Body-section schemas form a separate ticket. Handoffs:
-  [query core](./issues/29-query-core-and-plan.md), [note document
+  protocol. `traces check` takes paths and splits schema errors from violations.
+  Delta rule applies. A class-set change prompts the user. Date-shaped text: no
+  override, no quote convention. Body-section schemas form a separate ticket.
+  Handoffs: [query core](./issues/29-query-core-and-plan.md), [note document
   model](./issues/23-note-document-model.md), [temporal
   boundary](./issues/30-temporal-boundary-and-dialects.md), [template
   boundary](./issues/31-template-engine-boundary.md),
@@ -367,17 +366,17 @@ implement the redesign. It ends at hand-off to specification.
 - [What is the explicit execution context, and what ambient state is
   eliminated?](./issues/21-ambient-environment-and-execution-context.md):
   adapters snapshot OS inputs at workspace opening. Core workspaces own
-  independent policy/config generations, rechecking local trust at each
-  request admission. One frame per query/render/request pins clock, week
-  rule, and lazy zone resolution. Lazy results memoize errors. A civil
-  `CalendarPeriod` (start and `CalendarUnit`) supplies filename-only `file.date`,
-  which never falls back to `file.cdate`. Creation fields never fall back to
-  mtime. Whole-period comparisons use the instant's local civil date. Period
-  identity and sorting remain distinct. Authored defaults work unattended;
-  missing answers fail. Multi-root construction is supported without a
-  registry. Same-root index writer coordination stays with tickets
-  24/25/32/33. Handoffs: [config](./issues/22-config-ownership-and-lifecycle.md),
-  [read model](./issues/24-index-read-model-and-query-execution.md),
+  independent policy/config generations, rechecking local trust at each request
+  admission. One frame per query/render/request pins clock, week rule, and lazy
+  zone resolution. Lazy results memoize errors. A civil `CalendarPeriod` (start
+  and `CalendarUnit`) supplies filename-only `file.date`, which never falls back
+  to `file.cdate`. Creation fields never fall back to mtime. Whole-period
+  comparisons use the instant's local civil date. Period identity and sorting
+  remain distinct. Authored defaults work unattended; missing answers fail.
+  Multi-root construction is supported without a registry. Same-root index
+  writer coordination stays with tickets 24/25/32/33. Handoffs:
+  [config](./issues/22-config-ownership-and-lifecycle.md), [read
+  model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
   [query](./issues/29-query-core-and-plan.md),
   [temporal](./issues/30-temporal-boundary-and-dialects.md),
@@ -391,14 +390,13 @@ implement the redesign. It ends at hand-off to specification.
   lifecycle?](./issues/22-config-ownership-and-lifecycle.md): the root types
   `task`, `tag`, and `field` stay as shared vocabulary. `note` owns its parser
   input, so `note` no longer imports `config`. `ConfigDigests` is deleted.
-  `index` owns
-  `IndexPolicy` as the only source of the fingerprint. One exhaustive
-  projection builds it from `Config`. Ticket 25 keeps content and granularity.
-  Two trust and tracker stores remain. `ConfigService` is the only writer.
-  Root-only grants and `MissingBaseline` are removed. The `ConfigFile` typestate
-  retains a store-level trust check. Adapters build `HostInputs`.
-  `ConfigService` owns its locator. A relative path variable is an error.
-  `init` is a core use case, trusting only a workspace that it created. `Config`
+  `index` owns `IndexPolicy` as the only source of the fingerprint. One
+  exhaustive projection builds it from `Config`. Ticket 25 keeps content and
+  granularity. Two trust and tracker stores remain. `ConfigService` is the only
+  writer. Root-only grants and `MissingBaseline` are removed. The `ConfigFile`
+  typestate retains a store-level trust check. Adapters build `HostInputs`.
+  `ConfigService` owns its locator. A relative path variable is an error. `init`
+  is a core use case, trusting only a workspace that it created. `Config`
   carries a stamp. `ConfigService::admit` is the admission primitive. Core holds
   no workspace object (ticket 33).
 - [What is the note document model: spans, facts, items, multi-value
@@ -411,10 +409,9 @@ implement the redesign. It ends at hand-off to specification.
   list item. It stores the status symbol and kind, not the name. Keep the stored
   note-level tags and inline fields. Two maps and one note-owned effective
   accessor. Several values form a list. Ticket 29 reserves a membership IR name;
-  ticket 30 chooses its frontend. External URLs leave the stored links.
-  The math pass runs only for a heading with `$`.
-  Notices return beside the `Note`. Handoffs: [read
-  model](./issues/24-index-read-model-and-query-execution.md),
+  ticket 30 chooses its frontend. External URLs leave the stored links. The math
+  pass runs only for a heading with `$`. Notices return beside the `Note`.
+  Handoffs: [read model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
   [query](./issues/29-query-core-and-plan.md),
   [template](./issues/31-template-engine-boundary.md),
@@ -436,16 +433,16 @@ implement the redesign. It ends at hand-off to specification.
   back to a trusted fresh parse for read queries, while `traces index` fails
   closed. Ticket 25 owns freshness and crash recovery. Tickets 29, 32, 33, and
   34 own rows, paths, writer admission, and notices.
-- [Does the landed index freshness model stand?](./issues/25-index-freshness-and-invalidation.md):
-  config drift detection triggers a full rebuild. Store identity uses an engine
-  tag, format epoch, canonical root, extractor fingerprint and policy
-  fingerprint (`IndexPolicy::fingerprint()`). Ticket 32 removes the platform
-  family. A higher epoch triggers a read fallback to fresh parsing.
-  Crash recovery is a no-op refresh of uncommitted files. Ticket 26
-  (journal measurement) is decoupled. Content comparison
-  detects edits when size and mtime match; a file row stores a racy bit.
-  ADR-0009 text and the glossary fingerprint definition are fallible and partly
-  stale. Handoffs: [live
+- [Does the landed index freshness model
+  stand?](./issues/25-index-freshness-and-invalidation.md): config drift
+  detection triggers a full rebuild. Store identity uses an engine tag, format
+  epoch, canonical root, extractor fingerprint and policy fingerprint
+  (`IndexPolicy::fingerprint()`). Ticket 32 removes the platform family. A
+  higher epoch triggers a read fallback to fresh parsing. Crash recovery is a
+  no-op refresh of uncommitted files. Ticket 26 (journal measurement) is
+  decoupled. Content comparison detects edits when size and mtime match; a file
+  row stores a racy bit. ADR-0009 text and the glossary fingerprint definition
+  are fallible and partly stale. Handoffs: [live
   buffer](./issues/28-live-buffer-and-persisted-index-consistency.md), [query
   core](./issues/29-query-core-and-plan.md),
   [host](./issues/33-workspace-host-and-composition.md),
@@ -455,26 +452,25 @@ implement the redesign. It ends at hand-off to specification.
   save?](./issues/26-measure-index-recovery-journal.md): cost screen measured,
   no journal chosen. Against the loose saved-work upper bound no candidate
   rejects. At 50,000 notes the external facts journal costs 76 ms per command
-  against a 1,332.9 ms bound for rebuilds. The bound counts the persist that
-  a replay still pays, so this is not proof that a journal saves. The in-store
-  journal table costs more than the external file at every measured size (477
-  ms added per rebuild). Break-even rates for edits are provisional in this
-  screen. Ticket 27 later measures them for the prototype journal. No-change
-  commands never pass. A kill before the last rebuild
-  sync leaves an empty store in the sample of 9 of 15 stop points. The next
-  open costs 17 to 37 ms. The claims of 85 percent more write time and 2 times
-  size for a facet layout stay untested. The screen split rows round-robin,
-  not the decided layout. The `None` versus `Immediate` choice stays with
-  ticket 36. Handoff:
-  [replay prototype](./issues/27-index-replay-prototype-and-fault-tests.md).
-- [Does the index replay prototype survive fault tests, and what does
-  recovery cost?](./issues/27-index-replay-prototype-and-fault-tests.md):
-  the real-layout probe passes 63 of 63 macOS release-profile cases. The
-  Linux container run passes 62 of 63 cases (one ignored by design) against
-  `.traces/index.redb`. The same-incarnation, same-revision fork
-  exposes a missing content check. A digest rejects that fork in the probe;
-  ticket 25 has not adopted that safeguard. The probe also covers its modeled
-  identity mutations, signal stops, and hostile-body rejection.
+  against a 1,332.9 ms bound for rebuilds. The bound counts the persist that a
+  replay still pays, so this is not proof that a journal saves. The in-store
+  journal table costs more than the external file at every measured size (477 ms
+  added per rebuild). Break-even rates for edits are provisional in this screen.
+  Ticket 27 later measures them for the prototype journal. No-change commands
+  never pass. A kill before the last rebuild sync leaves an empty store in the
+  sample of 9 of 15 stop points. The next open costs 17 to 37 ms. The claims of
+  85 percent more write time and 2 times size for a facet layout stay untested.
+  The screen split rows round-robin, not the decided layout. The `None` versus
+  `Immediate` choice stays with ticket 36. Handoff: [replay
+  prototype](./issues/27-index-replay-prototype-and-fault-tests.md).
+- [Does the index replay prototype survive fault tests, and what does recovery
+  cost?](./issues/27-index-replay-prototype-and-fault-tests.md): the real-layout
+  probe passes 63 of 63 macOS release-profile cases. The Linux container run
+  passes 62 of 63 cases (one ignored by design) against `.traces/index.redb`.
+  The same-incarnation, same-revision fork exposes a missing content check. A
+  digest rejects that fork in the probe; ticket 25 has not adopted that
+  safeguard. The probe also covers its modeled identity mutations, signal stops,
+  and hostile-body rejection.
 
   The measurements do not establish a winning production policy. The corrected
   Linux protocol uses native redb durability, 20 runs per case and an A-B-A
@@ -482,8 +478,8 @@ implement the redesign. It ends at hand-off to specification.
   notes. Replay saves about 20 percent against parse fallback at 5k. A colder
   second session does not reproduce the reported 50k saving. The faster
   50,000-note case labeled read-only actually runs writable recovery. The
-  reported 60-times comparison uses the historical 53.3 ms row-copy bound, not
-  a recovery-latency budget.
+  reported 60-times comparison uses the historical 53.3 ms row-copy bound, not a
+  recovery-latency budget.
 
   The dedicated `ENOSPC` probe reports a catchable `StorageFull` error at the
   failing commit. Acknowledged `Durability::None` rows vanish on reopen at that
@@ -492,34 +488,33 @@ implement the redesign. It ends at hand-off to specification.
   establish a general redb failure rule.
 
   Ticket 27 records a completed investigation, not complete adoption proof.
-  [Ticket
-  36](./issues/36-reconcile-decisions-and-audit-coverage.md) owns adoption;
-  ticket 33 owns the host freshness decision. The probe source is in
-  `.scratch/arch-design/research/27-probe/replay/`. The production
-  `test-utils` seams lived only on the removed scratch branch, so a future
-  run needs them again; ticket 35 decides their durable version. The linked
-  ticket and research asset distinguish the tested behavior from the
-  remaining gates.
+  [Ticket 36](./issues/36-reconcile-decisions-and-audit-coverage.md) owns
+  adoption; ticket 33 owns the host freshness decision. The probe source is in
+  `.scratch/arch-design/research/27-probe/replay/`. The production `test-utils`
+  seams lived only on the removed scratch branch, so a future run needs them
+  again; ticket 35 decides their durable version. The linked ticket and research
+  asset distinguish the tested behavior from the remaining gates.
 - [How should open editor buffers relate to the persisted
   index?](./issues/28-live-buffer-and-persisted-index-consistency.md): every
   host query sees open-buffer content. The CLI sees the saved store only. This
   divergence is a new documented surface. An open buffer feeds a derived
   in-memory generation that is never persisted. Each derivation reapplies all
-  current buffers to the validated base, never to a previous derived snapshot.
-  A private immutable resolution context uses the exact base snapshot and the
+  current buffers to the validated base, never to a previous derived snapshot. A
+  private immutable resolution context uses the exact base snapshot and the
   effective path set as its key. That set includes admitted overlay paths and
   ghosts. The context holds the effective resolver and base-note edges under it.
   A base publish, replay or effective path-set change invalidates the context.
-  Closing a base path removes its replacement without a full re-resolve.
-  The original prototype measured 0.148 ms for a content patch and 113.8 ms
-  for a full re-resolve at 50,000 notes. These timings do not prove the amended
+  Closing a base path removes its replacement without a full re-resolve. The
+  original prototype measured 0.148 ms for a content patch and 113.8 ms for a
+  full re-resolve at 50,000 notes. These timings do not prove the amended
   lifecycle. Ordered LSP events update text before bounded snapshot parse work.
-  Keep one running job and one latest pending snapshot, with session/version checks.
-  Select a position generation before pinning it; otherwise return `Stale`.
-  A derived generation adds a process-local monotonic `derived_id` to the base pair.
-  A retained closed snapshot has a proof time. An eligible scan validates and
-  installs the base atomically with its removal. Failed scans release nothing.
-  Ticket 33 wires these rules and chooses the numeric staleness bound.
+  Keep one running job and one latest pending snapshot, with session/version
+  checks. Select a position generation before pinning it; otherwise return
+  `Stale`. A derived generation adds a process-local monotonic `derived_id` to
+  the base pair. A retained closed snapshot has a proof time. An eligible scan
+  validates and installs the base atomically with its removal. Failed scans
+  release nothing. Ticket 33 wires these rules and chooses the numeric staleness
+  bound.
 - [What is the query core: grammar, IR/plan, rows, output
   formatting?](./issues/29-query-core-and-plan.md): both grammars lower to one
   predicate IR with spans and a typed builder. Pushdown results are Exact,
@@ -533,30 +528,30 @@ implement the redesign. It ends at hand-off to specification.
   Ticket 29 reserves membership semantics; ticket 30 chooses its frontend.
   Rendering uses per-group widths. Ticket 35 chooses the output-module path.
   Task display depth uses active preceding ancestors without changing explicit
-  sort order. This is an acknowledged frozen-stdout defect repair.
-  Printed group labels escape terminal controls but are not typed serialization.
-  Tickets 30, 31, 33, 34 and 35 take the handoffs.
+  sort order. This is an acknowledged frozen-stdout defect repair. Printed group
+  labels escape terminal controls but are not typed serialization. Tickets 30,
+  31, 33, 34 and 35 take the handoffs.
 - [What owns root confinement and path
   identity?](./issues/32-path-and-capability-model.md): `ProjectRoot` owns
   confinement I/O. `RelativePath` is a pure UTF-8 string with `/` separators.
   `ProjectRoot` owns native conversion and component validation, with typed
-  errors for native-unrepresentable names. No public zero-cost path view remains.
-  Canonical path values and journal facts use UTF-8 `/` text.
-  The store adapter owns NUL-encoded database lookup keys.
-  A new format epoch retains the canonical root and removes the platform family.
-  The sort key replaces `/` with byte 0x00, so output order stays unchanged.
-  A path value keeps the spelling that the file
-  system lists. A lazy fold map answers queries in another spelling. The scan
-  skips non-UTF-8 names with a notice. Metadata exclusion uses filesystem identity
-  and subtree pruning, not the query Comparison Key. Other ignored names keep
-  exact case. A strictly in-root `.traces` directory link remains permitted.
-  External or unverifiable targets fail. Ticket 33 wires finding F11.
-  Root relocation rebuilds recognized derived state without deleting user files.
-  The old `mv` replay result remains prototype evidence, not the production rule.
-  The accepted TOCTOU window includes final-component note reads.
-  Inspection has a confined default and a separately named raw-path test.
-  `Config::output_dir` keeps its named output exception. Local trust and global
-  config obey ticket 22. `DryRun` uses the writer rule with that exception.
+  errors for native-unrepresentable names. No public zero-cost path view
+  remains. Canonical path values and journal facts use UTF-8 `/` text. The store
+  adapter owns NUL-encoded database lookup keys. A new format epoch retains the
+  canonical root and removes the platform family. The sort key replaces `/` with
+  byte 0x00, so output order stays unchanged. A path value keeps the spelling
+  that the file system lists. A lazy fold map answers queries in another
+  spelling. The scan skips non-UTF-8 names with a notice. Metadata exclusion
+  uses filesystem identity and subtree pruning, not the query Comparison Key.
+  Other ignored names keep exact case. A strictly in-root `.traces` directory
+  link remains permitted. External or unverifiable targets fail. Ticket 33 wires
+  finding F11. Root relocation rebuilds recognized derived state without
+  deleting user files. The old `mv` replay result remains prototype evidence,
+  not the production rule. The accepted TOCTOU window includes final-component
+  note reads. Inspection has a confined default and a separately named raw-path
+  test. `Config::output_dir` keeps its named output exception. Local trust and
+  global config obey ticket 22. `DryRun` uses the writer rule with that
+  exception.
 
 ## Not yet specified
 
@@ -574,12 +569,12 @@ implement the redesign. It ends at hand-off to specification.
 - **Template internals**: compiled-AST and regex caches, lazy schema load.
   Sharpen after [What is the template engine boundary with query, schema,
   temporal, and the host?](./issues/31-template-engine-boundary.md).
-- **Output formats** (`--format json|csv`) remain open. Ticket 29 moves rendering
-  to an output module; ticket 35 chooses its path.
+- **Output formats** (`--format json|csv`) remain open. Ticket 29 moves
+  rendering to an output module; ticket 35 chooses its path.
 - **Async dialog bridging** for a long-lived host remains open. The
   forward-consumer and workspace-host decisions constrain it.
-- **Persistence portability** (cache across OSes): graduated to [the path
-  model decision](./issues/32-path-and-capability-model.md). The store form is
+- **Persistence portability** (cache across OSes): graduated to [the path model
+  decision](./issues/32-path-and-capability-model.md). The store form is
   portable. The canonical root, not the platform family, scopes a store.
 - **Agent workflows around the check** (validated CLI write commands, isolated
   session or inbox with a gated merge, per-folder instruction snippets): product

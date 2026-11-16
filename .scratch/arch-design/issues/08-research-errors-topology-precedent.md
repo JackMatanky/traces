@@ -8,12 +8,12 @@ Blocked by: none
 
 Traces has 28 `thiserror` enums in 14 modules. They funnel into a 1.8k-line
 `CliError` that matches 4 levels deep (`src/cli/error.rs`). It uses
-`#[expect(private_interfaces)]` to embed `pub(crate)` errors in a public enum
-(`:39-50`). It drops structured diagnostics for all subsystems except query. It
-exposes 45 (now 46, after `207cc3fb`) private types through `traces::testing`
-for 12 benches + integration tests (`src/lib.rs:177-210`). The exposure is
-guarded by 1,528 (now 1,550) frozen visibility tokens and API baselines. Single
-crate, 93k LoC, strictly acyclic 10-tier module DAG. See `survey/cli.md`,
+`#[expect(private_interfaces)]` to embed `pub(crate)` errors in a public enum.
+It drops structured diagnostics for all subsystems except query. It exposes 45
+(now 46, after `207cc3fb`) private types through `traces::testing` for 12
+benches + integration tests (`src/lib.rs`). The exposure is guarded by 1,528
+(now 1,550) frozen visibility tokens and API baselines. Single crate, 93k LoC,
+strictly acyclic 10-tier module DAG. See `survey/cli.md`,
 `survey/cross-cutting.md`, ADR-0004.
 
 Study these comparables:

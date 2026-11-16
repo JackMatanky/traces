@@ -11,7 +11,7 @@ composition includes config load, trust, schema load, index refresh/persist,
 query execution and template service.
 
 - Decide between a headless host/session type and private CLI helpers
-  (`src/cli/mod.rs:335-502`).
+  (`src/cli/mod.rs`).
 - Decide ownership of scaffolding (`cli::init`).
 - Decide ownership of query-source normalization (`normalize_source_input`) and
   task-filter synthesis.
@@ -31,7 +31,7 @@ forward-consumer decision refuses a second consumer, test whether the host is
 still worth it for testability and cohesion.
 
 Re-verified (main @ `207cc3fb`): `IndexerService::from(&Config)` also derived an
-`IndexFingerprint` from `config.digests()` (`src/index/service.rs:47-59`). A
+`IndexFingerprint` from `config.digests()` (`src/index/service.rs`). A
 drift heal is only logged (`tracing::info!`) and never surfaces to the CLI.
 Both details affect what the host composes and reports.
 
@@ -56,7 +56,7 @@ maps violation codes to ignore, warn or reject. `traces check --before --after`
 is a thin CLI command over a core use case.
 
 Fact: the cli currently decides whether to load schemas for a query
-(`has_classes`, `src/cli/mod.rs:474-480`), i.e. it owns composition that the app
+(`has_classes`, `src/cli/mod.rs`), i.e. it owns composition that the app
 layer should own.
 
 `check_note(before, after)` takes a path and content on each side. Class binding
@@ -104,7 +104,7 @@ checks `(key, content)` pairs against bound schemas by building a throwaway
 graph before anything is written (`crates/diwe/src/schema.rs`) [V]. The MCP
 gate is always on. Strict mode means mandatory `expect` count guards on
 `iwe_query` mutations (the round-4 reading was wrong). Multi-document changes
-are all-or-nothing, and every write tool accepts `dry_run` (`docs/mcp.md:125`)
+are all-or-nothing, and every write tool accepts `dry_run` (`docs/mcp.md`)
 [V].
 
 The `expect` count guards are a stronger bulk guard than a per-call cap. The
@@ -141,11 +141,12 @@ See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
   changes from 1 to 0.
 - A host validates sources within a staleness bound. This ticket chooses the
   numeric bound, using tickets 27 and 28 as inputs.
-- A host that starts against a store with a higher format epoch never writes
-  it. It parses fresh if it has no generation.
-- A rebuild heal is quiet. A read that meets a higher epoch gives one stderr notice.
+- A host that starts against a store with a higher format epoch never writes it.
+  It parses fresh if it has no generation.
+- A rebuild heal is quiet. A read that meets a higher epoch gives one stderr
+  notice.
 - Memory is the cost of serving from a pinned generation: 467 MB at 50,000 notes
-  (`research/24-prep/g-probe-results.md:67`).
+  (`research/24-prep/g-probe-results.md`).
 
 ## Inputs from the note document and index read model decisions
 
@@ -170,21 +171,22 @@ See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
 
 - Replace task-filter string synthesis with ticket 29's typed builder. Choose
   its callers, not a second synthesis design.
-- Resolve literal and folder sources through the core comparison-key map.
-  Keep glob patterns as patterns.
+- Resolve literal and folder sources through the core comparison-key map. Keep
+  glob patterns as patterns.
 - Wire one owner that serializes buffer changes, base publication and replay.
-- Apply all incremental LSP edits in order before coalescing parse work.
-  Keep one running job and one latest pending versioned snapshot.
+- Apply all incremental LSP edits in order before coalescing parse work. Keep
+  one running job and one latest pending versioned snapshot.
 - Fence results by base, overlay-state token, document session and version.
   Debounce diagnostics, not generation publication.
-- Keep `derive(base, current_buffers)` independent of previous derived snapshots.
-  Cache resolution context only for the exact base and effective path set.
+- Keep `derive(base, current_buffers)` independent of previous derived
+  snapshots. Cache resolution context only for the exact base and effective path
+  set.
 - Define the overlay container, scan-completion event, LSP re-push rule and
   numeric staleness bound B.
-- Select a request's required version before pinning its generation.
-  Never repin execution. Map core `Stale` outcomes to the host protocol.
-- Install a validated base atomically with closed-snapshot proof removal.
-  A failed scan cannot release the snapshot.
-- Apply ticket 32's metadata identity exclusion and contained-link policy.
-  Own F11 from `research/22-prep/o-stress-test-findings.md`.
+- Select a request's required version before pinning its generation. Never repin
+  execution. Map core `Stale` outcomes to the host protocol.
+- Install a validated base atomically with closed-snapshot proof removal. A
+  failed scan cannot release the snapshot.
+- Apply ticket 32's metadata identity exclusion and contained-link policy. Own
+  F11 from `research/22-prep/o-stress-test-findings.md`.
 - Name the EPIPE writer contract once with ticket 35's output module.

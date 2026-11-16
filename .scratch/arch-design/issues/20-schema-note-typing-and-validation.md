@@ -9,21 +9,21 @@ Blocked by: 18, 19
 `src/schema` (12k LoC; ~4.7k production) models field definitions and
 inheritance. It never touches note values, and the index extracts `fileClass`
 independently. Should schemas drive validation/typing of note frontmatter and
-inline fields? Options include advisory diagnostics, gating, or no checks. If so,
-which module owns the validator, the diagnostic type, and the shared typed-field
-representation for templates (`ui` prompts) and query?
+inline fields? Options include advisory diagnostics, gating, or no checks. If
+so, which module owns the validator, the diagnostic type, and the shared
+typed-field representation for templates (`ui` prompts) and query?
 
-Facts: `survey/schema.md` §2-3, `src/index/service.rs:1732-1923` (`mod
-class_field`; shifted from 1656-1840 by `207cc3fb`), and global schema semantics.
-Four field-type enums exist: `RawSchemaFieldType`, `SchemaFieldTypeTag`,
+Facts: `survey/schema.md` §2-3, `src/index/service.rs` (`mod class_field`;
+shifted from 1656-1840 by `207cc3fb`), and global schema semantics. Four
+field-type enums exist: `RawSchemaFieldType`, `SchemaFieldTypeTag`,
 `SchemaFieldType`, and `NoteFieldType`. Other facts include the `SchemaService`
 `expect(dead_code)` constructor and the `FileClassExpander` seam. The charting
 judged this seam sound, but the Answer overturns it.
 
 Alternatives: keep schema passive (template/prompt metadata only), add an
 advisory validation pass producing structured diagnostics, or use schema-typed
-ingestion at index time. Include the keep-as-is option and what it means for
-12k lines.
+ingestion at index time. Include the keep-as-is option and what it means for 12k
+lines.
 
 Inputs: `survey/schema.md`, `research/03`, value model and coercion decisions,
 compat envelope.
@@ -33,9 +33,9 @@ Graduates fog: schema internals simplification (see map).
 ## Inputs from the value model decision
 
 See [ticket 18's Answer](./18-value-model.md). Schema options use a schema-local
-literal type. Strings stay strings, with no date/duration/link variants.
-Native TOML dates read as strings. Select values that name links are interpreted as links
-only here, at the consumer boundary, with the shared root `Link` wikilink
+literal type. Strings stay strings, with no date/duration/link variants. Native
+TOML dates read as strings. Select values that name links are interpreted as
+links only here, at the consumer boundary, with the shared root `Link` wikilink
 parser.
 
 ## Inputs from the coercion and comparison decision
@@ -62,10 +62,12 @@ specified below.
 **Roles of the schema:**
 
 - Value and source provider for templates and LSP completion.
-- Advisory frontmatter checker for LSP diagnostics and post-render template checks.
+- Advisory frontmatter checker for LSP diagnostics and post-render template
+  checks.
 - Hover and go-to-definition metadata.
 - Write-path guardrail for an MCP agent.
-- Schema definitions never affect parsing, the index or the fingerprint (only the configured class-field name is shared).
+- Schema definitions never affect parsing, the index or the fingerprint (only
+  the configured class-field name is shared).
 
 **Layering (standing principle, binds tickets 29, 31, 33 and 35):** cli, lsp and
 mcp are thin hosts of `core`. `core` holds an app layer of use cases. The app
@@ -132,11 +134,11 @@ not. It is not a class: no `@global` query can name it, and no class extends it.
 A class declaration of the same field always wins. `required` in `global` still
 degrades to `false`. A class can exclude a global field with `excludes`.
 Violations from this layer carry layer `global`. The diagnostic adapter derives
-a separate `schema.global.*` code family. Hosts can set a different policy
-(for example, hint-level in the LSP or ignored on unclassed notes). Ticket 34
-owns default severities and is asked to rank this family below class violations.
-This changes the documented invariant in `src/schema/mod.rs:48-51`. The doc
-comment and the survey are updated with the specification.
+a separate `schema.global.*` code family. Hosts can set a different policy (for
+example, hint-level in the LSP or ignored on unclassed notes). Ticket 34 owns
+default severities and is asked to rank this family below class violations. This
+changes the documented invariant in `src/schema/mod.rs`. The doc comment and the
+survey are updated with the specification.
 
 **Class binding:** A note's class set has three sources:
 
@@ -166,12 +168,12 @@ plain hierarchy keyed by one normalising `ClassName` (the index stores
 lowercase). The app layer passes it to the query service. Return unknown classes
 as data, not as a logging side effect. Hosts replace the snapshot wholesale when
 schemas change. Delete the trait, crate-root `src/file_class_expander.rs`, the
-`&mut ClassExpansionMode` out-parameter, and
-`Option<Arc<dyn FileClassExpander>>`. Verified smells include a single
-implementation, a consumer-defined trait, and out-parameter mutation of the
-query AST. The orphan rule also forbids this implementation in any third crate once
-`query` and `schema` are separate crates. Reproduction showed E0117 in a
-throwaway workspace, but a newtype compiles.
+`&mut ClassExpansionMode` out-parameter, and `Option<Arc<dyn
+FileClassExpander>>`. Verified smells include a single implementation, a
+consumer-defined trait, and out-parameter mutation of the query AST. The orphan
+rule also forbids this implementation in any third crate once `query` and
+`schema` are separate crates. Reproduction showed E0117 in a throwaway
+workspace, but a newtype compiles.
 
 A latent hazard exists. Without an expander, store queries fall back to exact
 match while in-memory filters match nothing. Production always attaches one, so
@@ -211,40 +213,45 @@ what the harness provides [P, `research/20-prep/round5/report.md`]:
   dry-run `check_note` tool taking a path and proposed content. A gate is as
   strong as its weakest open write path. The tools must cover every edit
   operation, including the body, or native writes must be denied. Otherwise,
-  agents fall back to native edit tools that can change frontmatter. Guards the MCP host runs on its own, against protocol revision 2026-07-28 [V,
-  [round-6 addendum](../research/20-prep/round6/I-mcp-server-guards.md)]:
+  agents fall back to native edit tools that can change frontmatter. Guards the
+  MCP host runs on its own, against protocol revision 2026-07-28 [V, [round-6
+  addendum](../research/20-prep/round6/I-mcp-server-guards.md)]:
   - Validate before write with the delta rule.
-  - A content-hash precondition on edits (the agent must have read the current note).
+  - A content-hash precondition on edits (the agent must have read the current
+    note).
   - Atomic write, then re-read and re-check.
   - A bounded undo journal.
-  - Delete, move and bulk guards (inbound links, class-set change, a per-call cap).
+  - Delete, move and bulk guards (inbound links, class-set change, a per-call
+    cap).
   - Schema-aware input coercion.
-  - Violations and a short field summary on every read result. Confirmations use a multi round-trip
-  `input_required` result on `tools/call`, which only clients that declare
-  `elicitation` can answer. With none, deny. `requestState` must be
-  integrity-protected and bound to the request digest and a TTL. A notice of
-  notes changed outside the server needs an in-process watcher and baseline.
-  This notice is best effort only. The protocol has no sessions, so state
-  across calls is a server-minted handle or process memory lost on restart. Also,
-  the result block that carries it may or may not reach the model [H]. Features that are unavailable or untrusted:
+  - Violations and a short field summary on every read result. Confirmations use
+    a multi round-trip `input_required` result on `tools/call`, which only
+    clients that declare `elicitation` can answer. With none, deny.
+    `requestState` must be integrity-protected and bound to the request digest
+    and a TTL. A notice of notes changed outside the server needs an in-process
+    watcher and baseline. This notice is best effort only. The protocol has no
+    sessions, so state across calls is a server-minted handle or process memory
+    lost on restart. Also, the result block that carries it may or may not reach
+    the model [H]. Features that are unavailable or untrusted:
   - Roots: deprecated. Use server configuration.
   - Logging: deprecated. Per-request opt-in.
   - `subscriptions/ listen`: client opt-in, no known model feed.
   - The Skills extension: no coding harness in the client matrix.
   - Tool annotations: hints, untrusted. Server `instructions` now ride
-  `server/discover`, which clients may skip.
+    `server/discover`, which clients may skip.
 - *An LSP client:* diagnostics. Feedback only (`didChange` cannot deny,
   `willSaveWaitUntil` cannot abort a save).
 - *Hooks, sandboxes, deny rules:* documented recipes, not features. Claude
   Code's pre-write hook does carry the full `content` for whole-file writes [V].
-  The earlier claim that hooks never see the resulting file is withdrawn.
-  Shell writes remain invisible to hooks.
+  The earlier claim that hooks never see the resulting file is withdrawn. Shell
+  writes remain invisible to hooks.
 - *Placement:* the only harness-independent prevention is to keep the writer
   away from the canonical store, which is a workflow, not a filter [H;
   consistent with every surveyed tool, none of which prevents raw writes]. Use
-  an isolated working copy (git worktree or branch, or APFS/Btrfs clone elsewhere)
-  or an `_inbox/` folder. A gated `traces merge` or `promote` promotes notes by
-  running `check_note` on the destination path (bindings need it).
+  an isolated working copy (git worktree or branch, or APFS/Btrfs clone
+  elsewhere) or an `_inbox/` folder. A gated `traces merge` or `promote`
+  promotes notes by running `check_note` on the destination path (bindings need
+  it).
 - *Working copy isolation:* isolation holds only where the writer is launched
   inside the copy. Same-user processes can still reach the canonical vault.
   Multi-user editing is a product feature outside the map's destination. The
@@ -256,8 +263,8 @@ what the harness provides [P, `research/20-prep/round5/report.md`]:
 
 Give the agent MCP tool input schemas and a schema resource up front. Do not
 project large enums or strftime formats. Check those after the call. The delta
-rule blocks only violations introduced by the edit. Key violations by
-`(field, code, hash(value))`, not list position.
+rule blocks only violations introduced by the edit. Key violations by `(field,
+code, hash(value))`, not list position.
 
 Ask the user before a class-set change, including one caused by a move or a
 binding-tag edit. Also ask before setting an unknown class. Deny either change
@@ -275,12 +282,15 @@ Rejected as a design basis or default:
 
 - Hook-based gating.
 - A staging directory without a launch convention (an instruction).
-- A watcher daemon as a standalone product. The daemon has no channel to the agent; inside the MCP server it is an advisory notice.
+- A watcher daemon as a standalone product. The daemon has no channel to the
+  agent; inside the MCP server it is an advisory notice.
 - Auto-revert (destroys data).
-- ACP, FUSE or WebDAV interception (custom client, kernel extension, fragile mounts).
+- ACP, FUSE or WebDAV interception (custom client, kernel extension, fragile
+  mounts).
 - Git clean filters (break `checkout` and `diff`).
 - `reference-transaction` hooks (see commit hashes only).
-- YAML-comment or `$schema` hints in notes (Obsidian strips comments [V]; `$schema` pollutes every note).
+- YAML-comment or `$schema` hints in notes (Obsidian strips comments [V];
+  `$schema` pollutes every note).
 
 A loopback NFS mount gates atomic-rename writers on macOS without root [V, one
 experiment in round 6]. It does not gate in-place writes (a shell `>` exits 0
@@ -292,15 +302,17 @@ lossless frontmatter change to a note. Ticket 20 adds no write-back or span
 requirement to ticket 23 (ticket 17 holds). Raise edit-range needs when MCP is
 specified.
 
-**Date-shaped text:** no parse-time override, no quote convention. `input` accepts any scalar. Consumers get a text view rendered from the typed
-value, under a tested round-trip invariant. Canonical forms round-trip, and
+**Date-shaped text:** no parse-time override, no quote convention. `input`
+accepts any scalar. Consumers get a text view rendered from the typed value,
+under a tested round-trip invariant. Canonical forms round-trip, and
 normalisation is documented. Links already normalise display. A `string()` cast
 arrives only if a real use appears (ticket 19).
 
 A TOML-style single versus double quote convention is rejected [S]. Noyalib
 exposes no per-scalar quote style outside the CST (+59% parse time). Also,
-Obsidian's property editor rewrites quote style on save. Quoted numbers and versions already stay text and leading-zero values
-are strings (`src/note/metadata.rs:319`). Only date, datetime and
+Obsidian's property editor rewrites quote style on save. Quoted numbers and
+versions already stay text and leading-zero values are strings
+(`src/note/metadata.rs`). Only date, datetime and
 
 **Alternatives considered:**
 
@@ -313,7 +325,8 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
 - *`schema` imports `note`; `note` imports `schema`:* rejected (note must parse
   without schemas, ADR-0009).
 - *Small value-view trait, compiled generic validator, merged vault-model
-  module:* rejected. They need a glue implementation or inverted dependency. Flat scalar schemas do not justify a compiled engine (blast radius).
+  module:* rejected. They need a glue implementation or inverted dependency.
+  Flat scalar schemas do not justify a compiled engine (blast radius).
 - *Index-time typing and query-bind typing:* rejected by tickets 16 and 19 and
   ADR-0009.
 - *Optional link-oracle trait for tier-2 checks:* withdrawn (one-implementor
@@ -325,15 +338,17 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
   rejected as the cross-class rule. Reordering a class list must not flip
   results, and nothing is masked silently. Single-class only is rejected because
   Fileclass, Metadata Menu, IWE and Logseq all support several classes [V].
-- *JSON Schema as the schema format:* rejected. IWE uses it for validation only. Traces schemas also drive prompts, completion, file links and label/value mapping. JSON Schema remains an export for MCP.
+- *JSON Schema as the schema format:* rejected. IWE uses it for validation only.
+  Traces schemas also drive prompts, completion, file links and label/value
+  mapping. JSON Schema remains an export for MCP.
 - *Binding only by frontmatter class* (the first Answer) and *binding stored in
   the index:* rejected. Binding by tag and path is conventional in Metadata
   Menu, Fileclass and IWE, and query-time expansion keeps the index schema-free.
-  Union and priority-ordered combinations of explicit and bound classes (Metadata
-  Menu, Fileclass, IWE) were considered. Suppression was chosen because bindings
-  cover notes without a class. This choice creates the fewest false conflicts
-  and keeps one simple rule. Fallback if the query exclusion proves costly:
-  union with source priority.
+  Union and priority-ordered combinations of explicit and bound classes
+  (Metadata Menu, Fileclass, IWE) were considered. Suppression was chosen
+  because bindings cover notes without a class. This choice creates the fewest
+  false conflicts and keeps one simple rule. Fallback if the query exclusion
+  proves costly: union with source priority.
 - *Global as a reference pool only, or applied only to classed notes:* rejected;
   applying it to every note types shared fields like `due` in unclassed notes
   without a binding mechanism.
@@ -344,7 +359,8 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
 - Classification (note parser, tickets 18 and 19).
 - Select and link equality (value-semantics module, ticket 19).
 - Class-name normalisation (one `ClassName`).
-- Class binding resolution, class-change detection and the delta (core app layer).
+- Class binding resolution, class-change detection and the delta (core app
+  layer).
 - Policy per code (each host).
 - Precedence of the `global` layer (`schema`).
 
@@ -354,29 +370,32 @@ are strings (`src/note/metadata.rs:319`). Only date, datetime and
 - The `ClassExpansionMode` out-parameter.
 - The `Option<Arc<dyn>>` field and the unknown class logging side effect.
 - The test-only `SchemaService::new`.
-- The `#[cfg(test)]` gating on `min`, `max`, `step` and `format` accessors (they become production).
+- The `#[cfg(test)]` gating on `min`, `max`, `step` and `format` accessors (they
+  become production).
 
 Not removable: `required`, `multi`, `min`, `max`, `step`, `format`.
 
 **Evidence note:** the author's own vault was treated as one example, not as
 authority. Decisions rest on code, ADRs, tickets, protocol facts and external
 precedent. Items tagged [S] come from scout reports not re-read. No benchmark
-was run. Drift since `207cc3fb` touched `query/service.rs`, `query/grammar/source.rs`,
-`template/service.rs` and `template/engine/schema.rs` only in doc comments and
-the minijinja per-render state API used by the template `Schema` handle. The
-seams cited here still exist. These seams include the `FileClassExpander` trait
-and the `render()`/`write()` split. Research:
+was run. Drift since `207cc3fb` touched `query/service.rs`,
+`query/grammar/source.rs`, `template/service.rs` and `template/engine/schema.rs`
+only in doc comments and the minijinja per-render state API used by the template
+`Schema` handle. The seams cited here still exist. These seams include the
+`FileClassExpander` trait and the `render()`/`write()` split. Research:
 [brief](../research/20-prep/brief.md) (revision 2 plus MCP section; its
 consumer-module recommendation is superseded here), the round-3
 [synthesis](../research/20-prep/round3/report.md) and the round-4 [external
 precedent](../research/20-prep/round4/report.md). Verified in round 4: Fileclass
 last-wins and class binding sources, Metadata Menu's combined mapping, Logseq
 multi-parent `extends`, IWE's design, Umbraco's rejection of conflicting
-compositions. Corrected: the earlier attribution of first-listed wins to Metadata Menu was
-wrong. The arXiv paper cited for "agents ignore advisory warnings" does not show
-that claim. The guardrail rests on protocol arguments and not on that paper. Scout E's default severities and element-indexed delta key
-are superseded by this Answer. Rounds 5 and 6 read the remaining scout claims at the source ([claim checks and
-guardrail channels](../research/20-prep/round5/report.md), [harness-independent
+compositions. Corrected: the earlier attribution of first-listed wins to
+Metadata Menu was wrong. The arXiv paper cited for "agents ignore advisory
+warnings" does not show that claim. The guardrail rests on protocol arguments
+and not on that paper. Scout E's default severities and element-indexed delta
+key are superseded by this Answer. Rounds 5 and 6 read the remaining scout
+claims at the source ([claim checks and guardrail
+channels](../research/20-prep/round5/report.md), [harness-independent
 guardrails](../research/20-prep/round6/report.md)). LDAP, CUE, Kubernetes
 pruning, Plone, Tana, SilverBullet, Metadata Enforcer, and Obsidian rewriting
 were verified. Dendron "fatal" path binding, Logseq "broken trees", and
@@ -455,26 +474,26 @@ overturned.** Confirmed or refined:
 - *Suppression and conflict reporting.* Fileclass's code collects every bound
   class and lets the last win a shared key. A lower-ranked source (path,
   bookmark, base view) overrides a frontmatter class although its docs list
-  frontmatter first (`src/schema/resolver.ts:119-180`; code-read, no test,
-  intent unknown). This is the failure the suppression rule and the one-per-note
+  frontmatter first (`src/schema/resolver.ts`; code-read, no test, intent
+  unknown). This is the failure the suppression rule and the one-per-note
   `schema.class-conflict` avoid.
 - *`global` layer.* Fileclass prepends its global class to every note's merge
   list, so it is the lowest-precedence layer for classed and unclassed notes
-  (`resolveBinding`, `src/schema/resolver.ts:200-219`) [V]. Same design.
+  (`resolveBinding`, `src/schema/resolver.ts`) [V]. Same design.
 - *`origin`.* Fileclass keeps a `BindingOrigin` per class (frontmatter, tag,
   path, bookmark, global) [V], the same idea as the violation `origin`.
 - *Delta rule.* IWE's gate, `validate_pending_documents`, validates each pending
   `(key, content)` pair in isolation in a throwaway graph, with no base to
-  compare (`crates/diwe/src/schema.rs:255-312`) [V]. Any violation in a touched
-  document blocks the write. It is the same shape as `check_note`, minus the
-  delta. The block-on-pre-existing-violation consequence is [H].
+  compare (`crates/diwe/src/schema.rs`) [V]. Any violation in a touched document
+  blocks the write. It is the same shape as `check_note`, minus the delta. The
+  block-on-pre-existing-violation consequence is [H].
 - *Other gates.* IWE's MCP schema gate is always on; "strict" means mandatory
-  `expect` count guards on `iwe_query` mutations (`docs/mcp.md:99`), and every
+  `expect` count guards on `iwe_query` mutations (`docs/mcp.md`), and every
   write tool accepts `dry_run`. Multi-document changes are all-or-nothing.
   `expect` guards are a candidate for the MCP host's bulk guards (ticket 33).
 - *Stricter than both.* Fileclass never validates `step`, lets `[]` satisfy
-  `required` (`validate.ts:58`) and accepts any non-empty string for a field
-  with a custom date format. IWE has no `step`. The Answer's rules stand.
+  `required` (`validate.ts`) and accepts any non-empty string for a field with a
+  custom date format. IWE has no `step`. The Answer's rules stand.
 - *Binding placement.* IWE binds in the host config (`[schemas.<name>].match`,
   globs with gitignore-style `!`, last match wins), has no inheritance and
   composes overlapping schemas order-free. The Answer keeps class-owned
@@ -489,6 +508,10 @@ research 13 and 14):
 
 - IWE does not bind by a frontmatter `type` (round-4 file D).
 - Its "strict mode" is not the gate's on switch.
-- Fields with a reserved prefix (`_`, `$`, `.`, `#`, `@`) are validated since iwe 0.22.0. Withdraw the "[V] IWE ignores reserved-prefix fields" row in the round-4 report. The doc it read (`crates/iwe/docs/schema.md:83`) is stale. The source test is `liwe/src/schema/document.rs` `builds_section_tree_with_levels_and_keeps_prefixed_frontmatter`.
+- Fields with a reserved prefix (`_`, `$`, `.`, `#`, `@`) are validated since
+  iwe 0.22.0. Withdraw the "[V] IWE ignores reserved-prefix fields" row in the
+  round-4 report. The doc it read (`crates/iwe/docs/schema.md`) is stale. The
+  source test is `liwe/src/schema/document.rs`
+  `builds_section_tree_with_levels_and_keeps_prefixed_frontmatter`.
 - Fileclass has 28 field types in its AST (22 take input), not 26.
 - Its documented binding priority does not match its code.

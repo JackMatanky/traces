@@ -6,13 +6,12 @@ Blocked by: none
 
 ## Question
 
-Root confinement is enforced by `strict-path` at construction
-(`src/path.rs:181-189`). But `SafeRelativePath` returns a plain join with an
-acknowledged TOCTOU window (`:159-161,190`). `FileMeta::path` and `CliError`
-fields degrade back to raw `PathBuf`. Template path inspection accepts absolute
-paths (`src/template/engine/path.rs:162`). DryRun skips confinement
-(`src/template/service.rs:225`). The redb path codec stores raw OS bytes/wide
-units. This makes the cache non-portable (`src/path.rs:340-437`). See
+Root confinement is enforced by `strict-path` at construction (`src/path.rs`).
+But `SafeRelativePath` returns a plain join with an acknowledged TOCTOU window.
+`FileMeta::path` and `CliError` fields degrade back to raw `PathBuf`. Template
+path inspection accepts absolute paths (`src/template/engine/path.rs`). DryRun
+skips confinement (`src/template/service.rs`). The redb path codec stores raw OS
+bytes/wide units. This makes the cache non-portable (`src/path.rs`). See
 `survey/root-primitives.md` H7, `survey/cross-cutting.md` H4,
 `survey/template.md` H4/H5.
 

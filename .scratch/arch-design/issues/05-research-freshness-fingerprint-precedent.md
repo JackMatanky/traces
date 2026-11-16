@@ -12,8 +12,8 @@ when charted. It has since landed (`207cc3fb`) (ADR-0009
 `docs/adr/0009-index-refresh.md`,
 `.scratch/index-query/issues/17-config-drift-detection-and-rebuild.md`).
 Path-set changes trigger whole-vault re-resolution. Content edits patch locally
-(`src/index/refresh.rs:344-386`). See `survey/index.md` H2/H3,
-`survey/config-dialog.md` H1.
+(`src/index/refresh.rs`). See `survey/index.md` H2/H3, `survey/config-dialog.md`
+H1.
 
 Study these comparables:
 

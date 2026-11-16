@@ -10,9 +10,9 @@ Blocked by: none
 
 The throwaway prototype passed 63 of 63 macOS release-profile cases with redb
 4.3.0. The Linux container run passed 62 cases; the guarded `ENOSPC` case stays
-ignored by design. The results do not establish every requirement in
-sections A–E. The resolved status records the investigation's completion, not
-completion of all adoption gates.
+ignored by design. The results do not establish every requirement in sections
+A–E. The resolved status records the investigation's completion, not completion
+of all adoption gates.
 
 Ticket 36 weighs adoption and the `None` versus `Immediate` choice. Ticket 33
 gets the freshness data and validates the proposed bound against real hosts.
@@ -50,28 +50,29 @@ The macOS suite covers these cases:
 - `SIGKILL` and `SIGINT` match the simulated stops.
 - The probe rejects a hostile checksum-valid body without a large allocation.
 
-A Linux container run passed the full 62-test re-targeted suite with pinned
-redb 4.3.0 (one case ignored by design). Two `SIGKILL`/`SIGINT` cases first
-failed there because the image ships no `kill` binary; a
-`T27_SIGNAL_HELPER`-aware harness fixes that. The 4 GiB VM setting below is the
-original plan, not the actual run configuration.
+A Linux container run passed the full 62-test re-targeted suite with pinned redb
+4.3.0 (one case ignored by design). Two `SIGKILL`/`SIGINT` cases first failed
+there because the image ships no `kill` binary; a `T27_SIGNAL_HELPER`-aware
+harness fixes that. The 4 GiB VM setting below is the original plan, not the
+actual run configuration.
 
 ### Storage-failure observation and blocker
 
-A dedicated `enospc-probe` binary reproduced real `ENOSPC` in a 64 MiB
-`tmpfs` container. The writer gets a real catchable error
-(`code: 28 StorageFull`) at the failing commit. The loss is what follows: under
-`Durability::None`, every row acknowledged before that commit vanished on
-reopen (`acknowledged=31 actual=0 missing=31`). Under native `Immediate`, all
-earlier acknowledged rows survived on the same filesystem. An orderly close
-with no failure kept all 128 `None` rows, so the loss needs the failure
-boundary, not a `None` commit alone. A post-`ENOSPC` store keeps a recovery
-flag, so `open_read_only` reports `RepairAborted`; the separately labelled
-writable reopen is the only working scan.
+A dedicated `enospc-probe` binary reproduced real `ENOSPC` in a 64 MiB `tmpfs`
+container. The writer gets a real catchable error (`code: 28 StorageFull`) at
+the failing commit. The loss is what follows: under `Durability::None`, every
+row acknowledged before that commit vanished on reopen
+(`acknowledged=31 actual=0 missing=31`). Under native `Immediate`, all earlier
+acknowledged rows survived on the same filesystem. An orderly close with no
+failure kept all 128 `None` rows, so the loss needs the failure boundary, not a
+`None` commit alone.
+A post-`ENOSPC` store keeps a recovery flag, so `open_read_only` reports
+`RepairAborted`; the separately labelled writable reopen is the only working
+scan.
 
-The journal-induced and no-journal surfaces matched, and both lost
-acknowledged `None` rows. The decided reopen-and-classify path has an error to
-report, but it cannot restore the lost acknowledged rows.
+The journal-induced and no-journal surfaces matched, and both lost acknowledged
+`None` rows. The decided reopen-and-classify path has an error to report, but it
+cannot restore the lost acknowledged rows.
 
 This observation is an adoption blocker for ticket 36 to weigh. It is scoped to
 the tested stack (redb 4.3.0, tmpfs, orderly exit at the failure boundary). It
@@ -81,35 +82,34 @@ is not a general redb guarantee, and it is not a power-loss test.
 
 The corrected matched harness ran its implemented matrix on Linux with the
 release profile, using native redb durability (`Durability::Immediate` commits,
-`checkpoint_for_probe` for the flush barrier). Policy comparisons use 20 runs
-in a true a-b-a-c-a order at 5,000 and 50,000 notes. All other cases use 20
-runs. The 50-note anchor remains outside this matrix.
+`checkpoint_for_probe` for the flush barrier). Policy comparisons use 20 runs in
+a true a-b-a-c-a order at 5,000 and 50,000 notes. All other cases use 20 runs.
+The 50-note anchor remains outside this matrix.
 
 Linux results at 5k: the a-block medians are 671.9, 658.1 and 659.8 ms, so the
 noise band is about 2 percent. Journaled `Immediate` costs 667.3 ms and
 journaled `None` costs 662.9 ms against the 663.7 ms no-journal median. At 50k
-the no-journal median is 6,686.0 ms. Journaled `Immediate` is 6,705.5 ms
-(+0.3 percent). Journaled `None` is 6,620.8 ms (-1 percent). The journal
-surcharge sits inside the noise band at both sizes. No policy ranking is
-proved.
+the no-journal median is 6,686.0 ms. Journaled `Immediate` is 6,705.5 ms (+0.3
+percent). Journaled `None` is 6,620.8 ms (-1 percent). The journal surcharge
+sits inside the noise band at both sizes. No policy ranking is proved.
 
-Recovery saves real work at 5k. Replay takes about 300 ms against about
-330 ms for parse fallback (8 to 10 percent saved). The 2026-11-10 run
-reports 8.2 to 10.7 percent saved at 50k, but the colder second-session
-protocol does not reproduce that saving. Treat the 50k replay saving as
-unproven. A policy rebuild dominates both paths at about 5.7 s at 50k.
+Recovery saves real work at 5k. Replay takes about 300 ms against about 330 ms
+for parse fallback (8 to 10 percent saved). The 2026-11-10 run reports 8.2 to
+10.7 percent saved at 50k, but the colder second-session protocol does not
+reproduce that saving. Treat the 50k replay saving as unproven. A policy rebuild
+dominates both paths at about 5.7 s at 50k.
 
 The source-check placement comparison now uses equal work. Placement A (check
 before hold) totals 551.2 ms with a 217.8 ms hold at 50k. Placement B (check
-inside hold) totals 560.9 ms with a 558.3 ms hold. The totals match; B holds
-the writer lock 2.56 times longer. Stable versus all-racy snapshots differ by
-under 5 ms at 20 runs each (2,997.9 versus 3,002.6 ms at 50k). A pure
-read-only no-change pass costs the same with and without a retained journal
-(216.4 versus 215.6 ms digest). First usable queries take 9 to 101 ms by
-size; repeated queries are cheaper.
+inside hold) totals 560.9 ms with a 558.3 ms hold. The totals match; B holds the
+writer lock 2.56 times longer. Stable versus all-racy snapshots differ by under
+5 ms at 20 runs each (2,997.9 versus 3,002.6 ms at 50k). A pure read-only
+no-change pass costs the same with and without a retained journal (216.4 versus
+215.6 ms digest). First usable queries take 9 to 101 ms by size; repeated
+queries are cheaper.
 
-Earlier macOS numbers below keep their record. The Linux run supersedes them
-as the primary evidence for the corrected protocol.
+Earlier macOS numbers below keep their record. The Linux run supersedes them as
+the primary evidence for the corrected protocol.
 
 - Journal encode is about 0.3 ms. The journaled `Immediate` cost was reported as
   sync cost, not encode: about 490 ms at 5k and 5.5 s at 50k. These figures
@@ -140,39 +140,37 @@ as the primary evidence for the corrected protocol.
 
 ### Second-session anchor, stop-window and bound (2026-11-11)
 
-A fresh container reran the protocol with a per-sample cache hint. The 50k
-parse phase then ran 3.8 to 4.3 s, against about 1.1 s in the first session.
-The first session served warmer pages, so its recovery savings are
-warm-cache figures. This section supersedes the 2026-11-10 recovery table for
-recovery claims.
+A fresh container reran the protocol with a per-sample cache hint. The 50k parse
+phase then ran 3.8 to 4.3 s, against about 1.1 s in the first session. The first
+session served warmer pages, so its recovery savings are warm-cache figures.
+This section supersedes the 2026-11-10 recovery table for recovery claims.
 
-The 50-note anchor is now inside the matrix. Totals are 10.4 ms for policy a
-(n = 60), 12.1 ms for b, and 12.4 ms for c. Replay takes 6.10 ms against
-7.13 ms for parse fallback. At this size every recovery is a few
-milliseconds, and the journal surcharge sits inside the noise band.
+The 50-note anchor is now inside the matrix. Totals are 10.4 ms for policy a (n
+= 60), 12.1 ms for b, and 12.4 ms for c. Replay takes 6.10 ms against 7.13 ms
+for parse fallback. At this size every recovery is a few milliseconds, and the
+journal surcharge sits inside the noise band.
 
 The stop-window cases answer when the journal pays:
 
-- At 5k a stop before the journal exists parses (437.6 ms). A stop after
-  publish replays (348.4 ms). The saving is 89.2 ms, about 20 percent.
-- At 5k a stop after commit pays the ordinary refresh cost (435.5 ms), not
-  a persist. The store is already current.
-- At 50k the parse stop takes 5,988.1 ms and the replay stop takes
-  6,163.2 ms. The ranges overlap and the median favors parse by 175 ms.
-  The 50k replay saving is not measurable under the colder protocol.
-- Per phase, the 5k encode and publish phases carry 11.9 ms of overhead for
-  an 89.2 ms saving per stop. The break-even point is one stop per 7.5
-  writes landing in that window. The removal phase (2.6 ms at 5k, 22.7 ms
-  at 50k) saves nothing and never breaks even.
-- The replayable window spans encode start to commit end: 91 of 770 ms at
-  5k, and 802 of 10,824 ms at 50k.
+- At 5k a stop before the journal exists parses (437.6 ms). A stop after publish
+  replays (348.4 ms). The saving is 89.2 ms, about 20 percent.
+- At 5k a stop after commit pays the ordinary refresh cost (435.5 ms), not a
+  persist. The store is already current.
+- At 50k the parse stop takes 5,988.1 ms and the replay stop takes 6,163.2 ms.
+  The ranges overlap and the median favors parse by 175 ms. The 50k replay
+  saving is not measurable under the colder protocol.
+- Per phase, the 5k encode and publish phases carry 11.9 ms of overhead for an
+  89.2 ms saving per stop. The break-even point is one stop per 7.5 writes
+  landing in that window. The removal phase (2.6 ms at 5k, 22.7 ms at 50k) saves
+  nothing and never breaks even.
+- The replayable window spans encode start to commit end: 91 of 770 ms at 5k,
+  and 802 of 10,824 ms at 50k.
 
-The host freshness bound: after an interrupted write, the next
-command must produce a queryable store within one completed publish cycle of
-the same host. That limit applies per host. Measured recovery plus first
-query is 361 to 450 ms at 5k
-against a 770 ms cycle. At 50k it is 6.2 to 6.3 s against a 10.8 s cycle. The
-bound holds at both sizes on VM storage. Ticket 33 re-measures it on real
+The host freshness bound: after an interrupted write, the next command must
+produce a queryable store within one completed publish cycle of the same host.
+That limit applies per host. Measured recovery plus first query is 361 to 450 ms
+at 5k against a 770 ms cycle. At 50k it is 6.2 to 6.3 s against a 10.8 s cycle.
+The bound holds at both sizes on VM storage. Ticket 33 re-measures it on real
 hosts.
 
 ### Requirements that the evidence does not close
@@ -190,14 +188,13 @@ evidence. These requirements remain visible:
   remain unproved.
 
 The second session closed three requirements: the 50-note anchor, the
-stop-window rates with per-phase break-even, and the numeric freshness
-proposal. The 2026-11-10 50k recovery savings are now treated as
-warm-cache figures.
+stop-window rates with per-phase break-even, and the numeric freshness proposal.
+The 2026-11-10 50k recovery savings are now treated as warm-cache figures.
 
 No new experiment is part of this document revision beyond the corrected Linux
 protocol and `ENOSPC` probe reported above. The provisional protocol below is a
-design for the throwaway prototype, not proof that every rule was implemented
-or checked.
+design for the throwaway prototype, not proof that every rule was implemented or
+checked.
 
 ## Follow-on purpose and boundaries
 
@@ -251,8 +248,7 @@ out of its body. The maintainer decides adoption after this ticket.
 
 ## B. Fault tests
 
-Run these tests after the replay prototype works. Separate two failure
-classes:
+Run these tests after the replay prototype works. Separate two failure classes:
 
 - **Process stop.** Run tests with `SIGKILL`, `abort`, a panic and `Ctrl-C`. The
   shipped release profile uses `panic = "abort"`, so a release panic does not
@@ -420,8 +416,8 @@ Treat a failed redb commit as an uncertain outcome:
 
 - Measure the real saved-work bounds:
   - Count replay persistence, derivation, decode, source checks and redb repair.
-  - Count the target-state comparison, checkpoint and later cleanup of a retained
-    journal against its original write.
+  - Count the target-state comparison, checkpoint and later cleanup of a
+    retained journal against its original write.
   - Replace the provisional break-even rates from the screen.
 - Report the measured stop-window rates for incremental edits:
   - Calculate a break-even rate per phase.
@@ -573,8 +569,9 @@ adoption after the fault tests and measurements.
 
 - A current-engine writer cleans its safe stale and orphan files after the
   identity checks. Leave retired-engine files for the ticket 36 decision.
-  Preserve a higher-epoch or unreadable-version journal. Skip optional journaling
-  if the final name stays occupied. Use the normal source path in that case.
+  Preserve a higher-epoch or unreadable-version journal. Skip optional
+  journaling if the final name stays occupied. Use the normal source path in
+  that case.
 - An optional journal failure does not change the store error rules. A replay
   and a normal journal discard are quiet. Journal corruption alone gives no
   notice. The existing notice applies to an actual cache-read fallback or a
@@ -608,7 +605,7 @@ adoption after the fault tests and measurements.
   - Do not abort.
   - Use release-profile child processes.
 
-  `src/index/store.rs:366` is `#[cfg(test)]`, not a probe API.
+  `src/index/store.rs` is `#[cfg(test)]`, not a probe API.
 - Run a test with a journal that uses space needed by the later store write.
   Compare its error with a no-journal write. Treat a new store-write failure as
   an adoption blocker, not as an optional journal error.
@@ -625,18 +622,19 @@ adoption after the fault tests and measurements.
 Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
 amend this Answer. They do not reopen it. Current test details carry [V].
 
-- Identity tests (lines 305-306): ticket 32 removes the platform family from
-  the store identity. The probe test `rejects_mutated_platform` [V] at
-  `research/27-probe/replay/tests/fault.rs:842` has no production meaning under
+- Identity tests: ticket 32 removes the platform family from the
+  store identity. The probe test `rejects_mutated_platform` [V] at
+  `research/27-probe/replay/tests/fault.rs` has no production meaning under
   that decision. A mutated canonical root replaces it.
-- Path form: journal fact paths use canonical UTF-8 `/` text.
-  Database lookup keys use the NUL-form store encoding.
+- Path form: journal fact paths use canonical UTF-8 `/` text. Database lookup
+  keys use the NUL-form store encoding.
 - Root relocation: ticket 32 supersedes the path-change exception at lines
   313-315. A new canonical root rebuilds recognized derived state under the
   existing epoch rules. Do not replay its old-root journal.
 - The prototype's `mv` replay result remains historical evidence. It does not
   establish the production relocation policy. A note rename within one root
   still uses normal refresh rules.
-- Never transfer trust grants or remove user-authored files during a cache rebuild.
+- Never transfer trust grants or remove user-authored files during a cache
+  rebuild.
 - Replay writes only recorded, validated disk facts. Derived generations and
   closed pending-proof snapshots cannot create journal batches.

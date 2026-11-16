@@ -7,22 +7,30 @@ Blocked by: 3, 18
 ## Question
 
 Given the value model, where does string-to-date/duration promotion happen?
-Does promotion happen at value construction, in a schema-bound pass, or during query evaluation?
-What is the cross-kind ordering and equality policy for Date against DateTime, Number against String, and Duration?
+Does promotion happen at value construction, in a schema-bound pass, or during
+query evaluation?
+What is the cross-kind ordering and equality policy for Date against DateTime,
+Number against String, and Duration?
 How is determinism preserved without an ambient timezone in `Ord`?
 
-Facts to start from: coercion at `src/field.rs:843`.
+Facts to start from: coercion at `src/field.rs`.
 NOTE `research/01` corrected the scope.
 Default `Deserialize for FieldValueRef` is `Passthrough`.
-Classification runs only through `From<noyalib::Value>` (`src/field.rs:781`, the frontmatter path) and explicit `deserialize_with(..Classify)`.
-Other facts include `TextShape::classify` (`src/query/sort.rs:462`) and literal promotion (`src/query/grammar/filter.rs:238`).
-Ambient-zone Date-to-DateTime promotion inside `NoteFieldValueRef::compare` (`src/note/field.rs:297-300`) diverges from `NoteFieldValue: PartialEq`.
-The rank order is `Null<Bool<Number<Duration<Temporal<Text<Link<List<Object` (`src/query/sort.rs:425-439`).
-Strictness-by-seam spreads across four owners (`.scratch/temporal-core/divergence-register.md`).
+Classification runs only through `From<noyalib::Value>` (`src/field.rs`, the
+frontmatter path) and explicit `deserialize_with(..Classify)`.
+Other facts include `TextShape::classify` (`src/query/sort.rs`) and literal
+promotion (`src/query/grammar/filter.rs`).
+Ambient-zone Date-to-DateTime promotion inside `NoteFieldValueRef::compare`
+(`src/note/field.rs`) diverges from `NoteFieldValue: PartialEq`.
+The rank order is `Null<Bool<Number<Duration<Temporal<Text<Link<List<Object`
+(`src/query/sort.rs`).
+Strictness-by-seam spreads across four owners
+(`.scratch/temporal-core/divergence-register.md`).
 
 Alternatives include explicit typed values with a query-level cast policy.
 Another alternative is schema-informed typing.
-A third option keeps the heuristic, but centralizes it in one lattice owned by the value model.
+A third option keeps the heuristic, but centralizes it in one lattice owned by
+the value model.
 A fourth option removes implicit promotion, which needs a compatibility decision.
 
 Inputs: `survey/query.md` H6, `survey/temporal.md` H3, `survey/note.md` H7,
@@ -33,10 +41,13 @@ input.
 
 See [ticket 18's Answer](./18-value-model.md). Handed to this ticket:
 
-- Frontmatter literal-string escape. Frontmatter classification is quote-insensitive. Inline quotes are the escape.
-- `Int` and `Float` share one numeric rank. Derived `PartialEq` stays structural, so semantic numeric equality lives here.
+- Frontmatter literal-string escape. Frontmatter classification is
+  quote-insensitive. Inline quotes are the escape.
+- `Int` and `Float` share one numeric rank. Derived `PartialEq` stays
+  structural, so semantic numeric equality lives here.
 - `Link` equality and order, including `embedded`.
-- Zone-shifted naive datetimes. Frontmatter `12:00` was observed as `10:00Z`, persisted in the cache.
+- Zone-shifted naive datetimes. Frontmatter `12:00` was observed as `10:00Z`,
+  persisted in the cache.
 - Schema select strings against note `Link` matching.
 
 ## Pre-grilling research
@@ -58,12 +69,20 @@ clock.
 
 **Alternatives considered:**
 
-- Keep as is. This option keeps three equality evaluators, rank-leaking relational filters, and three promotion seams.
-- Lexical storage with typing on demand. This was rejected. Zero-config date queries would need a schema or casts.
-- Quote-sensitive frontmatter. This was rejected. Noyalib has no public route. CST costs +59% per note and 2.6x for the lazy variant on notes with dates. Templater, Metadata Menu, and formatters write quoted dates, so notes would silently lose behavior.
-- Errors on ordinary data mismatches. This approach is hostile to open-world vaults. Environmental failures are different (see ticket 21).
-- A custom `PartialEq` equating `Int` and `Float`. This breaks `Eq` and `Hash` coherence.
-- Comparison by resolved note identity. This option needs the index and is impure.
+- Keep as is. This option keeps three equality evaluators, rank-leaking
+  relational filters, and three promotion seams.
+- Lexical storage with typing on demand. This was rejected. Zero-config date
+  queries would need a schema or casts.
+- Quote-sensitive frontmatter. This was rejected. Noyalib has no public route.
+  CST costs +59% per note and 2.6x for the lazy variant on notes with dates.
+  Templater, Metadata Menu, and formatters write quoted dates, so notes would
+  silently lose behavior.
+- Errors on ordinary data mismatches. This approach is hostile to open-world
+  vaults. Environmental failures are different (see ticket 21).
+- A custom `PartialEq` equating `Int` and `Float`. This breaks `Eq` and `Hash`
+  coherence.
+- Comparison by resolved note identity. This option needs the index and is
+  impure.
 
 **Relations (owner: the value-semantics module):**
 
@@ -107,7 +126,8 @@ lexeme.
 **Adaptive literals (replaces `classify_literal` sniffing):**
 
 - Adapt quoted string literals only. Bare tokens are already typed. Adapt either
-  side of a comparison, the counterpart-typed operand in arithmetic (`due - "2026-07-29"`, `due + "1d"`), and the `contains` target. Do not adapt
+  side of a comparison, the counterpart-typed operand in arithmetic (`due -
+  "2026-07-29"`, `due + "1d"`), and the `contains` target. Do not adapt
   field-versus-field or literal-versus-literal comparisons. Both literals stay
   strings in the latter case.
 - At query build, parse each quoted literal once into candidates: DatePoint and
@@ -116,10 +136,14 @@ lexeme.
   grammar: `"5"` is `Int`, `"5.0"` is `Float`, and integers beyond `i64` become
   `Float`. Do not accept hex, separators or non-finite numbers.
 - For comparison against a row, select candidates as follows:
-  - Against a Date, DateTime or CalendarPeriod row, select the period candidate of a date-shaped literal for comparison. Keep DatePoint for date arithmetic.
-  - Other rows select the candidate matching their kind (Duration, Link, `Int` or `Float`, Bool).
-  - `String`, `List`, `Object` and `Null` rows use raw text. Rows without a parsed candidate also use raw text, which fails the bracket.
-  - Do not parse or allocate per row. Use the pinned frame for any row-dependent zone conversion.
+  - Against a Date, DateTime or CalendarPeriod row, select the period candidate
+    of a date-shaped literal for comparison. Keep DatePoint for date arithmetic.
+  - Other rows select the candidate matching their kind (Duration, Link, `Int`
+    or `Float`, Bool).
+  - `String`, `List`, `Object` and `Null` rows use raw text. Rows without a
+    parsed candidate also use raw text, which fails the bracket.
+  - Do not parse or allocate per row. Use the pinned frame for any row-dependent
+    zone conversion.
 - A `Link` row adopts a literal as its folded target. In `[[Alpha|A]]`, only the
   target contributes. This resolves schema select string versus `Link` matching
   for ticket 20.
@@ -164,9 +188,9 @@ folds case through `ComparisonKey`: `project == "alpha"` matches `[[Alpha]]`,
 but `title == "alpha"` stays case-sensitive.
 
 Sort strings with `icu_collator`: CLDR root collation, tertiary strength,
-numeric ordering, significant punctuation and a raw-byte tiebreak. Thus
-`Chapter 2 < Chapter 10` and `apfel < Äpfel < apple < Zebra`. Do not use
-host-locale collation.
+numeric ordering, significant punctuation and a raw-byte tiebreak. Thus `Chapter
+2 < Chapter 10` and `apfel < Äpfel < apple < Zebra`. Do not use host-locale
+collation.
 
 Sort keys are transient. Do not persist them. The scout's ~350 KB binary cost
 and that ICU4X is already in the tree through `textwrap` were not verified here.
@@ -201,15 +225,19 @@ The specification must confirm them.
 - `NoteFieldValueRef::compare` and `is_equal_to_literal`.
 - `ComparisonExpr::classify_literal`.
 - `TextShape::classify` and its two callers.
-- The ambient-zone promotion in `DateTimeValue::try_from(DateValue)` and `is_midnight_of`.
+- The ambient-zone promotion in `DateTimeValue::try_from(DateValue)` and
+  `is_midnight_of`.
 - The `List` or `Object` to `Null` mapping in `SortKey`.
 
 **Deliberate behavior changes (for the specification change table):**
 
 - Relational filters across kinds stop matching. Today they match by rank.
-- Quoted filter literals adapt per row. This change fixes `title == "2025-01-15"` on a String field.
-- Coarse date literals match intervals. `due == 2026-07` no longer means the first day.
-- Naive datetimes are civil values. The cache no longer embeds the indexing machine zone (cache format change).
+- Quoted filter literals adapt per row. This change fixes `title ==
+  "2025-01-15"` on a String field.
+- Coarse date literals match intervals. `due == 2026-07` no longer means the
+  first day.
+- Naive datetimes are civil values. The cache no longer embeds the indexing
+  machine zone (cache format change).
 - Inline fields can be `DateTime`.
 - `NaN` becomes `Null`.
 - `Link` equality ignores display and embed.
@@ -249,50 +277,57 @@ The `input` method accepts any scalar value.
 Consumers get a text view rendered from the typed value.
 No `string()` cast is added until a real use appears.
 Select strings naming links are parsed into `Link` values in the schema checker.
-These values use the shared Link equality relation, not the query binder's literal adaptation.
+These values use the shared Link equality relation, not the query binder's
+literal adaptation.
 
 ## Refined by ticket 21
 
-The [execution-context Answer](./21-ambient-environment-and-execution-context.md)
-sets a lazily acquired system-local default zone
-(a configurable override source still belongs to tickets 22/30).
-The answer also sets civil `CalendarPeriod` identity and an exclusive literal upper boundary.
+The [execution-context
+Answer](./21-ambient-environment-and-execution-context.md) sets a lazily
+acquired system-local default zone (a configurable override source still belongs
+to tickets 22/30).
+The answer also sets civil `CalendarPeriod` identity and an exclusive literal
+upper boundary.
 Period membership is a filter predicate, not `PartialEq` or `Ord`.
 Period-versus-period equality is exact normalized identity.
 Overlap and containment need separate operators if needed.
 The request frame makes environmental failures typed.
 Ordinary bracket mismatches remain nonmatches.
-These refinements override the earlier inclusive `[s, e]` wording and blanket principle that filters never error.
+These refinements override the earlier inclusive `[s, e]` wording and blanket
+principle that filters never error.
 
 ## Refined by the field-value link decision
 
-Frontmatter and inline fields handle every link type: wikilink, Markdown link and embed.
+Frontmatter and inline fields handle every link type: wikilink, Markdown link
+and embed.
 This ticket's link rules cover only wikilink targets.
 Define the Markdown link case before the specification:
 
-- A Markdown target keeps its extension and may be percent-encoded. A wikilink target does not.
+- A Markdown target keeps its extension and may be percent-encoded. A wikilink
+  target does not.
 - Decide whether `[[b]]` and `[b](b.md)` fold to one `ComparisonKey`.
 - Decide how `date(link)` reads a Markdown target.
 - External URLs in a Markdown link are not note targets.
 
-Link equality still ignores `display` and `embedded`.
-The syntax kind is part of the value and renders back, but it does not decide equality.
+Link equality still ignores `display` and `embedded`. The syntax kind is part of
+the value and renders back, but it does not decide equality.
 
 ## TODOs
 
-Glossary updates deferred until the specification is written.
-Do not edit the glossaries yet. They describe the current code:
+Glossary updates deferred until the specification is written. Do not edit the
+glossaries yet. They describe the current code:
 
-- TODO `src/temporal/GLOSSARY.md`: rewrite *Date-Time*.
-  Naive input becomes a civil value, and only `Z` or offset input is an instant.
-  Remove "unzoned input resolves in the process's local zone".
-  Remove "comparisons with Date promote the Date to local midnight".
-  Rewrite *Zone* (supplied by the execution context, not process-local).
-  Keep *Duration* nominal wording once ticket 30 settles it.
+- TODO `src/temporal/GLOSSARY.md`: rewrite *Date-Time*. Naive input becomes a
+  civil value, and only `Z` or offset input is an instant. Remove "unzoned input
+  resolves in the process's local zone". Remove "comparisons with Date promote
+  the Date to local midnight". Rewrite *Zone* (supplied by the execution
+  context, not process-local). Keep *Duration* nominal wording once ticket 30
+  settles it.
 - TODO `src/GLOSSARY.md`: *Duration* still says "written source components".
   This statement conflicts with `src/temporal/GLOSSARY.md` (pre-existing drift).
-  *Temporal Strictness & Resolution* says query filters evaluate "strict typed expressions", which adaptive literals qualify.
-  *Comparison Key* gains link equality and stays excluded from sort order.
+  *Temporal Strictness & Resolution* says query filters evaluate "strict typed
+  expressions", which adaptive literals qualify. *Comparison Key* gains link
+  equality and stays excluded from sort order.
 - TODO `src/note/GLOSSARY.md`: *Note Field Value* omits `Int`, `Float`,
   `DateTime` and `Duration`.
 - TODO `src/query/GLOSSARY.md`: add *Type Bracket*, *Adaptive Literal*, *Literal
@@ -304,12 +339,15 @@ Do not edit the glossaries yet. They describe the current code:
 
 ## Comments
 
-2026-10-21, after [research 13](../research/13-iwe-query-schema-and-agent-write-gating.md) and [14](../research/14-fileclass-model-binding-and-validation.md): no decision changes.
-IWE independently uses the same value semantics for its query engine (`crates/liwe/src/query/filter.rs`, `sort.rs`, `collation.rs`) [V].
-It uses strict scalar types, cross-type `==` false, and undefined cross-type ordering for filters.
-It uses ICU natural collation, nulls first ascending, and a rank-based total order for sort.
-It has no date, duration, or link kinds, so it does not test adaptive literals or interval semantics.
-The fileclass validator behaves differently (`src/fields/validate.ts:66-81`) [V].
-A number field accepts any string `Number()` can parse.
-A boolean field accepts `"true"` and `"false"`.
+2026-10-21, after [research
+13](../research/13-iwe-query-schema-and-agent-write-gating.md) and
+[14](../research/14-fileclass-model-binding-and-validation.md): no decision
+changes. IWE independently uses the same value semantics for its query engine
+(`crates/liwe/src/query/filter.rs`, `sort.rs`, `collation.rs`) [V]. It uses
+strict scalar types, cross-type `==` false, and undefined cross-type ordering
+for filters. It uses ICU natural collation, nulls first ascending, and a
+rank-based total order for sort. It has no date, duration, or link kinds, so it
+does not test adaptive literals or interval semantics. The fileclass validator
+behaves differently (`src/fields/validate.ts`) [V]. A number field accepts any
+string `Number()` can parse. A boolean field accepts `"true"` and `"false"`.
 This ticket's classification rule avoids that lenient behavior.

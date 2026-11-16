@@ -37,8 +37,8 @@ behavior change within an envelope the user may call a "disposable cache".
 
 Use `survey/cli.md`, `survey/cross-cutting.md` (visibility freeze), existing
 ADRs, and `tests/e2e/*` as evidence. Decide whether Obsidian/Dataview/Templater
-compatibility is needed or only a historical influence on temporal
-and inline-field behavior.
+compatibility is needed or only a historical influence on temporal and
+inline-field behavior.
 
 Do not use the divergence register as evidence. The register is now
 `.scratch/temporal-core/divergence-register.md` (formerly
@@ -76,7 +76,7 @@ from that table is a regression.
 | Vault-format parsing (frontmatter, `Key:: Value` inline fields, wikilinks, tasks, tags) | **Frozen** | Same files parse to the same meaning |
 | Frontmatter and inline-field links of every type (wikilink, Markdown link, embed) become `Link` values. Today only wikilinks do ([ticket 18](./18-value-model.md)) | **Migratable** | A frontmatter string like `[a](b.md)` changes from `String` to `Link`. Add a change-table row with the migration. A query that compared it as text changes result |
 | Dataview / Templater semantic parity | **Free** | Historical influence only |
-| Index result equivalence with a fresh parse, for a source whose size, mtime and (on Unix) ctime changed, outside the racy window; `traces index --verify` checks the rest ([ticket 25](./25-index-freshness-and-invalidation.md)) | **Frozen** | A same-size edit with a restored mtime stays stale. The canary `tests/e2e/index.rs:129-180` pins this. Record the Windows ctime gap in the change table |
+| Index result equivalence with a fresh parse, for a source whose size, mtime and (on Unix) ctime changed, outside the racy window; `traces index --verify` checks the rest ([ticket 25](./25-index-freshness-and-invalidation.md)) | **Frozen** | A same-size edit with a restored mtime stays stale. The canary `tests/e2e/index.rs` pins this. Record the Windows ctime gap in the change table |
 | `index.redb` layout, versioning, refresh and drift strategy, heal-on-next-query | **Free** | `207cc3fb` already wiped stores once |
 | Exit codes 0/1/2/130; stdout = payload only, stderr = diagnostics, mutating commands print nothing to stdout | **Frozen** | |
 | Stdout payload shapes: `list` as `- <path>` lines, `table` as Markdown tables, `task` as checkbox lines with the original status char | **Frozen** | Header naming inside them is Migratable; a new `--format` option is an addition |
@@ -109,8 +109,8 @@ rule above.
 
 **Verified facts (V, main @ `b521a009`).** Cargo `0.1.0`, no release tags,
 `README.md` declared but absent. e2e asserts at least 7 diagnostic codes and a
-set of message strings. Closed-pipe, `i64` to `f64` (`src/note/field.rs:545`),
-and `.first()`-only multi-valued reads are all still present.
+set of message strings. Closed-pipe, `i64` to `f64` (`src/note/field.rs`), and
+`.first()`-only multi-valued reads are all still present.
 
 **Open, not decided here.** Unit-test wording pins were not scanned. They only
 affect the size of the change table. (The divergence register has since been

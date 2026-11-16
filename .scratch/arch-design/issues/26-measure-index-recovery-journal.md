@@ -497,9 +497,10 @@ inside these numbers. They are not stale.
 Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
 amend this Answer. They do not reopen it.
 
-- Store identity (line 251): the platform family leaves the identity (ticket
+- Store identity: the platform family leaves the identity (ticket
   32). The canonical root stays.
 - Path form: journal fact paths use canonical UTF-8 text with `/` separators.
   Database lookup keys use the store adapter's NUL-form encoding.
 - Overlay: store and journal batches accept validated disk facts only.
-  Derived generations and closed pending-proof snapshots have no write capability.
+  Derived generations and closed pending-proof snapshots have no write
+  capability.

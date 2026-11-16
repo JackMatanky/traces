@@ -8,32 +8,31 @@ Blocked by: 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35
 
 Reconcile all resolved decisions codebase-wide. Check unresolved competing
 invariants, inconsistent boundaries, duplicated responsibilities and added
-coupling. Check missed recursive-deepening opportunities and
-ordering/dependency constraints for the specification.
+coupling. Check missed recursive-deepening opportunities and ordering/dependency
+constraints for the specification.
 
 Audit coverage across each subsystem and each significant cross-subsystem
 interaction. The subsystems include root primitives, temporal, note, schema,
 index, query, template, config, dialog, cli, path/file and
 tests/benches/tooling. Confirm each received scrutiny. State whether each
 subsystem is *redesigned*, *redrawn at the edges*, or *withstands*. Decide
-whether any fog patch must graduate before handoff and whether the
-destination is reached.
+whether any fog patch must graduate before handoff and whether the destination
+is reached.
 
 Standing checks added by re-verification (main @ `207cc3fb`):
 
-1. Re-run the drift check before reconciling:
-   `git diff 207cc3fb..main -- src tests docs` and any divergence from
-   `reverification.md`.
+1. Re-run the drift check before reconciling: `git diff 207cc3fb..main -- src
+   tests docs` and any divergence from `reverification.md`.
 2. Confirm that the freshness decision (ticket 25) replaced the landed
    fingerprint design with a store identity. Confirm that the config-lifecycle
    decision (ticket 22) accounted for the residual digest surface.
 3. State in the specification which existing ADRs it supersedes, including
-   ADR-0009 (implemented, still `proposed`) and the stale glossary entry
-   "Index Fingerprint".
-4. Collect the "Code delta" section of each resolved ticket. Order the deltas
-   by dependency. This order is the refactor sequence. Report every
-   ticket-to-ticket conflict that you find. Do not report a ticket-to-code
-   gap as a conflict.
+   ADR-0009 (implemented, still `proposed`) and the stale glossary entry "Index
+   Fingerprint".
+4. Collect the "Code delta" section of each resolved ticket. Order the deltas by
+   dependency. This order is the refactor sequence. Report every
+   ticket-to-ticket conflict that you find. Do not report a ticket-to-code gap
+   as a conflict.
 
 Output: the list of specification-ready decisions with their dependency order
 and the explicit non-decisions.
@@ -50,7 +49,7 @@ method, and treat the author's vault as one example, not as evidence.
 Invariants changed by 20 to re-check:
 
 - The `global` schema was "never applied to a note" and is now a
-  lowest-precedence layer for every note (`src/schema/mod.rs:48-51`).
+  lowest-precedence layer for every note (`src/schema/mod.rs`).
 - First-listed-wins no longer decides class-versus-class conflicts (it still
   decides `extends` parents).
 - The index and fingerprint stay schema-free because class binding expands at
@@ -84,16 +83,16 @@ cutover. Check that new filename prefix recognition is isolated from the frozen
 vault-format parser. Record changed week/quarter results in the behavior-change
 table.
 
-A present creation/modification timestamp needs the pinned zone to yield a
-civil `cdate`/`mdate`. Absent creation is `Null`, while zone failure is a typed
-error. Keep current-code glossaries unchanged until the implementation updates
-their domain vocabulary.
+A present creation/modification timestamp needs the pinned zone to yield a civil
+`cdate`/`mdate`. Absent creation is `Null`, while zone failure is a typed error.
+Keep current-code glossaries unchanged until the implementation updates their
+domain vocabulary.
 
 ## Inputs from the live-buffer, query-core and path decisions
 
-See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
-[ticket 29](./29-query-core-and-plan.md) and
-[ticket 32](./32-path-and-capability-model.md).
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md), [ticket
+29](./29-query-core-and-plan.md) and [ticket
+32](./32-path-and-capability-model.md).
 
 - Check task-row group equivalence and Windows/Linux locking.
 - Place durable benchmarks with ticket 35.
@@ -103,8 +102,8 @@ See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
   explicit until measurements close them.
 - Reconcile the shared change-table rows without duplicate owners.
 - Keep ticket 27's journal adoption blockers separate from completed research.
-- Separate design-changing measurements from production acceptance checks.
-  A prototype can settle a design choice. Cutover needs checks of the actual
+- Separate design-changing measurements from production acceptance checks. A
+  prototype can settle a design choice. Cutover needs checks of the actual
   implementation.
-- Keep current-code glossaries and ADR history accurate until cutover.
-  Record successor definitions and supersession notes with the implementation.
+- Keep current-code glossaries and ADR history accurate until cutover. Record
+  successor definitions and supersession notes with the implementation.

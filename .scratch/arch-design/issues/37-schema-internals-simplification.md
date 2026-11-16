@@ -50,7 +50,7 @@ This ticket graduates these fog items: "Schema internals" in the map.
 Also from 20: the schema subsystem has a strict `[binding]` table (`tags`,
 `paths` with `!` exclusions) on class schemas. The table is not inherited.
 `global` becomes a lowest-precedence layer for every note. Update the invariant
-at `src/schema/mod.rs:48-51`. The schema subsystem gets new schema keys
+at `src/schema/mod.rs`. The schema subsystem gets new schema keys
 `description` and an `origin` record. The schema subsystem keeps multiple
 `extends` parents.
 
@@ -68,7 +68,7 @@ ten types are structurally distinct (`src/schema/field.ts`,
 A child redefinition replaces an ancestor field in that position. `excludes`
 accumulate toward ancestors. The global class is the first entry of the merge
 list, giving it lowest precedence for every note [V]. `step` is a UI helper
-only and `required` treats `[]` as present (`validate.ts:58`) [V].
+only and `required` treats `[]` as present (`validate.ts`) [V].
 
 IWE binds by globs in host config with gitignore-style `!` (the last matching
 pattern decides). IWE has no inheritance and composes overlapping schemas
@@ -82,5 +82,7 @@ delegates validation to an external crate (`schematter-validator` 0.2.0); see
 
 See [ticket 23's Answer](./23-note-document-model.md).
 
-- The note-owned effective accessor is not the schema field resolution. A frontmatter value wins over an inline value of the same key.
-- The effective accessor does not feed the schema check. The check stays frontmatter-only.
+- The note-owned effective accessor is not the schema field resolution. A
+  frontmatter value wins over an inline value of the same key.
+- The effective accessor does not feed the schema check. The check stays
+  frontmatter-only.

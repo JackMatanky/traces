@@ -7,35 +7,34 @@ Blocked by: 1, 2, 16
 ## Question
 
 Should the four value enums (`FieldValue`, `FieldValueRef`, `NoteFieldValue`,
-`NoteFieldValueRef`) collapse into one value model? If so, what are its
-numeric model, extension variants (Duration, Link, Date, DateTime),
-ownership/borrowing story, serialization form, and home module? If not, what is
-the explicit contract between the schema-side and note-side representations?
+`NoteFieldValueRef`) collapse into one value model? If so, what are its numeric
+model, extension variants (Duration, Link, Date, DateTime), ownership/borrowing
+story, serialization form, and home module? If not, what is the explicit
+contract between the schema-side and note-side representations?
 
 **Pending outcome (see Round 1 outcomes):** not one model and not four. Two
 owned enums: a runtime `FieldValue` for notes and queries, and a schema-local
 literal type, with no borrowed mirror enum in either.
 
-Verified facts (`research/01` claims 1-2; current source checked):
-`FieldValue` and `NoteFieldValue` differ. Their reference enums have
-separate ownership shapes. Frontmatter currently parses to `noyalib::Value`,
-and converts through `FieldValueRef` to `NoteFieldValue`
-(`src/note/metadata.rs:56-74`). The first conversion maps every
-`noyalib::Value::Number` through `as_f64()` to `FieldValueRef::Float`
-(`src/field.rs:769-797`). The later conversion also casts `Int(i64)` to f64
-(`src/note/field.rs:532-570`). Thus the current frontmatter path loses integer
-identity/precision before `NoteFieldValue` construction, not only at the
-final cast. `FieldValueRef`'s Serde visitor can retain `i64` (`src/field.rs:891-905`), but `RawFrontmatter::parse` does not use it. Raw YAML is held during
-parsing, and `Frontmatter` stores only structured values. Note values have no
-source spans (`src/note/metadata.rs:14-18,56-74,95-98`, survey/note.md).
-Current note `Link` mixes target and display text with source syntax kind and
-embed state (`src/note/links.rs:22-34`). `LinkTarget` is only a borrowed
-target decomposition. Query equality currently uses derived `Link` equality
-(including syntax/embed fields). In contrast, ordering compares target before
-display text and ignores syntax/embed (`src/note/field.rs:302-304,393-405,1082-1092`).
-This mismatch makes the semantic-value/occurrence split consequential.
-Postcard persists the parsed `Note` in the rebuildable index cache
-(`src/index/store.rs`, compatibility-envelope decision), not a standalone
+Verified facts (`research/01` claims 1-2; current source checked): `FieldValue`
+and `NoteFieldValue` differ. Their reference enums have separate ownership
+shapes. Frontmatter currently parses to `noyalib::Value`, and converts through
+`FieldValueRef` to `NoteFieldValue` (`src/note/metadata.rs`). The first
+conversion maps every `noyalib::Value::Number` through `as_f64()` to
+`FieldValueRef::Float` (`src/field.rs`). The later conversion also casts
+`Int(i64)` to f64 (`src/note/field.rs`). Thus the current frontmatter path loses
+integer identity/precision before `NoteFieldValue` construction, not only at the
+final cast. `FieldValueRef`'s Serde visitor can retain `i64` (`src/field.rs`),
+but `RawFrontmatter::parse` does not use it. Raw YAML is held during parsing,
+and `Frontmatter` stores only structured values. Note values have no source
+spans (`src/note/metadata.rs`, survey/note.md). Current note `Link` mixes target
+and display text with source syntax kind and embed state (`src/note/links.rs`).
+`LinkTarget` is only a borrowed target decomposition. Query equality currently
+uses derived `Link` equality (including syntax/embed fields). In contrast,
+ordering compares target before display text and ignores syntax/embed
+(`src/note/field.rs`). This mismatch makes the semantic-value/occurrence split
+consequential. Postcard persists the parsed `Note` in the rebuildable index
+cache (`src/index/store.rs`, compatibility-envelope decision), not a standalone
 value wire format.
 
 Alternatives:
@@ -69,38 +68,38 @@ model, query core, template boundary.
 - **Agreed direction:** convert parsed frontmatter into the final owned semantic
   model at the boundary where structure and type are known, while retaining
   source/editor information separately. Keep an intermediate representation only
-  when it carries information another consumer needs.
-  **Fact checked:** current code does not satisfy this yet. It converts
-  `noyalib::Value` through `FieldValueRef`. Its number bridge converts all
-  numbers to `f64` before note-value construction. The source parser's integer
-  distinction is available per `research/02`. A direct AST-to-owned-value
-  conversion can avoid both the borrowed mirror and precision loss. A direct
-  Serde visitor from raw YAML would be a broader parser change, not needed
-  merely to remove the intermediate value enum.
+  when it carries information another consumer needs. **Fact checked:** current
+  code does not satisfy this yet. It converts `noyalib::Value` through
+  `FieldValueRef`. Its number bridge converts all numbers to `f64` before
+  note-value construction. The source parser's integer distinction is available
+  per `research/02`. A direct AST-to-owned-value conversion can avoid both the
+  borrowed mirror and precision loss. A direct Serde visitor from raw YAML would
+  be a broader parser change, not needed merely to remove the intermediate value
+  enum.
 - **Agreed direction — owner:** choose the lowest existing layer that can own
   the shared semantic variants without depending upward on note parsing,
   editing, or presentation. Decide exact module/crate placement only after
   validating the dependency boundary and considering the crate-topology
   decision. Do not create a generic value module or absorb adjacent root domain
   types without a demonstrated need.
-- **Agreed direction — schema literals:** keep schema declarations distinct
-  from runtime values. Reuse shared literal variants only where the data has
+- **Agreed direction — schema literals:** keep schema declarations distinct from
+  runtime values. Reuse shared literal variants only where the data has
   identical semantics. Avoid conversion machinery unless actual schema fields
   need it.
 - **Agreed direction — Link split (revised):** use one root `Link` for the
   semantic value. It holds the destination, the optional display text, the
   syntax kind and the embed flag. `NoteLink` holds a `Link` and the source
-  ranges. Ranges stay out of the index. Equality and order semantics remain
-  with the comparison decision.
+  ranges. Ranges stay out of the index. Equality and order semantics remain with
+  the comparison decision.
 - **Schema evidence:** the reviewed [Metadata Menu source
   digest](../../../docs/digests/obsidian_mdelobelle-metadatamenu-src-digest.txt)
   treats field kinds such as Date and File as editing/acceptance behavior with
-  options, not necessarily runtime value variants. In Traces, raw schema
-  options are generic `FieldValue`s. A date `format` is a string. Numeric
-  bounds accept integers and convert to floats. Select `value`/`label`
-  resolve to strings while extra entry data is passed to templates. This
-  supports keeping declarations/options separate while testing selective
-  sharing for actual value payloads.
+  options, not necessarily runtime value variants. In Traces, raw schema options
+  are generic `FieldValue`s. A date `format` is a string. Numeric bounds accept
+  integers and convert to floats. Select `value`/`label` resolve to strings
+  while extra entry data is passed to templates. This supports keeping
+  declarations/options separate while testing selective sharing for actual value
+  payloads.
 - **Superseded — owner and dependency shape:** see "Owner and persistence
   decisions" as revised by the two-enum decision.
 - **Resolved — parsing and persistence:** see "Noyalib direct-deserialization
@@ -117,29 +116,31 @@ Reviewed the latest Noyalib release, 0.0.57, through rust-docs MCP (the project
 currently depends on 0.0.53). `from_str_with_config<T>` supports custom Serde
 targets while retaining a `ParserConfig`, but it is not unconditionally a
 streaming/raw-input visitor. The compatibility config sets
-`MergeKeyPolicy::AsOrdinary`, while the streaming path needs `Auto`. For
-that config, Noyalib parses a `Value` AST and span tree, and deserializes the
-target from them. Its `Value` target has a special span-free path that avoids
+`MergeKeyPolicy::AsOrdinary`, while the streaming path needs `Auto`. For that
+config, Noyalib parses a `Value` AST and span tree, and deserializes the target
+from them. Its `Value` target has a special span-free path that avoids
 re-walking the AST. Thus a custom target may add a span tree and another
 traversal. It is not automatically faster or lower-allocation than parsing to
 `noyalib::Value` and consuming that tree directly.
 
 **Agreed:** keep Noyalib's compatibility parser as the frontmatter boundary.
 Convert its owned AST directly into the shared semantic model, removing
-`FieldValueRef` from that conversion.
-Do not add a custom `Deserialize` target to this YAML path without justification from typed diagnostics or validation.
-The target must justify its extra span-tree/traversal cost, and preserve current invalid-key skipping.
+`FieldValueRef` from that conversion. Do not add a custom `Deserialize` target
+to this YAML path without justification from typed diagnostics or validation.
+The target must justify its extra span-tree/traversal cost, and preserve current
+invalid-key skipping.
 
-There is no field-level recovery today.
-Any YAML parse error, including an integer above `u64::MAX`, drops the whole frontmatter block with an alert notice (`note/metadata.rs:181`).
-The shared model may still implement `Deserialize` for other boundaries.
+There is no field-level recovery today. Any YAML parse error, including an
+integer above `u64::MAX`, drops the whole frontmatter block with an alert notice
+(`note/metadata.rs`). The shared model may still implement `Deserialize` for
+other boundaries.
 
 **Agreed:** preserve Noyalib's current behavior for integers above `i64::MAX`
 and through `u64::MAX`: explicitly convert them to `f64` at the parser-to-model
 boundary. This conversion can lose precision above 2^53. Exactness would need
 rejecting those values or adding an unsigned variant. Neither choice is part of
-the agreed model. Values beyond `u64::MAX` continue to error under the compatibility
-parser.
+the agreed model. Values beyond `u64::MAX` continue to error under the
+compatibility parser.
 
 Source references: [Noyalib 0.0.57
 `from_str_with_config`](https://docs.rs/noyalib/0.0.57/noyalib/fn.from_str_with_config.html),
@@ -149,29 +150,29 @@ Source references: [Noyalib 0.0.57
 ### Owner and persistence decisions
 
 **Agreed:** choose placement by dependency evidence, not by maximizing reuse.
-Only shared runtime semantics belong in the common layer. Keep note
-occurrences, schema declarations, and query projections local. Do not move
-adjacent root concepts such as paths, tags, or tasks without an independent
-semantic and dependency justification. Placement is settled below.
+Only shared runtime semantics belong in the common layer. Keep note occurrences,
+schema declarations, and query projections local. Do not move adjacent root
+concepts such as paths, tags, or tasks without an independent semantic and
+dependency justification. Placement is settled below.
 
 **Agreed:** do not define an independent stable wire format now. Keep cache
 serialization internal. Make sure incompatible model changes invalidate or
-rebuild the index cache. Revisit a stable contract if values become durable
-user data or are exchanged with independent consumers.
+rebuild the index cache. Revisit a stable contract if values become durable user
+data or are exchanged with independent consumers.
 
 **Agreed — schema boundary:** schema declarations/options remain schema-local.
-Share a resolved payload only when it has the same runtime meaning. Schema
-field types do not silently reinterpret literals. Any such interpretation must
-be explicit at the consumer boundary.
+Share a resolved payload only when it has the same runtime meaning. Schema field
+types do not silently reinterpret literals. Any such interpretation must be
+explicit at the consumer boundary.
 
 **Placement evidence (before the two-enum decision; see revised placement):**
-this is a single-crate design. `src/field.rs` is
-already the root-level shared home for `FieldValue`, field identifiers, and
-keys. It depends on temporal types but not on note parsing. `src/note/field.rs`
-depends on both `crate::field::FieldValueRef` and note-local `Link`, while
-schema code consumes the root field value. This makes `field` the selected
-dependency floor for the shared model. The semantic `Link` must not depend on
-note-local link parsing or `NoteLink`.
+this is a single-crate design. `src/field.rs` is already the root-level shared
+home for `FieldValue`, field identifiers, and keys. It depends on temporal types
+but not on note parsing. `src/note/field.rs` depends on both
+`crate::field::FieldValueRef` and note-local `Link`, while schema code consumes
+the root field value. This makes `field` the selected dependency floor for the
+shared model. The semantic `Link` must not depend on note-local link parsing or
+`NoteLink`.
 
 **Superseded by `## Answer`:** the two-enum decision removed the reason for a
 root-level shared `FieldValue`. The runtime value stays in `note`. Only the
@@ -181,49 +182,47 @@ semantic `Link` is root-level.
 
 **Agreed direction (narrowed in Round 1):** keep text-to-domain coercion at the
 note boundary and keep the runtime `FieldValue` representation-neutral.
-Frontmatter and inline fields share the date, duration, link and blank
-parsers, and one precedence order. Other differences are syntax-native and
-recorded as intentional.
+Frontmatter and inline fields share the date, duration, link and blank parsers,
+and one precedence order. Other differences are syntax-native and recorded as
+intentional.
 
 **Verified divergence:** frontmatter converts every parsed YAML string through
 date classification. Then the note conversion maps blank strings to `Null`,
-wikilinks to `Link`, and duration-shaped strings to `Duration`
-(`src/field.rs:769-797`, `src/note/metadata.rs:67-73`,
-`src/note/field.rs:526-570`). Inline parsing has its own atom grammar. Quoted
-strings bypass link/duration/date recognition, while unquoted strings
-are recognized (`src/note/parser/inline.rs:39-45,117-140,148-189,218-230`).
-For example, frontmatter `"4h15m"` becomes a duration, while inline `"4h15m"`
-remains a string. Noyalib's owned `Value::String` does not retain quote style,
-so a shared classifier alone cannot preserve that distinction for both
-syntaxes.
+wikilinks to `Link`, and duration-shaped strings to `Duration` (`src/field.rs`,
+`src/note/metadata.rs`, `src/note/field.rs`). Inline parsing has its own atom
+grammar. Quoted strings bypass link/duration/date recognition, while unquoted
+strings are recognized (`src/note/parser/inline.rs`). For example, frontmatter
+`"4h15m"` becomes a duration, while inline `"4h15m"` remains a string. Noyalib's
+owned `Value::String` does not retain quote style, so a shared classifier alone
+cannot preserve that distinction for both syntaxes.
 
 **Superseded:** the rule that explicitly quoted strings bypass recognition in
-both syntaxes was agreed, but withdrawn for frontmatter in Round 1. YAML
-needs quotes to write a link, and the style-recovery mechanism below is
-unsound. It remains true for inline fields only.
+both syntaxes was agreed, but withdrawn for frontmatter in Round 1. YAML needs
+quotes to write a link, and the style-recovery mechanism below is unsound. It
+remains true for inline fields only.
 
 **Mechanism reviewed and rejected (Round 1):** Noyalib 0.0.57 exposes
 `cst::parse_document_with_config` and `Document::span_at(path)`. Its CST
 preserves source bytes while its typed view uses the supplied `ParserConfig`.
-The span API can recover the exact source slice for a resolved value. This
-could provide YAML scalar style without implementing a second YAML scanner.
-Tradeoffs: `Document` retains a green tree plus typed-value/span data.
-Path-based span lookup must handle quoted/special mapping keys, aliases, and
-duplicate keys consistently with the typed map. The crate docs say duplicate
-key lookup resolves to the same last occurrence as the typed view.
+The span API can recover the exact source slice for a resolved value. This could
+provide YAML scalar style without implementing a second YAML scanner. Tradeoffs:
+`Document` retains a green tree plus typed-value/span data. Path-based span
+lookup must handle quoted/special mapping keys, aliases, and duplicate keys
+consistently with the typed map. The crate docs say duplicate key lookup
+resolves to the same last occurrence as the typed view.
 
-The project pins Noyalib 0.0.53, whose registry source was checked directly.
-It provides `cst::parse_document_with_config` and `Document::span_at` (behind
-`std`, which the project enables). The parser's event API is private, so
-the CST is the only public route to scalar style. The project does not enable
+The project pins Noyalib 0.0.53, whose registry source was checked directly. It
+provides `cst::parse_document_with_config` and `Document::span_at` (behind
+`std`, which the project enables). The parser's event API is private, so the CST
+is the only public route to scalar style. The project does not enable
 `lossless-u64`, so integers in `(i64::MAX, u64::MAX]` fall to `f64` as agreed.
 Behavior of the streaming gate in 0.0.53 was not re-verified.
 
-**Cost and scope caveat:** the CST path builds a green tree, a typed `Value`
-and a `SpanTree` per note. This cuts against the span-free rationale above.
-Aliases, merge keys, and tags (currently dropped: `Tagged` becomes its inner
-value, `field.rs:793`) remain unresolved by it. A lazy variant (consult style only
-for plain-eligible strings that are date, duration, link, or blank shaped) is an
+**Cost and scope caveat:** the CST path builds a green tree, a typed `Value` and
+a `SpanTree` per note. This cuts against the span-free rationale above. Aliases,
+merge keys, and tags (currently dropped: `Tagged` becomes its inner value,
+`field.rs`) remain unresolved by it. A lazy variant (consult style only for
+plain-eligible strings that are date, duration, link, or blank shaped) is an
 alternative to evaluate.
 
 ### Review findings (status)
@@ -231,13 +230,12 @@ alternative to evaluate.
 1. **Shared `FieldValue` vs schema-local literals:** resolved by the two-enum
    decision.
 2. **Serialization consumers:** resolved in structure (derived tagged form for
-   the runtime value, natural serde for schema literals, two template
-   adapters). The cache encoding of temporal values is a handoff (research
-   result 5).
+   the runtime value, natural serde for schema literals, two template adapters).
+   The cache encoding of temporal values is a handoff (research result 5).
 3. **Integer policy per boundary:** resolved (Round 1, Numbers).
 4. **Inline `Int`/`Float`:** resolved (Round 1, Numbers).
-5. **Classifier divergence:** resolved as intentional, syntax-native
-   differences (Round 1, Classifier scope; table below).
+5. **Classifier divergence:** resolved as intentional, syntax-native differences
+   (Round 1, Classifier scope; table below).
 6. **Quoted-literal undercut downstream:** deferred to ticket 19.
 7. **Scope vs ticket 19:** resolved. Ticket 18 settles only schema-free
    parse-time classification.
@@ -246,8 +244,8 @@ alternative to evaluate.
 10. **Visibility:** deferred to ticket 35. Evidence is in research result 6.
 11. **Size budget:** resolved by research result 1 (keep 80 B, no boxing).
 12. **Behavior change from the literal rule:** obsolete, since quoted
-    frontmatter values stay typed. Replaced by the behavior changes this
-    ticket does introduce:
+    frontmatter values stay typed. Replaced by the behavior changes this ticket
+    does introduce:
     - Inline integers become `Int`.
     - The values-file `visit_u64` converts instead of saturating.
     - Computed query fields become `Int`.
@@ -284,15 +282,15 @@ then `FieldValueRef` then `NoteFieldValue`) and the inline parser
 Consequences:
 
 - **A wikilink in YAML must be quoted to be a value at all.** Unquoted `[[x]]`
-  is a flow sequence. The agreed rule "quoted strings bypass link recognition
-  in both syntaxes" would therefore make frontmatter links impossible. The
-  rule needs a link exemption in frontmatter or a different rule.
+  is a flow sequence. The agreed rule "quoted strings bypass link recognition in
+  both syntaxes" would therefore make frontmatter links impossible. The rule
+  needs a link exemption in frontmatter or a different rule.
 - **Path-based CST span lookup is unsound for some keys.** With `Document`,
   `get("a.b")` resolves to nested `a: {b: ...}`, not the literal key `"a.b"`.
-  `get("\"a.b\"")` returns `None`. `!!str 4h` reports an unquoted span.
-  Block scalars include the `|` header. Aliases resolve to the anchor's span.
-  The last duplicate wins (consistent with the typed map). A correct design would
-  need a custom tree walk, not `span_at(path)`.
+  `get("\"a.b\"")` returns `None`. `!!str 4h` reports an unquoted span. Block
+  scalars include the `|` header. Aliases resolve to the anchor's span. The last
+  duplicate wins (consistent with the typed map). A correct design would need a
+  custom tree walk, not `span_at(path)`.
 - **No test fixture relies on quoted frontmatter dates or durations** (only
   `link: "[[Project Alpha|Alpha]]"` in `note/field.rs`).
 - **`FieldValue` (non-note) has no consumer outside schema today.** It is used
@@ -301,7 +299,7 @@ Consequences:
   `DateTime` variants are produced in production only through `FieldValueRef`'s
   classify path (frontmatter) and in tests. Schema loading uses the passthrough
   deserializer. The note side has its own minijinja adapter
-  (`template/engine/query.rs:604`), so templates already see two hand-written
+  (`template/engine/query.rs`), so templates already see two hand-written
   natural forms.
 - **`NoteFieldValue(Ref)` are public API** (`tests/baselines/public-api-*.txt`,
   `benches/query_sort.rs`, one integration test). Schema `FieldValue` is
@@ -316,8 +314,8 @@ Consequences:
 ### Candidate designs compared
 
 - **A. One shared enum** (agreed direction): `FieldValue` gains `Duration` and
-  `Link`. Schema, notes, and queries all use it. It is 80 bytes. Schema literals can then
-  represent values they never produce.
+  `Link`. Schema, notes, and queries all use it. It is 80 bytes. Schema literals
+  can then represent values they never produce.
 - **B. Two owned enums, explicit contract:** a schema/config literal type
   (`Null/Bool/Int/Float/String/List/Object`, natural serde form, no postcard)
   and a note runtime value (adds `Date/DateTime/Duration/Link`, derived tagged
@@ -325,14 +323,16 @@ Consequences:
   note-level comparison (none today).
 - **C. Generic container over scalars:** `Value<S>` with `List`/`Object` shared.
   Rejected: generic burden on every caller for seven shared variants.
-- **D. Lexical storage, typing on demand** (Obsidian/Metadata Menu style):
-  note values stay YAML-native. Date/Duration/Link appear only through schema
-  or query-time casts. Belongs to ticket 19, not decided here.
+- **D. Lexical storage, typing on demand** (Obsidian/Metadata Menu style): note
+  values stay YAML-native. Date/Duration/Link appear only through schema or
+  query-time casts. Belongs to ticket 19, not decided here.
 - **E. Reuse an external value type** (`serde_json::Value`, `noyalib::Value`):
   rejected: no `Date`, `Duration`, or `Link`. `noyalib::Value` carries `Tagged`
   and `Number` variants the model does not want.
 
-### Round 1 outcomes (confirmed, with placement and link details revised in the Answer)
+### Round 1 outcomes (confirmed, with placement and link details revised in the
+
+Answer)
 
 Stress tests covered: absence of schema consumers, the `007`/`~`/`""` and
 timezone divergences, template number rendering, link consumers, and borrowed
@@ -343,18 +343,19 @@ capabilities, since the crate has end users and a public surface.
   `field::FieldValue` (`Null, Bool, Int(i64), Float(f64), String, Date,
   DateTime, Duration, Link, List(Box<[Self]>), Object`), keeping the derived
   tagged form for postcard. The current schema `FieldValue`, its visitor,
-  `DateTimeCoercion` and `FieldStringValue` move into the schema module. They form a
-  schema-local literal type (tentatively `SchemaLiteral`, same variant names,
-  no `Date`/`DateTime`/`Duration`/`Link`, natural serde). Two explicit template
-  adapters remain: natural serde for schema literals (`select_entry_value`) and
-  the hand-written runtime adapter (`template/engine/query.rs`). User input:
-  select values may reference links, but must remain readable as plain strings on the
-  schema side. Date min/max/default are not planned. So schema literals stay
-  strings. A literal is interpreted as a link only at the consumer boundary (ticket 20),
-  through the shared `Link` wikilink parser. Wikilink rendering and parsing must
-  round-trip at root level for wikilinks only. A Markdown `[t](x)` link does
-  not round-trip as a wikilink. Revisit trigger: if schema literals
-  ever need typed dates, durations or links, collapse to one enum.
+  `DateTimeCoercion` and `FieldStringValue` move into the schema module. They
+  form a schema-local literal type (tentatively `SchemaLiteral`, same variant
+  names, no `Date`/`DateTime`/`Duration`/`Link`, natural serde). Two explicit
+  template adapters remain: natural serde for schema literals
+  (`select_entry_value`) and the hand-written runtime adapter
+  (`template/engine/query.rs`). User input: select values may reference links,
+  but must remain readable as plain strings on the schema side. Date
+  min/max/default are not planned. So schema literals stay strings. A literal is
+  interpreted as a link only at the consumer boundary (ticket 20), through the
+  shared `Link` wikilink parser. Wikilink rendering and parsing must round-trip
+  at root level for wikilinks only. A Markdown `[t](x)` link does not round-trip
+  as a wikilink. Revisit trigger: if schema literals ever need typed dates,
+  durations or links, collapse to one enum.
 - **Quote rule (revised):** frontmatter classification stays quote-insensitive
   (links need quotes in YAML; the CST path is unsound for dotted keys, tags and
   block scalars). Inline quotes remain the escape hatch. The literal-string
@@ -362,8 +363,8 @@ capabilities, since the crate has end users and a public surface.
 - **Classifier scope (revised):** share the date/duration/link/blank parsers and
   one precedence order. Inline does not gain `DateTime`. Naive datetimes are
   zone-shifted at parse time and persisted in the cache, so the zone question
-  goes to tickets 19 and 21. Bool, null, number, list, `#tag`, `~`, and `""` stay
-  syntax-native, recorded as intentional divergences.
+  goes to tickets 19 and 21. Bool, null, number, list, `#tag`, `~`, and `""`
+  stay syntax-native, recorded as intentional divergences.
 - **Numbers (revised):** `Int(i64)`/`Float(f64)`. Frontmatter: integer to `Int`,
   values above `i64::MAX` to `Float`. Values-file visitor: `visit_u64` converts
   to `Float` instead of saturating. Inline: integer-shaped text fitting `i64` to
@@ -373,19 +374,19 @@ capabilities, since the crate has end users and a public surface.
   use `Int`. Template number rendering changes from `5.0` to `5` (confirmed
   below).
 - **Link (revised by the field-value link decision):** one root-level `Link`
-  holds `target`, `display: Option<String>`, `kind` and `embedded`. `display`
-  is `None` when the trimmed, unescaped display is absent, empty or equal to
-  the trimmed, unescaped target. Frontmatter and inline fields handle every
-  link type: wikilink, Markdown link and embed. A value must keep its `kind`
-  to render and to round-trip. `NoteLink` is the document occurrence. It
-  wraps a `Link` and adds the source ranges. Equality and order stay with
-  ticket 19. Which type a runtime `FieldValue::Link` carries is now the root
-  `Link` (Open question 1).
+  holds `target`, `display: Option<String>`, `kind` and `embedded`. `display` is
+  `None` when the trimmed, unescaped display is absent, empty or equal to the
+  trimmed, unescaped target. Frontmatter and inline fields handle every link
+  type: wikilink, Markdown link and embed. A value must keep its `kind` to
+  render and to round-trip. `NoteLink` is the document occurrence. It wraps a
+  `Link` and adds the source ranges. Equality and order stay with ticket 19.
+  Which type a runtime `FieldValue::Link` carries is now the root `Link` (Open
+  question 1).
 - **Borrowed views (refines the "no mirror" line above):** the model exports
   `&FieldValue` and no mirror enum. Any view enum is query-local. Ticket 29
   benchmarks owned vs view over `file.name` sort and filter before deleting
-  `NoteFieldValueRef`. Currently `resolve_file_ref` returns borrowed `&str`
-  for `file.name` and borrowable paths without allocation.
+  `NoteFieldValueRef`. Currently `resolve_file_ref` returns borrowed `&str` for
+  `file.name` and borrowable paths without allocation.
 - **Handoffs:**
   - Ticket 19: zone-dependent naive datetimes, literal-string escape, `Int` vs
     `Float` equality, `Link` equality, and schema-select string vs note `Link`
@@ -433,22 +434,22 @@ capabilities, since the crate has end users and a public surface.
    `NoteFieldValue`. `Frontmatter` accessors and `Note::get` are `pub(crate)`.
    Externally the enum is constructible and exposes `as_str`, `as_date`,
    `as_ref`, and `NoteFieldValueRef::compare`. `Note::outlinks()` returns
-   `&[Link]` whose accessors are `pub(crate)`, so it is opaque. The value
-   types' public surface is thin. Ticket 35 should keep public only what is
-   meant for end users. The `test-utils` baseline was not checked.
+   `&[Link]` whose accessors are `pub(crate)`, so it is opaque. The value types'
+   public surface is thin. Ticket 35 should keep public only what is meant for
+   end users. The `test-utils` baseline was not checked.
 
 ### Open questions (answered)
 
 1. **Link in the runtime value:** agreed, `embedded` on the root `Link`.
-2. **"Splitting note types":** the earlier ticket's idea of separate note
-   shapes for indexing/querying and for editing. So `NoteLink` (syntax kind and
-   source span) belongs to the editor-side shape and is defined by ticket 23.
+2. **"Splitting note types":** the earlier ticket's idea of separate note shapes
+   for indexing/querying and for editing. So `NoteLink` (syntax kind and source
+   span) belongs to the editor-side shape and is defined by ticket 23.
 3. **Out-of-range integers:** agreed, frontmatter-only config copy with
    `integer_overflow_errors` off.
 4. **Equality:** agreed, derived structural `PartialEq`. Semantic cross-kind
    equality lives in the query layer (ticket 19).
-5. **Placement:** agreed, `NoteFieldValue` stays in `note`. Only `Link` goes
-   to root. Schema type is renamed and moved into schema.
+5. **Placement:** agreed, `NoteFieldValue` stays in `note`. Only `Link` goes to
+   root. Schema type is renamed and moved into schema.
 6. **YAML tags, aliases, merge keys:** agreed, recorded as intentional.
 7. **TOML datetimes in schema data:** agreed, read as strings.
 
@@ -462,10 +463,10 @@ mirror enum.
 **Alternatives considered:**
 
 - *Keep as is* (four enums, three-stage conversion `noyalib::Value` to
-  `FieldValueRef` to `NoteFieldValue`): rejected.
-  `FieldValueRef` is always immediately owned (zero-copy gain is nil). The
-  chain costs about 41 percent of frontmatter parse time. Integers lose
-  identity at the first hop, and the duplicate visitors diverge.
+  `FieldValueRef` to `NoteFieldValue`): rejected. `FieldValueRef` is always
+  immediately owned (zero-copy gain is nil). The chain costs about 41 percent of
+  frontmatter parse time. Integers lose identity at the first hop, and the
+  duplicate visitors diverge.
 - *One shared enum:* rejected. Schema literals would hold variants they never
   produce, and the schema boundary must read select values as strings.
 - *Generic container over scalars:* rejected, generic burden for seven shared
@@ -478,25 +479,26 @@ mirror enum.
   compat config builds a `Value` AST and span tree anyway, and
   `Document::span_at(path)` is unsound for dotted keys, tags and block scalars.
 
-**Runtime value (`note::NoteFieldValue`):** use these variants:
-`Null, Bool, Int(i64), Float(f64), String, Date, DateTime, Duration, Link(Link), List(Box<[Self]>), Object(IndexMap<String, Self>)`.
-Replace `Number(f64)`. Keep derived tagged serde for the postcard cache and
-derived structural `PartialEq`. Keep the 80-byte size test. Do not box
-more variants (`IndexMap` and `DurationValue` are both 72 B).
+**Runtime value (`note::NoteFieldValue`):** use these variants: `Null, Bool,
+Int(i64), Float(f64), String, Date, DateTime, Duration, Link(Link),
+List(Box<[Self]>), Object(IndexMap<String, Self>)`. Replace `Number(f64)`. Keep
+derived tagged serde for the postcard cache and derived structural `PartialEq`.
+Keep the 80-byte size test. Do not box more variants (`IndexMap` and
+`DurationValue` are both 72 B).
 
-**Schema literal (schema module, tentatively `SchemaLiteral`):** move and
-rename the current `FieldValue`. Keep `Null, Bool, Int, Float, String, List(Vec), Object` and natural serde. Do not add `Date`, `DateTime`, `Duration` or `Link`.
+**Schema literal (schema module, tentatively `SchemaLiteral`):** move and rename
+the current `FieldValue`. Keep `Null, Bool, Int, Float, String, List(Vec),
+Object` and natural serde. Do not add `Date`, `DateTime`, `Duration` or `Link`.
 
-Read native TOML datetimes as strings. Today they
-silently become a bogus object. Keep select values that name links as strings.
-Ticket 20 interprets them at the consumer boundary with the shared wikilink
-parser.
+Read native TOML datetimes as strings. Today they silently become a bogus
+object. Keep select values that name links as strings. Ticket 20 interprets them
+at the consumer boundary with the shared wikilink parser.
 
 **Root `Link`:** use `Link { target, display: Option<String>, embedded: bool }`.
 Set `display` to `None` if the trimmed, unescaped display is absent, empty or
 equal to the trimmed, unescaped target. This removes the two current spellings
-of "no alias". Own wikilink rendering and parsing at the root. They
-round-trip for wikilinks only. Ticket 35 chooses the module name. `NoteLink` is the
+of "no alias". Own wikilink rendering and parsing at the root. They round-trip
+for wikilinks only. Ticket 35 chooses the module name. `NoteLink` is the
 editor-side occurrence type with syntax kind and source span. Ticket 23 defines
 it.
 
@@ -540,9 +542,9 @@ owned values against views for `file.name` sort and filter.
 - The schema consumer owns literal-vs-link interpretation of schema strings
   (ticket 20).
 
-**Becomes removable:** the cutover makes `FieldValueRef`, its seed and
-visitor, `DateTimeCoercion`, and `FieldStringValue` removable. It also removes
-both `From<FieldValueRef>` conversions, `Number(f64)`, the values-file saturation
+**Becomes removable:** the cutover makes `FieldValueRef`, its seed and visitor,
+`DateTimeCoercion`, and `FieldStringValue` removable. It also removes both
+`From<FieldValueRef>` conversions, `Number(f64)`, the values-file saturation
 test, and the double frontmatter conversion. `NoteFieldValueRef` remains a
 removal candidate, pending ticket 29's benchmark gate.
 
@@ -551,8 +553,8 @@ removal candidate, pending ticket 29's benchmark gate.
 - Inline and frontmatter integers become `Int`. Computed query fields become
   `Int`.
 - Template numbers render `5`.
-- Values-file `u64` overflow converts. Huge frontmatter integers no longer
-  drop the block.
+- Values-file `u64` overflow converts. Huge frontmatter integers no longer drop
+  the block.
 - `Link` display is normalized.
 - Native TOML dates in schema data are read as strings.
 - Quoted frontmatter values keep their current classification.
@@ -585,13 +587,14 @@ See [ticket 19's Answer](./19-coercion-and-comparison-policy.md). It revokes
 "Inline does not gain `DateTime`" (the reason was the persisted zone shift;
 naive datetimes become civil values). It settles the handoffs from this ticket:
 
-- No frontmatter literal-string escape. Classification stays quote-insensitive, and a schema override covers text.
+- No frontmatter literal-string escape. Classification stays quote-insensitive,
+  and a schema override covers text.
 - Exact `Int` and `Float` comparison outside structural `PartialEq`.
 - `Link` equality on the folded target only.
 - Schema select strings matching links by literal adoption.
 
 ## Superseded in part by ticket 20
 
-See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). The
-"schema override covers text" handoff is not built (no override). Select values
-that name links are parsed with the root `Link` parser at the schema check.
+See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). The "schema
+override covers text" handoff is not built (no override). Select values that
+name links are parsed with the root `Link` parser at the schema check.
