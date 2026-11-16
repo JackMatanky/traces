@@ -479,12 +479,14 @@ mirror enum.
   compat config builds a `Value` AST and span tree anyway, and
   `Document::span_at(path)` is unsound for dotted keys, tags and block scalars.
 
-**Runtime value (`note::NoteFieldValue`):** use these variants: `Null, Bool,
-Int(i64), Float(f64), String, Date, DateTime, Duration, Link(Link),
-List(Box<[Self]>), Object(IndexMap<String, Self>)`. Replace `Number(f64)`. Keep
-derived tagged serde for the postcard cache and derived structural `PartialEq`.
-Keep the 80-byte size test. Do not box more variants (`IndexMap` and
-`DurationValue` are both 72 B).
+**Runtime value (`note::NoteFieldValue`):** use the variants in the list below.
+Replace `Number(f64)`. Keep derived tagged serde for the postcard cache and
+derived structural `PartialEq`. Keep the 80-byte size test. Do not box more
+variants (`IndexMap` and `DurationValue` are both 72 B).
+
+- Scalars: `Null`, `Bool`, `Int(i64)`, `Float(f64)`, `String`.
+- Temporal and link: `Date`, `DateTime`, `Duration`, `Link(Link)`.
+- Containers: `List(Box<[Self]>)`, `Object(IndexMap<String, Self>)`.
 
 **Schema literal (schema module, tentatively `SchemaLiteral`):** move and rename
 the current `FieldValue`. Keep `Null, Bool, Int, Float, String, List(Vec),
