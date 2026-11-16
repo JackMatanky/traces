@@ -707,7 +707,8 @@ repository at the domain port. Class axes stay frontmatter-only.
 
 ## Code delta
 
-The code does not implement this ticket. This table lists what the refactor changes. Locations are the working tree on 2026-11-02.
+The code does not implement this ticket. This table lists what the refactor
+changes. Locations are the working tree on 2026-11-02.
 
 | Area | Today (path:line) | Target (ticket decision) | Depends on |
 | --- | --- | --- | --- |
@@ -730,12 +731,49 @@ The code does not implement this ticket. This table lists what the refactor chan
 
 Not in code:
 
-- Conformance test suite verifying that every store adapter matches fresh-parse rows.
-- Measurement of generic scalar field and task range-key encoding performance on real vaults.
+- Conformance test suite verifying that every store adapter matches
+  fresh-parse rows.
+- Measurement of generic scalar field and task range-key encoding performance
+  on real vaults.
 - Measurement of full row materialization against facet scans on large vaults.
 - Linux and Windows file lock validation for host-CLI concurrency.
 
 Unclear in the ticket:
 
 - "The precise range-key encoding and measured write and read costs".
-- "Confirm the choice on assembled rows, task-heavy input and one-note replacement before fixing the layout".
+- "Confirm the choice on assembled rows, task-heavy input and one-note
+  replacement before fixing the layout".
+
+## Amendments from tickets 28, 29 and 32
+
+Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
+amend this Answer. They do not reopen it. Measurements carry [V].
+
+- Platform family: ticket 32 removes the platform family from the store
+  identity. Rule 3 (line 299) and the `meta` list (line 311) change. The
+  canonical root stays in the identity.
+- Path order check (lines 392-395): use the NUL-form key of ticket 32. The key
+  is the path with `/` as byte 0x00. It replaces the `OsStr` comparison.
+- Trie benchmark (lines 396-398): the red team measured the trie build alone at
+  2.0 to 2.3 ms for 5,000 candidates [V]. The 224 ms figure is probably the
+  whole `InlinkMap::new` [H]. Keep the trie. Relabel the figure.
+- Rows: a derived generation (ticket 28) needs `FileEntry` to share `Note` and
+  `inlinks` by `Arc`. `LinkResolver` becomes an owned type. A spine clone takes
+  134 us at 50k in the prototype [V]
+  (`../research/28-prep/h3-redteam-round2.md`, "Components of (C)").
+- Resolution context: ticket 28 uses a private immutable context for the exact
+  validated base snapshot and the effective path set. It holds the effective
+  resolver and the base-note edges under that resolver. Every derive applies
+  all current buffers. A previous derived result never becomes the base.
+  The original prototype timings do not measure this lifecycle.
+- Bracket counts: ticket 29 keeps per-field bracket counts in the `meta`
+  facet. The write transaction deletes the old derived facts first. It updates
+  the bracket counts in the same transaction.
+- Range keys: ticket 29 ships range keys first for unquoted numeric, temporal
+  and bool literals. It adds no text range table at first.
+- Bracket totals are generation-level shortcuts. They do not equal the mismatch
+  count of an arbitrary query. Ticket 29 requires exact notices for each atom's
+  logical filter-stage input. A derived generation computes its own metadata.
+- Candidates: a persisted-only candidate index cannot prune a derived query. A
+  derived query scans its effective generation unless its candidate index
+  includes every replacement and addition.

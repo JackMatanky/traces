@@ -491,3 +491,15 @@ Drift check: `git diff 207cc3fb..main -- src tests docs` shows 197 files. The
 index changed in 13 files (+1,003, -576), including `store.rs`, `refresh.rs` and
 `service.rs`. The probe measured `main` at `79f393a2`, so the landed drift is
 inside these numbers. They are not stale.
+
+## Amendments from tickets 28, 29 and 32
+
+Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
+amend this Answer. They do not reopen it.
+
+- Store identity (line 251): the platform family leaves the identity (ticket
+  32). The canonical root stays.
+- Path form: journal fact paths use canonical UTF-8 text with `/` separators.
+  Database lookup keys use the store adapter's NUL-form encoding.
+- Overlay: store and journal batches accept validated disk facts only.
+  Derived generations and closed pending-proof snapshots have no write capability.

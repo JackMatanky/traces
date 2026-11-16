@@ -619,3 +619,24 @@ adoption after the fault tests and measurements.
   - Report no proved winner if the ranges overlap.
 
   Ticket 36 decides adoption.
+
+## Amendments from tickets 28, 29 and 32
+
+Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
+amend this Answer. They do not reopen it. Current test details carry [V].
+
+- Identity tests (lines 305-306): ticket 32 removes the platform family from
+  the store identity. The probe test `rejects_mutated_platform` [V] at
+  `research/27-probe/replay/tests/fault.rs:842` has no production meaning under
+  that decision. A mutated canonical root replaces it.
+- Path form: journal fact paths use canonical UTF-8 `/` text.
+  Database lookup keys use the NUL-form store encoding.
+- Root relocation: ticket 32 supersedes the path-change exception at lines
+  313-315. A new canonical root rebuilds recognized derived state under the
+  existing epoch rules. Do not replay its old-root journal.
+- The prototype's `mv` replay result remains historical evidence. It does not
+  establish the production relocation policy. A note rename within one root
+  still uses normal refresh rules.
+- Never transfer trust grants or remove user-authored files during a cache rebuild.
+- Replay writes only recorded, validated disk facts. Derived generations and
+  closed pending-proof snapshots cannot create journal batches.

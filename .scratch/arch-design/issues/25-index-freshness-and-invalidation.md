@@ -525,7 +525,8 @@ Findings logged for other tickets, not adopted here:
 
 ## Code delta
 
-The code does not implement this ticket. This table lists what the refactor changes. Locations are the working tree on 2026-10-30.
+The code does not implement this ticket. This table lists what the refactor
+changes. Locations are the working tree on 2026-10-30.
 
 | Area | Today | Target | Depends on |
 | --- | --- | --- | --- |
@@ -551,3 +552,35 @@ Not in code:
 - The staleness bound (tickets 28 and 33).
 - The release process and the `--locked` install rule (ticket 39).
 - The journal decision (ticket 26).
+
+## Amendments from tickets 28, 29 and 32
+
+Tickets 28, 29 and 32 resolved on 2026-11-15. These confirmed design rules [P]
+amend this Answer. They do not reopen it. Observations carry [V].
+
+- Platform family (lines 299-300 and 355-357): ticket 32 removes it from the
+  store identity. The canonical root stays in the identity. A store under
+  another root is a fork. The reader rebuilds it. A rebuild heal stays quiet:
+  the refresh report carries the cause (ticket 34 gives the text).
+- Format epoch: ticket 32 adds one format epoch for the new path form. An older
+  reader still never wipes a store with a higher epoch (line 359).
+- Extractor fingerprint: include the NFC normalization dependency.
+  Fold-based link resolution bumps the format epoch.
+- Missing `ctime`: a stored row without `ctime` is stale when a Unix host
+  reads it.
+- Scan exclusion: cover `.Traces`, physical APFS `.traceſ`, and an admitted
+  in-root metadata target under a different listed name.
+  Exclude its filesystem identity and subtree, not only its text spelling.
+- Overlay proof: assign each scan an identity and its original monotonic start.
+  A retained closed snapshot has `proof_time`, including snapshots without a save.
+  For a save, use its ordered receipt time.
+- A scan with `scan_start >= proof_time + 2 s` proves a closed snapshot only
+  after validation and atomic installation of the coherent in-memory base.
+  Release the snapshot in that same owner transition.
+- A no-change scan needs no new persisted revision. Failed, incomplete or
+  discarded scans prove nothing. Failed persistence does not invalidate an
+  installed, validated in-memory base.
+- Test no-change scans, racy rows, failed publication, and a later terminal edit.
+  Ticket 33 wires the completion event and schedules pending validations.
+- Staleness bound: ticket 28 states the overlay rules for a bound parameter.
+  Ticket 33 sets the number.
