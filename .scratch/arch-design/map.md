@@ -288,7 +288,7 @@ implement the redesign. It ends at hand-off to specification.
   the next committed consumer; MCP is likely. Support source-aware editor
   features. Keep the core synchronous by default. Assess operation-specific
   performance across the seven target vault sizes. Reopen the note-model choice
-  in ticket 23. Resolve open-buffer/index consistency in ticket 27.
+  in ticket 23. Resolve open-buffer/index consistency in ticket 28.
 - [What is the single dynamic value model, and who owns
   it?](./issues/18-value-model.md): two owned types and no borrowed mirror enum.
   The runtime `NoteFieldValue` (`Int(i64)`/`Float(f64)`, `Link`, derived tagged
@@ -335,7 +335,7 @@ implement the redesign. It ends at hand-off to specification.
   on-demand check. No parse-time typing, no read-path gating, and schema never
   enters the index or fingerprint. `schema` owns the pure, span-free rule over
   resolved effective fields. The runtime value type sits below `schema` and
-  `note` (placement to 34). Gating is a host policy over stable violation codes
+  `note` (placement to 35). Gating is a host policy over stable violation codes
   carrying a layer (`class` or `global`). Layering principle: cli, lsp, and mcp
   are thin hosts of core. Core app layer composes domain modules with plain data
   and no one-implementor traits. `FileClassExpander` and its crate-root impl are
@@ -345,7 +345,7 @@ implement the redesign. It ends at hand-off to specification.
   `global` becomes the lowest-precedence layer for every note. Class binding by
   tag and path (class-owned `[binding]`) supplies classes to notes without an
   explicit class. This expands at query time so the index stays schema-free.
-  `required` is kept. `step` is checked. `date.format` is a hint until 29.
+  `required` is kept. `step` is checked. `date.format` is a hint until 30.
   `origin`, `description`, and `parent_order` are added. Template check is a
   post-render advisory use case. No design depends on harness hooks. The
   portable guarantee is detection and feedback through tiered channels (lint
@@ -410,8 +410,9 @@ implement the redesign. It ends at hand-off to specification.
   and the version. A stored position never drives an edit. A task is a kind of
   list item. It stores the status symbol and kind, not the name. Keep the stored
   note-level tags and inline fields. Two maps and one note-owned effective
-  accessor. Several values form a list; ticket 29 adds membership. External URLs
-  leave the stored links. The math pass runs only for a heading with `$`.
+  accessor. Several values form a list. Ticket 29 reserves a membership IR name;
+  ticket 30 chooses its frontend. External URLs leave the stored links.
+  The math pass runs only for a heading with `$`.
   Notices return beside the `Note`. Handoffs: [read
   model](./issues/24-index-read-model-and-query-execution.md),
   [freshness](./issues/25-index-freshness-and-invalidation.md),
@@ -437,17 +438,19 @@ implement the redesign. It ends at hand-off to specification.
   34 own rows, paths, writer admission, and notices.
 - [Does the landed index freshness model stand?](./issues/25-index-freshness-and-invalidation.md):
   config drift detection triggers a full rebuild. Store identity uses an engine
-  tag, platform family, format epoch, extractor fingerprint, and policy
-  fingerprint (`IndexPolicy::fingerprint()`). A higher epoch triggers a read
-  fallback to fresh parsing. Crash recovery is a no-op refresh of uncommitted
-  files. Ticket 26 (journal measurement) is decoupled. Content comparison
+  tag, format epoch, canonical root, extractor fingerprint and policy
+  fingerprint (`IndexPolicy::fingerprint()`). Ticket 32 removes the platform
+  family. A higher epoch triggers a read fallback to fresh parsing.
+  Crash recovery is a no-op refresh of uncommitted files. Ticket 26
+  (journal measurement) is decoupled. Content comparison
   detects edits when size and mtime match; a file row stores a racy bit.
   ADR-0009 text and the glossary fingerprint definition are fallible and partly
   stale. Handoffs: [live
   buffer](./issues/28-live-buffer-and-persisted-index-consistency.md), [query
   core](./issues/29-query-core-and-plan.md),
   [host](./issues/33-workspace-host-and-composition.md),
-  [diagnostics](./issues/34-error-and-diagnostic-architecture.md).
+  [diagnostics](./issues/34-error-and-diagnostic-architecture.md). Ticket 32
+  removes the platform family from the store identity.
 - [What does a durable index repair journal cost and
   save?](./issues/26-measure-index-recovery-journal.md): cost screen measured,
   no journal chosen. Against the loose saved-work upper bound no candidate
@@ -497,6 +500,63 @@ implement the redesign. It ends at hand-off to specification.
   run needs them again; ticket 35 decides their durable version. The linked
   ticket and research asset distinguish the tested behavior from the
   remaining gates.
+- [How should open editor buffers relate to the persisted
+  index?](./issues/28-live-buffer-and-persisted-index-consistency.md): every
+  host query sees open-buffer content. The CLI sees the saved store only. This
+  divergence is a new documented surface. An open buffer feeds a derived
+  in-memory generation that is never persisted. Each derivation reapplies all
+  current buffers to the validated base, never to a previous derived snapshot.
+  A private immutable resolution context uses the exact base snapshot and the
+  effective path set as its key. That set includes admitted overlay paths and
+  ghosts. The context holds the effective resolver and base-note edges under it.
+  A base publish, replay or effective path-set change invalidates the context.
+  Closing a base path removes its replacement without a full re-resolve.
+  The original prototype measured 0.148 ms for a content patch and 113.8 ms
+  for a full re-resolve at 50,000 notes. These timings do not prove the amended
+  lifecycle. Ordered LSP events update text before bounded snapshot parse work.
+  Keep one running job and one latest pending snapshot, with session/version checks.
+  Select a position generation before pinning it; otherwise return `Stale`.
+  A derived generation adds a process-local monotonic `derived_id` to the base pair.
+  A retained closed snapshot has a proof time. An eligible scan validates and
+  installs the base atomically with its removal. Failed scans release nothing.
+  Ticket 33 wires these rules and chooses the numeric staleness bound.
+- [What is the query core: grammar, IR/plan, rows, output
+  formatting?](./issues/29-query-core-and-plan.md): both grammars lower to one
+  predicate IR with spans and a typed builder. Pushdown results are Exact,
+  Inexact or Unsupported, and the residual filter always runs. The first
+  implementation ships range keys for unquoted numeric, temporal and bool
+  literals with And only. Measured whole-process saving is 9 ms at 5,000 notes
+  and 65 ms at 50,000 notes. `group_by` becomes a grouped result with one key,
+  one hash-group path and outer-list fan-out. Canonical recursive keys cover
+  existing value kinds, including period identity, nested lists and objects.
+  Scoped mismatch notices remain exact regardless of physical optimization.
+  Ticket 29 reserves membership semantics; ticket 30 chooses its frontend.
+  Rendering uses per-group widths. Ticket 35 chooses the output-module path.
+  Task display depth uses active preceding ancestors without changing explicit
+  sort order. This is an acknowledged frozen-stdout defect repair.
+  Printed group labels escape terminal controls but are not typed serialization.
+  Tickets 30, 31, 33, 34 and 35 take the handoffs.
+- [What owns root confinement and path
+  identity?](./issues/32-path-and-capability-model.md): `ProjectRoot` owns
+  confinement I/O. `RelativePath` is a pure UTF-8 string with `/` separators.
+  `ProjectRoot` owns native conversion and component validation, with typed
+  errors for native-unrepresentable names. No public zero-cost path view remains.
+  Canonical path values and journal facts use UTF-8 `/` text.
+  The store adapter owns NUL-encoded database lookup keys.
+  A new format epoch retains the canonical root and removes the platform family.
+  The sort key replaces `/` with byte 0x00, so output order stays unchanged.
+  A path value keeps the spelling that the file
+  system lists. A lazy fold map answers queries in another spelling. The scan
+  skips non-UTF-8 names with a notice. Metadata exclusion uses filesystem identity
+  and subtree pruning, not the query Comparison Key. Other ignored names keep
+  exact case. A strictly in-root `.traces` directory link remains permitted.
+  External or unverifiable targets fail. Ticket 33 wires finding F11.
+  Root relocation rebuilds recognized derived state without deleting user files.
+  The old `mv` replay result remains prototype evidence, not the production rule.
+  The accepted TOCTOU window includes final-component note reads.
+  Inspection has a confined default and a separately named raw-path test.
+  `Config::output_dir` keeps its named output exception. Local trust and global
+  config obey ticket 22. `DryRun` uses the writer rule with that exception.
 
 ## Not yet specified
 
@@ -514,11 +574,13 @@ implement the redesign. It ends at hand-off to specification.
 - **Template internals**: compiled-AST and regex caches, lazy schema load.
   Sharpen after [What is the template engine boundary with query, schema,
   temporal, and the host?](./issues/31-template-engine-boundary.md).
-- **Output formats** (`--format json|csv`) and where formatting lives; **async
-  dialog bridging** for a long-lived host. Both hang on the forward-consumer and
-  workspace-host decisions.
-- **Persistence portability** (cache across OSes) hangs on the compatibility
-  envelope and the path model.
+- **Output formats** (`--format json|csv`) remain open. Ticket 29 moves rendering
+  to an output module; ticket 35 chooses its path.
+- **Async dialog bridging** for a long-lived host remains open. The
+  forward-consumer and workspace-host decisions constrain it.
+- **Persistence portability** (cache across OSes): graduated to [the path
+  model decision](./issues/32-path-and-capability-model.md). The store form is
+  portable. The canonical root, not the platform family, scopes a store.
 - **Agent workflows around the check** (validated CLI write commands, isolated
   session or inbox with a gated merge, per-folder instruction snippets): product
   features outside the destination. Only their pressure on core (a change-set

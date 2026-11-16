@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 8, 12, 13, 20, 34
+Blocked by: 8, 12, 13, 20, 28, 29, 31, 32
 
 ## Question
 
@@ -81,9 +81,9 @@ registry go beyond both models.
 See [ticket 21's Answer](./21-ambient-environment-and-execution-context.md).
 Distinguish a nonmatching row or nullable creation timestamp from missing
 required temporal context, failed lazy result materialization, presentation
-failure, and an unanswered unattended prompt. The latter failures must cross
-query/template boundaries as typed errors and be translated by each host without
-silently dropping rows or emitting partial success. Keep the frozen CLI exit
+failure, and an unanswered unattended prompt. These failures cross
+query/template boundaries as typed errors. Each host translates them without
+dropping rows or emitting partial success. Keep the frozen CLI exit
 codes and successful stdout payloads; update the redesign change table and
 asserted diagnostics for new failure paths. A memoized failure on a lazy result
 must remain observable on every terminal accessor.
@@ -92,16 +92,44 @@ must remain observable on every terminal accessor.
 
 See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
-- A read that meets a store with a higher format epoch parses fresh, gives one stderr notice, and exits 0. Make the notice travel as a notice and not as an error.
+- A read that meets a store with a higher format epoch parses fresh, gives one
+  stderr notice, and exits 0. Make the notice travel as a notice, not an error.
 - A rebuild heal gives no notice. Report its cause in the refresh report only.
-- Ticket 25 renames `RefreshReport::ConfigDrift` and `DriftCause` and adds identity causes: engine, platform, epoch, extractor and damaged `META`. This ticket gives the cause texts.
-- `traces index` from an older binary replaces a newer store. It gives one stderr notice first.
+- Ticket 25 renames `RefreshReport::ConfigDrift` and `DriftCause`. Identity causes
+  include engine, canonical root, epoch, extractor and damaged `META`.
+  Ticket 32 removes the platform family. This ticket gives the cause texts.
+- `traces index` from an older binary replaces a newer store. It gives one
+  stderr notice first.
 
 ## Inputs from the note document and index read model decisions
 
-See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+See [ticket 23's Answer](./23-note-document-model.md) and
+[ticket 24's Answer](./24-index-read-model-and-query-execution.md).
 
-- `parse_markdown` returns notices beside `Note`. A parse-time `NaN` becomes `Null` with a notice.
+- `parse_markdown` returns notices beside `Note`. A parse-time `NaN` becomes
+  `Null` with a notice.
 - This ticket owns how parser notices show. It also owns the bulk-index notice path.
 - Ticket 24 stores parser notices in the `notices` facet.
-- A cache failure on a read is one stderr notice and exit 0. See ticket 24 and the freshness inputs above.
+- A cache failure on a read is one stderr notice and exit 0. See ticket 24 and
+  the freshness inputs above.
+
+## Inputs from the live-buffer, query-core and path decisions
+
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
+[ticket 29](./29-query-core-and-plan.md) and
+[ticket 32](./32-path-and-capability-model.md).
+
+- Use one notice mechanism for query evaluation, overlay divergence and skipped
+  paths. Keep notices separate from typed failures.
+- Print skipped non-UTF-8 names with quoted octal escapes. Print Windows lone
+  surrogates as `\uXXXX`.
+- Retain clause identities and atom spans for query notices.
+- Deduplicate overlay notices by `(document or path, kind)` until the state
+  changes or the buffer closes. Cover divergence, ghost rows and rename
+  duplicates.
+- Give no notice for a comparison-key lookup that returns several candidates.
+- Choose the Windows device-name lint code and the diagnostic envelope and text.
+- Keep mismatch notices exact for each atom's logical filter-stage input.
+  Global totals are a shortcut only when they prove that scoped result.
+- Keep labels safe for terminals without removing ordinary RTL letters.
+  Visible escapes for controls do not make display labels typed serialization.

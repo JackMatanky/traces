@@ -1,8 +1,8 @@
-# What belongs inside temporal, and where do format dialects and calendar helpers live?
+# Where do temporal, format dialects and calendar helpers belong?
 
 Type: grilling
 Status: open
-Blocked by: 14, 19, 21, 22
+Blocked by: 14, 19, 21, 22, 29
 
 ## Question
 
@@ -114,6 +114,22 @@ syntax and the system-zone acquisition/override policy with ticket 22.
 
 See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
-- The extractor fingerprint hashes the resolved versions of `jiff` and `speedate`. A change to the parsing stack changes the fingerprint and forces one rebuild. Update the crate list in ticket 25 if this ticket removes a crate.
+- The extractor fingerprint hashes the resolved versions of `jiff` and
+  `speedate`. A change to the parsing stack changes the fingerprint and forces
+  one rebuild. Update the crate list in ticket 25 if this ticket removes a crate.
 - A civil datetime must deserialize from the cache without a zone lookup.
-- Until the civil variant exists in code, the fingerprint corpus uses only datetimes with an explicit offset. Add the civil variant to the corpus when it lands. That change bumps the format epoch.
+- Until the civil variant exists in code, the fingerprint corpus uses only
+  datetimes with an explicit offset. Add the civil variant when it lands.
+  That change bumps the format epoch.
+
+## Inputs from the query-core decision
+
+See [ticket 29's Answer](./29-query-core-and-plan.md).
+
+- Bind relative keywords and range-key bounds to the pinned frame at plan time.
+- Choose the `member_of` frontend spelling. Ticket 29 reserves only the IR name.
+- Define the filename-period parser and the `date.format` dialect.
+- Keep filename-derived `file.date` keys Unsupported until the parser contract
+  is complete. `file.day` is retired.
+- Specify temporal probe bounds for each operator and eligible value kind.
+  An unproved mapping scans instead of excluding candidates.

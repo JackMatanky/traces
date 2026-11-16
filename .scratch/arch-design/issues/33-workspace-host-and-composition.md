@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 12, 13, 17, 21, 22, 24, 25
+Blocked by: 12, 13, 17, 21, 22, 24, 25, 28, 29, 32
 
 ## Question
 
@@ -136,18 +136,55 @@ its history.
 
 See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
-- A host opens the store only to refresh and to persist. It serves queries from its pinned in-memory generation. The exit code of a CLI call on a held store changes from 1 to 0.
-- A host validates sources within a staleness bound. Set the bound with ticket 27.
-- A host that starts against a store with a higher format epoch never writes it. It parses fresh if it has no generation.
+- A host opens the store only to refresh and to persist. It serves queries from
+  its pinned in-memory generation. The exit code of a CLI call on a held store
+  changes from 1 to 0.
+- A host validates sources within a staleness bound. This ticket chooses the
+  numeric bound, using tickets 27 and 28 as inputs.
+- A host that starts against a store with a higher format epoch never writes
+  it. It parses fresh if it has no generation.
 - A rebuild heal is quiet. A read that meets a higher epoch gives one stderr notice.
-- Memory is the cost of serving from a pinned generation: 467 MB at 50,000 notes (`research/24-prep/g-probe-results.md:67`).
+- Memory is the cost of serving from a pinned generation: 467 MB at 50,000 notes
+  (`research/24-prep/g-probe-results.md:67`).
 
 ## Inputs from the note document and index read model decisions
 
-See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+See [ticket 23's Answer](./23-note-document-model.md) and
+[ticket 24's Answer](./24-index-read-model-and-query-execution.md).
 
-- A host keeps a compact link and heading range index. It keeps a document only for an open buffer. It tags each range set with a source revision.
-- A host publishes an immutable generation of shared entries. A request pins one generation.
+- A host keeps a compact link and heading range index. It keeps a document only
+  for an open buffer. It tags each range set with a source revision.
+- A host publishes an immutable generation of shared entries. A request pins
+  one generation.
 - This ticket owns host writer admission.
-- A long-lived host keeps parser settings in an `Arc`. The cold CLI borrows them for one call.
-- Ticket 23 leaves the host memory at 50,000 notes and a two-process store open unmeasured.
+- A long-lived host keeps parser settings in an `Arc`. The cold CLI borrows
+  them for one call.
+- Ticket 23 leaves the host memory at 50,000 notes and a two-process store open
+  unmeasured.
+
+## Inputs from the live-buffer, query-core and path decisions
+
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
+[ticket 29](./29-query-core-and-plan.md) and
+[ticket 32](./32-path-and-capability-model.md).
+
+- Replace task-filter string synthesis with ticket 29's typed builder. Choose
+  its callers, not a second synthesis design.
+- Resolve literal and folder sources through the core comparison-key map.
+  Keep glob patterns as patterns.
+- Wire one owner that serializes buffer changes, base publication and replay.
+- Apply all incremental LSP edits in order before coalescing parse work.
+  Keep one running job and one latest pending versioned snapshot.
+- Fence results by base, overlay-state token, document session and version.
+  Debounce diagnostics, not generation publication.
+- Keep `derive(base, current_buffers)` independent of previous derived snapshots.
+  Cache resolution context only for the exact base and effective path set.
+- Define the overlay container, scan-completion event, LSP re-push rule and
+  numeric staleness bound B.
+- Select a request's required version before pinning its generation.
+  Never repin execution. Map core `Stale` outcomes to the host protocol.
+- Install a validated base atomically with closed-snapshot proof removal.
+  A failed scan cannot release the snapshot.
+- Apply ticket 32's metadata identity exclusion and contained-link policy.
+  Own F11 from `research/22-prep/o-stress-test-findings.md`.
+- Name the EPIPE writer contract once with ticket 35's output module.

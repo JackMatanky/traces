@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 7, 16, 18, 28, 31
+Blocked by: 7, 16, 18, 28, 29, 30, 32
 
 ## Question
 
@@ -59,8 +59,9 @@ resolves the class, and calls the schema check. The check skips execution
 without frontmatter or class. The check also runs under `--dry-run`. The schema
 stays a source of values, not of prompts (ADR-0006).
 
-Under `--dry-run` no output path is computed, so the post-render check cannot
-apply path bindings (frontmatter and tag bindings still apply).
+Today `--dry-run` computes no output path. Thus its post-render check cannot
+apply path bindings. Ticket 32's target adds consistent resolved-target preview.
+Reconcile path binding when that target is known; retain frontmatter and tag checks.
 
 ## Inputs from the execution-context decision
 
@@ -81,7 +82,28 @@ request-global service.
 
 ## Inputs from the note document and index read model decisions
 
-See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+See [ticket 23's Answer](./23-note-document-model.md) and
+[ticket 24's Answer](./24-index-read-model-and-query-execution.md).
 
-- Check whether a template reads external links or outlinks. Ticket 23 removes external URLs from the stored `Note::outlinks`.
-- Ticket 24 names this ticket as an index-facing consumer. Use the index-owned domain port. Do not import a storage engine.
+- Check whether a template reads external links or outlinks. Ticket 23 removes
+  external URLs from the stored `Note::outlinks`.
+- Ticket 24 names this ticket as an index-facing consumer. Use the index-owned
+  domain port. Do not import a storage engine.
+
+## Inputs from the live-buffer, query-core and path decisions
+
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
+[ticket 29](./29-query-core-and-plan.md) and
+[ticket 32](./32-path-and-capability-model.md).
+
+- A host render reads its pinned derived generation, including admitted buffers.
+- Expose `{key, rows}` through a distinct `GroupedQuerySet`. Preserve the typed
+  key and the `QuerySet` rows.
+- Preserve fallible terminals, clause identities and atom spans through callbacks.
+- Return typed replacement errors for grouped `sort`, `limit`, `where` and
+  `count` calls. Name the permitted operation in each error.
+- Choose names for the confined default inspection test and the raw-path test.
+- Apply the writer's output-directory rule to `DryRun`. Local values pass local
+  trust admission. Global values obey ticket 22's global-config policy.
+- Keep output-path resolution consistent between inspection, preview and writing.
+  Show preview diagnostics without changing successful stdout payloads.

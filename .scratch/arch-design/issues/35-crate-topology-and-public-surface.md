@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 8, 12, 16, 22, 33, 34, 35
+Blocked by: 8, 12, 16, 22, 33, 34
 
 ## Question
 
@@ -130,15 +130,42 @@ cannot establish the dependency boundary.
 
 See [ticket 25's Answer](./25-index-freshness-and-invalidation.md).
 
-- `build.rs` reads `Cargo.lock` to hash the resolved versions of `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard`. After a workspace split, the lock file is at the workspace root. Decide how `build.rs` finds it.
-- The `check:boundaries` mise task confines `pulldown-cmark` to `src/note/parser.rs` and `src/note/parser/`. It confines `redb` and `postcard` to `src/index/`. It is provisional. Replace it with crate boundaries if this ticket splits the crates.
-- Remove `META_VERSION` and `META_VERSION_KEY` from `src/index/store.rs`. The store identity replaces them.
+- `build.rs` reads `Cargo.lock` to hash the resolved versions of
+  `pulldown-cmark`, `logos`, `noyalib`, `jiff`, `speedate` and `postcard`.
+  After a workspace split, the lock file is at the workspace root.
+  Decide how `build.rs` finds it.
+- The `check:boundaries` mise task confines `pulldown-cmark` to
+  `src/note/parser.rs` and `src/note/parser/`. It confines `redb` and `postcard`
+  to `src/index/`. It is provisional. Replace it with crate boundaries if this
+  ticket splits the crates.
+- Remove `META_VERSION` and `META_VERSION_KEY` from `src/index/store.rs`.
+  The store identity replaces them.
 
 ## Inputs from the note document and index read model decisions
 
-See [ticket 23's Answer](./23-note-document-model.md) and [ticket 24's Answer](./24-index-read-model-and-query-execution.md).
+See [ticket 23's Answer](./23-note-document-model.md) and
+[ticket 24's Answer](./24-index-read-model-and-query-execution.md).
 
-- Decide the visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the buffer parser. Ticket 23 puts `Link` at the crate root as shared vocabulary. `NoteLink` stays in `note`.
+- Decide the visibility of `Link`, `NoteLink`, `NoteDoc`, the status map and the
+  buffer parser. Ticket 23 puts `Link` at the crate root as shared vocabulary.
+  `NoteLink` stays in `note`.
 - Decide where `NoteDoc` lives. Ticket 23 keeps `Note` as the facts type.
-- Decide the visibility of the index and the store port. No engine type crosses the port.
-- Ticket 24 asks for a domain-level store port with an adapter boundary.
+- Decide the visibility of the index and the store port. No engine type crosses
+  the port.
+- Ticket 24 asks for a domain-level store port with an adapter seam.
+
+## Inputs from the live-buffer, query-core and path decisions
+
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
+[ticket 29](./29-query-core-and-plan.md) and
+[ticket 32](./32-path-and-capability-model.md).
+
+- Choose the output-module path and the outward-facing row and
+  `GroupedQuerySet` interfaces.
+- Choose the visibility of `RelativePath`, `ProjectRoot` and
+  `derive(base, current_buffers)`. Keep native path validation in `ProjectRoot`.
+- Regenerate path-interface baselines. Remove the obsolete `path_codec`
+  re-export at implementation cutover.
+- Enforce path order through types, not a `Path::cmp` Clippy entry.
+- Choose a durable home for overlay, grouping and path benchmarks.
+- Name the EPIPE writer contract once with ticket 33.

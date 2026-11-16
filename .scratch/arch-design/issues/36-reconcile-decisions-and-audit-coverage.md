@@ -88,3 +88,23 @@ A present creation/modification timestamp needs the pinned zone to yield a
 civil `cdate`/`mdate`. Absent creation is `Null`, while zone failure is a typed
 error. Keep current-code glossaries unchanged until the implementation updates
 their domain vocabulary.
+
+## Inputs from the live-buffer, query-core and path decisions
+
+See [ticket 28](./28-live-buffer-and-persisted-index-consistency.md),
+[ticket 29](./29-query-core-and-plan.md) and
+[ticket 32](./32-path-and-capability-model.md).
+
+- Check task-row group equivalence and Windows/Linux locking.
+- Place durable benchmarks with ticket 35.
+- Check the target implementation under the shipped `opt-level = "z"` profile.
+- Run the Windows path-order property test against the real path type.
+- Keep the heavy-note clone, `Arc<Note>` and single-thread rebuild evidence gaps
+  explicit until measurements close them.
+- Reconcile the shared change-table rows without duplicate owners.
+- Keep ticket 27's journal adoption blockers separate from completed research.
+- Separate design-changing measurements from production acceptance checks.
+  A prototype can settle a design choice. Cutover needs checks of the actual
+  implementation.
+- Keep current-code glossaries and ADR history accurate until cutover.
+  Record successor definitions and supersession notes with the implementation.
