@@ -6,20 +6,40 @@ Blocked by: 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35
 
 ## Question
 
-Reconcile all resolved decisions codebase-wide. Check unresolved competing
-invariants, inconsistent boundaries, duplicated responsibilities and added
-coupling. Check missed recursive-deepening opportunities and ordering/dependency
-constraints for the specification.
+Answer each numbered question separately.
 
-Audit coverage across each subsystem and each significant cross-subsystem
-interaction. The subsystems include root primitives, temporal, note, schema,
-index, query, template, config, dialog, cli, path/file and
-tests/benches/tooling. Confirm each received scrutiny. State whether each
-subsystem is *redesigned*, *redrawn at the edges*, or *withstands*. Decide
-whether any fog patch must graduate before handoff and whether the destination
-is reached.
+1. Decide how to resolve competing invariants across the resolved tickets.
+2. Decide how to remove inconsistent boundaries, duplicated responsibilities and
+   added coupling.
+3. Decide which recursive-deepening opportunities still need a decision.
+4. Decide the dependency order for the specification.
+5. Audit coverage across each subsystem and each significant cross-subsystem
+   interaction. Include these subsystems:
+   - Root primitives.
+   - Temporal.
+   - Note.
+   - Schema.
+   - Index.
+   - Query.
+   - Template.
+   - Config.
+   - Dialog.
+   - CLI.
+   - Path/file.
+   - Tests/benches/tooling.
+6. State whether each subsystem is *redesigned*, *redrawn at the edges*, or
+   *withstands*. Confirm the evidence for each disposition.
+7. Decide whether any fog patch must graduate before handoff.
+8. Decide whether the destination is reached.
+   Distinguish this audit from final specification readiness.
+   Ticket 37 remains downstream of this audit.
+9. Decide whether tickets 38 and 39 enter the specification hand-off.
+   Include their accepted scope, or state their exclusion explicitly.
 
-Standing checks added by re-verification (main @ `207cc3fb`):
+Do not introduce a dependency cycle to represent the final readiness check.
+Check affected conclusions again after ticket 37 resolves.
+
+Required reconciliation checks (added after re-verification on main @ `207cc3fb`):
 
 1. Re-run the drift check before reconciling: `git diff 207cc3fb..main -- src
    tests docs` and any divergence from `reverification.md`.
@@ -34,8 +54,12 @@ Standing checks added by re-verification (main @ `207cc3fb`):
    ticket-to-ticket conflict that you find. Do not report a ticket-to-code gap
    as a conflict.
 
-Output: the list of specification-ready decisions with their dependency order
-and the explicit non-decisions.
+Output:
+
+- The specification-ready decisions.
+- Their dependency order.
+- The explicit non-decisions.
+- The remaining conditions for final handoff.
 
 Inputs: every resolved ticket and `research/*`.
 

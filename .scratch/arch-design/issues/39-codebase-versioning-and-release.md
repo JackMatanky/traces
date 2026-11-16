@@ -2,6 +2,7 @@
 
 Type: decision
 Status: open
+Blocked by: 16, 22, 25, 32
 
 ## Question
 
@@ -12,10 +13,12 @@ repository has no version tags.
 
 [Does the landed index freshness model
 stand?](./25-index-freshness-and-invalidation.md) does not depend on this
-ticket. The store identity uses an epoch and a fingerprint, not the binary
-version. The binary version is only a label in notices.
+ticket. The store identity uses an epoch and fingerprints, not the binary
+version. Notices use the binary version as a label.
 
-Decide these points:
+Tickets 25, 28, 29 and 32 use the words "pre-release" and "before release".
+They treat a wipe or an epoch bump as free until a release. This ticket must
+define that boundary.
 
 - Where the version lives. `Cargo.toml` is the proposed single source.
 - When a bump is required.

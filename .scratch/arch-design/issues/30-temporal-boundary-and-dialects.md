@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 14, 19, 21, 22, 29
+Blocked by: 7, 14, 16, 18, 19, 20, 21, 22, 23, 24, 25, 29, 32
 
 ## Question
 
@@ -23,9 +23,7 @@ Facts: `survey/temporal.md`, `survey/template.md` H2,
 `survey/root-primitives.md` §3, `src/schema/fields/date.rs` (unvalidated
 format), `.scratch/temporal-core/divergence-register.md`.
 
-Alternatives: move dialects into temporal. Keep them in the template as a
-compatibility adapter. Drop Moment tokens in favour of strftime (needs compat
-decision). Include keep-as-is and say what withstood scrutiny.
+Alternatives:
 
 Inputs: `research/07`, execution-context decision, coercion policy, compat
 envelope.
@@ -51,12 +49,26 @@ ticket:
 - **Civil vs instant.** Naive datetimes are civil values and only input with `Z`
   or an offset is an instant; decide the type shape (a variant or an inner enum)
   and how `DatePoint` precision survives.
-- **Durations.** Nominal equality and order are kept provisionally; decide
-  whether to refine and how calendar arithmetic is documented.
+- **Durations.** Nominal equality and order are kept provisionally. Decide
+  whether to refine them and how calendar arithmetic is documented.
 - **`date(link)`** reads only the link target's last segment and accepts a
   pattern argument for non-ISO titles.
 - The temporal glossary line saying a Date promotes to local midnight is
   superseded.
+- A Markdown link is open. Ticket 19 asks for a rule for how `date(link)` reads
+  a Markdown target. A Markdown target keeps its extension and can be
+  percent-encoded. External URLs are not note targets.
+
+Other decided rules that bind this ticket:
+
+- Temporal brackets hold `Date`, `DateTime` and `CalendarPeriod`. Across
+  brackets `==` is false and relational operators do not match.
+- A quoted date-shaped literal parses once into candidates. The candidates are a
+  `DatePoint`, a validated `CalendarPeriod` and a `DateTime`.
+- A period literal matches a whole span. The upper bound is exclusive.
+- A build-time advisory notice covers an invalid date-shaped quoted literal. A
+  bare invalid date literal stays a syntax error.
+- Inline fields can now yield `DateTime`.
 
 ## Inputs from the schema typing decision
 
@@ -67,15 +79,18 @@ date component. Tests in `schema` use Moment tokens. Temporal and the template
 filter seam translate them. Pick the dialect. After choosing a dialect, add the
 date-format check.
 
+The Answer text of ticket 20 is cut off after "Only date, datetime and". Do not
+read a rule into that fragment.
+
 ## Inputs from the Fileclass research
 
 See [research 14](../research/14-fileclass-model-binding-and-validation.md).
 Fileclass checks dates with ISO regexes only. A field with a custom Moment
 `dateFormat` accepts any non-empty string. It also accepts a wikilink as a date
-(`src/fields/validate.ts`) [V]. `dateFormatCheck.ts` instead lints
-the tokens of the declared format string, not values [V]. Fileclass validates
-durations against an RFC 5545 subset (weeks, or days and time; no years or
-months) (`src/fields/duration.ts`) [V].
+(`src/fields/validate.ts`) [V]. `dateFormatCheck.ts` instead lints the tokens of
+the declared format string, not values [V]. Fileclass validates durations
+against an RFC 5545 subset (weeks, or days and time; no years or months)
+(`src/fields/duration.ts`) [V].
 
 [H] Two cheap options exist for the dialect choice. Check a declared format at
 schema load as a schema error, not a note violation. Keep the value check
