@@ -29,6 +29,7 @@
 //! A naive date-time input represents the reader's local clock time and parses
 //! to a UTC instant through the core date module's DST resolver. A date-only
 //! input remains a zone-free calendar date.
+//!
 //! Human-facing filters render local clock time. `timestamp`, `is_past`,
 //! `is_future`, and fixed-unit [`date_diff`] use the stored UTC instant.
 //! `date.now()`, `date.today()`, `date.tomorrow()`, `date.yesterday()`, and
