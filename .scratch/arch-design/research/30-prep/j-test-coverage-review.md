@@ -2,20 +2,34 @@
 
 ## Result and evidence limit
 
-[V] The current tests cover many temporal operations. They do not establish the accepted civil-value, frame, period, or pushdown contracts.
+[V] The inspected tests cover many temporal operations. They do not establish
+the accepted civil-value, frame, period, or pushdown contracts.
 
-This review reads assertions, not only test names. It separates current behavior from target acceptance tests.
-I read [brief.md](./brief.md), [synthesis.md](./synthesis.md), and [h-redteam.md](./h-redteam.md).
-I also read the accepted frame and period rules in [ticket 21](../../issues/21-ambient-environment-and-execution-context.md), lines 106-179.
-I read the pushdown rules in [ticket 29](../../issues/29-query-core-and-plan.md), lines 498-612.
+This review reads assertions, not only test names. It separates inspected
+behavior from target acceptance tests. I read [brief.md](./brief.md),
+[synthesis.md](./synthesis.md), and [h-redteam.md](./h-redteam.md). I also read
+the accepted frame and period rules in
+[ticket 21](../../issues/21-ambient-environment-and-execution-context.md),
+lines 106-179. I read the pushdown rules in
+[ticket 29](../../issues/29-query-core-and-plan.md), lines 498-612.
 
-[V] CodeGraph supplied the code and test bodies below. I used LSP for the fuzz-helper reference query.
-LSP returned only the declaration. The fuzz target itself contains a call. Thus, that reference result does not establish absence.
-CodeGraph briefly flagged `src/template/engine/date.rs` as changed. Later node reads supplied its current test bodies.
-All code locations below refer to those source reads. They are not test-run results.
+[V] CodeGraph supplied the code and test bodies below. I used LSP for the
+fuzz-helper reference query. LSP returned only the declaration. The fuzz
+target itself contains a call. Thus, that reference result does not establish
+absence. CodeGraph briefly flagged `src/template/engine/date.rs` as changed.
+Later node reads supplied its test bodies. All code locations below refer
+to those source reads. They are not test-run results.
+
+The findings describe that snapshot, not later synthesis repairs or probe
+runs. [m-gap-closure.md](./m-gap-closure.md) records later bounded probe
+evidence. It does not establish that the proposed production implementation
+passes these matrices. [L6](./l-answer-verification.md#l6-temporal-group-class-order-does-not-settle-every-mixed-value-sort-key)
+also distinguishes the accepted group-class order from the unresolved
+complete value-sort key.
 
 I ran no commands, builds, tests, probes, linters, formatters, or benchmarks.
-I changed no production code, test code, accepted Answer, or other research file.
+During that review, I changed no production code, test code, accepted Answer,
+or other research file.
 
 Tags: [V] means source inspection. [H] means an inference. [P] means a proposed acceptance check.
 No proposal below resolves a human choice.
@@ -57,10 +71,11 @@ A format hint such as `YYYY` cannot recover written precision from that stored v
 See `src/temporal/datetime.rs:622-658`.
 A successful current postcard round trip does not prove the accepted civil-datetime persistence rule.
 
-[P] Reuse the codec property test. Extend its generated temporal cases after the selected carrier exists.
-Retain exact byte fixtures for unchanged Date and instant encodings.
-An authorized format-epoch change does not need unchanged bytes.
-Test cache rejection or rebuild at that epoch boundary. Do not reinterpret old naive-derived instants as recovered civil values.
+[P] Reuse the codec property test. Extend its generated temporal cases after
+the selected carrier exists. Retain exact byte fixtures for unchanged Date
+and instant encodings. An authorized format-epoch change does not need
+unchanged bytes. Check cache rejection or rebuild at that epoch boundary.
+Do not reinterpret old naive-derived instants as recovered civil values.
 
 ### DatePoint, precision, and DurationValue
 
@@ -98,15 +113,17 @@ See `fuzz/fuzz_targets/duration_value.rs:8-17`.
 
 [V] The date fuzz target calls `date_point_display_law_holds`.
 See `fuzz/fuzz_targets/date_point.rs:7-11` and `src/lib.rs:251-270`.
-That helper checks only Day-precision Calendar values. It excludes Month points and all datetimes, and accepts documented range failures.
-It does not establish general temporal round-trip coverage.
+That helper checks only Day-precision Calendar values. It excludes Month
+points and all datetimes. It accepts documented range failures. It does not
+establish general temporal round-trip coverage.
 
 [V] The written-order test at `point.rs:1998-2014` uses `1w 2d`.
 Both application orders produce August 7. The fixture cannot distinguish order.
 The query fixture at `filter.rs:1953-1966` uses January 31 plus `1mo 1d`.
 Month-first and day-first application both produce March 1 for that fixture.
 
-[P] Use a distinguishing anchor when testing the approved arithmetic rule. Do not infer rule coverage from these test names.
+[P] Use an anchor that distinguishes application order for the approved
+arithmetic rule. Do not infer rule coverage from these test names.
 
 ### Moment tokens and render behavior
 
@@ -130,9 +147,11 @@ That assertion protects `match_moment_run`'s precondition. It is not a rendering
 See `src/template/engine/date.rs:1612-1619`.
 It does not prove the full dialect contract. Retain the rendered-output tables as the primary contract.
 
-[P] Move or reuse these tables if the translator moves. Do not add a second table-derived oracle.
-For newly selected tokens, add independent rendered examples. For rejected tokens, assert the typed error and token.
-Do not add `Q`, `Qo`, `ww`, or `DDDD` success expectations before the human selects their scope.
+[P] Move or reuse these tables if the translator moves. Do not add a second
+table-derived oracle. For newly selected tokens, add independent rendered
+examples. For rejected tokens, assert the typed error and token. Do not add
+`Q`, `Qo`, `ww`, or `DDDD` success expectations before the human selects
+their scope.
 
 ### Gaps, folds, and unavailable zones
 
@@ -224,7 +243,8 @@ These ranks express correctness risk, not measured cost or implementation order.
    Current `FileMeta::day` tests assert day-prefix precedence and creation-time fallback.
    See `src/file.rs:482-538`. The target removes that fallback and adds week, quarter, and optional year forms.
 5. **Mixed temporal comparison and candidate pruning lack target checks.**
-   Current sort tests promote a Date to midnight; current comparison tests also encode that model.
+   Current sort tests promote a Date to midnight. Current comparison tests
+   also encode that model.
    See `src/query/sort.rs:842-875` and `src/note/field.rs:996-1025,1040-1054`.
    Target filter relations, grouping keys, total sort keys, and candidate bounds need separate oracles.
 
@@ -233,7 +253,8 @@ No production-code deletion follows from this review. Reuse the existing fixture
 
 ## 3. Precise acceptance matrices
 
-All rows below are [P]. “Target” means absent target coverage, not an assertion that current code passes.
+All rows below are [P]. “Target” identifies coverage absent from the inspected
+tests. It does not assert that current code passes.
 
 ### Matrix A: frozen parsing and storage
 
@@ -269,21 +290,28 @@ For parser parity, use the current implementation as the baseline and independen
 | Point precision | Month-precision July 1 shifted by one day | Result remains a point on July 2. Do not accept it as a canonical Month period start. |
 | Target period construction | Day, Week, Month, Quarter, Year; valid starts and one-day misaligned starts | Constructor rejects or normalizes according to the approved rule. The resulting period always has a canonical start. |
 | Target period equality | Same start and unit; same start with different units; overlapping periods | Only matching normalized `(start, unit)` pairs are equal. Overlap and containment never define equality. |
-| Target mixed sorting | Civil values, instants, and periods in every input permutation | Use the accepted Civil, Instant, Period class order. Check antisymmetry, transitivity, and deterministic group order. |
+| Target mixed sorting | Civil values, instants, and periods in every input permutation | Check the selected total sort key for antisymmetry and transitivity. Group keys retain the accepted Civil, Instant, Period class order. |
 | Target period unit tie-break | Equal starts with all five units | Use the human-approved fixed rank. Do not rank by nominal duration or written precision. |
 
 [P] Equal nominal durations need not stay substitutive under calendar addition. Current tests deliberately show the opposite.
 Do not use period membership as a Rust Eq, hash, grouping, or total-order test.
 
 **Repair the “no-cross-class-Ord test” recommendation.**
-`Ord` compares a type, not selected enum variants.
-A runtime test cannot prove that a trait implementation is absent.
-Do not inspect source text for `derive(Ord)` or replace the check with two unequal sample values.
 
-If the selected API prohibits `Ord`, use the project's compile-time contract test mechanism, when available.
-A compile-fail check must fail specifically because `Ord` is unavailable, not because an import or constructor is wrong.
-Separately test the actual filter relation and total sort key through their intended seams.
-The present `DatePoint` already lacks `Ord`; adding an absence test there would not prove the proposed inner carrier's contract.
+`Ord` compares a type, not selected enum variants. A runtime test cannot prove
+that a trait implementation is absent. Do not inspect source text for
+`derive(Ord)`. Do not replace the check with two unequal sample values.
+
+If the selected API prohibits `Ord`, use the project's compile-time contract
+test mechanism, when available. A compile-fail check must fail specifically
+because `Ord` is unavailable. An incorrect import or constructor must not
+cause the failure. Separately check the actual filter relation and total
+sort key through their intended seams.
+
+The present `DatePoint` already lacks `Ord`. An absence test there would not
+prove the proposed inner carrier's contract. Ticket 19 prohibits `Ord` on
+`NoteFieldValue`; it does not prohibit every inner temporal `Ord`
+implementation. A proposed inner-carrier restriction needs its own decision.
 
 ### Matrix C: zone-sensitive boundaries
 
@@ -325,7 +353,8 @@ A passing test for a proposed preset cannot settle that decision.
 
 ### Matrix E: operation frame ownership
 
-Use deterministic clock and resolver inputs. Count reads at the adapter boundary, not by scanning source text.
+Use deterministic clock and resolver inputs. Count reads at the adapter
+boundary. Do not infer read counts from source text.
 
 | Operation | Adversarial input | Target acceptance |
 | --- | --- | --- |
@@ -361,17 +390,20 @@ The matrix must preserve those distinctions.
 | Period and zone edges | Include Matrix C, equal-start different-unit periods, and point-versus-period matching. Keep membership bounds separate from group/range key identity. |
 | Residual execution | Use an observable predicate-evaluation counter or existing executor test seam. Assert residual execution even for an Exact candidate source. |
 | Diagnostics | Scan and pushed paths emit equal notices under source restrictions, And, Limit, row modes, and buffer edits. |
-| Initial Boolean scope | Test supported And intersection. Or, Not, and quoted forms still scan in the first implementation. |
+| Initial Boolean scope | Check supported And intersection. Or, Not, and quoted forms still scan in the first implementation. |
 
 [P] Do not infer temporal-key correctness from numeric-key timings.
 Do not prove Exact by comparing a key against its own encoder.
 Do not compare only pushed output with a scan that shares the same incorrect temporal conversion.
 Include independent boundary answers and distinct expected notices.
-Resolve the membership-bound versus range-key wording before claiming an Exact period mapping.
+Clarify predicate-specific membership bounds and canonical range keys before
+claiming an Exact period mapping. L5 explains why their distinction does not
+prove an accepted-rule contradiction.
 
 ## 4. Probes now versus implementation gates
 
-No probe in this table ran during this review.
+No probe in this table ran during this review. Later bounded probe results
+in `m-gap-closure.md` have their own limits.
 
 | Work | Can close a decision gap now? | What it can establish |
 | --- | --- | --- |
@@ -385,14 +417,18 @@ No probe in this table ran during this review.
 | Pinned frames and escaping lazy sets | Only after implementation. | Exercise operation ownership, resolver read counts, retained failures, and new-operation refresh. |
 | Exact temporal bounds and whole-process benefit | Only after key implementation. | Prove candidate sets, residual execution, notices, and measured benefit with the optimization enabled and disabled. |
 
-[V] The crate report lists its unrun differential probe at `d-crate-evidence.md:161-209,428`.
-The current strict-date tests provide reusable fixtures. They do not supply a differential result.
+[V] At this review's snapshot, the crate report lists its unrun differential
+probe at `d-crate-evidence.md:161-209,428`. The strict-date tests provide
+reusable fixtures. They do not supply a differential result.
 
 ## 5. Lens-10 conclusion
 
 [P] Reuse strong value, extent, rendered-output, codec, and CLI fixtures.
-Add independent expected outcomes where current tests compare two paths with shared logic.
-Do not replace duration components with nominal equality, point precision with period normalization, or filter equality with sort order.
+Add independent expected outcomes where current tests compare two paths
+with shared logic. Keep duration components distinct from nominal equality.
+Keep point precision distinct from period normalization. Keep filter
+equality distinct from sort order.
 
-The current source supports these coverage findings. It does not prove that the target design passes.
-Unexecuted probes, unselected grammar rules, and absent target seams remain explicit limits.
+The inspected source supports these coverage findings. It does not prove
+that the target design passes. Probes not run in this review, unselected
+grammar rules, and absent target seams limit its conclusions.

@@ -1,20 +1,23 @@
 # Digest lessons for ticket 30: temporal boundary and dialects
 
-Artifact: `research/30-prep/c-digest-lessons.md`. Ticket: `issues/30-temporal-boundary-and-dialects.md`
-(36 questions). This file gives per-question evidence from `docs/digests/`, then the lesson for
-Traces. Product behavior and Traces proposals stay separate.
+Artifact: `research/30-prep/c-digest-lessons.md`.
+Ticket: `issues/30-temporal-boundary-and-dialects.md` (36 questions).
+This file gives digest evidence and per-question Traces proposals.
+Product behavior and proposals remain separate.
 
 Method and limits:
 
-- Sources: digest excerpts of Templater (docs, src), Dataview (docs, src), Natural Language Dates
-  (`nldates`), Fileclass, Metadata Menu, Obsidian Tasks, IWE, zk, plus three Rust PKM tools
-  (basalt, obsidian-export, obsidian-rs). I cloned no upstream repository. Digest excerpts are the
-  inspection surface.
-- Tags: `[V]` read in a digest or in ticket 30. `[H]` hypothesis from that reading. `[P]` proposal
-  for the grilling. `[A]` the topic is absent from every digest read for this file.
-- Upstream file names and line numbers come from the digest excerpts. Treat them as approximate.
-- Prose: ASD-STE100. Sentences stay short. Where a caveat needs nuance, the text says so and steps
-  out of STE. Owner material is English; this report is English by the same choice.
+- Sources include Templater, Dataview, Natural Language Dates (`nldates`),
+  Fileclass, Metadata Menu, Obsidian Tasks, IWE, and zk.
+  Rust PKM sources include basalt, obsidian-export, and obsidian-rs.
+  This review uses `docs/digests/` excerpts, not new upstream clones.
+- Tags: `[V]` records a digest or ticket 30 read. `[H]` marks a hypothesis.
+  `[P]` marks a proposal. `[A]` marks absence from the inspected excerpts,
+  not proof of absence from complete upstream projects.
+- Upstream file names and line numbers come from digest excerpts.
+  Treat those line numbers as approximate.
+- Prose uses short, direct sentences. Technical terms retain their domain
+  meanings. The owner material and this report use English.
 
 ## Q1 to Q5: Moment compatibility and format dialects
 
@@ -22,138 +25,166 @@ Method and limits:
 
 Evidence:
 
-- Templater translates nothing. It calls Obsidian's runtime `moment` and exposes the whole object
-  to user scripts. Docs digest `obsidian_silentvoid13-templater-docs-digest.txt:1587-1597`; src
-  digest `InternalModuleDate.ts` (default `"YYYY-MM-DD"`, `.weekday(n)`, `moment(reference,
-  reference_format)` guard). Upstream: github.com/SilentVoid13/Templater. `[V]`
-- Dataview does not speak Moment at all. Its value type is Luxon `DateTime`
-  (`obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:7643-7666` area; `export type {
-  DateTime, Duration } from "luxon"`). Its settings and docs use Luxon tokens in lowercase form:
-  default `"MMMM dd, yyyy"` (src, settings defaults). Upstream:
-  github.com/blacksmithgu/obsidian-dataview. `[V]`
-- Fileclass and Metadata Menu store and lint Moment tokens (`dateFormat: "YYYY-MM-DD"`, `YYYY`,
-  `DDDD`, `Q`). `obsidian_mdelobelle-fileclass-src-digest.txt:3082-3318`,
+- Templater calls Obsidian's runtime `moment`.
+  It exposes that object to user scripts.
+  Docs: `obsidian_silentvoid13-templater-docs-digest.txt:1587-1597`.
+  Source: `InternalModuleDate.ts`, with default `"YYYY-MM-DD"`,
+  `.weekday(n)`, and a `moment(reference, reference_format)` guard.
+  Upstream: github.com/SilentVoid13/Templater. `[V]`
+- Dataview uses Luxon `DateTime`, not Moment.
+  Source: `obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:7643-7666`,
+  including `export type { DateTime, Duration } from "luxon"`.
+  Its default format is `"MMMM dd, yyyy"` (settings defaults).
+  Upstream: github.com/blacksmithgu/obsidian-dataview. `[V]`
+- Fileclass and Metadata Menu store Moment format strings (`YYYY-MM-DD`,
+  `YYYY`, `DDDD`, `Q`). Fileclass has a separate token scanner.
+  Its value-validation path bypasses that scanner for a string
+  `dateFormat` (K8 in `k-citation-verification.md`).
+  Sources: `obsidian_mdelobelle-fileclass-src-digest.txt:3082-3318`,
   `obsidian_mdelobelle-metadatamenu-src-digest.txt:11862-11931`. `[V]`
-- Traces facts: `MOMENT_TOKENS` in `src/temporal/token.rs` lacks `ww`, `Q`, `Qo`, `DDDD`. The
-  owner's Templater-shaped templates use `ww`, `YY`, `Q`, `Qo`
-  (`docs/vault/07_templates/12_01_week_periodic.md`, `14_01_quarter_periodic.md`). The owner's
-  Fileclass data uses `YYYY`, `DDDD`, `Q` (`docs/vault/05_metadata/cal.md`). `[V ticket]`
+- Traces' `MOMENT_TOKENS` lacks `ww`, `Q`, `Qo`, and `DDDD`
+  (`src/temporal/token.rs`). The owner uses `ww`, `YY`, `Q`, and `Qo`
+  in `docs/vault/07_templates/12_01_week_periodic.md` and
+  `14_01_quarter_periodic.md`.
+  Metadata uses `YYYY`, `DDDD`, and `Q` in
+  `docs/vault/05_metadata/cal.md`. `[V ticket]`
 
-Product behavior: Moment is the authoring dialect of the Obsidian template and metadata ecosystem.
-Dataview alone uses a Luxon dialect. No plugin makes Moment a domain concept; each treats it as a
-string syntax at its own edge.
+Product behavior: the inspected Obsidian tools use Moment for templates
+and metadata formats. Dataview uses Luxon. These examples show format
+syntax at tool boundaries. They do not prove a unique domain design.
 
-Lesson: `[P]` Moment compatibility is a compat surface, not a domain concept. Research 07 and
-ticket 16 support this. The owner evidence says the surface must accept `Q`, `Qo`, `ww`, `YY`,
-`DDDD`, because the owner writes them. A translator that drops them fails on real files.
+Lesson: `[P]` Keep Moment compatibility at a syntax-adapter boundary.
+Research 07 proposes that placement. Ticket 16 makes parity Free.
+The owner's templates use `Q`, `Qo`, `ww`, and `YY`. The metadata uses
+`DDDD`. Retention needs support for those tokens. Removal needs an
+explicit migration, not an unsupported claim that no user needs them.
 
 ### Q2: Where does the Moment dialect translator live?
 
 Evidence:
 
-- Fileclass lints Moment tokens with a pure scanner and no moment dependency. `TOKENS` is sorted
-  longest-first and includes week-year, quarter, and ordinal tokens
-  (`dateFormatCheck.ts:3082-3318`). Its code comment records the failure that motivates the lint.
-  Moment never fails on a bad format. It prints unknown text verbatim. So `YYYY-KK-007` silently
-  stores `2026-KK-007`. `[V]`
-- Metadata Menu formats through moment directly and shows a live example of the user's format in
-  settings (`AbstractDate.ts:11884-11931`). No translation layer exists. `[V]`
-- Minijinja contrib date filters use strftime and hold no Moment logic (research 07, restated in
-  ticket 30). `[V research]`
-- Traces facts: the translator sits in `src/temporal/token.rs` since commit `6104d0ae`. It holds
-  `pattern_to_strftime`, `MOMENT_TOKENS`, and the ordinal suffix. `config` already imports
-  `DEFAULT_DATETIME_PATTERN` from temporal, so the `config -> temporal` edge exists. `[V ticket]`
+- Fileclass scans tokens without a Moment runtime dependency.
+  `TOKENS` uses longest-first order. It includes week-year, quarter,
+  and ordinal tokens (`dateFormatCheck.ts:3082-3318`).
+  Its comment explains the failure: unknown format text prints unchanged.
+  Thus `YYYY-KK-007` can write `2026-KK-007` without a format error. `[V]`
+- Metadata Menu calls moment directly.
+  Its settings show a live format example
+  (`AbstractDate.ts:11884-11931`). `[V]`
+- Minijinja contrib filters use strftime without Moment logic
+  (research 07, recorded in ticket 30). `[V research]`
+- Commit `6104d0ae` puts the translator in `src/temporal/token.rs`.
+  It includes `pattern_to_strftime`, `MOMENT_TOKENS`, and the ordinal suffix.
+  Config imports `DEFAULT_DATETIME_PATTERN` from temporal.
+  Thus the `config -> temporal` edge already exists. `[V ticket]`
 
-Product behavior: two shapes exist in the ecosystem. Shape A: a per-plugin runtime dependency on
-one dialect (Templater, Metadata Menu). Shape B: a pure token scanner or translator at the compat
-edge with no runtime dependency (Fileclass; minijinja strftime).
+Product behavior: Templater and Metadata Menu use the runtime formatter.
+Fileclass instead scans tokens without that runtime dependency.
+Minijinja supplies a separate strftime interface.
+These examples do not all include translation.
 
-Lesson: `[P]` The translator is a syntax adapter. It can live at the template compat seam or in
-temporal, but it must stay a pure function with an explicit unsupported-token error. The ticket's
-alternatives list both placements. The evidence does not force one placement; it does force
-purity (no ambient state) and an explicit error. `[H]` Keeping it in temporal is defensible only
-if schema formats need Moment syntax too (ticket 20 leaves that open).
+Lesson: `[P]` Keep the translator pure. Return an explicit
+unsupported-token error. The template compatibility seam and temporal
+remain placement options. The examples do not decide placement.
+`[H]` Shared schema support for Moment would support a shared adapter.
+It would not by itself prove that temporal must own the adapter.
 
 ### Q3: One dialect or a split across four format surfaces?
 
 Evidence:
 
-- IWE splits values, not dialects. `[workspace]` has `date_format` and `time_format` for keys.
-  `[markdown]` has `date_format` and `time_format` for content. Both use chrono strftime
-  specifiers (`%Y`, `%b %d, %Y`). Defaults differ: key default `%Y-%m-%d`, content default
-  `%b %d, %Y`. Docs and code agree (`iwe-org-iwe-src-digest.txt:844-896`, `:13744-13873`,
-  `:9607-9733`, `:9888-9890`). Upstream: github.com/iwe-org/iwe. `[V]`
-- Dataview uses one Luxon dialect across settings (`defaultDateFormat`,
-  `taskCompletionDateFormat`), the per-query `dateformat(date, string)` function, and the
-  arbitrary-format parse `date(text, "format")` (src `:6924-6928`; docs changelog `:366`,
-  `:373-374`). One dialect, four surfaces. `[V]`
-- zk names styles plus one dialect: `{{format-date now}}` maps `short|medium|long|full|year|time|
-  timestamp|timestamp-unix` to strftime and passes any other string through as strftime
-  (`zk-src-digest.txt:2213-2316`). Upstream: github.com/zk-org/zk. `[V]`
-- Traces facts: query `date(text, pattern)` accepts strftime only through
-  `DatePoint::parse_with_pattern` `[V ticket]`. Schema tests use Moment tokens `[V ticket 20]`.
-  Config date keys use strftime default `%Y-%m-%dT%H:%M:%S` `[V ticket]`.
+- IWE uses chrono format specifiers for keys and content.
+  `[workspace]` stores key `date_format` and `time_format`.
+  `[markdown]` stores the corresponding content fields.
+  Defaults differ: `%Y-%m-%d` for keys and `%b %d, %Y` for content.
+  Other examples use `%Y`.
+  Sources: `iwe-org-iwe-src-digest.txt:844-896`, `:13744-13873`,
+  `:9607-9733`, `:9888-9890`.
+  Upstream: github.com/iwe-org/iwe. `[V]`
+- Dataview uses Luxon across the inspected format surfaces.
+  Settings include `defaultDateFormat` and `taskCompletionDateFormat`.
+  Query functions include `dateformat(date, string)` and
+  `date(text, "format")`.
+  Sources: src `:6924-6928`; changelog `:366`, `:373-374`. `[V]`
+- zk maps named styles to strftime.
+  `{{format-date now}}` accepts
+  `short|medium|long|full|year|time|timestamp|timestamp-unix`.
+  Other strings pass through as strftime
+  (`zk-src-digest.txt:2213-2316`).
+  Upstream: github.com/zk-org/zk. `[V]`
+- Traces query `date(text, pattern)` uses strftime through
+  `DatePoint::parse_with_pattern`. Schema tests use Moment tokens.
+  Config defaults to `%Y-%m-%dT%H:%M:%S`. `[V ticket]`
 
-Product behavior: the ecosystem norm is one dialect per tool with per-surface values and defaults.
-IWE's key-versus-content split is the only two-value split; its dialect stays strftime. A
-dialect-per-surface split has no precedent in the read set.
+Product behavior: IWE and Dataview use one format family across their
+inspected surfaces. IWE separates key and content format values.
+This sample does not establish an ecosystem-wide dialect rule.
 
-Lesson: `[P]` Pick one dialect for the four surfaces, with separate default values per surface.
-The ticket asks "one dialect or justify a split". The evidence justifies one dialect plus
-per-surface defaults, and it makes Moment a fifth, compat-only dialect at the template seam.
-Caveat, outside STE strictness: the owner's schema tests already use Moment tokens. The schema
-check then needs a Moment lint (Fileclass precedent) or a migration of those tests. This is a
-compat cost, not a reason for a second native dialect.
+Lesson: `[P]` Use one native dialect across the four format surfaces.
+Keep separate defaults where the surfaces need them. Treat template
+Moment support as a compatibility adapter, not a fifth native dialect.
+The schema tests already use Moment tokens. A change needs either a
+Moment scanner or a documented migration of those tests.
 
 ### Q4: How does `date.format` treat a format with no full date?
 
 Evidence:
 
-- Fileclass separates two checks. Check one lints the format string's tokens (`dateFormatCheck`).
-  Check two validates values. For a custom `dateFormat` it accepts any non-empty string. The
-  reason: a check needs a date library (`validate.ts:6079-6087`). Wikilink-stored dates pass
-  as-is. `[V]`
-- Dataview's literal parser accepts a precision ladder whose root needs a year and a month:
-  `YYYY-MM[-DDTHH:mm[:ss[.nnn]]][Zone]` (docs `:1788`; src `EXPRESSION.date` `:7913-7947`).
-  A bare `YYYY` fails the ladder; year-month and fuller values are valid dates in its
-  model. `[V]`
-- Dataview's date render path writes `null` for unparseable text and compares with typed
-  operators; it has no schema check. `[V]`
-- Traces facts: `SchemaDateField.format` is an unvalidated `Option<String>` with a test-only
-  accessor; tests use `YYYY-MM-DD` `[V ticket]`. The owner's Fileclass data declares `YYYY`,
-  `DDDD`, `Q` `[V ticket]`, so formats without a full date exist in the owner's real data.
+- Fileclass separates token scanning from value validation.
+  `validateDatePattern` bypasses pattern validation for a string
+  `dateFormat`. The outer validator handles empty values and `required`.
+  This bypass does not itself enforce a string type.
+  Sources: `validate.ts:6079-6087,6107-6112,6153-6164,6191-6196`;
+  K8 in `k-citation-verification.md`. `[V]`
+- Dataview's literal parser needs a year and month.
+  Its ladder is `YYYY-MM[-DDTHH:mm[:ss[.nnn]]][Zone]`.
+  Bare `YYYY` does not match.
+  Sources: docs `:1788`; `EXPRESSION.date` at src `:7913-7947`. `[V]`
+- Dataview renders unparseable date text as `null`.
+  Its typed comparisons do not supply a schema check. `[V]`
+- Traces' `SchemaDateField.format` is an unvalidated `Option<String>`.
+  Its accessor is test-only. Tests use `YYYY-MM-DD`.
+  The owner's metadata declares `YYYY`, `DDDD`, and `Q`.
+  Thus partial formats occur in real owner data. `[V ticket]`
 
-Product behavior: two ecosystem answers exist. Metadata Menu ignores the problem (moment prints
-garbage verbatim). Fileclass lints the format at declaration time and leaves values alone.
-Dataview has no declared formats at all.
+Product behavior: Fileclass has a token scanner but bypasses pattern
+validation on the string-format path. Dataview has no schema format
+declarations. Neither example decides Traces partial-date validation.
 
-Lesson: `[P]` Check the declared format at schema load as a schema error (the ticket's own
-`[H]` option). Use a precision-aware value check afterwards. `YYYY-MM` has the Dataview ladder
-precedent; bare `YYYY`, `Q`, and `DDDD` do not. They are calendar metadata, not precision
-reductions of the ISO ladder, and the owner's data uses all three. `[H]` A dialect with a
-token table can classify `Q` as quarter-of-year and `DDDD` as day-of-year. The value check can
-then accept the matching value shapes or reject them with a named reason.
+Lesson: `[P]` Check declared tokens at schema load. Separate full-date,
+partial-date, and no-date-component formats. Ticket 20's provisional
+scalar acceptance applies only to the last category.
+
+`YYYY-MM` has a Dataview literal precedent. Bare `YYYY`, `Q`, and `DDDD`
+do not belong to its inspected literal ladder. `[H]` A token table can
+classify quarter-of-year and day-of-year formats. The human must choose
+which values those formats accept. The unrelated truncated ticket 20
+fragment does not block this choice (L1/L2 in `l-answer-verification.md`).
 
 ### Q5: Fate of `format` under `[frontmatter.date_created]` and `[frontmatter.date_modified]`
 
 Evidence:
 
-- Traces facts: each table has `name` and `format`; default format `%Y-%m-%dT%H:%M:%S`; ticket 22
-  records that no production code reads them; config has no `[date]` table `[V ticket]`.
-- IWE shows the target shape: one `[date]`-like policy with per-surface format, time format, and
-  locale fields, consumed through accessors (`format_options()`), not raw config
+- Each Traces table has `name` and `format`.
+  The default format is `%Y-%m-%dT%H:%M:%S`.
+  Ticket 22 records no production reader.
+  Config has no `[date]` table at that inspection date. `[V ticket]`
+- IWE uses per-surface date, time, and locale fields.
+  Consumers call accessors such as `format_options()`
   (`:13744-13873`, `:65575`). `[V]`
-- Rust precedent for file stamps: `obsidian-export` copies mtimes with `filetime::set_file_mtime`
-  behind an opt-in `--preserve-mtime` flag (`rust_zoni-obsidian-export-digest.txt:452-454`,
-  `:2818-2839`). Upstream: github.com/zoni/obsidian-export. `[V]`
+- `obsidian-export` copies mtimes with `filetime::set_file_mtime`.
+  Its `--preserve-mtime` flag is opt-in.
+  Sources: `rust_zoni-obsidian-export-digest.txt:452-454`, `:2818-2839`.
+  Upstream: github.com/zoni/obsidian-export. `[V]`
 
-Product behavior: frontmatter stamp configs exist in the Obsidian world, but Traces never reads
-them. File mtimes are handled by copy tools, not by note formats.
+Product behavior: the inspected Traces stamp formats have no reader.
+The export tool preserves filesystem mtime separately from note formats.
 
-Lesson: `[P]` The ticket's "joins the new `[date]` table" option matches the IWE shape: one
-policy, several fields. The "goes" option matches the unread-config evidence and ticket 22's
-fingerprint cleanup. `[H]` Keep the fields only if a migration writes them; otherwise remove and
-record a change-table row (ticket 16 makes config formats Migratable).
+Lesson: `[P]` Compare moving the fields into `[date]` with removing the
+unread fields. IWE supports the first shape. Ticket 22 records the
+unread-config evidence. If the fields stay, identify a consumer.
+If the fields go, record a change-table row. Ticket 16 makes config
+formats Migratable.
 
 ## Q6 to Q8: Calendar helpers and filenames
 
@@ -178,9 +209,10 @@ Evidence:
 Product behavior: anchors live where the request lives. Templates anchor to a file title or render
 time. Queries anchor to the frame. Edge resolution is shared arithmetic.
 
-Lesson: `[P]` The shared arithmetic (edges, offsets) belongs in temporal. The anchor choice stays
-per surface. The engine keeps thin wrappers that pass the render frame's `today` and week rule.
-Ticket 31 will need the wrapper signatures; this ticket fixes the split.
+Lesson: `[P]` Put shared arithmetic in temporal. Keep anchor selection at
+each surface. The engine keeps thin wrappers for the render frame.
+Only operations that need a date acquire the frame's zone-derived `today`.
+Ticket 31 needs wrapper signatures after the human decides this boundary.
 
 ### Q7: Where does the filename-period parser live?
 
@@ -201,14 +233,16 @@ Evidence:
   checks typed metadata fields before that; `date(link)` falls back to `resolved.file.day`
   (src `:6872-6890`). `[V]`
 
-Product behavior: no read tool parses period prefixes (week, quarter) from filenames. Dataview
-extracts full date patterns anywhere in the name; that is not prefix parsing. Pattern-driven
-filename writing exists (Metadata Menu, zk), and both keep literal text literal.
+Product behavior: the inspected Dataview helper finds full dates anywhere
+in a filename. It does not recognize week or quarter labels.
+Metadata Menu and zk show pattern-based filename writing.
+These excerpts do not prove that no other tool parses filename periods.
 
-Lesson: `[P]` The parser is a temporal-owned, filename-scoped reader that yields a period (kind
-plus start), per ticket 21. It must not read the frozen vault-format paths. The Metadata Menu
-failure gives the contract rule. Only explicit prefix forms match. Longer invalid prefixes never
-downgrade to shorter ones. Ticket 21 already decides this rule. The checks list must exercise it.
+Lesson: `[P]` Put the filename-scoped period parser in temporal.
+Keep the new filename forms out of frozen note parsing. Preserve the
+explicitly accepted civil and inline-datetime changes (L3).
+Recognize only explicit prefix forms. Never reinterpret a malformed
+longer prefix as a shorter one. Ticket 21 already accepts that rule.
 
 ### Q8: Week-one rule for a custom week start
 
@@ -231,15 +265,16 @@ Evidence:
 - Traces facts: `CalendarPeriod::Week` is the ISO week, Monday to Sunday; ticket 21 records that
   ISO `2026-W01` starts `2025-12-29` and that ISO `2025-W53` is invalid `[V ticket]`.
 
-Product behavior: the ecosystem is inconsistent on the same word. Tasks means ISO week. Dataview
-`date(sow)` means Luxon's default week, which is ISO today. nldates follows the Obsidian
-locale through a private field. Moment exposes both rules and pairs them (`dow` + `doy`).
+Product behavior: Tasks and the inspected Dataview calls use ISO weeks.
+nldates reads Obsidian locale data through a private field.
+Moment exposes both ISO and locale rules.
 
-Lesson: `[P]` A configurable week start needs a paired week-one parameter, exactly as Moment
-pairs `dow` with `doy`. Ticket 21's ISO facts become the defaults. `[H]` The Tasks precedent
-(forcing ISO) is the low-surface alternative: no config, no week-year drift across devices.
-The nldates precedent is the failure mode to avoid: a locale change silently shifts every week
-label.
+Lesson: `[P]` Define the week-one rule if configurable starts affect week
+numbering. A pair such as `dow` and `doy` can express that policy.
+The fields do not have to change together (K4).
+Ticket 21 keeps ISO filename weeks stable under general week settings.
+`[H]` Fixed ISO is the smaller alternative. Avoid an implicit device-locale
+read, which can change labels without a config change.
 
 ## Q9 to Q12: Parsing stack
 
@@ -270,19 +305,22 @@ Evidence, shared:
   extractor fingerprint hashes resolved versions of `jiff` and `speedate`; ticket 25's list omits
   `winnow`. `[V ticket]`
 
-Product behavior: single-parser-crate designs dominate the read set. IWE shows that hand-rolled
-scanners need their own adversarial tests. zk shows that layered capabilities (format, NL, named
-styles) can come from separate small crates.
+Product behavior: IWE combines chrono with hand-written scanners.
+Its scanner tests supply an adversarial-test precedent, not complete
+Unicode safety. zk uses separate formatting and natural-date libraries.
 
-Lesson: `[P]` Crate decisions are coupling decisions, not style decisions. Removing `speedate`
-changes the fingerprint epoch behavior of ticket 25. Removing `winnow` moves duration-prefix
-locating into other code and requires the ticket 25 list fix. Keeping `logos` serves five
-call-site clusters. `[A]` No digest measures any of these crates. The prep must run the
-ticket 25 cross-check before any removal, and the grilling needs a measurement or an explicit
-acceptance of the rebuild cost.
+Lesson: `[P]` Evaluate parser coupling and persisted producers.
+Removing `speedate` changes ticket 25's extractor fingerprint.
+Removing direct `winnow` use needs a producer-list update.
+Keeping that use needs correction of the current omission.
+Keeping `logos` serves the listed lexer consumers.
 
-Critic note: the digest set has no speedate or winnow user. Absence of precedent is weak evidence
-for removal. Say so in the grilling.
+`[A]` The digest excerpts contain no crate measurements. Use the separate
+crate evidence for probe results. Do not treat a probe binary delta as
+a repository measurement or acceptance of rebuild cost.
+
+Critic note: the inspected excerpts contain no speedate or winnow user.
+That absence is weak evidence for removal. State this limit in the grilling.
 
 ## Q13 to Q18: Natural-language dates
 
@@ -300,52 +338,68 @@ Evidence:
   `sow|start-of-week`, `eow|end-of-week`, `som`, `eom`, `soy`, `eoy` (src `:7643-7666`). The
   parser picks `dateShorthand` or the ISO ladder, longest key first (`:7907-7912`,
   `:7950-7954`). `[V]`
-- Ticket 19 proposes a closed English grammar: keywords, weekdays, offsets such as `in 2 weeks`.
-  `[V ticket]`
+- Ticket 19 leaves natural-language dates as a hook. Its closed English
+  grammar is a proposal, not an adopted grammar (L11). `[V ticket]`
 
-Product behavior: both shapes exist in production. The closed list gives determinism and
-testability. The open grammar gives coverage and pays with ambiguity, locale switches, and
-heuristic weekday inference.
+Product behavior: Dataview uses a closed shorthand list.
+That list still reads an ambient clock. nldates uses a broader grammar
+with locale settings and weekday inference. A closed list alone does
+not prove determinism (K17 in `k-citation-verification.md`).
 
-Lesson: `[P]` The closed list is the Dataview precedent and matches ticket 19. The nldates
-inventory is the requirements list for the closed grammar: relative keywords, weekday names,
-offset phrases, period phrases (`this|next|last X`), and edge words (`end of`, `mid`) only if
-the owner uses them. `[H]` The owner's templates and suggesters show no `Christmas`-style words;
-keep the grammar closed.
+Lesson: `[P]` Keep the hook-only alternative. If the human adopts a grammar,
+consider a closed list with pinned inputs. Decide coverage separately
+from implementation ownership.
+The nldates examples supply candidate phrases, not mandatory scope.
+`[H]` The inspected owner templates show no `Christmas`-style words.
+That absence supports a smaller proposal, not a universal user requirement.
 
 ### Q14: Build in the repository or use a crate?
 
 Evidence:
 
-- zk embeds `naturaldate`. The helper's default branch logs an error and returns a zero
-  `time.Time` (`date.go:2233-2251`); whether every parse-error path returns that zero value is
-  unverified. A silent zero date is the worst error shape in the read set. `[V]`
+- zk's helper logs parsing errors and returns the utility's returned time.
+  Its default branch returns an initialized zero `time.Time`.
+  The inspected helper does not establish every utility error return
+  (`date.go:2233-2251`; K19). `[V]`
 - zk hard-exits the process when a renamed helper is used with the old spelling
   (`date.go:2243-2246`, `os.Exit(1)`). `[V]`
 - nldates logs `"Invalid date"` at debug level and continues (`main.ts:414-426`). `[V]`
 - Dataview's `date()` returns `null` on a bad string and throws on a bad format argument
   (`:6865-6909`). `[V]`
-- Ticket 30 prep facts: `fuzzydate` 0.4.1 (MIT, ~2.6k lines, 14 releases, chrono dep with
-  `clock`), `jiff-english` 0.0.1 (MIT, ~1.3k lines, one release, 29 downloads, `jiff ^0.2`
-  default features + `scanlex`). Traces sets `default-features = false` for jiff. `[V ticket]`
-- Runtime probe (`probes/candidates`; `m-gap-closure.md`): both candidates return points only,
-  never periods. `jiff-english` rejects `next week`; `fuzzydate` returns a +7-day point.
-  `last friday` diverges between them. Neither accepts `eom` or `in 2 weeks`. Both parse in
-  under a microsecond. `[V]`
+- Ticket 30 records `fuzzydate` 0.4.1 and `jiff-english` 0.0.1 as candidates.
+  The historical fuzzydate snapshot reports MIT, ~2.6k lines, 14 releases,
+  and a chrono `clock` dependency.
+  The English snapshot reports MIT, ~1.3k lines, one release, 29 downloads,
+  `jiff ^0.2` defaults, and `scanlex`.
+  These counts do not establish maintenance quality.
+  Traces disables Jiff defaults. The probe enables them through English
+  dependency unification (`d-crate-evidence.md`). `[V ticket, probe]`
+- The recorded candidate matrix returns points, not periods.
+  `jiff-english` rejects `next week`. `fuzzydate` returns a +7-day point.
+  `last friday` differs between the candidates.
+  Neither accepts `eom` or `in 2 weeks`.
+  Indicative timings are below a microsecond for the measured phrases.
+  These results are not controlled or production benchmarks
+  (`probes/candidates`; `m-gap-closure.md`). `[V]`
 - `.scratch/temporal-core/design-nl-dates.md` proposes an in-house parser; ticket 30 records four
   conflicts with decided rules. `[V ticket]`
 
-Product behavior: error reporting, not parsing power, separates the integrations. zk shows a
-silent zero; nldates logs at debug level and continues. Dataview's typed `null` plus a
-thrown error for a bad format is the closest to a usable contract. The read set shows these
-shapes; it does not prove that every integration has one.
+Product behavior: zk's inspected default branch returns a zero time.
+nldates logs at debug level and continues. Dataview returns typed `null`
+for failed string parsing and can throw for custom-format parsing.
+These are specific error paths, not a complete integration inventory.
 
-Lesson: `[P]` The grilling needs the ticket's prep first. The digest evidence adds the error
-contract requirement. That contract is: a span-carrying error, no zero-date fallback, no process
-exit, no debug-log silence. `[H]` The in-house default stands unless a crate meets that contract and the coverage
-list. The runtime probe settles the coverage half: neither crate yields periods, and
-`jiff-english` rejects `next week` outright (`m-gap-closure.md`). The crate evidence in the
-ticket is thin (one release, 29 downloads) and cannot carry the decision alone.
+Lesson: `[P]` Compare crate behavior with the chosen grammar and error
+contract. The proposed contract needs span-carrying errors.
+It permits no zero-date fallback, process exit, or debug-only silence.
+`[H]` Prefer an in-repository grammar unless a candidate meets that
+contract. Keep deferral valid because the grammar itself is not adopted.
+
+The bounded matrix establishes specific coverage gaps.
+Neither candidate returns periods, and `jiff-english` rejects `next week`.
+The matrix does not settle complete coverage, all runtime behavior,
+or maintenance quality. Release and download counts alone cannot decide
+adoption.
 
 ### Q15: Meaning of a bare weekday
 
@@ -360,15 +414,16 @@ Evidence:
 - Dataview has no bare weekday spelling; `date(sow)` and friends are the only week words. `[V]`
 - Traces fact: `date.weekday(n)` selects ISO weekday `n` of the current week `[V ticket]`.
 
-Product behavior: "which Monday" has three ecosystem answers: locale-indexed (Templater),
-parser-flagged forward or backward (nldates/chrono), or index-into-current-week (Traces today,
-ISO). None of the read tools answers "next vs nearest" as a stated rule; chrono hides the choice
-in a flag.
+Product behavior: the examples implement different operations.
+Templater indexes a locale week. nldates controls forward selection with
+a parser flag. Traces indexes the current ISO week.
+These APIs do not decide one bare-weekday rule for Traces.
 
-Lesson: `[P]` A closed grammar cannot carry a hidden flag. State the rule: the ticket asks next,
-nearest, or current-week day. `[H]` Pin the rule to the frame's week rule (current-week day).
-That is deterministic and matches the existing template filter. `next` and `last` prefixes give
-the other two meanings. Caveat: owner preference is unknown; ask in the grilling.
+Lesson: `[P]` State the bare-weekday rule explicitly if the human adopts
+weekday phrases. Next, nearest, and current-week remain choices.
+`[H]` Current-week selection can use the pinned week rule and match the
+existing template filter. Define `next` and `last` separately.
+The owner's preference remains unknown. Ask during the grilling.
 
 ### Q16: Interval precision of `next week`
 
@@ -391,10 +446,10 @@ Evidence:
 Product behavior: three shapes exist: span value (Tasks), two point spellings (Dataview), and
 flag-driven point (chrono). Tasks' start-plus-end shape pays an end-adjustment tax on arithmetic.
 
-Lesson: `[P]` Start-plus-unit (ticket 21) derives bounds on demand and avoids Tasks'
-end-adjustment complexity. The exclusive upper bound needs one documented derivation rule per
-unit; the Fileclass display precedent (store the canonical value, derive the reading) supports
-that split.
+Lesson: `[P]` Derive bounds from normalized start plus unit, as ticket 21
+accepts. Document the exclusive upper-bound derivation for each unit.
+Fileclass's separate stored-value and display paths are an analogy,
+not a proof of period arithmetic.
 
 ### Q17: Filter spelling of relative keywords
 
@@ -414,18 +469,19 @@ Product behavior: call syntax (`date(today)`) is the established spelling that a
 field-name collision. Ticket 29 already uses `eom` as a relative keyword in one place while the
 grammar defines it as a function; ticket 30 lists that discrepancy.
 
-Lesson: `[P]` Keep one spelling: keywords as function arguments, exactly as today. The
-supersession note in ticket 29 then resolves by deletion, not by a second rule. `[H]` A bare
-keyword would need a reserved-word list. It would also need a migration of any field named
-`today` or `eom`. Nothing in the evidence needs that cost.
+Lesson: `[P]` Consider relative words as `date(...)` arguments.
+This Dataview precedent is not the existing Traces relative-date grammar.
+Traces currently has no such relative keyword.
+Bare keywords need an explicit field-name collision rule and migration.
+Keep this spelling proposal separate from adopting a grammar.
 
 ### Q18: Frontend spelling of `member_of`
 
 Evidence:
 
-- `[A]` No read digest has a membership operator or spelling. Dataview's emoji shorthands on
-  tasks (`📅`) mark a date field membership on a task (docs `:1599-1640`), which is storage
-  syntax, not a query operator. `[V]`
+- `[A]` The excerpts show no directly equivalent membership syntax.
+  Dataview's task shorthand `📅` marks a date field
+  (docs `:1599-1640`). It is storage syntax, not a query operator. `[V]`
 - Fileclass's recorded failure is adjacent: a Bases `contains` filter on a link-stored scalar
   silently drops the note from the view (an upstream code comment records it; this task did not
   measure it). Plain scalar values still work like lists for several comparison operators. The
@@ -435,16 +491,19 @@ Evidence:
 Product behavior: no precedent. The nearest lesson is negative: silent membership mismatches hide
 rows.
 
-Lesson: `[P]` The grilling can pick the spelling freely. It needs a paired notice rule, so a
-scalar-versus-list mismatch is visible. This answers the Fileclass failure and ticket 34.
+Lesson: `[P]` Keep the hook-only and IR-reservation alternatives.
+If the human adopts a frontend spelling, define its relation first.
+Consider a notice for the specific link-scalar mismatch.
+Do not infer a general scalar-versus-list rule from that upstream comment.
 
-Grammar ambiguities worth recording, all `[V]`:
+Source patterns and proposed grammar implications:
 
-- `date(` parsing: Dataview requires the call form; a bare `today` stays a field. Traces shares
-  this ambiguity and today resolves it the same way.
-- Longest-match ordering: Dataview sorts shorthand keys and duration units longest-first, because
-  `sow` must beat `so`-prefixes and `minutes` must beat `m`. Any closed Traces grammar needs the
-  same deterministic order rule.
+- Dataview treats bare `today` as a field outside its `date(...)` syntax.
+  Traces also parses a bare word as a field path. `[V]`
+- Dataview sorts shorthand keys and duration units longest-first.
+  An adopted Traces grammar needs an explicit overlap rule.
+  These examples do not prove that every grammar must use the same
+  implementation. `[V, P]`
 - Dataview's `date(link)` display-first branch is an ambiguity by design; see Q25.
 
 ## Q19 to Q25: Value shapes
@@ -463,14 +522,17 @@ Evidence:
 - Traces facts: `DateValue` 4 bytes, `DateTimeValue` 16 bytes, `DurationValue` 72 bytes,
   `NoteFieldValue` capped at 80 bytes; a new civil variant must keep the cap. `[V ticket]`
 
-Product behavior: no read tool separates civil from instant values. The day-normalization hack
-is the documented failure class that a civil variant removes: equality silently breaks when two
-machines disagree on the zone.
+Product behavior: the inspected Tasks and Dataview paths do not separate
+civil datetimes from instants. Tasks' midnight-normalization comment
+exposes a portability risk. It does not document a measured cross-machine
+equality failure (K6).
 
-Lesson: `[P]` The civil/instant split is Traces-native; the digests supply the failure story, not
-a design. `[H]` An inner-enum `DatePoint` keeps `NoteFieldValue` inside 80 bytes. The reason: the
-largest payload today is 72 bytes. An outer variant adds a discriminant plus the same payload.
-Both shapes fit. The grilling decides on the 80-byte proof.
+Lesson: `[P]` Preserve the accepted Traces civil/instant distinction.
+The digest examples show risks, not a representation proof.
+The later default-test-profile mirror measures 80 bytes.
+It substitutes a boolean for `LinkType` and a tuple for `DurationValue`.
+It does not measure the actual proposed product types
+(`m-gap-closure.md`). The human still chooses the representation.
 
 ### Q20: Where does `CalendarPeriod` sit in the value model?
 
@@ -489,10 +551,15 @@ Evidence:
 Product behavior: span values exist in one tool, as endpoint pairs. The canonical-store,
 derived-display pattern exists for durations.
 
-Lesson: `[P]` A `CalendarPeriod` variant with start plus unit follows the canonical-store
-pattern and ticket 21. `[H]` A start-plus-end variant would import Tasks' end-adjustment
-complexity into every shift. The 80-byte cap accepts either; unit is smaller than a second
-endpoint.
+Lesson: `[P]` Represent each period with normalized start plus unit,
+as ticket 21 accepts. Complete the one-runtime-value model from ticket 18.
+A separate query runtime carrier needs an explicit amendment (L4).
+The absence of period syntax in note fields does not justify another
+runtime carrier.
+
+`[H]` Endpoint pairs would add Tasks' end-adjustment work.
+The start-plus-unit mirror fits the 80-byte limit.
+That mirror does not prove the actual product layout.
 
 ### Q21: Date versus instant at an ambiguous or absent local midnight
 
@@ -506,77 +573,93 @@ Evidence:
   invalidate the real day before it; period-versus-instant tests the civil date of the instant
   in the pinned zone and never tests midnight existence. `[V ticket]`
 
-Product behavior: the ecosystem sidesteps; none solves.
+Product behavior: these excerpts do not establish an ordinary
+Date-versus-instant gap/fold comparison rule.
 
-Lesson: `[P]` Keep the ticket 21 rule separate from membership, as the ticket orders. The
-Fileclass floating-UTC pattern is the rejected analogy: it hides the zone question and mislabels
-civil values as UTC. State that rejection with the failure scenario: a floating-UTC date
-arithmetic across a DST boundary disagrees with every civil calendar view.
+Lesson: `[P]` Keep ordinary field comparison separate from period
+membership. Ticket 21 already fixes membership through the instant's
+civil date in the pinned zone.
+Fileclass's UTC arithmetic does not answer the ordinary comparison
+question. A calendar-day shift across DST can differ from a fixed
+24-hour shift. Do not claim that every civil operation differs.
 
 ### Q22: Total sort key for mixed temporal values
 
 Evidence:
 
-- Dataview's `compareValue` defines a total order across its types: type names sort by
-  `localeCompare`, dates compare by epoch, and duration comparison uses a fixed conversion
-  matrix (months as 30 days, years as 365 days) after `shiftToAll().normalize()`. Its `equals`
-  for dates and durations checks Luxon unit fields plus locale, not only milliseconds. It has
-  no period type (`src`, comparison and binaryop modules). `[V]`
-- `[A]` No read tool has period values, so no total order covers a period kind. Dataview's
-  order covers its own types only.
+- Dataview's `compareValue` orders types by `localeCompare`.
+  Dates compare by epoch. Durations use a fixed conversion matrix after
+  `shiftToAll().normalize()`. The matrix assigns 30 days per month and
+  365 days per year. Luxon equality also considers fields and metadata.
+  These reads do not prove comparator laws for every equal numeric value
+  (`src`, comparison and binaryop modules; K9). `[V]`
+- `[A]` The excerpts supply no normalized start-plus-unit period sort key.
+  Tasks' endpoint ranges are not that representation.
 - Ticket 29 section 3 fixes the group class order as Civil, Instant, Period; the owner
   confirmed it (B65/C3). This ticket keeps the mixed temporal value sort key and the period
   unit tie-break. `[V ticket]`
 
-Product behavior: Dataview sorts across its types; no tool covers a period kind.
+Product behavior: Dataview compares its own types.
+Its comparator supplies no Traces period-order proof.
 
-Lesson: `[P]` The group class order is accepted (B65/C3). The grilling keeps the mixed
-temporal value sort key and the period unit tie-break; a class-rank proposal must respect the
-accepted group order. The Dataview `compareValue` structure supports the shape: compare
-within a class, tie-break across classes by a fixed rank, and inside periods tie-break by
-unit. Its fixed duration matrix is one precedent for a stated conversion rule.
+Lesson: `[P]` Preserve the accepted Civil, Instant, Period group order
+(B65/C3). Define the complete value-sort key and period unit tie-break.
+State how that key relates to group keys.
+Do not infer its laws from Dataview's comparator (K9; L6).
 
 ### Q23: Nominal duration equality and order
 
 Evidence:
 
-- Fileclass restricts durations to the RFC 5545 `dur-value` subset: a week count alone, or
-  days plus a time part. RFC 5545 itself excludes years and months there; weeks and days are
-  still nominal units. Fileclass computes total milliseconds, so equality is millisecond
-  equality (`duration.ts:3499-3688`). `[V]`
-- Dataview's duration units include years, months, and weeks (`DURATION_TYPES`, src
-  `:7602-7640`; changelog `dur(2yr8mo12d)`). Its comparator does not read Luxon's raw
-  milliseconds. It converts with a fixed matrix (months 30 days, years 365 days) after
-  normalization, and `equals` compares shifted unit fields plus locale. The comparison is
-  deterministic but conversion-defined. `[V]`
+- Fileclass excludes year and month designators.
+  Its input regex permits weeks mixed with days and time.
+  It captures a sign that `parseDuration` does not apply.
+  `buildDuration` folds mixed weeks into days.
+  `durationMs` uses `86_400_000` milliseconds per day.
+  These are source findings, not executed examples
+  (`duration.ts:3499-3688`; K8). `[V]`
+- RFC 5545 instead permits weeks alone, or days and time, or time alone.
+  It calls weeks and days nominal durations.
+  It excludes years and months (K7). `[V]`
+- Dataview includes years, months, and weeks in `DURATION_TYPES`
+  (src `:7602-7640`; changelog `dur(2yr8mo12d)`).
+  Its comparator uses a fixed matrix after normalization.
+  It assigns 30 days per month and 365 days per year.
+  Equality also considers shifted unit fields and locale.
+  This is a conversion convention, not proof of calendar equivalence
+  (K9). `[V]`
 - Ticket 19 keeps nominal equality and order provisionally and asks whether to refine. `[V
   ticket]`
 
-Product behavior: excluding years and months makes equality trivial (Fileclass). Allowing them
-buys a comparison convention that must be stated (Dataview fixes months at 30 days and years
-at 365 days).
+Product behavior: Fileclass uses fixed-day milliseconds.
+Dataview uses a fixed conversion matrix for more units.
+Neither conversion follows from excluding years and months.
+The RFC still treats weeks and days as nominal units.
 
-Lesson: `[P]` The provisional rule stands unless the owner needs month-based durations.
-`[H]` The read set gives two refinements: exclude years and months from stored durations
-(Fileclass), or fix a conversion matrix and state it. Dataview uses months of 30 days and
-years of 365 days. Define nominal equality exactly at the unit level. The grilling decides
-with the owner's real data.
+Lesson: `[P]` Compare retaining ticket 19's nominal-seconds rule with
+an explicit refinement. Excluding years and months is a separate scope
+choice. It does not make calendar-day equality trivial.
+Define unit conversion, equality, order, and arithmetic separately.
+Do not adopt Fileclass's permissive input grammar or ignored sign as
+an RFC requirement.
 
 ### Q24: How documents describe calendar arithmetic
 
 Evidence:
 
-- Tasks documents its own limit in code: the month-shift end adjustment and the untested
-  week-range case (`DateRange.ts:5108-5140`). `[V]`
-- Dataview docs teach arithmetic by example: `date + duration`,
-  `this.release-date - date(now)`, and duration render rules (docs `:1842-1858`). `[V]`
-- IWE documents its specifier set in a "Date format patterns" table (digest `:9888-9890`). `[V]`
+- Tasks records month-shift end adjustment and an untested week-range case
+  (`DateRange.ts:5108-5140`). `[V]`
+- Dataview teaches arithmetic with `date + duration`,
+  `this.release-date - date(now)`, and rendering examples
+  (docs `:1842-1858`). `[V]`
+- IWE gives a "Date format patterns" table (digest `:9888-9890`). `[V]`
 
-Product behavior: honest limits in code comments; example-led docs; explicit specifier tables.
+Product behavior: these sources use examples, tables, and explicit limits.
 
-Lesson: `[P]` Document the arithmetic as three lists: exact rules (civil add), rule-with-caveat
-(nominal add, DST), and undefined cases (skipped days). Ticket 34 carries the caveat notices.
-The Tasks comment is the tone model for the undefined cases.
+Lesson: `[P]` Separate accepted rules, operation-specific caveats, and
+unresolved cases. Skipped-day period membership already has an accepted
+rule. Do not label every skipped-day operation undefined.
+Ticket 34 owns any adopted caveat-notice mechanism.
 
 ### Q25: How `date(link)` reads a Markdown link target
 
@@ -586,17 +669,20 @@ Evidence:
   `:6872-6890`). A user-chosen alias can therefore produce the date. `[V]`
 - Fileclass expands patterns inside link paths and keeps literal text literal
   (`expandLinkPath`, `dateFormatCheck.ts` area `:3180-3318`). `[V]`
-- Ticket 19 decides: read the last segment of the target only, accept a pattern argument for
-  non-ISO titles, keep the extension, allow percent-encoding, exclude external URLs. This ticket
-  fixes that pattern's dialect. `[V ticket]`
+- Ticket 19 accepts last-segment target extraction and a pattern argument.
+  Its later Markdown-link handoff leaves percent decoding and extension
+  normalization open (`19:299-313`; L, remaining human choices).
+  External URLs are not note targets. This ticket chooses the pattern
+  dialect. `[V ticket]`
 
 Product behavior: display-first is the documented hazard. Path-token expansion is the precedent
 for pattern-in-target.
 
-Lesson: `[P]` The last-segment rule removes the display hazard by construction. `[H]` The
-pattern argument should be the same dialect as `date(text, pattern)` (Q3) so one dialect serves
-both. `[A]` No digest covers percent-encoded targets; the prep needs one test with an encoded
-target before the grilling.
+Lesson: `[P]` Keep target extraction independent of display text.
+Consider the same pattern dialect as `date(text, pattern)` (Q3).
+The digests supply no percent-decoding runtime evidence.
+RFC component separation and the later handoff keep encoded separators
+as a separate decision (K22; L).
 
 ## Q26 to Q32: Configuration and zone
 
@@ -611,9 +697,10 @@ Evidence:
 
 Product behavior: strict tables with name-listing errors are the IWE precedent.
 
-Lesson: `[P]` Fix the field set exactly (Q27), validate at parse, and let the unknown-field error
-carry the expected names. The IWE typo in its own error message (`refs_extention`) shows that
-these errors get read and that their text matters.
+Lesson: `[P]` Define the exact field set (Q27).
+Check each field at the chosen validation stage.
+Let unknown-field errors list the expected names.
+The IWE typo `refs_extention` shows why diagnostic text needs care.
 
 ### Q27: Fields of config-owned `DateConfig`
 
@@ -629,9 +716,10 @@ Evidence:
 Product behavior: format pairs (date and datetime), week rule, locale, and NL toggles are the
 field vocabulary across tools.
 
-Lesson: `[P]` The field list follows the hand-off. Each field needs a default and a validation
-rule at parse time (Q26). `[H]` Keep format fields as one dialect (Q3) with per-surface
-defaults, mirroring IWE's key-versus-content split only if Traces has two real surfaces.
+Lesson: `[P]` Give each adopted field a default and a validation rule.
+Choose spelling checks separately from runtime acquisition.
+`[H]` Use one format dialect with per-surface defaults only where a named
+consumer needs a different format.
 
 ### Q28: Temporal-owned policy without importing config
 
@@ -639,37 +727,46 @@ Evidence:
 
 - IWE parses config into a `Configuration` and engines consume accessors (`format_options()`),
   so the config crate keeps the TOML knowledge (`:13744-13873`, `:65575`). `[V]`
-- Traces fact: the edge `config -> temporal` already exists; ticket 30 keeps it. `[V ticket]`
+- Traces already has a `config -> temporal` edge.
+  Retaining that direction is a ticket 30 proposal, not a new accepted
+  decision. `[V ticket]`
 
 Product behavior: parse in config, consume as plain values.
 
-Lesson: `[P]` Temporal receives a plain `DateConfig`-shaped policy value. No new edge, no
-temporal-to-config import. This ratifies the ticket 22 direction with IWE as the precedent.
+Lesson: `[P]` Pass plain policy values from config into temporal.
+Keep TOML parsing in config. Do not make temporal import config.
+The existing edge and IWE accessors support that direction.
 
 ### Q29: Configured zone syntax and validation
 
 Evidence:
 
-- `[A]` No read tool configures a zone in config. Dataview accepts zones inside value literals:
-  `Z`, offsets `+02`, `+0200`, `+02:00`, and `[Area/City]` names in its literal grammar (src
-  `:7928-7945`). `[V]`
-- IWE's locale-string normalization (strip `.UTF-8`, `@euro`, map `de-DE` to `de_DE`; an
-  invalid configured locale falls directly to `POSIX`, and the system locale enters only when
-  nothing is configured) is the nearest validation pattern (`locale.rs:54931-54990`). `[V]`
+- `[A]` The inspected excerpts show value-literal zones, not a zone config
+  policy. Dataview's bracket-zone regex is `[0-9A-Za-z+-\/]+`.
+  It excludes underscores, including `America/New_York`.
+  The offset branch accepts one or two hour digits and optional
+  colon-minute digits. It does not establish `+0200` support.
+  Sources: src `:7928-7945`; K14. `[V]`
+- IWE normalizes locale strings. It removes `.UTF-8` and `@euro`.
+  It maps `de-DE` to `de_DE`. An invalid configured locale selects
+  `POSIX`. Only an absent configured locale permits a system-locale read
+  (`locale.rs:54931-54990`). `[V]`
 
-Product behavior: zone syntax lives in values; config-level zone is new ground. Locale-string
-normalization is the proven validation pattern.
+Product behavior: Dataview supplies limited value-zone syntax.
+IWE supplies a locale-normalization example, not a zone-validation proof.
 
-Lesson: `[P]` Accept IANA names plus fixed offsets. Validate at parse. The parse error names the
-accepted forms. Reuse the normalization discipline from IWE. `[A]` No digest evidence constrains
-the exact accepted set; the grilling decides it.
+Lesson: `[P]` Consider IANA names and fixed offsets.
+Choose accepted spellings and validation timing separately.
+Keep spelling checks distinct from runtime zone acquisition.
+Preserve lazy resolution for civil-only work (L9).
+No digest excerpt decides the exact accepted zone set.
 
 ### Q30: Host system zone and failure reporting
 
 Evidence:
 
-- `[A]` No read tool reports a zone-acquisition failure. Every plugin runs inside the host app
-  with full ICU data.
+- `[A]` The inspected excerpts show no zone-acquisition error contract.
+  They do not prove that every host has complete ICU data.
 - Anti-precedents for platform reads: `obsidian-rs` chains `unwrap()` on file
   `metadata().created()` (`rust_adamisrael-obsidian-rs-digest.txt:509-523`); basalt stores an
   optional timestamp with a silent `0` fallback (commit note in
@@ -687,18 +784,21 @@ Ticket 34 needs the error variant from this ticket.
 Evidence: see Q8. The same evidence splits: nldates configurable, Tasks fixed ISO, Dataview
 Luxon-default (ISO unless `useLocaleWeeks` is set), Moment paired rules. `[V]`
 
-Lesson: `[P]` If configurable, the config needs the week-one companion (Q8). The functions
-`sow`/`eom`/`eoy` and template `date.weekday` must read the same rule from the frame. Otherwise
-the nldates-versus-Tasks inconsistency reappears inside one product.
+Lesson: `[P]` State which operations use a configurable week rule.
+Week numbering needs a week-one rule. `eom` and `eoy` are month/year
+operations, not week-start consumers.
+Preserve accepted ISO filename prefixes independently of general settings
+(L10). Do not infer a numbering policy from a display-week start alone.
 
 ### Q32: Opt-in key for bare-year filename prefixes
 
 Evidence:
 
 - `[A]` No read tool parses year-only filename prefixes.
-- Nearest analogs: Dataview's value ladder accepts `YYYY` and `YYYY-MM` as values (docs
-  `:1788`); Traces' `scan_date_prefix` accepts `YYYY-MM-DD` and `YYYY-MM` and never an instant;
-  ticket 21 adds quarters and an opt-in bare year. `[V]`
+- The inspected Dataview literal ladder starts at `YYYY-MM`, not `YYYY`
+  (docs `:1788`; K15). Traces' `scan_date_prefix` accepts `YYYY-MM-DD`
+  and `YYYY-MM`, never an instant.
+  Ticket 21 adds filename quarters and an opt-in bare year. `[V]`
 
 Product behavior: absent.
 
@@ -714,20 +814,26 @@ unknown). `[H]` A boolean key is enough. The parser change is the real content. 
 
 Evidence, shared:
 
-- Every read tool anchors relative words to parse-time ambient state: Dataview's shorthand table
-  calls `DateTime.local()` during parse (src `:7950-7954`); nldates uses `window.moment()` and
-  the runtime locale; Tasks uses `window.moment()` in `DateParser`. `[V]`
-- No read tool has an injected clock or zone. `[A]`
-- Ticket 21 decides: one frame per query, render, or request pins clock and week rule; the frame
-  acquires the zone lazily and memoizes failures; ambient `local_zone()`, `now_instant()`, and
-  `ZoneGuard` leaves. `[V ticket]`
+- The inspected Dataview shorthand table calls `DateTime.local()` during
+  parsing (src `:7950-7954`). nldates uses `window.moment()` and runtime
+  locale data. Tasks uses `window.moment()` in `DateParser`. `[V]`
+- These paths show ambient inputs. They do not prove absence of injection
+  APIs throughout the complete upstream projects.
+- Ticket 21 accepts one frame per query, render, or request.
+  The frame pins the clock and week rule. It acquires a required zone
+  lazily and retains success or failure.
+  Remove `local_zone()`, `now_instant()`, and `ZoneGuard` after injection
+  replaces their uses. `[V ticket]`
 
-Product behavior: ambient parse-time anchoring everywhere; the bug class is stale or
-device-dependent results on replay.
+Product behavior: the named relative-date paths read ambient inputs.
+Those inputs create replay and cross-device risks.
+The excerpts do not measure failures in every tool.
 
-Lesson: `[P]` The frame exports exactly what the closed grammar and helpers read. That is:
-`today` (civil, in the pinned zone), the week rule, and the zone handle. `Anchor` wrappers (Q6)
-take the frame. This is Traces-native; the digests supply the failure story only.
+Lesson: `[P]` Export the inputs that operations need.
+Keep one clock sample, the week rule, and a lazy zone resolver.
+Derive `today` only when an operation needs the selected zone.
+Pass the frame through anchor wrappers (Q6).
+Do not force zone acquisition for civil-only operations.
 
 ### Q35: Temporal probe bounds per operator and value kind
 
@@ -757,12 +863,14 @@ Evidence:
 - Dataview yields `null` for unparseable `date()` input with no notice (`:6865-6909`). `[V]`
 - Ticket 34 owns the mechanism; ticket 29 did not adopt the first-round notice. `[V ticket]`
 
-Product behavior: the norm is silence.
+Product behavior: the named date-error paths often provide no user notice.
+That sample does not establish a universal silence rule.
 
-Lesson: `[P]` Silence is the rejected analogy with a recorded cost (invisible rows). `Notice`
-on: an unparseable date-shaped literal that filters a row out, and a scalar-versus-list
-membership mismatch. `[H]` A plain absent field is not a notice case, or every vault gets noisy.
-The grilling draws that line with ticket 34.
+Lesson: `[P]` Define the notice condition with ticket 34.
+Consider malformed date-shaped input and the specific link-scalar
+membership failure. Do not infer notices for every absent date.
+Memoized resolution failure does not guarantee one emitted notice.
+Delivery and deduplication remain ticket 34 concerns.
 
 ## Analogies that do not transfer
 
@@ -775,15 +883,15 @@ Each entry states the failure that disqualifies it as a Traces pattern.
 - Dataview's display-first `date(link)` cascade: an alias decides the value. `[V]`
 - Tasks' mutable start-plus-end range with end re-derivation on shift: arithmetic must patch two
   endpoints per unit, and its own comment admits untested combinations. `[V]`
-- Fileclass's RFC 5545 duration subset: forbidding months and years is clean for stored values
-  but does not cover nominal arithmetic that ticket 19 keeps provisionally. `[V]`
+- Fileclass's duration parser: ignored signs and mixed-week input are not
+  a safe RFC 5545 validation model (K8). `[V]`
 - Metadata Menu's raw moment format over whole link paths: literal text mangles (`Daily` ->
   day-of-month). Token expansion must be explicit. `[V]`
 - `obsidian-rs` unwrap chains and basalt's `0` sentinel: platform reads need typed failures,
   not crashes or silent zeros. `[V]`
-- Locale-following week tokens as a single rule: Moment must expose two rule sets because one
-  set cannot serve both conventions; a deterministic store cannot follow a device locale. `[V
-  web]`
+- Implicit locale week policy: device locale can change week labels.
+  A fixed explicit locale or week rule removes that ambient dependence.
+  The inspected Moment APIs support both week families. `[V web]`
 
 ## Question-to-evidence map
 
@@ -796,36 +904,37 @@ Each entry states the failure that disqualifies it as a Traces pattern.
 | 5 | Ticket 22 unread-config facts; IWE shape; obsidian-export | Join `[date]` or remove; needs owner use case `[P]` |
 | 6 | Templater weekday/offset; Dataview edges; Traces calendar.rs | Shared arithmetic in temporal; anchors per surface `[P]` |
 | 7 | Traces derive_day; Metadata Menu path patterns; zk stamps | Temporal-owned filename parser, period yield `[P]` |
-| 8 | Moment dow/doy; Tasks isoWeek; nldates locale read | Week start pairs with week-one rule `[P]` |
+| 8 | Moment dow/doy; Tasks ISO; nldates locale read | Specify numbering policy; general settings do not reinterpret ISO prefixes `[P]` |
 | 9-12 | IWE chrono; zk layered crates; ticket fingerprint facts | Decide by coupling and fingerprint cost, not style `[P]` |
-| 13 | nldates chrono patches; Dataview closed shorthands | Closed list matches ticket 19 `[P]` |
-| 14 | zk naturaldate failures; candidate probes (points only, `next week` gaps); design-nl-dates conflicts | In-house grammar; probes settle the coverage half `[P]` |
-| 15 | Templater locale rule; chrono forwardDate; Traces ISO weekday | Pin to frame week rule; state the rule `[P]` |
-| 16 | Tasks DateRange; Dataview sow/eow; nldates chrono points | Start-plus-unit period; exclusive upper bound `[P]` |
-| 17 | Traces grammar facts; Dataview identifiers and keywords | Keywords as call arguments only `[P]` |
-| 18 | Absence; Fileclass silent-drop failure | Spelling free; pair with notice rule `[P]` |
-| 19 | Tasks startOf-day comment; Dataview single type; byte facts | Civil variant fits 80 bytes; prove shape `[P]` |
-| 20 | Tasks DateRange; Fileclass canonical-store pattern | Start-plus-unit variant `[P]` |
-| 21 | Absence; Fileclass floating-UTC; ticket 21 Apia facts | Keep separate from membership; reject floating `[P]` |
-| 22 | Dataview `compareValue` total order; ticket 29 accepted class order | Sort key plus unit tie-break; rank respects group order `[P]` |
-| 23 | Fileclass dur-value subset; Dataview nominal units with fixed matrix | Provisional rule stands; refine or forbid `[P]` |
+| 13 | nldates patches; Dataview ambient closed shorthands; ticket 19 hook | Closed list is a proposal; hook-only remains valid `[P]` |
+| 14 | Candidate matrix; source APIs; recorded error shapes | Compare contract and coverage; bounded probes do not settle adoption `[P]` |
+| 15 | Locale indexing; forward flag; current-week filter | Choose bare weekday semantics explicitly `[P]` |
+| 16 | Tasks ranges; Dataview points; ticket 21 | Normalize periods if phrases are adopted `[P]` |
+| 17 | Traces field paths; Dataview date arguments | Consider date arguments; grammar adoption remains open `[P]` |
+| 18 | IR reservation; specific link-scalar failure | Define relation before syntax; reservation-only remains valid `[P]` |
+| 19 | Tasks midnight comment; Dataview type; limited layout mirror | Preserve civil behavior; choose and measure actual representation `[P]` |
+| 20 | Ticket 18 runtime owner; ticket 21 normalized period | Complete one runtime carrier; keep parser acceptance separate `[P]` |
+| 21 | Ticket 21 membership; ordinary field comparison gap | Decide ordinary gap/fold rule separately `[P]` |
+| 22 | Dataview comparator limits; ticket 29 group order | Define full value-sort key and unit tie-break `[P]` |
+| 23 | Fileclass permissive parser and ignored sign; Dataview fixed matrix | Retain or refine nominal seconds explicitly `[P]` |
 | 24 | Tasks code comments; Dataview docs; IWE specifier table | Three-list documentation model `[P]` |
-| 25 | Dataview display-first cascade; Fileclass path tokens | Last segment; one dialect for pattern arg; test encoding `[P]` |
+| 25 | Display-first risk; path-token example; K22/L | Decide decoding, encoded separators, and extension treatment `[P]` |
 | 26 | IWE strict tables and error text; ticket 22 rules | Exact field set; name-listing errors `[P]` |
 | 27 | IWE fields; nldates settings; ticket 19 hand-off | Field list per hand-off; defaults and validation `[P]` |
 | 28 | IWE accessors; existing config-to-temporal edge | Plain policy value; no new edge `[P]` |
-| 29 | Absence in config; Dataview value-literal zones; IWE locale normalization | IANA plus offsets; parse-time validation `[P]` |
+| 29 | Limited Dataview zone grammar; IWE locale example; L9 | Choose spellings and timing; preserve lazy acquisition `[P]` |
 | 30 | Anti-precedents (unwrap, zero); ticket 21 rules | Typed memoized failure; feed ticket 34 `[P]` |
-| 31 | Q8 evidence | Configurable only with paired week-one rule `[P]` |
-| 32 | Absence; Dataview ladder; ticket 21 opt-in | Boolean opt-in key under ticket 22 rules `[P]` |
-| 33-34 | Ambient parse-time anchoring everywhere; ticket 21 frame rules | Frame exports today, week rule, zone handle `[P]` |
+| 31 | Q8 evidence; L10 | Define configurable operations; keep ISO filename weeks stable `[P]` |
+| 32 | Year-month literal precedent; ticket 21 opt-in | Boolean opt-in proposal under ticket 22 rules `[P]` |
+| 33-34 | Named ambient paths; ticket 21 frame rules | Clock, week rule, lazy zone; derive today on demand `[P]` |
 | 35 | Absence; Dataview indexed-data note; ticket 29 scope | Prove or leave Unsupported `[P]` |
-| 36 | Fileclass silent-drop cost; nldates debug log; Dataview null | Notice on exclusion mismatches; line with ticket 34 `[P]` |
+| 36 | Specific silent failures; ticket 34 ownership | Choose notice conditions; keep delivery and deduplication separate `[P]` |
 
 Open items this file does not settle, by design:
 
-- Crate decisions Q9 to Q12 need the ticket 25 cross-check and a measurement; the digests have
-  none. `[A]`
-- Crate review for Q14 belongs to the prep step and the external-designs peer, not to digests.
-- Percent-encoded `date(link)` targets (Q25) have no digest evidence; one test before grilling.
-- The owner's bare-weekday preference (Q15) is a question for the grilling, not for digests.
+- Crate decisions need producer-list and cost evidence beyond these digests.
+  The probe results are bounded snapshots, not production measurements.
+- Candidate source and runtime limits appear in `d-crate-evidence.md`.
+- Markdown-link decoding, encoded separators, and extensions remain choices.
+  Digest excerpts supply no runtime proof for those rules.
+- The owner's bare-weekday preference remains a grilling question.

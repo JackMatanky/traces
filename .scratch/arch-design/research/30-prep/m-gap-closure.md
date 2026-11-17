@@ -7,17 +7,21 @@ rerun them. Paths below are relative to this directory.
 
 ## Scope and environment
 
-All runs used one Apple Silicon arm64 host (macOS 27.2). Probe runs used the
-pinned toolchain `nightly-2026-10-01` (rustc 1.101.0-nightly, 2026-09-30). One
-candidate-stack build also ran on the stable 1.89.0 toolchain as a
-compatibility cross-check. Probe profiles copy the repository release profile
-(`opt-level = "z"`, strip, LTO, one codegen unit, `panic = "abort"`). The
-parity and cost probes pin `jiff-core 0.1.1` and `jiff-tzdb 0.1.9` through
-`cargo update --precise`, so transitive versions match the repository lockfile
-at preparation time.
+The recorded runs use one Apple Silicon arm64 host (macOS 27.2). Probe runs
+use `nightly-2026-10-01` (rustc 1.101.0-nightly, 2026-09-30). The recorded
+stable build uses rustc 1.89.0 for the `english` feature only.
 
-The probes under `probes/` are throwaway evidence for ticket 30. They are not
-part of the product test suite and do not link repository code.
+The release profile sets `opt-level = "z"`, strip, LTO, one codegen unit,
+and `panic = "abort"`. The layout tests use the default Cargo test profile,
+not that release profile. The lockfiles pin `jiff-core 0.1.1` and
+`jiff-tzdb 0.1.9`, as in the repository lockfile at preparation time.
+This does not mean that every transitive dependency matches.
+The original preparation pins those versions with
+`cargo update --precise`. Use the preserved lockfiles when reproducing
+the recorded dependency set.
+
+The probes under `probes/` are research artifacts for ticket 30. They are
+not part of the product test suite and do not link repository code.
 
 ## Parser parity probe (`probes/parity`)
 
@@ -27,8 +31,8 @@ Jiff parser. The guarded domain is byte-level: years `0000..9999`, months
 of six seed strings and adds ten malformed or extended shapes. It checks
 4,635,370 inputs in total.
 
-Result, reproduced inside the repository during this round with the preserved
-sources:
+The recorded result below summarizes the run. The two error messages are
+abbreviated. This is not a verbatim output log.
 
 ```text
 checked=4635370 legacy_valid=3652624 acceptance_differences=0
@@ -41,7 +45,7 @@ raw_jiff "-0009-01-01"=Err(failed to parse six digit integer as year)
 sizes Date=4 DateTime=12 Timestamp=16 Span=64 DateTimePayload=24 PeriodTuple=6
 ```
 
-Reproduce with:
+Run this command from `probes/parity`:
 
 ```sh
 cargo +nightly-2026-10-01 run --release --locked
@@ -52,16 +56,16 @@ ASCII digits and separators. Raw Jiff accepts a superset: compact `20260101`,
 naive datetimes, and negative years. The probe does not cover datetimes,
 spans, time zones, or any repository parser beyond the field one.
 
-## Complete value-layout proof (`probes/parity/tests/layout.rs`)
+## Complete-value layout probe (`probes/parity/tests/layout.rs`)
 
-Earlier evidence measured the 24-byte temporal payload only. This round adds
-a build test that mirrors the complete proposed `NoteFieldValue`. The mirror
-replaces the runtime `DateTimeValue` with
-`DateTimePayload { Civil, Instant }`. It uses the real Jiff `civil::DateTime`
-and `Timestamp` types. It reproduces the link and duration shapes from
-`src/note/links.rs:28` and `src/temporal/duration.rs`.
+Earlier evidence measures the 24-byte temporal payload only. The layout
+test measures a mirror of the complete proposed `NoteFieldValue`. The
+mirror replaces `DateTimeValue` with `DateTimePayload { Civil, Instant }`.
+It uses Jiff's `civil::DateTime` and `Timestamp` types. It models the link
+and duration fields from `src/note/links.rs:28` and
+`src/temporal/duration.rs`.
 
-Result, release profile, pinned toolchain:
+Recorded result, default Cargo test profile, pinned toolchain:
 
 | Variant | Size (bytes) |
 |:--------|-------------:|
@@ -76,45 +80,57 @@ Result, release profile, pinned toolchain:
 | Object | 72 |
 | complete enum | 80 |
 
-The complete enum is exactly 80 bytes and stays inside the cap, because
-`Duration` (72 bytes) binds the largest variant. Growing the temporal payload
-from 16 to 24 bytes does not move any other variant. A second test parses a
-value inside an allocation-counting window (`stats_alloc`) after a warm-up
-parse and asserts zero allocations and zero deallocations in the window.
+The mirror enum measures exactly 80 bytes on this host and compiler.
+Its Duration and Object payloads both measure 72 bytes. The temporal
+payload increase from 16 to 24 bytes does not increase this mirror's size.
 
-Limits. This proves the proposed layout, not the landed runtime layout: the
-real `NoteFieldValue` still stores a transparent `Timestamp` wrapper today.
-The link mirror approximates `LinkType` with one boolean byte; any accepted
-enum for `LinkType` keeps one-byte storage, so the total stays 80 bytes.
+The allocation check parses the fixture before the measured window.
+Inside the window, it constructs the temporal enum value from that fixture.
+The recorded result is zero allocations and zero deallocations. This does
+not measure parsing allocations or the product pipeline.
+
+Limits. The mirror is not the proposed production type. It uses a boolean
+in place of `LinkType` and does not import the product's leaf types.
+No result guarantees the layout of a different enum, compiler, or target.
+The production size assertion remains an implementation gate.
+
+Run the layout tests from `probes/parity`:
+
+```sh
+cargo +nightly-2026-10-01 test --locked --test layout -- --nocapture
+```
 
 ## Candidate probes (`probes/candidates`)
 
-One probe binary tests both natural-language candidates against one fixed
-anchor (2026-03-14T12:00:00Z, a Saturday), with `--features english` for
-`jiff-english 0.0.1` and `--features fuzzy` for `fuzzydate 0.4.1`. Each phrase
-runs as its own process, so a panic cannot hide. A 15-phrase behavior matrix
-and a 20,000-iteration indicative benchmark cover both candidates.
+The probe uses the fixed anchor 2026-03-14T12:00:00Z, a Saturday.
+The `english` feature selects `jiff-english 0.0.1`. The `fuzzy` feature
+selects `fuzzydate 0.4.1`. The recorded matrix contains 15 phrases for
+each candidate. Each phrase runs in a separate process. Process isolation
+alone does not prove that every exit succeeds or that no input can panic.
 
-Behavior findings, all runtime-verified:
+The recorded behavior and inspected output types support these findings:
 
-- Both candidates return points only. Neither produces periods or spans, and
-  neither reports error spans.
+- Both date-parser entry points return points, not periods. Their date
+  result types do not provide a period unit or an error span.
 - `jiff-english` rejects `next week` outright (`expected week day or month
   name`). `fuzzydate` accepts it and returns a +7-day point. Neither accepts
   `in 2 weeks`.
 - `last friday` diverges: `jiff-english` returns the previous day
   (2026-03-13), `fuzzydate` returns the Friday one week back (2026-03-06).
-- Bare weekdays land on the next strictly-after occurrence in both, with
-  midnight in `jiff-english` and preserved anchor time in `fuzzydate`.
+- With this Saturday anchor, bare `monday` returns the next Monday.
+  `jiff-english` returns midnight; `fuzzydate` retains the anchor time.
+  This case does not establish either candidate's same-day weekday rule.
 - Neither accepts `eom`. `jiff-english` lenient mode misparses
   `start of month` as midnight today; `fuzzydate` rejects it.
-- Typos, full-width digits, and CJK input all fail cleanly in both; no panic
-  was observed. The `week_day` slicing panic risk in `jiff-english` stays a
-  source-level observation, not an executed proof.
+- The sampled typo, full-width digits, and CJK input return errors.
+  No panic appears in those recorded cases. The `week_day` byte-slice
+  hazard remains a source observation, not a general runtime guarantee.
 - Both reject `3 days ago tomorrow` and `tomorrow xyz`.
 
-Indicative cost, 20,000 in-process iterations with `black_box`, release
-profile (not a controlled benchmark; single host, warm cache):
+Recorded indicative timings cover 20,000 iterations with `black_box`.
+The run uses the release profile on one host. It has no confidence
+intervals and is not a controlled benchmark. These numbers describe the
+executed probe revision, not a guaranteed result from the final source.
 
 | Phrase | `jiff-english` | `fuzzydate` |
 |:-------|---------------:|------------:|
@@ -122,7 +138,7 @@ profile (not a controlled benchmark; single host, warm cache):
 | next monday | 588 ns/parse | 585 ns/parse |
 | `next weke` (fail) | 383 ns/parse | 215 ns/parse |
 
-Integration cost, release profile, same codegen flags as the baseline:
+Earlier probe revision, release profile, recorded binary sizes:
 
 | Build | Binary size | Delta |
 |:------|------------:|------:|
@@ -130,30 +146,44 @@ Integration cost, release profile, same codegen flags as the baseline:
 | `--features english` | 485,488 B | +65.0 KiB |
 | `--features fuzzy` | 469,008 B | +48.9 KiB |
 
-Feature unification, measured with `cargo tree -e features -i jiff`:
+These sizes predate the final timing-mode edits to the probe source.
+The current source and lockfiles permit new measurements, not an exact
+reproduction of those earlier binary sizes.
+
+The recorded `cargo tree -e features -i jiff` output shows:
 
 - `english` pulls `jiff` default features on top of the repository's
   deliberate `default-features = false` set: `tz-fat`, `tzdb-zoneinfo`,
   `tzdb-concatenated`, `tzdb-bundle-platform`, and `perf-inline` join the
   unified build. The delta above includes this unification plus the parser.
-- `fuzzy` leaves the Jiff tree untouched, because `fuzzydate` sits on
-  `chrono 0.4.45`; the delta is the `chrono` stack plus the parser.
+- `fuzzy` leaves the Jiff feature set unchanged and adds `chrono 0.4.45`.
+  Its recorded size delta includes the `chrono` stack and parser.
 
-Compatibility and maintenance, checked 2026-11-17 through the crates.io API:
+The source manifests and build record support these compatibility facts:
 
-- Both candidates declare edition 2021 and no `rust-version`. Both build
-  clean under stable rustc 1.89.0, well below the repository's 1.96 floor.
+- Both candidates declare edition 2021 and no `rust-version`.
+- The recorded stable rustc 1.89.0 build selects `english` only.
+  It does not establish stable compatibility for `fuzzy`.
+- Neither observation establishes a minimum supported Rust version.
+  The repository declares a 1.96 floor.
+
+The crates.io API gives these metadata facts on 2026-11-17:
+
 - `fuzzydate 0.4.1`: created 2022-02-17, last update 2026-04-05, 164,489
   downloads, repository `DevinVS/fuzzydate`.
 - `jiff-english 0.0.1`: single release on 2026-08-07, 29 downloads,
   repository `Squirreljetpack/feeling`, a port of `chrono-english`.
 
-Reproduce with:
+Run these commands from `probes/candidates`. Select one candidate feature
+per build. Both features share the same binary path, so check which build
+produces each result.
 
 ```sh
 cargo +nightly-2026-10-01 build --release --locked --features english
 target/release/temporal-cost-probe "next monday"
 target/release/temporal-cost-probe "next monday" --bench
+cargo +nightly-2026-10-01 build --release --locked --features fuzzy
+target/release/temporal-cost-probe "next monday"
 ```
 
 ## Moment counterexample (`probes/moment`)
@@ -169,15 +199,15 @@ tracked here, and the assertion set ran during this round.
 ## What this round did not measure
 
 - Repository binary-size, compile-time, and startup deltas for any adoption.
-  Probe sizes and warm-cache link times are not repository measurements, and
-  no compile-time benchmark ran. The 6.3/6.7/6.0 second figures in the build
-  log are final-crate link times with a warm target directory.
+  Probe sizes and warm-build completion times are not repository
+  measurements. No compile-time benchmark ran. The 6.3/6.7/6.0 second
+  figures are Cargo completion times, not isolated linker measurements.
 - Temporal-key index timing and memory on representative corpora. That needs
   the implemented temporal keys and stays an acceptance gate.
-- Allocation profile of the real parse pipeline beyond the single layout
-  window test.
-- Exhaustive Unicode, overflow, and ambient-state behavior of every
-  candidate; the matrix is a bounded phrase list.
+- Parsing allocations or the product allocation profile. The layout test
+  counts only enum construction after the fixture parse.
+- Exhaustive Unicode, overflow, and ambient-state behavior. The matrix
+  contains a bounded phrase list.
 - Throughput of the repository grammar, winnow duration-prefix handling, and
   `jiff` friendly parsing in repository shapes.
 - Live repository health of the two candidate projects beyond the crates.io
@@ -193,5 +223,5 @@ tracked here, and the assertion set ran during this round.
 - Zone-frame timing: lazy acquisition policy details.
 - Filename period forms: which labels stay frozen and which add.
 
-Each item maps to a numbered question in `z-grilling-guide.md`; the guide
-carries the dispositions.
+Each item maps to a numbered question in `z-grilling-guide.md`.
+The guide records the current status of each question.

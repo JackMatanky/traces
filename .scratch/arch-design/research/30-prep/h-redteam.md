@@ -7,12 +7,32 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 
 ## How to read this file
 
-- Tags: [V] I read the source. [H] inference. [P] proposal for the grilling.
+- Tags: [V] source inspection in this report, not execution or proof of every
+  attached claim. [H] inference. [P] proposal for the grilling.
 - Ledger ids B, C, P and D come from [b-prior-decisions.md](./b-prior-decisions.md).
 - Verdicts: HOLDS, WEAKENED (with a repair) or FAILS (with a better option).
 - The owner edited `synthesis.md` while I worked. I reviewed the version
-  with the modification time 19:10 on 2026-11-16. Later edits are unseen.
+  with the modification time 19:10 on 2026-11-16. This report does not assess
+  later edits.
 - I read code with `read` and `grep`. I did not run builds, tests or probes.
+
+This report records an attack on that snapshot. Its verdicts are historical,
+not findings about the repaired synthesis. Later source checks correct some
+attacks: [K4](./k-citation-verification.md#k4-cldr-first-day-minimum-days-and-week-rollover)
+rejects the claim about `(sunday, 4)`.
+[L1-L2](./l-answer-verification.md#l1-b26-is-not-the-truncated-schema-fragment)
+correct Q4's schema-rule argument.
+[L5](./l-answer-verification.md#l5-membership-bounds-do-not-prove-a-conflicting-physical-key-rule)
+corrects Q35's asserted contradiction.
+[L8-L12](./l-answer-verification.md#l8-config-merge-is-inherited-not-an-undecided-default)
+correct the merge, lazy-zone, ISO-prefix, grammar-scope, and tolerance-release
+arguments. These corrections also apply to repeated claims below.
+
+[K22](./k-citation-verification.md#k22-markdown-percent-decoding-and-unicode-text)
+supersedes Q25's proposed decode-before-segmentation order.
+[m-gap-closure.md](./m-gap-closure.md) supplies later bounded probes. The
+unmeasured and unexamined items below describe this report only. They do not
+deny that later evidence.
 
 ## Part 1: question-by-question attack
 
@@ -27,8 +47,8 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   [V: `.rust-docs/cache/crates/jiff/0.2.38/source/src/fmt/strtime/mod.rs:171-195`].
 - Attack 2. The reject reason for S says the owner's templates break. The
   ticket says Traces does not run those Templater scripts [V: ticket 30,
-  "Current code"]. They keep running in Obsidian's real Moment. Nothing breaks
-  unless the owner ports them to `date_format`.
+  "Current code"]. Obsidian continues to run those scripts with real Moment.
+  The port cost arises only if the owner moves them to `date_format`.
 - Attack 3. Dialect choice uses a `%` sniff for the whole pattern
   [V: `token.rs:55-61`]. A pattern cannot mix both dialects. The cluster does
   not consider an explicit dialect marker.
@@ -41,9 +61,10 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 
 - Recommendation: P moves it to the template engine. Q keeps it in
   `src/temporal/token.rs`. Both call it a pure syntax adapter. [P]
-- Attack 1. The translator is not pure. It takes a civil datetime and bakes
-  the day ordinal into the output [V: `token.rs:186-189`]. A parse direction
-  cannot use that output, because the ordinal needs a known day.
+- Attack 1. The translator does more than convert syntax. It takes a civil
+  datetime and writes the day ordinal into the output
+  [V: `token.rs:186-189`]. A parse-side adapter cannot use that output,
+  because the ordinal needs a known day.
 - Attack 2. Moment `ww` needs a week rule. Q31 B makes the week rule
   configurable. Then the translator needs the frame, not only a datetime.
 - Attack 3. The ticket lists a third home: a sibling `format` unit shared by
@@ -56,8 +77,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 
 - Recommendation: same cluster. Reject R (one Moment dialect). [P]
 - Attack 1. The cluster rejects R because R "breaks `%Y-%m-%d` configs".
-  Q5 deletes the config `format` keys. After Q5, no config surface reads a
-  format. The reject reason is vacuous. Q3 then has three surfaces, not four.
+  If Q5's removal proposal is adopted, no config surface reads a format.
+  That rejection reason then no longer applies. Q3 would cover three
+  surfaces, not four.
 - Attack 2. Under Q, the query `date(text, pattern)` speaks strftime and the
   schema `date.format` speaks Moment. One note-name pattern then needs two
   spellings. The ticket asks for a justified split. The cluster gives none.
@@ -102,8 +124,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   unread keys. B44 removes the keys from the fingerprint, not from the file
   format [V: b-file B44].
 - Rules at risk: B4 (Migratable, so a row is enough), B45.
-- Verdict: WEAKENED. Repair: accept and ignore the keys for one release with a
-  notice. Then delete them. Name the digest change. Fix the B44 citation.
+- Verdict: WEAKENED. Repair: accept the keys for one release with a notice.
+  Ignore their values during that release. Then delete them. Name the digest
+  change. Correct the B44 citation.
 
 ### Q6 Which calendar helpers stay in the engine
 
@@ -115,7 +138,7 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   moves with the week rule, as the e-file says [V: e-file q6].
 - Attack 2. `Anchor::base` reads `DateValue::today()` and
   `DateTimeValue::now()` [V: `src/template/engine/date.rs:245-255`]. That is
-  an ambient clock read. The Anchor body needs a rewrite on the frame.
+  an ambient clock read. Rewrite the `Anchor` body to use the frame.
 - Attack 3. `weekday_from_number` rejects `0` [V: `calendar.rs:115-125`].
   The owner's template calls `day(0)` for Sunday [V: ticket 30]. The helper
   cannot carry the owner's numbering.
@@ -127,7 +150,7 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 
 - Recommendation: A. In temporal, next to the date lexers. [P]
 - Attack 1. The synthesis says the parser "shares token shapes" with the
-  lexers. The logos enums `DatePrefixToken` and `TemporalShapeToken` also
+  lexers. The Logos enums `DatePrefixToken` and `TemporalShapeToken` also
   serve the frozen note parser [V: d-crate Q5; `src/temporal/lexer.rs:93-111`].
   A week or quarter token added there changes frozen parsing (B1, B37).
   The parser needs its own token enum.
@@ -155,8 +178,8 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   changes meaning when config changes [V: ticket 21 input, [H] there].
   A global config can then reinterpret a vault's committed week notes.
 - Rules at risk: B34, B46.
-- Verdict: WEAKENED. Repair: ship named presets (`iso`, `us`). State that the
-  prefix follows the pinned rule. State which config level may set the rule.
+- Verdict: WEAKENED. Repair: ship named presets (`iso`, `us`). State that
+  the prefix obeys the pinned rule. State which config level may set the rule.
 
 ### Q9 `speedate`
 
@@ -167,8 +190,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   else to another [V: d-crate Q3, `date.rs:350-374`]. A digit pre-check can
   keep that mapping [H]. Negative years already use `civil::Date::new`
   [V: d-crate Q3, `date.rs:385-396`].
-- Attack 2. The d-crate source read shows jiff accepts a strict superset of
-  the speedate shape [V: d-crate Q3]. The nine-scenario probe is unrun.
+- Attack 2. The d-crate source read shows that Jiff accepts a strict superset
+  of the speedate shape [V: d-crate Q3]. This review did not run the
+  nine-scenario probe.
 - Rules at risk: B1 (frozen parsing), B61 (one rebuild).
 - Verdict: WEAKENED. Repair: base B on the missing parity probe, not on reason
   strings. Schedule the probe.
@@ -185,8 +209,8 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 - Attack 3. The synthesis cites jiff `parser.rs:134-194`. The d-crate file
   gives 183-194 and 311-348 [V: d-crate Q2].
 - Rules at risk: B57, D7.
-- Verdict: WEAKENED. Repair: add the ticket 25 list contract. Price the
-  rebuild coupling against the 10-line scanner.
+- Verdict: WEAKENED. Repair: add the ticket 25 list contract. Compare the
+  rebuild-coupling cost with the cost of the 10-line scanner.
 
 ### Q11 `logos`
 
@@ -216,11 +240,12 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 ### Q14 Build or use a crate
 
 - Recommendation: A. Build in the repository. [P]
-- Attack: the d-crate source reads support A. None yields a period. None
-  reports spans. `jiff-english` can panic on non-ASCII identifiers [V: d-crate
-  T6]. The ticket asks for the size and test cost of an in-repo grammar and
-  for binary size. Nobody measured either [V: d-crate "Not checked"]. The
-  ticket also lists "defer to fog" as an alternative. Q14 omits it.
+- Attack: the d-crate source reads support A. No inspected candidate yields
+  a period or reports spans. `jiff-english` can panic on non-ASCII identifiers
+  [V: d-crate T6]. The ticket asks for the size and test cost of an in-repo
+  grammar and for binary size. This review has no measurements for either
+  [V: d-crate "Not checked"]. The ticket also lists "defer to fog" as an
+  alternative. Q14 omits it.
 - Verdict: HOLDS. Repair: add the defer alternative. Mark the costs unmeasured.
 
 ### Q15 Bare weekday
@@ -232,7 +257,7 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   today [V: d-crate table].
 - Attack 2. The template `date.weekday(1)` on Sunday 2026-11-15 gives Monday
   2026-11-09 [V: `calendar.rs:57-64`]. A bare `monday` under A gives
-  2026-11-16. One word, two results, seven days apart.
+  2026-11-16. The helper and the literal give results seven days apart.
 - Attack 3. The c-digest leans to the current-week day [V: c-digest Q15]. The
   synthesis says "no evidence picks one" and does not record that lean.
 - Verdict: WEAKENED. Repair: record the c-digest lean. Add `this <weekday>`.
@@ -243,8 +268,8 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 - Recommendation: A. Periods for period phrases, points for point phrases. [P]
 - Attack: the rule says which phrases are periods. It does not classify
   `in 2 weeks` or `3 months ago`. From 2027-01-30, `in 1 month` clamps to
-  2027-02-28 as a point. `next month` starts on 2027-02-01 as a period. One
-  word, two behaviors.
+  2027-02-28 as a point. `next month` starts on 2027-02-01 as a period.
+  Relative-offset phrases and calendar-period phrases need separate rules.
 - Verdict: WEAKENED. Repair: classify every offset phrase as point or period.
 
 ### Q17 Relative keyword spelling
@@ -279,18 +304,20 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   resolves a naive datetime through the process zone
   [V: `point.rs:34-39,113`]. The owner's frontmatter holds naive values such
   as `date_created: 2023-06-12T08:14` [V: `docs/vault/05_metadata/cal.md:9`].
-  Two variants (`Calendar`, `DateTime`) cannot hold Date, civil datetime and
-  instant. Option A does not answer the question.
+  The current payloads of the two variants (`Calendar`, `DateTime`) cannot
+  retain Date, civil datetime, and instant as distinct kinds. Option A does
+  not answer the question without a payload change.
 - Attack: the ticket asks about `NoteFieldValue` at 80 bytes. The synthesis
-  discusses only `DatePoint`. The 80-byte cap does not bind either shape
-  because the largest payload is 72 bytes [V: c-digest Q19, ticket 18].
+  discusses only `DatePoint`. Its payload discussion does not establish
+  compliance with the 80-byte cap. The largest current payload is 72 bytes
+  [V: c-digest Q19, ticket 18].
 - Attack: a new variant bumps the format epoch (B58). The synthesis omits it.
   It cites a "27-probe" for the DST panic. The probe sits in ticket 29.
 - Rules at risk: B16, B58, B24 (parse-time classification, no ambient zone).
-- Verdict: FAILS. Better: decide the field-level shape directly. Compare (i)
-  an inner `Civil`/`Instant` enum in `DateTimeValue` without a derived `Ord`,
-  (ii) a `NoteFieldValue` civil variant, (iii) a third `DatePoint` variant.
-  Measure sizes. Add the epoch bump.
+- Verdict: FAILS. Better: decide the field-level shape directly. Compare:
+  (i) an inner `Civil`/`Instant` enum in `DateTimeValue` without a derived
+  `Ord`; (ii) a `NoteFieldValue` civil variant; (iii) a third `DatePoint`
+  variant. Measure sizes. Add the epoch bump.
 
 ### Q20 `CalendarPeriod` placement
 
@@ -357,7 +384,7 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 - Rules at risk: B23 asks this ticket to refine or re-affirm with a
   counterexample.
 - Verdict: WEAKENED. Repair: correct the number. Answer the counterexample.
-  Choose keep, or class-aware equality, in the Answer.
+  Choose retained equality or class-aware equality in the Answer.
 
 ### Q24 Documents for calendar arithmetic
 
@@ -412,8 +439,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 - Recommendation: B. A new `TemporalPolicy`. [P]
 - Attack: B60 does not name any field. The synthesis says "the fields B60
   names". The e-file calls the type `DatePolicy`. The names differ across
-  files. The field-for-field copy from `DateConfig` is small. The zone type
-  differs (text versus loaded zone), which justifies two types.
+  files. A field-for-field copy from `DateConfig` has few fields. The zone
+  type differs (text versus loaded zone). This review uses that difference
+  to argue for two types. L9 later corrects the loaded-zone premise.
 - Verdict: HOLDS. Repair: fix the B60 citation. Pick one type name.
 
 ### Q29 Zone syntax and validation
@@ -424,9 +452,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   [V: `src/note/field.rs:1041`, comment "UTC+02:00"]. The e-file recommends
   an explicit `±HH:MM` form [V: e-file q29]. The synthesis says no evidence
   exists. It does not cite the e-file.
-- Attack 2. Loading the zone at config parse fails every command on a typo,
-  including commands that need no zone. B28 says to acquire a zone only
-  when needed [H: tension].
+- Attack 2. Zone acquisition at config parse makes every command fail on a
+  typo, including commands that need no zone. B28 says to acquire a zone
+  only when needed [H: tension].
 - Attack 3. Legacy names such as `EST` and `EST5EDT` pass a tzdb lookup
   [H]. "Every config value is a named zone" is true but weak.
 - Verdict: WEAKENED. Repair: accept `±HH:MM` or document the `Etc/GMT` trap.
@@ -439,7 +467,7 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   frames [V: owner-evidence, `mod.rs:69,123-133`]. A fixes drift inside one
   operation, not staleness across operations. The synthesis says the
   concurrency lens "measured" the hazard. The owner note is a source read.
-  Nobody observed two zones in one operation.
+  This review contains no observation of two zones in one operation.
 - Verdict: HOLDS. Repair: replace "measured" with "read in source".
 
 ### Q31 Is the week start configurable
@@ -478,9 +506,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
   carries the policy [V: e-file q33].
 - Attack 2. `OnceCell` is not `Sync`. A frame shared by an LSP request or a
   lazy `QuerySet` (B41) may cross threads. `OnceLock` fits [H].
-- Attack 3. `today()` (Q17) needs the zone at plan time. Most date queries
-  then acquire the zone at plan. B stays correct. The "only when needed"
-  benefit is smaller than the text implies.
+- Attack 3. `today()` (Q17) needs the zone when the planner binds that call.
+  Queries that use it then acquire the zone during binding. B stays correct.
+  The "only when needed" benefit is smaller for those queries.
 - Attack 4. "65 crate call sites": I count 133 text hits of `local_zone(`
   in `src/`, tests included. The synthesis count is unverified [H].
 - Verdict: WEAKENED. Repair: add the policy. Use `OnceLock`. Recount.
@@ -539,8 +567,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 - Q4 (classify `Q` and `DDDD`) against Q1 and Q2 (the table rejects them).
 - Q2 ("pure adapter") against Q31 B (week tokens need a week rule).
 - Q21 A (always maps) against Q21 C (Null when ambiguous).
-- Q8 ("not in config") against Q27 (the pair is in config). Read as value in
-  config and algorithm in temporal, the two agree. The text says otherwise.
+- Q8 ("not in config") against Q27 (the pair is in config). The two agree if
+  config stores policy values and temporal owns the algorithm. The text
+  does not make that distinction.
 - Q33 (frame fields) against Q27 (the filename flag must reach evaluation).
 
 ### Check 2: contradictions with accepted Answers
@@ -581,16 +610,16 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 19. Q1 reject S says five owner templates need migration. The templates are
     Templater scripts that Traces does not run [V: ticket 30].
 
-### Check 4: recommendations that need an unmade measurement
+### Check 4: recommendations without measurements in this report
 
 - Q12 and Q14: binary size and in-repo grammar cost. Unmeasured.
 - Q19 and Q20: size estimates (32 and 16 bytes) are [H]. Sizes for `civil::DateTime`
-  and a period were not measured.
-- Q35: no temporal key timing exists.
-- Q9: the speedate and jiff differential probe is unrun.
-- Q10: the rebuild cost of a `winnow` bump is unmeasured.
-- Q30 and Q33: nobody observed a two-zone operation.
-- Q8 and Q31: no week-year test corpus for a custom pair exists.
+  and a period have no measurements in this report.
+- Q35: this report contains no temporal key timing.
+- Q9: this review did not run the speedate and Jiff differential probe.
+- Q10: this report contains no rebuild-cost measurement for a `winnow` bump.
+- Q30 and Q33: this report contains no observation of a two-zone operation.
+- Q8 and Q31: this report supplies no custom-pair week-year test corpus.
 
 ### Check 5: frozen vault-format parsing (ticket 16)
 
@@ -615,8 +644,9 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 - The ticket lists two alternatives that no section weighs: a sibling
   `format` unit, and deferring the natural-language grammar to fog.
 - The synthesis promises a downstream contract in every section. None
-  appears. Tickets 31, 34, 35 and 36 need a table: owner of each invariant,
-  error types, zone failure type, notice condition, crate list changes.
+  appears in the inspected snapshot. Tickets 31, 34, 35, and 36 need a table
+  with each invariant's owner, error types, zone-failure type, notice
+  condition, and crate-list changes.
 - The natural-language grammar has no scope question. It must say which
   phrases are date-shaped for the B21 advisory. A typo such as `"next weke"`
   runs as a string without a notice.
@@ -639,10 +669,11 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 
 ## Part 3: the 10 weakest points to settle in the grilling
 
-1. Q19. Two `DatePoint` variants cannot hold Date, civil datetime and
-   instant. Decide the field-level shape, the sizes and the epoch bump.
+1. Q19. The current `DatePoint` payloads cannot retain Date, civil datetime,
+   and instant as distinct kinds. Decide the field-level shape. Measure the
+   sizes. Record the epoch bump.
 2. Q21. A and C contradict. A maps civil to instant, which is not monotone
-   in a gap. Test option D (instant to civil).
+   in a gap. Make a test of option D (instant to civil).
 3. Q25. The ticket 19 Markdown rule has no answer: percent-encoding,
    extension and external URLs.
 4. Q1 to Q3. Decide the token table. Fix the reject reasons. Decide the
@@ -653,15 +684,16 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
    Choose a wrapper or a variant.
 7. Q26, Q27, Q32 and Q33. Fix the key shape and count. State the merge rule.
    Put the filename flag into the frame. Use `OnceLock`.
-8. Q35. No temporal key encoding or timing exists. Zone-dependent mappings
-   are not monotone. Resolve B70 against B66 and B68.
+8. Q35. This review supplies no temporal key encoding or timing.
+   Civil-to-instant gap mapping is not monotone. Clarify B70 against B66 and
+   B68, subject to L5's later correction.
 9. Q23. The synthesis misquotes the year length and ignores the
    `1mo == 30d` counterexample. Decide with the real rule in view.
 10. Q15 to Q17. The weekday meaning, the offset-phrase classification and the
     keyword spelling interact with adaptive quoted literals. Draft the grammar
     table before any single choice.
 
-## Not checked
+## Not checked in this report
 
 - I ran no build, test, probe or benchmark. I used `read` and `grep`, not
   CodeGraph, for code claims.

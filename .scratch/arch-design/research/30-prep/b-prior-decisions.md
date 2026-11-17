@@ -29,10 +29,10 @@ records supersessions.
 | 11 performance evidence | Relevant, two numbers live | The 80-byte unified enum measure [V](../../issues/11-research-performance-evidence.md), line 49, binds Q19. The survey's "temporal is 10k lines" figures are stale; [ticket 30 Current code](../../issues/30-temporal-boundary-and-dialects.md), lines 147-154, replaces them [V]. |
 | 12 IWE core and hosts | Relevant, negative evidence | IWE has no date type and hands YAML dates to its validator as ISO strings [V](../../issues/30-temporal-boundary-and-dialects.md), lines 324-325. No temporal boundary input beyond that. |
 | 13 IWE query schema | Screened out | No date kind in IWE's query engine [V](../../issues/19-coercion-and-comparison-policy.md), line 349. Tests ticket 19's rules only. |
-| 14 Fileclass research | Relevant, verified | Owner's Fileclass data uses Moment formats `YYYY`, `DDDD`, `Q` [V](../../issues/30-temporal-boundary-and-dialects.md), lines 207-209. Fileclass checks dates with ISO regexes only; pattern validation is bypassed for a string `dateFormat`, and the outer validator checks empty values and `required` [V](../14-fileclass-model-binding-and-validation.md), lines 115-119, narrowed by [K8](k-citation-verification.md). Duration check is an RFC 5545 subset without years or months [V](../../issues/30-temporal-boundary-and-dialects.md), lines 319-320. |
+| 14 Fileclass research | Relevant, corrected | Owner data uses Moment formats `YYYY`, `DDDD`, `Q` [V](../../issues/30-temporal-boundary-and-dialects.md), lines 207-209. Fileclass bypasses pattern validation for a string `dateFormat`. The outer validator checks empty values and `required` [V](../14-fileclass-model-binding-and-validation.md), lines 115-119, narrowed by [K8](k-citation-verification.md). Its duration parser excludes years and months but accepts mixed weeks. It captures a sign without applying it. Do not use it as an RFC 5545 oracle [V, K8]. |
 | 15 schematter research | Screened out | Body-section scope. No temporal content. |
 | 16 compatibility envelope | Binding | Defines Frozen/Migratable/Free for every surface this ticket touches. See ledger B1 to B8. |
-| 17 forward consumers | Binding, scope only | Sets the seven measurement points (50 to 50,000 notes) [V](../../issues/17-grilling-forward-consumers-and-design-pressure.md), lines 51-55. Crate decisions Q9 to Q12 need measurement evidence at those points; no binary-size claim is measured today [H]. |
+| 17 forward consumers | Binding, scope only | Sets seven measurement points, from 50 to 50,000 notes [V](../../issues/17-grilling-forward-consumers-and-design-pressure.md), lines 51-55. Q9 to Q12 need evidence at those points. Later candidate binary sizes are probe snapshots, not repository measurements (`m-gap-closure.md`). |
 | 18 value model | Binding | `NoteFieldValue` variants, the 80-byte test, and the Link model. See B9 to B13. |
 | 19 coercion and comparison | Binding | The three relations, adaptive literals, `date(link)`, duration provisional rule, notice set. See B14 to B24. |
 | 20 schema typing | Binding, one fragment | Advisory check, `date.format` gap left explicit for this ticket, and one truncated sentence. See B25 to B27 and I1. |
@@ -65,6 +65,9 @@ Classification:
   filenames only ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 175-176),
   and ticket 30 must check the shared parser separately
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 573-574).
+  Preserve explicitly accepted changes, including civil naive datetimes and
+  inline `DateTime`, with their migration rows ([19](../../issues/19-coercion-and-comparison-policy.md),
+  lines 110-118, 232-246; [L3](l-answer-verification.md)).
   Today the note parser calls `DatePoint::parse_prefix` for task dates and
   inline fields [V](../../issues/30-temporal-boundary-and-dialects.md), lines 185-187.
 - **B2. Template and query capabilities are Frozen.** Date arithmetic stays
@@ -76,20 +79,20 @@ Classification:
 - **B4. `config.toml` and schema TOML formats are Migratable.** A `[date]`
   table and a `date.format` check need a change-table row
   ([16](../../issues/16-grilling-compatibility-envelope.md), line 86).
-- **B5. `index.redb` layout and refresh strategy are Free**; the store was
-  already wiped once ([16](../../issues/16-grilling-compatibility-envelope.md), line 80).
+- **B5. `index.redb` layout and refresh strategy are Free.** The store had
+  already been wiped once ([16](../../issues/16-grilling-compatibility-envelope.md), line 80).
 - **B6. Exit codes and stdout/stderr split are Frozen**
   ([16](../../issues/16-grilling-compatibility-envelope.md), line 81). A
   higher-epoch read miss exits 0 with one stderr notice, per ticket 25.
-- **B7. Dataview/Templater semantic parity is Free**; historical influence
-  only ([16](../../issues/16-grilling-compatibility-envelope.md), line 78).
-  Moment parity is therefore free; ticket 30 decides it on design grounds,
+- **B7. Dataview/Templater semantic parity is Free.** Those tools supply
+  historical influence only ([16](../../issues/16-grilling-compatibility-envelope.md), line 78).
+  Moment parity is also Free. Ticket 30 decides parity on design grounds,
   not compatibility grounds.
-- **B8. Visibility rule: reduce visibility by default; justify each `pub`**
+- **B8. Reduce visibility by default. Justify each `pub`**
   ([16](../../issues/16-grilling-compatibility-envelope.md), lines 94-100).
   The divergence register is not an input
-  ([16](../../issues/16-grilling-compatibility-envelope.md), lines 60-62); use
-  `.scratch/temporal-core/divergence-register.md` as a pointer only
+  ([16](../../issues/16-grilling-compatibility-envelope.md), lines 60-62).
+  Use `.scratch/temporal-core/divergence-register.md` as a pointer only
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 111-114).
 
 ### 2.2 Value model (ticket 18)
@@ -105,10 +108,10 @@ Classification:
   72 B, `DateTimeValue` 16 B, `DateValue` 4 B [V in research 11]
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 467-468). A
   civil variant must keep the total at 80 bytes
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), line 469). A period
-  variant, if added, meets the same test (ticket 18 lists no period variant,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 465-466; Q20
-  decides placement).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md), line 469).
+  Ticket 18 lists no period variant
+  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 465-466).
+  A period variant must meet the same size test. Q20 decides its placement.
 - **B11. Schema literals stay a separate type** without `Date`, `DateTime`,
   `Duration` or `Link` ([18](../../issues/18-value-model.md), lines 491-493).
 - **B12. Root `Link` carries `target`, normalized `display`, `embedded`, and,
@@ -118,10 +121,11 @@ Classification:
   uses the folded target plus subpath; `display` and `embedded` do not decide
   equality ([19](../../issues/19-coercion-and-comparison-policy.md), lines 147-149,
   [19](../../issues/19-coercion-and-comparison-policy.md), lines 172-174).
-- **B13. Temporal values persist through derived tagged serde; the cache
-  invalidates on a model change**
-  ([18](../../issues/18-value-model.md), lines 529-531). Ticket 24 keeps them as
-  text until a compact encoding shows a measured gain (B54).
+- **B13. Temporal values persist through derived tagged serde. A model
+  change invalidates the cache**
+  ([18](../../issues/18-value-model.md), lines 529-531).
+  Ticket 24 keeps them as text until compact encoding shows a measured
+  gain (B52).
 
 ### 2.3 Coercion and comparison (ticket 19, as refined)
 
@@ -167,25 +171,33 @@ Classification:
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 207-211).
   Ticket 34 owns the notice mechanism
   ([19](../../issues/19-coercion-and-comparison-policy.md), line 212).
-- **B22. `date(link)` reads only the target's last path segment.** Strip
-  folders, `#anchor` and `.md`; never read display text. Accept an optional
-  pattern argument for non-ISO titles; return `Null` on parse failure
+- **B22. `date(link)` reads only the target's last path segment.** Remove
+  folders, `#anchor` and `.md`. Never read display text. Accept an optional
+  pattern argument for non-ISO titles. Return `Null` on parse failure
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 172-180,
   [19](../../issues/19-coercion-and-comparison-policy.md), lines 307-310).
+
   Today `date()` rejects `Link` [V]
-  ([19-prep/g:20](../19-prep/g-links-holding-dates.md), line 20). Two Markdown-link
-  questions remain. Do `[[b]]` and `[b](b.md)` fold to one
-  `ComparisonKey`? How does `date(link)` read a percent-encoded Markdown
-  target ([19](../../issues/19-coercion-and-comparison-policy.md), lines 299-313,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 284-288)?
+  ([19-prep/g:20](../19-prep/g-links-holding-dates.md), line 20).
+  Two Markdown-link questions remain:
+
+  - Do `[[b]]` and `[b](b.md)` fold to one `ComparisonKey`?
+  - How does `date(link)` read a percent-encoded Markdown target
+    ([19](../../issues/19-coercion-and-comparison-policy.md), lines 299-313,
+    [30](../../issues/30-temporal-boundary-and-dialects.md), lines 284-288)?
+
+  The later Markdown-link handoff leaves extension normalization and
+  percent decoding open ([19](../../issues/19-coercion-and-comparison-policy.md),
+  lines 299-313; [L](l-answer-verification.md), remaining human choices).
+  Do not extend the earlier `.md` rule to every Markdown target.
 - **B23. Duration equality and order keep nominal seconds provisionally**
-  (`1mo == 30d`, `1y == 365d`); calendar arithmetic stays Jiff-based;
-  refinement belongs to ticket 30
+  (`1mo == 30d`, `1y == 365d`). Calendar arithmetic stays Jiff-based.
+  Ticket 30 owns refinement
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 182-184).
-  Q23 must refine or re-affirm with a counterexample. Precedent: PostgreSQL
-  keeps months separate; DuckDB and Dataview normalize nominally
-  [V](../19-prep/e-query-engine-conventions.md), lines 84-89.
-- **B24. Classification happens once at parse time; only query string
+  Q23 must refine or reaffirm the rule with a counterexample.
+  PostgreSQL keeps months separate. DuckDB and Dataview use nominal
+  conversions [V](../19-prep/e-query-engine-conventions.md), lines 84-89.
+- **B24. Classification happens once at parse time. Only query string
   literals get late typing. No comparison reads an ambient clock or zone**
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 64-68).
 
@@ -203,8 +215,8 @@ Classification:
   Q4 decides how a format with no full date (`YYYY`, `Q`, `DDDD`) is
   treated. The owner's data uses exactly those formats
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 207-209).
-- **B27. Layering: cli, lsp, mcp are thin hosts of `core`; domain modules
-  expose data and pure functions; no one-implementor traits**
+- **B27. The cli, lsp and mcp modules are thin hosts of `core`. Domain
+  modules expose data and pure functions. Do not add one-implementor traits**
   ([20](../../issues/20-schema-note-typing-and-validation.md), lines 72-77).
   This binds Q28's policy handoff shape.
 - **I1. Truncated fragment.** Ticket 20's Answer ends mid-sentence in its
@@ -213,15 +225,15 @@ Classification:
   lines 305-315).
   Do not read a rule into that fragment
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 309-310).
-  Keep the fragment as a separate ticket 36 recovery item. It does not gate
-  the date-format check that ticket 20 already delegates; B26's accepted
+  Keep the fragment as a separate ticket 36 recovery item. The fragment
+  does not block the delegated date-format check. B26's complete
   provisional scalar-acceptance rule stands on its own.
 
 ### 2.5 Execution context (ticket 21)
 
 - **B28. One frame per query, render or request pins the clock and the week
-  rule. The frame acquires the zone only when needed; a failure is
-  memoized**
+  rule. The frame acquires the zone only when needed. The frame retains a
+  zone-acquisition success or failure**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 106-110,
   [30](../../issues/30-temporal-boundary-and-dialects.md), lines 365-366).
 - **B29. A host may select UTC explicitly. UTC is never an implicit
@@ -241,34 +253,39 @@ Classification:
   Today `CalendarPeriod` has `Week`, `Month`, `Year` only, and `Week` is the
   ISO week [V](../../issues/30-temporal-boundary-and-dialects.md), lines 172-174.
 - **B32. Period-versus-instant filters use the instant's civil date in the
-  pinned zone. A skipped local day matches no instants; a skipped next day
-  does not invalidate a real prior day**
+  pinned zone. A skipped local day matches no instants. A skipped next day
+  does not invalidate a real preceding day**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 142-145).
   Civil points use their civil dates without a zone
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 344-345).
 - **B33. Do not use Rust `Eq`/`Ord` for membership. Use a separate
-  deterministic total sort key for mixed temporal values; the unit tie-break
-  for period sort stays open for this ticket**
+  deterministic total sort key for mixed temporal values. The period unit
+  tie-break stays open for this ticket**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 148-156,
   [21](../../issues/21-ambient-environment-and-execution-context.md), lines 269-270).
-- **B34. Filename prefixes: keep day/month recognition. Add validated ISO
-  week forms (Monday start, four-day week one) and quarter forms. Enable a
-  bare year prefix only through `DateConfig`. Prefer the longest valid
-  shape; never reinterpret a malformed longer prefix as a shorter one**
-  ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 170-174).
-- **B35. `file.date` holds a filename-derived `CalendarPeriod`; `Null` when
-  no recognized prefix. Never fall back to creation time. `file.day` is
-  retired and keeps no new meaning**
+- **B34. Filename-prefix rules**
+  ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 170-174):
+  - Keep day/month recognition.
+  - Add validated ISO week forms with Monday start and four-day week one.
+  - Add quarter forms.
+  - Enable a bare year prefix only through `DateConfig`.
+  - Prefer the longest valid shape.
+  - Never reinterpret a malformed longer prefix as a shorter one.
+- **B35. `file.date` holds a filename-derived `CalendarPeriod`. Return
+  `Null` when no prefix matches. Never fall back to creation time.
+  Retire `file.day` without a new meaning**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 157-161).
-- **B36. `file.cdate`/`file.ctime` use only creation time; `Null` when
-  unavailable; never substitute mtime. `file.mdate` uses mtime. Timestamp
-  fields stay instants; `cdate`/`mdate` project to civil dates in the pinned
-  zone during evaluation, with a typed failure if the zone is unavailable.
-  Never persist those zone-derived dates**
+- **B36. `file.cdate`/`file.ctime` use only creation time. Return `Null` when
+  creation time is unavailable. Never substitute mtime. `file.mdate` uses
+  mtime. Timestamp fields stay instants**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 162-169).
-- **B37. The new prefix forms apply to filenames only; the frozen shared
-  parser does not change**
-  ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 175-176).
+  During evaluation, `cdate`/`mdate` project to civil dates in the pinned
+  zone. An unavailable required zone causes a typed failure. Never persist
+  those zone-derived dates.
+- **B37. The new prefix forms apply to filenames only. Preserve frozen
+  shared parsing except for explicitly accepted changes and migration rows**
+  ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 175-176;
+  [L3](l-answer-verification.md)).
 - **B38. Ambient removals: `local_zone()` leaf reads, per-row zone lookups,
   and the test-only `ZoneGuard` leave after injection lands**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 196-200,
@@ -285,8 +302,8 @@ Classification:
   tie-break, compact encoding, week formats beyond ISO, and the configured
   zone source
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 269-274).
-- **B41. A lazy `QuerySet` keeps its creator's resolved plan and frame;
-  terminal access must not hide execution errors**
+- **B41. A lazy `QuerySet` keeps its creator's resolved plan and frame.
+  Terminal access must not hide execution errors**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 128-132,
   [29](../../issues/29-query-core-and-plan.md), lines 979-981).
 
@@ -306,14 +323,14 @@ Classification:
   `IndexPolicy` holds the filename-period policy only if the index stores
   parsed periods
   ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 100-101).
-- **B45. `deny_unknown_fields` stays; no `version` key until the first
+- **B45. Keep `deny_unknown_fields`. Add no `version` key before the first
   breaking change. The `[date]` table needs an exact field set**
   ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 225-226,
   [30](../../issues/30-temporal-boundary-and-dialects.md), line 408).
 - **B46. Config merge applies global first, then local, field by field.
-  Ticket 30 must state whether `[date]` follows that rule**
-  ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 231-233,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 409-410).
+  This inherited rule also applies to `[date]`**
+  ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 223-235;
+  [L8](l-answer-verification.md)). A different merge needs an explicit amendment.
   Config values from a local file apply only after the trust gate passes
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 412-413).
 - **P1. Edge direction.** `config` reads `DEFAULT_DATETIME_PATTERN` from
@@ -332,9 +349,9 @@ Classification:
   The `%Y-%m-%d %H:%M` value in
   [22-prep/a2](../22-prep/a2-inventory-digests-lifecycle.md), lines 253-262,
   is stale and not the current default.
-  Zone, week rules and bare-year parsing have zero
-  config presence today [V]([22-prep/a2](../22-prep/a2-inventory-digests-lifecycle.md),
-  line 262).
+  Zone, week rules and bare-year parsing have no config presence in
+  the recorded snapshot [V]
+  ([22-prep/a2](../22-prep/a2-inventory-digests-lifecycle.md), line 262).
 
 ### 2.7 Note document model (ticket 23)
 
@@ -388,9 +405,9 @@ Classification:
   fixes source instants with evaluation-time civil projection (B36), and
   ticket 24 keeps compact temporal encoding conditional on measurement
   (B52).
-- **B56. Ticket 29 ships range keys first for unquoted numeric, temporal and
-  bool literals; no text range table at first; bracket counts live in the
-  `meta` facet and delete old derived facts first**
+- **B56. Ticket 29 starts range keys for unquoted numeric, temporal and
+  bool literals. It adds no text range table at first. Bracket counts live
+  in the `meta` facet. Remove old derived facts before adding replacements**
   ([24](../../issues/24-index-read-model-and-query-execution.md), lines 761-765).
 
 ### 2.9 Freshness (ticket 25, as amended by 28/29/32)
@@ -438,7 +455,7 @@ Classification:
   lines 1070-1078).
   Do not infer period dates from the buffer clock or invent metadata for
   new buffers.
-- **B64. Memo identity must include the frame and the generation; a changed
+- **B64. Memo identity must include the frame and the generation. A changed
   plan, frame or generation needs a distinct memo identity**
   ([29](../../issues/29-query-core-and-plan.md), lines 965-978).
 
@@ -448,32 +465,33 @@ Classification:
   Period.** Ticket 29 section 3 sets it:
   "The classes stay apart and order Civil, Instant, Period"
   ([29](../../issues/29-query-core-and-plan.md), lines 721-730). Confirmed
-  owner per Main, 2026-11-16. The ledger's C3 owns group-class order; C4
-  owns period upper-bound wording. Ticket 30's line "Nobody has defined that
-  order" ([30](../../issues/30-temporal-boundary-and-dialects.md), lines
-  537-538) is stale and belongs in the supersession list, not a reopening.
-  Q22 keeps only the mixed temporal value sort key and the period unit
-  tie-break.
+  owner per Main, 2026-11-16. C3 owns group-class order. C4 owns period
+  upper-bound wording. Ticket 30's "Nobody has defined that order"
+  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 537-538)
+  is stale. Record that sentence in the supersession list. Q22 still
+  needs the complete mixed temporal value sort key and the period unit
+  tie-break ([L6](l-answer-verification.md)).
 - **B66. A `Date` and a civil-midnight `DateTime` share a group key when
-  their civil values agree. Civil values and instants stay separate classes.
-  A period groups by exact `(start, unit)`. Membership never supplies key
-  equality; ticket 29 section 3 fixes group equality, not a physical-key
-  rule. Operator-specific membership bounds are a separate R5 contract
-  (B70). Q35 must not read B66 as a ban on those bounds**
+  their civil values agree. Civil values and instants stay separate.
+  A period groups by exact `(start, unit)`. Membership does not define
+  group equality. Ticket 29 section 3 does not ban operator-specific
+  membership bounds. R5 governs those bounds (B70)**
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 533-536;
   [29](../../issues/29-query-core-and-plan.md), lines 716-730).
 - **B67. Mixed civil/instant comparators are unsound across a DST gap.** The
   cycle is civil 02:30 < civil 03:00 < instant 07:15Z < civil 02:30 in
   `America/New_York` on 2026-03-08. `sort_by` panicked in 15 of 200 runs [V]
   ([29](../../issues/29-query-core-and-plan.md), lines 724-727,
-  [29-prep/h3](../29-prep/h3-redteam-round2.md), lines 161-163). The fix:
-  project each temporal value to its canonical class key once; never
-  compare raw civil and instant values. Group keys are civil
-  `(date, time)`, epoch nanoseconds, or `(start, unit)` and need no zone
-  lookup; ticket 21 forbids zone acquisition for civil-only work. Keep the
-  pinned frame for operations that need it. Keep the DST comparator
-  failure as probe evidence from the ticket 29 preparation, not a result
-  of this task.
+  [29-prep/h3](../29-prep/h3-redteam-round2.md), lines 161-163).
+
+  For grouping, project each temporal value to its canonical class key
+  once. Do not compare raw civil and instant values. Civil group keys use
+  `(date, time)`. Instant keys use epoch nanoseconds. Period keys use
+  `(start, unit)`. These keys need no zone lookup.
+
+  Ticket 21 forbids zone acquisition for civil-only work. Keep the pinned
+  frame for operations that need it. The DST comparator failure is probe
+  evidence from ticket 29 preparation, not a result of this task.
 - **B68. `member_of` is reserved as an IR node name only; no frontend, no
   implementation. The spelling waits on ticket 30 (Q18). Its relation is
   never a range key and never a group key**
@@ -514,15 +532,17 @@ Classification:
 
 ### 2.11 Paths (ticket 32)
 
-- **B74. `RelativePath` is a normalized, `/`-joined UTF-8 `String`; pure, no
-  I/O; rejects NUL and `..`; its `Ord` maps `/` to NUL**
+- **B74. `RelativePath` is a normalized, `/`-joined UTF-8 `String`. Its
+  operations are pure and need no I/O. It rejects NUL and `..`.
+  Its `Ord` maps `/` to NUL**
   ([32](../../issues/32-path-and-capability-model.md), lines 431-461).
 - **B75. The filename-period parser reads the last segment of that string.
   Today `derive_day` reads a `Path` through `BaseNameRef::from_path`**
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 513-518).
-  [V] `FileMeta::derive_day` at `src/file.rs:87-97`: filename prefix wins,
-  else `created_at` (the Dataview rule). Ticket 21 removes that fallback
-  (B35).
+  [V] `FileMeta::derive_day` at `src/file.rs:87-97` uses a filename prefix
+  first, then `created_at`. Ticket 21 removes that fallback (B35).
+  Dataview's inspected helper instead checks typed metadata before the
+  filename ([K15](k-citation-verification.md)).
 - **B76. The scan skips non-UTF-8 names with a notice**
   ([30](../../issues/30-temporal-boundary-and-dialects.md), line 516).
 - **B77. The Comparison Key (NFC, lowercase, NFC) is a lookup aid only. It
@@ -538,10 +558,9 @@ Classification:
 
 ### 2.12 Cross-cutting
 
-- **B79. Performance evidence rules.** Use the seven measurement points from
-  ticket 17 (B above). Do not claim a design is optimal from line count,
-  dependency count or unmeasured cost. Mark unmeasured binary size and
-  runtime cost explicitly
+- **B79. Performance evidence rules.** Use ticket 17's seven measurement
+  points. Do not infer optimality from line count, dependency count, or
+  unmeasured cost. Mark unmeasured binary size and runtime cost explicitly
   ([brief.md:75-76](./brief.md), lines 75-76,
   [17](../../issues/17-grilling-forward-consumers-and-design-pressure.md), lines 51-55).
 - **B80. Pinned `jiff`.** `jiff = "=0.2.38"` with `default-features = false`,
@@ -610,8 +629,8 @@ Items that look like rules but are not accepted decisions:
 
 ## 4. Contradictions and exact human decisions needed
 
-Each item names the conflict and the decision owner. None of these may be
-resolved by amending an earlier Answer.
+Each item names a conflict, a supersession, or an open choice.
+Only the human can authorize an amendment to an earlier Answer.
 
 - **C1. Moment translator home.** Research 07 concluded Moment is a
   Templater-compat feature, not a temporal concept, and proposed a template
@@ -640,18 +659,21 @@ resolved by amending an earlier Answer.
   Civil, Instant, Period. Ticket 30's "nobody has defined that order"
   sentence is stale. Main confirmed on 2026-11-16 these three actions. Cite
   ticket 29 as the accepted owner in the integration synthesis. Record the
-  stale sentence in the supersession list. Q22 keeps only the mixed-value
-  sort key and the period unit tie-break (B65).
+  stale sentence in the supersession list. Q22 still needs the complete
+  mixed-value sort key and the period unit tie-break (B65).
 - **C4. Period upper-bound wording.** Ticket 19's original `[s, e]` wording
-  conflicts with ticket 21's exclusive bound. Ticket 19 itself records the
+  conflicts with ticket 21's exclusive bound. Ticket 19 records the
   refinement as overriding
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 283-297).
-  No new decision; carry the exclusive rule (B20). Do not re-argue it.
-- **C5. Week-one rule under a custom week start.** Ticket 21 fixes ISO for
-  the default week only ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 43-44).
+  Carry the exclusive rule (B20). Do not reopen the accepted bound.
+- **C5. Week-one rule under a custom week start.** Ticket 21 fixes Monday
+  start and four-day week one for ISO filename weeks. General week settings
+  do not reinterpret those prefixes ([21](../../issues/21-ambient-environment-and-execution-context.md),
+  lines 170-179, 266-270; [L10](l-answer-verification.md)).
   A first-weekday setting alone does not define week-year numbering.
-  Minimum days in week one matter. ISO `2025-W53` is invalid; accept no
-  rollover [V/H](../21-prep/r5-temporal-adversarial.md), lines 31-34. Human decision: Q8.
+  Q8 decides custom numbering and its supported operations.
+  ISO `2025-W53` is invalid. Accept no rollover
+  [V/H](../21-prep/r5-temporal-adversarial.md), lines 31-34.
 - **C6. Bare weekday meaning.** Next, nearest, or current-week day. Ticket
   19 leaves it open
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 170-171);
@@ -680,16 +702,17 @@ resolved by amending an earlier Answer.
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 73-75).
   Ticket 36 must reconcile that list
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 584-585).
-  Q20 decides placement under B10 and B31.
+  Q20 decides placement under B9, B10 and B31. A separate runtime carrier
+  needs an explicit amendment ([L4](l-answer-verification.md)).
 - **C10. Zone acquisition failure reporting.** B29/B30 fix the policy;
   ticket 22 fixes the precedence (B42). Q30 decides the host acquisition
   mechanism and report path with ticket 34. Jiff note [V]
   ([K20](k-citation-verification.md)): `TimeZone::try_system` errors when
-  discovery fails or `tz-system` is disabled; the convenience
-  `TimeZone::system` can fall back to UTC. That fallback is exactly the
-  implicit UTC that B29 forbids as an ambient default. The older
-  `Etc/Unknown` claim in 21-prep e-design is not the jiff behavior the
-  citation check verified.
+  discovery fails or `tz-system` is disabled. The convenience
+  `TimeZone::system` can fall back to `Etc/Unknown`, which behaves like UTC
+  ([d, TimeZone::try_system](d-crate-evidence.md)).
+  B29 forbids that implicit fallback. Keep the exact zone identity
+  separate from its UTC-like behavior.
 - **C11. `member_of` spelling and Null-date notices.** Ticket 29 reserved
   the IR name only and did not adopt the first-round notice (B68, B73).
   Human decisions: Q18 (spelling) and Q36 (notice condition, with ticket
@@ -727,8 +750,9 @@ resolved by amending an earlier Answer.
   already decided, B38). Ticket 33 later wires the frame source and
   `DateConfig` into the host
   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 137-140).
-- **C19. Truncated ticket 20 sentence.** I1: get the intended rule through
-  ticket 36 before adopting any value check beyond B26.
+- **C19. Truncated ticket 20 sentence.** Recover I1 through ticket 36.
+  Do not infer its missing words. Recovery does not block the complete
+  B26 rule or the date-format check delegated to ticket 30 ([L1](l-answer-verification.md)).
 
 ## 5. Question-to-constraint map
 
@@ -737,7 +761,7 @@ resolved by amending an earlier Answer.
 | 1 | Moment as domain concept | B7, B83 | C1 |
 | 2 | Translator home | B7, B3, B80, B27 | C1 |
 | 3 | Dialect per surface | B3, B4, B80 | C2 |
-| 4 | `date.format` no-full-date check | B26, I1 | C2, C19 |
+| 4 | `date.format` no-full-date check | B26 | C2; C19 is a separate recovery item |
 | 5 | `[frontmatter.date_*]` fate | B4, B44, current surface [V] | C2 |
 | 6 | Calendar helpers in engine | B39, B31 | C16 |
 | 7 | Filename-period parser home | B34, B35, B37, B51, B1, B75 | C15 |
@@ -753,9 +777,9 @@ resolved by amending an earlier Answer.
 | 17 | Relative keyword spelling | B69, D8 | C11/D8 |
 | 18 | `member_of` spelling | B68 | C11 |
 | 19 | Civil/instant type shape | B9, B10, B16, B58 | C8 |
-| 20 | `CalendarPeriod` in value model | B10, B31, B52 | C9 |
+| 20 | `CalendarPeriod` in value model | B9, B10, B31, B52 | C9 |
 | 21 | Ambiguous/absent midnight rule | B16, B30, B32 | open, keep separate from membership (30:76-77) |
-| 22 | Mixed temporal sort key | B33, B65, B66, B67 | C3 (scope reduced) |
+| 22 | Mixed temporal sort key | B33, B65, B66, B67 | Complete value-sort key and unit rank; C3 preserves group order |
 | 23 | Duration refinement | B23 | C7 |
 | 24 | Calendar arithmetic documentation | B23, B81, 19 TODOs 315-338 | open |
 | 25 | `date(link)` target reading | B22, B74, B75 | open Markdown-link sub-questions |
@@ -775,22 +799,24 @@ resolved by amending an earlier Answer.
 
 Claims re-checked before repeating:
 
-- Research 07's "Moment belongs in a template compat module" is [H], and the
-  code has moved since. Do not repeat it as fact (C1).
-- Research 14's Fileclass facts stand; the owner's vault confirms the
-  Moment tokens in use [V] (B26, C1).
-- Research 19-prep `g-links-holding-dates.md` numbers are probe results
-  against the current grammar; ticket 19's accepted `date(link)` rule
-  supersedes its recommendation as a decision. Keep only the code facts
-  (`date()` rejects `Link` today [V]).
-- Research 21-prep `r5-temporal-adversarial.md` facts are sound: the
-  skipped-day counterexample (`Pacific/Apia` 2011-12-30), the min-days
-  examples, the `Etc/Unknown` hazard, and the 98-site `ZoneGuard` census
+- Research 07's template-adapter placement is a proposal [H]. The code has
+  moved since. Do not repeat that placement as an accepted rule (C1).
+- The owner's vault confirms the Moment tokens in use [V] (B26, C1).
+  K8 narrows research 14's Fileclass claims. Its input parser accepts
+  mixed weeks and does not apply the captured sign.
+- Research 19-prep `g-links-holding-dates.md` reports earlier grammar probes.
+  Ticket 19's accepted `date(link)` rule supersedes that report's
+  recommendation. Keep the historical code fact that `date()` rejects
+  `Link` at that inspection date [V].
+- Research 21-prep `r5-temporal-adversarial.md` records the skipped-day
+  counterexample (`Pacific/Apia` 2011-12-30), min-days examples, and a
+  98-site `ZoneGuard` census
   [V/H](../21-prep/r5-temporal-adversarial.md), lines 22-34,
-  [21-prep/e-design:248](../21-prep/e-design-temporal.md), line 248). Ticket 21's
-  Answer adopted the skipped-day and exclusive-bound rules.
-- Do not cite `22-prep/n1`, `n2b`, `n5`, `n6` or `23-prep/h1` to `h3`; the
-  ticket 22 and 23 Answers mark those agent files unreliable
+  [21-prep/e-design:248](../21-prep/e-design-temporal.md), line 248).
+  Treat the census as historical. Ticket 21 adopted the skipped-day and
+  exclusive-bound rules. Use C10 for the corrected Jiff fallback identity.
+- Do not cite `22-prep/n1`, `n2b`, `n5`, `n6` or `23-prep/h1` to `h3`.
+  The ticket 22 and 23 Answers mark those agent files unreliable
   ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 72-75,
   [23](../../issues/23-note-document-model.md), lines 255-257).
 - Ticket 30's Current code section is fresher than the survey and

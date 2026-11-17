@@ -17,17 +17,17 @@ counterexamples from outside the repository. It does not resolve the ticket.
 
 ## How to read this file
 
-- `[V]` = I read the linked source in this session and quote or paraphrase its
-  text. The link shows the page.
+- `[V]` = a linked source read or a recorded probe result.
+  Each citation identifies the source or the historical run.
 - `[V-repo]` = ticket 30 records a verified code read on main @ `cf6d79bd`.
   I did not re-read the file. I cite the ticket.
 - `[H]` = hypothesis or unverified claim. It needs a check before the owner
   treats it as evidence.
 - `[P]` = proposal for the grilling. Not a decision.
-- No measurement in this file comes from this session. Where a size or cost
-  matters and nobody measured it, the text says "not measured".
-- Each design option carries a counterexample and a condition that would
-  reject it. Ticket 36's evidence-gate rules need this shape.
+- No measurement comes from this writing pass. Later recorded probe
+  results appear with their limits. Unmeasured costs remain unmeasured.
+- Each option gives a counterexample or a stated evidence gap.
+  These arguments support the grilling. They do not decide the options.
 
 ## Sources
 
@@ -56,7 +56,7 @@ Primary sources, read on 2026-11-16 unless noted:
 | S19 | `jiff` 0.2.38 crate docs (`fmt::temporal`, `fmt::strtime`, `RoundMode`), read from the local `.rust-docs` cache |
 | S20 | `chrono-english` 0.2.1 crate docs, read from the local `.rust-docs` cache |
 | S21 | W3C XSD 1.1 Part 2: Datatypes, <https://www.w3.org/TR/xmlschema11-2/> |
-| S22 | crates.io API reads for `jiff-english` 0.0.1 and `fuzzydate` 0.4.1, 2026-11-16 (recorded in ticket 30; I re-checked the cache state of both) |
+| S22 | Candidate metadata and API evidence recorded in ticket 30 and `d-crate-evidence.md`; crates.io snapshots on 2026-11-16 and 2026-11-17 |
 | S23 | Duckling (facebook/duckling) README, <https://github.com/facebook/duckling> |
 | S24 | In-repo probe runs: `probes/parity`, `probes/parity/tests/layout.rs`, `probes/candidates`, `probes/moment`; results recorded in `m-gap-closure.md` (2026-11-17) |
 
@@ -70,29 +70,28 @@ Gaps at the end of this file list what these sources do not cover.
 
 - [V] Templater delegates all formatting to Obsidian's runtime `moment`
   object and translates nothing (research 07, recorded in ticket 30).
-- [V] Moment's week tokens (`w ww gggg` local, `W WW GGGG` ISO) get their week
-  start and week-one rule from the locale (`dow`, `doy`). The locale can
-  change per call. A value that depends on the locale is not a stable domain
-  value (S7).
-- [V] Moment's forgiving parser is the default. The string
-  `5917238b-33ff-f849-cd63-80f4c9b37d0c` matches `YYYYDDD` and parses as
-  `5917-08-26` (S7, strict-mode guide, which also documents the
-  `moment.ISO_8601` strict mode).
+- [V] Lowercase Moment tokens (`w ww gggg`) use locale week rules.
+  Uppercase tokens (`W WW GGGG`) use ISO rules. Locale data supplies
+  `dow` and `doy` for the lowercase family (S7; K1).
+- [V] Moment's strict-mode guide documents a forgiving ISO parse of
+  `5917238b-33ff-f849-cd63-80f4c9b37d0c` as `5917-08-26`.
+  The example uses `moment.ISO_8601`; `YYYYDDD` describes the accidental
+  shape, not the example's API call (S7; K23).
 - [V] `minijinja-contrib` date filters use strftime only. They hold no Moment
   logic [V-repo, research 07].
 
-Counterexample against "Moment is a domain concept": the same template renders
-different week numbers after a locale change. A domain value must not change
-that way.
+Counterexample against implicit locale policy: the same template can
+produce different week numbers after a locale change. A fixed, explicit
+week rule removes this device-locale dependence. The example supports an
+adapter boundary, not a unique module home.
 
 Counterexample against dropping Moment tokens now: the owner's vault templates
 write `ww`, `YY`, `Q`, `Qo`, and the Fileclass data uses `YYYY`, `DDDD`, `Q`
 [V-repo]. A cold drop breaks those templates.
 
-[P] Treat Moment syntax as a template compatibility adapter. Keep the domain
-value model dialect-free. Rejecting condition: schema `date.format` checks
-must accept Moment tokens. Then the dialect crosses the schema seam. A
-second home for the dialect needs a decision (q3, q4).
+[P] Treat Moment syntax as a compatibility adapter. Keep domain values
+dialect-free. If schema checks also accept Moment, identify a shared
+adapter consumer. That need does not by itself decide the module home.
 
 ### q2. Where does the Moment dialect translator live?
 
@@ -104,12 +103,13 @@ otherwise the code translates Moment tokens. An unknown token returns
 - [V] `jiff` supports strftime-like parsing and formatting only, in
   `fmt::strtime`. Its docs say the goal is not to match POSIX exactly
   (S19).
-- [V] Moment tokens the translator must map include week-of-year and quarter
-  tokens (`ww`, `Q`, `Qo`). Those need a week rule and a quarter rule. Jiff
-  gives `%V`/`%G` (ISO week) and `%q` (quarter, format-only). It gives no
-  local-week tokens (S19).
-- [V] `jiff-english` and `fuzzydate` do not carry format tokens at all
-  (S22).
+- [V] The owner's Moment tokens include `ww`, `Q`, and `Qo`.
+  Lowercase `ww` needs a locale-style week rule.
+  Jiff gives ISO `%V`/`%G` and format-only `%q` for quarters.
+  Its `%U`/`%W` use week zero. They do not replace a general locale
+  week-year rule (S19; K20).
+- [V] The candidate date-parsing APIs carry no format-token interface
+  (`d-crate-evidence.md`, candidate sections).
 
 The options:
 
@@ -147,15 +147,16 @@ Facts per surface:
 
 External evidence:
 
-- [V] One dialect per surface is the norm in mature systems. PG keeps ISO
-  input unambiguous in every `DateStyle` mode, and documents that non-ISO
-  input orders (`MDY`, `DMY`, `YMD`) re-read the same literal (S5). Jiff's
-  `fmt::strtime` is one grammar for parse and print (S19).
-- [V] A two-grammar system needs a dispatch rule and documents it: the
-  current `pattern_to_strftime` dispatches on `%`. That rule makes
-  `YYYY` a Moment pattern and `%Y` a strftime pattern. It cannot express a
-  format that mixes both. Jiff has no quarter directive; its `%Q` is a
-  zone-offset alias, not a quarter (S19).
+- [V] The inspected PostgreSQL and Jiff interfaces document their format
+  rules. PostgreSQL preserves ISO input across `DateStyle` modes.
+  Non-ISO input depends on `MDY`, `DMY`, or `YMD` (S5).
+  Jiff's `fmt::strtime` supplies parsing and formatting directives (S19).
+  These examples do not prove an ecosystem-wide dialect rule.
+- [V-repo] `pattern_to_strftime` selects strftime when it finds `%` outside
+  brackets. Otherwise it translates Moment tokens.
+  Thus `YYYY` selects Moment and `%Y` selects strftime.
+  Jiff's format-only quarter directive is `%q`.
+  `%Q` means a zone identifier or offset, not a quarter (S19; K20).
 - [V] Dataview accepts two grammars by argument shape: `date(text)` auto-parses
   ISO and `date(text, format)` uses Luxon tokens (S9).
 
@@ -177,10 +178,10 @@ an owner-confirmed need for Moment tokens in queries or config.
 
 - [V] The owner's Fileclass data declares exactly these partial formats
   [V-repo].
-- [V] Fileclass skips pattern validation when a field's declared format is
-  a plain string, so Moment `dateFormat` tokens go unlinted; its outer
-  validator still checks empty values and `required` [V-repo, research 14;
-  K8 in `k-citation-verification.md`].
+- [V] Fileclass bypasses pattern validation for a string `dateFormat`.
+  That bypass does not enforce a string type or a non-empty value.
+  The outer validator handles empty values and `required`
+  [V-repo, research 14; K8 in `k-citation-verification.md`].
 - [V] Mainstream value types for month- and year-only data: Temporal ships
   `PlainYearMonth` and `PlainMonthDay` (no plain-year type), java.time
   ships `Year` and `YearMonth`, and XSD has `gYear`/`gYearMonth` (S2, S14,
@@ -206,11 +207,11 @@ Counterexample against "no check at all": the current state already has no
 check, and `SchemaDateField.format` is dead config [V-repo]. An unvalidated
 format silently emits wrong dates when a writer uses it.
 
-[P] Classify each format token at schema load. Formats that name a full date
-get the value check. Formats that name a month, quarter, or day-of-year get
-a structural check only (string shape). Formats with no date component get
-no value check. The ticket 20 fragment is located and read; it does not
-gate this proposal (`i-leakage-review.md`, I1).
+[P] Classify format tokens at schema load. Separate full-date, partial-date,
+and no-date-component formats. Define a value check for each adopted
+category. Ticket 20's provisional scalar rule applies only when no date
+component exists (L2). Its unrelated truncated fragment does not block
+the delegated date-format check (L1).
 
 ### q5. `format` under `[frontmatter.date_created]` and `[frontmatter.date_modified]`
 
@@ -218,10 +219,10 @@ gate this proposal (`i-leakage-review.md`, I1).
   defaults are `%Y-%m-%dT%H:%M:%S` (strftime).
 - [V] A configured input format with day-first or month-first order is a
   hazard PG documents: `01/02/03` re-reads per `DateStyle` mode (S5).
-- [V] RFC 3339 section 5.1 shows why the timestamp format for stored values
-  should stay fixed and sortable. Lexicographic order equals time order
-  only when all strings share one precision, one uppercase `T`/`Z`
-  spelling, and one zone offset (S3).
+- [V] RFC 3339 section 5.1 states conditions for timestamp string order:
+  use the same offset, zone spelling, fractional-second digit count,
+  and punctuation form (S3). This rule covers complete timestamps.
+  It does not establish a format rule for arbitrary stored values.
 
 Options: keep the keys where they are, move them into the new `[date]`
 table, or delete them.
@@ -259,9 +260,9 @@ changes Migratable, which still needs a change-table row.
   week. That is a week-start rule read, not a render-only concern
   [V-repo].
 
-Counterexample against keeping `Anchor` in the template engine: the query
-side also needs the pinned `today` (relative keywords bind at plan time,
-ticket 29). Two anchors mean two clocks.
+Counterexample against independent anchor selection: a query and template
+can select different clocks. Keeping a template wrapper does not cause
+that failure if both surfaces use the same pinned frame.
 
 Counterexample against moving the `date_*` filters into temporal: filters
 are a template API surface. Ticket 16 freezes template capabilities but the
@@ -279,19 +280,16 @@ moves with the week rule into temporal.
   `scan_date_prefix` in `src/temporal/lexer.rs` sees `YYYY-MM-DD` and
   `YYYY-MM` only. The note parser also calls `parse_prefix`. Ticket 16
   freezes that parsing.
-- [V] Dataview's `extractDate` searches the whole file name for full date
-  shapes (`yyyy-mm-dd`, `yyyymmdd`, ISO datetimes), and its `findDate`
-  checks typed metadata fields first (S9). Two differences from Traces: no
-  weeks or quarters, and no strict-prefix scan (frontmatter dates, not
-  creation time).
-- [V] NumPy's `datetime64` shows the opposite convention: `'2005'` parses as
-  a year-granularity value and equals `'2005-01-01'` (S17). Traces must not
-  do this: ticket 21 forbids reinterpreting an invalid longer prefix as a
-  shorter prefix.
-- [V] A `parse_prefix`-style scan is prefix-driven, and year-first ISO is
-  the prefix-friendly order. RFC 3339's ordering property covers complete
-  same-shape strings, not prefixes with arbitrary tails, so prefix
-  unambiguity is a convention, not an RFC theorem (S3).
+- [V] Dataview's `extractDate` searches for dashed or compact full dates
+  anywhere in the name. `findDate` checks typed metadata first.
+  That helper can also inspect link path, subpath, and display text
+  (S9; K15). The inspected extraction helper recognizes no week or quarter
+  labels. This limited read does not establish ecosystem-wide absence.
+- [V] NumPy's year-granularity `'2005'` equals `'2005-01-01'` (S17).
+  That cross-unit equality says nothing about malformed-prefix fallback.
+- [V] RFC 3339's ordering rule covers complete same-shape timestamps,
+  not arbitrary filename suffixes (S3). Prefix separators and fallback
+  rules need their own grammar.
 
 Ticket 21 adds validated ISO weeks, quarters, and an opt-in bare year, and
 scopes the new parser to filenames.
@@ -299,26 +297,28 @@ scopes the new parser to filenames.
 Options for the home:
 
 1. In temporal, next to `DatePoint` and the existing prefix scan. The
-   parser shares the date grammar and the week validation. Counterexample
-   against: none found. `DatePoint::parse_prefix` already sits in temporal.
-2. In the file scanner. It would re-implement prefix and week logic or call
-   temporal anyway. Counterexample: two homes for one grammar.
-3. In the note parser. Forbidden: vault-format parsing is frozen (ticket
-   16), and filename forms must not change note parsing.
+   parser can share date and week validation. No contrary dependency
+   example appears in this read set.
+2. In the file scanner. It can call temporal without owning the grammar.
+   Duplicating prefix and week logic would create two grammar owners.
+3. In the note parser. A shared parser must preserve frozen note meaning,
+   except for explicitly accepted changes (L3).
+   Filename forms do not authorize new note syntax.
 
-[P] Option 1. A `filename::Period` parser unit in temporal, consumed by the
-scanner and by `file.date`/`file.cdate` evaluation. The parser returns a
-kind plus a start, not one `DateValue` (ticket 21).
+[P] Put the filename-period parser in temporal. Queries derive `file.date`
+from its normalized start and unit (ticket 24).
+`file.cdate` instead derives from creation time in the pinned zone.
+Do not make `file.cdate` consume a filename prefix.
 
 ### q8. The week-one rule for a custom week start
 
-- [V] CLDR defines a week by two values: `firstDay` (sun..sat) and `minDays`
-  (1..7). Root locale: Monday, 1 day. The US uses Sunday, 1 day. Many
-  European territories use a 4-day minimum with Monday. The rule: a week
-  counts as
-  week 1 of a year when it includes at least `minDays` days of that year.
-  CLDR also tells implementations how to read week number 53 in a year
-  with no week 53. The reader treats it as week 1 of the next year (S1).
+- [V] CLDR defines numbered weeks with `firstDay` and `minDays`.
+  Territory `001` uses Monday and 1 day. The US uses Sunday and 1 day.
+  Many European territories use Monday and 4 days.
+  A first week needs at least `minDays` days in that year (S1).
+  The rollover note concerns a previously valid week 53 made unavailable
+  by changed week settings. It does not define every strict ISO parser
+  (K4).
 - [V] Moment encodes the same rule as `week: {dow, doy}` with
   `doy = 7 + dow - janX`, where `janX` is the first day of January that
   belongs to week 1. Presets: ISO (dow 1, doy 4, janX 4) and US (dow 0,
@@ -342,17 +342,16 @@ Monday, min-days 4 and min-days 5 put `2009-01-01` in different years.
 Week 1 of 2009 versus week 53 of 2008 (S14 week table). A
 `week_start = monday` config does not say which.
 
-Counterexample for the rollover trap: ISO `2025-W53` does not exist. CLDR
-tells readers to map it to week 1 of 2026. Ticket 21 forbids that
-rollover and calls the literal invalid. The config must state which
-behavior applies to a typed week literal and to a filename week prefix.
-Ticket 21 already decides: invalid, no rollover.
+Counterexample for rollover policy: ISO `2025-W53` is invalid.
+CLDR's changed-settings note permits rollover in its stated context.
+Ticket 21 instead accepts strict ISO filename validation without rollover.
+Do not generalize the CLDR note to every invalid typed week.
 
-[P] `DateConfig` carries the pair `(first_day, min_days)`, default
-`(monday, 4)` = ISO. Week-based numbering always follows the pair.
-Rejecting condition for the default: if the owner's usage shows US-style
-weeks, the default changes to `(sunday, 1)` and ISO week literals need a
-separate spelling.
+[P] Consider a configurable `(first_day, min_days)` pair for general
+week operations, with ISO `(monday, 4)` as the proposed default.
+The two fields need not change together.
+Preserve ISO filename prefixes independently of general settings.
+A non-ISO filename spelling needs a separate decision (L10).
 
 ---
 
@@ -373,18 +372,17 @@ separate spelling.
 Counterexample against keeping it: two RFC 3339 grammars can disagree on
 edge forms, and the fingerprint carries both crates forever.
 
-Counterexample against removing it before a check: the call site's accepted
-forms had not been diffed against jiff when this file was written. The
-parity probe now ran in-repo (`probes/parity`, S24): 4,635,370 guarded
-inputs, zero acceptance, value, and error-category differences. The guard
-is the ten-byte date shape only; raw jiff accepts a superset (compact
-`20260101`, naive datetimes, negative years). Ticket 16 freezes
-vault-format parsing. A silent grammar change breaks frozen parsing.
+Counterexample against removal without parity evidence: a broader Jiff
+entry point could change frozen acceptance. The later probe reports
+4,635,370 guarded date inputs with zero acceptance, value, or error-category
+differences (`probes/parity`, S24). The guard admits only the ten-byte date
+shape. Raw Jiff also accepts compact `20260101`, naive datetimes, and
+negative years.
 
-[P] Remove after a parity audit of the call site's accepted forms against
-jiff. The audit exists in-repo (`probes/parity`, S24) and holds for the
-guarded date shape. The remaining audit scope (the call site's other
-shapes) still belongs in the ticket Answer before removal.
+[P] Remove speedate only with the existing guard and diagnostic behavior
+preserved. Cite the bounded parity evidence.
+Do not claim that this probe covers datetimes, spans, zones, or unguarded
+Jiff input.
 
 ### q10. Does `winnow` stay?
 
@@ -398,30 +396,31 @@ shapes) still belongs in the ticket Answer before removal.
 - [V] `winnow` is a parser-combinator library. A combinator in one call site
   is a dependency for one grammar.
 
-Counterexample against swapping winnow for jiff: the frozen inline-field
-duration grammar does not match jiff's `Span` grammar. A swap changes what
-parses, which ticket 16 forbids without a change-table row.
+Counterexample against direct replacement: the frozen duration-prefix
+grammar needs a consumed boundary. Jiff's public friendly parser accepts
+only complete input and reports no consumed prefix
+(`d-crate-evidence.md`, Question 2).
 
-[P] Keep `winnow` until ticket 35 does the crate cut. Keep the crate in the
-ticket 25 fingerprint list (ticket 36 records the omission). A hand-written
-replacement needs a grammar spec first. That is a new artifact, not a
-shortcut.
+[P] Keep `winnow` for that boundary role. Correct ticket 25's persisted
+producer list, or remove the direct use under a separate grammar-parity
+argument. Removing the direct dependency does not remove transitive
+`winnow` from this lockfile (d, Question 4).
 
 ### q11. Does `logos` stay as part of the parsing base?
 
 - [V-repo] `logos` serves `lexer.rs`, `datetime.rs`, and `point.rs` in
   temporal, plus the shared lexer, the note parser, and the query grammar.
-- [V] `logos` builds a deterministic automaton from regexes at compile
-  time. Errors carry spans. The closed-keyword NL grammar of ticket 19 fits
-  a token-based lexer well.
+- [V] Logos builds a deterministic automaton from token definitions
+  (K20 in `k-citation-verification.md`). That lexical property does not
+  prove deterministic callbacks, clock inputs, or relative-date resolution.
 - [H] Binary-size effect under `opt-level = "z"`: not measured.
 
-Counterexample against removal: three temporal lexers plus the query grammar
-already share it. A removal is a rewrite of four lexers with no reported
-defect.
+Counterexample against removal: temporal, note, and query lexers already
+use Logos. Replacing those consumers needs grammar-parity evidence.
+The listed files do not establish exactly four independent lexers.
 
-[P] Keep `logos` as the lexing base. The NL grammar (q13) should reuse it
-for the closed keyword set.
+[P] Keep Logos as the lexing base. Consider reuse if the human adopts a
+closed NL grammar. Reuse does not prove parser-wide determinism.
 
 ### q12. Does `jiff` stay as part of the parsing base?
 
@@ -473,9 +472,12 @@ dialect of record (q3) and set the parser defaults explicitly where a
 - [V] `chrono-english` states the closed-list position in its crate docs:
   it makes no try at full natural language parsing. It supports only a
   limited set of patterns (S20).
-- [V] Duckling (Haskell, rule-based) resolves relative time against a
-  `reference_time` parameter and reports a grain (day, hour, second). Its
-  corpus tests each rule with positive and negative examples (S23).
+- [V] Duckling's example server accepts `reftime`.
+  It puts that value in `Context.referenceTime`.
+  Without that parameter, it uses the current reference time.
+  Its corpus fixes the reference at 2013-02-12 at 04:30.
+  Results carry a grain, and rules have positive and negative examples
+  (S23; K17).
 - [V] Obsidian Tasks uses the flexible parser `chrono` for filter dates and
   warns users against two adjacent word-dates in one range because flexible
   parsing makes the range ambiguous. It recommends `YYYY-MM-DD` (S10).
@@ -483,13 +485,14 @@ dialect of record (q3) and set the parser defaults explicitly where a
   (`today`, `now`, `tomorrow`, `yesterday`, `sow`, `eow`, `som`, `eom`,
   `soy`, `eoy`) (S9).
 
-Counterexample against an open NL parser: Tasks documents the failure mode
-(ambiguous ranges) of flexible parsing in a user-facing note (S10). A query
-engine needs deterministic plans. Ambiguity breaks caching and replays.
+Counterexample against unpinned flexible parsing: Tasks documents
+ambiguous word-date ranges (S10). A broad grammar can replay consistently
+when all relevant inputs are pinned. A closed grammar can still read
+an ambient clock. Grammar size does not prove determinism (K17).
 
-[P] Closed grammar, as ticket 19 proposes. The grammar table belongs in the
-ticket Answer with one example and one negative example per rule (the
-Duckling corpus practice, S23).
+[P] Keep ticket 19's hook-only alternative. If the human adopts a grammar,
+consider a closed list with pinned inputs. Put positive and negative
+examples in the accepted grammar table.
 
 ### q14. Build in the repository or use a crate?
 
@@ -500,28 +503,36 @@ owner needs, with what the evidence gives:
 | --- | --- | --- | --- |
 | Licence, releases | MIT; 1 release (2026-08-07); 29 downloads (crates.io, 2026-11-17) [V, S22, S24] | MIT; 14 releases; last update 2026-04-05 (crates.io, 2026-11-17) [V, S22, S24] | n/a |
 | Size | ~1.3k lines [V, S22] | ~2.6k lines [V, S22] | [H] not written yet |
-| Dependencies | `jiff ^0.2` default features + `scanlex ^0.1`; the probe shows the jiff default features unify into the build (`tz-fat`, tzdb bundles, `perf-inline`) [V, S22, S24] | `chrono 0.4.45` (feature `clock`), `lazy_static`, `thiserror`; the jiff tree stays untouched [V, S22, S24] | none |
-| Determinism | bounded probe matrix, one anchor, own process per phrase [V, S24]; a source-level `week_day` slicing panic risk remains | same probe shape; no panic observed on the matrix [V, S24] | yes, by construction (frame in q33) |
-| Week rules | `last friday` returns the previous day (2026-03-13 from the 2026-03-14 anchor) [V, S24] | `last friday` returns one week back (2026-03-06); bare weekdays keep the anchor time [V, S24] | decided by q8 |
-| Output type | a point; `next week` is rejected outright [V, S24] | a point; `next week` returns a +7-day point [V, S24] | `CalendarPeriod` (start, unit) per ticket 21 |
-| Coverage of the closed grammar | no `next week`, no `eom`, no `in 2 weeks`; lenient mode misparses `start of month` as midnight today [V, S24] | no `eom`, no `in 2 weeks`; `next week` covered as a point [V, S24] | exactly the decided list |
-| Coupling with jiff `=0.2.38` | unifies jiff default features into the build [V, S24] | adds `chrono`; two datetime stacks in one binary [V, S24] | none |
-| Binary cost, probe | +65.0 KiB over the 409 KiB probe baseline, including the feature unification [V, S24] | +48.9 KiB, including the `chrono` stack [V, S24] | [H] not measured |
-| Speed, probe | 263 to 588 ns/parse (indicative) [V, S24] | 215 to 585 ns/parse (indicative) [V, S24] | [H] not measured |
-| Version risk | 0.0.1, 29 downloads, one release [V, S22] | active but pulls a second stack | repo owns changes |
+| Dependencies | `jiff ^0.2` default features + `scanlex ^0.1`; probe feature unification adds `tz-fat`, tzdb bundles, `perf-inline` [V, S22, S24] | `chrono 0.4.45` with `clock`, `lazy_static`, `thiserror`; inspected probe tree leaves Jiff unchanged [V, S22, S24] | no new parser crate proposed [P]; actual dependencies unmeasured |
+| Determinism evidence | bounded fixed-anchor matrix [V, S24]; source slicing risk remains; no complete transitive audit | bounded fixed-anchor matrix [V, S24]; no panic observed in that matrix; no complete transitive audit | pinned-input contract proposed [P]; no implementation proof |
+| Week rules | `last friday` gives 2026-03-13 from the 2026-03-14 anchor [V, S24] | `last friday` gives 2026-03-06; sampled bare `monday` keeps anchor time [V, S24]; same-day runtime untested | phrase rules need q15/q16; q8 alone does not decide them |
+| Output type | point; `next week` rejected [V, S24] | point; `next week` gives +7 days [V, S24] | `CalendarPeriod` proposed for adopted period phrases [P] |
+| Coverage | no `next week`, `eom`, or `in 2 weeks`; lenient `start of month` gives midnight today [V, S24] | no `eom` or `in 2 weeks`; `next week` is a point [V, S24] | chosen list only if implemented and checked [P]; no demonstrated coverage |
+| Coupling with jiff `=0.2.38` | enables jiff defaults in probe [V, S24] | adds a chrono stack in probe [V, S24] | Jiff-based implementation proposed [P] |
+| Binary snapshot | +65.0 KiB over 409 KiB baseline, including feature unification [V, S24] | +48.9 KiB, including chrono [V, S24] | not measured |
+| Speed snapshot | 263 to 588 ns/parse, indicative [V, S24] | 215 to 585 ns/parse, indicative [V, S24] | not measured |
+| Compatibility | edition 2021; no `rust-version`; recorded stable rustc 1.89.0 build covers English only [V, S24] | edition 2021; no `rust-version`; no recorded stable 1.89.0 fuzzy build | repository floor 1.96; proposed parser unbuilt |
+| Maintenance evidence | 0.0.1, 29 downloads, one release [V, S22] | release/download snapshot only; issue and commit activity unexamined | repository would own changes [P] |
 
-Limits of the probe rows: the matrix is a bounded phrase list. Exhaustive
-Unicode, overflow, and ambient-state behavior is not covered, and the
-benchmark is indicative, not controlled (S24).
+Probe limits: the phrase matrix is bounded. It does not cover all Unicode,
+overflow, or ambient-input paths. Fuzzydate same-day behavior remains
+runtime-untested. The mislabeled same-day invocation ran the English binary
+(d, fuzzydate section).
+
+Binary sizes precede final timing-mode source edits. They are
+earlier-revision snapshots, not current reproducible deltas.
+The timings are indicative, not controlled or production benchmarks.
+The absence of `rust-version` establishes no minimum supported version.
 
 Evidence from the closest comparable crate, `chrono-english` 0.2.1 (S20):
 
-- It takes the anchor as an explicit `DateTime` parameter. Determinism is
-  conditional: the result depends only on the text and pinned inputs, but
-  zone data and week rules are among those inputs (S20).
-- It outputs `Interval = Seconds | Days | Months` for bare offsets. That is
-  a duration, not a period. `next week` needs a period (q16). No candidate
-  crate's documented output is a period.
+- It takes a `DateTime<Tz>` anchor. That API supports injection.
+  The source read does not prove absence of ambient reads through every
+  generic conversion or dependency (S20; K17).
+- Its separate `parse_duration` API returns
+  `Interval::Seconds | Days | Months`. That is a duration result.
+  The inspected candidate date APIs return points, not periods
+  (S20; K17; d). Period phrases remain an adoption choice.
 - Its weekday semantics are dialect-split: US `next friday` = the coming
   Friday. UK `next friday` = Friday of next week. A repo grammar fixes one
   meaning.
@@ -533,17 +544,18 @@ feature. `Cargo.toml` has no `chrono` entry today [V, S22]. Adding it puts a
 second calendar implementation next to jiff, with different week and
 arithmetic defaults, inside a codebase that just pinned jiff.
 
-Counterexample against `jiff-english`: one release, one month old by its
-date, 29 downloads. That is not a maintenance signal. It is a prototype
-signal. A crates.io API re-check on 2026-11-17 still shows 29 downloads
-(S24).
+Counterexample against adoption based on popularity: jiff-english has one
+release on 2026-08-07 and 29 recorded downloads. The 2026-11-17 API
+snapshot still shows 29 (S24). Those counts do not prove maintenance
+quality or justify calling the crate a prototype.
 
-[P] Build in the repository, as ticket 30 proposes. The runtime probe
-settles the rejecting condition in the negative. Neither candidate yields
-`(start, unit)` periods or takes an injected anchor, and `jiff-english`
-rejects `next week` outright (S24, `m-gap-closure.md`). Probe costs:
-+65.0 KiB (english, with jiff default-feature unification) and +48.9 KiB
-(fuzzy, with a `chrono` stack); both parse in under a microsecond.
+[P] Prefer an in-repository grammar if the human adopts period phrases
+and the candidate APIs cannot meet that contract. Both candidates take
+injected anchors. Fuzzydate's naive-anchor API still uses ambient `Local`;
+its aware API accepts an explicit zone. Neither candidate returns
+`(start, unit)` periods. Jiff-english rejects `next week`
+(S24; d, candidate sections). These gaps support the proposal, not a
+completed adoption decision.
 
 ### q15. The meaning of a bare weekday
 
@@ -564,10 +576,10 @@ Evidence, one library per meaning:
 - [V] No weekday resolution at all: cron's day-of-week field matches the
   day itself, with no relative meaning (S18).
 
-Counterexample against "nearest" in a query engine: `nearest` is
-non-monotonic in `today`. On Wednesday a bare `tuesday` resolves to
-yesterday, so `due > tuesday` includes today. A user who reads the filter
-as "next Tuesday" gets extra rows and gets no error (S10).
+Counterexample against an unstated nearest rule: on Wednesday, bare
+`tuesday` can mean yesterday. A reader who expects next Tuesday interprets
+`due > tuesday` differently (S10). This is an expectation mismatch,
+not proof that nearest selection is non-monotonic.
 
 Counterexample against "current week" in queries: on Sunday, ISO current
 week runs Monday to Sunday, so a bare `monday` on Sunday lands six days
@@ -578,17 +590,16 @@ Counterexample against "next" as the only meaning: Tasks users document the
 nearest expectation. Adopting `next` silently changes answers for users who
 come from that habit. Ticket 19 asks to fix exactly this fork.
 
-[P] Spell the meanings, do not imply them. Expose `next <weekday>` and
-`last <weekday>`. java.time's `nextOrSame` decision can wait. `next` =
-strictly after `today` is the monotonic choice. Give a bare weekday one
-fixed meaning chosen by the owner, recorded in `DateConfig` (q27).
-Rejecting condition for any bare-weekday default: none is safe by evidence
-alone. This input does not decide it.
+[P] Define `next <weekday>` and `last <weekday>` explicitly if adopted.
+Consider strictly-after `today` for `next`. Choose a bare-weekday meaning
+separately. The evidence does not select one safe default.
+A `DateConfig` setting is an option, not a requirement.
 
 ### q16. Interval precision of phrases such as `next week`
 
-- [V-repo] Tickets 19 and 21 separate periods from arithmetic points. The
-  grammar must yield a period with a unit.
+- [V-repo] Tickets 19 and 21 distinguish periods from arithmetic points.
+  If the human adopts period phrases, the grammar needs period-valued
+  results. Grammar adoption itself remains open (L11).
 - [V] Dataview's week keywords are edge points: `sow`/`eow` give the start
   or end of the current week (S9). They are points that imply a span only
   when paired.
@@ -604,19 +615,19 @@ alone. This input does not decide it.
   clamps March 31 + 1 month to April 30 (S5). Temporal offers
   `constrain`/`reject` (S2).
 
-Counterexample against a point-only grammar: `file.date = next week` as a
-point is underdetermined (which day?). Tasks resolves it as a range (S10);
-Traces resolves it as a period (ticket 19).
+Counterexample against a point-only period phrase: `file.date = next week`
+does not identify one day. Tasks uses a range (S10).
+If Traces adopts that phrase, the proposal needs a period result.
 
-Counterexample for the clamp rule in periods: the period "next month"
-starts on a computed date. The start can clamp if `today` is `2027-01-30`
-and the unit arithmetic walks month edges. The ticket must state whether
-the start uses clamping or reject-on-invalid.
+Counterexample against shifting a raw label as a period start:
+`2027-01-30` is not a normalized month start. Adding a month can clamp
+that point, but it does not define "next month". A normalized month period
+starts on the first day. Keep point-shift overflow policy separate from
+period construction.
 
-[P] Grammar yields `CalendarPeriod` (normalized civil start, unit),
-equality by `(start, unit)`, per tickets 19 and 21. Start computation uses
-clamping, matching PG and `chrono-english`, with `reject` recorded as the
-alternative.
+[P] For adopted period phrases, return normalized `CalendarPeriod`
+values. Derive the target period from the anchor and unit.
+Do not use month-clamp examples as proof of a period-normalization rule.
 
 ### q17. Filter spelling of relative keywords such as `today` and `eom`
 
@@ -642,18 +653,17 @@ Dataview's `eom` means end of the current month. Traces' `eom(date)`
 parameterizes the month, which is strictly more general and matches the
 landed function form.
 
-[P] Keep the function spelling: `today()`, `eom()`, `eom(date)`, with the
-no-argument forms resolving against the frame's `today` at plan time
-(ticket 29). Rejecting condition: none known. The collision with field
-paths is decisive.
+[P] Consider `today()`, `eom()`, and `eom(date)`.
+The proposed no-argument forms bind against the frame at plan time.
+This is the q17 function alternative, not the existing grammar.
+Dataview-style `date(today)` remains a competing spelling.
 
 ### q18. The frontend spelling of `member_of`
 
 - [V-repo] Ticket 29 reserves only the IR name. The first pushdown scope
   covers unquoted literals and `And`.
-- [V] Tasks has a semantic membership filter, `happens`: true when any of
-  the task's dates falls in the given range (S10). The name reads as
-  membership, not containment.
+- [V] Tasks' `happens` checks start, scheduled, and due dates against a
+  range (S10; K18). It does not check every task date.
 - [V] Dataview spells containment as `contains()` on lists (S9).
 - [V] PG spells array containment as `@>` and set membership as `IN`
   (S5).
@@ -661,17 +671,14 @@ paths is decisive.
   ordering. Period membership tests the civil date of the instant in the
   pinned zone.
 
-Counterexample against overloading `in`: range filters already use `in`
-spelling in this family of tools (Tasks `in 2026-06`, S10). Overloading
-makes `date in 2026-06` ambiguous between range and membership.
+Syntax risk: Tasks uses `in` for ranges, but that spelling does not prove
+an ambiguity in Traces. A Traces grammar must define its own productions
+and relation (K18).
 
-Counterexample against an operator soup (`@>`): the DSL is user-facing
-text. Symbol operators read as implementation, not query.
-
-[P] One word, one meaning: a named operator or function spelled
-`member_of(...)`, or a distinct word such as `within` if the owner prefers
-prose. Keep `in` for ranges. Rejecting condition: if `member_of` reads as
-implementation to the owner's users, the word changes. The IR name stays.
+[P] Compare `member_of(...)` or `within` with keeping only the reserved
+IR name. Do not infer a required frontend implementation.
+If the human adopts syntax, distinguish a matching alias from a new
+relation. The evidence does not choose the spelling.
 
 ---
 
@@ -679,11 +686,11 @@ implementation to the owner's users, the word changes. The IR name stays.
 
 ### q19. Type shape for civil and instant values
 
-- [V] java.time: separate types `LocalDate`, `LocalTime`, `LocalDateTime`,
-  `ZonedDateTime`, `Instant`, `OffsetDateTime`. The package doc states the
-  design intent: "the widespread use of time-zones tends to add considerable
-  complexity" (S14). The doc also recommends `Offset*` types for network and
-  database protocols. Stores hold offsets, not zone identities.
+- [V] java.time separates `LocalDate`, `LocalTime`, `LocalDateTime`,
+  `ZonedDateTime`, `Instant`, and `OffsetDateTime`.
+  Its package documentation identifies time-zone complexity.
+  It recommends `Offset*` types for network and database protocols (S14).
+  That recommendation does not prove how every store represents zones.
 - [V] Jiff: separate types `civil::Date`, `civil::DateTime`, `Timestamp`,
   `Zoned`, with explicit conversions (S19).
 - [V] Temporal: `PlainDate`/`PlainDateTime` (civil) versus `Instant` versus
@@ -699,20 +706,20 @@ implementation to the owner's users, the word changes. The IR name stays.
 - [V-repo] `NoteFieldValue` must stay at 80 bytes. `DateValue` is 4 bytes,
   `DateTimeValue` 16, `DurationValue` 72 (research 11).
 
-Counterexample against a single `DatePoint` with a mode flag: PG's mode
-flag is the documented hazard (silent offset drop, no zone retention). The
-value also cannot state which conversions are legal at the type level.
+Counterexample against permissive offset handling: PostgreSQL's
+without-zone type ignores an input offset (S5; K13).
+PostgreSQL exposes distinct SQL types, not one public mode-flag type.
+That parser policy does not prove that a Rust inner enum is unsafe.
 
-Counterexample against one `NoteFieldValue` variant per kind (`Date`,
-`CivilDateTime`, `Instant`, `Period`): each variant spends the 80-byte
-envelope and each needs coercion rules. Ticket 19 already lists the three
-temporal brackets (`Date`, `DateTime`, `CalendarPeriod`).
+Counterexample against assuming variant cost: every variant contributes
+to the same enum maximum. Separate variants do not each consume another
+80-byte slot. Both proposed Rust shapes need actual layout evidence.
 
-[P] One `DateValue` slot holding an inner enum `civil | instant` (plus a
-period representation at the temporal level, q20). Precision of written
-input stays on the civil side. Rejecting condition: if an inner enum pushes
-`DateValue` past the slot budget, the variant split returns. Sizes are not
-measured here.
+[P] Compare an inner temporal enum with separate runtime variants.
+Keep civil datetimes distinct from instants in either shape.
+The later default-test-profile mirror measures 80 bytes, not the proposed
+product types. Its `LinkType` and duration substitutions limit that result
+(S24; `m-gap-closure.md`).
 
 ### q20. Where `CalendarPeriod` sits in the value model
 
@@ -720,49 +727,51 @@ measured here.
   19 and 21 need period values for `file.date` and filter literals. Ticket
   19 puts `CalendarPeriod` in the temporal brackets. Ticket 21 defines it
   as a normalized civil start plus unit.
-- [V] Temporal's `PlainYearMonth` is a period-as-value precedent. Its
-  constructor pitfall (reference day makes equal months unequal) is
-  evidence for storing the normalized start, never the raw label (S2).
-- [V] Arrow carries an interval type in its columnar format with units
-  months, day-time, and month-day-nano (S16). The minimal unit (month
-  interval) is a plain integer of months. It is a storage encoding without
-  calendar semantics; it supports a `(start, unit)`-style layout but does
-  not decide period equality or ordering.
-- [V-repo] The store does not persist filename periods. Queries derive them
-  (ticket 24). Group keys use `(start, unit)`. Membership never defines a
-  group key or range key (ticket 29).
+- [V] Temporal's `PlainYearMonth` supplies a month-value precedent.
+  A non-default reference day can affect equality in its constructor.
+  This supports canonical representation, not a general week/quarter
+  period model (S2; K5).
+- [V] Arrow encodes month, day-time, and month-day-nano intervals (S16).
+  Those units describe relative quantities, not periods with start dates.
+  The encoding analogy does not establish Traces period layout, equality,
+  or ordering (K12).
+- [V-repo] Ticket 24 derives filename periods during query evaluation.
+  Ticket 29 uses `(start, unit)` for period group identity.
+  Operator-specific membership bounds remain a separate contract (L5).
 
-Counterexample against putting the raw filename label in the value:
-`2026-W01` reads differently under different week rules (ticket 21). The
-value must be the normalized start.
+Counterexample against raw labels: storing only `2026-W01` leaves later
+code to repeat normalization. Ticket 21 already fixes this prefix as ISO.
+A general configured week rule must not reinterpret it.
 
 Counterexample against a persisted period column: the store keeps temporal
 values as text and derives filename periods at query time. A persisted
 period column needs an `IndexPolicy` entry and a fingerprint input
 (ticket 25).
 
-[P] `CalendarPeriod` exists as a temporal-level value (filter literals,
-`file.date` evaluation, grouping). Whether it needs a `NoteFieldValue`
-variant depends on whether note fields themselves can hold periods. No
-evidence in this file says they can. Default: no new `NoteFieldValue`
-variant.
+[P] Complete ticket 18's single runtime carrier for notes, queries and
+templates. Place the normalized period in that carrier without another
+period-value type. A separate query carrier needs an explicit amendment
+(L4). Runtime representation does not itself authorize period syntax in
+stored note fields.
 
 ### q21. Date compared with an instant at an ambiguous or absent local midnight
 
-Ticket 21's handed-over rule: a period against an instant tests the civil
-date of the instant in the pinned zone. It does not test that the next
-day's midnight exists. Civil values use their civil dates without a zone.
-This question keeps that rule separate from membership.
+Ticket 21 already fixes period-versus-instant membership through the
+instant's civil date in the pinned zone. A skipped next day does not
+invalidate the preceding day. This question separately asks about an
+ordinary Date field versus an instant. Membership does not decide that
+ordinary field comparison.
 
 - [V] java.time makes `LocalDate` and `Instant` incomparable at the type
   level. The package doc's design notes explain the type split (S14).
-- [V] Temporal makes cross-kind `compare` a TypeError. Only like types
-  compare (S2).
-- [V] PG compares `date` to `timestamptz` by assuming midnight in the
-  `TimeZone` setting, and documents `+ interval '1 day'` versus
-  `+ interval '24 hours'` across a DST boundary (Denver 2005-04-03 example)
-  (S5). PG's comparison acquires a zone implicitly, which the repo forbids
-  (ticket 21: UTC is never an implicit fallback).
+- [V] Temporal uses specific conversion rules, not a universal cross-kind
+  rejection. `PlainDate.compare` accepts `PlainDateTime` through
+  `PlainDate.from`, which drops its time (S2; K6).
+- [V] PostgreSQL compares `date` to `timestamptz` with midnight in its
+  `TimeZone` setting. Its Denver 2005-04-03 example distinguishes
+  `+ interval '1 day'` from `+ interval '24 hours'` (S5; K13).
+  Traces instead needs an explicit pinned zone. That boundary contrast
+  does not itself decide gap/fold resolution.
 - [V] tzdb shows the counterexamples that force the rule:
   - Skipped day: Samoa's 2011-12-30 does not exist. The zone switches
     standard offsets from -11 to +13 at 2011-12-29 24:00 local. With the
@@ -786,17 +795,17 @@ date and an instant are different classes. Ticket 29 keeps civil values and
 instants in separate classes for grouping. Projection erases the class
 boundary that grouping needs.
 
-[P] Keep ticket 21's rule. Equality stays cross-class false. Relational
-filters against periods use the pinned-zone civil date of the instant.
-Relational filters between civil and instant values do not match (same as
-ticket 19 across brackets). Document the Havana and Apia cases in the
-Answer.
+[P] Preserve ticket 21's period-membership rule. Choose the ordinary
+Date-versus-instant gap/fold rule separately. Ticket 19 uses the pinned
+zone for civil-versus-instant comparison. Group-class separation does not
+imply cross-class filter failure. A blanket no-match rule would change
+that contract, not apply it (L).
 
 ### q22. The total sort key for mixed temporal values
 
-- [V] RFC 3339 section 5.1 defines when plain string sort equals time sort:
-  components from least to most precise, one zone spelling, same fractional
-  digits. Optional punctuation breaks it (S3).
+- [V] RFC 3339 section 5.1 orders timestamp components from least to most
+  precise. Its string-order rule also needs identical offsets, zone
+  spelling, fractional digit counts, and punctuation (S3; K10).
 - [V] Temporal's `Duration.compare` needs `relativeTo` when any
   years/months/weeks component is nonzero, and throws `RangeError`
   otherwise. It refuses to order mixed-precision nominal values without an
@@ -812,37 +821,37 @@ Answer.
   February 1697 and March 1903 (S21; confirmed in the K round,
   `k-citation-verification.md`, K11).
 
-Counterexample against "sort everything by physical time": a month period
-and a day period have no physical time without an anchor. Nominal
-durations flip order by anchor month (XSD example, S21). The key must be
-label-based, not time-based, across classes.
+Counterexample against treating periods as instants: a month or day period
+does not designate one instant. The value-sort key needs an explicit
+convention. XSD's anchor-dependent duration order is a separate example
+of why physical comparison and product sorting need distinct contracts.
 
-Counterexample against "sort by written text only": ISO strings sort
-correctly only inside one class, one shape, and one zone spelling (S3).
-Mixed shapes carry no time order. `2026-02-28` (date) and `2026-03`
-(month) differ in shape, so their text order is a byte order, not a time
-order.
+Limit of written-text sorting: `2026-02-28` sorts before `2026-03`.
+That pair is not a reversed-order counterexample.
+The RFC theorem covers complete timestamps, not partial periods or a
+mixed-class total key (K10).
 
-[P] Key = (class rank, class-local value, unit tie-break). Class rank must
-respect the accepted group class order: Civil, Instant, Period (B65/C3).
-Within Civil, `Date` before `DateTime` is a free choice. The constraint:
-one rank per class, periods after points, unit tie-break ascending Day <
-Week < Month < Quarter < Year. Civil values sort by their civil components
-(year, month, day, time). Instants sort by instant. The Answer must state
-the rank explicitly. This file only supplies the shape and the traps.
+[P] Consider `(class rank, class-local value, unit tie-break)`.
+Preserve the accepted Civil, Instant, Period group order.
+State the full value-sort key and its relation to group keys (L6).
+One proposal sorts civil components together, instants by epoch, and
+periods by `(start, unit)`.
+For periods, consider Day < Week < Month < Quarter < Year.
+The human must choose this rank. The source analogies do not prove it.
 
 ### q23. Nominal duration equality and order
 
 - [V] Ticket 19 kept nominal equality and order provisionally.
-- [V] RFC 5545 forbids years and months in durations, and its editors say
-  why in effect: nominal units have no fixed length (S4).
-- [V] java.time splits `Period` from `Duration` so nominal and exact
-  quantities never compare (S14). `chrono-english` returns
-  `Interval::Seconds | Days | Months` and never compares across the three
-  (S20).
-- [V] Dataview durations (`dur`) do include months, through Luxon (S9).
-  Fileclass validates durations against an RFC 5545 subset: weeks, or days
-  and time. No years or months [V-repo, research 14].
+- [V] RFC 5545 excludes year and month designators.
+  It still calls weeks and days nominal durations.
+  It permits weeks alone, or days and time, or time alone (S4; K7).
+- [V] java.time distinguishes `Period` from `Duration` (S14).
+  `chrono-english` parses `Interval::Seconds | Days | Months` (S20).
+  This output distinction does not decide Traces equality or order.
+- [V] Dataview uses a fixed Luxon conversion matrix (S9; K9).
+  Fileclass's input parser permits mixed weeks and ignores a captured
+  sign. Its fixed-day milliseconds are not the RFC's calendar rule
+  [V-repo, research 14; K8].
 
 Counterexample against numeric equality across nominal and exact units: one
 month is 28 to 31 days depending on the month. XSD's own `P1M` versus
@@ -853,10 +862,11 @@ Counterexample against physical order without an anchor: Temporal throws
 when asked (S2). PG clamps month arithmetic and documents the asymmetry
 (S5).
 
-[P] Equality: same unit classes, equal counts. Order: by class, then count;
-no cross-class comparison. Arithmetic resolves calendar units through the
-pinned frame (q33). Document that `dur` values with months keep nominal
-semantics and never equal a day count.
+[P] Compare same-unit equality and class-based order with retaining ticket
+19's nominal seconds (`1mo == 30d`, `1y == 365d`).
+Same-unit-only equality changes that provisional rule. It needs an
+explicit human decision and supersession record. Keep comparison
+conventions separate from calendar arithmetic.
 
 ### q24. How the documents describe calendar arithmetic
 
@@ -868,17 +878,19 @@ semantics and never equal a day count.
 - [V] Jiff's `Zoned` arithmetic respects the zone. Civil arithmetic does
   not see zones (S19).
 
-[P] One normative paragraph in the temporal docs. Day, week, month, year
-arithmetic is a calendar series in the frame's zone and pinned week rule.
-Hour, minute, second arithmetic is exact. The series examples use the
-Denver DST case and the Apia skipped day. No leap second handling. Keep the
-examples in the docs, not in this file.
+[P] Document civil arithmetic and zoned arithmetic separately.
+Civil operations need no zone. Zoned calendar units can cross offset
+changes. Exact elapsed units need a different rule.
+
+Use the Denver DST case and the Apia skipped day to explain that split.
+State leap-second treatment. Do not impose a frame on pure civil
+arithmetic merely because zoned arithmetic needs one.
 
 ### q25. How `date(link)` reads a Markdown link target
 
-Ticket 19 hands over these rules: read only the last segment. Keep the
-extension. Accept a pattern argument. Targets can be percent-encoded.
-External URLs are not note targets.
+Ticket 19 accepts last-segment target extraction and a pattern argument.
+The later Markdown-link handoff leaves extension normalization and
+percent decoding open (19:299-313; L). External URLs are not note targets.
 
 - [V] RFC 3986 §2.4: encode data octets that conflict with delimiters.
   Decoding an unreserved octet is safe and equivalence-preserving. Decoding
@@ -893,25 +905,25 @@ External URLs are not note targets.
 - [V-repo] `scan_date_prefix` accepts `YYYY-MM-DD` and `YYYY-MM` prefixes;
   the pattern argument of `date()` accepts a strftime format [V-repo].
 
-Counterexample for decode-once: a note named `2026-01%20notes.md` decodes
-once to `2026-01 notes.md` and the prefix `2026-01` still parses. Decode
-twice and a literal `%2541` becomes `A` wrongly. RFC 3986 forbids the
-double decode (S13).
+Counterexample against repeated decoding: decoding `%2541` once yields
+the literal `%41`. A second decode changes it to `A`.
+RFC 3986 forbids repeated decoding (S13).
+The name `2026-01%20notes.md` separately illustrates a single encoded space.
 
-Counterexample for stripping the extension: `2026-05-01.review.md` keeps
-its extension per ticket 19. The prefix parse must look at the segment
-before the first dot-group? The ticket says the target keeps the
-extension, so the parser must parse the prefix of the full segment, not of
-a stem. State that in the Answer.
+Open extension case: `2026-05-01.review.md` contains multiple dot groups.
+The human must specify segment extraction, extension treatment, and
+pattern matching. Do not present "keep the extension" as an accepted
+Markdown-link rule.
 
 Counterexample for external URLs: `date(https://x/2026-01-01)` must not
 match. Ticket 19 says external URLs are not note targets. The value is
 Null. The notice policy belongs to q36.
 
-[P] Decode percent-escapes once, then parse the leading prefix (or the
-given pattern) of the last segment with its extension intact. Non-note
-targets yield Null. No silent reinterpretation of a malformed prefix
-(ticket 21 rule).
+[P] Identify URI components and the target's last segment first.
+Then decode that segment once.
+Do not let decoded `%2F`, `%23`, or `%3F` create new component boundaries
+(S13; K22). Choose the encoded-separator and extension rules explicitly.
+Non-note targets yield `Null`. Preserve the malformed-prefix rule.
 
 ---
 
@@ -928,13 +940,14 @@ targets yield Null. No silent reinterpretation of a malformed prefix
 - [V-repo] The current `SchemaDateField.format` is unvalidated, and its
   accessor exists only under `#[cfg(test)]`. That is the cautionary state.
 
-Counterexample against free-form keys: an unvalidated `format` string
-parses at first use, deep in a query. The error lands far from the config
-file. Validation must run at load.
+Counterexample against delayed format checking: a malformed format can
+fail far from its declaration. A config-load token check can report its
+key path. This does not prove that runtime zone acquisition must occur
+at load.
 
-[P] One table with an exact key set (q27), each key scalar or enum,
-validated at config load, errors carry the key path. No nested free-form
-strings.
+[P] Use an exact config key set (q27). Specify each field's validation
+stage. Keep zone spelling checks separate from required zone acquisition.
+Preserve inherited merge and trust rules.
 
 ### q27. The fields of `DateConfig`
 
@@ -944,20 +957,23 @@ Candidate fields, each with its evidence:
   `%Y-%m-%dT%H:%M:%S` [V-repo]. Keep strftime spelling (q3).
 - Week rule: `(first_day, min_days)` (q8).
 - Weekday resolution for relative phrases: the q15 output, one enum value.
-- NL grammar options: on/off plus the keyword list version (q13). A
-  version key on the grammar lets the index fingerprint change with it if
-  filename periods ever persist (ticket 25).
-- Zone: the configured zone key per q29 and ticket 22's precedence.
-- Filename period policy: week/quarter prefixes on or off, bare-year opt-in
-  key (q32).
+- NL options, only if the human adopts them (q13).
+  A grammar version enters the extractor fingerprint only when it changes
+  persisted facts (ticket 25). Filename persistence alone does not prove
+  that the NL keyword list produces those facts.
+- Zone source, under q29 and ticket 22's precedence.
+- Bare-year filename opt-in (q32).
+  Ticket 21 already accepts week and quarter prefixes.
+  Optional switches that disable them need a separate amendment.
 
-Counterexample against putting the NL keyword list itself in user config:
-the grammar is a closed, versioned list (q13). Config turns it on or off;
-it does not extend it. An open keyword list in config breaks determinism
-and the change-table discipline.
+Counterexample against an unspecified keyword list: user-defined words can
+collide with field paths or named grammar rules. An extensible grammar
+needs explicit conflict and migration rules.
+An open list alone does not prove nondeterminism.
 
-[P] The field list above, no more. Every field has a default so an absent
-`[date]` table equals today's behavior.
+[P] Choose only fields with a named consumer. State defaults for an absent
+`[date]` table. Those defaults must implement accepted changes, not claim
+exact parity with today's retired `file.day` behavior.
 
 ### q28. Which temporal-owned policy receives the fields without importing `config`
 
@@ -983,10 +999,10 @@ into `DatePolicy` at load. The edge stays one-way.
   `backward`; `Etc/UTC` and `GMT` exist; `Etc/Unknown` is reserved by CLDR.
   The naming rules are guidelines with legacy exceptions (`Etc/GMT0`,
   `GMT0`, `EST5EDT`) (S6 theory).
-- [V] PG accepts three zone spellings with different meanings: full IANA
-  names, abbreviations (date-dependent offset, e.g. `MSK` moved +3 to +4),
-  and POSIX-style strings whose sign is opposite to ISO (`UTC-4` = ISO
-  +04). Its docs record the sign confusion as a fact (S5).
+- [V] PostgreSQL datetime input accepts IANA names, abbreviations, and
+  POSIX-style strings with different meanings.
+  Its `TimeZone` setting does not accept abbreviations.
+  POSIX `UTC-4` means ISO +04 (S5; K13).
 - [V] Jiff parses IANA names and fixed offsets (S19). Temporal
   canonicalizes identifiers and errors on unknown ones (S2).
 
@@ -995,14 +1011,15 @@ string. `EST` is an abbreviation with a date-dependent meaning. `UTC-4`
 reverses sign relative to ISO. Three spellings, three meanings, one config
 key: that is the documented PG trap (S5).
 
-Counterexample against no validation: a typo (`Europe/Prag` is not a zone
-name) surfaces as a per-row zone lookup failure instead of a config
-error.
+Counterexample against no validation: an identifier absent from the
+selected database causes a lookup failure. The design must state whether
+that failure occurs at config load or first required zone acquisition.
 
-[P] Accept IANA names plus an explicit fixed-offset form (`±HH:MM`).
-Validate at config load against a stated data source and version (a bundled
-database with a pinned tzdb version makes load-time validation
-deterministic). Reject abbreviations and POSIX strings.
+[P] Consider IANA database names and explicit fixed offsets (`±HH:MM`).
+Specify treatment of legacy aliases separately from POSIX rule strings.
+Choose spelling validation and actual acquisition timing separately.
+State the zone-data source and version before claiming reproducibility.
+Preserve lazy acquisition for civil-only work (L9; K21).
 
 ### q30. How the host gets the system zone and reports failure
 
@@ -1016,12 +1033,11 @@ deterministic). Reject abbreviations and POSIX strings.
   all times before 1970, and the `backzone` file is less reliable (S6).
   System-database and bundled-database versions can differ, which changes
   answers near historical edges.
-- [V] Jiff's failure mode is source-read and recorded: `TimeZone::try_system`
-  returns an error when zone discovery fails or the `tz-system` feature is
-  off, and `TimeZone::system` can fall back to `UTC` under the same
-  conditions. The frame must use `try_system` and memoize the error
-  (S19; owner-evidence.md, jiff section; K20 in
-  `k-citation-verification.md`).
+- [V] Jiff's `TimeZone::try_system` reports discovery or disabled-feature
+  errors. `TimeZone::system` can fall back to `Etc/Unknown`, which behaves
+  like UTC (d, `TimeZone::try_system`; S19; K20).
+  The frame must retain a required acquisition error.
+  The convenience fallback does not satisfy ticket 21.
 
 Counterexample against reading the system zone per row: PG's
 `transaction_timestamp` note (one consistent notion of current time per
@@ -1043,18 +1059,19 @@ Evidence is in q8. The added points:
   still needs to choose.
 - [V] Tasks shipped ISO-only and users file requests for other week starts
   (S10). Configurability is a real request, not a hypothetical.
-- [V-repo] The owner's week template lists days from `day(0)`, Sunday
-  first [V-repo]. The owner's own templates disagree with an ISO-only
-  default.
+- [V-repo] The owner's week template displays `day(0)`, Sunday, first.
+  Moment `day(0)` always means Sunday (K1).
+  This display order does not prove a preferred week-numbering rule.
 
-Counterexample against "week start configurable, week-one rule fixed at
-ISO": `first_day = sunday` with `min_days = 4` is rare. CLDR lists it for
-`is` and `pt`, but it is not unused (S1). It re-numbers weeks in ways the q8
-tables show (S14). The pair must move together.
+Counterexample against treating Sunday plus four minimum days as invalid:
+CLDR lists that pair for `is` and `pt` (S1; K4).
+A configurable first day does not force both fields to change.
+Display-week starts and week-numbering rules can be separate policies.
 
-[P] Configurable as the `(first_day, min_days)` pair, default ISO. The
-week rule enters the frame and the fingerprint-relevant policy set if
-filename weeks ever persist (ticket 25 gate).
+[P] Compare ISO-only operation with a configurable pair.
+Name the operations that use any custom rule.
+Keep accepted ISO filename prefixes unchanged.
+Fingerprint a rule only when that rule changes persisted facts.
 
 ### q32. The opt-in key for bare-year filename prefixes
 
@@ -1073,10 +1090,11 @@ gives every such note a `file.date` and silently changes sorts and filters.
 Counterexample for no validation: a five-digit prefix (`20261-thing`) is
 not a year. The parser must reject, not truncate.
 
-[P] Key `[date] filename_year = false` (default), validated as exactly
-four digits, range check on the value, no rollover. Alternative spellings
-(`filename_periods.year`) go to the change-table row if the owner prefers
-nesting.
+[P] Use a boolean key, `[date] filename_year = false`.
+Validate the config value as a boolean.
+Separately validate a filename year as exactly four digits in range.
+Reject malformed longer prefixes without truncation.
+Nested `filename_periods.year` is a competing syntax choice.
 
 ---
 
@@ -1089,8 +1107,8 @@ nesting.
   memoizes a failure. UTC only if explicitly selected.
 - [V] java.time models this as an injectable `Clock` (with a fixed variant
   for tests) plus explicit `ZoneId` arguments (S14).
-- [V] Duckling takes `reference_time` as a parameter. Its corpus pins one
-  reference time to make tests deterministic (S23).
+- [V] Duckling's `reftime` parameter supplies `Context.referenceTime`.
+  Its corpus fixes a reference time for replay (S23; K17).
 - [V] Tasks' relative dates recompute from `today` and the maintainers
   document re-evaluation and staleness pitfalls for long-lived results
   (S10, issue #1289 recorded there).
@@ -1103,9 +1121,11 @@ Counterexample for a frame without a zone resolver: civil-to-instant
 projection needs the zone on demand. A memoized failure is part of the
 frame's determinism (ticket 21).
 
-[P] Frame contents: `today` (civil date), week rule, zone resolver (lazy,
-memoized failure), and the `DatePolicy` (q28). Temporal exports the frame
-type and constructors. Query and template hold and pass frames.
+[P] Keep one clock sample, the week rule, policy, and a lazy zone resolver
+in the operation frame. Derive the civil `today` only when needed.
+Temporal exports value operations and policy inputs.
+Query and template retain ownership of their operation frames.
+The exact frame constructor boundary remains a human choice.
 
 ### q34. Replacements for ambient `local_zone()`, `now_instant()`, `ZoneGuard`
 
@@ -1123,8 +1143,9 @@ Counterexample for keeping any ambient read: two queries in one render
 frame could observe different clocks or zones across the removal boundary.
 Ticket 21's memoization rule exists to prevent exactly that.
 
-[P] Every temporal function takes the frame parameter. Test fixtures build
-fixed frames. No global state remains in temporal.
+[P] Give state-dependent functions explicit frame inputs.
+Keep pure civil operations free of unnecessary frame parameters.
+Build fixed frames in fixtures. Remove the obsolete ambient helpers.
 
 ---
 
@@ -1132,33 +1153,34 @@ fixed frames. No global state remains in temporal.
 
 ### q35. Temporal probe bounds per operator and value kind
 
-- [V-repo] Ticket 24: a range key needs proof for each operator, row kind,
-  temporal frame, and field precedence. Unproved mappings scan. The first
-  pushdown scope covers unquoted temporal literals and `And`. Membership
-  never defines a range key (ticket 29).
+- [V-repo] Ticket 24 needs a proof per operator, row kind, temporal frame,
+  and field precedence. Unproved mappings scan.
+  Ticket 29's first temporal scope uses unquoted literals and `And`.
+  R5 permits operator-specific point-period membership bounds.
+  The reserved `member_of` node remains unsupported (L5).
 - [V] PG's expression evaluator does not define subexpression evaluation
   order, and the planner may reorganize boolean expressions by Boolean
   algebra (S5). A pushdown bound must stay sound if the engine reorders or
   drops predicates.
-- [V] Cross-kind ordering is where proofs break: Temporal refuses mixed
-  nominal ordering without an anchor (S2), and the q22 class ranks decide
-  whether `<` between a date and a period even has a meaning.
+- [V] Temporal needs anchors for nominal duration comparison (S2).
+  That duration rule does not define Traces point-period filter order.
+  The q22 total sort key is also separate from filter matching.
 
-Counterexample for a proved bound across classes: `mdate < 2026-03` is a
-month period tested against a mix of civil dates and instants. The proof
-needs the class rank of the period and the exclusive upper bound. If the
-plan reorders `A And B` to `B And A`, the bound must still hold. Bounds
-that depend on evaluation order are unsound (S5).
+Proof case: `mdate < 2026-03` compares an evaluated field with a month
+period. Use the field's actual value kind, the operator's matching rule,
+and the pinned frame. Do not substitute the total-sort class rank.
+The proof must remain sound under predicate reordering.
 
-Counterexample for membership pushdown: membership tests the civil date of
-the instant in the pinned zone. A range key over instants cannot answer it
-without the zone. Ticket 29 says membership never defines a range key
-[V-repo]. That rule is consistent with the zone-dependency.
+Membership case: instant-to-period matching uses the pinned zone.
+That dependency needs an operator-specific bound proof.
+It does not prove that an instant key can never supply sound candidate
+bounds. R5 anticipates such proofs without supplying them.
 
-[P] A table in the Answer. Rows = value kinds (Date, DateTime civil,
-Instant, Period). Columns = operators (`==`, `<`, `<=`, `>`, `>=`,
-`member_of`). Each cell = the proved bound formula or `Unsupported`. No
-cell depends on evaluation order.
+[P] Give the Answer a table of value kinds and existing operators.
+Each cell states a proved bound or `Unsupported`.
+Keep `member_of` unsupported unless the human separately adopts its
+semantics and implementation. Never claim a physical-key contradiction
+from group equality alone (L5).
 
 ### q36. When a row with a `Null` date gets a notice
 
@@ -1166,24 +1188,27 @@ cell depends on evaluation order.
   first-round notice.
 - [V] Dataview's `file.day` is silently absent when the file name has no
   date. No notice, no error (S9). That is the silent-Null baseline.
-- [V] Fileclass skips pattern validation for a plain-string custom format
-  today; the outer validator still checks empty values and `required`
-  [V-repo, research 14; K8 in `k-citation-verification.md`]. A malformed
-  date value in such a field is invisible today.
+- [V] Fileclass bypasses pattern validation for a string custom format.
+  The outer validator checks empty values and `required`.
+  A malformed non-empty date string can bypass the pattern check
+  [V-repo, research 14; K8 in `k-citation-verification.md`].
 
-Counterexample for noticing every Null: `file.date` is Null for most files.
-A notice per row floods output and trains users to ignore notices.
+Counterexample against noticing every `Null`: ordinary undated notes
+would produce notices despite having no malformed date input.
 
-Counterexample for noticing nothing: `2026-13-40-notes.md` has a
-date-shaped prefix that fails validation. Silent Null hides the malformed
-file name from the user. Ticket 19 already chose an advisory notice for an
-invalid quoted date literal. Silence would be inconsistent.
+Counterexample against noticing nothing: `2026-13-40-notes.md` has a
+malformed date-shaped prefix. A silent `Null` conceals that defect.
+Ticket 19's invalid-quoted-literal advisory is an analogy, not an already
+accepted filename-notice rule.
 
-[P] Three cases. (a) Absent value with expected shape = Null: no notice.
-(b) Malformed date-shaped value where a format was declared or a prefix
-failed validation = one notice per file or literal, with the span.
-(c) Zone failure during projection = the typed zone error, not a notice.
-Ticket 34 owns the plumbing. This ticket owns the condition.
+[P] Distinguish these cases:
+
+- Return `Null` without a notice for an expected absent value.
+- Consider a notice for a malformed declared value or date-shaped prefix.
+- Return a typed error for required zone-acquisition failure.
+
+Ticket 34 owns notice delivery and deduplication.
+A memoized failure does not itself guarantee one emitted notice.
 
 ---
 
@@ -1207,48 +1232,45 @@ evidence lives:
 
 ## Competing designs the evidence supports
 
-One line per axis, options in evidence order. These are inputs for the
-grilling, not decisions.
+These are competing inputs for the grilling, not decisions.
 
-1. Dialect: one strftime dialect everywhere plus a template-only Moment
-   adapter [P]. Alternatives: keep-as-is translator in temporal
-   [V-repo state]. Moment everywhere is rejected (q1 counterexamples).
-   Strftime everywhere with no adapter is rejected by the owner's template
-   tokens [V-repo].
-2. NL grammar: closed in-repo grammar [P], versus `fuzzydate` (second
-   calendar stack), versus `jiff-english` (0.0.1 prototype), versus defer
-   to fog with a scope decision (ticket 19 preserves the hook).
-3. Civil/instant: inner enum in one slot [P], versus separate value
-   variants, versus mode-flag type (PG's documented hazard).
-4. Zone key: IANA names plus explicit fixed offsets [P], versus full PG
-   spelling zoo (documented sign traps), versus free-form string (late
-   errors).
-5. Week config: `(first_day, min_days)` pair [P], versus first-day-only
-   (underdetermined numbering), versus ISO-only (Tasks' shipped choice,
-   owner's templates disagree).
-6. Bare weekday: spelled `next`/`last` with one bare meaning in
-   `DateConfig` [P], versus nearest-only (Tasks), versus next-only
-   (monotonic), versus current-week (template parity), versus four adjuster
-   spellings (java.time). No evidence-based single winner. Owner decides.
+1. Dialect: one native strtime dialect with a template Moment adapter [P].
+   Keeping the translator in temporal remains an option.
+   Removing Moment needs a migration of the owner's tokens.
+2. NL grammar: closed in-repository grammar [P], versus candidate
+   integration, versus retaining the hook without adoption.
+   Candidate point results and coverage gaps need explicit treatment.
+3. Civil/instant: an inner enum versus separate runtime variants.
+   Either shape must preserve accepted semantics and the size limit.
+   PostgreSQL's input policy does not decide the Rust representation.
+4. Zone key: database names plus explicit fixed offsets [P].
+   Define legacy aliases, POSIX rules, and validation timing separately.
+5. Week config: a configurable pair versus fixed ISO.
+   Preserve ISO filename prefixes under general week settings.
+   The owner's Sunday-first display does not decide week numbering.
+6. Bare weekday: nearest, strictly next, or current-week selection.
+   Explicit `next`/`last` forms are another proposal.
+   No inspected source chooses the owner's preferred rule.
 7. Relative spelling: functions (`today()`, `eom()`) [P], versus bare
    keywords (collides with field paths [V-repo]).
-8. Period values: temporal-level value, no new `NoteFieldValue` variant
-   [P], versus new variant (spends slots, no evidence note fields hold
-   periods).
-9. Parser stack: keep jiff and logos, remove speedate after a parity audit,
-   keep winnow until ticket 35 [P], versus big-bang removal (frozen
-   grammar risk).
-10. Frame: frame carries clock, week rule, lazy memoized zone, policy
-    [P]. Zero ambient reads.
+8. Period values: complete the single runtime carrier with a normalized
+   period [P]. A separate query carrier needs an amendment.
+   Keep runtime representation separate from note-parser acceptance.
+9. Parser stack: keep Jiff and Logos [P].
+   Remove speedate only with guarded parity and diagnostics preserved.
+   Keep winnow's boundary role unless a replacement proves parity.
+10. Frame: one clock sample, week rule, and lazy zone result [P].
+    Remove obsolete ambient reads after explicit inputs replace them.
 
 ## Gaps and unverified claims
 
 List for the integration owner. Each needs a check or a decision to leave
 open:
 
-1. `fuzzydate` and `jiff-english` APIs: closed. The runtime probe
-   (`probes/candidates`, S24) measured the behavior matrix; the q14 table
-   rows now cite it.
+1. Candidate APIs: source reads establish injected-anchor entry points.
+   The bounded runtime matrix does not close every behavior gap.
+   Fuzzydate same-day behavior remains runtime-untested.
+   Stable rustc 1.89.0 covers English only, not either candidate's minimum.
 2. W3C XSD duration partial order: closed. S21 read and confirmed in the
    K round (`k-citation-verification.md`, K11); q22 states it as `[V]`.
 3. Arrow strptime directive table: not retrieved. S16 gives the columnar
@@ -1257,19 +1279,19 @@ open:
    directive-by-directive comparison.
 4. Jiff `tz-system` failure behavior: closed. Source-read in the K round
    (K20); q30 states it as `[V]` with the `try_system`/`system` split.
-5. Binary size effects: the two NL candidates are now measured in the
-   probe (+65.0 KiB and +48.9 KiB, S24). `tzdb-bundle-always`, `logos`,
-   and an in-repo NL grammar in repository builds: still not measured. The
-   brief forbids unmeasured cost claims; change-table rows must not cite
-   sizes except the probe's own.
+5. Binary sizes: +65.0 KiB and +48.9 KiB are earlier-revision probe
+   snapshots (S24). They precede final timing-mode source edits.
+   Repository costs for candidates, `tzdb-bundle-always`, `logos`, and an
+   in-repository grammar remain unmeasured.
+   Do not present the snapshots as current reproducible binary deltas.
 6. In-repo grammar size and test cost (q14 Size row): not written yet.
    That estimate belongs to the owner with the d-crate researcher's input.
 7. `moment.now` overridability: closed as documented. Moment's plugin
    guide documents the `moment.now` override (K23 in
    `k-citation-verification.md`).
-8. The `chrono-english` doc phrase "this coming Friday" leaves
-   same-day behavior unstated (is `friday` on a Friday today or +7?). A
-   source read answers it if the owner wants the parallel exactly.
+8. Chrono-english same-day rule: d's source read covers the weekday and
+   time-part branches. That source evidence does not replace runtime
+   same-day checks. Fuzzydate's same-day runtime case also remains open.
 
 ## Pointers to sibling files
 
@@ -1278,5 +1300,5 @@ open:
   d-crate researcher's file.
 - Repo-side layout facts: the lens scouts' files.
 - Prior decisions and their wording: the b-prior file.
-- Digest of plans and designs: the b-digest file.
+- Digest lessons: `c-digest-lessons.md`.
 - Integration and cross-checks: the brief owner.

@@ -1,11 +1,14 @@
-//! Behavior and indicative-cost probe for the natural-language candidates
-//! (`Q14`). Each feature set runs the same phrase list through its candidate
-//! against one fixed anchor, so results are comparable across candidates.
+//! Runs the selected natural-language parser against a fixed anchor (`Q14`).
+//!
+//! The `english` feature prints lenient and strict results.
+//! The `fuzzy` feature prints one anchored result.
+//! Each build writes the same binary path; identify the selected feature
+//! before interpreting output.
 //!
 //! Usage:
-//!   `<bin> "phrase"`            — one parse, both result forms printed
-//!   `<bin> "phrase" --bench`    — indicative ns/parse over 20,000 in-process
-//!                                 iterations (release build, black_box)
+//!   `<bin> "phrase"` prints the selected parser's result.
+//!   `<bin> "phrase" --bench` measures 20,000 iterations in a release build.
+//! The timing mode uses `black_box` and gives indicative timings only.
 //!
 //! Run: `cargo +nightly-2026-10-01 build --release --locked [--features
 //! english|fuzzy]`

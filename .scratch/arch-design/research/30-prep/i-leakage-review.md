@@ -2,26 +2,40 @@
 
 ## Scope and evidence
 
-This report covers Rust-design lens 6: boundary crossings and vertical leakage.
-It prepares ticket 30. It does not settle human choices or change accepted Answers.
+This report covers Rust-design lens 6: boundary crossings and vertical
+leakage. It prepares ticket 30. It does not settle human choices or change
+accepted Answers.
 
-[V] means source inspection in this review. [H] means an inference. [P] means a candidate for approval.
-Current code and accepted target rules are separate below.
+[V] means source inspection in this review. [H] means an inference. [P]
+means a candidate for approval. The report separates inspected code from
+accepted target rules.
 
-CodeGraph `status` reported 12 modified files. It did not report a fully synchronized index.
-CodeGraph `explore` and `node` returned current source from disk for the cited code.
-One exploration omitted changed `src/template/engine.rs`. This report makes no claim about its current body.
-LSP supplied references for `pattern_to_strftime`, `find_closing_flat`, `DEFAULT_DATETIME_PATTERN`, and `DatePoint::parse`.
-The first translator-reference request returned no references. A later request returned seven locations.
+This report records the inspected snapshot, not the repaired synthesis.
+References to incorrect owner evidence concern the older note inspected
+here. [L5](./l-answer-verification.md#l5-membership-bounds-do-not-prove-a-conflicting-physical-key-rule)
+later clarifies L7's claimed wording conflict. Later bounded probes in
+[m-gap-closure.md](./m-gap-closure.md) do not replace implementation evidence.
 
-These are source reads, not execution evidence.
-I ran no builds, tests, linters, formatters, benchmarks, or diagnostic scripts.
+CodeGraph `status` reported 12 modified files. It did not report a fully
+synchronized index. CodeGraph `explore` and `node` returned source from disk
+for the cited code. One exploration omitted changed `src/template/engine.rs`.
+This report makes no claim about that file's body.
+
+LSP supplied references for `pattern_to_strftime`, `find_closing_flat`,
+`DEFAULT_DATETIME_PATTERN`, and `DatePoint::parse`. The first
+translator-reference request returned no references. A later request
+returned seven locations.
+
+These are source reads, not execution evidence. I ran no builds, tests,
+linters, formatters, benchmarks, or diagnostic scripts. During that review,
 I changed no source files or earlier research files.
 
 ## L1. Keep policy direction separate from shared lexer dependencies
 
-**Current source [V].** Temporal imports no `config`, `query`, `template`, `schema`, or `note` module in the inspected crate references.
-It does use root primitives. Thus, the claim that temporal has no internal dependencies is false.
+**Current source [V].** The inspected crate references show no temporal
+imports of `config`, `query`, `template`, `schema`, or `note`. Temporal does
+use root primitives. Thus, the claim that temporal has no internal
+dependencies is false.
 
 - `src/temporal/token.rs:11-12,86-100,106-131` imports `DelimiterType` and calls its flat bracket scan.
 - `src/temporal/point.rs:143-150` returns root `Spanned` values through `crate::lexer::lex_prefix`.
@@ -40,10 +54,11 @@ Ticket 21 assigns validated periods, week rules, and explicit-zone operations to
 See [22:223-233](../../issues/22-config-ownership-and-lifecycle.md) and [21:106-127,134-179](../../issues/21-ambient-environment-and-execution-context.md).
 Ticket 30 Q28 explicitly excludes a temporal import of config.
 
-**Candidate [P].** Let composition project `DateConfig` into temporal-owned policy data.
-Pass that data to the query or render frame. Do not pass `&Config` into temporal.
-If Moment translation moves, review whether its exclusive flat-scan helper should move with it.
-Do not move shared prefix recognition merely because temporal calls it.
+**Candidate [P].** Let the composition layer convert `DateConfig` into
+temporal-owned policy data. Pass that data to the query or render frame.
+Do not pass `&Config` into temporal. If Moment translation moves, review
+whether its exclusive flat-scan helper should move with it. Do not move
+shared prefix recognition merely because temporal calls it.
 
 **Retain option.** Retain the current root lexer, position, and delimiter dependencies while the crate stays whole.
 Retain the config-to-temporal constant dependency if the config format keys remain.
@@ -55,10 +70,10 @@ Reject a policy design that requires temporal to read config, trust state, or an
 
 ## L2. Schema format checks must not depend on a render-only adapter
 
-**Current source [V].** `SchemaDateField::parse` checks that `format` is a string and stores it.
-Its only accessor has `#[cfg(test)]`.
-See `src/schema/fields/date.rs:12-23,41-53`.
-The tests use `YYYY-MM-DD`; they do not establish a shared runtime dialect contract.
+**Current source [V].** `SchemaDateField::parse` checks that `format` is a
+string and stores it. Its only accessor has `#[cfg(test)]`. See
+`src/schema/fields/date.rs:12-23,41-53`. The tests use `YYYY-MM-DD`. They do
+not establish a shared runtime dialect contract.
 
 `pattern_to_strftime` takes a civil datetime, not only a pattern.
 The `Do` branch writes the supplied day and its suffix into the result.
@@ -67,12 +82,14 @@ LSP found its production calls only in the template date adapter.
 Query pattern parsing instead calls `DatePoint::parse_with_pattern` directly.
 See `src/query/grammar/filter.rs:702-719` and `src/temporal/point.rs:152-185`.
 
-**Inherited rule.** Schema owns the pure value check. Schema definitions do not change note classification or index freshness.
-See [20:53-70,79-89](../../issues/20-schema-note-typing-and-validation.md).
-The intact Answer states that `date.format` is a write hint.
-It also accepts Date/DateTime and any scalar when the format has no date component.
-See [20:119-123](../../issues/20-schema-note-typing-and-validation.md).
-The truncated sentence occurs separately at line 315. It does not erase the intact rule.
+**Inherited rule.** Schema owns the pure value check. Schema definitions
+do not change note classification or index freshness. See
+[20:53-70,79-89](../../issues/20-schema-note-typing-and-validation.md).
+The intact Answer states that `date.format` is a write hint. It also accepts
+Date/DateTime and any scalar when the format has no date component. See
+[20:119-123](../../issues/20-schema-note-typing-and-validation.md). The
+truncated sentence occurs separately at line 315. It does not erase the
+intact rule.
 
 **Candidate [P].** Separate pattern inspection from rendering.
 Let temporal or a format unit report pattern validity and required components as data.
@@ -121,8 +138,9 @@ I did not execute a failing-zone example.
 Required zone, calendar-resolution, and presentation failures must remain typed.
 See [19:199-212](../../issues/19-coercion-and-comparison-policy.md) and [21:123-132](../../issues/21-ambient-environment-and-execution-context.md).
 
-**Candidate [P].** Keep invalid user data distinct from failed required context through evaluation and lazy materialization.
-Resolve the frame once, but do not assume every row-dependent conversion can finish during binding.
+**Candidate [P].** Keep invalid user data distinct from failed required
+context through evaluation and lazy materialization. Resolve the frame once.
+Do not assume every row-dependent conversion can finish during binding.
 Return domain categories to query. Let query attach its operation context.
 
 **Retain option.** Retain temporal error ownership and ordinary mismatch behavior.
@@ -133,7 +151,7 @@ The current blanket `.ok()` adapters cannot satisfy the accepted target.
 Counterexample: a valid instant needs civil projection, but system-zone discovery fails.
 Reject any design that converts this failure to `Null`, a comparison rank, or a boolean result.
 
-## L4. Direct template helpers preserve errors; generic text paths do not
+## L4. Error preservation in direct helpers and generic text paths
 
 **Current source [V].** Template date helpers generally preserve temporal causes.
 `parse_date_point` attaches `DateError` to a render error.
@@ -183,10 +201,12 @@ See `src/temporal/datetime.rs:622-657,133-154`.
 `DatePoint::parse` stores the resolved result at `src/temporal/point.rs:105-114`.
 This temporary parse distinction is not a retained value distinction.
 
-Thus, [owner-evidence.md:13-17](./owner-evidence.md) correctly lists the variants but draws the wrong conclusion.
-The outer enum separates civil dates from instants. It does not separate civil datetimes from instants.
-The corrected [synthesis Q19](./synthesis.md) states this distinction.
-Do not use the older owner note as evidence for ratification without redesign.
+Thus, the inspected [owner-evidence.md:13-17](./owner-evidence.md) lists the
+variants correctly but draws the wrong conclusion. The outer enum separates
+civil dates from instants. It does not separate civil datetimes from
+instants. The corrected [synthesis Q19](./synthesis.md) states this
+distinction. Do not use the older owner note as evidence for ratification
+without redesign.
 
 **Inherited rule.** Naive datetimes must remain civil and zone-free.
 Only explicit offsets or `Z` identify instants.
@@ -210,12 +230,11 @@ Reject a carrier that requires zone lookup to reconstruct that civil value.
 
 ## L6. Q20 has a real runtime-carrier conflict
 
-**Current source [V].** Today's `CalendarPeriod` selects Week, Month, or Year. It carries no start date.
-See `src/temporal/calendar.rs:18-30`.
-Today's runtime enum has no period variant.
-See `src/note/field.rs:43-64`.
-Query expressions and function results use that runtime enum.
-See `src/query/grammar/filter.rs:238-280,621-649`.
+**Current source [V].** In the inspected code, `CalendarPeriod` selects Week,
+Month, or Year. It carries no start date. See
+`src/temporal/calendar.rs:18-30`. The inspected runtime enum has no period
+variant. See `src/note/field.rs:43-64`. Query expressions and function results
+use that runtime enum. See `src/query/grammar/filter.rs:238-280,621-649`.
 These facts do not establish a target period carrier.
 
 **Inherited rule.** Ticket 18 chooses one owned runtime model for notes, queries, and templates.
@@ -229,9 +248,10 @@ It prohibits a second period-value type and heap allocation for that value.
 It assigns filename-derived periods to `file.date`.
 See [21:136-160](../../issues/21-ambient-environment-and-execution-context.md).
 
-**Candidate [P].** Add the validated temporal period to the common runtime carrier.
-Keep stored note classification separate: a runtime variant does not need the note parser to produce it.
-Keep `file.date` evaluation-derived, as the accepted index design requires.
+**Candidate [P].** Add the validated temporal period to the common runtime
+carrier. Keep stored note classification separate. A runtime variant does
+not need the note parser to produce it. Keep `file.date` evaluation-derived,
+as the accepted index design requires.
 
 **Retain option.** Retain the current note-origin variants and schema-local literals.
 A query-only owned wrapper remains an alternative, but it explicitly revises ticket 18's shared runtime-carrier decision.
@@ -265,10 +285,11 @@ Section 10 reserves a `member_of` node without implementation or frontend.
 It says that relation is never a range key or group key.
 See [29:1176-1199](../../issues/29-query-core-and-plan.md).
 
-**Candidate interpretation [H].** These clauses can coexist if “key” means a stored canonical identity/order representation.
-A planner can derive predicate bounds without declaring membership to be an equality relation.
-However, the phrase “never a range key” can also prohibit that optimization.
-The accepted text does not define this distinction clearly enough for an implementation.
+**Candidate interpretation [H].** These clauses can coexist if “key” means a
+stored canonical identity/order representation. A planner can derive
+predicate bounds without declaring membership to be an equality relation.
+However, this review also considers a prohibitive reading of “never a range
+key”. L5 later rejects the claim that these reads prove a contradiction.
 
 **Candidate [P].** State the distinction explicitly in Q35 and the reconciliation handoff.
 Use a matrix with operator, literal kind, row kind, frame requirement, and key encoding.
@@ -329,10 +350,12 @@ No external-consumer compatibility test or public-API check ran in this review.
 
 ## Integration result
 
-The leakage lens is covered by direct source inspection.
-The findings expose decision and integration work; they do not prove the proposed implementation.
-The main repairs concern the stale `DatePoint` claim, schema-check ownership, period-carrier ownership, and membership-key wording.
-The parent can integrate these findings without changing completed Answers.
+This report covers the leakage lens through direct source inspection. The
+findings identify decision and integration work. They do not prove the
+proposed implementation. The main repairs concern the older `DatePoint`
+claim, schema-check ownership, period-carrier ownership, and membership-key
+wording. The parent can integrate these findings without changing completed
+Answers.
 
 Checks not run: builds, tests, linters, formatters, benchmarks, or public-API checks.
 Remaining risk: candidate carriers and temporal bounds have no execution or size evidence in this review.

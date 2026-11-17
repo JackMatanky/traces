@@ -2,19 +2,25 @@
 
 ## Scope and evidence
 
-This report checks accepted text against `b-prior-decisions.md` and `synthesis.md`.
-It does not supply a new Answer.
-It changes no accepted Answer or production file.
+This report checks accepted text against `b-prior-decisions.md` and
+`synthesis.md`. It does not supply a new Answer. It changes no accepted
+Answer or production file.
 
-[V] means a direct source read in this task.
-[H] means an interpretation that the cited text does not settle.
-[P] means a correction proposed for the preparation only.
-No build, test, benchmark, formatter, linter or diagnostic script ran.
-Earlier measurements remain reports from their original authors.
+The mismatch descriptions refer to the preparation snapshot inspected here.
+They do not assert that the repaired preparation retains those errors.
+The proposed corrections remain proposals unless they restate cited accepted
+text. Later bounded probes in [m-gap-closure.md](./m-gap-closure.md) have
+their own limits. They are not execution evidence from this report.
 
-I read the Answers and later amendments in tickets 16, 18, 19, 20, 21, 22, 23, 24, 25, 28, 29 and 32.
-Ticket 25 records its accepted decisions under `Comments`, including its later replacement rules.
-I used those direct sections, not the B ledger, as authority.
+[V] means a direct source read in this task. [H] means an interpretation that
+the cited text does not settle. [P] means a correction proposed for the
+preparation only. No build, test, benchmark, formatter, linter, or diagnostic
+script ran. Earlier measurements remain reports from their original authors.
+
+I read the Answers and later amendments in tickets 16, 18, 19, 20, 21, 22,
+23, 24, 25, 28, 29, and 32. Ticket 25 records its accepted decisions under
+`Comments`, including its later replacement rules. I used those direct
+sections, not the B ledger, as authority.
 
 I read these research sections only to trace changed claims:
 
@@ -23,11 +29,12 @@ I read these research sections only to trace changed claims:
 - `h-redteam.md`, Q26 to Q29: merge, key counts and the loaded zone.
 - `h-redteam.md`, Q35: the claimed conflict about membership bounds.
 
-I also inspected two code facts through CodeGraph.
-`TaskDateSet` has six `Option<DateValue>` fields (`src/task.rs:498-505`).
-`DEFAULT_DATETIME_PATTERN` equals `%Y-%m-%dT%H:%M:%S` (`src/temporal/datetime.rs:32`).
-LSP references connect that constant to config defaults (`src/config/model/frontmatter.rs:261,296`).
-These are source reads, not execution results.
+I also inspected two code facts through CodeGraph. `TaskDateSet` has six
+`Option<DateValue>` fields (`src/task.rs:498-505`).
+`DEFAULT_DATETIME_PATTERN` equals `%Y-%m-%dT%H:%M:%S`
+(`src/temporal/datetime.rs:32`). LSP references connect that constant to config
+defaults (`src/config/model/frontmatter.rs:261,296`). These are source reads,
+not execution results.
 
 ## Direct-source coverage
 
@@ -50,9 +57,9 @@ These are source reads, not execution results.
 
 ### L1. B26 is not the truncated schema fragment
 
-Affected text: B26, I1, C19 and synthesis Q4.
-The synthesis says a value check needs recovery of the truncated sentence first.
-It recommends a token lint only.
+Affected text: B26, I1, C19, and synthesis Q4. The inspected synthesis says a
+value check needs recovery of the truncated sentence first. It recommends
+a token lint only.
 
 [V] Ticket 20 gives a complete provisional value rule:
 
@@ -70,10 +77,10 @@ Sources: 20:416-417, 20:119.
 Source: 20:305-315.
 That fragment does not state a date-format rule.
 
-[P] Keep the fragment as a separate recovery item.
-Remove the claim that fragment recovery blocks the already delegated date-format check.
-Present lint-only behavior as a proposed narrowing of ticket 20, not as its inherited requirement.
-Do not complete the fragment by inference.
+[P] Keep the fragment as a separate recovery item. Remove the claim that
+fragment recovery blocks the already delegated date-format check. Present
+lint-only behavior as a proposed narrowing of ticket 20, not as its inherited
+requirement. Do not complete the fragment by inference.
 
 ### L2. Partial dates and formats with no date component are different cases
 
@@ -110,11 +117,13 @@ Source: 18:586-590.
 It does not authorize those forms in note fields.
 Source: 21:170-176.
 
-[P] State: preserve frozen classification except for explicitly accepted changes and their migration rows.
-Keep the new filename grammar separate.
-Do not use Frozen to reject the accepted civil change.
-Do not use that civil change to authorize unrelated new note syntax.
-The synthesis already recognizes the civil exception in Q19; carry it into the common constraints.
+[P] Preserve frozen classification except for explicitly accepted changes
+and their migration rows. Keep the new filename grammar separate. Do not use
+Frozen to reject the accepted civil change. Do not use that civil change to
+authorize unrelated new note syntax.
+
+The inspected synthesis already recognizes the civil exception in Q19.
+Include it in the common constraints.
 
 ### L4. The period carrier alternative conflicts with the one-runtime-value rule
 
@@ -157,11 +166,12 @@ Section 3 forbids membership as group equality.
 It does not add the B66 sentence that membership “never defines a range key”.
 Source: 29:716-730.
 
-[H] The wording needs careful separation, but these reads do not prove a contradiction.
-An equivalence/order key and operator-specific candidate bounds are different things.
-A membership relation need not become a total key order to select a sound candidate interval.
-R5 expressly anticipates such bounds.
-It does not supply their proof or adopt a `member_of` probe.
+[H] These reads need a careful terminology distinction. They do not prove a
+contradiction. An equivalence/order key and operator-specific candidate
+bounds are different things. A membership relation can select a sound
+candidate interval without becoming a total key order. R5 expressly
+anticipates such bounds. It does not supply their proof or adopt a
+`member_of` probe.
 
 [P] Remove the asserted contradiction and its reject condition from Q35.
 Describe it as a terminology clarification if the human wants one.
@@ -191,13 +201,13 @@ Source: 30:97-98.
 Do not reduce Q22 to the unit tie-break alone.
 State the complete proposed value-sort key and its relation to the group key.
 
-Any change to the group-class order needs an explicit amendment.
-Do not present ticket 29 as a universal ban on every inner temporal `Ord` implementation.
-Ticket 19 expressly forbids `Ord` on `NoteFieldValue` itself.
-Source: 19:87-102.
+Any change to the group-class order needs an explicit amendment. Do not
+present ticket 29 as a universal ban on every inner temporal `Ord`
+implementation. Ticket 19 expressly forbids `Ord` on `NoteFieldValue`
+itself. Source: 19:87-102.
 
-B65/C4 also names the wrong contradiction identifier.
-The ledger's C3 owns group-class order; its C4 owns period upper-bound wording.
+B65/C4 also names the wrong contradiction identifier. The ledger's C3 owns
+group-class order. Its C4 owns period upper-bound wording.
 
 ### L7. Group-key construction does not need a zone lookup
 
@@ -247,14 +257,16 @@ Source: 21:106-127.
 Ticket 22 fixes the selected source order: host, config, system.
 Source: 22:227-230.
 
-[P] Distinguish zone spelling checks, zone-source selection and actual zone acquisition.
-Do not justify two policy types by assuming an eagerly loaded zone.
-Keep the configured-zone validation time as an explicit human choice.
-Do not claim that rejecting malformed config necessarily equals acquiring a required runtime zone.
-The chosen design must preserve civil-only work and avoid implicit UTC fallback.
+[P] Distinguish zone spelling checks, zone-source selection, and actual zone
+acquisition. Do not justify two policy types by assuming an eagerly loaded
+zone. Keep the configured-zone validation time as an explicit human choice.
+Do not equate rejection of malformed config with acquisition of a required
+runtime zone. The chosen design must preserve civil-only work. It must avoid
+implicit UTC fallback.
 
-Q30's “keep a loaded zone from workspace open” option needs an explicit change to per-operation acquisition.
-It is not an equivalent implementation of the inherited frame lifetime.
+Q30's “keep a loaded zone from workspace open” option needs an explicit
+change to per-operation acquisition. It is not an equivalent implementation
+of the inherited frame lifetime.
 
 ### L10. Configurable weeks do not silently redefine accepted ISO filename prefixes
 
@@ -265,10 +277,13 @@ It separately mentions configurable first weekdays and leaves week formats beyon
 Sources: 21:170-179, 21:266-270.
 It does not say that a configured general week rule reinterprets an ISO prefix.
 
-[P] Remove the statement that the filename prefix obeys the configured frame week rule.
-Keep ISO prefixes stable under a template or query week setting unless the human expressly changes ticket 21.
-Ask separately which operations use a custom week rule and which spelling identifies a non-ISO filename week.
-The note about global settings changing committed ISO labels assumes a change that is not yet accepted.
+[P] Remove the statement that the filename prefix obeys the configured frame
+week rule. Keep ISO prefixes stable under template or query week settings
+unless the human expressly changes ticket 21.
+
+Ask which operations use a custom week rule. Ask which spelling identifies
+a non-ISO filename week. The risk note about global settings changing
+committed ISO labels assumes a change that is not yet accepted.
 
 ### L11. New grammar and membership syntax remain choices
 
@@ -284,11 +299,11 @@ Sources: 29:467-478, 29:1186-1199.
 Ticket 21 permits new overlap or containment functions only when a query needs them.
 Source: 21:149-152.
 
-[P] Make grammar adoption a separate decision from grammar design and crate choice.
-Keep the hook-only alternative valid without implying a missing implementation.
-Make Q16 conditional on adoption of period phrases.
-For Q18, distinguish a spelling reservation, a readable alias and a genuinely new relation.
-Do not infer a required new implementation from the reserved name.
+[P] Make grammar adoption a separate decision from grammar design and crate
+choice. Keep the hook-only alternative valid without implying a missing
+implementation. Make Q16 conditional on adoption of period phrases. For Q18,
+distinguish a spelling reservation, a readable alias, and a genuinely new
+relation. Do not infer a required new implementation from the reserved name.
 
 ### L12. A release-long config tolerance path is new scope
 
@@ -299,10 +314,11 @@ Ticket 22 keeps `deny_unknown_fields` and calls for comment-preserving migration
 Neither Answer requires a one-release accept-and-ignore path.
 Sources: 16:60-72, 16:86, 22:223-226.
 
-[P] Remove the implied requirement for a tolerance release.
-Compare a direct documented migration with any proposed tolerance path.
-Label tolerance as more compatibility behavior for human approval.
-Keep the chosen removal scope precise: the format key and the whole frontmatter date table are different changes.
+[P] Remove the implied requirement for a tolerance release. Compare a direct
+documented migration with any proposed tolerance path. Label tolerance as
+more compatibility behavior for human approval. Keep the removal scope
+precise. The format key and the whole frontmatter date table are different
+changes.
 
 ### L13. Config key counts and diagnostic ownership overstate the direct Answer
 
@@ -341,11 +357,11 @@ Sources: 21:162-169, 24:397-405.
 [V] B60 can cite 25:180-184 directly.
 That text excludes unused filename parsing rules from the fingerprint.
 
-[V] The relevance table promises B63 and B64, but the ledger skips those entries.
-Use ticket 28 directly for the missing temporal interaction.
-A host overlay keeps base `mtime` and `created`; a new file has neither.
-Source: 28:1070-1078.
-The frame/generation memo rule is explicit in 29:965-978.
+[V] The relevance table promises B63 and B64, but the ledger skips those
+entries. Use ticket 28 directly for the missing temporal interaction. A host
+overlay keeps base `mtime` and `created`. A new file has neither.
+Source: 28:1070-1078. The frame/generation memo rule is explicit in
+29:965-978.
 
 [P] Replace proxy citations with these direct owners.
 Do not infer period dates from the buffer clock or invent metadata for new buffers.
@@ -364,34 +380,40 @@ No formatting execution ran.
 
 ## Invariants that the preparation must retain
 
-1. **Note parser:** classify each field element once. Keep schemas out of classification.
-   Preserve frozen meaning except for accepted changes and migration rows.
+1. **Note parser:** classify each field element once. Keep schemas out of
+   classification. Preserve frozen meaning except for accepted changes and
+   migration rows.
    Sources: 19:64-68, 23:334-341.
-2. **Runtime value owner:** keep one runtime carrier across notes, queries and templates.
-   Keep the 80-byte test. Do not add another period-value type.
+2. **Runtime value owner:** keep one runtime carrier across notes, queries,
+   and templates. Keep the 80-byte test. Do not add another period-value type.
    Sources: 18:458-489, 21:136-141.
-3. **Value semantics:** keep structural equality, filter matching, group equivalence and total sorting distinct.
+3. **Value semantics:** keep these four contracts separate: structural
+   equality, filter matching, group equivalence, and total sorting.
    Period membership does not define a partition or period identity order.
    Sources: 19:87-102, 29:1519-1526.
-4. **Temporal:** normalize a period to `(start, unit)`.
-   Project an instant to its civil date for membership.
-   A skipped next day must not invalidate the prior day.
+4. **Temporal:** normalize a period to `(start, unit)`. Project an instant to
+   its civil date for membership. A skipped next day must not invalidate the
+   prior day.
    Source: 21:136-156.
-5. **Query and template:** retain one operation frame and its lazy zone result, including failure.
-   Keep terminal failures typed. Never replace them with `Null`, blank cells or missing rows.
+5. **Query and template:** retain one operation frame and its lazy zone
+   result, including failure. Keep terminal failures typed. Never replace
+   them with `Null`, blank cells, or missing rows.
    Source: 21:106-132.
-6. **Config:** own `DateConfig`, preserve trust-before-parse, and apply accepted merge and zone precedence.
-   Temporal must not import config merely to get its policy.
+6. **Config:** own `DateConfig`. Preserve trust-before-parse. Apply the
+   accepted merge and zone precedence. Temporal must not import config
+   merely to get its policy.
    Sources: 22:223-235, 20:72-77.
 7. **Index:** persist source timestamps, not zone-derived dates or filename periods.
    Decode civil datetimes without a machine zone.
    Sources: 24:397-405, 24:503-510.
 8. **Fingerprint owner:** cover persisted producers and probe outputs.
-   Add the civil case and epoch change. Audit `winnow` before declaring the producer list complete.
-   Query-only grammar changes do not automatically become extractor changes.
+   Add the civil case. Record the epoch change. Audit `winnow` before
+   declaring the producer list complete. Query-only grammar changes do not
+   automatically become extractor changes.
    Sources: 25:304-334, 25:180-184.
 9. **Planner and store:** prove matching-set equality for Exact probes.
-   Run residual predicates. Scan Unsupported cases and merely Inexact cases in the first scope.
+   Run residual predicates. Scan Unsupported cases in the first scope.
+   Also scan merely Inexact cases in that scope.
    Sources: 29:504-542, 29:571-583.
 10. **Path owner:** read listed path text, not NUL-form database keys or folded Comparison Keys.
     Keep link percent decoding and encoded separators as explicit decisions.
@@ -403,35 +425,41 @@ No formatting execution ran.
 
 ## Remaining human choices and evidence blockers
 
-These items do not authorize changes to earlier Answers.
+These items do not authorize changes to earlier Answers. Evidence limits
+below apply to this report, not every later investigation.
 
-- **Schema semantics:** choose the dialect and define partial-date value acceptance.
-  Recover the unrelated truncated classification fragment without guessing its missing words.
+- **Schema semantics:** choose the dialect. Define partial-date value
+  acceptance. Recover the unrelated truncated classification fragment
+  without guessing its missing words.
 - **Civil/instant shape:** choose the field-level representation within the runtime-value and size constraints.
   The accepted civil behavior is not open again.
-- **Period carrier:** complete the one-runtime-value model, or explicitly amend that contract before choosing another carrier.
+- **Period carrier:** complete the one-runtime-value model. Before choosing
+  another carrier, get approval for an explicit amendment to that contract.
   Do not make stored period syntax an accidental consequence.
 - **Ordinary Date versus instant:** choose the gap/fold comparison rule separately from period membership.
   Ticket 21 does not settle that ordinary field comparison.
-- **Total sort key:** specify the mixed-value key and period unit rank.
-  Preserve the already accepted group classes and transitivity requirements.
+- **Total sort key:** specify the mixed-value key. Specify the period unit
+  rank. Preserve the accepted group classes and transitivity requirements.
 - **Configured weeks:** choose the supported operations and week-one rule.
   Do not silently reinterpret ISO filename weeks through a general week setting.
-- **Zone validation:** choose allowed spellings and the timing of spelling checks and acquisition.
-  Preserve lazy operation-scoped resolution and civil-only work.
+- **Zone validation:** choose allowed spellings. Decide when to check those
+  spellings and when to acquire the zone. Preserve lazy operation-scoped
+  resolution and civil-only work.
 - **New language:** decide whether to adopt grammar or frontend syntax at all.
   Then decide phrase precision, weekdays, spelling and crate ownership.
 - **Duration semantics:** retain or refine nominal seconds explicitly.
   Ticket 19 keeps `1mo == 30d` and `1y == 365d` provisionally.
-- **Markdown links:** decide percent decoding, encoded separators and extension normalization.
-  Decide `[[b]]` versus `[b](b.md)` equality separately from `date(link)` extraction.
+- **Markdown links:** decide percent decoding. Decide encoded-separator
+  handling. Decide extension normalization. Decide `[[b]]` versus
+  `[b](b.md)` equality separately from `date(link)` extraction.
   Sources: 19:299-313, 32:872-874.
 - **Pushdown evidence:** no direct Answer supplies a temporal physical encoding or operator proof table.
   Key eligibility needs the full temporal bracket, including period rows, and the pinned frame.
   Quoted literals remain Unsupported in the accepted first scope.
   A timing for numeric or folder keys supplies no temporal proof.
-- **Implementation evidence:** this task does not measure enum size, parser parity, key cost, grammar cost or shipped-profile behavior.
-  Those are evidence gates, not permission to choose the human's semantics.
+- **Implementation evidence:** this report does not measure enum size,
+  parser parity, key cost, grammar cost, or shipped-profile behavior. Those
+  are evidence gates, not permission to choose the human's semantics.
 
-Only this new research report was written.
-No existing file changed. No checks ran.
+During the original inspection, I wrote only this new research report.
+I changed no existing file. I ran no checks.

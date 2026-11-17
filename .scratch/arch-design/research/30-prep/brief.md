@@ -6,13 +6,17 @@ Prepare evidence for [Where do temporal, format dialects and calendar helpers be
 Do not resolve the ticket. Do not implement the redesign.
 The ticket remains claimed for preparation and the later human discussion.
 
-## Baseline
+## Recorded starting baseline
+
+This section records the initial preparation state. It does not describe
+the current working tree or current index status.
 
 - Source revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
-- CodeGraph reports an up-to-date index.
-- The worktree already has changes in six architecture tickets.
-- Preserve those changes. Only the integration owner changes the temporal ticket.
-- Read the map and the local tracker rules before interpreting ticket status.
+- At the start, CodeGraph reports an up-to-date index.
+- The starting worktree has changes in six architecture tickets.
+- Preserve those changes.
+- Only the integration owner changes the temporal ticket.
+- Read the map and local tracker rules before interpreting ticket status.
 - The map ends at architectural decisions for a specification.
 
 ## Question groups and research routes
@@ -36,7 +40,7 @@ This list guides research. It does not replace the accepted Answers.
 - Treat target decisions and current implementation as different evidence.
 - Keep naive datetimes civil. Explicit offsets identify instants.
 - Keep period membership separate from equality, grouping and total order.
-- Use the civil date for membership of a zoned instant. Do not need a next-day midnight.
+- Use the instant's civil date for membership. Do not depend on next-day midnight.
 - Keep one pinned clock and week rule per operation.
 - Get the zone only when needed. Retain a failed lookup in that frame.
 - Do not use UTC as an implicit fallback.
@@ -45,7 +49,8 @@ This list guides research. It does not replace the accepted Answers.
 - Derive filename periods during evaluation, not in the persisted note.
 - Keep schemas out of the index fingerprint.
 - Keep unproved range mappings Unsupported. Always run the residual predicate.
-- Keep the 80-byte runtime value limit as a design constraint, not a measured result for a new design.
+- Keep the 80-byte runtime value limit as a constraint.
+  A mirror measurement does not establish a new production type's size.
 - Do not treat the truncated schema date-check sentence as an accepted rule.
 
 ## Parallel work and file ownership
@@ -69,8 +74,10 @@ Use these tags:
 Rules for evidence:
 
 - Cite the primary source for each material claim.
-- Use source symbols and paths for code citations. Add exact locations in scout findings.
+- Cite source symbols and paths. Add exact locations to scout findings.
 - State the crate version and feature configuration for crate claims.
+- Read line citations against the report's recorded source snapshot.
+  Later prose edits can move those lines without changing the cited rule.
 - Use rust-docs tools only with project-local `.rust-docs/` sources.
 - Do not claim that a cached version matches a candidate without checking it.
 - Keep prototype facts separate from production behavior.
@@ -81,12 +88,14 @@ Rules for evidence:
 Rules for research prose:
 
 - Write all research prose in ASD-STE100.
-- Keep instructions to 20 words. Keep descriptions to 25 words.
-- Use short active sentences. Preserve caveats, numbers, identifiers and source links.
+- Limit instructions to 20 words and descriptions to 25 words.
+- Use short, active sentences.
+- Preserve caveats, numbers, identifiers and source links.
 - Use the same term for the same concept.
 - Do not change earlier Answers, current-code glossaries or production files.
 - Do not run builds, tests, benchmarks, formatters, linters or diagnostic scripts in an agent.
 - The integration owner runs the final checks.
+  Checker results do not replace a review of meaning.
 - Do not claim a design is optimal from line count, dependency count or unmeasured cost.
 - Compare retain, consolidation, adapters and removal where each applies.
 - Give each candidate a counterexample and a condition that rejects it.

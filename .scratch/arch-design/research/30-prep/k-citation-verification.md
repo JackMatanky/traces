@@ -2,26 +2,35 @@
 
 ## Scope and method
 
-This report checks material claims in `c-digest-lessons.md` and `e-external-designs.md`.
-It also identifies affected claims in `synthesis.md`.
-It does not change a ticket Answer or select a design.
+This report checks material claims in `c-digest-lessons.md` and
+`e-external-designs.md`. It also identifies affected claims in
+`synthesis.md`. It does not change a ticket Answer or select a design.
 
-- **Confirmed** means that the inspected source supports the stated, limited claim.
-- **Corrected** means that the source contradicts the claim or needs a narrower statement.
+The corrections address the versions inspected for this report. Later
+repairs can remove the cited errors. The report does not claim that those
+errors remain in the present preparation. “Precise repair” introduces a
+recommended text correction, not an accepted Traces design rule.
+
+- **Confirmed** means that the inspected source supports the stated,
+  limited claim.
+- **Corrected** means that the source contradicts the claim or supports only
+  a narrower statement.
 - **Unresolved** means that this inspection does not establish the claim.
-- `[V]` identifies a source read. It does not identify a program execution.
+- `[V]` identifies a source read, not a program execution.
 - `[INFERENCE]` identifies a conclusion from the inspected source.
 
-I read the brief, the synthesis, and both research files.
-I opened the primary URLs and the digest blocks cited below.
-I used CodeGraph for the initial production-code inspection.
-I used project-local rust-docs records for the Rust documentation reads.
-I changed only this report. I ran no builds, tests, linters, formatters, benchmarks, or runtime probes.
+I read the brief, the synthesis, and both research files. I opened the
+primary URLs and the digest blocks cited below. I used CodeGraph for the
+initial production-code inspection. I used project-local rust-docs records
+for the Rust documentation reads. During that inspection, I changed only
+this report. I ran no builds, tests, linters, formatters, benchmarks, or
+runtime probes.
 
-The owner separately reports a Moment runtime probe. Section K1 records that distinction.
-Live upstream pages describe their current content, not the owner's installed plugin versions.
-Pinned source links identify the version where available.
-The digest extracts do not prove that their code matches a released plugin build.
+The owner separately reports a Moment runtime probe. Section K1 records
+that distinction. Live upstream pages describe their current content, not
+the owner's installed plugin versions. Pinned source links identify the
+version where available. The digest extracts do not prove that their code
+matches a released plugin build.
 
 ## Repairs that affect the grilling
 
@@ -72,15 +81,15 @@ Precise repair:
 | Many Arab countries example | 6 | 12 | 1 |
 | Other Monday-first example | 1 | 7 | 1 |
 
-[V] `Q` formats the quarter. `Qo` formats its ordinal.
-Parsing `Q` sets the first month of that quarter.
-`DDD` and `DDDD` identify the day of year.
-The source checks the selected year's day count. The valid range includes day 366 in leap years.
-Replace the blanket range `1 to 365` in e q4 with `1 to 365, or 366 in a leap year`.
+[V] `Q` formats the quarter. `Qo` formats its ordinal. Parsing `Q` sets the
+first month of that quarter. `DDD` and `DDDD` identify the day of year.
+The source checks the selected year's day count. The valid range includes
+day 366 in leap years. Replace the blanket range `1 to 365` in e q4 with
+`1 to 365, or 366 in a leap year`.
 
-[V] `day(0)` always selects Sunday. `weekday(0)` selects the locale's first weekday.
-Do not treat those methods as the same API.
-The inspected Templater helper uses `weekday`, not `day`; see K2.
+[V] `day(0)` always selects Sunday. `weekday(0)` selects the locale's first
+weekday. Do not treat those methods as the same API. The inspected
+Templater helper uses `weekday`, not `day`. See K2.
 
 [V] The owner reports this separate runtime result for Moment 2.30.1, English locale, at UTC `2025-12-28`:
 
@@ -92,10 +101,10 @@ The owner's evidence file is `m-gap-closure.md`.
 I did not repeat that runtime probe.
 The source independently confirms the distinct token rules that explain the result.
 
-Precise repair: retain the filename collision example, with its explicit locale and token spelling.
-Do not claim that all local-week formats are inherently unstable.
-A fixed, explicit week policy removes device-locale dependence.
-Supporting or rejecting those tokens remains a human choice.
+Precise repair: retain the filename collision example with its explicit
+locale and token spelling. Do not claim that all local-week formats are
+inherently unstable. A fixed, explicit week policy removes device-locale
+dependence. The human still chooses whether to support those tokens.
 
 ## K2. Templater delegates formatting and weekday policy
 
@@ -166,11 +175,15 @@ Its Sunday-first list also includes `IS` and `PT`.
 The statement “no major locale uses `(sunday, 4)`” is false under this cited data.
 CLDR also permits a Unicode `fw` override for the first day.
 
-Precise repair: delete the “no major locale” assertion and its implied restriction.
-A pair can describe a week rule. Both fields do not have to change together.
-The policy still needs an explicit rule for week numbering.
-Display-week start and numbered-week semantics can also be separate concepts.
-The external evidence does not select either design.
+Precise repair:
+
+- Delete the “no major locale” assertion.
+- Remove its implied restriction.
+
+A pair can describe a week rule. A change to one field does not need a
+change to the other. The policy still needs an explicit rule for week
+numbering. Display-week start and numbered-week semantics can be separate
+concepts. The external evidence does not select either design.
 
 [V] CLDR recommends rollover when changed week settings make a previously valid week 53 unavailable.
 Its note says to treat that date as part of the next year's first week.
@@ -233,11 +246,11 @@ Tasks normalizes parsed dates and range endpoints to local midnight.
 Its comment explicitly names equality as the reason.
 
 [V] “Temporal cross-kind `compare` always throws” is too broad.
-`PlainDate.compare` converts inputs through `PlainDate.from`.
-The documented `PlainDate.from(PlainDateTime)` conversion succeeds and drops the time.
+`PlainDate.compare` converts inputs through `PlainDate.from`. The documented
+`PlainDate.from(PlainDateTime)` conversion succeeds and drops the time.
 
-Precise repair: cite the specific conversion or comparison API.
-Do not generalize one rejected civil/instant conversion to every cross-kind input.
+Precise repair: cite the specific conversion or comparison API. Do not
+generalize one rejected civil/instant conversion to every cross-kind input.
 Treat Traces cross-class equality and ordering as its own contract.
 
 [INFERENCE] Midnight normalization and ambient zones identify a portability risk.
@@ -334,7 +347,7 @@ Replace “calendar-dependent duration comparison” with the fixed conversion-m
 Keep actual calendar arithmetic separate from duration-number conversion.
 Do not cite `.equals` as plain millisecond equality.
 Do not copy this comparator as proof of Traces total-order laws.
-I did not test its behavior for equal numeric values with different metadata.
+I did not execute cases with equal numeric values and different metadata.
 
 ## K10. RFC 3339 string ordering
 
@@ -355,11 +368,12 @@ Do not reverse that direction.
 - They use the same number of fractional-second digits.
 - They do not mix optional punctuation forms.
 
-The preparation omits the precision condition in q5 and cites section 5.6 instead of 5.1.
+The inspected preparation omits the precision condition in q5 and cites
+section 5.6 instead of 5.1.
 
-Precise repair: cite section 5.1 and state all conditions.
-Do not use the ordering property as proof that filename prefix parsing is unambiguous.
-That property does not define suffix separators or malformed-prefix fallback.
+Precise repair: cite section 5.1. State all conditions. Do not use the ordering
+property as proof that filename prefix parsing is unambiguous. That
+property does not define suffix separators or malformed-prefix fallback.
 
 [V] e q22's example is also wrong: lexical order puts `2026-02-28` before `2026-03`.
 Delete that example. Neither partial periods nor cross-class ordering fall under the RFC's timestamp theorem.
@@ -413,10 +427,10 @@ Precise repair: retain Arrow as evidence for representation choices and civil/in
 Do not use its interval type as direct evidence for `(start, unit)` period identity.
 
 [V] Arrow's formatter defaults to `%Y-%m-%dT%H:%M:%S` and locale `C`.
-It errors when a defined time zone is unavailable or the requested locale does not exist.
-Its `%S` precision follows the input precision.
+It reports an error when a defined time zone is unavailable or the requested
+locale does not exist. Its `%S` precision matches the input precision.
 The page does not provide the missing directive-by-directive comparison.
-Keep that comparison unresolved rather than inferring POSIX parity.
+Keep that comparison unresolved rather than infer POSIX parity.
 
 ## K13. PostgreSQL date and timestamp semantics
 
@@ -482,10 +496,10 @@ It does not establish c Q29's `+0200` claim for this grammar.
 Precise repair: separate Unicode identifier support from date and zone grammar support.
 Do not describe this digest as accepting all IANA names or all common offset spellings.
 
-[V] IWE's scanner checks ASCII digits and slices date/time components by byte positions.
-Its tests contain three multibyte timezone-tail rejection cases.
-Those are test-source reads, not executed tests.
-The date scanner checks shape, not calendar ranges; `is_iso_date` does not validate month lengths.
+[V] IWE's scanner checks ASCII digits and slices date/time components by byte
+positions. Its tests contain three multibyte timezone-tail rejection cases.
+Those are test-source reads, not executed tests. The date scanner checks
+shape, not calendar ranges. `is_iso_date` does not validate month lengths.
 
 Precise repair: retain the narrow adversarial-test precedent.
 Do not generalize it into complete Unicode safety or semantic date validation.
@@ -517,13 +531,15 @@ This is more precise than the public documentation's summary.
 [V] NumPy documents equality between year-granularity `2005` and day-granularity `2005-01-01`.
 That is a cross-unit equality rule. It is not malformed-prefix fallback behavior.
 
-Precise repair: replace “no ecosystem tool parses filename periods”.
-Replace it with this limited observation.
+Precise repair: replace “no ecosystem tool parses filename periods” with
+this limited observation:
+
 “The inspected Dataview extraction helper recognizes full dates, not week or quarter labels.”
-The inspected Tasks query parser recognizes numbered weeks, months, quarters, and years.
-It does not establish a filename parser.
-No finite sample supports the blanket absence claim.
-The universal claim remains unresolved and must not decide the parser boundary.
+
+The inspected Tasks query parser recognizes numbered weeks, months,
+quarters, and years. It does not establish a filename parser. No finite
+sample supports the blanket absence claim. The universal claim remains
+unresolved and must not decide the parser boundary.
 
 ## K16. NumPy week units
 
@@ -570,11 +586,14 @@ Its `next week` branch parses the configured first weekday, not an unchanged wee
 Replace c Q16's “same weekday next week” claim with that inspected branch.
 Its `next month` and `next year` branches use two-stage parsing.
 
-[V] Duckling provides grain-bearing results and positive/negative corpus examples.
-Its example HTTP server accepts **`reftime`**, not `reference_time`.
-It uses that value to fill `Context.referenceTime`; otherwise it reads the current reference time.
-The README pins the corpus reference to 2013-02-12 at 04:30.
-This proves an injected-context precedent, not that an open grammar cannot replay consistently.
+[V] Duckling provides grain-bearing results and positive/negative corpus
+examples. Its example HTTP server accepts **`reftime`**, not
+`reference_time`. It uses that value to fill `Context.referenceTime`.
+Otherwise, it reads the current reference time. The README pins the corpus
+reference to 2013-02-12 at 04:30.
+
+This source supports an injected-context precedent. It does not prove that
+an open grammar cannot replay consistently.
 
 [V] `chrono-english::parse_date_string` takes text, a `DateTime<Tz>` anchor, and a dialect.
 Its documentation limits the grammar and explains the UK/US weekday difference.
@@ -583,13 +602,16 @@ Those facts support the documented API comparison.
 The generic `TimeZone` and conversion paths still matter to a full determinism claim.
 I did not inspect every transitive conversion or execute same-day weekday cases.
 
-Precise repair: replace “deterministic by construction” with a conditional statement.
+Precise repair: replace “deterministic by construction” with a conditional
+statement.
+
 “The parser must depend only on its text and pinned inputs, including zone data, week rules, and dialect.”
 
-A source audit and fixed-input behavior evidence must establish that contract.
-The unwritten in-repository grammar has no demonstrated coverage or determinism yet.
-A closed grammar can simplify the contract. It does not prove the contract.
-An open but deterministic grammar can also replay with pinned inputs.
+A source audit and fixed-input behavior evidence must establish that
+proposed contract. This report does not demonstrate the coverage or
+determinism of the unwritten in-repository grammar. A closed grammar can
+simplify the contract. It does not prove the contract. An open but
+deterministic grammar can also replay with pinned inputs.
 
 [V] Java recommends injected clocks and provides `Clock.fixed`.
 It also documents ambient clock APIs.
@@ -629,12 +651,13 @@ Digest blocks read:
 - `docs/digests/zk-src-digest.txt:2213-2316`, `date.go`.
 - `docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:6865-6909,6924-6928`.
 
-[V] IWE separates key and content formatting values and uses the same chrono formatting family.
-The inspected current configuration places content fields under `[markdown]`, not `[formatting]`.
-Its `format_options()` selects content options.
-Its locale helper uses the system locale only when no configured value exists.
-An invalid configured locale falls directly to `POSIX`; it does not retry the system locale.
-Repair those table names and fallback descriptions in c Q3, Q5, Q27, and Q29.
+[V] IWE separates key and content formatting values. It uses the same chrono
+formatting family for both. The inspected current configuration places
+content fields under `[markdown]`, not `[formatting]`. Its
+`format_options()` selects content options. Its locale helper uses the system
+locale only when no configured value exists. An invalid configured locale
+falls directly to `POSIX`. It does not retry the system locale. Correct
+those table names and fallback descriptions in c Q3, Q5, Q27, and Q29.
 
 [V] zk has named styles with custom strftime fallback.
 Its helper logs a parse error and returns the utility's returned time value.
@@ -647,10 +670,10 @@ Its old time-valued helper path calls `os.Exit(1)`.
 Its two-string custom-format branch can throw.
 It formats through Luxon's `toFormat`.
 
-Precise repair: keep these specific error shapes.
-Delete “every integration has a silent-or-drastic failure path” as an unproved universal statement.
-One-dialect-per-tool and one-dialect-per-surface are sample descriptions, not ecosystem laws.
-Neither sample proves a unique Traces placement.
+Precise repair: keep these specific error shapes. Delete “every integration
+has a silent-or-drastic failure path” as an unproved universal statement.
+One-dialect-per-tool and one-dialect-per-surface describe the inspected
+sample, not ecosystem laws. Neither sample proves a unique Traces placement.
 
 ## K20. Jiff formatting and acquisition citations
 
@@ -730,14 +753,20 @@ It lets renderers leave non-ASCII destination characters unencoded.
 Do not reduce its destination grammar to “all parentheses need escaping”.
 
 [V] RFC 3986 requires component separation before decoding reserved octets.
-It prohibits repeated percent decoding.
-Decoding a reserved delimiter can change interpretation.
+It prohibits repeated percent decoding. Decoding a reserved delimiter can
+change interpretation.
 
-Precise repair: identify URI components and the target segment before percent decoding that segment once.
-Do not decode a complete target and then rediscover `/`, `#`, or `?` boundaries.
-For example, `%2F` must not create a new final-segment boundary.
-The accepted ticket rules still control Markdown parsing and note-target classification.
-This RFC does not replace those rules.
+Precise repair:
+
+- Identify URI components before percent decoding.
+- Identify the target segment before decoding it once.
+- Do not decode a complete target before identifying its `/`, `#`, or `?`
+  boundaries.
+- Do not let `%2F` create a new final-segment boundary.
+
+The accepted ticket rules still control Markdown parsing and note-target
+classification. This RFC does not replace those rules. Traces
+percent-decoding policy remains a human choice.
 
 [V] Dataview's `date(link)` tries display text, then path, then resolved `file.day`.
 That source supports the alias-risk example.
@@ -751,14 +780,19 @@ No runtime link example was executed here.
 - [Java `TemporalAdjusters`](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/temporal/TemporalAdjusters.html) documents externalized adjustment and four explicit next/previous variants. It does not choose Traces bare-weekday semantics.
 - [POSIX `tzset`](https://pubs.opengroup.org/onlinepubs/9799919799.2024edition/functions/tzset.html) documents an implementation-defined zone when `TZ` is absent. It recommends explicit setup before portable `localtime_r` use.
 - [Cron's manual](https://man7.org/linux/man-pages/man5/crontab.5.html) defines weekday matching, not relative-weekday resolution. It also documents missing-time and repeated-time scheduling effects.
-- [Moment's guide](https://momentjs.com/guides/#/parsing/strict-mode/) gives the UUID parsing example. Its exact UUID is `5917238b-33ff-f849-cd63-80f4c9b37d0c`, parsed with `moment.ISO_8601`. Repair e q1's altered input/API attribution or cite it as a paraphrase, not an executed example.
+- [Moment's guide](https://momentjs.com/guides/#/parsing/strict-mode/) gives the UUID parsing example.
+  Its exact UUID is `5917238b-33ff-f849-cd63-80f4c9b37d0c`, parsed with
+  `moment.ISO_8601`. Correct e q1's altered input/API attribution. If you
+  paraphrase the example, do not present it as an executed example.
 - [Moment time-source customization](https://momentjs.com/docs/#/customization/now/) documents overridable `moment.now`. This closes e's stated documentation gap. A mutable global clock hook is not per-request clock injection.
 
 ## Exact limits of this inspection
 
-This is a broad, claim-focused source audit. It is not a line-by-line audit of every cited project.
-Do not mark every statement in c or e verified from this report.
-These claims remain unexamined here:
+This is a source audit of selected material claims, not every line of every
+cited project. Do not mark every statement in c or e as checked from this
+report. The claims below remain unexamined **in this report**. Later
+source checks and bounded probes in [m-gap-closure.md](./m-gap-closure.md)
+have their own scope. They do not resolve every item in this list.
 
 - The accepted Answers, ledger identifiers, supersession rules, and compatibility classifications in earlier tickets.
 - The owner's complete template inventory and schema-format inventory.
@@ -778,6 +812,6 @@ These claims remain unexamined here:
 - A directive-by-directive Arrow parsing/formatting comparison.
 - Binary size, allocation cost, throughput, and the size of a proposed runtime value.
 
-These limits do not undo the confirmed corrections above.
-Use separate evidence for the unexamined claims before those claims decide an architecture choice.
-No source sample proves a globally optimal design.
+These limits do not undo the confirmed corrections above. Use separate
+evidence for claims unexamined here before those claims decide an
+architecture choice. No source sample proves a globally optimal design.

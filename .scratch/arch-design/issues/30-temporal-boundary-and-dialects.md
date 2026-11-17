@@ -242,15 +242,17 @@ envelope.
 
 ## Prep before grilling
 
-The natural-language grammar needed a prep step before the grilling. Ticket 19
-said nobody reviewed `jiff-english` or `fuzzydate`. That gap is closed:
+The natural-language grammar needs the candidate review described below.
 [d-crate-evidence](../research/30-prep/d-crate-evidence.md) reviews
-`jiff-english`, `fuzzydate`, `parse_datetime` and `chrono-english` against the
-evidence list below [V]. The k-citation pass checked that file's citations
-([k-citation-verification](../research/30-prep/k-citation-verification.md)).
-Measured runtime evidence for the candidates, including parsing behavior,
-sizes and throughput, is in
-[m-gap-closure](../research/30-prep/m-gap-closure.md).
+`jiff-english`, `fuzzydate`, `parse_datetime` and `chrono-english`.
+The [K report](../research/30-prep/k-citation-verification.md) checks
+selected external claims from C and E. Candidate source APIs are outside
+its own audit. It does not check every D citation.
+
+The [M report](../research/30-prep/m-gap-closure.md) records bounded runtime
+cases and indicative costs. It distinguishes earlier probe revisions,
+source checks and implementation gates. A completed report does not
+mean that every candidate or production cost is measured.
 
 Facts from the crates.io API, read on 2026-11-16 [V]:
 
@@ -346,9 +348,9 @@ See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Schema
 year-only variant. The `date` check accepts any scalar when the format has no
 date component. Tests in `schema` use Moment tokens. Temporal and the template
 filter seam translate them. Pick the dialect. After choosing a dialect, add the
-date-format check. A lint-only check, as question 4 proposes, narrows this
-provisional scalar acceptance; it is a proposed amendment to ticket 20, not an
-inherited behavior.
+date-format check. The lint-only proposal in synthesis Q4 removes the
+provisional value check. It needs an explicit amendment to ticket 20;
+it is not inherited behavior.
 
 The Answer text of ticket 20 is cut off after "Only date, datetime and". Do not
 read a rule into that fragment.
