@@ -318,9 +318,8 @@ impl<'a> SortKeys<'a> {
 /// [`NoteFieldValueRef::compare`] when comparisons need full value detail.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum SortKey<'a> {
-    /// Represents a missing or non-indexed value.
-    ///
-    /// It sorts below every other kind.
+    /// Represents a missing or non-indexed value that sorts below every other
+    /// kind.
     Null,
     /// Stores a boolean value.
     Bool(bool),

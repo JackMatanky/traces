@@ -90,9 +90,8 @@ impl SchemaFieldDef {
         &self.kind
     }
 
-    /// Returns the static selectable entries for a `select` or `multi` field.
-    ///
-    /// Returns `None` for every other field type.
+    /// Returns the static selectable entries for a `select` or `multi` field,
+    /// or `None` for other field types.
     #[inline]
     #[must_use]
     pub(crate) fn select_values(&self) -> Option<&[SchemaSelectFieldEntry]> {
@@ -106,9 +105,8 @@ impl SchemaFieldDef {
         }
     }
 
-    /// Returns the borrowed file filter for a `file` field.
-    ///
-    /// Returns `None` for every other field type.
+    /// Returns the borrowed file filter for a `file` field, or `None` for other
+    /// field types.
     #[inline]
     #[must_use]
     pub(crate) fn file_filter(&self) -> Option<file::SchemaFileFieldRef<'_>> {

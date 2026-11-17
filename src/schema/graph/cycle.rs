@@ -39,9 +39,8 @@ impl<'a> CycleDetector<'a, '_> {
         }
     }
 
-    /// Returns every remaining Schema in a cycle, in declaration order.
-    ///
-    /// Returns an empty vector if `visited` already covers every node.
+    /// Returns every remaining Schema in a cycle in declaration order, or an
+    /// empty vector if `visited` covers every node.
     pub(super) fn find(mut self) -> Vec<SchemaName> {
         if self.visited.len() == self.adjacency.node_count() {
             return Vec::new();

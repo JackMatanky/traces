@@ -193,10 +193,8 @@ impl FileField {
         "tags",
     ];
 
-    /// Parses the field portion of a `file.<field>` accessor string.
-    ///
-    /// Returns `None` for unknown names so callers can report the full
-    /// `file.<field>` path.
+    /// Parses the field name from a `file.<field>` accessor string and returns
+    /// `None` for unknown names.
     pub(crate) fn parse(name: &str) -> Option<Self> {
         match name {
             "path" => Some(Self::Path),

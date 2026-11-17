@@ -90,9 +90,8 @@ impl ListTracker {
         self.item_stack.last_mut()?.flush_scan_buffer()
     }
 
-    /// Pushes a list frame and flushes any active parent item's scan buffer.
-    ///
-    /// Returns the flushed inline fields and tags, if any.
+    /// Pushes a list frame, flushes the active parent item's scan buffer, and
+    /// returns any flushed inline fields and tags.
     pub(super) fn start_list(
         &mut self,
         is_ordered: bool,
@@ -179,9 +178,8 @@ impl ListTracker {
         flushed
     }
 
-    /// Appends text to the active item's display text and scan buffer.
-    ///
-    /// Returns `false` if there is no active item.
+    /// Appends text to the active item's display text and scan buffer, or
+    /// returns `false` if no item is active.
     pub(super) fn push_text(
         &mut self,
         text: &str,
@@ -194,9 +192,8 @@ impl ListTracker {
         true
     }
 
-    /// Appends a line break to the active item's buffers.
-    ///
-    /// Returns `false` if there is no active item.
+    /// Appends a line break to the active item's buffers, or returns `false` if
+    /// no item is active.
     pub(super) fn push_break(&mut self) -> bool {
         let Some(item) = self.item_stack.last_mut() else {
             return false;
@@ -205,9 +202,8 @@ impl ListTracker {
         true
     }
 
-    /// Pushes a literal character into the active item's scan buffer.
-    ///
-    /// Returns `false` if there is no active item.
+    /// Pushes a literal character into the active item's scan buffer, or
+    /// returns `false` if no item is active.
     pub(super) fn push_scan_char(&mut self, ch: char) -> bool {
         let Some(item) = self.item_stack.last_mut() else {
             return false;

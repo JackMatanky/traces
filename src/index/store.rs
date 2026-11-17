@@ -1263,10 +1263,8 @@ impl IndexStore {
         Ok(InlinkMap::from_raw(links))
     }
 
-    /// Resolves one `target -> sources` row through the path maps.
-    ///
-    /// Returns `None` when the target has no indexed path or when no source
-    /// remains.
+    /// Resolves one `target -> sources` row through the path maps, or returns
+    /// `None` when the target has no indexed path or no source remains.
     ///
     /// # Errors
     ///

@@ -44,10 +44,8 @@ pub use terminal::TerminalDialogProvider;
 /// [`Self::select`] and [`Self::multi_select`] return indices into the `items`
 /// slice. See the module-level documentation for the rationale.
 pub trait DialogProvider: Send + Sync {
-    /// Reports whether this provider can do interactive prompting.
-    ///
-    /// Returns `false` when standard input is not a terminal or when no preset
-    /// answers remain.
+    /// Returns `true` if this provider can prompt interactively, or `false`
+    /// when no terminal or preset answers remain.
     #[inline]
     #[must_use]
     fn is_interactive(&self) -> bool {

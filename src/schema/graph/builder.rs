@@ -25,9 +25,8 @@ pub(crate) struct SchemaGraphBuilder<'a> {
 }
 
 impl<'a> SchemaGraphBuilder<'a> {
-    /// Builds the adjacency and seeds the ready queue.
-    ///
-    /// Returns the builder and any warnings from [`SchemaAdjacency::build`].
+    /// Builds the adjacency, seeds the ready queue, and returns the builder
+    /// with any warnings from [`SchemaAdjacency::build`].
     ///
     /// # Arguments
     ///
@@ -108,9 +107,8 @@ impl<'a> SchemaGraphBuilder<'a> {
         })
     }
 
-    /// Pops the next Schema whose `unresolved_parent_count` reached zero.
-    ///
-    /// Returns `None` once the queue drains.
+    /// Pops the next Schema whose `unresolved_parent_count` reached zero, or
+    /// returns `None` when the queue is empty.
     fn next_ready(&mut self) -> Option<SchemaNameRef<'a>> {
         let index = self.ready_queue.pop_front()?;
         let name = self.adjacency.name_of(index)?;

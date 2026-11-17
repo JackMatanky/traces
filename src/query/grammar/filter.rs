@@ -256,9 +256,8 @@ pub(crate) enum ValueExpr {
 }
 
 impl ValueExpr {
-    /// Evaluates a value expression.
-    ///
-    /// Returns `None` when a row value cannot satisfy a comparison.
+    /// Evaluates a value expression and returns `None` when a row value cannot
+    /// satisfy a comparison.
     fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
         match self {
             Self::Field(path) => Some(row.resolve_ref(path).to_owned_value()),
@@ -623,9 +622,8 @@ impl QueryFunction {
         Ok(())
     }
 
-    /// Evaluates the call over already evaluated argument values.
-    ///
-    /// Returns `None` when the arguments cannot satisfy a comparison.
+    /// Evaluates the call over evaluated argument values and returns `None`
+    /// when the arguments cannot satisfy a comparison.
     fn evaluate(self, args: &[NoteFieldValue]) -> Option<NoteFieldValue> {
         match self {
             Self::Dur => match args {

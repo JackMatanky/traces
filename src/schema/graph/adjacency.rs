@@ -266,9 +266,8 @@ impl<'a> SchemaAdjacency<'a> {
         }
     }
 
-    /// Borrows `name`'s deduplicated, declaration-order `extends` parent list.
-    ///
-    /// Returns an empty slice if `name` is unknown or is `excluded`.
+    /// Borrows `name`'s deduplicated, declaration-order `extends` parent list,
+    /// or returns an empty slice if `name` is unknown or `excluded`.
     pub(super) fn parents_of(&self, name: SchemaNameRef<'_>) -> &[SchemaName] {
         if name == self.excluded {
             return &[];

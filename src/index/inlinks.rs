@@ -107,9 +107,8 @@ impl InlinkMap {
         Self(edges)
     }
 
-    /// Returns inbound sources for `target`.
-    ///
-    /// Returns an empty slice when `target` has no inbound links.
+    /// Returns inbound sources for `target`, or an empty slice if `target` has
+    /// none.
     #[inline]
     #[must_use]
     pub fn inlinks_of(&self, target: &Path) -> &[PathBuf] {

@@ -185,10 +185,8 @@ impl LocalConfigFile<Discovered> {
         Self::new(root.to_path_buf(), root.join(LOCAL_CONFIG_FILE), Discovered)
     }
 
-    /// Returns the project root for a local Configuration File path.
-    ///
-    /// Returns `None` unless the path ends in `.traces/config.toml` and its
-    /// `.traces` directory has a parent.
+    /// Returns a local Configuration File for a `.traces/config.toml` path with
+    /// a parent project root, or `None`.
     #[inline]
     pub(crate) fn from_config_path(path: &Path) -> Option<Self> {
         let traces_dir = path.parent()?;

@@ -272,9 +272,8 @@ impl SourceLine {
     /// The minimum valid line number (1).
     pub const MIN: Self = Self(NonZeroU32::MIN);
 
-    /// Wraps `line` as a 1-indexed source line number.
-    ///
-    /// Returns `None` if `line` is zero.
+    /// Wraps a nonzero `line` as a 1-indexed source line number, or returns
+    /// `None` for zero.
     ///
     /// # Examples
     ///

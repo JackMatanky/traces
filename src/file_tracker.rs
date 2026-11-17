@@ -501,10 +501,8 @@ fn has_suffix(path: &Path, suffixes: &[&str]) -> bool {
     suffixes.iter().any(|suffix| name.ends_with(suffix.as_bytes()))
 }
 
-/// Reads `entry`'s recorded target path.
-///
-/// Returns `None` if reading `entry` fails or [`FilePathTracker::record`] did
-/// not write it.
+/// Reads the target path recorded at `entry` by [`FilePathTracker::record`], or
+/// returns `None` on failure.
 fn recorded_target(entry: &Path) -> Option<PathBuf> {
     #[cfg(unix)]
     let target = fs::read_link(entry);

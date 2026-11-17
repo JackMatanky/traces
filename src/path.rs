@@ -223,9 +223,7 @@ impl AsRef<Path> for SafeRelativePath {
 pub(crate) struct FolderRef<'a>(&'a Path);
 
 impl<'a> FolderRef<'a> {
-    /// Extracts the containing folder from `path`.
-    ///
-    /// Returns the root `""` for top-level paths.
+    /// Returns the containing folder of `path`, or `""` for top-level paths.
     #[inline]
     #[must_use]
     pub(crate) fn of(path: &'a Path) -> Self {

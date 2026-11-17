@@ -268,10 +268,8 @@ impl QueryDisplayFormat {
         Ok(out)
     }
 
-    /// Replaces newlines with spaces and escapes pipes in table cells.
-    ///
-    /// Returns plain text without another allocation when no escaping is
-    /// needed.
+    /// Replaces newlines with spaces and escapes pipes in table cells, or
+    /// returns the input without a new allocation.
     fn escape_table_cell<'a>(text: impl Into<Cow<'a, str>>) -> String {
         let text = text.into();
         if !text.contains(['\n', '|']) {

@@ -267,9 +267,7 @@ fn resolve_trust_subjects(
     }
 }
 
-/// Canonicalizes a path or returns its given spelling if it does not exist.
-///
-/// It returns other errors instead of using a possibly different path.
+/// Canonicalizes `path` or returns its given spelling when missing.
 ///
 /// # Errors
 ///

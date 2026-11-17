@@ -216,9 +216,8 @@ impl<'a> TemplateService<'a> {
         Ok(WriteOutcome::Written(resolved_path))
     }
 
-    /// Reads the source text of `resolved` from disk.
-    ///
-    /// Returns the file contents as a string.
+    /// Reads the source text of `resolved` from disk and returns the file
+    /// contents as a string.
     ///
     /// # Errors
     ///

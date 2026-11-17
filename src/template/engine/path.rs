@@ -211,10 +211,8 @@ impl AsRef<Path> for InspectTarget {
     }
 }
 
-/// Returns the final component of `path` including its extension.
-///
-/// Returns an empty string when `path` has no filename component (e.g. `""`,
-/// `"/"`, `".."`).
+/// Returns the final component of `path` with its extension, or an empty string
+/// when `path` has no filename component (e.g. `""`, `"/"`, `".."`).
 fn filename(path: &str) -> String {
     Path::new(path)
         .file_name()
@@ -223,18 +221,16 @@ fn filename(path: &str) -> String {
         .to_owned()
 }
 
-/// Returns the final component of `path` without its extension.
-///
-/// Returns an empty string when `path` has no filename component.
+/// Returns the final component of `path` without its extension, or an empty
+/// string when `path` has no filename component (e.g. `""`, `"/"`, `".."`).
 fn basename(path: &str) -> String {
     FileName::try_from(Path::new(path))
         .map(|name| BaseName::from(&name).as_str().to_owned())
         .unwrap_or_default()
 }
 
-/// Returns the file extension of `path` without the leading dot.
-///
-/// Returns an empty string when `path` has no extension.
+/// Returns the file extension of `path` without the leading dot, or an empty
+/// string when `path` has no extension.
 fn extension(path: &str) -> String {
     FileName::try_from(Path::new(path))
         .ok()
@@ -242,10 +238,8 @@ fn extension(path: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Returns the parent directory of `path`.
-///
-/// Returns an empty string when `path` has no parent (e.g. `""`, `"/"`, or a
-/// single bare name).
+/// Returns the parent directory of `path`, or an empty string when `path` has
+/// no parent.
 fn parent(path: &str) -> String {
     Path::new(path)
         .parent()

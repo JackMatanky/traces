@@ -174,10 +174,8 @@ impl FileMeta {
         BaseNameRef::from_path(&self.path).unwrap_or(BaseNameRef::empty())
     }
 
-    /// Returns the file's parent directory, relative to the project root.
-    ///
-    /// Returns a [`FolderRef`] pointing to `""` for files directly under the
-    /// project root.
+    /// Returns the file's parent [`FolderRef`] relative to the project root, or
+    /// `""` for top-level files.
     #[inline]
     #[must_use]
     pub(crate) fn folder(&self) -> FolderRef<'_> {
@@ -304,10 +302,8 @@ impl From<&FileName> for BaseName {
 pub(crate) struct BaseNameRef<'a>(&'a str);
 
 impl<'a> BaseNameRef<'a> {
-    /// Borrows `path`'s file stem.
-    ///
-    /// Returns [`None`] when `path` has no final component or the stem is not
-    /// valid UTF-8.
+    /// Borrows the UTF-8 file stem of `path`, or returns [`None`] if missing or
+    /// invalid UTF-8.
     #[must_use]
     pub(crate) fn from_path(path: &'a Path) -> Option<Self> {
         path.file_stem().and_then(|stem| stem.to_str()).map(Self)

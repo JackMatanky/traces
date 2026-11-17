@@ -62,9 +62,8 @@ impl StrOps {
     }
 }
 
-/// Removes `prefix` from the start of `value` when it is present.
-///
-/// Returns `value` unchanged when [`str::strip_prefix`] finds no `prefix`.
+/// Removes `prefix` from the start of `value`, or returns `value` unchanged
+/// when [`str::strip_prefix`] finds no match.
 ///
 /// # Examples
 ///
@@ -82,9 +81,8 @@ fn trim_prefix(value: &str, prefix: &str) -> String {
     value.strip_prefix(prefix).unwrap_or(value).to_owned()
 }
 
-/// Removes `suffix` from the end of `value` when it is present.
-///
-/// Returns `value` unchanged when [`str::strip_suffix`] finds no `suffix`.
+/// Removes `suffix` from the end of `value`, or returns `value` unchanged when
+/// [`str::strip_suffix`] finds no match.
 fn trim_suffix(value: &str, suffix: &str) -> String {
     value.strip_suffix(suffix).unwrap_or(value).to_owned()
 }
@@ -210,9 +208,8 @@ fn regex_replace(
     Ok(re.replace_all(value, replacement).into_owned())
 }
 
-/// Checks whether `value` contains a match for the regex `pattern`.
-///
-/// Returns `true` when the pattern matches and `false` otherwise.
+/// Returns `true` when `value` matches the regex `pattern`, and `false`
+/// otherwise.
 ///
 /// # Errors
 ///

@@ -347,8 +347,6 @@ impl TaskStatusType {
         }
     }
 
-    /// Derives the boolean completion flag for this status type.
-    ///
     /// Returns `true` for completed or canceled tasks, and `false` for
     /// incomplete tasks.
     #[inline]

@@ -691,9 +691,8 @@ const PATTERN_TIMESTAMP: u8 = 2;
 /// flag mask.
 const PATTERN_OFFSET: u8 = 4;
 
-/// Scans policy-relevant fields while Jiff owns parsing and validation.
-///
-/// Returns [`None`] if the pattern contains an unsupported `%Q` directive.
+/// Scans policy-relevant fields in `pattern` and returns [`None`] if `pattern`
+/// contains an unsupported `%Q` directive.
 fn pattern_fields(pattern: &str) -> Option<PatternKind> {
     let mut characters = pattern.chars().peekable();
     let mut fields = 0;

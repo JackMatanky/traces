@@ -276,10 +276,8 @@ impl TrustStore {
         }
     }
 
-    /// Revokes trust for the workspace root in a [`TrustRequest`].
-    ///
-    /// It removes the root and its Companion Hash. It returns the number of
-    /// root entries removed.
+    /// Revokes trust for a [`TrustRequest`] by removing its root and Companion
+    /// Hash, and returns the removed count.
     ///
     /// # Errors
     ///
@@ -309,9 +307,8 @@ impl TrustStore {
         self.store.list_all(&[COMPANION_SUFFIX]).map_err(Into::into)
     }
 
-    /// Removes missing workspace roots and their Companion Hashes.
-    ///
-    /// It returns the number of root entries removed.
+    /// Removes missing workspace roots and their Companion Hashes and returns
+    /// the removed root count.
     ///
     /// # Errors
     ///

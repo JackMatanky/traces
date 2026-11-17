@@ -58,9 +58,8 @@ impl DelimiterStack {
         self.entries.get(index).copied()
     }
 
-    /// Updates active quote state on encountering `ch`.
-    ///
-    /// Returns `true` if quote tracking consumes `ch`.
+    /// Updates the active quote state for `ch` and returns `true` when quote
+    /// tracking consumes it.
     #[inline]
     fn advance_quote_state(&mut self, ch: char) -> bool {
         if let Some(active_quote) = self.active_quote {
@@ -310,9 +309,8 @@ impl DelimiterType {
         input.char_indices().find(|&(_, ch)| ch == close).map(|(pos, _)| pos)
     }
 
-    /// Advances the backslash escape state on seeing `ch`.
-    ///
-    /// Returns `true` if escape processing consumes `ch`.
+    /// Updates the backslash escape state for `ch` and returns `true` when
+    /// escape processing consumes it.
     #[inline]
     fn advance_escaped(ch: char, escaped: &mut bool) -> bool {
         if *escaped {
