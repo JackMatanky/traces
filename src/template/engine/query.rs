@@ -39,7 +39,7 @@
 //! [`QuerySet::table`], [`QuerySet::list`], [`QuerySet::task_list`], and
 //! `count` (an alias for [`QuerySet::len`]) stop a chain. They render final
 //! Markdown or scalar output. Each method is available as a `call_method`
-//! (`rows.table(["Name"], ["file.name"])`) and as a pipeline filter (`rows |
+//! (`rows.table(["Name"], ["file.name"])`) or as a pipeline filter (`rows |
 //! table(["Name"], ["file.name"])`). [`QueryOps::register_terminal_filters`]
 //! registers the filters once. Both forms call the same [`QuerySet`] method.
 //!
@@ -98,7 +98,7 @@ pub(super) struct QueryOps {
     /// Stores the minijinja global name for this instance.
     name: &'static str,
     indexer: Arc<IndexerService>,
-    /// Stores the pre-configured service. Every `.from()` call reuses it.
+    /// Stores the preconfigured service. Every `.from()` call reuses it.
     service: QueryService,
     /// Holds the row granularity that this namespace sends to
     /// [`QueryBuilder`].
@@ -358,7 +358,7 @@ impl Object for QuerySet {
     /// - [`ErrorKind::MissingArgument`] if `args` lacks a required value.
     /// - [`ErrorKind::InvalidOperation`] if an argument has the wrong type.
     /// - [`ErrorKind::InvalidOperation`] if a field path or filter expression
-    ///   is unparsable.
+    ///   cannot be parsed.
     /// - [`ErrorKind::InvalidOperation`] if `table` gets headers and columns of
     ///   different lengths.
     /// - [`ErrorKind::InvalidOperation`] if `.limit(...)` gets a negative
@@ -448,10 +448,10 @@ impl Object for QuerySet {
 /// borrowed `Vec<&str>` values. The minijinja `Function` trait needs each
 /// parameter to implement `ArgType` for every lifetime. A borrowed vector
 /// cannot meet this need. The owned `String` form can. [`Object::call_method`]
-/// also cannot borrow `Vec<&str>` from a list-literal argument value. Minijinja
-/// reports "type conversion is not legal in this situation (implicit borrow)".
-/// Both entry points first build owned `Vec<String>` values and borrow from
-/// them.
+/// cannot borrow `Vec<&str>` from a list-literal argument value either.
+/// Minijinja reports "type conversion is not legal in this situation (implicit
+/// borrow)". Both entry points first build owned `Vec<String>` values and
+/// borrow from them.
 ///
 /// # Errors
 ///
@@ -1455,7 +1455,7 @@ mod tests {
             )
             .expect("render succeeds");
 
-            // The default Todo status symbol is a space.
+            // The default task status symbol is a space.
             // It creates the empty-looking segment between `Todo|` and `|todo`.
             assert_eq!(
                 rendered,

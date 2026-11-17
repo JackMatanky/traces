@@ -11,7 +11,7 @@
 //! an [`Object`]. The `num_format` name avoids minijinja's built-in `format`
 //! filter.
 //!
-//! minijinja converts integer and float [`Value`] arguments to `f64`. It
+//! Minijinja converts integer and float [`Value`] arguments to `f64`. It
 //! returns its standard argument-type error for other values.
 //!
 //! [`Object`]: minijinja::value::Object

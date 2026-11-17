@@ -461,7 +461,7 @@ fn parse_local_year(s: &str) -> TemplateEngineResult<i32> {
 /// # Errors
 ///
 /// - [`ErrorKind::InvalidOperation`] if `value` does not parse, the local zone
-///   lookup fails, or `pattern` has an unclosed bracket literal, invalid
+///   lookup fails, or `pattern` has an unterminated bracket literal, invalid
 ///   strftime syntax, or an unsupported moment token (see
 ///   [`parse_date_point`]).
 fn date_format(value: &str, pattern: &str) -> TemplateEngineResult<String> {
@@ -1715,7 +1715,7 @@ mod tests {
                 )
                 .expect("render succeeds");
 
-            // Local 14:30 in UTC+2 is the same instant as 12:30Z.
+            // Local 14:30 in UTC+2 is the same instant as 12:30 UTC.
             assert_eq!(rendered, "0");
         }
 

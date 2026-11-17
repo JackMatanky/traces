@@ -1,29 +1,55 @@
-//! Builds the minijinja environment that [`TemplateService`] uses.
+//! Builds the minijinja [`Environment`] that powers template rendering.
 //!
-//! [`TemplateEngine`] owns an [`Environment`] with the template loader and
-//! helper functions. Rendering returns [`RenderOutput`] with the rendered text
-//! and optional `file.write_to()` path.
+//! [`TemplateEngine`] wraps a minijinja [`Environment`] and registers the
+//! helper namespaces that templates can call. It also provides the [`render`]
+//! method that evaluates a template source string.
 //!
-//! Helper modules:
+//! # Helper Namespaces
 //!
-//! - [`date`] registers date generators, date filters, and date tests.
-//! - [`duration`] registers duration rendering filters.
-//! - [`mod@file`] registers `file.write_to()` and `file.include()`.
-//! - [`path`] registers path tests and path-component filters.
-//! - [`num`] registers numeric filters.
-//! - [`query`] registers the `query`, `lists`, and `tasks` namespaces plus
-//!   terminal query filters.
-//! - [`mod@schema`] registers Schema registry access through `schema.get()`.
-//! - [`string`] registers case, trimming, truncation, repetition, and regex
-//!   filters.
-//! - [`ui`] registers dialog-backed `ui.*` helpers.
-//! - [`uuid`] registers the standalone UUID generator.
-//! - [`yaml`] registers YAML serialization (`to_yaml`) and parsing
-//!   (`from_yaml`).
+//! | Namespace | Module | Registered By |
+//! |-----------|--------|---------------|
+//! | `file` | [`crate::template::engine::file`] | [`FileOps`] |
+//! | `query` | [`crate::template::engine::query`] | [`QueryOps`] |
+//! | `path` | [`crate::template::engine::path`] | [`PathOps`] |
+//! | `ui` | [`crate::template::engine::ui`] | [`UiOps`] |
+//! | `date` | [`crate::template::engine::date`] | [`DateOps`] |
+//! | `duration` | [`crate::template::engine::duration`] | [`DurationOps`] |
+//! | `str` | [`crate::template::engine::string`] | [`StrOps`] |
+//! | `num` | [`crate::template::engine::num`] | [`NumOps`] |
+//! | `yaml` | [`crate::template::engine::yaml`] | [`YamlOps`] |
+//! | `schema` | [`crate::template::engine::schema`] | [`SchemaOps`] |
+//! | `uuid` | none | built-in filter |
 //!
-//! [`TemplateService`]: super::service::TemplateService
+//! The `uuid` filter is registered directly on the [`Environment`] as a plain
+//! function, not through an [`Object`] namespace.
+//!
+//! # Construction
+//!
+//! [`TemplateEngine::new`] builds the [`Environment`], configures it with
+//! strict mode, registers the `uuid` filter and all namespaces, then returns
+//! the ready-to-render engine. The engine holds a reference to the
+//! [`TemplateLoader`] for `include` resolution and a [`DialogProvider`] for
+//! `ui.*` helpers.
+//!
+//! # Rendering
+//!
+//! [`TemplateEngine::render`] evaluates `source` with the given `name` as the
+//! template identifier. Errors carry the filename and line number so users can
+//! locate failures in their template source.
+//!
+//! [`render`]: TemplateEngine::render
 //! [`Environment`]: minijinja::Environment
-//! [`uuid`]: fn@uuid
+//! [`Object`]: minijinja::value::Object
+//! [`FileOps`]: crate::template::engine::file::FileOps
+//! [`QueryOps`]: crate::template::engine::query::QueryOps
+//! [`PathOps`]: crate::template::engine::path::PathOps
+//! [`UiOps`]: crate::template::engine::ui::UiOps
+//! [`DateOps`]: crate::template::engine::date::DateOps
+//! [`DurationOps`]: crate::template::engine::duration::DurationOps
+//! [`StrOps`]: crate::template::engine::string::StrOps
+//! [`NumOps`]: crate::template::engine::num::NumOps
+//! [`YamlOps`]: crate::template::engine::yaml::YamlOps
+//! [`SchemaOps`]: crate::template::engine::schema::SchemaOps
 
 mod cache;
 mod date;

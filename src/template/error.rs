@@ -26,9 +26,9 @@ use crate::{DialogError, index::IndexError, query::QueryError};
 pub enum TemplateError {
     /// Reports a failure to resolve the requested template identifier.
     ///
-    /// This variant covers validation errors, ambiguous stem matches,
-    /// unreadable template directories, and missing templates. The wrapped
-    /// [`TemplatePathError`] identifies the condition.
+    /// Covers validation errors, ambiguous stem matches, unreadable template
+    /// directories, and missing templates. The wrapped [`TemplatePathError`]
+    /// identifies the condition.
     #[error(transparent)]
     Resolve(#[from] TemplatePathError),
 
@@ -57,9 +57,8 @@ pub enum TemplateError {
 
     /// Reports an output path that escapes the project root.
     ///
-    /// This variant covers absolute `-o` and `file.write_to()` paths, paths
-    /// with unsafe components such as `..`, and paths that use an external
-    /// symlink.
+    /// Covers absolute `-o` and `file.write_to()` paths, paths with unsafe
+    /// components such as `..`, and paths that use an external symlink.
     #[error("output path {path} escapes the project root")]
     OutputPathEscapesRoot {
         /// Rejected output path from the caller or template.
@@ -68,9 +67,9 @@ pub enum TemplateError {
 
     /// Reports an explicit path that fails the root confinement check.
     ///
-    /// This variant occurs when `strict-path` cannot check the root boundary or
-    /// resolve existing path components. The writer stops instead of writing to
-    /// a path that it has not checked.
+    /// Occurs when `strict-path` cannot check the root boundary or resolve
+    /// existing path components. The writer stops instead of writing to a path
+    /// that it has not checked.
     #[error("failed to verify output path {path} is inside the project root")]
     OutputPathUnverifiable {
         /// Output path rejected by the root confinement check.
@@ -82,23 +81,23 @@ pub enum TemplateError {
 
     /// Reports a failure to render the template source.
     ///
-    /// This variant covers minijinja syntax errors, missing helpers, and bad
-    /// helper arguments. It also covers include or extends errors,
-    /// query/index/schema errors, file include errors, and dialog errors.
+    /// Covers minijinja syntax errors, missing helpers, and bad helper
+    /// arguments, plus include or extends errors, query/index/schema errors,
+    /// file include errors, and dialog errors.
     #[error("failed to render template {path}")]
     Render {
         /// Absolute path used as the minijinja template name.
         path: PathBuf,
-        /// minijinja error with template context and source-chain details.
+        /// Minijinja error with template context and source-chain details.
         #[source]
         source: minijinja::Error,
     },
 
     /// Reports a failure to write rendered output.
     ///
-    /// This variant covers parent-directory creation, file creation except
-    /// existing-file collisions reported by [`Self::OutputFileAlreadyExists`],
-    /// and writes of rendered bytes.
+    /// Covers parent-directory creation, file creation except existing-file
+    /// collisions reported by [`Self::OutputFileAlreadyExists`], and writes of
+    /// rendered bytes.
     #[error("failed to write rendered output to {path}")]
     Write {
         /// Template output path being written.
@@ -108,16 +107,16 @@ pub enum TemplateError {
         source: io::Error,
     },
 
-    /// Reports a failed or cancelled output-collision prompt.
+    /// Reports a failed or canceled output-collision prompt.
     ///
-    /// This variant covers the writer prompt before it replaces an output file.
+    /// Covers the writer prompt before it replaces an output file.
     #[error(transparent)]
     Prompt(#[from] DialogError),
 
     /// Reports a registry-wide Schema loading error during service
     /// construction.
     ///
-    /// This variant covers these registry-wide errors:
+    /// Covers these registry-wide errors:
     ///
     /// - The service cannot read or list the registry directory.
     /// - A Schema TOML file has invalid syntax or an unknown key.

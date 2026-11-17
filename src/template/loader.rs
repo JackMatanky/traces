@@ -45,8 +45,8 @@ use crate::{Config, DirTree};
 /// without [`Config`].
 ///
 /// [`Clone`] is cheap because the struct stores two [`Option<PathBuf>`] values.
-/// [`TemplateEngine::new`] clones one loader into minijinja's `set_loader`
-/// callback and keeps the original for [`Self::find`]. This avoids a second
+/// [`TemplateEngine::new`] registers one cloned loader with minijinja's
+/// `set_loader` and keeps the original for [`Self::find`]. This avoids a second
 /// derivation from [`Config`].
 ///
 /// [`TemplateEngine::new`]: super::engine::TemplateEngine::new

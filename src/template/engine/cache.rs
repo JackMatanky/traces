@@ -7,13 +7,14 @@
 //! times then pays for one load instead of hand-rolling its own get-or-load
 //! body per resource. `schema.rs` seeds its render's
 //! [`SchemaService`](crate::schema::SchemaService) the same way, with a typed
-//! newtype of its own and no load step. [`Schema`](crate::schema::Schema)'s own
-//! minijinja `Object` impl can then reach it without holding a reference
-//! itself.
+//! newtype of its own and no load step. The minijinja
+//! [`Object`](minijinja::value::Object) impl for
+//! [`Schema`](crate::schema::Schema) can then reach it without holding a
+//! reference itself.
 //!
-//! minijinja 3's extensions replace the string-keyed temp pattern for typed
+//! Minijinja 3 extensions replace the string-keyed temp pattern for typed
 //! state. Each extension uses a `TypeId` key instead of a `&'static str`. It
-//! needs no [`Value`](minijinja::value::Value)
+//! needs no [`Value`](minijinja::value::Value) or
 //! [`Object`](minijinja::value::Object) wrapper and no interior mutability
 //! because it needs `&mut State`. Like temps, extensions are render-local. They
 //! persist across includes, blocks, and macros. They drop with the render's

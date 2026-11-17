@@ -12,10 +12,10 @@
 //!
 //! - `.name`: the Schema name, read from the source file stem.
 //! - `.field(name)`: the selectable values of the named field. A `select` field
-//!   returns plain strings for a simple string list and `{value, label,
-//!   ...extra}` objects for structured inline values and values files. A `file`
-//!   field returns a [`SourceSelector`] filter. That filter is declarative
-//!   data: building it runs no query. Templates combine it with
+//!   returns plain strings for a simple string list and objects with `value`,
+//!   `label`, and extra keys for structured inline values and values files. A
+//!   `file` field returns a [`SourceSelector`] filter. That filter is
+//!   declarative data: building it runs no query. Templates combine it with
 //!   `query.from(...)` and `| with_children` or `| with_descendants`. Every
 //!   other field type returns `none`.
 //! - `.children()`: the Schemas that directly `extend` this Schema. Each result
@@ -45,7 +45,7 @@
 //! the `schema.get` branch seeds on first use (see [`cached_service`]). The
 //! extension stores the shared service only; it never resolves the registry.
 //! `.children()` and `.descendants()` do not memoize results: each call
-//! re-reads the shared service and the target Schema's precomputed
+//! rereads the shared service and the target Schema's precomputed
 //! `children`/`descendants` set, with no registry scan per call.
 //!
 //! # Examples
@@ -972,7 +972,7 @@ mod tests {
         fn unknown_schema_error_carries_the_template_name_and_line() {
             // The error carries template context (name and line), not only
             // a message. The shared `render()` helper does not assert on
-            // that context, so this test asserts it directly. minijinja
+            // that context, so this test asserts it directly. Minijinja
             // records the name and line in every build; only the
             // byte-accurate column data that `crate::cli::error` reads
             // needs `set_debug(true)`. The test turns debug on to match the

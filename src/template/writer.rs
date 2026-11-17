@@ -10,8 +10,8 @@
 //!
 //! 1. `-o` / `--output` (`requested`): a runtime value confined to
 //!    [`Config::root`] with [`SafeRelativePath::parse`].
-//! 2. `file.write_to()` ([`DeclaredOutputPath`]): also a runtime value confined
-//!    to [`Config::root`].
+//! 2. `file.write_to()` ([`DeclaredOutputPath`]): another runtime value
+//!    confined to [`Config::root`].
 //! 3. Caller-supplied default: from an already trust-gated
 //!    [`Config::output_dir`].
 //!
@@ -188,7 +188,7 @@ impl<'a> TemplateWriteTarget<'a> {
     ///
     /// - [`OutputPathEscapesRoot`] if the target path resolves outside `root`.
     /// - [`OutputPathUnverifiable`] if the confinement check fails.
-    /// - [`Prompt`] if an interactive collision prompt fails or is cancelled.
+    /// - [`Prompt`] if an interactive collision prompt fails or is canceled.
     /// - [`OutputFileAlreadyExists`] if the output file exists under
     ///   [`CommitPolicy::CreateNew`].
     /// - [`Write`] if creating parent directories or writing content fails.
@@ -249,7 +249,7 @@ impl<'a> TemplateWriteTarget<'a> {
     ///
     /// - [`OutputPathEscapesRoot`] if `requested` or `declared` escapes `root`.
     /// - [`OutputPathUnverifiable`] if the confinement check fails.
-    /// - [`Prompt`] if the collision prompt is cancelled or fails.
+    /// - [`Prompt`] if the collision prompt is canceled or fails.
     ///
     /// [`OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
     /// [`OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
@@ -387,7 +387,7 @@ fn commit_with_writer(
     let published = match policy {
         CommitPolicy::Overwrite => fs::rename(temp_path.as_path(), path),
         // A hard link fails atomically when `path` exists, so `create_new`
-        // semantics hold. `Drop` removes the temp name afterwards.
+        // semantics hold. `Drop` removes the temp name afterward.
         CommitPolicy::CreateNew => fs::hard_link(temp_path.as_path(), path),
     };
     published.map_err(|source| {
@@ -531,7 +531,7 @@ mod tests {
             .expect("leading . is safe");
 
             // The leading "./" resolves through the existing `root/.` ancestor.
-            // Canonicalization normalizes it away, so the confined path has no
+            // The resolution normalizes it away, so the confined path has no
             // trailing dot component.
             assert_eq!(target, root.join("notes/daily.md"));
         }
@@ -779,7 +779,7 @@ mod tests {
         }
 
         #[test]
-        fn returns_prompt_error_when_prompt_is_cancelled() {
+        fn returns_prompt_error_when_prompt_is_canceled() {
             struct CancellingDialogProvider;
             impl DialogProvider for CancellingDialogProvider {
                 fn is_interactive(&self) -> bool {
@@ -831,7 +831,7 @@ mod tests {
                     &CancellingDialogProvider,
                     || root.join("daily.md"),
                 )
-                .expect_err("cancelled prompt fails");
+                .expect_err("canceled prompt fails");
 
             assert!(matches!(
                 error,

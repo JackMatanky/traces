@@ -5,7 +5,7 @@
 //! `ui.select(label, items)`, `ui.confirm(label)`, and `ui.multi_select(label,
 //! items)`.
 //!
-//! Each call uses the shared [`DialogProvider`]. Live renders use
+//! Each invocation uses the shared [`DialogProvider`]. Live renders use
 //! [`TerminalDialogProvider`]. Renders with `--no-input` use
 //! [`PresetDialogProvider`], which uses preset values only.
 //!

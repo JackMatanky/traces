@@ -2,11 +2,12 @@
 //!
 //! [`TemplateService`] manages the template pipeline for a [`Config`].
 //!
-//! - Resolve template input paths with [`TemplateLoader`].
-//! - The service reads template source files from disk.
-//! - Render template source with [`TemplateEngine`]. Use the resolved absolute
-//!   path as the template name to report the file and line number in errors.
-//! - Resolve output paths and write files with [`TemplateWriteTarget`].
+//! - Resolves template input paths with [`TemplateLoader`].
+//! - Reads template source files from disk.
+//! - Renders template source with [`TemplateEngine`]. It uses the resolved
+//!   absolute path as the template name to report the file and line number in
+//!   errors.
+//! - Resolves output paths and writes files with [`TemplateWriteTarget`].
 
 use std::{
     path::{Path, PathBuf},
@@ -129,14 +130,14 @@ impl<'a> TemplateService<'a> {
 
     /// Resolves `name` and renders its source into a [`RenderedTemplate`].
     ///
-    /// This method performs the resolution and rendering steps of
-    /// [`Self::render_to_file`]. It lets callers inspect rendered content
-    /// before they call [`Self::write`]. The split prevents repeated `ui.*`
-    /// calls when callers use the rendered result more than once.
+    /// Performs the resolution and rendering steps of [`Self::render_to_file`].
+    /// It lets callers inspect rendered content before they call
+    /// [`Self::write`]. The split prevents repeated `ui.*` calls when callers
+    /// use the rendered result more than once.
     ///
     /// The method gives the resolved absolute path to [`TemplateEngine`] as the
     /// template name. The [`minijinja::Error::name`] method then reports the
-    /// file path and line number when rendering fails.
+    /// path and line number when rendering fails.
     ///
     /// # Errors
     ///
