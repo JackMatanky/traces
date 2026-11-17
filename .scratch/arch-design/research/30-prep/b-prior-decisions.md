@@ -26,10 +26,10 @@ records supersessions.
 | 08 errors-topology precedent | Screened out, out of scope | Error topology belongs to ticket 34. Ticket 30 only supplies the temporal error set. |
 | 09 capability-path precedent | Screened out, superseded | Superseded by the [32 Answer](../../issues/32-path-and-capability-model.md), line 360. |
 | 10 document-model precedent | Screened out, superseded | Superseded by the [23 Answer](../../issues/23-note-document-model.md), line 249. |
-| 11 performance evidence | Relevant, two numbers live | The 80-byte unified enum measure [V](../../issues/11-research-performance-evidence.md), line 49, binds Q19. The survey's "temporal is 10k lines" figures are stale; [ticket 30 Current code](../../issues/30-temporal-boundary-and-dialects.md), lines 147-154, replaces them [V]. |
-| 12 IWE core and hosts | Relevant, negative evidence | IWE has no date type and hands YAML dates to its validator as ISO strings [V](../../issues/30-temporal-boundary-and-dialects.md), lines 324-325. No temporal boundary input beyond that. |
+| 11 performance evidence | Relevant, two numbers live | The 80-byte unified enum measure [V](../../issues/11-research-performance-evidence.md), line 49, binds Q19. The survey's "temporal is 10k lines" figures are stale; [ticket 30 Current code](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code", replaces them [V]. |
+| 12 IWE core and hosts | Relevant, negative evidence | IWE has no date type and hands YAML dates to its validator as ISO strings [V](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-fileclass-research), section "Inputs from the Fileclass research". No temporal boundary input beyond that. |
 | 13 IWE query schema | Screened out | No date kind in IWE's query engine [V](../../issues/19-coercion-and-comparison-policy.md), line 349. Tests ticket 19's rules only. |
-| 14 Fileclass research | Relevant, corrected | Owner data uses Moment formats `YYYY`, `DDDD`, `Q` [V](../../issues/30-temporal-boundary-and-dialects.md), lines 207-209. Fileclass bypasses pattern validation for a string `dateFormat`. The outer validator checks empty values and `required` [V](../14-fileclass-model-binding-and-validation.md), lines 115-119, narrowed by [K8](k-citation-verification.md). Its duration parser excludes years and months but accepts mixed weeks. It captures a sign without applying it. Do not use it as an RFC 5545 oracle [V, K8]. |
+| 14 Fileclass research | Relevant, corrected | Owner data uses Moment formats `YYYY`, `DDDD`, `Q` [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code". Fileclass bypasses pattern validation for a string `dateFormat`. The outer validator checks empty values and `required` [V](../14-fileclass-model-binding-and-validation.md), lines 115-119, narrowed by [K8](k-citation-verification.md). Its duration parser excludes years and months but accepts mixed weeks. It captures a sign without applying it. Do not use it as an RFC 5545 oracle [V, K8]. |
 | 15 schematter research | Screened out | Body-section scope. No temporal content. |
 | 16 compatibility envelope | Binding | Defines Frozen/Migratable/Free for every surface this ticket touches. See ledger B1 to B8. |
 | 17 forward consumers | Binding, scope only | Sets seven measurement points, from 50 to 50,000 notes [V](../../issues/17-grilling-forward-consumers-and-design-pressure.md), lines 51-55. Q9 to Q12 need evidence at those points. Later candidate binary sizes are probe snapshots, not repository measurements (`m-gap-closure.md`). |
@@ -61,15 +61,16 @@ Classification:
 - **B1. Vault-format parsing is Frozen.** Frontmatter, `Key:: Value` inline
   fields, wikilinks, tasks and tags parse to the same meaning
   ([16](../../issues/16-grilling-compatibility-envelope.md), line 76). This binds
-  the shared note parser. Ticket 21 scopes the new filename-period parser to
-  filenames only ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 175-176),
-  and ticket 30 must check the shared parser separately
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 573-574).
+  the shared note parser. Ticket 21 scopes the new filename-period parser
+  to filenames only ([21](../../issues/21-ambient-environment-and-execution-context.md),
+  lines 175-176). Check the shared parser separately for ticket 30
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#checks-before-resolution),
+  section "Checks before resolution").
   Preserve explicitly accepted changes, including civil naive datetimes and
   inline `DateTime`, with their migration rows ([19](../../issues/19-coercion-and-comparison-policy.md),
   lines 110-118, 232-246; [L3](l-answer-verification.md)).
   Today the note parser calls `DatePoint::parse_prefix` for task dates and
-  inline fields [V](../../issues/30-temporal-boundary-and-dialects.md), lines 185-187.
+  inline fields [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code".
 - **B2. Template and query capabilities are Frozen.** Date arithmetic stays
   reachable ([16](../../issues/16-grilling-compatibility-envelope.md), line 89).
 - **B3. Template function API and query DSL spelling are Migratable.** This
@@ -93,7 +94,7 @@ Classification:
   The divergence register is not an input
   ([16](../../issues/16-grilling-compatibility-envelope.md), lines 60-62).
   Use `.scratch/temporal-core/divergence-register.md` as a pointer only
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 111-114).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#query-pushdown-and-notices), section "Query pushdown and notices").
 
 ### 2.2 Value model (ticket 18)
 
@@ -106,11 +107,11 @@ Classification:
 - **B10. The 80-byte size test stays.** Do not box more variants
   ([18](../../issues/18-value-model.md), lines 484-485). Sizes: `DurationValue`
   72 B, `DateTimeValue` 16 B, `DateValue` 4 B [V in research 11]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 467-468). A
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-value-model-decision), section "Inputs from the value model decision"). A
   civil variant must keep the total at 80 bytes
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), line 469).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-value-model-decision), section "Inputs from the value model decision").
   Ticket 18 lists no period variant
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 465-466).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-value-model-decision), section "Inputs from the value model decision").
   A period variant must meet the same size test. Q20 decides its placement.
 - **B11. Schema literals stay a separate type** without `Date`, `DateTime`,
   `Duration` or `Link` ([18](../../issues/18-value-model.md), lines 491-493).
@@ -136,7 +137,7 @@ Classification:
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 92-95).
 - **B15. Temporal brackets hold `Date`, `DateTime` and `CalendarPeriod`**
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 90-92,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 291-292).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-coercion-and-comparison-decision), section "Inputs from the coercion and comparison decision").
 - **B16. Naive datetimes are civil, zone-free values. Only input with `Z` or
   an offset is an instant**
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 110-113). An
@@ -162,7 +163,7 @@ Classification:
   Do not parse or allocate per row
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 145-146).
 - **B20. A period literal matches a whole span; the upper bound is
-  exclusive** ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 295-296).
+  exclusive** ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-coercion-and-comparison-decision), section "Inputs from the coercion and comparison decision").
   This supersedes ticket 19's inclusive `[s, e]` wording
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 283-297).
 - **B21. Advisory notices: a build-time advisory covers an invalid
@@ -184,7 +185,7 @@ Classification:
   - Do `[[b]]` and `[b](b.md)` fold to one `ComparisonKey`?
   - How does `date(link)` read a percent-encoded Markdown target
     ([19](../../issues/19-coercion-and-comparison-policy.md), lines 299-313,
-    [30](../../issues/30-temporal-boundary-and-dialects.md), lines 284-288)?
+    [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-coercion-and-comparison-decision), section "Inputs from the coercion and comparison decision")?
 
   The later Markdown-link handoff leaves extension normalization and
   percent decoding open ([19](../../issues/19-coercion-and-comparison-policy.md),
@@ -211,10 +212,10 @@ Classification:
   gap stays explicit until ticket 30 fixes the dialect. After choosing a
   dialect, add the date-format check**
   ([20](../../issues/20-schema-note-typing-and-validation.md), lines 120-123,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 300-307).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-schema-typing-decision), section "Inputs from the schema typing decision").
   Q4 decides how a format with no full date (`YYYY`, `Q`, `DDDD`) is
   treated. The owner's data uses exactly those formats
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 207-209).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code").
 - **B27. The cli, lsp and mcp modules are thin hosts of `core`. Domain
   modules expose data and pure functions. Do not add one-implementor traits**
   ([20](../../issues/20-schema-note-typing-and-validation.md), lines 72-77).
@@ -224,7 +225,7 @@ Classification:
   date, datetime and" ([20](../../issues/20-schema-note-typing-and-validation.md),
   lines 305-315).
   Do not read a rule into that fragment
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 309-310).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-schema-typing-decision), section "Inputs from the schema typing decision").
   Keep the fragment as a separate ticket 36 recovery item. The fragment
   does not block the delegated date-format check. B26's complete
   provisional scalar-acceptance rule stands on its own.
@@ -235,11 +236,11 @@ Classification:
   rule. The frame acquires the zone only when needed. The frame retains a
   zone-acquisition success or failure**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 106-110,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 365-366).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-execution-context-decision), section "Inputs from the execution-context decision").
 - **B29. A host may select UTC explicitly. UTC is never an implicit
   fallback**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), line 127,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 367-368).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-execution-context-decision), section "Inputs from the execution-context decision").
 - **B30. A missing required zone, calendar resolution or presentation is a
   typed resolution, materialization or render failure. Never drop the row,
   return `Null`, or blank the cell**
@@ -251,13 +252,13 @@ Classification:
   allocation for this value**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 136-141).
   Today `CalendarPeriod` has `Week`, `Month`, `Year` only, and `Week` is the
-  ISO week [V](../../issues/30-temporal-boundary-and-dialects.md), lines 172-174.
+  ISO week [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code".
 - **B32. Period-versus-instant filters use the instant's civil date in the
   pinned zone. A skipped local day matches no instants. A skipped next day
   does not invalidate a real preceding day**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 142-145).
   Civil points use their civil dates without a zone
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 344-345).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-execution-context-decision), section "Inputs from the execution-context decision").
 - **B33. Do not use Rust `Eq`/`Ord` for membership. Use a separate
   deterministic total sort key for mixed temporal values. The period unit
   tie-break stays open for this ticket**
@@ -289,15 +290,16 @@ Classification:
 - **B38. Ambient removals: `local_zone()` leaf reads, per-row zone lookups,
   and the test-only `ZoneGuard` leave after injection lands**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 196-200,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 368-370).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-execution-context-decision), section "Inputs from the execution-context decision").
   The evaluator must not read the clock or ambient zone
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 115-119).
-  Today `local_zone` and `ZoneGuard` still exist [V]
-  (`src/temporal/mod.rs:64`, `src/temporal/mod.rs:100`).
+  Current code still has `local_zone()` in `src/temporal/zone.rs` and
+  test-only `ZoneGuard` in `src/temporal/mod.rs`. `local_zone()` is at
+  `zone.rs` line 13; `ZoneGuard` is at `mod.rs` line 109 [V].
 - **B39. Temporal owns validated periods, week rules and explicit-zone civil
   conversion. Query owns pinned frames. Template owns the render frame**
   ([21](../../issues/21-ambient-environment-and-execution-context.md), lines 242-245,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 370-371).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-execution-context-decision), section "Inputs from the execution-context decision").
 - **B40. Left to later tickets by ticket 21**: the period sort unit
   tie-break, compact encoding, week formats beyond ISO, and the configured
   zone source
@@ -326,26 +328,26 @@ Classification:
 - **B45. Keep `deny_unknown_fields`. Add no `version` key before the first
   breaking change. The `[date]` table needs an exact field set**
   ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 225-226,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), line 408).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-config-decision), section "Inputs from the config decision").
 - **B46. Config merge applies global first, then local, field by field.
   This inherited rule also applies to `[date]`**
   ([22](../../issues/22-config-ownership-and-lifecycle.md), lines 223-235;
   [L8](l-answer-verification.md)). A different merge needs an explicit amendment.
   Config values from a local file apply only after the trust gate passes
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 412-413).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-config-decision), section "Inputs from the config decision").
 - **P1. Edge direction.** `config` reads `DEFAULT_DATETIME_PATTERN` from
-  temporal today [V](../../issues/30-temporal-boundary-and-dialects.md), lines 422-423;
+  temporal today [V](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-config-decision), section "Inputs from the config decision";
   temporal imports `DelimiterType` from the crate root in
-  `src/temporal/token.rs:12` [V]. The ticket records a [P] lean: keep the
-  edge from `config` to temporal
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 423-424).
+  `src/temporal/token.rs` [V].
+  The ticket records a [P] lean: keep the edge from `config` to temporal
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-config-decision), section "Inputs from the config decision").
   This is a proposal, not an accepted rule.
 - **Current config surface [V]**: no `DateConfig` type exists. Date config
   is `DateFieldConfig { name, format }` under `[frontmatter.date_created]`
   and `[frontmatter.date_modified]`, default format `%Y-%m-%dT%H:%M:%S`
-  from `DEFAULT_DATETIME_PATTERN` [V] (`src/temporal/datetime.rs:32`;
-  config defaults reference it at
-  `src/config/model/frontmatter.rs:261,296`).
+  from `DEFAULT_DATETIME_PATTERN` [V]
+  (`src/temporal/datetime.rs`, `DEFAULT_DATETIME_PATTERN`;
+  `src/config/model/frontmatter.rs`, date-field defaults).
   The `%Y-%m-%d %H:%M` value in
   [22-prep/a2](../22-prep/a2-inventory-digests-lifecycle.md), lines 253-262,
   is stale and not the current default.
@@ -358,21 +360,20 @@ Classification:
 - **B47. The parser classifies each value once at parse time; frontmatter
   and inline fields share one parser set and one precedence order**
   ([23](../../issues/23-note-document-model.md), lines 334-336,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 477-479).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-note-document-decision), section "Inputs from the note document decision").
 - **B48. Inline fields can yield `DateTime`; a naive one is civil**
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 110-118;
   element-wise classification at
   [23](../../issues/23-note-document-model.md), lines 334-335; read through
   the ticket 30 inputs,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), line 298).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-coercion-and-comparison-decision), section "Inputs from the coercion and comparison decision").
   Ticket 23 line 477 concerns the task payload, not inline datetime
   classification.
 - **B49. Task dates stay civil `DateValue` values; `TaskDateSet` holds six
-  of them** ([30](../../issues/30-temporal-boundary-and-dialects.md), lines
-  480-481).
-  [V] `TaskDateSet` at `src/task.rs:498-505` holds six `Option<DateValue>`
-  slots with first-wins insert. This is current code, not a new rule in the
-  ticket 23 Answer.
+  of them** ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-note-document-decision), section "Inputs from the note document decision").
+  [V] `TaskDateSet` in `src/task.rs` has six `Option<DateValue>` slots
+  and first-wins insert (`TaskDateSet`, fields and `insert`).
+  This is current code, not a new rule in the ticket 23 Answer.
 - **B50. A fact-changing parser setting enters `IndexPolicy`; a change of
   the stored `Note` changes the extractor fingerprint or bumps the format
   epoch** ([23](../../issues/23-note-document-model.md), lines 368-371).
@@ -382,11 +383,11 @@ Classification:
 - **B51. The store persists source timestamps and size; it does not persist
   `day`. A query derives the filename period; this ticket owns that parser**
   ([24](../../issues/24-index-read-model-and-query-execution.md), lines 402-405,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 449-450).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-read-model-decision), section "Inputs from the read model decision").
 - **B52. The store keeps temporal values as text until a compact encoding
   shows a measured gain; postcard re-parses them on each load**
   ([24](../../issues/24-index-read-model-and-query-execution.md), lines 400-401,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 451-452).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-read-model-decision), section "Inputs from the read model decision").
 - **B53. A range key needs a proof for each operator, row kind, temporal
   frame and field precedence. Unsupported mappings scan**
   ([24](../../issues/24-index-read-model-and-query-execution.md), lines 312-327).
@@ -400,7 +401,7 @@ Classification:
   mislabeled.
 - **B55. Research 25 says a persisted key for `file.mdate` keeps UTC
   instants, not civil dates**
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 456-457).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-read-model-decision), section "Inputs from the read model decision").
   This is research input, not an accepted physical encoding. Ticket 21
   fixes source instants with evaluation-time civil projection (B36), and
   ticket 24 keeps compact temporal encoding conditional on measurement
@@ -417,18 +418,18 @@ Classification:
   `jiff`, `speedate` and `postcard`, plus encoded probe records. Whoever
   prunes a crate updates the list**
   ([25](../../issues/25-index-freshness-and-invalidation.md), lines 304-311,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 430-433).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-freshness-decision), section "Inputs from the freshness decision").
 - **D7. Recorded omission.** Ticket 25's crate list omits `winnow`. Ticket
   30 records the effect. `winnow` locates duration prefixes for inline fields.
   Those values reach the store. Keep `winnow` in the list, or remove it from
-  the code ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 434-436).
+  the code ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-freshness-decision), section "Inputs from the freshness decision").
   [V] `winnow` 1.0.4 has one call site, `src/temporal/lexer.rs:7,118`.
   This appears in the ticket 36 supersession list
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), line 586).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#checks-before-resolution), section "Checks before resolution").
 - **B58. The corpus uses explicit-offset datetimes only until the civil
   variant lands; adding it bumps the format epoch**
   ([25](../../issues/25-index-freshness-and-invalidation.md), lines 332-334,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 438-440).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-freshness-decision), section "Inputs from the freshness decision").
 - **B59. Store identity: engine tag, format epoch, extractor fingerprint,
   policy fingerprint, written-by version, canonical root; platform family
   removed by ticket 32. Store-open rules and rebuild/miss policy are
@@ -436,13 +437,13 @@ Classification:
   ([25](../../issues/25-index-freshness-and-invalidation.md), lines 285-302,
   [32](../../issues/32-path-and-capability-model.md), lines 1150-1159).
 - **B60. Ticket 25 does not fingerprint filename-period rules; the store
-  does not persist them. If a persisted facet starts to use those rules, the
-  rules enter `IndexPolicy` and the corpus**
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 441-443;
-  direct source at [25](../../issues/25-index-freshness-and-invalidation.md),
-  lines 180-184).
+  does not persist them.** A persisted facet that uses those rules must
+  include them in `IndexPolicy` and the corpus. The sources are
+  [ticket 30, Inputs from the freshness decision](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-freshness-decision)
+  and [ticket 25](../../issues/25-index-freshness-and-invalidation.md),
+  lines 180-184.
 - **B61. A change of the parsing stack changes the fingerprint and forces
-  one rebuild** ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 430-431).
+  one rebuild** ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-freshness-decision), section "Inputs from the freshness decision").
 - **B62. Journal and replay batches accept validated disk facts only; journal
   fact paths use canonical UTF-8 `/` text**
   ([26](../../issues/26-measure-index-recovery-journal.md), lines 502-506,
@@ -466,17 +467,16 @@ Classification:
   "The classes stay apart and order Civil, Instant, Period"
   ([29](../../issues/29-query-core-and-plan.md), lines 721-730). Confirmed
   owner per Main, 2026-11-16. C3 owns group-class order. C4 owns period
-  upper-bound wording. Ticket 30's "Nobody has defined that order"
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 537-538)
-  is stale. Record that sentence in the supersession list. Q22 still
-  needs the complete mixed temporal value sort key and the period unit
-  tie-break ([L6](l-answer-verification.md)).
+  upper-bound wording. Ticket 30's “Nobody has defined that order”
+  sentence is a historical discrepancy that was repaired. Its current
+  open sort question is the complete mixed temporal value-sort key and
+  period unit tie-break ([L6](l-answer-verification.md)).
 - **B66. A `Date` and a civil-midnight `DateTime` share a group key when
   their civil values agree. Civil values and instants stay separate.
   A period groups by exact `(start, unit)`. Membership does not define
   group equality. Ticket 29 section 3 does not ban operator-specific
   membership bounds. R5 governs those bounds (B70)**
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 533-536;
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-query-core-decision), section "Inputs from the query-core decision";
   [29](../../issues/29-query-core-and-plan.md), lines 716-730).
 - **B67. Mixed civil/instant comparators are unsound across a DST gap.** The
   cycle is civil 02:30 < civil 03:00 < instant 07:15Z < civil 02:30 in
@@ -500,7 +500,7 @@ Classification:
   time. A standalone query acquires a new frame; a render or request
   supplies its shared frame**
   ([29](../../issues/29-query-core-and-plan.md), lines 976-978,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), line 524).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-query-core-decision), section "Inputs from the query-core decision").
   Q17 decides the filter spelling.
 - **B70. Temporal probe bounds need operator-specific proofs for `Date`,
   civil `DateTime`, instant and `CalendarPeriod` values under the pinned
@@ -512,22 +512,22 @@ Classification:
 - **B71. First pushdown scope: unquoted temporal literals and `And` only;
   quoted literals and `Not`/`Or` scan**
   ([29](../../issues/29-query-core-and-plan.md), lines 571-577,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), line 539).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-query-core-decision), section "Inputs from the query-core decision").
 - **B72. Filename-derived `file.date` keys stay Unsupported until the parser
   contract is complete. `file.day` is retired**
   ([29](../../issues/29-query-core-and-plan.md), lines 596-597,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 527-528).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-query-core-decision), section "Inputs from the query-core decision").
 - **B73. Notices: a bracket mismatch, an invalid date-shaped quoted literal
   and NaN-to-Null ride one stderr mechanism; ticket 34 owns the envelope.
   Ticket 29 did not adopt the first-round notice for rows with a `Null`
   date. Tickets 30 and 34 decide it (Q36)**
   ([29](../../issues/29-query-core-and-plan.md), lines 1124-1138,
   [29](../../issues/29-query-core-and-plan.md), lines 1198-1199,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 531-532).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-query-core-decision), section "Inputs from the query-core decision").
 - **D8. Recorded discrepancy.** Ticket 29 uses `eom` as a relative keyword,
   although the current grammar defines `eom` as a function that takes a date
-  argument [V](../../issues/30-temporal-boundary-and-dialects.md), lines 167-171.
-  Ticket 36 records it ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 589-590).
+  argument [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code".
+  Ticket 36 records it ([30](../../issues/30-temporal-boundary-and-dialects.md#checks-before-resolution), section "Checks before resolution").
   Q17 resolves the spelling.
 
 ### 2.11 Paths (ticket 32)
@@ -538,13 +538,13 @@ Classification:
   ([32](../../issues/32-path-and-capability-model.md), lines 431-461).
 - **B75. The filename-period parser reads the last segment of that string.
   Today `derive_day` reads a `Path` through `BaseNameRef::from_path`**
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 513-518).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-path-decision), section "Inputs from the path decision").
   [V] `FileMeta::derive_day` at `src/file.rs:87-97` uses a filename prefix
   first, then `created_at`. Ticket 21 removes that fallback (B35).
   Dataview's inspected helper instead checks typed metadata before the
   filename ([K15](k-citation-verification.md)).
 - **B76. The scan skips non-UTF-8 names with a notice**
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), line 516).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-path-decision), section "Inputs from the path decision").
 - **B77. The Comparison Key (NFC, lowercase, NFC) is a lookup aid only. It
   never applies to redb keys, sort order, I/O paths or overlay keys**
   ([32](../../issues/32-path-and-capability-model.md), lines 657-670).
@@ -565,21 +565,24 @@ Classification:
   [17](../../issues/17-grilling-forward-consumers-and-design-pressure.md), lines 51-55).
 - **B80. Pinned `jiff`.** `jiff = "=0.2.38"` with `default-features = false`,
   features `std`, `tz-system`, `tzdb-bundle-always` [V]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 179-180,
-  `Cargo.toml:128`). `speedate` 0.18.0 has one call site in
-  `src/temporal/date.rs`. `winnow` 1.0.4 has one in `src/temporal/lexer.rs`.
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code",
+  `Cargo.toml:128`).
+  `DateTimeValue` is a transparent `Timestamp` wrapper with derived `Ord`
+  [V] (`src/temporal/datetime.rs`, `DateTimeValue`).
+  `speedate` 0.18.0 has one call site in `src/temporal/date.rs`.
+  `winnow` 1.0.4 has one in `src/temporal/lexer.rs`.
   `logos` 0.16.1 serves `lexer.rs`, `datetime.rs`, `point.rs`, the shared
   lexer, the note parser and the query grammar [V]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 175-178,
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code",
   `Cargo.toml:129,143,152`).
 - **B81. Stale temporal glossary.** `src/temporal/GLOSSARY.md` still says
   unzoned input uses the process zone and a Date promotes to local midnight
-  [V](../../issues/30-temporal-boundary-and-dialects.md), lines 200-202. Ticket 19
+  [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code". Ticket 19
   supersedes both sentences ([19](../../issues/19-coercion-and-comparison-policy.md), lines 110-118,
   [19](../../issues/19-coercion-and-comparison-policy.md), lines 320-325).
   Treat the glossary as stale code documentation, not as an accepted rule.
 - **B82. ADR-0010 is `proposed`, not accepted.** It lexes a bare ISO date as
-  one query literal [V](../../issues/30-temporal-boundary-and-dialects.md), lines 197-198.
+  one query literal [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code".
   It constrains nothing until accepted. Ticket 28 records that ticket 19
   fixes the ADR's quoted/unquoted divergence
   ([28](../../issues/28-live-buffer-and-persisted-index-consistency.md), line 1238).
@@ -594,12 +597,12 @@ Items that look like rules but are not accepted decisions:
   closed English grammar. It resolves from injected `today`. Filter literals,
   `date()`, `date_add` and template filters share it. It must yield an
   interval precision for phrases like `next week`. The meaning of a bare
-  weekday stays open ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 269-276,
+  weekday stays open ([30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-coercion-and-comparison-decision), section "Inputs from the coercion and comparison decision",
   [19](../../issues/19-coercion-and-comparison-policy.md), lines 167-170).
   Ticket 30 owns grammar and crate choice (Q13 to Q16).
 - **P3. In-repo grammar default.** Ticket 30 records a [P] lean: run the prep
   first and treat an in-repository grammar as the default until evidence
-  beats it ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 254-255).
+  beats it ([30](../../issues/30-temporal-boundary-and-dialects.md#prep-before-grilling), section "Prep before grilling").
 - **P1. Config-to-temporal edge direction** (see above).
 - **P4. `.scratch/temporal-core/design-nl-dates.md` is an unreviewed agent
   draft [H].** It conflicts with accepted decisions in four places:
@@ -608,7 +611,7 @@ Items that look like rules but are not accepted decisions:
     grammar.
   - It reads `now_instant()` and `ZoneGuard`. Ticket 21 replaces both.
   - It fixes weekday meanings that ticket 30 must still decide
-    ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 227-238).
+    ([30](../../issues/30-temporal-boundary-and-dialects.md#prep-before-grilling), section "Prep before grilling").
 
   Treat it as a pointer, not evidence.
 - **P5. Ticket 21 handoffs that await this ticket**: period/unit vocabulary
@@ -617,15 +620,15 @@ Items that look like rules but are not accepted decisions:
 - **P6. Downstream needs (not blockers)**: ticket 31 needs the translator
   owner, calendar helpers, render civil/instant/period rendering, frame and
   zone-failure error type, unsupported-token error shape
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 543-550).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#downstream-consumers), section "Downstream consumers").
   Ticket 34 needs the temporal error set, typed zone failure, `Null`-date
   notice condition and any new schema date-format code
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 551-553).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#downstream-consumers), section "Downstream consumers").
   Ticket 35 prunes `speedate`/`winnow` after this ticket
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 554-555).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#downstream-consumers), section "Downstream consumers").
   Ticket 36 records the `file.day` to `file.date` migration and checks the
   frozen-parser separation
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 556-558).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#downstream-consumers), section "Downstream consumers").
 
 ## 4. Contradictions and exact human decisions needed
 
@@ -635,9 +638,9 @@ Only the human can authorize an amendment to an earlier Answer.
 - **C1. Moment translator home.** Research 07 concluded Moment is a
   Templater-compat feature, not a temporal concept, and proposed a template
   compat module [H](../07-template-bridge-precedent.md), lines 87-88,
-  [30](../../issues/30-temporal-boundary-and-dialects.md), lines 508-510).
+  [30](../../issues/30-temporal-boundary-and-dialects.md#inputs-from-the-template-bridge-research), section "Inputs from the template bridge research").
   Commit `6104d0ae` moved the translator into `src/temporal/token.rs` [V]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 152-155).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code").
   Ticket 16 makes parity Free (B7), so the decision is design-only. Human
   decision: ratify the temporal home (Q1/Q2), return it to a template
   adapter, or drop Moment tokens. The owner needs three kinds of evidence:
@@ -645,13 +648,13 @@ Only the human can authorize an amendment to an earlier Answer.
     uses `ww`, `YY`, `Q`. `14_01_quarter_periodic.md:84-89` uses `Q`, `Qo` [V].
   - The unsupported-token behavior. `MOMENT_TOKENS` has no `ww`, `Q`, `Qo`,
     `DDDD`, so those tokens fail [V by reading]
-    ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 160-161).
+    ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code").
   - The change-table cost (B3).
 - **C2. `date.format` dialect and the no-full-date check.** Four format
   surfaces exist: config `format`, query `date(text, pattern)` (strftime
-  only today [V](../../issues/30-temporal-boundary-and-dialects.md), lines 195-196),
+  only today [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code"),
   template `date_format`, and schema `date.format` (unvalidated
-  `Option<String>` [V](../../issues/30-temporal-boundary-and-dialects.md), lines 188-190).
+  `Option<String>` [V](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code").
   B26 leaves the check gap explicit. I1 forbids reading the truncated
   sentence. Human decision: one dialect or a justified split (Q3), the
   no-full-date rule (Q4), and the fate of `[frontmatter.date_*]` (Q5).
@@ -685,13 +688,14 @@ Only the human can authorize an amendment to an earlier Answer.
   ([19](../../issues/19-coercion-and-comparison-policy.md), lines 324-325).
 - **C8. Civil/instant type shape.** A `DatePoint` variant or an inner enum;
   `DatePoint` today stores `Calendar { date, date_precision }` or
-  `DateTime(DateTimeValue)` [V] (`src/temporal/point.rs:41-52`). The 80-byte
-  test (B10) constrains it. Q19 decides; B58 ties the corpus change to the
-  landing. Correction: `DateTimeValue` is a transparent `Timestamp` wrapper
-  with derived `Ord` [V] (`src/temporal/datetime.rs:76-78`). Parse-time
-  `LocalClock` civil values resolve through the process-local zone
-  (`src/temporal/datetime.rs:622-657` and `:133-154`;
-  `src/temporal/point.rs:105-114`).
+  `DateTime(DateTimeValue)` [V] (`src/temporal/point.rs`, `DatePoint`).
+  The 80-byte test (B10) constrains it. Q19 decides; B58 ties the corpus
+  change to the landing. Correction: `DateTimeValue` is a transparent
+  `Timestamp` wrapper with derived `Ord` [V]
+  (`src/temporal/datetime.rs`, `DateTimeValue`). Parse-time `LocalClock`
+  civil values resolve through the process-local zone [V]
+  (`src/temporal/datetime.rs`, `LocalClock`; `src/temporal/point.rs`,
+  `DatePoint` conversion).
   Today's runtime keeps no civil datetime: the outer Calendar/DateTime
   split separates civil dates from instants, not civil datetimes from
   instants. Ratifying the current shape does not satisfy the accepted
@@ -699,9 +703,9 @@ Only the human can authorize an amendment to an earlier Answer.
   [owner-evidence.md](./owner-evidence.md), corrected).
 - **C9. Period value placement.** Ticket 18 lists no period variant; tickets
   19 and 21 need period values for `file.date`
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 73-75).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#value-shapes), section "Value shapes").
   Ticket 36 must reconcile that list
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 584-585).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#checks-before-resolution), section "Checks before resolution").
   Q20 decides placement under B9, B10 and B31. A separate runtime carrier
   needs an explicit amendment ([L4](l-answer-verification.md)).
 - **C10. Zone acquisition failure reporting.** B29/B30 fix the policy;
@@ -733,13 +737,13 @@ Only the human can authorize an amendment to an earlier Answer.
 - **C16. Calendar helpers in the template engine.** `Anchor`, `apply_offset`
   and `weekday` live in `src/template/engine/date.rs` (2,512 lines, about
   880 production [V]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 162-164)).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code")).
   `PERIOD_EDGE_LOOKUP` and `resolve_period_edge` already live in
   `src/temporal/calendar.rs` and serve query and template [V]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 165-167).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code").
   Q6 decides which helpers stay. Template `date.weekday(n)` selects ISO
   weekday `n` of the current week today [V]
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), line 174).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#current-code), section "Current code").
 - **C17. `[date]` table syntax, merge and validation.** B42/B45/B46 fix
   ownership and constraints. Q26 to Q29 decide syntax, fields, the temporal
   policy type, and zone syntax. Q31 decides week-start configurability; B40
@@ -749,7 +753,7 @@ Only the human can authorize an amendment to an earlier Answer.
   `local_zone()`, `now_instant()` and `ZoneGuard` reads (their removal is
   already decided, B38). Ticket 33 later wires the frame source and
   `DateConfig` into the host
-  ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 137-140).
+  ([30](../../issues/30-temporal-boundary-and-dialects.md#query-pushdown-and-notices), section "Query pushdown and notices").
 - **C19. Truncated ticket 20 sentence.** Recover I1 through ticket 36.
   Do not infer its missing words. Recovery does not block the complete
   B26 rule or the date-format check delegated to ticket 30 ([L1](l-answer-verification.md)).
@@ -771,14 +775,14 @@ Only the human can authorize an amendment to an earlier Answer.
 | 11 | `logos` | B80 (shared lexer base) | open |
 | 12 | `jiff` | B80, B57, B61 | open |
 | 13 | Grammar shape | P2 | open |
-| 14 | Grammar crate vs in-repo | B79, P3, prep step 30:217-253 | open |
+| 14 | Grammar crate vs in-repo | B79, P3, prep step (ticket 30, section "Prep before grilling") | open |
 | 15 | Bare weekday meaning | P2 | C6 |
 | 16 | Interval precision of phrases | P2, B18 | open |
 | 17 | Relative keyword spelling | B69, D8 | C11/D8 |
 | 18 | `member_of` spelling | B68 | C11 |
 | 19 | Civil/instant type shape | B9, B10, B16, B58 | C8 |
 | 20 | `CalendarPeriod` in value model | B9, B10, B31, B52 | C9 |
-| 21 | Ambiguous/absent midnight rule | B16, B30, B32 | open, keep separate from membership (30:76-77) |
+| 21 | Ambiguous/absent midnight rule | B16, B30, B32 | open, keep separate from membership (ticket 30, Question 21) |
 | 22 | Mixed temporal sort key | B33, B65, B66, B67 | Complete value-sort key and unit rank; C3 preserves group order |
 | 23 | Duration refinement | B23 | C7 |
 | 24 | Calendar arithmetic documentation | B23, B81, 19 TODOs 315-338 | open |
@@ -821,10 +825,9 @@ Claims re-checked before repeating:
   [23](../../issues/23-note-document-model.md), lines 255-257).
 - Ticket 30's Current code section is fresher than the survey and
   `reverification.md`; the ticket itself notes both predate the translator
-  move ([30](../../issues/30-temporal-boundary-and-dialects.md), line 591).
-- `DEFAULT_DATETIME_PATTERN` is `%Y-%m-%dT%H:%M:%S` [V]
-  (`src/temporal/datetime.rs:32`); config defaults reference it
-  (`src/config/model/frontmatter.rs:261,296`).
+  `DEFAULT_DATETIME_PATTERN` is `%Y-%m-%dT%H:%M:%S` [V]
+  (`src/temporal/datetime.rs`, `DEFAULT_DATETIME_PATTERN`); config
+  defaults in `src/config/model/frontmatter.rs`, date-field defaults.
   The stale `%Y-%m-%d %H:%M` value in research 22-prep a2 is not the
   current default. No formatting execution ran.
 
@@ -835,11 +838,13 @@ Claims re-checked before repeating:
    `CalendarPeriod` (C9).
 3. Ticket 25's `winnow` omission in the extractor crate list (D7).
 4. Ticket 23's Question versus its later input on `IndexPolicy` date keys
-   ([30](../../issues/30-temporal-boundary-and-dialects.md), lines 587-588).
-5. Ticket 29's stale "nobody defined the order" sentence in ticket 30, and
-   `eom` keyword-versus-function wording (C3, D8).
+   ([30](../../issues/30-temporal-boundary-and-dialects.md#checks-before-resolution), section "Checks before resolution").
+5. Ticket 29's order is accepted; ticket 30's earlier “nobody defined the
+   order” sentence was repaired. Q22 still needs the complete mixed-value
+   sort key and period unit tie-break. Also record the `eom`
+   keyword-versus-function wording (C3, D8).
 6. The temporal survey and `reverification.md` predate the translator move
    (B80 vs the survey figures; see
-   [30](../../issues/30-temporal-boundary-and-dialects.md), line 591).
+   [30](../../issues/30-temporal-boundary-and-dialects.md#checks-before-resolution), section "Checks before resolution").
 7. Ticket 19's glossary TODOs stay deferred until ticket 30 settles duration
    wording ([19](../../issues/19-coercion-and-comparison-policy.md), lines 320-325).

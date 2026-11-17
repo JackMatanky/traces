@@ -249,12 +249,16 @@ The [K report](../research/30-prep/k-citation-verification.md) checks
 selected external claims from C and E. Candidate source APIs are outside
 its own audit. It does not check every D citation.
 
-The [M report](../research/30-prep/m-gap-closure.md) records bounded runtime
-cases and indicative costs. It distinguishes earlier probe revisions,
-source checks and implementation gates. A completed report does not
-mean that every candidate or production cost is measured.
+The [M report](../research/30-prep/m-gap-closure.md) records expanded runtime
+cases, final probe sizes and repository dependency-linkage costs.
+Its Unicode sweep records 1,234 English failures from 5,514 inputs.
+The fuzzy build records zero. These samples do not prove general safety.
+[P] Reject unmodified `jiff-english 0.0.1` for user input.
+The report separates source checks, bounded runs and implementation gates.
+It also records the failed broad verification and passed temporal task.
+The production redesign and human decisions remain open.
 
-Facts from the crates.io API, read on 2026-11-16 [V]:
+Facts from the crates.io API, read on 2026-11-17 [V]:
 
 - `fuzzydate` 0.4.1 has the MIT licence, about 2.6k code lines and 14 releases.
   It depends on `chrono` (feature `clock`), `lazy_static` and `thiserror`.

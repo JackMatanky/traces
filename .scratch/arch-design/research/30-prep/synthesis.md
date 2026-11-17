@@ -472,8 +472,9 @@ Facts [V: d-crate Q6].
   Plain `fuzzydate` and `parse_datetime` entry points read the clock.
 - `fuzzydate` and `chrono-english` add `chrono`, a second calendar stack.
 - No candidate reports an error span.
-- `jiff-english` and `chrono-english` slice `&s[0..3]` on identifiers. A
-  non-ASCII identifier can panic there.
+- `jiff-english` and `chrono-english` slice `&s[0..3]` on identifiers.
+  The expanded English run confirms a UTF-8 abort. Chrono-english
+  remains source-only; no equivalent runtime result is claimed.
 - `jiff-english` is one release with 29 downloads [V: ticket 30 prep].
 - The recorded probe uses the anchor 2026-03-14T12:00:00Z, a Saturday.
   `jiff-english 0.0.1` rejects `next week`; `fuzzydate 0.4.1` returns a
@@ -482,19 +483,25 @@ Facts [V: d-crate Q6].
 - With this anchor, `last friday` returns 2026-03-13 in `jiff-english`
   and 2026-03-06 in `fuzzydate`. Bare `monday` returns the next Monday:
   midnight in `jiff-english`, and the anchor time in `fuzzydate`.
-  This case does not establish their same-day weekday rules.
-- The sampled typo, full-width digits and CJK input return errors.
-  These cases do not prove a general absence of panics.
-- Recorded indicative timings are 263 to 588 ns per parse for `english`
-  and 215 to 585 ns for `fuzzy`. Earlier probe binaries add 65.0 KiB and
-  48.9 KiB over a 409 KiB baseline. These are not production measurements.
-  The final probe source differs from the earlier binary-size source.
-- The `english` feature enables Jiff default features as well as the
-  project's explicit features. `fuzzy` adds `chrono 0.4.45` without
-  changing Jiff's feature set. Both manifests declare edition 2021 and
-  no `rust-version`. Only the `english` stable 1.89.0 build is recorded.
+  The expanded same-day run makes the difference explicit. Bare
+  `saturday` moves to March 21 in English but retains March 14 noon
+  in fuzzydate. English US and UK also disagree on `next saturday`.
+- The Unicode sweep records 1,234 failures from 5,514 English inputs.
+  The fuzzy build records zero. These are bounded process tests.
+  Reject unmodified `jiff-english 0.0.1` for user input [P].
+- Final indicative medians are 264/582/372 ns for English and
+  376/597/223 ns for fuzzydate, for tomorrow/next monday/typo.
+  Final probe binary deltas are +81.17 KiB and +98.11 KiB.
+  Repository dependency-linkage deltas are +48.88 KiB and +65.39 KiB.
+  The M report gives ranges, repeated build times and experiment limits.
+  These are not complete integration or controlled benchmark results.
+- The `english` feature enables Jiff defaults alongside project features.
+  `fuzzy` adds `chrono 0.4.45` without changing Jiff's feature set.
+  Both features build with stable 1.92.0 and 1.98.0.
+  Both manifests declare edition 2021 and no `rust-version`.
+  Those builds do not establish a minimum supported version.
   `fuzzydate` metadata shows an update on 2026-04-05 and 164,489 downloads.
-  See [m-gap-closure.md](./m-gap-closure.md) for evidence limits.
+  See [m-gap-closure.md](./m-gap-closure.md) for the upstream-access limits.
 
 Alternatives.
 
@@ -531,8 +538,9 @@ Facts [V: e-file q15, c-digest Q15].
 - The c-digest leans to the current-week day. It matches the template
   filter and is deterministic.
 - The inspected `fuzzydate` and `parse_datetime` source paths include
-  today when the bare weekday matches. The recorded Saturday-to-Monday
-  case does not execute that same-day condition.
+  today when the bare weekday matches. The expanded fuzzydate run
+  confirms this rule with a Saturday anchor. Parse_datetime remains
+  source-only.
 
 Alternatives.
 

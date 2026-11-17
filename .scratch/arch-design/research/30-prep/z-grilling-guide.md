@@ -92,7 +92,7 @@ speedate leaves (B61).
 | Question | Status | Proposal |
 | --- | --- | --- |
 | Q13 grammar | Decision | Adoption, rule semantics and crate choice are separate. The rule table is a proposal with no implementation or completeness proof. |
-| Q14 build or buy | Decision | Build in the repository [P]. The recorded probe shows that `jiff-english` rejects `next week` and `fuzzydate` returns a point. Neither tested date result provides a period unit or error span. See [m-gap-closure.md](./m-gap-closure.md). |
+| Q14 build or buy | Decision | Build in the repository [P]. English aborts on UTF-8 input; reject this version as supplied [P]. Fuzzydate returns points without periods or error spans. The M report records same-day cases, final probe sizes and repository dependency-linkage costs. |
 | Q15 bare weekday | Human decision | Default proposal: next occurrence after today. Add `next`, `last` and `this` prefixes. State the same-day rule. |
 | Q16 `next week` | Decision | A `CalendarPeriod` [P]. Derive it from the period that holds today. Point or period remains open for offset phrases such as `in 2 weeks`. |
 | Q17 keyword spelling | Decision | Add nullary `today()` and `now()` [P]. Keep explicit arguments for edge functions, as in `eom(today())`. A nullary `eom()` needs the separate Q17-B proposal. |
@@ -176,7 +176,15 @@ These corrections change research claims, not accepted Answers:
 
 ## What the preparation did not cover
 
-- Compile time and run time for every crate option beyond the probe's
-  throughput figures.
-- Any temporal key timing.
+- Full integration cost. The M report measures candidate parse times,
+  final probe sizes and dependency linkage in repository copies.
+  Repeated build observations do not prove compile-time regressions.
+- Temporal-key timing and per-operator residual equivalence.
+  These need the selected implementation before an `Exact` claim.
+- Production type size, the compile-fail `Ord` check and the format epoch
+  change. The mirror experiment does not pass these implementation gates.
+- Exhaustive Unicode, overflow, host-locale and transitive ambient-state
+  safety. English fails the bounded Unicode sample; fuzzydate passes it.
+- A broad verification pass. The temporal-filtered task passes.
+  The earlier broad run fails or cancels; its test output is unavailable.
 - The owner's answers to the human questions above.

@@ -26,8 +26,9 @@ counterexamples from outside the repository. It does not resolve the ticket.
 - `[P]` = proposal for the grilling. Not a decision.
 - No measurement comes from this writing pass. Later recorded probe
   results appear with their limits. Unmeasured costs remain unmeasured.
-- Each option gives a counterexample or a stated evidence gap.
-  These arguments support the grilling. They do not decide the options.
+- Each proposed option needs a counterexample and a rejection condition.
+  A missing check remains an evidence gap, not support for the option.
+  These arguments prepare the grilling. They do not decide it.
 
 ## Sources
 
@@ -92,6 +93,8 @@ write `ww`, `YY`, `Q`, `Qo`, and the Fileclass data uses `YYYY`, `DDDD`, `Q`
 [P] Treat Moment syntax as a compatibility adapter. Keep domain values
 dialect-free. If schema checks also accept Moment, identify a shared
 adapter consumer. That need does not by itself decide the module home.
+Reject the adapter boundary if it leaks dialect tokens into domain values
+or cannot preserve the adopted compatibility surface [P].
 
 ### q2. Where does the Moment dialect translator live?
 
@@ -270,8 +273,8 @@ Rust library surface is free.
 
 [P] Move arithmetic (`apply_offset` and the calendar-series logic it needs)
 into temporal, next to `resolve_period_edge`. Keep filter registration in
-the template engine. `Anchor` dies once the frame from q33 lands. `weekday`
-moves with the week rule into temporal.
+the template engine. `Anchor` is removable once the frame of ticket 21
+supplies `today` (q33). `weekday` moves with the week rule into temporal.
 
 ### q7. Where does the filename-period parser live?
 
@@ -352,6 +355,8 @@ week operations, with ISO `(monday, 4)` as the proposed default.
 The two fields need not change together.
 Preserve ISO filename prefixes independently of general settings.
 A non-ISO filename spelling needs a separate decision (L10).
+Reject a general-week setting that silently changes accepted ISO filename
+labels or cannot represent the adopted week-one rule [P].
 
 ---
 
@@ -386,9 +391,9 @@ Jiff input.
 
 ### q10. Does `winnow` stay?
 
-- [V-repo] One call site, in `src/temporal/lexer.rs`. Ticket 25's freshness
+- [V-repo] One call site, in `src/temporal/lexer.rs`. Ticket 30's freshness
   input says `winnow` locates duration prefixes for inline fields, and those
-  values reach the store.
+  values reach the store. Ticket 25's crate list omits `winnow`.
 - [V] The accepted duration shapes are frozen vault-format parsing (ticket
   16). Jiff's `Span` grammar allows weeks mixed with other units and
   fractional lowest units (S19). RFC 5545 allows weeks only alone and
@@ -401,9 +406,10 @@ grammar needs a consumed boundary. Jiff's public friendly parser accepts
 only complete input and reports no consumed prefix
 (`d-crate-evidence.md`, Question 2).
 
-[P] Keep `winnow` for that boundary role. Correct ticket 25's persisted
-producer list, or remove the direct use under a separate grammar-parity
-argument. Removing the direct dependency does not remove transitive
+[P] Keep `winnow` for that boundary role until ticket 35 makes the crate cut.
+Ticket 36 records ticket 25's omission, or the direct use goes under a
+separate grammar-parity argument. A hand-written replacement needs a grammar
+specification first. Removing the direct dependency does not remove transitive
 `winnow` from this lockfile (d, Question 4).
 
 ### q11. Does `logos` stay as part of the parsing base?
@@ -504,24 +510,22 @@ owner needs, with what the evidence gives:
 | Licence, releases | MIT; 1 release (2026-08-07); 29 downloads (crates.io, 2026-11-17) [V, S22, S24] | MIT; 14 releases; last update 2026-04-05 (crates.io, 2026-11-17) [V, S22, S24] | n/a |
 | Size | ~1.3k lines [V, S22] | ~2.6k lines [V, S22] | [H] not written yet |
 | Dependencies | `jiff ^0.2` default features + `scanlex ^0.1`; probe feature unification adds `tz-fat`, tzdb bundles, `perf-inline` [V, S22, S24] | `chrono 0.4.45` with `clock`, `lazy_static`, `thiserror`; inspected probe tree leaves Jiff unchanged [V, S22, S24] | no new parser crate proposed [P]; actual dependencies unmeasured |
-| Determinism evidence | bounded fixed-anchor matrix [V, S24]; source slicing risk remains; no complete transitive audit | bounded fixed-anchor matrix [V, S24]; no panic observed in that matrix; no complete transitive audit | pinned-input contract proposed [P]; no implementation proof |
-| Week rules | `last friday` gives 2026-03-13 from the 2026-03-14 anchor [V, S24] | `last friday` gives 2026-03-06; sampled bare `monday` keeps anchor time [V, S24]; same-day runtime untested | phrase rules need q15/q16; q8 alone does not decide them |
+| Determinism and safety | injected-anchor sample; 1,234 Unicode-sweep failures from 5,514 inputs; reject as supplied [P, S24] | injected-anchor sample; zero failures in the same sweep; no complete transitive audit [V, S24] | pinned-input contract proposed [P]; no implementation proof |
+| Week rules | US/UK `next saturday` differs; bare same-day Saturday moves +7 days [V, S24] | bare same-day Saturday retains the anchor; `last friday` gives 2026-03-06 [V, S24] | phrase rules need q15/q16; q8 alone does not decide them |
 | Output type | point; `next week` rejected [V, S24] | point; `next week` gives +7 days [V, S24] | `CalendarPeriod` proposed for adopted period phrases [P] |
 | Coverage | no `next week`, `eom`, or `in 2 weeks`; lenient `start of month` gives midnight today [V, S24] | no `eom` or `in 2 weeks`; `next week` is a point [V, S24] | chosen list only if implemented and checked [P]; no demonstrated coverage |
 | Coupling with jiff `=0.2.38` | enables jiff defaults in probe [V, S24] | adds a chrono stack in probe [V, S24] | Jiff-based implementation proposed [P] |
-| Binary snapshot | +65.0 KiB over 409 KiB baseline, including feature unification [V, S24] | +48.9 KiB, including chrono [V, S24] | not measured |
-| Speed snapshot | 263 to 588 ns/parse, indicative [V, S24] | 215 to 585 ns/parse, indicative [V, S24] | not measured |
-| Compatibility | edition 2021; no `rust-version`; recorded stable rustc 1.89.0 build covers English only [V, S24] | edition 2021; no `rust-version`; no recorded stable 1.89.0 fuzzy build | repository floor 1.96; proposed parser unbuilt |
-| Maintenance evidence | 0.0.1, 29 downloads, one release [V, S22] | release/download snapshot only; issue and commit activity unexamined | repository would own changes [P] |
+| Final probe binary delta | +81.17 KiB, including feature unification [V, S24] | +98.11 KiB, including chrono [V, S24] | not measured |
+| Repository linkage delta | +48.88 KiB; reachable-call experiment, not complete integration [V, S24] | +65.39 KiB; same experiment [V, S24] | not implemented |
+| Parse-time medians | 264/582/372 ns for tomorrow/next monday/typo; indicative [V, S24] | 376/597/223 ns for the same inputs; indicative [V, S24] | not measured |
+| Compatibility | edition 2021; no `rust-version`; builds with stable 1.92.0 and 1.98.0 [V, S24] | same stable build evidence; no minimum-version claim [V, S24] | repository floor 1.96; proposed parser unbuilt |
+| Maintenance evidence | advertised repository API returns 404; search finds no named repository; quality unknown [V, S24] | repository and open-issue snapshot checked; no maintenance-quality guarantee [V, S24] | repository would own changes [P] |
 
-Probe limits: the phrase matrix is bounded. It does not cover all Unicode,
-overflow, or ambient-input paths. Fuzzydate same-day behavior remains
-runtime-untested. The mislabeled same-day invocation ran the English binary
-(d, fuzzydate section).
-
-Binary sizes precede final timing-mode source edits. They are
-earlier-revision snapshots, not current reproducible deltas.
-The timings are indicative, not controlled or production benchmarks.
+The expanded matrix now tests both candidates' same-day weekday case.
+The Unicode failures confirm English's byte-slice defect.
+The sample does not prove exhaustive Unicode or overflow safety.
+The M report gives timing ranges and all repeated repository build times.
+These are indicative observations, not controlled or production benchmarks.
 The absence of `rust-version` establishes no minimum supported version.
 
 Evidence from the closest comparable crate, `chrono-english` 0.2.1 (S20):
@@ -657,6 +661,8 @@ landed function form.
 The proposed no-argument forms bind against the frame at plan time.
 This is the q17 function alternative, not the existing grammar.
 Dataview-style `date(today)` remains a competing spelling.
+Reject a spelling that captures existing field paths or binds relative
+values outside the plan frame [P]. Explicit edge arguments remain valid.
 
 ### q18. The frontend spelling of `member_of`
 
@@ -720,6 +726,10 @@ Keep civil datetimes distinct from instants in either shape.
 The later default-test-profile mirror measures 80 bytes, not the proposed
 product types. Its `LinkType` and duration substitutions limit that result
 (S24; `m-gap-closure.md`).
+
+Reject either product shape if it exceeds the 80-byte slot budget [P].
+If the inner enum exceeds that limit, compare the separate-variant shape.
+Do not assume that the alternative fits without its own product assertion.
 
 ### q20. Where `CalendarPeriod` sits in the value model
 
@@ -799,7 +809,7 @@ boundary that grouping needs.
 Date-versus-instant gap/fold rule separately. Ticket 19 uses the pinned
 zone for civil-versus-instant comparison. Group-class separation does not
 imply cross-class filter failure. A blanket no-match rule would change
-that contract, not apply it (L).
+that contract, not apply it (ticket 19, Answer).
 
 ### q22. The total sort key for mixed temporal values
 
@@ -890,7 +900,8 @@ arithmetic merely because zoned arithmetic needs one.
 
 Ticket 19 accepts last-segment target extraction and a pattern argument.
 The later Markdown-link handoff leaves extension normalization and
-percent decoding open (19:299-313; L). External URLs are not note targets.
+percent decoding open (ticket 19, Markdown-link handoff).
+External URLs are not note targets.
 
 - [V] RFC 3986 §2.4: encode data octets that conflict with delimiters.
   Decoding an unreserved octet is safe and equivalence-preserving. Decoding
@@ -989,8 +1000,8 @@ Counterexample against temporal importing config: ticket 35 may cut
 temporal into its own crate. A config dependency blocks that cut.
 
 [P] Temporal defines a `DatePolicy` (formats, week rule, weekday
-resolution, NL options) and a frame type (q33). Config maps `DateConfig`
-into `DatePolicy` at load. The edge stays one-way.
+resolution, NL options). Config maps `DateConfig` into `DatePolicy` at
+load. The edge stays one-way. The frame boundary stays a human choice (q33).
 
 ### q29. Zone syntax and validation
 
@@ -1020,6 +1031,8 @@ Specify treatment of legacy aliases separately from POSIX rule strings.
 Choose spelling validation and actual acquisition timing separately.
 State the zone-data source and version before claiming reproducibility.
 Preserve lazy acquisition for civil-only work (L9; K21).
+Reject a validation path that acquires a zone for civil-only work or
+silently interprets a POSIX string as a fixed offset [P].
 
 ### q30. How the host gets the system zone and reports failure
 
@@ -1204,7 +1217,8 @@ accepted filename-notice rule.
 [P] Distinguish these cases:
 
 - Return `Null` without a notice for an expected absent value.
-- Consider a notice for a malformed declared value or date-shaped prefix.
+- Propose one notice per malformed declared value or date-shaped prefix.
+  Attach its span. Ticket 34 must define delivery and deduplication.
 - Return a typed error for required zone-acquisition failure.
 
 Ticket 34 owns notice delivery and deduplication.
@@ -1224,10 +1238,10 @@ evidence lives:
 | DST fold and gap | S5 functions-datetime (Denver 1 day vs 24 hours); S2 timezone doc (LA fold/gap) |
 | Month clamp | S5 (Mar 31 + 1 month = Apr 30); S20 (Jan 30 + 1 month = Feb 28/29); S2 (`constrain`/`reject`) |
 | Invalid week 53 | S1 (week 53 rollover note); ISO `2025-W53` invalid, no rollover (ticket 21) |
-| Prefix fallback | S9 (Dataview filename forms); S17 (NumPy year-granularity equality — a different convention, not a prefix fallback); S7 (Moment forgiving parse of a UUID as `YYYYDDD`); ticket 21 no-reinterpretation rule |
+| Prefix fallback | S9 (Dataview filename forms); S17 (NumPy year-granularity equality — a different convention, not a prefix fallback); S7 (Moment `moment.ISO_8601` forgiving parse of a UUID, K23); ticket 21 no-reinterpretation rule |
 | Percent-encoded link | S13 §2.4 (decode once); S12 (destination forms) |
 | Period equality vs membership | S2 `PlainYearMonth` (reference-day inequality); ticket 21 `(start, unit)`; S4 (nominal vs exact); S21 `[V]` (partial order) |
-| Relative literal parsing | S5 (`today`/`tomorrow` staleness in prepared statements); S10 (Tasks recompute and issue #1289); S23 (Duckling `reference_time`) |
+| Relative literal parsing | S5 (`today`/`tomorrow` staleness in prepared statements); S10 (Tasks recompute and issue #1289); S23 (Duckling `reftime`, K17) |
 | Null-notice observability | S9 (Dataview silent `file.day`); q36 case table |
 
 ## Competing designs the evidence supports
@@ -1267,31 +1281,32 @@ These are competing inputs for the grilling, not decisions.
 List for the integration owner. Each needs a check or a decision to leave
 open:
 
-1. Candidate APIs: source reads establish injected-anchor entry points.
-   The bounded runtime matrix does not close every behavior gap.
-   Fuzzydate same-day behavior remains runtime-untested.
-   Stable rustc 1.89.0 covers English only, not either candidate's minimum.
+1. Candidate APIs have bounded source and runtime evidence.
+   The expanded run confirms fuzzydate's same-day anchor retention.
+   Both candidate features build with stable 1.92.0 and 1.98.0.
+   Exhaustive safety and either minimum supported version remain unproved.
 2. W3C XSD duration partial order: closed. S21 read and confirmed in the
    K round (`k-citation-verification.md`, K11); q22 states it as `[V]`.
-3. Arrow strptime directive table: not retrieved. S16 gives the columnar
-   types and the pyarrow signature (default `%Y-%m-%dT%H:%M:%S`, locale `C`,
-   error on unknown tz). Enough for the interval-type evidence, not for a
-   directive-by-directive comparison.
+3. Arrow formatter evidence: S16 documents `strftime`, not `strptime`.
+   Its default is `%Y-%m-%dT%H:%M:%S`, with locale `C`.
+   An unknown timestamp zone or unavailable host locale causes an error.
+   The function and options pages give no complete directive table.
+   They support the formatter and type comparison, not directive parity.
 4. Jiff `tz-system` failure behavior: closed. Source-read in the K round
    (K20); q30 states it as `[V]` with the `try_system`/`system` split.
-5. Binary sizes: +65.0 KiB and +48.9 KiB are earlier-revision probe
-   snapshots (S24). They precede final timing-mode source edits.
-   Repository costs for candidates, `tzdb-bundle-always`, `logos`, and an
-   in-repository grammar remain unmeasured.
-   Do not present the snapshots as current reproducible binary deltas.
-6. In-repo grammar size and test cost (q14 Size row): not written yet.
-   That estimate belongs to the owner with the d-crate researcher's input.
+5. Binary sizes: the M report now records final probe deltas of +81.17 KiB
+   and +98.11 KiB. Repository dependency-linkage deltas are +48.88 KiB and
+   +65.39 KiB. These are not complete integration costs.
+   Separate `tzdb-bundle-always`, `logos` and in-repository grammar costs
+   remain unmeasured.
+6. In-repository grammar size and test cost: no implementation exists.
+   Measure the selected grammar before adoption. Do not substitute an
+   unsupported estimate.
 7. `moment.now` overridability: closed as documented. Moment's plugin
    guide documents the `moment.now` override (K23 in
    `k-citation-verification.md`).
-8. Chrono-english same-day rule: d's source read covers the weekday and
-   time-part branches. That source evidence does not replace runtime
-   same-day checks. Fuzzydate's same-day runtime case also remains open.
+8. Chrono-english's same-day rule remains source-only evidence.
+   The expanded fuzzydate run confirms its same-day anchor retention.
 
 ## Pointers to sibling files
 

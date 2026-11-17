@@ -20,6 +20,15 @@ use std::time::Instant;
 
 use jiff::tz::TimeZone;
 
+/// Selects the English month-day order: `TRACES_DIALECT=uk` or the US default.
+#[cfg(feature = "english")]
+fn dialect() -> jiff_english::Dialect {
+    match std::env::var("TRACES_DIALECT").as_deref() {
+        Ok("uk") => jiff_english::Dialect::Uk,
+        _ => jiff_english::Dialect::Us,
+    }
+}
+
 fn main() {
     let input =
         std::env::args().nth(1).unwrap_or_else(|| "tomorrow".to_owned());
@@ -30,13 +39,14 @@ fn main() {
         .to_zoned(TimeZone::UTC);
     #[cfg(feature = "english")]
     if bench {
+        let selected = dialect();
         let start = Instant::now();
         let mut ok = 0u64;
         for _ in 0..20_000 {
             let parsed = jiff_english::parse_date_string(
                 black_box(&input),
                 black_box(&base),
-                jiff_english::Dialect::Us,
+                selected,
             );
             ok += u64::from(black_box(parsed.is_ok()));
         }
@@ -70,19 +80,11 @@ fn main() {
     {
         println!(
             "lenient={:?}",
-            jiff_english::parse_date_string(
-                &input,
-                &base,
-                jiff_english::Dialect::Us
-            )
+            jiff_english::parse_date_string(&input, &base, dialect())
         );
         println!(
             "strict={:?}",
-            jiff_english::parse_strict(
-                &input,
-                &base,
-                jiff_english::Dialect::Us
-            )
+            jiff_english::parse_strict(&input, &base, dialect())
         );
     }
     #[cfg(feature = "fuzzy")]

@@ -34,7 +34,8 @@ Evidence:
 - Dataview uses Luxon `DateTime`, not Moment.
   Source: `obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:7643-7666`,
   including `export type { DateTime, Duration } from "luxon"`.
-  Its default format is `"MMMM dd, yyyy"` (settings defaults).
+  The changelog records the Luxon `DateTime` export at `:366`.
+  Its default format is `"MMMM dd, yyyy"` (settings defaults at `:1203`).
   Upstream: github.com/blacksmithgu/obsidian-dataview. `[V]`
 - Fileclass and Metadata Menu store Moment format strings (`YYYY-MM-DD`,
   `YYYY`, `DDDD`, `Q`). Fileclass has a separate token scanner.
@@ -102,10 +103,10 @@ Evidence:
   `:9607-9733`, `:9888-9890`.
   Upstream: github.com/iwe-org/iwe. `[V]`
 - Dataview uses Luxon across the inspected format surfaces.
-  Settings include `defaultDateFormat` and `taskCompletionDateFormat`.
+  Settings include `defaultDateFormat` and `taskCompletionDateFormat`
+  (`:1180-1203`).
   Query functions include `dateformat(date, string)` and
-  `date(text, "format")`.
-  Sources: src `:6924-6928`; changelog `:366`, `:373-374`. `[V]`
+  `date(text, "format")` (`:6924-6928`). `[V]`
 - zk maps named styles to strftime.
   `{{format-date now}}` accepts
   `short|medium|long|full|year|time|timestamp|timestamp-unix`.
@@ -229,9 +230,10 @@ Evidence:
   `[V]`
 - zk writes filename stamps from templates (`{{format-date now 'timestamp'}}` -> `200911172034`,
   `zk-src-digest.txt:2019-2020`). It has no filename parser. `[V]`
-- Dataview's `extractDate` searches the whole filename for its date patterns, and `findDate`
-  checks typed metadata fields before that; `date(link)` falls back to `resolved.file.day`
-  (src `:6872-6890`). `[V]`
+- Dataview's `extractDate` searches dashed and compact full dates anywhere
+  in a filename (`:13868-13879`). `findDate` checks typed metadata before
+  the filename (`:3632-3647`). `date(link)` then uses display text, path,
+  and `resolved.file.day` (`:6872-6890`). `[V]`
 
 Product behavior: the inspected Dataview helper finds full dates anywhere
 in a filename. It does not recognize week or quarter labels.
@@ -360,7 +362,7 @@ Evidence:
 - zk's helper logs parsing errors and returns the utility's returned time.
   Its default branch returns an initialized zero `time.Time`.
   The inspected helper does not establish every utility error return
-  (`date.go:2233-2251`; K19). `[V]`
+  (`date.go:2247-2250`; K19). `[V]`
 - zk hard-exits the process when a renamed helper is used with the old spelling
   (`date.go:2243-2246`, `os.Exit(1)`). `[V]`
 - nldates logs `"Invalid date"` at debug level and continues (`main.ts:414-426`). `[V]`
@@ -455,24 +457,26 @@ not a proof of period arithmetic.
 
 Evidence:
 
-- Traces facts: the grammar has `sow`, `eom`, `eoy` as functions with a date argument and no bare
-  relative keyword; a bare word parses as a field path, so bare `today` names a field. `[V
-  ticket]`
-- Dataview never spells relative words bare. They are arguments of `date(...)`. Its identifier
-  rule is permissive. A name can start with any letter or emoji, then letters, digits, `_`, `-`,
-  and emoji. A bare keyword would collide with field names (`EXPRESSION.identifier`, src
-  `:7853-7858`). `[V]`
+- Traces has `sow`, `eom`, and `eoy` functions with date arguments.
+  In the inspected query grammar, bare words parse as field paths, so
+  bare `today` is a field name in that scope. `[V ticket]`
+- Dataview places relative shorthands inside `date(...)`.
+  Its identifier rule is permissive: names can start with a letter or
+  emoji, then use letters, digits, `_`, `-`, and emoji
+  (`EXPRESSION.identifier`, src `:7853-7858`). `[V]`
 - Dataview reserves `FROM`, `WHERE`, `LIMIT`, `GROUP`, `FLATTEN` as keywords and nothing else
   (src `:7668-7672`). `[V]`
 
-Product behavior: call syntax (`date(today)`) is the established spelling that avoids the
-field-name collision. Ticket 29 already uses `eom` as a relative keyword in one place while the
-grammar defines it as a function; ticket 30 lists that discrepancy.
+Product behavior: Dataview uses `date(...)` for relative shorthands.
+That syntax avoids field-name ambiguity in the inspected parser.
+Ticket 29 uses `eom` as a relative keyword in one place, while the
+current Traces grammar defines it as a function. Ticket 30 records
+that discrepancy.
 
 Lesson: `[P]` Consider relative words as `date(...)` arguments.
-This Dataview precedent is not the existing Traces relative-date grammar.
-Traces currently has no such relative keyword.
-Bare keywords need an explicit field-name collision rule and migration.
+This Dataview precedent does not establish that bare words are
+unreachable in every Traces grammar context. Ticket 30 must decide
+the keyword spelling and its field-name interaction.
 Keep this spelling proposal separate from adopting a grammar.
 
 ### Q18: Frontend spelling of `member_of`
@@ -480,8 +484,8 @@ Keep this spelling proposal separate from adopting a grammar.
 Evidence:
 
 - `[A]` The excerpts show no directly equivalent membership syntax.
-  Dataview's task shorthand `📅` marks a date field
-  (docs `:1599-1640`). It is storage syntax, not a query operator. `[V]`
+  Dataview task shorthand marks a date field (docs `:1599-1640`).
+  It is storage syntax, not a query operator. `[V]`
 - Fileclass's recorded failure is adjacent: a Bases `contains` filter on a link-stored scalar
   silently drops the note from the view (an upstream code comment records it; this task did not
   measure it). Plain scalar values still work like lists for several comparison operators. The
@@ -847,24 +851,23 @@ Evidence:
 
 Product behavior: absent.
 
-Lesson: `[P]` Provide the proof per operator and kind, or leave `Unsupported` and scan. The
-digests add no evidence here; the grilling decides from ticket 24's key rules and the type
-shape answers (Q19, Q20, Q22).
+Lesson: `[P]` Provide proof per operator and kind, or leave `Unsupported`
+and scan. The digests add no evidence for the required bounds.
 
-### Q36: When a Null date gets a notice
+### Q36: When does a Null date get a notice?
 
 Evidence:
 
-- Fileclass records the silent-drop failure (upstream comment, not measured here): a
-  `contains` filter on link-stored scalar values skips them, so notes vanish from a view with
-  no message. Its validation messages then teach the storage shape (`dateFormatCheck` message
-  design, `[V]`).
-- nldates logs `"Invalid date"` at debug level and continues (`main.ts:414-426`). `[V]`
-- Dataview yields `null` for unparseable `date()` input with no notice (`:6865-6909`). `[V]`
-- Ticket 34 owns the mechanism; ticket 29 did not adopt the first-round notice. `[V ticket]`
+- Fileclass records a silent-drop failure in an upstream comment; this
+  task did not measure it. Its validation messages teach the storage shape.
+- nldates logs `"Invalid date"` at debug level and continues
+  (`main.ts:414-426`). `[V]`
+- Dataview yields `null` for unparseable `date()` input with no notice
+  (`:6865-6909`). `[V]`
+- Ticket 34 owns the notice mechanism; ticket 29 did not adopt the first-round notice. `[V ticket]`
 
-Product behavior: the named date-error paths often provide no user notice.
-That sample does not establish a universal silence rule.
+Product behavior: these named paths can provide no user notice.
+They do not establish a universal silence rule.
 
 Lesson: `[P]` Define the notice condition with ticket 34.
 Consider malformed date-shaped input and the specific link-scalar
@@ -876,8 +879,9 @@ Delivery and deduplication remain ticket 34 concerns.
 
 Each entry states the failure that disqualifies it as a Traces pattern.
 
-- zk's zero-time fallback in the `naturaldate` helper's default branch (`date.go:2238-2242`):
-  a zero date silently joins comparisons and sorts as an epoch value. `[V]`
+- zk's `naturaldate` helper logs an error and returns its initialized zero
+  `time.Time` from the default branch (`date.go:2247-2250`; K19).
+  The inspected code does not show that this value sorts as an epoch. `[V]`
 - nldates' private-API locale read (`moment.localeData()._week.dow`): week labels shift when the
   host locale changes, and the API can vanish. `[V]`
 - Dataview's display-first `date(link)` cascade: an alias decides the value. `[V]`

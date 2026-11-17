@@ -11,7 +11,7 @@ result. [H] marks a hypothesis. [P] marks a proposal for the grilling.
 A later parent-run round measured jiff-english and fuzzydate at runtime.
 `m-gap-closure.md` records the results and corrections. Bounded source
 searches do not prove absence of all transitive ambient reads.
-Compile time and repository-wide deltas remain unmeasured.
+The later round also measures dependency linkage in throwaway repository copies.
 
 ## Cache and tools
 
@@ -44,22 +44,20 @@ cached `Cargo.toml` and from `Cargo.lock` instead. [V]
 | Injected anchor | yes; `now: &Zoned` argument (`lib.rs:124-128`) | yes; `parse_relative_to` takes a naive datetime; `aware_parse` takes an optional anchor and explicit zone | yes; `parse_datetime_at_date(Zoned, ...)` (`lib.rs:230-235`) | yes; `now: DateTime<Tz>` argument (`lib.rs:95-99`) |
 | Ambient clock or zone reads in inspected paths | search of crate `src/` finds no `now()` call [V]; transitive absence unproved | `parse` reads `Local::now` (`lib.rs:268-270`); `parse_relative_to` resolves through `Local` (`lib.rs:259-262`) | plain `parse_datetime` uses `Zoned::now` (`builder.rs:263`) | inspected `Utc::now` calls occur in `#[cfg(test)]` code (`lib.rs:146-158`) [V]; transitive absence unproved |
 | `next week` | error; `wee` fails weekday and month tables (`types.rs:433-446`) [runtime: confirmed] | point; today's weekday plus one week (`ast.rs:357-370`) [runtime: confirmed] | point; now plus 7 days, time of day kept (`ordinal.rs:32`, `relative.rs:118-122`) | error; same tables as jiff-english (`types.rs:402-460`) |
-| Bare weekday | next occurrence; same-day selection depends on parsed time; no time part gives midnight (`types.rs:119-137,346-363`) [runtime: confirmed for bare same-day input] | today when today matches; otherwise next match; base time kept (`ast.rs:454-463`) [source; same-day runtime untested] | midnight when today matches; otherwise forward match (`builder.rs:311-349`) | same source rule as jiff-english (`types.rs:102-135`) |
+| Bare weekday | next occurrence; same-day selection depends on parsed time; no time part gives midnight (`types.rs:119-137,346-363`) [runtime: Saturday moves +7 days] | today when today matches; otherwise next match; base time kept (`ast.rs:454-463`) [runtime: Saturday retains the anchor] | midnight when today matches; otherwise forward match (`builder.rs:311-349`) | same source rule as jiff-english (`types.rs:102-135`) |
 | Error spans | none; message string only (`errors.rs:5-24`) | none; token text only (`lib.rs:212-225`) | none; public `InvalidInput` drops detail (`lib.rs:140-159`) | none; message string only (`errors.rs:5-24`) |
-| Locale | English only; `Dialect` switches day and month order | English only | English only; GNU date dialect, ASCII lowercasing (`mod.rs:240-246`) | English only; `Dialect` as jiff-english |
+| Locale and dialect | English only; `Dialect` changes numeric date order and next-weekday semantics [runtime: US/UK next Saturday differs] | English only | English only; GNU date dialect, ASCII lowercasing (`mod.rs:240-246`) | English only; `Dialect` as jiff-english |
 
 The inspected date-parser entry points return points, not periods. [V]
 Their point types are `jiff::Zoned`, chrono `NaiveDateTime` or
 `DateTime<Tz>`, and `parse_datetime::ParsedDateTime`.
 Separate duration-parsing APIs do not change those date result types.
-The historical probe reports parse timings of 215 to 588 ns
-(`m-gap-closure.md`). Earlier-revision binary snapshots add +65.0 KiB
-and +48.9 KiB over a 409 KiB baseline. Final timing-mode edits came after
-those snapshots. These are indicative probe results, not controlled or
-production benchmarks. They do not establish current binary deltas.
-
-Compile time and repository deltas remain unmeasured.
-Chrono-english and parse_datetime have source evidence only.
+The final five-run timing summary and current binary sizes are in
+`m-gap-closure.md`. Probe deltas are +81.17 KiB for English and +98.11 KiB
+for fuzzydate. Reachable-call repository experiments add +48.88 KiB and
++65.39 KiB respectively. Those experiments do not implement the proposed
+integration. Repeated clean-build observations are not controlled
+compile-time benchmarks. Chrono-english and parse_datetime remain source-only.
 
 ## jiff 0.2.38
 
@@ -274,8 +272,8 @@ Path prefix: `.rust-docs/cache/crates/jiff-english/0.0.1/source/`.
   jiff-english enables jiff default features. `tz-fat`, `tzdb-zoneinfo`,
   `tzdb-concatenated`, `tzdb-bundle-platform`, and `perf-inline` join the
   unified build. The project disables jiff defaults (`Cargo.toml:128`).
-  The earlier-revision binary snapshot adds +65.0 KiB over the 409 KiB
-  baseline. This is a probe result, not a repository measurement.
+  Final probe linkage adds +81.17 KiB. A separate repository-copy experiment
+  adds +48.88 KiB. Neither measures a complete adopted integration.
 - Anchor. `parse_date_string(s, now: &Zoned, dialect)` and
   `parse_and_remainder` take the base zone and instant as arguments
   (`src/lib.rs:124-155`). A search over this crate's `src/` finds no
@@ -295,14 +293,17 @@ Path prefix: `.rust-docs/cache/crates/jiff-english/0.0.1/source/`.
 - Errors. One message string field lives at `errors.rs:5-34` in
   `DateError`. The type exposes no spans. `parse_and_remainder` returns the
   unparsed remainder (`src/lib.rs:147`), which is text, not a span.
-- Locale. English only. `Dialect::Uk` or `Dialect::Us` switches day and
-  month order (`src/lib.rs:109-113`, `src/parser.rs:71`).
-- Risk note [V]. `week_day` slices `&s[0..3]` on scanner identifiers.
-  scanlex accepts non-ASCII alphabetic identifier characters
-  (scanlex 0.1.4 `src/lib.rs:291-292`). A three-byte-or-longer identifier
-  whose third byte is not a char boundary can panic there.
-  The runtime matrix supplies `週` and full-width digits. Both fail without
-  an observed panic. The `ééé` identifier path remains unexecuted.
+- Locale. English only. `Dialect::Uk` and `Dialect::Us` change numeric
+  date order and weekday semantics. With the fixed Saturday anchor,
+  `next saturday` gives March 28 under UK and March 21 under US.
+- Safety defect [V]. `week_day` slices `&s[0..3]` on scanner identifiers
+  (`src/types.rs:433-446`). The scanner accepts non-ASCII letters.
+  The expanded run aborts on Hebrew `מחר`. The tracked Unicode sweep
+  records 1,234 nonzero exits from 5,514 inputs for this English build.
+  The fuzzy build records zero. The earlier CJK and full-width cases
+  missed the failing identifier path. The release profile aborts on panic.
+  A `Result` wrapper cannot recover from it. Reject this version as
+  supplied for user input [P]; see `m-gap-closure.md`.
 
 ### fuzzydate 0.4.1
 
@@ -326,11 +327,11 @@ Path prefix: `.rust-docs/cache/crates/fuzzydate/0.4.1/source/`.
   (`src/ast.rs:357-370`, `src/ast.rs:768-781`). A runtime check confirms
   the +7-day point with the base time kept (`probes/candidates`).
 - Bare weekday. The `Weekday(day)` branch scans forward from today.
-  A matching weekday returns today, so `thursday` on Thursday returns
-  today (`src/ast.rs:454-463`). This is source evidence only.
-  The supposed fuzzydate same-day run printed `lenient`/`strict` results
-  from the English binary. It supplies no fuzzydate evidence.
-  Fuzzydate same-day behavior remains untested at runtime.
+  A matching weekday returns today (`src/ast.rs:454-463`).
+  An older supposed fuzzydate run actually used the English binary.
+  The expanded run uses a separate fuzzy executable. Bare `saturday`
+  returns 2026-03-14T12:00Z with the Saturday anchor.
+  That result agrees with the inspected source.
 
   Week arithmetic uses `iso_week` and Monday-start ISO rules
   (`src/ast.rs:374-409`). The inspected path takes no configured week-start
@@ -400,10 +401,9 @@ Path prefix: `.rust-docs/cache/crates/chrono-english/0.2.1/source/`.
 
 ## Question 7: rejection tests
 
-These proposed checks state expected behavior for later adoption work.
-They are not completed runs. Each candidate needs an explicit anchor.
-T1, T3, T6, and T10 have partial later runtime evidence, as noted below.
-T3's runtime evidence covers jiff-english only.
+These proposed checks govern later adoption. Source expectations are not
+completed runs. T1, T3, T6 and T10 have partial runtime evidence.
+The expanded T3 evidence covers both leading candidates.
 
 - T1, interval grammar, all candidates. Supply `next week` with base
   Thursday 2024-03-14 12:00 UTC. The source expectations differ:
@@ -423,26 +423,28 @@ T3's runtime evidence covers jiff-english only.
   chrono-english return 2024-03-21 00:00. parse_datetime returns
   2024-03-14 00:00. fuzzydate returns 2024-03-14 12:00. Reject a
   candidate whose same-day rule differs from the note-model rule.
-  The later run confirms jiff-english's bare same-day move.
-  The mislabeled fuzzydate invocation ran the English binary.
-  Fuzzydate's source expectation remains runtime-untested.
-- T4, midnight gap. Pick a zone and a date whose local midnight falls in
-  a gap, for example America/Sao_Paulo 2015-10-18. Feed `today`.
-  jiff-english maps through jiff `Compatible` and lands at 01:00
-  (`jiff zoned.rs:1104-1118`). Reject any candidate that reports a
-  different instant for the same civil day or cannot state its mapping.
-- T5, injected anchor only. Select each candidate's anchor-taking API.
-  Select an explicit zone where the API permits one.
-  Inspect the resolved dependency features.
-  Reject an API that needs ambient inputs on the selected path.
-  Reject feature unification if the adopted contract forbids jiff defaults.
-  The existing project uses `default-features = false` (`Cargo.toml:128`).
-  Fuzzydate also adds chrono. That is a separate coupling decision.
-- T6, panics on non-ASCII names. Feed `ééé` or `next ééé` to jiff-english
-  and chrono-english. A byte-slice panic at the `&s[0..3]` tables rejects
-  the candidate for user-visible values unless it fixes the slice.
-  (Runtime: `週` and full-width digits failed cleanly with no panic;
-  the `ééé` identifier path stays unexecuted.)
+  The expanded Saturday run confirms English's +7-day move and
+  fuzzydate's same-day anchor retention. It does not execute every
+  weekday, parsed time or zone.
+- T4, midnight gap. Use America/Sao_Paulo on 2015-10-18.
+  Distinguish an explicit midnight request from bare `today`.
+  English's `Skip::to_date_time` retains the base time when the time
+  specification is empty (`src/types.rs:218-232`).
+  Bare `today` therefore does not establish a 01:00 midnight-gap result.
+  Reject a mapping that contradicts the adopted civil-to-instant rule.
+  The explicit-midnight candidate case remains an adoption test.
+- T5, injected anchor only. Select an explicit anchor and zone.
+  Reject a selected path that still needs ambient inputs.
+  Inspect resolved features, not only dependency declarations.
+  English enables Jiff defaults; fuzzydate adds chrono.
+  Both conflict with Q14's proposed no-new-stack, restricted-feature gate.
+  Adopting either needs an explicit change to that proposal.
+- T6, panics on non-ASCII names. The English Unicode sweep records
+  1,234 failures from 5,514 inputs. Source and inspected abort messages
+  identify the `&s[0..3]` defect. Reject this version as supplied for
+  user input [P]. A fixed version needs the failing-input regressions.
+  Chrono-english has source evidence only; no equivalent runtime run
+  is claimed for it.
 - T7, trailing input. Feed `10pm meeting` and `2024-03-14 x`. jiff-english
   accepts the first in lenient mode and offers `parse_strict`
   (`src/lib.rs:157-166`). fuzzydate and parse_datetime reject both.
@@ -464,29 +466,26 @@ T3's runtime evidence covers jiff-english only.
 
 ## Not checked
 
-- Compile time, repository-wide size deltas, and startup cost for any
-  adoption. Probe sizes and warm-cache link times are not repository
-  measurements (`m-gap-closure.md`).
+- Full integration compile time, startup and binary size. The M report
+  now records dependency-linkage sizes and repeated clean-build times
+  in repository copies, not a complete integration or controlled benchmark.
 - Minimum supported Rust versions. Both manifests declare edition 2021
-  without `rust-version` (`m-gap-closure.md`). The recorded stable
-  rustc 1.89.0 build covers `--features english` only.
-  It does not establish fuzzydate compatibility or either minimum
-  supported Rust version. The repository floor is 1.96.
+  without `rust-version`. Both candidate features build with stable
+  1.92.0 and 1.98.0. Neither result establishes a minimum.
+  The older 1.89.0 record covers English only. The repository floor is 1.96.
 - Parse timings for `chrono-english` and `parse_datetime`.
   Only the two leading candidates have indicative probe timings.
 - The datetime scenarios of the old differential matrix. The in-repo
   parity probe covers 4,635,370 guarded date inputs with zero
   differences, but datetimes, spans, and zones stay outside it.
-- `chrono` feature resolution beyond the probe tree. The probe shows
-  fuzzydate adds `chrono 0.4.45` with `clock` and no `chrono-tz`.
-  The inspected probe feature tree leaves Jiff unchanged.
-- Repository `Cargo.lock` claims. They rest on read lockfile entries;
-  the probe tree ran against the probe lockfile only.
-- Upstream issue state and commit activity. The 2026-11-17 crates.io
-  snapshot gives release and download facts (`m-gap-closure.md`).
-  Those facts do not establish current maintenance quality.
+- Exhaustive feature and ambient-state behavior. The probe and repository
+  experiments confirm Jiff default-feature unification for English.
+  Fuzzydate adds `chrono 0.4.45` with `clock`; the inspected feature trees
+  leave Jiff unchanged. Lock entries include target-specific dependencies.
+- Complete upstream maintenance quality. The M report separates the
+  crates.io snapshot from the later repository API observations.
 - `time 0.3.55` sources in the cache. Not read. No question in this
   file requires it. `chrono 0.4.45` was built in the probe, not read.
-- Behavior of the candidates under locales other than English. Not
-  tested. All four are English-only by source reading, and the runtime
-  matrix used English inputs.
+- Every host locale. The expanded run tests English US and UK dialects
+  and selected non-English inputs. These checks do not establish locale
+  independence or exhaustive non-English safety.
