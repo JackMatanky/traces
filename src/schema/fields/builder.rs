@@ -26,9 +26,10 @@ use crate::{
     },
 };
 
-/// [`SchemaFieldBuilder::resolve_from_raw`]'s result: the inherited base field
-/// (if any), the effective type tag to parse against, and whether parser errors
-/// on this field degrade to warnings rather than failing hard.
+/// Holds [`SchemaFieldBuilder::resolve_from_raw`]'s output.
+///
+/// Stores the inherited base field (if any), the effective type tag to parse
+/// against, and whether parser errors degrade to warnings.
 struct ResolvedBase<'a> {
     field: Option<&'a SchemaFieldDef>,
     tag: SchemaFieldTypeTag,
@@ -96,9 +97,10 @@ impl<'a> SchemaFieldBuilder<'a> {
     ///
     /// - `Direct(kind)` or `Ref` with a `type` override: builds fresh from
     ///   `raw.options` against the resolved kind.
-    /// - Bare `Ref` (no override): resolves the base via [`Self::resolve_ref`],
-    ///   then merges `raw.options` on top. Unrecognized or wrongly-shaped keys
-    ///   degrade to [`SchemaWarning`] rather than failing.
+    /// - Bare `Ref` (no override): resolves the base with
+    ///   [`Self::resolve_ref`], then merges `raw.options` on top. Unrecognized
+    ///   or wrongly-shaped keys degrade to [`SchemaWarning`] rather than
+    ///   failing.
     ///
     /// # Arguments
     ///
@@ -155,7 +157,7 @@ impl<'a> SchemaFieldBuilder<'a> {
         Ok((SchemaFieldDef::new(field_type, required, multi), warnings))
     }
 
-    /// Resolve `raw` to its base [`SchemaFieldDef`], the effective
+    /// Resolves `raw` to its base [`SchemaFieldDef`], the effective
     /// [`SchemaFieldTypeTag`], and whether parser errors should degrade to
     /// warnings.
     ///
@@ -201,7 +203,7 @@ impl<'a> SchemaFieldBuilder<'a> {
         }
     }
 
-    /// Parse `options` into a [`SchemaFieldType`], returning the resolved type
+    /// Parses `options` into a [`SchemaFieldType`], returning the resolved type
     /// and any [`SchemaFieldParserError`]s for unknown keys or type mismatches.
     ///
     /// # Arguments
@@ -248,12 +250,11 @@ impl<'a> SchemaFieldBuilder<'a> {
         (field_type, errors)
     }
 
-    /// Degrade `required` to `false` for Global Schema fields, which can never
-    /// be required.
+    /// Degrades `required` to `false` for Global Schema fields.
     ///
-    /// Returns the adjusted `required` value and a
-    /// [`SchemaWarning::StrayGlobalRequired`] when the field lives in the
-    /// Global Schema and was marked required.
+    /// The Global Schema never marks fields as required. Returns the adjusted
+    /// `required` value and a [`SchemaWarning::StrayGlobalRequired`] when the
+    /// field lives in the Global Schema and was marked required.
     fn handle_global_required_value(
         address: FieldAddressRef<'_>,
         required: bool,
@@ -270,7 +271,7 @@ impl<'a> SchemaFieldBuilder<'a> {
         }
     }
 
-    /// Resolve `base_address` to its [`SchemaFieldDef`].
+    /// Resolves `base_address` to its [`SchemaFieldDef`].
     ///
     /// # Errors
     ///

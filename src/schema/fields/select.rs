@@ -1,7 +1,7 @@
 //! Defines the `select` field type, its entries, and attribute parsing.
 //!
 //! Parses the `values` attribute for `select` fields into
-//! [`SchemaSelectFieldEntry`]s.
+//! [`SchemaSelectFieldEntry`] items.
 
 use std::{
     cell::RefCell,
@@ -38,7 +38,7 @@ impl SchemaSelectField {
         &self.values
     }
 
-    /// Build an instance for tests.
+    /// Builds an instance for tests.
     #[cfg(test)]
     pub(crate) const fn for_test(values: Vec<SchemaSelectFieldEntry>) -> Self {
         Self {
@@ -139,8 +139,7 @@ pub(crate) struct SchemaSelectFieldEntry {
 }
 
 impl SchemaSelectFieldEntry {
-    /// Builds a new entry with explicit value, label, and extra passthrough
-    /// keys.
+    /// Builds a new entry with explicit value, label, and extra keys.
     pub(crate) const fn new(
         value: FieldValue,
         label: FieldValue,
@@ -177,7 +176,7 @@ impl SchemaSelectFieldEntry {
         &self.label
     }
 
-    /// Returns this entry's passthrough keys beyond `value`/`label`.
+    /// Returns this entry's extra keys beyond `value`/`label`.
     #[inline]
     #[must_use]
     pub(crate) const fn extra(&self) -> &IndexMap<String, FieldValue> {
@@ -185,7 +184,7 @@ impl SchemaSelectFieldEntry {
     }
 
     #[cfg(test)]
-    /// Build an entry with a distinct label and extra passthrough keys.
+    /// Builds an entry with a distinct label and extra keys.
     pub(crate) fn with_label(
         value: String,
         label: String,
@@ -288,9 +287,10 @@ impl SelectValuesFileCache {
     }
 }
 
-/// Pushes `source` as an entry-shape failure, tagging it with `path` when the
-/// entry came from an external values file (`None` for an entry declared
-/// inline in the field's own `values` list).
+/// Pushes `source` as an entry-shape failure.
+///
+/// Tags the error with `path` when the entry came from an external values file,
+/// or `None` for an inline entry.
 fn push_entry_error(
     parser: &mut SchemaFieldParser<'_>,
     path: Option<&str>,
@@ -302,7 +302,8 @@ fn push_entry_error(
     });
 }
 
-/// Extracts an optional file selector for `value`/`label`/`order`.
+/// Extracts an optional file selector for `value`, `label`, or `order`.
+///
 /// Missing selectors fall back at the call site.
 fn extract_optional_file_selector<'a>(
     subtable: &'a IndexMap<String, FieldValue>,
@@ -328,6 +329,8 @@ fn extract_optional_file_selector<'a>(
     }
 }
 
+/// Selects the source keys used to extract entry values, labels, and sort
+/// order.
 #[derive(Copy, Clone)]
 struct EntrySelectors<'a> {
     value: &'a str,
@@ -556,8 +559,8 @@ fn parse_file_subtable(
     let path_str = match subtable.get("path") {
         Some(FieldValue::String(p)) => p.as_str(),
         Some(other) => {
-            // Reverted to `base` unconditionally by `parse`'s caller once any
-            // error is recorded; this return value is never read.
+            // `parse` reverts to `base` when any error occurs. This return
+            // value is unused.
             push_entry_error(
                 parser,
                 None,

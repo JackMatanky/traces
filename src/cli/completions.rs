@@ -1,4 +1,4 @@
-//! Shell completion generation and template-name listing.
+//! Generates shell completions and lists template names.
 //!
 //! Serves `traces completions` by emitting a static completion script for a
 //! supported [`Shell`] or printing available template names for dynamic
@@ -10,9 +10,9 @@ use clap_complete::{Shell, generate};
 use super::error::{CliError, CliResult};
 use crate::{ConfigService, template::TemplateService};
 
-/// Arguments for `traces completions`.
+/// Defines arguments for `traces completions`.
 ///
-/// Exactly one of `--shell` or `--list-templates` must be provided.
+/// Accepts either `--shell` or `--list-templates`, but not both.
 #[derive(Debug, Args)]
 #[command(group(
     ArgGroup::new("completions_mode")
@@ -21,28 +21,30 @@ use crate::{ConfigService, template::TemplateService};
         .multiple(false)
 ))]
 pub(super) struct Completions {
-    /// Generate a static shell completion script for `traces`.
+    /// Generates a static shell completion script for `traces`.
     #[arg(long, value_enum)]
     shell: Option<Shell>,
-    /// Print available template names for dynamic tab-completion.
+    /// Prints available template names for dynamic tab-completion.
     #[arg(long)]
     list_templates: bool,
 }
 
 impl Completions {
-    /// Runs `traces completions`.
+    /// Emits a shell completion script or lists available template names.
     ///
-    /// With `--shell`, writes a shell completion script to stdout. With
-    /// `--list-templates`, prints available template names.
+    /// Dispatches between the two mutually exclusive CLI modes:
+    ///
+    /// - `--shell`: writes a static completion script for the selected
+    ///   [`Shell`] to standard output.
+    /// - `--list-templates`: loads the effective configuration and prints
+    ///   available template names, one per line.
     ///
     /// # Errors
     ///
-    /// - [`CurrentDirectory`] if `--list-templates` requires reading the
-    ///   current directory and it cannot be read.
-    /// - [`ConfigLoad`] if loading configuration for `--list-templates` fails.
-    ///
-    /// [`CurrentDirectory`]: CliError::CurrentDirectory
-    /// [`ConfigLoad`]: CliError::ConfigLoad
+    /// - [`CliError::CurrentDirectory`] if `--list-templates` needs the current
+    ///   directory and reading it fails.
+    /// - [`CliError::ConfigLoad`] if loading configuration for
+    ///   `--list-templates` fails.
     #[inline]
     pub(super) fn run(self, service: &ConfigService) -> CliResult {
         self.shell.map_or_else(
@@ -54,7 +56,7 @@ impl Completions {
         )
     }
 
-    /// Writes the completion script for `shell` to stdout.
+    /// Writes the completion script for `shell` to standard output.
     #[expect(
         clippy::print_stdout,
         reason = "completion scripts are data meant to be sourced by the \
@@ -86,15 +88,12 @@ impl Completions {
             .expect("clap_complete generates valid UTF-8 shell-script text")
     }
 
-    /// Loads configuration and retrieves available template names.
+    /// Loads configuration and gets available template names.
     ///
     /// # Errors
     ///
-    /// - [`CurrentDirectory`] if reading the current directory fails.
-    /// - [`ConfigLoad`] if configuration discovery or loading fails.
-    ///
-    /// [`CurrentDirectory`]: CliError::CurrentDirectory
-    /// [`ConfigLoad`]: CliError::ConfigLoad
+    /// - [`CliError::CurrentDirectory`] if reading the current directory fails.
+    /// - [`CliError::ConfigLoad`] if configuration discovery or loading fails.
     fn template_names(
         service: &ConfigService,
     ) -> Result<Vec<String>, CliError> {
@@ -102,7 +101,7 @@ impl Completions {
         Ok(TemplateService::list_available(&config))
     }
 
-    /// Prints available template names to stdout, one per line.
+    /// Prints available template names to standard output, one per line.
     ///
     /// # Errors
     ///
@@ -153,7 +152,8 @@ mod tests {
             assert!(output.contains("-c traces"));
         }
 
-        /// Every non-hidden subcommand name on the root `Cli`.
+        /// Collects every non-hidden subcommand name on the root
+        /// [`crate::cli::Cli`].
         fn cli_subcommand_names() -> Vec<String> {
             let command = crate::cli::Cli::command();
             command
@@ -163,9 +163,11 @@ mod tests {
                 .collect()
         }
 
-        /// Every long flag declared by the named subcommand, derived from
-        /// the same `Cli` tree `Completions::script` renders, so this test
-        /// tracks the CLI definition instead of a hand-written list.
+        /// Collects every long flag declared by `subcommand`.
+        ///
+        /// Derives flags from the same [`crate::cli::Cli`] tree that
+        /// [`Completions::script`] renders so this test tracks the CLI
+        /// definition instead of a hand-written list.
         fn cli_long_flags(subcommand: &str) -> Vec<String> {
             let command = crate::cli::Cli::command();
             let sub = command
@@ -177,8 +179,10 @@ mod tests {
                 .collect()
         }
 
-        /// How `shell` spells the long flag `long` in its script: fish
-        /// declares it as `-l long`, the others keep `--long`.
+        /// Formats `long` as `shell` spells it in its completion script.
+        ///
+        /// Fish declares long flags as `-l long`, while the others keep
+        /// `--long`.
         fn flag_token(shell: Shell, long: &str) -> String {
             match shell {
                 Shell::Fish => format!("-l {long}"),

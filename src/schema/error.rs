@@ -1,8 +1,8 @@
 //! Defines error and warning types for Schema loading, resolution, and field
 //! construction.
 //!
-//! [`SchemaError`] is a hard failure that stops resolution. [`SchemaWarning`]
-//! is a recoverable defect that resolution degrades past.
+//! [`SchemaError`] stops resolution. [`SchemaWarning`] records a recoverable
+//! defect that resolution degrades past.
 
 use std::{fmt, path::PathBuf};
 
@@ -11,7 +11,7 @@ use thiserror::Error;
 use super::{SchemaName, fields::SchemaFieldBuilderError};
 use crate::FieldName;
 
-/// Indicates why a [`SchemaName`] could not be constructed.
+/// Describes why [`SchemaName`] construction failed.
 #[derive(Debug, Eq, PartialEq, Error)]
 pub(crate) enum SchemaNameError {
     /// Rejects an empty name.
@@ -19,7 +19,7 @@ pub(crate) enum SchemaNameError {
     Empty,
 }
 
-/// Convenience result alias carrying [`SchemaError`].
+/// Defines a result alias carrying [`SchemaError`].
 pub(crate) type SchemaResult<T> = std::result::Result<T, SchemaError>;
 
 /// Represents a hard failure that stops Schema loading or resolution.
@@ -27,12 +27,11 @@ pub(crate) type SchemaResult<T> = std::result::Result<T, SchemaError>;
 /// Defects that resolution can recover from are emitted as [`SchemaWarning`]
 /// instead.
 ///
-/// Deliberately `pub(crate)`, not `pub`: [`TemplateError::SchemaLoad`] wraps
-/// this transparently for its `Display`/`Error` chain without exposing the
-/// concrete type, via a scoped `#[expect(private_interfaces)]`; do not "fix"
-/// that by making this `pub`, which would cascade the same requirement onto
-/// every field type below (`SchemaName`, `FieldName`,
-/// `SchemaFieldBuilderError`, …), all otherwise intentionally crate-internal.
+/// Deliberately `pub(crate)`, not `pub`. [`TemplateError::SchemaLoad`] wraps
+/// this type for its `Display` and `Error` chain with a scoped
+/// `#[expect(private_interfaces)]`. Making this `pub` would force `pub` onto
+/// every field type below (`SchemaName`, `FieldName`, and
+/// `SchemaFieldBuilderError`), which are intentionally crate-internal.
 ///
 /// [`TemplateError::SchemaLoad`]: crate::template::TemplateError::SchemaLoad
 #[derive(Debug, Error)]
@@ -73,14 +72,12 @@ pub(crate) enum SchemaError {
     FieldBuilder(Box<SchemaFieldBuilderError>),
 }
 
-/// Describes why a Schema TOML file could not be loaded, once its path is
-/// known.
+/// Describes why loading a Schema TOML file failed once its path is known.
 ///
-/// Deliberately not shared with `select`'s file loader
-/// (`SchemaSelectFieldFileError`, in `fields::error`, a private submodule this
-/// doc comment can't link to): Schema files are always TOML, values files can
-/// be TOML or JSON, so the two don't have the same shape to share, even though
-/// both follow the same "read, then parse" pattern.
+/// Separate from `select`'s file loader (`SchemaSelectFieldFileError` in
+/// `fields::error`, a private submodule). Schema files are always TOML, whereas
+/// values files can be TOML or JSON. Both follow the "read, then parse"
+/// pattern, but the two types do not share the same shape.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaFileError {
     /// Indicates an I/O failure.
@@ -99,8 +96,8 @@ impl From<SchemaFieldBuilderError> for SchemaError {
 
 /// Represents a recoverable Schema resolution defect.
 ///
-/// Resolution skips the offending key or parent and continues. Every warning is
-/// surfaced to the caller as diagnostic context.
+/// Resolution skips the offending key or parent and continues. Every warning
+/// gives diagnostic context to the caller.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SchemaWarning {
     /// Indicates an `extends` target has no corresponding Schema file.
@@ -113,39 +110,36 @@ pub(crate) enum SchemaWarning {
     },
     /// Indicates the same `extends` target is declared more than once.
     ///
-    /// Duplicates are ignored; only the first occurrence contributes fields.
+    /// Resolution ignores duplicates. Only the first occurrence contributes
+    /// fields.
     DuplicateExtendsTarget {
         schema: SchemaName,
         target: SchemaName,
     },
     /// Indicates a declared `extends` parent exists but failed to build its own
-    /// fields. This Schema resolves without that parent's contribution;
-    /// other valid parents still contribute.
+    /// fields.
+    ///
+    /// This Schema resolves without that parent's contribution. Other valid
+    /// parents still contribute.
     ParentFailedToResolve {
         schema: SchemaName,
         parent: SchemaName,
     },
-    /// Indicates `required = true` was declared on the Global Schema, which is
-    /// always ignored.
+    /// Indicates `required = true` appeared on the Global Schema.
     ///
-    /// Global Schema fields can never be required; a referencing Schema may
-    /// mark the field required locally instead.
+    /// Global Schema fields are never required. A referencing Schema can mark
+    /// the field required locally instead.
     StrayGlobalRequired {
         field: String,
     },
-    /// Indicates a bare `$ref` override declared an invalid attribute.
-    /// wrongly-shaped value, or invalid `number`/`select` configuration). The
-    /// key (or whole `values` override) is dropped and the base field's value
-    /// is used as-is.
+    /// Indicates a bare `$ref` override declared an invalid attribute,
+    /// wrongly-shaped value, or invalid `number`/`select` configuration.
     ///
-    /// `message` is exactly what a hard failure for this same attribute would
-    /// report (`SchemaFieldParserError`'s `Display`, a private `fields::error`
-    /// type), rather than a second, hand-mirrored wording per failure kind:
-    /// five variants used to restate `SchemaFieldParserError`'s five variants
-    /// field-for-field just to change "field ... has no attribute" into "$ref
-    /// override ... has no attribute"; the wrapped message already carries the
-    /// address, kind, and key, so this variant only adds what a degraded
-    /// override actually needs on top: that it *was* degraded.
+    /// Resolution drops the key (or whole `values` override) and uses the base
+    /// field's value as-is. `message` matches what a hard failure for this
+    /// attribute reports (`SchemaFieldParserError`'s `Display`). Because
+    /// `message` already carries the address, kind, and key, this variant only
+    /// notes that resolution degraded the override.
     DegradedOverride {
         message: String,
     },
@@ -313,23 +307,18 @@ mod tests {
 
         #[test]
         fn stays_small() {
-            // Regression guard (mem-assert-type-size): `UnresolvedRef` used
-            // to carry 5 owned Strings (120 bytes) because `ref_schema`/
-            // `ref_field` duplicated what `reference` already shows
-            // verbatim. `RefOutOfBounds`/`RefFieldNotFound` box both their
-            // own referencing address (`own`) and the `$ref` target
-            // (`reference`) as `Box<FieldAddress>` now that a `$ref` is a
-            // validated `SchemaName` + `FieldName` pair rather than a single
-            // `String`. `AmbiguousFieldName` boxes `second` for the same
-            // reason: two owned `FieldName`s alongside `schema` would tie it
-            // for the largest variant. `FieldBuilder` boxes the whole wrapped
-            // `SchemaFieldBuilderError`: its own largest variant is
-            // `Parser(Vec<SchemaFieldParserError>)`, a fixed-size `Vec`
-            // handle regardless of what's inside it, so boxing here mainly
-            // decouples `SchemaError`'s size from that enum's future growth.
-            // Keep every variant's payload
-            // small enough that `Result<_, SchemaError>` stays cheap to move
-            // through the resolution call chain.
+            // Guards `SchemaError` size so `Result<_, SchemaError>` stays cheap
+            // to move:
+            //
+            // - `UnresolvedRef` stores `reference` without duplicating
+            //   `ref_schema` and `ref_field` (formerly 5 owned `String`s, 120
+            //   bytes).
+            // - `RefOutOfBounds` and `RefFieldNotFound` box `own` and
+            //   `reference` as `Box<FieldAddress>` because each `$ref` pairs a
+            //   `SchemaName` and `FieldName`.
+            // - `AmbiguousFieldName` boxes `second` for the same reason.
+            // - `FieldBuilder` boxes `SchemaFieldBuilderError` to isolate
+            //   `SchemaError` size from future enum growth.
             assert!(
                 std::mem::size_of::<SchemaError>() <= 64,
                 "SchemaError grew to {} bytes; box or trim the offending \

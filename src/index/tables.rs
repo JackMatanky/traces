@@ -1,8 +1,8 @@
-//! Defines redb table schemas and rebuild deletion policies for the index
+//! Defines `redb` table schemas and rebuild deletion policies for the index
 //! store.
 //!
-//! [`IndexStore`] owns connections and row payloads. This module defines eight
-//! `TableSpec` entries, each with a table definition and rebuild policy.
+//! [`IndexStore`] owns connections and row payloads. Eight [`TableSpec`]
+//! entries pair each table definition with its rebuild policy.
 //!
 //! [`IndexStore`]: super::store::IndexStore
 
@@ -39,21 +39,21 @@ pub(super) const LINKS: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("links");
 
-/// Defines the path lookup by tag multimap table.
+/// Defines the path lookup by tag `multimap` table.
 pub(super) const PATHS_BY_TAG: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("paths_by_tag");
 
-/// Defines the path lookup by file class multimap table.
+/// Defines the path lookup by file class `multimap` table.
 pub(super) const PATHS_BY_FILE_CLASS: MultimapTableDefinition<
     'static,
     &'static [u8],
     &'static [u8],
 > = MultimapTableDefinition::new("paths_by_file_class");
 
-/// Defines the reverse tag index from paths to normalized tags.
+/// Defines the reverse tag index mapping each path to its normalized tags.
 ///
 /// Incremental updates touch O(path tag count) entries instead of scanning
 /// [`PATHS_BY_TAG`].
@@ -63,7 +63,8 @@ pub(super) const TAGS_BY_PATH: MultimapTableDefinition<
     &'static [u8],
 > = MultimapTableDefinition::new("tags_by_path");
 
-/// Defines the reverse file-class index from paths to normalized classes.
+/// Defines the reverse file-class index mapping each path to its normalized
+/// classes.
 pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
     'static,
     &'static [u8],
@@ -73,18 +74,18 @@ pub(super) const FILE_CLASSES_BY_PATH: MultimapTableDefinition<
 /// Defines the store's metadata table.
 ///
 /// The `version` key identifies the persisted row format. The `fingerprint` key
-/// stores digests for the config settings that produced the rows, as written by
-/// [`super::fingerprint::IndexFingerprint`].
+/// stores digests for the configuration settings that produced the rows, as
+/// written by [`super::fingerprint::IndexFingerprint`].
 pub(super) const META: TableDefinition<'static, &'static [u8], &'static [u8]> =
     TableDefinition::new("meta");
 
-/// Represents a schema table: to-one row or to-many multimap.
+/// Represents a schema table: to-one row or to-many `multimap`.
 enum TableDef {
     ToOne(TableDefinition<'static, &'static [u8], &'static [u8]>),
     ToMany(MultimapTableDefinition<'static, &'static [u8], &'static [u8]>),
 }
 
-/// Specifies how a table's rows are treated during a rebuild wipe.
+/// Specifies how a rebuild wipe handles a table's rows.
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum DeletePolicy {
     /// A delete error fails the rebuild.
@@ -150,7 +151,7 @@ impl TableSpec {
     ///
     /// # Errors
     ///
-    /// - [`redb::TableError`] if redb cannot open the table or its definition
+    /// - [`redb::TableError`] if `redb` cannot open the table or its definition
     ///   does not match.
     pub(super) fn probe(
         &self,
@@ -167,7 +168,7 @@ impl TableSpec {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot open the table, or the stored
+    /// - [`StoreError::Redb`] if `redb` cannot open the table, or the stored
     ///   definition does not match.
     ///
     /// [`StoreError::Redb`]: super::error::StoreError::Redb
@@ -185,13 +186,14 @@ impl TableSpec {
 
     /// Deletes this table's contents per its [`DeletePolicy`].
     ///
-    /// `Required` returns every storage error. `BestEffort` ignores a missing
-    /// table and returns every other error.
+    /// [`DeletePolicy::Required`] returns every storage error.
+    /// [`DeletePolicy::BestEffort`] ignores a missing table and returns every
+    /// other error.
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if deleting the table fails in redb and policy
-    ///   does not permit ignoring it.
+    /// - [`StoreError::Redb`] if `redb` fails to delete the table and policy
+    ///   requires it.
     ///
     /// [`StoreError::Redb`]: super::error::StoreError::Redb
     pub(super) fn delete(

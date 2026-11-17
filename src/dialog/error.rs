@@ -1,12 +1,12 @@
-//! Error types for dialog prompt failures.
+//! Defines error types for dialog prompt failures.
 //!
 //! [`DialogError`] groups prompt failures by caller-visible outcome so CLI code
 //! can choose the right diagnostic.
 
-/// Convenience alias for dialog operations that may fail.
+/// Represents the outcome of a fallible dialog operation.
 pub type DialogResult<T> = std::result::Result<T, DialogError>;
 
-/// Error returned by [`DialogProvider`] methods.
+/// Categorizes failures returned by [`DialogProvider`] methods.
 ///
 /// Variants distinguish user-controlled exits from configuration mistakes and
 /// backend failures so CLI code can choose the right diagnostic.
@@ -15,7 +15,7 @@ pub type DialogResult<T> = std::result::Result<T, DialogError>;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum DialogError {
-    /// A single-selection prompt received no options.
+    /// Signals that a single-selection prompt received no options.
     ///
     /// [`DialogProvider::select`] cannot return an item without at least one
     /// choice. [`DialogProvider::multi_select`] accepts an empty list and
@@ -26,32 +26,33 @@ pub enum DialogError {
     #[error("cannot select from an empty list")]
     EmptySelectionInput,
 
-    /// The user cancelled the prompt (e.g. pressing Esc).
+    /// Signals that the user canceled the prompt, such as by pressing Escape.
     #[error("dialog user cancelled the operation")]
     UserCancelled,
 
-    /// The user interrupted the prompt (e.g. pressing Ctrl-C).
+    /// Signals that the user interrupted the prompt, such as by pressing
+    /// `Control-C`.
     #[error("dialog user interrupted the operation")]
     UserInterrupted,
 
-    /// An invalid dialog configuration was provided.
+    /// Signals that the caller provided an invalid dialog configuration.
     ///
     /// Contains a description of what was invalid.
     #[error("invalid dialog configuration: {0}")]
     InvalidConfiguration(String),
 
-    /// The input stream does not support interactive prompts.
+    /// Indicates that the input stream does not support interactive prompts.
     ///
-    /// Returned when stdin is not a terminal and the caller did not provide
-    /// fallback defaults. [`TerminalDialogProvider`] catches this condition
-    /// before invoking the backend, so this variant should not appear when
-    /// using that provider.
+    /// Returned when standard input is not a terminal and the caller did not
+    /// provide fallback defaults. [`TerminalDialogProvider`] catches this
+    /// condition before invoking the backend, so this variant should not appear
+    /// when using that provider.
     ///
     /// [`TerminalDialogProvider`]: super::TerminalDialogProvider
     #[error("interactive dialog not available, stdin is not a terminal")]
     NotInteractive,
 
-    /// An I/O operation failed during prompting.
+    /// Wraps an underlying I/O failure that occurred during prompting.
     ///
     /// The underlying [`std::io::Error`] is available through the [`source`]
     /// chain.
@@ -60,16 +61,17 @@ pub enum DialogError {
     #[error("dialog I/O operation failed: {0}")]
     Io(#[source] std::io::Error),
 
-    /// The dialog backend reported an unexpected error.
+    /// Wraps an unexpected error reported by the dialog backend.
     ///
-    /// The backend error is preserved as the [`source`] so the chain can be
-    /// walked, while its concrete type stays opaque outside of this crate.
+    /// Preserves the backend error as the [`source`] so callers can walk the
+    /// chain. Its concrete type stays opaque outside this crate.
     ///
     /// [`source`]: std::error::Error::source
     #[error("dialog backend error: {0}")]
     BackendFailure(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
+/// Converts a [`std::io::Error`] into [`DialogError::Io`].
 impl From<std::io::Error> for DialogError {
     #[inline]
     fn from(err: std::io::Error) -> Self {
@@ -77,10 +79,11 @@ impl From<std::io::Error> for DialogError {
     }
 }
 
-/// Maps each `inquire` outcome to its matching [`DialogError`] variant.
+/// Maps each [`inquire::InquireError`] outcome to its matching [`DialogError`]
+/// variant.
 ///
-/// Distinguishes cancellation, interruption, missing TTY, I/O, and
-/// configuration errors into distinct caller-visible outcomes; only truly
+/// Separates cancellation, interruption, missing terminal, I/O, and
+/// configuration errors into distinct caller-visible outcomes. Only
 /// unrecognized backend failures fall through to
 /// [`DialogError::BackendFailure`].
 impl From<inquire::InquireError> for DialogError {

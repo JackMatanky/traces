@@ -7,6 +7,7 @@
 //!
 //! A [`SortOrder`] combines [`SortTerm`] clauses into a row-major key matrix
 //! for multi-column sorts.
+
 use std::{borrow::Cow, cmp::Ordering, num::NonZeroUsize};
 
 use super::{
@@ -91,8 +92,8 @@ impl SortOrder {
 
     /// Compares key slices one term at a time.
     ///
-    /// Applies each term's direction and null placement.
-    /// Full sorting and top-k selection use the same comparison.
+    /// Applies each term's direction and null placement. Full sorting and top-k
+    /// selection use the same comparison.
     #[must_use]
     pub(super) fn compare_keys(
         &self,
@@ -175,8 +176,8 @@ impl SortOrder {
     /// Parses a comma-separated sort clause.
     ///
     /// A `+` or `-` sets a segment's direction. Other segments use
-    /// `default_direction`. The parser skips blank segments.
-    /// It returns `Ok(None)` when the input is blank.
+    /// `default_direction`. The parser skips blank segments. It returns
+    /// `Ok(None)` when the input is blank.
     ///
     /// # Errors
     ///
@@ -318,17 +319,18 @@ impl<'a> SortKeys<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum SortKey<'a> {
     /// Represents a missing or non-indexed value.
+    ///
     /// It sorts below every other kind.
     Null,
-    /// Boolean value.
+    /// Stores a boolean value.
     Bool(bool),
-    /// Numeric value.
+    /// Stores a numeric value.
     Number(f64),
-    /// Date or date-time value, normalized to a date-time.
+    /// Stores a date or date-time value, normalized to a date-time.
     DateTime(DateTimeValue),
-    /// Duration value with exact nominal ordering.
+    /// Stores a duration value with exact nominal ordering.
     Duration(DurationValue),
-    /// Text value, borrowed where possible.
+    /// Stores a text value, borrowed where possible.
     Text(Cow<'a, str>),
 }
 
@@ -370,6 +372,7 @@ impl<'a> SortKey<'a> {
     }
 
     /// Classifies free text as a date-time, date, or duration.
+    ///
     /// It keeps other text as text. [`Cow`] stores borrowed or owned input.
     fn from_text(s: Cow<'a, str>) -> Self {
         match TextShape::classify(&s) {
@@ -400,8 +403,8 @@ impl<'a> SortKey<'a> {
 
     /// Compares two normalized sort keys.
     ///
-    /// Null sorts below all values. Like kinds compare by value.
-    /// Unlike non-null kinds sort by rank.
+    /// Null sorts below all values. Like kinds compare by value. Unlike
+    /// non-null kinds sort by rank.
     pub(super) fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Self::Null, Self::Null) => Ordering::Equal,
@@ -420,14 +423,14 @@ impl<'a> SortKey<'a> {
 }
 
 /// Holds the date, date-time, duration, or plain-text result of classification.
-/// [`SortKey`] and [`super::grammar::filter::ComparisonExpr::classify_literal`]
-/// use this classifier.
+///
+/// [`SortKey`] and `ComparisonExpr::classify_literal` use this classifier.
 pub(super) enum TextShape {
-    /// Text parsed as an ISO date-time.
+    /// Represents text parsed as an ISO date-time.
     DateTime(DateTimeValue),
-    /// Text parsed as an ISO date with no time component.
+    /// Represents text parsed as an ISO date with no time component.
     Date(DateValue),
-    /// Text parsed as a duration such as `1h30m`.
+    /// Represents text parsed as a duration such as `1h30m`.
     Duration(crate::DurationValue),
     /// Holds text with no date, date-time, or duration shape.
     Plain,

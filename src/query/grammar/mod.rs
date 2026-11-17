@@ -1,9 +1,10 @@
 //! Defines query languages for source selection, row filtering, and field
 //! access.
 //!
-//! The [`source`] and [`filter`] modules parse query expressions.
-//! The [`expr`] module parses their shared boolean operators.
-//! The [`field`] module parses and validates field paths.
+//! The [`source`] and [`filter`] modules parse query expressions. The [`expr`]
+//! module parses their shared boolean operators. The [`field`] module parses
+//! and validates field paths.
+
 mod expr;
 mod field;
 mod filter;

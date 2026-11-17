@@ -5,8 +5,8 @@
 //! uses a separate error type.
 //!
 //! [`DurationError`] reports duration parsing, validation, and conversion
-//! failures. The [`Display`](std::fmt::Display) text of each variant is the
-//! message shown by the CLI and is part of the crate's contract.
+//! failures. The [`std::fmt::Display`] text of each variant is the message
+//! shown by the CLI and is part of the crate's contract.
 
 /// Reports date/date-time parsing, local-zone resolution, rendering, or
 /// representable-range failures.
@@ -48,7 +48,8 @@ pub enum DateError {
     /// `26-08-22`).
     ///
     /// Years use four ASCII digits, optionally prefixed by `-` for negative
-    /// years. Shorter or non-ASCII year forms are rejected rather than guessed.
+    /// years. The parser rejects shorter or non-ASCII year forms rather than
+    /// guessing.
     #[error("`{input}` does not have a 4-digit year")]
     YearNotFourDigits {
         /// Stores the raw input that failed to parse.
@@ -128,8 +129,9 @@ pub enum DurationError {
     MisplacedSign,
 
     /// Reports that the number portion is not valid float syntax (e.g., a bare
-    /// `"."`). No production path constructs this variant. It stays as public
-    /// contract.
+    /// `"."`).
+    ///
+    /// No production path constructs this variant. It stays as public contract.
     #[error("invalid number syntax: {source}")]
     MalformedNumber {
         /// Stores the underlying float-parse failure.
@@ -156,7 +158,7 @@ pub enum DurationError {
     NonFiniteSeconds,
 
     /// Reports that a finite seconds value does not fit the range representable
-    /// by a Jiff [`Span`](jiff::Span).
+    /// by a Jiff [`jiff::Span`].
     #[error("duration seconds are outside the representable range")]
     SecondsOutOfRange,
 }
@@ -217,25 +219,25 @@ pub enum UnitError {
     },
 }
 
-/// An error translating a date pattern to strftime.
+/// Reports an error translating a date pattern to strftime.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum TemporalTokenError {
-    /// A bracket literal (`[...]`) was opened but never closed.
+    /// Reports that a bracket literal (`[...]`) opened without closing.
     #[error("unclosed bracket literal in pattern `{pattern}`")]
     UnclosedBracket {
-        /// The pattern containing the unclosed bracket.
+        /// Stores the pattern missing a closing bracket.
         pattern: Box<str>,
     },
-    /// A token has no moment-dialect to strftime mapping.
+    /// Reports that a token has no moment-dialect to strftime mapping.
     #[error(
         "unsupported moment-dialect token `{token}` in pattern `{pattern}`; \
          supported tokens are YYYY, YY, MMMM, MMM, MM, M, dddd, ddd, Do, DD, \
          D, HH, H, hh, h, mm, m, ss, s, SSS, SS, S, and [bracketed literals]"
     )]
     UnsupportedToken {
-        /// The offending token.
+        /// Stores the offending token.
         token: Box<str>,
-        /// The pattern containing the token.
+        /// Stores the pattern containing the unsupported token.
         pattern: Box<str>,
     },
 }

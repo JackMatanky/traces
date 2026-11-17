@@ -13,7 +13,9 @@ use crate::{
 /// Holds task status mappings and tag filters from Task Configuration.
 #[derive(Clone, Debug)]
 pub struct TaskConfig {
+    /// Holds the status symbol mappings used to recognize tasks.
     statuses: TaskStatusMap,
+    /// Holds the tags that select which status-marked items are tasks.
     tag_filters: Vec<Tag>,
 }
 
@@ -114,13 +116,14 @@ impl Default for TaskConfig {
 impl TryFrom<RawTaskConfig> for TaskConfig {
     type Error = ConfigValueError;
 
-    /// Resolves task statuses and tag filters from raw Config File values.
+    /// Resolves task statuses and tag filters from raw Configuration File
+    /// values.
     ///
     /// # Errors
     ///
-    /// - [`ConfigValueError::Task`] if a status symbol is `(`, `)`, `[`, `]`,
+    /// - `ConfigValueError::Task` if a status symbol is `(`, `)`, `[`, `]`,
     ///   `{`, or `}`.
-    /// - [`ConfigValueError::InvalidTagFilter`] if a tag filter does not form a
+    /// - `ConfigValueError::InvalidTagFilter` if a tag filter does not form a
     ///   valid [`Tag`].
     #[inline]
     fn try_from(raw: RawTaskConfig) -> Result<Self, Self::Error> {
@@ -171,7 +174,9 @@ const TASKS_TAG_FILTERS: &[u8] = b"tasks.tag_filters";
 /// Holds the digests of [`TaskConfig`] settings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TaskDigests {
+    /// Holds the digest of the ordered task status definitions.
     pub(crate) statuses: Blake3Digest,
+    /// Holds the digest of the configured tag filters.
     pub(crate) tag_filters: Blake3Digest,
 }
 

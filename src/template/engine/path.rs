@@ -1,6 +1,6 @@
 //! Registers path tests and path filters for templates.
 //!
-//! [`PathOps`] adds three minijinja [`Environment::add_test`] tests:
+//! [`PathOps`] adds three `MiniJinja` [`Environment::add_test`] tests:
 //!
 //! - `path_exists`
 //! - `is_file_path`
@@ -14,11 +14,12 @@
 //! - `path_parent`
 //!
 //! The three filesystem tests resolve relative paths against [`Config::root`]
-//! and use absolute paths as-is. They call [`std::fs::metadata`] directly
-//! instead of [`Path::exists`], [`Path::is_file`], or [`Path::is_dir`], which
-//! turn every filesystem error into `false`. Permission errors therefore
-//! surface as [`minijinja::Error`] instead of being misreported as "does not
-//! exist".
+//! and use absolute paths as-is.
+//!
+//! They call [`std::fs::metadata`] directly instead of [`Path::exists`],
+//! [`Path::is_file`], or [`Path::is_dir`], which turn every filesystem error
+//! into `false`. Permission errors therefore surface as [`minijinja::Error`]
+//! instead of being misreported as "does not exist".
 //!
 //! The four filters transform [`std::path::Path`] input with pure string
 //! operations. They read no files.
@@ -50,7 +51,7 @@ use crate::{
     path::{PathError, SafeRelativePath},
 };
 
-/// A filesystem fact selected by a path test.
+/// Selects which filesystem check a path test runs.
 #[derive(Copy, Clone)]
 enum PathQuery {
     Exists,
@@ -143,7 +144,7 @@ fn inspect(
     }
 }
 
-/// A `path` test's argument, resolved against `root` and proven safe for
+/// Holds a `path` test's argument, resolved against `root` and proven safe for
 /// [`std::fs::metadata`].
 ///
 /// Only [`Self::resolve`] constructs it, so [`inspect`] cannot accidentally
@@ -153,12 +154,18 @@ struct InspectTarget(PathBuf);
 impl InspectTarget {
     /// Resolves `path` against `root`.
     ///
-    /// Uses an absolute `path` as-is. Resolves a `path` that names `root`
-    /// itself ([`Self::is_root_reference`]) directly to `root`. Resolves every
-    /// other relative path with [`SafeRelativePath::parse`], the check
-    /// [`super::file`] applies to `file.include()` and the writer applies to
-    /// `-o` and `file.write_to()` paths. Parent traversals and symlink escapes
-    /// therefore fail here exactly as they fail in those paths.
+    /// Path resolution handles three cases:
+    ///
+    /// - An absolute `path` stays as-is.
+    /// - A `path` that names `root` itself ([`Self::is_root_reference`])
+    ///   resolves directly to `root`.
+    /// - Any other relative `path` resolves through
+    ///   [`SafeRelativePath::parse`].
+    ///
+    /// [`super::file`] uses the same [`SafeRelativePath::parse`] check for
+    /// `file.include()`, and the writer uses it for `-o` and `file.write_to()`
+    /// paths. Parent traversals and symlink escapes therefore fail here as they
+    /// fail there.
     ///
     /// # Errors
     ///
@@ -185,9 +192,10 @@ impl InspectTarget {
     /// Checks whether `candidate` names `root` itself.
     ///
     /// Every component must be [`Component::CurDir`], or the path must have no
-    /// components, as with an empty path. Joining this path cannot escape the
-    /// root. [`RelativePath::parse`] rejects this path because it cannot name a
-    /// file to write or include. Path tests use it to query the root with
+    /// components (such as an empty path), so joining it cannot escape `root`.
+    ///
+    /// [`RelativePath::parse`] rejects this path because it cannot name a file
+    /// to write or include. Path tests still use it to query `root` with
     /// `is_dir_path('')` or `path_exists('')`.
     ///
     /// [`RelativePath::parse`]: crate::path::RelativePath::parse
@@ -262,13 +270,13 @@ mod tests {
 
     /// Renders `{{ value is test }}`.
     ///
-    /// That is the `is`/`is not` syntax minijinja tests use
+    /// That is the `is`/`is not` syntax `MiniJinja` tests use
     /// ([`Environment::add_test`]), unlike filters' `|` syntax
     /// ([`Environment::add_filter`]).
     ///
     /// # Panics
     ///
-    /// Panics if minijinja fails to render the generated template.
+    /// Panics if `MiniJinja` fails to render the generated template.
     fn check(root: &Path, test: &str, input: &str) -> String {
         let template = format!("{{{{ value is {test} }}}}");
         env(root)

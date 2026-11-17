@@ -1,4 +1,4 @@
-//! Trust-store revocation.
+//! Revokes trust from project configurations.
 //!
 //! Handles `traces untrust` by resolving a directory or `.traces/config.toml`
 //! to trust subjects and removing their roots from the store.
@@ -10,29 +10,31 @@ use clap::Args;
 use super::error::{CliError, CliResult};
 use crate::ConfigService;
 
-/// Arguments for `traces untrust`.
+/// Defines arguments for `traces untrust`.
 ///
-/// Revokes trust from a project root (default) or from all descendant configs
-/// when `--all` is passed.
+/// Revokes trust from a project root (default) or from all descendant
+/// configurations when the caller passes `--all`.
 #[derive(Debug, Args)]
 pub(super) struct Untrust {
-    /// Apply untrust to descendant configurations too.
+    /// Revokes trust from descendant configurations as well.
     #[arg(long)]
     all: bool,
-    /// Directory or `.traces/config.toml` to untrust.
+    /// Specifies the directory or `.traces/config.toml` from which to revoke
+    /// trust.
     ///
     /// Defaults to the current directory.
     path: Option<PathBuf>,
 }
 
 impl Untrust {
-    /// Runs `traces untrust` for the selected target directory or config.
+    /// Runs `traces untrust` for the selected target directory or
+    /// configuration.
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    /// - [`CliError::CurrentDirectory`] if `path` is `None` and reading the
     ///   current directory fails.
-    /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+    /// - [`CliError::TrustTargetResolve`] if trust-target resolution fails.
     /// - [`CliError::Untrust`] if updating the trust store fails.
     #[inline]
     pub(super) fn run(self, service: &ConfigService) -> CliResult {

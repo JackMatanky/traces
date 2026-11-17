@@ -1,25 +1,25 @@
-//! Tracks DAG relationships for the `extends` hierarchy, linearized via Kahn's
+//! Tracks DAG relationships for the `extends` hierarchy, linearized with
 //! topological sort.
 //!
 //! [`SchemaGraph`] owns graph mechanics so [`super::builder::SchemaBuilder`]
 //! can drive resolution order without tangling traversal into field-merge
-//! logic. Adjacency is stored as a compressed sparse row (CSR) graph over dense
+//! logic. Adjacency is stored as a compressed sparse row graph over dense
 //! [`u32`] indices, making lookups array accesses rather than hash probes.
 //!
 //! # Ordering
 //!
-//! A Schema is yielded only after every one of its present `extends` parents
-//! has already been yielded. Schemas whose in-degree reaches zero
-//! simultaneously yield in raw-map insertion order.
-//! [`SchemaGraphBuilder::new`]'s `excluded` parameter keeps the Global Schema
-//! out of the graph entirely, so it never competes for queue position.
+//! A Schema is yielded only after each of its present `extends` parents has
+//! already been yielded. Schemas whose in-degree reaches zero simultaneously
+//! yield in raw-map insertion order. [`SchemaGraphBuilder::new`]'s `excluded`
+//! parameter keeps the Global Schema out of the graph entirely, so it never
+//! competes for queue position.
 //!
 //! # Driving resolution
 //!
-//! 1. [`SchemaGraphBuilder::new`] validates every `extends` edge; `excluded`
+//! 1. [`SchemaGraphBuilder::new`] validates every `extends` edge. `excluded`
 //!    (the Global Schema) never becomes a node.
 //! 2. [`SchemaGraphBuilder::build`] runs topological sort to completion and
-//!    checks for a cycle, entirely internally. There is no stepwise driving
+//!    checks for a cycle, entirely internally. There is no incremental driving
 //!    API. Returns a [`SchemaGraph`] on success, or the list of cyclic Schemas
 //!    on failure.
 //! 3. Query the resulting [`SchemaGraph`]: [`topological_order`],
@@ -43,8 +43,8 @@ use super::{SchemaName, SchemaNameRef};
 
 /// Represents a validated, acyclic `extends` DAG in topological order.
 ///
-/// Only constructible via [`SchemaGraphBuilder::build`], so querying hierarchy
-/// is impossible before cycle-checking.
+/// Only built through [`SchemaGraphBuilder::build`], so querying hierarchy is
+/// impossible before cycle-checking.
 #[derive(Debug)]
 pub(super) struct SchemaGraph<'a> {
     adjacency: SchemaAdjacency<'a>,
@@ -75,8 +75,8 @@ impl<'a> SchemaGraph<'a> {
     /// filtered by `keep`.
     ///
     /// `keep(candidate, ancestor)` decides whether `candidate` still counts as
-    /// a child/descendant of `ancestor`; callers use this to drop links a
-    /// failed parent resolution invalidated. Descendant closure is computed
+    /// a child or descendant of `ancestor`. Callers use this to drop links that
+    /// a failed parent resolution invalidated. Descendant closure is computed
     /// once, then converted straight into the owned sets the caller stores.
     pub(super) fn hierarchy<'b>(
         &'b self,
@@ -123,11 +123,11 @@ impl<'a> SchemaGraph<'a> {
 
     /// Returns every node's transitive descendants as dense indices.
     ///
-    /// Output-sensitive Habib-Morvan-Rampon transitive closure, `O(V + E +
-    /// Σ|closure(x)|)`, proportional to the closure's actual size rather than
-    /// the `O(V²/w)` a bitset DP pays unconditionally. Requires children
-    /// iterated in topological-rank order, which [`SchemaGraphBuilder::build`]
-    /// already sorted `child_targets` into.
+    /// Output-sensitive transitive closure, `O(V + E + Σ|closure(x)|)`,
+    /// proportional to the closure's actual size rather than the `O(V²/w)` a
+    /// bit set DP pays unconditionally. Requires children iterated in
+    /// topological-rank order, which [`SchemaGraphBuilder::build`] already
+    /// sorted `child_targets` into.
     fn descendant_indices(&self) -> Vec<Vec<DenseIndex>> {
         let count = self.adjacency.node_count();
 
@@ -146,7 +146,7 @@ impl<'a> SchemaGraph<'a> {
     }
 }
 
-/// Per-node transitive-descendant accumulator for [`SchemaGraph::hierarchy`]'s
+/// Accumulates transitive descendants per node for [`SchemaGraph::hierarchy`]'s
 /// reverse-topological sweep.
 ///
 /// `seen` is scratch, cleared before each `accumulate` call returns, so
@@ -154,11 +154,11 @@ impl<'a> SchemaGraph<'a> {
 /// per node.
 struct DescendantAccumulator<'b> {
     seen: bit_vec::BitVec,
-    /// Descendant list per node, finalized once every node has been swept
-    /// (leaves first).
+    /// Stores the descendant list per node, finalized once every node has been
+    /// swept (leaves first).
     descendants: Vec<Vec<DenseIndex>>,
-    /// Topological rank per node, used to keep each finalized descendant list
-    /// in globally topological order.
+    /// Stores the topological rank per node to keep each finalized descendant
+    /// list in globally topological order.
     rank: &'b [u32],
 }
 
@@ -197,7 +197,7 @@ impl<'b> DescendantAccumulator<'b> {
     }
 
     /// Folds `child`'s already-finalized descendant list into
-    /// `node_descendants`, deduplicating via `self.seen`.
+    /// `node_descendants`, deduplicating with `self.seen`.
     fn merge_child_into(
         &mut self,
         node_descendants: &mut Vec<DenseIndex>,
@@ -258,6 +258,7 @@ mod tests {
     }
 
     /// Builds a graph from `raw`, discarding construction warnings.
+    ///
     /// Test-only: eliminates the `SchemaGraphBuilder::new(...).0.build()`
     /// postfix-tuple-indexing chain that appears at every call site below.
     fn build_graph(
@@ -319,7 +320,7 @@ mod tests {
 
         #[test]
         fn returns_only_direct_extenders() {
-            // thing <- book <- {sci_fi, memoir}
+            // `thing <- book <- {sci_fi, memoir}`
             let mut raw = IndexMap::new();
             raw.insert(SchemaName::for_test("thing"), schema(&[]));
             raw.insert(SchemaName::for_test("book"), schema(&["thing"]));
@@ -366,12 +367,14 @@ mod tests {
 
         #[test]
         fn sorts_children_by_topological_rank_not_insertion_order() {
-            // To exercise the sort, raw CSR order must differ from
-            // topological order.  sci_fi extends parent (declared before
-            // book), so raw CSR for parent's children is [sci_fi, book].
-            // Topological order is [parent, book, sci_fi] (book first
-            // because sci_fi depends on it).  After sort by rank the
-            // children become [book, sci_fi].
+            // To test the sort, raw sparse-row order must differ from
+            // topological order:
+            //
+            // - Declaration order puts `sci_fi` before `book`, so raw adjacency
+            //   for `parent`'s children is `[sci_fi, book]`.
+            // - Topological order is `[parent, book, sci_fi]` because `sci_fi`
+            //   depends on `book`.
+            // - Sorting by topological rank yields `[book, sci_fi]`.
             let mut raw = IndexMap::new();
             raw.insert(SchemaName::for_test("parent"), schema(&[]));
             raw.insert(
@@ -472,17 +475,15 @@ mod tests {
 
         #[test]
         fn orders_descendants_by_topological_rank_not_raw_declaration_order() {
-            // `sci_fi` is declared before `book` but extends both `thing`
-            // and `book`, so it can only reach topological rank 2 (after
-            // `book`'s rank 1). `descendant_indices`'s accumulator must
-            // sort `thing`'s descendants by that rank, not by the order
-            // `sci_fi`/`book` were pushed while walking the raw map.
+            // Raw declaration order places `sci_fi` before `book`, yet `sci_fi`
+            // extends both `thing` and `book`. Because `sci_fi` depends on
+            // `book`, `book` gets rank 1 and `sci_fi` gets rank 2.
             //
-            // `IndexSet`'s `PartialEq` compares as a set and ignores
-            // order (`self.len() == other.len() && self.is_subset(other)`),
-            // so this asserts against a `Vec` collected in iteration
-            // order: an `assert_eq!` against another `IndexSet` here
-            // would silently pass even if the sort were removed.
+            // `descendant_indices`'s accumulator must sort `thing`'s
+            // descendants by topological rank rather than raw map order.
+            //
+            // `IndexSet::eq` ignores order, so collect the result into a `Vec`
+            // to check iteration order.
             let mut raw = IndexMap::new();
             raw.insert(SchemaName::for_test("thing"), schema(&[]));
             raw.insert(

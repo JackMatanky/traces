@@ -1,18 +1,18 @@
 //! Encodes resolved settings as digests grouped by section.
 //!
-//! Each setting has a digest under a section-qualified label.
-//! The label identifies the setting and prevents collisions with other
-//! settings. [`super::Config::hash`] combines all digests under one version
-//! label.
+//! Each setting has a digest under a section-qualified label. The label
+//! identifies the setting and prevents collisions with other settings.
+//! [`super::Config::hash`] combines all digests under one version label.
 //!
 //! # Exhaustive destructuring
 //!
 //! Each `digests` constructor, each bundle's `feed_into`, and
-//! [`ConfigDigests::compose`] destructure their type without `..`.
-//! Adding a setting or bundle then causes a compile error.
-//! The code compiles again after the new item gets a label and a place in the
-//! encoding. A source scan checks this rule because Rust cannot distinguish a
-//! rest pattern from a full pattern.
+//! [`ConfigDigests::compose`] destructure their type without `..`. Adding a
+//! setting or bundle causes a compile error until the new item gets a label and
+//! a place in the encoding.
+//!
+//! A source scan checks this rule because Rust cannot distinguish a rest
+//! pattern from a full pattern.
 //!
 //! # Key Types
 //!
@@ -24,16 +24,21 @@ use super::{
 };
 use crate::{Blake3Digest, Blake3Hasher};
 
-/// Versions the composed Config Fingerprint encoding.
+/// Versions the composed Configuration Fingerprint encoding.
 const CONFIG_LABEL: &[u8] = b"traces.config.v1";
 
-/// Holds one framed digest per resolved setting, grouped by config section.
+/// Holds one framed digest per resolved setting, grouped by section.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigDigests {
+    /// Holds the digest of the workspace root path.
     pub(crate) root: Blake3Digest,
+    /// Holds digests for Template Directory and output directory settings.
     pub(crate) templates: TemplateDigests,
+    /// Holds digests for schema directory and class field settings.
     pub(crate) schemas: SchemaDigests,
+    /// Holds digests for frontmatter key names and date field formats.
     pub(crate) frontmatter: FrontmatterDigests,
+    /// Holds digests for task status mappings and tag filters.
     pub(crate) tasks: TaskDigests,
 }
 
@@ -44,10 +49,9 @@ pub(crate) struct ConfigDigests {
 impl ConfigDigests {
     /// Combines every setting digest under `b"traces.config.v1"`.
     ///
-    /// Settings enter in declaration order.
-    /// The result is the Config Fingerprint.
-    /// A change to the order, labels, or version label invalidates stored
-    /// fingerprints.
+    /// Settings enter in declaration order. The result is the Configuration
+    /// Fingerprint. A change to the order, labels, or version label invalidates
+    /// stored fingerprints.
     pub(crate) fn compose(&self) -> Blake3Digest {
         let Self {
             root,
@@ -86,8 +90,8 @@ impl ConfigDigests {
 
 /// Digests one setting from its label and the value bytes that `feed` adds.
 ///
-/// This function adds the label frame.
-/// [`Blake3Hasher`] value methods do not add labels.
+/// Adds the label frame because [`Blake3Hasher`] value methods do not add
+/// labels.
 pub(super) fn setting<F>(label: &[u8], feed: F) -> Blake3Digest
 where
     F: FnOnce(&mut Blake3Hasher),
@@ -253,9 +257,10 @@ mod tests {
             )]);
         }
 
-        /// Reads `model.rs` and every `.rs` file in `model/` at test time, so
-        /// a new file cannot skip the scan. Fails on a subdirectory, which the
-        /// scan does not cover.
+        /// Reads `model.rs` and every `.rs` file in `model/` at test time.
+        ///
+        /// Fails on a subdirectory because the scan does not cover
+        /// subdirectories.
         fn sources() -> Vec<String> {
             let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("src/config");

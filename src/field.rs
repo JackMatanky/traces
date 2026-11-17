@@ -17,9 +17,11 @@
 //! form for forgiving matches across case, whitespace, and punctuation changes.
 //!
 //! [`FieldValueRef`] borrows from a document's source text wherever the backing
-//! TOML/JSON/YAML deserializer supports it (an unescaped string borrows
-//! directly; anything needing processing still allocates). [`FieldValue`] is
-//! the owned counterpart, built once a value must outlive its source text.
+//! TOML, JSON, or YAML [`Deserializer`] supports it. Strings without escapes
+//! borrow directly. Strings that need processing still allocate.
+//!
+//! [`FieldValue`] is the owned counterpart, built once a value must outlive its
+//! source text.
 
 use std::{
     borrow::{Borrow, Cow},
@@ -61,9 +63,9 @@ impl FieldName {
 
     /// Feeds this name into `fp` as its exact UTF-8 bytes.
     ///
-    /// Case and punctuation are preserved, so `status` and `Status` feed
-    /// different bytes. Digests built from this encoding persist, so the
-    /// contract is part of their format.
+    /// It keeps case and punctuation, so `status` and `Status` feed different
+    /// bytes. Digests built from this encoding persist, so the contract is part
+    /// of their format.
     #[inline]
     pub(crate) fn feed_into(&self, fp: &mut Blake3Hasher) {
         fp.bytes(self.0.as_bytes());
@@ -166,8 +168,8 @@ impl Borrow<str> for FieldName {
 }
 
 impl fmt::Debug for FieldName {
-    /// Matches `str`'s own `Debug` (quoted, escaped) so wrapping a field name
-    /// in this type never changes an error message's text.
+    /// Matches the `Debug` format of `str` (quoted, escaped) so wrapping a
+    /// field name in this type never changes an error message's text.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
@@ -232,8 +234,8 @@ impl Borrow<str> for FieldNameRef<'_> {
 }
 
 impl fmt::Debug for FieldNameRef<'_> {
-    /// Matches `str`'s own `Debug` (quoted, escaped); see [`FieldName`]'s
-    /// `Debug` impl for why this matters.
+    /// Matches the `Debug` format of `str` (quoted, escaped). See
+    /// [`FieldName`]'s `Debug` impl for why this matters.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.0, f)
     }
@@ -248,6 +250,7 @@ impl fmt::Display for FieldNameRef<'_> {
 /// Stores a forgiving note field identifier.
 ///
 /// Keeps two forms:
+///
 /// - `name` stores the original key text for display and serialization
 /// - `canonical` stores the normalized text used for matching
 ///
@@ -267,8 +270,8 @@ impl FieldKey {
     /// # Errors
     ///
     /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation.
-    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
-    ///   searchable character.
+    /// - [`FieldKeyError::EmptyCanonical`] if [`Self::canonicalize`] strips
+    ///   every searchable character.
     pub(crate) fn try_new(
         raw: impl Into<String>,
     ) -> Result<Self, FieldKeyError> {
@@ -304,6 +307,7 @@ impl FieldKey {
     /// Returns `true` if `candidate` matches this key.
     ///
     /// Matching succeeds when either condition holds:
+    ///
     /// - `candidate` exactly equals [`Self::name`]
     /// - `candidate` canonicalizes to [`Self::canonical`]
     #[inline]
@@ -335,16 +339,17 @@ impl FieldKey {
     /// Canonicalizes a raw key for forgiving field matching.
     ///
     /// Character transformations:
-    /// - ASCII whitespace is substituted with `-`
-    /// - `_` and `-` are kept unchanged
-    /// - ASCII letters are kept and lowercased
-    /// - ASCII digits are kept unchanged
-    /// - Non-ASCII characters are kept and lowercased with
+    ///
+    /// - ASCII whitespace becomes `-`
+    /// - `_` and `-` stay unchanged
+    /// - ASCII letters stay and become lowercase
+    /// - ASCII digits stay unchanged
+    /// - Non-ASCII characters stay and become lowercase with
     ///   [`char::to_lowercase`]
-    /// - All other ASCII punctuation and symbols are stripped
+    /// - All other ASCII punctuation and symbols drop
     ///
     /// Consecutive whitespace produces consecutive `-` characters. Existing `-`
-    /// characters are not collapsed with substituted whitespace.
+    /// characters do not collapse with substituted whitespace.
     #[must_use]
     pub(crate) fn canonicalize(raw: &str) -> String {
         let mut result = String::with_capacity(raw.len());
@@ -358,7 +363,6 @@ impl FieldKey {
                     result.push(c);
                 }
             }
-            // strip everything else
         }
         result
     }
@@ -395,9 +399,8 @@ impl FieldKey {
     /// Returns the canonical form of `raw`, borrowing when `raw` is already
     /// canonical to avoid allocation.
     ///
-    /// Use this instead of [`Self::canonicalize`] when the caller needs a
-    /// `&str` for comparison and wants to avoid allocation on the common path
-    /// (already-canonical input).
+    /// Use this instead of [`Self::canonicalize`] to get a `&str` for
+    /// comparison. It avoids allocation when the input is already canonical.
     #[must_use]
     pub(crate) fn to_canonical(raw: &str) -> Cow<'_, str> {
         if Self::is_canonical(raw) {
@@ -444,8 +447,8 @@ impl TryFrom<String> for FieldKey {
     /// # Errors
     ///
     /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation
-    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
-    ///   searchable character
+    /// - [`FieldKeyError::EmptyCanonical`] if [`Self::canonicalize`] strips
+    ///   every searchable character
     fn try_from(raw: String) -> Result<Self, Self::Error> {
         Self::try_new(raw)
     }
@@ -459,8 +462,8 @@ impl TryFrom<&str> for FieldKey {
     /// # Errors
     ///
     /// - [`FieldKeyError::Name`] if `raw` fails [`FieldName`] validation
-    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
-    ///   searchable character
+    /// - [`FieldKeyError::EmptyCanonical`] if [`Self::canonicalize`] strips
+    ///   every searchable character
     fn try_from(raw: &str) -> Result<Self, Self::Error> {
         Self::try_new(raw)
     }
@@ -485,8 +488,8 @@ impl TryFrom<serde_json::Value> for FieldKey {
     ///   values.
     /// - [`FieldKeyError::Name`] if the coerced string fails [`FieldName`]
     ///   validation.
-    /// - [`FieldKeyError::EmptyCanonical`] if canonicalization strips every
-    ///   searchable character.
+    /// - [`FieldKeyError::EmptyCanonical`] if [`Self::canonicalize`] strips
+    ///   every searchable character.
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
         let raw = match value {
             serde_json::Value::String(s) => s,
@@ -521,18 +524,15 @@ impl<'de> Deserialize<'de> for FieldKey {
     }
 }
 
-/// Borrows a candidate string for a zero-allocation, O(1) forgiving lookup
-/// against a [`FieldKey`]-keyed [`IndexMap`].
+/// Borrows a candidate string for O(1) forgiving [`FieldKey`] lookups.
 ///
 /// Implements [`indexmap::Equivalent<FieldKey>`] so `IndexMap<FieldKey,
-/// V>::get` accepts this directly, without constructing an owned [`FieldKey`]
-/// first. [`Hash`] and [`Equivalent::equivalent`] together preserve
-/// [`FieldKey::is_match`]'s exact semantics: hashing borrows the candidate
-/// as-is when it is already in canonical form, and allocates only when
-/// [`FieldKey::canonicalize`] would actually change it.
+/// V>::get` accepts this wrapper directly without constructing an owned
+/// [`FieldKey`].
 ///
-/// [`Hash`]: std::hash::Hash
-/// [`Equivalent::equivalent`]: indexmap::Equivalent::equivalent
+/// [`std::hash::Hash`] and [`Equivalent::equivalent`] preserve the exact
+/// semantics of [`FieldKey::is_match`]. Hashing borrows canonical candidates
+/// as-is and allocates only when [`FieldKey::canonicalize`] changes the input.
 pub(crate) struct FieldKeyRef<'a>(&'a str);
 
 impl<'a> FieldKeyRef<'a> {
@@ -560,10 +560,10 @@ impl Equivalent<FieldKey> for FieldKeyRef<'_> {
 
 /// Stores an owned value parsed from a TOML, JSON, or YAML document.
 ///
-/// The crate's canonical value representation once a value must outlive its
-/// source text: a values-file cache entry, an inline value object's
-/// hand-authored passthrough keys. [`FieldValueRef`] is the zero-copy borrowed
-/// counterpart; convert one to the other with `.into()`.
+/// The crate's canonical value representation when a value must outlive its
+/// source text. Examples include values-file cache entries and pass-through
+/// keys on inline value objects. [`FieldValueRef`] is the zero-copy borrowed
+/// counterpart. Convert between them with `.into()`.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum FieldValue {
     /// Empty or missing value.
@@ -676,15 +676,15 @@ impl<'de> Deserialize<'de> for FieldValue {
 
 /// Borrows a value parsed from a TOML, JSON, or YAML document.
 ///
-/// Zero-copy on the common path: TOML, JSON, and YAML's deserializers all call
-/// [`Visitor::visit_borrowed_str`] for an unescaped string, so
-/// [`Cow::Borrowed`] holds a slice of the source text directly, no allocation.
-/// A string needing processing (an escape sequence, a multi-line/folded scalar)
-/// falls back to [`Cow::Owned`], same as any [`Deserialize`] impl over
-/// [`Cow<str>`].
+/// String deserialization avoids allocation on the common path:
 ///
-/// Scoped to the source text's lifetime `'a`; convert to the owned
-/// [`FieldValue`] with `.into()` before a value must outlive that text.
+/// - Strings without escapes use [`Visitor::visit_borrowed_str`] and store a
+///   [`Cow::Borrowed`] slice of the source text.
+/// - Strings needing processing, such as escape sequences or multiline scalars,
+///   fall back to [`Cow::Owned`].
+///
+/// Each value is scoped to the source text lifetime `'a`. Convert to
+/// [`FieldValue`] with `.into()` when a value must outlive that text.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum FieldValueRef<'a> {
     /// Empty or missing value.
@@ -742,9 +742,9 @@ impl From<noyalib::Value> for FieldValueRef<'static> {
     /// Converts a [`noyalib::Value`] into a [`FieldValueRef`] with date
     /// classification.
     ///
-    /// Date strings are classified as [`FieldValueRef::Date`] or
-    /// [`FieldValueRef::DateTime`]. `noyalib` mapping keys are always
-    /// strings, so no key coercion is needed.
+    /// This classifies date strings as [`FieldValueRef::Date`] or
+    /// [`FieldValueRef::DateTime`]. `noyalib` mapping keys are always strings,
+    /// so no key coercion is needed.
     fn from(value: noyalib::Value) -> Self {
         match value {
             noyalib::Value::Null => Self::Null,
@@ -780,13 +780,15 @@ pub(crate) enum DateTimeCoercion {
     /// Treat all strings as plain text.
     Passthrough,
 }
-/// A string value that knows whether it is a plain string, ISO date, or ISO
-/// datetime. Construction-time classification centralizes the logic that
-/// determines which [`FieldValueRef`] variant a string becomes.
+
+/// Wraps a string value for classification as plain text, an ISO date, or an
+/// ISO datetime.
 ///
-/// Use [`classify`](Self::classify) to produce the appropriate
-/// [`FieldValueRef`] variant, delegating to [`crate::DateTimeValue::parse_iso`]
-/// and [`crate::DateValue::parse_iso`] for the actual classification.
+/// Construction-time classification centralizes the logic that determines which
+/// [`FieldValueRef`] variant a string becomes. Use [`Self::classify`] to
+/// produce the appropriate [`FieldValueRef`] variant, delegating to
+/// [`crate::DateTimeValue::parse_iso`] and [`crate::DateValue::parse_iso`] for
+/// the actual classification.
 #[repr(transparent)]
 pub(crate) struct FieldStringValue<'a>(Cow<'a, str>);
 
@@ -825,7 +827,7 @@ impl<'a> FieldStringValue<'a> {
     }
 }
 
-/// Seed that carries [`DateTimeCoercion`] through map value deserialization.
+/// Carries [`DateTimeCoercion`] through map value deserialization.
 struct FieldValueRefSeed<'a> {
     coercion: DateTimeCoercion,
     _marker: PhantomData<&'a ()>,
@@ -842,8 +844,8 @@ impl<'de: 'a, 'a> de::DeserializeSeed<'de> for FieldValueRefSeed<'a> {
     }
 }
 
-/// Serde [`Visitor`] for [`FieldValueRef`] with configurable date-time
-/// coercion.
+/// Visits serialized values to construct a [`FieldValueRef`] with configurable
+/// date-time coercion.
 struct FieldValueRefVisitor<'a> {
     coercion: DateTimeCoercion,
     _marker: PhantomData<&'a ()>,
@@ -933,9 +935,9 @@ impl<'de: 'a, 'a> Visitor<'de> for FieldValueRefVisitor<'a> {
 }
 
 /// Deserializes from any self-describing format (TOML, JSON, or YAML) with
-/// zero-copy borrowing: [`Deserializer::deserialize_any`] drives whichever
-/// `visit_*` method matches the source data, borrowing text from `'de` wherever
-/// the format's deserializer supports it.
+/// zero-copy borrowing. [`Deserializer::deserialize_any`] calls the matching
+/// `visit_*` method and borrows text from `'de` when the [`Deserializer`]
+/// supports it.
 ///
 /// The default impl uses [`DateTimeCoercion::Passthrough`], treating all
 /// strings as plain text. Use [`FieldValueRef::deserialize_with`] to classify
@@ -952,8 +954,8 @@ impl<'de: 'a, 'a> Deserialize<'de> for FieldValueRef<'a> {
 impl<'a> FieldValueRef<'a> {
     /// Deserializes with the given [`DateTimeCoercion`].
     ///
-    /// When `coercion` is [`DateTimeCoercion::Classify`], ISO date strings are
-    /// classified as [`FieldValueRef::Date`] rather than
+    /// When `coercion` is [`DateTimeCoercion::Classify`], this classifies ISO
+    /// date strings as [`FieldValueRef::Date`] instead of
     /// [`FieldValueRef::String`].
     ///
     /// # Errors
@@ -974,7 +976,7 @@ impl<'a> FieldValueRef<'a> {
     }
 }
 
-/// Reports why a [`FieldName`] could not be parsed.
+/// Reports why parsing a [`FieldName`] failed.
 #[derive(Debug, Error)]
 pub(crate) enum FieldNameError {
     /// Rejects an empty or whitespace-only name.
@@ -987,12 +989,12 @@ pub(crate) enum FieldNameError {
     ContainsSlash {
         name: String,
     },
-    /// Rejects a JSON value that cannot be represented as scalar field text.
+    /// Rejects a JSON value that is not scalar field text.
     #[error("JSON value is not a scalar")]
     NotScalar,
 }
 
-/// Reports why a [`FieldKey`] could not be parsed.
+/// Reports why parsing a [`FieldKey`] failed.
 #[derive(Debug, Error)]
 pub(crate) enum FieldKeyError {
     /// The raw key failed [`FieldName`] validation.
@@ -1292,8 +1294,8 @@ mod tests {
 
             #[test]
             fn is_canonical_rejects_strings_with_stripped_punctuation() {
-                // "a!b" canonicalizes to "ab" — the '!' is stripped, so the
-                // canonical form differs from the input.
+                // `"a!b"` canonicalizes to `"ab"` because `canonicalize` strips
+                // `'!'`, so the canonical form differs from the input.
                 assert!(!FieldKey::is_canonical("a!b"));
             }
 
@@ -1476,7 +1478,7 @@ mod tests {
             let b = FieldKey::try_new("Priority").unwrap();
             a.hash(&mut h1);
             b.hash(&mut h2);
-            // canonical forms differ, so hashes should differ
+            // Canonical forms differ, so hashes differ.
             assert_ne!(h1.finish(), h2.finish());
 
             let mut h3 = DefaultHasher::new();
@@ -1485,7 +1487,7 @@ mod tests {
             let d = FieldKey::try_new("Status").unwrap();
             c.hash(&mut h3);
             d.hash(&mut h4);
-            // same canonical form, so hashes should match
+            // Same canonical form, so hashes should match.
             assert_eq!(h3.finish(), h4.finish());
         }
     }
@@ -1567,8 +1569,8 @@ mod tests {
         use super::super::*;
 
         /// Test-only map lookup: production code either destructures a known
-        /// variant directly or uses the owned [`FieldValue`] accessors.
-        /// No accessor earns its keep outside this test module.
+        /// variant directly or uses the owned [`FieldValue`] accessors. No
+        /// accessor earns its keep outside this test module.
         fn get<'v, 'a>(
             value: &'v FieldValueRef<'a>,
             key: &str,

@@ -1,9 +1,9 @@
-//! Finds Config Files on disk without reading their TOML.
+//! Finds Configuration Files on disk without reading their TOML.
 //!
-//! [`ConfigLocator`] uses walk ceilings and the global Config File directory.
-//! It finds the nearest local Config File, its optional global counterpart, or
-//! local Config Files in a subtree. It does not check trust or write to the
-//! Tracker Store.
+//! [`ConfigLocator`] uses walk ceilings and the global Configuration File
+//! directory. It finds the nearest local Configuration File, its optional
+//! global counterpart, or local Configuration Files in a subtree. It does not
+//! check trust or write to the Tracker Store.
 
 use std::{
     io,
@@ -16,31 +16,31 @@ use super::{
 };
 use crate::{DirTree, dirs, env_vars};
 
-/// Names the subdirectory for the global Config File under the OS config home.
+/// Names the global Configuration File subdirectory under configuration home.
 const GLOBAL_CONFIG_DIR: &str = "traces";
 
-/// Holds the Config Files found for one project load.
+/// Holds the Configuration Files found for one project load.
 #[derive(Debug)]
 pub(super) struct DiscoveredConfigs {
-    /// Holds the nearest local Config File. The builder applies it after
-    /// [`Self::global`].
+    /// Holds the nearest local Configuration File. The builder applies it
+    /// after [`Self::global`].
     pub(super) local: LocalConfigFile<Discovered>,
-    /// Holds the optional global Config File. The builder applies it before
-    /// [`Self::local`].
+    /// Holds the optional global Configuration File. The builder applies it
+    /// before [`Self::local`].
     pub(super) global: Option<GlobalConfigFile<Discovered>>,
 }
 
-/// Finds Config Files from the environment and the given directory.
+/// Finds Configuration Files from the environment and the given directory.
 #[derive(Clone, Debug)]
 pub(super) struct ConfigLocator {
     /// Holds directories where an upward walk stops without a check.
     ceilings: Vec<PathBuf>,
-    /// Holds the directory containing the global Config File.
+    /// Holds the directory containing the global Configuration File.
     global_dir: PathBuf,
 }
 
 impl ConfigLocator {
-    /// Builds a Config Locator from the process environment.
+    /// Builds a Configuration Locator from the process environment.
     #[must_use]
     pub(super) fn from_env() -> Self {
         Self {
@@ -49,7 +49,7 @@ impl ConfigLocator {
         }
     }
 
-    /// Builds a Config Locator from explicit test inputs.
+    /// Builds a Configuration Locator from explicit test inputs.
     #[cfg(test)]
     #[must_use]
     pub(super) const fn new(
@@ -62,14 +62,14 @@ impl ConfigLocator {
         }
     }
 
-    /// Finds the nearest local and optional global Config Files for `cwd` and
-    /// returns them.
+    /// Finds the nearest local and optional global Configuration Files for
+    /// `cwd`.
     ///
     /// # Errors
     ///
-    /// - [`NotFound`] if no local Config File exists between `cwd` and a walk
-    ///   ceiling.
-    /// - [`Inaccessible`] if the file system cannot inspect a candidate path.
+    /// - [`NotFound`] if no local Configuration File exists between `cwd` and a
+    ///   walk ceiling.
+    /// - [`Inaccessible`] if the filesystem cannot inspect a candidate path.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -86,15 +86,17 @@ impl ConfigLocator {
         })
     }
 
-    /// Finds and returns the nearest local Config File at or above `dir`.
+    /// Finds and returns the nearest local Configuration File at or above
+    /// `dir`.
     ///
-    /// The walk stops before it checks a ceiling directory.
-    /// It also stops when `dir` is itself a ceiling.
+    /// The walk stops before it checks a ceiling directory. It also stops when
+    /// `dir` is itself a ceiling.
     ///
     /// # Errors
     ///
-    /// - [`NotFound`] if no local Config File exists before a walk ceiling.
-    /// - [`Inaccessible`] if the file system cannot inspect a candidate path.
+    /// - [`NotFound`] if no local Configuration File exists before a walk
+    ///   ceiling.
+    /// - [`Inaccessible`] if the filesystem cannot inspect a candidate path.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -116,15 +118,17 @@ impl ConfigLocator {
         })
     }
 
-    /// Finds local Config Files at or below `dir` and orders them by root.
+    /// Finds local Configuration Files at or below `dir` and orders them by
+    /// root.
     ///
-    /// Uses [`Self::nearest_local`] if the subtree has no local Config File.
+    /// Uses [`Self::nearest_local`] if the subtree has no local Configuration
+    /// File.
     ///
     /// # Errors
     ///
-    /// - [`NotFound`] if no local Config File exists in the subtree or above it
-    ///   before a walk ceiling.
-    /// - [`Inaccessible`] if the file system cannot inspect a path.
+    /// - [`NotFound`] if no local Configuration File exists in the subtree or
+    ///   above it before a walk ceiling.
+    /// - [`Inaccessible`] if the filesystem cannot inspect a path.
     ///
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -141,18 +145,18 @@ impl ConfigLocator {
     }
 }
 
-/// Collects and returns local Config Files at or below `dir`.
+/// Collects and returns local Configuration Files at or below `dir`.
 ///
-/// It skips subtrees named by [`env_vars::is_ignored_dir`].
-/// It does not prune the walk root `dir`.
-/// [`DirTree::filter`] does not check the predicate for the root.
-/// A root with an ignored name is still scanned.
-/// It returns traversal failures instead of treating them as an empty subtree.
+/// The walk skips subtrees named by [`env_vars::is_ignored_dir`], but
+/// [`DirTree::filter`] does not check the predicate for the root `dir`. As a
+/// result, the walk still scans a root that has an ignored name.
+///
+/// Traversal failures return an error instead of an empty subtree.
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if the root is removed or the file system cannot inspect
-///   a path.
+/// - [`Inaccessible`] if the root is removed or the filesystem cannot inspect a
+///   path.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn collect_descendant_configs(
@@ -180,13 +184,12 @@ fn collect_descendant_configs(
     Ok(configs)
 }
 
-/// Returns whether `path` is a regular file.
-///
-/// Returns `false` when the path does not exist.
+/// Returns whether `path` is a regular file or `false` if the path does not
+/// exist.
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if the file system cannot inspect the path for another
+/// - [`Inaccessible`] if the filesystem cannot inspect the path for another
 ///   reason.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
@@ -246,7 +249,7 @@ mod tests {
             p
         }
 
-        /// Builds a Config Locator with isolated global storage and no
+        /// Builds a Configuration Locator with isolated global storage and no
         /// ceilings.
         fn locator(&self) -> ConfigLocator {
             ConfigLocator::new(Vec::new(), self.path("global-home/traces"))
@@ -482,9 +485,9 @@ mod tests {
 
             let result = is_config_file(&blocking_file.join("config.toml"));
 
-            // Unix reports ENOTDIR (inaccessible); Windows reports
-            // ERROR_PATH_NOT_FOUND, which maps to NotFound and so to "no
-            // config".
+            // Unix reports `ENOTDIR` (inaccessible). Windows reports
+            // `ERROR_PATH_NOT_FOUND`, which maps to `NotFound` ("no
+            // configuration").
             #[cfg(unix)]
             assert!(matches!(
                 result,

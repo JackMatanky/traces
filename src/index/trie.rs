@@ -1,11 +1,10 @@
-//! Resolves nearest-candidate files for wikilink basenames based on folder
+//! Resolves nearest-candidate files for wikilink base names based on folder
 //! distance.
 //!
-//! [`BaseNameIndex::build`] selects a [`ResolutionType`] once for each
-//! basename. It uses a linear scan below [`TRIE_THRESHOLD`] candidates and a
-//! folder trie at or above the threshold. [`BaseNameIndex::nearest`] returns
-//! the nearest candidate by folder distance. It returns `None` when candidates
-//! tie.
+//! [`BaseNameIndex::build`] selects a [`ResolutionType`] once for each base
+//! name. It uses a linear scan below [`TRIE_THRESHOLD`] candidates and a folder
+//! trie at or above the threshold. [`BaseNameIndex::nearest`] returns the
+//! nearest candidate by folder distance. It returns `None` when candidates tie.
 
 use std::path::Path;
 
@@ -14,7 +13,7 @@ use rustc_hash::FxHashMap;
 
 use crate::path::FolderRef;
 
-/// Selects a flat scan or folder trie for each basename lookup.
+/// Selects a flat scan or folder trie for each base name lookup.
 ///
 /// Callers use one query method and do not see the selected representation.
 pub(super) struct BaseNameIndex<'a>(ResolutionType<'a>);
@@ -30,8 +29,8 @@ enum ResolutionType<'a> {
 pub(super) const TRIE_THRESHOLD: usize = 64;
 
 impl<'a> BaseNameIndex<'a> {
-    /// Builds the index for one basename's `candidates`, selecting the strategy
-    /// by [`TRIE_THRESHOLD`].
+    /// Builds the index for one base name's `candidates`, selecting the
+    /// strategy by [`TRIE_THRESHOLD`].
     pub(super) fn build(candidates: Vec<&'a Path>) -> Self {
         Self(if candidates.len() >= TRIE_THRESHOLD {
             ResolutionType::Trie(Box::new(CandidateTrie::build(&candidates)))
@@ -92,9 +91,9 @@ impl<'a> BaseNameIndex<'a> {
     }
 }
 
-/// Indexes candidates for one Wikilink basename by folder.
+/// Indexes candidates for one wikilink base name by folder.
 ///
-/// Precomputes each folder's nearest same-basename candidate in its subtree.
+/// Precomputes each folder's nearest matching-name candidate in its subtree.
 /// This supports nearest-candidate queries in `O(depth(from))`. Its lifetime
 /// and mutability keep the parallel path in [`super::inlinks::InlinkMap::new`]
 /// `Sync`.
@@ -137,7 +136,8 @@ impl<'a> CandidateTrie<'a> {
         let from_folder = FolderRef::of(from).as_path();
 
         // Find the nearest trie node above `from`'s folder. `extra_up` counts
-        // skipped folders. A linking note's folder rarely contains a candidate.
+        // skipped folders. The source note's folder rarely contains a
+        // candidate.
         let mut extra_up = 0_usize;
         let mut probe = from_folder;
         let start_node = loop {
@@ -298,7 +298,7 @@ impl<'a> CandidateTrie<'a> {
             .collect()
     }
 
-    /// Returns the data of the node with the given id.
+    /// Returns the data of the node for `id`.
     ///
     /// # Panics
     ///
@@ -317,7 +317,7 @@ impl<'a> CandidateTrie<'a> {
         )
     }
 
-    /// Returns the mutable data of the node with the given id.
+    /// Returns the mutable data of the node for `id`.
     ///
     /// # Panics
     ///
@@ -344,7 +344,7 @@ struct TrieNode<'a> {
     depth: usize,
     /// Stores candidates whose containing folder is this node.
     ///
-    /// Multiple entries have the same folder and basename, with different
+    /// Multiple entries have the same folder and base name, with different
     /// extensions.
     locals: Vec<(Option<&'a str>, &'a Path)>,
     /// Stores aggregates for this node's candidates and all descendants.
@@ -359,7 +359,7 @@ struct TrieNode<'a> {
 
 /// Tracks subtree aggregates and optional extension buckets.
 ///
-/// `by_ext` uses a `Vec`. Same-basename candidates rarely span enough
+/// `by_ext` uses a `Vec`. Candidates with the same base name rarely span enough
 /// extensions for a `HashMap` and its per-node allocation to be worthwhile.
 #[derive(Clone, Debug, Default)]
 struct SubtreeAggregate<'a> {
@@ -601,10 +601,11 @@ mod tests {
 
             use super::*;
 
-            /// Uses a deterministic linear congruential generator (LCG).
+            /// Uses a deterministic pseudo-random generator.
+            ///
             /// Each draw calculates `state = state * a + c` modulo `2^64` with
-            /// one multiply and one addition. The fixed seed
-            /// reproduces failures across runs without `rand`.
+            /// one multiply and one addition. The fixed seed reproduces
+            /// failures across runs without `rand`.
             fn lcg_next(state: &mut u64) -> u64 {
                 *state = state
                     .wrapping_mul(6_364_136_223_846_793_005)

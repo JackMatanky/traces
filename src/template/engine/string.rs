@@ -70,7 +70,9 @@ impl StrOps {
 ///
 /// ```
 /// # let mut env = minijinja::Environment::new();
-/// # env.add_filter("trim_prefix", |value: &str| value.strip_prefix("foo_").unwrap_or(value).to_owned());
+/// # env.add_filter("trim_prefix", |value: &str| {
+/// #     value.strip_prefix("foo_").unwrap_or(value).to_owned()
+/// # });
 /// let rendered = env
 ///     .render_str("{{ 'foo_bar' | trim_prefix }}", ())
 ///     .expect("template renders");
@@ -159,8 +161,8 @@ fn truncate_words(
         kept.push_str(word);
     }
 
-    // If `words` is exhausted, every word fits within `count`.
-    // Return `value` unchanged to preserve its original whitespace.
+    // If `words` is exhausted, every word fits within `count`. Return `value`
+    // unchanged to preserve its original whitespace.
     if words.next().is_none() {
         return Ok(value.to_owned());
     }

@@ -1,17 +1,18 @@
 //! Translates moment-dialect date patterns to strftime patterns.
 //!
-//! The moment dialect is the template-facing token language (`YYYY-MM-DD`,
-//! `Do MMMM YYYY`, `[Daily]`) that the `date_format` filter accepts. This
-//! module owns the tokenizer that converts it to a strftime pattern jiff can
-//! render. Patterns it cannot translate fail with [`TemporalTokenError`]
-//! (declared in `error.rs`). This module's `pattern_to_strftime` owns
-//! the bracket-aware dialect dispatch. The engine's same-named wrapper calls
-//! it and maps the error to a template render error.
+//! The moment dialect is the template-facing token language (`YYYY-MM-DD`, `Do
+//! MMMM YYYY`, `[Daily]`) that the `date_format` filter accepts. The tokenizer
+//! converts it to a strftime pattern for Jiff, or fails with
+//! [`TemporalTokenError`] (declared in `error.rs`).
+//!
+//! [`pattern_to_strftime`] owns the bracket-aware dialect dispatch. The
+//! engine's same-named wrapper calls it and maps any failure to a template
+//! render error.
 
 use super::error::TemporalTokenError;
 use crate::DelimiterType;
 
-/// The moment-dialect to strftime token table (scope 1).
+/// Maps moment-dialect tokens to strftime format specifiers (scope 1).
 const MOMENT_TOKENS: &[(&str, &str)] = &[
     ("YYYY", "%Y"),
     ("YY", "%y"),
@@ -39,8 +40,8 @@ const MOMENT_TOKENS: &[(&str, &str)] = &[
 /// Returns the strftime spec for a maximal run of `ch` with length
 /// `run_len`, or `None` when the run is not a moment-dialect token.
 ///
-/// This works because every `MOMENT_TOKENS` entry repeats one byte.
-/// Multi-character tokens such as `Do` are dispatched before the run lookup.
+/// This works because every [`MOMENT_TOKENS`] entry repeats one byte. The
+/// parser dispatches multi-character tokens such as `Do` before the run lookup.
 /// They are not table entries.
 fn match_moment_run(ch: u8, run_len: usize) -> Option<&'static str> {
     MOMENT_TOKENS
@@ -54,11 +55,13 @@ fn match_moment_run(ch: u8, run_len: usize) -> Option<&'static str> {
 
 /// Selects the dialect for `pattern` and translates it to a strftime pattern.
 ///
-/// A `%` directive outside any bracket literal selects the strftime dialect.
-/// The function copies the pattern and doubles `%` inside bracket literals, so
-/// bracketed text renders literally. Otherwise the moment dialect applies
-/// and tokens (`YYYY MM DD HH mm ss`, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`,
-/// bracket literals like `[Daily]`) are translated.
+/// Dispatch chooses between two dialects based on bracket literals:
+///
+/// - Strftime dialect (selected when `%` appears outside any bracket literal)
+///   copies the pattern and doubles `%` inside brackets so bracketed text
+///   renders literally.
+/// - Moment dialect (selected otherwise) translates moment tokens and bracket
+///   literals such as `[Daily]`.
 ///
 /// # Errors
 ///
@@ -100,9 +103,10 @@ fn percent_outside_brackets(pattern: &str) -> Result<bool, TemporalTokenError> {
     Ok(percent | rest.contains('%'))
 }
 
-/// Copies `pattern` for jiff in the strftime dialect, dropping bracket
-/// delimiters and doubling `%` inside bracket literals so bracketed text
-/// renders literally.
+/// Copies `pattern` for Jiff in the strftime dialect.
+///
+/// Drops bracket delimiters and doubles `%` inside bracket literals so
+/// bracketed text renders literally.
 fn escape_bracket_percents(pattern: &str) -> String {
     let mut out = String::with_capacity(pattern.len());
     let mut rest = pattern;
@@ -149,8 +153,6 @@ fn ordinal_suffix(day: i8) -> &'static str {
 ///
 /// # Errors
 ///
-/// - [`TemporalTokenError::UnclosedBracket`] if a bracket literal opens but
-///   does not close.
 /// - [`TemporalTokenError::UnsupportedToken`] if a moment token has no strftime
 ///   equivalent.
 fn moment_to_strftime(

@@ -1,8 +1,8 @@
-//! Fingerprints the config settings that shape persisted index rows.
+//! Fingerprints the configuration settings that shape persisted index rows.
 //!
 //! The store records an [`IndexFingerprint`] beside its rows. Refresh compares
-//! it with the running config and rebuilds the index when the fingerprints
-//! differ.
+//! it with the running configuration and rebuilds the index when the
+//! fingerprints differ.
 //!
 //! The fingerprint includes `title`, `aliases`, and date keys, although
 //! index-time code does not read them today. Extra settings can cause harmless
@@ -10,17 +10,17 @@
 //!
 //! # Exhaustive destructuring
 //!
-//! [`IndexFingerprint::new`] destructures every config digest bundle without
-//! `..`. A new setting then causes a compile error until this code fingerprints
-//! or ignores it. A source test checks this rule because the compiler does not
-//! reject rest patterns.
+//! [`IndexFingerprint::new`] destructures every configuration digest bundle
+//! without `..`. A new setting then causes a compile error until this code
+//! fingerprints or ignores it. A source test checks this rule because the
+//! compiler does not reject rest patterns.
 //!
 //! # Main Types
 //!
 //! - [`IndexFingerprint`]: one digest per index-relevant setting.
 //! - [`IndexSetting`]: names one such setting for diagnosis.
 //! - [`StoredFingerprint`]: what a store holds, before comparison.
-//! - [`DriftCause`]: why a store no longer matches the running config.
+//! - [`DriftCause`]: why a store no longer matches the running configuration.
 
 use std::fmt::{self, Display, Formatter};
 
@@ -35,10 +35,10 @@ use crate::{
 /// Counts the settings that enter the fingerprint.
 pub(super) const SETTING_COUNT: usize = 10;
 
-/// Names one config setting that shapes persisted index rows.
+/// Names one configuration setting that shapes persisted index rows.
 ///
-/// Each variant names a config key. [`Display`] adds the section. The config
-/// does not use this type; it only helps diagnose drift.
+/// Each variant names a configuration key. [`Display`] adds the section. The
+/// configuration does not use this type. It only helps diagnose drift.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IndexSetting {
     /// The `[frontmatter] title` key.
@@ -102,13 +102,13 @@ impl Display for IndexSetting {
     }
 }
 
-/// Explains why a stored index differs from the running config.
+/// Explains why a stored index differs from the running configuration.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DriftCause {
     /// Lists changed settings in fingerprint order.
     Settings(Box<[IndexSetting]>),
-    /// The store has rows but no readable fingerprint, so no setting can be
-    /// named.
+    /// The store has rows but no readable fingerprint, so it cannot name a
+    /// setting.
     Unrecorded,
 }
 
@@ -146,7 +146,7 @@ pub(super) enum StoredFingerprint {
     Virgin,
     /// The store has rows but no readable fingerprint.
     Unreadable,
-    /// The fingerprint recorded with the rows.
+    /// Holds the fingerprint recorded with the rows.
     Recorded(Box<IndexFingerprint>),
 }
 
@@ -214,7 +214,7 @@ impl IndexFingerprint {
         Some(Self((*digests).map(Blake3Digest::from_bytes)))
     }
 
-    /// Explains why `stored` does not match the running config.
+    /// Explains why `stored` does not match the running configuration.
     ///
     /// Returns `None` when the fingerprints match. A virgin store has no rows,
     /// so it cannot drift. Rows without a readable fingerprint produce
@@ -250,8 +250,8 @@ impl IndexFingerprint {
 mod tests {
     use super::*;
 
-    /// Builds the fingerprint of a copy of the default test config digests
-    /// after `edit`.
+    /// Builds the fingerprint of a copy of the default test configuration
+    /// digests after `edit`.
     fn fingerprint_after(
         edit: impl FnOnce(&mut ConfigDigests),
     ) -> IndexFingerprint {

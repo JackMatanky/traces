@@ -13,9 +13,9 @@ fn main() -> ExitCode {
 
 /// Maps the CLI result to a process [`ExitCode`].
 ///
-/// Successful completion and Escape exit with `0`. Ctrl-C exits with `130`
-/// (POSIX SIGINT convention). Any other error is printed to stderr and exits
-/// with `1`.
+/// Successful completion and Escape exit with `0`. Control-C exits with `130`
+/// (POSIX SIGINT convention). Any other error prints to standard error and
+/// exits with `1`.
 fn exit_code(
     result: Result<CommandOutcome, traces::cli::CliError>,
 ) -> ExitCode {

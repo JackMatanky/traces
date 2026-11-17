@@ -46,13 +46,13 @@ impl TemplatePathInput {
     ///
     /// # Errors
     ///
-    /// - [`TemplatePathError::Absolute`] if `path` is absolute.
-    /// - [`TemplatePathError::UnsafeComponent`] if `path` contains `..`, an
+    /// - `TemplatePathError::Absolute` if `path` is absolute.
+    /// - `TemplatePathError::UnsafeComponent` if `path` contains `..`, an
     ///   unsupported component, or no [`Component::Normal`].
     ///
     /// [`Component::Normal`]: std::path::Component::Normal
-    /// [`TemplatePathError::Absolute`]: TemplatePathError::Absolute
-    /// [`TemplatePathError::UnsafeComponent`]: TemplatePathError::UnsafeComponent
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// # #[cfg(feature = "test-utils")]
@@ -90,8 +90,8 @@ impl AsRef<Path> for TemplatePathInput {
     }
 }
 
-/// A validated template path resolved against a template directory, proven to
-/// exist on disk.
+/// Holds a validated template path resolved against a template directory on
+/// disk.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct TemplatePath {
     input: TemplatePathInput,
@@ -266,7 +266,7 @@ mod tests {
 
         #[test]
         fn accepts_a_path_with_a_leading_current_dir_segment() {
-            // "./daily.md" splits into [CurDir, Normal("daily.md")]. A CurDir
+            // `./daily.md` splits into [CurDir, Normal(`daily.md`)]. A CurDir
             // segment at the start does not count as a normal component, but it
             // does not make the path invalid. The trailing Normal component
             // makes the path valid. A bare "." has no Normal component.

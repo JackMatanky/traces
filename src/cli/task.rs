@@ -1,11 +1,9 @@
-//! Task query CLI command implementation.
+//! Runs the task query CLI command.
 //!
 //! Handles `traces task` by refreshing the trusted project root's
-//! [`WorkspaceIndex`], selecting task rows via optional source and filter
-//! expressions, and formatting matching tasks as Markdown checkbox lines or a
-//! table.
-//!
-//! [`WorkspaceIndex`]: crate::index::WorkspaceIndex
+//! [`crate::index::WorkspaceIndex`] and selecting task rows with optional
+//! source and filter expressions. Formats matching tasks as Markdown checkbox
+//! lines or a table.
 
 use clap::Args;
 
@@ -15,26 +13,28 @@ use super::{
 };
 use crate::{Config, query::TaskPathStyle};
 
-/// Default table column headers when `--table` is passed without `--column`.
+/// Default table column headers when `--table` runs without `--column`.
 const DEFAULT_TABLE_HEADERS: &[&str] =
     &["Task", "Status", "Due", "Priority", "File"];
 
-/// Default table field paths when `--table` is passed without `--column`.
+/// Default table field paths when `--table` runs without `--column`.
 const DEFAULT_TABLE_COLUMNS: &[&str] =
     &["list.text", "list.status", "list.due", "list.priority", "file.path"];
 
-/// Filter options for task completion and status.
+/// Defines filter options for task completion and status.
 #[derive(Clone, Debug, Default, Args, PartialEq, Eq)]
 pub(super) struct TaskFilterArgs {
-    /// Filter to incomplete tasks (`list.completed == false`). Conflicts with
-    /// `--done`.
+    /// Filters to incomplete tasks (`list.completed == false`).
+    ///
+    /// Conflicts with `--done`.
     #[arg(long, conflicts_with = "done")]
     todo: bool,
-    /// Filter to completed tasks (`list.completed == true`). Conflicts with
-    /// `--todo`.
+    /// Filters to completed tasks (`list.completed == true`).
+    ///
+    /// Conflicts with `--todo`.
     #[arg(long, conflicts_with = "todo")]
     done: bool,
-    /// Filter by status character via `list.status_symbol == "<char>"`.
+    /// Filters by status character with `list.status_symbol == "<char>"`.
     #[arg(long, value_name = "CHAR")]
     status: Option<char>,
 }
@@ -64,14 +64,15 @@ impl TaskFilterArgs {
     }
 }
 
-/// Table presentation configuration for task output.
+/// Defines table presentation options for task output.
 #[derive(Clone, Debug, Default, Args, PartialEq, Eq)]
 pub(super) struct TaskTableArgs {
-    /// Render output as a Markdown table.
+    /// Renders output as a Markdown table.
     #[arg(long)]
     table: bool,
-    /// Field path to render as a table column. Custom overrides default table
-    /// columns.
+    /// Specifies a field path to render as a table column.
+    ///
+    /// Overrides the default table columns when set.
     #[arg(long = "column", requires = "table")]
     columns: Vec<String>,
 }
@@ -98,16 +99,16 @@ impl TaskTableArgs {
     }
 }
 
-/// Output presentation configuration for task lists, tables, and counts.
+/// Defines output presentation options for task lists, tables, and counts.
 #[derive(Clone, Debug, Default, Args, PartialEq, Eq)]
 pub(super) struct TaskPresentationArgs {
-    /// Display clickable editor line coordinates `({path}:{line})`.
+    /// Displays clickable editor line coordinates `({path}:{line})`.
     #[arg(short = 'l', long = "line-numbers")]
     line_numbers: bool,
-    /// Table configuration options.
+    /// Configures table output options.
     #[command(flatten)]
     table: TaskTableArgs,
-    /// Output only the matching row count.
+    /// Outputs only the matching row count.
     #[arg(long)]
     count: bool,
 }
@@ -139,27 +140,30 @@ impl TaskPresentationArgs {
     }
 }
 
-/// Arguments for `traces task`.
+/// Defines arguments for `traces task`.
 ///
 /// Queries tasks from the trusted project root and prints matching checkbox
 /// lines or a formatted table.
 #[derive(Debug, Default, Args)]
 pub(super) struct Task {
-    /// Source expression, e.g. `#tag`, `folder/`, `@Class*`, or a boolean
-    /// combination. Omit to query every indexed note's tasks.
+    /// Selects the source scope, such as `#tag`, `folder/`, or `@Class*`.
+    ///
+    /// Omit to query every indexed note's tasks.
     #[arg(long)]
     from: Option<String>,
-    /// Filter expression narrowing results, e.g. `"list.completed == false"`.
-    /// Repeatable; multiple `--where` flags compose as AND.
+    /// Narrows results with a filter expression, such as
+    /// `"list.completed == false"`.
+    ///
+    /// Repeatable. Multiple `--where` flags combine with AND.
     #[arg(long = "where")]
     filter: Vec<String>,
-    /// Filter shortcuts for task completion and status.
+    /// Configures task completion and status filter shortcuts.
     #[command(flatten)]
     filters: TaskFilterArgs,
-    /// Sort configuration. See [`SortArgs`].
+    /// Configures result sorting with [`SortArgs`].
     #[command(flatten)]
     sort: SortArgs,
-    /// Output presentation configuration.
+    /// Configures output presentation.
     #[command(flatten)]
     presentation: TaskPresentationArgs,
 }
@@ -167,21 +171,17 @@ pub(super) struct Task {
 impl Task {
     /// Runs `traces task` for the trusted project root.
     ///
-    /// Refreshes the root's [`WorkspaceIndex`] and writes each matching task to
-    /// stdout as a Markdown checkbox line or formatted table.
+    /// Refreshes the root's [`crate::index::WorkspaceIndex`] and writes each
+    /// matching task to standard output as a Markdown checkbox line or
+    /// formatted table.
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if the current directory cannot be
-    ///   read.
-    /// - [`CliError::ConfigLoad`] if loading configuration fails, including an
-    ///   untrusted project root.
-    /// - [`CliError::Index`] if refreshing the [`WorkspaceIndex`] fails.
-    /// - [`CliError::Query`] if `--where` is an unparsable filter expression,
+    /// - [`CliError::Index`] if refreshing the [`crate::index::WorkspaceIndex`]
+    ///   fails.
+    /// - [`CliError::Query`] if `--where` is an invalid filter expression,
     ///   `--sort` names a malformed field path, or `--column` names a malformed
     ///   field path.
-    ///
-    /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
     #[expect(
         clippy::print_stdout,
         reason = "task rows are primary command output, not diagnostic text; \
@@ -198,20 +198,20 @@ impl Task {
         Ok(())
     }
 
-    /// Renders matching tasks from `root`'s [`WorkspaceIndex`] as a Markdown
-    /// task list, table, or count-only output, alongside the matched row
-    /// count.
+    /// Renders matching tasks from `config`'s [`crate::index::WorkspaceIndex`]
+    /// as a Markdown task list, table, or count-only output, alongside the
+    /// matched row count.
     ///
-    /// Split from [`Self::run`] so tests can assert on rendered content
-    /// without capturing process stdout.
+    /// Split from [`Self::run`] so tests can assert on rendered content without
+    /// capturing process standard output.
+    ///
     /// # Errors
     ///
-    /// - [`CliError::Index`] if refreshing the [`WorkspaceIndex`] fails.
-    /// - [`CliError::Query`] if `--where` is an unparsable filter expression,
+    /// - [`CliError::Index`] if refreshing the [`crate::index::WorkspaceIndex`]
+    ///   fails.
+    /// - [`CliError::Query`] if `--where` is an invalid filter expression,
     ///   `--sort` names a malformed field path, or `--column` names a malformed
     ///   field path.
-    ///
-    /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
     fn render(&self, config: &Config) -> Result<(String, usize), CliError> {
         let root = config.root();
         let status_filter = self.filters.status_filter();
@@ -700,7 +700,7 @@ mod tests {
         use super::*;
         use crate::cli::{Cli, Commands};
 
-        /// Extracts the parsed `Task` args from `cli`.
+        /// Extracts the parsed [`Task`] arguments from `cli`.
         fn task_args(cli: &Cli) -> &Task {
             match &cli.command {
                 Some(Commands::Task(task)) => Some(task),

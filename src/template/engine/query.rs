@@ -33,30 +33,36 @@
 //!
 //! Template callers chain `.where(...)` or `.filter(...)`, `.sort(...)`,
 //! `.limit(...)`, `.group_by(...)`, and `.flatten(...)`. [`QuerySet`] contains
-//! the transformation logic. This module supplies only the minijinja [`Object`]
-//! wiring.
+//! the transformation logic. This module supplies only the `MiniJinja`
+//! [`Object`] wiring.
 //!
 //! [`QuerySet::table`], [`QuerySet::list`], [`QuerySet::task_list`], and
-//! `count` (an alias for [`QuerySet::len`]) stop a chain. They render final
-//! Markdown or scalar output. Each method is available as a `call_method`
-//! (`rows.table(["Name"], ["file.name"])`) or as a pipeline filter (`rows |
-//! table(["Name"], ["file.name"])`). [`QueryOps::register_terminal_filters`]
-//! registers the filters once. Both forms call the same [`QuerySet`] method.
+//! `count` (an alias for [`QuerySet::len`]) stop a chain and render final
+//! Markdown or scalar output.
+//!
+//! Each terminal method works as a `call_method` (`rows.table(["Name"],
+//! ["file.name"])`) or as a pipeline filter (`rows | table(["Name"],
+//! ["file.name"])`). [`QueryOps::register_terminal_filters`] registers the
+//! filters once, and both forms call the same [`QuerySet`] method.
 //!
 //! # Object Wiring
 //!
 //! This module implements [`Object`] for [`QuerySet`] and [`QueryRow`], not
-//! [`crate::index`]. This keeps [`crate::index`] independent from minijinja.
+//! [`crate::index`]. This keeps [`crate::index`] independent from `MiniJinja`.
 //! `traces task` can then reuse [`WorkspaceIndex`], [`QuerySet`], and
 //! [`QueryRow`] without rendering concerns.
 //!
-//! `record` attributes other than `file` and `list` use [`QueryRow::field`],
-//! the resolver that `.where()` and `.sort()` use. `record.file.*` and
-//! `record.list.*` use forwarding wrappers ([`FileFields`] and [`ListFields`]).
-//! Minijinja resolves a dotted attribute path one segment at a time. The
-//! wrappers call [`FileField::parse`] and [`ListField::parse`] directly. They
-//! skip the string-prefix handling in [`QueryRow::field`] because the `file` or
-//! `list` segment is already known.
+//! Dotted `record` attribute access splits into two paths:
+//!
+//! - Attributes other than `file` and `list` use [`QueryRow::field`], the same
+//!   resolver that `.where()` and `.sort()` use.
+//! - `record.file.*` and `record.list.*` use forwarding wrappers
+//!   ([`FileFields`] and [`ListFields`]).
+//!
+//! Because `MiniJinja` resolves a dotted attribute path one segment at a time,
+//! those wrappers call [`FileField::parse`] and [`ListField::parse`] directly.
+//! They skip string-prefix handling in [`QueryRow::field`] because the `file`
+//! or `list` segment is already known.
 //!
 //! # Errors
 //!
@@ -90,12 +96,12 @@ use crate::{
 /// Lists the methods that [`QueryOps::enumerate`] exposes for each namespace.
 const METHODS: &[&str] = &["from"];
 
-/// Backs the `query`, `lists`, and `tasks` minijinja namespace objects.
+/// Backs the `query`, `lists`, and `tasks` `MiniJinja` namespace objects.
 ///
 /// Each instance registers one global and runs one [`QueryBuilder`] mode.
 #[derive(Debug)]
 pub(super) struct QueryOps {
-    /// Stores the minijinja global name for this instance.
+    /// Stores the `MiniJinja` global name for this instance.
     name: &'static str,
     indexer: Arc<IndexerService>,
     /// Stores the preconfigured service. Every `.from()` call reuses it.
@@ -189,8 +195,10 @@ impl QueryOps {
     }
 
     /// Runs this namespace's query for `source` against the cached
-    /// [`WorkspaceIndex`]. Refreshes the index if this render has not cached
-    /// it. See [`Self::cached_index`].
+    /// [`WorkspaceIndex`].
+    ///
+    /// Refreshes the index if this render has not cached it. See
+    /// [`Self::cached_index`].
     ///
     /// # Errors
     ///
@@ -208,14 +216,17 @@ impl QueryOps {
     }
 
     /// Returns this render's cached [`WorkspaceIndex`], refreshing and caching
-    /// it when needed. The cache lives in `state`'s render-local typed
-    /// extensions. All three namespaces share it through [`QueryOps::run`]. A
-    /// render that calls multiple namespaces makes one
-    /// [`IndexerService::refresh`] call instead of one call per query.
+    /// it when needed.
+    ///
+    /// The cache lives in `state`'s render-local typed extensions, and all
+    /// three namespaces share it through [`QueryOps::run`] (see
+    /// [`super::cache::cached`]). A render that calls multiple namespaces makes
+    /// one [`IndexerService::refresh`] call instead of one per query.
+    ///
     /// Extensions apply to one render, including `{% include %}`s, and reset
     /// for the next render. A cache field on [`QueryOps`] would persist across
     /// independent renders that reuse an [`Environment`] or
-    /// [`super::TemplateEngine`]. See [`super::cache::cached`].
+    /// [`super::TemplateEngine`].
     ///
     /// # Errors
     ///
@@ -224,7 +235,7 @@ impl QueryOps {
     /// The returned error keeps the original failure as [`source`].
     ///
     /// [`ErrorKind::InvalidOperation`]: minijinja::ErrorKind::InvalidOperation
-    /// [`source`]: `std::error::Error::source`
+    /// [`source`]: std::error::Error::source
     fn cached_index(
         &self,
         state: &mut State,
@@ -305,7 +316,7 @@ fn resolve_from_arg(
     SourceSelector::parse(text).map_err(query_error)
 }
 
-/// Lets `.field()` pass a [`SourceSelector`] through minijinja.
+/// Lets `.field()` pass a [`SourceSelector`] through `MiniJinja`.
 ///
 /// `.from()` and the `with_children` or `with_descendants` filters recover it
 /// with [`Value::downcast_object_ref`].
@@ -358,7 +369,7 @@ impl Object for QuerySet {
     /// - [`ErrorKind::MissingArgument`] if `args` lacks a required value.
     /// - [`ErrorKind::InvalidOperation`] if an argument has the wrong type.
     /// - [`ErrorKind::InvalidOperation`] if a field path or filter expression
-    ///   cannot be parsed.
+    ///   fails to parse.
     /// - [`ErrorKind::InvalidOperation`] if `table` gets headers and columns of
     ///   different lengths.
     /// - [`ErrorKind::InvalidOperation`] if `.limit(...)` gets a negative
@@ -444,14 +455,15 @@ impl Object for QuerySet {
 /// Renders a Markdown table for the `rows | table(...)` filter. See
 /// [`QuerySet::table`].
 ///
-/// The filter takes owned `Vec<String>` values for `headers` and `columns`, not
-/// borrowed `Vec<&str>` values. The minijinja `Function` trait needs each
-/// parameter to implement `ArgType` for every lifetime. A borrowed vector
-/// cannot meet this need. The owned `String` form can. [`Object::call_method`]
-/// cannot borrow `Vec<&str>` from a list-literal argument value either.
-/// Minijinja reports "type conversion is not legal in this situation (implicit
-/// borrow)". Both entry points first build owned `Vec<String>` values and
-/// borrow from them.
+/// The filter takes owned `Vec<String>` values for `headers` and `columns`
+/// instead of borrowed `Vec<&str>` values. The `MiniJinja` `Function` trait
+/// needs each parameter to implement `ArgType` for every lifetime, which a
+/// borrowed vector cannot satisfy.
+///
+/// [`Object::call_method`] cannot borrow `Vec<&str>` from a list-literal
+/// argument value either, and `MiniJinja` reports "type conversion is not legal
+/// in this situation (implicit borrow)". Both entry points therefore build
+/// owned `Vec<String>` values first and borrow from them.
 ///
 /// # Errors
 ///
@@ -574,7 +586,7 @@ impl Object for QueryRow {
 
 /// Forwards `record.file.<field>` to [`FileField::parse`].
 ///
-/// Minijinja resolves a dotted attribute path one segment at a time. It must
+/// `MiniJinja` resolves a dotted attribute path one segment at a time. It must
 /// resolve `record.file` before it looks up `.name`.
 ///
 /// This wrapper calls the [`FileField`] accessor pair that [`QueryRow::field`]
@@ -596,7 +608,7 @@ impl Object for FileFields {
 
 /// Forwards `record.list.<field>` to [`ListField::parse`].
 ///
-/// Minijinja resolves a dotted attribute path one segment at a time. It must
+/// `MiniJinja` resolves a dotted attribute path one segment at a time. It must
 /// resolve `record.list` before it looks up a field.
 ///
 /// This wrapper calls the [`ListField`] accessor pair that [`QueryRow::field`]
@@ -616,13 +628,13 @@ impl Object for ListFields {
     }
 }
 
-/// Converts a resolved [`NoteFieldValue`] to a minijinja [`Value`].
+/// Converts a resolved [`NoteFieldValue`] to a `MiniJinja` [`Value`].
 ///
-/// - [`NoteFieldValue::Null`] becomes minijinja's `none`, not `undefined`. A
+/// - [`NoteFieldValue::Null`] becomes `MiniJinja`'s `none`, not `undefined`. A
 ///   valid path with no value resolves to `Null`, not an error, as [`QueryRow`]
 ///   documents.
-/// - [`NoteFieldValue::Link`] becomes its target path. Traces has no minijinja
-///   link type.
+/// - [`NoteFieldValue::Link`] becomes its target path. Traces has no
+///   `MiniJinja` link type.
 fn field_value(value: NoteFieldValue) -> Value {
     match value {
         NoteFieldValue::Null => Value::from(()),
@@ -666,6 +678,7 @@ mod tests {
     }
 
     /// Builds `query` [`QueryOps`] for `root` with the default `class` field.
+    ///
     /// The Schema registry directory is `root/.traces/schemas`.
     fn page_ops(root: &Path) -> QueryOps {
         QueryOps::page(
@@ -976,8 +989,8 @@ mod tests {
             )
             .expect("render succeeds");
 
-            // The Note has one complete task and one incomplete task.
-            // The filter must keep only the matching task row.
+            // The Note has one complete task and one incomplete task. The
+            // filter must keep only the matching task row.
             assert_eq!(rendered, "pay rent");
         }
 
@@ -1212,7 +1225,7 @@ mod tests {
 
         use super::*;
 
-        /// `table` and `list` accept field path strings, not minijinja
+        /// `table` and `list` accept field path strings, not `MiniJinja`
         /// expressions. Thus, no terminal renderer can express
         /// `file.name | upper`. A `{% for %}` loop lets template
         /// authors apply the full filter pipeline to each value.
@@ -1455,8 +1468,8 @@ mod tests {
             )
             .expect("render succeeds");
 
-            // The default task status symbol is a space.
-            // It creates the empty-looking segment between `Todo|` and `|todo`.
+            // The default task status symbol is a space. It creates the
+            // empty-looking segment between `Todo|` and `|todo`.
             assert_eq!(
                 rendered,
                 "buy milk #errand|True|task|Todo| \
@@ -1471,6 +1484,7 @@ mod tests {
         use super::*;
 
         /// `>` and `<` on rows use document order.
+        ///
         /// Each distinct pair has one order, not both.
         #[test]
         fn row_comparisons_follow_document_order() {
@@ -1756,11 +1770,11 @@ mod tests {
             let env = Environment::new();
             let mut state = env.empty_state();
 
-            // This call caches the render's WorkspaceIndex.
-            // Both namespaces share the cached extension.
+            // This call caches the render's WorkspaceIndex. Both namespaces
+            // share the cached extension.
             page_from.call(&mut state, &[]).expect("query.from succeeds");
-            // This test writes a note after it caches the index.
-            // The cache-sharing `tasks.from()` call must not see the new task.
+            // This test writes a note after it caches the index. The
+            // cache-sharing `tasks.from()` call must not see the new task.
             write_note(temp.path(), "todo.md", "- [ ] buy milk\n");
             let tasks =
                 task_from.call(&mut state, &[]).expect("tasks.from succeeds");
@@ -1805,8 +1819,8 @@ mod tests {
                 "- [ ] buy milk\n- [x] pay rent\n",
             );
 
-            // The page-level query returns one row for this Note.
-            // The task-level query must keep separate task rows.
+            // The page-level query returns one row for this Note. The
+            // task-level query must keep separate task rows.
             let pages = render(temp.path(), "{{ query.from() | length }}")
                 .expect("render succeeds");
             let tasks = render(temp.path(), "{{ tasks.from() | length }}")
@@ -1889,8 +1903,8 @@ mod tests {
         #[test]
         fn degrades_to_exact_match_when_the_class_has_no_schema() {
             let temp = tempfile::tempdir().expect("create temp dir");
-            // Without a Schema registry, `book` cannot resolve subclasses.
-            // Only a Note whose class is `book` matches.
+            // Without a Schema registry, `book` cannot resolve subclasses. Only
+            // a Note whose class is `book` matches.
             write_class_note(temp.path(), "dune.md", "class: book");
             write_class_note(temp.path(), "unknown.md", "class: sci_fi");
 
@@ -1933,8 +1947,8 @@ mod tests {
                 render(temp.path(), r#"{{ lists.from("@book") | length }}"#)
                     .expect("render succeeds");
 
-            // Both list items match.
-            // `tasks.from` would return only the task row.
+            // Both list items match. `tasks.from` would return only the task
+            // row.
             assert_eq!(rendered, "2");
         }
 

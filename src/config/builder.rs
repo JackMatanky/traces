@@ -1,8 +1,8 @@
-//! Resolves local and global Config Files into [`Config`].
+//! Resolves local and global Configuration Files into [`Config`].
 //!
-//! [`ConfigBuilder`] applies Configuration Scope precedence to each field.
-//! It resolves each Template Directory against its Config File root before it
-//! merges values. A global directory never uses the local project root.
+//! [`ConfigBuilder`] applies Configuration Scope precedence to each field. It
+//! resolves each Template Directory against its Configuration File root before
+//! it merges values. A global directory never uses the local project root.
 
 use std::path::PathBuf;
 
@@ -18,20 +18,22 @@ use super::{
 };
 use crate::FieldName;
 
-/// Merges local and optional global Config Files into [`Config`].
+/// Merges local and optional global Configuration Files into [`Config`].
 ///
-/// It applies Configuration Scope precedence to unset values.
-/// It resolves each Template Directory against its Config File root.
-/// It checks each value.
+/// It applies Configuration Scope precedence to unset values. It resolves each
+/// Template Directory against its Configuration File root. It checks each
+/// value.
 pub(crate) struct ConfigBuilder {
+    /// Holds the project workspace root for resolving relative local paths.
     root: PathBuf,
+    /// Holds the parsed project-local Configuration File.
     local: LocalConfigFile<Parsed>,
+    /// Holds the optional parsed global Configuration File.
     global: Option<GlobalConfigFile<Parsed>>,
 }
 
 impl ConfigBuilder {
-    /// Creates a builder for the project root and its local and global Config
-    /// Files.
+    /// Creates a builder for the project root and its Configuration Files.
     #[inline]
     #[must_use]
     pub(crate) fn new(
@@ -71,6 +73,14 @@ impl ConfigBuilder {
         ))
     }
 
+    /// Resolves local and global Template Directories and the output directory.
+    ///
+    /// # Errors
+    ///
+    /// - [`InvalidSubDir`] if a Template Directory has an unsafe path or
+    ///   escapes its Configuration File root.
+    ///
+    /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     fn resolve_templates(&self) -> Result<TemplateConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
@@ -115,6 +125,17 @@ impl ConfigBuilder {
         ))
     }
 
+    /// Resolves schema directory and class field settings with local-first
+    /// precedence.
+    ///
+    /// # Errors
+    ///
+    /// - [`InvalidFieldKey`] if `class_field` is invalid.
+    /// - [`InvalidSubDir`] if the schema directory has an unsafe path or
+    ///   escapes its root.
+    ///
+    /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
+    /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     fn resolve_schemas(&self) -> Result<SchemasConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
@@ -154,6 +175,13 @@ impl ConfigBuilder {
         Ok(SchemasConfig::new(directory, class_field))
     }
 
+    /// Merges and checks `[frontmatter]` settings with local-first precedence.
+    ///
+    /// # Errors
+    ///
+    /// - [`InvalidFieldKey`] if a configured frontmatter key is invalid.
+    ///
+    /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
     fn resolve_frontmatter(
         &self,
     ) -> Result<FrontmatterConfig, ConfigValueError> {
@@ -185,6 +213,15 @@ impl ConfigBuilder {
         FrontmatterConfig::try_from(raw_frontmatter)
     }
 
+    /// Merges and checks `[tasks]` settings with local-first precedence.
+    ///
+    /// # Errors
+    ///
+    /// - [`Task`] if a task status symbol is not allowed.
+    /// - [`InvalidTagFilter`] if a tag filter entry is invalid.
+    ///
+    /// [`Task`]: ConfigValueError::Task
+    /// [`InvalidTagFilter`]: ConfigValueError::InvalidTagFilter
     fn resolve_tasks(&self) -> Result<TaskConfig, ConfigValueError> {
         let local_raw = self.local.raw();
         let global_raw = self.global.as_ref().map(GlobalConfigFile::raw);
@@ -207,6 +244,7 @@ impl ConfigBuilder {
     }
 }
 
+/// Returns a clone of `local` when present, or `global` otherwise.
 fn merge_optional<T: Clone>(
     local: Option<&T>,
     global: Option<&T>,
@@ -214,6 +252,8 @@ fn merge_optional<T: Clone>(
     local.or(global).cloned()
 }
 
+/// Merges local and global date field tables per field with local-first
+/// precedence.
 fn merge_date_field(
     local: Option<&RawDateFieldConfig>,
     global: Option<&RawDateFieldConfig>,
@@ -243,7 +283,7 @@ mod tests {
         mod fixtures {
             use super::*;
 
-            /// Creates a directory for Config File path checks.
+            /// Creates a directory for Configuration File path checks.
             pub(super) fn temp_root(
                 temp: &tempfile::TempDir,
                 name: &str,

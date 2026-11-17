@@ -27,10 +27,10 @@ use crate::{
     template::{RenderFailureKind, TemplateError, TemplatePathError},
 };
 
-/// Convenience alias for CLI command results.
+/// Defines a convenience alias for CLI command results.
 pub type CliResult = std::result::Result<(), CliError>;
 
-/// Unified error type for all `traces` CLI operations.
+/// Represents the unified error type for all `traces` CLI operations.
 ///
 /// Maps domain failures to stable diagnostic codes, help text, and deliberate
 /// [`UserAbort`] detection. Command modules return [`CliError`] instead of
@@ -50,7 +50,7 @@ pub type CliResult = std::result::Result<(), CliError>;
 )]
 #[non_exhaustive]
 pub enum CliError {
-    /// The process current directory could not be read.
+    /// Reading the process current directory failed.
     ///
     /// Shared by every command that needs configuration, trust target
     /// resolution, or `init` scaffolding.
@@ -74,16 +74,17 @@ pub enum CliError {
     /// Resolving a `traces trust` user-provided target failed.
     #[error("failed to resolve trust target {path}")]
     TrustTargetResolve {
-        /// The path that could not be resolved.
+        /// The target path that failed to resolve.
         path: PathBuf,
         /// Source discovery error.
         #[source]
         source: ConfigDiscoveryError,
     },
-    /// Trusting `root` failed while updating the store or hashing config.
+    /// Trusting `root` failed while updating the store or hashing
+    /// configuration.
     #[error("failed to trust {root}")]
     Trust {
-        /// The root that could not be trusted.
+        /// The root that failed to receive trust.
         root: PathBuf,
         /// Source trust-store error.
         #[source]
@@ -92,7 +93,7 @@ pub enum CliError {
     /// Removing trust for `root` failed.
     #[error("failed to untrust {root}")]
     Untrust {
-        /// The root whose trust entry could not be removed.
+        /// The root whose trust entry failed to remove.
         root: PathBuf,
         /// Source trust-store error.
         #[source]
@@ -101,7 +102,7 @@ pub enum CliError {
     /// Reading trust status for `root` failed.
     #[error("failed to show trust status for {root}")]
     TrustShow {
-        /// The root whose trust status could not be read.
+        /// The root whose trust status failed to load.
         root: PathBuf,
         /// Source trust-store error.
         #[source]
@@ -121,14 +122,14 @@ pub enum CliError {
         #[source]
         source: ConfigTrustError,
     },
-    /// Listing the tracked-config store failed.
+    /// Listing the tracked-configuration store failed.
     #[error("failed to list tracked configs")]
     TrackedList {
         /// Source tracked-store error.
         #[source]
         source: ConfigTrustError,
     },
-    /// Cleaning the tracked-config store failed.
+    /// Cleaning the tracked-configuration store failed.
     #[error("failed to clean the tracked-config store")]
     TrackedClean {
         /// Source tracked-store error.
@@ -166,14 +167,15 @@ pub enum CliError {
         #[source]
         source: io::Error,
     },
-    /// Writing the local config file under `root` failed: the collected
-    /// template and output directories could not be serialized, or the
-    /// serialized file could not be written to disk.
+    /// Writing the local configuration file under `root` failed.
+    ///
+    /// Serializing the collected directories or writing the file to disk
+    /// failed.
     #[error("failed to write config file in {root}")]
     InitConfigWrite {
         /// The root being initialized.
         root: PathBuf,
-        /// Source config-scaffold error.
+        /// Source configuration-scaffold error.
         #[source]
         source: ConfigScaffoldError,
     },
@@ -186,7 +188,7 @@ pub enum CliError {
         #[source]
         source: IndexError,
     },
-    /// Loading Schemas needed to resolve a File Class query failed.
+    /// Loading `Schema` files needed to resolve a `File Class` query failed.
     #[error("failed to load Schemas for query in {root}")]
     SchemaQuery {
         /// The project root the query ran against.
@@ -195,7 +197,7 @@ pub enum CliError {
         #[source]
         source: SchemaError,
     },
-    /// Running a query under `root` failed: an unparsable source or filter
+    /// Running a query under `root` failed: an invalid source or filter
     /// expression, field path, or negative limit.
     #[error("failed to run query in {root}")]
     Query {
@@ -219,14 +221,14 @@ pub enum CliError {
     #[error("no templates found")]
     NoTemplates,
     /// The interactive picker prompt itself failed: an I/O error, or the user
-    /// canceled (Esc) or interrupted (Ctrl-C) it.
+    /// canceled (Escape) or interrupted (Control-C) it.
     #[error("template picker failed")]
     TemplatePicker {
         /// The underlying dialog error.
         #[source]
         source: DialogError,
     },
-    /// Neither a subcommand nor `-i`/`--input` was given.
+    /// Neither a subcommand nor `-i`/`--input` is present.
     #[error("no template name given; pass -i <name> or run a subcommand")]
     NoCommand,
 }
@@ -400,6 +402,7 @@ impl Diagnostic for CliError {
     }
 }
 
+/// Returns static diagnostic help text for `error` when available.
 const fn static_help(error: &CliError) -> Option<&'static str> {
     match error {
         CliError::CurrentDirectory {
@@ -740,14 +743,15 @@ fn template_instantiate_help(source: &TemplateError) -> Box<dyn Display + '_> {
     }
 }
 
-/// Formats a render error's failing location as `name:line`, or
-/// `name:line:column` when minijinja captured a byte-accurate span (requires
-/// [`minijinja::Environment::set_debug`], which `TemplateEngine::new` always
-/// enables).
+/// Formats a render error's location as `name:line` or `name:line:column`.
 ///
-/// Returns `None` if minijinja never attached a template name, which should not
-/// happen: every render goes through `TemplateEngine::render`, which always
-/// names the template via `template_from_named_str`.
+/// Includes the column when `minijinja` captures a byte-accurate span. This
+/// needs [`minijinja::Environment::set_debug`], which `TemplateEngine::new`
+/// always enables.
+///
+/// Returns `None` if `minijinja` never attached a template name. Every render
+/// goes through `TemplateEngine::render`, which names the template with
+/// `template_from_named_str`.
 fn render_error_location(error: &minijinja::Error) -> Option<String> {
     let name = error.name()?;
     let line = error.line().unwrap_or(0);
@@ -763,10 +767,9 @@ fn render_error_location(error: &minijinja::Error) -> Option<String> {
 
 /// Returns the 1-based column of `byte_pos` within its line of `source`.
 ///
-/// `None` if `byte_pos` falls outside `source` or on a non-character boundary
-/// (defensive: minijinja's own span positions always land on a boundary of the
-/// same source it reports, but this stays panic-free either way instead of
-/// asserting that invariant).
+/// Returns `None` if `byte_pos` falls outside `source` or on a non-character
+/// boundary. `minijinja` spans always land on a boundary of the reported
+/// source, but this function stays panic-free instead of asserting.
 fn line_column(source: &str, byte_pos: usize) -> Option<usize> {
     let up_to_pos = source.get(..byte_pos)?;
     let line_start =

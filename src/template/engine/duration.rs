@@ -15,7 +15,7 @@ use minijinja::{Environment, Error, ErrorKind, value::Value};
 use super::error::{TemplateEngineResult, invalid_operation};
 use crate::DurationValue;
 
-/// Registration namespace for the stateless duration filters.
+/// Registers stateless duration filters on a template environment.
 pub(super) struct DurationOps;
 
 impl DurationOps {

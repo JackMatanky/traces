@@ -1,34 +1,31 @@
-//! Persisted index rebuild command.
+//! Rebuilds the persisted workspace index.
 //!
 //! Handles `traces index` by loading the trusted project root, refreshing its
-//! [`WorkspaceIndex`](crate::index::WorkspaceIndex), and replacing the stored
-//! index. Task queries live in the task command module.
+//! [`crate::index::WorkspaceIndex`], and replacing the stored index. Task
+//! queries live in the task command module.
 
 use clap::Args;
 
 use super::error::{CliError, CliResult};
 use crate::{Config, IndexerService};
 
-/// Arguments for `traces index`.
+/// Defines arguments for `traces index`.
 ///
 /// Takes no positional or optional arguments. Scans the trusted project root
-/// and persists a fresh [`WorkspaceIndex`](crate::index::WorkspaceIndex).
+/// and persists a fresh [`crate::index::WorkspaceIndex`].
 #[derive(Debug, Args)]
 pub(super) struct Index;
 
 impl Index {
     /// Runs `traces index` for the trusted project root.
     ///
-    /// Scans the root, persists the fresh [`WorkspaceIndex`], and reports the
-    /// indexed file count to stderr.
+    /// Scans the root, persists the fresh [`crate::index::WorkspaceIndex`], and
+    /// reports the indexed file count to standard error.
     ///
     /// # Errors
     ///
-    /// - [`Index`] if scanning the project root or persisting the
-    ///   [`WorkspaceIndex`] fails.
-    ///
-    /// [`Index`]: CliError::Index
-    /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
+    /// - [`CliError::Index`] if scanning the project root or persisting the
+    ///   [`crate::index::WorkspaceIndex`] fails.
     #[expect(
         clippy::unused_self,
         reason = "keeps the dispatch signature consistent with every other \

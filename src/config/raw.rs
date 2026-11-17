@@ -1,4 +1,4 @@
-//! Parses Config File TOML into strict Serde types.
+//! Parses Configuration File TOML into strict Serde types.
 //!
 //! [`RawConfig`] holds configured values before
 //! [`super::builder::ConfigBuilder`] applies Configuration Scope precedence.
@@ -10,9 +10,10 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Holds Config File values before merge and path resolution.
+/// Holds Configuration File values before merge and path resolution.
 ///
-/// Local and global Config Files use these tables. Serde rejects unknown keys.
+/// Local and global Configuration Files use these tables. Serde rejects unknown
+/// keys.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawConfig {
@@ -32,12 +33,13 @@ pub(crate) struct RawConfig {
 
 /// Holds the `[templates]` table before the builder merges values.
 ///
-/// Serialization omits absent fields when it creates a Config File scaffold.
+/// Serialization omits absent fields when it creates a Configuration File
+/// scaffold.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTemplateConfig {
-    /// Names the Template Directory before resolution against the Config File
-    /// root.
+    /// Names the Template Directory before resolution against the
+    /// Configuration File root.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) directory: Option<PathBuf>,
     /// Names the directory for rendered templates.
@@ -50,23 +52,25 @@ pub(crate) struct RawTemplateConfig {
 
 /// Holds the `[schemas]` table before the builder merges values.
 ///
-/// Serialization omits absent fields when it creates a Config File scaffold.
+/// Serialization omits absent fields when it creates a Configuration File
+/// scaffold.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchemasConfig {
-    /// Names the frontmatter key for a Note's File Class before the builder
-    /// applies the `class` default.
+    /// Names the frontmatter key for a Note's File Class before applying the
+    /// `class` default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) class_field: Option<String>,
-    /// Names the schema directory before the builder applies the
-    /// `.traces/schemas/` default.
+    /// Names the schema directory before applying the `.traces/schemas/`
+    /// default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) directory: Option<PathBuf>,
 }
 
 /// Holds the `[frontmatter]` table before the builder merges values.
 ///
-/// Serialization omits absent fields when it creates a Config File scaffold.
+/// Serialization omits absent fields when it creates a Configuration File
+/// scaffold.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawFrontmatterConfig {
@@ -97,9 +101,9 @@ pub(crate) struct RawFrontmatterConfig {
 
 /// Holds an optional frontmatter key and format for a date field.
 ///
-/// [`super::model::DateFieldConfig`] supplies role-specific defaults when
-/// values are missing. Serialization omits absent fields when it creates a
-/// Config File scaffold.
+/// `DateFieldConfig` supplies role-specific defaults when values are missing.
+/// Serialization omits absent fields when it creates a Configuration File
+/// scaffold.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDateFieldConfig {
@@ -113,7 +117,8 @@ pub(crate) struct RawDateFieldConfig {
 
 /// Holds the `[tasks]` table before the builder merges values.
 ///
-/// Serialization omits empty fields when it creates a Config File scaffold.
+/// Serialization omits empty fields when it creates a Configuration File
+/// scaffold.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTaskConfig {
@@ -134,7 +139,7 @@ pub(crate) struct RawTaskConfig {
     pub(crate) statuses: Vec<RawTaskStatus>,
 }
 
-/// Holds a `[[tasks.statuses]]` entry from a Config File.
+/// Holds a `[[tasks.statuses]]` entry from a Configuration File.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTaskStatus {
@@ -218,8 +223,8 @@ mod tests {
             RawTemplateConfig,
         };
 
-        /// Arbitrary text, including control characters and non-ASCII
-        /// letters, over a bounded length so shrinking stays readable.
+        /// Arbitrary text, including control characters and non-ASCII letters,
+        /// over a bounded length so shrinking stays readable.
         fn text() -> impl Strategy<Value = String> {
             "\\PC{0,32}"
         }
@@ -316,18 +321,16 @@ mod tests {
         }
 
         proptest! {
-            /// Pins the Config File scaffold law: every generated
-            /// configuration survives a serialise-then-parse round trip
-            /// unchanged, so scaffolded files never lose configured values.
+            /// Pins the Configuration File scaffold law: every generated
+            /// configuration survives a serialize-then-parse round trip
+            /// unchanged, so generated scaffolds never lose configured values.
             #[test]
             fn toml_serialization_round_trips(config in raw_config()) {
-                // Act
                 let written = toml::to_string(&config)
                     .expect("RawConfig always serialises");
                 let reparsed = toml::from_str::<RawConfig>(&written)
                     .expect("scaffolded Config File TOML must re-parse");
 
-                // Assert
                 prop_assert_eq!(reparsed, config);
             }
         }

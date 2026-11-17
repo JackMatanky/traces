@@ -33,7 +33,7 @@ pub enum IndexError {
     /// UTF-8.
     #[error("failed to parse note {path}")]
     NoteParse {
-        /// Names the note that the index could not read or parse.
+        /// Names the note that the index cannot read or parse.
         path: PathBuf,
         /// Holds the underlying read error.
         #[source]
@@ -42,7 +42,7 @@ pub enum IndexError {
     /// Reports when a scan cannot inspect file metadata.
     #[error("failed to inspect {path}")]
     Inspect {
-        /// Names the file whose metadata the scan could not inspect.
+        /// Names the file whose metadata the scan cannot inspect.
         path: PathBuf,
         /// Holds the underlying metadata error.
         #[source]
@@ -56,19 +56,19 @@ pub(crate) enum StoreError {
     /// Reports a filesystem access failure.
     #[error("failed to access {path}")]
     Io {
-        /// Names the path that the store could not access.
+        /// Names the path that the store cannot access.
         path: PathBuf,
         /// Holds the underlying filesystem error.
         #[source]
         source: io::Error,
     },
-    /// Reports a failure when the index opens, reads, or writes the redb
+    /// Reports a failure when the index opens, reads, or writes the `redb`
     /// database.
     #[error("failed to access the database at {path}")]
     Redb {
         /// Names the database file.
         path: PathBuf,
-        /// Holds the underlying redb error.
+        /// Holds the underlying `redb` error.
         #[source]
         source: Box<redb::Error>,
     },

@@ -1,25 +1,31 @@
 //! Provides calendar dates, date-times, durations, and the arithmetic that
 //! relates them.
 //!
-//! This module owns recognition, parsing, formatting, and value semantics for
-//! date-shaped and duration-shaped input. Callers use validated values. Parse
-//! failures are public errors, while arithmetic failures stay internal and map
-//! at the query and template boundaries.
+//! Owns recognition, parsing, formatting, and value semantics for date-shaped
+//! and duration-shaped input. Callers use validated values. Parse failures are
+//! public errors, while arithmetic failures stay internal and map at the query
+//! and template boundaries.
 //!
 //! # Clock doctrine
 //!
-//! Naive Date-Time input resolves in the process-local zone and is stored as
-//! UTC. Explicit-offset input is normalized to UTC. A Date remains zone-free.
-//! Date-Time display uses the local clock. Repeated local times resolve to the
-//! earlier occurrence. Skipped local times shift forward by the gap length.
+//! The temporal layer separates zone-free dates from UTC-stored date-times:
+//!
+//! - Naive date-time input resolves in the process-local zone and stores as
+//!   UTC.
+//! - Explicit-offset input normalizes to UTC.
+//! - Calendar dates remain zone-free.
+//! - Date-time display converts back to the local clock.
+//! - Repeated local times resolve to the earlier occurrence, and skipped times
+//!   shift forward by the gap length.
 //!
 //! # Calendar arithmetic
 //!
-//! A duration is applied in one Jiff calendar operation, independent of the
-//! order in which its units were written. Calendar units use the local clock;
-//! exact units measure elapsed time. Calendar-day differences count local
-//! calendar boundaries, while hour and smaller differences measure elapsed
-//! time.
+//! Calendar arithmetic applies a duration in one Jiff calendar operation,
+//! regardless of unit order:
+//!
+//! - Calendar units operate on the local clock, and calendar-day differences
+//!   count local calendar boundaries.
+//! - Exact units and hour-or-smaller differences measure elapsed time.
 //!
 //! # Key types
 //!
@@ -29,6 +35,7 @@
 //!   time.
 //! - [`DurationValue`]: A validated duration with nominal identity and
 //!   calendar-aware application.
+
 mod calendar;
 mod date;
 mod datetime;
@@ -68,12 +75,14 @@ pub(crate) mod test_support {
     use jiff::tz::TimeZone;
 
     /// Installs a thread-local local-zone override for the current test thread
-    /// and restores the previous override when dropped. Overrides do not cross
-    /// thread boundaries, so parallel tests cannot observe each other's zones.
+    /// and restores the previous override when dropped.
     ///
-    /// Repeated calls to [`Self::set`] replace the active override while
-    /// retaining the original zone. Use [`Self::with`] for nested scoped
-    /// changes. Each scope restores its immediate parent during unwind.
+    /// Overrides do not cross thread boundaries, so parallel tests cannot
+    /// observe each other's zones. Repeated calls to [`Self::set`] replace the
+    /// active override while retaining the original zone.
+    ///
+    /// Use [`Self::with`] for nested scoped changes. Each scope restores its
+    /// immediate parent during unwind.
     ///
     /// # Examples
     ///
@@ -105,9 +114,9 @@ pub(crate) mod test_support {
         /// Sets the thread-local zone override for the current test thread.
         ///
         /// Readers on other threads observe their own zone. Repeated calls
-        /// replace the override. The original value returns when the parked
-        /// guard is cleared by [`Self::reset`] or the thread exits. Use
-        /// [`Self::with`] for scoped overrides.
+        /// replace the override. Calling [`Self::reset`] or exiting the thread
+        /// restores the original value. Use [`Self::with`] for scoped
+        /// overrides.
         ///
         /// # Panics
         ///
@@ -125,8 +134,8 @@ pub(crate) mod test_support {
 
         /// Runs `action` with a thread-local zone override.
         ///
-        /// Nested calls restore the immediately enclosing zone. The override is
-        /// restored during normal return and panic unwinding.
+        /// Nested calls restore the immediately enclosing zone on normal return
+        /// and panic unwinding.
         ///
         /// # Panics
         ///
@@ -145,8 +154,8 @@ pub(crate) mod test_support {
             result
         }
 
-        /// Clears any override parked on the current thread, restoring the zone
-        /// that was active before the parked guard was installed.
+        /// Clears any override parked on the current thread and restores the
+        /// previous zone.
         #[inline]
         pub fn reset() {
             let guard = ZONE_GUARD.with(|slot| slot.borrow_mut().take());
@@ -155,8 +164,8 @@ pub(crate) mod test_support {
 
         /// Sets the thread-local override to a previously resolved zone.
         ///
-        /// Repeated calls replace the active override. The original value
-        /// returns when the parked guard is cleared or the thread exits.
+        /// Repeated calls replace the active override. Clearing the parked
+        /// guard or exiting the thread restores the original value.
         pub(crate) fn set_timezone(zone: TimeZone) {
             let parked = ZONE_GUARD.with(|slot| slot.borrow().is_some());
             if parked {

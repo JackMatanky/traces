@@ -1,5 +1,7 @@
-//! Deterministic [`DialogProvider`] that replays queued responses for tests
-//! and non-interactive execution.
+//! Provides a deterministic [`DialogProvider`] that replays queued responses.
+//!
+//! Used for tests and unattended execution where prompts must not touch the
+//! terminal.
 
 use std::{
     collections::VecDeque,
@@ -23,12 +25,11 @@ fn get_mut<T>(m: &mut Mutex<T>) -> &mut T {
     m.get_mut().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Deterministic [`DialogProvider`] that replays queued responses.
+/// Replays queued prompt responses deterministically without terminal access.
 ///
-/// Queue answers with builder methods such as [`with_text`](Self::with_text)
-/// and [`with_confirm`](Self::with_confirm). Each dialog call consumes one
-/// queued value, then falls back to the prompt's default or the provider's
-/// hard-coded fallback.
+/// Queue answers with builder methods such as [`Self::with_text`] and
+/// [`Self::with_confirm`]. Each dialog call consumes one queued value, then
+/// falls back to the prompt's default or the provider's hard-coded fallback.
 ///
 /// Used where prompts must not touch the terminal: tests, automation, and MCP
 /// execution.
@@ -45,9 +46,13 @@ fn get_mut<T>(m: &mut Mutex<T>) -> &mut T {
 /// ```
 #[derive(Debug, Default)]
 pub struct PresetDialogProvider {
+    /// Queued responses for [`DialogProvider::text`] calls, consumed FIFO.
     texts: Mutex<VecDeque<String>>,
+    /// Queued responses for [`DialogProvider::confirm`] calls, consumed FIFO.
     confirms: Mutex<VecDeque<bool>>,
+    /// Queued indices for [`DialogProvider::select`] calls, consumed FIFO.
     selects: Mutex<VecDeque<usize>>,
+    /// Queued index lists for [`DialogProvider::multi_select`], consumed FIFO.
     multi_selects: Mutex<VecDeque<Vec<usize>>>,
 }
 
@@ -64,8 +69,8 @@ impl PresetDialogProvider {
 
     /// Queues a response for the next [`DialogProvider::text`] call.
     ///
-    /// Text responses are consumed first-in-first-out. When the queue is empty,
-    /// `text` falls back to the `default` parameter.
+    /// Calls consume text responses first-in-first-out. When the queue is
+    /// empty, `text` falls back to the `default` parameter.
     ///
     /// # Examples
     ///
@@ -105,16 +110,13 @@ impl PresetDialogProvider {
 
     /// Queues a chosen index for the next [`DialogProvider::select`] call.
     ///
-    /// The queued index is validated only when [`DialogProvider::select`]
-    /// consumes it. An index at or beyond the prompted items' length returns
-    /// [`DialogError::InvalidConfiguration`] instead of an out-of-range
-    /// `usize`, mirroring how the real prompt can never return an invalid
-    /// choice.
+    /// [`DialogProvider::select`] validates the queued index only when it
+    /// consumes that index, mirroring how the real prompt never returns an
+    /// invalid choice:
     ///
-    /// # Errors
-    ///
-    /// - [`DialogError::EmptySelectionInput`] if `items` is empty (returned by
-    ///   [`DialogProvider::select`], not at queue time).
+    /// - Out-of-bounds indices return [`DialogError::InvalidConfiguration`]
+    ///   instead of an invalid `usize`.
+    /// - Empty `items` slices fail with [`DialogError::EmptySelectionInput`].
     ///
     /// # Examples
     ///
@@ -169,11 +171,13 @@ impl PresetDialogProvider {
 }
 
 impl DialogProvider for PresetDialogProvider {
+    /// Returns `true` while any preset response queue still holds an entry.
     #[inline]
     fn is_interactive(&self) -> bool {
         !self.is_empty()
     }
 
+    /// Pops the next queued text response, falling back to `default` or `""`.
     #[inline]
     fn text(
         &self,
@@ -185,6 +189,7 @@ impl DialogProvider for PresetDialogProvider {
             .unwrap_or_else(|| default.unwrap_or_default().to_owned()))
     }
 
+    /// Pops the next queued confirmation, falling back to `default` or `false`.
     #[inline]
     fn confirm(
         &self,
@@ -223,6 +228,8 @@ impl DialogProvider for PresetDialogProvider {
         Ok(0)
     }
 
+    /// Pops the next queued index list, returning an empty [`Vec`] if `items`
+    /// is empty or the queue is exhausted.
     #[inline]
     fn multi_select(
         &self,

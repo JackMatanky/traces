@@ -1,8 +1,8 @@
-//! Local project scaffold command.
+//! Scaffolds a local traces project.
 //!
 //! Handles `traces init` by collecting template and output directories
 //! interactively, creating `.traces/` plus its template directory, and writing
-//! the initial local config.
+//! the initial local configuration.
 
 use std::{
     fs,
@@ -22,32 +22,32 @@ use crate::{
     },
 };
 
+/// Default output directory offered during interactive initialization.
 const DEFAULT_OUTPUT_DIRECTORY: &str = ".";
 
-/// Arguments for `traces init`.
+/// Defines arguments for `traces init`.
 ///
 /// Initializes traces configuration in the current directory by scaffolding
-/// `.traces/`, a template directory, and a local config file.
+/// `.traces/`, a template directory, and a local configuration file.
 #[derive(Debug, Args)]
 pub struct Init;
 
 impl Init {
     /// Runs `traces init` using the current directory as the project root.
     ///
-    /// Nothing is written when the chosen template directory is invalid, and
-    /// everything this run created is removed again if a later step fails.
+    /// Writes nothing if the chosen template directory is invalid. Removes all
+    /// created directories if a later step fails.
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if the current directory cannot be
-    ///   read.
+    /// - [`CliError::CurrentDirectory`] if reading the current directory fails.
     /// - [`CliError::InitPrompt`] if collecting input interactively fails.
     /// - [`CliError::InitAlreadyInitialized`] if `.traces` already exists.
     /// - [`CliError::InitInvalidTemplateDir`] if the template directory is
     ///   absolute, contains `..`, or resolves outside the project.
     /// - [`CliError::InitScaffold`] if directory scaffolding fails.
     /// - [`CliError::InitConfigWrite`] if serializing or writing the local
-    ///   config file fails.
+    ///   configuration file fails.
     #[inline]
     pub fn run(self, provider: &dyn DialogProvider) -> CliResult {
         let root = super::current_dir()?.into_inner();
@@ -106,9 +106,10 @@ impl Init {
         })
     }
 
-    /// Creates `.traces/` and every missing directory down to `templates_dir`,
-    /// recording each directory it creates in `created` (in creation order) so
-    /// a failure can be undone.
+    /// Creates `.traces/` and every missing directory down to `templates_dir`.
+    ///
+    /// Records each new directory in `created` in creation order so a failure
+    /// removes them.
     ///
     /// # Errors
     ///
@@ -143,12 +144,12 @@ impl Init {
         Ok(())
     }
 
-    /// Writes the local config file under `root`.
+    /// Writes the local configuration file under `root`.
     ///
     /// # Errors
     ///
     /// - [`CliError::InitConfigWrite`] if serializing or writing the local
-    ///   config file fails.
+    ///   configuration file fails.
     fn write_config_file(
         root: &Path,
         directory: &Path,
@@ -162,9 +163,10 @@ impl Init {
         })
     }
 
-    /// Removes the directories a failed run created, newest first. Never
-    /// recursive: a directory that gained other content is left alone, which
-    /// also protects a config file this run did not create.
+    /// Removes the directories a failed run created, newest first.
+    ///
+    /// Never recursive: a directory that gained other content is left alone,
+    /// which also protects a configuration file this run did not create.
     fn undo(created: &[PathBuf]) {
         for dir in created.iter().rev() {
             // Best effort: the original error is the one worth reporting.
@@ -173,21 +175,22 @@ impl Init {
     }
 }
 
-/// Errors raised while scaffolding a local config file on disk.
+/// Enumerates errors raised while scaffolding a local configuration file on
+/// disk.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigScaffoldError {
-    /// The collected template and output directories could not be serialized to
-    /// TOML.
+    /// Serializing the collected template and output directories to TOML
+    /// failed.
     #[error("failed to serialize local config")]
     Serialize {
         /// Source TOML serialization error.
         #[source]
         source: toml::ser::Error,
     },
-    /// The serialized local config could not be written to disk.
+    /// Writing the serialized local configuration to disk failed.
     ///
-    /// Includes the case where the file already exists, since
-    /// [`std::fs::File::create_new`] is used to prevent silent clobbering.
+    /// Includes existing files, because [`std::fs::File::create_new`] prevents
+    /// silent overwrites.
     #[error("failed to write local config file")]
     Write {
         /// Source filesystem error.
@@ -196,17 +199,15 @@ pub(crate) enum ConfigScaffoldError {
     },
 }
 
-/// Serializes `directory`/`output_dir` as the local template config and writes
-/// it to `root.join(LOCAL_CONFIG_FILE)`.
+/// Serializes `directory` and `output_dir` as the local template configuration
+/// and writes it to `LOCAL_CONFIG_FILE` under `root`.
 ///
-/// `[schemas]` and `[frontmatter]` are written as empty tables (their serde
-/// defaults), so a freshly scaffolded config behaves identically to one that
-/// omits those tables entirely.
+/// Writes `[schemas]` and `[frontmatter]` as empty tables (their `serde`
+/// defaults), so a new configuration matches one that omits those tables.
 ///
-/// Uses [`std::fs::File::create_new`] rather than [`std::fs::write`] so this
-/// fails atomically if the file already exists, preventing a concurrent `traces
-/// init` or a file planted between the existence check and write from being
-/// silently clobbered.
+/// Uses [`std::fs::File::create_new`] instead of [`std::fs::write`] to fail
+/// atomically if the file exists. This prevents a concurrent `traces init` or a
+/// race from overwriting the file.
 ///
 /// # Errors
 ///
@@ -247,9 +248,12 @@ fn scaffold_local(
     Ok(())
 }
 
-/// The user's chosen template/output directories, collected interactively.
+/// Stores the user's chosen template and output directories, collected
+/// interactively.
 struct InitInput {
+    /// Relative path to the templates directory.
     directory: PathBuf,
+    /// Relative path to the default output directory.
     output_dir: PathBuf,
 }
 
@@ -349,7 +353,8 @@ mod tests {
             assert!(!preset.path().join(".traces/templates").exists());
         }
 
-        /// Checks that the dialog's defaults are written to the local config.
+        /// Checks that the dialog's defaults are written to the local
+        /// configuration.
         #[test]
         fn scaffolds_config_with_default_template_and_output_paths() {
             let defaults =
@@ -420,13 +425,13 @@ mod tests {
             assert!(!outside.path().join("templates").exists());
         }
 
-        /// A failure after `.traces` exists must not block a re-run.
+        /// Verifies a failure after `.traces` exists does not block a rerun.
         #[test]
         fn cleans_up_after_a_mid_run_failure() {
             let root = tempfile::tempdir().expect("create temp dir");
             let _guard = CwdGuard::enter(root.path());
-            // A parent that is a regular file lets `.traces` be created and
-            // the nested template directory fail, on any platform and user.
+            // A regular-file parent lets `.traces` succeed while the nested
+            // template directory fails, on any platform.
             fs::write(root.path().join("docs"), "").expect("create blocker");
             let failing =
                 crate::PresetDialogProvider::new().with_text("docs/templates");
@@ -457,7 +462,8 @@ mod tests {
             assert!(!root.path().join(".traces").exists());
         }
 
-        /// Existing initialization must not be overwritten.
+        /// Checks that init refuses a `.traces` directory that already
+        /// exists.
         #[test]
         fn refuses_existing_traces_directory() {
             let existing =

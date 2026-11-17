@@ -1,4 +1,5 @@
-//! Provides redb persistence for [`FileMeta`], [`Note`], and derived inlinks.
+//! Provides `redb` persistence for [`FileMeta`], [`Note`], and derived inbound
+//! links.
 //!
 //! [`IndexStore`] owns the database connection and uses the schema in
 //! [`super::tables`]. Callers use [`super::IndexerService`] instead of
@@ -42,7 +43,7 @@ const META_VERSION: &[u8] = b"1";
 /// Names the raw index fingerprint key in `META`.
 const META_FINGERPRINT_KEY: &[u8] = b"fingerprint";
 
-/// Groups stored files, path-sorted notes, and target-keyed inlinks.
+/// Groups stored files, path-sorted notes, and target-keyed inbound links.
 pub(super) type StoreSnapshot =
     (SortedByPath<FileMeta>, SortedByPath<Note>, InlinkMap);
 
@@ -106,7 +107,7 @@ pub(super) enum PersistRows<'a> {
     Rebuild {
         entries: &'a [FileEntry],
     },
-    /// Applies incremental file, note, dimension, and inlink changes.
+    /// Applies incremental file, note, dimension, and inbound link changes.
     Incremental {
         delta: &'a FileDelta,
         notes: &'a [&'a Note],
@@ -129,18 +130,18 @@ type ResolvedLink = Option<(PathBuf, Box<[PathBuf]>)>;
 /// Names a read-only table with raw byte keys and values.
 type BytesReadTable = redb::ReadOnlyTable<&'static [u8], &'static [u8]>;
 
-/// Names a read-only multimap table with raw byte keys and values.
+/// Names a read-only `multimap` table with raw byte keys and values.
 type BytesReadMultimapTable =
     redb::ReadOnlyMultimapTable<&'static [u8], &'static [u8]>;
 
-/// Names an unboxed range iterator over redb table entries.
+/// Names an unboxed range iterator over `redb` table entries.
 type TableRange<'a> = redb::Range<'a, &'static [u8], &'static [u8]>;
 
-/// Names a multimap table with raw byte keys and values.
+/// Names a `multimap` table with raw byte keys and values.
 type BytesMultimapTable<'txn> =
     redb::MultimapTable<'txn, &'static [u8], &'static [u8]>;
 
-/// Manages a redb-backed database handle for one project root's index.
+/// Manages a `redb`-backed database handle for one project root's index.
 #[derive(Debug)]
 pub(crate) struct IndexStore {
     db: redb::Database,
@@ -157,9 +158,8 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`Store`] if the database's parent directory cannot be created, the
-    ///   database file cannot be opened, or a corrupted or schema-mismatched
-    ///   file cannot be replaced during recovery.
+    /// - [`Store`] if the store cannot create the database parent directory,
+    ///   open the database file, or replace a corrupt file.
     ///
     /// [`Store`]: IndexError::Store
     pub(crate) fn open(root: &Path) -> IndexResult<Self> {
@@ -327,7 +327,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if the transaction cannot be started.
+    /// - [`StoreError::Redb`] if `redb` cannot start the transaction.
     fn begin_read(&self) -> StoreResult<ReadTransaction> {
         self.db.begin_read().map_err(|source| self.wrap_redb_error(source))
     }
@@ -336,7 +336,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if the transaction cannot be started.
+    /// - [`StoreError::Redb`] if `redb` cannot start the transaction.
     #[inline(never)]
     fn begin_write(&self) -> StoreResult<WriteTransaction> {
         self.db.begin_write().map_err(|source| self.wrap_redb_error(source))
@@ -413,7 +413,7 @@ impl IndexStore {
         Ok(())
     }
 
-    /// Opens a row table for reads; a missing table is an empty cache.
+    /// Opens a row table for reads. A missing table represents an empty cache.
     fn open_table_for_read(
         &self,
         txn: &ReadTransaction,
@@ -426,7 +426,7 @@ impl IndexStore {
         }
     }
 
-    /// Opens a multimap for reads; a missing table is an empty cache.
+    /// Opens a `multimap` for reads. A missing table represents an empty cache.
     fn open_multimap_for_read(
         &self,
         txn: &ReadTransaction,
@@ -478,10 +478,11 @@ impl IndexStore {
     }
 
     /// Loads every stored [`FileMeta`] and [`Note`] (sorted by path) and every
-    /// derived inlink edge. Stale or orphaned edges are dropped.
+    /// derived inbound link edge. Stale or orphaned edges are dropped.
     ///
     /// Targets resolve through every stored [`FileMeta`] because attachments
-    /// can carry inlinks; sources resolve through stored [`Note`] rows only.
+    /// can carry inbound links. Sources resolve through stored [`Note`] rows
+    /// only.
     ///
     /// # Errors
     ///
@@ -555,13 +556,13 @@ impl IndexStore {
 
     /// Reads the fingerprint recorded in `META`.
     ///
-    /// An absent table means a virgin store. A table without a decodable
-    /// fingerprint is unreadable, so callers fail closed.
+    /// An absent table means a virgin store. A table without a valid
+    /// fingerprint is unreadable, so callers treat it as drifted.
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if `META` cannot be opened or its fingerprint row
-    ///   cannot be read.
+    /// - [`StoreError::Redb`] if `redb` cannot open `META` or read its
+    ///   fingerprint row.
     fn read_fingerprint(
         &self,
         txn: &ReadTransaction,
@@ -578,7 +579,8 @@ impl IndexStore {
         }))
     }
 
-    /// Reads all persisted inlink edges, resolving path bytes against `files`.
+    /// Reads all persisted inbound link edges and resolves path bytes against
+    /// `files`.
     ///
     /// # Errors
     ///
@@ -611,13 +613,13 @@ impl IndexStore {
         self.read_links(&txn, LINKS, &target_paths, &source_paths)
     }
 
-    /// Deserializes every `target -> sources` edge from the `links` multimap
+    /// Deserializes every `target -> sources` edge from the `links` `multimap`
     /// table, resolving stored path bytes through `target_paths` and
     /// `source_paths`.
     ///
-    /// A target missing from `target_paths` drops its whole edge set; a source
-    /// missing from `source_paths` is skipped; an entry left with no surviving
-    /// sources is omitted entirely.
+    /// A target missing from `target_paths` drops its whole edge set. This
+    /// method skips any source missing from `source_paths` and omits any entry
+    /// with no surviving sources.
     ///
     /// # Errors
     ///
@@ -643,8 +645,8 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`Store`] if the table cannot be opened or written, or an item cannot
-    ///   be encoded.
+    /// - [`Store`] if `redb` cannot open or write the table, or if encoding
+    ///   fails.
     ///
     /// [`Store`]: IndexError::Store
     fn write_table<'a, T: Serialize + 'a>(
@@ -673,7 +675,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`Store`] if the table cannot be opened or written.
+    /// - [`Store`] if `redb` cannot open or write the table.
     ///
     /// [`Store`]: IndexError::Store
     fn write_meta(
@@ -694,12 +696,12 @@ impl IndexStore {
         Ok(())
     }
 
-    /// Writes every [`FileEntry`]'s inbound-link edges into the [links]
-    /// multimap table.
+    /// Writes every [`FileEntry`]'s inbound-link edges into the [`LINKS`]
+    /// `multimap` table.
     ///
     /// # Errors
     ///
-    /// - [`Store`] if the table cannot be opened or written.
+    /// - [`Store`] if `redb` cannot open or write the table.
     ///
     /// [`Store`]: IndexError::Store
     fn write_links(
@@ -729,7 +731,7 @@ impl IndexStore {
 
     // --- Persistence entry points -------------------------------------
 
-    /// Persists a rebuild or a non-empty incremental refresh.
+    /// Persists a rebuild or a nonempty incremental refresh.
     ///
     /// Incremental requests must contain at least one file, note, or edge
     /// change. `IndexerService::prepare_pass` filters empty passes before they
@@ -737,7 +739,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`Store`] if the transaction fails or a row cannot be encoded.
+    /// - [`Store`] if the transaction fails or row encoding fails.
     ///
     /// [`Store`]: IndexError::Store
     pub(super) fn persist(
@@ -837,7 +839,7 @@ impl IndexStore {
     ) -> IndexResult<()> {
         self.create_tables(&txn)?;
         // The core tables (FILES, NOTES, and tag/class axes) do not overlap
-        // with LINKS. rayon::join can therefore run both write batches at the
+        // with LINKS. `rayon::join` can therefore run both write batches at the
         // same time.
         let (core_res, links_res) = rayon::join(
             || -> IndexResult<()> {
@@ -861,7 +863,7 @@ impl IndexStore {
 
     // --- Error -------------------------------------------------------
 
-    /// Wraps a redb error with this store's database path.
+    /// Wraps a `redb` error with this store's database path.
     #[cold]
     #[inline(never)]
     pub(super) fn wrap_redb_error(
@@ -889,7 +891,7 @@ impl IndexStore {
         )
     }
 
-    /// Distinguishes invalid on-disk bytes from non-recoverable open failures.
+    /// Distinguishes invalid on-disk bytes from unrecoverable open failures.
     fn is_recoverable_open_error(error: &redb::DatabaseError) -> bool {
         match error {
             redb::DatabaseError::Storage(redb::StorageError::Corrupted(_)) => {
@@ -906,8 +908,9 @@ impl IndexStore {
 
     /// Opens (or creates) the database file.
     ///
-    /// Recovers by wipe-and-recreate on redb corruption or an invalid file
-    /// header. Redb reports an invalid magic number as `InvalidData` I/O.
+    /// Recovers by wipe-and-recreate on `redb` corruption or an invalid file
+    /// header. `redb` reports an invalid magic number as an `InvalidData`
+    /// error.
     ///
     /// # Errors
     ///
@@ -988,9 +991,10 @@ impl IndexStore {
         Ok(version.value() != META_VERSION)
     }
 
-    /// Reads and decodes `paths` from `kind`'s table in parallel. It warns and
-    /// skips corrupt rows. The result contains only rows that exist and decode
-    /// successfully.
+    /// Reads and decodes `paths` for `kind` in parallel.
+    ///
+    /// Logs and skips corrupt rows. The result contains only rows that exist
+    /// and decode successfully.
     ///
     /// # Errors
     ///
@@ -1040,7 +1044,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`Store`] if redb cannot look up or read a stored path.
+    /// - [`Store`] if `redb` cannot look up or read a stored path.
     ///
     /// [`Store`]: IndexError::Store
     #[inline(never)]
@@ -1086,7 +1090,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot open or read the table range.
+    /// - [`StoreError::Redb`] if `redb` cannot open or read the table range.
     fn collect_folder_paths(
         &self,
         table: &redb::ReadOnlyTable<&[u8], &[u8]>,
@@ -1097,7 +1101,7 @@ impl IndexStore {
             self.collect_all_folder_paths(table)
         } else {
             // Stored keys are native path bytes, so the separator is
-            // platform-specific; `/` is also accepted on every platform.
+            // platform-specific. Every platform also accepts `/`.
             let prefix =
                 if folder_str.ends_with(['/', std::path::MAIN_SEPARATOR]) {
                     folder_str.into_owned()
@@ -1112,7 +1116,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot read a table entry.
+    /// - [`StoreError::Redb`] if `redb` cannot read a table entry.
     fn collect_all_folder_paths(
         &self,
         table: &redb::ReadOnlyTable<&[u8], &[u8]>,
@@ -1136,7 +1140,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot open or read the table range.
+    /// - [`StoreError::Redb`] if `redb` cannot open or read the table range.
     fn collect_prefixed_folder_paths(
         &self,
         table: &redb::ReadOnlyTable<&[u8], &[u8]>,
@@ -1175,7 +1179,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot open the iterator.
+    /// - [`StoreError::Redb`] if `redb` cannot open the iterator.
     #[inline(never)]
     fn open_table_iter<'a>(
         &self,
@@ -1186,21 +1190,20 @@ impl IndexStore {
 
     /// Deserializes every row in an already-open `table`.
     ///
-    /// Decodes rows from borrowed `redb::AccessGuard` bytes during one
-    /// sequential B-tree walk. It does not copy rows into buffers or decode
-    /// them with Rayon. Benchmarks found that copying cost more than parallel
-    /// decoding saved at every tested workspace size. The regressions reached
-    /// +27% for small and medium tables. Results were flat at 20,000 rows.
+    /// Decodes rows directly from borrowed `redb::AccessGuard` bytes during one
+    /// sequential B-tree walk, without buffering or Rayon parallelism.
+    /// Benchmarks showed copying cost more than parallel decoding saved. Small
+    /// and medium tables regressed up to +27%, and 20,000-row tables stayed
+    /// flat.
     ///
-    /// `T` is [`FileMeta`] or [`Note`]. Inline fields in [`Note`] put the
-    /// monomorphized frame just above Clippy's default stack limit.
-    /// `read_batch` calls `decode_row::<T>` inside a closure. Clippy does not
-    /// report the same frame size there.
+    /// `T` is [`FileMeta`] or [`Note`]. Inline fields in [`Note`] push the
+    /// `monomorphized` frame past `clippy`'s stack limit, which `read_batch`
+    /// avoids inside a closure.
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot read the table.
-    /// - [`StoreError::Deserialize`] if a stored row cannot be decoded.
+    /// - [`StoreError::Redb`] if `redb` cannot read the table.
+    /// - [`StoreError::Deserialize`] if postcard fails to decode a stored row.
     #[expect(
         clippy::large_stack_frames,
         reason = "decode_row<Note> owns a same-sized frame in read_batch's \
@@ -1228,7 +1231,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot read the table.
+    /// - [`StoreError::Redb`] if `redb` cannot read the table.
     fn collect_multimap_links(
         &self,
         table: &redb::ReadOnlyMultimapTable<&[u8], &[u8]>,
@@ -1267,7 +1270,7 @@ impl IndexStore {
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot read a target or source entry.
+    /// - [`StoreError::Redb`] if `redb` cannot read a target or source entry.
     #[inline(never)]
     fn resolve_link_entry(
         &self,
@@ -1289,11 +1292,12 @@ impl IndexStore {
         Ok(Some((target, sources)))
     }
 
-    /// Collects source paths from a multimap iterator and skips unknown paths.
+    /// Collects source paths from a `multimap` iterator and skips unknown
+    /// paths.
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if redb cannot read a source entry.
+    /// - [`StoreError::Redb`] if `redb` cannot read a source entry.
     #[inline(never)]
     fn collect_source_paths(
         &self,
@@ -1317,30 +1321,29 @@ impl IndexStore {
     /// Full-rebuild persistence with durability disabled.
     ///
     /// Uses [`redb::Durability::None`]: `index.redb` is a derived cache, not
-    /// source data. A crash after commit can lose only this write;
-    /// [`IndexerService::refresh`] or a future [`Self::open`] rebuilds by
-    /// rescanning disk, and skipping redb's per-commit fsync removes the fixed
-    /// cost that dominates full-index persistence.
+    /// source data. A crash after commit can lose only this write.
+    /// [`IndexerService::refresh`] or [`Self::open`] rebuilds from disk.
+    /// Skipping `redb` per-commit `fsync` removes the main persistence cost.
     ///
     /// [`IndexerService::refresh`]: super::service::IndexerService::refresh
     ///
     /// # Errors
     ///
-    /// - [`StoreError::Redb`] if the transaction cannot be started or the
-    ///   durability hint cannot be set.
+    /// - [`StoreError::Redb`] if `redb` cannot start the transaction or set
+    ///   durability.
     #[inline(never)]
     fn begin_cache_txn(&self) -> StoreResult<WriteTransaction> {
         self.configure_cache_txn(self.begin_write()?)
     }
 
     /// Deletes every table's contents ahead of a full rebuild write.
-    /// Best-effort tables tolerate only a missing table (the fresh-database
-    /// case); every other storage error propagates.
     ///
-    /// Sequential: redb serializes every `delete_table`/`delete_multimap_table`
-    /// call behind `WriteTransaction`'s single table-namespace mutex, so
-    /// dispatching the seven deletions through Rayon adds scheduling overhead
-    /// without any actual concurrent page-walk work underneath it.
+    /// Best-effort tables tolerate only a missing table (the fresh-database
+    /// case). Every other storage error propagates.
+    ///
+    /// This runs sequentially because `redb` serializes deletions behind
+    /// `WriteTransaction`'s mutex. Dispatching seven deletions through Rayon
+    /// adds overhead without concurrent page work.
     fn delete_tables(&self, txn: &WriteTransaction) -> IndexResult<()> {
         TABLES.iter().try_for_each(|spec| {
             spec.delete(self, txn).map_err(IndexError::from)
@@ -1388,7 +1391,7 @@ impl IndexStore {
     /// rebuild.
     ///
     /// Split from [`Self::write_index_by_path`] so [`WriteTarget::ALL`] can
-    /// write distinct redb tables concurrently.
+    /// write distinct `redb` tables concurrently.
     fn write_index_by_value(
         &self,
         txn: &WriteTransaction,
@@ -1431,7 +1434,7 @@ impl IndexStore {
         Ok(())
     }
 
-    /// Opens or creates a multimap table for write access.
+    /// Opens or creates a `multimap` table for write access.
     fn open_multimap_for_write<'txn>(
         &self,
         txn: &'txn WriteTransaction,
@@ -1443,9 +1446,10 @@ impl IndexStore {
     }
 
     /// Reads `key`'s current values out of `table` into owned byte vectors.
-    /// Collecting first (rather than removing while iterating) is required:
-    /// redb's iterator borrows `table`, so mutating it while a read guard is
-    /// still live is a borrow conflict.
+    ///
+    /// Callers must collect before removing values. The `redb` iterator borrows
+    /// `table`, so mutating it while a read guard is live causes a borrow
+    /// conflict.
     fn collect_multimap_values(
         &self,
         table: &BytesMultimapTable<'_>,
@@ -1521,11 +1525,11 @@ impl IndexStore {
         Ok(())
     }
 
-    /// Removes a path's old values from the forward table by using its reverse
-    /// index. It then clears the reverse entry. The work is O(k), where k is
-    /// the path's value count. It does not scan the full table.
-    /// [`Self::delete_index_entries_for_paths`] and [`Self::upsert_index_axis`]
-    /// use this method.
+    /// Removes a path's old forward-table values using its reverse index.
+    ///
+    /// Clears the reverse entry afterward in `O(k)` work for `k` values,
+    /// avoiding a full table scan. [`Self::delete_index_entries_for_paths`] and
+    /// [`Self::upsert_index_axis`] call this method.
     #[inline(never)]
     fn remove_axis_entry(
         &self,
@@ -1606,8 +1610,9 @@ impl IndexStore {
     }
 
     /// Replaces each modified note's values in `dimension`'s forward table. The
-    /// method removes old values through the reverse table in O(k) time, where
-    /// k is the note's old value count. It does not scan the full table.
+    /// method removes old values through the reverse table in `O(k)` time,
+    /// where `k` is the note's old value count. It does not scan the full
+    /// table.
     fn upsert_index_axis<'a>(
         &self,
         txn: &WriteTransaction,
@@ -2244,7 +2249,7 @@ mod tests {
         txn.commit().expect("commit raw insert");
     }
 
-    /// Builds a sorted inlink-map fixture.
+    /// Builds a sorted inbound-link map fixture.
     fn make_inlinks(entries: &[(PathBuf, &[PathBuf])]) -> InlinkMap {
         let mut map = HashMap::new();
         for (target, sources) in entries {
@@ -2273,8 +2278,8 @@ mod tests {
         ))
     }
 
-    /// Writes an orphanable raw `LINKS` row that `write_all_parts` cannot
-    /// assemble.
+    /// Writes a potentially orphaned raw `LINKS` row that `write_all_parts`
+    /// cannot assemble.
     fn write_raw_link(store: &IndexStore, target: &Path, source: &Path) {
         let txn = store.db.begin_write().expect("begin write txn");
         {
@@ -2581,7 +2586,7 @@ mod tests {
             let store = IndexStore::open(temp.path()).expect("open store");
             let notes: Vec<_> =
                 ["a.md", "target.md"].iter().map(|p| parse(*p, "")).collect();
-            // Write orphan edges as raw rows. Assembly cannot create unindexed
+            // Write orphan edges as raw rows. Assembly cannot create missing
             // targets or sources.
             write_all_parts(
                 &store,
@@ -3020,9 +3025,9 @@ mod tests {
             width: None,
         })]
         // `open_table` can report table corruption separately from container
-        // corruption, which `create_db` handles. A file fixture would
-        // need redb internals to corrupt one table and keep container
-        // checksums valid. Test the predicate directly instead.
+        // corruption, which `create_db` handles. A file fixture would need
+        // `redb` internals to corrupt one table and keep container checksums
+        // valid. Test the predicate directly instead.
         #[case::storage_corrupted(redb::TableError::Storage(
             redb::StorageError::Corrupted("simulated".to_owned()),
         ))]

@@ -11,19 +11,19 @@ use crate::{FieldName, strsim::closest_match};
 pub struct Schema {
     name: SchemaName,
     fields: IndexMap<FieldName, SchemaFieldDef>,
-    /// Transitive `extends` targets that resolved.
+    /// Stores transitive `extends` targets that resolved.
     ancestors: IndexSet<SchemaName>,
-    /// Schemas that directly `extends` this one.
+    /// Stores Schemas that directly extend this one.
     children: IndexSet<SchemaName>,
-    /// Every Schema that transitively `extends` this one.
+    /// Stores every Schema that transitively extends this one.
     descendants: IndexSet<SchemaName>,
 }
 
 impl Schema {
     /// Builds a resolved Schema from its merged fields and ancestors.
     ///
-    /// Hierarchy links ([`children`], [`descendants`]) are empty until
-    /// [`set_hierarchy`] is called after full DAG resolution.
+    /// Hierarchy links ([`children`], [`descendants`]) stay empty until the
+    /// builder calls [`set_hierarchy`] after full DAG resolution.
     ///
     /// # Arguments
     ///
@@ -137,7 +137,7 @@ impl Schema {
         }
     }
 
-    /// Find the field name with the smallest edit distance to `field`.
+    /// Finds the field name with the smallest edit distance to `field`.
     fn closest_field_name(&self, field: &str) -> Option<&str> {
         closest_match(
             self.fields.keys().map(|name| (name.as_str(), name.as_str())),
@@ -315,11 +315,10 @@ mod tests {
 
         #[test]
         fn suggests_nothing_when_two_fields_canonically_match() {
-            // Defensive: Schema resolution already rejects two fields sharing
-            // a canonical form within one Schema (`SchemaError::
-            // AmbiguousFieldName`), so this never happens for a real
-            // resolved Schema: this test only proves `suggest_field` itself
-            // degrades safely if it ever did.
+            // Defensive check: Schema resolution already rejects duplicate
+            // canonical field names within one Schema
+            // (`SchemaError::AmbiguousFieldName`). This test proves
+            // `suggest_field` degrades safely if a caller bypasses that check.
             let schema = schema_with_fields(&["due date", "Due-Date"]);
 
             assert_eq!(schema.suggest_field("due-date"), None);

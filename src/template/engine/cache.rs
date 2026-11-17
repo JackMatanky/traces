@@ -1,31 +1,33 @@
 //! Caches render-scoped resources in [`minijinja::State`]'s typed extension
 //! storage.
 //!
-//! [`cached`] backs `query.rs`'s
-//! [`WorkspaceIndex`](crate::index::WorkspaceIndex) cache. It stashes a load
-//! result in a typed extension. A render that calls into a namespace several
-//! times then pays for one load instead of hand-rolling its own get-or-load
-//! body per resource. `schema.rs` seeds its render's
-//! [`SchemaService`](crate::schema::SchemaService) the same way, with a typed
-//! newtype of its own and no load step. The minijinja
-//! [`Object`](minijinja::value::Object) impl for
-//! [`Schema`](crate::schema::Schema) can then reach it without holding a
-//! reference itself.
+//! [`cached`] backs the [`WorkspaceIndex`](crate::index::WorkspaceIndex) cache
+//! in `query.rs`. It stores a load result in a typed extension, so repeated
+//! namespace calls in one render pay for one load.
 //!
-//! Minijinja 3 extensions replace the string-keyed temp pattern for typed
-//! state. Each extension uses a `TypeId` key instead of a `&'static str`. It
-//! needs no [`Value`](minijinja::value::Value) or
-//! [`Object`](minijinja::value::Object) wrapper and no interior mutability
-//! because it needs `&mut State`. Like temps, extensions are render-local. They
-//! persist across includes, blocks, and macros. They drop with the render's
-//! state.
+//! The `schema.rs` module seeds its
+//! [`SchemaService`](crate::schema::SchemaService) the same way, using a typed
+//! newtype without a load step. The `MiniJinja`
+//! [`Object`](minijinja::value::Object) impl for
+//! [`Schema`](crate::schema::Schema) can then reach the service without holding
+//! a reference.
+//!
+//! `MiniJinja` 3 extensions replace the string-keyed temp pattern for typed
+//! state by keying on `TypeId` instead of `&'static str`. They need no
+//! [`Value`](minijinja::value::Value) or [`Object`](minijinja::value::Object)
+//! wrapper, and no interior mutability because access needs `&mut State`.
+//!
+//! Like temps, extensions are render-local and persist across includes, blocks,
+//! and macros. They drop when the render's state drops.
 
 use minijinja::State;
 
 /// Wraps a render-scoped cacheable value in its own extension type, keeping the
-/// cache slot isolated from any raw `T` extension elsewhere. `T` alone selects
-/// the slot. A second `cached()` call site that instantiates the same `T` in
-/// one render reuses the first call's value. Templates never see this type.
+/// cache slot isolated from any raw `T` extension elsewhere.
+///
+/// `T` alone selects the slot. A second `cached()` call site that instantiates
+/// the same `T` in one render reuses the first call's value. Templates never
+/// see this type.
 #[derive(Debug)]
 struct Cached<T>(T);
 

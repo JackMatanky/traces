@@ -22,7 +22,7 @@ impl SchemaDateField {
         self.format.as_deref()
     }
 
-    /// Build an instance for tests.
+    /// Builds an instance for tests.
     #[cfg(test)]
     pub(crate) const fn for_test(format: Option<String>) -> Self {
         Self {

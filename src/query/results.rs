@@ -2,8 +2,10 @@
 //!
 //! [`QueryRow`] represents an indexed note or list item by position. It borrows
 //! field values from the [`WorkspaceIndex`] where possible.
+//!
 //! [`QuerySet`] holds rows and pending [`ExecutionPlan`] transforms. It runs
 //! and caches those transforms when a caller reads or formats the rows.
+
 use std::{path::PathBuf, sync::Arc};
 
 use super::{
@@ -37,7 +39,7 @@ enum RowType {
 pub struct QueryRow {
     index: Arc<WorkspaceIndex>,
     position: RowIndex,
-    /// Field overrides for exploded rows from [`QuerySet::flatten`].
+    /// Stores field overrides for exploded rows from [`QuerySet::flatten`].
     flattened: Vec<(FieldPath, NoteFieldValue)>,
     kind: RowType,
 }
@@ -160,7 +162,7 @@ impl QueryRow {
         self.entry().note()
     }
 
-    /// Returns project-relative paths of Notes linking to this row's Note.
+    /// Returns project-relative paths of notes that link to this row's note.
     #[inline]
     #[must_use]
     pub(crate) fn inlinks(&self) -> &[PathBuf] {
@@ -412,6 +414,7 @@ impl QueryRow {
     }
 
     /// Orders rows by position in the [`WorkspaceIndex`].
+    ///
     /// Note rows use document order. List and task rows use item order within
     /// each note. The template engine uses this order for row comparisons and
     /// its `sort` filter.
@@ -448,8 +451,8 @@ impl std::fmt::Debug for QueryRow {
 
 /// Wraps a lazily transformed, memoized collection of [`QueryRow`] values.
 ///
-/// Transform methods append to the pending plan in `O(1)` time.
-/// Reads and terminal renderers run the plan once and cache its result.
+/// Transform methods append to the pending plan in `O(1)` time. Reads and
+/// terminal renderers run the plan once and cache its result.
 #[must_use]
 #[derive(Clone, Default)]
 pub struct QuerySet {
@@ -459,6 +462,7 @@ pub struct QuerySet {
 }
 
 impl QuerySet {
+    /// Creates a query set from initial `rows`.
     pub(super) fn new(rows: Vec<QueryRow>) -> Self {
         Self {
             base: rows.into(),
@@ -530,7 +534,7 @@ impl QuerySet {
         Ok(self.push(QueryTransform::filter(expr)?))
     }
 
-    /// Test-only Rust-side alias for [`Self::filter`].
+    /// Aliases [`Self::filter`] for Rust-side tests.
     ///
     /// # Errors
     ///
@@ -543,6 +547,7 @@ impl QuerySet {
     }
 
     /// Sorts rows by `path` for tests.
+    ///
     /// Aliases the template engine's sort filter and [`Self::sort_field`].
     ///
     /// # Errors
@@ -577,6 +582,7 @@ impl QuerySet {
     }
 
     /// Appends a composite sort order transform for tests.
+    ///
     /// Matches the pre-fetch
     /// [`QueryBuilder::order`](super::QueryBuilder::order) path.
     #[inline]
@@ -1513,8 +1519,8 @@ rating: note
             let table =
                 rows.table(&["Notes"], &["notes"]).expect("valid table");
 
-            // A newline in a cell must not create another table row.
-            // The output has one header, one separator, and one data row.
+            // A newline in a cell must not create another table row. The output
+            // has one header, one separator, and one data row.
             assert_eq!(table.lines().count(), 3);
         }
 

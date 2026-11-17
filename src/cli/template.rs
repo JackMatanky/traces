@@ -1,8 +1,8 @@
-//! Template rendering command.
+//! Renders templates from project configuration.
 //!
-//! Handles `traces template` and default `traces -i` dispatch by resolving a
-//! template name, choosing interactive or preset prompt handling, rendering
-//! with [`TemplateService`], and writing or previewing the result.
+//! Handles `traces template` and default `traces -i` dispatch. Resolves a
+//! template name, selects interactive or preset prompt handling, renders with
+//! [`TemplateService`], and writes or previews the result.
 
 use std::{
     path::{Path, PathBuf},
@@ -20,10 +20,11 @@ use crate::{
     },
 };
 
-/// Arguments for `traces template`.
+/// Defines arguments for `traces template`.
 ///
-/// Renders a named template to disk or stdout. Supports interactive template
-/// selection when no name is given, dry-run preview, and output-path override.
+/// Renders a named template to disk or standard output. Supports interactive
+/// template selection when the caller omits the name, dry-run preview, and
+/// output-path override.
 #[derive(Debug, Args)]
 #[command(group(ArgGroup::new("mode").args(["list"]).multiple(false)))]
 #[expect(
@@ -32,10 +33,10 @@ use crate::{
               related enough to collapse into a state-machine enum"
 )]
 pub(super) struct Template {
-    /// Template name or path passed positionally.
+    /// Accepts a template name or path as a positional argument.
     #[arg(value_name = "NAME", conflicts_with = "input")]
     pub(super) name: Option<PathBuf>,
-    /// Template name or path passed through `-i`/`--input`.
+    /// Accepts a template name or path through `-i` or `--input`.
     #[arg(
         short = 'i',
         long = "input",
@@ -43,35 +44,36 @@ pub(super) struct Template {
         conflicts_with = "name"
     )]
     pub(super) input: Option<PathBuf>,
-    /// List available template names and exit without rendering.
+    /// Lists available template names and exits without rendering.
     #[arg(short = 'l', long, conflicts_with_all = ["name", "input"])]
     pub(super) list: bool,
-    /// Output path overriding any `file.write_to()` call inside the template.
+    /// Overrides any `file.write_to()` call inside the template.
     ///
     /// Falls back in this order:
+    ///
     /// 1. The template-declared `write_to` path.
-    /// 2. The config-derived default output directory.
+    /// 2. The configuration-derived default output directory.
     #[arg(short = 'o', long, value_name = "PATH")]
     pub(super) output: Option<PathBuf>,
-    /// Overwrite the output path if it already exists.
+    /// Overwrites the output path if it already exists.
     #[arg(short = 'f', long)]
     pub(super) force: bool,
-    /// Render to stdout and write nothing to disk.
+    /// Renders to standard output and writes nothing to disk.
     ///
-    /// Skips the output-existence check and conflicts with `-o`/`--output`.
+    /// Skips the output-existence check and conflicts with `-o` or `--output`.
     #[arg(short = 'n', long, conflicts_with = "output")]
     pub(super) dry_run: bool,
-    /// Disable interactive prompts during template rendering.
+    /// Disables interactive prompts during template rendering.
     ///
     /// Every `ui.*` call returns its default. Calls without a default return
-    /// an empty, false, or first-item response. This is for scripted or CI use
-    /// and is independent of `--dry-run`.
+    /// an empty, false, or first-item response. Use this for scripts or
+    /// CI, independent of `--dry-run`.
     #[arg(long = "no-input")]
     pub(super) no_input: bool,
 }
 
 impl Template {
-    /// Constructs [`Template`] args for `traces -i <name>` dispatch.
+    /// Constructs [`Template`] arguments for `traces -i <name>` dispatch.
     pub(super) const fn new(name: PathBuf) -> Self {
         Self {
             name: Some(name),
@@ -84,7 +86,7 @@ impl Template {
         }
     }
 
-    /// Constructs [`Template`] args for interactive `traces -i` dispatch.
+    /// Constructs [`Template`] arguments for interactive `traces -i` dispatch.
     pub(super) const fn interactive() -> Self {
         Self {
             name: None,
@@ -97,7 +99,8 @@ impl Template {
         }
     }
 
-    /// Returns the template name passed positionally or through `-i`/`--input`.
+    /// Returns the template name passed as a positional argument or through
+    /// `-i` or `--input`.
     #[inline]
     #[must_use]
     pub(super) fn name(&self) -> Option<&Path> {
@@ -108,12 +111,9 @@ impl Template {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if the current directory cannot be
-    ///   read.
-    /// - [`CliError::ConfigLoad`] if loading configuration fails.
     /// - [`CliError::NoTemplates`] if no template is available to pick.
-    /// - [`CliError::TemplatePicker`] if interactive selection fails or is
-    ///   cancelled.
+    /// - [`CliError::TemplatePicker`] if interactive selection fails or the
+    ///   user cancels it.
     /// - [`CliError::TemplateInstantiate`] if resolving, rendering, or writing
     ///   fails.
     pub(super) fn run(
@@ -128,6 +128,16 @@ impl Template {
         self.execute(config, provider)
     }
 
+    /// Resolves the template, renders it, and writes or previews the output.
+    ///
+    /// # Errors
+    ///
+    /// - [`CliError::NoTemplates`] if interactive selection is needed and no
+    ///   templates are available.
+    /// - [`CliError::TemplatePicker`] if interactive selection fails or the
+    ///   user cancels it.
+    /// - [`CliError::TemplateInstantiate`] if resolving, rendering, or writing
+    ///   fails.
     fn execute(
         self,
         config: &Config,
@@ -153,7 +163,7 @@ impl Template {
         Ok(())
     }
 
-    /// Lists all available templates to stdout, one per line.
+    /// Lists all available templates to standard output, one per line.
     #[expect(
         clippy::print_stdout,
         reason = "--list output is data meant to be piped, not diagnostic text"
@@ -178,15 +188,15 @@ impl Template {
 
     /// Resolves the template name from arguments or the interactive picker.
     ///
-    /// Returns the explicit name when present; otherwise asks `provider` to
+    /// Returns the explicit name when present. Otherwise asks `provider` to
     /// choose from templates available in `config`.
     ///
     /// # Errors
     ///
-    /// - [`CliError::NoTemplates`] if interactive selection is required and no
+    /// - [`CliError::NoTemplates`] if interactive selection is needed and no
     ///   templates are available.
     /// - [`CliError::TemplatePicker`] if the picker is unavailable, fails, or
-    ///   is cancelled.
+    ///   the user cancels it.
     /// - [`CliError::TemplateInstantiate`] if parsing the template input path
     ///   fails.
     fn resolve_name(
@@ -200,6 +210,12 @@ impl Template {
         )
     }
 
+    /// Parses `name` into a [`TemplatePathInput`].
+    ///
+    /// # Errors
+    ///
+    /// - [`CliError::TemplateInstantiate`] if `name` is not a valid template
+    ///   input path.
     fn parse_input(name: &Path) -> Result<TemplatePathInput, CliError> {
         TemplatePathInput::parse(name).map_err(|source| {
             CliError::TemplateInstantiate {
@@ -209,7 +225,8 @@ impl Template {
         })
     }
 
-    /// Prints preview content to stdout or a write diagnostic to stderr.
+    /// Prints preview content to standard output or a write diagnostic to
+    /// standard error.
     #[expect(
         clippy::print_stdout,
         reason = "dry-run preview content is data meant to be piped, not \
@@ -229,8 +246,8 @@ impl Template {
     /// # Errors
     ///
     /// - [`CliError::NoTemplates`] if no templates are available in `config`.
-    /// - [`CliError::TemplatePicker`] if interactive prompt fails, is
-    ///   non-interactive, or is cancelled.
+    /// - [`CliError::TemplatePicker`] if the interactive prompt fails, the
+    ///   session is not interactive, or the user cancels selection.
     /// - [`CliError::TemplateInstantiate`] if parsing the chosen template path
     ///   fails.
     fn pick_template(
@@ -275,16 +292,16 @@ mod tests {
         use super::*;
         use crate::DialogError;
 
-        /// Cheap deterministic provider for tests that never exercise `ui.*`.
+        /// Builds a deterministic provider for tests that never exercise
+        /// `ui.*`.
         ///
-        /// [`Template::run`] requires a provider even when rendering does not
-        /// call any `ui.*` function.
+        /// [`Template::run`] needs a provider even when rendering does not call
+        /// any `ui.*` function.
         pub(super) fn preset_provider() -> Arc<dyn DialogProvider> {
             Arc::new(crate::PresetDialogProvider::new())
         }
         /// Sets up a trusted project with a template directory and optional
-        /// template file, returning the project root and its loaded
-        /// [`Config`].
+        /// template file, returning the project root and the loaded [`Config`].
         pub(super) fn create_test_project(
             temp: &Path,
             template_content: &str,
@@ -296,6 +313,7 @@ mod tests {
             (project.root().to_path_buf(), project.config())
         }
 
+        /// Test [`DialogProvider`] that cancels every interactive prompt.
         pub(super) struct CancellingDialogProvider;
         impl DialogProvider for CancellingDialogProvider {
             fn is_interactive(&self) -> bool {
@@ -427,9 +445,9 @@ mod tests {
             let temp = tempfile::tempdir().expect("create temp dir");
             let (_root, config) = create_test_project(temp.path(), "");
 
-            // Unlike the interactive picker (which errors NoTemplates on an
-            // empty list), `--list` is a plain listing command: nothing to
-            // pick from isn't a failure, it's just an empty list.
+            // Unlike the interactive picker (which returns `NoTemplates` on an
+            // empty list), `--list` is a plain listing command. An empty list
+            // is valid.
             Template {
                 name: None,
                 input: None,
@@ -580,8 +598,8 @@ mod tests {
                 temp.path(),
                 "{{ ui.text_input(\"name\", \"anon\") }}",
             );
-            // A provider whose queued answer must never be consulted once
-            // `--no-input` is set.
+            // Setting `--no-input` prevents `Template` from reading this queued
+            // answer.
             let provider: Arc<dyn DialogProvider> = Arc::new(
                 crate::PresetDialogProvider::new().with_text("claude"),
             );

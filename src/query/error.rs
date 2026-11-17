@@ -13,6 +13,7 @@
 //!   location.
 //! - [`FieldPathError`]: Field path syntax failures with edit-distance typo
 //!   recommendations for standard accessors (`file.<field>`, `list.<field>`).
+
 use std::fmt;
 
 use miette::{Diagnostic, SourceSpan};
@@ -20,13 +21,13 @@ use thiserror::Error;
 
 use crate::LexError;
 
-/// Result alias carrying `QueryError`.
+/// Defines the query result alias that carries `QueryError`.
 pub type QueryResult<T> = std::result::Result<T, QueryError>;
 
 /// Represents any failure during query construction, syntax analysis, field
 /// path resolution, or formatting.
 ///
-/// Delegates [`miette::Diagnostic`] to the inner [`QuerySyntaxError`] for
+/// Delegates [`miette::Diagnostic`] to the inner `QuerySyntaxError` for
 /// syntax failures.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum QueryError {
@@ -92,11 +93,10 @@ pub enum QueryBuilderError {
     /// Indicates a field-path parse or accessor failure.
     #[error(transparent)]
     FieldPath(#[from] FieldPathError),
-    /// Indicates a query limit is negative or exceeds platform [`usize`]
-    /// bounds.
+    /// Indicates that a query limit is negative or exceeds [`usize`] bounds.
     #[error("invalid limit {limit}; expected a non-negative row count")]
     LimitOutOfRange {
-        /// The rejected limit count.
+        /// Stores the rejected limit count.
         limit: i64,
     },
 }
@@ -104,11 +104,11 @@ pub enum QueryBuilderError {
 /// Represents a syntax error in a source or filter expression.
 ///
 /// Provides [`miette::Diagnostic`] spans and repair hints from the underlying
-/// `LexError`.
+/// [`LexError`].
 #[derive(Clone, Debug, Eq, PartialEq, Diagnostic, Error)]
 #[error("invalid {dialect} expression")]
 pub struct QuerySyntaxError {
-    /// The query language that rejected the expression.
+    /// Stores the query language that rejected the expression.
     pub(crate) dialect: QueryDialect,
     /// Stores the complete input expression.
     #[source_code]

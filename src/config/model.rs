@@ -11,6 +11,7 @@
 //! - [`SchemasConfig`]: schema registry and class field.
 //! - [`FrontmatterConfig`]: canonical metadata key names and date fields.
 //! - [`TaskConfig`]: Task Configuration statuses and tag filters.
+
 mod digest;
 mod frontmatter;
 mod schemas;
@@ -40,17 +41,22 @@ use crate::{
     path::{PathError, RelativePath, SafeRelativePath},
 };
 
-/// Labels the workspace root setting in the Config Fingerprint.
+/// Labels the workspace root setting in the Configuration Fingerprint.
 const ROOT: &[u8] = b"root";
 
-/// Holds resolved Config File values after discovery, read, trust, and value
-/// checks.
+/// Holds resolved Configuration File values after discovery, read, trust, and
+/// value checks.
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// Holds the shared workspace root for resolving relative local paths.
     root: Arc<Path>,
+    /// Holds resolved local and global Template Directories and output path.
     templates: TemplateConfig,
+    /// Holds resolved schema registry directory and class field name.
     schemas: SchemasConfig,
+    /// Holds resolved canonical metadata key names and date field formats.
     frontmatter: FrontmatterConfig,
+    /// Holds the task status mappings and tag filters.
     tasks: TaskConfig,
 }
 
@@ -98,8 +104,8 @@ impl Config {
     /// Returns the resolved output directory or [`Self::root`] when none is
     /// set.
     ///
-    /// Resolves relative paths against the workspace root.
-    /// It returns absolute paths unchanged.
+    /// Resolves relative paths against the workspace root. It returns absolute
+    /// paths unchanged.
     #[inline]
     #[must_use]
     pub fn output_dir(&self) -> &Path {
@@ -142,12 +148,14 @@ impl Config {
         Arc::from(self.schemas().class_field_name())
     }
 
-    /// Computes the Config Fingerprint from every setting digest under
-    /// `b"traces.config.v1"`.
+    /// Computes the Configuration Fingerprint from every setting digest.
     ///
-    /// The index does not store this digest.
-    /// It stores a subset of the setting digests.
-    /// Tests check the encoding. The `digest` module defines the framing.
+    /// This method combines all setting digests under `b"traces.config.v1"`,
+    /// using the framing that the `digest` module defines. Tests check this
+    /// combined encoding.
+    ///
+    /// The index does not store the combined fingerprint and instead stores a
+    /// subset of individual setting digests.
     #[inline]
     #[must_use]
     #[cfg_attr(
@@ -164,9 +172,9 @@ impl Config {
 
     /// Digests every resolved setting separately.
     ///
-    /// Each digest starts with its section-qualified label.
-    /// The label identifies the setting. [`ConfigDigests::compose`] combines
-    /// the digests into the Config Fingerprint.
+    /// Each digest starts with its section-qualified label. The label
+    /// identifies the setting. [`ConfigDigests::compose`] combines the digests
+    /// into the Configuration Fingerprint.
     #[inline]
     #[must_use]
     pub(crate) fn digests(&self) -> ConfigDigests {
@@ -186,8 +194,7 @@ impl Config {
         )
     }
 
-    /// Builds resolved configuration values for tests without finding Config
-    /// Files.
+    /// Builds resolved configuration values for tests without file discovery.
     ///
     /// Use [`super::service::ConfigService::for_test`] with TOML fixtures to
     /// check the loading pipeline.
@@ -270,10 +277,10 @@ impl Config {
     }
 }
 
-/// Holds a non-empty, safe subdirectory relative to the workspace.
+/// Holds a nonempty, safe subdirectory relative to the workspace.
 ///
 /// It rejects absolute paths, parent components, and paths with no named
-/// component before it checks the file system.
+/// component before it checks the filesystem.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfigSubDir(RelativePath);
 
@@ -289,7 +296,7 @@ impl ConfigSubDir {
     ///
     /// # Errors
     ///
-    /// - [`InvalidSubDir`] if the path escapes `root` or a file system check
+    /// - [`InvalidSubDir`] if the path escapes `root` or a filesystem check
     ///   fails.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
@@ -310,7 +317,7 @@ impl ConfigSubDir {
     /// # Errors
     ///
     /// - [`InvalidSubDir`] if `dir` has an unsafe component, escapes `root`, or
-    ///   fails a file system check.
+    ///   fails a filesystem check.
     ///
     /// [`InvalidSubDir`]: ConfigValueError::InvalidSubDir
     pub(crate) fn resolve(

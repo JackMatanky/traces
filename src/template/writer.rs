@@ -28,8 +28,7 @@ use std::{
 use super::{error::TemplateError, path::DeclaredOutputPath};
 use crate::{DialogError, DialogProvider, path::SafeRelativePath};
 
-/// Write mode controls whether rendered output returns to the caller or goes to
-/// disk.
+/// Controls whether rendered output returns to the caller or goes to disk.
 ///
 /// Built from CLI flags before rendering begins. Rendering still runs in both
 /// modes, including `ui.*` template helpers.
@@ -58,7 +57,7 @@ impl WriteMode {
     }
 }
 
-/// Commit policy controls how a write handles an existing output path.
+/// Controls how a write handles an existing output path.
 ///
 /// [`WriteMode::Commit`] stores this value. The code creates it from CLI flags
 /// and uses it for output path resolution and the final write.
@@ -122,8 +121,7 @@ impl CommitPolicy {
     }
 }
 
-/// Write outcome reports what happens to rendered content under a
-/// [`WriteMode`].
+/// Reports what happens to rendered content under a [`WriteMode`].
 #[derive(Debug, Eq, PartialEq)]
 pub enum WriteOutcome {
     /// Wrote rendered content to the resolved output path.
@@ -406,7 +404,7 @@ fn commit_with_writer(
     })
 }
 
-/// Writes staged bytes to a sibling temporary file, then renames it over
+/// Manages a sibling temporary file that stages bytes before publishing to
 /// `path`. [`Drop`] deletes the temporary file if a step fails.
 struct TempSiblingPath {
     path: PathBuf,

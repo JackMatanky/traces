@@ -1,4 +1,4 @@
-//! Detects cycles over the unvisited subgraph after topological sort.
+//! Detects cycles over the remaining nodes after topological sort.
 
 use indexmap::IndexSet;
 
@@ -9,16 +9,18 @@ use super::{
 
 /// Finds every Schema participating in an `extends` cycle.
 ///
-/// Restricted to the subgraph the topological sort never resolved (a resolved
-/// node is provably acyclic). Iterative strongly-connected-components search
-/// (explicit work-stack, no recursion) over that unvisited subgraph, walking
-/// `extends` backward (parent-direction, via [`SchemaAdjacency::parents_of`])
-/// rather than the forward adjacency the rest of the graph uses. `O(V + E)`
-/// over the unvisited subgraph.
+/// The detector skips nodes already resolved by topological sort, because
+/// resolved nodes are provably acyclic. Over the remaining nodes, it runs in
+/// `O(V + E)` time with two key choices:
+///
+/// - It uses an iterative strongly connected components search with an explicit
+///   work stack instead of recursion.
+/// - It walks `extends` backward through [`SchemaAdjacency::parents_of`] rather
+///   than using the graph's forward adjacency.
 pub(super) struct CycleDetector<'a, 'b> {
     adjacency: &'b SchemaAdjacency<'a>,
-    /// Schemas Kahn's sort already resolved; only unvisited nodes are
-    /// explored.
+    /// Holds Schemas that topological sort already resolved. Only remaining
+    /// nodes are explored.
     visited: &'b IndexSet<SchemaNameRef<'a>>,
     search: CycleSearchState,
     cyclic: Vec<SchemaName>,
@@ -37,8 +39,9 @@ impl<'a> CycleDetector<'a, '_> {
         }
     }
 
-    /// Returns every unvisited Schema in a cycle, in declaration order.
-    /// Empty if `visited` already covers every node.
+    /// Returns every remaining Schema in a cycle, in declaration order.
+    ///
+    /// Returns an empty vector if `visited` already covers every node.
     pub(super) fn find(mut self) -> Vec<SchemaName> {
         if self.visited.len() == self.adjacency.node_count() {
             return Vec::new();
@@ -54,15 +57,16 @@ impl<'a> CycleDetector<'a, '_> {
         self.cyclic
     }
 
-    /// Whether `node` was resolved by Kahn's sort.
+    /// Returns whether `node` was resolved by topological sort.
     fn is_kahn_visited(&self, node: DenseIndex) -> bool {
         self.adjacency
             .name_of(node)
             .is_some_and(|name| self.visited.contains(&name))
     }
 
-    /// Explicit work-stack DFS rooted at `start`, extracting every nontrivial
-    /// strongly-connected component (or self-loop) into `self.cyclic`.
+    /// Runs an iterative depth-first search rooted at `start`, extracting every
+    /// nontrivial strongly connected component (or self-loop) into
+    /// `self.cyclic`.
     fn explore_from(&mut self, start: DenseIndex) {
         let mut work_stack: Vec<(DenseIndex, usize)> = vec![(start, 0)];
         while let Some(&(node, scan_pos)) = work_stack.last() {
@@ -79,9 +83,10 @@ impl<'a> CycleDetector<'a, '_> {
     }
 
     /// Scans `node`'s raw `extends` list from `from`, skipping unknown or
-    /// Kahn-visited targets. Returns the first unvisited-and-known parent and
-    /// the position to resume from. `O(V + E)` total via the
-    /// monotonically-advancing `from`.
+    /// already-resolved targets.
+    ///
+    /// Returns the first remaining known parent and the position to resume
+    /// from. Runs in `O(V + E)` total with the monotonically advancing `from`.
     fn next_unvisited_parent(
         &self,
         node: DenseIndex,
@@ -102,7 +107,7 @@ impl<'a> CycleDetector<'a, '_> {
         None
     }
 
-    /// Whether `node`'s raw `extends` list contains a valid, unvisited
+    /// Returns whether `node`'s raw `extends` list contains a valid, unresolved
     /// self-reference.
     fn has_self_extend(&self, node: DenseIndex) -> bool {
         let Some(name) = self.adjacency.name_of(node) else {
@@ -114,9 +119,11 @@ impl<'a> CycleDetector<'a, '_> {
         })
     }
 
-    /// Advances `node`'s frame to `resume_at`, then descends into `parent` if
-    /// undiscovered, or folds `parent`'s discovery order into `node`'s
-    /// lowest-reachable rank if `parent` is a live back edge.
+    /// Advances `node`'s frame to `resume_at`, then visits `parent`.
+    ///
+    /// If `parent` is undiscovered, pushes it onto `work_stack`. If `parent` is
+    /// a live back edge, folds its discovery order into `node`'s minimum
+    /// reachable rank.
     fn advance(
         &mut self,
         work_stack: &mut Vec<(DenseIndex, usize)>,
@@ -139,9 +146,9 @@ impl<'a> CycleDetector<'a, '_> {
         }
     }
 
-    /// Completes `node`: if it is a component root, pops and records its
-    /// strongly-connected component into `self.cyclic` in insertion order,
-    /// then propagates its lowest-reachable rank to its caller.
+    /// Completes `node` by recording its strongly connected component into
+    /// `self.cyclic` in insertion order and propagating its minimum reachable
+    /// rank to its caller.
     fn finish_node(
         &mut self,
         work_stack: &mut Vec<(DenseIndex, usize)>,
@@ -157,8 +164,11 @@ impl<'a> CycleDetector<'a, '_> {
         }
     }
 
-    /// If `node` is an SCC root, pops the component and extends `self.cyclic`
-    /// with its members (in declaration order) when nontrivial or self-looping.
+    /// Records a component rooted at `node` into `self.cyclic` when nontrivial
+    /// or self-looping.
+    ///
+    /// Members are sorted into declaration order before extending
+    /// `self.cyclic`.
     fn record_cyclic_component(&mut self, node: DenseIndex) {
         let node_order = self.search.discovery_order_of(node);
         if node_order.is_none()
@@ -171,8 +181,8 @@ impl<'a> CycleDetector<'a, '_> {
         if !is_cyclic {
             return;
         }
-        // Insertion order, not Tarjan pop order: matches
-        // SchemaBuilder::compute_hierarchy's error-reporting convention.
+        // Insertion order, not stack pop order: matches
+        // `SchemaBuilder::compute_hierarchy`'s error-reporting convention.
         component.sort_by_key(|idx| idx.index());
         let adjacency = &self.adjacency;
         self.cyclic.extend(
@@ -184,21 +194,21 @@ impl<'a> CycleDetector<'a, '_> {
     }
 }
 
-/// Per-node bookkeeping for [`CycleDetector`]'s SCC search.
+/// Tracks per-node bookkeeping for [`CycleDetector`]'s component search.
 ///
-/// Sized to the full unvisited-subgraph node count; entries for unreached nodes
-/// stay at their initial value.
+/// Sized to the full node count. Entries for nodes that are never reached stay
+/// at their initial value.
 struct CycleSearchState {
-    /// Discovery order, assigned once per node on first visit.
+    /// Stores discovery order, assigned once per node on first visit.
     discovery_order: Vec<Option<u32>>,
-    /// Lowest discovery order reachable from each node via tree or back edges
-    /// (Tarjan's "lowlink").
+    /// Stores the lowest discovery order reachable from each node through tree
+    /// or back edges.
     lowest_reachable: Vec<u32>,
-    /// Whether each node is currently on `component_stack`.
+    /// Tracks whether each node is currently on `component_stack`.
     on_stack: Vec<bool>,
-    /// SCC-accumulation stack, in discovery order.
+    /// Accumulates component members in discovery order.
     component_stack: Vec<DenseIndex>,
-    /// Next discovery order to assign.
+    /// Holds the next discovery order to assign.
     next_discovery_order: u32,
 }
 
@@ -213,7 +223,7 @@ impl CycleSearchState {
         }
     }
 
-    /// Whether `node` has been assigned a discovery order.
+    /// Returns `true` if `node` has a discovery order.
     fn is_discovered(&self, node: DenseIndex) -> bool {
         self.discovery_order.get(node.index()).copied().flatten().is_some()
     }
@@ -229,7 +239,8 @@ impl CycleSearchState {
         self.lowest_reachable.get(node.index()).copied()
     }
 
-    /// Whether `node` is on the SCC stack (not the traversal work-stack).
+    /// Returns whether `node` is on the component stack (not the traversal
+    /// work-stack).
     fn is_on_stack(&self, node: DenseIndex) -> bool {
         self.on_stack.get(node.index()).copied().unwrap_or(false)
     }
@@ -250,7 +261,7 @@ impl CycleSearchState {
         }
     }
 
-    /// Folds `candidate` into `node`'s lowest-reachable rank, keeping the
+    /// Folds `candidate` into `node`'s minimum reachable rank, keeping the
     /// smaller value.
     fn lower_reachable(&mut self, node: DenseIndex, candidate: u32) {
         if let Some(slot) = self.lowest_reachable.get_mut(node.index()) {
@@ -258,8 +269,8 @@ impl CycleSearchState {
         }
     }
 
-    /// Pops the SCC rooted at `root` off `component_stack` (most recently
-    /// discovered first).
+    /// Pops the component rooted at `root` off `component_stack`, most
+    /// recently discovered first.
     fn pop_component(&mut self, root: DenseIndex) -> Vec<DenseIndex> {
         let mut component = Vec::new();
         while let Some(popped) = self.component_stack.pop() {

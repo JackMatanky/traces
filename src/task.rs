@@ -4,10 +4,10 @@
 //! # Key Types
 //!
 //! - [`TaskStatus`]: named, typed status keyed by its marker symbol.
-//! - [`TaskStatusMap`]: lookup table for resolving marker symbols to configured
-//!   statuses.
-//! - [`TaskStatusType`]: workflow classification (todo, in-progress, on-hold,
-//!   done, cancelled, non-task).
+//! - [`TaskStatusMap`]: lookup table that resolves marker symbols into
+//!   configured statuses.
+//! - [`TaskStatusType`]: workflow classification (`todo`, `in-progress`,
+//!   `on-hold`, `done`, `cancelled`, `non-task`).
 //! - [`TaskStatusSymbol`]: marker character inside `[<char>]`.
 //! - [`TaskDateSet`]: set of up to six lifecycle dates.
 //! - [`TaskDate`]: single lifecycle date occurrence paired with its slot.
@@ -25,6 +25,7 @@
 //! assert_eq!(status.kind(), TaskStatusType::Todo);
 //! assert_eq!(TaskPriority::Highest.as_str(), "highest");
 //! ```
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -104,7 +105,7 @@ impl Default for TaskStatus {
 /// resolution.
 ///
 /// Provides lookup by marker symbol, display name, and workflow type. Default
-/// statuses are always present; configuration can add new statuses or override
+/// statuses are always present. Configuration can add new statuses or override
 /// default ones that share a symbol.
 ///
 /// # Examples
@@ -135,10 +136,11 @@ impl TaskStatusMap {
 
     /// Resolves a scanned marker `symbol` to its configured [`TaskStatus`].
     ///
-    /// Falls back to an incomplete todo status when no configured status uses
-    /// `symbol`, preserving `symbol` on the fallback for diagnostics. Unknown
-    /// markers are never downgraded to plain bullets: this is the custom marker
-    /// scanner's only source of truth for marker-to-status resolution.
+    /// Falls back to an incomplete [`TaskStatusType::Todo`] status when no
+    /// configured status uses `symbol`, preserving `symbol` on the fallback for
+    /// diagnostics. Unknown markers are never downgraded to plain bullets: this
+    /// is the custom marker scanner's only source of truth for marker-to-status
+    /// resolution.
     #[inline]
     #[must_use]
     pub(crate) fn resolve(&self, symbol: char) -> TaskStatus {
@@ -205,8 +207,8 @@ impl TaskStatusMap {
     ///
     /// # Errors
     ///
-    /// - [`ProhibitedStatusSymbol`] if the status symbol is one of `(`, `)`,
-    ///   `[`, `]`, `{`, or `}`.
+    /// - [`ProhibitedStatusSymbol`] if the status symbol is `(`, `)`, `[`, `]`,
+    ///   `{`, or `}`.
     ///
     /// [`ProhibitedStatusSymbol`]: TaskError::ProhibitedStatusSymbol
     #[inline]
@@ -229,8 +231,9 @@ impl TaskStatusMap {
     }
 
     /// Removes stale entries left by a previous status sharing the same symbol
-    /// from the `kinds` and `names` maps. No-op if `status.symbol` has no
-    /// predecessor.
+    /// from the `kinds` and `names` maps.
+    ///
+    /// Does nothing if `status.symbol` has no predecessor.
     fn purge_stale_entries(&mut self, status: &TaskStatus) {
         let Some(previous) = self.symbols.get(&status.symbol) else {
             return;
@@ -248,9 +251,10 @@ impl TaskStatusMap {
         }
     }
 
-    /// Indexes `status` into all three lookup maps in one step. Caller must
-    /// call [`Self::purge_stale_entries`] first when overriding an existing
-    /// symbol.
+    /// Indexes `status` into all three lookup maps in one step.
+    ///
+    /// Callers must call [`Self::purge_stale_entries`] first when overriding an
+    /// existing symbol.
     fn index_status(&mut self, status: TaskStatus) {
         self.kinds.entry(status.kind).or_default().push(status.clone());
         self.symbols.insert(status.symbol, status.clone());
@@ -278,7 +282,7 @@ impl Default for TaskStatusMap {
 /// Represents the workflow classification of a [`TaskStatus`].
 ///
 /// Maps statuses to standard lifecycle states used in task views and completion
-/// rollups.
+/// summaries.
 ///
 /// # Examples
 ///
@@ -298,20 +302,22 @@ pub enum TaskStatusType {
     OnHold,
     /// Finished.
     Done,
-    /// Abandoned; excluded from both active and completed views.
+    /// Abandoned task, excluded from both active and completed views.
     Cancelled,
-    /// A checkbox status that never becomes a Task (reserved for future
-    /// configured statuses; no default status uses it).
+    /// Checkbox status that never becomes a task.
+    ///
+    /// Reserved for future configured statuses. No default status uses it.
     NonTask,
 }
 
 impl TaskStatusType {
-    /// Derives the tri-state completion value for this status type.
+    /// Derives the three-state completion value for this status type.
     ///
     /// Returns:
-    /// - `Some(true)` for [`Self::Done`]
-    /// - `None` for [`Self::Cancelled`]
-    /// - `Some(false)` for all other status types
+    ///
+    /// - `Some(true)` for [`Self::Done`].
+    /// - `None` for [`Self::Cancelled`].
+    /// - `Some(false)` for all other status types.
     #[inline]
     #[must_use]
     pub(crate) const fn completed(self) -> Option<bool> {
@@ -326,8 +332,8 @@ impl TaskStatusType {
 
     /// Returns the stable lowercase identifier for this status type.
     ///
-    /// Shared by query output and the config fingerprint, so it must not change
-    /// for an existing variant.
+    /// Shared by query output and the configuration fingerprint, so it must not
+    /// change for an existing variant.
     #[inline]
     #[must_use]
     pub(crate) const fn as_str(self) -> &'static str {
@@ -341,9 +347,9 @@ impl TaskStatusType {
         }
     }
 
-    /// Derives the boolean completion rollup for this status type.
+    /// Derives the boolean completion flag for this status type.
     ///
-    /// Returns `true` for completed or cancelled tasks, and `false` for
+    /// Returns `true` for completed or canceled tasks, and `false` for
     /// incomplete tasks.
     #[inline]
     #[must_use]
@@ -407,7 +413,8 @@ impl PartialEq<TaskStatusSymbol> for char {
     }
 }
 
-/// The default statuses always available, before any configured overrides.
+/// Returns the default statuses always available before any configured
+/// overrides.
 ///
 /// `'x'` and `'X'` both resolve to `Done`, matching the custom marker scanner's
 /// case-insensitive acceptance of the done marker.
@@ -449,8 +456,8 @@ fn default_statuses() -> [TaskStatus; 6] {
 /// Normalizes a status name for lookup: case-folds, trims, and collapses
 /// internal whitespace to a single space.
 ///
-/// Display names ([`TaskStatus::name`]) remain exactly as configured; only the
-/// lookup key is normalized.
+/// Display names ([`TaskStatus::name`]) stay as configured. Only the lookup key
+/// normalizes.
 fn normalize_name(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     let mut words = name.split_whitespace();
@@ -507,8 +514,8 @@ pub struct TaskDateSet {
 impl TaskDateSet {
     /// Inserts a [`TaskDate`] into its corresponding slot.
     ///
-    /// Adheres to first-wins precedence: if the slot is already occupied, the
-    /// incoming date is ignored.
+    /// Uses first-wins precedence. If the slot is already occupied, this method
+    /// ignores the incoming date.
     #[inline]
     pub(crate) fn insert(&mut self, date: TaskDate) {
         let slot = match date.kind {
@@ -639,6 +646,7 @@ impl Extend<TaskDate> for TaskDateSet {
 /// Iterates over the occupied lifecycle dates in a [`TaskDateSet`].
 ///
 /// Yields [`TaskDate`] elements in declaration order:
+///
 /// 1. [`TaskDateType::Created`]
 /// 2. [`TaskDateType::Scheduled`]
 /// 3. [`TaskDateType::Start`]
@@ -743,17 +751,17 @@ impl TaskDate {
 /// ```
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TaskDateType {
-    /// Date the task was created (`➕` or `[created::]`).
+    /// Creation date (`➕` or `[created::]`).
     Created,
-    /// Date the task is scheduled (`⏳` or `[scheduled::]`).
+    /// Scheduled date (`⏳` or `[scheduled::]`).
     Scheduled,
-    /// Date work on the task begins (`🛫` or `[start::]`).
+    /// Start date (`🛫` or `[start::]`).
     Start,
-    /// Date the task is due (`📅`, `🗓`, or `[due::]`).
+    /// Due date (`📅`, `🗓`, or `[due::]`).
     Due,
-    /// Date the task was completed (`✅`, `[done::]`, or `[completion::]`).
+    /// Completion date (`✅`, `[done::]`, or `[completion::]`).
     Done,
-    /// Date the task was cancelled (`❌` or `[cancelled::]`).
+    /// Cancellation date (`❌` or `[cancelled::]`).
     Cancelled,
 }
 
@@ -1018,8 +1026,8 @@ impl TaskPriority {
     ///
     /// Sort keys use this rank instead of the [`TaskPriority::as_str`] display
     /// name so `list.priority` orders by severity, not alphabetically. `Normal`
-    /// resolves to rank `2` but is unreachable from parsing (no emoji or name
-    /// maps to it; items with no priority store `None`).
+    /// resolves to rank `2`, but parsing cannot produce it. No emoji or name
+    /// maps to `Normal`, and items without a priority store `None`.
     #[inline]
     #[must_use]
     pub const fn rank(self) -> u8 {
@@ -1038,11 +1046,11 @@ impl TaskPriority {
     ///
     /// | Emoji | Priority |
     /// | ----- | -------- |
-    /// | 🔺    | highest  |
-    /// | ⏫    | high     |
-    /// | 🔼    | medium   |
-    /// | 🔽    | low      |
-    /// | ⏬    | lowest   |
+    /// | 🔺 | highest |
+    /// | ⏫ | high |
+    /// | 🔼 | medium |
+    /// | 🔽 | low |
+    /// | ⏬ | lowest |
     ///
     /// # Examples
     ///
@@ -1130,19 +1138,19 @@ impl std::str::FromStr for TaskPriority {
 /// Represents errors arising from task domain parsing failures.
 #[derive(Debug, Clone, Eq, PartialEq, thiserror::Error)]
 pub enum TaskError {
-    /// Task status symbol is reserved as a delimiter.
+    /// Indicates that a task status symbol is reserved as a delimiter.
     #[error("task status symbol `{symbol}` is reserved as a delimiter")]
     ProhibitedStatusSymbol {
         /// The reserved delimiter symbol.
         symbol: char,
     },
-    /// No task priority name or emoji matched `input`.
+    /// Indicates that no task priority name or emoji matched `input`.
     #[error("unrecognized task priority: {input:?}")]
     InvalidPriority {
         /// The unrecognized input.
         input: String,
     },
-    /// No task lifecycle date slot matched `input`.
+    /// Indicates that no task lifecycle date slot matched `input`.
     #[error("unrecognized task date slot: {input:?}")]
     InvalidDateType {
         /// The unrecognized input.

@@ -1,12 +1,13 @@
 //! Defines on-disk Schema TOML shapes and serde deserialization.
 //!
 //! These types match `.traces/schemas/<name>.toml` and deny unknown fields.
-//! `$ref` strings and `type`/`$ref` source are parsed into validated shapes
-//! ([`FieldAddress`], [`RawSchemaFieldSource`]) at deserialization time.
+//! During deserialization, serde parses `$ref` strings and `type`/`$ref`
+//! sources into validated [`FieldAddress`] and [`RawSchemaFieldSource`] values.
+//!
 //! Type-specific keys land in [`RawSchemaFieldDef::options`] as generic
-//! [`FieldValue`]s; their validation is
-//! [`SchemaFieldBuilder::build`](super::fields::SchemaFieldBuilder::build)'s
-//! job.
+//! [`FieldValue`] entries, which [`SchemaFieldBuilder::build`] validates later.
+//!
+//! [`SchemaFieldBuilder::build`]: super::fields::SchemaFieldBuilder::build
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer};
@@ -23,40 +24,44 @@ const ALLOWED_OPTION_KEYS: &[&str] = &[
 /// Represents one `.traces/schemas/<name>.toml` file, parsed but not yet
 /// resolved.
 ///
-/// The filename stem (not any field on this type) is the Schema name.
-/// Unknown keys at any level are rejected by `#[serde(deny_unknown_fields)]`.
+/// The filename stem (not any field on this type) is the Schema name. Unknown
+/// keys at any level are rejected by `#[serde(deny_unknown_fields)]`.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchema {
-    /// Parent Schema names, first-listed wins on shared fields.
+    /// Lists parent Schema names. The first-listed parent wins on shared
+    /// fields.
     #[serde(default)]
     pub(crate) extends: Vec<SchemaName>,
-    /// Field names to drop from inherited definitions.
+    /// Lists field names to drop from inherited definitions.
     #[serde(default)]
     pub(crate) excludes: Vec<FieldName>,
-    /// Field definitions keyed by name.
+    /// Maps field names to their raw definitions.
     #[serde(default)]
     pub(crate) fields: IndexMap<FieldName, RawSchemaFieldDef>,
 }
 
 /// Represents a field definition parsed from TOML, before `$ref` resolution.
 ///
-/// Exactly one of [`RawSchemaFieldSource::Direct`] or
-/// [`RawSchemaFieldSource::Ref`] is set, determined by the presence of
-/// `type` and/or `$ref` in the TOML table. Type-specific keys land in
-/// [`options`](Self::options) as generic [`FieldValue`]s; their shape
-/// validation is deferred to
-/// [`SchemaFieldBuilder::build`](super::fields::SchemaFieldBuilder::build).
+/// Deserialization sets [`source`](Self::source) to either
+/// [`RawSchemaFieldSource::Direct`] or [`RawSchemaFieldSource::Ref`] based on
+/// `type` and `$ref` in the TOML table.
+///
+/// Type-specific keys land in [`options`](Self::options) as generic
+/// [`FieldValue`] entries, which
+/// [`SchemaFieldBuilder::build`](super::fields::SchemaFieldBuilder::build)
+/// validates later.
 #[derive(Clone, Debug)]
 pub(crate) struct RawSchemaFieldDef {
-    /// The field's source: a direct `type` or a `$ref` with optional override.
+    /// Specifies the field's source: a direct `type` or a `$ref` with an
+    /// optional override.
     pub(crate) source: RawSchemaFieldSource,
-    /// Whether the field must be set. Ignored (with a warning) on the Global
-    /// Schema.
+    /// Indicates whether the field must be set. The Global Schema ignores this
+    /// flag with a warning.
     pub(crate) required: Option<bool>,
-    /// Whether the field accepts multiple values.
+    /// Indicates whether the field accepts multiple values.
     pub(crate) multi: Option<bool>,
-    /// Type-specific options as raw [`FieldValue`]s, keyed by TOML name.
+    /// Stores type-specific options as raw [`FieldValue`]s keyed by TOML name.
     pub(crate) options: IndexMap<String, FieldValue>,
 }
 
@@ -100,14 +105,10 @@ impl<'de> Deserialize<'de> for RawSchemaFieldDef {
     ///
     /// # Errors
     ///
-    /// - [`MissingSource`] if neither `type` nor `$ref` is present.
-    ///
-    /// [`MissingSource`]: RawFieldDefError::MissingSource
-    /// - Serde deserialization error if `$ref` is not shaped
-    ///   `#<schema>/<field>` or if any unknown key is present (per
-    ///   `#[serde(deny_unknown_fields)]` on the wire shape).
-    ///
-    /// [`RawFieldDefError::MissingSource`]: RawFieldDefError::MissingSource
+    /// - [`RawFieldDefError::MissingSource`] if neither `type` nor `$ref` is
+    ///   present.
+    /// - A serde error if `$ref` does not match `#<schema>/<field>` or if an
+    ///   unknown key is present.
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -202,17 +203,17 @@ pub(crate) enum RawSchemaFieldSource {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum RawSchemaFieldType {
-    /// Free-form text input.
+    /// Represents free-form text input.
     Input,
-    /// Configured selectable values.
+    /// Represents configured selectable values.
     Select,
-    /// Boolean value.
+    /// Represents a boolean value.
     Boolean,
-    /// Numeric value.
+    /// Represents a numeric value.
     Number,
-    /// Date value.
+    /// Represents a date value.
     Date,
-    /// File link with optional filters.
+    /// Represents a file link with optional filters.
     File,
 }
 
@@ -229,19 +230,22 @@ impl std::fmt::Display for RawSchemaFieldType {
     }
 }
 
-/// Represents the raw DTO matching the root shape of a values file.
+/// Represents the deserialized root shape of a `select` values file.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchemaSelectFieldValues {
+    /// Lists raw select entries when present in the values file.
     pub(crate) entries: Option<Vec<RawSchemaSelectFieldEntry>>,
 }
 
-/// Represents a raw entry DTO in a values file, constrained to bare strings or
-/// structured objects.
+/// Represents a raw entry in a `select` values file, constrained to bare
+/// strings or structured objects.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum RawSchemaSelectFieldEntry {
+    /// Represents a bare string option entry.
     Bare(String),
+    /// Represents a structured key-value option entry.
     Structured(IndexMap<String, FieldValue>),
 }
 
@@ -257,7 +261,7 @@ impl From<RawSchemaSelectFieldEntry> for FieldValue {
 /// Describes why a [`RawSchemaFieldDef`] failed to deserialize.
 #[derive(Debug, Error)]
 pub(crate) enum RawFieldDefError {
-    /// Neither `type` nor `$ref` was present.
+    /// Indicates neither `type` nor `$ref` was present.
     #[error("field definition has neither `type` nor `$ref`")]
     MissingSource,
 }
@@ -362,11 +366,9 @@ mod tests {
         #[test]
         fn accepts_a_wrongly_shaped_value_at_parse_leaving_validation_to_the_builder()
          {
-            // `min` is a `number`-type key, but nothing at this layer knows
-            // this field is (or isn't) a `number` field, or that "abc" is the
-            // wrong shape for `min`: both checks are
-            // `SchemaFieldBuilder`'s job once the field's resolved type is
-            // known (see `SchemaFieldParserError::TypeMismatch`).
+            // `min` is a `number` key, but this layer does not know the field's
+            // type. `SchemaFieldBuilder` validates both the key and its value
+            // shape later (see `SchemaFieldParserError::TypeMismatch`).
             let raw: RawSchemaFieldDef =
                 toml::from_str("type = \"number\"\nmin = \"abc\"")
                     .expect("valid toml: value shape isn't validated here");

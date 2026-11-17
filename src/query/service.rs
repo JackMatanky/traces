@@ -1,8 +1,9 @@
 //! Executes queries over in-memory indexes and persisted key-value storage.
 //!
 //! [`QueryService`] runs queries against a [`WorkspaceIndex`] or stored
-//! records. It selects candidate paths, expands File Classes, creates
+//! records. It selects candidate paths, expands file classes, creates
 //! [`QueryRow`] values, and applies an [`super::plan::ExecutionPlan`].
+
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -23,7 +24,7 @@ use crate::{
 
 /// Coordinates query execution against in-memory indexes and persisted storage.
 ///
-/// Supports page/list/task modes, optional File Class expansion, and pending
+/// Supports page/list/task modes, optional file-class expansion, and pending
 /// plan transformations.
 ///
 /// # Examples
@@ -82,7 +83,8 @@ impl QueryService {
         self
     }
 
-    /// Expands File Class atoms in `source` when the service has an expander.
+    /// Expands file-class atoms in `source` when the service has an expander.
+    ///
     /// Both execution paths expand classes before they create rows.
     fn resolve_source_classes(&self, source: &mut SourceSelector) {
         if source.has_classes()
@@ -92,7 +94,7 @@ impl QueryService {
         }
     }
 
-    /// Executes `builder` against `index`, applying File Class expansion and
+    /// Executes `builder` against `index`, applying file-class expansion and
     /// plan transformations.
     #[inline]
     pub fn run(
@@ -203,9 +205,8 @@ impl QueryService {
     /// [`SourceSelector::All`].
     ///
     /// Selective sources keep the default vector growth because their result
-    /// count is not known before matching.
-    /// Prior measurements showed 28% excess capacity at 100 rows, 64% at
-    /// 10,000 rows, and 2.4% at 1,000 rows.
+    /// count is not known before matching. Prior measurements showed 28% excess
+    /// capacity at 100 rows, 64% at 10,000 rows, and 2.4% at 1,000 rows.
     fn collect_matched_file_rows(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -220,6 +221,7 @@ impl QueryService {
         }
     }
 
+    /// Collects one [`QueryRow`] per matching note.
     fn pages(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -247,16 +249,12 @@ impl QueryService {
         self.item_rows(index, source, |item| item.kind().is_task())
     }
 
-    /// Expands matching notes into one [`QueryRow`] per list item whose kind
-    /// satisfies `is_wanted`, in document order.
+    /// Expands matching notes into one [`QueryRow`] per wanted list item.
     ///
-    /// Counts matching items before it builds rows, then reserves exact
-    /// capacity. This avoids vector growth and prevents sparse task queries
-    /// from reserving space for every list item. It also collects base rows
-    /// through [`Self::collect_matched_file_rows`] to avoid excess
-    /// capacity.
-    /// Reserving for every item would waste space when many notes have lists
-    /// but few tasks.
+    /// Items satisfy `is_wanted` and appear in document order. This method
+    /// collects base rows through [`Self::collect_matched_file_rows`] and
+    /// counts matching items before it allocates, avoiding excess capacity on
+    /// sparse task queries.
     fn item_rows(
         &self,
         index: &Arc<WorkspaceIndex>,
@@ -287,6 +285,7 @@ impl QueryService {
     }
 
     /// Creates one row per indexed file matching `source`, at note granularity.
+    ///
     /// List and task modes expand these base rows with [`Self::item_rows`].
     fn matched_file_rows<'b>(
         &'b self,
@@ -335,8 +334,9 @@ impl<'a> SourceResolver<'a> {
     }
 
     /// Resolves a boolean source expression recursively.
-    /// It intersects `And` branches and combines `Or` branches.
-    /// It resolves `Not` by returning every indexed path.
+    ///
+    /// It intersects `And` branches and combines `Or` branches. It resolves
+    /// `Not` by returning every indexed path.
     fn resolve_expr(
         &self,
         expr: &BooleanExpr<SourceAtom>,
@@ -405,7 +405,8 @@ impl<'a> SourceResolver<'a> {
         }
     }
 
-    /// Linear two-pointer intersection of two sorted slices.
+    /// Computes the intersection of two sorted path slices using a two-pointer
+    /// scan.
     fn intersect_sorted(a: &[PathBuf], b: &[PathBuf]) -> Box<[PathBuf]> {
         let mut out = Vec::new();
         let mut i = 0usize;

@@ -4,17 +4,17 @@
 //! [`FileMeta`] stores the metadata the indexer persists for every regular file
 //! under a project root: project-root-relative path, parent folder, timestamps,
 //! byte size, and [`FileFormat`] classification. [`FileFormat::Note`] files
-//! also get parsed into [`crate::Note`] metadata. [`FileFormat::Other`] files
-//! keep only their [`FileMeta`].
+//! also parse into [`crate::Note`] metadata. [`FileFormat::Other`] files keep
+//! only their [`FileMeta`].
 //!
 //! File-name newtypes decompose a path's final component for index lookup:
 //!
 //! - [`FileName`]: owns the full final component including extension
-//!   (`todo.md`). Constructed from a [`Path`] with [`TryFrom`]. Returns
+//!   (`todo.md`). Build it from a [`Path`] with [`TryFrom`]. Returns
 //!   [`FileNameError::Missing`] when the path has no final component.
 //! - [`BaseName`]: owns the stem with the extension stripped (`todo`), derived
-//!   from [`FileName`] with [`From`]. Used as the index key for stem-based link
-//!   resolution.
+//!   from [`FileName`] with [`From`]. It serves as the index key for stem-based
+//!   link resolution.
 //! - [`BaseNameRef`]: borrows the stem without allocation, enabling zero-copy
 //!   comparison and hash lookups directly from a [`Path`].
 //!
@@ -56,12 +56,12 @@ impl FileMeta {
     /// Builds a [`FileMeta`] from filesystem metadata.
     ///
     /// `relative` is a project-root-relative path already validated by the
-    /// scanner. The modification time is read from `metadata`. Creation time
-    /// is captured if the host OS reports it, and [`None`] otherwise.
+    /// scanner. Reads the modification time from `metadata`. Captures the
+    /// creation time if the host OS reports it, or [`None`] otherwise.
     ///
     /// # Errors
     ///
-    /// - [`std::io::Error`] if the file's modification time cannot be read.
+    /// - [`std::io::Error`] if reading the file's modification time fails.
     pub(crate) fn from_metadata(
         relative: RelativePath,
         metadata: &fs::Metadata,
@@ -192,9 +192,9 @@ impl FileMeta {
 
     /// Returns the filesystem creation timestamp, if the host reports one.
     ///
-    /// On Linux, [`std::fs::Metadata::created`] fails on tmpfs, FAT32, `NFSv3`,
-    /// and kernels before 4.11. Callers should treat this as `Option`, falling
-    /// back to [`Self::modified_at`] or displaying `None` as appropriate.
+    /// On Linux, [`std::fs::Metadata::created`] fails on `tmpfs`, FAT32,
+    /// `NFSv3`, and kernels before 4.11. Callers must treat this as [`Option`],
+    /// fall back to [`Self::modified_at`], or display `None`.
     #[inline]
     #[must_use]
     pub(crate) const fn created_at(&self) -> Option<SystemTime> {
@@ -232,8 +232,10 @@ impl crate::path::HasPath for FileMeta {
 
 /// Stores the final path component of a file, including any extension.
 ///
-/// Wraps the text returned by [`Path::file_name`]. For `todo.md`, stores
-/// `todo.md`. For `.gitignore`, stores `.gitignore`.
+/// Wraps the text returned by [`Path::file_name`]:
+///
+/// - `todo.md` stores `todo.md`.
+/// - `.gitignore` stores `.gitignore`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct FileName(String);
 
@@ -256,10 +258,8 @@ impl TryFrom<&Path> for FileName {
     ///
     /// # Errors
     ///
-    /// - [`Missing`] if `path` has no final component, such as `/`, `..`, or an
-    ///   empty path.
-    ///
-    /// [`Missing`]: FileNameError::Missing
+    /// - [`FileNameError::Missing`] if `path` has no final component, such as
+    ///   `/`, `..`, or an empty path.
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         path.file_name()
             .map(|name| Self(name.to_string_lossy().into_owned()))
@@ -267,11 +267,12 @@ impl TryFrom<&Path> for FileName {
     }
 }
 
-/// Stores an owned file name with any extension stripped.
+/// Stores an owned filename with any extension stripped.
 ///
-/// Uses [`Path::file_stem`] on [`FileName`]'s stored text. For `todo.md`,
-/// stores `todo`. Dotfiles such as `.gitignore` keep their full text as the
-/// stem.
+/// Uses [`Path::file_stem`] on [`FileName`]'s stored text:
+///
+/// - `todo.md` stores `todo`.
+/// - `.gitignore` keeps `.gitignore` as the full stem.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub(crate) struct BaseName(String);
 
@@ -295,7 +296,7 @@ impl From<&FileName> for BaseName {
     }
 }
 
-/// Borrows a file name with any extension stripped.
+/// Borrows a filename with any extension stripped.
 ///
 /// Use this instead of [`BaseName`] when a comparison or hash lookup can borrow
 /// directly from a [`Path`]. Dotfile behavior matches [`Path::file_stem`].
@@ -335,7 +336,7 @@ impl std::borrow::Borrow<str> for BaseNameRef<'_> {
 
 /// Classifies files for the two-tier index.
 ///
-/// Markdown notes get parsed [`crate::Note`] metadata in addition to their
+/// Markdown notes receive parsed [`crate::Note`] metadata in addition to their
 /// [`FileMeta`]. Other files only keep general file metadata.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum FileFormat {
@@ -375,8 +376,9 @@ mod tests {
 
     use super::*;
 
-    /// Builds a `FileMeta` with `created_at`/`modified_at` set directly, for
-    /// exercising timestamp accessor behavior without touching the filesystem.
+    /// Builds a [`FileMeta`] with `created_at` and `modified_at` set directly,
+    /// for exercising timestamp accessor behavior without touching the
+    /// filesystem.
     fn record_with(
         created_at: Option<SystemTime>,
         modified_at: SystemTime,
@@ -641,7 +643,7 @@ mod tests {
         fn returns_none_when_the_stem_is_not_valid_utf8() {
             use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
-            let invalid = OsStr::from_bytes(&[0x66, 0x6f, 0x80, 0x6f]); // "fo\x80o"
+            let invalid = OsStr::from_bytes(&[0x66, 0x6f, 0x80, 0x6f]); // `b"fo\x80o"`
             let path = Path::new(invalid);
 
             assert_eq!(BaseNameRef::from_path(path), None);

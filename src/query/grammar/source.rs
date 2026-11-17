@@ -2,8 +2,9 @@
 //!
 //! Source expressions match notes in a
 //! [`WorkspaceIndex`](crate::index::WorkspaceIndex). They support hierarchical
-//! tags, paths, glob patterns, and File Classes. Combine source terms with
+//! tags, paths, glob patterns, and file classes. Combine source terms with
 //! `and`, `or`, `not`, and parentheses.
+
 use std::{collections::BTreeSet, path::Path};
 
 use logos::{Lexer, Logos};
@@ -62,7 +63,7 @@ impl SourceSelector {
         }
     }
 
-    /// Reports whether the source contains File Class atoms that need
+    /// Reports whether the source contains file-class atoms that need
     /// expansion.
     #[must_use]
     pub(crate) fn has_classes(&self) -> bool {
@@ -72,7 +73,7 @@ impl SourceSelector {
         }
     }
 
-    /// Expands each File Class atom with `expander`.
+    /// Expands each file-class atom with `expander`.
     pub(crate) fn resolve_classes(
         &mut self,
         expander: &(impl FileClassExpander + ?Sized),
@@ -188,7 +189,7 @@ pub(crate) enum SourceAtom {
     Tag(String),
     /// Matches a path pattern.
     Path(GlobPattern),
-    /// Matches a File Class hierarchy.
+    /// Matches a file class hierarchy.
     Class {
         /// Stores the class names from the query.
         names: Vec<String>,
@@ -243,9 +244,12 @@ where
 
 /// Represents a compiled glob used by path source atoms.
 ///
-/// `*` matches characters except `/`. `**` also crosses `/`.
-/// Other characters match literally. Native separators become `/` before
-/// matching. The compiled regex matches the whole path.
+/// Native separators become `/` before matching, and the compiled regex matches
+/// the whole path:
+///
+/// - `*` matches any characters except `/`.
+/// - `**` matches any characters including `/`.
+/// - Other characters match literally.
 #[derive(Clone)]
 pub(crate) struct GlobPattern {
     regex: Regex,
@@ -303,17 +307,17 @@ impl PartialEq for GlobPattern {
     }
 }
 
-/// Expansion depth for a File Class match.
+/// Controls expansion depth for a file-class match.
 ///
 /// - `Exact` matches the named class. Use the `@C` sigil or the `class(C)`
 ///   form.
-/// - `Children` matches the named class and its direct sub-classes. Use the
+/// - `Children` matches the named class and its direct subclasses. Use the
 ///   `@C+` sigil or the `class(C, children)` form.
-/// - `Descendants` matches the named class and all transitive sub-classes. Use
+/// - `Descendants` matches the named class and all transitive subclasses. Use
 ///   the `@C*` sigil or the `class(C, descendants)` form.
 ///
-/// The set of resolved class names starts empty after parsing.
-/// The query fills it before matching.
+/// The set of resolved class names starts empty after parsing. The query fills
+/// it before matching.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ClassExpansionMode {
     Exact(BTreeSet<String>),
@@ -323,6 +327,7 @@ pub(crate) enum ClassExpansionMode {
 
 impl ClassExpansionMode {
     /// Returns the resolved class names.
+    ///
     /// [`Self::set_classes`] fills the set before matching.
     #[must_use]
     pub(crate) const fn classes(&self) -> &BTreeSet<String> {
@@ -343,10 +348,10 @@ impl ClassExpansionMode {
     }
 }
 
-/// Resolves File Class names against the Schema domain.
+/// Resolves file class names against the schema domain.
 ///
 /// The `Send + Sync` bounds let `QueryOps` store this trait object in
-/// [`std::sync::Arc`]. The [`minijinja::Object`] trait also needs these
+/// [`std::sync::Arc`]. The [`minijinja::value::Object`] trait also needs these
 /// bounds.
 pub(crate) trait FileClassExpander: Send + Sync {
     /// Adds names from `classes` to the match set in `mode`.
@@ -357,7 +362,7 @@ pub(crate) trait FileClassExpander: Send + Sync {
 struct SourceGrammar;
 
 impl SourceGrammar {
-    /// Parses a sigil-form File Class term such as `@Class`, `@Class+`, or
+    /// Parses a sigil-form file-class term such as `@Class`, `@Class+`, or
     /// `@Class*`.
     ///
     /// # Errors
@@ -402,7 +407,7 @@ impl SourceGrammar {
         })
     }
 
-    /// Parses a function-form File Class term such as `class(Name)`.
+    /// Parses a function-form file-class term such as `class(Name)`.
     ///
     /// Accepts `class(Name, children)` and `.with_descendants()` modifiers.
     ///
@@ -655,15 +660,14 @@ enum SourceToken {
 
 /// Parses a `#tag`-shaped token starting at the already-consumed leading `#`.
 ///
-/// Uses [`Tag::prefix_len`], the scanner used by the Markdown body lexer.
-/// The scanner accepts the same tag shapes as notes, including one-letter
-/// tags.
-/// Returns [`LexError::UnexpectedToken`](crate::LexError::UnexpectedToken) if
-/// `#` is not followed by a valid tag body.
+/// Uses [`Tag::prefix_len`], the scanner used by the Markdown body lexer. The
+/// scanner accepts the same tag shapes as notes, including one-letter tags.
+/// Returns `Err(())` if `#` is not followed by a valid tag body, which the
+/// lexer reports as a token error.
 ///
 /// # Errors
 ///
-/// - An error if `#` is not followed by a valid tag body.
+/// - `()` if `#` is not followed by a valid tag body.
 fn tag_callback(lex: &mut Lexer<'_, SourceToken>) -> Result<String, ()> {
     let tag_start = lex.span().start;
     let tail = lex.source().get(tag_start..).ok_or(())?;
@@ -1086,8 +1090,8 @@ mod tests {
             let index = IndexerService::for_tests(temp.path())
                 .build()
                 .expect("build index");
-            // `covers/**/*.md` needs an intermediate path segment.
-            // This checks that `**` crosses `/` boundaries.
+            // `covers/**/*.md` needs an intermediate path segment. This checks
+            // that `**` crosses `/` boundaries.
             let expression =
                 SourceExpr::parse("covers/**/*.md").expect("valid source");
             let direct =

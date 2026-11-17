@@ -17,7 +17,7 @@ use crate::{
 /// Combines failures from the discovery, read, trust, and value stages.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigError {
-    /// Reports a failure while finding a Config File.
+    /// Reports a failure while finding a Configuration File.
     #[error(transparent)]
     Discovery(#[from] ConfigDiscoveryError),
     /// Reports a file read or TOML deserialization failure.
@@ -31,25 +31,25 @@ pub(crate) enum ConfigError {
     Value(#[from] ConfigValueError),
 }
 
-/// Names the result type for Config File discovery operations.
+/// Names the result type for Configuration File discovery operations.
 pub(crate) type ConfigDiscoveryResult<T> =
     std::result::Result<T, ConfigDiscoveryError>;
 
-/// Reports failures while finding candidate Config Files on disk.
+/// Reports failures while finding candidate Configuration Files on disk.
 ///
 /// Discovery does not read TOML or check Trust Status.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigDiscoveryError {
-    /// Reports that the ancestor walk found no local Config File.
+    /// Reports that the ancestor walk found no local Configuration File.
     #[error("no local config found from {cwd}")]
     NotFound {
         /// Holds the directory where the ancestor walk began.
         cwd: PathBuf,
     },
-    /// Reports a file system inspection failure during discovery.
+    /// Reports a filesystem inspection failure during discovery.
     #[error("failed to access path {path} during discovery")]
     Inaccessible {
-        /// Holds the path that the file system could not inspect.
+        /// Holds the path that the filesystem could not inspect.
         path: PathBuf,
         /// Holds the I/O failure.
         #[source]
@@ -57,15 +57,15 @@ pub(crate) enum ConfigDiscoveryError {
     },
 }
 
-/// Reports failures while reading or parsing a Config File.
+/// Reports failures while reading or parsing a Configuration File.
 ///
 /// Parsing an in-memory buffer does not find paths or check Trust Status.
 #[derive(Debug, Error)]
 pub(crate) enum ConfigReadError {
-    /// Reports a failure while reading a Config File from disk.
+    /// Reports a failure while reading a Configuration File from disk.
     #[error("failed to read config file {path}")]
     Io {
-        /// Holds the path of the Config File that could not be read.
+        /// Holds the path of the Configuration File that failed to read.
         path: PathBuf,
         /// Holds the I/O failure.
         #[source]
@@ -74,7 +74,7 @@ pub(crate) enum ConfigReadError {
     /// Reports a TOML parsing or deserialization failure.
     #[error("failed to parse TOML syntax in {path}")]
     Parse {
-        /// Holds the path of the Config File with invalid TOML data.
+        /// Holds the path of the Configuration File with invalid TOML data.
         path: PathBuf,
         /// Holds the TOML deserialization error.
         #[source]
@@ -94,7 +94,7 @@ pub enum ConfigTrustError {
     Untrusted {
         /// Holds the workspace root whose Trust Status blocks loading.
         root: PathBuf,
-        /// Holds the local Config File that failed Trust Verification.
+        /// Holds the local Configuration File that failed Trust Verification.
         path: PathBuf,
         /// Holds the Trust Status that blocked loading.
         status: ConfigTrustStatus,
@@ -102,7 +102,7 @@ pub enum ConfigTrustError {
     /// Reports a Trust Store or Tracker Store operation failure.
     #[error(transparent)]
     Tracker(#[from] FilePathTrackerError),
-    /// Reports a Config File read failure during Trust Verification.
+    /// Reports a Configuration File read failure during Trust Verification.
     #[error(transparent)]
     Hash(#[from] HashError),
 }

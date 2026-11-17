@@ -127,9 +127,9 @@ impl Note {
 
     /// Iterates over frontmatter fields, then body inline fields.
     ///
-    /// Frontmatter keys take precedence: inline fields whose canonical key
-    /// matches a frontmatter key are skipped. Returns borrowed keys to avoid
-    /// cloning every [`FieldKey`] on each call.
+    /// Frontmatter keys take precedence. The iterator skips inline fields whose
+    /// canonical key matches a frontmatter key. It returns borrowed keys to
+    /// avoid cloning every [`FieldKey`] on each call.
     #[inline]
     #[cfg_attr(
         not(test),
@@ -180,7 +180,7 @@ impl Note {
         &self.tags
     }
 
-    /// Iterates over all list items in document order.
+    /// Iterates through all list items in document order.
     #[inline]
     pub fn list_items(&self) -> impl Iterator<Item = &ListItem> {
         self.lists.iter()
@@ -192,12 +192,12 @@ impl Note {
         self.lists.iter().filter(|item| item.kind().is_task())
     }
 
-    /// Returns an iterator over all descendant items of the list item at
+    /// Returns an iterator yielding every descendant item of the list item at
     /// `parent_idx`.
     ///
-    /// Scans contiguous items following `parent_idx` in document order whose
-    /// depth is strictly greater than the parent's depth, stopping at the first
-    /// sibling or ancestor item.
+    /// Scans contiguous items after `parent_idx` in document order with depth
+    /// greater than the parent's depth, stopping at the first sibling or
+    /// ancestor.
     #[inline]
     pub fn descendants(
         &self,

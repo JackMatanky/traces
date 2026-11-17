@@ -1,8 +1,8 @@
 //! Parses Markdown event streams into structured [`Note`] records.
 //!
 //! [`parse_markdown`] walks a `pulldown-cmark` event stream in a single pass,
-//! assembling a [`Note`] from frontmatter, headings, lists, outlinks, inline
-//! fields, and tags.
+//! assembling a [`Note`] from frontmatter, headings, lists, outgoing links,
+//! inline fields, and tags.
 //!
 //! # Architecture
 //!
@@ -10,21 +10,22 @@
 //!
 //! - [`inline`]: parses inline field value strings into typed
 //!   [`NoteFieldValue`] records.
-//! - [`input`]: provides borrowed input and configuration containers via
+//! - [`input`]: provides borrowed input and configuration containers with
 //!   [`MarkdownParserInput`].
-//! - [`lexer`]: tokenizes inline fields, task emoji shorthands, priority
+//! - [`lexer`]: tokenizes inline fields, task emoji shorthand, priority
 //!   symbols, and tags.
-//! - [`list`]: tracks list hierarchy and manages item classification via
+//! - [`list`]: tracks list hierarchy and manages item classification with
 //!   [`ListTracker`].
 //! - [`marker`]: scans and classifies item-leading task markers.
 //! - [`task`]: extracts task dates, priorities, and normalized text from item
 //!   tokens.
+//!
 //! # Metadata Extraction
 //!
-//! Inline fields and tags are lexed from text buffers for paragraphs, headings,
-//! and list items. Code blocks and inline code spans are excluded from metadata
-//! scanning. Standard Markdown links preserve bracketed text in scan buffers so
-//! visible-key inline fields can be detected within link text.
+//! The parser lexes inline fields and tags from text buffers for paragraphs,
+//! headings, and list items. It excludes code blocks and inline code spans from
+//! metadata scanning. Standard Markdown links keep bracketed text in scan
+//! buffers so the lexer detects visible-key inline fields inside link text.
 //!
 //! # Examples
 //!
@@ -41,6 +42,7 @@
 //! assert_eq!(note.path(), path);
 //! # }
 //! ```
+
 use std::mem;
 
 use indexmap::IndexMap;
@@ -69,7 +71,7 @@ const MARKDOWN_OPTIONS: Options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
     .union(Options::ENABLE_WIKILINKS)
     .union(Options::ENABLE_FOOTNOTES);
 
-/// Math is excluded from heading display text only.
+/// Excludes math from heading display text only.
 const HEADING_OPTIONS: Options = MARKDOWN_OPTIONS.union(Options::ENABLE_MATH);
 
 /// Parses Markdown source into a [`Note`].
@@ -77,16 +79,16 @@ const HEADING_OPTIONS: Options = MARKDOWN_OPTIONS.union(Options::ENABLE_MATH);
 /// Traverses the source for metadata, then collects headings with math and
 /// footnote parsing enabled so existing metadata extraction remains unchanged.
 /// Extracts:
-/// - YAML frontmatter metadata blocks
-/// - Headings in document order with display text and source line
-/// - Ordered and unordered list items, including task statuses
-/// - Outlinks (wikilinks and standard Markdown links)
+///
+/// - YAML frontmatter metadata blocks.
+/// - Headings in document order with display text and source line.
+/// - Ordered and unordered list items, including task statuses.
+/// - Wikilinks and standard Markdown outgoing links.
 /// - Dataview-style inline fields (`Key:: Value`, `[Key:: Value]`, `(Key::
-///   Value)`)
-/// - Hashtags (`#tag`, `#nested/tag`)
+///   Value)`).
+/// - Hashtags (`#tag`, `#nested/tag`).
 ///
 /// # Examples
-///
 ///
 /// ```rust
 /// # #[cfg(feature = "test-utils")]
@@ -161,7 +163,7 @@ fn collect_headings(src: &str, line_index: &LineIndex) -> Vec<Heading> {
     headings
 }
 
-/// Top-level syntactic block currently being traversed.
+/// Represents the top-level syntactic block currently being traversed.
 ///
 /// Metadata, code, and text blocks represent mutually exclusive parsing states.
 #[derive(Default, Eq, PartialEq)]
@@ -173,10 +175,10 @@ enum BlockContext {
     Text,
 }
 
-/// Flushed inline fields collected from an item buffer.
+/// Stores flushed inline fields collected from an item buffer.
 type FlushedFields = Vec<(FieldKey, NoteFieldValue)>;
 
-/// Intermediate metadata collected from a list item's scan buffer.
+/// Holds intermediate metadata collected from a list item's scan buffer.
 ///
 /// Holds the inline fields and tags extracted from an item before they are
 /// folded into the document-level collections.
@@ -320,7 +322,7 @@ struct ParserContext<'a> {
     block: BlockContext,
     /// Buffered frontmatter YAML text.
     metadata_buffer: String,
-    /// Outlinks recorded in document order.
+    /// Outgoing links recorded in document order.
     outlinks: Vec<Link>,
     /// Link currently being traversed and accumulating display text, if any.
     active_link: Option<ActiveLink>,
@@ -411,8 +413,8 @@ impl<'a> ParserContext<'a> {
     /// Starts tracking an outgoing link.
     ///
     /// Standard Markdown links push `[` into the scan buffer (and `]` in
-    /// [`Self::end_link`]) so visible-key inline fields can be detected in link
-    /// text.
+    /// [`Self::end_link`]) so the lexer detects visible-key inline fields in
+    /// link text.
     fn start_link(&mut self, link_type: CmarkLinkType, dest_url: CowStr<'_>) {
         let kind = if matches!(link_type, CmarkLinkType::WikiLink { .. }) {
             LinkType::Wikilink
@@ -508,9 +510,9 @@ impl<'a> ParserContext<'a> {
 
     /// Closes the innermost list.
     ///
-    /// Items of a list nested inside an active item carry that item's line as
-    /// their `parent` and a deeper `depth`; a top-level list's items become
-    /// [`Note::lists`] entries in document order.
+    /// Items in a nested list carry the active item's line as `parent` and a
+    /// deeper `depth`. Top-level list items become [`Note::lists`] entries in
+    /// document order.
     fn end_list(&mut self) {
         self.list_nesting.end_list();
     }
@@ -590,7 +592,7 @@ impl<'a> ParserContext<'a> {
     }
 }
 
-/// A link currently being walked, accumulating its display text.
+/// Tracks a link currently being walked and accumulates its display text.
 struct ActiveLink {
     target: String,
     kind: LinkType,
@@ -804,9 +806,9 @@ mod tests {
             assert_eq!(note.tags().len(), 0);
         }
 
-        /// Fifty-thousand-deep blockquote chains stress the widest nesting
-        /// the Markdown grammar allows without quadratic input growth. The
-        /// pipeline must stay iterative: parsing on a 1 `MiB` stack pins the
+        /// Fifty-thousand-deep block quote chains stress the widest nesting the
+        /// Markdown grammar allows without quadratic input growth. The pipeline
+        /// must stay iterative: parsing on a 1 `MiB` stack pins the
         /// explicit-stack design against a regression into recursion.
         #[test]
         fn parses_fifty_thousand_deep_blockquote_chain_on_a_small_stack() {
@@ -1173,14 +1175,15 @@ mod tests {
 
         #[test]
         fn parses_code_block_without_leaking_content_as_metadata() {
-            // Arrange: fenced code block contains YAML-like content that could
-            // be mistaken for frontmatter if block context doesn't switch.
+            // Arrange: fenced code block contains YAML-like content that the
+            // parser could mistake for frontmatter if block context fails to
+            // switch.
             let input = "---\ntitle: Real Frontmatter\n---\n\nSome \
                          text.\n\n```\n---\nfake: value\n```\n\nMore text.";
             let note = parse(input);
 
-            // Act: the real frontmatter has 1 field; the fenced content must
-            // not appear as additional fields.
+            // Act: the real frontmatter has 1 field. Fenced content must not
+            // appear as more fields.
             let field_count =
                 note.frontmatter().map_or(0, |fm| fm.fields().len());
 
@@ -1193,11 +1196,9 @@ mod tests {
 
         #[test]
         fn treats_text_after_closing_fence_as_body() {
-            // Arrange: text after a fenced code block must be treated as body
-            // text, not as code block content (end_code_block
-            // resets BlockContext). Inline fields are extracted from body text,
-            // so verifying they appear after a code block proves the context
-            // reset worked.
+            // Arrange: treat text after a fenced code block as body text
+            // (`end_code_block` resets `BlockContext`). Inline fields appear in
+            // body text, proving the context reset worked.
             let input = "```\ncode here\n```\n\nStatus:: Draft";
             let note = parse(input);
 
@@ -1214,11 +1215,10 @@ mod tests {
         #[test]
         fn preserves_body_through_nested_list_text_blocks() {
             // Arrange: a paragraph followed by a nested list with text,
-            // followed by another paragraph. The
-            // body_buffer.clear() in start_text_block must NOT fire
-            // for nested text blocks (L215 mutant inverts the guard).
-            // We verify indirectly: inline fields from both paragraphs must be
-            // extracted, proving both paragraphs were processed.
+            // followed by another paragraph. The `body_buffer.clear()` call in
+            // `start_text_block` must NOT fire for nested text blocks (a mutant
+            // inverts the guard). Check indirectly: extract inline fields from
+            // both paragraphs to prove both ran.
             let input = "Status:: Draft\n\n- Item one.\n- Nested \
                          item.\n\nAuthor:: Jane";
             let note = parse(input);
@@ -1227,7 +1227,7 @@ mod tests {
             let keys: Vec<&str> =
                 note.inline_fields().iter().map(|(k, _)| k.name()).collect();
 
-            // Assert: both paragraph fields must be extracted
+            // Assert: extract both paragraph fields.
             assert!(
                 keys.contains(&"Status"),
                 "first paragraph field must be extracted, got: {keys:?}"
@@ -1263,9 +1263,8 @@ mod tests {
 
         #[test]
         fn captures_field_after_blockquote_inside_item() {
-            // Bare fields are line-start-gated in the scan buffer; a
-            // block-level child before them must end the prior line or the
-            // field is invisible to the lexer.
+            // Bare fields need line start in the scan buffer. A block-level
+            // child before them must end the prior line.
             let note = parse("- alpha\n\n  > Status:: Draft");
 
             let keys: Vec<&str> =
@@ -1279,8 +1278,8 @@ mod tests {
 
         #[test]
         fn keeps_code_fence_content_out_of_field_scan() {
-            // The scan buffer excludes code text: a bare field inside a fence
-            // must never be extracted, even after block separation.
+            // The scan buffer excludes code text. Never extract a bare field
+            // inside a fence, even after block separation.
             let note = parse("- alpha\n\n  ```\n  Status:: Draft\n  ```");
 
             let keys: Vec<&str> =
@@ -1295,9 +1294,9 @@ mod tests {
         #[test]
         fn emits_breaks_in_body_text() {
             // Arrange: hard breaks (two trailing spaces) in body text must
-            // produce newlines in the body buffer (L317 mutant removes the
-            // push). We verify indirectly: a field value must be
-            // truncated at the newline, not span across the break.
+            // produce newlines in the body buffer (a mutant removes the push).
+            // Check indirectly: truncate a field value at the newline instead
+            // of spanning the break.
             let input = "Key:: value1  \nmore text";
             let note = parse(input);
 
@@ -1316,10 +1315,10 @@ mod tests {
 
         #[test]
         fn preserves_inline_code_in_list_item_text() {
-            // Arrange: inline code inside a list item must appear in the
-            // item's display text (buffers.text) but NOT in the scan
-            // buffer (for field/tag scanning). The push_code method
-            // writes only to buffers.text.
+            // Arrange: inline code inside a list item must appear in the item's
+            // display text (`buffers.text`) but NOT in the scan buffer (for
+            // field/tag scanning). The `push_code` method writes only to
+            // `buffers.text`.
             let input = "- Item with `inline code` here\n";
             let note = parse(input);
 
@@ -1431,8 +1430,8 @@ mod tests {
                 second_priority.1.first().and_then(|v| v.as_str()),
                 Some("low")
             );
-            // Both fields still surface on the page-level bag, unscoped,
-            // grouped under the same key.
+            // Both fields still surface on the page-level bag, without item
+            // scoping, grouped under the same key.
             assert_eq!(note.inline_fields().len(), 1);
             assert_eq!(
                 note.inline_fields()

@@ -2,18 +2,21 @@
 //! [`TimeUnit`] and date-point [`DateUnit`].
 //!
 //! [`TEMPORAL_UNITS`] stores each duration unit's nominal length, frame, and
-//! human names. [`UNIT_LOOKUP`] stores accepted spellings. Callers read these
-//! facts from [`TimeUnit`] instead of keeping private copies. Calendar units
-//! ([`TimeUnit::Day`], [`TimeUnit::Week`], [`TimeUnit::Month`],
-//! [`TimeUnit::Year`]) take effect on the local clock. Exact units
-//! ([`TimeUnit::Hour`] and smaller) are exact elapsed time.
+//! human names, while [`UNIT_LOOKUP`] stores accepted spellings. Callers read
+//! these facts from [`TimeUnit`] instead of keeping private copies.
+//!
+//! Duration units fall into two frames:
+//!
+//! - Calendar units ([`TimeUnit::Day`], [`TimeUnit::Week`],
+//!   [`TimeUnit::Month`], [`TimeUnit::Year`]) take effect on the local clock.
+//! - Exact units ([`TimeUnit::Hour`] and smaller) measure exact elapsed time.
 //!
 //! [`DateUnit`] identifies calendar or clock components of a date reading and
 //! provides projection from local datetime values.
 //!
 //! [`decompose`] turns a magnitude in whole seconds into whole-unit counts over
-//! a caller-chosen unit set, and is the one decomposition routine behind both
-//! canonical spelling and human duration rendering.
+//! a caller-chosen unit set. It serves both canonical spelling and human
+//! duration rendering.
 
 use jiff::{Span, civil};
 
@@ -98,9 +101,9 @@ impl TimeUnit {
 
     /// Resolves a unit spelling or reports why it was rejected.
     ///
-    /// The [`UnitError`] message quotes [`UNIT_SPELLINGS_HINT`], so a
-    /// rejected `unit="..."` kwarg names every accepted spelling without a
-    /// second copy of the list beside the caller.
+    /// The [`UnitError`] message quotes [`UNIT_SPELLINGS_HINT`]. A rejected
+    /// `unit="..."` keyword argument names every accepted spelling without
+    /// duplicating the list.
     ///
     /// # Errors
     ///
@@ -268,11 +271,13 @@ impl DecomposedPart {
 /// Greedily decomposes a non-negative magnitude in whole seconds into
 /// whole-unit counts.
 ///
-/// `total_secs` is a magnitude in whole seconds. Order `units` largest first,
-/// as [`TEMPORAL_UNITS`] and duration composition sets are.
-/// Unit sizes are [`TimeUnit::nominal_seconds`], so the registry stays the
-/// sole ratio table. Units larger than the remaining magnitude contribute no
-/// row. Returns the rows and the sub-unit remainder in seconds.
+/// Pass `total_secs` as a whole-second magnitude and order `units` largest
+/// first, matching [`TEMPORAL_UNITS`] and duration composition sets. Unit sizes
+/// come from [`TimeUnit::nominal_seconds`], keeping the registry as the sole
+/// ratio table.
+///
+/// Units larger than the remaining magnitude contribute no row. The function
+/// returns the decomposed rows and the sub-unit remainder in seconds.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "registered unit sizes are nonzero and decomposition maintains a \

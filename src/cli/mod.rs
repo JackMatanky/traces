@@ -1,17 +1,17 @@
-//! CLI entry point and command dispatch.
+//! Parses CLI arguments and dispatches commands.
 //!
-//! Parses process arguments via [`clap`], routes to the selected subcommand (or
-//! the default `-i` template dispatch), and translates domain errors into
+//! Parses process arguments with [`clap`], routes to the selected subcommand
+//! (or the default `-i` template dispatch), and translates domain errors into
 //! [`CliError`] diagnostics.
 //!
 //! # Key Types
 //!
 //! - [`CommandOutcome`]: top-level result of a successful command.
-//! - [`UserAbort`]: deliberate user cancellation or interruption.
+//! - [`UserAbort`]: deliberate cancellation or interruption.
 //! - [`CliError`]: unified diagnostic error for all CLI operations.
 //!
-//! Submodules contain command-specific logic; this module stays limited to
-//! argument flow and shared helpers.
+//! Submodules contain command-specific logic. This module handles argument
+//! flow and shared helpers.
 
 mod completions;
 mod cwd;
@@ -50,23 +50,22 @@ use crate::{
     schema::{SchemaService, warn_schema_construction_diagnostics},
 };
 
-/// Top-level result of a successful CLI command.
+/// Represents the top-level result of a CLI command.
 ///
 /// Returned by [`run`] to distinguish normal completion from deliberate user
 /// cancellation or interruption. The process exit code is `0` for `Completed`
-/// and for `Aborted(UserAbort::Cancelled)`; `Aborted(UserAbort::Interrupted)`
-/// exits with `130`. Callers that need different behavior can match on the
-/// variant.
+/// and `Aborted(UserAbort::Cancelled)`. `Aborted(UserAbort::Interrupted)` exits
+/// with `130`. Callers can match on the variant if needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum CommandOutcome {
     /// The command completed its work without interruption.
     Completed,
-    /// The user cancelled or interrupted an interactive prompt before the
+    /// The user canceled or interrupted an interactive prompt before the
     /// command could finish.
     Aborted(UserAbort),
 }
 
-/// User gesture that ended an interactive command.
+/// Identifies the user gesture that ended an interactive command.
 ///
 /// Extracted from dialog-layer cancellation or interruption errors in the error
 /// source chain.
@@ -74,15 +73,15 @@ pub enum CommandOutcome {
 pub enum UserAbort {
     /// The user pressed Escape to cancel an interactive prompt.
     Cancelled,
-    /// The user pressed Ctrl-C to interrupt an interactive prompt.
+    /// The user pressed Control-C to interrupt an interactive prompt.
     Interrupted,
 }
 
-/// Root command-line parser for `traces`.
+/// Defines the root command-line parser for `traces`.
 ///
 /// Dispatches to a subcommand when one is present, or to the default
-/// `-i`/`--input` template instantiation path when the flag is given. Returns
-/// [`CliError::NoCommand`] when neither is provided.
+/// `-i`/`--input` template path when the caller passes the flag. Returns
+/// [`CliError::NoCommand`] when neither is present.
 #[derive(Debug, Parser)]
 #[command(
     name = "traces",
@@ -91,17 +90,21 @@ pub enum UserAbort {
     args_conflicts_with_subcommands = true
 )]
 struct Cli {
+    /// Subcommand to run when not using `-i` or `--input`.
     #[command(subcommand)]
     command: Option<Commands>,
     /// Optional template name for the default `traces -i <name>` dispatch.
     ///
     /// Passing `-i` with no value opens the interactive fuzzy picker.
     //
-    // `Option<Option<_>>`, not `Option<PathBuf>`, so parsing can distinguish
-    // "flag absent" (`None`, -> `CliError::NoCommand`) from "flag present, no
-    // value" (`Some(None)`, -> the interactive picker) from "flag present,
-    // value given" (`Some(Some(name))`, -> the ordinary `-i <name>` dispatch).
-    // `Option<PathBuf>` alone collapses the first two into the same `None`.
+    // Uses `Option<Option<_>>` instead of `Option<PathBuf>` to separate three
+    // states:
+    //
+    // - `None` (flag absent) returns `CliError::NoCommand`.
+    // - `Some(None)` (flag present, no value) opens the interactive picker.
+    // - `Some(Some(name))` runs `-i <name>`.
+    //
+    // `Option<PathBuf>` collapses the first two states into `None`.
     #[arg(short = 'i', long = "input", value_name = "NAME", num_args = 0..=1)]
     #[expect(
         clippy::option_option,
@@ -119,8 +122,8 @@ impl Cli {
     ///
     /// # Errors
     ///
-    /// - [`CliError::NoCommand`] if neither a subcommand nor `-i`/`--input` was
-    ///   provided.
+    /// - [`CliError::NoCommand`] if neither a subcommand nor `-i`/`--input` is
+    ///   present.
     /// - Any [`CliError`] returned by command execution.
     fn run(
         self,
@@ -148,31 +151,30 @@ impl Cli {
     }
 }
 
-/// Top-level `traces` subcommands.
+/// Enumerates top-level `traces` subcommands.
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Initialize local traces configuration in the current directory.
+    /// Initializes local traces configuration in the current directory.
     Init(init::Init),
-    /// Grant trust to one or more project roots.
+    /// Grants trust to one or more project roots.
     Trust(trust::Trust),
-    /// Revoke trust from one or more project roots.
+    /// Revokes trust from one or more project roots.
     Untrust(untrust::Untrust),
-    /// Build or rebuild the persisted
-    /// [`WorkspaceIndex`](crate::index::WorkspaceIndex).
+    /// Builds or rebuilds the persisted [`crate::index::WorkspaceIndex`].
     Index(index::Index),
-    /// Query pages and print matching file paths as a Markdown bullet list.
+    /// Queries pages and prints matching file paths as a Markdown bullet list.
     List(list::List),
-    /// Query pages and print matching records as a Markdown table.
+    /// Queries pages and prints matching records as a Markdown table.
     Table(table::Table),
-    /// Query tasks and print matching checkbox lines.
+    /// Queries tasks and prints matching checkbox lines.
     Task(task::Task),
-    /// Render a template and write it to disk, or list available templates.
+    /// Renders a template and writes it to disk, or lists available templates.
     #[command(alias = "tmpl")]
     Template(template::Template),
-    /// Generate shell completion scripts or list available template names.
+    /// Generates shell completion scripts or lists available template names.
     #[command(alias = "completion")]
     Completions(completions::Completions),
-    /// Inspect or clean the tracked-config store.
+    /// Inspects or cleans the tracked-configuration store.
     Tracked(tracked::Tracked),
 }
 
@@ -215,13 +217,13 @@ impl Commands {
 /// Parses process arguments and runs the selected `traces` command.
 ///
 /// Yields [`CommandOutcome::Completed`] on success, or
-/// [`CommandOutcome::Aborted`] if the user cancelled or interrupted an
+/// [`CommandOutcome::Aborted`] if the user canceled or interrupted an
 /// interactive prompt.
 ///
 /// # Errors
 ///
 /// - [`CliError::NoCommand`] when neither a subcommand nor `-i`/`--input` is
-///   provided.
+///   present.
 /// - Any [`CliError`] for command execution failures (such as configuration
 ///   loading, indexing, query evaluation, or template instantiation).
 #[inline]
@@ -235,8 +237,8 @@ pub fn run() -> Result<CommandOutcome, CliError> {
 ///
 /// # Errors
 ///
-/// - [`CliError::CurrentDirectory`] if the directory does not exist or cannot
-///   be accessed.
+/// - [`CliError::CurrentDirectory`] if the directory does not exist or the
+///   process lacks access.
 fn current_dir() -> Result<Cwd, CliError> {
     Cwd::new().map_err(|source| CliError::CurrentDirectory {
         source,
@@ -260,11 +262,10 @@ fn load_config(service: &ConfigService) -> Result<Config, CliError> {
 /// Loads the current configuration and runs `handler` against a reference to
 /// it.
 ///
-/// Isolates the [`Config`]-sized stack temporary in its own non-inlined frame,
-/// away from the larger multi-arm dispatch frames in [`Cli::run`] and
-/// [`Commands::run`] (`clippy::large_stack_frames` otherwise sums every match
-/// arm's locals, including every other arm's [`CliError`] payload, into those
-/// functions' frames).
+/// Isolates the [`Config`] stack temporary in its own non-inlined frame, away
+/// from the larger dispatch frames in [`Cli::run`] and [`Commands::run`].
+/// Otherwise, `clippy::large_stack_frames` sums every match arm's locals into
+/// those frames.
 ///
 /// # Errors
 ///
@@ -279,35 +280,39 @@ fn run_with_config(
     handler(&load_config(service)?)
 }
 
-/// Shared `--sort`/`--asc`/`--desc` CLI arguments for [`list::List`] and
-/// [`table::Table`].
+/// Defines shared `--sort`, `--asc`, and `--desc` CLI arguments for
+/// [`list::List`] and [`table::Table`].
 ///
-/// Flattened into both subcommands via `#[command(flatten)]` so the sort flags,
-/// their clap validation (`--asc`/`--desc` conflict with each other and require
-/// `--sort`), and their parsing all come from one definition instead of two
-/// copies.
+/// Flattened into both subcommands with `#[command(flatten)]` to share one
+/// definition. `clap` enforces that `--asc` and `--desc` conflict and need
+/// `--sort`.
 #[derive(Debug, Default, clap::Args)]
 pub(super) struct SortArgs {
-    /// Field path to sort by. Repeatable; multiple `--sort` flags or
-    /// comma-separated values compose as composite sort terms. Defaults to
-    /// descending order unless overridden by prefix `+` or the `--asc` flag.
+    /// Specifies field paths to sort by.
+    ///
+    /// Repeatable. Multiple `--sort` flags or comma-separated values combine
+    /// into composite sort terms. Defaults to descending order unless `+` or
+    /// `--asc` overrides it.
     #[arg(long = "sort", value_delimiter = ',', num_args = 1..)]
     keys: Vec<String>,
-    /// Sort in ascending order. Conflicts with `--desc`. Requires `--sort`.
+    /// Sorts in ascending order.
+    ///
+    /// Conflicts with `--desc` and needs `--sort`.
     #[arg(long, conflicts_with = "desc", requires = "keys")]
     asc: bool,
-    /// Sort in descending order (the default). Conflicts with `--asc`.
-    /// Requires `--sort`.
+    /// Sorts in descending order (the default).
+    ///
+    /// Conflicts with `--asc` and needs `--sort`.
     #[arg(long, conflicts_with = "asc", requires = "keys")]
     desc: bool,
 }
 
 impl SortArgs {
-    /// Resolves these arguments into an optional composite [`SortOrder`] via
+    /// Resolves these arguments into an optional composite [`SortOrder`] with
     /// [`SortOrder::parse`].
     ///
-    /// `--asc`/`--desc` select the default direction for segments with no
-    /// `+`/`-` prefix; descending is the default when neither flag is given.
+    /// `--asc` and `--desc` set the default direction for segments without
+    /// `+` or `-`. Descending is the default when neither flag is present.
     ///
     /// # Errors
     ///
@@ -334,8 +339,8 @@ impl SortArgs {
 /// # Errors
 ///
 /// - [`CliError::Index`] if syncing the index or querying the store fails.
-/// - [`CliError::Query`] if any filter expression is malformed or the source
-///   selector cannot be parsed.
+/// - [`CliError::Query`] if any filter expression is malformed or the parser
+///   rejects the source selector.
 fn refresh_query<'a>(
     config: &Config,
     from: Option<&str>,
@@ -435,8 +440,8 @@ fn parse_source(
 /// `root` by appending the `.md` extension.
 ///
 /// Leaves tags (`#tag`), classes (`@Class`), folder globs, and already-quoted
-/// expressions untouched. Paths containing whitespace are enclosed in quotes so
-/// the query source lexer tokenizes them as a single quoted path atom.
+/// expressions untouched. Wraps paths containing whitespace in quotes so the
+/// query source lexer reads them as one quoted path atom.
 fn normalize_source_input<'a>(
     root: &Path,
     input: &'a str,
@@ -471,6 +476,13 @@ fn normalize_source_input<'a>(
     std::borrow::Cow::Borrowed(input)
 }
 
+/// Runs `builder` against `store`, enabling class expansion when `has_classes`
+/// is true.
+///
+/// # Errors
+///
+/// - [`CliError::SchemaQuery`] if loading schemas fails.
+/// - [`CliError::Index`] if running the query against `store` fails.
 fn run_query_builder_from_store(
     config: &Config,
     store: &IndexStore,
@@ -491,6 +503,12 @@ fn run_query_builder_from_store(
     })
 }
 
+/// Loads [`SchemaService`] from `config`'s schema directory and emits
+/// construction warnings.
+///
+/// # Errors
+///
+/// - [`CliError::SchemaQuery`] if loading the schema directory fails.
 fn load_schema_service(config: &Config) -> Result<SchemaService, CliError> {
     let root = config.root();
     let schema_directory = config.schemas().directory();
@@ -520,9 +538,9 @@ fn query_error(root: &Path, source: QueryError) -> CliError {
 ///
 /// # Errors
 ///
-/// - [`CliError::CurrentDirectory`] if no path was provided and reading the
-///   current directory fails.
-/// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+/// - [`CliError::CurrentDirectory`] if `path` is `None` and reading the current
+///   directory fails.
+/// - [`CliError::TrustTargetResolve`] if trust-target resolution fails.
 fn resolve_trust_subjects(
     path: Option<&Path>,
     all: bool,
@@ -560,6 +578,7 @@ mod tests {
             test_support::TestProject,
         };
 
+        /// Test [`DialogProvider`] that cancels selection prompts.
         pub(super) struct CancellingSelect;
         impl DialogProvider for CancellingSelect {
             fn is_interactive(&self) -> bool {
@@ -600,8 +619,8 @@ mod tests {
         }
 
         /// Parses `argv` and drives it through [`Cli::run`] against an
-        /// isolated, trusted project, writing (and returning the contents
-        /// of) `daily.md`.
+        /// isolated, trusted project, writing (and returning the contents of)
+        /// `daily.md`.
         pub(super) fn dispatch_argv_and_read_output(
             argv: &[&str],
             root: &Path,
@@ -630,10 +649,9 @@ mod tests {
 
         use super::*;
 
-        /// Guards the `#[command(subcommand)]` wiring [`run`] depends on:
-        /// `trust::run`'s own tests exercise the trust logic once parsed, but
-        /// nothing else asserts that real `traces trust ...` argv actually
-        /// reaches the [`Commands::Trust`] variant through [`Cli`] at all.
+        /// Guards the `#[command(subcommand)]` wiring that [`run`] uses. Tests
+        /// in `trust` check trust logic after parsing, so this test verifies
+        /// that `traces trust ...` reaches [`Commands::Trust`] through [`Cli`].
         #[test]
         fn trust_argv_maps_to_trust_subcommand() {
             let cli = Cli::try_parse_from(["traces", "trust", "some/path"])
@@ -789,7 +807,7 @@ mod tests {
                 .expect_err("top-level input conflicts with subcommand");
 
             // `-i` after a subcommand is not that subcommand's flag, so clap
-            // reports an unknown argument rather than an ArgumentConflict.
+            // reports an unknown argument rather than an `ArgumentConflict`.
             assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
         }
 
@@ -830,9 +848,9 @@ mod tests {
             args.resolve(Path::new("")).expect("valid sort")
         }
 
-        /// Parses `input` the same way [`SortOrder::parse`] does, for
-        /// asserting [`SortArgs::resolve`]'s output against the real grammar
-        /// rather than decomposing its internal terms.
+        /// Parses `input` the same way [`SortOrder::parse`] does, for asserting
+        /// [`SortArgs::resolve`]'s output against the real grammar rather than
+        /// decomposing its internal terms.
         fn expect_parse(
             input: &str,
             default_direction: SortDirection,
@@ -1096,26 +1114,28 @@ mod tests {
         }
     }
 
-    /// End-to-end coverage exercised together against one shared project
-    /// instead of each command's isolated per-behavior tests:
+    /// Covers end-to-end workflows for one shared project.
     ///
-    /// - Indexing.
+    /// These tests exercise shared-project behavior across five areas instead
+    /// of isolated per-command tests:
+    ///
+    /// - Index building and syncing.
     /// - Page and task CLI queries.
     /// - Template `query`/`tasks` `QueryOps`.
-    /// - Derived inlinks.
+    /// - Derived incoming links.
     /// - Diagnostics.
     ///
     /// See `cli::list`, `cli::table`, `cli::task`, and
     /// `template::engine::query` for exhaustive per-feature coverage.
     ///
-    /// `list`/`table`/`task` write their primary output to stdout, which
-    /// this module doesn't capture (see [`super::list::List::render`]'s
-    /// docs for why). Their CLI-equivalent assertions below drive
-    /// [`WorkspaceIndex`] directly instead, the same shared interface those
-    /// commands' `render`/`lines` methods call. [`Cli::run`] dispatch is
-    /// still exercised directly wherever the observable is on the
-    /// [`Result`] itself, in the diagnostics tests below and every
-    /// `parse`/`dispatch_end_to_end` test above.
+    /// `list`, `table`, and `task` write primary output to standard output,
+    /// which this module does not capture (see [`super::list::List::render`]).
+    /// Their assertions drive [`WorkspaceIndex`] directly through the same
+    /// interface those commands call.
+    ///
+    /// Diagnostics tests below and the `parse` and `dispatch_end_to_end` tests
+    /// above test [`Cli::run`] dispatch directly wherever the result is on
+    /// [`Result`].
     mod query_workflows {
         use std::{
             fs,
@@ -1139,15 +1159,15 @@ mod tests {
             test_support::TestProject,
         };
 
-        /// Writes a trusted project under `root/project` with two Notes
-        /// exercising every seam this suite covers: `#book` tags, a
-        /// `rating` frontmatter field, one markdown task, and a wikilink
-        /// from `hyperion.md` to `dune.md` so `dune.md` gets a derived
-        /// inlink. `dune`'s stem is unique in the project, so the wikilink
-        /// resolves unambiguously regardless of proximity tie-breaking.
+        /// Writes a trusted project under `root/project` with two notes.
         ///
-        /// Returns the trusted [`ConfigService`] (for [`Cli::run`]
-        /// dispatch) and the project root (for direct [`WorkspaceIndex`]/
+        /// The notes include `#book` tags, a `rating` frontmatter field, one
+        /// Markdown task, and a wikilink from `hyperion.md` to `dune.md`.
+        /// Because `dune`'s stem is unique, the wikilink resolves unambiguously
+        /// and gives `dune.md` a derived incoming link.
+        ///
+        /// Returns the trusted [`ConfigService`] (for [`Cli::run`] dispatch)
+        /// and the project root (for direct [`WorkspaceIndex`] and
         /// [`TemplateService`] calls).
         fn seed_book_project(root: &Path) -> (ConfigService, PathBuf) {
             let project = TestProject::trusted(root.join("project"));
@@ -1163,11 +1183,12 @@ mod tests {
             (project.service().clone(), project.root().to_path_buf())
         }
 
-        /// Renders `source` as a one-off template under `project`'s
-        /// `templates` directory and returns its preview content, mirroring
-        /// `traces template -i report --dry-run` without going through
-        /// [`ConfigService`]/trust (this only needs [`Config::for_test`],
-        /// matching [`crate::template::service`]'s own render tests).
+        /// Renders `source` as a one-off template under `project`'s `templates`
+        /// directory and returns its preview content.
+        ///
+        /// Mirrors `traces template -i report --dry-run` without going through
+        /// [`ConfigService`] and trust. Uses [`Config::for_test`], matching
+        /// render tests in [`crate::template::service`].
         fn render_query_template(project: &Path, source: &str) -> String {
             let templates_dir = project.join("templates");
             fs::write(templates_dir.join("report.md"), source)
@@ -1198,8 +1219,9 @@ mod tests {
             let _guard = CwdGuard::enter(&project);
 
             // First invocation: no `.traces/index.redb` exists yet, so this
-            // both builds and persists the index (`IndexerService::sync`'s
-            // cold path), with no explicit `traces index` command run.
+            // both builds and persists the index (the cold path of
+            // `IndexerService::sync`), with no explicit `traces index` command
+            // run.
             let first_outcome = Cli::try_parse_from([
                 "traces",
                 "table",
@@ -1213,7 +1235,7 @@ mod tests {
             .expect("table succeeds");
             assert_eq!(first_outcome, CommandOutcome::Completed);
 
-            // Edit dune.md directly on disk, simulating an external editor;
+            // Edit `dune.md` directly on disk, simulating an external editor;
             // no `traces index` command runs in between.
             fs::write(
                 project.join("books/dune.md"),
@@ -1234,10 +1256,9 @@ mod tests {
             .expect("table succeeds");
             assert_eq!(second_outcome, CommandOutcome::Completed);
 
-            // `table`'s own stdout isn't captured (see the module doc above),
-            // so confirm the edit reached the persisted store without
-            // re-syncing by using `load()` rather than
-            // `refresh_store()`.
+            // This test does not capture `table` standard output. Use `load()`
+            // instead of `refresh_store()` to check that the edit reached the
+            // store.
             let index = Arc::new(
                 IndexerService::for_tests(&project)
                     .load()
@@ -1490,12 +1511,12 @@ mod tests {
         }
 
         /// Verifies that a user interrupt (`Ctrl-C`) during interactive dialog
-        /// input
-        /// maps to `CommandOutcome::Aborted(UserAbort::Interrupted)`.
+        /// input maps to `CommandOutcome::Aborted(UserAbort::Interrupted)`.
         ///
         /// Chain of custody:
+        ///
         /// 1. `DialogProvider` returns `DialogError::UserInterrupted` (e.g.
-        ///    from SIGINT / Ctrl-C).
+        ///    from SIGINT / Control-C).
         /// 2. `Template::run` wraps prompt errors into
         ///    `CliError::TemplatePicker { source }`.
         /// 3. `CliError::user_abort()` maps `DialogError::UserInterrupted` to
@@ -1505,7 +1526,7 @@ mod tests {
         /// 5. `src/main.rs` matches `Aborted(UserAbort::Interrupted)` and exits
         ///    with code 130.
         ///
-        /// Defect class: unwitnessed-contract (mapping link was previously
+        /// Defect class: untested contract (mapping link was previously
         /// untested).
         #[test]
         fn user_interrupted_during_template_picker_returns_aborted_interrupted()

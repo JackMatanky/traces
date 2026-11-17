@@ -1,10 +1,9 @@
 //! Defines metadata field values parsed from YAML frontmatter and inline field
 //! text.
 //!
-//! This module provides [`NoteFieldValue`] and [`NoteFieldValueRef`], the owned
-//! and borrowed representations of strongly typed metadata values extracted
-//! from Markdown notes, including scalars (booleans, numbers, strings, dates,
-//! durations), links, lists, and objects.
+//! Provides [`NoteFieldValue`] and [`NoteFieldValueRef`] for owned and borrowed
+//! metadata values. Supported kinds include scalars (booleans, numbers,
+//! strings, dates, durations), links, lists, and objects.
 //!
 //! # Examples
 //!
@@ -14,6 +13,7 @@
 //! let val = NoteFieldValue::String("value".to_owned());
 //! assert_eq!(val.as_str(), Some("value"));
 //! ```
+
 use std::fmt::Write as _;
 
 use indexmap::IndexMap;
@@ -53,8 +53,8 @@ pub enum NoteFieldValue {
     Date(DateValue),
     /// ISO `YYYY-MM-DDThh:mm:ss` date-time.
     DateTime(DateTimeValue),
-    /// Validated duration; renders in canonical spelling. Equality and ordering
-    /// compare rounded nominal seconds, not the original input text.
+    /// Validated duration that renders in canonical spelling. Equality and
+    /// ordering compare rounded nominal seconds, not the original input text.
     Duration(DurationValue),
     /// A link parsed from wikilink or Markdown link syntax.
     Link(Link),
@@ -216,11 +216,10 @@ pub(crate) enum NoteFieldType {
     /// A duration such as `1h30m`.
     Duration,
     /// Covers both [`NoteFieldValueRef::Date`] and
-    /// [`NoteFieldValueRef::DateTime`]: the same comparable temporal domain at
-    /// different precision. [`NoteFieldValueRef::is_equal_to_literal`] already
-    /// treats a bare `Date` and a midnight-UTC `DateTime` as equal; giving them
-    /// separate ranks would silently coarsen that into "different kind, never
-    /// equal".
+    /// [`NoteFieldValueRef::DateTime`], which share one comparable temporal
+    /// domain. [`NoteFieldValueRef::is_equal_to_literal`] treats a bare `Date`
+    /// and a midnight-UTC `DateTime` as equal. Separate ranks would break that
+    /// equality.
     Temporal,
     /// Free text.
     Text,
@@ -233,8 +232,10 @@ pub(crate) enum NoteFieldType {
 }
 
 impl NoteFieldType {
-    /// `Null < Bool < Number < Duration < Temporal < Text < Link < List <
-    /// Object`.
+    /// Returns the ordinal rank of this field type in canonical total order.
+    ///
+    /// Ordered as `Null < Bool < Number < Duration < Temporal < Text < Link <
+    /// List < Object`.
     pub(crate) const fn rank(self) -> u8 {
         match self {
             Self::Null => 0,
@@ -277,10 +278,9 @@ impl NoteFieldValueRef<'_> {
     /// cross-kind case, which share one rank).
     ///
     /// A bare [`Date`](Self::Date) promotes to a [`DateTime`](Self::DateTime)
-    /// at local-zone midnight for the cross-kind comparison (see
-    /// [`DateTimeValue`]'s promotion from [`DateValue`]), so a `Date`'s exact
-    /// ordering against a same-day `DateTime` depends on the process's local
-    /// zone.
+    /// at local-zone midnight for cross-kind comparison (see
+    /// [`DateTimeValue`]). Exact ordering against a same-day `DateTime` depends
+    /// on the local zone.
     #[inline]
     #[must_use]
     pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
@@ -359,7 +359,7 @@ impl NoteFieldValueRef<'_> {
         }
     }
 
-    /// Borrows a string field; formatted durations have no borrowed spelling.
+    /// Borrows a string field. Formatted durations have no borrowed spelling.
     pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(value) => Some(value),
@@ -429,7 +429,7 @@ impl NoteFieldValueRef<'_> {
 
     /// Evaluates `contains(field_val, target)`.
     ///
-    /// Lists match exact values or descendant tags; string-like fields use
+    /// Lists match exact values or descendant tags. String-like fields use
     /// substring containment.
     pub(crate) fn is_containing(&self, target: &NoteFieldValue) -> bool {
         match self {
@@ -470,11 +470,9 @@ impl PartialEq for NoteFieldValueRef<'_> {
 }
 impl Eq for NoteFieldValueRef<'_> {}
 
-/// Delegates to [`NoteFieldValueRef::compare`]: `NoteFieldValueRef` has a
-/// total order, so it implements the standard comparison traits alongside
-/// its own named [`NoteFieldValueRef::compare`] method (kept as the
-/// primary, most-discoverable entry point since every internal caller in
-/// this crate already spells it that way).
+/// Delegates to [`NoteFieldValueRef::compare`]. `NoteFieldValueRef` has a total
+/// order, so it implements standard comparison traits alongside
+/// [`NoteFieldValueRef::compare`].
 impl PartialOrd for NoteFieldValueRef<'_> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -496,9 +494,11 @@ pub(crate) fn normalize_zero(n: f64) -> f64 {
     n + 0.0
 }
 
-/// Sorted key lists first (`Vec<&str>: Ord` already gives exactly the list
-/// rule: element-wise, shorter-is-less-when-prefix), then values in that
-/// sorted-key order.
+/// Compares two field objects by sorted key lists, then by values.
+///
+/// Compares sorted key lists first (`Vec<&str>: Ord` already gives the
+/// element-wise, shorter-is-less-when-prefix rule), then compares values in
+/// that sorted-key order.
 fn compare_objects(
     a: &IndexMap<String, NoteFieldValue>,
     b: &IndexMap<String, NoteFieldValue>,
@@ -525,10 +525,10 @@ fn compare_objects(
 
 /// Converts a borrowed field value into a [`NoteFieldValue`].
 ///
-/// Handles note-specific post-classification of scalar strings, applied
-/// recursively through lists and objects: empty strings become null, wikilink
-/// syntax becomes [`NoteFieldValue::Link`], and any remaining duration-shaped
-/// spelling (e.g. `4h15m`) becomes [`NoteFieldValue::Duration`].
+/// Applies note-specific scalar string classification recursively through lists
+/// and objects. Empty strings become null, wikilinks become
+/// [`NoteFieldValue::Link`], and duration spellings (e.g. `4h15m`) become
+/// [`NoteFieldValue::Duration`].
 impl From<FieldValueRef<'_>> for NoteFieldValue {
     #[inline]
     fn from(value: FieldValueRef<'_>) -> Self {
@@ -883,8 +883,8 @@ mod tests {
 
         #[test]
         fn as_date_returns_none_for_a_string_ending_mid_char_boundary() {
-            // The first 10 bytes of "2026-09-0é" split a multi-byte UTF-8
-            // character; `as_date` must not panic on this input.
+            // The first 10 bytes of `"2026-09-0é"` split a multibyte UTF-8
+            // character. `as_date` must not panic on this input.
             let str_val = NoteFieldValue::String("2026-09-0é-x".to_owned());
             assert_eq!(str_val.as_date(), None);
         }
@@ -1041,11 +1041,9 @@ mod tests {
             ZoneGuard::set("Etc/GMT-2"); // UTC+02:00, no DST
 
             let d = date("2026-07-29");
-            // 23:00Z on the 28th falls between the date's local-zone
-            // midnight (22:00Z in UTC+2) and a UTC-midnight promotion
-            // (00:00Z on the 29th); this ordering holds only under the
-            // local-zone promotion, pinning it against a regression to pure
-            // UTC midnight.
+            // 23:00Z on the 28th falls between local midnight (22:00Z in UTC+2)
+            // and UTC midnight (00:00Z on the 29th). This ordering holds only
+            // under local-zone promotion.
             let dt = datetime("2026-07-28T23:00:00Z");
             assert_eq!(
                 NoteFieldValueRef::Date(d)
@@ -1311,8 +1309,9 @@ mod tests {
 
         proptest! {
             /// Proves total order laws for `NoteFieldValueRef::compare`:
+            ///
             /// 1. Reflexivity: `a.compare(a) == Equal` (including `NaN == NaN` and `-0.0 == 0.0`).
-            /// 2. Antisymmetry: `a.compare(b) == b.compare(a).reverse()`.
+            /// 2. Order reversal: `a.compare(b) == b.compare(a).reverse()`.
             /// 3. Transitivity: if `a.compare(b) == ord1` and `b.compare(c) == ord2`
             ///    and `ord1 == ord2`, then `a.compare(c) == ord1`.
             #[test]
@@ -1330,7 +1329,7 @@ mod tests {
                 prop_assert_eq!(ref_b.compare(&ref_b), Ordering::Equal);
                 prop_assert_eq!(ref_c.compare(&ref_c), Ordering::Equal);
 
-                // 2. Antisymmetry
+                // 2. Order reversal
                 let ab = ref_a.compare(&ref_b);
                 let ba = ref_b.compare(&ref_a);
                 prop_assert_eq!(ab, ba.reverse());

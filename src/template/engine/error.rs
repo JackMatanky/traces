@@ -1,4 +1,4 @@
-//! Maps helper failures into minijinja errors.
+//! Maps helper failures into `MiniJinja` errors.
 //!
 //! Engine helpers return [`minijinja::Error`] so template diagnostics keep
 //! name, line, and column context. This module centralizes common conversions
@@ -8,7 +8,7 @@ use minijinja::{Error, ErrorKind};
 
 use crate::path::PathError;
 
-/// A convenience alias for template engine helper return types.
+/// Represents the return type for template engine helpers.
 pub(super) type TemplateEngineResult<T> = std::result::Result<T, Error>;
 
 /// Builds a [`minijinja::Error`] for a template `path` argument rejected by
@@ -43,7 +43,7 @@ pub(super) fn confine_error(path: &str, source: PathError) -> Error {
 /// `source` as its error-chain cause.
 ///
 /// Every `template::engine` submodule shares it when it maps a domain error
-/// (I/O, index, query, regex, dialog) into minijinja's error type. The
+/// (I/O, index, query, regex, dialog) into `MiniJinja`'s error type. The
 /// resulting error keeps the same "generic message plus preserved source"
 /// shape.
 pub(super) fn invalid_operation<E>(

@@ -3,6 +3,7 @@
 //! Owns [`DatePoint`], a Date written at a month or day [`DatePrecision`], or a
 //! Date-Time stored as UTC that renders as the local clock. Parsing retains the
 //! written precision. Month precision denotes the first of the month.
+//!
 //! Arithmetic applies calendar units on the local clock and exact units as
 //! elapsed time. Differences preserve whole versus fractional measurements.
 //! Callers hold the validated date point or receive a [`DateError`].
@@ -52,6 +53,8 @@ pub(crate) enum DatePoint {
 }
 
 impl DatePoint {
+    /// Constructs a [`DatePoint`] from a civil date and its parsed
+    /// [`DateShape`].
     pub(super) fn from_date_shape(date: civil::Date, shape: DateShape) -> Self {
         let date_precision = match shape {
             DateShape::YearMonthDay => DatePrecision::Day,
@@ -316,9 +319,10 @@ impl DatePoint {
         }
     }
 
-    /// Shifts by `n` whole units. Calendar units move the local clock. Exact
-    /// units move elapsed time. Calendar dates change only when a shift crosses
-    /// midnight.
+    /// Shifts this date point by `n` whole units in `zone`.
+    ///
+    /// Calendar units move the local clock. Exact units move elapsed time.
+    /// Calendar dates change only when a shift crosses midnight.
     ///
     /// # Errors
     ///
@@ -394,7 +398,7 @@ impl DatePoint {
         self.with_date(target, zone)
     }
 
-    /// Selects a weekday of this date point's ISO week in zone.
+    /// Selects a weekday of this date point's ISO week in `zone`.
     ///
     /// # Errors
     ///
@@ -417,11 +421,17 @@ impl DatePoint {
 
     /// Measures the difference to another date point in the requested unit.
     ///
-    /// Calendar days and weeks count local civil-clock time. A 23- or 25-hour
-    /// DST day counts as one day. When both points have a time, the result
-    /// retains sub-day clock remainders. Date-only differences return whole
-    /// units, truncated toward zero. Hours and smaller measure elapsed time
-    /// for two date-times.
+    /// Difference calculation depends on the unit and whether both points carry
+    /// a time:
+    ///
+    /// - Calendar days and weeks count local civil-clock time, so a 23- or
+    ///   25-hour DST day counts as one day.
+    /// - Day and week differences retain sub-day clock remainders when both
+    ///   points have a time. Date-only differences return whole units truncated
+    ///   toward zero.
+    /// - Hours and smaller units measure elapsed time when both points are
+    ///   date-times.
+    ///
     /// Reversing the operands negates the result.
     ///
     /// # Errors
@@ -673,13 +683,17 @@ enum PatternKind {
     Timestamp,
 }
 
+/// Marks a clock-time directive in a strtime pattern flag mask.
+const PATTERN_CLOCK: u8 = 1;
+/// Marks a Unix-timestamp directive (`%s`) in a strtime pattern flag mask.
+const PATTERN_TIMESTAMP: u8 = 2;
+/// Marks a zone or offset directive (`%Z`, `%z`, `%+`) in a strtime pattern
+/// flag mask.
+const PATTERN_OFFSET: u8 = 4;
+
 /// Scans policy-relevant fields while Jiff owns parsing and validation.
 ///
 /// Returns [`None`] if the pattern contains an unsupported `%Q` directive.
-const PATTERN_CLOCK: u8 = 1;
-const PATTERN_TIMESTAMP: u8 = 2;
-const PATTERN_OFFSET: u8 = 4;
-
 fn pattern_fields(pattern: &str) -> Option<PatternKind> {
     let mut characters = pattern.chars().peekable();
     let mut fields = 0;
@@ -725,6 +739,7 @@ fn pattern_fields(pattern: &str) -> Option<PatternKind> {
     Some(pattern_kind(fields))
 }
 
+/// Maps a flag mask of pattern field flags to its [`PatternKind`].
 fn pattern_kind(fields: u8) -> PatternKind {
     if fields & PATTERN_TIMESTAMP != 0 {
         PatternKind::Timestamp
@@ -820,6 +835,7 @@ fn parse_pattern_fields(
         .map_err(|source| pattern_value_error(text, &source))
 }
 
+/// Maps a Jiff pattern-parse error into [`DateError::InvalidValue`].
 fn pattern_value_error(text: &str, source: &jiff::Error) -> DateError {
     DateError::InvalidValue {
         input: text.into(),
@@ -3393,12 +3409,13 @@ mod tests {
                 prop_assert_eq!(restored, point);
             }
 
-            /// Pins the ISO display law over the full supported year range:
-            /// rendering a full-precision calendar point with `%Y-%m-%d` and
-            /// re-parsing the text restores the point, including negative
-            /// years whose rendered sign sits outside the field width. Year
-            /// -9999 is excluded: its early days lie before Jiff's minimum
-            /// timestamp, so `format_in` reports `OutOfRange` by contract.
+            /// Pins the ISO display law over the full supported year range.
+            ///
+            /// Rendering a full-precision calendar point with `%Y-%m-%d` and
+            /// re-parsing the text restores the point. Negative years keep
+            /// their sign outside the field width. This test excludes year
+            /// -9999 because its early days precede Jiff's minimum timestamp,
+            /// so `format_in` returns `OutOfRange`.
             #[test]
             fn iso_display_round_trips_supported_date_points(
                 year in -9998_i32..=9999,

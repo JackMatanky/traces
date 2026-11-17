@@ -1,10 +1,10 @@
-//! Tracked-config store inspection and cleanup.
+//! Inspects and cleans the tracked-configuration store.
 //!
 //! Handles `traces tracked` by listing or cleaning the best-effort store of
-//! local config files [`crate::ConfigService::load`] has seen, kept
-//! separate from [`traces trust`](super::trust)'s trust decisions. Tracking
-//! records which config files traces has loaded; trust controls whether config
-//! and templates are allowed to run from a workspace.
+//! local configuration files that [`crate::ConfigService::load`] reads. This
+//! store is separate from trust decisions in [`super::trust`]. Tracking records
+//! which configuration files traces loads. Trust controls whether a workspace
+//! can run configuration files and templates.
 
 use std::path::PathBuf;
 
@@ -13,12 +13,13 @@ use clap::{Args, Subcommand};
 use super::error::{CliError, CliResult};
 use crate::config::TrackerStore;
 
-/// Arguments for `traces tracked`.
+/// Defines arguments for `traces tracked`.
 ///
-/// Inspects or cleans the best-effort store of local config files that
-/// [`crate::ConfigService::load`] has seen.
+/// Inspects or cleans the best-effort store of local configuration files that
+/// [`crate::ConfigService::load`] reads.
 #[derive(Debug, Args)]
 pub(super) struct Tracked {
+    /// Subcommand action to run.
     #[command(subcommand)]
     action: TrackedAction,
 }
@@ -28,8 +29,10 @@ impl Tracked {
     ///
     /// # Errors
     ///
-    /// - [`CliError::TrackedList`] if reading the tracked-config store fails.
-    /// - [`CliError::TrackedClean`] if cleaning the tracked-config store fails.
+    /// - [`CliError::TrackedList`] if reading the tracked-configuration store
+    ///   fails.
+    /// - [`CliError::TrackedClean`] if cleaning the tracked-configuration store
+    ///   fails.
     pub(super) fn run(self, tracked: &TrackerStore) -> CliResult {
         match self.action {
             TrackedAction::List => Self::list(tracked),
@@ -37,11 +40,12 @@ impl Tracked {
         }
     }
 
-    /// Prints all tracked config paths to stdout, one per line.
+    /// Prints all tracked configuration paths to standard output, one per line.
     ///
     /// # Errors
     ///
-    /// - [`CliError::TrackedList`] if reading the tracked-config store fails.
+    /// - [`CliError::TrackedList`] if reading the tracked-configuration store
+    ///   fails.
     #[expect(
         clippy::print_stdout,
         reason = "tracked list's output is data meant to be piped, not \
@@ -58,11 +62,12 @@ impl Tracked {
         Ok(())
     }
 
-    /// Removes dangling entries from the tracked-config store.
+    /// Removes dangling entries from the tracked-configuration store.
     ///
     /// # Errors
     ///
-    /// - [`CliError::TrackedClean`] if cleaning the tracked-config store fails.
+    /// - [`CliError::TrackedClean`] if cleaning the tracked-configuration store
+    ///   fails.
     fn clean(tracked: &TrackerStore) -> CliResult {
         let removed =
             tracked.clean().map_err(|source| CliError::TrackedClean {
@@ -76,12 +81,12 @@ impl Tracked {
     }
 }
 
-/// Nested `traces tracked` subcommands.
+/// Enumerates nested `traces tracked` subcommands.
 #[derive(Debug, Subcommand)]
 enum TrackedAction {
-    /// List all tracked local config paths.
+    /// Lists all tracked local configuration paths.
     List,
-    /// Remove stale tracked config entries.
+    /// Removes stale tracked configuration entries.
     Clean,
 }
 

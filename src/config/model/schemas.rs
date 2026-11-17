@@ -1,4 +1,4 @@
-//! Holds schema registry settings and their config digests.
+//! Holds schema registry settings and their configuration digests.
 
 use std::path::{Path, PathBuf};
 
@@ -15,18 +15,19 @@ pub(in crate::config) const DEFAULT_CLASS_FIELD: &str = "class";
 /// Holds the schema registry directory and the class field name.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SchemasConfig {
+    /// Holds the resolved directory containing schema definitions.
     directory: PathBuf,
+    /// Holds the frontmatter key name for a Note's File Class.
     class_field: FieldName,
 }
 
 impl SchemasConfig {
     /// Returns the schema registry directory.
     ///
-    /// Config File loading resolves a configured directory against its
-    /// Configuration Scope root.
-    /// If no directory is configured, loading uses the workspace root.
-    /// [`SchemasConfig::default`] keeps a relative directory because it has no
-    /// workspace root.
+    /// Configuration File loading resolves a configured directory against its
+    /// Configuration Scope root. If the file omits the directory, loading uses
+    /// the workspace root. [`SchemasConfig::default`] keeps a relative
+    /// directory because it has no workspace root.
     #[inline]
     #[must_use]
     pub fn directory(&self) -> &Path {
@@ -108,7 +109,7 @@ impl Default for SchemasConfig {
     ///
     /// # Panics
     ///
-    /// - Panics if [`DEFAULT_CLASS_FIELD`] is not a valid field key.
+    /// - Panics if `DEFAULT_CLASS_FIELD` is not a valid field key.
     #[inline]
     #[expect(
         clippy::expect_used,
@@ -131,7 +132,9 @@ const SCHEMAS_CLASS_FIELD: &[u8] = b"schemas.class_field";
 /// Holds the digests of [`SchemasConfig`] settings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SchemaDigests {
+    /// Holds the digest of the schema registry directory.
     pub(crate) directory: Blake3Digest,
+    /// Holds the digest of the class field name.
     pub(crate) class_field: Blake3Digest,
 }
 

@@ -1,4 +1,4 @@
-//! Trust-store mutation and inspection.
+//! Mutates and inspects the configuration trust store.
 //!
 //! Handles `traces trust` by resolving a directory or `.traces/config.toml` to
 //! trust subjects, then listing, cleaning, showing, or recording trusted
@@ -11,23 +11,24 @@ use clap::{Args, Subcommand};
 use super::error::{CliError, CliResult};
 use crate::{ConfigService, TrustRequest, config::TrustStore};
 
-/// Arguments for `traces trust`.
+/// Defines arguments for `traces trust`.
 ///
 /// Grants trust to a project root (default), lists trusted roots, shows trust
 /// status, or cleans stale entries. Pass `--all` to operate on descendant
-/// configs.
+/// configurations.
 #[derive(Debug, Args)]
 #[command(args_conflicts_with_subcommands = true)]
 pub(super) struct Trust {
+    /// Optional subcommand action to run.
     #[command(subcommand)]
     action: Option<TrustAction>,
-    /// Show resolved configuration trust status instead of changing it.
+    /// Displays resolved configuration trust status instead of changing it.
     #[arg(long)]
     show: bool,
-    /// Apply trust or status checks to descendant configurations too.
+    /// Applies trust or status checks to descendant configurations as well.
     #[arg(long)]
     all: bool,
-    /// Directory or `.traces/config.toml` to trust.
+    /// Specifies the directory or `.traces/config.toml` to trust.
     ///
     /// Defaults to the current directory.
     path: Option<PathBuf>,
@@ -38,9 +39,9 @@ impl Trust {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    /// - [`CliError::CurrentDirectory`] if no path is set and reading the
     ///   current directory fails.
-    /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+    /// - [`CliError::TrustTargetResolve`] if trust-target resolution fails.
     /// - [`CliError::TrustList`] if reading the trust store fails.
     /// - [`CliError::TrustClean`] if cleaning the trust store fails.
     /// - [`CliError::TrustShow`] if reading trust status fails.
@@ -55,7 +56,7 @@ impl Trust {
         }
     }
 
-    /// Prints all trusted directories to stdout, one per line.
+    /// Prints all trusted directories to standard output, one per line.
     ///
     /// # Errors
     ///
@@ -96,9 +97,9 @@ impl Trust {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    /// - [`CliError::CurrentDirectory`] if no path is set and reading the
     ///   current directory fails.
-    /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+    /// - [`CliError::TrustTargetResolve`] if trust-target resolution fails.
     /// - [`CliError::TrustShow`] if reading trust status fails.
     #[expect(
         clippy::print_stdout,
@@ -127,9 +128,9 @@ impl Trust {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    /// - [`CliError::CurrentDirectory`] if no path is set and reading the
     ///   current directory fails.
-    /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+    /// - [`CliError::TrustTargetResolve`] if trust-target resolution fails.
     /// - [`CliError::Trust`] if updating the trust store fails.
     fn trust(&self, service: &ConfigService) -> CliResult {
         self.for_each_subject(|subject: TrustRequest| {
@@ -149,9 +150,9 @@ impl Trust {
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if no path was provided and reading the
+    /// - [`CliError::CurrentDirectory`] if no path is set and reading the
     ///   current directory fails.
-    /// - [`CliError::TrustTargetResolve`] if resolving trust targets fails.
+    /// - [`CliError::TrustTargetResolve`] if trust-target resolution fails.
     /// - Any [`CliError`] returned by `visit`.
     fn for_each_subject(
         &self,
@@ -166,12 +167,12 @@ impl Trust {
     }
 }
 
-/// Nested `traces trust` subcommands.
+/// Enumerates nested `traces trust` subcommands.
 #[derive(Debug, Subcommand)]
 enum TrustAction {
-    /// List all trusted directories.
+    /// Lists all trusted directories.
     List,
-    /// Remove stale trust entries.
+    /// Removes stale trust entries.
     Clean,
 }
 
@@ -193,7 +194,7 @@ mod tests {
 
         /// Wraps [`Trust`] in a minimal top-level parser for clap tests.
         ///
-        /// This allows [`Parser::try_parse_from`] to exercise
+        /// Allows [`Parser::try_parse_from`] to exercise
         /// `args_conflicts_with_subcommands`, which [`clap::Args`] types do not
         /// parse standalone.
         #[derive(Debug, Parser)]
@@ -294,8 +295,8 @@ mod tests {
             ])
             .expect_err("action conflicts with path");
 
-            // Clap reports a stray positional after a subcommand as an
-            // unknown argument, not an ArgumentConflict.
+            // Clap reports a stray positional after a subcommand as an unknown
+            // argument, not an `ArgumentConflict`.
             assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
         }
 
@@ -305,8 +306,8 @@ mod tests {
                 fixtures::TestCli::try_parse_from(["test", "list", "--show"])
                     .expect_err("show conflicts with action");
 
-            // Clap reports a top-level flag beside a subcommand as an
-            // unknown argument, not an ArgumentConflict.
+            // Clap reports a top-level flag beside a subcommand as an unknown
+            // argument, not an `ArgumentConflict`.
             assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
         }
     }

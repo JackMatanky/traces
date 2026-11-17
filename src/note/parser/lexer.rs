@@ -1,6 +1,6 @@
 //! Tokenizes list item text into [`ItemToken`] elements in a single pass.
 //!
-//! One logos pass yields inline fields, task date shorthands, priority emojis,
+//! One logos pass yields inline fields, task date shorthand, priority emojis,
 //! and tags, together with the callbacks and look-behind helpers they share.
 
 use logos::{Filter, Lexer, Logos};
@@ -13,8 +13,8 @@ use crate::{
 
 /// Extracts inline fields from `text` in document order.
 ///
-/// Converts task emoji shorthands into date fields when `mode` is
-/// [`TaskFieldEmojis::Include`]. Tags are ignored during field scanning.
+/// Converts task emoji shorthand into date fields when `mode` is
+/// [`TaskFieldEmojis::Include`]. Ignores tags during field scanning.
 #[must_use]
 fn scan_fields(
     text: &str,
@@ -43,7 +43,7 @@ pub(super) fn tokenize_item_text(
 ) -> Vec<Spanned<ItemToken>> {
     let mut lexer = ItemToken::lexer_with_extras(text, mode);
     let mut tokens = Vec::new();
-    // The skip rule matches all bytes; logos yields only valid tokens.
+    // The skip rule matches all bytes. Logos yields only valid tokens.
     while let Some(Ok(token)) = lexer.next() {
         let span = lexer.span();
         tokens.push(Spanned::from_usize_range(token, span));
@@ -53,9 +53,8 @@ pub(super) fn tokenize_item_text(
 
 /// Returns the character immediately before the current match.
 ///
-/// Returns `None` if the match starts at the beginning of the source. Shared by
-/// [`body_field_callback`] and [`tag_callback`], both of which need a
-/// look-behind check that logos' regex dialect cannot express.
+/// Returns `None` if the match starts at index zero. [`body_field_callback`]
+/// and [`tag_callback`] share this helper for look-behind checks.
 fn char_before<'source, T>(lex: &Lexer<'source, T>) -> Option<char>
 where
     T: Logos<'source, Source = str>,
@@ -68,22 +67,22 @@ where
     prefix.chars().next_back()
 }
 
-/// Controls whether task field emoji shorthands are recognized during
+/// Controls whether task field emoji shorthand is recognized during
 /// tokenization.
 ///
-/// Used as [`ItemToken`]'s logos `extras` value so [`scan_fields`] chooses its
-/// lexer behavior without passing a bare `bool`.
+/// Serves as [`ItemToken`]'s logos `extras` value so [`scan_fields`] chooses
+/// lexer behavior without a bare `bool`.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(super) enum TaskFieldEmojis {
-    /// Recognizes task field emoji shorthands.
+    /// Recognizes task field emoji shorthand.
     Include,
-    /// Ignores task field emoji shorthands.
+    /// Ignores task field emoji shorthand.
     #[default]
     Exclude,
 }
 
 impl TaskFieldEmojis {
-    /// Returns `true` if task field emoji shorthands are recognized.
+    /// Returns `true` if task field emoji shorthand is recognized.
     #[inline]
     #[must_use]
     const fn is_included(self) -> bool {
@@ -115,11 +114,10 @@ pub(super) struct FieldToken {
 /// Represents tokenized components extracted from free-form Markdown text.
 #[derive(Debug, PartialEq, Logos)]
 #[logos(extras = TaskFieldEmojis)]
-// Skip runs, not single characters: logos compiles each skipped match into a
-// recursive state call, and a debug build has no tail-call optimization, so a
-// per-character skip overflows the stack on a long paragraph. A run stops at
-// every character that can start a token and at `\n` and `:`, so a bare
-// `Key::` at a line start is longer than the run before it and wins.
+// Skip runs, not single characters. Logos compiles each skipped match into a
+// recursive call without tail-call optimization in debug builds, which
+// overflows the stack on long paragraphs. A run stops at token starters, `\n`,
+// and `:`, so a line-start `Key::` outlasts the run before it.
 #[logos(skip "[^\\n:#\\[(\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}\u{1F4C5}\u{1F5D3}\u{2795}\u{1F6EB}\u{23F3}\u{2705}\u{274C}]+")]
 #[logos(skip "[\\n:]+")]
 pub(super) enum ItemToken {
@@ -164,11 +162,10 @@ pub(super) enum ItemToken {
     /// Value)`).
     Field(FieldToken),
 }
-/// Parses a bare inline field (`Key:: Value`) starting at line begin.
+/// Parses a bare inline field (`Key:: Value`) at the start of a line.
 ///
 /// Rejects the match if it does not begin at the start of the source or
-/// immediately following a newline. Consumes the rest of the line as the raw
-/// value.
+/// immediately after a newline. Consumes the rest of the line as the raw value.
 fn body_field_callback(lex: &mut Lexer<'_, ItemToken>) -> Filter<FieldToken> {
     let at_line_start = char_before(lex).is_none_or(|ch| ch == '\n');
     if !at_line_start {
@@ -195,9 +192,10 @@ fn body_field_callback(lex: &mut Lexer<'_, ItemToken>) -> Filter<FieldToken> {
 /// Parses a wrapped inline field (`[Key:: Value]` or `(Key:: Value)`).
 ///
 /// Rejects the match and skips the opening delimiter when:
-/// - No `::` separator is found before the end of the text
-/// - The extracted key is empty or contains bracket characters
-/// - No matching closing delimiter is found
+///
+/// - No `::` separator is found before the end of the text.
+/// - The extracted key is empty or contains bracket characters.
+/// - No matching closing delimiter is found.
 fn wrapped_field_callback(
     lex: &mut Lexer<'_, ItemToken>,
     kind: DelimiterType,
@@ -268,11 +266,12 @@ fn task_date_callback(
     Filter::Emit(TaskDate::new(kind, date))
 }
 
-/// Parses a Markdown tag following the leading `#` character.
+/// Parses a Markdown tag after the leading `#` character.
 ///
 /// Rejects the tag when:
-/// - Preceded by an alphanumeric character or underscore (`_`)
-/// - The tag does not begin with an alphabetic character
+///
+/// - Preceded by an alphanumeric character or underscore (`_`).
+/// - The tag does not begin with an alphabetic character.
 fn tag_callback<'source, T: Logos<'source, Source = str>>(
     lex: &mut Lexer<'source, T>,
 ) -> Filter<Tag> {
@@ -294,7 +293,7 @@ fn tag_callback<'source, T: Logos<'source, Source = str>>(
         Err(_) => Filter::Skip,
     }
 }
-/// Token stream for Markdown tags in free-form text.
+/// Tokenizes Markdown tags in free-form text.
 #[derive(Clone, Debug, PartialEq, Logos)]
 #[logos(skip "[^#]+")]
 enum TagToken {
@@ -334,9 +333,9 @@ mod tests {
     use super::*;
     use crate::{DateValue, DurationValue};
 
-    /// Skipped text must not cost stack depth: a debug build has no tail-call
-    /// optimization, so a lexer that recurses once per skipped character
-    /// overflows the stack on a long paragraph.
+    /// Skipped text must not consume stack depth. Debug builds lack tail-call
+    /// optimization, so per-character recursion overflows the stack on long
+    /// paragraphs.
     mod long_input {
         use pretty_assertions::assert_eq;
 
@@ -806,7 +805,7 @@ mod tests {
             #[case] expected: Option<&str>,
         ) {
             // Byte 10 of a multibyte candidate falls inside a character, so the
-            // candidate must be skipped rather than sliced.
+            // scanner skips it instead of slicing.
             let fields = scan_fields(input, TaskFieldEmojis::Include);
 
             let expected = expected.map(|date| {

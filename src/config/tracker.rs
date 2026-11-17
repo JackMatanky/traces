@@ -1,33 +1,36 @@
-//! Records Tracked Config Paths separately from Trust Verification.
+//! Records Tracked Configuration Paths separately from Trust Verification.
 //!
-//! [`TrackerStore`] records local Config Files during loading and trust grants.
-//! Loading continues if recording fails. A trust grant needs a successful
-//! record.
+//! [`TrackerStore`] records local Configuration Files during loading and trust
+//! grants. Loading continues if recording fails. A trust grant needs a
+//! successful record.
 
 use std::path::{Path, PathBuf};
 
 use super::error::ConfigTrustError;
 use crate::{CleanMode, FilePathTracker, dirs};
 
-/// Stores Tracked Config Paths separately from [`super::trust::TrustStore`].
+/// Stores Tracked Configuration Paths separately from
+/// [`super::trust::TrustStore`].
 ///
-/// Loading continues if path recording fails.
-/// A trust grant records a path before it adds a trusted root.
+/// Loading continues if path recording fails. A trust grant records a path
+/// before it adds a trusted root.
 #[derive(Clone, Debug)]
 pub(crate) struct TrackerStore {
+    /// Holds the underlying path tracker store.
     store: FilePathTracker,
 }
 
 impl TrackerStore {
-    /// Records a Tracked Config Path and returns an error if the store cannot
-    /// save it.
+    /// Records a Tracked Configuration Path and returns an error if saving
+    /// fails.
     ///
-    /// Trust grants use this method.
-    /// Configuration loading uses [`Self::record_best_effort`].
+    /// Trust grants use this method. Configuration loading uses
+    /// [`Self::record_best_effort`].
     ///
     /// # Errors
     ///
-    /// - [`Tracker`] if path canonicalization or store write fails.
+    /// - [`Tracker`] if resolving the canonical path or writing to the store
+    ///   fails.
     ///
     /// [`Tracker`]: ConfigTrustError::Tracker
     #[inline]
@@ -35,7 +38,8 @@ impl TrackerStore {
         self.store.record(path).map_err(Into::into)
     }
 
-    /// Records a Tracked Config Path and does not fail configuration loading.
+    /// Records a Tracked Configuration Path without failing configuration
+    /// loading.
     ///
     /// Logs at warn level if [`Self::record`] fails.
     #[inline]
@@ -49,7 +53,7 @@ impl TrackerStore {
         }
     }
 
-    /// Lists and returns the canonical paths of Tracked Config Paths.
+    /// Lists and returns the canonical paths of Tracked Configuration Paths.
     ///
     /// # Errors
     ///
@@ -61,8 +65,7 @@ impl TrackerStore {
         self.store.list_all(&[]).map_err(Into::into)
     }
 
-    /// Removes Tracked Config Paths whose files no longer exist and returns the
-    /// number removed.
+    /// Removes missing Tracked Configuration Paths and returns the count.
     ///
     /// # Errors
     ///
@@ -86,7 +89,7 @@ impl TrackerStore {
 }
 
 impl Default for TrackerStore {
-    /// Creates a Tracker Store in the OS tracked-config directory.
+    /// Creates a Tracker Store in the OS tracked-configuration directory.
     #[inline]
     fn default() -> Self {
         Self {
@@ -121,7 +124,7 @@ mod tests {
                 }
             }
 
-            /// Writes a local Config File and returns its path.
+            /// Writes a local Configuration File and returns its path.
             pub(super) fn write_config(&self, name: &str) -> PathBuf {
                 let path =
                     self.temp.path().join(name).join(".traces/config.toml");

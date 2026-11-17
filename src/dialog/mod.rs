@@ -1,13 +1,14 @@
-//! I/O seam separating template rendering from user interaction.
+//! Defines the I/O seam separating template rendering from user interaction.
 //!
-//! This module defines the [`DialogProvider`] trait, the object-safe contract
-//! for prompting users and collecting responses. Two implementations cover the
-//! supported runtime modes:
+//! The [`DialogProvider`] trait provides the object-safe contract for prompting
+//! users and collecting responses. Two implementations cover the supported
+//! runtime modes:
 //!
-//! - [`PresetDialogProvider`] replays queued responses for tests and
-//!   non-interactive MCP execution.
+//! - [`PresetDialogProvider`] replays queued responses for tests and unattended
+//!   MCP execution.
 //! - [`TerminalDialogProvider`] delegates to [`inquire`] for real terminal
-//!   interaction and returns fallback values in non-TTY contexts.
+//!   interaction and returns fallback values when standard input is not a
+//!   terminal.
 //!
 //! # Key Types
 //!
@@ -34,19 +35,19 @@ pub use error::{DialogError, DialogResult};
 pub use preset::PresetDialogProvider;
 pub use terminal::TerminalDialogProvider;
 
-/// Object-safe trait for prompting users and collecting responses.
+/// Prompts users and collects responses behind an object-safe interface.
 ///
-/// The trait is object-safe so callers can hold a `&dyn DialogProvider` chosen
-/// at runtime. Both [`Send`] and [`Sync`] bounds are required so shared
-/// providers can be captured by thread-safe template-rendering closures.
+/// The trait is object-safe, so callers can hold a `&dyn DialogProvider` chosen
+/// at runtime. Thread-safe template-rendering closures capture shared
+/// providers, so implementations need both [`Send`] and [`Sync`].
 ///
-/// `select` and `multi_select` return indices into the `items` slice. See the
-/// module-level documentation for the rationale.
+/// [`Self::select`] and [`Self::multi_select`] return indices into the `items`
+/// slice. See the module-level documentation for the rationale.
 pub trait DialogProvider: Send + Sync {
-    /// Reports whether this provider can perform interactive prompting.
+    /// Reports whether this provider can do interactive prompting.
     ///
-    /// Returns `false` in non-TTY environments or when no preset answers
-    /// remain.
+    /// Returns `false` when standard input is not a terminal or when no preset
+    /// answers remain.
     #[inline]
     #[must_use]
     fn is_interactive(&self) -> bool {
@@ -55,14 +56,15 @@ pub trait DialogProvider: Send + Sync {
 
     /// Displays a yes/no confirmation prompt.
     ///
-    /// When the user provides no input, `default` is returned if present;
-    /// otherwise `false` is returned.
+    /// Shows `label` as the prompt message. When the user provides no input,
+    /// this method returns `default`, or `false` if `default` is `None`.
     ///
     /// # Errors
     ///
     /// - [`DialogError::UserCancelled`] if the user cancels the prompt.
-    /// - [`DialogError::UserInterrupted`] if the user interrupts (e.g. Ctrl-C).
-    /// - [`DialogError::NotInteractive`] if stdin is not a terminal.
+    /// - [`DialogError::UserInterrupted`] if the user interrupts (such as
+    ///   pressing Control-C).
+    /// - [`DialogError::NotInteractive`] if standard input is not a terminal.
     /// - [`DialogError::Io`] if an I/O error occurs during prompting.
     /// - [`DialogError::BackendFailure`] if the backend reports an unexpected
     ///   error.
@@ -81,13 +83,14 @@ pub trait DialogProvider: Send + Sync {
 
     /// Displays a multi-selection prompt and returns the chosen indices.
     ///
-    /// An empty `items` slice yields an empty [`Vec`] (not an error).
+    /// Shows `label` above the selectable `items`. An empty `items` slice
+    /// yields an empty [`Vec`] (not an error).
     ///
     /// # Errors
     ///
     /// - [`DialogError::UserCancelled`] if the user cancels the prompt.
     /// - [`DialogError::UserInterrupted`] if the user interrupts.
-    /// - [`DialogError::NotInteractive`] if stdin is not a terminal.
+    /// - [`DialogError::NotInteractive`] if standard input is not a terminal.
     /// - [`DialogError::Io`] if an I/O error occurs during prompting.
     /// - [`DialogError::BackendFailure`] if the backend reports an unexpected
     ///   error.
@@ -110,10 +113,10 @@ pub trait DialogProvider: Send + Sync {
 
     /// Displays a single-selection prompt and returns the chosen index.
     ///
-    /// Index-based selection lets the caller recover the chosen entry from a
-    /// parallel list, supporting non-string item types and disambiguating
-    /// duplicate labels. See the module-level documentation for the full
-    /// rationale.
+    /// Shows `label` above the selectable `items`. Index-based selection lets
+    /// the caller recover the chosen entry from a parallel list, supporting
+    /// non-string item types and disambiguating duplicate labels. See the
+    /// module-level documentation for the full rationale.
     ///
     /// # Errors
     ///
@@ -122,7 +125,7 @@ pub trait DialogProvider: Send + Sync {
     ///   bounds (only [`PresetDialogProvider`]).
     /// - [`DialogError::UserCancelled`] if the user cancels the prompt.
     /// - [`DialogError::UserInterrupted`] if the user interrupts.
-    /// - [`DialogError::NotInteractive`] if stdin is not a terminal.
+    /// - [`DialogError::NotInteractive`] if standard input is not a terminal.
     /// - [`DialogError::Io`] if an I/O error occurs during prompting.
     /// - [`DialogError::BackendFailure`] if the backend reports an unexpected
     ///   error.
@@ -139,16 +142,17 @@ pub trait DialogProvider: Send + Sync {
     /// ```
     fn select(&self, label: &str, items: &[String]) -> DialogResult<usize>;
 
-    /// Displays a freeform text prompt and returns the user's input.
+    /// Displays a text prompt and returns the user's input.
     ///
-    /// When the user submits an empty string, `default` is returned if present;
-    /// otherwise an empty string is returned.
+    /// Shows `label` as the prompt message. When the user submits an empty
+    /// string, this method returns `default`, or an empty string if `default`
+    /// is `None`.
     ///
     /// # Errors
     ///
     /// - [`DialogError::UserCancelled`] if the user cancels the prompt.
     /// - [`DialogError::UserInterrupted`] if the user interrupts.
-    /// - [`DialogError::NotInteractive`] if stdin is not a terminal.
+    /// - [`DialogError::NotInteractive`] if standard input is not a terminal.
     /// - [`DialogError::Io`] if an I/O error occurs during prompting.
     /// - [`DialogError::BackendFailure`] if the backend reports an unexpected
     ///   error.

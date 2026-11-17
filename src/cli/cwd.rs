@@ -1,18 +1,18 @@
-//! Centralized access to the process current working directory.
+//! Centralizes access to the process current working directory.
 //!
-//! [`Cwd`] is the only production wrapper around [`env::current_dir`]. The
-//! direct call is disallowed elsewhere by `clippy.toml`, keeping cwd access
-//! auditable at this boundary.
+//! [`Cwd`] is the only production wrapper around [`env::current_dir`].
+//! `clippy.toml` disallows direct calls elsewhere, so all working directory
+//! access goes through this boundary.
 
 use std::{
     env, io,
     path::{Path, PathBuf},
 };
 
-/// Process current working directory captured at construction time.
+/// Captures the process current working directory at construction time.
 ///
-/// Wraps [`env::current_dir`] to keep cwd access auditable at a single boundary
-/// (enforced by `clippy.toml`).
+/// Wraps [`env::current_dir`] to keep working directory access auditable at a
+/// single boundary (enforced by `clippy.toml`).
 #[derive(Clone, Debug)]
 pub(crate) struct Cwd(PathBuf);
 
@@ -21,8 +21,8 @@ impl Cwd {
     ///
     /// # Errors
     ///
-    /// - [`io::Error`] if the current directory does not exist or cannot be
-    ///   accessed.
+    /// - [`io::Error`] if the current directory does not exist or the process
+    ///   lacks access.
     #[inline]
     #[expect(
         clippy::disallowed_methods,
@@ -49,20 +49,22 @@ impl AsRef<Path> for Cwd {
 
 /// Serializes every [`CwdGuard`]-mediated test.
 ///
-/// The process cwd is global state, so concurrent changes race. A dropped
-/// `tempfile::TempDir` can also remove the directory underneath another test.
-/// The lock is held for a [`CwdGuard`]'s whole lifetime.
+/// The process current working directory is global state, so concurrent changes
+/// race. A dropped `tempfile::TempDir` can also remove the directory underneath
+/// another test. Each [`CwdGuard`] holds this lock for its whole lifetime.
 #[cfg(test)]
 static CWD_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// Scoped guard that enters a directory and restores the original on drop.
+/// Enters a directory for a scope and restores the original on drop.
 ///
 /// Tests that change the working directory should use this instead of calling
 /// [`env::set_current_dir`] directly. Holding [`CWD_TEST_LOCK`] serializes
-/// concurrent cwd changes.
+/// concurrent working-directory changes.
 #[cfg(test)]
 pub(crate) struct CwdGuard {
+    /// Original working directory that the guard restores on drop.
     original: PathBuf,
+    /// Mutex guard serializing working-directory changes across tests.
     _lock: std::sync::MutexGuard<'static, ()>,
 }
 
@@ -73,8 +75,8 @@ impl CwdGuard {
     ///
     /// # Panics
     ///
-    /// Panics if the current directory cannot be read or the change fails,
-    /// since both indicate a broken test environment.
+    /// Panics if reading the current directory fails or changing to `dir`
+    /// fails. Both failures indicate a broken test environment.
     #[expect(
         clippy::disallowed_methods,
         reason = "CwdGuard is the sole authorized caller of \
@@ -94,10 +96,11 @@ impl CwdGuard {
         }
     }
 
-    /// Holds [`CWD_TEST_LOCK`] while keeping the cwd unchanged.
+    /// Holds [`CWD_TEST_LOCK`] while keeping the working directory unchanged.
     ///
-    /// For tests that never change the directory but must not observe another
-    /// thread's `CwdGuard`-mediated change (the cwd is global state).
+    /// Protects tests that never change the directory from observing another
+    /// thread's [`CwdGuard`]-mediated change, because the current working
+    /// directory is global state.
     #[inline]
     #[must_use]
     pub(crate) fn same_dir() -> Self {
@@ -129,9 +132,11 @@ impl Drop for CwdGuard {
 mod tests {
     use super::*;
 
-    /// Reads cwd under [`CWD_TEST_LOCK`] too: an un-serialized read can observe
-    /// another thread's `CwdGuard`-entered directory disappearing mid-read once
-    /// that guard drops and its backing `TempDir` is removed.
+    /// Reads the current working directory under [`CWD_TEST_LOCK`].
+    ///
+    /// Reading without holding the lock can observe another thread's
+    /// [`CwdGuard`]-entered directory disappearing mid-read once that guard
+    /// drops and removes the backing `TempDir`.
     fn locked_cwd() -> Cwd {
         let _lock = CWD_TEST_LOCK
             .lock()

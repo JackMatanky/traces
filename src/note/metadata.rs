@@ -3,6 +3,7 @@
 //! [`RawFrontmatter`] preserves unparsed source YAML. [`Frontmatter`] stores
 //! parsed YAML key-value pairs mapping [`FieldKey`] to [`NoteFieldValue`]
 //! values.
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -41,10 +42,10 @@ impl RawFrontmatter {
 
     /// Parses the raw YAML text into structured frontmatter fields.
     ///
-    /// Mapping keys deserialize directly to `String` under the shared YAML
-    /// config (see [`crate::yaml::parse`]); a key that fails [`FieldKey`]
-    /// validation (e.g. an empty canonical form) is skipped rather than
-    /// failing the whole parse.
+    /// Mapping keys deserialize directly to `String` under
+    /// [`crate::yaml::parse`]. The parser skips keys that fail [`FieldKey`]
+    /// validation, such as an empty canonical form, instead of failing the
+    /// parse.
     ///
     /// # Errors
     ///
@@ -59,10 +60,8 @@ impl RawFrontmatter {
         let noyalib::Value::Mapping(map) = parsed else {
             return Err(FrontmatterParseError::NotMapping);
         };
-        // Every top-level key normally parses into a field (a skip is rare:
-        // a key failing `FieldKey` validation), so `map.len()` is a tight
-        // upper bound known upfront - avoids `IndexMap`'s amortized growth
-        // needing to guess capacity across repeated `insert` calls.
+        // Most top-level keys parse into fields, so `map.len()` is a tight
+        // upper bound. Pre-allocating avoids repeated `IndexMap` reallocations.
         let mut fields = IndexMap::with_capacity(map.len());
         for (key_str, raw_value) in map {
             let Ok(key) = FieldKey::try_new(key_str) else {

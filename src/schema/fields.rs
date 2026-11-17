@@ -1,19 +1,19 @@
-//! Defines resolved field definitions, type-specific options, and `$ref`
-//! building.
+//! Defines field definitions, type-specific options, and `$ref` building.
 //!
 //! Each raw field's `type` and `options` bag are validated and merged into a
 //! [`SchemaFieldType`] by the per-type `parse` functions in submodules.
 //!
 //! Two severities back the same validation:
+//!
 //! - **Hard failure** for `Direct` fields and `$ref` with a `type` override.
-//! - **Degraded warning** for bare `$ref` overrides (offending key dropped,
-//!   every other valid key kept).
+//! - **Degraded override** for bare `$ref` overrides (drops the offending key
+//!   and keeps every other valid key).
 //!
 //! Submodules partition the per-type parsing:
 //!
 //! - [`parser`] provides [`SchemaFieldParser`](parser::SchemaFieldParser) for
 //!   shared attribute-table validation.
-//! - [`select`] parses `values` into [`SchemaSelectFieldEntry`]s.
+//! - [`select`] parses `values` into [`SchemaSelectFieldEntry`] items.
 //! - [`number`] parses `min`/`max`/`step`.
 //! - [`date`] parses `format`.
 //! - [`mod@file`] parses `folders`/`ext`/`class` and provides
@@ -65,7 +65,7 @@ impl SchemaFieldDef {
         }
     }
 
-    /// Build a resolved field definition directly, for tests outside this
+    /// Builds a resolved field definition directly, for tests outside this
     /// module that need a [`SchemaFieldDef`] without going through
     /// [`SchemaFieldBuilder`].
     #[cfg(test)]
@@ -140,29 +140,31 @@ impl SchemaFieldDef {
 /// Represents a field's effective type and its type-specific options.
 ///
 /// Each variant wraps the resolved options for that kind:
-/// - [`Select`][SchemaFieldType::Select]: [`SchemaSelectField`]
-/// - [`Number`][SchemaFieldType::Number]: [`SchemaNumberField`]
-/// - [`Date`][SchemaFieldType::Date]: [`SchemaDateField`]
-/// - [`File`][SchemaFieldType::File]: [`SchemaFileField`]
-/// - [`Input`][SchemaFieldType::Input] / [`Boolean`][SchemaFieldType::Boolean]:
-///   no options
+///
+/// - [`SchemaFieldType::Select`][]: [`SchemaSelectField`]
+/// - [`SchemaFieldType::Number`][]: [`SchemaNumberField`]
+/// - [`SchemaFieldType::Date`][]: [`SchemaDateField`]
+/// - [`SchemaFieldType::File`][]: [`SchemaFileField`]
+/// - [`SchemaFieldType::Input`] and [`SchemaFieldType::Boolean`]: no options
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum SchemaFieldType {
-    /// Free-form text input.
+    /// Represents free-form text input.
     Input,
-    /// Boolean value.
+    /// Represents a boolean value.
     Boolean,
-    /// Numeric value with optional bounds ([`SchemaNumberField::min`],
-    /// [`SchemaNumberField::max`]) and step ([`SchemaNumberField::step`]).
+    /// Represents a numeric value with optional bounds
+    /// ([`SchemaNumberField::min`], [`SchemaNumberField::max`]) and step
+    /// ([`SchemaNumberField::step`]).
     Number(SchemaNumberField),
-    /// Date value with an optional display format
+    /// Represents a date value with an optional display format
     /// ([`SchemaDateField::format`]).
     Date(SchemaDateField),
-    /// A link to files matched by folder, extension, and class filters.
+    /// Links to files matched by folder, extension, and class filters.
     ///
     /// Class matching happens at query time, not here.
     File(Arc<SchemaFileField>),
-    /// One value from a configured list of [`SchemaSelectFieldEntry`]s.
+    /// Selects one value from a configured list of [`SchemaSelectFieldEntry`]
+    /// items.
     Select(Arc<SchemaSelectField>),
 }
 
@@ -173,8 +175,8 @@ impl std::fmt::Display for SchemaFieldType {
 }
 
 impl SchemaFieldType {
-    /// Return the inner [`SchemaSelectField`] if this is a
-    /// [`Select`][Self::Select] variant.
+    /// Returns the inner [`SchemaSelectField`] if this is a
+    /// [`Self::Select`] variant.
     pub(super) fn as_select(&self) -> Option<&SchemaSelectField> {
         match self {
             Self::Select(inner) => Some(inner.as_ref()),
@@ -182,8 +184,8 @@ impl SchemaFieldType {
         }
     }
 
-    /// Return the inner [`SchemaNumberField`] if this is a
-    /// [`Number`][Self::Number] variant.
+    /// Returns the inner [`SchemaNumberField`] if this is a
+    /// [`Self::Number`] variant.
     pub(super) const fn as_number(&self) -> Option<&SchemaNumberField> {
         match self {
             Self::Number(inner) => Some(inner),
@@ -191,7 +193,7 @@ impl SchemaFieldType {
         }
     }
 
-    /// Return the inner [`SchemaDateField`] if this is a [`Date`][Self::Date]
+    /// Returns the inner [`SchemaDateField`] if this is a [`Self::Date`]
     /// variant.
     pub(super) const fn as_date(&self) -> Option<&SchemaDateField> {
         match self {
@@ -200,7 +202,7 @@ impl SchemaFieldType {
         }
     }
 
-    /// Return the inner [`SchemaFileField`] if this is a [`File`][Self::File]
+    /// Returns the inner [`SchemaFileField`] if this is a [`Self::File`]
     /// variant.
     pub(super) fn as_file(&self) -> Option<&SchemaFileField> {
         match self {
@@ -209,7 +211,7 @@ impl SchemaFieldType {
         }
     }
 
-    /// Return this type's tag: which of the six variants it is, without its
+    /// Returns this type's tag: which of the six variants it is, without its
     /// payload.
     #[inline]
     #[must_use]
@@ -226,12 +228,11 @@ impl SchemaFieldType {
 }
 
 /// Identifies which of the six field kinds a [`SchemaFieldType`] or
-/// [`RawSchemaFieldType`] is, without either's payload.
+/// [`RawSchemaFieldType`] represents, without its payload.
 ///
-/// Constructible from a [`RawSchemaFieldType`] (via
-/// [`From`]) or projected from an already-resolved [`SchemaFieldType`] (via
-/// [`SchemaFieldType::kind`]), never the reverse. Used by
-/// [`SchemaFieldParserError`], [`SchemaWarning`], and
+/// Built from a [`RawSchemaFieldType`] with [`From`], or projected from an
+/// already-resolved [`SchemaFieldType`] with [`SchemaFieldType::kind`], never
+/// the reverse. Used by [`SchemaFieldParserError`], [`SchemaWarning`], and
 /// [`parser::SchemaFieldParser`] to name a field's kind in diagnostics without
 /// carrying its resolved options.
 ///

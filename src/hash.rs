@@ -14,12 +14,12 @@ use std::{
 
 use thiserror::Error;
 
-/// Stores a BLAKE3 digest: of file contents ([`Self::from_path`], `From<&str>`)
+/// Stores a BLAKE3 digest of file contents ([`Self::from_path`], `From<&str>`)
 /// or of structured values built with `Blake3Hasher`.
 ///
-/// Prefer hashing already-loaded content when the caller has it. Hashing a path
-/// and then reading the same path again creates a time-of-check to time-of-use
-/// window where the file contents can change between reads.
+/// Hash already-loaded content when the caller has it. Hashing a path before
+/// reading it creates a time-of-check to time-of-use gap. The file contents can
+/// change between reads.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Blake3Digest(blake3::Hash);
 
@@ -29,13 +29,13 @@ impl Blake3Digest {
 
     /// Computes the BLAKE3 hash of `path`'s current contents.
     ///
-    /// Reads `path` fully into memory before hashing. Use this only when the
-    /// path read itself is the source of truth; otherwise hash the content that
-    /// was already read to avoid a time-of-check to time-of-use gap.
+    /// Reads `path` into memory before hashing. Use this only when the path
+    /// read is the source of truth. Otherwise, hash the loaded content to avoid
+    /// a time-of-check to time-of-use gap.
     ///
     /// # Errors
     ///
-    /// - `HashError` if `path` cannot be read.
+    /// - `HashError` if reading `path` fails.
     #[cfg(any(test, feature = "test-utils"))]
     #[inline]
     pub fn from_path(path: &Path) -> Result<Self, HashError> {
@@ -53,7 +53,7 @@ impl Blake3Digest {
         self.0.to_hex()
     }
 
-    /// Returns the raw digest bytes, the form persisted by stores.
+    /// Returns the raw digest bytes that stores save.
     #[inline]
     #[must_use]
     pub(crate) const fn to_bytes(self) -> [u8; Self::LEN] {
@@ -82,18 +82,22 @@ impl Display for Blake3Digest {
     }
 }
 
-/// Incremental, injective encoder behind structured digests.
+/// Encodes structured fields incrementally into a [`Blake3Digest`].
 ///
-/// Every field is length-prefixed with a little-endian `u64`, so no value, even
-/// one containing delimiter bytes, can be re-read as a different field split.
-/// Paths are fed as raw OS bytes, and optional paths carry a presence tag so
-/// `None` differs from an empty path. The framing is part of every persisted
-/// digest: changing it invalidates them.
+/// The framing format uses three rules:
+///
+/// - Each field starts with a little-endian `u64` length prefix, so delimiter
+///   bytes inside a value cannot split fields.
+/// - Paths encode raw OS bytes.
+/// - Optional paths include a presence tag so `None` differs from an empty
+///   path.
+///
+/// Changing this framing invalidates every saved digest.
 #[derive(Debug)]
 pub(crate) struct Blake3Hasher(blake3::Hasher);
 
 impl Blake3Hasher {
-    /// Starts an empty hasher.
+    /// Creates an empty [`Blake3Hasher`].
     #[must_use]
     pub(crate) fn new() -> Self {
         Self(blake3::Hasher::new())
@@ -107,7 +111,7 @@ impl Blake3Hasher {
 
     /// Feeds `len` as a little-endian `u64`.
     ///
-    /// Saturates instead of truncating; a length above `u64::MAX` is
+    /// Saturates instead of truncating. A length above `u64::MAX` is
     /// unreachable for in-memory data.
     pub(crate) fn len(&mut self, len: usize) {
         self.0.update(&u64::try_from(len).unwrap_or(u64::MAX).to_le_bytes());
@@ -138,7 +142,7 @@ impl Blake3Hasher {
         }
     }
 
-    /// Finalizes the hasher into a digest.
+    /// Finalizes the accumulated fields into a [`Blake3Digest`].
     #[must_use]
     pub(crate) fn finish(self) -> Blake3Digest {
         Blake3Digest(self.0.finalize())
@@ -147,12 +151,12 @@ impl Blake3Hasher {
 
 /// Stores a BLAKE3 hex hash of path bytes.
 ///
-/// Used as a hash-keyed store filename. Callers that need canonical keys must
-/// canonicalize before constructing this value.
+/// Stores use this value as a hash-keyed filename. Callers that need canonical
+/// keys must canonicalize the path before creating this value.
 ///
 /// Stores the hex digest as `[u8; 64]` instead of a [`String`] because BLAKE3
-/// hex encoding is always exactly 64 ASCII bytes. The fixed array avoids a heap
-/// allocation while still exposing the digest as UTF-8 when needed.
+/// hex output is always 64 ASCII bytes. The fixed array avoids heap allocation
+/// and exposes the digest as UTF-8.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Blake3PathHash([u8; 64]);
 
@@ -172,8 +176,8 @@ impl Blake3PathHash {
     /// # Panics
     ///
     /// Panics if the stored digest bytes are not valid UTF-8. BLAKE3 hex output
-    /// is always ASCII, so this can only happen if the invariant inside
-    /// [`Blake3PathHash`] is broken.
+    /// is always ASCII. This panic only occurs if internal code breaks the
+    /// [`Blake3PathHash`] invariant.
     #[inline]
     #[must_use]
     #[expect(
@@ -188,11 +192,11 @@ impl Blake3PathHash {
     }
 }
 
-/// Reports that a file could not be read for hashing.
+/// Reports a file-read failure during hashing.
 #[derive(Debug, Error)]
 #[error("failed to read {path} for hashing")]
 pub struct HashError {
-    /// Path that could not be read.
+    /// Path to the unreadable file.
     pub(crate) path: PathBuf,
     /// Source I/O error.
     #[source]

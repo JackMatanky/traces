@@ -27,8 +27,8 @@ use serde::{Deserialize, Serialize};
 /// Stores precomputed line-start byte positions providing O(log n) line
 /// lookups.
 ///
-/// Precomputes line-start byte positions once per document; each conversion is
-/// an O(log n) binary search over them via [`slice::partition_point`].
+/// Precomputes line-start byte positions once per document. Each conversion
+/// runs an O(log n) binary search with [`slice::partition_point`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LineIndex(Box<[BytePos]>);
 
@@ -168,12 +168,11 @@ impl From<Range<usize>> for ByteSpan {
     }
 }
 
-/// A 0-indexed UTF-8 byte position into source text.
+/// Stores a 0-indexed UTF-8 byte position into source text.
 ///
-/// Distinct from [`SourceLine`] so a line number can never be passed where a
-/// byte position is expected, or vice versa. Backed by `u32`, so positions past
-/// 4 `GiB` cannot be represented: saturating conversions clamp at
-/// [`BytePos::MAX`].
+/// Distinct from [`SourceLine`] so callers cannot mix up line numbers and byte
+/// positions. Stores a `u32`, so it cannot represent positions past 4 `GiB`.
+/// Saturating conversions clamp at [`BytePos::MAX`].
 #[derive(
     Copy,
     Clone,
@@ -204,8 +203,8 @@ impl BytePos {
     /// Narrows `pos` to a UTF-8 byte position, clamping values beyond the `u32`
     /// range at [`BytePos::MAX`].
     ///
-    /// This is the saturating counterpart of the fallible [`TryFrom`]
-    /// conversion; use it at boundaries where oversized input must not fail.
+    /// Saturating counterpart of the fallible [`TryFrom`] conversion. Use it at
+    /// boundaries where oversized input must not fail.
     #[inline]
     #[must_use]
     pub(crate) fn saturating_from(pos: usize) -> Self {
@@ -254,8 +253,8 @@ impl TryFrom<usize> for BytePos {
 
 /// Stores a 1-indexed source line number.
 ///
-/// Distinct from `BytePos` so a byte position can never be passed where a line
-/// number is expected, or vice versa.
+/// Distinct from `BytePos` so callers cannot mix up line numbers and byte
+/// positions.
 ///
 /// # Examples
 ///
@@ -372,7 +371,7 @@ impl<T> Spanned<T> {
         }
     }
 
-    /// Convenience constructor converting a raw `Range<usize>`.
+    /// Constructs a [`Spanned`] wrapper from a raw `Range<usize>`.
     #[inline]
     #[must_use]
     pub(crate) fn from_usize_range(value: T, range: Range<usize>) -> Self {
@@ -471,11 +470,12 @@ impl<T: Ord> Ord for Spanned<T> {
 /// Represents errors arising from invalid source positions or line numbers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum PositionError {
-    /// A byte position exceeds the `u32` range.
+    /// Indicates that a byte position exceeds the `u32` range.
     #[error("byte position exceeds u32 range")]
     BytePosOverflow,
 
-    /// A source line number is zero (line numbers are 1-indexed).
+    /// Indicates that a source line number is zero (line numbers are
+    /// 1-indexed).
     #[error("source line number must be non-zero")]
     ZeroSourceLine,
 }

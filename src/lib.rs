@@ -31,6 +31,7 @@
 //!   field definitions.
 //! - `template`: template loading, path expansion, custom engine bindings, and
 //!   note rendering.
+//!
 //! # Key Types
 //!
 //! Always available:
@@ -64,8 +65,8 @@
 //! # Visibility Probes
 //!
 //! Internal configuration structures remain private to the crate and unnameable
-//! from outside. Each compile-fail probe is paired with a positive-control
-//! doctest verifying that the corresponding public interface is nameable.
+//! from outside. Each compile-fail probe is paired with a positive-control doc
+//! test verifying that the corresponding public interface is nameable.
 //!
 //! ```compile_fail
 //! // ConfigError must not be nameable from outside the crate.
@@ -234,7 +235,7 @@ pub mod fuzzing {
         FilterExpr::parse(input).is_ok()
     }
 
-    /// Parses `input` as a Config File and reports whether it parsed.
+    /// Parses `input` as a configuration file and reports whether it succeeds.
     #[must_use]
     #[inline]
     pub fn parse_raw_config(input: &str) -> bool {
@@ -244,7 +245,7 @@ pub mod fuzzing {
     /// Parses `input` as a date point and checks the display law.
     ///
     /// A day-precision calendar point must survive a `%Y-%m-%d` display and
-    /// re-parse unchanged. Returns `true` for unparsable input and for points
+    /// reparse unchanged. Returns `true` for unparseable input and for points
     /// that the law does not cover.
     #[must_use]
     #[inline]
@@ -271,26 +272,27 @@ pub mod fuzzing {
     }
 }
 
-/// Builds isolated fixtures for the crate's own `#[cfg(test)]` suites and,
-/// under the `test-utils` feature, for external `tests/`/`benches/`
-/// consumers.
-///
-/// - [`TestProject`]: encapsulates an isolated workspace fixture managing
-///   paths, configuration, trust records, schemas, templates, and on-disk index
-///   persistence.
-/// - [`fixture_service`]: returns a [`ConfigService`] backed by temporary
-///   directories.
-/// - [`create_trusted_project`]: writes a minimal config and trusts it.
-/// - [`write_note`], [`write_template`], and [`write_schema`]: write fixture
-///   files.
-/// - [`parse_note`], [`parse_note_str`], and [`build_test_index`]: construct
-///   in-memory notes and indexes with zero disk I/O.
-/// - [`parse_tag`]: parses tag string slices for fixture data.
-///
-/// Time-zone fixtures are owned by `temporal::test_support`, not this generic
-/// project-fixture module.
 #[cfg(any(test, feature = "test-utils"))]
 mod test_support {
+    //! Builds isolated fixtures for the crate's own `#[cfg(test)]` suites and,
+    //! under the `test-utils` feature, for external `tests/`/`benches/`
+    //! consumers.
+    //!
+    //! - [`TestProject`]: encapsulates an isolated workspace fixture managing
+    //!   paths, configuration, trust records, schemas, templates, and on-disk
+    //!   index persistence.
+    //! - [`fixture_service`]: returns a [`ConfigService`] backed by temporary
+    //!   directories.
+    //! - [`create_trusted_project`]: writes a minimal configuration and trusts
+    //!   it.
+    //! - [`write_note`], [`write_template`], and [`write_schema`]: write
+    //!   fixture files.
+    //! - [`parse_note`], [`parse_note_str`], and [`build_test_index`]:
+    //!   construct in-memory notes and indexes without disk reads or writes.
+    //! - [`parse_tag`]: parses tag string slices for fixture data.
+    //!
+    //! Time-zone fixtures are owned by `temporal::test_support`, not this
+    //! generic project-fixture module.
     #![expect(
         clippy::expect_used,
         reason = "fixture-only code; a failed .expect() here means the \
@@ -318,9 +320,9 @@ mod test_support {
     /// Default schema values directory relative to project root.
     pub const DEFAULT_SCHEMA_VALUES_DIR: &str = ".traces/schemas/values";
 
-    /// Minimal local config TOML shared by every crate-side fixture that
-    /// writes `.traces/config.toml` directly. Single-sourced here (ticket
-    /// 17); the E2E harness keeps its own copy and imports nothing from the
+    /// Minimal local configuration TOML shared by every crate-side fixture that
+    /// writes `.traces/config.toml` directly. Single-sourced here (ticket 17).
+    /// The end-to-end harness keeps its own copy and imports nothing from the
     /// crate.
     const LOCAL_CONFIG_TOML: &str = "[templates]\ndirectory = \"templates\"\n";
 
@@ -349,13 +351,13 @@ mod test_support {
             fixture_service(&state_root)
         }
 
-        /// Creates an empty directory with an isolated config service and no
-        /// `.traces/` directory.
+        /// Creates an empty directory with an isolated configuration service
+        /// and no `.traces/` directory.
         ///
         /// # Panics
         ///
-        /// Panics if `root` cannot be created. Fixture-only code: a panic
-        /// here means the fixture setup itself is broken.
+        /// Panics if creating `root` fails. Fixture-only code: a panic here
+        /// means the fixture setup itself is broken.
         #[inline]
         #[must_use]
         pub fn empty<P: Into<PathBuf>>(root: P) -> Self {
@@ -372,7 +374,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the config file cannot be written. Fixture-only code.
+        /// Panics if writing the configuration file fails. Fixture-only code.
         #[inline]
         #[must_use]
         pub fn untrusted<P: Into<PathBuf>>(root: P) -> Self {
@@ -397,7 +399,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the fixture setup fails; see [`create_trusted_project`].
+        /// Panics if the fixture setup fails. See [`create_trusted_project`].
         #[inline]
         #[must_use]
         pub fn trusted<P: Into<PathBuf>>(root: P) -> Self {
@@ -437,10 +439,11 @@ mod test_support {
             self.service.load(&self.root).expect("load fixture config")
         }
 
-        /// Returns test [`Config`] rooted at this project, configuring the
-        /// local `templates/` directory only when that directory exists on
-        /// disk — the directory-existence flip is the accessor's whole
-        /// contract, hence the name.
+        /// Returns a test [`Config`] rooted at this project.
+        ///
+        /// Configures the local `templates/` directory only when that directory
+        /// exists on disk. The directory-existence check is the accessor's
+        /// whole contract.
         #[inline]
         #[must_use]
         pub fn config_with_templates_if_present(&self) -> Config {
@@ -456,9 +459,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if `.traces/config.toml` is missing or invalid.
-        /// Fixture-only code: a panic here means the test's fixture data is
-        /// wrong.
+        /// Panics if `.traces/config.toml` is missing or invalid. Fixture-only
+        /// code: a panic here means the test's fixture data is wrong.
         #[inline]
         pub fn trust(&self) {
             let config = LocalConfigFile::from_root(&self.root);
@@ -472,7 +474,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the trust entry cannot be removed. Fixture-only code.
+        /// Panics if removing the trust entry fails. Fixture-only code.
         #[inline]
         #[must_use]
         pub fn untrust(&self) -> usize {
@@ -485,7 +487,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the path escapes `root` or the file cannot be written.
+        /// Panics if the path escapes `root` or writing the file fails.
         /// Fixture-only code: a panic here means the fixture setup is broken.
         #[inline]
         pub fn write_file<P: AsRef<Path>>(
@@ -506,7 +508,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if `rel_path` escapes `root` or the note cannot be written.
+        /// Panics if `rel_path` escapes `root` or writing the note fails.
         /// Fixture-only code: a panic here means the fixture setup is broken.
         #[inline]
         pub fn write_note<P: AsRef<Path>>(
@@ -521,8 +523,8 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the path escapes `root` or the template cannot be
-        /// written. Fixture-only code.
+        /// Panics if the path escapes `root` or writing the template fails.
+        /// Fixture-only code.
         #[inline]
         pub fn write_template<P: AsRef<Path>>(
             &self,
@@ -539,7 +541,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the path escapes `root` or the schema cannot be written.
+        /// Panics if the path escapes `root` or writing the schema fails.
         /// Fixture-only code.
         #[inline]
         pub fn write_schema<P: AsRef<Path>>(
@@ -558,7 +560,7 @@ mod test_support {
         ///
         /// # Panics
         ///
-        /// Panics if the path escapes `root` or the file cannot be written.
+        /// Panics if the path escapes `root` or writing the file fails.
         /// Fixture-only code.
         #[inline]
         pub fn write_schema_value<P: AsRef<Path>>(
@@ -636,7 +638,7 @@ mod test_support {
     }
 
     /// Builds an in-memory [`WorkspaceIndex`] wrapped in an [`Arc`] from note
-    /// path and content pairs with zero disk I/O.
+    /// path and content pairs without disk reads or writes.
     ///
     /// # Examples
     ///
@@ -697,8 +699,8 @@ mod test_support {
         root.join(rel_path)
     }
 
-    /// Creates a [`ConfigService`] backed by isolated tracked-config and trust
-    /// stores under `root`, never the real OS state directories.
+    /// Creates a [`ConfigService`] backed by isolated tracked-configuration and
+    /// trust stores under `root`, never the real OS state directories.
     #[inline]
     #[must_use]
     pub fn fixture_service(root: &Path) -> ConfigService {
@@ -708,16 +710,18 @@ mod test_support {
         )
     }
 
-    /// Writes a minimal local config at `root/.traces/config.toml` configuring
-    /// `templates` as the template directory name, and records `root` as
-    /// trusted in `service`'s trust store. Note: does not create the template
+    /// Writes a minimal local configuration at `root/.traces/config.toml` and
+    /// trusts `root`.
+    ///
+    /// Sets `templates` as the template directory name and records `root` as
+    /// trusted in `service`'s trust store without creating the template
     /// directory on disk.
     ///
     /// # Panics
     ///
-    /// Panics if `root` cannot be created, the config file cannot be written,
-    /// or trust cannot be recorded. Fixture-only code: a panic here means the
-    /// fixture setup itself is broken.
+    /// Panics if creating `root`, writing the configuration file, or recording
+    /// trust fails. Fixture-only code: a panic here means the fixture setup
+    /// itself is broken.
     #[inline]
     #[must_use]
     pub fn create_trusted_project(
@@ -742,7 +746,7 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// Panics if the path escapes `root` or the note cannot be written.
+    /// Panics if the path escapes `root` or writing the note fails.
     /// Fixture-only code: a panic here means the fixture setup is broken.
     #[inline]
     pub fn write_note<P: AsRef<Path>>(
@@ -763,7 +767,7 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// Panics if the path escapes `root` or the template cannot be written.
+    /// Panics if the path escapes `root` or writing the template fails.
     /// Fixture-only code: a panic here means the fixture setup is broken.
     #[inline]
     pub fn write_template<P: AsRef<Path>>(
@@ -787,7 +791,7 @@ mod test_support {
     ///
     /// # Panics
     ///
-    /// Panics if the path escapes `root` or the schema cannot be written.
+    /// Panics if the path escapes `root` or writing the schema fails.
     /// Fixture-only code: a panic here means the fixture setup is broken.
     #[inline]
     pub fn write_schema<P: AsRef<Path>>(

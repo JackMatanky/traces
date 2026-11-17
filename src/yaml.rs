@@ -4,15 +4,17 @@ use std::sync::LazyLock;
 
 use noyalib::ParserConfig;
 
-/// Configures YAML 1.2 parsing using noyalib's `serde_yaml_compat` preset.
+/// Configures YAML 1.2 parsing using the `noyalib` `serde_yaml_compat` preset.
 ///
-/// Leading-zero integers (`01234`) resolve as strings. YAML 1.1 binary literals
-/// resolve as integers. An overflowing float literal stays a string. An integer
-/// past `u64::MAX` errors instead of degrading to `f64`. A non-scalar mapping
-/// key errors, and `<<` merge keys stay ordinary entries. Built once and shared
-/// by every call to [`parse`]. [`RawFrontmatter`]'s YAML parsing and the
-/// template engine's `to_yaml`/`from_yaml` filters therefore parse and render
-/// YAML identically.
+/// Every call to [`parse`], [`RawFrontmatter`], and the `to_yaml` / `from_yaml`
+/// template filters shares these rules:
+///
+/// - Leading-zero integers (`01234`) resolve as strings.
+/// - YAML 1.1 binary literals resolve as integers.
+/// - Overflowing float literals stay strings.
+/// - Integers past `u64::MAX` error instead of degrading to `f64`.
+/// - Non-scalar mapping keys error.
+/// - Merge keys (`<<`) stay ordinary entries.
 ///
 /// [`RawFrontmatter`]: crate::note::RawFrontmatter
 static YAML_CONFIG: LazyLock<ParserConfig> =
@@ -23,7 +25,7 @@ static YAML_CONFIG: LazyLock<ParserConfig> =
 /// # Errors
 ///
 /// - [`noyalib::Error`] if `text` is not valid YAML 1.2 under the shared
-///   `serde_yaml_compat` parity config.
+///   `serde_yaml_compat` parity configuration.
 #[inline]
 pub(crate) fn parse(text: &str) -> Result<noyalib::Value, noyalib::Error> {
     noyalib::from_str_with_config(text, &YAML_CONFIG)

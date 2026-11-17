@@ -1,9 +1,9 @@
 //! Provides balanced delimiter tracking and string-level delimiter scanning.
 //!
-//! Provides zero-allocation stack validation for paired delimiters
-//! ([`DelimiterType`], [`DelimiterStack`]) and quote states ([`QuoteType`]),
-//! with support for parentheses, square brackets, curly braces, and Obsidian
-//! wikilink double brackets.
+//! [`DelimiterStack`] validates paired delimiters ([`DelimiterType`]) and quote
+//! states ([`QuoteType`]) without heap allocation. Supported delimiters are
+//! parentheses, square brackets, curly braces, and Obsidian wikilink double
+//! brackets.
 
 const MAX_DELIMITER_DEPTH: usize = 16;
 
@@ -38,7 +38,7 @@ impl DelimiterStack {
         }
     }
 
-    /// Returns the active quote kind if scanning inside a string literal.
+    /// Returns the active quote variant when scanning inside a string literal.
     #[cfg_attr(
         not(test),
         expect(
@@ -60,7 +60,7 @@ impl DelimiterStack {
 
     /// Updates active quote state on encountering `ch`.
     ///
-    /// Returns `true` if `ch` was consumed as part of quote tracking.
+    /// Returns `true` if quote tracking consumes `ch`.
     #[inline]
     fn advance_quote_state(&mut self, ch: char) -> bool {
         if let Some(active_quote) = self.active_quote {
@@ -78,9 +78,10 @@ impl DelimiterStack {
 
     /// Checks for a double-bracket closer `]]`.
     ///
-    /// Returns `Some(true)` if the root double bracket was cleanly closed,
-    /// `Some(false)` if an inner double bracket was closed, or `None` if `rest`
-    /// does not start with `]]` matching an active double bracket.
+    /// - Returns `Some(true)` if `]]` closes the root double bracket.
+    /// - Returns `Some(false)` if `]]` closes an inner double bracket.
+    /// - Returns `None` if `rest` does not start with `]]` for an active double
+    ///   bracket.
     #[inline]
     fn check_double_bracket_close(&mut self, rest: &str) -> Option<bool> {
         if self.current_kind() == Some(DelimiterType::DoubleBracket)
@@ -95,9 +96,9 @@ impl DelimiterStack {
 
     /// Handles a single closing character.
     ///
-    /// - Returns `Ok(true)` if the root delimiter was cleanly closed.
-    /// - Returns `Ok(false)` if an inner nested delimiter was closed or if `ch`
-    ///   is allowed content (e.g. lone `]` inside double brackets).
+    /// - Returns `Ok(true)` if `ch` closes the root delimiter.
+    /// - Returns `Ok(false)` if `ch` closes an inner nested delimiter or is
+    ///   allowed content (such as a lone `]` inside double brackets).
     ///
     /// # Errors
     ///
@@ -118,7 +119,8 @@ impl DelimiterStack {
     }
 }
 
-/// Paired delimiter kinds recognized across lexers and grammar parsers.
+/// Represents paired delimiter kinds recognized across lexers and grammar
+/// parsers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub(crate) enum DelimiterType {
@@ -226,13 +228,13 @@ impl DelimiterType {
         }
     }
 
-    /// Finds the byte position of this delimiter's matching closing token in
-    /// `input`, managing nested `()`, `[]`, `{}`, `[[]]`, and string quotes
-    /// (`"..."`, `'...'`).
+    /// Finds the byte position of the matching closing token in `input`,
+    /// managing nested `()`, `[]`, `{}`, `[[]]`, and string quotes (`"..."`,
+    /// `'...'`).
     ///
-    /// `input` begins immediately after this opening delimiter was consumed.
-    /// Returns `Some(pos)` of the matching closing delimiter, or `None` if
-    /// delimiters are unclosed, mismatched, or truncated.
+    /// `input` begins immediately after the opening delimiter. Returns
+    /// `Some(pos)` for the matching closing delimiter, or `None` if delimiters
+    /// are unterminated or mismatched.
     #[must_use]
     pub(crate) fn find_closing(self, input: &str) -> Option<usize> {
         let mut stack = DelimiterStack::with_root(self);
@@ -291,16 +293,17 @@ impl DelimiterType {
         None
     }
 
-    /// Finds the byte position of this delimiter's first closing character in
-    /// `input`, tracking no nesting, quotes, or escapes.
+    /// Finds the byte position of the first closing character in `input`,
+    /// without tracking nesting, quotes, or escapes.
     ///
-    /// `input` begins immediately after this opening delimiter was consumed.
-    /// Returns `Some(pos)` of the first closing character, or `None` if it
-    /// never appears (always `None` for [`Self::DoubleBracket`]). The flat
-    /// scan serves the bracket-literal dialect scans in `temporal::token`,
-    /// whose grammar treats every closing character as a close;
-    /// [`Self::find_closing`] keeps the nesting, quote, and escape tracking
-    /// for note link parsing.
+    /// `input` begins immediately after the opening delimiter. Returns
+    /// `Some(pos)` for the first closing character, or `None` if none appears
+    /// (always `None` for [`Self::DoubleBracket`]).
+    ///
+    /// This flat scan serves the bracket-literal dialect scans in
+    /// `temporal::token`, where every closing character closes the token.
+    /// [`Self::find_closing`] keeps nesting, quote, and escape tracking for
+    /// note link parsing.
     #[must_use]
     pub(crate) fn find_closing_flat(self, input: &str) -> Option<usize> {
         let close = self.close_char()?;
@@ -309,7 +312,7 @@ impl DelimiterType {
 
     /// Advances the backslash escape state on seeing `ch`.
     ///
-    /// Returns `true` if `ch` was consumed by escape processing.
+    /// Returns `true` if escape processing consumes `ch`.
     #[inline]
     fn advance_escaped(ch: char, escaped: &mut bool) -> bool {
         if *escaped {

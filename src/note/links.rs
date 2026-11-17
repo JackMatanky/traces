@@ -1,9 +1,9 @@
 //! Defines representations and parsers for outgoing Markdown and Obsidian
 //! wikilinks.
 //!
-//! [`Link`] pairs a raw target string with its [`LinkType`] (Markdown or
-//! wikilink syntax); [`LinkTarget`] splits that raw target into its path and
-//! heading-anchor parts for resolution against indexed notes.
+//! [`Link`] pairs a raw target string with its [`LinkType`]. [`LinkTarget`]
+//! splits that raw target into its path and heading-anchor parts for resolution
+//! against indexed notes.
 
 use serde::{Deserialize, Serialize};
 
@@ -21,13 +21,13 @@ pub enum LinkType {
 
 /// Represents an outgoing Markdown link or Obsidian wikilink.
 ///
-/// Holds the raw target string, optional display text (or alias for wikilinks;
-/// `None` falls back to the target), link syntax kind, and an embedded flag
-/// for `![[target]]` embeds.
+/// Holds the raw target string, optional display text, link syntax kind, and an
+/// embedded flag for `![[target]]` embeds. For wikilinks, the display text
+/// holds the alias, and `None` falls back to the target.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Link {
     target: String,
-    /// Alias or display text; `None` means the target doubles as the text.
+    /// Alias or display text. `None` falls back to the target.
     text: Option<String>,
     kind: LinkType,
     embedded: bool,
@@ -68,8 +68,8 @@ impl Link {
     ///
     /// Allows trailing text after the closing `]]` and returns the parsed link
     /// with the number of bytes consumed. Returns `None` if `s` does not start
-    /// with `[[` (after an optional leading `!`), has no unescaped closing
-    /// `]]`, or has an empty target.
+    /// with `[[` or `![[`, has no closing `]]` without a backslash escape, or
+    /// has an empty target.
     #[must_use]
     pub(crate) fn parse_wikilink_prefix(s: &str) -> Option<(Self, usize)> {
         let source = SourceText::new(s);
@@ -242,10 +242,10 @@ impl<'a> LinkTarget<'a> {
         }
     }
 
-    /// Returns whether this target has a non-empty path segment.
+    /// Returns `true` if this target has a path segment that is not empty.
     ///
-    /// `false` for [`Self::AnchorOnly`] and for the degenerate case of an
-    /// entirely empty target. Corresponds to whether an exact-path lookup is
+    /// Returns `false` for [`Self::AnchorOnly`] and for the degenerate case of
+    /// an entirely empty target. Corresponds to whether an exact-path lookup is
     /// worth attempting at all.
     #[must_use]
     pub(crate) fn has_path(self) -> bool {
@@ -261,18 +261,16 @@ impl<'a> LinkTarget<'a> {
     /// Returns `false` for:
     ///
     /// - [`Self::AnchorOnly`], which has no path.
-    /// - Paths with an explicit directory component. A qualified path that
-    ///   fails to match exactly stays unresolved rather than falling back to a
-    ///   whole-index name search that could match an unrelated note.
+    /// - Paths with an explicit directory component. An unresolved qualified
+    ///   path does not fall back to a whole-index name search.
     #[must_use]
     pub(crate) fn is_basename(self) -> bool {
         self.has_path() && self.path().is_some_and(|path| !path.contains('/'))
     }
 }
 
-/// Finds the byte offset of the first unescaped character in `s` for which
-/// `is_close` returns `true`, treating a `\` as escaping the character that
-/// follows it.
+/// Finds the byte offset of the first character in `s` not escaped by `\`, for
+/// which `is_close` returns `true`.
 ///
 /// Shared by [`find_wikilink_close`] and [`split_wikilink_text`], which need
 /// identical escape tracking with different terminal predicates.
@@ -297,15 +295,17 @@ fn find_unescaped(
     None
 }
 
-/// Finds the byte offset of the first unescaped `]]` in `s`, marking the
-/// wikilink's closing double brackets.
+/// Finds the byte offset of the first `]]` in `s` not escaped by `\`, marking
+/// the wikilink's closing double brackets.
 fn find_wikilink_close(s: &str) -> Option<usize> {
     DelimiterType::DoubleBracket.find_closing(s)
 }
 
-/// Splits wikilink inner text at the first unescaped `|` into a `(target,
-/// alias)` pair, or `(s, s)` when there is no `|` separator, so callers can
-/// treat the alias as identical to the target.
+/// Splits wikilink inner text at the first `|` without a backslash escape into
+/// `(target, alias)`.
+///
+/// Returns `(s, s)` when no `|` separator exists so callers can use the target
+/// as the alias.
 fn split_wikilink_text(s: &str) -> (&str, &str) {
     let source = SourceText::new(s);
     find_unescaped(s, |_, ch| ch == '|').map_or((s, s), |index| {
@@ -313,10 +313,10 @@ fn split_wikilink_text(s: &str) -> (&str, &str) {
     })
 }
 
-/// Unescapes a wikilink target or alias segment.
+/// Removes backslash escapes from `|` in a wikilink target or alias segment.
 ///
-/// A backslash escapes only `|`: `\|` becomes a literal `|`. Every other
-/// backslash is copied through unchanged.
+/// A backslash escapes only `|`, so `\|` becomes a literal `|`. All other
+/// backslashes remain unchanged.
 fn unescape_wikilink_part(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut escaped = false;

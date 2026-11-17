@@ -23,7 +23,7 @@ pub(crate) fn local_zone() -> Result<TimeZone, DateError> {
 ///
 /// # Errors
 ///
-/// - [`DateError::LocalZoneLookup`] if system time-zone discovery fails.
+/// - [`DateError::LocalZoneLookup`] if `source` returns an error.
 fn resolve<E>(
     source: impl FnOnce() -> Result<TimeZone, E>,
 ) -> Result<TimeZone, DateError>

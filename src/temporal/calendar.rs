@@ -2,10 +2,10 @@
 //! periods and period edges.
 //!
 //! This module owns the names that date-point arithmetic and its query and
-//! template callers share. It holds no arithmetic of its own: the calendar
+//! template callers share. It holds no arithmetic of its own. The calendar
 //! owner modules apply [`CalendarPeriod`] and [`PeriodEdge`] at date-point
-//! boundaries, while the free functions here supply the zone-free datetime
-//! shifting those owners share.
+//! boundaries. The free functions here supply the zone-free date-time shifting
+//! those owners share.
 //!
 //! # Key Types
 //!
@@ -53,6 +53,7 @@ impl CalendarPeriod {
         }
     }
 
+    /// Aligns `date` to `target` weekday within the same ISO week.
     #[must_use]
     pub(super) fn snap_weekday(
         date: civil::Date,
@@ -76,7 +77,7 @@ pub(crate) enum PeriodEdge {
     End,
 }
 
-/// Maps accepted period-boundary shorthands to periods and edges.
+/// Maps accepted period-boundary abbreviations to periods and edges.
 pub(crate) static PERIOD_EDGE_LOOKUP: phf::Map<
     &'static str,
     (CalendarPeriod, PeriodEdge),
@@ -114,7 +115,7 @@ pub(crate) fn resolve_period_edge(
 
 /// Maps an ISO weekday number to its [`civil::Weekday`].
 ///
-/// Returns [`None`] for anything outside `1..=7`. `0` is rejected because
+/// Returns [`None`] for anything outside `1..=7`. It rejects zero because
 /// Sunday-based conventions disagree on it (Sunday is `0` in some and `1` in
 /// others).
 #[must_use]

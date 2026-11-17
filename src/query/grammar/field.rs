@@ -42,7 +42,8 @@ pub(crate) enum FieldPath {
     Tags,
     /// Holds project-relative paths of notes that link to this note.
     ///
-    /// The query derives these paths from [`InlinkMap`], not from the note.
+    /// The query derives these paths from
+    /// [`InlinkMap`](crate::index::InlinkMap), not from the note.
     Inlinks,
 }
 
@@ -174,7 +175,7 @@ pub(crate) enum FileField {
 }
 
 impl FileField {
-    /// Accepted `file.<field>` accessor names, including aliases.
+    /// Lists accepted `file.<field>` accessor names, including aliases.
     pub(crate) const ACCESSOR_NAMES: &'static [&'static str] = &[
         "path",
         "name",
@@ -229,14 +230,15 @@ pub(crate) enum TaskField {
     Completed,
     /// Accesses task priority string.
     Priority,
-    /// A task lifecycle date slot, resolved through [`crate::TaskDateSet`].
+    /// Accesses a task lifecycle date slot, resolved through
+    /// [`crate::TaskDateSet`].
     Date(TaskDateType),
     /// Accesses whether all descendants of this task are complete.
     FullyComplete,
 }
 
 impl TaskField {
-    /// Accepted task-specific `list.<field>` accessor names.
+    /// Lists accepted task-specific `list.<field>` accessor names.
     #[cfg(test)]
     pub(super) const ACCESSOR_NAMES: &'static [&'static str] = &[
         "status",
@@ -293,7 +295,7 @@ pub(crate) enum ListField {
 }
 
 impl ListField {
-    /// Accepted `list.<field>` accessor names.
+    /// Lists accepted `list.<field>` accessor names.
     pub(crate) const ACCESSOR_NAMES: &'static [&'static str] = &[
         "text",
         "raw_text",
@@ -486,8 +488,8 @@ mod tests {
 
         #[test]
         fn closest_accessor_breaks_ties_by_iteration_order() {
-            // Both candidates have distance 1 from "mat".
-            // The parser chooses the first candidate.
+            // Both candidates have distance 1 from "mat". The parser chooses
+            // the first candidate.
             let candidates: &[&str] = &["cat", "bat"];
             assert_eq!(
                 FieldPath::closest_accessor(candidates, "mat"),

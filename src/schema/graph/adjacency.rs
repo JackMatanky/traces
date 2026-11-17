@@ -1,4 +1,4 @@
-//! Stores CSR (compressed sparse row) adjacency for the `extends` DAG.
+//! Stores compressed sparse row adjacency for the `extends` DAG.
 //!
 //! [`SchemaAdjacency`] owns the dense index mapping and parent→child edge
 //! storage that [`SchemaGraph`] and [`SchemaGraphBuilder`] query during
@@ -19,30 +19,33 @@ struct SchemaGraphEdge {
     target: DenseIndex,
 }
 
-/// Stores `extends` adjacency between Schemas as a CSR graph over dense
-/// [`DenseIndex`] values.
+/// Stores `extends` adjacency between Schemas as a compressed sparse row graph
+/// over dense [`DenseIndex`] values.
 ///
-/// The Global Schema (`excluded`) is never assigned a node. It participates via
-/// `$ref`, never `extends`, so it must never compete for topological position
-/// or appear in any hierarchy query.
+/// The Global Schema (`excluded`) is never assigned a node. It participates
+/// through `$ref`, never `extends`, so it must never compete for topological
+/// position or appear in any hierarchy query.
 #[derive(Debug)]
 pub(super) struct SchemaAdjacency<'a> {
-    /// The Global Schema name, excluded from the graph.
+    /// Stores the Global Schema name, excluded from the graph.
     excluded: SchemaNameRef<'a>,
-    /// Dense index to name, in raw-map insertion order, `excluded` skipped.
+    /// Maps dense indices to names in raw-map insertion order, skipping
+    /// `excluded`.
     names: Vec<SchemaNameRef<'a>>,
-    /// Name to dense index, built once at construction.
+    /// Maps names to dense indices, built once at construction.
     index_of: IndexMap<SchemaNameRef<'a>, DenseIndex>,
-    /// Each schema's raw `extends` list, deduplicated by first occurrence and
-    /// order-preserved. [`Self::parents_of`] exposes this instead of the raw
-    /// list so a duplicated `extends` target (already warned via
+    /// Stores each schema's raw `extends` list, deduplicated by first
+    /// occurrence and order-preserved.
+    ///
+    /// [`Self::parents_of`] exposes this deduplicated list instead of the raw
+    /// list. A duplicated `extends` target (warned with
     /// [`DuplicateExtendsTarget`](SchemaWarning::DuplicateExtendsTarget)) is
-    /// processed once by callers, not once per repetition.
+    /// processed once by callers.
     declared_parents: IndexMap<SchemaNameRef<'a>, Vec<SchemaName>>,
-    /// CSR parent→child offsets: node `i`'s children occupy
+    /// Stores sparse-row parent→child offsets: node `i`'s children occupy
     /// `child_targets[child_offsets[i]..child_offsets[i + 1]]`.
     child_offsets: Vec<u32>,
-    /// CSR parent→child targets, indexed via
+    /// Stores sparse-row parent→child targets, indexed by
     /// [`child_offsets`](Self::child_offsets).
     child_targets: Vec<DenseIndex>,
 }
@@ -50,13 +53,13 @@ pub(super) struct SchemaAdjacency<'a> {
 impl<'a> SchemaAdjacency<'a> {
     /// Builds the `extends` adjacency, skipping `excluded` entirely.
     ///
-    /// An `extends` edge naming `excluded` is silently ignored (the Global
-    /// Schema is referenced via `$ref`, never `extends`).
+    /// An `extends` edge naming `excluded` is ignored. The Global Schema is
+    /// referenced through `$ref`, never `extends`.
     ///
     /// # Warnings
     ///
     /// - [`DuplicateExtendsTarget`] if the same `extends` target appears more
-    ///   than once; checked before target-existence, so a repeated unresolvable
+    ///   than once. Checked before target existence, so a repeated unknown
     ///   target warns `Missing` on first occurrence and `Duplicate` thereafter.
     /// - [`MissingExtendsTarget`] if an `extends` target has no corresponding
     ///   Schema file (other than `excluded`).
@@ -124,7 +127,7 @@ impl<'a> SchemaAdjacency<'a> {
     }
 
     /// Validates and deduplicates each schema's `extends` targets, producing
-    /// the edge list for CSR construction and any warnings.
+    /// the edge list for sparse-row construction and any warnings.
     fn validate_edges(
         raw: &'a IndexMap<SchemaName, RawSchema>,
         excluded: SchemaNameRef<'a>,
@@ -166,7 +169,7 @@ impl<'a> SchemaAdjacency<'a> {
         (valid_edges, warnings)
     }
 
-    /// Builds CSR offsets and targets from the validated edge list.
+    /// Builds sparse-row offsets and targets from the validated edge list.
     fn build_csr(
         valid_edges: Vec<SchemaGraphEdge>,
         count: usize,
@@ -189,7 +192,7 @@ impl<'a> SchemaAdjacency<'a> {
         }
         let edge_count = DenseIndex::widen_usize(running);
 
-        // Fill CSR targets via a scratch write cursor per node.
+        // Fill sparse-row targets with a scratch write cursor per node.
         let mut cursor: Vec<u32> =
             child_offsets.iter().take(count).copied().collect();
         let mut child_targets: Vec<DenseIndex> =
@@ -229,7 +232,7 @@ impl<'a> SchemaAdjacency<'a> {
         rank
     }
 
-    /// Returns `node`'s CSR children slice (its direct `extends`
+    /// Returns `node`'s sparse-row children slice (its direct `extends`
     /// reverse-adjacency), or an empty slice if `node` is out of range.
     pub(super) fn children_slice(&self, node: DenseIndex) -> &[DenseIndex] {
         let idx = node.index();
@@ -245,8 +248,8 @@ impl<'a> SchemaAdjacency<'a> {
             .unwrap_or(&[])
     }
 
-    /// Mutable counterpart of [`children_slice`](Self::children_slice), for
-    /// sorting a node's children in place.
+    /// Returns a mutable slice of `node`'s direct `extends` children for
+    /// sorting in place.
     pub(super) fn children_slice_mut(
         &mut self,
         node: DenseIndex,
@@ -264,6 +267,7 @@ impl<'a> SchemaAdjacency<'a> {
     }
 
     /// Borrows `name`'s deduplicated, declaration-order `extends` parent list.
+    ///
     /// Returns an empty slice if `name` is unknown or is `excluded`.
     pub(super) fn parents_of(&self, name: SchemaNameRef<'_>) -> &[SchemaName] {
         if name == self.excluded {
@@ -300,7 +304,9 @@ impl<'a> SchemaAdjacency<'a> {
         self.names.iter().copied()
     }
 
-    /// Borrows every CSR child target, across every node, in CSR storage order.
+    /// Borrows every sparse-row child target across every node in storage
+    /// order.
+    ///
     /// Used to derive per-node in-degree without re-scanning raw `extends`
     /// lists.
     pub(super) fn child_targets_iter(
@@ -564,7 +570,7 @@ mod tests {
 
         #[test]
         fn returns_direct_children_for_a_parent() {
-            // book <- {sci_fi, memoir}
+            // `book <- {sci_fi, memoir}`
             let mut raw = IndexMap::new();
             raw.insert(SchemaName::for_test("book"), schema(&[]));
             raw.insert(SchemaName::for_test("sci_fi"), schema(&["book"]));
@@ -631,7 +637,7 @@ mod tests {
 
             let mut topo_order = IndexSet::new();
             topo_order.insert(SchemaNameRef::from("a"));
-            // "b" not in topo_order
+            // `"b"` is not in `topo_order`.
 
             let rank = adj.compute_topo_rank(&topo_order);
 

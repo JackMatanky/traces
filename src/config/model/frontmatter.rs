@@ -27,10 +27,15 @@ const DEFAULT_DATE_MODIFIED_FIELD: &str = "date_modified";
 /// Holds canonical metadata key names and date formats from `[frontmatter]`.
 #[derive(Clone, Debug)]
 pub struct FrontmatterConfig {
+    /// Holds the frontmatter key for a Note's display title.
     title: FieldName,
+    /// Holds the frontmatter key for a Note's aliases.
     aliases: FieldName,
+    /// Holds the frontmatter key for a Note's tags.
     tags: FieldName,
+    /// Holds the creation timestamp key name and date format.
     date_created: DateFieldConfig,
+    /// Holds the modification timestamp key name and date format.
     date_modified: DateFieldConfig,
 }
 
@@ -170,15 +175,13 @@ impl Default for FrontmatterConfig {
 impl TryFrom<RawFrontmatterConfig> for FrontmatterConfig {
     type Error = ConfigValueError;
 
-    /// Resolves canonical metadata fields from raw Config File values.
+    /// Resolves canonical metadata fields from raw Configuration File values.
     ///
     /// # Errors
     ///
-    /// - [`InvalidFieldKey`] if a configured title, aliases, tags, creation
-    ///   date, or modification date key is empty, whitespace-only, or contains
-    ///   `/`.
-    ///
-    /// [`InvalidFieldKey`]: ConfigValueError::InvalidFieldKey
+    /// - `ConfigValueError::InvalidFieldKey` if a configured title, aliases,
+    ///   tags, creation date, or modification date key is empty,
+    ///   whitespace-only, or contains `/`.
     #[inline]
     fn try_from(raw: RawFrontmatterConfig) -> Result<Self, Self::Error> {
         let invalid_key =
@@ -213,7 +216,9 @@ impl TryFrom<RawFrontmatterConfig> for FrontmatterConfig {
 /// Holds a frontmatter date key and its format string.
 #[derive(Clone, Debug)]
 pub struct DateFieldConfig {
+    /// Holds the frontmatter key name for this date field.
     name: FieldName,
+    /// Holds the date format pattern for this field's value.
     format: String,
 }
 
@@ -304,7 +309,9 @@ const FRONTMATTER_TAGS: &[u8] = b"frontmatter.tags";
 
 /// Labels the two settings of a [`DateFieldConfig`] for one metadata role.
 struct DateLabels {
+    /// Labels the date field's frontmatter key name setting.
     name: &'static [u8],
+    /// Labels the date field's format pattern setting.
     format: &'static [u8],
 }
 
@@ -321,10 +328,15 @@ const DATE_MODIFIED: DateLabels = DateLabels {
 /// Holds the digests of [`FrontmatterConfig`] settings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FrontmatterDigests {
+    /// Holds the digest of the title key name.
     pub(crate) title: Blake3Digest,
+    /// Holds the digest of the aliases key name.
     pub(crate) aliases: Blake3Digest,
+    /// Holds the digest of the tags key name.
     pub(crate) tags: Blake3Digest,
+    /// Holds digests for the creation date key name and format.
     pub(crate) date_created: DateFieldDigests,
+    /// Holds digests for the modification date key name and format.
     pub(crate) date_modified: DateFieldDigests,
 }
 
@@ -349,7 +361,9 @@ impl FrontmatterDigests {
 /// Holds the digests of one [`DateFieldConfig`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DateFieldDigests {
+    /// Holds the digest of the date key name.
     pub(crate) name: Blake3Digest,
+    /// Holds the digest of the date format pattern.
     pub(crate) format: Blake3Digest,
 }
 

@@ -8,8 +8,8 @@
 //!
 //! 1. **Build**: Create a [`QueryBuilder`] with a [`SourceSelector`] and row
 //!    type.
-//! 2. **Select**: [`QueryService::run`] matches notes and can expand File
-//!    Classes through a [`FileClassExpander`].
+//! 2. **Select**: [`QueryService::run`] matches notes and can expand file
+//!    classes through a `FileClassExpander`.
 //! 3. **Create rows**: Matching notes produce [`QueryRow`] values. List and
 //!    task queries produce one positional row for each matching list item.
 //! 4. **Transform**: The planner combines filters and sorts. It can also
@@ -19,8 +19,8 @@
 //!
 //! # Query Expressions
 //!
-//! - **Source selectors (`--from`)** match tags, paths, globs, and File
-//!   Classes. Combine terms with `and`, `or`, `not`, and parentheses.
+//! - **Source selectors (`--from`)** match tags, paths, globs, and file
+//!   classes. Combine terms with `and`, `or`, `not`, and parentheses.
 //! - **Filter expressions (`--where`)** compare row fields or call
 //!   `contains(...)`.
 //! - **Fields** include `file.<field>`, `list.<field>`, tags, inbound links,
@@ -31,7 +31,7 @@
 //! - [`QueryBuilder`]: Declarative builder for query configuration.
 //! - [`QueryService`]: Executes query plans against an index.
 //! - [`QuerySet`]: Holds query rows and pending transforms.
-//! - [`QueryRow`]: Represents one indexed file or list item.
+//! - [`QueryRow`]: Represents a single indexed file or list item.
 //! - [`SourceSelector`]: Selects source documents.
 //! - [`QueryError`]: Reports query construction, parsing, and rendering errors.
 //!
@@ -63,7 +63,7 @@
 //! ```
 //!
 //! [`WorkspaceIndex`]: crate::index::WorkspaceIndex
-//! [`FileClassExpander`]: crate::query::grammar::FileClassExpander
+
 mod builder;
 mod error;
 mod format;

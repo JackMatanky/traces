@@ -2,10 +2,13 @@
 //!
 //! [`IndexerService`] manages one project's [`WorkspaceIndex`] and
 //! [`IndexStore`]. [`IndexerService::refresh`] and
-//! [`IndexerService::refresh_store`] share one incremental path. Content
-//! changes update links from changed notes. Path changes rebuild all links
-//! because Wikilink resolution depends on every indexed path. Config drift also
-//! rebuilds the index and reuses the refresh scan and store handle.
+//! [`IndexerService::refresh_store`] share one incremental update path:
+//!
+//! - Content changes update links only from changed notes.
+//! - Path changes rebuild all links because wikilink resolution depends on
+//!   every indexed path.
+//! - Configuration drift rebuilds the index while reusing the refresh scan and
+//!   store handle.
 
 use std::path::{Path, PathBuf};
 
@@ -30,9 +33,9 @@ use crate::{
 /// Manages the file index for one project root.
 ///
 /// [`Self::refresh`] returns a full [`WorkspaceIndex`] and logs write failures.
-/// `refresh_store` updates only the store and returns write failures because it
-/// has no in-memory fallback. Both methods rebuild the index when its config
-/// fingerprint has drifted.
+/// `Self::refresh_store` updates only the store and returns write failures
+/// because it has no fallback in memory. Both methods rebuild the index when
+/// its configuration fingerprint has drifted.
 #[derive(Clone, Debug)]
 pub struct IndexerService {
     root: PathBuf,
@@ -87,7 +90,7 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::NoteParse` if the parser cannot read a Markdown file or
+    /// - [`IndexError::NoteParse`] if the parser cannot read a Markdown file or
     ///   decode UTF-8.
     fn build_from(
         &self,
@@ -109,13 +112,13 @@ impl IndexerService {
     /// changed notes from disk and removes deleted files. It logs write
     /// failures and still returns the index.
     ///
-    /// A config fingerprint mismatch triggers a full rebuild. If the rebuild
-    /// write fails, the method logs the error and leaves the stored fingerprint
-    /// unchanged. The next refresh tries the rebuild again.
+    /// A configuration fingerprint mismatch triggers a full rebuild. If the
+    /// rebuild write fails, the method logs the error and leaves the stored
+    /// fingerprint unchanged. The next refresh tries the rebuild again.
     ///
     /// The refresh patches links only for content changes. It rebuilds all
     /// links after a path is added, deleted, or renamed because those changes
-    /// can alter Wikilink targets.
+    /// can alter wikilink targets.
     ///
     /// # Errors
     ///
@@ -234,15 +237,15 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    /// - [`IndexError::Scan`] if the scan cannot read a directory or node,
     ///   including metadata.
-    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
-    ///   record.
-    /// - `IndexError::NoteParse` if the parser cannot read a note or decode
+    /// - [`IndexError::Inspect`] if the scan cannot convert file metadata into
+    ///   a record.
+    /// - [`IndexError::NoteParse`] if the parser cannot read a note or decode
     ///   UTF-8.
-    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    /// - [`IndexError::Path`] if the scan cannot make a safe project-relative
     ///   path.
-    /// - `IndexError::Store` if persisting the rebuilt index fails.
+    /// - [`IndexError::Store`] if persisting the rebuilt index fails.
     pub(crate) fn rebuild(&self) -> IndexResult<WorkspaceIndex> {
         let index = self.build()?;
         self.persist(&index)?;
@@ -252,9 +255,9 @@ impl IndexerService {
     /// Synchronizes the persisted index without building a [`WorkspaceIndex`].
     ///
     /// An empty delta returns the opened store without decoding notes or
-    /// writing rows. A config fingerprint mismatch triggers a full rebuild.
-    /// Unlike [`Self::refresh`], this method returns write errors because
-    /// callers have no in-memory fallback.
+    /// writing rows. A configuration fingerprint mismatch triggers a full
+    /// rebuild. Unlike [`Self::refresh`], this method returns write errors
+    /// because callers have no fallback in memory.
     ///
     /// # Errors
     ///
@@ -266,7 +269,7 @@ impl IndexerService {
     ///   decode UTF-8.
     /// - `IndexError::Path` if the scan cannot make a safe project-relative
     ///   path.
-    /// - `IndexError::Store` if the database cannot open or read, required
+    /// - [`IndexError::Store`] if the database cannot open or read, required
     ///   notes cannot be read, or incremental persistence fails.
     #[inline]
     pub(crate) fn refresh_store(&self) -> IndexResult<IndexStore> {
@@ -323,7 +326,7 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::NoteParse` if the parser cannot read a file or decode
+    /// - [`IndexError::NoteParse`] if the parser cannot read a file or decode
     ///   UTF-8.
     fn parse_notes(&self, files: &[FileMeta]) -> IndexResult<Vec<Note>> {
         files
@@ -338,7 +341,7 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::NoteParse` if reading the file fails.
+    /// - [`IndexError::NoteParse`] if reading the file fails.
     fn parse_note(&self, file: &FileMeta) -> IndexResult<Note> {
         let full_path = self.root.join(file.path());
         let content =
@@ -361,18 +364,19 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if the database directory cannot be created, the
-    ///   transaction fails, or a row cannot be encoded.
+    /// - `IndexError::Store` if the store cannot create the database directory,
+    ///   a transaction fails, or row encoding fails.
     #[inline]
     pub fn persist(&self, index: &WorkspaceIndex) -> IndexResult<()> {
         self.persist_into(&IndexStore::open(&self.root)?, index)
     }
 
-    /// Replaces every row of `store` with `index` under this service's config.
+    /// Replaces every row of `store` with `index` under this service's
+    /// configuration.
     ///
     /// # Errors
     ///
-    /// - `IndexError::Store` if the transaction fails or a row cannot be
+    /// - [`IndexError::Store`] if the transaction fails or a row cannot be
     ///   encoded.
     fn persist_into(
         &self,
@@ -415,11 +419,11 @@ impl IndexerService {
     ///
     /// # Errors
     ///
-    /// - `IndexError::Scan` if the scan cannot read a directory or node,
+    /// - [`IndexError::Scan`] if the scan cannot read a directory or node,
     ///   including metadata.
-    /// - `IndexError::Inspect` if the scan cannot convert file metadata into a
-    ///   record.
-    /// - `IndexError::Path` if the scan cannot make a safe project-relative
+    /// - [`IndexError::Inspect`] if the scan cannot convert file metadata into
+    ///   a record.
+    /// - [`IndexError::Path`] if the scan cannot make a safe project-relative
     ///   path.
     pub(super) fn scan(root: &Path) -> IndexResult<Vec<FileMeta>> {
         let index_db = root.join(INDEX_FILE);
@@ -446,9 +450,8 @@ impl IndexerService {
 
 /// Builds `node`'s [`FileMeta`] from metadata relative to `root`.
 fn scan_file_metadata(node: &DirNode, root: &Path) -> IndexResult<FileMeta> {
-    // `node.path()` borrows from `node`, so no owned path is allocated on the
-    // success path: the clone inside the error constructors only runs when a
-    // failure actually occurs.
+    // `node.path()` borrows from `node`, so the success path allocates no owned
+    // path. The error constructors clone the path only on failure.
     let path = node.path();
     let relative = RelativePath::derive(root, path)?;
     let metadata = node.metadata()?;
@@ -881,9 +884,9 @@ mod tests {
             note::{Frontmatter, Link, LinkType, NoteFieldValue},
         };
 
-        // The fixture materializes a raw non-Unicode filename on disk; macOS
-        // filename normalization makes that unreliable, so this helper and the
-        // tests using it run only on Linux.
+        // The fixture creates a raw non-Unicode filename on disk. macOS
+        // filename normalization makes that unreliable, so this helper runs
+        // only on Linux.
         #[cfg(target_os = "linux")]
         fn non_unicode_path() -> PathBuf {
             use std::os::unix::ffi::OsStringExt as _;
@@ -1488,7 +1491,7 @@ mod tests {
 
             fs::write(&note, "Status:: Final")
                 .expect("rewrite note with same byte length");
-            // Set after the write: a write resets the mtime.
+            // Set after the write: a write resets the `mtime`.
             fs::File::options()
                 .write(true)
                 .open(&note)
@@ -1739,9 +1742,9 @@ mod tests {
 
         #[test]
         fn resolves_stale_ambiguous_wikilink_after_unrelated_deletion() {
-            // `a.md` is never reparsed: deleting one `foo.md` changes an
+            // `a.md` is never re-parsed: deleting one `foo.md` changes an
             // ambiguous `[[foo]]` into a resolvable link, so `refresh` must
-            // full-recompute inlinks when indexed paths change.
+            // full-recompute inbound links when indexed paths change.
             let temp = tempfile::tempdir().expect("create temp dir");
             fs::create_dir_all(temp.path().join("notes")).expect("mkdir notes");
             fs::create_dir_all(temp.path().join("archive"))
@@ -1845,7 +1848,7 @@ mod tests {
             let index = service.build().expect("build index");
             service.persist(&index).expect("persist index");
 
-            // Act: rewrite b.md to new class and run incremental refresh
+            // Act: rewrite `b.md` to new class and run incremental refresh
             fs::write(root.join("b.md"), "---\nkind: novel\n---\n# B")
                 .expect("rewrite b");
             let (_refreshed_index, _report) =
@@ -1863,9 +1866,10 @@ mod tests {
             assert_eq!(book.as_ref(), [PathBuf::from("a.md")]);
         }
 
-        /// A `class_field` edit leaves file metadata untouched, yet the next
-        /// refresh detects the drift, rebuilds, and re-derives the class axes
-        /// under the new field with no `traces index`.
+        /// Rebuilds and re-derives class axes after a `class_field` edit.
+        ///
+        /// The edit leaves file metadata untouched, yet the next refresh
+        /// detects drift without `traces index`.
         #[test]
         fn heals_class_axes_when_class_field_config_changes() {
             // Arrange
@@ -1881,7 +1885,7 @@ mod tests {
             let index = builder.build().expect("build index");
             builder.persist(&index).expect("persist index");
 
-            // Act: same untouched files, service under class_field = "kind"
+            // Act: same untouched files, service under `class_field = "kind"`
             let changed = Config::test_default(root.to_path_buf())
                 .with_schemas(SchemasConfig::for_test("kind"));
             let (_refreshed, report) = IndexerService::from(&changed)
@@ -1981,7 +1985,7 @@ mod tests {
         }
 
         /// Persists an index of one classed note built under the default
-        /// config.
+        /// configuration.
         fn persisted_under_default_config(root: &Path) -> IndexerService {
             fs::write(
                 root.join("a.md"),

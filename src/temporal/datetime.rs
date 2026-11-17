@@ -33,17 +33,21 @@ pub(crate) const DEFAULT_DATETIME_PATTERN: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Stores a Date-Time in UTC and renders it as the local clock.
 ///
-/// Accepts RFC 3339 input with an explicit offset, except leap seconds, which
-/// Jiff cannot represent. ISO date portions need zero-padded month and day
-/// fields. Naive input in the five accepted shapes resolves in the
-/// process-local zone. Folds take the earlier occurrence. Gaps shift forward by
-/// their length. Pattern-based parsing uses a separate strftime grammar and
-/// retains its pattern-driven padding rules.
+/// Input parsing obeys these rules:
 ///
-/// [`Display`](fmt::Display) renders the local clock time without a zone
-/// offset, while serialization carries an explicit RFC 3339 `…Z` spelling.
-/// Deserialization runs the same parser as [`FromStr`](std::str::FromStr), so
-/// inline and deserialized date-times follow one grammar.
+/// - Explicit-offset input obeys RFC 3339, except leap seconds, which Jiff
+///   cannot represent.
+/// - ISO date portions need zero-padded month and day fields.
+/// - Naive input in the five accepted shapes resolves in the process-local
+///   zone. Repeated local times take the earlier occurrence, and skipped times
+///   shift forward by the gap length.
+/// - Pattern-based parsing uses a separate strftime grammar and keeps its
+///   pattern-driven padding rules.
+///
+/// [`fmt::Display`] renders the local clock time without a zone offset, while
+/// serialization carries an explicit RFC 3339 `…Z` spelling. Deserialization
+/// runs the same parser as [`FromStr`], so inline and deserialized date-times
+/// follow one grammar.
 ///
 /// # Examples
 ///
@@ -157,8 +161,8 @@ impl DateTimeValue {
     /// Parses an RFC 3339 or ISO-8601 date-time string with Jiff's Temporal
     /// parser after applying the accepted application grammar.
     ///
-    /// Surrounding whitespace is ignored. Accepted whitespace runs between date
-    /// and time normalize to one separator before parsing.
+    /// The parser ignores surrounding whitespace. Accepted whitespace runs
+    /// between date and time normalize to one separator before parsing.
     ///
     /// # Errors
     ///
@@ -383,7 +387,7 @@ impl FromStr for DateTimeValue {
 
 impl Serialize for DateTimeValue {
     /// Serializes as explicit RFC 3339 `…Z`, independent of local-clock
-    /// [`Display`](fmt::Display) output.
+    /// [`fmt::Display`] output.
     ///
     /// # Errors
     ///
@@ -406,7 +410,7 @@ impl Serialize for DateTimeValue {
 /// rule and every accepted shape (including the `…Z` interop spelling) apply
 /// identically to inline and deserialized date-times.
 impl<'de> Deserialize<'de> for DateTimeValue {
-    /// Deserializes a string with the same grammar as `FromStr`.
+    /// Deserializes a string with the same grammar as [`FromStr`].
     ///
     /// # Errors
     ///
@@ -512,8 +516,8 @@ impl DateTimeShape {
     ///
     /// # Errors
     ///
-    /// - `Err` if the lexer does not identify one supported date-time shape
-    ///   that spans all of `input`.
+    /// - `Err` if the lexer fails to identify a supported date-time shape
+    ///   spanning all of `input`.
     fn recognize(input: &str) -> Result<Self, &'static str> {
         let mut lexer = TemporalShapeToken::lexer(input);
         let Some(Ok(token)) = lexer.next() else {
@@ -541,6 +545,7 @@ impl DateTimeShape {
         }
     }
 
+    /// Truncates fractional-second digits beyond nanosecond precision.
     fn truncate_fractional_seconds(input: &str) -> Cow<'_, str> {
         let Some((prefix, fraction)) = input.split_once('.') else {
             return Cow::Borrowed(input);
@@ -558,6 +563,7 @@ impl DateTimeShape {
         Cow::Owned(format!("{prefix}.{leading}{suffix}"))
     }
 
+    /// Normalizes a whitespace run between date and time to a single space.
     fn normalize_separator(input: Cow<'_, str>) -> Cow<'_, str> {
         let separator_at = if input.starts_with('-') {
             11
@@ -632,8 +638,8 @@ pub(super) enum DateTimeInput {
 impl DateTimeInput {
     /// Resolves parsed date-time input into a UTC-stored [`DateTimeValue`].
     ///
-    /// For [`Self::Absolute`], the timestamp is stored directly. For
-    /// [`Self::LocalClock`], resolution runs through
+    /// For [`Self::Absolute`], this method stores the timestamp directly. For
+    /// [`Self::LocalClock`], it resolves the local time through
     /// [`DateTimeValue::from_local`] in the process-local time zone.
     ///
     /// # Errors

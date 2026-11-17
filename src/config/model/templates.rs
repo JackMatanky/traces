@@ -13,13 +13,16 @@ pub(crate) const DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates";
 /// Keeps local and global directories separate for local-first lookup.
 #[derive(Clone, Debug)]
 pub(in crate::config) struct TemplateConfig {
+    /// Holds the resolved project-local Template Directory, when configured.
     local: Option<PathBuf>,
+    /// Holds the resolved user-global Template Directory, when configured.
     global: Option<PathBuf>,
+    /// Holds the resolved directory for rendered template output.
     output: PathBuf,
 }
 
 impl TemplateConfig {
-    /// Assembles resolved Template Directories and the output directory.
+    /// Stores the Template Directories and the output directory.
     #[inline]
     #[must_use]
     pub(in crate::config) const fn new(
@@ -81,8 +84,11 @@ const TEMPLATES_OUTPUT: &[u8] = b"templates.output";
 /// Holds the digests of [`TemplateConfig`] settings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TemplateDigests {
+    /// Holds the digest of the local Template Directory setting.
     local: Blake3Digest,
+    /// Holds the digest of the global Template Directory setting.
     global: Blake3Digest,
+    /// Holds the digest of the output directory setting.
     output: Blake3Digest,
 }
 

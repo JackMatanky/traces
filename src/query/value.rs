@@ -3,6 +3,7 @@
 //!
 //! [`QueryFieldValueRef`] borrows note metadata, tags, and inbound links.
 //! It uses owned values for non-UTF-8 paths and calculated values.
+
 use std::path::PathBuf;
 
 use crate::{
@@ -12,13 +13,13 @@ use crate::{
 
 /// Represents a borrowed field value resolved from a [`super::QueryRow`].
 pub(super) enum QueryFieldValueRef<'a> {
-    /// Borrowed metadata field from note-domain storage.
+    /// Borrows a metadata field from note-domain storage.
     Note(NoteFieldValueRef<'a>),
     /// Stores an owned value when a path contains bytes outside UTF-8.
     Owned(NoteFieldValue),
-    /// Borrowed note tags.
+    /// Borrows note tags.
     Tags(&'a [Tag]),
-    /// Borrowed incoming links.
+    /// Borrows incoming links.
     Inlinks(&'a [PathBuf]),
 }
 
@@ -129,8 +130,8 @@ impl QueryFieldValueRef<'_> {
 
     /// Evaluates `contains(field_val, target)`.
     ///
-    /// Lists match exact values or descendant tags.
-    /// String-like fields match substrings.
+    /// Lists match exact values or descendant tags. String-like fields match
+    /// substrings.
     pub(super) fn is_containing(&self, target: &NoteFieldValue) -> bool {
         match self {
             Self::Note(note_ref) => note_ref.is_containing(target),

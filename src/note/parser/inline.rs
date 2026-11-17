@@ -1,9 +1,9 @@
 //! Parses inline field value text into typed field value records.
 //!
-//! Converts raw inline field value strings (Dataview syntax) into strongly
-//! typed [`NoteFieldValue`] records, supporting comma-separated lists, quoted
-//! strings, wikilinks, durations, booleans, nulls, ISO dates, numbers, and
-//! tags.
+//! Converts raw inline field value strings in Dataview syntax into
+//! [`NoteFieldValue`] records. Supported values include comma-separated lists,
+//! quoted strings, wikilinks, durations, booleans, nulls, ISO dates, numbers,
+//! and tags.
 
 use crate::{
     DurationValue, Tag,
@@ -32,7 +32,7 @@ impl ParsedAtom {
 
 /// Parses raw inline value text into a [`NoteFieldValue`].
 ///
-/// Trims surrounding whitespace; empty or whitespace-only text parses as
+/// Trims surrounding whitespace. Empty or whitespace-only text parses as
 /// [`NoteFieldValue::Null`].
 #[inline]
 #[must_use]
@@ -64,10 +64,11 @@ impl<'a> InlineValueParser<'a> {
     /// Parses the enclosed value text into a [`NoteFieldValue`].
     ///
     /// Returns:
-    /// - A single scalar atom when the atom spans the full value
+    ///
+    /// - A single scalar atom when the atom spans the full value.
     /// - A [`NoteFieldValue::List`] of atoms when followed by a comma-separated
-    ///   atom sequence
-    /// - A [`NoteFieldValue::String`] containing the raw text as a fallback
+    ///   atom sequence.
+    /// - A [`NoteFieldValue::String`] containing the raw text as a fallback.
     fn parse(&self) -> NoteFieldValue {
         let Some(first) = self.parse_atom_at(0) else {
             return NoteFieldValue::String(self.source.as_ref().to_owned());
@@ -88,7 +89,7 @@ impl<'a> InlineValueParser<'a> {
     /// Parses comma-separated atoms starting at the comma delimiter at `pos`.
     ///
     /// Returns `Some` with all parsed values if every subsequent item parses as
-    /// a valid atom, or `None` if any item fails to parse or is malformed.
+    /// a valid atom. Returns `None` if any item fails to parse or is malformed.
     fn parse_comma_list_from(
         &self,
         first: NoteFieldValue,
@@ -117,6 +118,7 @@ impl<'a> InlineValueParser<'a> {
     /// Parses a single typed atom at `pos`, skipping leading whitespace.
     ///
     /// Evaluates candidate atom grammars in priority order:
+    ///
     /// 1. Quoted string (`"text"`)
     /// 2. Wikilink or embed (`[[target]]`, `![[target]]`)
     /// 3. Duration (`1h 30m`)
@@ -142,9 +144,9 @@ impl<'a> InlineValueParser<'a> {
 
     /// Parses a double-quoted string atom at `pos`.
     ///
-    /// A backslash escapes the following character verbatim, so `\"` includes a
+    /// A backslash escapes the next character verbatim, so `\"` includes a
     /// literal quote. Returns `None` if `pos` is not a `"` or the string has no
-    /// closing, unescaped `"`.
+    /// closing `"` not escaped by `\`.
     fn parse_quoted_string_at(&self, pos: usize) -> Option<ParsedAtom> {
         let rest = self.source.from(pos)?.strip_prefix('"')?;
         let mut value = String::with_capacity(rest.len());
@@ -179,7 +181,7 @@ impl<'a> InlineValueParser<'a> {
 
     /// Parses a duration atom at `pos`.
     ///
-    /// Recognizes one or more `<number><unit>` parts via
+    /// Recognizes one or more `<number><unit>` parts with
     /// [`DurationValue::parse_prefix`] and returns
     /// [`NoteFieldValue::Duration`].
     fn parse_duration_at(&self, pos: usize) -> Option<ParsedAtom> {
@@ -229,7 +231,7 @@ impl<'a> InlineValueParser<'a> {
         ))
     }
 
-    /// Parses a finite f64 number atom at pos.
+    /// Parses a finite `f64` number atom at `pos`.
     fn parse_number_at(&self, pos: usize) -> Option<ParsedAtom> {
         let tail = self.source.from(pos)?;
         let parsed = crate::lexer::lex_prefix(tail, |tail| {
@@ -250,9 +252,9 @@ impl<'a> InlineValueParser<'a> {
 
     /// Parses a tag-shaped atom.
     ///
-    /// Requires `#` followed by an alphabetic character. The match is returned
-    /// as [`NoteFieldValue::String`] holding the tag text, including the
-    /// leading `#`, since there's no dedicated tag value kind.
+    /// Requires `#` followed by an alphabetic character. Returns the match as
+    /// [`NoteFieldValue::String`] with the leading `#` because no dedicated tag
+    /// value kind exists.
     fn parse_tag_at(&self, pos: usize) -> Option<ParsedAtom> {
         let tail = self.source.from(pos)?;
         let tag_len = Tag::prefix_len(tail)?;
@@ -264,7 +266,8 @@ impl<'a> InlineValueParser<'a> {
     /// Returns `true` if `pos` is at an atom boundary.
     ///
     /// An atom boundary occurs at:
-    /// - The end of the source text
+    ///
+    /// - The end of the source text.
     /// - A whitespace character
     /// - A comma delimiter (`,`)
     fn is_atom_boundary(&self, pos: usize) -> bool {

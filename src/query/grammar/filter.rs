@@ -2,8 +2,9 @@
 //!
 //! Filter expressions support field paths, comparisons, and function calls.
 //! They also support date and duration arithmetic and boolean operators.
-//! Arithmetic runs from left to right and has no precedence rules.
-//! Invalid static function arguments fail during parsing.
+//! Arithmetic runs from left to right and has no precedence rules. Invalid
+//! static function arguments fail during parsing.
+
 use logos::{Lexer, Logos};
 
 use super::{
@@ -144,7 +145,7 @@ impl FilterAtom {
 /// Represents a filter function with type-specific matching semantics.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum FilterFunction {
-    /// `contains(field, target)` predicate.
+    /// Evaluates a `contains(field, target)` predicate.
     ///
     /// Lists match exact values or tag prefixes, such as `#book` matching
     /// `#book/fiction`. Other fields use substring matching.
@@ -236,17 +237,17 @@ impl ComparisonExpr {
 /// Represents a value expression in a query filter.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ValueExpr {
-    /// Field path lookup on a query row.
+    /// Looks up a field path on a query row.
     Field(FieldPath),
-    /// A literal value.
+    /// Holds a literal value.
     Literal(NoteFieldValue),
-    /// A value-returning function call (e.g. `dur`, `date_add`, `date_diff`,
-    /// `date_component`).
+    /// Invokes a value-returning function (for example, `dur`, `date_add`,
+    /// `date_diff`, or `date_component`).
     Call {
         function: QueryFunction,
         args: Vec<Self>,
     },
-    /// An arithmetic binary operation evaluated left-to-right.
+    /// Evaluates an arithmetic binary operation from left to right.
     Binary {
         lhs: Box<Self>,
         op: ArithOp,
@@ -256,6 +257,7 @@ pub(crate) enum ValueExpr {
 
 impl ValueExpr {
     /// Evaluates a value expression.
+    ///
     /// Returns `None` when a row value cannot satisfy a comparison.
     fn evaluate(&self, row: &QueryRow) -> Option<NoteFieldValue> {
         match self {
@@ -282,7 +284,8 @@ impl ValueExpr {
         }
     }
 
-    /// Whether this is arithmetic over number literals only.
+    /// Returns `true` when this expression is arithmetic over number literals
+    /// only.
     fn is_number_only(&self) -> bool {
         match self {
             Self::Literal(NoteFieldValue::Number(_)) => true,
@@ -307,7 +310,8 @@ impl ValueExpr {
         }
     }
 
-    /// Whether this is a string literal that is not a valid duration.
+    /// Returns `true` when this expression is a string literal that is not a
+    /// valid duration.
     fn is_invalid_duration_literal(&self) -> bool {
         matches!(
             self,
@@ -320,11 +324,11 @@ impl ValueExpr {
 /// Represents a binary arithmetic operator.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ArithOp {
-    /// Addition operator (`+`).
+    /// Adds two operands (`+`).
     Add,
-    /// Subtraction operator (`-`).
+    /// Subtracts two operands (`-`).
     Sub,
-    /// Multiplication operator (`*`).
+    /// Multiplies two operands (`*`).
     Mul,
 }
 
@@ -455,27 +459,31 @@ impl ArithOp {
     }
 }
 
-/// A function callable from a filter expression, resolved at parse time.
+/// Identifies a function callable from a filter expression, resolved at parse
+/// time.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum QueryFunction {
-    /// `dur(text)`: duration literal conversion.
+    /// Converts a duration literal with `dur(text)`.
     Dur,
-    /// `date_add(date, duration)` or `date_add(date, n, unit)`.
+    /// Shifts a date with `date_add(date, duration)` or `date_add(date, n,
+    /// unit)`.
     DateAdd,
-    /// `date_diff(date1, date2[, unit])`.
+    /// Computes a date difference with `date_diff(date1, date2[, unit])`.
     DateDiff,
-    /// `date_component(date, name)`.
+    /// Extracts a date component with `date_component(date, name)`.
     DateComponent,
-    /// First day of a calendar period (`sow`, `som`, `soy` and long spellings).
+    /// Snaps to the first day of a calendar period (`sow`, `som`, `soy`, and
+    /// long spellings).
     StartOf(CalendarPeriod),
-    /// Last day of a calendar period (`eow`, `eom`, `eoy` and long spellings).
+    /// Snaps to the last day of a calendar period (`eow`, `eom`, `eoy`, and
+    /// long spellings).
     EndOf(CalendarPeriod),
-    /// `date(text[, pattern])`: date literal conversion.
+    /// Parses a date literal with `date(text[, pattern])`.
     Date,
 }
 
 impl QueryFunction {
-    /// Functions whose names do not come from the calendar period lookup.
+    /// Lists function names not resolved from the calendar period lookup.
     const FIXED_NAMES: &'static [(&'static str, Self)] = &[
         ("dur", Self::Dur),
         ("date_add", Self::DateAdd),
@@ -1071,6 +1079,7 @@ impl FilterGrammar {
     }
 
     /// Folds arithmetic in written order.
+    ///
     /// Stops when it reaches a comparison or logical token.
     ///
     /// # Errors
@@ -1208,7 +1217,7 @@ impl AtomParser for FilterGrammar {
     }
 }
 
-/// Filter expression lexer tokens.
+/// Represents filter expression lexer tokens.
 #[derive(Clone, Debug, PartialEq, Logos)]
 #[logos(skip r"[ \t\n\r\f]+")]
 enum FilterToken {
@@ -1241,7 +1250,7 @@ enum FilterToken {
     #[token("null", |_| NoteFieldValue::Null, priority = 3)]
     #[token("Null", |_| NoteFieldValue::Null, priority = 3)]
     Literal(NoteFieldValue),
-    /// A bare ISO date or date-time shape, validated while tokenizing.
+    /// Captures a bare ISO date or date-time shape, validated while tokenizing.
     #[regex(
         r"[0-9]{4}-[0-9]{2}(-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:[0-9]{2})?)?)?",
         |lex| lex.slice().to_owned()
@@ -1442,8 +1451,8 @@ mod tests {
                 ("text.md", "---\nrating: gold\n---"),
             ]);
 
-            // Canonical rank places Number before Text.
-            // `rating > 5` matches 7 and the higher-ranked text value "gold".
+            // Canonical rank places Number before Text. `rating > 5` matches 7
+            // and the higher-ranked text value "gold".
             let filtered =
                 rows.clone().filter("rating > 5").expect("valid filter");
             assert_eq!(names(&filtered), ["num_high", "text"]);
@@ -1649,9 +1658,9 @@ mod tests {
 
         #[test]
         fn evaluates_a_date_only_literal_at_local_midnight() {
-            // A date literal uses the reader's time zone.
-            // In UTC+2, local midnight spans 22:00 UTC on each adjacent day.
-            // The fixture instants still fall on separate dates.
+            // A date literal uses the reader's time zone. In UTC+2, local
+            // midnight spans 22:00 UTC on each adjacent day. The fixture
+            // instants still fall on separate dates.
             ZoneGuard::set("Etc/GMT-2");
 
             let temp = tempfile::tempdir().expect("create temp dir");

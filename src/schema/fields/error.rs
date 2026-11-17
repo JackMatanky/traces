@@ -1,18 +1,20 @@
 //! Defines field-construction error types for schema fields.
 //!
-//! [`SchemaFieldParserError`] is the single per-key validation vocabulary
-//! every field type's parser pushes through: `number`'s
-//! [`SchemaFieldParserError::NumberConstraint`]/
-//! [`SchemaFieldParserError::NumberRange`] and `select`'s
-//! [`SchemaFieldParserError::SelectValue`] are field-specific variants on this
-//! one enum, not a parallel error tree.
+//! [`SchemaFieldParserError`] provides the single per-key validation vocabulary
+//! for every field type's parser. Type-specific errors live directly on this
+//! enum rather than in a parallel error tree:
 //!
-//! Both types are only ever constructed and matched within [`super`]; the only
-//! outside touch is [`SchemaFieldBuilderError`] wrapping into
-//! [`SchemaError::FieldBuilder`](super::super::error::SchemaError::FieldBuilder)
-//! and [`SchemaFieldParserError`] converting into
-//! [`SchemaWarning`] for a degraded bare
-//! `$ref` override.
+//! - `number` uses [`SchemaFieldParserError::NumberConstraint`] and
+//!   [`SchemaFieldParserError::NumberRange`].
+//! - `select` uses [`SchemaFieldParserError::SelectValue`].
+//!
+//! Only [`super`] constructs and matches both types. Outside callers handle
+//! them in two ways:
+//!
+//! - Wrap [`SchemaFieldBuilderError`] into
+//!   [`SchemaError::FieldBuilder`](super::super::error::SchemaError::FieldBuilder).
+//! - Convert [`SchemaFieldParserError`] into [`SchemaWarning`] for a degraded
+//!   bare `$ref` override.
 
 use thiserror::Error;
 
@@ -22,12 +24,13 @@ use crate::{path::PathError, schema::error::SchemaWarning};
 /// Describes why [`super::SchemaFieldBuilder::build`] failed.
 ///
 /// Always hard failures:
+///
 /// - [`Self::RefOutOfBounds`]
 /// - [`Self::RefFieldNotFound`]
 ///
 /// Hard failures for `Direct` fields and `$ref` with a `type` override,
-/// degraded to [`SchemaWarning`] for bare
-/// `$ref` overrides:
+/// degraded to [`SchemaWarning`] for bare `$ref` overrides:
+///
 /// - [`Self::Parser`]
 #[derive(Debug, Error)]
 pub(crate) enum SchemaFieldBuilderError {
@@ -49,9 +52,11 @@ pub(crate) enum SchemaFieldBuilderError {
         reference: Box<FieldAddress>,
     },
     /// Indicates one or more per-key validation failures from parsing a field
-    /// type's `options`. Never empty: only constructed from a non-empty
+    /// type's `options`.
+    ///
+    /// Never empty: only constructed when
     /// [`SchemaFieldParser::finish`](super::parser::SchemaFieldParser::finish)
-    /// result.
+    /// returns at least one error.
     #[error(
         "{} field option error(s): {}",
         .0.len(),
@@ -63,12 +68,12 @@ pub(crate) enum SchemaFieldBuilderError {
 /// Represents one per-key validation failure from parsing a field type's
 /// `options`.
 ///
-/// Every field type pushes through this one vocabulary: `select`'s
-/// [`Self::SelectValue`] wraps [`SchemaSelectFieldValueError`] the same way
-/// `number`'s [`Self::NumberConstraint`]/[`Self::NumberRange`] are flat
-/// siblings here, not a second parser-error hierarchy.
+/// Every field type uses this one vocabulary. `select`'s [`Self::SelectValue`]
+/// wraps [`SchemaSelectFieldValueError`] the same way `number`'s
+/// [`Self::NumberConstraint`] and [`Self::NumberRange`] are flat siblings here.
 ///
 /// Converts into:
+///
 /// - [`SchemaFieldBuilderError::Parser`] (hard failure) for `Direct` fields and
 ///   `$ref` with a `type` override.
 /// - [`SchemaWarning`] (degraded) for bare `$ref` overrides.
@@ -127,18 +132,18 @@ pub(crate) enum SchemaFieldParserError {
 /// Represents a validation failure inside a `select`/`multi` values definition.
 ///
 /// Reuses [`SchemaSelectFieldEntryError::ShapeMismatch`] for every "this must
-/// be {expected}, got {value}" failure (a file's `path`, a selector name, a
-/// selected entry value, an `order` value) instead of a bespoke variant per
-/// selector: the shape is always the same, only the description of what was
-/// checked varies.
+/// be {expected}, got {value}" failure. Examples include a file's `path`, a
+/// selector name, a selected entry value, or an `order` value. The shape is
+/// always the same. Only the description of what failed varies.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaSelectFieldValueError {
-    /// Indicates a file subtable omitted its required `path` attribute.
+    /// Indicates a file table omitted the required `path` attribute.
     #[error("values file subtable is missing required attribute \"path\"")]
     MissingPath,
     /// Indicates an entry has a shape or selector problem.
-    /// the field's own `values` list or loaded from an external file;
-    /// `path` names which (`None` for inline).
+    ///
+    /// Applies to either the field's own `values` list or an external file;
+    /// `path` names the file (`None` for inline).
     #[error(
         "{}",
         path.as_deref().map_or_else(
@@ -151,8 +156,8 @@ pub(crate) enum SchemaSelectFieldValueError {
         #[source]
         source: SchemaSelectFieldEntryError,
     },
-    /// Indicates the referenced values file itself could not be confined, read,
-    /// parsed, or has the wrong top-level shape.
+    /// Indicates a failure to confine, read, parse, or validate the top-level
+    /// shape of the referenced values file.
     #[error("values file {path:?} is invalid: {source}")]
     ValuesFile {
         path: String,
@@ -162,8 +167,9 @@ pub(crate) enum SchemaSelectFieldValueError {
 }
 
 /// Represents one entry's shape or selector failure.
-/// [`SchemaSelectFieldValueError::Entry`] carries whether the entry was inline
-/// or loaded from a file: this type doesn't need to know.
+///
+/// [`SchemaSelectFieldValueError::Entry`] records whether the entry was inline
+/// or loaded from a file, so this type does not need to track that context.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaSelectFieldEntryError {
     /// Indicates a selector's or entry key's value has the wrong shape.
@@ -190,8 +196,8 @@ pub(crate) enum SchemaSelectFieldEntryError {
         selector: &'static str,
         key: String,
     },
-    /// Indicates an entry includes a passthrough key reserved by rendered
-    /// select output.
+    /// Indicates an entry includes an extra key reserved by rendered select
+    /// output.
     #[error(
         "entry key {key:?} is reserved for rendered select output; choose \
          another source key or selector"
@@ -201,30 +207,31 @@ pub(crate) enum SchemaSelectFieldEntryError {
     },
 }
 
-/// Describes why the file backing a `select`/`multi` values subtable could not
-/// be loaded.
+/// Describes why loading the file backing a `select`/`multi` values nested
+/// table failed.
 #[derive(Debug, Error)]
 pub(crate) enum SchemaSelectFieldFileError {
-    /// The values file path escaped the schema directory or contained unsafe
-    /// components.
+    /// Indicates the values file path escaped the schema directory or contained
+    /// unsafe components.
     #[error(transparent)]
     Confinement(#[from] PathError),
-    /// An I/O error occurred while reading the values file.
+    /// Indicates an I/O error occurred while reading the values file.
     #[error("failed to read values file: {0}")]
     Io(#[from] std::io::Error),
-    /// A TOML values file failed to parse.
+    /// Indicates a TOML values file failed to parse.
     #[error("failed to parse TOML values file: {0}")]
     ParseToml(#[from] Box<toml::de::Error>),
-    /// A JSON values file failed to parse.
+    /// Indicates a JSON values file failed to parse.
     #[error("failed to parse JSON values file: {0}")]
     ParseJson(#[from] Box<serde_json::Error>),
-    /// The values file path has an unsupported extension.
+    /// Indicates the values file path has an unsupported extension.
     #[error("unsupported values file extension {0:?} (must be .toml or .json)")]
     BadExtension(String),
-    /// The values file is missing the top-level `entries` list.
+    /// Indicates the values file is missing the top-level `entries` list.
     #[error("values file missing top-level 'entries' list")]
     MissingEntries,
-    /// The values file's `entries` list mixed incompatible entry shapes.
+    /// Indicates the values file's `entries` list mixed incompatible entry
+    /// shapes.
     #[error(
         "entries must be a list of strings or a list of value objects, got {0}"
     )]
@@ -232,10 +239,10 @@ pub(crate) enum SchemaSelectFieldFileError {
 }
 
 impl From<SchemaFieldParserError> for SchemaWarning {
-    /// Stringifies the wrapped error rather than re-deriving a parallel
-    /// `SchemaWarning` variant per `SchemaFieldParserError` variant: a
-    /// degraded `$ref` override reports the exact same failure a hard error
-    /// would, plus "using the base value instead".
+    /// Stringifies the wrapped error instead of duplicating `SchemaWarning`
+    /// variants for each `SchemaFieldParserError` variant. A degraded `$ref`
+    /// override reports the same failure as a hard error, plus "using the base
+    /// value instead".
     fn from(error: SchemaFieldParserError) -> Self {
         Self::DegradedOverride {
             message: error.to_string(),

@@ -1,4 +1,4 @@
-//! Builds and manages inbound links from indexed note outlinks.
+//! Builds and manages inbound links from indexed note outbound links.
 //!
 //! [`InlinkMap`] maps each indexed target to its deduplicated source paths.
 //! [`super::IndexerService::build`] and [`super::IndexerService::refresh`]
@@ -8,16 +8,16 @@
 //! # Link resolution
 //!
 //! [`LinkResolver`] tries an exact path first. It then tries the same path with
-//! an implied `.md` extension. For basename-only Wikilinks, it selects the
+//! an implied `.md` extension. For base-name-only wikilinks, it selects the
 //! nearest indexed file. Equal-distance matches remain unresolved.
 //!
-//! # Basename index design
+//! # Base name index design
 //!
-//! Most basenames have one candidate, so the resolver scans them directly. At
+//! Most base names have one candidate, so the resolver scans them directly. At
 //! [`crate::index::trie::TRIE_THRESHOLD`] candidates, `CandidateTrie` uses
 //! folder aggregates. This changes nearest-candidate lookup from
-//! `O(candidates)` to `O(depth)`. Folder distance equals `depth(a) + depth(b) -
-//! 2 * depth(LCA(a, b))`.
+//! `O(candidates)` to `O(depth)`. Folder distance equals
+//! `depth(a) + depth(b) - 2 * depth(LCA(a, b))`.
 //!
 //! # Hash map choice
 //!
@@ -42,20 +42,20 @@ use crate::{
 
 /// Maps each indexed target to the paths of notes that link to it.
 ///
-/// Each target maps to deduplicated source paths in ascending path order.
+/// Each target holds deduplicated source paths in ascending path order.
 /// [`InlinkMap::new`] enforces these rules:
 ///
-/// 1. Every target key has at least one inbound source.
-/// 2. Sources for each target are strictly deduplicated.
-/// 3. Sources for each target are canonically sorted in ascending path order.
+/// - Every target key has at least one inbound source.
+/// - Sources for each target are strictly deduplicated.
+/// - Sources for each target are canonically sorted in ascending path order.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InlinkMap(HashMap<PathBuf, Box<[PathBuf]>>);
 
 impl InlinkMap {
-    /// Builds a canonical, validated inlink graph.
+    /// Builds a canonical, validated inbound link graph.
     ///
-    /// Resolves note outlinks and attachment targets. Repeated links from one
-    /// note to one target produce one edge.
+    /// Resolves note outbound links and attachment targets. Repeated links from
+    /// one note to one target produce one edge.
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
         expect(
@@ -191,7 +191,7 @@ impl InlinkMap {
         self.0.remove(target)
     }
 
-    /// Reconstructs trusted persisted inlink storage.
+    /// Reconstructs trusted persisted inbound link storage.
     #[inline]
     #[must_use]
     pub(super) fn from_raw(edges: HashMap<PathBuf, Box<[PathBuf]>>) -> Self {
@@ -199,11 +199,14 @@ impl InlinkMap {
     }
 
     /// Patches inbound edges sourced by `edited_sources` and computes the exact
-    /// `InlinkDelta` in one pass.
+    /// [`InlinkDelta`] in one pass.
     ///
     /// Changes only edited targets and sources in the consumed map. It moves
     /// untouched paths without copying them. This avoids cloning the full map
     /// or scanning all notes with [`InlinkDelta::compute`].
+    ///
+    /// [`InlinkDelta`]: super::delta::InlinkDelta
+    /// [`InlinkDelta::compute`]: super::delta::InlinkDelta::compute
     #[must_use]
     pub(super) fn patch_and_diff(
         mut self,
@@ -285,9 +288,9 @@ impl From<HashMap<PathBuf, Box<[PathBuf]>>> for InlinkMap {
     }
 }
 
-/// Resolves notes into edge pairs for [`InlinkMap::with_edges`].
+/// Resolves notes into `(target, source)` edge pairs.
 ///
-/// Shares one [`LinkResolver`] so a batch builds the basename index only once.
+/// Shares one [`LinkResolver`] so a batch builds the base name index only once.
 pub(super) fn resolve_edges_for(
     notes: &[Note],
     files: &[FileMeta],
@@ -303,14 +306,14 @@ pub(super) fn resolve_edges_for(
     edges
 }
 
-/// Indexes paths and basenames used during link resolution.
+/// Indexes paths and base names used during link resolution.
 pub(super) struct LinkResolver<'a> {
     files: &'a [FileMeta],
     basename_index: FxHashMap<BaseNameRef<'a>, BaseNameIndex<'a>>,
 }
 
 impl<'a> LinkResolver<'a> {
-    /// Indexes file basenames in one `O(n)` pass.
+    /// Indexes file base names in one `O(n)` pass.
     pub(super) fn new(files: &'a [FileMeta]) -> Self {
         let mut by_basename: FxHashMap<BaseNameRef<'a>, Vec<&'a Path>> =
             FxHashMap::with_capacity_and_hasher(files.len(), FxBuildHasher);
@@ -332,10 +335,10 @@ impl<'a> LinkResolver<'a> {
         }
     }
 
-    /// Resolves one note's outlinks to unique target paths.
+    /// Resolves one note's outbound links to unique target paths.
     ///
-    /// This method performs no I/O. Callers can share one resolver across notes
-    /// instead of rebuilding its basename index for each note.
+    /// This method does no disk reads. Callers can share one resolver across
+    /// notes instead of rebuilding its base name index for each note.
     fn resolve_note(&self, note: &Note) -> Vec<Target<'a>> {
         let mut targets: Vec<Target<'a>> = note
             .outlinks()
@@ -349,10 +352,10 @@ impl<'a> LinkResolver<'a> {
         targets
     }
 
-    /// Resolves a split [`LinkTarget`] to an indexed file path.
+    /// Resolves a split [`LinkTarget`] to an indexed path.
     ///
     /// Tries the exact path, then a path with an implied `.md` extension. For
-    /// basename-only Wikilinks, it selects the nearest match. Equal-distance
+    /// base-name-only wikilinks, it selects the nearest match. Equal-distance
     /// matches stay unresolved.
     fn resolve(
         &self,
@@ -406,7 +409,7 @@ impl<'a> LinkResolver<'a> {
     }
 }
 
-/// Holds the indexed file path that an outlink targets.
+/// Holds the indexed path that an outbound link targets.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Target<'a>(&'a Path);
 
@@ -614,10 +617,10 @@ mod tests {
                 #[test]
                 fn resolves_none_for_a_tie_spanning_an_ancestor_and_a_descendant_branch()
                  {
-                    // One candidate is below an ancestor of `from`; the other
-                    // is under a separate root folder. Both
-                    // have distance 2. The exclusion aggregate
-                    // must include both without counting either twice.
+                    // One candidate is below an ancestor of `from`. The other
+                    // candidate is under a separate root folder. Both have
+                    // distance 2. The exclusion aggregate must include both
+                    // without counting either twice.
                     let files = files_from_notes(&[
                         "shared/a/b/note.md",
                         "other/note.md",

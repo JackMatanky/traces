@@ -1,9 +1,9 @@
 //! Renders canonical date-time patterns with one year convention.
 //!
 //! The sign always sits outside the four-digit year width (`-0009-01-01`),
-//! matching `DateValue`'s display and jiff's own `%F`. Jiff's `%Y` counts the
+//! matching `DateValue`'s display and Jiff's own `%F`. Jiff's `%Y` counts the
 //! sign inside the width (`-009-01-01`), which the four-digit parse rule
-//! rejects, so canonical output renders through [`render_canonical_pattern`]
+//! rejects. Canonical output renders through [`render_canonical_pattern`]
 //! instead of `%Y`.
 
 use jiff::civil;
@@ -19,23 +19,25 @@ pub(crate) const DATETIME_MICROS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.6f";
 /// Canonical date-time pattern with nanosecond precision.
 pub(crate) const DATETIME_NANOS_PATTERN: &str = "%Y-%m-%dT%H:%M:%S%.9f";
 
-/// One canonical output shape and the yearless pattern for each of its
-/// halves.
+/// Represents one canonical output shape and the year-free pattern for each of
+/// its halves.
 enum CanonicalForm {
     /// `YYYY-MM-DD`: the date half only.
     Date,
     /// `YYYY-MM`: reduced year-month precision.
     Month,
-    /// A full date-time. The payload renders the time half after `T`. Time
-    /// carries no year, so it cannot reintroduce a sign convention.
+    /// Full date-time.
+    ///
+    /// The payload renders the time half after `T`. Time carries no year, so it
+    /// cannot reintroduce a sign convention.
     DateTime(&'static str),
 }
 
-/// Every pattern the crate renders canonically, paired with its form.
+/// Lists every pattern the crate renders canonically, paired with its form.
 ///
-/// Entry one is the date pattern, entry two is month precision, the next four
-/// are `DateTimeValue::canonical_pattern`'s shapes, and `"%F"` is the
-/// user-facing ISO date.
+/// Entry one is the date pattern. Entry two is month precision. The next four
+/// are `DateTimeValue::canonical_pattern` shapes, and `"%F"` is the user-facing
+/// ISO date.
 static CANONICAL_PATTERNS: &[(&str, CanonicalForm)] = &[
     (DEFAULT_DATE_PATTERN, CanonicalForm::Date),
     ("%Y-%m", CanonicalForm::Month),
@@ -47,8 +49,10 @@ static CANONICAL_PATTERNS: &[(&str, CanonicalForm)] = &[
 ];
 
 /// Renders `datetime` with a canonical `pattern`, keeping the sign outside the
-/// year width. Returns `None` when `pattern` is not canonical.
-/// [`render_pattern`] applies the Jiff fallback for those patterns.
+/// year width.
+///
+/// Returns `None` when `pattern` is not canonical. [`render_pattern`] applies
+/// the Jiff fallback for those patterns.
 pub(crate) fn render_canonical_pattern(
     datetime: civil::DateTime,
     pattern: &str,
@@ -75,20 +79,17 @@ pub(crate) fn render_canonical_pattern(
 /// Renders `datetime` with `pattern` through the canonical table first.
 ///
 /// Canonical patterns render through [`render_canonical_pattern`] so the sign
-/// stays outside the year width. A miss falls back to Jiff's own strtime over
-/// `fallback`. The miss arm is unreachable for
-/// `DateTimeValue::canonical_pattern` shapes (pinned by
-/// `canonical_pattern_is_in_the_render_table`) and stays live for user patterns
-/// such as `%d %B %Y`, which only Jiff can render.
+/// stays outside the four-digit year width. Non-canonical patterns fall back to
+/// Jiff's strtime over `fallback`.
 ///
-/// Uses `fallback` when the pattern is not canonical. A `&Zoned` fallback keeps
-/// zone-dependent directives such as `%Z` working. Returns the rendered
-/// spelling.
+/// That fallback arm is unreachable for `DateTimeValue::canonical_pattern`
+/// shapes (pinned by `canonical_pattern_is_in_the_render_table`), but handles
+/// user patterns such as `%d %B %Y`. Passing a `&Zoned` fallback keeps
+/// zone-dependent directives such as `%Z` working.
 ///
 /// # Errors
 ///
-/// Returns Jiff's strtime failure when `pattern` is neither canonical nor
-/// renderable by Jiff.
+/// - [`jiff::Error`] if `pattern` is neither canonical nor valid for Jiff.
 pub(crate) fn render_pattern<T>(
     datetime: civil::DateTime,
     pattern: &str,
@@ -191,7 +192,7 @@ mod tests {
 
     #[test]
     fn date_values_keep_the_same_year_spelling() {
-        // Arrange: DateValue's Display predates the table and must stay
+        // Arrange: `DateValue` display predates the table and must stay
         // byte-identical to it.
         let date =
             DateValue::from_ymd(-9, 1, 5).expect("fixture date is valid");
@@ -235,9 +236,9 @@ mod tests {
             month in 1u32..=12,
             day in 1u32..=28,
         ) {
-            // Arrange: jiff's `%F` writes the sign outside the year width
-            // itself (printer.rs:454-468), so both spellings must agree
-            // for every representable year.
+            // Arrange: Jiff's `%F` writes the sign outside the year width (see
+            // `printer.rs`, lines 454 to 468). Both spellings must agree for
+            // every representable year.
             let date = DateValue::from_ymd(year, month, day)
                 .expect("generated fields form a valid date");
             let datetime = date.civil_date().at(0, 0, 0, 0);

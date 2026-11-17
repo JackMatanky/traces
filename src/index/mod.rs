@@ -2,22 +2,19 @@
 //! for a project root.
 //!
 //! [`IndexerService`] scans the filesystem, parses Markdown notes, derives
-//! inbound links, and stores the resulting [`WorkspaceIndex`] in redb through
-//! the [`store`] module.
+//! inbound links, and stores the resulting [`WorkspaceIndex`] in `redb` through
+//! the `store` module.
 //!
 //! [`WorkspaceIndex`] holds file entries, parsed metadata, and link data in
-//! memory. It stores no root path. Callers inspect its sorted
+//! memory without storing a root path. Callers inspect the sorted
 //! [`WorkspaceIndex::entries`] view and use [`crate::query::QueryService`] to
 //! evaluate queries.
 //!
 //! Fresh builds use [`IndexerService::build`]. Cold CLI reads use
-//! [`IndexerService::refresh_store`](service::IndexerService::refresh_store) to
-//! load and refresh an existing store. Refresh compares the stored
-//! [`fingerprint`] with the running config and rebuilds the index when they
-//! differ.
-//!
-//! [`fingerprint`]: mod@fingerprint
-//! [`store`]: mod@store
+//! [`IndexerService::refresh_store`] to load and refresh an existing store.
+//! Refresh compares the stored `fingerprint` with the running configuration and
+//! rebuilds the index when they differ.
+
 mod codec;
 mod delta;
 mod entry;
@@ -74,8 +71,8 @@ mod tests {
     pub(crate) mod fixtures {
         use std::{fs, path::Path};
 
-        /// Restores directory permissions on drop so the temporary directory
-        /// can be removed.
+        /// Restores directory permissions on drop so tests can remove the
+        /// temporary directory.
         #[cfg(unix)]
         pub struct PermissionsGuard<'a>(pub &'a Path);
 

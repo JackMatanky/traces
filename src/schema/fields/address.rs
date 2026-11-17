@@ -51,8 +51,8 @@ impl TryFrom<&str> for FieldAddress {
     ///
     /// # Errors
     ///
-    /// - [`Malformed`] if `raw` is not shaped `#<schema>/<field>` with both
-    ///   segments non-empty.
+    /// - [`Malformed`] if `raw` is not shaped `#<schema>/<field>` with neither
+    ///   segment empty.
     /// - [`FieldName`] if the field segment fails [`FieldName`] validation.
     ///
     /// [`Malformed`]: FieldAddressError::Malformed
@@ -90,7 +90,7 @@ impl From<FieldAddressRef<'_>> for FieldAddress {
 impl FromStr for FieldAddress {
     type Err = FieldAddressError;
 
-    /// Parse a string slice into a [`FieldAddress`].
+    /// Parses a string slice into a [`FieldAddress`].
     ///
     /// # Errors
     ///
@@ -161,8 +161,8 @@ impl<'a> FieldAddressRef<'a> {
 /// Describes why a [`FieldAddress`] failed to parse.
 #[derive(Debug, Error)]
 pub(crate) enum FieldAddressError {
-    /// Indicates the input was not shaped `#<schema>/<field>` with both
-    /// segments non-empty.
+    /// Indicates the input was not shaped `#<schema>/<field>` with neither
+    /// segment empty.
     #[error("malformed $ref {reference:?}: expected `#<schema>/<field>`")]
     Malformed {
         reference: String,

@@ -7,15 +7,15 @@
 //! # Architecture and Parsing Pipeline
 //!
 //! 1. `pulldown-cmark` tokenizes raw Markdown with YAML metadata blocks and
-//!    wikilinks enabled. Task markers are recognized at item-leading positions
-//!    using pulldown-cmark-compatible whitespace rules.
+//!    wikilinks enabled. The parser recognizes task markers at item-leading
+//!    positions with `pulldown-cmark` whitespace rules.
 //! 2. `ParserContext` accumulates block-level state, including frontmatter
-//!    text, list nesting, link targets, and plain-text scan buffers that
-//!    exclude fenced code blocks, indented code blocks, and inline code spans.
-//! 3. When a text block closes, inline token lexing scans its buffer for `Key::
-//!    Value`, `[Key:: Value]`, `(Key:: Value)`, and `#tag` tokens.
-//!    Status-marked list items also recognize task emoji shorthands (`🗓️`,
-//!    `➕`, `🛫`, `⏳`, `✅`).
+//!    text, list nesting, and link targets. Its plain-text scan buffers exclude
+//!    fenced code blocks, indented code blocks, and inline code spans.
+//! 3. When a text block closes, inline token lexing scans the block buffer for
+//!    `Key:: Value`, `[Key:: Value]`, `(Key:: Value)`, and `#tag` tokens.
+//!    Status-marked list items also recognize task emoji shorthand (`🗓️`, `➕`,
+//!    `🛫`, `⏳`, `✅`).
 //! 4. The assembled [`Note`] stores all extracted data in document order.
 //!
 //! # Key Types
@@ -29,7 +29,7 @@
 //!   extracted task dates, and priority levels.
 //! - [`Link`], [`LinkType`], [`LinkTarget`]: Outgoing links from Markdown
 //!   `[text](target)` and Obsidian `[[target|alias]]` syntax.
-//! - [`Frontmatter`], [`RawFrontmatter`]: YAML frontmatter as structured fields
+//! - [`Frontmatter`], `RawFrontmatter`: YAML frontmatter as structured fields
 //!   or raw text.
 //! - [`NoteFieldValue`], [`NoteFieldValueRef`]: Owned and borrowed metadata
 //!   values parsed from YAML frontmatter and inline `Key:: Value` syntax.

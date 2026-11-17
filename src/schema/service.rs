@@ -46,9 +46,9 @@ impl SchemaService {
     ///
     /// # Errors
     ///
-    /// Returns [`SchemaServiceError`] if the registry directory exists but
-    /// cannot be listed, a `.toml` file cannot be read or fails to parse, or
-    /// the `extends` DAG contains a cycle.
+    /// Returns [`SchemaServiceError`] if listing the registry directory fails.
+    /// Also fails if reading or parsing a `.toml` file fails, or if the
+    /// `extends` DAG contains a cycle.
     #[cfg_attr(
         not(any(test, feature = "test-utils")),
         expect(
@@ -68,7 +68,8 @@ impl SchemaService {
     ///
     /// The `extends` DAG is linearized and each Schema's fields are merged from
     /// its parents. A missing directory resolves to an empty registry.
-    /// Per-Schema [`SchemaError`]s exclude that Schema from the result; its
+    ///
+    /// Per-Schema [`SchemaError`]s exclude that Schema from the result. Its
     /// dependents still resolve without its fields (`ParentFailedToResolve`).
     ///
     /// # Errors
@@ -184,7 +185,7 @@ impl SchemaService {
         matches
     }
 
-    /// Warn once per unknown class name in `classes`.
+    /// Warns once per unknown class name in `classes`.
     ///
     /// Shared by [`Self::matches`] and `file_class_expander`'s
     /// [`FileClassExpander`](crate::query::FileClassExpander) impl.
@@ -200,8 +201,8 @@ impl SchemaService {
         }
     }
 }
-/// Read and parse every `*.toml` file directly under `dir` into a [`RawSchema`]
-/// keyed by filename stem.
+/// Reads and parses every `*.toml` file directly under `dir` into a
+/// [`RawSchema`] keyed by filename stem.
 ///
 /// Walks only `dir`'s immediate entries (`min_depth(1).max_depth(1)`):
 /// Schemas do not nest. A `dir` that does not exist yields an empty map
@@ -209,7 +210,7 @@ impl SchemaService {
 ///
 /// # Errors
 ///
-/// - [`ReadDirectory`] if `dir` exists but its entries cannot be listed.
+/// - [`ReadDirectory`] if `dir` exists but listing its entries fails.
 /// - [`File`] if a `.toml` file cannot be read, or is malformed, contains an
 ///   unknown key, has a malformed `$ref`, or omits both `type` and `$ref` for a
 ///   field.
@@ -254,7 +255,8 @@ fn read_raw_schemas(
     Ok(schemas)
 }
 
-/// Verbose Schema construction result, including recoverable diagnostics.
+/// Represents a verbose Schema construction result, including recoverable
+/// diagnostics.
 #[derive(Debug)]
 pub(crate) struct SchemaConstruction {
     pub(crate) service: SchemaService,
@@ -288,7 +290,7 @@ impl From<ResolvedSchemas> for SchemaConstruction {
     }
 }
 
-/// Emit construction diagnostics once, at the caller that chose verbose load.
+/// Emits construction diagnostics once at the caller that chose verbose load.
 pub(crate) fn warn_schema_construction_diagnostics(
     construction: &SchemaConstruction,
 ) {
@@ -314,9 +316,10 @@ mod tests {
         SchemaError,
     >;
 
-    /// Resolves every Schema TOML file directly under `dir`, mirroring the
-    /// pre-refactor `SchemaRegistry::load(dir)` call shape: `dir` is used
-    /// directly as the Schema directory, `root` is unused by resolution itself.
+    /// Resolves every Schema TOML file directly under `dir`.
+    ///
+    /// Mirrors the pre-refactor `SchemaRegistry::load(dir)` call shape. Uses
+    /// `dir` directly as the Schema directory and ignores `root`.
     fn resolve_dir(dir: &Path) -> ResolveResult {
         SchemaService::load_verbose(dir).map(SchemaConstruction::into_parts)
     }
@@ -545,8 +548,8 @@ mod tests {
             use std::os::unix::fs::PermissionsExt as _;
 
             /// Restores a locked directory's permissions on drop, even if the
-            /// test panics. Otherwise, a `0o000` directory blocks the tempdir's
-            /// own cleanup.
+            /// test panics. Otherwise, a `0o000` directory blocks the temporary
+            /// directory's own cleanup.
             struct RestorePermissions<'a>(&'a Path);
 
             impl Drop for RestorePermissions<'_> {
@@ -945,13 +948,13 @@ mod tests {
             };
             let subscriber = tracing_subscriber::registry().with(capture);
             let guard = tracing::subscriber::set_default(subscriber);
-            // `set_default` installs a thread-local subscriber but does not
-            // rebuild `tracing`'s per-callsite `Interest` cache. Without
-            // this, `warn_unknown_classes`'s `tracing::warn!` callsite can
-            // be cached as "never interested" from an earlier point in the
-            // process (e.g. another test's subscriber, or no subscriber at
-            // all) and skip every subscriber - including this one - making
-            // the assertions below flake under a full parallel test run.
+            // `set_default` installs a thread-local subscriber without
+            // rebuilding `tracing`'s per-call-site `Interest` cache.
+            //
+            // Without `rebuild_interest_cache()`, an earlier thread can mark
+            // `warn_unknown_classes`'s `tracing::warn!` site as "never
+            // interested", which skips this subscriber and causes parallel test
+            // flakes.
             tracing::callsite::rebuild_interest_cache();
 
             service.warn_unknown_classes(&[

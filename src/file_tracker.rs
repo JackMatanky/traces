@@ -4,11 +4,11 @@
 //!
 //! - [`FilePathTracker`]: hash-keyed tracker for canonical file paths.
 //! - [`FilePathTrackerError`]: I/O failure from tracker operations.
-//! - [`CleanMode`]: cleanup policy for stale entries.
+//! - [`CleanMode`]: cleaning policy for stale entries.
 //!
-//! Entries are named with [`Blake3PathHash`]. Unix entries are symlinks whose
-//! targets are the recorded paths. Windows entries are plain files whose
-//! contents are the recorded paths.
+//! Each entry uses a [`Blake3PathHash`] filename. Unix entries are symlinks
+//! that point to the recorded paths. Windows entries are plain files that hold
+//! the recorded paths.
 
 use std::{
     fs, io,
@@ -22,10 +22,11 @@ use crate::{Blake3PathHash, DirTree, DirTreeError, dirs::StateDirRoot};
 /// Stores canonical file paths under hash-named entries.
 ///
 /// Entry behavior by platform:
-/// - Unix creates a symbolic link named by [`Blake3PathHash`] and pointing at
-///   the canonical target path
-/// - Windows writes a plain file named by [`Blake3PathHash`] whose contents are
-///   the canonical target path bytes
+///
+/// - Unix creates a symbolic link with a [`Blake3PathHash`] name that points to
+///   the canonical target path.
+/// - Windows writes a plain file with a [`Blake3PathHash`] name that holds the
+///   canonical target path bytes.
 ///
 /// Companion files are separate files with suffixes appended to the entry path.
 #[derive(Clone, Debug)]
@@ -40,15 +41,15 @@ impl FilePathTracker {
     /// root if needed. Recording an already-stored path is a no-op.
     ///
     /// Platform behavior:
-    /// - Unix writes a symlink from the hash entry to the canonical target
+    ///
+    /// - Unix writes a symlink from the hash entry to the canonical target.
     /// - Windows writes a file at the hash entry containing the canonical
-    ///   target path bytes
+    ///   target path bytes.
     ///
     /// # Errors
     ///
-    /// - [`Canonicalize`] if `target` cannot be canonicalized.
-    /// - [`StoreIo`] if the store root cannot be created or the entry cannot be
-    ///   written.
+    /// - [`Canonicalize`] if canonicalizing `target` fails.
+    /// - [`StoreIo`] if creating the store root or writing the entry fails.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
@@ -102,8 +103,8 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`Canonicalize`] if `target` cannot be canonicalized.
-    /// - [`StoreIo`] if the entry's existence cannot be checked.
+    /// - [`Canonicalize`] if canonicalizing `target` fails.
+    /// - [`StoreIo`] if checking the entry's existence fails.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
@@ -125,16 +126,17 @@ impl FilePathTracker {
     /// Lists the canonical paths of all live entries in this store.
     ///
     /// Reads recorded targets from symlinks on Unix and path-bearing files on
-    /// Windows. Entries with a path suffix in `companion_suffixes` are skipped.
-    /// A live entry has a readable target and is included when that target
-    /// exists or its existence cannot be checked. Dangling or unreadable
-    /// entries are omitted. An absent or non-directory root returns an empty
-    /// list.
+    /// Windows, returning an empty list if the root is absent or not a
+    /// directory:
+    ///
+    /// - Skips entries with a suffix in `companion_suffixes`.
+    /// - Includes readable targets that exist or fail existence checks.
+    /// - Omits dangling or unreadable entries.
     ///
     /// # Errors
     ///
-    /// - [`StoreIo`] if the store root exists but cannot be read or a child
-    ///   entry cannot be inspected.
+    /// - [`StoreIo`] if reading the store root or inspecting a child entry
+    ///   fails.
     ///
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
     #[inline]
@@ -157,15 +159,16 @@ impl FilePathTracker {
     /// Removes stale entries and returns the number removed.
     ///
     /// Reads recorded targets from symlinks on Unix and path-bearing files on
-    /// Windows. A stale entry has a readable target that no longer exists.
-    /// Unreadable entries are ignored. An absent or non-directory root removes
-    /// nothing.
+    /// Windows, removing nothing if the root is absent or not a directory:
+    ///
+    /// - Removes entries whose readable target no longer exists.
+    /// - Ignores unreadable entries.
     ///
     /// # Errors
     ///
-    /// - [`StoreIo`] if the store root cannot be read, a child entry cannot be
-    ///   inspected, or a stale entry cannot be removed.
-    /// - [`CompanionRemove`] if a companion file cannot be removed.
+    /// - [`StoreIo`] if reading the store root, inspecting a child entry, or
+    ///   removing a stale entry fails.
+    /// - [`CompanionRemove`] if removing a companion file fails.
     ///
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
     /// [`CompanionRemove`]: FilePathTrackerError::CompanionRemove
@@ -207,10 +210,10 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`Canonicalize`] if `target` cannot be canonicalized.
-    /// - [`StoreIo`] if the store root cannot be created.
-    /// - [`CompanionWrite`] if the companion cannot be written or the
-    ///   replacement cannot be renamed into place.
+    /// - [`Canonicalize`] if canonicalizing `target` fails.
+    /// - [`StoreIo`] if creating the store root fails.
+    /// - [`CompanionWrite`] if writing the companion or renaming the
+    ///   replacement into place fails.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
@@ -263,8 +266,8 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`Canonicalize`] if `target` cannot be canonicalized.
-    /// - [`CompanionRead`] if the companion exists but cannot be read.
+    /// - [`Canonicalize`] if canonicalizing `target` fails.
+    /// - [`CompanionRead`] if the companion exists but reading it fails.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     /// [`CompanionRead`]: FilePathTrackerError::CompanionRead
@@ -287,7 +290,7 @@ impl FilePathTracker {
         }
     }
 
-    /// Removes `target`'s entry and its companion files.
+    /// Removes the store entry for `target` and its companion files.
     ///
     /// Canonicalizes and hashes `target` to find the same entry path used by
     /// [`Self::record`]. Removes the Unix symlink or Windows path-bearing file,
@@ -296,9 +299,9 @@ impl FilePathTracker {
     ///
     /// # Errors
     ///
-    /// - [`Canonicalize`] if `target` cannot be canonicalized.
-    /// - [`StoreIo`] if the root entry exists but cannot be removed.
-    /// - [`CompanionRemove`] if a companion file cannot be removed.
+    /// - [`Canonicalize`] if canonicalizing `target` fails.
+    /// - [`StoreIo`] if the root entry exists but removing it fails.
+    /// - [`CompanionRemove`] if removing a companion file fails.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
@@ -339,14 +342,13 @@ impl FilePathTracker {
 
     /// Removes stale entries and returns each removed root entry path.
     ///
-    /// `companion_suffixes` lists the suffixes `clean` also removes for each
-    /// stale entry; entries whose own path ends with one of those suffixes are
-    /// skipped, since they are companion files, not hash entries.
+    /// `companion_suffixes` lists suffixes that `clean` removes for each stale
+    /// entry. Skips entries whose own path ends with one of those suffixes
+    /// because they are companion files, not hash entries.
     ///
     /// # Errors
     ///
-    /// - [`StoreIo`] if the store root cannot be read or a stale entry cannot
-    ///   be removed.
+    /// - [`StoreIo`] if reading the store root or removing a stale entry fails.
     ///
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
     fn clean_reporting(
@@ -377,10 +379,10 @@ impl FilePathTracker {
 
     /// Lazily yields the store root's entry paths, companion files excluded.
     ///
-    /// Walks the root one level deep, absorbing an absent or non-directory root
-    /// into an empty walk, and skips any entry whose file name ends in one of
+    /// Walks the root one level deep and treats an absent or non-directory root
+    /// as empty. Skips any entry whose file name ends with a suffix in
     /// `companion_suffixes`. Failures while reading the root or an entry
-    /// surface as [`StoreIo`] items at their original position in the walk.
+    /// surface as [`StoreIo`] items in the walk.
     ///
     /// [`StoreIo`]: FilePathTrackerError::StoreIo
     fn entry_paths(
@@ -442,6 +444,7 @@ impl CleanMode<'_> {
     }
 }
 
+/// Holds a canonical target path and its hashed entry name.
 struct StoreEntry {
     canonical_target: PathBuf,
     hash: Blake3PathHash,
@@ -457,7 +460,7 @@ impl StoreEntry {
     ///
     /// # Errors
     ///
-    /// - [`Canonicalize`] if `target` cannot be canonicalized.
+    /// - [`Canonicalize`] if canonicalizing `target` fails.
     ///
     /// [`Canonicalize`]: FilePathTrackerError::Canonicalize
     #[inline]
@@ -500,8 +503,8 @@ fn has_suffix(path: &Path, suffixes: &[&str]) -> bool {
 
 /// Reads `entry`'s recorded target path.
 ///
-/// Returns `None` if `entry` was not written by [`FilePathTracker::record`] or
-/// cannot be read.
+/// Returns `None` if reading `entry` fails or [`FilePathTracker::record`] did
+/// not write it.
 fn recorded_target(entry: &Path) -> Option<PathBuf> {
     #[cfg(unix)]
     let target = fs::read_link(entry);
@@ -522,10 +525,10 @@ fn store_error(error: DirTreeError) -> FilePathTrackerError {
 /// Reports a [`FilePathTracker`] operation failure.
 #[derive(Debug, Error)]
 pub enum FilePathTrackerError {
-    /// Fails before hashing when a target path cannot be canonicalized.
+    /// Fails before hashing when canonicalizing a target path fails.
     #[error("failed to canonicalize path {path}")]
     Canonicalize {
-        /// Path that could not be canonicalized.
+        /// Target path that failed to canonicalize.
         path: PathBuf,
         /// Source I/O error.
         #[source]
@@ -1266,7 +1269,7 @@ mod tests {
             // Arrange
             let fixture = Fixture::new();
             let target = fixture.target("target");
-            // Do not record, so store.root does not exist
+            // Skip recording so `store.root` does not exist.
 
             // Act
             let result =

@@ -10,11 +10,12 @@
 //! - [`codec`]: Serde support for [`PathBuf`] fields in serialized formats.
 //!
 //! Confinement happens in two phases:
+//!
 //! - Lexical validation rejects absolute paths, parent-directory components,
-//!   non-normal components other than `.`, and paths without a named component
+//!   non-normal components other than `.`, and paths without a named component.
 //! - Filesystem validation uses `strict-path` boundary resolution to resolve
 //!   symlinks, Windows 8.3 short names, and alternate data streams before the
-//!   containment check
+//!   containment check.
 //!
 //! The returned confined path is the plain join, not the canonicalized path. A
 //! symlink changed after validation and before later I/O can still redirect the
@@ -35,9 +36,9 @@ use thiserror::Error;
 ///
 /// Internal storage and filesystem operations use platform-native encodings
 /// (see module docs). This normalizes only the *textual* representation shown
-/// to users or matched against `/`-separated query syntax. Borrowed on Unix,
-/// where `/` is already the separator. Non-UTF-8 components are lossily
-/// converted, matching [`Path::to_string_lossy`].
+/// to users or matched against `/`-separated query syntax. Returns a borrowed
+/// string on Unix, where `/` is already the separator. Non-UTF-8 components
+/// undergo lossy conversion, matching [`Path::to_string_lossy`].
 #[must_use]
 pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
     let text = path.to_string_lossy();
@@ -48,10 +49,10 @@ pub(crate) fn display_portable(path: &Path) -> Cow<'_, str> {
     }
 }
 
-/// Trait for a row addressable by its project-relative path.
+/// Exposes a row's project-relative path.
 ///
-/// Implemented by stored index rows so sorted containers can order and search
-/// by path without knowing the concrete row type.
+/// Stored index rows implement this trait so sorted containers can order and
+/// search by path without knowing the concrete row type.
 pub(crate) trait HasPath {
     /// Returns the row's project-relative path.
     fn path(&self) -> &Path;
@@ -83,7 +84,7 @@ impl RelativePath {
     }
 
     /// Derives `path` relative to `root`, failing if the prefix does not match
-    /// or the remainder is lexically unsafe.
+    /// or the remainder fails lexical checks.
     ///
     /// # Errors
     ///
@@ -149,12 +150,13 @@ impl SafeRelativePath {
     /// Validates `candidate` and returns its plain join with `root`.
     ///
     /// Uses two-phase validation:
+    ///
     /// - Lexical check: [`RelativePath::parse`] rejects absolute paths,
     ///   parent-directory components, non-normal components other than `.`, and
-    ///   paths without a named component
-    /// - Filesystem check: uses `strict-path` to validate `root` as a boundary
-    ///   and resolve the candidate's existing components before rejecting paths
-    ///   outside canonical `root`
+    ///   paths without a named component.
+    /// - Filesystem check: `strict-path` validates `root` as a boundary and
+    ///   resolves the candidate's existing components before rejecting paths
+    ///   outside canonical `root`.
     ///
     /// The returned path is not canonicalized. A symlink changed after this
     /// function returns and before later I/O can still race the confinement
@@ -298,7 +300,7 @@ pub(crate) enum PathError {
     /// `strict-path` resolves a confined candidate outside the root boundary.
     #[error("path is outside the root directory")]
     OutsideRoot,
-    /// Rejects a lexically unsafe relative path.
+    /// Rejects a relative path that fails lexical checks.
     ///
     /// Returned when the candidate contains `..`, contains a component other
     /// than a plain name or `.`, or has no plain-name component.
@@ -333,10 +335,10 @@ impl PathError {
     }
 }
 
-/// Serde support for paths using platform-native encodings.
+/// Serializes and deserializes paths using platform-native encodings.
 ///
-/// This is the crate's bytes-of-a-path codec. The index's bytes-of-a-row codec
-/// lives at `crate::index::codec`.
+/// Implements the crate's bytes-of-a-path codec. The index's bytes-of-a-row
+/// codec lives at `crate::index::codec`.
 pub mod codec {
     use std::path::{Path, PathBuf};
 
@@ -360,7 +362,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - `D::Error` if the deserializer rejects the byte payload.
+    /// - `D::Error` if [`Deserializer`] rejects the byte payload.
     #[cfg(unix)]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -394,7 +396,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - `D::Error` if the deserializer rejects the wide-character payload.
+    /// - `D::Error` if [`Deserializer`] rejects the wide-character payload.
     #[cfg(windows)]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
@@ -424,7 +426,7 @@ pub mod codec {
     ///
     /// # Errors
     ///
-    /// - `D::Error` if the deserializer rejects the string payload.
+    /// - `D::Error` if [`Deserializer`] rejects the string payload.
     #[cfg(not(any(unix, windows)))]
     #[inline]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>

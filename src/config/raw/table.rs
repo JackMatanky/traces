@@ -1,12 +1,13 @@
-//! Rejects TOML arrays where a Config File section expects a table.
+//! Rejects TOML arrays where a Configuration File section expects a table.
 //!
-//! A derived [`Deserialize`] struct accepts a sequence as well as a map,
-//! because Serde reserves the sequence form for formats without field names.
-//! TOML arrays are self-describing, but `toml` forwards them to the struct's
-//! sequence visitor, so `templates = ["x"]` would otherwise fill the struct by
-//! position. The `deserialize_with` functions here pass only maps to the
+//! A derived [`Deserialize`] struct accepts both maps and sequences because
+//! Serde reserves sequences for formats without field names. Because TOML
+//! arrays are self-describing, `templates = ["x"]` would otherwise fill the
+//! struct by position.
+//!
+//! The `deserialize_with` functions in this module pass only maps to the
 //! struct's visitor. Serde then reports `invalid type: sequence, expected
-//! struct <Name>` and `toml` keeps the span of the offending value.
+//! struct <Name>`, and the parser keeps the span of the offending value.
 
 use std::fmt;
 
@@ -19,7 +20,7 @@ use serde::{
 ///
 /// Every other `visit_*` method keeps the [`Visitor`] default, which fails with
 /// an `invalid type` error that names the wrapped visitor's
-/// [`expecting`](Visitor::expecting) text.
+/// [`Visitor::expecting`] text.
 struct MapOnly<V>(V);
 
 impl<'de, V: Visitor<'de>> Visitor<'de> for MapOnly<V> {
@@ -84,7 +85,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Table<T> {
     }
 }
 
-/// Deserializes a required table field into `T` and rejects an array.
+/// Deserializes a table field into `T` and rejects an array.
 ///
 /// Use it as `deserialize_with` on a field that holds a [`Deserialize`] struct.
 ///
@@ -120,8 +121,7 @@ where
         .map(|table| table.map(|table| table.0))
 }
 
-/// Deserializes an array of tables into `Vec<T>` and rejects an array entry
-/// that is not a table.
+/// Deserializes an array of tables into `Vec<T>` and rejects non-table entries.
 ///
 /// Use it as `deserialize_with` on a field that holds a list of [`Deserialize`]
 /// structs.

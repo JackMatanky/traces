@@ -2,9 +2,9 @@
 //! regime.
 //!
 //! Owns [`DurationValue`], the nominal identity measure, and the written
-//! components that witness the regime. Every duration-shaped string in the
-//! crate is recognized here. Callers hold a validated [`DurationValue`] or
-//! receive a [`DurationError`].
+//! components that witness the regime. This module recognizes every
+//! duration-shaped string in the crate. Callers hold a validated
+//! [`DurationValue`] or receive a [`DurationError`].
 //!
 //! # Identity and application
 //!
@@ -37,7 +37,7 @@ use super::{
     unit::{TimeUnit, decompose},
 };
 
-/// Largest-first order for rendering a compound English magnitude.
+/// Defines the largest-first order for rendering a compound English magnitude.
 ///
 /// Milliseconds are rounded and rendered from the remaining magnitude.
 pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
@@ -50,17 +50,22 @@ pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
     TimeUnit::Second,
 ];
 
+/// Bounds the maximum supported duration in nominal seconds.
 const MAX_NOMINAL_SECONDS: f64 = 631_107_417_600.0;
 
-/// Prints sub-second fields as fractional seconds. The parser rejects the
-/// `ms`, `us`, and `ns` spellings, so Display text must never contain them.
+/// Prints sub-second fields as fractional seconds.
+///
+/// The parser rejects the `ms`, `us`, and `ns` spellings, so display text must
+/// never contain them.
 const PRINTER: SpanPrinter = SpanPrinter::new()
     .designator(Designator::Compact)
     .direction(Direction::Sign)
     .fractional(Some(FractionalUnit::Second));
 
 /// Rounds a span's fractional seconds exactly once for nominal identity and
-/// fieldwise arithmetic. Calendar fields stay untouched.
+/// fieldwise arithmetic.
+///
+/// Calendar fields stay untouched.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "Jiff bounds each subsecond field below one second"
@@ -79,6 +84,7 @@ fn rounded_seconds(span: Span) -> i64 {
     span.get_seconds().saturating_add(carry)
 }
 
+/// Computes the total nominal seconds of `span` using the unit registry.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "Jiff's bounded span units safely sum into i64 nominal seconds"
@@ -169,6 +175,7 @@ pub struct DurationValue {
 }
 
 impl DurationValue {
+    /// Wraps a [`Span`] and caches its rounded nominal seconds.
     #[inline]
     fn new(span: Span) -> Self {
         Self {
@@ -695,7 +702,7 @@ impl DurationComponent {
     }
 }
 
-/// Returns whether `unit` is a Jiff spelling of a millisecond, microsecond or
+/// Returns whether `unit` is a Jiff spelling of a millisecond, microsecond, or
 /// nanosecond unit, in any letter case.
 fn is_subsecond_unit(unit: &str) -> bool {
     const SUBSECOND_UNITS: [&str; 21] = [
@@ -752,8 +759,8 @@ fn validate_friendly_input(input: &str) -> Result<(), DurationError> {
             return Err(DurationError::NumberOverflow);
         }
         // The closed unit vocabulary stops at seconds. Reject every Jiff
-        // spelling of a sub-second unit, in any component of the word: such a
-        // field can exceed one second, which breaks the rounding invariant.
+        // spelling of a sub-second unit in any component. Such a field can
+        // exceed one second and break the rounding invariant.
         if word.split(|c: char| !c.is_ascii_alphabetic()).any(is_subsecond_unit)
         {
             return Err(DurationError::UnknownUnit);
@@ -819,6 +826,8 @@ fn validate_friendly_input(input: &str) -> Result<(), DurationError> {
     Ok(())
 }
 
+/// Inserts a leading zero before bare decimal points so Jiff accepts `.5h`
+/// forms.
 #[expect(
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
@@ -847,6 +856,7 @@ fn normalize_friendly_input(input: &str) -> Cow<'_, str> {
     Cow::Owned(result)
 }
 
+/// Maps a Jiff span-parse error into the corresponding [`DurationError`].
 #[expect(
     clippy::needless_pass_by_value,
     reason = "takes error to inspect formatted message"
@@ -1758,8 +1768,8 @@ mod tests {
             assert_eq!(json, format!("\"{input}\""));
         }
 
-        /// Regression: the fuzz target found that `0.000000001s` displayed as
-        /// `1ns`, which the parser rejects, so a stored value could not be read
+        /// Regression: the fuzz target found `0.000000001s` displayed as `1ns`.
+        /// The parser rejects `1ns`, so serde could not read stored values
         /// back.
         #[rstest]
         #[case::nanosecond("0.000000001s")]

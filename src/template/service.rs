@@ -25,7 +25,7 @@ use crate::{Config, DialogProvider};
 
 /// Resolves, renders, and writes templates for one configuration.
 ///
-/// The service holds the configured template loader and minijinja engine. It
+/// The service holds the configured template loader and `MiniJinja` engine. It
 /// supports multiple renders with the same [`Config`].
 ///
 /// # Interaction with [`WriteMode`]
@@ -49,10 +49,8 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::SchemaLoad`] if the service cannot load the Schema
+    /// - `TemplateError::SchemaLoad` if the service cannot load the Schema
     ///   registry.
-    ///
-    /// [`TemplateError::SchemaLoad`]: TemplateError::SchemaLoad
     #[inline]
     pub fn new(
         config: &'a Config,
@@ -95,29 +93,21 @@ impl<'a> TemplateService<'a> {
     ///
     /// # Errors
     ///
-    /// - [`TemplateError::Resolve`] if the template name does not resolve.
-    /// - [`TemplateError::Read`] if the service cannot read the resolved
-    ///   template source.
-    /// - [`TemplateError::Render`] if minijinja cannot evaluate the template.
-    /// - [`TemplateError::OutputPathEscapesRoot`] if the output path escapes
-    ///   the project root.
-    /// - [`TemplateError::OutputPathUnverifiable`] if `strict-path` cannot
-    ///   check path confinement.
-    /// - [`TemplateError::Prompt`] if a template prompt fails or you cancel it.
-    /// - [`TemplateError::OutputFileAlreadyExists`] if the file exists under
+    /// - `TemplateError::Resolve` if the template name does not resolve.
+    /// - `TemplateError::Read` if the service cannot read the resolved template
+    ///   source.
+    /// - `TemplateError::Render` if `MiniJinja` cannot evaluate the template.
+    /// - `TemplateError::OutputPathEscapesRoot` if the output path escapes the
+    ///   project root.
+    /// - `TemplateError::OutputPathUnverifiable` if `strict-path` cannot check
+    ///   path confinement.
+    /// - `TemplateError::Prompt` if a template prompt fails or you cancel it.
+    /// - `TemplateError::OutputFileAlreadyExists` if the file exists under
     ///   [`CommitPolicy::CreateNew`].
-    /// - [`TemplateError::Write`] if the service cannot create a directory or
+    /// - `TemplateError::Write` if the service cannot create a directory or
     ///   file, or write the rendered content.
     ///
     /// [`CommitPolicy::CreateNew`]: super::writer::CommitPolicy::CreateNew
-    /// [`TemplateError::Resolve`]: TemplateError::Resolve
-    /// [`TemplateError::Read`]: TemplateError::Read
-    /// [`TemplateError::Render`]: TemplateError::Render
-    /// [`TemplateError::OutputPathEscapesRoot`]: TemplateError::OutputPathEscapesRoot
-    /// [`TemplateError::OutputPathUnverifiable`]: TemplateError::OutputPathUnverifiable
-    /// [`TemplateError::Prompt`]: TemplateError::Prompt
-    /// [`TemplateError::OutputFileAlreadyExists`]: TemplateError::OutputFileAlreadyExists
-    /// [`TemplateError::Write`]: TemplateError::Write
     #[inline]
     pub fn render_to_file(
         &self,
@@ -130,10 +120,10 @@ impl<'a> TemplateService<'a> {
 
     /// Resolves `name` and renders its source into a [`RenderedTemplate`].
     ///
-    /// Performs the resolution and rendering steps of [`Self::render_to_file`].
-    /// It lets callers inspect rendered content before they call
-    /// [`Self::write`]. The split prevents repeated `ui.*` calls when callers
-    /// use the rendered result more than once.
+    /// Runs the resolution and rendering steps of [`Self::render_to_file`]. It
+    /// lets callers inspect rendered content before they call [`Self::write`].
+    /// The split prevents repeated `ui.*` calls when callers use the rendered
+    /// result more than once.
     ///
     /// The method gives the resolved absolute path to [`TemplateEngine`] as the
     /// template name. The [`minijinja::Error::name`] method then reports the
@@ -187,14 +177,14 @@ impl<'a> TemplateService<'a> {
     /// # Errors
     ///
     /// - [`OutputPathEscapesRoot`] if the declared or explicit path escapes the
-    ///   project root. This error does not occur in dry-run mode.
+    ///   project root. This error does not happen in dry-run mode.
     /// - [`OutputFileAlreadyExists`] if the target exists and `mode` uses
-    ///   [`CommitPolicy::CreateNew`]. This error does not occur in dry-run
+    ///   [`CommitPolicy::CreateNew`]. This error does not happen in dry-run
     ///   mode.
     /// - [`OutputPathUnverifiable`] if the service cannot check path
-    ///   confinement. This error does not occur in dry-run mode.
+    ///   confinement. This error does not happen in dry-run mode.
     /// - [`Prompt`] if a collision prompt fails or you cancel it. This error
-    ///   does not occur in dry-run mode.
+    ///   does not happen in dry-run mode.
     /// - [`Write`] if the service cannot create a directory or file, or write
     ///   the rendered content.
     ///
@@ -440,7 +430,7 @@ mod tests {
 
         #[test]
         fn normalizes_extension_input_but_keeps_directory() {
-            // Both "notes/daily" and "notes/daily.md" resolve to the same
+            // Both `notes/daily` and `notes/daily.md` resolve to the same
             // output path. The resolved subdirectory remains in the path.
             let temp = tempfile::tempdir().expect("create temp dir");
             let local_dir = temp.path().join("templates");
@@ -592,8 +582,8 @@ mod tests {
             let local_dir = temp.path().join("templates");
             write_file(&local_dir, "daily.md", "hello");
             // This file blocks creation of the output directory.
-            // `fs::create_dir_all` fails when a path component
-            // exists as a file.
+            // `fs::create_dir_all` fails when a path component exists as a
+            // file.
             fs::write(temp.path().join("notes"), "not a directory")
                 .expect("write blocking file");
             let config = Config::for_test(

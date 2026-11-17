@@ -20,12 +20,15 @@ pub(crate) const DEFAULT_DATE_PATTERN: &str = "%Y-%m-%d";
 
 /// Represents a zone-free calendar date with no time of day.
 ///
-/// Carries a validated proleptic Gregorian date: no zone and no clock time.
-/// Full dates need zero-padded month and day fields. `YYYY-MM` input defaults
-/// its day to 1. Years use exactly four ASCII digits, with a leading minus sign
-/// for negative years in `-YYYY-MM-DD` form. Deserialization runs the same
-/// parser as [`FromStr`](std::str::FromStr), so inline and deserialized dates
-/// follow one grammar.
+/// Each value holds a validated proleptic Gregorian date with no time zone and
+/// no clock time. Input strings obey these grammar rules:
+///
+/// - Full dates need zero-padded month and day fields.
+/// - `YYYY-MM` input defaults its day to 1.
+/// - Years use four ASCII digits, with a leading minus sign in `-YYYY-MM-DD`.
+///
+/// Deserialization runs the same parser as [`FromStr`], so inline and
+/// deserialized dates obey one grammar.
 ///
 /// # Examples
 ///
@@ -73,7 +76,7 @@ impl DateValue {
     /// Parses an ISO-8601 date string (`YYYY-MM-DD`, `YYYY-MM`, or a signed
     /// four-digit year in the same forms) using the recognition layer.
     ///
-    /// Trims surrounding whitespace first, then requires a four-digit year,
+    /// Trims surrounding whitespace first, then needs a four-digit year,
     /// optionally prefixed by a minus sign, before trying accepted shapes.
     ///
     /// # Errors
@@ -234,11 +237,11 @@ impl Serialize for DateValue {
     }
 }
 
-/// Deserializes through the same parser as [`FromStr`](std::str::FromStr), so
-/// the four-digit-year rule and `YYYY-MM` acceptance apply identically to
-/// inline and deserialized dates.
+/// Deserializes through the same parser as [`FromStr`], so the four-digit-year
+/// rule and `YYYY-MM` acceptance apply identically to inline and deserialized
+/// dates.
 impl<'de> Deserialize<'de> for DateValue {
-    /// Deserializes a string with the same grammar as `FromStr`.
+    /// Deserializes a string with the same grammar as [`FromStr`].
     ///
     /// # Errors
     ///
@@ -729,7 +732,7 @@ mod tests {
         #[case::unpadded_month_and_day("2026-1-1")]
         #[case::unpadded_day("2026-07-2")]
         fn rejects_unpadded_dates(#[case] input: &str) {
-            // Arrange: strict date parsing requires zero-padded month and day.
+            // Arrange: strict date parsing needs zero-padded month and day.
             // Act
             let result = input.parse::<DateValue>();
             // Assert
@@ -1132,8 +1135,8 @@ mod tests {
 
         #[test]
         fn accepts_an_unquoted_iso_date_scalar() {
-            // Arrange: a bare `2026-07-29` is a specially typed scalar in
-            // YAML 1.1. noyalib yields the plain string the parser accepts.
+            // Arrange: a bare `2026-07-29` is a specially typed scalar in YAML
+            // 1.1. `noyalib` yields the plain string the parser accepts.
             let yaml = "date: 2026-07-29\n";
 
             // Act

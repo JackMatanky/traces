@@ -1,9 +1,11 @@
-//! Implements [`crate::query::FileClassExpander`] for
-//! [`crate::schema::SchemaService`].
+//! Implements [`FileClassExpander`] for [`SchemaService`].
 //!
-//! This is the only place in the crate referencing both `schema` and `query`
-//! for File Class expansion. Neither module depends on the other; this module
-//! wires them together.
+//! This module is the only place in the crate that references both `schema` and
+//! `query` for File Class expansion. Neither module depends on the other. This
+//! module connects them.
+//!
+//! [`FileClassExpander`]: crate::query::FileClassExpander
+//! [`SchemaService`]: crate::schema::SchemaService
 
 use indexmap::IndexSet;
 
@@ -28,9 +30,8 @@ impl FileClassExpander for SchemaService {
                 }
             }
             ClassExpansionMode::Descendants(_) => {
-                // `matches` warns internally, so this branch alone would
-                // otherwise skip the warning the other two branches emit
-                // directly above.
+                // `matches` logs unknown classes internally, so this branch
+                // skips `warn_unknown_classes`.
                 expanded = self.matches(classes);
             }
         }

@@ -1,7 +1,7 @@
 //! Defines schema name newtypes: owned ([`SchemaName`]) and borrowed
 //! ([`SchemaNameRef`]).
 //!
-//! Ordering matches `str`'s, which `SchemaGraph`'s determinism depends on.
+//! Ordering matches `str`, which `SchemaGraph` uses for deterministic output.
 
 use std::{borrow::Borrow, fmt};
 
@@ -46,9 +46,14 @@ impl SchemaName {
         Self(GLOBAL_SCHEMA_NAME.to_owned())
     }
 
-    /// Test-only infallible constructor: every test fixture name is a non-empty
-    /// literal, so forcing `Result` handling through hundreds of call sites
-    /// buys production code nothing.
+    /// Constructs a [`SchemaName`] from a test fixture literal.
+    ///
+    /// Every test fixture name is a literal. Panicking on empty inputs avoids
+    /// propagating `Result` through test call sites.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `name` is empty.
     #[cfg(test)]
     pub(crate) fn for_test(name: &str) -> Self {
         Self::try_from(name).expect("test schema name must not be empty")
@@ -60,18 +65,13 @@ impl TryFrom<&str> for SchemaName {
 
     /// Attempts to construct a [`SchemaName`], rejecting an empty name.
     ///
-    /// Prefer an infallible path for non-empty inputs:
-    /// - [`SchemaName::global`] for the reserved Global Schema name.
-    /// - [`From<BaseNameRef>`] for a Schema file's stem.
-    ///
-    /// This exists for `$ref` segments parsed from user-authored TOML,
-    /// where the input is genuinely untrusted.
+    /// Prefer [`SchemaName::global`] for the reserved Global Schema name or
+    /// `From<BaseNameRef>` for a Schema file stem. This conversion parses
+    /// untrusted `$ref` segments from user-authored TOML.
     ///
     /// # Errors
     ///
-    /// - [`Empty`] if `name` is empty.
-    ///
-    /// [`Empty`]: SchemaNameError::Empty
+    /// Returns [`SchemaNameError::Empty`] if `name` is empty.
     fn try_from(name: &str) -> Result<Self, Self::Error> {
         if name.is_empty() {
             return Err(SchemaNameError::Empty);
@@ -89,9 +89,9 @@ impl From<SchemaNameRef<'_>> for SchemaName {
 impl From<BaseNameRef<'_>> for SchemaName {
     /// Builds a [`SchemaName`] from a Schema file's stem.
     ///
-    /// Infallible: [`BaseNameRef`] derives from
-    /// [`Path::file_stem`](std::path::Path::file_stem), which is never
-    /// empty for a real path component.
+    /// This conversion never fails because [`BaseNameRef`] comes from
+    /// [`Path::file_stem`](std::path::Path::file_stem), which is never empty
+    /// for a real path component.
     fn from(name: BaseNameRef<'_>) -> Self {
         Self(name.as_str().to_owned())
     }

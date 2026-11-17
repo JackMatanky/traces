@@ -2,17 +2,17 @@
 //!
 //! Tags are `#`-prefixed identifiers: a Unicode alphabetic first character
 //! followed by any mix of Unicode alphanumeric characters, `_`, `/`, or `-`.
-//! Validation happens once, at construction; hierarchy segments and containment
-//! checks are computed on demand from the stored string.
+//! [`Tag::parse`] validates the string once. Other methods compute hierarchy
+//! segments and containment checks on demand.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Represents a validated Markdown tag whose stored string starts with `#`.
 ///
-/// Constructed via [`Tag::parse`], which validates the format once; nesting
-/// checks ([`Self::is_contained_in`]) and segments ([`Self::segments`]) are
-/// computed on demand from the stored string.
+/// [`Tag::parse`] builds this type and validates the format once. Nesting
+/// checks ([`Self::is_contained_in`]) and segments ([`Self::segments`]) compute
+/// on demand from the stored string.
 ///
 /// # Examples
 ///
@@ -75,10 +75,11 @@ impl Tag {
         Ok(Self(input[..=end].into()))
     }
 
-    /// Parses `input` leniently; see [`Self::parse_lenient_into`].
+    /// Parses `input` leniently using a fresh buffer.
     ///
-    /// Allocates its own scratch buffer: for a caller that parses many tags in
-    /// a loop, prefer [`Self::parse_lenient_into`] with a reused buffer.
+    /// See [`Self::parse_lenient_into`] for parsing rules. Callers that parse
+    /// many tags in a loop can reuse a buffer with
+    /// [`Self::parse_lenient_into`].
     ///
     /// # Errors
     ///
@@ -97,14 +98,12 @@ impl Tag {
         Self::parse_lenient_into(input, &mut buf)
     }
 
-    /// Parses `input` leniently, appending the normalized form into `buf`
-    /// (cleared first, reused across calls).
+    /// Parses `input` leniently using `buf` as a reusable scratch buffer.
     ///
-    /// Trims whitespace and treats a missing leading `#` as implicit, so
-    /// `"book"` and `"#book"` both parse to the same [`Tag`]. An
-    /// already-present leading `#` is kept as-is, so doubled hashes still fail
-    /// the validation performed by [`Self::parse`] instead of silently
-    /// normalizing away.
+    /// Clears `buf` before writing the normalized tag. Trims whitespace and
+    /// treats a missing leading `#` as implicit, so `"book"` and `"#book"`
+    /// parse to the same [`Tag`]. Keeps an existing leading `#`, so doubled
+    /// hashes still fail [`Self::parse`] validation.
     ///
     /// # Errors
     ///
@@ -208,18 +207,14 @@ impl Tag {
                 || self.0.as_bytes().get(prefix.len()) == Some(&b'/'))
     }
 
-    /// Returns `true` if `item` and `target` are both valid tags where `item`
-    /// is `target` or a hierarchical sub-tag of it (e.g. `#book/fiction`
-    /// matches `#book`).
+    /// Returns `true` if `item` is a valid tag equal to or nested under
+    /// `target`.
     ///
-    /// Pure hierarchy check: unlike [`Self::is_contained_in`], `item` and
-    /// `target` are raw strings that may not be `#`-prefixed at all, in which
-    /// case this returns `false` (rejected by [`Self::parse`] or
-    /// [`Self::is_contained_in`] without either needing the other to be
-    /// `#`-prefixed). Callers wanting an exact-string shortcut too (`item ==
-    /// target` regardless of tag shape) must add that check themselves; baking
-    /// it in here would let non-tag values with a coincidentally matching
-    /// string collide.
+    /// Unlike [`Self::is_contained_in`], `item` and `target` are raw strings.
+    /// If either string lacks a `#` prefix, this method returns `false`.
+    /// Callers that also want an exact-string shortcut (`item == target`) must
+    /// add that check themselves. Baking it in here would let non-tag values
+    /// collide.
     #[inline]
     #[must_use]
     pub(crate) fn is_hierarchical_match(item: &str, target: &str) -> bool {
@@ -228,8 +223,8 @@ impl Tag {
 
     /// Returns `true` if `self` and `other` are the exact same tag.
     ///
-    /// Unlike [`Self::is_contained_in`], this performs no hierarchical
-    /// containment check: `#task` does not exactly match `#task/project`.
+    /// Unlike [`Self::is_contained_in`], this method skips hierarchical
+    /// containment checks. `#task` does not match `#task/project`.
     #[inline]
     #[must_use]
     pub fn is_exact_match(&self, other: &Self) -> bool {
@@ -243,10 +238,10 @@ pub enum TagError {
     /// The input has no leading `#`, or nothing follows it.
     #[error("tag must start with `#`")]
     MissingHash,
-    /// The character immediately following `#` is not alphabetic.
+    /// The character right after `#` is not alphabetic.
     #[error("tag must start with `#` followed by a letter, found `{found}`")]
     InvalidFirstCharacter {
-        /// The invalid character found after `#`.
+        /// Invalid character after `#`.
         found: char,
     },
     /// The tag body contains an invalid character.
@@ -255,9 +250,9 @@ pub enum TagError {
          and `/` are allowed"
     )]
     InvalidBodyCharacter {
-        /// Byte offset in the input where the invalid character occurred.
+        /// Byte offset of the invalid character in the input.
         offset: usize,
-        /// The invalid character encountered.
+        /// Invalid character found in the tag body.
         found: char,
     },
 }
@@ -292,9 +287,8 @@ mod tests {
             assert_eq!(err, TagError::MissingHash);
         }
 
-        // `_` is a valid body character but not alphabetic, so it must be
-        // rejected as a first character even though `is_body_char` accepts it
-        // everywhere else in the tag.
+        // `_` is a valid body character, not a letter. `Tag::parse` must
+        // reject it as the first character.
         #[rstest]
         #[case::digit("#1book", '1')]
         #[case::underscore("#_tag", '_')]
@@ -334,8 +328,9 @@ mod tests {
 
         #[test]
         fn returns_the_byte_offset_for_a_multi_byte_invalid_character() {
-            // 'é' is a 2-byte UTF-8 sequence, so the byte offset of the invalid
-            // '!' that follows it (5) differs from its char index (4).
+            // `'é'` is a 2-byte UTF-8 sequence, so the byte offset of the
+            // invalid `'!'` that follows it (5) differs from its char index
+            // (4).
             let err = Tag::parse("#café!").unwrap_err();
             assert!(
                 matches!(err, TagError::InvalidBodyCharacter {
@@ -444,7 +439,7 @@ mod tests {
         #[rstest]
         #[case::exact_tag("#book", 5)]
         #[case::trailing_non_tag_text("#book more text", 5)]
-        // "#café" is 1 (`#`) + 3 (c, a, f) + 2 (é) = 6 bytes.
+        // `"#café"` is 1 (`#`) + 3 (`c`, `a`, `f`) + 2 (`é`) = 6 bytes.
         #[case::multi_byte_characters("#café", 6)]
         fn returns_the_valid_prefix_length(
             #[case] input: &str,
@@ -511,12 +506,15 @@ mod tests {
         }
 
         proptest! {
-            /// Proves tag prefix hierarchy laws:
-            /// 1. Reflexivity: every valid tag contains itself as a prefix (`tag.is_contained_in(tag.as_str())`).
-            /// 2. Prefix hierarchy: every descendant is contained in each ancestor
-            ///    whose path ends at a segment boundary.
-            /// 3. Boundary & segment-boundary safety: a partial string prefix that does not
-            ///    end at a segment boundary (e.g. `foo` vs `foobar`) never reports containment.
+            /// Proves tag prefix hierarchy laws.
+            ///
+            /// 1. Reflexivity: every valid tag contains its own prefix
+            ///    (`tag.is_contained_in(tag.as_str())`).
+            /// 2. Prefix hierarchy: every ancestor ending at a segment boundary
+            ///    contains each descendant.
+            /// 3. Boundary safety: a partial string prefix that does not end at
+            ///    a segment boundary (e.g. `foo` vs `foobar`) never reports
+            ///    containment.
             #[test]
             fn preserves_containment_hierarchy_and_transitivity(
                 segments in tag_segments_strategy(),
@@ -532,12 +530,12 @@ mod tests {
                     tags.push(parsed);
                 }
 
-                // Reflexivity: tag is contained in its own string.
+                // Reflexivity: every tag contains its own string.
                 for tag in &tags {
                     prop_assert!(tag.is_contained_in(tag.as_str()));
                 }
 
-                // Prefix hierarchy: longer tag is contained in shorter tag's string representation.
+                // Prefix hierarchy: shorter ancestor strings contain longer descendant tags.
                 for (i, ancestor) in tags.iter().enumerate() {
                     for descendant in tags.iter().skip(i) {
                         let ancestor_prefix = ancestor.as_str();

@@ -1,11 +1,10 @@
 //! Provides shared lexer primitives for tokenizing text into typed token
 //! streams.
 //!
-//! Provides shared prefix recognition ([`lex_prefix`]), token streaming with
-//! one-token lookahead ([`LexTokenStream`]), spanned token wrappers
-//! ([`Spanned`]), token expectations ([`TokenSpec`]), error diagnostics
-//! ([`LexError`]), and string unescaping ([`lexical_unquote`],
-//! [`lexical_backslash_unescape`]).
+//! Exposes prefix recognition ([`lex_prefix`]), one-token lookahead
+//! ([`LexTokenStream`]), and spanned wrappers ([`Spanned`]). Also provides
+//! token expectations ([`TokenSpec`]), error diagnostics ([`LexError`]), and
+//! quote/escape decoding ([`lexical_unquote`], [`lexical_backslash_unescape`]).
 
 use std::{iter::Peekable, ops::Range, vec};
 
@@ -64,7 +63,8 @@ impl<T> LexTokenStream<Spanned<T>> {
     /// # Errors
     ///
     /// - [`UnexpectedToken`] when the logos lexer encounters an unrecognized
-    ///   token or when `post` returns an error.
+    ///   token.
+    /// - Propagates any [`LexError`] returned by `post`.
     ///
     /// [`UnexpectedToken`]: LexError::UnexpectedToken
     pub(crate) fn tokenize_with<'a>(
@@ -199,7 +199,9 @@ impl<T> LexTokenStream<Spanned<T>> {
 /// Pairs an expected token value with its diagnostic description.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct TokenSpec<'a, T: ?Sized> {
+    /// Target token value compared against the next token.
     pub(crate) value: &'a T,
+    /// Human-readable description used in error diagnostics.
     pub(crate) desc: &'static str,
 }
 
@@ -225,12 +227,12 @@ impl<'a, T: ?Sized> TokenSpec<'a, T> {
 }
 
 /// Strips matching single (`'...'`) or double (`"..."`) quotes from `raw` and
-/// unescapes backslash sequences via [`lexical_backslash_unescape`].
+/// decodes backslash escapes with [`lexical_backslash_unescape`].
 ///
-/// If `raw` is enclosed in matching quotes (such as `"hello \"world\""` or
-/// `'single \'quote\''`), the outer quotes are stripped and internal escape
-/// sequences are unescaped. Unquoted strings (such as `plain\ text`) are
-/// unescaped without stripping characters.
+/// When `raw` has matching outer quotes (such as `"hello \"world\""` or
+/// `'single \'quote\''`), this function removes the quotes and decodes internal
+/// escape sequences. It decodes unquoted strings (such as `plain\ text`)
+/// without stripping characters.
 #[must_use]
 pub(crate) fn lexical_unquote(raw: &str) -> String {
     if (raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2)
@@ -243,11 +245,11 @@ pub(crate) fn lexical_unquote(raw: &str) -> String {
     }
 }
 
-/// Strips backslash escapes from `input`, returning the unescaped string.
+/// Decodes backslash escapes in `input`, returning the decoded string.
 ///
-/// A backslash followed by any character consumes both and emits the second
-/// character verbatim (for example, `\"` becomes `"`, and `\\` becomes `\`). A
-/// trailing backslash with no subsequent character is retained verbatim.
+/// A backslash and the next character collapse into that second character
+/// verbatim (for example, `\"` becomes `"`, and `\\` becomes `\`). A trailing
+/// backslash with no character after it stays verbatim.
 #[must_use]
 fn lexical_backslash_unescape(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
@@ -270,7 +272,7 @@ fn lexical_backslash_unescape(input: &str) -> String {
 /// parsing.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub(crate) enum LexError {
-    /// An unexpected token was encountered where another token was expected.
+    /// Input contains an unexpected token.
     #[error("found `{found}`, expected {expected}")]
     UnexpectedToken {
         /// The byte span of the unexpected token.

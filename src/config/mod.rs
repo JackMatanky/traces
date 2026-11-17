@@ -3,26 +3,26 @@
 //! The discovery, read, trust, and value stages report separate failures.
 //! Loading uses these stages in order:
 //!
-//! 1. [`discovery::ConfigLocator`] finds the nearest local Config File and an
-//!    optional global Config File. It does not read TOML.
-//! 2. [`file::LocalConfigFile::into_trusted`] records the local Tracked Config
-//!    Path in the Tracker Store. It then checks Trust Status before it parses
-//!    local TOML. A tracking failure does not stop loading.
+//! 1. [`discovery::ConfigLocator`] finds the nearest local Configuration File
+//!    and an optional global Configuration File. It does not read TOML.
+//! 2. [`file::LocalConfigFile::into_trusted`] records the local Tracked
+//!    Configuration Path in the Tracker Store. It then checks Trust Status
+//!    before it parses local TOML. A tracking failure does not stop loading.
 //! 3. [`mod@file`] parses trusted local content and reads the global file
 //!    without a trust check. It returns [`raw::RawConfig`] values.
 //! 4. [`ConfigBuilder`] applies global defaults before local values. It checks
 //!    each value and resolves paths. It returns [`Config`].
 //!
-//! A trust grant records the local Tracked Config Path before it grants trust.
-//! Revoking trust leaves the path tracked. [`crate::dirs`] supplies OS paths
-//! for both stores.
+//! A trust grant records the local Tracked Configuration Path before it grants
+//! trust. Revoking trust leaves the path tracked. [`crate::dirs`] supplies OS
+//! paths for both stores.
 //!
-//! # Config Digests
+//! # Configuration Digests
 //!
 //! [`Config::digests`] hashes each resolved setting under a section-qualified
 //! label. Each stored digest names its setting. [`Config::hash`] combines the
-//! digests under `b"traces.config.v1"` to make the Config Fingerprint. This is
-//! the only encoding in use.
+//! digests under `b"traces.config.v1"` to make the Configuration Fingerprint.
+//! This is the only encoding in use.
 //!
 //! Every digest constructor and bundle destructures its type without `..`.
 //! Adding a setting to a configuration type then causes a compile error until
@@ -35,11 +35,11 @@
 //! - [`ConfigService`]: loads configuration and administers trust.
 //! - [`Config`]: holds resolved values and the workspace root.
 //! - [`TaskConfig`]: holds Task Configuration status mappings and tag filters.
-//! - [`TrustRequest`]: identifies a workspace root or local Config File for
-//!   trust operations.
+//! - [`TrustRequest`]: identifies a workspace root or local Configuration File
+//!   for trust operations.
 //! - [`trust::TrustStore`]: persists trusted roots and Companion Hashes.
-//! - [`tracker::TrackerStore`]: persists Tracked Config Paths independently of
-//!   trust decisions.
+//! - [`tracker::TrackerStore`]: persists Tracked Configuration Paths
+//!   independently of trust decisions.
 //! - [`error::ConfigError`]: combines failures from the four stages.
 
 mod builder;

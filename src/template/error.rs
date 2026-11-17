@@ -8,8 +8,6 @@
 //! - [`TemplateError`]: reports resolution, read, render, output-path, write,
 //!   and prompt errors.
 //! - [`RenderFailureKind`]: classifies render errors for CLI diagnostics.
-//!
-//! [`TemplateService`]: super::service::TemplateService
 
 use std::{error::Error as StdError, io, path::PathBuf};
 
@@ -67,7 +65,7 @@ pub enum TemplateError {
 
     /// Reports an explicit path that fails the root confinement check.
     ///
-    /// Occurs when `strict-path` cannot check the root boundary or resolve
+    /// Happens when `strict-path` cannot check the root boundary or resolve
     /// existing path components. The writer stops instead of writing to a path
     /// that it has not checked.
     #[error("failed to verify output path {path} is inside the project root")]
@@ -81,14 +79,14 @@ pub enum TemplateError {
 
     /// Reports a failure to render the template source.
     ///
-    /// Covers minijinja syntax errors, missing helpers, and bad helper
+    /// Covers `MiniJinja` syntax errors, missing helpers, and bad helper
     /// arguments, plus include or extends errors, query/index/schema errors,
     /// file include errors, and dialog errors.
     #[error("failed to render template {path}")]
     Render {
-        /// Absolute path used as the minijinja template name.
+        /// Absolute path used as the `MiniJinja` template name.
         path: PathBuf,
-        /// Minijinja error with template context and source-chain details.
+        /// `MiniJinja` error with template context and source-chain details.
         #[source]
         source: minijinja::Error,
     },
@@ -148,7 +146,7 @@ pub enum TemplateError {
 /// matching.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RenderFailureKind {
-    /// Reports invalid minijinja syntax in the template.
+    /// Reports invalid `MiniJinja` syntax in the template.
     Syntax,
     /// Reports a failed `ui.*` prompt, except for a deliberate user abort.
     Prompt,

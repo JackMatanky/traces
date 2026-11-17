@@ -60,7 +60,7 @@ impl SchemaFileField {
         }
     }
 
-    /// Build an instance for tests.
+    /// Builds an instance for tests.
     #[cfg(test)]
     pub(crate) const fn for_test(
         folders: Vec<String>,
@@ -114,11 +114,11 @@ impl SchemaFileField {
 /// [`SchemaFieldDef::file_filter`](super::SchemaFieldDef::file_filter).
 #[derive(Copy, Clone)]
 pub(crate) struct SchemaFileFieldRef<'a> {
-    /// Borrowed folder paths.
+    /// Borrows configured folder paths.
     pub(crate) folders: &'a [String],
-    /// Borrowed file extension, if set.
+    /// Borrows the configured file extension, if set.
     pub(crate) ext: Option<&'a str>,
-    /// Borrowed class tags.
+    /// Borrows configured class tags.
     pub(crate) class: &'a [String],
 }
 

@@ -8,10 +8,10 @@
 //! - `num_format`
 //!
 //! Each filter is a function registered with [`Environment::add_filter`], not
-//! an [`Object`]. The `num_format` name avoids minijinja's built-in `format`
+//! an [`Object`]. The `num_format` name avoids `MiniJinja`'s built-in `format`
 //! filter.
 //!
-//! Minijinja converts integer and float [`Value`] arguments to `f64`. It
+//! `MiniJinja` converts integer and float [`Value`] arguments to `f64`. It
 //! returns its standard argument-type error for other values.
 //!
 //! [`Object`]: minijinja::value::Object

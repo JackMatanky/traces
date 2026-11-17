@@ -9,7 +9,7 @@
 //! [`TerminalDialogProvider`]. Renders with `--no-input` use
 //! [`PresetDialogProvider`], which uses preset values only.
 //!
-//! The `select` and `multi_select` methods derive labels like minijinja's
+//! The `select` and `multi_select` methods derive labels like `MiniJinja`'s
 //! `map`, `sort`, and `groupby` filters. The optional `attribute=` kwarg names
 //! a dotted path and defaults to `"label"`. The optional `default=` kwarg
 //! supplies a label for items with no such attribute. See
@@ -65,9 +65,9 @@ impl UiOps {
 
 /// Formats `UiOps` without requiring [`DialogProvider`] to implement [`Debug`].
 ///
-/// The minijinja [`Object`] trait requires [`Debug`]. A derived implementation
-/// would add a [`Debug`] bound to every [`DialogProvider`] implementation, but
-/// an opaque provider has no useful debug output.
+/// The `MiniJinja` [`Object`] trait requires [`Debug`]. A derived
+/// implementation would add a [`Debug`] bound to every [`DialogProvider`]
+/// implementation, but an opaque provider has no useful debug output.
 impl std::fmt::Debug for UiOps {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UiOps").finish_non_exhaustive()
@@ -151,7 +151,7 @@ impl SelectOptions {
     /// [`DialogProvider`] use the returned index to identify the selected
     /// value.
     ///
-    /// Reads labels from `kwargs` with the minijinja `map`, `sort`, and
+    /// Reads labels from `kwargs` with the `MiniJinja` `map`, `sort`, and
     /// `groupby` convention:
     ///
     /// - `attribute` is an optional string with a dotted path, such as
@@ -233,7 +233,7 @@ fn dialog_error(source: DialogError) -> Error {
 /// Reads the value at the dot-separated `path` in `item`.
 ///
 /// Numeric path segments use [`Value::get_item_by_index`]. Other segments use
-/// [`Value::get_attr`], matching minijinja's `map`, `sort`, and `groupby`
+/// [`Value::get_attr`], matching `MiniJinja`'s `map`, `sort`, and `groupby`
 /// filters.
 ///
 /// Returns [`Value::UNDEFINED`] for a missing attribute. Skips later segments

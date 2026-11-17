@@ -8,7 +8,8 @@ use std::path::Path;
 
 use crate::path::HasPath;
 
-/// Enforces that rows are sorted in ascending order by [`HasPath::path`].
+/// Wraps a path-sorted vector of index rows in ascending [`HasPath::path`]
+/// order.
 ///
 /// Use [`SortedByPath::sorted`] to sort rows or
 /// [`SortedByPath::assumed_sorted`] to check rows in debug builds. Lookup
@@ -64,8 +65,8 @@ impl<T: HasPath> SortedByPath<T> {
 
     /// Returns the row stored at `path` for in-place payload mutation.
     ///
-    /// Keep the returned row's path unchanged. A path change would break the
-    /// sorted invariant that [`SortedByPath`] guarantees.
+    /// Keep the returned row's path unchanged. A path change breaks the sorted
+    /// invariant that [`SortedByPath`] guarantees.
     #[inline]
     #[cfg(test)]
     pub(crate) fn get_mut_by_path(&mut self, path: &Path) -> Option<&mut T> {
@@ -73,8 +74,10 @@ impl<T: HasPath> SortedByPath<T> {
         self.0.get_mut(index)
     }
 
-    /// Binary-searches for `path`, returning `Ok(index)` if found or
-    /// `Err(insertion_point)` otherwise; see [`slice::binary_search_by`].
+    /// Searches for `path` with binary search.
+    ///
+    /// Returns `Ok(index)` when found or `Err(insertion_point)` when missing.
+    /// See [`slice::binary_search_by`].
     #[inline]
     pub(crate) fn binary_search_by_path(
         &self,

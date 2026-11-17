@@ -13,15 +13,15 @@ use super::{
     sort::SortOrder,
 };
 
-/// Row granularity produced by a [`QueryBuilder`].
+/// Selects the row granularity produced by a [`QueryBuilder`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum QueryMode {
-    /// One row per matching note.
+    /// Emits one row per matching note.
     Pages,
-    /// One row per list item in each matching note (plain bullets, checkboxes,
-    /// and tasks).
+    /// Emits one row per list item in each matching note (plain bullets,
+    /// checkboxes, and tasks).
     Lists,
-    /// One row per task list item in each matching note.
+    /// Emits one row per task list item in each matching note.
     Tasks,
 }
 

@@ -16,11 +16,11 @@ use super::{
 /// Build with [`new`](Self::new), then call [`build`](Self::build) once.
 pub(crate) struct SchemaGraphBuilder<'a> {
     adjacency: SchemaAdjacency<'a>,
-    /// Per-node count of unresolved parents.
+    /// Tracks the per-node count of unresolved parents.
     unresolved_parent_count: Vec<u32>,
-    /// Nodes whose `unresolved_parent_count` reached zero.
+    /// Queues nodes whose `unresolved_parent_count` reached zero.
     ready_queue: VecDeque<DenseIndex>,
-    /// Schemas popped from `ready_queue`, in topological order.
+    /// Stores Schemas popped from `ready_queue`, in topological order.
     visited: IndexSet<SchemaNameRef<'a>>,
 }
 
@@ -40,9 +40,9 @@ impl<'a> SchemaGraphBuilder<'a> {
         let (adjacency, warnings) = SchemaAdjacency::build(raw, excluded);
         let node_count = adjacency.node_count();
 
-        // Derive each node's in-degree from the CSR adjacency itself
-        // (occurrences of a node across every parent's children list) rather
-        // than re-scanning raw `extends` lists a second time.
+        // Derive each node's in-degree from the sparse-row adjacency itself
+        // instead of re-scanning raw `extends` lists. Count how many times each
+        // node appears across all parents' children lists.
         let mut unresolved_parent_count: Vec<u32> = vec![0; node_count];
         for child in adjacency.child_targets_iter() {
             if let Some(count) = unresolved_parent_count.get_mut(child.index())
@@ -73,9 +73,9 @@ impl<'a> SchemaGraphBuilder<'a> {
     /// Drains the ready queue, checks for cycles, and returns the completed
     /// [`SchemaGraph`].
     ///
-    /// After topological sort completes, sorts every node's CSR children into
-    /// topological-rank order (a precondition for [`SchemaGraph::hierarchy`]'s
-    /// closure sweep).
+    /// After topological sort completes, sorts every node's sparse-row children
+    /// into topological-rank order (a precondition for
+    /// [`SchemaGraph::hierarchy`]'s closure sweep).
     ///
     /// # Errors
     ///
@@ -109,6 +109,7 @@ impl<'a> SchemaGraphBuilder<'a> {
     }
 
     /// Pops the next Schema whose `unresolved_parent_count` reached zero.
+    ///
     /// Returns `None` once the queue drains.
     fn next_ready(&mut self) -> Option<SchemaNameRef<'a>> {
         let index = self.ready_queue.pop_front()?;

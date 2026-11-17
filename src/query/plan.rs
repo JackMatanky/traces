@@ -7,12 +7,14 @@
 //!
 //! Before it processes rows, [`ExecutionPlan::run`] applies three
 //! optimizations:
+//!
 //! - **Filter fusion** combines adjacent predicates and removes an intermediate
 //!   row buffer.
-//! - **Sort fusion** combines adjacent sort steps into one [`SortOrder`].
+//! - **Sort fusion** combines adjacent sort steps into a single [`SortOrder`].
 //! - **Sort-limit fusion** replaces a sort and limit with bounded
 //!   [`QueryTransform::TopK`] selection. This uses an $O(n)$ partition instead
 //!   of an $O(n \log n)$ sort.
+
 #[cfg(test)]
 use super::sort::SortTerm;
 use super::{
@@ -138,14 +140,20 @@ impl ExecutionPlan {
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum QueryTransform {
+    /// Retains rows matching a filter predicate.
     Filter(FilterExpr),
+    /// Orders rows by a composite sort order.
     Sort {
         order: SortOrder,
     },
+    /// Truncates rows to at most the given count.
     Limit(usize),
+    /// Orders rows ascending by a grouping field path.
     GroupBy(FieldPath),
+    /// Explodes list values at a field path into one row per element.
     Flatten(FieldPath),
-    /// The optimizer creates this step after callers add `Sort` and `Limit`.
+    /// Replaces adjacent `Sort` and `Limit` steps with bounded top-k selection
+    /// during plan optimization.
     TopK {
         order: SortOrder,
         n: usize,

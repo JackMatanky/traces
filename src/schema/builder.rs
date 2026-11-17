@@ -5,10 +5,10 @@
 //!
 //! 1. Resolves the Global Schema first (a `$ref` target, not an `extends`
 //!    target) so later `$ref` lookups find it.
-//! 2. Drives [`SchemaGraphBuilder`]/[`SchemaGraph`]: Kahn's topological sort
-//!    yields schemas in dependency order, with the Global Schema excluded from
-//!    the graph entirely.
-//! 3. Merges each Schema's fields via [`SchemaBuilder::merge`], applying
+//! 2. Drives [`SchemaGraphBuilder`]/[`SchemaGraph`]: topological sort yields
+//!    schemas in dependency order, with the Global Schema excluded from the
+//!    graph entirely.
+//! 3. Merges each Schema's fields with [`SchemaBuilder::merge`], applying
 //!    first-listed-wins inheritance, `excludes`, and `$ref` resolution.
 //! 4. Filters hierarchy sets against resolution failures so broken links do not
 //!    propagate downstream.
@@ -42,12 +42,11 @@ pub(crate) struct SchemaFailure {
 /// recoverable defects and failures for hard errors.
 #[derive(Debug)]
 pub(super) struct ResolvedSchemas {
-    /// Every Schema that resolved without error.
+    /// Stores every Schema that resolved without error.
     pub(super) schemas: IndexMap<SchemaName, Schema>,
-    /// Recoverable defects encountered across the whole set.
+    /// Collects recoverable defects encountered across the whole set.
     pub(super) warnings: Vec<SchemaWarning>,
-    /// Schemas that failed to resolve, each paired with the error that caused
-    /// the failure.
+    /// Collects Schemas that failed to resolve, each paired with its error.
     pub(super) failures: Vec<SchemaFailure>,
 }
 
@@ -56,20 +55,20 @@ pub(super) struct ResolvedSchemas {
 /// Build with [`new`](Self::new), then call [`build`](Self::build) to produce
 /// [`ResolvedSchemas`].
 pub(super) struct SchemaBuilder<'a> {
-    /// Raw schemas to resolve, keyed by name.
+    /// Borrows raw schemas to resolve, keyed by name.
     raw: &'a IndexMap<SchemaName, RawSchema>,
-    /// Construction-time dependencies for field type parsers.
+    /// Borrows construction-time dependencies for field type parsers.
     field_context: &'a SchemaFieldBuildContext,
-    /// Schemas resolved so far.
+    /// Stores Schemas resolved so far.
     resolved: IndexMap<SchemaName, Schema>,
-    /// Recoverable defects accumulated across the whole set.
+    /// Accumulates recoverable defects across the whole set.
     warnings: Vec<SchemaWarning>,
-    /// Schemas that failed to resolve, accumulated across the whole set.
+    /// Accumulates Schemas that failed to resolve across the whole set.
     failures: Vec<SchemaFailure>,
 }
 
-/// [`SchemaBuilder::inherit_fields`]'s result: the inherited field map,
-/// transitive ancestors, and any `ParentFailedToResolve` warnings.
+/// Represents the output of [`SchemaBuilder::inherit_fields`]: the inherited
+/// field map, transitive ancestors, and any `ParentFailedToResolve` warnings.
 type InheritedFields = (
     IndexMap<FieldName, super::fields::SchemaFieldDef>,
     IndexSet<SchemaName>,
@@ -92,12 +91,11 @@ impl<'a> SchemaBuilder<'a> {
         }
     }
 
-    /// Resolve every Schema, returning successes, warnings, and failures.
+    /// Resolves every Schema, returning successes, warnings, and failures.
     ///
-    /// The Global Schema is resolved first (its `extends` is ignored) so
-    /// later `$ref` lookups find it. Remaining schemas are resolved in
-    /// Kahn topological order, with the Global Schema excluded from the
-    /// graph entirely.
+    /// The Global Schema is resolved first (its `extends` is ignored) so later
+    /// `$ref` lookups find it. Remaining schemas are resolved in topological
+    /// order, with the Global Schema excluded from the graph entirely.
     ///
     /// # Errors
     ///
@@ -113,8 +111,8 @@ impl<'a> SchemaBuilder<'a> {
     /// - [`StrayGlobalRequired`] if the Global Schema declares `required =
     ///   true`.
     /// - [`DegradedOverride`] if a bare `$ref` override declares an invalid
-    ///   attribute or value; the key (or whole `values` override) is dropped
-    ///   and the base field's value is used as-is.
+    ///   attribute or value. Resolution drops the key (or whole `values`
+    ///   override) and uses the base field's value as-is.
     ///
     /// [`Cycle`]: SchemaError::Cycle
     /// [`MissingExtendsTarget`]: SchemaWarning::MissingExtendsTarget
@@ -138,9 +136,11 @@ impl<'a> SchemaBuilder<'a> {
         Ok(self.finish())
     }
 
-    /// Merge the Global Schema first, so later `$ref` lookups against it
-    /// succeed regardless of raw-map order. Its `extends`, if declared, is
-    /// ignored: it is a `$ref` target, never a DAG participant.
+    /// Merges the Global Schema first, so later `$ref` lookups against it
+    /// succeed regardless of raw-map order.
+    ///
+    /// Its `extends`, if declared, is ignored: it is a `$ref` target, never a
+    /// DAG participant.
     fn resolve_global(&mut self) -> SchemaResult<()> {
         let Some(global_raw) = self.raw.get(GLOBAL_SCHEMA_NAME) else {
             return Ok(());
@@ -155,15 +155,15 @@ impl<'a> SchemaBuilder<'a> {
         Ok(())
     }
 
-    /// Merge every non-Global Schema's fields in `graph`'s topological order,
+    /// Merges every non-Global Schema's fields in `graph`'s topological order,
     /// so each Schema's `extends` parents are already in `self.resolved` when
     /// it merges.
     ///
     /// # Panics
     ///
-    /// Never in practice: `graph` is built exclusively from `self.raw`'s own
-    /// keys (minus the excluded Global Schema), so every name
-    /// `graph.topological_order()` yields is present in `self.raw`.
+    /// Never panics in practice. `graph` contains only keys from `self.raw`
+    /// minus the Global Schema, so every name from `graph.topological_order()`
+    /// exists in `self.raw`.
     fn merge_in_topological_order(&mut self, graph: &SchemaGraph<'a>) {
         for name in graph.topological_order() {
             #[expect(
@@ -227,9 +227,11 @@ impl<'a> SchemaBuilder<'a> {
         Ok((Schema::new(SchemaName::from(name), fields, ancestors), warnings))
     }
 
-    /// First-listed-wins inheritance from `parents`, each already resolved in
-    /// `self.resolved`. Returns the inherited field map, transitive
-    /// ancestors, and any `ParentFailedToResolve` warnings.
+    /// Inherits fields from `parents` using first-listed-wins precedence.
+    ///
+    /// Each parent is already resolved in `self.resolved`. Returns the
+    /// inherited field map, transitive ancestors, and any
+    /// `ParentFailedToResolve` warnings.
     fn inherit_fields(
         &self,
         name: SchemaNameRef<'a>,
@@ -267,10 +269,12 @@ impl<'a> SchemaBuilder<'a> {
         }
     }
 
-    /// `$ref`-resolves and validates own fields via `SchemaFieldBuilder`,
-    /// inserting them into `fields` (own fields override inherited ones:
-    /// `IndexMap::insert` replaces any existing entry for the same key).
-    /// Must run after inheritance (`ancestors` bounds-checks `$ref` targets).
+    /// Resolves `$ref` targets and validates own fields with
+    /// `SchemaFieldBuilder`, inserting them into `fields`.
+    ///
+    /// Own fields override inherited ones because `IndexMap::insert` replaces
+    /// any existing entry for the same key. Must run after inheritance so
+    /// `ancestors` bounds-checks `$ref` targets.
     fn resolve_own_fields(
         &self,
         name: SchemaNameRef<'a>,
@@ -295,14 +299,16 @@ impl<'a> SchemaBuilder<'a> {
     }
 
     /// Rejects a field map where two entries canonicalize to the same
-    /// [`FieldKey`] (case-folded,
-    /// hyphen/underscore-normalized form); ambiguous field identities would
-    /// make note-vs-schema field matching unreliable.
+    /// [`FieldKey`].
+    ///
+    /// A [`FieldKey`] is the case-folded, hyphen/underscore-normalized form.
+    /// Ambiguous field identities make note-vs-schema field matching
+    /// unreliable.
     ///
     /// # Errors
     ///
     /// - [`AmbiguousFieldName`](SchemaError::AmbiguousFieldName) if a collision
-    ///   is found
+    ///   is found.
     fn reject_ambiguous_field_names(
         name: SchemaNameRef<'a>,
         fields: &IndexMap<FieldName, super::fields::SchemaFieldDef>,
@@ -322,16 +328,16 @@ impl<'a> SchemaBuilder<'a> {
         Ok(())
     }
 
-    /// Assign direct children and transitive descendants to each resolved
-    /// Schema, filtering out schemas that are not structural descendants due
-    /// to failed resolution links.
+    /// Assigns direct children and transitive descendants to each resolved
+    /// Schema, filtering out schemas that are not structural descendants due to
+    /// failed resolution links.
     ///
     /// Two passes (compute, then apply) avoid needing a full-registry
     /// ancestor-set snapshot: the first pass only reads `self.resolved`,
     /// the second only writes to it.
     fn compute_hierarchy(&mut self, graph: &SchemaGraph<'a>) {
-        /// One resolved Schema's recomputed direct children and transitive
-        /// descendants, staged before being written back to `self.resolved`.
+        /// Holds one resolved Schema's recomputed direct children and
+        /// transitive descendants before writing them back to `self.resolved`.
         type HierarchyUpdate =
             (SchemaName, IndexSet<SchemaName>, IndexSet<SchemaName>);
 
@@ -348,9 +354,10 @@ impl<'a> SchemaBuilder<'a> {
         }
     }
 
-    /// Whether `candidate` still structurally descends from `name` (its
-    /// resolved `ancestors` still contains `name`); a failed parent link can
-    /// drop a Schema from a hierarchy set it would otherwise belong to.
+    /// Returns whether `candidate` still structurally descends from `name`.
+    ///
+    /// A failed parent link can drop a Schema from a hierarchy set it would
+    /// otherwise belong to when resolved `ancestors` no longer contain `name`.
     fn still_descends_from(
         &self,
         candidate: SchemaNameRef<'_>,

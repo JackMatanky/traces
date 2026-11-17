@@ -4,6 +4,7 @@
 //! Markdown structures never recurse through the call stack. [`ItemFrame`]
 //! pairs an active item's buffers, marker state, and scanned metadata, then
 //! finalizes the frame into a classified [`ListItem`].
+
 use std::collections::{VecDeque, vec_deque};
 
 use indexmap::IndexMap;
@@ -20,8 +21,8 @@ use crate::{
 
 /// Tracks nested list and list-item state across a Markdown event stream.
 ///
-/// Completed top-level lists live in `lists`; still-open lists and items live
-/// on explicit stacks.
+/// Completed top-level lists live in `lists`. Open lists and items live on
+/// explicit stacks.
 #[derive(Default)]
 pub(super) struct ListTracker {
     lists: Vec<ListItem>,
@@ -54,6 +55,7 @@ impl ListTracker {
     }
 
     /// Records an inline code span on the active item's display text only.
+    ///
     /// Inline code is excluded from inline field/tag scanning.
     pub(super) fn inline_code(&mut self, text: &str) {
         if let Some(item) = self.item_stack.last_mut() {
@@ -61,8 +63,8 @@ impl ListTracker {
         }
     }
 
-    /// Rejects a pending item-leading marker: inline content occupies the
-    /// item's leading slot, so no marker can be recognized there.
+    /// Rejects a pending item-leading marker because inline content occupies
+    /// the item's leading slot.
     pub(super) fn reject_marker(&mut self) {
         if let Some(item) = self.item_stack.last_mut() {
             item.reject_marker();
@@ -72,8 +74,8 @@ impl ListTracker {
     /// Force-decides a pending item-leading marker as if the item's first line
     /// ended: a complete `[<char>]` shape becomes a marker.
     ///
-    /// Called before the classification state is read (scan-buffer flushes,
-    /// item end) and on block-structure events that terminate the first line.
+    /// Runs before reading classification state (scan-buffer flushes, item end)
+    /// and on block events that end the first line.
     pub(super) fn resolve_pending_marker(&mut self) {
         if let Some(item) = self.item_stack.last_mut() {
             item.resolve_pending_marker();
@@ -104,9 +106,9 @@ impl ListTracker {
 
     /// Closes the innermost list.
     ///
-    /// Items of a list nested inside an active item carry that item's line as
-    /// their `parent` and a deeper `depth`; a top-level list's items are
-    /// appended to the tracker's completed lists.
+    /// Items in a nested list carry the active item's line as `parent` and a
+    /// deeper `depth`. The tracker appends top-level list items to its
+    /// completed lists.
     pub(super) fn end_list(&mut self) {
         self.list_stack.pop();
     }
@@ -114,8 +116,9 @@ impl ListTracker {
     /// Starts tracking a new list item at `line`.
     ///
     /// Sets initial item hierarchy:
-    /// - `depth`: 0-indexed nesting level derived from the list stack
-    /// - `parent`: source line of the enclosing active list item, if any
+    ///
+    /// - `depth`: 0-indexed nesting level derived from the list stack.
+    /// - `parent`: source line of the enclosing active list item, if any.
     pub(super) fn start_item(&mut self, line: SourceLine) {
         let depth = u8::try_from(self.list_stack.len().saturating_sub(1))
             .unwrap_or(u8::MAX);
@@ -248,7 +251,7 @@ impl ItemBuffers {
 
     /// Appends `text` to both buffers unconditionally.
     ///
-    /// Only withheld marker-byte flushes use this; those bytes are never code.
+    /// Only withheld marker-byte flushes use this. Those bytes are never code.
     fn append_verbatim(&mut self, text: &str) {
         self.text.push_str(text);
         self.scan.push_str(text);
@@ -391,8 +394,8 @@ impl ItemFrame {
         self.buffers.push_break();
     }
 
-    /// Rejects a pending marker: inline content occupies the item's leading
-    /// slot, so no marker can be recognized there.
+    /// Rejects a pending marker because inline content occupies the item's
+    /// leading slot.
     fn reject_marker(&mut self) {
         if let MarkerAction::FlushPlain {
             buffered,
@@ -428,10 +431,10 @@ impl ItemFrame {
 
     /// Scans and flushes this item's scan buffer into its local metadata.
     ///
-    /// The marker state must be decided before the scan mode is read: a
-    /// pending `- [x]` item flushes when a nested list starts, with no
-    /// trailing-whitespace text chunk ever arriving. A marked item scans with
-    /// task emoji shorthands enabled; a plain item scans without them.
+    /// Decides the marker state before reading the scan mode. An undecided
+    /// `- [x]` item flushes when a nested list starts without a trailing
+    /// whitespace chunk. A marked item enables task emoji shorthand, and a
+    /// plain item disables it.
     ///
     /// Returns the flushed metadata, or `None` if the scan buffer is empty.
     fn flush_scan_buffer(&mut self) -> Option<FlushedMetadata> {
@@ -457,7 +460,7 @@ impl ItemFrame {
     ///
     /// One tokenization pass feeds priority, date, and clean-text extraction.
     /// Extraction reads must precede the move of the raw text into `ListText`
-    /// (NLL-enforced).
+    /// (enforced by non-lexical lifetimes).
     fn finish(
         self,
         tag_filters: &[Tag],
@@ -505,7 +508,8 @@ struct FinalizedItem {
     item: ListItem,
     /// Whether the item classified as a task.
     is_task: bool,
-    /// Whether the item's own task status is complete; `true` for non-tasks.
+    /// Whether the item's own task status is complete, or `true` for
+    /// non-tasks.
     is_complete: bool,
     /// The item's descendant-task completion state at close time.
     completion: SubTaskCompletion,

@@ -7,7 +7,7 @@
 //! - `file.include("path")` reads a file under [`Config::root`] and inserts its
 //!   content.
 //!
-//! The `write_to` method stores its path in minijinja's per-render
+//! The `write_to` method stores its path in `MiniJinja`'s per-render
 //! [`State::set_temp`]. [`super::TemplateEngine::render`] reads the path after
 //! rendering completes.
 //!

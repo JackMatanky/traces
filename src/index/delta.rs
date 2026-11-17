@@ -91,7 +91,7 @@ pub(super) struct InlinkDelta {
 }
 
 impl InlinkDelta {
-    /// Computes added and removed inlink edges.
+    /// Computes added and removed inbound link edges.
     #[inline]
     #[must_use]
     pub(super) fn compute(
@@ -161,7 +161,7 @@ impl InlinkDelta {
 
 /// Pushes `left - right` source paths for `target` into `diff`.
 ///
-/// Both slices must be sorted; the function performs one merge pass.
+/// Both slices must be in sorted order. This function does one merge pass.
 fn diff_sorted_sources(
     target: &std::path::Path,
     left: &[PathBuf],

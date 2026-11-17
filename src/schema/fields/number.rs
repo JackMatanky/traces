@@ -40,7 +40,7 @@ impl SchemaNumberField {
         self.step
     }
 
-    /// Build an instance for tests.
+    /// Builds an instance for tests.
     #[cfg(test)]
     pub(crate) const fn for_test(
         min: Option<f64>,

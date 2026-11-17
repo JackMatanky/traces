@@ -15,8 +15,10 @@ pub(crate) static CEILING_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
         .unwrap_or_default()
 });
 
-/// Holds the default directory names ignored during scans; user-configured
-/// names from `TRACES_IGNORED_DIRS` are added on top of these.
+/// Holds the default directory names to ignore during scans.
+///
+/// [`IGNORED_DIRS`] adds user-configured names from `TRACES_IGNORED_DIRS` to
+/// this list.
 pub(crate) const DEFAULT_IGNORED_DIRS: [&str; 4] =
     [".git", "target", "node_modules", ".traces"];
 

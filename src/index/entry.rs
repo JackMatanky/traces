@@ -112,8 +112,8 @@ impl WorkspaceIndex {
     ///
     /// # Panics
     ///
-    /// Panics if `position` is out of bounds for the entries slice. Row indices
-    /// are only constructed from a valid range over entries.
+    /// Panics if `position` is out of bounds for the entries slice. Callers
+    /// construct row indices only from a valid range over entries.
     #[expect(
         clippy::expect_used,
         reason = "RowIndex is always in bounds: values are only constructed \
@@ -197,7 +197,7 @@ impl RowIndex {
     }
 }
 
-/// Moves inlink sources into their matching [`FileEntry`]s.
+/// Moves inbound link sources into their matching [`FileEntry`] items.
 ///
 /// The typed view sorts `entries` by path. Each lookup uses binary search with
 /// that order. A miss therefore means the target is unknown, not that the slice
@@ -354,7 +354,7 @@ mod tests {
         }
         #[test]
         fn creates_no_files_on_disk() {
-            // The current directory is process-wide state. Hold CWD_TEST_LOCK
+            // The current directory is process-wide state. Hold `CWD_TEST_LOCK`
             // so another test cannot change it during this walk.
             let _cwd = crate::cli::CwdGuard::same_dir();
             let count_entries =

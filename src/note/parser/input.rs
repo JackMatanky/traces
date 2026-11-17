@@ -4,6 +4,7 @@
 //! Markdown source text alongside resolved [`TaskConfig`] and
 //! [`FrontmatterConfig`] settings. By borrowing all components, parsing
 //! operates without heap allocations or cloning configuration tables.
+
 use std::path::Path;
 
 use crate::config::{FrontmatterConfig, TaskConfig};
@@ -23,13 +24,13 @@ static DEFAULT_FRONTMATTER_CONFIG: std::sync::LazyLock<FrontmatterConfig> =
 /// without allocating or cloning configuration tables.
 #[derive(Clone, Debug)]
 pub struct MarkdownParserInput<'a> {
-    /// Project-relative path of the note being parsed.
+    /// Stores the project-relative path of the target note.
     path: &'a Path,
-    /// Raw Markdown source text.
+    /// Stores the raw Markdown source text.
     src: &'a str,
-    /// Resolved task status and tag filter configuration.
+    /// Stores the resolved task status and tag filter configuration.
     tasks: &'a TaskConfig,
-    /// Resolved frontmatter field name configuration.
+    /// Stores the resolved frontmatter field name configuration.
     frontmatter: &'a FrontmatterConfig,
 }
 
@@ -65,7 +66,7 @@ impl<'a> MarkdownParserInput<'a> {
         }
     }
 
-    /// Returns the project-relative path of the note being parsed.
+    /// Returns the project-relative path of the target note.
     #[inline]
     #[must_use]
     pub(crate) const fn path(&self) -> &'a Path {

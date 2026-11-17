@@ -25,7 +25,7 @@ pub(super) struct TaskScan<'a> {
 }
 
 impl<'a> TaskScan<'a> {
-    /// Tokenizes `raw` in a single pass with task shorthands enabled.
+    /// Tokenizes `raw` in a single pass with task shorthand enabled.
     pub(super) fn scan(
         raw: &'a str,
         code_spans: &[std::ops::Range<usize>],
@@ -45,11 +45,12 @@ impl<'a> TaskScan<'a> {
         }
     }
 
-    /// Extracts task lifecycle dates from emoji shorthands and inline task
+    /// Extracts task lifecycle dates from emoji shorthand and inline task
     /// fields.
     ///
     /// Precedence and resolution rules:
-    /// - Emoji date shorthands take precedence over inline key-value fields.
+    ///
+    /// - Emoji date shorthand takes precedence over inline key-value fields.
     /// - When multiple dates appear for the same lifecycle kind, the first
     ///   occurrence wins.
     /// - Unmatched lifecycle dates fall back to searching `fields` by canonical
@@ -90,6 +91,7 @@ impl<'a> TaskScan<'a> {
     /// <level>]` field.
     ///
     /// Precedence and resolution rules:
+    ///
     /// - Priority emojis take precedence over inline fields.
     /// - When multiple priority emojis are present, the first in document order
     ///   wins.
@@ -119,15 +121,16 @@ impl<'a> TaskScan<'a> {
     /// whitespace.
     ///
     /// Strips:
-    /// - Priority emojis
-    /// - Task date shorthands and wrapped date fields
-    /// - Tags matching configured `tag_filters`
+    ///
+    /// - Priority emojis.
+    /// - Task date shorthand and wrapped date fields.
+    /// - Tags matching configured `tag_filters`.
     ///
     /// Expects `raw` to have any leading task marker prefix already removed.
     pub(super) fn clean_text(&self, tag_filters: &[Tag]) -> String {
-        // Token spans from a single logos pass are disjoint and ordered, so
-        // unremoved text slices can be accumulated directly without an
-        // intermediate allocation of removal spans.
+        // Token spans from a single logos pass are disjoint and ordered.
+        // Accumulate retained text slices directly without allocating removal
+        // spans.
         let mut cleaned = String::with_capacity(self.raw.len());
         let mut current_idx = 0;
         for token in &self.tokens {
@@ -201,7 +204,7 @@ impl<'a> TaskScan<'a> {
 
     /// Returns the first date value matching `key_name` across `fields`.
     ///
-    /// [`FieldKeyRef`] resolves the canonical entry in O(1); keys in `fields`
+    /// [`FieldKeyRef`] resolves the canonical entry in O(1). Keys in `fields`
     /// are unique under canonical equality, so at most one entry matches.
     fn first_date_in_field(
         fields: &IndexMap<FieldKey, Vec<NoteFieldValue>>,
@@ -241,6 +244,7 @@ impl<'a> TaskScan<'a> {
 /// incomplete.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(super) enum SubTaskCompletion {
+    /// Indicates every descendant task is complete.
     AllComplete,
     /// Conservative fallback: unknown or default completion state is
     /// fail-closed.
@@ -249,6 +253,8 @@ pub(super) enum SubTaskCompletion {
 }
 
 impl SubTaskCompletion {
+    /// Creates the initial completion state for a newly opened item.
+    ///
     /// A newly opened item contains zero child tasks, so its descendant tree
     /// contains no incomplete tasks until a child task is observed.
     #[inline]
@@ -260,8 +266,9 @@ impl SubTaskCompletion {
     /// Updates completion state after observing a child item.
     ///
     /// Transitions to [`Self::HasIncomplete`] when:
-    /// - The child item is an incomplete task
-    /// - The child item's subtask completion is [`Self::HasIncomplete`]
+    ///
+    /// - The child item is an incomplete task.
+    /// - The child item's subtask completion is [`Self::HasIncomplete`].
     #[inline]
     pub(super) fn observe_child(
         &mut self,
@@ -290,7 +297,7 @@ pub(super) struct TaskClassificationParams<'a> {
     pub(super) fields: &'a IndexMap<FieldKey, Vec<NoteFieldValue>>,
     /// Tags scanned from the item's own text.
     pub(super) tags: &'a [Tag],
-    /// Configured filters deciding Task vs Checkbox classification.
+    /// Stores configured filters that decide task vs checkbox classification.
     pub(super) tag_filters: &'a [Tag],
     /// Resolves marker symbols to task statuses.
     pub(super) statuses: &'a TaskStatusMap,
@@ -650,8 +657,8 @@ mod tests {
         #[test]
         fn classifies_a_bare_marker_with_no_trailing_text_as_a_task() {
             // `- [x]` as an entire item: the line terminator supplies the
-            // marker's trailing whitespace, matching pulldown-cmark's
-            // ENABLE_TASKLISTS behavior.
+            // marker's trailing whitespace, matching `pulldown-cmark`'s
+            // `ENABLE_TASKLISTS` behavior.
             let note = parse("- [x]");
 
             let item = note.lists().first().expect("item present");
@@ -713,8 +720,9 @@ mod tests {
 
         #[test]
         fn rejects_unicode_whitespace_after_the_marker() {
-            // NBSP is ordinary text in Markdown, not the marker's trailing
-            // whitespace (ASCII whitespace only, mirroring pulldown-cmark).
+            // Non-breaking space is ordinary text in Markdown, not the marker's
+            // trailing whitespace (ASCII whitespace only, mirroring
+            // `pulldown-cmark`).
             let note = parse("- [x]\u{00A0}Task");
 
             let item = note.lists().first().expect("item present");
@@ -1252,9 +1260,8 @@ mod tests {
 
         #[test]
         fn rejects_datetime_shorthand_with_alphanumeric_terminator() {
-            // `📅 2025-01-15T12:00` is not a valid shorthand date: both the
-            // lexer and the date scanner must reject it so no due date is
-            // extracted from plain text.
+            // `📅 2025-01-15T12:00` is not a valid shorthand date. Both the
+            // lexer and date scanner must reject it.
             let input = "- [ ] Task 📅 2025-01-15T12:00";
             let note = parse(input);
             let task = first_task(&note).expect("task present");
@@ -1264,8 +1271,8 @@ mod tests {
 
         #[test]
         fn skips_multibyte_text_after_date_emoji_without_panicking() {
-            // Byte 10 of the multibyte candidate is not a char boundary; the
-            // scanner must skip it and still find the valid date that follows.
+            // Byte 10 of the multibyte candidate is not a char boundary. The
+            // scanner must skip it and find the valid date that follows.
             let input = "- [ ] Task 📅 你好你好 📅 2025-01-15";
             let note = parse(input);
             let task = first_task(&note).expect("task present");

@@ -1,11 +1,14 @@
 //! Plans incremental index refreshes and applies typed updates to the index
 //! store.
 //!
-//! [`RefreshState`] models refresh outcomes. Fresh scans use the store as-is.
-//! Stale scans use [`PendingApply`] before they return a persisted store.
-//! Drifted scans rebuild the index. Drift takes priority over staleness.
-//! [`PersistFailed`] keeps the pending data so [`IndexerService::refresh`] can
-//! still build an in-memory index after a write fails.
+//! [`RefreshState`] models four refresh outcomes, with configuration drift
+//! taking priority over staleness:
+//!
+//! - Fresh scans use the persisted store as-is.
+//! - Stale scans apply [`PendingApply`] before returning a persisted store.
+//! - Drifted scans rebuild the index.
+//! - [`PersistFailed`] keeps pending data so [`IndexerService::refresh`] can
+//!   still build an in-memory index after a write fails.
 //!
 //! [`IndexerService::refresh`]: super::service::IndexerService::refresh
 
@@ -24,8 +27,8 @@ use crate::{FileMeta, Note};
 
 /// Reports the changes found and handled by one refresh.
 ///
-/// Count accessors return zero for variants without counts. A config drift
-/// report gives its cause instead of row counts.
+/// Count accessors return zero for variants without counts. A configuration
+/// drift report gives its cause instead of row counts.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum RefreshReport {
     /// Nothing changed, so the refresh used the persisted index as-is.
@@ -40,9 +43,9 @@ pub enum RefreshReport {
         /// Counts added and removed inbound link edges.
         links_modified: usize,
     },
-    /// The config changed, so the refresh rebuilt the index.
+    /// The configuration changed, so the refresh rebuilt the index.
     ConfigDrift {
-        /// Explains why the stored index no longer matched the config.
+        /// Explains why the stored index no longer matched the configuration.
         cause: DriftCause,
     },
 }
@@ -118,14 +121,14 @@ pub(super) enum RefreshState {
     /// File metadata changed. The refresh has reconciled the changes but has
     /// not persisted them.
     Stale(Box<PendingApply>),
-    /// The store used a different config. The plan rebuilt the index from its
-    /// scan and keeps its store handle for the rebuild write.
+    /// The store used a different configuration. The plan rebuilt the index
+    /// from its scan and keeps its store handle for the rebuild write.
     Drifted {
-        /// Explains why the stored index no longer matched the config.
+        /// Explains why the stored index no longer matched the configuration.
         cause: DriftCause,
         /// Holds the index rebuilt from the plan's scan.
         index: WorkspaceIndex,
-        /// Holds the plan's open store. redb allows only one open handle.
+        /// Holds the plan's open store. `redb` allows only one open handle.
         store: IndexStore,
     },
 }
@@ -237,7 +240,7 @@ impl PersistFailed {
         self.source
     }
 
-    /// Materializes the unpersisted pass into an in-memory [`WorkspaceIndex`].
+    /// Materializes the retained pass into an in-memory [`WorkspaceIndex`].
     ///
     /// # Errors
     ///
@@ -248,7 +251,7 @@ impl PersistFailed {
     }
 }
 
-/// Tracks the notes used to build the reconciled inlink map.
+/// Tracks the notes used to build the reconciled inbound link map.
 pub(super) struct InlinkReconciliation {
     links: InlinkMap,
     notes: NoteScope,
@@ -312,13 +315,14 @@ pub(super) struct RefreshPlan {
 }
 
 impl RefreshPlan {
-    /// Opens [`IndexStore`], scans the filesystem, and reads stored files and
-    /// their fingerprint.
+    /// Opens [`IndexStore`], scans the filesystem, and reads stored metadata.
     ///
-    /// The filesystem walk runs alongside [`IndexStore::open`] and the store
-    /// read. This method does not decode link rows. Reconciliation or index
-    /// materialization loads them as needed. A virgin store has no drift; its
-    /// first build is a file change.
+    /// The filesystem walk runs in parallel with [`IndexStore::open`] and the
+    /// metadata read. This method skips decoding link rows until reconciliation
+    /// or index materialization needs them.
+    ///
+    /// A virgin store reports no drift, so its initial build records file
+    /// changes.
     ///
     /// # Errors
     ///
@@ -354,7 +358,7 @@ impl RefreshPlan {
     }
 
     /// Takes the cause of the drift, or `None` if the store matches the running
-    /// config.
+    /// configuration.
     #[inline]
     pub(super) const fn take_drift(&mut self) -> Option<DriftCause> {
         self.drift.take()
@@ -398,7 +402,7 @@ impl RefreshPlan {
         }
     }
 
-    /// Reconciles reparsed notes with persisted state.
+    /// Reconciles re-parsed notes with persisted state.
     ///
     /// # Errors
     ///
@@ -535,7 +539,7 @@ impl IndexUpdate {
     }
 }
 
-/// Merges stored notes with deletions and reparsed notes for a full recompute.
+/// Merges stored notes with deletions and re-parsed notes for a full recompute.
 ///
 /// Moves `modified_notes` into the result without cloning notes.
 ///
@@ -560,8 +564,8 @@ fn merge_refreshed_notes(
     }
 
     // Both inputs are path-ascending: `read_all_notes` returns sorted rows and
-    // `parse_notes` preserves the sorted upsert order, so one merge pass
-    // produces the union with modified notes replacing persisted rows.
+    // `parse_notes` preserves the sorted upsert order. One merge pass produces
+    // the union with modified notes replacing persisted rows.
     let mut merged = Vec::with_capacity(
         all_notes.len().saturating_add(modified_notes.len()),
     );

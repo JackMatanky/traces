@@ -1,12 +1,10 @@
-//! Pipeline tests shared by the page-query commands (`list` and `table`).
+//! Runs shared pipeline tests for the page-query commands (`list` and `table`).
 //!
-//! Both commands run the same pipeline: resolve the sort order against the
-//! trusted root, refresh the [`WorkspaceIndex`], apply the source selector and
-//! `--where` filters, then render. These rstest tables pin that shared
-//! pipeline once per behaviour for both modes; each command's own
-//! formatting-specific tests stay beside its implementation.
-//!
-//! [`WorkspaceIndex`]: crate::index::WorkspaceIndex
+//! Both commands resolve the sort order against the trusted root and refresh
+//! the [`crate::index::WorkspaceIndex`]. They then apply the source selector
+//! and `--where` filters before rendering. These `rstest` tables test that
+//! shared pipeline once per behavior for both modes. Each command keeps its own
+//! formatting tests beside its implementation.
 
 use std::{fs, path::Path};
 
@@ -19,22 +17,25 @@ use crate::{
     query::{QueryBuilderError, QueryError},
 };
 
-/// Which page-query command the table drives.
+/// Identifies which page-query command the test table drives.
 #[derive(Copy, Clone, Debug)]
 enum Mode {
-    /// `traces list`: Markdown bullets of `file.path`.
+    /// Runs `traces list` with Markdown bullets of `file.path`.
     List,
-    /// `traces table`: a Markdown table with one `file.path` column.
+    /// Runs `traces table` as a Markdown table with one `file.path` column.
     Table,
 }
 
-/// Either command, exposing the common `render` seam.
+/// Wraps either page-query command behind a common `render` seam.
 enum Query {
+    /// Page list command.
     List(List),
+    /// Page table command.
     Table(Table),
 }
 
 impl Query {
+    /// Renders the wrapped command against `config`.
     fn render(self, config: &Config) -> Result<(String, usize), CliError> {
         match self {
             Self::List(list) => list.render(config),
@@ -43,8 +44,7 @@ impl Query {
     }
 }
 
-/// Builds the command for `mode` with the shared `file.path` column for
-/// `table` (the only column both modes' expected outputs reference).
+/// Builds a command for `mode` using the shared `file.path` column.
 fn query(
     mode: Mode,
     from: Option<String>,

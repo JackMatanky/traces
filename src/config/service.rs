@@ -1,12 +1,13 @@
-//! Loads Config Files and manages trust.
+//! Loads Configuration Files and administers trust.
 //!
-//! [`ConfigService`] finds Config Files and builds the effective
-//! Configuration Scope. It checks Trust Status before it reads local content.
-//! It records each local Tracked Config Path in the [`TrackerStore`]. A failure
-//! to record during loading does not stop loading. A trust grant records the
-//! path before it writes to the [`TrustStore`]. Each trusted root with a local
-//! Config File therefore has a tracked path. [`ConfigService::trust_subjects`]
-//! resolves user paths into trust requests.
+//! [`ConfigService`] finds Configuration Files, checks Trust Status before it
+//! reads local content, and builds the effective Configuration Scope. It also
+//! records each local Tracked Configuration Path in the [`TrackerStore`],
+//! though a recording failure does not stop loading.
+//!
+//! A trust grant records the path before it writes to the [`TrustStore`], so
+//! each trusted root with a local Configuration File has a tracked path.
+//! [`ConfigService::trust_subjects`] resolves caller paths into trust requests.
 
 use std::{
     io,
@@ -28,16 +29,25 @@ use super::{
     trust::{TrustRequest, TrustRequests, TrustScope, TrustStore},
 };
 
-/// Loads Config Files and manages trust.
+/// Loads Configuration Files and administers trust.
 ///
-/// Loading uses discovery, read, trust, and value stages.
-/// Trust Verification checks local content before parsing.
-/// Global Config Files do not need a trust check.
-/// The Tracker Store records Tracked Config Paths.
-/// The Trust Store records workspace roots and Companion Hashes.
+/// Loading runs through four stages:
+///
+/// - Discovery: locates local and global Configuration Files.
+/// - Trust: checks local content before parsing, while global Configuration
+///   Files skip this check.
+/// - Read: reads and parses the selected Configuration Files.
+/// - Value: checks parsed configuration values.
+///
+/// Two stores hold trust and path state:
+///
+/// - Tracker Store: records Tracked Configuration Paths.
+/// - Trust Store: records workspace roots and Companion Hashes.
 #[derive(Clone, Debug)]
 pub struct ConfigService {
+    /// Holds the Tracker Store for local Configuration File paths.
     tracked: TrackerStore,
+    /// Holds the Trust Store for workspace roots and Companion Hashes.
     trust: TrustStore,
 }
 
@@ -56,17 +66,16 @@ impl ConfigService {
         &self.tracked
     }
 
-    /// Finds Config Files from `cwd` and builds the effective Configuration
-    /// Scope.
+    /// Finds Configuration Files from `cwd` and builds the Configuration Scope.
     ///
     /// # Errors
     ///
-    /// - [`Discovery`] if discovery finds no local Config File or the file
-    ///   system cannot inspect a path.
-    /// - [`Read`] if the file system cannot read a selected Config File or TOML
-    ///   parsing fails.
-    /// - [`Trust`] if Trust Verification rejects the local Config File or a
-    ///   Trust Store or Config File read fails.
+    /// - [`Discovery`] if discovery finds no local Configuration File or the
+    ///   filesystem cannot inspect a path.
+    /// - [`Read`] if the filesystem cannot read a selected Configuration File
+    ///   or TOML parsing fails.
+    /// - [`Trust`] if Trust Verification rejects the local Configuration File
+    ///   or a Trust Store or Configuration File read fails.
     /// - [`Value`] if a parsed value fails its check.
     ///
     /// [`Discovery`]: ConfigError::Discovery
@@ -79,19 +88,19 @@ impl ConfigService {
         self.build(discovered)
     }
 
-    /// Builds [`Config`] from discovered Config Files.
+    /// Builds [`Config`] from discovered Configuration Files.
     ///
-    /// Applies global values before local values.
-    /// Records the local Tracked Config Path before Trust Verification.
-    /// A recording failure does not stop loading.
-    /// It checks local content before parsing it.
+    /// This method applies global values before local values and checks local
+    /// content before parsing it. It also records the local Tracked
+    /// Configuration Path before Trust Verification, and a recording failure
+    /// does not stop loading.
     ///
     /// # Errors
     ///
-    /// - [`Trust`] if Trust Verification rejects the local Config File or a
-    ///   Trust Store or Config File read fails.
-    /// - [`Read`] if the file system cannot read a selected Config File or TOML
-    ///   parsing fails.
+    /// - [`Trust`] if Trust Verification rejects the local Configuration File
+    ///   or a Trust Store or Configuration File read fails.
+    /// - [`Read`] if the filesystem cannot read a selected Configuration File
+    ///   or TOML parsing fails.
     /// - [`Value`] if a parsed value fails its check.
     ///
     /// [`Trust`]: ConfigError::Trust
@@ -119,14 +128,13 @@ impl ConfigService {
 
     /// Grants trust for a [`TrustRequest`].
     ///
-    /// Records a local Tracked Config Path first.
-    /// It stops the grant if recording fails.
-    /// A root-only request has no path to record.
+    /// Records a local Tracked Configuration Path first. It stops the grant if
+    /// recording fails. A root-only request has no path to record.
     ///
     /// # Errors
     ///
     /// - [`Tracker`] if recording the path or workspace root fails.
-    /// - [`Hash`] if reading the Config File as UTF-8 text fails.
+    /// - [`Hash`] if reading the Configuration File as UTF-8 text fails.
     ///
     /// [`Tracker`]: ConfigTrustError::Tracker
     /// [`Hash`]: ConfigTrustError::Hash
@@ -155,23 +163,26 @@ impl ConfigService {
         self.trust.untrust(subject)
     }
 
-    /// Resolves a user-supplied path into trust requests.
+    /// Resolves a caller-supplied path into trust requests.
     ///
-    /// It uses canonical paths to identify workspaces.
-    /// It keeps the given spelling for paths that do not exist.
-    /// A Config File path identifies that Config File.
-    /// Another file uses its parent directory.
-    /// [`TrustScope::NearestLocal`] selects the nearest enclosing local Config
-    /// File or a root-only request.
-    /// [`TrustScope::LocalSubtree`] selects Config Files in or below the
-    /// directory. If none exist, it selects the enclosing Config File.
+    /// Workspaces use canonical paths, while missing paths keep their given
+    /// spelling. A Configuration File path selects that file, and any other
+    /// path uses its parent directory.
+    ///
+    /// The scope controls which Configuration Files match:
+    ///
+    /// - [`TrustScope::NearestLocal`]: selects the nearest enclosing local
+    ///   Configuration File or a root-only request.
+    /// - [`TrustScope::LocalSubtree`]: selects Configuration Files in or below
+    ///   the directory, or the enclosing file if none exist.
     ///
     /// # Errors
     ///
-    /// - [`Inaccessible`] if the file system cannot inspect or canonicalize a
+    /// - [`Inaccessible`] if the filesystem cannot inspect or canonicalize a
     ///   path that exists.
-    /// - [`NotFound`] if [`TrustScope::LocalSubtree`] finds no local Config
-    ///   File in, below, or above the directory before a walk ceiling.
+    /// - [`NotFound`] if [`TrustScope::LocalSubtree`] finds no local
+    ///   Configuration File in, below, or above the directory before a walk
+    ///   ceiling.
     ///
     /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
     /// [`NotFound`]: ConfigDiscoveryError::NotFound
@@ -186,9 +197,8 @@ impl ConfigService {
     /// Creates a service that uses the given Tracker Store and Trust Store
     /// roots.
     ///
-    /// Tests use isolated stores.
-    /// Production code uses [`ConfigService::default`] for OS state
-    /// directories.
+    /// Tests use isolated stores. Production code uses
+    /// [`ConfigService::default`] for OS state directories.
     #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     #[inline]
@@ -214,13 +224,13 @@ impl Default for ConfigService {
     }
 }
 
-/// Resolves a path with [`ConfigLocator`] and the rules from
-/// [`ConfigService::trust_subjects`].
+/// Resolves a path with [`ConfigLocator`] and [`ConfigService::trust_subjects`]
+/// rules.
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if the file system cannot inspect or canonicalize a path.
-/// - [`NotFound`] if subtree discovery finds no local Config File.
+/// - [`Inaccessible`] if the filesystem cannot inspect or canonicalize a path.
+/// - [`NotFound`] if subtree discovery finds no local Configuration File.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 /// [`NotFound`]: ConfigDiscoveryError::NotFound
@@ -263,8 +273,8 @@ fn resolve_trust_subjects(
 ///
 /// # Errors
 ///
-/// - [`Inaccessible`] if canonicalization fails for a reason other than a
-///   missing path.
+/// - [`Inaccessible`] if resolving the canonical path fails for a reason other
+///   than a missing path.
 ///
 /// [`Inaccessible`]: ConfigDiscoveryError::Inaccessible
 fn canonical_or_given(path: &Path) -> ConfigDiscoveryResult<PathBuf> {
@@ -280,7 +290,7 @@ fn canonical_or_given(path: &Path) -> ConfigDiscoveryResult<PathBuf> {
     }
 }
 
-/// Creates one [`TrustRequest`] for each found local Config File.
+/// Creates one [`TrustRequest`] for each found local Configuration File.
 fn config_requests(files: &[LocalConfigFile<FileDiscovered>]) -> TrustRequests {
     files.iter().map(TrustRequest::from).collect()
 }
@@ -351,7 +361,7 @@ mod tests {
                 .expect("trust candidate root");
         }
 
-        /// Limits discovery to fixture directories and Config Files.
+        /// Limits discovery to fixture directories and Configuration Files.
         fn locator(&self) -> ConfigLocator {
             ConfigLocator::new(
                 vec![self.temp.path().to_path_buf()],
@@ -363,12 +373,12 @@ mod tests {
         ///
         /// # Errors
         ///
-        /// - [`Discovery`] if discovery finds no local Config File or the file
-        ///   system cannot inspect a path.
-        /// - [`Trust`] if Trust Verification rejects the local Config File or a
-        ///   Trust Store or Config File read fails.
-        /// - [`Read`] if the file system cannot read a Config File or TOML
-        ///   parsing fails.
+        /// - [`Discovery`] if discovery finds no local Configuration File or
+        ///   the filesystem cannot inspect a path.
+        /// - [`Trust`] if Trust Verification rejects the local Configuration
+        ///   File or a Trust Store or Configuration File read fails.
+        /// - [`Read`] if the filesystem cannot read a Configuration File or
+        ///   TOML parsing fails.
         /// - [`Value`] if a parsed value fails its check.
         ///
         /// [`Discovery`]: ConfigError::Discovery

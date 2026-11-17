@@ -1,10 +1,8 @@
-//! Page-level list query command.
+//! Runs the page-level list query command.
 //!
-//! Handles `traces list` by refreshing the trusted root's [`WorkspaceIndex`],
-//! selecting a source scope, applying the optional filter, and printing
-//! matching pages as a Markdown bullet list.
-//!
-//! [`WorkspaceIndex`]: crate::index::WorkspaceIndex
+//! Handles `traces list` by refreshing the trusted root's
+//! [`crate::index::WorkspaceIndex`], selecting a source scope, applying the
+//! optional filter, and printing matching pages as a Markdown bullet list.
 
 use clap::Args;
 
@@ -14,24 +12,27 @@ use super::{
 };
 use crate::Config;
 
-/// Field path rendered for each `traces list` bullet.
+/// Defines the field path rendered for each `traces list` bullet.
 const LIST_FIELD: &str = "file.path";
 
-/// Arguments for `traces list`.
+/// Defines arguments for `traces list`.
 ///
 /// Queries pages from the trusted project root and prints matching file paths
 /// as a Markdown bullet list.
 #[derive(Debug, Args)]
 pub(super) struct List {
-    /// Source expression, e.g. `#tag`, `folder/`, `@Class*`, or a boolean
-    /// combination. Omit to query every indexed page.
+    /// Selects the source scope, such as `#tag`, `folder/`, or `@Class*`.
+    ///
+    /// Omit to query every indexed page.
     #[arg(long)]
     pub(super) from: Option<String>,
-    /// Filter expression narrowing results, e.g. `"file.folder == \"books\""`.
-    /// Repeatable; multiple `--where` flags compose as AND.
+    /// Narrows results with a filter expression, such as
+    /// `"file.folder == \"books\""`.
+    ///
+    /// Repeatable. Multiple `--where` flags combine with AND.
     #[arg(long = "where")]
     pub(super) filter: Vec<String>,
-    /// Sort configuration. See [`SortArgs`].
+    /// Configures result sorting with [`SortArgs`].
     #[command(flatten)]
     pub(super) sort: SortArgs,
 }
@@ -39,20 +40,16 @@ pub(super) struct List {
 impl List {
     /// Runs `traces list` for the trusted project root.
     ///
-    /// Refreshes the root's [`WorkspaceIndex`] and writes one Markdown bullet
-    /// per matching page to stdout.
+    /// Refreshes the root's [`crate::index::WorkspaceIndex`] and writes one
+    /// Markdown bullet per matching page to standard output.
     ///
     /// # Errors
     ///
-    /// - [`CliError::CurrentDirectory`] if the current directory cannot be
-    ///   read.
-    /// - [`CliError::ConfigLoad`] if loading configuration fails, including an
-    ///   untrusted project root.
-    /// - [`CliError::Index`] if refreshing the [`WorkspaceIndex`] fails.
-    /// - [`CliError::Query`] if `--where` is an unparsable filter expression or
-    ///   `--sort` names a malformed field path.
-    ///
-    /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
+    /// - [`CliError::Index`] if refreshing the [`crate::index::WorkspaceIndex`]
+    ///   fails.
+    /// - [`CliError::Query`] if `--where` is an invalid filter expression, the
+    ///   parser rejects the source selector, or `--sort` names a malformed
+    ///   field path.
     #[expect(
         clippy::print_stdout,
         reason = "list output is primary command output, not diagnostic text; \
@@ -66,21 +63,21 @@ impl List {
         Ok(())
     }
 
-    /// Renders matching pages from `root`'s [`WorkspaceIndex`] as a Markdown
-    /// bullet list, alongside the matched row count.
+    /// Renders matching pages from `config`'s [`crate::index::WorkspaceIndex`]
+    /// as a Markdown bullet list alongside the matched row count.
     ///
     /// Split from [`Self::run`] so tests can assert on rendered content without
-    /// capturing process stdout. `pub(super)` so the shared
-    /// `query_pipeline_tests` module can drive it alongside `Table::render`.
+    /// capturing process standard output. Uses `pub(super)` so
+    /// `super::query_pipeline_tests` can drive it alongside
+    /// [`super::table::Table::render`].
     ///
     /// # Errors
     ///
-    /// - [`CliError::Index`] if refreshing the [`WorkspaceIndex`] fails.
-    /// - [`CliError::Query`] if `--where` is an unparsable filter expression,
-    ///   the source selector cannot be parsed, or `--sort` names a malformed
+    /// - [`CliError::Index`] if refreshing the [`crate::index::WorkspaceIndex`]
+    ///   fails.
+    /// - [`CliError::Query`] if `--where` is an invalid filter expression, the
+    ///   parser rejects the source selector, or `--sort` names a malformed
     ///   field path.
-    ///
-    /// [`WorkspaceIndex`]: crate::index::WorkspaceIndex
     pub(super) fn render(
         &self,
         config: &Config,
@@ -241,13 +238,11 @@ mod tests {
         use super::*;
         use crate::cli::{Cli, Commands};
 
-        /// Extracts the parsed `List` args from `cli`.
+        /// Extracts the parsed [`List`] arguments from `cli`.
         ///
-        /// A dedicated `Option`-returning match so the "this is the List
-        /// subcommand" invariant is asserted through the same `.expect()`
-        /// idiom as the rest of this suite, not a manual `panic!`/
-        /// `unreachable!`/`assert!(false, ..)` (all denied by this crate's
-        /// clippy lint policy, including inside test code).
+        /// Uses an `Option`-returning match to assert the variant with
+        /// `.expect()`. This avoids `panic!`, `unreachable!`, and
+        /// `assert!(false, ..)`, which the crate `clippy` policy denies.
         fn list_args(cli: &Cli) -> &List {
             match &cli.command {
                 Some(Commands::List(list)) => Some(list),

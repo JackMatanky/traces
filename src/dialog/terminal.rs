@@ -1,19 +1,19 @@
-//! Interactive terminal [`DialogProvider`] backed by [`inquire`].
+//! Implements [`DialogProvider`] for interactive terminals using [`inquire`].
 
 use super::{DialogError, DialogProvider, DialogResult};
 
-/// [`DialogProvider`] that prompts through an interactive terminal.
+/// Prompts users through an interactive terminal with [`inquire`].
 ///
-/// Delegates to [`inquire`](https://docs.rs/inquire) when stdin is a TTY. In
-/// non-TTY contexts (CI, pipes, scripts, dry runs), returns fallback values
-/// instead of blocking:
+/// Delegates to [`inquire`] when standard input is a terminal. When standard
+/// input is not a terminal (CI, pipes, scripts, dry runs), it returns fallback
+/// values instead of blocking:
 ///
-/// - [`text`](DialogProvider::text): default or `""`
-/// - [`confirm`](DialogProvider::confirm): default or `false`
-/// - [`select`](DialogProvider::select): index `0`
-/// - [`multi_select`](DialogProvider::multi_select): empty [`Vec`]
+/// - [`DialogProvider::text`]: default or `""`
+/// - [`DialogProvider::confirm`]: default or `false`
+/// - [`DialogProvider::select`]: index `0`
+/// - [`DialogProvider::multi_select`]: empty [`Vec`]
 ///
-/// [`select`](DialogProvider::select) checks for empty `items` before the TTY
+/// [`DialogProvider::select`] checks for empty `items` before the terminal
 /// guard and returns [`DialogError::EmptySelectionInput`] in every runtime
 /// mode.
 ///
@@ -23,7 +23,7 @@ use super::{DialogError, DialogProvider, DialogResult};
 /// use traces::{DialogProvider, TerminalDialogProvider};
 ///
 /// let p = TerminalDialogProvider::new();
-/// // In non-TTY contexts all methods return their fallback defaults:
+/// // When standard input is not a terminal, methods return fallback defaults:
 /// let name = p.text("name", Some("carol"))?;
 /// assert_eq!(name, "carol");
 /// # Ok::<_, traces::DialogError>(())
@@ -108,7 +108,7 @@ impl DialogProvider for TerminalDialogProvider {
     }
 }
 
-/// Returns `true` when stdin is connected to an interactive terminal.
+/// Returns `true` when standard input is connected to an interactive terminal.
 #[inline]
 fn stdin_is_tty() -> bool {
     use std::io::IsTerminal as _;

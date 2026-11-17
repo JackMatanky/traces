@@ -1,8 +1,9 @@
-//! Implements row encoding and decoding for redb payloads in the index store.
+//! Implements row encoding and decoding for `redb` payloads in the index
+//! store.
 //!
 //! Rows use postcard and include [`StoreError`] context. [`path_from_bytes`]
-//! decodes invalid UTF-8 lossily. The path codec for serde fields lives at
-//! [`crate::path::codec`].
+//! decodes invalid UTF-8 with lossy replacement. The path codec for serde
+//! fields lives at [`crate::path::codec`].
 
 use std::{
     mem,
@@ -52,13 +53,14 @@ pub(super) fn decode_row<T: DeserializeOwned>(
     })
 }
 
-/// Exposes a borrowed project-relative path's native bytes as a redb key.
+/// Exposes a borrowed project-relative path's native bytes as a `redb` key.
 ///
-/// The store writes keys with [`Path::as_encoded_bytes`] and reads them through
-/// [`path_from_bytes`]. Serde row payloads use [`crate::path::codec`].
+/// The store writes keys with [`std::ffi::OsStr::as_encoded_bytes`] and reads
+/// them through [`path_from_bytes`]. Serde row payloads use
+/// [`crate::path::codec`].
 ///
 /// The wrapper keeps the borrowed path for error construction and row payloads.
-/// Converting the bytes back to an [`std::ffi::OsStr`] would require
+/// Converting the bytes back to an [`std::ffi::OsStr`] needs
 /// [`std::ffi::OsStr::from_encoded_bytes_unchecked`].
 #[derive(Copy, Clone)]
 pub(super) struct PathKey<'a>(&'a Path);
@@ -83,9 +85,9 @@ impl<'a> PathKey<'a> {
 /// Builds a path from byte-oriented store data.
 ///
 /// Tries UTF-8 first and falls back to lossy decoding for non-Unicode paths.
-/// The fallback can only surface in row-key decode context and query-output
-/// paths (tag, class, and folder lookups); stored `LINKS` edges resolve
-/// byte-exactly through loaded rows instead, never through this fallback.
+/// The fallback surfaces only in row-key decode context and query-output paths
+/// (tag, class, and folder lookups). Stored `LINKS` edges resolve byte-exactly
+/// through loaded rows instead.
 pub(super) fn path_from_bytes(bytes: &[u8]) -> PathBuf {
     str::from_utf8(bytes).map_or_else(
         |_| PathBuf::from(String::from_utf8_lossy(bytes).into_owned()),
@@ -215,7 +217,7 @@ mod tests {
             FileMeta, Note, file::FileFormat, test_support::parse_note,
         };
 
-        /// Generates a relative path of one to three unicode segments.
+        /// Generates a relative path of one to three Unicode segments.
         fn relative_path() -> impl Strategy<Value = PathBuf> {
             prop::collection::vec("[\\p{L}\\p{N}_ -]{1,8}", 1..=3)
                 .prop_map(|segments| PathBuf::from(segments.join("/") + ".md"))
@@ -263,8 +265,8 @@ mod tests {
         }
 
         proptest! {
-            /// Pins the file-row law: any file row decodes to the row that
-            /// was encoded, including non-ASCII paths and timestamps.
+            /// Pins the file-row law: any file row decodes to the original row,
+            /// including non-ASCII paths and timestamps.
             #[test]
             fn file_row_round_trips(
                 path in relative_path(),
@@ -287,8 +289,8 @@ mod tests {
                 prop_assert_eq!(decoded, row);
             }
 
-            /// Pins the note-row law: a parsed note decodes to the note that
-            /// was encoded, whatever headings, tags, links, and dates it has.
+            /// Pins the note-row law: a parsed note decodes to the original
+            /// note, whatever headings, tags, links, and dates it has.
             #[test]
             fn note_row_round_trips(
                 path in relative_path(),
@@ -308,8 +310,8 @@ mod tests {
                 prop_assert_eq!(decoded, row);
             }
 
-            /// Pins the reused-buffer law: encoding a second row into a
-            /// buffer that holds a first row leaves only the second row.
+            /// Pins the reused-buffer law: encoding a second row into a buffer
+            /// that holds a first row leaves only the second row.
             #[test]
             fn reused_buffer_holds_only_latest_row(
                 first in relative_path(),

@@ -1,6 +1,6 @@
-//! Builds the minijinja [`Environment`] that powers template rendering.
+//! Builds the `MiniJinja` [`Environment`] that powers template rendering.
 //!
-//! [`TemplateEngine`] wraps a minijinja [`Environment`] and registers the
+//! [`TemplateEngine`] wraps a `MiniJinja` [`Environment`] and registers the
 //! helper namespaces that templates can call. It also provides the [`render`]
 //! method that evaluates a template source string.
 //!
@@ -8,16 +8,16 @@
 //!
 //! | Namespace | Module | Registered By |
 //! |-----------|--------|---------------|
-//! | `file` | [`crate::template::engine::file`] | [`FileOps`] |
-//! | `query` | [`crate::template::engine::query`] | [`QueryOps`] |
-//! | `path` | [`crate::template::engine::path`] | [`PathOps`] |
-//! | `ui` | [`crate::template::engine::ui`] | [`UiOps`] |
-//! | `date` | [`crate::template::engine::date`] | [`DateOps`] |
-//! | `duration` | [`crate::template::engine::duration`] | [`DurationOps`] |
-//! | `str` | [`crate::template::engine::string`] | [`StrOps`] |
-//! | `num` | [`crate::template::engine::num`] | [`NumOps`] |
-//! | `yaml` | [`crate::template::engine::yaml`] | [`YamlOps`] |
-//! | `schema` | [`crate::template::engine::schema`] | [`SchemaOps`] |
+//! | `file` | [`crate::template::engine::file`] | [`file::FileOps`] |
+//! | `query` | [`crate::template::engine::query`] | [`query::QueryOps`] |
+//! | `path` | [`crate::template::engine::path`] | [`path::PathOps`] |
+//! | `ui` | [`crate::template::engine::ui`] | [`ui::UiOps`] |
+//! | `date` | [`crate::template::engine::date`] | [`date::DateOps`] |
+//! | `duration` | [`crate::template::engine::duration`] | [`duration::DurationOps`] |
+//! | `str` | [`crate::template::engine::string`] | [`string::StrOps`] |
+//! | `num` | [`crate::template::engine::num`] | [`num::NumOps`] |
+//! | `yaml` | [`crate::template::engine::yaml`] | [`yaml::YamlOps`] |
+//! | `schema` | [`crate::template::engine::schema`] | [`schema::SchemaOps`] |
 //! | `uuid` | none | built-in filter |
 //!
 //! The `uuid` filter is registered directly on the [`Environment`] as a plain
@@ -25,11 +25,10 @@
 //!
 //! # Construction
 //!
-//! [`TemplateEngine::new`] builds the [`Environment`], configures it with
-//! strict mode, registers the `uuid` filter and all namespaces, then returns
-//! the ready-to-render engine. The engine holds a reference to the
-//! [`TemplateLoader`] for `include` resolution and a [`DialogProvider`] for
-//! `ui.*` helpers.
+//! [`TemplateEngine::new`] builds the [`Environment`], registers the `uuid`
+//! filter and all namespaces, then returns the ready-to-render engine. The
+//! engine holds a reference to the [`TemplateLoader`] for `include` resolution
+//! and a [`DialogProvider`] for `ui.*` helpers.
 //!
 //! # Rendering
 //!
@@ -40,16 +39,6 @@
 //! [`render`]: TemplateEngine::render
 //! [`Environment`]: minijinja::Environment
 //! [`Object`]: minijinja::value::Object
-//! [`FileOps`]: crate::template::engine::file::FileOps
-//! [`QueryOps`]: crate::template::engine::query::QueryOps
-//! [`PathOps`]: crate::template::engine::path::PathOps
-//! [`UiOps`]: crate::template::engine::ui::UiOps
-//! [`DateOps`]: crate::template::engine::date::DateOps
-//! [`DurationOps`]: crate::template::engine::duration::DurationOps
-//! [`StrOps`]: crate::template::engine::string::StrOps
-//! [`NumOps`]: crate::template::engine::num::NumOps
-//! [`YamlOps`]: crate::template::engine::yaml::YamlOps
-//! [`SchemaOps`]: crate::template::engine::schema::SchemaOps
 
 mod cache;
 mod date;
@@ -197,18 +186,17 @@ impl TemplateEngine {
     }
 
     /// Compiles and renders `source` as template `name` with an empty context.
-    /// Returns the rendered text and any path captured by `file.write_to()` in
-    /// [`RenderOutput`].
     ///
-    /// The engine gives `name` to minijinja as the template identifier.
-    /// Diagnostic errors then report that name instead of `<string>`. The
-    /// engine collects `file.write_to()` state across the full render tree,
-    /// including included and extended templates.
+    /// Returns the rendered text and any path captured by `file.write_to()` in
+    /// [`RenderOutput`]. The engine gives `name` to `MiniJinja` as the template
+    /// identifier. Diagnostic errors then report that name instead of
+    /// `<string>`. The engine collects `file.write_to()` state across the full
+    /// render tree, including included and extended templates.
     ///
     /// # Errors
     ///
     /// - [`minijinja::Error`] if `source` fails to parse or render. The error
-    ///   also occurs if a referenced `{% include %}` or `{% extends %}`
+    ///   also happens if a referenced `{% include %}` or `{% extends %}`
     ///   template target fails to load or render.
     #[inline]
     pub(super) fn render(

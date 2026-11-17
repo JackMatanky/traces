@@ -1,9 +1,9 @@
 //! Parses recursive descent boolean algebra shared by source and filter
 //! languages.
 //!
-//! The parser applies `not` before `and`, then `or`.
-//! Parentheses group expressions. [`AtomParser`] supplies domain-specific
-//! atoms.
+//! The parser applies `not` before `and`, then `or`. Parentheses group
+//! expressions. [`AtomParser`] supplies domain-specific atoms.
+
 use crate::{
     Spanned, SpannedTokenStream,
     query::error::{QueryBuilderError, QuerySyntaxError},
@@ -12,9 +12,9 @@ use crate::{
 /// Represents binary logical operators and their accepted spellings.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum LogicalOp {
-    /// `AND` / `and` / `&&`.
+    /// Represents a logical AND operator (`AND`, `and`, `&&`).
     And,
-    /// `OR` / `or` / `||`.
+    /// Represents a logical OR operator (`OR`, `or`, `||`).
     Or,
 }
 
@@ -46,11 +46,11 @@ pub(super) enum LogicalControl {
 pub(crate) enum BooleanExpr<A> {
     /// Matches the inner domain-local atom.
     Atom(A),
-    /// Every child must match.
+    /// Requires every child expression to match.
     And(Vec<Self>),
-    /// Any child may match.
+    /// Matches when any child expression matches.
     Or(Vec<Self>),
-    /// The child must not match.
+    /// Negates the inner child expression.
     Not(Box<Self>),
 }
 
@@ -98,7 +98,7 @@ struct BooleanExprParser<'input, G: AtomParser> {
     depth: usize,
 }
 
-/// Parser function for one precedence tier.
+/// Defines a parser function for one precedence tier.
 type ParseTerm<'input, G> =
     fn(
         &mut BooleanExprParser<'input, G>,

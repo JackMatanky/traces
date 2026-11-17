@@ -1,10 +1,9 @@
 //! Defines the data structures and hierarchy operations for Markdown list items
 //! and task lists.
 //!
-//! This module defines the flat list-item data model. Items are stored in
-//! strict document order inside a [`Note`](crate::Note); hierarchy is
-//! reconstructed from each item's `depth` and `parent` source line rather than
-//! from child containers.
+//! Stores list items in a flat data model. A [`Note`](crate::Note) stores items
+//! in strict document order. Callers reconstruct hierarchy from each item's
+//! `depth` and `parent` source line rather than child containers.
 //!
 //! # Key Types
 //!
@@ -17,8 +16,8 @@
 //!   [`ListItemType::Task`].
 //! - [`ListText`]: Dual-representation text container maintaining both raw
 //!   source and clean display text.
-//! - [`descendants_of`]: Contiguous slice scan yielding the items following a
-//!   parent within a document-order slice.
+//! - `descendants_of`: Contiguous slice scan yielding the items after a parent
+//!   within a document-order slice.
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -33,10 +32,9 @@ pub(crate) type ListFieldMap = IndexMap<FieldKey, Box<[NoteFieldValue]>>;
 /// fields, tags, and source line positioning information.
 //
 // NOTE: `Eq` is deliberately not derived. `ListFieldMap` contains
-// `NoteFieldValue`, whose `Number` variant holds `f64`, so `Eq` is
-// unrepresentable on this struct and the clippy nursery lint
-// `derive_partial_eq_without_eq` (visible only under `-W clippy::nursery`)
-// flags it in error, but its suggestion does not compile.
+// `NoteFieldValue`, whose `Number` variant holds `f64`, so this struct cannot
+// derive `Eq`. The `clippy` nursery lint `derive_partial_eq_without_eq` flags
+// it, but its suggestion does not compile.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListItem {
     text: ListText,
@@ -127,10 +125,9 @@ impl ListItem {
 
     /// Attaches tags scanned from this item's own text.
     ///
-    /// Uses the same tag-token lexer that scans note body text; these are the
-    /// same tags already consulted for task tag filter classification,
-    /// resurfaced here as queryable data rather than discarded after
-    /// classification decides.
+    /// Uses the same tag-token lexer that scans note body text. Retains the
+    /// tags already consulted for task tag filter classification as queryable
+    /// data instead of discarding them.
     #[inline]
     #[must_use]
     pub(crate) fn with_tags<T: Into<Box<[Tag]>>>(mut self, tags: T) -> Self {
@@ -225,7 +222,7 @@ impl ListItem {
 /// configured task tag filters:
 ///
 /// - [`Self::Plain`]: Standard bullet or numbered item with no checkbox marker.
-/// - [`Self::Checkbox`]: Status-marked item that did not match configured task
+/// - [`Self::Checkbox`]: Status-marked item that does not match configured task
 ///   tag filters. Checkboxes carry no task-specific metadata and are excluded
 ///   from [`super::Note::tasks`].
 /// - [`Self::Task`]: Status-marked item classified as an active task, carrying
@@ -327,8 +324,8 @@ impl ListItemType {
 /// Stores task-specific data carried by a [`ListItemType::Task`] item.
 ///
 /// Encapsulates extracted task lifecycle dates ([`TaskDateSet`]), an optional
-/// priority ([`TaskPriority`]), the resolved [`TaskStatus`], and a precomputed
-/// boolean flag indicating whether the entire task subtree is complete.
+/// priority ([`TaskPriority`]), and the resolved [`TaskStatus`]. Also stores a
+/// flag indicating whether the entire task subtree is complete.
 ///
 /// # Examples
 ///
@@ -408,7 +405,7 @@ impl TaskListItem {
     }
 
     /// Returns `true` if all descendant tasks in this item's subtree are
-    /// resolved (done or cancelled), or if this item has no descendant tasks.
+    /// resolved (done or canceled), or if this item has no descendant tasks.
     ///
     /// # Examples
     ///
@@ -635,8 +632,8 @@ impl PartialEq<ListText> for &str {
     }
 }
 
-/// Returns an iterator over all descendant items of a list item with
-/// `parent_depth` from the following items in `slice`.
+/// Returns an iterator yielding every descendant item of a list item with
+/// `parent_depth` from `slice`.
 ///
 /// Scans contiguous items in document order whose depth is strictly greater
 /// than `parent_depth`, stopping at the first sibling or ancestor item.
@@ -1010,12 +1007,10 @@ mod tests {
             }
         }
 
-        /// Frozen postcard bytes of a fully populated `TaskListItem`,
-        /// serialized by the pre-redesign types at commit `e797368b` (all six
-        /// `DateValue` slots, priority `High`, status Done via `x`, and
-        /// `fully_complete: true`). Cached postcard indexes carry no format
-        /// version marker, so this test fails if a field is added, removed, or
-        /// reordered in any struct on the item's serialization path.
+        /// Frozen postcard bytes of a populated `TaskListItem` serialized at
+        /// commit `e797368b` (six `DateValue` slots, `High`, `x`, and
+        /// `fully_complete: true`). Cached postcard indexes carry no version
+        /// marker, so struct field changes break this test.
         #[test]
         fn decodes_pre_c1_task_list_item_wire_fixture() {
             const HEX: &str = concat!(

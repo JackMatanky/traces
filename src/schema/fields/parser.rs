@@ -1,9 +1,9 @@
-//! Attribute-table parsing utilities for schema field definitions.
+//! Provides attribute-table parsing utilities for schema field definitions.
 //!
 //! When deserializing schema field options, field parsers inspect an underlying
-//! key-value map. This module provides [`SchemaFieldParser`], a tracker that
-//! validates expected field types, registers accessed keys, and detects
-//! unrecognized or extraneous configuration options.
+//! key-value map. This module provides [`SchemaFieldParser`] to check field
+//! types, register accessed keys, and detect unrecognized or extraneous
+//! configuration options.
 
 use std::collections::HashSet;
 
@@ -18,13 +18,13 @@ use crate::FieldValue;
 
 /// Extracts keys and collects validation errors for schema field option tables.
 ///
-/// `SchemaFieldParser` coordinates field validation by recording which keys
-/// were explicitly requested via typed extractor methods
-/// ([`string`](Self::string), [`string_list`](Self::string_list), and
-/// [`f64`](Self::f64)). When extraction completes, invoking
-/// [`finish`](Self::finish) checks the remaining entries in the source map to
-/// flag unknown keys alongside any type mismatch errors accumulated during
-/// extraction.
+/// `SchemaFieldParser` tracks each key requested through typed extractor
+/// methods such as [`string`](Self::string),
+/// [`string_list`](Self::string_list), and [`f64`](Self::f64).
+///
+/// After extraction, [`finish`](Self::finish) checks any unclaimed entries in
+/// the source map. It returns both unknown-key errors and any type mismatches
+/// recorded during extraction.
 pub(super) struct SchemaFieldParser<'a> {
     address: FieldAddressRef<'a>,
     kind: SchemaFieldTypeTag,
@@ -230,7 +230,7 @@ impl<'a> SchemaFieldParser<'a> {
     /// # Errors
     ///
     /// - [`TypeMismatch`] if `key` is present but the corresponding
-    ///   [`FieldValue`] cannot be converted to an `f64`.
+    ///   [`FieldValue`] does not convert to an `f64`.
     ///
     /// [`FieldValue`]: crate::FieldValue
     /// [`TypeMismatch`]: SchemaFieldParserError::TypeMismatch
@@ -258,11 +258,11 @@ impl<'a> SchemaFieldParser<'a> {
     /// Finalizes parsing by detecting unclaimed keys and returning all
     /// accumulated errors.
     ///
-    /// Any key present in `options` that was not accessed via a typed
-    /// extractor is treated as invalid and converted into a
-    /// [`SchemaFieldParserError::UnknownKey`]. Returns a [`Vec`] containing
-    /// all accumulated type mismatch errors and unknown key violations.
-    /// An empty list means all options were valid and recognized.
+    /// Any key in `options` not claimed by a typed extractor produces a
+    /// [`SchemaFieldParserError::UnknownKey`].
+    ///
+    /// Returns a [`Vec`] of all type mismatches and unknown-key errors, or an
+    /// empty [`Vec`] when every option is valid.
     pub(super) fn finish(
         self,
         options: &IndexMap<String, FieldValue>,

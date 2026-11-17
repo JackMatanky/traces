@@ -1,7 +1,8 @@
 //! Scans and accumulates item-leading task list markers.
 //!
-//! Identifies and parses `[<symbol>]` task markers at the start of list items,
-//! following `CommonMark` and Obsidian whitespace rules.
+//! Identifies and parses `[<symbol>]` task markers at the start of list items
+//! under `CommonMark` and Obsidian whitespace rules.
+
 use crate::DelimiterType;
 
 /// Maximum buffered bytes for marker recognition.
@@ -14,12 +15,11 @@ const MAX_MARKER_BYTES: usize = 8;
 /// accumulation.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum MarkerAction<'a> {
-    /// No text to append or flush (marker accumulation is incomplete).
+    /// Signals that marker accumulation is incomplete and produces no text.
     None,
-    /// Append text to item display and scan buffers.
+    /// Appends text to item display and scan buffers.
     Append(&'a str),
-    /// Flushes plain text: any buffered bytes from an incomplete marker
-    /// attempt, followed by trailing plain text.
+    /// Flushes buffered bytes from an incomplete marker and trailing text.
     FlushPlain {
         buffered: &'a str,
         trailing: &'a str,
@@ -40,9 +40,9 @@ const CLOSE_BRACKET: char = match DelimiterType::Bracket.close_char() {
 
 /// Represents a recognized item-leading task marker.
 ///
-/// `symbol` is the character inside `[<symbol>]`; `remainder` is the scanned
-/// text with the marker and its single trailing ASCII whitespace character
-/// trimmed.
+/// `symbol` holds the character inside `[<symbol>]`. `remainder` holds the
+/// scanned text without the marker and its single trailing ASCII whitespace
+/// character.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct MarkerScan<'a> {
     symbol: char,
@@ -65,23 +65,25 @@ impl MarkerScan<'_> {
     }
 }
 
-/// Classification of assembled item-leading text against the marker shape:
-/// `[`, one non-`]` character, `]`, then one ASCII whitespace character.
+/// Classifies assembled item-leading text against the marker shape.
+///
+/// The expected shape is `[`, one non-`]` character, `]`, then one ASCII
+/// whitespace character.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum MarkerPrefix<'a> {
-    /// `text` is a strict prefix of a potential marker (or exactly `[<char>]`
-    /// awaiting its trailing whitespace); keep accumulating text.
+    /// Indicates `text` is a strict prefix of a potential marker (or `[<char>]`
+    /// awaiting its trailing whitespace) so accumulation continues.
     Incomplete,
-    /// `text` cannot become an item-leading marker.
+    /// Indicates `text` cannot become an item-leading marker.
     Rejected,
-    /// A complete marker was recognized.
+    /// Holds a recognized complete marker.
     Complete(MarkerScan<'a>),
 }
 
 /// Classifies `text` as an item-leading marker prefix.
 ///
 /// Evaluates whether `text` forms a complete marker (`[<symbol>] `), a partial
-/// prefix awaiting additional characters, or an invalid marker sequence.
+/// prefix awaiting more characters, or an invalid marker sequence.
 #[inline]
 #[must_use]
 fn scan_marker_prefix(text: &str) -> MarkerPrefix<'_> {
@@ -177,7 +179,9 @@ fn char_boundary_le(text: &str, max: usize) -> usize {
 /// Represents the classification of a decided item-leading marker.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum ItemMarker {
+    /// A plain list item without a leading marker.
     Plain,
+    /// A task list item with its leading marker symbol.
     Marked(char),
 }
 
@@ -188,14 +192,14 @@ pub(super) enum ItemMarker {
 /// resolved. Marker syntax is withheld from item display buffers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum MarkerAccumulator {
-    /// Leading bytes are still being assembled; classification is pending.
+    /// Collects leading bytes while classification is pending.
     Buffering {
         buf: [u8; MAX_MARKER_BYTES],
         len: u8,
     },
-    /// Classification is final; the buffered bytes are retained so late
-    /// [`Self::reject`] or [`Self::resolve_at_line_end`] flushes can still
-    /// return them.
+    /// Classification is final. Retains the buffered bytes so late
+    /// [`Self::reject`] or [`Self::resolve_at_line_end`] flushes can return
+    /// them.
     Decided {
         marker: ItemMarker,
         buf: [u8; MAX_MARKER_BYTES],
@@ -237,15 +241,17 @@ impl MarkerAccumulator {
         }
     }
 
-    /// Appends incoming text to the accumulator and returns the required
-    /// marker action.
+    /// Appends incoming text to the accumulator and returns the next marker
+    /// action.
     ///
-    /// Resolution behavior:
-    /// - When decided, subsequent text is appended.
-    /// - When buffering, if text does not start with `[`, decides plain.
-    /// - If text completes the marker, decides marked and returns the
-    ///   remainder.
-    /// - When rejected or oversized, flushes plain text.
+    /// Handles incoming text according to the accumulator's current state:
+    ///
+    /// - `Decided`: appends the new text directly.
+    /// - Buffer without a `[` prefix: resolves immediately as plain text.
+    /// - Buffer with a complete marker: resolves as a marked item and returns
+    ///   any trailing text.
+    /// - Buffer past a valid marker or size limit: flushes the buffered text as
+    ///   plain text.
     pub(super) fn push_text<'a>(
         &'a mut self,
         text: &'a str,
@@ -310,8 +316,8 @@ impl MarkerAccumulator {
 
     /// Decides the accumulator from the buffered candidate assembled so far.
     ///
-    /// Called with the accumulator in the `Buffering` state after its buffer
-    /// was extended with the candidate bytes.
+    /// Expects the accumulator in the `Buffering` state with candidate bytes
+    /// appended.
     fn resolve_candidate<'a>(
         &'a mut self,
         text: &'a str,
@@ -334,10 +340,9 @@ impl MarkerAccumulator {
                     buf,
                     len,
                 };
-                // The prefix was `Incomplete` in prior chunks, so the marker's
-                // trailing whitespace always lands inside this chunk and the
-                // remainder starts within `text` (extending past `take_bytes`
-                // to the chunk end).
+                // Prior chunks left the prefix `Incomplete`, so trailing
+                // whitespace lands in this chunk. The remainder starts within
+                // `text` and runs to the chunk end.
                 let marker_in_text = candidate
                     .len()
                     .saturating_sub(scan.remainder().len())

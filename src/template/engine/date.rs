@@ -13,8 +13,8 @@
 //! `add_years`, `sub_years`, `weekday`, and `date_diff`. Period-edge filters
 //! register from [`PERIOD_EDGE_LOOKUP`](crate::temporal::PERIOD_EDGE_LOOKUP).
 //!
-//! The `date_format` name avoids a conflict with minijinja's built-in `format`
-//! filter. Tests inspect piped values: `is_past`, `is_future`, and
+//! The `date_format` name avoids a conflict with `MiniJinja`'s built-in
+//! `format` filter. Tests inspect piped values: `is_past`, `is_future`, and
 //! `is_leap_year`.
 //!
 //! [`parse_date_point`] sends each date/time string through
@@ -384,7 +384,7 @@ fn weekday_index_error(n: i64) -> Error {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `s` doesn't parse as a recognized date
+/// - [`ErrorKind::InvalidOperation`] if `s` does not parse as a recognized date
 ///   or datetime.
 fn parse_date_point(s: &str) -> TemplateEngineResult<DatePoint> {
     DatePoint::parse(s)
@@ -417,7 +417,7 @@ fn format_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<&str> {
 ///
 /// # Errors
 ///
-/// - [`ErrorKind::InvalidOperation`] if `unit` doesn't match
+/// - [`ErrorKind::InvalidOperation`] if `unit` does not match
 ///   [`TimeUnit::parse_spelling`]'s accepted unit names or abbreviations.
 /// - [`ErrorKind::TooManyArguments`] if `kwargs` carries a key besides `unit`.
 fn unit_kwarg(kwargs: &Kwargs) -> TemplateEngineResult<TimeUnit> {
@@ -525,12 +525,15 @@ fn render_period_edge(
 /// `"months"`/`"mo"`, `"weeks"`/`"w"`, `"days"`/`"d"`, `"hours"`/`"h"`,
 /// `"minutes"`/`"m"`, or `"seconds"`/`"s"`.
 ///
-/// A shift shorter than one day moves a date-only value only when it crosses
-/// midnight. A `25h` shift moves the date by one day. A `5h` shift keeps the
-/// date unchanged. The `"years"`, `"months"`, `"weeks"`, and `"days"` units
-/// preserve local clock time across a DST transition. Other units shift the
-/// exact instant, so the clock time can differ from a naive `n`-unit shift (see
-/// [`shift_by_unit`]).
+/// Shift behavior depends on the unit and input kind (see [`shift_by_unit`]):
+///
+/// - A shift shorter than one day moves a date-only value only when it crosses
+///   midnight (`25h` moves the date by one day, while `5h` leaves it
+///   unchanged).
+/// - Calendar units (`"years"`, `"months"`, `"weeks"`, `"days"`) preserve local
+///   clock time across a DST transition.
+/// - Sub-day units shift the exact instant, so the clock time can differ from a
+///   naive `n`-unit shift.
 ///
 /// # Errors
 ///
@@ -559,8 +562,8 @@ fn date_add(
 /// `"minutes"`/`"m"`, or `"seconds"`/`"s"`.
 ///
 /// A shift shorter than one day moves a date-only value only when it crosses
-/// midnight. A `25h` shift moves the date by one day. A `5h` shift keeps the
-/// date unchanged.
+/// midnight. For example, `25h` moves the date by one day, while `5h` leaves it
+/// unchanged.
 ///
 /// # Errors
 ///
@@ -588,12 +591,14 @@ fn date_sub(
 
 /// Shifts `value` by `n` `unit`s with calendar or fixed-duration behavior.
 ///
-/// A [`DatePoint::DateTime`] shifts calendar units on local clock time, which
-/// preserves the hour across DST. It shifts sub-day units on the exact
-/// date-time. A [`DatePoint::Calendar`] shifts at local midnight. A shift
-/// shorter than one day moves the date only when it crosses midnight. A
-/// `25h` shift moves the date by one day. A `5h` shift keeps the date
-/// unchanged.
+/// Behavior depends on the parsed [`DatePoint`] variant:
+///
+/// - [`DatePoint::DateTime`] shifts calendar units on local clock time to
+///   preserve the hour across DST, and shifts sub-day units on the exact
+///   date-time.
+/// - [`DatePoint::Calendar`] shifts at local midnight, so a sub-day shift moves
+///   the date only when it crosses midnight (`25h` moves it by one day, while
+///   `5h` leaves it unchanged).
 ///
 /// # Errors
 ///
@@ -742,12 +747,14 @@ fn weekday(
 /// when `other` is later. The `unit` kwarg defaults to `"days"` and accepts
 /// `"years"`, `"months"`, `"weeks"`, `"hours"`, `"minutes"`, or `"seconds"`.
 ///
-/// The `"years"` and `"months"` units count elapsed whole calendar units and
-/// account for the day of the month (see [`DatePoint::diff`]). They always
-/// return `i64`, regardless of input precision. Other units, including
-/// `"weeks"` and the default `"days"`, use fixed durations. They return
-/// `f64` when both inputs include a time component. They return a whole-unit
-/// `i64` otherwise.
+/// Unit behavior follows two rules (see [`DatePoint::diff`]):
+///
+/// - `"years"` and `"months"` count elapsed whole calendar units, account for
+///   the day of the month, and always return `i64` regardless of input
+///   precision.
+/// - Other units, including `"weeks"` and the default `"days"`, use fixed
+///   durations and return `f64` when both inputs include a time component, or a
+///   whole-unit `i64` otherwise.
 ///
 /// # Errors
 ///
@@ -1028,10 +1035,8 @@ mod tests {
 
         #[test]
         fn now_formats_a_negative_year_reference_sign_outside_the_width() {
-            // Set up the test.
             ZoneGuard::set("UTC");
 
-            // Run the operation.
             let rendered = env()
                 .render_str(
                     r#"{{ date.now(reference="-0009-01-01", reference_format="%Y-%m-%d", format="%Y-%m-%d") }}"#,
@@ -1039,7 +1044,6 @@ mod tests {
                 )
                 .expect("render succeeds");
 
-            // Check the result.
             assert_eq!(rendered, "-0009-01-01");
         }
     }
@@ -1621,10 +1625,8 @@ mod tests {
 
         #[test]
         fn renders_a_negative_year_with_the_sign_outside_the_width() {
-            // Use UTC for this test.
             ZoneGuard::set("UTC");
 
-            // Render the template.
             let rendered = env()
                 .render_str(
                     r#"{{ value | date_format("%Y-%m-%d") }}"#,
@@ -1632,7 +1634,6 @@ mod tests {
                 )
                 .expect("render succeeds");
 
-            // Check the result.
             assert_eq!(rendered, "-0009-01-01");
         }
 
@@ -1642,7 +1643,6 @@ mod tests {
             // both dialects must render.
             ZoneGuard::set("Pacific/Apia");
 
-            // Run the operation.
             let rendered = env()
                 .render_str(
                     r#"{{ value | date_format("Do") }}|{{ value | date_format("%d") }}"#,
@@ -1650,7 +1650,6 @@ mod tests {
                 )
                 .expect("render succeeds");
 
-            // Check the result.
             assert_eq!(rendered, "31st|31");
         }
 
@@ -1660,7 +1659,6 @@ mod tests {
             // is invalid.
             ZoneGuard::set("Etc/GMT-14");
 
-            // Run the operation.
             let error = env()
                 .render_str(
                     r#"{{ value | date_format("Q") }}"#,
@@ -1668,7 +1666,6 @@ mod tests {
                 )
                 .expect_err("local midnight falls outside the range");
 
-            // Check the result.
             let msg = error.to_string();
             assert!(
                 !msg.contains("moment-dialect"),
@@ -1905,7 +1902,6 @@ mod tests {
             // instant. `format_in` resolves it first.
             ZoneGuard::set("Etc/GMT-14");
 
-            // Run the operation.
             let error = env()
                 .render_str(
                     "{{ value | start_of_year }}",
@@ -1913,7 +1909,6 @@ mod tests {
                 )
                 .expect_err("year-start midnight falls outside the range");
 
-            // Check the result.
             let message = error.to_string();
             assert!(
                 message.contains("is out of the supported date/time range"),
@@ -2144,10 +2139,10 @@ mod tests {
             ZoneGuard::set("Etc/GMT-2"); // Set UTC+02:00 without DST.
 
             // The mixed-precision branch subtracts calendar clocks in the
-            // pinned zone, not the parser's naive representations.
-            // Naive 14:30 local and equivalent 12:30Z inputs both
-            // resolve to 14:30 local and produce the same truncated 14-hour
-            // difference. The mixed branch returns i64, not f64.
+            // pinned zone, not the parser's naive representations. Naive 14:30
+            // local and equivalent 12:30Z inputs both resolve to 14:30 local
+            // and produce the same truncated 14-hour difference. The mixed
+            // branch returns i64, not f64.
             let rendered = env()
                 .render_str(
                     r#"{{ "2026-07-29" | date_diff(other, unit="hours") }}"#,
@@ -2434,10 +2429,8 @@ mod tests {
                 source: inner,
             });
 
-            // Run the operation.
             let message = error.to_string();
 
-            // Check the result.
             assert_eq!(
                 message,
                 "invalid operation: local zone lookup failed for `system \
@@ -2488,9 +2481,7 @@ mod tests {
                 r"{{ date.today(reference='not-a-date', reference_format='%Y-%m-%d') }}",
                 minijinja::context! {},
             );
-            // Run the operation.
             let error = rendered.expect_err("a mismatched reference fails");
-            // Check the result.
             let message = error.to_string();
             assert!(
                 message.contains("does not have a 4-digit year")

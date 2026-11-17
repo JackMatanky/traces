@@ -38,6 +38,10 @@ impl<'a> SourceText<'a> {
     }
 
     /// Advances `pos` by `bytes` and returns the new offset.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds if `pos` is not on a UTF-8 character boundary.
     #[inline]
     #[must_use]
     #[expect(

@@ -2,6 +2,7 @@
 //!
 //! The formatter converts [`QueryRow`] items into Markdown tables, bullet
 //! lists, and task lists. [`TaskPathStyle`] adds file paths to task output.
+
 use std::borrow::Cow;
 
 use unicode_width::UnicodeWidthStr as _;
@@ -14,8 +15,7 @@ pub(crate) enum TaskPathStyle {
     /// Omits paths for template rendering.
     #[default]
     None,
-    /// Adds each row's path to `traces task` output.
-    /// Adds source line numbers in `traces task -l` output.
+    /// Appends the row's path to `traces task` output.
     Suffix,
     /// Adds file paths and 1-indexed source line numbers for `traces task -l`.
     Coordinates,
@@ -39,6 +39,7 @@ pub(super) enum QueryDisplayFormat {
 }
 
 impl QueryDisplayFormat {
+    /// Creates a table display format with column headers and field paths.
     #[must_use]
     pub(super) fn table(headers: &[&str], columns: &[&str]) -> Self {
         Self::Table {
@@ -53,6 +54,7 @@ impl QueryDisplayFormat {
         }
     }
 
+    /// Creates a bullet-list display format for `field`.
     #[must_use]
     pub(super) fn list(field: &str) -> Self {
         Self::List {
@@ -60,6 +62,7 @@ impl QueryDisplayFormat {
         }
     }
 
+    /// Creates a task-list display format using `style`.
     #[must_use]
     pub(super) const fn task_list(style: TaskPathStyle) -> Self {
         Self::TaskList {
@@ -120,8 +123,8 @@ impl QueryDisplayFormat {
                 columns: columns.len(),
             });
         }
-        // Keep the prior `comfy-table` output for a table with no columns.
-        // No caller creates one, but this branch preserves its output.
+        // Keep the prior `comfy-table` output for a table with no columns. No
+        // caller creates one, but this branch preserves its output.
         if headers.is_empty() {
             return Ok("||\n".to_owned());
         }
@@ -344,11 +347,12 @@ mod tests {
         use super::QueryDisplayFormat;
 
         proptest! {
-            /// Proves the Markdown table cell escaping law (01:G30, 02:G8):
+            /// Proves the Markdown table cell escaping invariants:
+            ///
             /// 1. Safety against row breaking: escaped text contains no literal newline (`\n`).
             /// 2. Delimiter containment: every pipe (`|`) in the escaped output is
             ///    preceded by a backslash. This checks the inserted character,
-            ///    not Markdown parity for pre-existing backslashes.
+            ///    not Markdown parity for existing backslashes.
             /// 3. Identity on clean inputs: any input lacking newlines and pipes
             ///    passes through unmodified.
             #[test]
@@ -360,7 +364,7 @@ mod tests {
                 // Safety law: no bare newline exists.
                 prop_assert!(!escaped.contains('\n'));
 
-                // Delimiter law: every pipe is preceded by a backslash.
+                // Delimiter law: a backslash precedes every pipe.
                 for (idx, ch) in escaped.char_indices() {
                     if ch == '|' {
                         let preceding = &escaped[..idx];
@@ -371,7 +375,7 @@ mod tests {
                     }
                 }
 
-                // Identity law: clean inputs pass unmodified.
+                // Identity law: clean inputs pass unchanged.
                 if !s.contains(['\n', '|']) {
                     prop_assert_eq!(&escaped, &s);
                 }
