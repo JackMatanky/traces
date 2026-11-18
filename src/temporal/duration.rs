@@ -53,6 +53,9 @@ pub(super) const COMPOUND_FORMAT_ORDER: [TimeUnit; 7] = [
 /// Bounds the maximum supported duration in nominal seconds.
 const MAX_NOMINAL_SECONDS: f64 = 631_107_417_600.0;
 
+/// Nanoseconds per second, spelled out for exact span arithmetic.
+const NANOS_PER_SECOND: i128 = 1_000_000_000;
+
 /// Prints sub-second fields as fractional seconds.
 ///
 /// The parser rejects the `ms`, `us`, and `ns` spellings, so display text must
@@ -62,41 +65,66 @@ const PRINTER: SpanPrinter = SpanPrinter::new()
     .direction(Direction::Sign)
     .fractional(Some(FractionalUnit::Second));
 
-/// Rounds a span's fractional seconds exactly once for nominal identity and
-/// fieldwise arithmetic.
-///
-/// Calendar fields stay untouched.
+/// Sums the minute-and-larger fields of `span` in nominal seconds.
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "Jiff bounds each subsecond field below one second"
+    reason = "Jiff's bounded calendar fields safely sum into i64"
 )]
-fn rounded_seconds(span: Span) -> i64 {
-    let nanos = i128::from(span.get_milliseconds()) * 1_000_000
-        + i128::from(span.get_microseconds()) * 1_000
-        + i128::from(span.get_nanoseconds());
-    let carry = if nanos >= 500_000_000 {
-        1
-    } else if nanos <= -500_000_000 {
-        -1
-    } else {
-        0
-    };
-    span.get_seconds().saturating_add(carry)
-}
-
-/// Computes the total nominal seconds of `span` using the unit registry.
-#[expect(
-    clippy::arithmetic_side_effects,
-    reason = "Jiff's bounded span units safely sum into i64 nominal seconds"
-)]
-fn nominal_seconds(span: Span) -> i64 {
+fn whole_seconds(span: Span) -> i64 {
     i64::from(span.get_years()) * TimeUnit::Year.nominal_seconds()
         + i64::from(span.get_months()) * TimeUnit::Month.nominal_seconds()
         + i64::from(span.get_weeks()) * TimeUnit::Week.nominal_seconds()
         + i64::from(span.get_days()) * TimeUnit::Day.nominal_seconds()
         + i64::from(span.get_hours()) * TimeUnit::Hour.nominal_seconds()
         + span.get_minutes() * TimeUnit::Minute.nominal_seconds()
-        + rounded_seconds(span)
+}
+
+/// Computes the total elapsed nanoseconds of `span` from every field.
+///
+/// Jiff's friendly parser may return an unbalanced span whose smaller fields
+/// exceed their canonical ranges, so no field may be dropped here.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i128 headroom covers every Jiff span field combination"
+)]
+fn total_nanoseconds(span: Span) -> i128 {
+    (i128::from(whole_seconds(span)) + i128::from(span.get_seconds()))
+        * NANOS_PER_SECOND
+        + i128::from(span.get_milliseconds()) * 1_000_000
+        + i128::from(span.get_microseconds()) * 1_000
+        + i128::from(span.get_nanoseconds())
+}
+
+/// Rounds a nanosecond count to the nearest second, halfway away from zero.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i128 headroom covers the half-second rounding bias"
+)]
+fn round_to_seconds(nanos: i128) -> i64 {
+    let half = NANOS_PER_SECOND / 2;
+    let rounded = if nanos < 0 {
+        (nanos - half) / NANOS_PER_SECOND
+    } else {
+        (nanos + half) / NANOS_PER_SECOND
+    };
+    i64::try_from(rounded).unwrap_or(if rounded < 0 {
+        i64::MIN
+    } else {
+        i64::MAX
+    })
+}
+
+/// Rounds a span's fractional seconds exactly once for nominal identity and
+/// fieldwise arithmetic.
+///
+/// Calendar fields stay untouched.
+fn rounded_seconds(span: Span) -> i64 {
+    nominal_seconds(span).saturating_sub(whole_seconds(span))
+}
+
+/// Computes the total nominal seconds of `span` using the unit registry.
+fn nominal_seconds(span: Span) -> i64 {
+    round_to_seconds(total_nanoseconds(span))
 }
 
 /// Adds each written unit independently, preserving the calendar regime.
@@ -184,6 +212,20 @@ impl DurationValue {
         }
     }
 
+    /// Rejects spans outside the supported nominal range in either direction.
+    ///
+    /// # Errors
+    ///
+    /// - [`DurationError::SecondsOutOfRange`] if the magnitude exceeds the
+    ///   supported nominal range.
+    #[inline]
+    fn checked_range(self) -> Result<Self, DurationError> {
+        if self.magnitude().abs() > MAX_NOMINAL_SECONDS {
+            return Err(DurationError::SecondsOutOfRange);
+        }
+        Ok(self)
+    }
+
     /// Synthesizes a canonical [`DurationValue`] from a nominal seconds value.
     ///
     /// # Errors
@@ -255,11 +297,7 @@ impl DurationValue {
         if unsigned.starts_with('P') || unsigned.starts_with('p') {
             let span: Span =
                 trimmed.parse().map_err(|_| DurationError::UnknownUnit)?;
-            let val = Self::new(span);
-            if val.magnitude() > MAX_NOMINAL_SECONDS {
-                return Err(DurationError::SecondsOutOfRange);
-            }
-            return Ok(val);
+            return Self::new(span).checked_range();
         }
 
         validate_friendly_input(trimmed)?;
@@ -269,12 +307,7 @@ impl DurationValue {
             .parse()
             .map_err(|err| classify_jiff_error(&normalized, err))?;
 
-        let val = Self::new(span);
-        if val.magnitude() > MAX_NOMINAL_SECONDS {
-            return Err(DurationError::SecondsOutOfRange);
-        }
-
-        Ok(val)
+        Self::new(span).checked_range()
     }
 
     /// Parses a duration prefix from `input`, returning its spanned extent.
@@ -1313,6 +1346,36 @@ mod tests {
                 "{input:?} is not scientific notation"
             );
         }
+
+        #[rstest]
+        #[case::unbalanced_hours_appended_to_seconds("-0838866400h08.030s")]
+        #[case::unbalanced_minutes("-10518456960m 8.5s")]
+        #[case::overflowing_hours("-175307617h")]
+        #[case::overflowing_hours_positive("175307617h")]
+        fn rejects_magnitudes_beyond_the_supported_range(#[case] input: &str) {
+            assert!(
+                matches!(
+                    parse_error(input),
+                    Some(DurationError::SecondsOutOfRange)
+                ),
+                "{input:?} exceeds the supported nominal range"
+            );
+        }
+
+        #[rstest]
+        #[case::hour_bound("-175307616h")]
+        #[case::hour_bound_positive("175307616h")]
+        #[case::second_bound("-631107417600s")]
+        fn accepts_the_range_boundary_and_round_trips(#[case] input: &str) {
+            let duration =
+                DurationValue::parse(input).expect("boundary parses");
+            let displayed = duration.to_string();
+            assert_eq!(
+                DurationValue::parse(&displayed).expect("display parses"),
+                duration,
+                "{input:?} shown as {displayed:?}"
+            );
+        }
     }
 
     mod validate_friendly_input {
@@ -1962,6 +2025,42 @@ mod tests {
                 let displayed = original.to_string();
                 let reparsed = DurationValue::parse(&displayed).expect("display must parse");
                 prop_assert_eq!(original, reparsed);
+            }
+
+            #[test]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "test offsets stay within a few hundred of the bound"
+            )]
+            fn display_round_trips_at_the_hour_boundary(delta in -200_i64..=200_i64) {
+                for hours in [175_307_616 + delta, -(175_307_616 + delta)] {
+                    let input = format!("{hours}h");
+                    if let Ok(original) = DurationValue::parse(&input) {
+                        let displayed = original.to_string();
+                        let reparsed = DurationValue::parse(&displayed)
+                            .expect("display must parse");
+                        prop_assert_eq!(original, reparsed);
+                    }
+                }
+            }
+
+            #[test]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "test offsets stay within a few hundred of the bound"
+            )]
+            fn display_round_trips_at_the_second_boundary(
+                delta in -200_i64..=200_i64,
+            ) {
+                for seconds in [631_107_417_600 + delta, -(631_107_417_600 + delta)] {
+                    let input = format!("{seconds}s");
+                    if let Ok(original) = DurationValue::parse(&input) {
+                        let displayed = original.to_string();
+                        let reparsed = DurationValue::parse(&displayed)
+                            .expect("display must parse");
+                        prop_assert_eq!(original, reparsed);
+                    }
+                }
             }
 
             #[test]
