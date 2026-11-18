@@ -29,14 +29,23 @@ local data_formats = new Mapping<String, Step> {
     ["check-json"] = Builtins.jq
     ["check-yaml"] = (Builtins.ryl) {
         check_after_diff = false
-        check = new Command {
-            argv = List("ryl", "-d", ryl_rules, "{{files}}")
+        check = new CommandSpec {
+            command = new Command {
+                argv = List("ryl", "-d", ryl_rules, "{{files}}")
+            }
+            effect = "read"
         }
-        check_diff = new Command {
-            argv = List("ryl", "--diff", "-d", ryl_rules, "{{files}}")
+        check_diff = new CommandSpec {
+            command = new Command {
+                argv = List("ryl", "--diff", "-d", ryl_rules, "{{files}}")
+            }
+            effect = "read"
         }
-        check_list_files = new Command {
-            argv = List("ryl", "--list-files", "-d", ryl_rules, "{{files}}")
+        check_list_files = new CommandSpec {
+            command = new Command {
+                argv = List("ryl", "--list-files", "-d", ryl_rules, "{{files}}")
+            }
+            effect = "read"
         }
         fix = new Command {
             argv = List("ryl", "--fix", "-d", ryl_rules, "{{files}}")
@@ -57,12 +66,18 @@ local security = new Mapping<String, Step> {
     ["detect-private-key"] = Builtins.detect_private_key
     ["cargo-audit"] = new Step {
         glob = List("**/Cargo.lock")
-        check = new Command {
-            argv = List("cargo", "audit")
+        check = new CommandSpec {
+            command = new Command {
+                argv = List("cargo", "audit")
+            }
+            effect = "write"
         }
     }
     ["gitleaks"] = (Builtins.gitleaks) {
-        check = "for file in {{files}}; do gitleaks dir --redact --no-banner --log-level error \"$file\" || exit $?; done"
+        check = new CommandSpec {
+            command = "for file in {{files}}; do gitleaks dir --redact --no-banner --log-level error \"$file\" || exit $?; done"
+            effect = "read"
+        }
     }
 }
 
@@ -108,24 +123,39 @@ local validation =
 local quality = new Mapping<String, Step> {
     ["cargo-clippy"] = new Step {
         glob = List("**/*.rs", "**/Cargo.toml", "**/Cargo.lock", "clippy.toml")
-        check = "mise run lint --no-fix"
+        check = new CommandSpec {
+            command = "mise run lint --no-fix"
+            effect = "write"
+        }
     }
     ["cargo-test"] = new Step {
         glob = List("**/*.rs", "**/Cargo.toml", "**/Cargo.lock")
-        check = "mise run test"
+        check = new CommandSpec {
+            command = "mise run test"
+            effect = "write"
+        }
     }
     ["cargo-doc"] = new Step {
         glob = List("**/*.rs", "**/Cargo.toml")
-        check = "mise run doc"
+        check = new CommandSpec {
+            command = "mise run doc"
+            effect = "write"
+        }
     }
     ["cargo-deny"] = rust["cargo-deny"]
     ["visibility"] = new Step {
         glob = List("src/**/*.rs", "tests/baselines/**", "Cargo.toml")
-        check = "mise run check:visibility"
+        check = new CommandSpec {
+            command = "mise run check:visibility"
+            effect = "write"
+        }
     }
     ["layer-enforcement"] = new Step {
         glob = List("tests/**/*.rs")
-        check = "mise run check:layers"
+        check = new CommandSpec {
+            command = "mise run check:layers"
+            effect = "write"
+        }
     }
 }
 

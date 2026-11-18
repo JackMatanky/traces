@@ -1,81 +1,150 @@
-//! Help-text snapshots: `--help` for the root command, every subcommand, and
-//! every subcommand alias, compared byte-for-byte with the files in
-//! `tests/baselines/help/`.
-//!
-//! Set `TRACES_UPDATE_GOLDEN=1` to rewrite the baseline files from the real
-//! binary output instead of comparing. Review the resulting diff before
-//! committing it: a changed baseline is a changed user-facing contract.
+//! Semantic help contracts for the root command, subcommands, and aliases.
+//! Command names, argument syntax, and documented options are stable surfaces;
+//! explanatory prose and line wrapping are not.
 
-use std::path::PathBuf;
-
-use pretty_assertions::assert_eq;
 use rstest::rstest;
 
 use super::support::Sandbox;
 
-/// Returns the baseline file for `name` under `tests/baselines/help/`.
-fn baseline_path(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/baselines/help")
-        .join(format!("{name}.txt"))
-}
-
-/// Strips trailing spaces from every line: clap pads blank doc-comment lines,
-/// and the repository's whitespace hook rejects baselines that keep them.
-fn strip_trailing_spaces(text: &str) -> String {
-    text.split_inclusive('\n')
-        .map(|line| match line.strip_suffix('\n') {
-            Some(body) => format!("{}\n", body.trim_end_matches(' ')),
-            None => line.trim_end_matches(' ').to_owned(),
-        })
-        .collect()
-}
-
-/// Pins the exact `--help` text of every command and alias.
+/// Exercises help in an empty sandbox without requiring configuration.
 ///
-/// Executes vs asserts:
-/// - Executes: `traces [<sub>] --help` in an empty sandbox.
-/// - Asserts: exit 0, empty stderr, and stdout (minus trailing spaces) equal to
-///   the baseline file. Aliases share the baseline of the command they alias.
+/// Asserts exit 0, empty stderr, usage syntax, documented option signatures,
+/// and nested command names. Aliases must expose their canonical command.
 ///
-/// Defect class: unwitnessed-contract (user-facing help text and flag
-/// surface).
+/// Defect class: unwitnessed-contract (user-facing help and flag surface).
 #[rstest]
-#[case::root(&["--help"], "root")]
-#[case::init(&["init", "--help"], "init")]
-#[case::trust(&["trust", "--help"], "trust")]
-#[case::untrust(&["untrust", "--help"], "untrust")]
-#[case::index(&["index", "--help"], "index")]
-#[case::list(&["list", "--help"], "list")]
-#[case::table(&["table", "--help"], "table")]
-#[case::task(&["task", "--help"], "task")]
-#[case::template(&["template", "--help"], "template")]
-#[case::template_alias(&["tmpl", "--help"], "template")]
-#[case::completions(&["completions", "--help"], "completions")]
-#[case::completions_alias(&["completion", "--help"], "completions")]
-#[case::tracked(&["tracked", "--help"], "tracked")]
-fn help_text_matches_baseline(#[case] args: &[&str], #[case] baseline: &str) {
+#[case::root(
+    &["--help"],
+    &["traces [OPTIONS]", "traces <COMMAND>"],
+    &["-i, --input [<NAME>]", "-V, --version"],
+    &[
+        "init", "trust", "untrust", "index", "list", "table", "task",
+        "template", "completions", "tracked", "help",
+    ],
+)]
+#[case::init(&["init", "--help"], &["traces init"], &[], &[])]
+#[case::trust(
+    &["trust", "--help"],
+    &["traces trust [OPTIONS] [PATH]", "traces trust <COMMAND>"],
+    &["--show", "--all"],
+    &["list", "clean", "help"],
+)]
+#[case::untrust(
+    &["untrust", "--help"],
+    &["traces untrust [OPTIONS] [PATH]"],
+    &["--all"],
+    &[],
+)]
+#[case::index(&["index", "--help"], &["traces index"], &[], &[])]
+#[case::list(
+    &["list", "--help"],
+    &["traces list [OPTIONS]"],
+    &["--from <FROM>", "--where <FILTER>", "--sort <KEYS>...", "--asc", "--desc"],
+    &[],
+)]
+#[case::table(
+    &["table", "--help"],
+    &["traces table [OPTIONS] --column <COLUMNS>"],
+    &[
+        "--from <FROM>", "--where <FILTER>", "--sort <KEYS>...", "--asc",
+        "--desc", "--column <COLUMNS>",
+    ],
+    &[],
+)]
+#[case::task(
+    &["task", "--help"],
+    &["traces task [OPTIONS]"],
+    &[
+        "--from <FROM>", "--where <FILTER>", "--todo", "--done",
+        "--status <CHAR>", "--sort <KEYS>...", "--asc", "--desc",
+        "-l, --line-numbers", "--table", "--column <COLUMNS>", "--count",
+    ],
+    &[],
+)]
+#[case::template(
+    &["template", "--help"],
+    &["traces template [OPTIONS] [NAME]"],
+    &[
+        "-i, --input <NAME>", "-l, --list", "-o, --output <PATH>",
+        "-f, --force", "-n, --dry-run", "--no-input",
+    ],
+    &[],
+)]
+#[case::template_alias(
+    &["tmpl", "--help"],
+    &["traces template [OPTIONS] [NAME]"],
+    &[
+        "-i, --input <NAME>", "-l, --list", "-o, --output <PATH>",
+        "-f, --force", "-n, --dry-run", "--no-input",
+    ],
+    &[],
+)]
+#[case::completions(
+    &["completions", "--help"],
+    &["traces completions <--shell <SHELL>|--list-templates>"],
+    &["--shell <SHELL>", "--list-templates"],
+    &[],
+)]
+#[case::completions_alias(
+    &["completion", "--help"],
+    &["traces completions <--shell <SHELL>|--list-templates>"],
+    &["--shell <SHELL>", "--list-templates"],
+    &[],
+)]
+#[case::tracked(
+    &["tracked", "--help"],
+    &["traces tracked <COMMAND>"],
+    &[],
+    &["list", "clean", "help"],
+)]
+fn help_exposes_command_contract(
+    #[case] args: &[&str],
+    #[case] usages: &[&str],
+    #[case] options: &[&str],
+    #[case] commands: &[&str],
+) {
     let sandbox = Sandbox::new();
-
     let run = sandbox.run(args);
-    // clap derives the usage name from argv[0], which ends in `.exe` on
-    // Windows.
-    let actual =
-        strip_trailing_spaces(&run.stdout).replace("traces.exe", "traces");
-
     run.assert_success();
     run.assert_stderr_eq("");
-    let path = baseline_path(baseline);
-    if std::env::var_os("TRACES_UPDATE_GOLDEN").is_some_and(|v| v == "1") {
-        std::fs::create_dir_all(path.parent().expect("baseline parent"))
-            .expect("create baseline dir");
-        std::fs::write(&path, &actual).expect("write help baseline");
-        return;
+
+    // clap derives argv[0] from the executable name, including `.exe` on
+    // Windows.
+    let stdout = run.stdout.replace("traces.exe", "traces");
+    for usage in usages {
+        assert!(
+            stdout.lines().any(|line| {
+                let line = line.trim();
+                line.strip_prefix("Usage: ").unwrap_or(line) == *usage
+            }),
+            "{args:?}: missing usage {usage:?}\n{stdout}",
+        );
     }
-    let expected = std::fs::read_to_string(&path)
-        .expect(
-            "read help baseline; run with TRACES_UPDATE_GOLDEN=1 to create it",
-        )
-        .replace("\r\n", "\n");
-    assert_eq!(actual, expected);
+    for option in std::iter::once("-h, --help").chain(options.iter().copied()) {
+        assert!(
+            stdout
+                .lines()
+                .skip_while(|line| line.trim() != "Options:")
+                .skip(1)
+                .any(|line| {
+                    line.trim_start().strip_prefix(option).is_some_and(|rest| {
+                        rest.is_empty() || rest.starts_with(char::is_whitespace)
+                    })
+                }),
+            "{args:?}: missing option {option:?}\n{stdout}",
+        );
+    }
+    for command in commands {
+        assert!(
+            stdout
+                .lines()
+                .skip_while(|line| line.trim() != "Commands:")
+                .skip(1)
+                .take_while(|line| {
+                    line.is_empty() || line.starts_with(char::is_whitespace)
+                })
+                .any(|line| line.split_whitespace().next() == Some(*command)),
+            "{args:?}: missing command {command:?}\n{stdout}",
+        );
+    }
 }

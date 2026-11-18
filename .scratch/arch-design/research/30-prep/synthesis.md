@@ -25,6 +25,7 @@ the findings that the owner checked against source.
 | [l-answer-verification.md](./l-answer-verification.md) | Direct read of 12 Answers, 15 corrections, invariants, remaining human choices | Complete |
 | [owner-evidence.md](./owner-evidence.md) | Owner checks: jiff system-zone cache, `DatePoint` shape | Complete |
 | [m-gap-closure.md](./m-gap-closure.md) | Recorded probes, measurements, reproduction commands and limits | Complete |
+| [n-parity-and-scope.md](./n-parity-and-scope.md) | Only the unsigned full-date branch calls speedate; separate carrier/frame acceptance scope | Complete |
 | [z-grilling-guide.md](./z-grilling-guide.md) | Session plan and clusters | Complete |
 | `lens-receipts.jsonl` | Scout delivery ledger | Complete |
 
@@ -44,6 +45,15 @@ outputs appear in [m-gap-closure.md](./m-gap-closure.md). The parity probe
 is preserved at [probes/parity](./probes/parity). Its recorded run
 reproduces the earlier counts. The layout test measures a mirror of the
 proposed value type, not the production type.
+
+The 2026-11-18 closure executes all four natural-language candidates at
+Rust 1.96.0. The M report's
+[acceptance closure](./m-gap-closure.md#four-candidate-acceptance-closure)
+holds 298 JSON records, first/warmed allocation tables and instrumented
+binary sizes. It also records the current broad verification pass.
+Earlier abort-profile probes remain bounded historical observations.
+The N report separates narrow speedate removal from the carrier/frame
+redesign. Neither report accepts a proposal or resolves this ticket.
 
 Evidence tags:
 
@@ -335,9 +345,12 @@ Alternatives.
 
 Recommendation. A, with the guards below. [P]
 The probe finds no difference within its generated guarded-date domain.
-Retain the length, separator and digit guards. The candidate probe also
-retains the mapped reason strings [V: probe]. This result does not cover
-all product parser paths.
+Retain the length, separator and digit guards and mapped reason strings.
+[n-parity-and-scope.md](./n-parity-and-scope.md) confirms that only the
+unsigned full-date field branch calls speedate. Datetime, duration and
+zone comparisons are not missing removal evidence. The probe does not
+execute repository wrappers or establish whole-parser parity. The future
+carrier/frame redesign still needs separate acceptance.
 The ticket 25 fingerprint list changes when the crate leaves (B61), and the
 lockfile diff needs a rebuild-coupling note (h-redteam Q10).
 
@@ -461,65 +474,90 @@ Reject condition. The owner uses phrases the closed list cannot cover.
 
 ### Q14 Build in the repository or use a crate
 
-Facts [V: d-crate Q6].
+Facts [V: d-crate Q6/T1 to T10; M
+[acceptance closure](./m-gap-closure.md#four-candidate-acceptance-closure)].
 
-- All four candidates return one point. None returns an interval or a period.
-- `next week` errors in `jiff-english` and `chrono-english`. It returns a
-  point in `fuzzydate` and `parse_datetime`.
-- The inspected anchor-taking paths in `jiff-english` and `chrono-english`
-  have no direct ambient clock call. This source observation does not
-  prove the absence of every transitive ambient read.
-  Plain `fuzzydate` and `parse_datetime` entry points read the clock.
-- `fuzzydate` and `chrono-english` add `chrono`, a second calendar stack.
-- No candidate reports an error span.
-- `jiff-english` and `chrono-english` slice `&s[0..3]` on identifiers.
-  The expanded English run confirms a UTF-8 abort. Chrono-english
-  remains source-only; no equivalent runtime result is claimed.
-- `jiff-english` is one release with 29 downloads [V: ticket 30 prep].
-- The recorded probe uses the anchor 2026-03-14T12:00:00Z, a Saturday.
-  `jiff-english 0.0.1` rejects `next week`; `fuzzydate 0.4.1` returns a
-  +7-day point. Neither tested entry point accepts `eom` or `in 2 weeks`.
-  Neither date result contains a period unit or an error span.
-- With this anchor, `last friday` returns 2026-03-13 in `jiff-english`
-  and 2026-03-06 in `fuzzydate`. Bare `monday` returns the next Monday:
-  midnight in `jiff-english`, and the anchor time in `fuzzydate`.
-  The expanded same-day run makes the difference explicit. Bare
-  `saturday` moves to March 21 in English but retains March 14 noon
-  in fuzzydate. English US and UK also disagree on `next saturday`.
-- The Unicode sweep records 1,234 failures from 5,514 English inputs.
-  The fuzzy build records zero. These are bounded process tests.
-  Reject unmodified `jiff-english 0.0.1` for user input [P].
-- Final indicative medians are 264/582/372 ns for English and
-  376/597/223 ns for fuzzydate, for tomorrow/next monday/typo.
-  Final probe binary deltas are +81.17 KiB and +98.11 KiB.
-  Repository dependency-linkage deltas are +48.88 KiB and +65.39 KiB.
-  The M report gives ranges, repeated build times and experiment limits.
-  These are not complete integration or controlled benchmark results.
-- The `english` feature enables Jiff defaults alongside project features.
-  `fuzzy` adds `chrono 0.4.45` without changing Jiff's feature set.
-  Both features build with stable 1.92.0 and 1.98.0.
-  Both manifests declare edition 2021 and no `rust-version`.
-  Those builds do not establish a minimum supported version.
-  `fuzzydate` metadata shows an update on 2026-04-05 and 164,489 downloads.
-  See [m-gap-closure.md](./m-gap-closure.md) for the upstream-access limits.
+- All four candidates return one point, without a period unit or an error
+  byte span. `next week` errors in English and chrono-english; fuzzydate
+  and GNU return March 21 noon from the March 14, 2024 noon UTC anchor.
+- All four execute the 64 shared case definitions. English also executes
+  two lenient cases. Candidate `OK/ERROR/PANIC` totals are 32/27/7 for
+  English, 29/34/1 for fuzzydate, 38/26/0 for GNU and 32/30/2 for
+  chrono-english. The totals exclude the four baselines and 36 host
+  variations. Every record contains identical first/warmed outcomes.
+- The English UTF-8 abort was already demonstrated under the historical
+  abort profile (1,234 failures from 5,514 inputs, bounded). The new
+  unwind harness also catches unchecked Span constructor panics and a
+  fuzzydate `NaiveDateTime`/`TimeDelta` overflow panic on
+  `3000000000 days ago`. Chrono-english panics on UTF-8 slicing. GNU has
+  no sampled panic, not a universal safety proof. A product `Result`
+  wrapper cannot catch abort-profile process termination.
+- Both English parsers turn `4294967295 years` into a 2023 result from
+  the 2024 anchor. Chrono-english accepts `today\u0000junk` by ignoring
+  the suffix and emits unsolicited `fkd date` twice for `1000000 years`.
+  GNU accepts timestamp and input-zone items beyond the proposed grammar.
+  Its `2024-03-14 x` succeeds because `x` is a military zone.
+- All seven matching weekday anchors execute. On Thursday March 14 noon,
+  bare `thursday` gives March 21 midnight in English/chrono-english,
+  March 14 noon in fuzzydate and March 14 midnight in GNU.
+  US/UK `next friday` gives March 15/22 midnight in both English parsers.
+  Fuzzydate gives March 22 noon in both; GNU gives March 15 midnight.
+  The latter two APIs have no dialect argument.
+- Explicit `00:00`, not bare `today` or `today at 00:00`, establishes the
+  observed midnight results. English/GNU move Sao_Paulo's 2015-10-18 gap
+  to 01:00-02 and Havana's 2020-03-08 gap to 01:00-04.
+  Fuzzydate/chrono-english error. Havana's 2020-11-01 fold gives
+  00:00-04 in English/fuzzydate, 00:00-05 in GNU and an error in
+  chrono-english. These do not select the human's conversion policy.
+- Selected explicit-anchor/zone paths stay unchanged across 36 host
+  `TZ`, `LC_ALL` and `TZDIR` variations. Plain fuzzydate and GNU
+  entry points still read the clock. English's Jiff defaults and the
+  Chrono stack in fuzzydate/chrono-english remain feature-coupling facts,
+  not corrected by explicit-context results.
+- All four build at the actual repository floor, Rust 1.96.0.
+  GNU declares `rust-version = "1.71.1"`; chrono-english uses edition
+  2024 without a declared floor. English/fuzzydate use edition 2021
+  without a declared floor. Upstream support for such an undocumented
+  minimum is a vendor promise this research cannot test; the successful
+  repository-floor builds close the compatibility question here.
+- The M allocation and size tables cover all four instrumented candidates.
+  For `thursday` at March 14 noon UTC, each pair shows first and warmed
+  counts. English allocates 8(73 B) and 8(73 B). Fuzzydate allocates
+  12(12,834 B) and 5(78 B). GNU allocates 1(128 B) and 1(128 B), and
+  chrono-english allocates 4(41 B) and 4(41 B).
+  Fixtures and zone lookup stay outside the call window; native input
+  copies and unwind handling stay inside. Construction and baseline
+  parsing allocate zero. Formatting and result drop are separate.
+- The new sizes use opt-z, LTO, strip, one codegen unit and unwind
+  instrumentation. They are not comparable to earlier abort-profile
+  sizes or production integration costs. No new throughput figures exist.
+  M preserves older indicative timings and dependency-linkage costs.
+- The English repository still returns 404. Public repository and commit
+  searches find no alternative; package VCS SHA
+  `a8b87edbeebafebd06a6c4f5a2b502b79b61e409` does not expose maintenance
+  history. The 2026-11-17 snapshot recorded 29 downloads; a 2026-11-18
+  read records 30. No count establishes maintenance quality.
 
 Alternatives.
 
 - A. Build the grammar in the repository.
 - B. Use `jiff-english`.
 - C. Use `fuzzydate`.
+- E. Use `parse_datetime`.
+- F. Use `chrono-english`.
 - D. Defer to fog.
 
 Recommendation. A. [P]
 The digest evidence adds an error contract: span-carrying errors, no
-zero-date fallback and no process exit [V: c-digest Q14]. No candidate
-meets the full contract. The runtime probe covers only the two named
-candidate versions. The source review covers the other candidates.
-The `jiff-english` build also enables Jiff default features.
-The d-crate file lists rejection tests T1 to T10. An injected anchor
-supports reproducibility, but determinism also needs pinned zone data,
-week rules and dialect (k-file K17). The in-repository grammar has no
-demonstrated coverage yet.
+zero-date fallback and no process exit [V: c-digest Q14]. No unmodified
+candidate meets the complete contract. Three have actual panic evidence.
+GNU has no bounded panic but has overbroad grammar and point-only output.
+All four now have runtime, allocation, same-day and floor-build evidence.
+T1 to T10 distinguish observed outcomes from the human's chosen semantics.
+An adapter needs its own restriction, period and diagnostic evidence.
+The in-repository grammar has no demonstrated coverage or completeness.
+Determinism also needs pinned zone data, week rules and dialect (K17);
+bounded host invariance does not prove every transitive path.
 
 Reject condition. A later read or probe shows a candidate that yields
 `(start, unit)` periods with an injected anchor, spans and no second
@@ -537,10 +575,10 @@ Facts [V: e-file q15, c-digest Q15].
   [V: h-redteam Q15, `calendar.rs:57-64`].
 - The c-digest leans to the current-week day. It matches the template
   filter and is deterministic.
-- The inspected `fuzzydate` and `parse_datetime` source paths include
-  today when the bare weekday matches. The expanded fuzzydate run
-  confirms this rule with a Saturday anchor. Parse_datetime remains
-  source-only.
+- All four execute seven same-day weekday anchors. Fuzzydate and GNU
+  include today; the English parsers move strictly forward in the tested
+  bare-day cases. These runtime observations confirm the cited source
+  rules; none selects the owner's preference [V: d T3, M].
 
 Alternatives.
 
@@ -1210,10 +1248,12 @@ This repair round fixed these points of the sections above:
 - Q19 separates the payload measurement from the mirror enum's measured
   80-byte size. The implemented production carrier still needs a size
   assertion [V: [m-gap-closure.md](./m-gap-closure.md)].
-- Q14 adds bounded runtime cases. The named candidates return points,
-  not periods. The sampled unsupported inputs return errors.
-- Q9 cites the in-repo parity probe, which reproduced its recorded
-  numbers exactly.
+- Q14 now has a four-candidate matrix, including real panics in three
+  candidates. All four return points without periods or error spans.
+  First/warmed allocations, same-day cases and Rust 1.96.0 builds are
+  recorded in M; the old two-candidate observations remain historical.
+- Q9 cites guarded field parity and N's source trace. No missing
+  speedate datetime/duration/zone comparison remains.
 - Q20 marks option B as an explicit revision of ticket 18's single-carrier
   rule (l-file L4, i-file L6).
 - Q25 orders segment selection before decoding (k-file K22).
@@ -1224,10 +1264,35 @@ This repair round fixed these points of the sections above:
 - Q35 removes a false reject condition about membership bounds.
 - Probe references link [m-gap-closure.md](./m-gap-closure.md) instead of
   session-local artifact paths.
+- The 2026-11-18 acceptance round adds the four-candidate instrumented
+  closure and the N scope trace. Q14, Q15, Q16 and Q21 now cite executed
+  runtime results; the S24-era two-candidate and source-only statements
+  above stay as historical records of that round.
 
-## What the preparation did not cover
+## Current verification and remaining gates
 
-- Compile time and run time for every crate option beyond the probe's
-  throughput figures.
-- Any temporal key timing.
-- The owner's answers to the human questions above.
+The current managed `mise verify` passes 3,975 unit, 41 integration,
+104 E2E, 155 feature and 87 doctests; two pre-existing E2E tests stay
+ignored [V: M]. Thirteen semantic help contracts replace brittle
+snapshot-prose tests; eleven obsolete fixtures are removed.
+CLI behavior is unchanged. The corrected hk effects produce a plan with
+zero unknown effects; scoped hk, clippy, visibility and layer gates pass.
+The failed/cancelled earlier broad run remains historical evidence only.
+These checks validate existing code, not the proposed temporal redesign.
+
+Only implementation-dependent gates remain for the human-selected design:
+
+- Implement the adopted grammar and prove its rule-table coverage, periods,
+  full consumption, checked arithmetic and error spans.
+- Implement the carrier/frame and assert the actual size, traits,
+  construction costs, format epoch and rebuild behavior.
+- Check filename boundaries apart from frozen note parsing, and implement
+  the selected dialect and notice contracts.
+- Measure integrated startup, size, throughput and temporal-key costs.
+  Prove residual equivalence per operator and row kind before `Exact`.
+
+The human forks above remain open. Upstream access and universal limits
+are not implementation gates: English maintenance history is inaccessible;
+no finite run proves all Unicode, overflow, locale or ambient-state safety.
+No new throughput measurement or full production integration exists.
+N's narrow speedate scope must not be used as whole-parser redesign parity.

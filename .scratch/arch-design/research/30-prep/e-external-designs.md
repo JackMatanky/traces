@@ -8,8 +8,9 @@ counterexamples from outside the repository. It does not resolve the ticket.
 
 - Researcher: temporal external-designs reviewer.
 - Date: 2026-11-16.
-- Repair pass: 2026-11-17. K-round citation fixes and the runtime probe
-  facts (`m-gap-closure.md`).
+- Repair passes: 2026-11-17 citation and runtime corrections;
+  2026-11-18 four-candidate acceptance and managed verification closure
+  (`m-gap-closure.md`, `n-parity-and-scope.md`).
 - Source rev of this research: brief at
   [`brief.md`](./brief.md) (rev `971bdd5729d9d5f51a1bd6fed46bab6947df936a`).
 - Prose: ASD-STE100 style. Sentences stay short. Approved verbs: use, check,
@@ -60,6 +61,8 @@ Primary sources, read on 2026-11-16 unless noted:
 | S22 | Candidate metadata and API evidence recorded in ticket 30 and `d-crate-evidence.md`; crates.io snapshots on 2026-11-16 and 2026-11-17 |
 | S23 | Duckling (facebook/duckling) README, <https://github.com/facebook/duckling> |
 | S24 | In-repo probe runs: `probes/parity`, `probes/parity/tests/layout.rs`, `probes/candidates`, `probes/moment`; results recorded in `m-gap-closure.md` (2026-11-17) |
+| S25 | Four-candidate Rust 1.96.0 instrumented acceptance matrix, allocation and binary-size tables, upstream-access checks and broad verification; [m-gap-closure.md](./m-gap-closure.md), 2026-11-18 |
+| S26 | Narrow speedate call-scope trace and separate carrier/frame acceptance scope; [n-parity-and-scope.md](./n-parity-and-scope.md), 2026-11-18 |
 
 Gaps at the end of this file list what these sources do not cover.
 
@@ -369,7 +372,7 @@ labels or cannot represent the adopted week-one rule [P].
   Removing the crate forces one rebuild (ticket 30, freshness input).
 - [V] Jiff's `fmt::temporal` parses a hybrid of RFC 3339, RFC 9557, and ISO
   8601, including offsets, zone annotations, and the space separator (S19).
-  The one call site's shapes need a parity check.
+  The later guarded field probe supplies parity evidence for the actual call.
 - [V] Jiff rejects ISO forms it does not support, for example
   `2024-06-16T10.5` (fractional hours) (S19). A second RFC 3339 parser in
   the same binary can accept strings the first rejects.
@@ -385,9 +388,10 @@ shape. Raw Jiff also accepts compact `20260101`, naive datetimes, and
 negative years.
 
 [P] Remove speedate only with the existing guard and diagnostic behavior
-preserved. Cite the bounded parity evidence.
-Do not claim that this probe covers datetimes, spans, zones, or unguarded
-Jiff input.
+preserved. Cite the bounded parity evidence. S26 confirms that only the
+unsigned full-date field branch calls speedate. Datetime, duration and zone
+comparisons are not missing replacement experiments. The redesigned
+carrier and frame need separate acceptance; this is not whole-parser parity.
 
 ### q10. Does `winnow` stay?
 
@@ -419,7 +423,9 @@ specification first. Removing the direct dependency does not remove transitive
 - [V] Logos builds a deterministic automaton from token definitions
   (K20 in `k-citation-verification.md`). That lexical property does not
   prove deterministic callbacks, clock inputs, or relative-date resolution.
-- [H] Binary-size effect under `opt-level = "z"`: not measured.
+- [V] The acceptance round measures whole instrumented binaries, not a
+  Logos marginal cost (S25). No isolated Logos size effect exists yet;
+  the production build cost stays an implementation gate.
 
 Counterexample against removal: temporal, note, and query lexers already
 use Logos. Replacing those consumers needs grammar-parity evidence.
@@ -447,12 +453,12 @@ closed NL grammar. Reuse does not prove parser-wide determinism.
   by default (S19).
 - [V] Jiff's year range tops out at 9999, smaller than Temporal's (S19).
   Note dates in a notes tool sit far inside that range.
-- [H] Binary size with `tzdb-bundle-always`: not measured. The feature
-  bundles tzdb data in the binary. Reproducibility holds only if the build
-  pins the bundled data version and ignores the system database. State the
-  selected data source and version before relying on that claim (S19). The
-  bundled database updates with crate releases. The extractor fingerprint
-  already changes with jiff versions.
+- [V] The acceptance harness includes a 766,544 B Jiff baseline with
+  `tzdb-bundle-always` (S25). That whole instrumented binary does not
+  isolate the feature's marginal size or establish a production cost.
+  Reproducibility needs a pinned data source and version, not merely a
+  bundle feature. The acceptance set pins jiff-tzdb 0.1.9.
+  The extractor fingerprint already changes with jiff versions.
 
 Counterexample against removal: temporal needs a zone database with history
 and skipped-day correctness (q21 counterexamples come from tzdb data that
@@ -495,6 +501,11 @@ Counterexample against unpinned flexible parsing: Tasks documents
 ambiguous word-date ranges (S10). A broad grammar can replay consistently
 when all relevant inputs are pinned. A closed grammar can still read
 an ambient clock. Grammar size does not prove determinism (K17).
+Runtime adds: explicit `00:00` anchors execute midnight conversions in
+the sampled DST gaps and folds. The phrase form `today at 00:00` is
+often a syntax error or ignored, so the tested evidence uses `00:00`
+[V: D T8, M, S25]. These observations do not select the owner's
+conversion policy.
 
 [P] Keep ticket 19's hook-only alternative. If the human adopts a grammar,
 consider a closed list with pinned inputs. Put positive and negative
@@ -502,31 +513,55 @@ examples in the accepted grammar table.
 
 ### q14. Build in the repository or use a crate?
 
-Candidates per ticket 30: `jiff-english`, `fuzzydate`. The prep items the
-owner needs, with what the evidence gives:
+The comparison below covers all four candidates. The 2026-11-18
+instrumented closure supplies runtime, allocation, same-day, size and
+repository-floor-build evidence for each (S25; M
+[acceptance closure](./m-gap-closure.md#four-candidate-acceptance-closure)).
 
 | Item | `jiff-english` 0.0.1 | `fuzzydate` 0.4.1 | in-repo |
 | --- | --- | --- | --- |
-| Licence, releases | MIT; 1 release (2026-08-07); 29 downloads (crates.io, 2026-11-17) [V, S22, S24] | MIT; 14 releases; last update 2026-04-05 (crates.io, 2026-11-17) [V, S22, S24] | n/a |
+| Licence, releases | MIT; 1 release (2026-08-07); 29 downloads in the 2026-11-17 snapshot [V, S22, S24] | MIT; 14 releases; last update 2026-04-05 (crates.io, 2026-11-17) [V, S22, S24] | n/a |
 | Size | ~1.3k lines [V, S22] | ~2.6k lines [V, S22] | [H] not written yet |
 | Dependencies | `jiff ^0.2` default features + `scanlex ^0.1`; probe feature unification adds `tz-fat`, tzdb bundles, `perf-inline` [V, S22, S24] | `chrono 0.4.45` with `clock`, `lazy_static`, `thiserror`; inspected probe tree leaves Jiff unchanged [V, S22, S24] | no new parser crate proposed [P]; actual dependencies unmeasured |
-| Determinism and safety | injected-anchor sample; 1,234 Unicode-sweep failures from 5,514 inputs; reject as supplied [P, S24] | injected-anchor sample; zero failures in the same sweep; no complete transitive audit [V, S24] | pinned-input contract proposed [P]; no implementation proof |
-| Week rules | US/UK `next saturday` differs; bare same-day Saturday moves +7 days [V, S24] | bare same-day Saturday retains the anchor; `last friday` gives 2026-03-06 [V, S24] | phrase rules need q15/q16; q8 alone does not decide them |
+| Determinism and safety | explicit-context sample invariant under selected host changes; UTF-8 and Span-constructor panics [V, S25]; reject as supplied [P] | explicit-context sample invariant; `3000000000 days ago` overflow panic [V, S25]; earlier zero-failure Unicode sweep remains bounded history | pinned-input contract proposed [P]; no implementation proof |
+| Week rules | all seven same-day weekday anchors executed; US/UK `next friday` differs [V, S25] | all seven same-day anchors retain base time; dialect parameter absent [V, S25] | phrase rules need q15/q16; q8 alone does not decide them |
 | Output type | point; `next week` rejected [V, S24] | point; `next week` gives +7 days [V, S24] | `CalendarPeriod` proposed for adopted period phrases [P] |
 | Coverage | no `next week`, `eom`, or `in 2 weeks`; lenient `start of month` gives midnight today [V, S24] | no `eom` or `in 2 weeks`; `next week` is a point [V, S24] | chosen list only if implemented and checked [P]; no demonstrated coverage |
 | Coupling with jiff `=0.2.38` | enables jiff defaults in probe [V, S24] | adds a chrono stack in probe [V, S24] | Jiff-based implementation proposed [P] |
-| Final probe binary delta | +81.17 KiB, including feature unification [V, S24] | +98.11 KiB, including chrono [V, S24] | not measured |
-| Repository linkage delta | +48.88 KiB; reachable-call experiment, not complete integration [V, S24] | +65.39 KiB; same experiment [V, S24] | not implemented |
-| Parse-time medians | 264/582/372 ns for tomorrow/next monday/typo; indicative [V, S24] | 376/597/223 ns for the same inputs; indicative [V, S24] | not measured |
-| Compatibility | edition 2021; no `rust-version`; builds with stable 1.92.0 and 1.98.0 [V, S24] | same stable build evidence; no minimum-version claim [V, S24] | repository floor 1.96; proposed parser unbuilt |
-| Maintenance evidence | advertised repository API returns 404; search finds no named repository; quality unknown [V, S24] | repository and open-issue snapshot checked; no maintenance-quality guarantee [V, S24] | repository would own changes [P] |
+| Historical abort-profile probe delta | +81.17 KiB, including feature unification [V, S24] | +98.11 KiB, including chrono [V, S24] | not implemented |
+| Historical repository linkage delta | +48.88 KiB; reachable-call experiment, not complete integration [V, S24] | +65.39 KiB; same experiment [V, S24] | not implemented |
+| Historical parse-time medians | 264/582/372 ns for tomorrow/next monday/typo; indicative [V, S24] | 376/597/223 ns for the same inputs; indicative [V, S24] | not implemented |
+| Instrumented parse allocations | 8(73 B)/8(73 B) first/warmed for bare `thursday` [V, S25] | 12(12,834 B)/5(78 B) for the same call [V, S25] | not implemented |
+| Compatibility | builds at repository floor Rust 1.96.0; edition 2021, no declared floor [V, S25] | builds at Rust 1.96.0; edition 2021, no declared floor [V, S25] | repository floor 1.96; proposed parser unbuilt |
+| Maintenance evidence | advertised upstream remains 404; public repository/commit searches find no alternative; package SHA recorded [V, S25] | repository and open-issue snapshot checked; no maintenance-quality guarantee [V, S24] | repository would own changes [P] |
 
-The expanded matrix now tests both candidates' same-day weekday case.
-The Unicode failures confirm English's byte-slice defect.
-The sample does not prove exhaustive Unicode or overflow safety.
-The M report gives timing ranges and all repeated repository build times.
-These are indicative observations, not controlled or production benchmarks.
-The absence of `rust-version` establishes no minimum supported version.
+The current acceptance matrix contains 64 shared definitions, two English
+lenient cases, four baselines and 36 explicit-context host variations:
+298 JSON records. Each records a native first call and warmed call.
+Selected `TZ`, `LC_ALL` and `TZDIR` changes leave those results unchanged.
+This is bounded evidence, not arbitrary-input determinism or safety (S25).
+
+| Candidate | `OK/ERROR/PANIC` cases | Observed failure of the unmodified contract |
+| --- | --- | --- |
+| jiff-english 0.0.1 | 32/27/7 (66, includes lenient cases) | UTF-8 and Span-constructor panics; huge-year wrap; point-only output; no spans |
+| fuzzydate 0.4.1 | 29/34/1 (64) | `NaiveDateTime`/`TimeDelta` overflow panic on `3000000000 days ago`; point-only output; no spans |
+| parse_datetime 0.17.0 | 38/26/0 (64) | overbroad GNU grammar (timestamps, input zones, military zones); point-only output; no spans; zero sampled panics is not a proof |
+| chrono-english 0.2.1 | 32/30/2 (64) | UTF-8 panics; huge-year wrap; ignored NUL suffix and unsolicited stderr; point-only output; no spans |
+
+All four build at Rust 1.96.0. GNU declares `rust-version = "1.71.1"`.
+Chrono-english uses edition 2024 without a declared floor. The two leading
+crates use edition 2021 without a declared floor. The successful
+repository-floor builds close the compatibility question for this ticket.
+Support for each crate's undocumented minimum remains an untestable
+upstream promise, not an open test gap.
+The M report holds allocation, size and behavior tables for all four.
+Its first-call/warmed counts exclude fixture parsing and zone lookup
+but include native input copies and unwind handling; result formatting
+and drops are separate rows. Construction and baseline calls allocate
+zero. Whole-binary sizes cover the instrumented `panic = "unwind"`,
+opt-z, LTO, strip, one-codegen-unit builds. They are not comparable to
+the historical abort-profile sizes or production integration costs.
+No new throughput measurement exists (S25).
 
 Evidence from the closest comparable crate, `chrono-english` 0.2.1 (S20):
 
@@ -539,9 +574,15 @@ Evidence from the closest comparable crate, `chrono-english` 0.2.1 (S20):
   (S20; K17; d). Period phrases remain an adoption choice.
 - Its weekday semantics are dialect-split: US `next friday` = the coming
   Friday. UK `next friday` = Friday of next week. A repo grammar fixes one
-  meaning.
+  meaning. Runtime: from the 2024-03-14 noon UTC anchor, US and UK give
+  March 15 and March 22, at midnight (S25).
 - Its short-year pivot is 1940 to 2040. A repo grammar can choose the same
   or another pivot, but must state it.
+- The current runtime checks confirm its US/UK and same-day rules.
+  They also catch its UTF-8 slicing panic. `4294967295 years` yields
+  2023 from the 2024 anchor; `1000000 years` emits `fkd date` twice.
+  It accepts `today\u0000junk` by ignoring the suffix (S25).
+  These are native first/warmed observations, not source guesses.
 
 Counterexample against `fuzzydate`: it depends on `chrono` with the `clock`
 feature. `Cargo.toml` has no `chrono` entry today [V, S22]. Adding it puts a
@@ -549,17 +590,17 @@ second calendar implementation next to jiff, with different week and
 arithmetic defaults, inside a codebase that just pinned jiff.
 
 Counterexample against adoption based on popularity: jiff-english has one
-release on 2026-08-07 and 29 recorded downloads. The 2026-11-17 API
-snapshot still shows 29 (S24). Those counts do not prove maintenance
-quality or justify calling the crate a prototype.
+release on 2026-08-07. The 2026-11-17 API snapshot recorded 29 downloads;
+a 2026-11-18 read records 30. Neither count proves maintenance
+quality or justifies calling the crate a prototype.
 
-[P] Prefer an in-repository grammar if the human adopts period phrases
-and the candidate APIs cannot meet that contract. Both candidates take
-injected anchors. Fuzzydate's naive-anchor API still uses ambient `Local`;
-its aware API accepts an explicit zone. Neither candidate returns
-`(start, unit)` periods. Jiff-english rejects `next week`
-(S24; d, candidate sections). These gaps support the proposal, not a
-completed adoption decision.
+[P] Prefer an in-repository grammar if the human adopts the closed grammar.
+No unmodified candidate meets the complete contract. Three have observed
+panics; GNU has no sampled panic but accepts input-driven zones and
+timestamps outside the proposed list. All four return points without
+period units or error spans. An adapter would need its own restriction,
+period and diagnostic evidence. The in-repository grammar still has no
+implementation or completeness proof. This recommendation decides nothing.
 
 ### q15. The meaning of a bare weekday
 
@@ -571,7 +612,7 @@ Evidence, one library per meaning:
   Tasks assumes you mean yesterday, as that is the closest Tuesday" (S10).
 - [V] Next (with dialect split): `chrono-english`. "friday means this
   coming Friday"; "next Friday" in the US means the coming Friday, else it
-  means Friday of next week (S20).
+  means Friday of next week (S20). Runtime confirms both (S25).
 - [V] Explicit four-way, no default: java.time names four adjusters,
   `next`, `nextOrSame`, `previous`, `previousOrSame` (S14). The library
   refuses to bake in one meaning.
@@ -596,7 +637,10 @@ come from that habit. Ticket 19 asks to fix exactly this fork.
 
 [P] Define `next <weekday>` and `last <weekday>` explicitly if adopted.
 Consider strictly-after `today` for `next`. Choose a bare-weekday meaning
-separately. The evidence does not select one safe default.
+separately. The evidence does not select one safe default. The runtime
+executed all seven same-day weekday anchors on all four candidates.
+English parsers move strictly forward; fuzzydate and GNU include today.
+Phrase times differ from midnight [V: D T3, S25].
 A `DateConfig` setting is an option, not a requirement.
 
 ### q16. Interval precision of phrases such as `next week`
@@ -617,7 +661,10 @@ A `DateConfig` setting is an option, not a requirement.
 - [V] Month arithmetic clamps. `chrono-english` states: "adding a month to
   30 Jan will give 28 Feb or 29 Feb depending if a leap year" (S20). PG
   clamps March 31 + 1 month to April 30 (S5). Temporal offers
-  `constrain`/`reject` (S2).
+  `constrain`/`reject` (S2). Runtime: `1 month ago` from 2024-03-31 gives
+  Feb 29 midnight in the English parsers, Feb 29 noon in fuzzydate and
+  March 2 noon in GNU. The native policies differ; the owner still picks
+  one clamp rule and phrase time [V: D T9, S25].
 
 Counterexample against a point-only period phrase: `file.date = next week`
 does not identify one day. Tasks uses a range (S10).
@@ -1236,7 +1283,8 @@ evidence lives:
 | Apia skipped day | S6 australasia, `Pacific/Apia` (2011-12-30 removed; 24:00 end convention) |
 | Ambiguous midnight | S6 northamerica, Cuba `0:00s` rules; S2 timezone doc |
 | DST fold and gap | S5 functions-datetime (Denver 1 day vs 24 hours); S2 timezone doc (LA fold/gap) |
-| Month clamp | S5 (Mar 31 + 1 month = Apr 30); S20 (Jan 30 + 1 month = Feb 28/29); S2 (`constrain`/`reject`) |
+| Month clamp | S5 (Mar 31 + 1 month = Apr 30); S20 (Jan 30 + 1 month = Feb 28/29); S2 (`constrain`/`reject`); runtime split Feb 29 midnight/noon and March 2 noon (D T9, S25) |
+| Bare weekday and phrase time | runtime seven-anchor matrix: next/nearest/today split and midnight-vs-base-time split (D T3, S25) |
 | Invalid week 53 | S1 (week 53 rollover note); ISO `2025-W53` invalid, no rollover (ticket 21) |
 | Prefix fallback | S9 (Dataview filename forms); S17 (NumPy year-granularity equality — a different convention, not a prefix fallback); S7 (Moment `moment.ISO_8601` forgiving parse of a UUID, K23); ticket 21 no-reinterpretation rule |
 | Percent-encoded link | S13 §2.4 (decode once); S12 (destination forms) |
@@ -1276,37 +1324,47 @@ These are competing inputs for the grilling, not decisions.
 10. Frame: one clock sample, week rule, and lazy zone result [P].
     Remove obsolete ambient reads after explicit inputs replace them.
 
-## Gaps and unverified claims
+## Closed evidence gaps and remaining limits
 
-List for the integration owner. Each needs a check or a decision to leave
-open:
+The 2026-11-18 acceptance round closes the earlier source-only and
+untested-allocation gaps, same-day gaps and floor-build gaps for all four (S25).
+The broad managed `mise verify` now passes: 3,975 unit, 41 integration,
+104 E2E, 155 feature and 87 doctests. Two pre-existing E2E tests stay
+ignored. The old failed/cancelled run remains historical, not current status.
+Thirteen semantic help contracts replace brittle snapshot-prose tests;
+eleven obsolete fixtures are removed without changing CLI behavior.
+The corrected hk plan reports zero unknown effects. Scoped hk, clippy,
+visibility and layer gates also pass (S25).
 
-1. Candidate APIs have bounded source and runtime evidence.
-   The expanded run confirms fuzzydate's same-day anchor retention.
-   Both candidate features build with stable 1.92.0 and 1.98.0.
-   Exhaustive safety and either minimum supported version remain unproved.
-2. W3C XSD duration partial order: closed. S21 read and confirmed in the
-   K round (`k-citation-verification.md`, K11); q22 states it as `[V]`.
-3. Arrow formatter evidence: S16 documents `strftime`, not `strptime`.
-   Its default is `%Y-%m-%dT%H:%M:%S`, with locale `C`.
-   An unknown timestamp zone or unavailable host locale causes an error.
-   The function and options pages give no complete directive table.
-   They support the formatter and type comparison, not directive parity.
-4. Jiff `tz-system` failure behavior: closed. Source-read in the K round
-   (K20); q30 states it as `[V]` with the `try_system`/`system` split.
-5. Binary sizes: the M report now records final probe deltas of +81.17 KiB
-   and +98.11 KiB. Repository dependency-linkage deltas are +48.88 KiB and
-   +65.39 KiB. These are not complete integration costs.
-   Separate `tzdb-bundle-always`, `logos` and in-repository grammar costs
-   remain unmeasured.
-6. In-repository grammar size and test cost: no implementation exists.
-   Measure the selected grammar before adoption. Do not substitute an
-   unsupported estimate.
-7. `moment.now` overridability: closed as documented. Moment's plugin
-   guide documents the `moment.now` override (K23 in
-   `k-citation-verification.md`).
-8. Chrono-english's same-day rule remains source-only evidence.
-   The expanded fuzzydate run confirms its same-day anchor retention.
+Previously closed source questions stay closed: XSD duration partial order
+(K11), Jiff `try_system` versus `system` failure behavior (K20), and
+documented `moment.now` override (K23). Arrow's formatter docs still do not
+establish complete directive parity; its formatter is not a parser (S16).
+
+Remaining implementation gates depend on human choices:
+
+1. Adopt a grammar and phrase semantics before implementing completeness,
+   period-unit and span-carrying error checks. No in-repository parser exists.
+2. Select the production carrier and frame before measuring their layout,
+   startup, integrated costs, format epoch and temporal-key behavior.
+3. Prove residual equivalence for each selected operator and row kind.
+4. Select dialect surfaces, token coverage and the filename grammar.
+   Test the selected contract without changing frozen note parsing.
+
+The M report preserves older timings and linkage costs as bounded history.
+Its new whole-binary sizes do not isolate Logos, bundled tzdb or a future
+in-repository grammar. A production implementation needs its own costs.
+N closes the claimed missing speedate datetime/duration/zone comparisons:
+those paths do not call speedate. Carrier/frame acceptance remains separate.
+
+Inaccessible upstream facts and universal limits are not implementation
+gates. The English package records VCS SHA
+`a8b87edbeebafebd06a6c4f5a2b502b79b61e409`, but its advertised repository
+still returns 404. Public searches reveal no alternative maintenance
+history. The 2026-11-17 snapshot recorded 29 downloads; a 2026-11-18 read
+records 30. No count proves maintenance quality. No finite matrix proves
+all Unicode, overflow, locale or transitive ambient-state behavior (S25).
+All four build at the repository floor; no candidate MSRV test gap remains.
 
 ## Pointers to sibling files
 

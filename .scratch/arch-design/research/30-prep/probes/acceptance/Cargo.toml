@@ -1,0 +1,38 @@
+[package]
+name = "temporal-acceptance-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+jiff = { version = "=0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
+stats_alloc = "=0.1.10"
+serde_json = "=1.0.154"
+jiff-english = { version = "=0.0.1", optional = true }
+fuzzydate = { version = "=0.4.1", optional = true }
+parse_datetime = { version = "=0.17.0", optional = true }
+chrono-english = { version = "=0.2.1", optional = true }
+chrono = { version = "=0.4.45", optional = true }
+# Harness-only IANA rules for the two Chrono parser APIs.
+chrono-tz = { version = "=0.10.4", optional = true }
+
+[dev-dependencies]
+pretty_assertions = "=1.4.1"
+
+[features]
+default = []
+english = ["dep:jiff-english"]
+fuzzy = ["dep:fuzzydate", "chronoanchor"]
+gnu = ["dep:parse_datetime"]
+chronoenglish = ["dep:chrono-english", "chronoanchor"]
+# A parser-free size baseline with the same Chrono anchor preparation.
+chronoanchor = ["dep:chrono", "dep:chrono-tz"]
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+panic = "unwind"
+codegen-units = 1

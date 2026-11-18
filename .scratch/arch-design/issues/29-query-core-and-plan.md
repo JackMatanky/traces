@@ -1497,7 +1497,7 @@ changes. The locations come from the code reads of the grilling session
 | CLI synthesis | `TaskFilterArgs::status_filter` formats a string (`src/cli/task.rs`). `escape_default`. | Typed builder calls. | Ticket 33 |
 | Rendering | `render` takes `&[QueryRow]` (`src/query/format.rs`). The flat width pass and the empty-table form `"||\n"`. | Output module with a cell grid and one renderer. Per-group widths for groups. | Ticket 35 |
 | Default sort order | `Path::cmp` order. | NUL-form key (ticket 32). Stdout order is unchanged. | Ticket 32 |
-| Docs and baselines | `tests/baselines/pub-tokens.txt`. Help baselines `tests/baselines/help/{list,table,task}.txt`. Tests `src/query/results.rs`. | Update baselines, tests, glossaries and ADRs. | None |
+| Docs and baselines | `tests/baselines/pub-tokens.txt`. Help usage, flags and aliases: `tests/e2e/help.rs`, `help_exposes_command_contract`. Tests `src/query/results.rs`. | Update baselines, tests, glossaries and ADRs. | None |
 
 Not in code:
 

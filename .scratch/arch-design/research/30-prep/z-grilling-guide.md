@@ -46,7 +46,7 @@ Questions for you.
 | --- | --- | --- |
 | Q19 civil and instant | Decision | An inner Civil/Instant enum inside `DateTimeValue` [P]. The mirror measures 80 bytes, with a 24-byte temporal payload. The production carrier still needs a size assertion and any chosen compile-fail `Ord` check. See [m-gap-closure.md](./m-gap-closure.md). |
 | Q20 period placement | Decision | `CalendarPeriod` in temporal, by value, not in `NoteFieldValue`. A query-only wrapper is an explicit revision of ticket 18's single-carrier rule, not an inherited application. |
-| Q21 midnight gap or fold | Decision | Option D: project an instant to civil in the pinned zone. Total, and it matches the membership direction. |
+| Q21 midnight gap or fold | Decision | Option D: project an instant to civil in the pinned zone. Total, and it matches the membership direction. All four candidate APIs error or split on the sampled midnight gap and fold anchors; the observed facts do not pick this policy [V: D T8, M]. |
 | Q22 mixed sort key | Decision | Proposed class order: Civil, Instant, Period. Within each class: `(date, time)`, epoch, or `(start, unit)`. Proposed unit rank: Day, Week, Month, Quarter, Year. Ticket 29 already fixes this class order for group keys. |
 | Q23 duration identity | Ratify | Keep the nominal rules. One year is 365 days. |
 | Q24 arithmetic notes | Decision | Three lists: exact, caveat, undefined. |
@@ -79,7 +79,7 @@ choice before any other question in this cluster.
 
 | Question | Status | Proposal |
 | --- | --- | --- |
-| Q9 speedate | Decision | Remove now. The parity probe found no difference on 4,635,370 inputs, reproduced in-repo at probes/parity. Keep the length guard and the reason strings. |
+| Q9 speedate | Decision | Remove the unsigned full-date field call [P]. The guarded probe found no difference on 4,635,370 inputs. Preserve guards and reason strings. [N](./n-parity-and-scope.md) confirms no missing datetime/duration/zone replacement comparison; carrier/frame acceptance stays separate. |
 | Q10 winnow | Decision | Keep it. Jiff cannot report a prefix length. It stays in the lockfile through toml anyway. |
 | Q11 logos | Inherited | Keep it. It serves the frozen grammars. |
 | Q12 jiff | Ratify | Keep it. |
@@ -92,9 +92,9 @@ speedate leaves (B61).
 | Question | Status | Proposal |
 | --- | --- | --- |
 | Q13 grammar | Decision | Adoption, rule semantics and crate choice are separate. The rule table is a proposal with no implementation or completeness proof. |
-| Q14 build or buy | Decision | Build in the repository [P]. English aborts on UTF-8 input; reject this version as supplied [P]. Fuzzydate returns points without periods or error spans. The M report records same-day cases, final probe sizes and repository dependency-linkage costs. |
-| Q15 bare weekday | Human decision | Default proposal: next occurrence after today. Add `next`, `last` and `this` prefixes. State the same-day rule. |
-| Q16 `next week` | Decision | A `CalendarPeriod` [P]. Derive it from the period that holds today. Point or period remains open for offset phrases such as `in 2 weeks`. |
+| Q14 build or buy | Decision | Build in the repository [P]. All four unmodified APIs fail the complete contract. English, fuzzydate and chrono-english have observed panics; GNU has none in the sample but exposes overbroad grammar and point-only output. All four return points, without native periods or error spans. [M](./m-gap-closure.md#four-candidate-acceptance-closure) records four-candidate behavior, allocations, sizes and Rust 1.96.0 builds. |
+| Q15 bare weekday | Human decision | Default proposal: next occurrence after today. Add `next`, `last` and `this` prefixes. State the same-day rule. Runtime: the English parsers move strictly forward, fuzzydate and GNU include today; phrase times keep or reset the anchor time by crate [V: D T3, M]. |
+| Q16 `next week` | Decision | A `CalendarPeriod` [P]. Derive it from the period that holds today. Point or period remains open for offset phrases such as `in 2 weeks`. Runtime: `next week` is a point in fuzzydate and GNU and an error in the English parsers; no candidate yields a period [V: D T1, M]. |
 | Q17 keyword spelling | Decision | Add nullary `today()` and `now()` [P]. Keep explicit arguments for edge functions, as in `eom(today())`. A nullary `eom()` needs the separate Q17-B proposal. |
 | Q18 `member_of` | Human decision | Pick a word. The reserved node stays Unsupported in this scope. |
 
@@ -102,6 +102,9 @@ Questions for you.
 
 - Which weekday meaning do you expect: next, nearest or this week?
 - Which word do you want for membership?
+- Which phrase time policy do you want: midnight or retained anchor time?
+  The executed month-end, same-day and midnight cases expose different
+  native policies. They do not select yours.
 
 ### Cluster 6: pushdown and notices (Q35, Q36)
 
@@ -130,7 +133,7 @@ Human decisions stay open until you answer them. [P] marks a proposal.
 | Q10, Q11 | Decision, Inherited | Q10 retains winnow for prefix consumption [P]. Q11 retains logos for the frozen grammars. |
 | Q12 | Ratify | Gate: re-check on any blocking d-crate finding. |
 | Q13 | Decision (proposal [P]) | Choose whether to adopt the closed grammar. Gate: check rule-table completeness. Nothing is implemented yet. |
-| Q14 | Decision (proposal [P]) | Evidence: [m-gap-closure.md](./m-gap-closure.md). Apply the relevant T1 to T10 acceptance checks to the selected design. |
+| Q14 | Decision (proposal [P]) | Evidence: [M acceptance closure](./m-gap-closure.md#four-candidate-acceptance-closure), D T1 to T10. All four have observed results. The selected product needs grammar, period, span and safety acceptance; no unmodified candidate passes. |
 | Q15 | Human decision | You pick the weekday meaning and the same-day rule. |
 | Q16 | Decision (proposal [P]) | You confirm period derivation. Open sub-choice: offset phrases as point or period. |
 | Q17 | Decision (proposal [P]) | You confirm the spelling. |
@@ -171,20 +174,45 @@ These corrections change research claims, not accepted Answers:
   remains a separate question.
 - The L report corrects 15 ledger citations. Read the accepted source
   text when a research summary and its source disagree.
-- The M report limits the layout result to a mirror type. It also limits
-  candidate behavior and compatibility claims to the recorded cases.
+- M records the four-candidate acceptance closure and broad verification
+  pass. N proves the narrow speedate call scope. The layout remains a
+  mirror measurement; product gates and human choices remain open.
 
-## What the preparation did not cover
+## Current evidence and remaining limits
 
-- Full integration cost. The M report measures candidate parse times,
-  final probe sizes and dependency linkage in repository copies.
-  Repeated build observations do not prove compile-time regressions.
-- Temporal-key timing and per-operator residual equivalence.
-  These need the selected implementation before an `Exact` claim.
-- Production type size, the compile-fail `Ord` check and the format epoch
-  change. The mirror experiment does not pass these implementation gates.
-- Exhaustive Unicode, overflow, host-locale and transitive ambient-state
-  safety. English fails the bounded Unicode sample; fuzzydate passes it.
-- A broad verification pass. The temporal-filtered task passes.
-  The earlier broad run fails or cancels; its test output is unavailable.
-- The owner's answers to the human questions above.
+The 2026-11-18 closure executes all four candidates at Rust 1.96.0.
+The 64 shared cases, two English lenient cases, four baselines and 36
+host variations produce 298 JSON records with first/warmed native calls.
+All seven same-day weekday anchors execute. Selected explicit-anchor/zone
+results stay invariant under `TZ`, `LC_ALL` and `TZDIR` variations.
+First-call/warmed allocations and whole-binary sizes are in M.
+The instrumented unwind profile is not the product abort profile.
+Earlier indicative timings and linkage costs remain historical evidence;
+no new throughput measurement or complete integration cost exists.
+
+The current managed `mise verify` passes 3,975 unit, 41 integration,
+104 E2E, 155 feature and 87 doctests; two pre-existing E2E tests stay
+ignored. The old failed/cancelled run is historical. Corrected hk effects
+leave zero unknown plan effects; scoped hk, clippy, visibility and layer
+gates pass. These results do not validate the proposed redesign [V: M].
+
+After the human chooses the design, these implementation gates remain:
+
+- Implement the grammar, periods, full consumption, arithmetic and spans.
+- Implement the carrier and frame. Assert the production size, chosen
+  traits and format epoch; the 80-byte mirror does not pass these gates.
+- Check filename boundaries separately from frozen note parsing.
+- Measure integrated startup, size, throughput and temporal-key costs.
+- Prove residual equivalence per operator and row kind before `Exact`.
+- Implement the chosen dialect and notice contracts.
+
+The human forks remain open. English's advertised upstream is inaccessible
+(404); public repository/commit searches find no alternative. Its package
+VCS SHA is not maintenance history. No finite sample proves arbitrary
+Unicode, overflow, locale or transitive ambient-state safety. Fuzzydate's
+older zero-failure Unicode sample remains valid, but the new count-overflow
+panic disproves general safety. GNU's zero sampled panics proves no universal
+claim. N rules out a missing speedate datetime/duration/zone experiment,
+not the broader carrier/frame acceptance work. All four build at the
+repository floor, so no candidate MSRV test gap remains; upstream promises
+about undocumented minima are untestable facts, not checks owed.

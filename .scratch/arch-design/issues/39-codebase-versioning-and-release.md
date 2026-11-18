@@ -106,7 +106,7 @@ Facts, all checked on `cf6d79bd` unless marked:
   `Cli`. `traces --version` prints `traces 0.1.0` from `CARGO_PKG_VERSION`.
 - [V] `tests/e2e/process_contract.rs` (`exit_code_zero_for_help_and_version`)
   asserts the exact `--version` stdout `traces <CARGO_PKG_VERSION>` and an empty
-  stderr. `tests/baselines/help/root.txt` lists `-V, --version`.
+  stderr. `tests/e2e/help.rs` checks the `-V, --version` option signature.
 - [V] `src/` and `benches/` have no other use of `CARGO_PKG_VERSION`.
 - [V] `Cargo.lock` is tracked in git. `[profile.release]` sets `opt-level =
   "z"`, `strip = true`, `lto = true`, `panic = "abort"` and `codegen-units = 1`.

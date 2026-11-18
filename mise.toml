@@ -112,7 +112,7 @@ declare -a extra
 eval "extra=(${usage_args:-})"
 
 cargo check --workspace "${extra[@]+"${extra[@]}"}"
-hk check \
+hk check --safe \
   --skip-step cargo-clippy \
   --skip-step cargo-test \
   --skip-step cargo-doc \

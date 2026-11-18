@@ -863,10 +863,11 @@ medium items. No test or scenario was deleted.
   Clap conflict tests assert `ErrorKind`. Flag precedence, completions per shell
   and the shared list and table pipeline have tests. Four empty-store unit tests
   were deleted. The e2e file `tests/e2e/streams.rs` replaces them.
-- **Process pins (`tests/e2e`).** New files pin help text for every subcommand
-  (`tests/baselines/help`), the exit-2 rules, the environment legs, stream and
-  message shapes, the unpinned diagnostics, and output determinism across file
-  creation order. Bare `traces -i` without a TTY fails in the picker with
+- **Process pins (`tests/e2e`).** Tests cover help usage, flags, commands and
+  aliases (`tests/e2e/help.rs`), the exit-2 rules, the environment legs,
+  stream and message shapes, diagnostics, and output determinism across
+  file creation order. Help prose and line wrapping are not pinned.
+  Bare `traces -i` without a TTY fails in the picker with
   `traces::cli::template::picker_failed`.
 - **Golden output.** `tests/e2e/golden.rs` compares five output shapes with
   files in `tests/baselines/output`. `TRACES_UPDATE_GOLDEN=1` rewrites them.

@@ -13,9 +13,12 @@ features also build with stable rustc 1.92.0 and 1.98.0. The older 1.89.0
 record covers `english` only. These builds do not establish a minimum
 supported Rust version. The repository declares a 1.96 floor.
 
-The release profile sets `opt-level = "z"`, strip, LTO, one codegen unit,
-and `panic = "abort"`. The layout tests use the default Cargo test profile,
-not that release profile. The lockfiles pin `jiff-core 0.1.1` and
+The original parity and cost probes use a release profile with
+`opt-level = "z"`, strip, LTO, one codegen unit and `panic = "abort"`.
+The later acceptance instrument instead uses unwind to classify panics.
+
+The layout tests use the default Cargo test profile. The lockfiles pin
+`jiff-core 0.1.1` and
 `jiff-tzdb 0.1.9`, as in the repository lockfile at preparation time.
 This does not mean that every transitive dependency matches.
 The original preparation pins those versions with
@@ -322,6 +325,221 @@ historical discrepancies from current facts and restore proposal rejection
 conditions. The current synthesis, guide and ticket use the corrected
 runtime evidence. This audit does not make proposals accepted decisions.
 
+## Four-candidate acceptance closure
+
+The 2026-11-18 round adds the standalone `probes/acceptance` instrument.
+All four candidate builds pass with Rust 1.96.0, the repository floor.
+Its dependencies pin Jiff 0.2.38, jiff-core 0.1.1 and jiff-tzdb 0.1.9.
+The Chrono routes use `chrono 0.4.45` and harness-only
+`chrono-tz 0.10.4`, whose recorded IANA data version is `2025b`.
+These rules are explicit inputs, not the process-local zone.
+
+The release instrument uses size optimization, LTO and one codegen unit.
+It uses unwind, not the product's abort strategy. A caught panic is a
+`PANIC` result, not an ordinary error or evidence of product recovery.
+The no-op panic hook prevents panic diagnostics from entering the counts.
+Native library stderr remains visible in the JSON records.
+
+The tracked `run-matrix.py` defines 64 shared cases. It adds two English
+lenient cases, four no-parser baseline records and 36 host-context
+variations. The completed run emits 298 JSON records. Each records a first
+call and a warmed call with identical explicit inputs. The driver checks
+their result equality. It also checks that baseline calls allocate
+nothing. The baseline flag skips calls, not parser linkage.
+
+The rows below count ordinary cases, not the baseline or host variations.
+These counts describe the sampled grammar and inputs. They are not
+coverage percentages or safety rankings.
+
+| Candidate | Cases | OK | ERROR | PANIC |
+|:----------|------:|---:|------:|------:|
+| `jiff-english 0.0.1` | 66 | 32 | 27 | 7 |
+| `fuzzydate 0.4.1` | 64 | 29 | 34 | 1 |
+| `parse_datetime 0.17.0` | 64 | 38 | 26 | 0 |
+| `chrono-english 0.2.1` | 64 | 32 | 30 | 2 |
+
+### Safety and consumption
+
+The English build panics on the Unicode identifiers and several large
+counts. Its Jiff span constructors reject those counts by panicking before
+`checked_add` can return an error. Fuzzydate panics on
+`3000000000 days ago` with `` `NaiveDate - TimeDelta` overflowed ``.
+English and Chrono-English also panic on the two Unicode identifiers.
+English panics there because slicing cuts inside a multi-byte character.
+
+English and Chrono-English accept `4294967295 years` from the 2024 anchor
+but return 2023. The accepted numeric count wraps to a negative year
+offset. The other two candidates reject the same input. These are
+input-handling defects, not desired calendar policies.
+
+Chrono-English writes `fkd date` to stderr on each `1000000 years` call.
+English panics on that input because the year count exceeds the span
+range. Fuzzydate and GNU return ordinary errors. Native library stderr
+does not pollute the JSON result channel, but it is still unsolicited
+process output.
+
+JSON input permits an embedded NUL, which an OS argument alone cannot
+carry. Strict English, fuzzydate and GNU reject `today\u0000junk`.
+Chrono-English returns the anchor, ignoring the suffix.
+[P] Reject the three panic-producing versions as supplied for user input.
+The GNU sample has no panic, but its date API still returns points without
+period units or error spans. It also accepts grammar forms outside the
+proposed closed grammar. No supplied API meets that complete contract.
+
+### T1 to T10 observations
+
+The instrument executes concrete cases for every rejection-test family.
+Observed results do not choose Traces' weekday, overflow or zone policy.
+
+| Test | Observed evidence |
+|:-----|:------------------|
+| T1, period | English and Chrono-English reject `next week`; fuzzydate and GNU return March 21 noon from March 14 noon. No period unit survives. |
+| T2, week rule | English APIs select March 15 in US and March 22 in UK for `next friday`. Fuzzydate selects March 22; GNU selects March 15. |
+| T3, same day | All seven matching weekdays run. English APIs move forward; fuzzydate retains the day and time; GNU selects midnight today. |
+| T4, gap/fold | Explicit `00:00` runs in São Paulo and Havana. The table below records the different policies. |
+| T5, explicit context | All 36 host variations preserve the selected explicit-anchor/zone result. |
+| T6, Unicode | Both English APIs panic on `éé` and `מחר`. The earlier wider English Unicode sweep remains separate evidence. |
+| T7, suffix | Strict English rejects the trailing-time case; its lenient API accepts it. Chrono-English rejects that case but ignores a NUL suffix. GNU accepts `2024-03-14 x` because `x` names military zone −11:00. |
+| T8, grammar | GNU accepts `@1758724019` and `TZ="UTC" 2 days`. These need a closed-grammar gate if adopted. |
+| T9, month end | From March 31, `1 month ago` gives February 29 in the English APIs and fuzzydate. GNU gives March 2. |
+| T10, errors | All four return native error values for invalid input. None supplies the required span contract. |
+
+The weekday examples use the explicit 2024-03-14T12:00:00Z anchor.
+The month-end case uses 2024-03-31T12:00:00Z. English APIs return midnight
+in that month-end case; fuzzydate and GNU retain noon.
+
+### Midnight and skipped-day evidence
+
+The literal `today at 00:00` is not interchangeable with `00:00`.
+Some parsers reject its syntax; Chrono-English can ignore its suffix.
+The explicit-midnight rows below use `00:00`, not the rejected spelling.
+The date-only `today` case retains a base time and proves no midnight rule.
+
+| Zone and local date | English | Fuzzydate | GNU | Chrono-English |
+|:--------------------|:--------|:----------|:----|:---------------|
+| São Paulo, 2015-10-18 gap | 01:00 −02:00 | ERROR | 01:00 −02:00 | ERROR |
+| Havana, 2020-03-08 gap | 01:00 −04:00 | ERROR | 01:00 −04:00 | ERROR |
+| Havana, 2020-11-01 fold | 00:00 −04:00 | 00:00 −04:00 | 00:00 −05:00 | ERROR |
+
+The anchors are 2015-10-18T15:00:00Z, 2020-03-08T16:00:00Z and
+2020-11-01T17:00:00Z respectively. GNU's fold result retains the base's
+offset in this case. A common Jiff dependency does not imply identical
+fold selection across APIs.
+
+For `tomorrow` from 2011-12-29T22:00:00Z in Pacific/Apia, English, GNU and
+Chrono-English return December 31 noon. Fuzzydate returns an error.
+This is point arithmetic. It does not replace ticket 21's civil-date
+membership rule for a skipped day.
+
+### Parse allocations and result lifetimes
+
+Input decoding, timestamp parsing and zone lookup occur before counting.
+The construction region measures typed anchor projection. It records zero
+allocations in every emitted record. Each parser region includes native
+input copies, errors and unwind work. Formatting and result destruction
+occur outside those regions. Drop counts appear separately in the JSON.
+The first result stays alive during the warmed call.
+
+The table uses `thursday` with the March 14 noon UTC anchor. The parsers
+return different points, so these are API observations, not equal-work
+performance rankings.
+
+| Candidate | First allocations | First allocated bytes | Warmed allocations | Warmed allocated bytes |
+|:----------|------------------:|----------------------:|-------------------:|-----------------------:|
+| English | 8 | 73 | 8 | 73 |
+| Fuzzydate | 12 | 12,834 | 5 | 78 |
+| GNU | 1 | 128 | 1 | 128 |
+| Chrono-English | 4 | 41 | 4 | 41 |
+
+Warmed means one earlier call in the same process. The fuzzydate difference
+includes first-call initialization; it is not evidence of a per-row leak.
+The input string is borrowed where the native API permits it. Required
+native copies remain part of the measured parser cost.
+
+### Explicit context and compatibility
+
+The host variants change `TZ`, `LC_ALL` and `TZDIR` in fresh processes.
+They include an invalid host zone and an absent zone-data directory.
+The supplied zones are UTC, America/Havana and Europe/Prague.
+All selected results stay equal under these 36 variations.
+The driver also checks negative fractional epoch conversion with
+1969-12-31T23:59:59.5Z.
+
+Source inspection explains the selected paths. Fuzzydate's
+`aware_parse(Some(anchor), zone)` skips the lazy `Local::now` fallback.
+Its AST uses the supplied zone. Both English APIs receive their base
+explicitly. GNU's in-range and extended builders use `Some(base)` rather
+than their clock fallback. Parsed GNU zone prefixes can still override
+the supplied zone. Such input needs its own grammar restriction.
+
+These are scoped source checks plus host perturbations, not a proof about
+every generic timezone implementation or every input. A selected
+integration must bind an actual zone-data source and version.
+
+All four configurations compile with Rust 1.96.0. GNU's package declares
+`rust-version = "1.71.1"`; that is not a test of its entire current
+dependency graph on that older compiler. Chrono-English declares edition
+2024 without a Rust-version promise. The other two declare edition 2021
+without a Rust-version promise. Missing upstream support promises are
+unknown facts, not values that a successful build can establish.
+
+### Instrument size and reproduction
+
+The binaries below include JSON reporting, allocation instrumentation and
+unwind handling. The Chrono variants also include the harness-only IANA
+adapter. They are not comparable with the older abort-profile cost probe.
+
+| Instrument build | Stripped bytes |
+|:-----------------|---------------:|
+| Jiff-only baseline | 766,544 |
+| Chrono anchor baseline | 1,955,888 |
+| English | 866,560 |
+| Fuzzydate | 2,039,792 |
+| GNU | 866,736 |
+| Chrono-English | 2,022,288 |
+
+Run from the repository root. Build exactly one parser feature at a time.
+Copy each executable before the next build overwrites its path.
+
+```sh
+P=.scratch/arch-design/research/30-prep/probes/acceptance
+mkdir -p "$P/target/bin"
+for feature in baseline chronoanchor english fuzzy gnu chronoenglish; do
+  if [ "$feature" = baseline ]; then
+    mise run --force --tool rust@1.96.0 release \
+      --manifest-path "$P/Cargo.toml" --locked
+  else
+    mise run --force --tool rust@1.96.0 release \
+      --manifest-path "$P/Cargo.toml" --locked --features "$feature"
+  fi
+  cp "$P/target/release/temporal-acceptance-probe" "$P/target/bin/$feature"
+done
+python3 "$P/run-matrix.py" "$P/target/bin"
+```
+
+The existing production test task hardcodes package `traces`.
+It cannot run a standalone probe package. The probe's own unit test command
+is `cargo +1.96.0 test --manifest-path "$P/Cargo.toml" --locked`.
+Its three tests distinguish a valid date, an ordinary error and a panic.
+They do not claim that any candidate is panic-free.
+
+### Upstream access and parity scope
+
+The advertised English repository still returns HTTP 404 on 2026-11-18.
+The packaged `.cargo_vcs_info.json` names commit
+`a8b87edbeebafebd06a6c4f5a2b502b79b61e409`. A public commit search finds
+no result. Public repository search and the publisher's public repository
+list supply no alternative. The cached package remains inspectable.
+Private or unavailable maintenance history cannot become verified
+maintenance evidence through more local tests.
+
+The [scope report](./n-parity-and-scope.md) traces every speedate call and
+its shared consumers. Only the unsigned full-date field branch calls it.
+Datetime, duration and zone parser comparisons are not missing comparisons
+for that narrow removal. Their redesign still needs separate acceptance
+evidence. The preserved guarded parity result remains the relevant
+replacement evidence; it does not justify a whole-parser replacement.
+
 ## Production regression check
 
 The parent ran the canonical `test` task with the `temporal` filter. It
@@ -329,13 +547,27 @@ passed 831 unit tests, five integration tests and nine feature tests. No
 E2E test matched that filter. The task also passed 87 doctests. This proves
 the exercised current behavior, not the proposed redesign.
 
-The earlier `verify` request timed out at the MCP transport. Task history
-records that verification as cancelled and its unfiltered test task as
-failed with exit code 100. Task logs were disabled. The original
-failing-test output is unavailable. No broad verification pass is claimed.
+The old MCP `verify` request timed out. Its original assertion output
+remains unavailable. A later diagnostic capture identifies five E2E help
+snapshots whose prose differs from the current CLI documentation.
+The repair retains all 13 help surfaces as semantic usage, option and alias
+contracts. It removes the obsolete wording snapshots and their 11 fixtures.
+It changes no CLI command or flag.
 
-The safe hk check refused to run because eight check commands have unknown
-effects. No unsafe check or configuration change was used to bypass it.
+The final managed `mise run verify` passes. It runs formatting, checks,
+strict Clippy and the canonical test task. That task passes 3,975 unit
+tests, 41 integration tests, 104 E2E tests, 155 feature tests and 87
+doctests. Two pre-existing E2E tests remain skipped.
+
+The hk refusal was missing effect metadata, not a failed static analysis.
+Ten check-side wrappers now state the effects of the eight custom steps.
+The commands remain unchanged.
+
+Write effects include Cargo artifacts,
+advisory-cache updates and task-launched environment preparation.
+The full plan has no unknown included check effects. The `check` task uses
+`hk check --safe`, and its changed-file checks pass within verification.
+Effect metadata states intended writes; it is not a sandbox.
 
 ## Evidence gates before adoption
 
@@ -363,18 +595,19 @@ human-owned choices. These gates must not be relabeled as passed research.
 
 - Unicode, overflow, locale and ambient-state checks are bounded.
   The English US/UK dialect checks do not test every host locale.
-- Parsing allocations remain unmeasured. The layout allocation check
-  starts after fixture parsing.
-- The two source-only alternatives have no runtime or size measurements.
-  Their point-only results and missing spans already fail the direct API
-  requirements. No competitive speed ranking is claimed.
+- Parsing allocations now have first-call and warmed observations for all
+  four candidates. They remain instrument observations, not product
+  allocation guarantees.
+- All four candidates now have runtime cases and instrument-size
+  observations. No new controlled throughput ranking is claimed.
 - The in-repository grammar has no measured size or test cost.
   Its grammar choices remain proposals.
 - Startup, representative temporal-index costs and full integration costs
   remain implementation gates, not dependency-linkage measurements.
-- No exhaustive transitive ambient-state proof exists.
-  Adoption must select an explicit-anchor, explicit-zone path.
-- Crates.io metadata does not prove repository maintenance quality.
+- Selected explicit-anchor/zone paths now have source inspection and 36
+  host perturbations. This does not prove every possible transitive path.
+- Private or unavailable upstream maintenance history remains inaccessible.
+  A package with no declared Rust-version promise has no verified promise.
 
 ## Questions still owned by the human grilling
 

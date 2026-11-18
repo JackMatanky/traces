@@ -745,7 +745,7 @@ Code facts [V]:
 - `--count` exists only on `task` (`TaskPresentationArgs`, `task.rs:112`).
 - `format.rs` pads flat tables to the widest cell (`:147-158`). Golden files
   pin this (`tests/baselines/output/*.txt` through `e2e/golden.rs`).
-- [P] Help baselines `tests/baselines/help/{list,table,task}.txt` change.
+- [P] Help-surface assertions in `tests/e2e/help.rs` change.
 - [P] The grammar tests that move include builder and plan tests
   (`src/query/builder.rs:324`,
   `plan.rs`) and the fuzz targets `source_expression` and `filter_expression`.
@@ -982,8 +982,8 @@ Local code (Traces) [V]:
   (`list-20-rows.txt`, `page-table-20-rows.txt`, `task-list-20-rows.txt`,
   `task-table-20-rows.txt`, `task-count-20-rows.txt`). They load through
   `tests/e2e/golden.rs:34-57`.
-- Help baselines: `tests/e2e/help.rs:43-57`. A `--group-by` flag changes
-  `tests/baselines/help/{list,table,task}.txt`.
+- Help contracts: `tests/e2e/help.rs`, `help_exposes_command_contract`.
+  A `--group-by` flag changes its expected list, table and task options.
 - Feature scenarios: `tests/features/query/query-render.feature` (lines 17,
   33, 48, 63). Unit render tests: `list.rs:121-135` and `table.rs:126-145`.
 - Public-API baselines: `tests/baselines/pub-tokens.txt:1020` and `:1046`.
